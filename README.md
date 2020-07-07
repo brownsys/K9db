@@ -1,2 +1,3 @@
-# pelton
-A new dataflow system
+# Pelton
+
+A new dataflow processor.
