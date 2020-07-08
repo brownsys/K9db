@@ -5,7 +5,7 @@ SRC_DIR = src
 
 all: $(BUILD_DIR) $(BUILD_DIR)/main
 
-include shared.mk
+include build/shared.mk
 
 $(BUILD_DIR):
 	@$(call run,mkdir -p $(BUILD_DIR),MKDIR $@)
