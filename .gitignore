@@ -31,6 +31,8 @@
 *.out
 *.app
 
-# Build directory
-target
-.deps
+# Build directories
+bazel-bin
+bazel-out
+bazel-pelton
+bazel-testlogs
