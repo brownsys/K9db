@@ -6,11 +6,13 @@ cc_library(
     srcs = [
         "graph.cc",
         "operator.cc",
+        "record.cc",
         "ops/identity.cc",
     ],
     hdrs = [
         "graph.h",
         "operator.h",
+        "record.h",
         "ops/identity.h",
     ],
     copts = PELTON_DEFAULT_COPTS,
