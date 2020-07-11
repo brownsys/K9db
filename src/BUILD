@@ -5,5 +5,5 @@ cc_binary(
       "@com_google_absl//absl/flags:flag",
       "@com_google_absl//absl/flags:parse",
   ],
-  srcs = ["src/main.cc"],
+  srcs = ["main.cc"],
 )

@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("//:build/options.bzl", "PELTON_DEFAULT_COPTS")
+load("//build:options.bzl", "PELTON_DEFAULT_COPTS")
 
 cc_library(
     name = "dataflow",
@@ -17,7 +17,7 @@ cc_library(
     ],
     copts = PELTON_DEFAULT_COPTS,
 #    linkopts = ABSL_DEFAULT_LINKOPTS,
-    visibility = ["//:__pkg__"],
+    visibility = ["//visibility:public"],
 #    deps = [
 #        "//absl/base",
 #        "//absl/base:config",
