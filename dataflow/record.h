@@ -1,4 +1,5 @@
 #include <unistd.h>
+
 #include <limits>
 #include <vector>
 
@@ -19,34 +20,25 @@ struct RecordData {
 };
 
 class Record {
-private:
+ private:
   bool positive_;
   int timestamp_;
 
   std::vector<RecordData> data_;
 
-public:
-  Record(bool positive, const std::vector<int>& v) :
-    positive_(positive),
-    timestamp_(0)
-  {
+ public:
+  Record(bool positive, const std::vector<int>& v)
+      : positive_(positive), timestamp_(0) {
     for (int i : v) {
-      data_.push_back(RecordData { .data_ = (uint64_t)i });
+      data_.push_back(RecordData{.data_ = (uint64_t)i});
     }
   }
 
-  Record() : positive_(true), timestamp_(0) {
-  }
+  Record() : positive_(true), timestamp_(0) {}
 
-  Record(int size) : positive_(true), timestamp_(0) {
-    data_.resize(size);
-  }
+  Record(int size) : positive_(true), timestamp_(0) { data_.resize(size); }
 
-  bool is_positive() {
-    return positive_;
-  }
+  bool is_positive() { return positive_; }
 
-  int timestamp() {
-    return timestamp_;
-  }
+  int timestamp() { return timestamp_; }
 };

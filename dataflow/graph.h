@@ -6,10 +6,11 @@
 #include "dataflow/operator.h"
 
 class DataFlowGraph {
-  public:
-    DataFlowGraph();
-  private:
-    std::vector<Operator> nodes_;
+ public:
+  DataFlowGraph();
+
+ private:
+  std::vector<Operator> nodes_;
 };
 
 #endif  // PELTON_DATAFLOW_GRAPH_H_

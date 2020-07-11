@@ -1,6 +1,7 @@
+#include "dataflow/record.h"
+
 #include <unistd.h>
 
-#include "dataflow/record.h"
 #include "gtest/gtest.h"
 
 // Tests internal storage format
@@ -15,7 +16,7 @@ TEST(RecordTest, DataRep) {
 
   RecordData d_val;
   d_val.data_ = v;
-  
+
   // deref should return pointer to value stored inline
   EXPECT_EQ((int*)&d_val.data_, (int*)*d_val);
 }

@@ -1,5 +1,3 @@
 #include "dataflow/ops/identity.h"
 
-bool IdentityOperator::process() {
-  return false;
-}
+bool IdentityOperator::process() { return false; }

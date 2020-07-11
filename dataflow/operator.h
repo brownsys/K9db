@@ -3,7 +3,7 @@
 
 class Operator {
  public:
-  virtual ~Operator() {};
+  virtual ~Operator(){};
   virtual bool process() = 0;
 };
 
