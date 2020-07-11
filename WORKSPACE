@@ -11,10 +11,10 @@ http_archive(
 
 # Google Test
 http_archive(
-  name = "com_google_googletest",
-  urls = ["https://github.com/google/googletest/archive/10b1902d893ea8cc43c69541d70868f91af3646b.zip"],
-  strip_prefix = "googletest-10b1902d893ea8cc43c69541d70868f91af3646b",
-  sha256 = "7c7709af5d0c3c2514674261f9fc321b3f1099a2c57f13d0e56187d193c07e81",
+  name = "gtest",
+  urls = ["https://github.com/google/googletest/archive/release-1.10.0.tar.gz"],
+  strip_prefix = "googletest-release-1.10.0",
+  sha256 = "9dc9157a9a1551ec7a7e43daea9a694a0bb5fb8bec81235d8a1e6ef64c716dcb",
 )
 
 # C++ rules for Bazel.

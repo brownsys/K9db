@@ -27,3 +27,14 @@ cc_library(
 #        "//absl/synchronization",
 #    ],
 )
+
+cc_test(
+    name = "dataflow-tests",
+    srcs = ["record_unittest.cc"],
+    copts = ["-Iexternal/gtest/include"],
+    deps = [
+        "@gtest//:gtest",
+	"@gtest//:gtest_main",
+	"//dataflow",
+    ],
+)
