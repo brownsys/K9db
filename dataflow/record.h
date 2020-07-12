@@ -1,3 +1,6 @@
+#ifndef PELTON_DATAFLOW_RECORD_H_
+#define PELTON_DATAFLOW_RECORD_H_
+
 #include <cstdint>
 
 #include <limits>
@@ -42,3 +45,5 @@ class Record {
 
   int timestamp() { return timestamp_; }
 };
+
+#endif  // PELTON_DATAFLOW_RECORD_H_
