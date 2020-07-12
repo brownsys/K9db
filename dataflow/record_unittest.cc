@@ -1,6 +1,6 @@
 #include "dataflow/record.h"
 
-#include <unistd.h>
+#include <cstdint>
 
 #include "gtest/gtest.h"
 
