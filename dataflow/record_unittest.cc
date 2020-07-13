@@ -4,6 +4,8 @@
 
 #include "gtest/gtest.h"
 
+namespace dataflow {
+
 // Tests internal storage format
 TEST(RecordTest, DataRep) {
   int v = 42;
@@ -20,3 +22,5 @@ TEST(RecordTest, DataRep) {
   // deref should return pointer to value stored inline
   EXPECT_EQ((int*)&d_val.data_, (int*)*d_val);
 }
+
+}  // namespace dataflow
