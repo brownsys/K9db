@@ -8,19 +8,29 @@ namespace dataflow {
 
 // Tests internal storage format
 TEST(RecordTest, DataRep) {
-  int v = 42;
-  RecordData d_ptr;
-  d_ptr.data_ = (uintptr_t)&v;
-  d_ptr.data_ |= TOP_BIT;
+  uint64_t v = 42;
+  uint64_t* p = new uint64_t(v);
+  std::unique_ptr<uint64_t> up(p);
+  RecordData d_ptr(std::move(up));
 
-  // deref should return the plain pointer
-  EXPECT_EQ(&v, (int*)*d_ptr);
+  // should return the plain pointer
+  EXPECT_EQ(p, (uint64_t*)d_ptr.data_);
+  EXPECT_EQ(p, (uint64_t*)d_ptr.as_ptr());
 
-  RecordData d_val;
-  d_val.data_ = v;
+  RecordData d_val(v);
 
-  // deref should return pointer to value stored inline
-  EXPECT_EQ((int*)&d_val.data_, (int*)*d_val);
+  // should return value stored inline
+  EXPECT_EQ((uint64_t)d_val.data_, v);
+  EXPECT_EQ((uint64_t)d_val.as_val(), v);
+
+  uint64_t bitmap = 0x2;  // set bit 1, for d_ptr
+  Record r(true, std::vector<RecordData>{d_val, d_ptr}, bitmap);
+
+  // should get data out either way when wrapped into Record
+  EXPECT_EQ((uint64_t*)r[0], &d_val.data_);
+  EXPECT_EQ(*(uint64_t*)r[0], v);
+  EXPECT_EQ((uint64_t*)r[1], p);
+  EXPECT_EQ(*(uint64_t*)r[1], v);
 }
 
 }  // namespace dataflow

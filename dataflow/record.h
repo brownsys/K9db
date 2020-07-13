@@ -9,8 +9,6 @@
 
 #include <gtest/gtest_prod.h>
 
-#define TOP_BIT std::numeric_limits<int64_t>::min()
-
 namespace dataflow {
 
 class RecordData {
@@ -20,64 +18,63 @@ class RecordData {
   explicit RecordData(std::unique_ptr<uint64_t> ptr);
   explicit RecordData(uint64_t val) { this->data_ = val; }
 
-  // Dereference to a byte-aligned pointer, either to the inline data or to the
-  // data pointed to by the pointer stored.
-  char* operator*() {
-    if (data_ & TOP_BIT) {
-      return (char*)(data_ ^ TOP_BIT);
-    } else {
-      return (char*)&data_;
-    }
-  }
-
   RecordData ShallowClone() const;
 
+  uintptr_t as_ptr() { return (uintptr_t)data_; }
+
+  // TODO(malte): can we use generics here?
+  uint64_t as_val() { return data_; }
+
  private:
-  // Store 8 bytes, which are either an immediate value or a pointer to data,
-  // signified by the top bit (which isn't valid in an x86-64 pointer).
-  //
-  // 1) INLINE DATA FORMAT
-  //
-  //  63                                 ...       0
-  // +-----------------------------------...--------+
-  // | Inline data (64b)                 ...        |
-  // +-----------------------------------...--------+
-  //
-  // 2) POINTER FORMAT
-  //
-  //  63           62  ...   48 47       ...       0
-  // +------------+----...-----+---------...--------+
-  // | Immed. bit | UNUSED     | Pointer addr (48b) |
-  // +------------+----...-----+---------...--------+
+  // 8 bytes of data, which represent either a pointer or an inline value.
   uint64_t data_;
 
   FRIEND_TEST(RecordTest, DataRep);
 };
 
 class Record {
- private:
-  bool positive_;
-  int timestamp_;
-
-  // data is interpreted according to schema stored outside the record.
-  std::vector<RecordData> data_;
-
  public:
-  Record(bool positive, const std::vector<RecordData>& v)
-      : positive_(positive), timestamp_(0) {
+  // TODO(malte): use move
+  Record(bool positive, const std::vector<RecordData>& v,
+         uint64_t inlining_bitmap)
+      : data_inlining_bitmap_(inlining_bitmap),
+        timestamp_(0),
+        positive_(positive) {
     for (const RecordData& i : v) {
       data_.push_back(i.ShallowClone());
     }
   }
 
-  Record() : positive_(true), timestamp_(0) {}
+  Record() : timestamp_(0), positive_(true) {}
+  Record(int size) : timestamp_(0), positive_(true) { data_.resize(size); }
 
-  Record(int size) : positive_(true), timestamp_(0) { data_.resize(size); }
+  char* operator[](size_t index);
+  char* at_mut(size_t index);
+  const char* at(size_t index);
 
-  bool is_positive() { return positive_; }
-
+  bool positive() { return positive_; }
+  void set_positive(bool pos) { positive_ = pos; };
   int timestamp() { return timestamp_; }
   void set_timestamp(int time) { timestamp_ = time; };
+
+ private:
+  // Data is interpreted according to schema stored outside the record.
+  std::vector<RecordData> data_;
+  // Bitmap indicating whether fields in data_ are pointers or inline values.
+  // Starts at column 0 in LSB, column 64 in MSB.
+  // TODO(malte): support >64 columns by using as pointer.
+  // TODO(malte): consider moving this to a schema structure.
+  uint64_t data_inlining_bitmap_;
+  // Timestamp of this record.
+  int timestamp_;
+  // Is this a positive or negative record?
+  bool positive_;
+
+  bool is_inline(size_t index) {
+    return data_inlining_bitmap_ & (0x1 << index);
+  }
+
+  FRIEND_TEST(RecordTest, DataRep);
 };
 
 }  // namespace dataflow
