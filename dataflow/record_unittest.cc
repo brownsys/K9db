@@ -24,12 +24,15 @@ TEST(RecordTest, DataRep) {
   EXPECT_EQ((uint64_t)d_val.as_val(), v);
 
   uint64_t bitmap = 0x2;  // set bit 1, for d_ptr
-  Record r(true, std::vector<RecordData>{d_val, d_ptr}, bitmap);
+  std::vector<RecordData> d_init{d_ptr, d_val};
+  Record r(true, d_init, bitmap);
 
   // should get data out either way when wrapped into Record
-  EXPECT_EQ((uint64_t*)r[0], &d_val.data_);
+  EXPECT_EQ((uint64_t*)r[0], p);
   EXPECT_EQ(*(uint64_t*)r[0], v);
-  EXPECT_EQ((uint64_t*)r[1], p);
+  // inline val gets copied on construction, so addr != &d_init.data_
+  EXPECT_EQ((uint64_t*)r[1], (uint64_t*)&(r.data_[1].data_));
+  EXPECT_NE((uint64_t*)r[1], (uint64_t*)&d_init[1].data_);
   EXPECT_EQ(*(uint64_t*)r[1], v);
 }
 
