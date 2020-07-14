@@ -16,7 +16,7 @@ class RecordData {
   RecordData(){};
   // TODO(malte): can we use generics here?
   explicit RecordData(std::unique_ptr<uint64_t> ptr);
-  explicit RecordData(uint64_t val) { this->data_ = val; }
+  explicit RecordData(uint64_t val) { data_ = val; }
 
   RecordData ShallowClone() const;
 
@@ -24,6 +24,10 @@ class RecordData {
 
   // TODO(malte): can we use generics here?
   uint64_t as_val() { return data_; }
+
+  // TODO(malte): needed so that Record can access data_, but ideally
+  // we'd solve this differently
+  uintptr_t raw_data_ptr() { return (uintptr_t)&data_; }
 
  private:
   // 8 bytes of data, which represent either a pointer or an inline value.

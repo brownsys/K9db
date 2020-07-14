@@ -19,7 +19,7 @@ char* Record::operator[](size_t index) { return at_mut(index); }
 
 char* Record::at_mut(size_t index) {
   if (is_inline(index)) {
-    return (char*)data_[index].as_val();
+    return (char*)data_[index].raw_data_ptr();
   } else {
     return (char*)data_[index].as_ptr();
   }
