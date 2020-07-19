@@ -1,6 +1,10 @@
 #ifndef PELTON_DATAFLOW_OPERATOR_H_
 #define PELTON_DATAFLOW_OPERATOR_H_
 
+enum OperatorType {
+  IDENTITY,
+};
+
 class Operator {
  public:
   virtual ~Operator(){};
