@@ -2,7 +2,7 @@
 #include "dataflow/operator.h"
 #include "dataflow/ops/identity.h"
 
-#include <cstdint>
+#include <memory>
 
 #include "gtest/gtest.h"
 
@@ -12,9 +12,7 @@ TEST(DataFlowGraphTest, Basic) {
   // TODO
   DataFlowGraph g;
 
-  IdentityOperator id_node;
-
-  // g.AddNode(OperatorType::IDENTITY, &id_node);
+  g.AddNode(OperatorType::IDENTITY, std::make_shared<IdentityOperator>());
 }
 
 }  // namespace dataflow

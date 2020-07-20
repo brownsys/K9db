@@ -1,3 +1,11 @@
 #include "dataflow/ops/identity.h"
 
-bool IdentityOperator::process() { return false; }
+#include <vector>
+
+#include "dataflow/record.h"
+
+namespace dataflow {
+
+bool IdentityOperator::process(std::vector<Record>& rs) { return true; }
+
+}  // namespace dataflow
