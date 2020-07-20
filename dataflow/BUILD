@@ -26,6 +26,9 @@ cc_library(
 #        "//absl/strings",
 #        "//absl/synchronization",
 #    ],
+    deps = [
+        "@gtest//:gtest_prod",
+    ],
 )
 
 cc_test(
@@ -34,7 +37,7 @@ cc_test(
         "record_unittest.cc",
         "graph_unittest.cc"
     ],
-    copts = ["-Iexternal/gtest/include"],
+    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         "@gtest//:gtest",
         "@gtest//:gtest_main",
