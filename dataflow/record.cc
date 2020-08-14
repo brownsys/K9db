@@ -8,9 +8,9 @@ RecordData::RecordData(std::unique_ptr<uint64_t> ptr) {
 }
 
 RecordData RecordData::ShallowClone() const {
-  return RecordData{
-      .data = data_,
-  };
+  RecordData d;
+  d.data_ = data_;
+  return d;
 }
 
 // Index into record, either to the inline data or to the data pointed to by the
