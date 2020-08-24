@@ -4,16 +4,22 @@ load("//build:options.bzl", "PELTON_DEFAULT_COPTS")
 cc_library(
     name = "dataflow",
     srcs = [
+        "edge.cc",
         "graph.cc",
         "operator.cc",
         "record.cc",
         "ops/identity.cc",
+        "ops/input.cc",
+        "ops/matview.cc",
     ],
     hdrs = [
+        "edge.h",
         "graph.h",
         "operator.h",
         "record.h",
         "ops/identity.h",
+        "ops/input.h",
+        "ops/matview.h",
     ],
     copts = PELTON_DEFAULT_COPTS,
     visibility = ["//visibility:public"],

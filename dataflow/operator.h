@@ -6,7 +6,9 @@
 namespace dataflow {
 
 enum OperatorType {
+  INPUT,
   IDENTITY,
+  MAT_VIEW,
 };
 
 class Operator {

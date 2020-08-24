@@ -15,6 +15,7 @@ RecordData RecordData::ShallowClone() const {
 
 // Index into record, either to the inline data or to the data pointed to by the
 // pointer stored.
+const char* Record::operator[](size_t index) const { return at(index); }
 char* Record::operator[](size_t index) { return at_mut(index); }
 
 char* Record::at_mut(size_t index) {
@@ -25,6 +26,12 @@ char* Record::at_mut(size_t index) {
   }
 }
 
-const char* Record::at(size_t index) { return (const char*)at_mut(index); }
+const char* Record::at(size_t index) const {
+  if (is_inline(index)) {
+    return (const char*)data_[index].raw_const_data_ptr();
+  } else {
+    return (const char*)data_[index].as_const_ptr();
+  }
+}
 
 }  // namespace dataflow
