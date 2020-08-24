@@ -16,17 +16,11 @@ cc_library(
         "ops/identity.h",
     ],
     copts = PELTON_DEFAULT_COPTS,
-#    linkopts = ABSL_DEFAULT_LINKOPTS,
     visibility = ["//visibility:public"],
-#    deps = [
-#        "//absl/base",
-#        "//absl/base:config",
-#        "//absl/base:core_headers",
-#        "//absl/memory",
-#        "//absl/strings",
-#        "//absl/synchronization",
-#    ],
     deps = [
+        "@absl//absl/base:core_headers",
+        "@absl//absl/container:flat_hash_map",
+        "@absl//absl/container:node_hash_map",
         "@gtest//:gtest_prod",
     ],
 )

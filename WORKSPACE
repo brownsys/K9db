@@ -3,7 +3,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 # Abseil C++ Libraries
 http_archive(
-  name = "com_google_absl",
+  name = "absl",
   urls = ["https://github.com/abseil/abseil-cpp/archive/20200225.2.zip"],
   strip_prefix = "abseil-cpp-20200225.2",
   sha256 = "f342aac71a62861ac784cadb8127d5a42c6c61ab1cd07f00aef05f2cc4988c42",
