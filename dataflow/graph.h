@@ -18,7 +18,8 @@ class DataFlowGraph {
 
   bool AddNode(OperatorType type, std::shared_ptr<Operator> op);
   bool AddEdge(std::shared_ptr<Operator> op1, std::shared_ptr<Operator> op2);
-  bool AddEdge(NodeIndex ni1, NodeIndex ni2);
+
+  std::vector<std::shared_ptr<Operator>> inputs();
 
  private:
   absl::node_hash_map<NodeIndex, std::shared_ptr<Operator>> nodes_;
