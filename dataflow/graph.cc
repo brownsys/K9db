@@ -25,7 +25,7 @@ bool DataFlowGraph::AddEdge(std::shared_ptr<Operator> op1,
   return res.second;
 }
 
-std::vector<std::shared_ptr<Operator>> inputs() {
+std::vector<std::shared_ptr<Operator>> DataFlowGraph::inputs() {
   // TODO get all input operators
   std::vector<std::shared_ptr<Operator>> v;
   return v;
