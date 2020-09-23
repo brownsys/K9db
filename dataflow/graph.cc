@@ -26,8 +26,14 @@ bool DataFlowGraph::AddEdge(std::shared_ptr<Operator> op1,
 }
 
 std::vector<std::shared_ptr<Operator>> DataFlowGraph::inputs() {
-  // TODO get all input operators
   std::vector<std::shared_ptr<Operator>> v;
+
+  for (auto op : nodes_) {
+    if (op.second->type() == OperatorType::INPUT) {
+      v.emplace_back(op.second);
+    }
+  }
+
   return v;
 }
 
