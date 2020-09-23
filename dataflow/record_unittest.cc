@@ -34,6 +34,8 @@ TEST(RecordTest, DataRep) {
   EXPECT_EQ((uint64_t*)r[1], (uint64_t*)&(r.data_[1].data_));
   EXPECT_NE((uint64_t*)r[1], (uint64_t*)&d_init[1].data_);
   EXPECT_EQ(*(uint64_t*)r[1], v);
+
+  delete p;
 }
 
 }  // namespace dataflow
