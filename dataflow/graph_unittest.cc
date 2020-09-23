@@ -37,9 +37,10 @@ TEST(DataFlowGraphTest, Basic) {
   std::shared_ptr<Operator> in = g.inputs()[0];
 
   std::vector<Record> rs;
-  //rs.push_back();
+  // rs.push_back();
 
-  EXPECT_TRUE(in->process(rs));
+  std::vector<Record> out_rs;
+  EXPECT_TRUE(in->process(rs, out_rs));
 }
 
 }  // namespace dataflow
