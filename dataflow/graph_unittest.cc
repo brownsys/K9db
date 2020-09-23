@@ -20,16 +20,15 @@ DataFlowGraph makeGraph() {
   EXPECT_TRUE(g.AddNode(OperatorType::INPUT, in));
   EXPECT_TRUE(g.AddNode(OperatorType::IDENTITY, ident));
   std::vector<ColumnID> keycol = {0};
-  EXPECT_TRUE(g.AddNode(OperatorType::MAT_VIEW, std::make_shared<MatViewOperator>(keycol)));
+  EXPECT_TRUE(g.AddNode(OperatorType::MAT_VIEW,
+                        std::make_shared<MatViewOperator>(keycol)));
 
   EXPECT_TRUE(g.AddEdge(in, ident));
 
   return g;
 }
 
-TEST(DataFlowGraphTest, Construct) {
-  DataFlowGraph g = makeGraph();
-}
+TEST(DataFlowGraphTest, Construct) { DataFlowGraph g = makeGraph(); }
 
 TEST(DataFlowGraphTest, Basic) {
   DataFlowGraph g = makeGraph();
