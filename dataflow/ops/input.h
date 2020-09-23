@@ -9,7 +9,8 @@
 namespace dataflow {
 
 class InputOperator : public Operator {
-  bool process(std::vector<Record>& rs) override;
+  OperatorType type() override { return OperatorType::INPUT; }
+  bool process(std::vector<Record>& rs, std::vector<Record>& out_rs) override;
 };
 
 }  // namespace dataflow

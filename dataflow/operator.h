@@ -14,7 +14,9 @@ enum OperatorType {
 class Operator {
  public:
   virtual ~Operator(){};
-  virtual bool process(std::vector<Record>& rs) = 0;
+  virtual OperatorType type() = 0;
+  virtual bool process(std::vector<Record>& rs,
+                       std::vector<Record>& out_rs) = 0;
 };
 
 }  // namespace dataflow

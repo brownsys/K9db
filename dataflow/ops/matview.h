@@ -12,7 +12,8 @@ namespace dataflow {
 
 class MatViewOperator : public Operator {
  public:
-  bool process(std::vector<Record>& rs) override;
+  OperatorType type() override { return OperatorType::MAT_VIEW; }
+  bool process(std::vector<Record>& rs, std::vector<Record>& out_rs) override;
 
   explicit MatViewOperator(std::vector<ColumnID> key_cols)
       : key_cols_(key_cols) {

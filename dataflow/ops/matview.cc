@@ -6,7 +6,10 @@
 
 namespace dataflow {
 
-bool MatViewOperator::process(std::vector<Record>& rs) {
+// Leaves out_rs empty, as materialized views are leaves of the graph.
+// We may change this if we allow mat views to have descendant nodes.
+bool MatViewOperator::process(std::vector<Record>& rs,
+                              std::vector<Record>& out_rs) {
   for (Record& r : rs) {
     auto key = get_key(r);
     if (!contents_.contains(key)) {
