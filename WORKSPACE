@@ -17,6 +17,30 @@ http_archive(
   sha256 = "9dc9157a9a1551ec7a7e43daea9a694a0bb5fb8bec81235d8a1e6ef64c716dcb",
 )
 
+# Google GFlags
+# Needed because GLog depends on this.
+#
+# NOTE(malte): do *not* change the name of this dependency; GLog's build
+# infrastructure depends on it being "com_github_gflags_gflags"
+http_archive(
+    name = "com_github_gflags_gflags",
+    strip_prefix = "gflags-2.2.2",
+    urls = [
+        "https://mirror.bazel.build/github.com/gflags/gflags/archive/v2.2.2.tar.gz",
+        "https://github.com/gflags/gflags/archive/v2.2.2.tar.gz",
+    ],
+)
+
+# Google GLog
+# Abseil will provide a similar logging API in the future, but for now
+# we're tied to classic GLog and GFlags.
+http_archive(
+  name = "glog",
+  urls = ["https://github.com/google/glog/archive/v0.4.0.tar.gz"],
+  strip_prefix = "glog-0.4.0",
+  sha256 = "f28359aeba12f30d73d9e4711ef356dc842886968112162bc73002645139c39c",
+)
+
 # C++ rules for Bazel.
 http_archive(
   name = "rules_cc",

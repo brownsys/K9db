@@ -2,15 +2,21 @@
 #include <string>
 #include <vector>
 
-#include "absl/flags/flag.h"
-#include "absl/flags/parse.h"
+#include "gflags/gflags.h"
+#include "glog/logging.h"
 
-ABSL_FLAG(bool, verbose, true, "Verbose output");
+DEFINE_bool(verbose, false, "Verbose output");
 
 int main(int argc, char* argv[]) {
-  absl::ParseCommandLine(argc, argv);
+  google::InitGoogleLogging(argv[0]);
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-  std::cout << "Hello world!" << std::endl;
+  if (FLAGS_verbose) {
+    LOG(INFO) << "Hello world log";
+    std::cout << "Hello world!" << std::endl;
+  }
+
+  // ServeGraph();
 
   return 0;
 }
