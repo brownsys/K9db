@@ -14,6 +14,11 @@ namespace dataflow {
 
 typedef uint32_t ColumnID;
 
+// `RecordData` encapsulates either a pointer to external data, or an inline
+// value. To avoid per-record space overhead, this type does *not* include
+// any indication of whether the data is inlined or not; it is up to the
+// caller to choose the right interpretation. Typically, `RecordData` is
+// inlined in a `Record` type, which maintains a bitmap of inlining states.
 class RecordData {
  public:
   RecordData(){};
