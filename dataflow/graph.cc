@@ -25,12 +25,24 @@ bool DataFlowGraph::AddEdge(std::shared_ptr<Operator> op1,
   return res.second;
 }
 
-std::vector<std::shared_ptr<Operator>> DataFlowGraph::inputs() {
-  std::vector<std::shared_ptr<Operator>> v;
+std::vector<std::shared_ptr<InputOperator>> DataFlowGraph::inputs() {
+  std::vector<std::shared_ptr<InputOperator>> v;
 
   for (auto op : nodes_) {
     if (op.second->type() == OperatorType::INPUT) {
-      v.emplace_back(op.second);
+      v.emplace_back(std::static_pointer_cast<InputOperator>(op.second));
+    }
+  }
+
+  return v;
+}
+
+std::vector<std::shared_ptr<MatViewOperator>> DataFlowGraph::outputs() {
+  std::vector<std::shared_ptr<MatViewOperator>> v;
+
+  for (auto op : nodes_) {
+    if (op.second->type() == OperatorType::MAT_VIEW) {
+      v.emplace_back(std::static_pointer_cast<MatViewOperator>(op.second));
     }
   }
 

@@ -33,13 +33,24 @@ TEST(DataFlowGraphTest, Construct) { DataFlowGraph g = makeGraph(); }
 TEST(DataFlowGraphTest, Basic) {
   DataFlowGraph g = makeGraph();
 
-  std::shared_ptr<Operator> in = g.inputs()[0];
+  std::shared_ptr<InputOperator> in = g.inputs()[0];
+  std::shared_ptr<MatViewOperator> out = g.outputs()[0];
 
   std::vector<Record> rs;
-  // rs.push_back();
+  RecordData key(42ULL);
 
-  std::vector<Record> out_rs;
-  EXPECT_TRUE(in->process(rs, out_rs));
+  std::vector<Record> proc_rs;
+
+  EXPECT_TRUE(in->process(rs, proc_rs));
+  // no records should have made it to the materialized view
+  EXPECT_EQ(out->lookup(key), std::vector<Record>());
+
+  std::vector<RecordData> rd = {key, RecordData(5ULL)};
+  Record r(true, rd, 0ULL);
+  rs.push_back(r);
+
+  EXPECT_TRUE(in->process(rs, proc_rs));
+  EXPECT_EQ(out->lookup(key), rs);
 }
 
 }  // namespace dataflow

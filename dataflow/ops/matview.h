@@ -20,6 +20,9 @@ class MatViewOperator : public Operator {
     // nothing to do
   }
 
+  std::vector<Record> lookup(const RecordData& key) const;
+  std::vector<Record> multi_lookup(std::vector<RecordData>& keys);
+
  private:
   // TODO(malte): should use Key type
   absl::flat_hash_map<RecordData, std::vector<Record>> contents_;
