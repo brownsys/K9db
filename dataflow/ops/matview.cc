@@ -29,4 +29,23 @@ bool MatViewOperator::process(std::vector<Record>& rs,
   return true;
 }
 
+std::vector<Record> MatViewOperator::lookup(const RecordData& key) const {
+  if (contents_.contains(key)) {
+    return contents_.at(key);
+  } else {
+    return std::vector<Record>();
+  }
+}
+
+std::vector<Record> MatViewOperator::multi_lookup(
+    std::vector<RecordData>& keys) {
+  std::vector<Record> out;
+  for (RecordData key : keys) {
+    if (contents_.contains(key)) {
+      // out.push_back(contents_.at(key));
+    }
+  }
+  return out;
+}
+
 }  // namespace dataflow

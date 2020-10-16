@@ -6,6 +6,8 @@
 
 #include "dataflow/edge.h"
 #include "dataflow/operator.h"
+#include "dataflow/ops/input.h"
+#include "dataflow/ops/matview.h"
 
 namespace dataflow {
 
@@ -19,7 +21,8 @@ class DataFlowGraph {
   bool AddNode(OperatorType type, std::shared_ptr<Operator> op);
   bool AddEdge(std::shared_ptr<Operator> op1, std::shared_ptr<Operator> op2);
 
-  std::vector<std::shared_ptr<Operator>> inputs();
+  std::vector<std::shared_ptr<InputOperator>> inputs();
+  std::vector<std::shared_ptr<MatViewOperator>> outputs();
 
  private:
   absl::node_hash_map<NodeIndex, std::shared_ptr<Operator>> nodes_;
