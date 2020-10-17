@@ -12,8 +12,9 @@ class FilterOperator : public Operator {
  public:
   enum Ops : unsigned char { OpsLT, OpsLT_Eq, OpsGT, OpsGT_Eq, OpsEq, OpsN_Eq };
 
-  explicit FilterOperator(std::vector<ColumnID> cids, std::vector<Ops> comp_ops,
-                          std::vector<RecordData> comp_vals) {
+  explicit FilterOperator(std::vector<ColumnID>& cids,
+                          std::vector<Ops>& comp_ops,
+                          std::vector<RecordData>& comp_vals) {
     cids = cid_;
     comp_ops = op_;
     val_ = comp_vals;
