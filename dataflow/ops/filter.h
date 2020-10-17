@@ -9,17 +9,22 @@
 namespace dataflow {
 
 class FilterOperator : public Operator {
-public:
-  explicit FilterOperator(ColumnID cid, std::string comp_op, RecordData comp_val){
-    cid = cid_; comp_op = op_; val_ = comp_val;
+ public:
+  enum Ops : unsigned char { OpsLT, OpsLT_Eq, OpsGT, OpsGT_Eq, OpsEq, OpsN_Eq };
+
+  explicit FilterOperator(std::vector<ColumnID> cids, std::vector<Ops> comp_ops,
+                          std::vector<RecordData> comp_vals) {
+    cids = cid_;
+    comp_ops = op_;
+    val_ = comp_vals;
   };
   OperatorType type() override { return OperatorType::FILTER; }
   bool process(std::vector<Record>& rs, std::vector<Record>& out_rs) override;
 
-private:
-  ColumnID cid_;
-  std::string op_;
-  RecordData val_;
+ private:
+  std::vector<ColumnID> cid_;
+  std::vector<Ops> op_;
+  std::vector<RecordData> val_;
 };
 
 }  // namespace dataflow
