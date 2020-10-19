@@ -8,7 +8,8 @@
 #include <memory>
 #include <vector>
 
-#include <gtest/gtest_prod.h>
+#include "glog/logging.h"
+#include "gtest/gtest_prod.h"
 
 namespace dataflow {
 
@@ -79,6 +80,10 @@ class Record {
   const char* operator[](size_t index) const;
   char* at_mut(size_t index);
   const char* at(size_t index) const;
+  RecordData raw_at(size_t index) const {
+    CHECK_LT(index, data_.size());
+    return data_[index];
+  }
 
   bool positive() const { return positive_; }
   void set_positive(bool pos) { positive_ = pos; };

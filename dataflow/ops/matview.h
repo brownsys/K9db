@@ -28,12 +28,11 @@ class MatViewOperator : public Operator {
   absl::flat_hash_map<RecordData, std::vector<Record>> contents_;
   std::vector<ColumnID> key_cols_;
 
-  const RecordData& get_key(const Record& r) {
+  const RecordData get_key(const Record& r) {
     assert(key_cols_.size() == 1);
     ColumnID cid = key_cols_[0];
 
-    // XXX(malte): yuck!
-    return *((const RecordData*)r[cid]);
+    return r.raw_at(cid);
   }
 };
 
