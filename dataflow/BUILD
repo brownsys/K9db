@@ -27,6 +27,7 @@ cc_library(
         "@absl//absl/base:core_headers",
         "@absl//absl/container:flat_hash_map",
         "@absl//absl/container:node_hash_map",
+        "@glog//:glog",
         "@gtest//:gtest_prod",
     ],
 )
@@ -39,6 +40,7 @@ cc_test(
     ],
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
+        "@glog//:glog",
         "@gtest//:gtest",
         "@gtest//:gtest_main",
         "//dataflow",
