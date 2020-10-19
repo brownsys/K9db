@@ -6,6 +6,11 @@
 
 namespace dataflow {
 
+TEST(RecordDataTest, Size) {
+  // should be 8 bytes
+  EXPECT_EQ(sizeof(RecordData), 8);
+}
+
 // Tests internal storage format
 TEST(RecordTest, DataRep) {
   uint64_t v = 42;
@@ -36,6 +41,11 @@ TEST(RecordTest, DataRep) {
   EXPECT_EQ(*(uint64_t*)r[1], v);
 
   delete p;
+}
+
+TEST(RecordTest, Size) {
+  // should be 48 bytes
+  EXPECT_EQ(sizeof(Record), 40);
 }
 
 }  // namespace dataflow

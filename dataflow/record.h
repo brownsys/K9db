@@ -125,7 +125,7 @@ class Record {
   bool positive_;
 
   // *******
-  // 11B SPARE on x86-64 due to alignment
+  // 3B SPARE on x86-64 due to 8B alignment
   // *******
 
   bool is_inline(size_t index) const {
