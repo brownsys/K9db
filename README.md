@@ -22,3 +22,8 @@ To run the tests, run `bazel test //dataflow:dataflow-tests`.
 
 For debugging, you may want to use the `--config asan` option, which enables C++
 sanitizers and provides more helpful output on memory errors (e.g., segfaults).
+
+## Code style
+
+We follow [the Google C++ style guide](https://google.github.io/styleguide/cppguide.html);
+please run `clang-format` on your code before pushing.
