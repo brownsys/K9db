@@ -18,8 +18,11 @@ class DataFlowGraph {
  public:
   DataFlowGraph();
 
-  bool AddNode(OperatorType type, std::shared_ptr<Operator> op);
+  bool AddInputNode(std::shared_ptr<InputOperator> op);
+  bool AddNode(OperatorType type, std::shared_ptr<Operator> op,
+               std::shared_ptr<Operator> parent);
   bool AddEdge(std::shared_ptr<Operator> op1, std::shared_ptr<Operator> op2);
+  bool Process(InputOperator& input, std::vector<Record> records);
 
   std::vector<std::shared_ptr<InputOperator>> inputs();
   std::vector<std::shared_ptr<MatViewOperator>> outputs();

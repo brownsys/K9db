@@ -13,8 +13,8 @@ bool MatViewOperator::process(std::vector<Record>& rs,
   for (Record& r : rs) {
     auto key = get_key(r);
     if (!contents_.contains(key)) {
-      // need to add key -> records entry
-      std::vector<Record> v = {r};
+      // need to add key -> records entry as empty vector
+      std::vector<Record> v;
       contents_.emplace(key, v);
     }
     std::vector<Record>& v = contents_[key];
