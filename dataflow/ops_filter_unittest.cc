@@ -1,53 +1,30 @@
+#include <memory>
+
 #include "dataflow/graph.h"
 #include "dataflow/operator.h"
+#include "dataflow/ops/filter.h"
 #include "dataflow/ops/identity.h"
 #include "dataflow/ops/input.h"
 #include "dataflow/ops/matview.h"
 #include "dataflow/record.h"
-#include "dataflow/filter.h"
-
-#include <memory>
-
 #include "gtest/gtest.h"
 
 namespace dataflow {
 
-DataFlowGraph makeGraph() {
-  DataFlowGraph g;
-
-  std::vector<ColumnID> cids = {0,1};
-  std::vector<FilterOperator::Ops> comp_ops = {FilterOperator::OpsGT_Eq, FilterOperator::OpsEq};
-  std::vector<RecordData> comp_vals = {RecordData(3ULL), RecordData(5ULL)};
-  std::vector<ColumnID> keycol = {0};
-
-  auto in = std::make_shared<InputOperator>();
-  auto filter = std::make_shared<FilterOperator>(cids, comp_ops, comp_vals);
-  auto matview = std::make_shared<MatViewOperator>(keycol));
-
-  EXPECT_TRUE(g.AddNode(OperatorType::INPUT, in));
-  EXPECT_TRUE(g.AddNode(OperatorType::FILTER, filter));
-  EXPECT_TRUE(g.AddNode(OperatorType::MAT_VIEW, matview);
-
-  EXPECT_TRUE(g.AddEdge(in, filter));
-  EXPECT_TRUE(g.AddEdge(filter, matview));
-
-  return g;
-}
-
-TEST(FilterOperatorTest, Construct) { DataFlowGraph g = makeGraph(); }
-
 TEST(FilterOperatorTest, Basic) {
-  DataFlowGraph g = makeGraph();
+  std::vector<ColumnID> cids = {0, 1};
+  std::vector<FilterOperator::Ops> comp_ops = {FilterOperator::OpsGT_Eq,
+                                               FilterOperator::OpsEq};
+  std::vector<RecordData> comp_vals = {RecordData(3ULL), RecordData(5ULL)};
 
-  std::shared_ptr<InputOperator> in = g.inputs()[0];
-  std::shared_ptr<MatViewOperator> out = g.outputs()[0];
-
+  std::shared_ptr<FilterOperator> filter =
+      std::make_shared<FilterOperator>(cids, comp_ops, comp_vals);
   std::vector<Record> rs;
   std::vector<Record> proc_rs;
 
-  EXPECT_TRUE(in->process(rs, proc_rs));
-  // no records should have made it to the materialized view
-  EXPECT_EQ(out->lookup(key), std::vector<Record>());
+  EXPECT_TRUE(filter->process(rs, proc_rs));
+  // no records are fed
+  EXPECT_EQ(proc_rs, std::vector<Record>());
 
   // feed records
   std::vector<RecordData> rd1 = {RecordData(1ULL), RecordData(2ULL)};
@@ -64,10 +41,19 @@ TEST(FilterOperatorTest, Basic) {
   rs.push_back(r4);
 
   std::vector<RecordData> keys = {RecordData(3ULL), RecordData(4ULL)};
-  std::vector<Record> expected_rs = {r3,r4}
+  std::vector<Record> expected_rs = {r3, r4};
 
-  EXPECT_TRUE(in->process(rs, proc_rs));
-  EXPECT_EQ(out->multi_lookup(keys), expected_rs);
+  EXPECT_TRUE(filter->process(rs, proc_rs));
+
+  // hard coded deep copy
+  EXPECT_EQ(proc_rs.size(), expected_rs.size());
+  for (size_t row = 0; row < proc_rs.size(); row++) {
+    for (size_t col = 0; col < proc_rs.size(); col++) {
+      RecordData ex = expected_rs[row].raw_at(col);
+      RecordData out = expected_rs[row].raw_at(col);
+      EXPECT_EQ(ex.as_val(), out.as_val());
+    }
+  }
 }
 
 }  // namespace dataflow

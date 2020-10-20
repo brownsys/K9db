@@ -15,12 +15,17 @@ class FilterOperator : public Operator {
   explicit FilterOperator(std::vector<ColumnID>& cids,
                           std::vector<Ops>& comp_ops,
                           std::vector<RecordData>& comp_vals) {
-    cids = cid_;
-    comp_ops = op_;
+    assert((cids.size() == comp_ops.size()) &&
+           (comp_ops.size() == comp_vals.size()));
+    cid_ = cids;
+    op_ = comp_ops;
     val_ = comp_vals;
   };
   OperatorType type() override { return OperatorType::FILTER; }
   bool process(std::vector<Record>& rs, std::vector<Record>& out_rs) override;
+  std::vector<ColumnID>& getCid() { return cid_; };
+  std::vector<Ops>& getOp() { return op_; };
+  std::vector<RecordData>& getVal() { return val_; };
 
  private:
   std::vector<ColumnID> cid_;
