@@ -39,7 +39,7 @@ cc_test(
     srcs = [
         "record_unittest.cc",
         "graph_unittest.cc",
-        "ops_filter_unittest.cc"
+        "ops/ops_filter_unittest.cc"
     ],
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [

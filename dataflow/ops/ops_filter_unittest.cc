@@ -23,7 +23,7 @@ TEST(FilterOperatorTest, Basic) {
   std::vector<Record> proc_rs;
 
   EXPECT_TRUE(filter->process(rs, proc_rs));
-  // no records are fed
+  // no records have been fed
   EXPECT_EQ(proc_rs, std::vector<Record>());
 
   // feed records
@@ -31,10 +31,10 @@ TEST(FilterOperatorTest, Basic) {
   std::vector<RecordData> rd2 = {RecordData(2ULL), RecordData(2ULL)};
   std::vector<RecordData> rd3 = {RecordData(3ULL), RecordData(5ULL)};
   std::vector<RecordData> rd4 = {RecordData(4ULL), RecordData(5ULL)};
-  Record r1(true, rd1, 0ULL);
-  Record r2(true, rd2, 0ULL);
-  Record r3(true, rd3, 0ULL);
-  Record r4(true, rd4, 0ULL);
+  Record r1(true, rd1, 3ULL);
+  Record r2(true, rd2, 3ULL);
+  Record r3(true, rd3, 3ULL);
+  Record r4(true, rd4, 3ULL);
   rs.push_back(r1);
   rs.push_back(r2);
   rs.push_back(r3);
@@ -44,16 +44,8 @@ TEST(FilterOperatorTest, Basic) {
   std::vector<Record> expected_rs = {r3, r4};
 
   EXPECT_TRUE(filter->process(rs, proc_rs));
-
-  // hard coded deep copy
   EXPECT_EQ(proc_rs.size(), expected_rs.size());
-  for (size_t row = 0; row < proc_rs.size(); row++) {
-    for (size_t col = 0; col < proc_rs.size(); col++) {
-      RecordData ex = expected_rs[row].raw_at(col);
-      RecordData out = expected_rs[row].raw_at(col);
-      EXPECT_EQ(ex.as_val(), out.as_val());
-    }
-  }
+  EXPECT_EQ(proc_rs, expected_rs);
 }
 
 }  // namespace dataflow
