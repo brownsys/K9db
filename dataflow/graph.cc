@@ -1,26 +1,42 @@
 #include "dataflow/graph.h"
-#include "dataflow/edge.h"
 
 #include <memory>
+
+#include "glog/logging.h"
+
+#include "dataflow/edge.h"
 
 namespace dataflow {
 
 DataFlowGraph::DataFlowGraph() {}
 
-bool DataFlowGraph::AddNode(OperatorType type, std::shared_ptr<Operator> op) {
+bool DataFlowGraph::AddInputNode(std::shared_ptr<InputOperator> op) {
+  return AddNode(OperatorType::INPUT, op, nullptr);
+}
+
+bool DataFlowGraph::AddNode(OperatorType type, std::shared_ptr<Operator> op,
+                            std::shared_ptr<Operator> parent) {
   NodeIndex idx = mint_node_index();
+  op->set_index(idx);
 
   auto res = nodes_.emplace(idx, op);
+
+  if (parent != nullptr) {
+    CHECK(AddEdge(parent, op));
+  }
 
   return res.second;
 }
 
-bool DataFlowGraph::AddEdge(std::shared_ptr<Operator> op1,
-                            std::shared_ptr<Operator> op2) {
+bool DataFlowGraph::AddEdge(std::shared_ptr<Operator> parent,
+                            std::shared_ptr<Operator> child) {
   EdgeIndex idx = mint_edge_index();
-  Edge edge(op1, op2);
+  std::shared_ptr<Edge> edge = std::make_shared<Edge>(Edge(parent, child));
 
-  auto res = edges_.emplace(idx, std::make_shared<Edge>(edge));
+  auto res = edges_.emplace(idx, edge);
+
+  // also implicitly adds op1 as child of op2
+  child->AddParent(parent, edge);
 
   return res.second;
 }
@@ -47,6 +63,10 @@ std::vector<std::shared_ptr<MatViewOperator>> DataFlowGraph::outputs() {
   }
 
   return v;
+}
+
+bool DataFlowGraph::Process(InputOperator& input, std::vector<Record> records) {
+  return input.ProcessAndForward(records);
 }
 
 }  // namespace dataflow
