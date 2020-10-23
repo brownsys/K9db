@@ -17,6 +17,7 @@ bool DataFlowGraph::AddInputNode(std::shared_ptr<InputOperator> op) {
 bool DataFlowGraph::AddNode(OperatorType type, std::shared_ptr<Operator> op,
                             std::shared_ptr<Operator> parent) {
   NodeIndex idx = mint_node_index();
+  op->set_index(idx);
 
   auto res = nodes_.emplace(idx, op);
 

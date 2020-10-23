@@ -11,9 +11,9 @@
 #include "glog/logging.h"
 #include "gtest/gtest_prod.h"
 
-namespace dataflow {
+#include "dataflow/types.h"
 
-typedef uint32_t ColumnID;
+namespace dataflow {
 
 // `RecordData` encapsulates either a pointer to external data, or an inline
 // value. To avoid per-record space overhead, this type does *not* include

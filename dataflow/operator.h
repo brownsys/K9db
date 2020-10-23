@@ -1,10 +1,16 @@
 #ifndef PELTON_DATAFLOW_OPERATOR_H_
 #define PELTON_DATAFLOW_OPERATOR_H_
 
+#include <memory>
+
 #include "dataflow/edge.h"
 #include "dataflow/record.h"
+#include "dataflow/types.h"
 
 namespace dataflow {
+
+typedef uint32_t EdgeIndex;
+typedef uint32_t NodeIndex;
 
 class Edge;
 
@@ -25,9 +31,11 @@ class Operator {
   bool ProcessAndForward(std::vector<Record>& rs);
 
   virtual OperatorType type() = 0;
+  NodeIndex index() const { return index_; }
+  void set_index(NodeIndex index) { index_ = index; }
 
  private:
-  std::vector<std::shared_ptr<Edge>> children_;
+  NodeIndex index_;
   std::vector<std::shared_ptr<Edge>> parents_;
 };
 

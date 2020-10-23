@@ -8,6 +8,7 @@
 #include "dataflow/operator.h"
 #include "dataflow/ops/input.h"
 #include "dataflow/ops/matview.h"
+#include "dataflow/types.h"
 
 namespace dataflow {
 

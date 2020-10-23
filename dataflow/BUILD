@@ -18,6 +18,7 @@ cc_library(
         "graph.h",
         "operator.h",
         "record.h",
+        "types.h",
         "ops/identity.h",
         "ops/input.h",
         "ops/matview.h",
