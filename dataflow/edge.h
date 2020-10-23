@@ -16,11 +16,11 @@ class Edge {
   virtual ~Edge(){};
 
   std::shared_ptr<Operator> from() { return from_; }
-  std::shared_ptr<Operator> to() { return to_; }
+  std::weak_ptr<Operator> to() { return to_; }
 
  private:
   std::shared_ptr<Operator> from_;
-  std::shared_ptr<Operator> to_;
+  std::weak_ptr<Operator> to_;
 };
 
 }  // namespace dataflow

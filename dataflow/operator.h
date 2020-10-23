@@ -36,6 +36,7 @@ class Operator {
 
  private:
   NodeIndex index_;
+  std::vector<std::weak_ptr<Edge>> children_;
   std::vector<std::shared_ptr<Edge>> parents_;
 };
 
