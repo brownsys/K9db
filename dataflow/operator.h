@@ -9,6 +9,7 @@ enum OperatorType {
   INPUT,
   IDENTITY,
   MAT_VIEW,
+  FILTER,
 };
 
 class Operator {
