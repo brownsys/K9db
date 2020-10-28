@@ -81,7 +81,7 @@ schema = StructType([
 args = parser.parse_args()
 
 # create db output path!
-os.mkdir(os.path.join(args.dest_path, 'db'))
+os.makedirs(os.path.join(args.dest_path, 'db'), exist_ok=True)
 
 spark.read.json(args.data_path, schema=schema).limit(20).createOrReplaceTempView('comments')
 rdd = spark.sql("SELECT * FROM comments ORDER BY author").rdd.map(lambda r: (r['author'], r)) \
