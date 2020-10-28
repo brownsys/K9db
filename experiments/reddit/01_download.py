@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 import urllib
 from tqdm import tqdm
 
-parser = argparse.ArgumentParser(description='Flight data cleaning example (3 joins)')
+parser = argparse.ArgumentParser(description='Reddit data prep')
 parser.add_argument('--path', type=str, dest='dest_path', default='./data',
                     help='path where to save data to')
 
