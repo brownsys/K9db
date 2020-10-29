@@ -16,23 +16,20 @@ class FilterOperator : public Operator {
 
   explicit FilterOperator(std::vector<ColumnID>& cids,
                           std::vector<Ops>& comp_ops,
-                          std::vector<RecordData>& comp_vals) {
+                          std::vector<RecordData>& comp_vals)
+      : cids_(cids), ops_(comp_ops), vals_(comp_vals) {
     CHECK_EQ(cids.size(), comp_ops.size());
     CHECK_EQ(comp_ops.size(), comp_vals.size());
-    cid_ = cids;
-    op_ = comp_ops;
-    val_ = comp_vals;
   };
+
   OperatorType type() override { return OperatorType::FILTER; }
+
   bool process(std::vector<Record>& rs, std::vector<Record>& out_rs) override;
-  std::vector<ColumnID>& getCid() { return cid_; };
-  std::vector<Ops>& getOp() { return op_; };
-  std::vector<RecordData>& getVal() { return val_; };
 
  private:
-  std::vector<ColumnID> cid_;
-  std::vector<Ops> op_;
-  std::vector<RecordData> val_;
+  std::vector<ColumnID> cids_;
+  std::vector<Ops> ops_;
+  std::vector<RecordData> vals_;
 };
 
 }  // namespace dataflow

@@ -11,42 +11,37 @@ namespace dataflow {
 // with their corresponding columns
 bool FilterOperator::process(std::vector<Record>& rs,
                              std::vector<Record>& out_rs) {
-  std::vector<ColumnID> cids = getCid();
-  std::vector<Ops> ops = getOp();
-  std::vector<RecordData> vals = getVal();
-
   for (Record& r : rs) {
     bool flag = false;
-    for (size_t i = 0; i < cids.size(); i++) {
-      RecordData entry = r.raw_at(cids[i]);
-      switch (ops[i]) {
+    for (size_t i = 0; i < cids_.size(); i++) {
+      RecordData entry = r.raw_at(cids_[i]);
+      switch (ops_[i]) {
         case OpsEq:
-          flag = entry.as_val() == vals[i].as_val();
+          flag = entry.as_val() == vals_[i].as_val();
           break;
         case OpsLT:
-          flag = entry.as_val() < vals[i].as_val();
+          flag = entry.as_val() < vals_[i].as_val();
           break;
         case OpsLT_Eq:
-          flag = entry.as_val() <= vals[i].as_val();
+          flag = entry.as_val() <= vals_[i].as_val();
           break;
         case OpsGT:
-          flag = entry.as_val() > vals[i].as_val();
+          flag = entry.as_val() > vals_[i].as_val();
           break;
         case OpsGT_Eq:
-          flag = entry.as_val() >= vals[i].as_val();
+          flag = entry.as_val() >= vals_[i].as_val();
           break;
         case OpsN_Eq:
-          flag = entry.as_val() != vals[i].as_val();
+          flag = entry.as_val() != vals_[i].as_val();
           break;
       }
       if (!flag) {
         break;
       }
     }
-    if (!flag) {
-      continue;
+    if (flag) {
+      out_rs.push_back(std::move(r));
     }
-    out_rs.push_back(std::move(r));
   }
 
   return true;
