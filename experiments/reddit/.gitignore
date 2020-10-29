@@ -1,0 +1,7 @@
+.ipynb_checkpoints
+data/
+.idea/
+*.pyc
+__pycache__/
+.DS_Store
+sharded/
