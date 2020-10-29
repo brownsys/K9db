@@ -7,7 +7,7 @@
 
 namespace dataflow {
 
-// performs logical AND on the predicates(cid + comparision ooperator + value)
+// performs logical AND on the predicates(cid + comparison operator + value)
 // with their corresponding columns
 bool FilterOperator::process(std::vector<Record>& rs,
                              std::vector<Record>& out_rs) {
