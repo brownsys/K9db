@@ -3,6 +3,8 @@
 
 #include <vector>
 
+#include "glog/logging.h"
+
 #include "dataflow/operator.h"
 #include "dataflow/record.h"
 
@@ -15,8 +17,8 @@ class FilterOperator : public Operator {
   explicit FilterOperator(std::vector<ColumnID>& cids,
                           std::vector<Ops>& comp_ops,
                           std::vector<RecordData>& comp_vals) {
-    assert((cids.size() == comp_ops.size()) &&
-           (comp_ops.size() == comp_vals.size()));
+    CHECK_EQ(cids.size(), comp_ops.size());
+    CHECK_EQ(comp_ops.size(), comp_vals.size());
     cid_ = cids;
     op_ = comp_ops;
     val_ = comp_vals;
