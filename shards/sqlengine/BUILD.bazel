@@ -1,0 +1,51 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "engine",
+    srcs = [
+        "engine.cc",
+    ],
+    hdrs= [
+        "engine.h",
+    ],
+    deps = [
+        ":parser",
+        ":schema",
+        "//shards:state",
+        "@antlr4_runtimes//:cpp",
+        "@grammars-v4//:sqlparser",
+    ],
+    visibility = ["//shards:__subpackages__"],
+)
+
+cc_library(
+    name = "parser",
+        srcs = [
+        "parser.cc",
+    ],
+    hdrs= [
+        "parser.h",
+    ],
+    deps = [
+        "//shards/sqlengine/visitors:visitors",
+        "@antlr4_runtimes//:cpp",
+        "@grammars-v4//:sqlparser",
+    ],
+)
+
+cc_library(
+    name = "schema",
+    srcs = [
+        "schema.cc",
+    ],
+    hdrs= [
+        "schema.h",
+    ],
+    deps = [
+        "//shards/sqlengine/visitors:visitors",
+        "//shards:state",
+        "@antlr4_runtimes//:cpp",
+        "@absl//absl/strings",
+        "@grammars-v4//:sqlparser",
+    ],
+)

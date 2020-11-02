@@ -1,0 +1,37 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_binary")
+
+cc_library(
+    name = "shards",
+    srcs = [
+        "shards.cc",
+    ],
+    hdrs= [
+        "shards.h",
+    ],
+    deps = [
+        ":state",
+        "//shards/sqlengine:engine",
+    ],
+)
+
+cc_library(
+    name = "state",
+    srcs = [
+        "state.cc",
+    ],
+    hdrs= [
+        "state.h",
+    ],
+    deps = [],
+    visibility = ["//shards:__subpackages__"],
+)
+
+cc_binary(
+    name = "cli",
+    srcs = [
+        "cli.cc",
+    ],
+    deps = [
+        ":shards",
+    ],
+)

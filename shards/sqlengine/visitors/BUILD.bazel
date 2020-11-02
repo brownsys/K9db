@@ -1,0 +1,19 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "visitors",
+    srcs = [
+        "stringify.cc",
+        "valid.cc",
+    ],
+    hdrs= [
+        "default.h",
+        "stringify.h",
+        "valid.h",
+    ],
+    deps = [
+        "@antlr4_runtimes//:cpp",
+        "@grammars-v4//:sqlparser",
+    ],
+    visibility = ["//shards:__subpackages__"],
+)

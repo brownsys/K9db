@@ -1,6 +1,15 @@
+# Optional per-user config goes into user.bazelrc, which is .gitignore-ed.
+try-import user.bazelrc
+
 build:asan --strip=never
 build:asan --copt -fsanitize=address
 build:asan --copt -g
 build:asan --copt -O1
 build:asan --copt -fno-omit-frame-pointer
 build:asan --linkopt -fsanitize=address
+build:asan --cxxopt="-std=c++17"
+build:asan --host_cxxopt="-std=c++17"
+
+# c++17
+build --cxxopt="-std=c++17"
+build --host_cxxopt="-std=c++17"
