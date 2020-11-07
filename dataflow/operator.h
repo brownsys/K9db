@@ -16,6 +16,7 @@ enum OperatorType {
   IDENTITY,
   MAT_VIEW,
   FILTER,
+  UNION,
 };
 
 class Operator {
