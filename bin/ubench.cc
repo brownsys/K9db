@@ -43,6 +43,24 @@ static void BM_MatViewInsert(benchmark::State& state) {
   }
 }
 
+static void BM_MatViewBatchInsert(benchmark::State& state) {
+  std::vector<dataflow::ColumnID> kc = {0};
+  auto op = std::make_shared<dataflow::MatViewOperator>(kc);
+
+  std::vector<dataflow::Record> rs = {};
+  for (int i = 0; i < state.range(0); ++i) {
+    std::vector<dataflow::RecordData> rd = {dataflow::RecordData(i),
+                                            dataflow::RecordData(i + 1)};
+    rs.push_back(dataflow::Record(true, rd, 3ULL));
+  }
+  std::vector<dataflow::Record> out_rs;
+
+  for (auto _ : state) {
+    op->process(rs, out_rs);
+  }
+}
+
 BENCHMARK(BM_MatViewInsert);
+BENCHMARK(BM_MatViewBatchInsert)->Arg(10)->Arg(100)->Arg(1000);
 
 BENCHMARK_MAIN();
