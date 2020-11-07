@@ -39,6 +39,14 @@ http_archive(
   sha256 = "f28359aeba12f30d73d9e4711ef356dc842886968112162bc73002645139c39c",
 )
 
+# Google Benchmark library for microbenchmarks
+http_archive(
+  name = "gbenchmark",
+  urls = ["https://github.com/google/benchmark/archive/v1.5.2.tar.gz"],
+  strip_prefix = "benchmark-1.5.2",
+  sha256 = "dccbdab796baa1043f04982147e67bb6e118fe610da2c65f88912d73987e700c",
+)
+
 # C++ rules for Bazel.
 http_archive(
   name = "rules_cc",
