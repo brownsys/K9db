@@ -2,9 +2,10 @@
 
 #include <memory>
 
+#include "gtest/gtest.h"
+
 #include "dataflow/operator.h"
 #include "dataflow/record.h"
-#include "gtest/gtest.h"
 
 namespace dataflow {
 
