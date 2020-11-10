@@ -2,6 +2,8 @@
 
 #include "shards/sqlengine/parser.h"
 
+#include <iostream>
+
 #include "shards/sqlengine/visitors/valid.h"
 
 namespace shards {

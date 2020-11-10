@@ -2,13 +2,13 @@
 #ifndef SHARDS_SQLENGINE_VISITORS_VALID_H_
 #define SHARDS_SQLENGINE_VISITORS_VALID_H_
 
-#include "SQLiteParserBaseVisitor.h"
+#include "shards/sqlengine/visitors/default.h"
 
 namespace shards {
 namespace sqlengine {
 namespace visitors {
 
-class Valid : public sqlparser::SQLiteParserBaseVisitor {
+class Valid : public Default {
  public:
   antlrcpp::Any defaultResult() override;
   antlrcpp::Any visitTerminal(antlr4::tree::TerminalNode *_) override;
@@ -83,6 +83,8 @@ class Valid : public sqlparser::SQLiteParserBaseVisitor {
       sqlparser::SQLiteParser::Detach_stmtContext *context) override;
   antlrcpp::Any visitDrop_stmt(
       sqlparser::SQLiteParser::Drop_stmtContext *context) override;
+  antlrcpp::Any visitExpr_list(
+      sqlparser::SQLiteParser::Expr_listContext *ctx) override;
   antlrcpp::Any visitExpr(
       sqlparser::SQLiteParser::ExprContext *context) override;
   antlrcpp::Any visitRaise_function(

@@ -138,6 +138,11 @@ class Default : public sqlparser::SQLiteParserBaseVisitor {
     throw "Unsupported SQL Syntax!";
   }
 
+  antlrcpp::Any visitExpr_list(
+      sqlparser::SQLiteParser::Expr_listContext *ctx) override {
+    throw "Unsupported SQL Syntax!";
+  }
+
   antlrcpp::Any visitExpr(sqlparser::SQLiteParser::ExprContext *ctx) override {
     throw "Unsupported SQL Syntax!";
   }

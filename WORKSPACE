@@ -80,7 +80,7 @@ new_git_repository(
     #remote = "https://github.com/antlr/grammars-v4",
     remote = "https://github.com/KinanBab/grammars-v4.git",
     #commit = "9514c04a33a0cf157853334105f32fc914e4f1de",  # My Fix on Oct 27 2020
-    commit = "9a9fd250ee8ac99169be8f645250aa097e459268",  # My non-merged fix from Oct 29 2020
+    commit = "ead0c4b7ec6a41a602bf35c631bf398729268af1",  # My non-merged second fix from Nov 10 2020
     build_file_content = """
 load("@rules_antlr//antlr:antlr4.bzl", "antlr")
 

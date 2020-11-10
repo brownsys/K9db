@@ -14,14 +14,20 @@
 #ifndef SHARDS_SQLENGINE_ENGINE_H_
 #define SHARDS_SQLENGINE_ENGINE_H_
 
+#include <list>
 #include <string>
+#include <utility>
 
 #include "shards/state.h"
 
 namespace shards {
 namespace sqlengine {
 
-void Rewrite(const std::string &sql, SharderState *state);
+using ShardSuffix = std::string;
+using SQLStatement = std::string;
+
+std::list<std::pair<ShardSuffix, SQLStatement>> Rewrite(const std::string &sql,
+                                                        SharderState *state);
 
 }  // namespace sqlengine
 }  // namespace shards

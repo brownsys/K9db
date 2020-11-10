@@ -2,7 +2,7 @@
 #include "shards/shards.h"
 
 // libsqlite3-dev, -lsqlite3
-// #include <sqlite3.h>
+//
 #include <iostream>
 
 #include "shards/sqlengine/engine.h"
@@ -16,7 +16,13 @@ bool open(const std::string &directory, SharderState *state) {
 
 bool exec(SharderState *state, const std::string &sql, Callback callback,
           void *context, char **errmsg) {
-  sqlengine::Rewrite(sql, state);
+  for (const auto &[shard_suffix, sql_statement] :
+       sqlengine::Rewrite(sql, state)) {
+    if (!state->ExecuteStatement(shard_suffix, sql_statement)) {
+      // TODO: we probably need some *transactional* notion here about failures.
+      return false;
+    }
+  }
   return true;
 }
 

@@ -40,6 +40,13 @@ class Stringify : public Default {
   antlrcpp::Any visitForeign_key_clause(
       sqlparser::SQLiteParser::Foreign_key_clauseContext *ctx) override;
 
+  // Insert.
+  antlrcpp::Any visitInsert_stmt(
+      sqlparser::SQLiteParser::Insert_stmtContext *ctx) override;
+  antlrcpp::Any visitExpr_list(
+      sqlparser::SQLiteParser::Expr_listContext *ctx) override;
+  antlrcpp::Any visitExpr(sqlparser::SQLiteParser::ExprContext *ctx) override;
+
   // Building blocks.
   antlrcpp::Any visitIndexed_column(
       sqlparser::SQLiteParser::Indexed_columnContext *ctx) override;

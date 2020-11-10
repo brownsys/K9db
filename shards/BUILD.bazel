@@ -22,7 +22,9 @@ cc_library(
     hdrs= [
         "state.h",
     ],
-    deps = [],
+    deps = [
+        "//shards/sqlconnections:pool",
+    ],
     visibility = ["//shards:__subpackages__"],
 )
 

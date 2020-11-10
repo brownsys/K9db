@@ -102,6 +102,48 @@ antlrcpp::Any Stringify::visitForeign_key_clause(
   return str;
 }
 
+// Insert.
+antlrcpp::Any Stringify::visitInsert_stmt(
+    sqlparser::SQLiteParser::Insert_stmtContext *ctx) {
+  std::string str = "INSERT INTO ";
+  // table name and columns.
+  str += ctx->table_name()->accept(this).as<std::string>();
+  if (ctx->column_name().size() > 0) {
+    str += "(";
+    str += ctx->column_name(0)->accept(this).as<std::string>();
+    for (size_t i = 1; i < ctx->column_name().size(); i++) {
+      str += ", " + ctx->column_name(i)->accept(this).as<std::string>();
+    }
+    str += ")";
+  }
+  // values.
+  str += " VALUES ";
+  for (size_t i = 0; i < ctx->expr_list().size(); i++) {
+    if (i > 0) {
+      str += ", ";
+    }
+    str += ctx->expr_list(i)->accept(this).as<std::string>();
+  }
+  return str;
+}
+
+antlrcpp::Any Stringify::visitExpr_list(
+    sqlparser::SQLiteParser::Expr_listContext *ctx) {
+  std::string str = "(";
+  for (size_t i = 0; i < ctx->expr().size(); i++) {
+    if (i > 0) {
+      str += ", ";
+    }
+    str += ctx->expr(i)->accept(this).as<std::string>();
+  }
+  str += ")";
+  return str;
+}
+
+antlrcpp::Any Stringify::visitExpr(sqlparser::SQLiteParser::ExprContext *ctx) {
+  return ctx->literal_value()->accept(this);
+}
+
 // Building blocks.
 antlrcpp::Any Stringify::visitIndexed_column(
     sqlparser::SQLiteParser::Indexed_columnContext *ctx) {

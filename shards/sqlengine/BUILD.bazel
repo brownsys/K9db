@@ -10,7 +10,8 @@ cc_library(
     ],
     deps = [
         ":parser",
-        ":schema",
+        ":create",
+        ":insert",
         "//shards:state",
         "@antlr4_runtimes//:cpp",
         "@grammars-v4//:sqlparser",
@@ -34,18 +35,35 @@ cc_library(
 )
 
 cc_library(
-    name = "schema",
+    name = "create",
     srcs = [
-        "schema.cc",
+        "create.cc",
     ],
     hdrs= [
-        "schema.h",
+        "create.h",
     ],
     deps = [
         "//shards/sqlengine/visitors:visitors",
         "//shards:state",
         "@antlr4_runtimes//:cpp",
         "@absl//absl/strings",
+        "@grammars-v4//:sqlparser",
+    ],
+)
+
+cc_library(
+    name = "insert",
+    srcs = [
+        "insert.cc",
+    ],
+    hdrs= [
+        "insert.h",
+    ],
+    deps = [
+        "//shards/sqlengine/visitors:visitors",
+        "//shards:state",
+        "@antlr4_runtimes//:cpp",
+        "@absl//absl/strings:str_format",
         "@grammars-v4//:sqlparser",
     ],
 )

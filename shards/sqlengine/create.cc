@@ -1,11 +1,12 @@
 // CREATE TABLE statements sharding and rewriting.
 
-#include "shards/sqlengine/schema.h"
+#include "shards/sqlengine/create.h"
 
 #include <iostream>
 #include <list>
 #include <optional>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -17,7 +18,7 @@
 
 namespace shards {
 namespace sqlengine {
-namespace schema {
+namespace create {
 
 namespace {
 
@@ -50,16 +51,20 @@ bool HasPII(sqlparser::SQLiteParser::Create_table_stmtContext *stmt) {
 
 // Figures out which shard kind this table should belong to.
 // Currently, we expect only a single foreign key to be linked to a PII table
-// or to another table in some shard. This table ias assigned to the shard
+// or to another table in some shard. This table is assigned to the shard
 // defined by that PII table, or to the same shard that the target table is in.
 // Having multiple such foreign keys results in a runtime error.
-std::optional<std::pair<ColumnName, ShardKind>> DetermineShardKind(
-    sqlparser::SQLiteParser::Create_table_stmtContext *stmt,
-    SharderState *state) {
+std::optional<std::tuple<ColumnName, ColumnIndex, ShardKind>>
+DetermineShardKind(sqlparser::SQLiteParser::Create_table_stmtContext *stmt,
+                   SharderState *state) {
   // Result is none by default.
-  std::optional<std::pair<ColumnName, ShardKind>> result;
+  std::optional<std::tuple<ColumnName, ColumnIndex, ShardKind>> result;
+  std::unordered_map<ColumnName, ColumnIndex> index_map;
   // Check column definitions for inlined foreign key constraints.
+  int index = 0;
   for (auto *column : stmt->column_def()) {
+    ColumnName column_name = column->column_name()->getText();
+    index_map.insert({column_name, index});
     for (auto *constraint : column->column_constraint()) {
       auto *foreign_key = constraint->foreign_key_clause();
       if (foreign_key != nullptr) {
@@ -71,17 +76,18 @@ std::optional<std::pair<ColumnName, ShardKind>> DetermineShardKind(
           if (result.has_value()) {
             throw "Table with several foreign keys to shards or PII!";
           }
-
-          ColumnName column_name = column->column_name()->getText();
           if (foreign_pii) {
-            result = std::make_pair(column_name, foreign_table);
+            result = std::make_tuple(column_name, index, foreign_table);
           }
           if (foreign_shard.has_value()) {
-            result = std::make_pair(column_name, foreign_shard.value());
+            // Our insert rewriting logic does not support this case yet!
+            throw "Indirect sharding is not supported!";
+            result = std::make_tuple(column_name, index, foreign_shard.value());
           }
         }
       }
     }
+    index++;
   }
   // Check standalone table constraints.
   for (auto *constraint : stmt->table_constraint()) {
@@ -101,11 +107,15 @@ std::optional<std::pair<ColumnName, ShardKind>> DetermineShardKind(
         }
 
         ColumnName column_name = constraint->column_name(0)->getText();
+        ColumnIndex column_index = index_map.at(column_name);
         if (foreign_pii) {
-          result = std::make_pair(column_name, foreign_table);
+          result = std::make_tuple(column_name, column_index, foreign_table);
         }
         if (foreign_shard.has_value()) {
-          result = std::make_pair(column_name, foreign_shard.value());
+          // Our insert rewriting logic does not support this case yet!
+          throw "Indirect sharding is not supported!";
+          result =
+              std::make_tuple(column_name, column_index, foreign_shard.value());
         }
       }
     }
@@ -166,7 +176,7 @@ void RemoveForeignKeyConstraint(
           dynamic_cast<sqlparser::SQLiteParser::Column_constraintContext *>(
               child);
       if (constraint->foreign_key_clause() != nullptr) {
-        break;
+        continue;
       }
     }
     remaining_children.push_back(child);
@@ -252,8 +262,9 @@ void UpdateTableSchema(sqlparser::SQLiteParser::Create_table_stmtContext *stmt,
 
 }  // namespace
 
-void Rewrite(sqlparser::SQLiteParser::Create_table_stmtContext *stmt,
-             SharderState *state) {
+std::list<std::pair<std::string, std::string>> Rewrite(
+    sqlparser::SQLiteParser::Create_table_stmtContext *stmt,
+    SharderState *state) {
   std::string table_name = stmt->table_name()->getText();
   if (state->Exists(table_name)) {
     throw "Table already exists!";
@@ -262,23 +273,22 @@ void Rewrite(sqlparser::SQLiteParser::Create_table_stmtContext *stmt,
   // Determine if this table is special: maybe it has PII fields, or maybe it
   // is linked to an existing shard via a foreign key.
   bool has_pii = HasPII(stmt);
-  std::optional<std::pair<ColumnName, ShardKind>> linked =
+  std::optional<std::tuple<ColumnName, ColumnIndex, ShardKind>> linked =
       DetermineShardKind(stmt, state);
   if (has_pii && linked.has_value()) {
     throw "Sharded Table cannot have PII fields!";
   }
 
   visitors::Stringify stringify;
-  std::cout << stmt->accept(&stringify).as<std::string>() << std::endl;
-
+  std::list<std::pair<std::string, std::string>> result;
   // Case 1: has pii but not linked to shards.
   // This means that this table define a type of user for which shards must be
   // created! Hence, it is a shard kind!
   if (has_pii && !linked.has_value()) {
     std::string create_table_str = stmt->accept(&stringify).as<std::string>();
-    std::cout << "PII:   " << create_table_str << std::endl;
     state->AddShardKind(table_name);
     state->AddUnshardedTable(table_name, create_table_str);
+    result.push_back(std::make_pair("default", create_table_str));
   }
 
   // Case 2: no pii but is linked to shards.
@@ -286,25 +296,27 @@ void Rewrite(sqlparser::SQLiteParser::Create_table_stmtContext *stmt,
   // is linked to. We must also drop the foreign key column(s) that link it to
   // the shard.
   if (!has_pii && linked.has_value()) {
-    auto [column_name, shard_kind] = linked.value();
+    auto [column_name, column_index, shard_kind] = linked.value();
     ForeignKeyShards fk_shards = ShardForeignKeys(stmt, shard_kind, state);
     fk_shards[column_name] = FK_REMOVED;
     UpdateTableSchema(stmt, fk_shards);
     std::string create_table_str = stmt->accept(&stringify).as<std::string>();
-    std::cout << "Sharded:   " << create_table_str << std::endl;
-    std::cout << "Shard kind: " << shard_kind << std::endl;
-    state->AddShardedTable(table_name, shard_kind, create_table_str);
+    state->AddShardedTable(table_name, shard_kind,
+                           std::make_pair(column_name, column_index),
+                           create_table_str);
   }
 
   // Case 3: neither pii nor linked.
   // The table does not belong to a shard and needs no further modification!
   if (!has_pii && !linked.has_value()) {
     std::string create_table_str = stmt->accept(&stringify).as<std::string>();
-    std::cout << "Plain:   " << create_table_str << std::endl;
     state->AddUnshardedTable(table_name, create_table_str);
+    result.push_back(std::make_pair("default", create_table_str));
   }
+
+  return result;
 }
 
-}  // namespace schema
+}  // namespace create
 }  // namespace sqlengine
 }  // namespace shards

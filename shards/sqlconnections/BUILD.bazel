@@ -1,0 +1,16 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "pool",
+    srcs = [
+        "pool.cc",
+    ],
+    hdrs= [
+        "pool.h",
+    ],
+    deps = [],
+    linkopts = [
+        "-lsqlite3",
+    ],
+    visibility = ["//shards:__subpackages__"],
+)

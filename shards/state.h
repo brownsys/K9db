@@ -7,10 +7,14 @@
 #ifndef SHARDS_STATE_H_
 #define SHARDS_STATE_H_
 
+#include <list>
 #include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
+
+#include "shards/sqlconnections/pool.h"
 
 namespace shards {
 
@@ -39,6 +43,8 @@ using UserId = std::string;
 
 using ColumnName = std::string;
 
+using ColumnIndex = int;
+
 // Valid SQL CreateTable statement formatted and ready to use to create
 // some table.
 using CreateStatement = std::string;
@@ -57,6 +63,9 @@ class SharderState {
   // Destructor.
   ~SharderState() {}
 
+  // Accessors.
+  const std::string &dir_path() { return this->dir_path_; }
+
   // Initialization.
   void Initialize(const std::string &dir_path);
 
@@ -67,21 +76,27 @@ class SharderState {
                          const CreateStatement &create_statement);
 
   void AddShardedTable(const TableName &table, const ShardKind &kind,
+                       const std::pair<ColumnName, ColumnIndex> &shard_by,
                        const CreateStatement &create_statement);
 
-  void AddTablePrimaryKeys(const TableName &table,
-                           std::unordered_set<ColumnName> &&keys);
+  std::list<CreateStatement> CreateShard(const ShardKind &shard_kind,
+                                         const UserId &user);
 
   // Schema lookups.
   bool Exists(const TableName &table) const;
 
-  bool ExistsInShardKind(const ShardKind &shard, const TableName &table) const;
-
   std::optional<ShardKind> ShardKindOf(const TableName &table) const;
+
+  std::optional<std::pair<ColumnName, ColumnIndex>> ShardedBy(
+      const TableName &table) const;
 
   bool IsPII(const TableName &table) const;
 
-  const std::unordered_set<ColumnName> &TableKeys(const TableName &table) const;
+  bool ShardExists(const ShardKind &shard_kind, const UserId &user) const;
+
+  // Sqlite3 Connection pool interace.
+  bool ExecuteStatement(const std::string &shard_suffix,
+                        const std::string &sql_statement);
 
  private:
   // Directory in which all shards are stored.
@@ -92,12 +107,21 @@ class SharderState {
 
   // Maps a shard kind into the names of all contained tables.
   // Invariant: a table can at most belong to one shard kind.
-  std::unordered_map<ShardKind, std::unordered_set<TableName>> kind_to_tables_;
+  std::unordered_map<ShardKind, std::list<TableName>> kind_to_tables_;
 
   // Inverse mapping of kind_to_tables.
   // If a table is unmapped by this map, then it does not belong to any shard
   // kind, and data in it are not owned or related to any user.
   std::unordered_map<TableName, ShardKind> table_to_kind_;
+
+  // Maps a table to the column name containing the data it is sharded by.
+  // This column is a foreign key to a PII table or to another table in the
+  // shard. This column is removed from the sharded schema of this table, and
+  // only exists logically in the pre-sharded schema.
+  // Column index is the index of the column in the pre-sharded table definition
+  // and it is used to rewrite statements that rely on the order of columns
+  // without specifying them explicitly.
+  std::unordered_map<TableName, std::pair<ColumnName, ColumnIndex>> sharded_by_;
 
   // Stores all the users identifiers which already have had shards
   // created for them.
@@ -107,8 +131,8 @@ class SharderState {
   // This can be used to create that table in a new shard.
   std::unordered_map<TableName, CreateStatement> schema_;
 
-  // Maps a table to the set of its primary keys.
-  std::unordered_map<TableName, std::unordered_set<ColumnName>> primary_keys_;
+  // Connection pool that manages the underlying sqlite3 databases.
+  sqlconnections::ConnectionPool pool_;
 };
 
 }  // namespace shards

@@ -23,11 +23,10 @@ antlrcpp::Any Valid::aggregateResult(antlrcpp::Any agg,
 // Valid Syntax.
 antlrcpp::Any Valid::visitSql_stmt(
     sqlparser::SQLiteParser::Sql_stmtContext *ctx) {
-  if (ctx->create_table_stmt() == nullptr) {
-    return false;
-  }
   return visitChildren(ctx);
 }
+
+// Create Table constructs.
 antlrcpp::Any Valid::visitCreate_table_stmt(
     sqlparser::SQLiteParser::Create_table_stmtContext *ctx) {
   if (ctx->TEMP() != nullptr || ctx->TEMPORARY() != nullptr ||
@@ -65,6 +64,32 @@ antlrcpp::Any Valid::visitForeign_key_clause(
   }
   return visitChildren(ctx);
 }
+
+// Insert constructs.
+antlrcpp::Any Valid::visitInsert_stmt(
+    sqlparser::SQLiteParser::Insert_stmtContext *ctx) {
+  if (ctx->REPLACE() != nullptr || ctx->OR() != nullptr ||
+      ctx->AS() != nullptr || ctx->select_stmt() != nullptr ||
+      ctx->upsert_clause() != nullptr || ctx->DEFAULT() != nullptr) {
+    return false;
+  }
+  if (ctx->expr_list().size() > 1) {
+    return false;
+  }
+  return visitChildren(ctx);
+}
+antlrcpp::Any Valid::visitExpr_list(
+    sqlparser::SQLiteParser::Expr_listContext *ctx) {
+  return visitChildren(ctx);
+}
+antlrcpp::Any Valid::visitExpr(sqlparser::SQLiteParser::ExprContext *ctx) {
+  if (ctx->literal_value() == nullptr) {
+    return false;
+  }
+  return visitChildren(ctx);
+}
+
+// Common constructs.
 antlrcpp::Any Valid::visitIndexed_column(
     sqlparser::SQLiteParser::Indexed_columnContext *ctx) {
   if (ctx->COLLATE() != nullptr || ctx->expr() != nullptr ||
@@ -209,15 +234,8 @@ antlrcpp::Any Valid::visitDrop_stmt(
     sqlparser::SQLiteParser::Drop_stmtContext *ctx) {
   return false;
 }
-antlrcpp::Any Valid::visitExpr(sqlparser::SQLiteParser::ExprContext *ctx) {
-  return false;
-}
 antlrcpp::Any Valid::visitRaise_function(
     sqlparser::SQLiteParser::Raise_functionContext *ctx) {
-  return false;
-}
-antlrcpp::Any Valid::visitInsert_stmt(
-    sqlparser::SQLiteParser::Insert_stmtContext *ctx) {
   return false;
 }
 antlrcpp::Any Valid::visitUpsert_clause(
