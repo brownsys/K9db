@@ -12,6 +12,7 @@ cc_library(
         "ops/input.cc",
         "ops/matview.cc",
         "ops/filter.cc",
+        "ops/equijoin.cc"
     ],
     hdrs = [
         "edge.h",
@@ -23,6 +24,7 @@ cc_library(
         "ops/input.h",
         "ops/matview.h",
         "ops/filter.h",
+        "ops/equijoin.h"
     ],
     copts = PELTON_DEFAULT_COPTS,
     visibility = ["//visibility:public"],
@@ -41,6 +43,7 @@ cc_test(
         "record_unittest.cc",
         "graph_unittest.cc",
         "ops/ops_filter_unittest.cc"
+        "ops/ops_equijoin_unittest.cc"
     ],
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
