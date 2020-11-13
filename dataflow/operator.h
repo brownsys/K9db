@@ -17,6 +17,7 @@ enum OperatorType {
   MAT_VIEW,
   FILTER,
   UNION,
+  AGGREGATE,
 };
 
 class Operator {
