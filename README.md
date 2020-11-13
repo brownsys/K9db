@@ -27,3 +27,12 @@ sanitizers and provides more helpful output on memory errors (e.g., segfaults).
 
 We follow [the Google C++ style guide](https://google.github.io/styleguide/cppguide.html);
 please run `clang-format` on your code before pushing.
+
+
+
+## IDE Setup
+### Mac OS X
+download VS Code (<https://code.visualstudio.com/docs/?dv=osx>), install there bazel and C++ plugin. Install also via brew following dependencies.
+```
+brew install bazel buildifier
+```

@@ -11,19 +11,20 @@ namespace dataflow {
 DataFlowGraph::DataFlowGraph() {}
 
 bool DataFlowGraph::AddInputNode(std::shared_ptr<InputOperator> op) {
-  return AddNode(OperatorType::INPUT, op, nullptr);
+  return AddNode(op, nullptr);
 }
 
-bool DataFlowGraph::AddNode(OperatorType type, std::shared_ptr<Operator> op,
-                            std::shared_ptr<Operator> parent) {
+bool DataFlowGraph::AddNode(std::shared_ptr<Operator> op,
+                            std::vector<std::shared_ptr<Operator>> parents) {
   NodeIndex idx = mint_node_index();
   op->set_index(idx);
 
   auto res = nodes_.emplace(idx, op);
 
-  if (parent != nullptr) {
-    CHECK(AddEdge(parent, op));
-  }
+  for(auto& parent : parents)
+    if (parent != nullptr) {
+      CHECK(AddEdge(parent, op));
+    }
 
   return res.second;
 }

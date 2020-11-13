@@ -13,6 +13,7 @@ cc_library(
         "ops/matview.cc",
         "ops/filter.cc",
         "ops/union.cc",
+        "ops/equijoin.cc",
     ],
     hdrs = [
         "edge.h",
@@ -28,6 +29,7 @@ cc_library(
         "ops/matview.h",
         "ops/filter.h",
         "ops/union.h",
+        "ops/equijoin.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -48,6 +50,8 @@ cc_test(
         "graph_unittest.cc",
         "ops/filter_unittest.cc",
         "ops/union_unittest.cc",
+        "ops/ops_filter_unittest.cc",
+        "ops/ops_equijoin_unittest.cc",
     ],
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
