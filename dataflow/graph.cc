@@ -68,7 +68,7 @@ std::vector<std::shared_ptr<MatViewOperator>> DataFlowGraph::outputs() const {
 }
 
 bool DataFlowGraph::Process(InputOperator& input, std::vector<Record> records) {
-  return input.ProcessAndForward(records);
+  return input.ProcessAndForward(UNDEFINED_NODE_INDEX, records);
 }
 
 }  // namespace dataflow
