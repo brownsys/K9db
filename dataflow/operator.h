@@ -9,9 +9,6 @@
 
 namespace dataflow {
 
-typedef uint32_t EdgeIndex;
-typedef uint32_t NodeIndex;
-
 class Edge;
 
 enum OperatorType {
@@ -19,6 +16,7 @@ enum OperatorType {
   IDENTITY,
   MAT_VIEW,
   FILTER,
+  UNION,
 };
 
 class Operator {

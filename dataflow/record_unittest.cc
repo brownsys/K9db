@@ -44,7 +44,7 @@ TEST(RecordTest, DataRep) {
 }
 
 TEST(RecordTest, Size) {
-  // should be 48 bytes
+  // should be 40 bytes
   EXPECT_EQ(sizeof(Record), 40);
 }
 
