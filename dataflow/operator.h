@@ -29,9 +29,14 @@ class Operator {
   virtual ~Operator() { graph_ = nullptr; }
 
   void AddParent(std::shared_ptr<Operator> parent, std::shared_ptr<Edge> edge);
+
+  virtual bool process(NodeIndex src_op_idx, std::vector<Record>& rs,
+                       std::vector<Record>& out_rs) {
+                         return process(rs, out_rs);
+                       }
   virtual bool process(std::vector<Record>& rs,
                        std::vector<Record>& out_rs) = 0;
-  bool ProcessAndForward(std::vector<Record>& rs);
+  bool ProcessAndForward(NodeIndex src_op_idx, std::vector<Record>& rs);
 
   virtual OperatorType type() = 0;
   NodeIndex index() const { return index_; }
@@ -40,7 +45,7 @@ class Operator {
   void set_graph(DataFlowGraph* graph) { graph_ = graph; }
 
   std::vector<std::shared_ptr<Operator>> parents() const;
-  
+
  private:
   NodeIndex index_;
   std::vector<std::weak_ptr<Edge>> children_;

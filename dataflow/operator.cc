@@ -14,10 +14,10 @@ void Operator::AddParent(std::shared_ptr<Operator> parent,
   parent->children_.push_back(std::weak_ptr<Edge>(edge));
 }
 
-bool Operator::ProcessAndForward(std::vector<Record>& rs) {
+bool Operator::ProcessAndForward(NodeIndex src_op_idx, std::vector<Record>& rs) {
   std::vector<Record> out;
 
-  if (!process(rs, out)) {
+  if (!process(src_op_idx, rs, out)) {
     return false;
   }
 
@@ -26,7 +26,7 @@ bool Operator::ProcessAndForward(std::vector<Record>& rs) {
     if (edge) {
       auto child = edge->to();
       auto fwd_rs = out;
-      if (!child.lock()->ProcessAndForward(fwd_rs)) {
+      if (!child.lock()->ProcessAndForward(src_op_idx, fwd_rs)) {
         return false;
       }
     }
