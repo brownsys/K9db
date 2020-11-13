@@ -13,13 +13,13 @@ namespace dataflow {
     class EquiJoin : public Operator {
     public:
 
-        explicit EquiJoin(Operator* left, Operator* right, ColumnID left_id, ColumnID right_id);
+        explicit EquiJoin(ColumnID left_id, ColumnID right_id);
     private:
         ColumnID left_id_;
         ColumnID right_id_;
 
-        Operator* left_;
-        Operator* right_;
+        std::shared_ptr<Operator> left() { assert(parents().size() == 2); return parents()[0]; }
+        std::shared_ptr<Operator> right() { assert(parents().size() == 2); return parents()[1]; }
     };
 }
 

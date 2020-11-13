@@ -34,4 +34,17 @@ bool Operator::ProcessAndForward(std::vector<Record>& rs) {
   return true;
 }
 
+std::vector<std::shared_ptr<Operator>> Operator::parents() const {
+  // lookup from graph
+  assert(graph_);
+
+  std::vector<std::shared_ptr<Operator>> nodes;
+  for(const auto& edge : parents_) {
+    CHECK_EQ(edge->to().lock().get(), this);
+    nodes.emplace_back(edge->from());
+  }
+
+  return nodes;
+}
+
 }  // namespace dataflow

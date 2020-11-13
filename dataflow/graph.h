@@ -28,6 +28,11 @@ class DataFlowGraph {
   std::vector<std::shared_ptr<InputOperator>> inputs() const;
   std::vector<std::shared_ptr<MatViewOperator>> outputs() const;
 
+  inline std::shared_ptr<Operator> GetNode(NodeIndex node_index) const {
+    auto it = nodes_.find(node_index);
+    return it == nodes_.end() ? nullptr : it->second;
+  }
+
  private:
   absl::node_hash_map<NodeIndex, std::shared_ptr<Operator>> nodes_;
   absl::node_hash_map<EdgeIndex, std::shared_ptr<Edge>> edges_;

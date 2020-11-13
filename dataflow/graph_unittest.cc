@@ -114,6 +114,18 @@ TEST(DataFlowGraphTest, SinglePathFilter) {
   }
 }
 
+TEST(DataFlowGraphTest, ParentChildren) {
+  DataFlowGraph g;
+  auto in = std::make_shared<InputOperator>();
+  auto ident = std::make_shared<IdentityOperator>();
+  g.AddInputNode(in);
+  g.AddNode(ident, in);
+
+  auto parents = ident->parents();
+  ASSERT_EQ(parents.size(), 1);
+  EXPECT_EQ(parents.front()->index(), in->index());
+}
+
 }  // namespace dataflow
 
 int main(int argc, char* argv[]) {
