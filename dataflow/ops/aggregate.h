@@ -11,7 +11,7 @@ namespace dataflow {
 
 class AggregateOperator : public Operator {
  public:
-  enum Func : unsigned char { FuncMax, FuncMin, FuncSum, FuncCount };
+  enum Func : unsigned char { FuncCount, FuncSum };
 
   OperatorType type() override { return OperatorType::AGGREGATE; }
   bool process(std::vector<Record>& rs, std::vector<Record>& out_rs) override;
