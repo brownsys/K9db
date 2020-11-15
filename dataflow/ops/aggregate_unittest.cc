@@ -9,14 +9,17 @@
 
 namespace dataflow {
 
-void compareRecordStreams(std::vector<Record>& rs1, std::vector<Record>& rs2){
-  //NOTE: Only compares records of size 2 (specific to these test cases)
+void compareRecordStreams(std::vector<Record>& rs1, std::vector<Record>& rs2) {
+  // NOTE: Only compares records of size 2 (specific to these test cases)
   EXPECT_EQ(rs1.size(), rs2.size());
-  //the records can be out of order, hence can't use EXPECT_EQ(proc_rs,expected_rs) for data comparision
-  for(size_t i = 0; i<rs1.size(); i++){
+  // the records can be out of order, hence can't use
+  // EXPECT_EQ(proc_rs,expected_rs) for data comparision
+  for (size_t i = 0; i < rs1.size(); i++) {
     bool flag = false;
-    for(size_t j = 0; j<rs2.size(); j++){
-      if(rs1[i].positive()==rs2[j].positive() && rs1[i].raw_at(0).as_val()==rs2[j].raw_at(0).as_val() && rs1[i].raw_at(1).as_val() == rs2[j].raw_at(1).as_val()){
+    for (size_t j = 0; j < rs2.size(); j++) {
+      if (rs1[i].positive() == rs2[j].positive() &&
+          rs1[i].raw_at(0).as_val() == rs2[j].raw_at(0).as_val() &&
+          rs1[i].raw_at(1).as_val() == rs2[j].raw_at(1).as_val()) {
         flag = true;
       }
     }
@@ -25,9 +28,10 @@ void compareRecordStreams(std::vector<Record>& rs1, std::vector<Record>& rs2){
 }
 
 TEST(AggregateOperatorTest, Sum) {
-  //Description: The test consists of two stages:
-  //STAGE1: records are fed for the first time, expect all out records to be positive
-  //STAGE2: a mix of positive and negative records are fed, out records can contain either positive or negative records.
+  // Description: The test consists of two stages:
+  // STAGE1: records are fed for the first time, expect all out records to be
+  // positive STAGE2: a mix of positive and negative records are fed, out records
+  // can contain either positive or negative records.
   std::vector<ColumnID> group_cols = {1};
   AggregateOperator::Func agg_func = AggregateOperator::FuncSum;
   ColumnID agg_col = 2;
@@ -59,7 +63,7 @@ TEST(AggregateOperatorTest, Sum) {
   rs.push_back(r3);
   rs.push_back(r4);
 
-  //STAGE1
+  // STAGE1
   EXPECT_TRUE(aggregate_op->process(rs, proc_rs));
 
   std::vector<RecordData> erd1 = {RecordData(2ULL), RecordData(16ULL)};
@@ -82,7 +86,7 @@ TEST(AggregateOperatorTest, Sum) {
   rs1.push_back(r5);
   rs1.push_back(r6);
 
-  //STAGE2
+  // STAGE2
   EXPECT_TRUE(aggregate_op->process(rs1, proc_rs1));
 
   std::vector<RecordData> erd3 = {RecordData(2ULL), RecordData(16ULL)};
@@ -97,9 +101,10 @@ TEST(AggregateOperatorTest, Sum) {
 }
 
 TEST(AggregateOperatorTest, Count) {
-  //Description: The test consists of two stages:
-  //STAGE1: records are fed for the first time, expect all out records to be positive
-  //STAGE2: a mix of positive and negative records are fed, out records can contain either positive or negative records.
+  // Description: The test consists of two stages:
+  // STAGE1: records are fed for the first time, expect all out records to be
+  // positive STAGE2: a mix of positive and negative records are fed, out records
+  // can contain either positive or negative records.
   std::vector<ColumnID> group_cols = {1};
   AggregateOperator::Func agg_func = AggregateOperator::FuncCount;
   ColumnID agg_col = 2;
@@ -131,7 +136,7 @@ TEST(AggregateOperatorTest, Count) {
   rs.push_back(r3);
   rs.push_back(r4);
 
-  //STAGE1
+  // STAGE1
   EXPECT_TRUE(aggregate_op->process(rs, proc_rs));
 
   std::vector<RecordData> erd1 = {RecordData(2ULL), RecordData(2ULL)};
@@ -148,7 +153,8 @@ TEST(AggregateOperatorTest, Count) {
                                  RecordData(6ULL)};
   std::vector<RecordData> rd6 = {RecordData(6ULL), RecordData(5ULL),
                                  RecordData(7ULL)};
-  std::vector<RecordData> rd7 = {RecordData(7ULL), RecordData(7ULL), RecordData(7ULL)};
+  std::vector<RecordData> rd7 = {RecordData(7ULL), RecordData(7ULL),
+                                 RecordData(7ULL)};
   Record r5(false, rd5, 3ULL);
   Record r6(true, rd6, 3ULL);
   Record r7(true, rd7, 3ULL);
@@ -159,7 +165,7 @@ TEST(AggregateOperatorTest, Count) {
   rs1.push_back(r8);
   rs1.push_back(r8);
 
-  //STAGE2
+  // STAGE2
   EXPECT_TRUE(aggregate_op->process(rs1, proc_rs1));
 
   std::vector<RecordData> erd3 = {RecordData(2ULL), RecordData(2ULL)};
@@ -177,7 +183,8 @@ TEST(AggregateOperatorTest, Count) {
   compareRecordStreams(proc_rs1, expected_rs1);
 
   // for (auto i : proc_rs) {
-  //   LOG(INFO) << "[OUT_RS]" << i.positive() << " : " << i.raw_at(0).as_val() << ", " << i.raw_at(1).as_val();
+  //   LOG(INFO) << "[OUT_RS]" << i.positive() << " : " << i.raw_at(0).as_val()
+  //   << ", " << i.raw_at(1).as_val();
   // }
 }
 
