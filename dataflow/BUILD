@@ -49,6 +49,9 @@ cc_test(
         "ops/filter_unittest.cc",
         "ops/union_unittest.cc",
         "ops/aggregate_unittest.cc",
+        "ops/matview_unittest.cc",
+        "ops/identity_unittest.cc",
+        "ops/input_unittest.cc",
     ],
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [

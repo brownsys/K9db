@@ -9,6 +9,7 @@
 namespace dataflow {
 
 class IdentityOperator : public Operator {
+public:
   OperatorType type() override { return OperatorType::IDENTITY; }
   bool process(std::vector<Record>& rs, std::vector<Record>& out_rs) override;
 };
