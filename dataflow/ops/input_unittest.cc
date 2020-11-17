@@ -1,14 +1,14 @@
+#include "dataflow/ops/input.h"
+
 #include <memory>
 
 #include "dataflow/operator.h"
-#include "dataflow/ops/input.h"
 #include "dataflow/record.h"
 #include "gtest/gtest.h"
 
 namespace dataflow {
 
 TEST(InputOperatorTest, Basic) {
-
   std::shared_ptr<InputOperator> input = std::make_shared<InputOperator>();
   std::vector<Record> rs;
   std::vector<Record> proc_rs;
@@ -31,7 +31,7 @@ TEST(InputOperatorTest, Basic) {
   rs.push_back(r3);
   rs.push_back(r4);
 
-  std::vector<Record> expected_rs = {r1,r2,r3,r4};
+  std::vector<Record> expected_rs = {r1, r2, r3, r4};
 
   EXPECT_TRUE(input->process(rs, proc_rs));
   EXPECT_EQ(proc_rs.size(), expected_rs.size());

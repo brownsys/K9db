@@ -45,7 +45,7 @@ std::vector<Record> MatViewOperator::multi_lookup(
   std::vector<Record> out;
   for (Key key : keys) {
     if (contents_.contains(key)) {
-      for(auto i: contents_.at(key)){
+      for (auto i : contents_.at(key)) {
         out.push_back(i);
       }
     }

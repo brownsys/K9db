@@ -1,16 +1,17 @@
+#include "dataflow/ops/matview.h"
+
 #include <memory>
 
 #include "dataflow/operator.h"
-#include "dataflow/ops/matview.h"
 #include "dataflow/record.h"
 #include "gtest/gtest.h"
 
 namespace dataflow {
 
 TEST(MatViewOperatorTest, Basic) {
-
   std::vector<ColumnID> keycol = {0};
-  std::shared_ptr<MatViewOperator> matview = std::make_shared<MatViewOperator>(keycol);
+  std::shared_ptr<MatViewOperator> matview =
+      std::make_shared<MatViewOperator>(keycol);
   std::vector<Record> rs;
   std::vector<Record> proc_rs;
 
@@ -37,8 +38,9 @@ TEST(MatViewOperatorTest, Basic) {
   std::vector<Record> expected_rs = {r3};
   EXPECT_EQ(matview->lookup(RecordData(3ULL)), expected_rs);
 
-  std::vector<RecordData> keys = {RecordData(1ULL), RecordData(2ULL), RecordData(3ULL), RecordData(4ULL)};
-  expected_rs = {r1,r2,r3,r4};
+  std::vector<RecordData> keys = {RecordData(1ULL), RecordData(2ULL),
+                                  RecordData(3ULL), RecordData(4ULL)};
+  expected_rs = {r1, r2, r3, r4};
   EXPECT_EQ(matview->multi_lookup(keys), expected_rs);
 }
 
