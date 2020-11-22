@@ -1,5 +1,6 @@
 #include "dataflow/graph.h"
 #include "dataflow/operator.h"
+#include "dataflow/ops/filter.h"
 #include "dataflow/ops/identity.h"
 #include "dataflow/ops/input.h"
 #include "dataflow/ops/matview.h"
@@ -12,7 +13,7 @@
 
 namespace dataflow {
 
-DataFlowGraph makeGraph() {
+DataFlowGraph makeTrivialGraph() {
   DataFlowGraph g;
 
   auto in = std::make_shared<InputOperator>();
@@ -27,10 +28,30 @@ DataFlowGraph makeGraph() {
   return g;
 }
 
-TEST(DataFlowGraphTest, Construct) { DataFlowGraph g = makeGraph(); }
+DataFlowGraph makeFilterGraph() {
+  DataFlowGraph g;
+
+  auto in = std::make_shared<InputOperator>();
+
+  std::vector<ColumnID> cids = {0, 1};
+  std::vector<FilterOperator::Ops> comp_ops = {FilterOperator::OpsGT_Eq,
+                                               FilterOperator::OpsEq};
+  std::vector<RecordData> filter_vals = {RecordData(10ULL), RecordData(6ULL)};
+  auto filter = std::make_shared<FilterOperator>(cids, comp_ops, filter_vals);
+
+  EXPECT_TRUE(g.AddInputNode(in));
+  EXPECT_TRUE(g.AddNode(OperatorType::FILTER, filter, in));
+  std::vector<ColumnID> keycol = {0};
+  EXPECT_TRUE(g.AddNode(OperatorType::MAT_VIEW,
+                        std::make_shared<MatViewOperator>(keycol), filter));
+
+  return g;
+}
+
+TEST(DataFlowGraphTest, Construct) { DataFlowGraph g = makeTrivialGraph(); }
 
 TEST(DataFlowGraphTest, Basic) {
-  DataFlowGraph g = makeGraph();
+  DataFlowGraph g = makeTrivialGraph();
 
   std::shared_ptr<InputOperator> in = g.inputs()[0];
   std::shared_ptr<MatViewOperator> out = g.outputs()[0];
@@ -50,6 +71,34 @@ TEST(DataFlowGraphTest, Basic) {
 
   EXPECT_TRUE(g.Process(*in, rs));
   EXPECT_EQ(out->lookup(key), rs);
+}
+
+TEST(DataFlowGraphTest, SinglePathFilter) {
+  DataFlowGraph g = makeFilterGraph();
+
+  std::shared_ptr<InputOperator> in = g.inputs()[0];
+  std::shared_ptr<MatViewOperator> out = g.outputs()[0];
+
+  RecordData key(42ULL);
+
+  std::vector<Record> rs1;
+  std::vector<RecordData> rd1 = {key, RecordData(6ULL)};
+  Record r1(true, rd1, 3ULL);
+  rs1.push_back(r1);
+
+  EXPECT_TRUE(g.Process(*in, rs1));
+  // record should be in mat view
+  EXPECT_EQ(out->lookup(key), rs1);
+
+  std::vector<Record> rs2;
+
+  std::vector<RecordData> rd2 = {key, RecordData(7ULL)};
+  Record r2(true, rd2, 3ULL);
+  rs2.push_back(r2);
+
+  EXPECT_TRUE(g.Process(*in, rs2));
+  // should still only have the first record
+  EXPECT_EQ(out->lookup(key), rs1);
 }
 
 }  // namespace dataflow
