@@ -34,8 +34,8 @@ DataFlowGraph makeFilterGraph() {
   auto in = std::make_shared<InputOperator>();
 
   std::vector<ColumnID> cids = {0, 1};
-  std::vector<FilterOperator::Ops> comp_ops = {FilterOperator::OpsGT_Eq,
-                                               FilterOperator::OpsEq};
+  std::vector<FilterOperator::Ops> comp_ops = {
+      FilterOperator::GreaterThanOrEqual, FilterOperator::Equal};
   std::vector<RecordData> filter_vals = {RecordData(10ULL), RecordData(6ULL)};
   auto filter = std::make_shared<FilterOperator>(cids, comp_ops, filter_vals);
 

@@ -16,22 +16,22 @@ bool FilterOperator::process(std::vector<Record>& rs,
     for (size_t i = 0; i < cids_.size(); i++) {
       RecordData entry = r.raw_at(cids_[i]);
       switch (ops_[i]) {
-        case OpsEq:
+        case Equal:
           flag = entry.as_val() == vals_[i].as_val();
           break;
-        case OpsLT:
+        case LessThan:
           flag = entry.as_val() < vals_[i].as_val();
           break;
-        case OpsLT_Eq:
+        case LessThanOrEqual:
           flag = entry.as_val() <= vals_[i].as_val();
           break;
-        case OpsGT:
+        case GreaterThan:
           flag = entry.as_val() > vals_[i].as_val();
           break;
-        case OpsGT_Eq:
+        case GreaterThanOrEqual:
           flag = entry.as_val() >= vals_[i].as_val();
           break;
-        case OpsN_Eq:
+        case NotEqual:
           flag = entry.as_val() != vals_[i].as_val();
           break;
       }
