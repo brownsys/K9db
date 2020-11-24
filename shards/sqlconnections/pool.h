@@ -1,7 +1,7 @@
 // Manages sqlite3 connections to the different shard/mini-databases.
 
-#ifndef SHARDS_SQLCONNECTIONS_POOL_
-#define SHARDS_SQLCONNECTIONS_POOL_
+#ifndef SHARDS_SQLCONNECTIONS_POOL_H_
+#define SHARDS_SQLCONNECTIONS_POOL_H_
 
 #include <sqlite3.h>
 
@@ -45,4 +45,4 @@ class ConnectionPool {
 }  // namespace sqlconnections
 }  // namespace shards
 
-#endif  // SHARDS_SQLCONNECTIONS_POOL_
+#endif  // SHARDS_SQLCONNECTIONS_POOL_H_

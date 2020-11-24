@@ -3,6 +3,10 @@
 #ifndef SHARDS_SQLENGINE_CREATE_H_
 #define SHARDS_SQLENGINE_CREATE_H_
 
+#include <list>
+#include <string>
+#include <utility>
+
 #include "SQLiteParser.h"
 #include "shards/state.h"
 

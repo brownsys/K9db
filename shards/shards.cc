@@ -19,7 +19,8 @@ bool exec(SharderState *state, const std::string &sql, Callback callback,
   for (const auto &[shard_suffix, sql_statement] :
        sqlengine::Rewrite(sql, state)) {
     if (!state->ExecuteStatement(shard_suffix, sql_statement)) {
-      // TODO: we probably need some *transactional* notion here about failures.
+      // TODO(babman): we probably need some *transactional* notion here
+      // about failures.
       return false;
     }
   }

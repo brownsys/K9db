@@ -4,6 +4,7 @@
 
 #include <list>
 
+// NOLINTNEXTLINE
 #include "antlr4-runtime.h"
 #include "shards/sqlengine/util.h"
 #include "shards/sqlengine/visitors/stringify.h"
