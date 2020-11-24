@@ -63,9 +63,14 @@ int main(int argc, char **argv) {
     }
 
     // Command has been fully read, execute it!
-    bool context = true;
-    shards::exec(&state, command, &Callback, reinterpret_cast<void *>(context),
-                 nullptr);
+    try {
+      bool context = true;
+      shards::exec(&state, command, &Callback,
+                   reinterpret_cast<void *>(context), nullptr);
+    } catch (const char *err_msg) {
+      std::cerr << "Error: " << err_msg << std::endl;
+      return 1;
+    }
 
     // Ready for next command.
     std::cout << ">>> " << std::flush;

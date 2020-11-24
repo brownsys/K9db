@@ -10,6 +10,7 @@ namespace shards {
 namespace sqlengine {
 namespace create {
 
+// <ShardSuffix, SQLStatement>
 std::list<std::pair<std::string, std::string>> Rewrite(
     sqlparser::SQLiteParser::Create_table_stmtContext *stmt,
     SharderState *state);

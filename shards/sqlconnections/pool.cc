@@ -2,8 +2,6 @@
 
 #include "shards/sqlconnections/pool.h"
 
-#include <iostream>
-
 namespace shards {
 namespace sqlconnections {
 
@@ -33,8 +31,7 @@ bool ConnectionPool::ExecuteStatement(const std::string &shard_suffix,
                      ConnectionPool::default_callback, 0, &err_msg);
   // Handle errors.
   if (result_code != SQLITE_OK) {
-    std::cout << "Execution error: " << err_msg << std::endl;
-    ::sqlite3_free(err_msg);
+    throw "SQLITE3 exeuction error!";
   }
   // Close connection (if needed).
   if (shard_suffix != "default") {

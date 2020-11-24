@@ -10,6 +10,7 @@
 #include <list>
 #include <optional>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -34,7 +35,14 @@ namespace shards {
 using ShardKind = std::string;
 
 // The name of a table from the original unsharded schema.
-using TableName = std::string;
+using UnshardedTableName = std::string;
+
+// The name of a table in the sharded schema.
+// Usually, this is the name of the original table this table corresponds to,
+// but has the sharding column name appended to it as a suffix.
+// This could also be exactly the same as the unsharded name if the table
+// is not sharded.
+using ShardedTableName = std::string;
 
 // A unique identifier that represents a user.
 // This is used to come up with shard names for new users, and to track
@@ -43,11 +51,25 @@ using UserId = std::string;
 
 using ColumnName = std::string;
 
-using ColumnIndex = int;
+using ColumnIndex = size_t;
 
 // Valid SQL CreateTable statement formatted and ready to use to create
 // some table.
 using CreateStatement = std::string;
+
+// Contains the details of how a given table is sharded.
+struct ShardingInformation {
+  // Which shard does this belong to (e.g. User, Doctor, Patient, etc)
+  ShardKind shard_kind;
+  // Name of the table after sharding.
+  ShardedTableName sharded_table_name;
+  // The column the table is sharded by. This is a column from the unsharded
+  // schema that is removed post-sharding, it can be deduced from the shard
+  // name.
+  ColumnName shard_by;
+  // The index of the sharding column in the table definition.
+  ColumnIndex shard_by_index;
+};
 
 class SharderState {
  public:
@@ -72,25 +94,25 @@ class SharderState {
   // Schema manipulations.
   void AddShardKind(const ShardKind &kind);
 
-  void AddUnshardedTable(const TableName &table,
+  void AddUnshardedTable(const UnshardedTableName &table,
                          const CreateStatement &create_statement);
 
-  void AddShardedTable(const TableName &table, const ShardKind &kind,
-                       const std::pair<ColumnName, ColumnIndex> &shard_by,
+  void AddShardedTable(const UnshardedTableName &table,
+                       const ShardingInformation &sharding_information,
                        const CreateStatement &create_statement);
 
   std::list<CreateStatement> CreateShard(const ShardKind &shard_kind,
                                          const UserId &user);
 
   // Schema lookups.
-  bool Exists(const TableName &table) const;
+  bool Exists(const UnshardedTableName &table) const;
 
-  std::optional<ShardKind> ShardKindOf(const TableName &table) const;
+  bool IsSharded(const UnshardedTableName &table) const;
 
-  std::optional<std::pair<ColumnName, ColumnIndex>> ShardedBy(
-      const TableName &table) const;
+  const std::list<ShardingInformation> &GetShardingInformation(
+      const UnshardedTableName &table) const;
 
-  bool IsPII(const TableName &table) const;
+  bool IsPII(const UnshardedTableName &table) const;
 
   bool ShardExists(const ShardKind &shard_kind, const UserId &user) const;
 
@@ -107,21 +129,21 @@ class SharderState {
 
   // Maps a shard kind into the names of all contained tables.
   // Invariant: a table can at most belong to one shard kind.
-  std::unordered_map<ShardKind, std::list<TableName>> kind_to_tables_;
+  std::unordered_map<ShardKind, std::list<ShardedTableName>> kind_to_tables_;
 
-  // Inverse mapping of kind_to_tables.
-  // If a table is unmapped by this map, then it does not belong to any shard
-  // kind, and data in it are not owned or related to any user.
-  std::unordered_map<TableName, ShardKind> table_to_kind_;
-
-  // Maps a table to the column name containing the data it is sharded by.
-  // This column is a foreign key to a PII table or to another table in the
-  // shard. This column is removed from the sharded schema of this table, and
-  // only exists logically in the pre-sharded schema.
-  // Column index is the index of the column in the pre-sharded table definition
-  // and it is used to rewrite statements that rely on the order of columns
-  // without specifying them explicitly.
-  std::unordered_map<TableName, std::pair<ColumnName, ColumnIndex>> sharded_by_;
+  // Maps a table to the its sharding information.
+  // If a table is unmapped by this map, then it is not sharded.
+  // A table mapped by this map is sharded (by one or more columns).
+  // Each entry in the mapped list specifies one such shard, including
+  // the name of the table when sharded that way, as well as the column it is
+  // sharded by.
+  // When a table is sharded in several ways, it means that multiple foreign
+  // keys were specified as OWNER, and data inserted into that table is
+  // duplicated along the shards.
+  // The shard by column is removed from the actual sharded table as it can be
+  // deduced from the shard.
+  std::unordered_map<UnshardedTableName, std::list<ShardingInformation>>
+      sharded_by_;
 
   // Stores all the users identifiers which already have had shards
   // created for them.
@@ -129,7 +151,7 @@ class SharderState {
 
   // Maps every table in the overall schema to its create table statement.
   // This can be used to create that table in a new shard.
-  std::unordered_map<TableName, CreateStatement> schema_;
+  std::unordered_map<ShardedTableName, CreateStatement> schema_;
 
   // Connection pool that manages the underlying sqlite3 databases.
   sqlconnections::ConnectionPool pool_;

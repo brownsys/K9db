@@ -2,8 +2,6 @@
 
 #include "shards/sqlengine/parser.h"
 
-#include <iostream>
-
 #include "shards/sqlengine/visitors/valid.h"
 
 namespace shards {
@@ -34,8 +32,6 @@ bool SQLParser::Parse(const std::string &sql) {
   // Make sure the constructs used in the statement are all supported!
   visitors::Valid valid;
   if (!statement_->accept(&valid).as<bool>()) {
-    std::cout << "SQL statement has unsupported construct or syntax!"
-              << std::endl;
     return false;
   }
 

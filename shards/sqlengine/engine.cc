@@ -16,7 +16,7 @@ std::list<std::pair<ShardSuffix, SQLStatement>> Rewrite(const std::string &sql,
   // Parse with ANTLR.
   parser::SQLParser parser;
   if (!parser.Parse(sql)) {
-    return {};
+    throw "SQL statement has unsupported construct or syntax!";
   }
 
   // Visit parsed statement!
@@ -36,7 +36,7 @@ std::list<std::pair<ShardSuffix, SQLStatement>> Rewrite(const std::string &sql,
     return insert::Rewrite(insert_stmt, state);
   }
 
-  return {};
+  throw "Unsupported SQL statement!";
 }
 
 }  // namespace sqlengine

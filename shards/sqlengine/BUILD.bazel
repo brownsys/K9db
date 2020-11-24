@@ -44,6 +44,7 @@ cc_library(
     ],
     deps = [
         "//shards/sqlengine/visitors:visitors",
+        "//shards/sqlengine:util",
         "//shards:state",
         "@antlr4_runtimes//:cpp",
         "@absl//absl/strings",
@@ -61,9 +62,24 @@ cc_library(
     ],
     deps = [
         "//shards/sqlengine/visitors:visitors",
+        "//shards/sqlengine:util",
         "//shards:state",
         "@antlr4_runtimes//:cpp",
-        "@absl//absl/strings:str_format",
         "@grammars-v4//:sqlparser",
+    ],
+)
+
+
+cc_library(
+    name = "util",
+    srcs = [
+        "util.cc",
+    ],
+    hdrs= [
+        "util.h",
+    ],
+    deps = [
+        "//shards:state",
+        "@absl//absl/strings",
     ],
 )

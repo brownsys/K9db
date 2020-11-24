@@ -30,55 +30,50 @@ void SharderState::AddShardKind(const ShardKind &kind) {
   this->shards_.insert({kind, {}});
 }
 
-void SharderState::AddUnshardedTable(const TableName &table,
+void SharderState::AddUnshardedTable(const UnshardedTableName &table,
                                      const CreateStatement &create_statement) {
   this->schema_.insert({table, create_statement});
 }
 
 void SharderState::AddShardedTable(
-    const TableName &table, const ShardKind &kind,
-    const std::pair<ColumnName, ColumnIndex> &shard_by,
+    const UnshardedTableName &table,
+    const ShardingInformation &sharding_information,
     const CreateStatement &create_statement) {
-  this->kind_to_tables_.at(kind).push_back(table);
-  this->table_to_kind_.insert({table, kind});
-  this->sharded_by_.insert({table, shard_by});
-  this->schema_.insert({table, create_statement});
+  // Record that the shard kind contains this sharded table.
+  this->kind_to_tables_.at(sharding_information.shard_kind).push_back(sharding_information.sharded_table_name);
+  // Map the unsharded name to its sharding information.
+  this->sharded_by_[table].push_back(sharding_information);
+  // Store the sharded schema.
+  this->schema_.insert({sharding_information.sharded_table_name, create_statement});
 }
 
 std::list<CreateStatement> SharderState::CreateShard(
     const ShardKind &shard_kind, const UserId &user) {
-  // Mark shard as created!
+  // Mark shard for this user as created!
   this->shards_.at(shard_kind).insert(user);
   // Return the create table statements.
   std::list<CreateStatement> result;
-  for (const TableName &table_name : this->kind_to_tables_.at(shard_kind)) {
-    result.push_back(this->schema_.at(table_name));
+  for (const ShardedTableName &table : this->kind_to_tables_.at(shard_kind)) {
+    result.push_back(this->schema_.at(table));
   }
   return result;
 }
 
 // Schema lookups.
-bool SharderState::Exists(const TableName &table) const {
-  return this->schema_.count(table) > 0;
+bool SharderState::Exists(const UnshardedTableName &table) const {
+  return this->schema_.count(table) > 0 || this->sharded_by_.count(table) > 0;
 }
 
-std::optional<ShardKind> SharderState::ShardKindOf(
-    const TableName &table) const {
-  if (this->table_to_kind_.count(table) == 1) {
-    return this->table_to_kind_.at(table);
-  }
-  return {};
+bool SharderState::IsSharded(const UnshardedTableName &table) const {
+  return this->sharded_by_.count(table) == 1;
 }
 
-std::optional<std::pair<ColumnName, ColumnIndex>> SharderState::ShardedBy(
-    const TableName &table) const {
-  if (this->sharded_by_.count(table) == 1) {
-    return this->sharded_by_.at(table);
-  }
-  return {};
+const std::list<ShardingInformation> &SharderState::GetShardingInformation(
+    const UnshardedTableName &table) const {
+  return this->sharded_by_.at(table);
 }
 
-bool SharderState::IsPII(const TableName &table) const {
+bool SharderState::IsPII(const UnshardedTableName &table) const {
   return this->kinds_.count(table) > 0;
 }
 
