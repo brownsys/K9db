@@ -14,15 +14,13 @@
 namespace shards {
 namespace sqlengine {
 
-inline ShardedTableName NameShardedTable(
-    const UnshardedTableName &table_name,
-    const ColumnName &shard_by_column) {
+inline ShardedTableName NameShardedTable(const UnshardedTableName &table_name,
+                                         const ColumnName &shard_by_column) {
   return absl::StrCat(table_name, "_", shard_by_column);
 }
 
-inline std::string NameShard(
-    const ShardKind &shard_kind,
-    const UserId &user_id) {
+inline std::string NameShard(const ShardKind &shard_kind,
+                             const UserId &user_id) {
   return absl::StrCat(shard_kind, "_", user_id);
 }
 

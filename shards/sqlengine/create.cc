@@ -13,8 +13,8 @@
 #include "absl/strings/match.h"
 // NOLINTNEXTLINE
 #include "antlr4-runtime.h"
-#include "shards/sqlengine/visitors/stringify.h"
 #include "shards/sqlengine/util.h"
+#include "shards/sqlengine/visitors/stringify.h"
 
 namespace shards {
 namespace sqlengine {
@@ -94,7 +94,7 @@ std::list<ShardingInformation> ShardTable(
   const std::string &table_name = stmt->table_name()->getText();
   // Check column definitions for inlined foreign key constraints.
   auto columns = stmt->column_def();
-  for (size_t index = 0; index <  columns.size(); index++) {
+  for (size_t index = 0; index < columns.size(); index++) {
     // Record index of column for later constraint processing.
     ColumnName column_name = columns[index]->column_name()->getText();
     index_map.insert({column_name, index});
@@ -109,12 +109,15 @@ std::list<ShardingInformation> ShardTable(
       bool explicit_owner = absl::StartsWith(column_name, "OWNER_");
       std::optional<ShardKind> shard_kind = ShouldShardBy(foreign_key, state);
       if (shard_kind.has_value()) {
-        std::string sharded_table_name = NameShardedTable(table_name, column_name);
+        std::string sharded_table_name =
+            NameShardedTable(table_name, column_name);
         // FK links to a shard, add it as either an explicit or implicit owner.
         if (explicit_owner) {
-          explicit_owners.push_back({shard_kind.value(), sharded_table_name, column_name, index});
+          explicit_owners.push_back(
+              {shard_kind.value(), sharded_table_name, column_name, index});
         } else {
-          implicit_owners.push_back({shard_kind.value(), sharded_table_name, column_name, index});
+          implicit_owners.push_back(
+              {shard_kind.value(), sharded_table_name, column_name, index});
         }
       }
     }
@@ -135,13 +138,16 @@ std::list<ShardingInformation> ShardTable(
       }
 
       ColumnName column_name = constraint->column_name(0)->getText();
-      std::string sharded_table_name = NameShardedTable(table_name, column_name);
+      std::string sharded_table_name =
+          NameShardedTable(table_name, column_name);
       ColumnIndex column_index = index_map.at(column_name);
       bool explicit_owner = absl::StartsWith(column_name, "OWNER_");
       if (explicit_owner) {
-        explicit_owners.push_back({shard_kind.value(), sharded_table_name, column_name, column_index});
+        explicit_owners.push_back({shard_kind.value(), sharded_table_name,
+                                   column_name, column_index});
       } else {
-        implicit_owners.push_back({shard_kind.value(), sharded_table_name, column_name, column_index});
+        implicit_owners.push_back({shard_kind.value(), sharded_table_name,
+                                   column_name, column_index});
       }
     }
   }
@@ -226,9 +232,11 @@ sqlparser::SQLiteParser::Column_defContext *RemoveForeignKeyConstraint(
           def->invokingState);
 
   for (antlr4::tree::ParseTree *child : def->children) {
-    if (antlrcpp::is<sqlparser::SQLiteParser::Column_constraintContext *>(child)) {
+    if (antlrcpp::is<sqlparser::SQLiteParser::Column_constraintContext *>(
+            child)) {
       sqlparser::SQLiteParser::Column_constraintContext *constraint =
-          dynamic_cast<sqlparser::SQLiteParser::Column_constraintContext *>(child);
+          dynamic_cast<sqlparser::SQLiteParser::Column_constraintContext *>(
+              child);
       if (constraint->foreign_key_clause() != nullptr) {
         continue;
       }
@@ -320,10 +328,11 @@ sqlparser::SQLiteParser::Create_table_stmtContext *UpdateTableSchema(
 
   // Change table name.
   // TODO(babman): improve copying?
-  antlr4::Token *symbol = result->table_name()->any_name()->IDENTIFIER()->getSymbol();
+  antlr4::Token *symbol =
+      result->table_name()->any_name()->IDENTIFIER()->getSymbol();
   *symbol = antlr4::CommonToken(symbol);
   static_cast<antlr4::CommonToken *>(symbol)->setText(sharded_table_name);
-  
+
   return result;
 }
 
@@ -340,7 +349,8 @@ std::list<std::pair<std::string, std::string>> Rewrite(
   // Determine if this table is special: maybe it has PII fields, or maybe it
   // is linked to an existing shard via a foreign key.
   bool has_pii = HasPII(stmt);
-  std::list<ShardingInformation> sharding_information = ShardTable(stmt, *state);
+  std::list<ShardingInformation> sharding_information =
+      ShardTable(stmt, *state);
   if (has_pii && sharding_information.size() > 0) {
     throw "Sharded Table cannot have PII fields!";
   }

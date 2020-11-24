@@ -40,11 +40,13 @@ void SharderState::AddShardedTable(
     const ShardingInformation &sharding_information,
     const CreateStatement &create_statement) {
   // Record that the shard kind contains this sharded table.
-  this->kind_to_tables_.at(sharding_information.shard_kind).push_back(sharding_information.sharded_table_name);
+  this->kind_to_tables_.at(sharding_information.shard_kind)
+      .push_back(sharding_information.sharded_table_name);
   // Map the unsharded name to its sharding information.
   this->sharded_by_[table].push_back(sharding_information);
   // Store the sharded schema.
-  this->schema_.insert({sharding_information.sharded_table_name, create_statement});
+  this->schema_.insert(
+      {sharding_information.sharded_table_name, create_statement});
 }
 
 std::list<CreateStatement> SharderState::CreateShard(

@@ -4,7 +4,5 @@
 #include "shards/sqlengine/util.h"
 
 namespace shards {
-namespace sqlengine {
-
-}  // namespace sqlengine
+namespace sqlengine {}  // namespace sqlengine
 }  // namespace shards

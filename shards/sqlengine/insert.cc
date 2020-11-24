@@ -5,8 +5,8 @@
 #include <list>
 
 #include "antlr4-runtime.h"
-#include "shards/sqlengine/visitors/stringify.h"
 #include "shards/sqlengine/util.h"
+#include "shards/sqlengine/visitors/stringify.h"
 
 namespace shards {
 namespace sqlengine {
@@ -28,14 +28,14 @@ size_t FindColumnIndex(sqlparser::SQLiteParser::Insert_stmtContext *stmt,
 
 // Get the specific value from the insert statement at the given index in the
 // value set.
-std::string GetValueByIndex(
-    sqlparser::SQLiteParser::Insert_stmtContext *stmt, size_t value_index) {
+std::string GetValueByIndex(sqlparser::SQLiteParser::Insert_stmtContext *stmt,
+                            size_t value_index) {
   // There must be only one set of values!
   sqlparser::SQLiteParser::Expr_listContext *values = stmt->expr_list(0);
   if (values->expr().size() < 2 || values->expr().size() <= value_index) {
     throw "Not enough values to insert into shard!";
   }
-  
+
   return values->expr().at(value_index)->getText();
 }
 
@@ -57,11 +57,11 @@ sqlparser::SQLiteParser::Insert_stmtContext *ShardStatement(
 
   result->children = std::vector(stmt->children);
   for (uint32_t i = 0; i < result->children.size(); i++) {
-    if (antlrcpp::is<sqlparser::SQLiteParser::Expr_listContext *>(result->children[i])) {
-      result->children[i] =
-          new sqlparser::SQLiteParser::Expr_listContext(
-              static_cast<antlr4::ParserRuleContext *>(result),
-              values->invokingState);
+    if (antlrcpp::is<sqlparser::SQLiteParser::Expr_listContext *>(
+            result->children[i])) {
+      result->children[i] = new sqlparser::SQLiteParser::Expr_listContext(
+          static_cast<antlr4::ParserRuleContext *>(result),
+          values->invokingState);
     }
   }
 
@@ -77,7 +77,8 @@ sqlparser::SQLiteParser::Insert_stmtContext *ShardStatement(
   }
 
   // Modify name.
-  antlr4::Token *symbol = result->table_name()->any_name()->IDENTIFIER()->getSymbol();
+  antlr4::Token *symbol =
+      result->table_name()->any_name()->IDENTIFIER()->getSymbol();
   *symbol = antlr4::CommonToken(symbol);
   static_cast<antlr4::CommonToken *>(symbol)->setText(sharded_table_name);
 
@@ -108,9 +109,10 @@ std::list<std::pair<std::string, std::string>> Rewrite(
   // Case 2: table is sharded!
   if (is_sharded) {
     // Duplicate the value for every shard this table has.
-    for (const ShardingInformation &sharding_info : state->GetShardingInformation(table_name)) {
+    for (const ShardingInformation &sharding_info :
+         state->GetShardingInformation(table_name)) {
       // Find the value corresponding to the shard by column.
-      ColumnIndex value_index = sharding_info.shard_by_index; 
+      ColumnIndex value_index = sharding_info.shard_by_index;
       if (stmt->column_name().size() > 0) {
         value_index = FindColumnIndex(stmt, sharding_info.shard_by);
       }
@@ -126,13 +128,15 @@ std::list<std::pair<std::string, std::string>> Rewrite(
       // TODO(babman): better to do this after user insert rather than user data
       //               insert.
       if (!state->ShardExists(sharding_info.shard_kind, value)) {
-        for (auto create_stmt : state->CreateShard(sharding_info.shard_kind, value)) {
+        for (auto create_stmt :
+             state->CreateShard(sharding_info.shard_kind, value)) {
           result.push_back(std::make_pair(shard_name, create_stmt));
         }
       }
 
       // Add the modified insert statement.
-      std::string insert_stmt_str = sharded_stmt->accept(&stringify).as<std::string>();
+      std::string insert_stmt_str =
+          sharded_stmt->accept(&stringify).as<std::string>();
       result.push_back(std::make_pair(shard_name, insert_stmt_str));
     }
   }
