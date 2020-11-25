@@ -19,11 +19,13 @@ namespace dataflow {
 class RecordData {
  public:
   RecordData(const Schema& schema) {
-    LOG(INFO) << "creating record with schema of "
-              << schema.num_inline_columns() << ", "
-              << schema.num_pointer_columns() << " columns";
     inline_data_ = new uint64_t[schema.num_inline_columns()];
     pointed_data_ = new uintptr_t[schema.num_pointer_columns()];
+
+    VLOG(10) << "creating record with schema of " << schema.num_inline_columns()
+             << ", " << schema.num_pointer_columns() << " columns";
+    VLOG(10) << "inlined data @ " << inline_data_ << "; pointed data @ "
+             << pointed_data_;
   };
 
   void Clear(const Schema& schema) {
