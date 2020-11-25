@@ -29,8 +29,12 @@ class RecordData {
   };
 
   void Clear(const Schema& schema) {
-    for (auto i = 0; i < schema.num_pointer_columns(); ++i) {
-      // delete pointed_data_[i];
+    for (auto i = 0;
+         i < schema.num_inline_columns() + schema.num_pointer_columns(); ++i) {
+      if (!is_inlineable(schema.TypeOf(i))) {
+        DeleteOwnedData(pointed_data_[schema.RawColumnIndex(i).second],
+                        schema.TypeOf(i));
+      }
     }
     delete pointed_data_;
     delete inline_data_;
@@ -39,6 +43,8 @@ class RecordData {
  private:
   uint64_t* inline_data_;
   uintptr_t* pointed_data_;
+
+  void DeleteOwnedData(uintptr_t ptr, DataType type);
 
   friend class Record;
   FRIEND_TEST(RecordTest, DataRep);

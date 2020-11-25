@@ -36,9 +36,13 @@ class Schema {
     }
   }
 
+  DataType TypeOf(size_t index) const {
+    BoundsCheckIndex(index);
+    return types_[index];
+  }
+
   std::pair<bool, size_t> RawColumnIndex(size_t index) const {
-    CHECK_LT(index, true_indices_.size())
-        << "column index " << index << " out of bounds";
+    BoundsCheckIndex(index);
     return true_indices_[index];
   }
 
@@ -50,6 +54,11 @@ class Schema {
   size_t num_inline_columns_;
   size_t num_pointer_columns_;
   std::vector<std::pair<bool, size_t>> true_indices_;
+
+  inline void BoundsCheckIndex(size_t index) const {
+    CHECK_LT(index, true_indices_.size())
+        << "column index " << index << " out of bounds";
+  }
 };
 
 }  // namespace dataflow

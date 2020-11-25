@@ -32,8 +32,6 @@ TEST(RecordTest, DataRep) {
   EXPECT_EQ(*static_cast<uint64_t*>(r[0]), v);
   EXPECT_EQ(*static_cast<std::string**>(r[1]), p);
   EXPECT_EQ(*static_cast<uint64_t*>(r[2]), v + 1);
-
-  delete p;
 }
 
 }  // namespace dataflow

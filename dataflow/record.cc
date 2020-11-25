@@ -2,6 +2,17 @@
 
 namespace dataflow {
 
+void RecordData::DeleteOwnedData(uintptr_t ptr, DataType type) {
+  switch (type) {
+    case TEXT:
+      delete reinterpret_cast<std::string*>(ptr);
+      break;
+    default:
+      LOG(FATAL) << "Tried to delete inline data (" << type
+                 << ") as if it was an owned pointer!";
+  }
+}
+
 const void* Record::at(size_t index) const {
   std::pair<bool, size_t> ri = schema_->RawColumnIndex(index);
   if (ri.first) {
