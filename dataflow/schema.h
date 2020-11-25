@@ -4,16 +4,16 @@
 namespace dataflow {
 
 enum DataType {
-  UINT,
-  INT,
-  TEXT,
-  DATETIME,
+  kUInt,
+  kInt,
+  kText,
+  kDatetime,
 };
 
 bool is_inlineable(DataType t) {
   switch (t) {
-    case UINT:
-    case INT:
+    case kUInt:
+    case kInt:
       return true;
     default:
       return false;

@@ -21,17 +21,17 @@ TEST(RecordTest, DataRep) {
   uint64_t v = 42;
   std::string* p = new std::string("hello");
 
-  std::vector<DataType> st = {UINT, TEXT, UINT};
+  std::vector<DataType> st = {kUInt, kText, kInt};
   Schema s(st);
   Record r(s);
   *static_cast<uint64_t*>(r[0]) = v;
   std::string** sp = static_cast<std::string**>(r[1]);
   *sp = p;
-  *static_cast<uint64_t*>(r[2]) = v + 1;
+  *static_cast<int64_t*>(r[2]) = v + 1;
 
   EXPECT_EQ(*static_cast<uint64_t*>(r[0]), v);
   EXPECT_EQ(*static_cast<std::string**>(r[1]), p);
-  EXPECT_EQ(*static_cast<uint64_t*>(r[2]), v + 1);
+  EXPECT_EQ(*static_cast<int64_t*>(r[2]), v + 1);
 }
 
 }  // namespace dataflow

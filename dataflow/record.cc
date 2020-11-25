@@ -4,12 +4,12 @@ namespace dataflow {
 
 void RecordData::DeleteOwnedData(uintptr_t ptr, DataType type) {
   switch (type) {
-    case TEXT:
+    case kText:
       delete reinterpret_cast<std::string*>(ptr);
       break;
     default:
-      LOG(FATAL) << "Tried to delete inline data (" << type
-                 << ") as if it was an owned pointer!";
+      LOG(FATAL)
+          << "Tried to delete inline data as if it was an owned pointer!";
   }
 }
 
