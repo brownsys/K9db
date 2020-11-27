@@ -36,4 +36,3 @@ bool Operator::ProcessAndForward(std::vector<Record>& rs) {
 }
 
 }  // namespace dataflow
-
