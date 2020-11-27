@@ -8,6 +8,7 @@ cc_library(
         #"graph.cc",
         "operator.cc",
         "record.cc",
+        "schema.cc",
         #"ops/identity.cc",
         #"ops/input.cc",
         #"ops/matview.cc",

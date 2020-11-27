@@ -1,6 +1,10 @@
 #ifndef PELTON_DATAFLOW_SCHEMA_H_
 #define PELTON_DATAFLOW_SCHEMA_H_
 
+#include <vector>
+
+#include "glog/logging.h"
+
 namespace dataflow {
 
 enum DataType {
@@ -12,21 +16,9 @@ enum DataType {
 
 class Schema {
  public:
-  Schema(std::vector<DataType> columns) : types_(columns) {
-    num_inline_columns_ = 0;
-    num_pointer_columns_ = 0;
-    for (auto t : columns) {
-      if (is_inlineable(t)) {
-        true_indices_.push_back(std::make_pair(true, num_inline_columns_));
-        num_inline_columns_++;
-      } else {
-        true_indices_.push_back(std::make_pair(false, num_pointer_columns_));
-        num_pointer_columns_++;
-      }
-    }
-  }
+  explicit Schema(std::vector<DataType> columns);
 
-  static bool is_inlineable(DataType t) {
+  static inline bool is_inlineable(DataType t) {
     switch (t) {
       case kUInt:
       case kInt:
