@@ -6,7 +6,7 @@ cc_library(
     srcs = [
         #"edge.cc",
         #"graph.cc",
-        #"operator.cc",
+        "operator.cc",
         "record.cc",
         #"ops/identity.cc",
         #"ops/input.cc",

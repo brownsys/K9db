@@ -10,16 +10,6 @@ enum DataType {
   kDatetime,
 };
 
-bool is_inlineable(DataType t) {
-  switch (t) {
-    case kUInt:
-    case kInt:
-      return true;
-    default:
-      return false;
-  }
-}
-
 class Schema {
  public:
   Schema(std::vector<DataType> columns) : types_(columns) {
@@ -33,6 +23,16 @@ class Schema {
         true_indices_.push_back(std::make_pair(false, num_pointer_columns_));
         num_pointer_columns_++;
       }
+    }
+  }
+
+  static bool is_inlineable(DataType t) {
+    switch (t) {
+      case kUInt:
+      case kInt:
+        return true;
+      default:
+        return false;
     }
   }
 

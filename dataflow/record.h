@@ -31,7 +31,7 @@ class RecordData {
   void Clear(const Schema& schema) {
     for (auto i = 0;
          i < schema.num_inline_columns() + schema.num_pointer_columns(); ++i) {
-      if (!is_inlineable(schema.TypeOf(i))) {
+      if (!Schema::is_inlineable(schema.TypeOf(i))) {
         DeleteOwnedData(pointed_data_[schema.RawColumnIndex(i).second],
                         schema.TypeOf(i));
       }
