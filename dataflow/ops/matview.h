@@ -5,6 +5,7 @@
 
 #include "absl/container/flat_hash_map.h"
 
+#include "dataflow/key.h"
 #include "dataflow/operator.h"
 #include "dataflow/record.h"
 
@@ -20,19 +21,19 @@ class MatViewOperator : public Operator {
     // nothing to do
   }
 
-  std::vector<Record> lookup(const RecordData& key) const;
-  std::vector<Record> multi_lookup(std::vector<RecordData>& keys);
+  std::vector<Record> lookup(const Key& key) const;
+  std::vector<Record> multi_lookup(std::vector<Key>& keys);
 
  private:
-  // TODO(malte): should use Key type
-  absl::flat_hash_map<RecordData, std::vector<Record>> contents_;
+  absl::flat_hash_map<Key, std::vector<Record>> contents_;
   std::vector<ColumnID> key_cols_;
 
-  const RecordData get_key(const Record& r) {
+  const std::pair<Key, bool> get_key(const Record& r) {
     assert(key_cols_.size() == 1);
     ColumnID cid = key_cols_[0];
 
-    return r.raw_at(cid);
+    return std::make_pair(Key(r[cid], r.schema().TypeOf(cid)),
+		          Schema::is_inlineable(r.schema().TypeOf(cid)));
   }
 };
 

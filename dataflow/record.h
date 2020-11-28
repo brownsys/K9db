@@ -66,9 +66,10 @@ class Record {
   const void* at(size_t index) const;
 
   bool positive() const { return positive_; }
-  void set_positive(bool pos) { positive_ = pos; };
+  void set_positive(bool pos) { positive_ = pos; }
   int timestamp() const { return timestamp_; }
-  void set_timestamp(int time) { timestamp_ = time; };
+  void set_timestamp(int time) { timestamp_ = time; }
+  const Schema& schema() const { return *schema_; }
 
   bool operator==(const Record& other) const {
     // XXX(malte): deep compare of records
