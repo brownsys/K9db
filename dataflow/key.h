@@ -35,8 +35,9 @@ class Key {
     if (Schema::is_inlineable(k.type_)) {
       return H::combine(std::move(h), k.data_);
     } else {
-      // XXX(malte): fix!
-      return H::combine(std::move(h), k.data_);
+      return H::combine(
+          std::move(h), k.data_,
+          Schema::size_of(k.type_, reinterpret_cast<void*>(k.data_)));
     }
   }
 
