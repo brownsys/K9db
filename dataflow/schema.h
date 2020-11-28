@@ -28,6 +28,21 @@ class Schema {
     }
   }
 
+  static inline size_t size_of(DataType t, void* data) {
+    switch (t) {
+      case kText: {
+        std::string* s = reinterpret_cast<std::string*>(data);
+        return s->size();
+      }
+      case kUInt:
+        return sizeof(uint64_t);
+      case kInt:
+        return sizeof(int64_t);
+      default:
+        LOG(FATAL) << "unimplemented";
+    }
+  }
+
   DataType TypeOf(size_t index) const {
     BoundsCheckIndex(index);
     return types_[index];
