@@ -44,10 +44,11 @@ class RecordData {
         void* other_data_ptr = reinterpret_cast<void*>(
             other.pointed_data_[inline_and_index.second]);
         size_t size = Schema::size_of(schema.TypeOf(i), data_ptr);
+        size_t other_size = Schema::size_of(schema.TypeOf(i), other_data_ptr);
         // XXX(malte): I don't think this is quite correct. std::string, for
         // example, stores a size as well as the data. A direct memcmp may not
         // compare the data, but bytewise equality of metadata + data.
-        if (memcmp(data_ptr, other_data_ptr, size) != 0) {
+        if (memcmp(data_ptr, other_data_ptr, std::min(size, other_size)) != 0) {
           return false;
         }
       }
