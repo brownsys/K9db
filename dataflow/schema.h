@@ -43,6 +43,8 @@ class Schema {
     }
   }
 
+  bool operator==(const Schema& other) const { return types_ == other.types_; }
+
   DataType TypeOf(size_t index) const {
     BoundsCheckIndex(index);
     return types_[index];
@@ -53,6 +55,9 @@ class Schema {
     return true_indices_[index];
   }
 
+  size_t num_columns() const {
+    return num_inline_columns_ + num_pointer_columns_;
+  }
   size_t num_inline_columns() const { return num_inline_columns_; }
   size_t num_pointer_columns() const { return num_pointer_columns_; }
 

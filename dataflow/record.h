@@ -1,9 +1,9 @@
 #ifndef PELTON_DATAFLOW_RECORD_H_
 #define PELTON_DATAFLOW_RECORD_H_
 
-#include <cstdint>
-
 #include <cassert>
+#include <cstdint>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <vector>
@@ -28,9 +28,32 @@ class RecordData {
              << pointed_data_;
   };
 
+  bool cmp(const RecordData& other, const Schema& schema) const {
+    for (auto i = 0; i < schema.num_columns(); ++i) {
+      std::pair<bool, size_t> inline_and_index = schema.RawColumnIndex(i);
+      if (inline_and_index.first) {
+        // inline value
+        if (inline_data_[inline_and_index.second] !=
+            other.inline_data_[inline_and_index.second]) {
+          return false;
+        }
+      } else {
+        // pointer-indirect value
+        void* data_ptr =
+            reinterpret_cast<void*>(pointed_data_[inline_and_index.second]);
+        void* other_data_ptr = reinterpret_cast<void*>(
+            other.pointed_data_[inline_and_index.second]);
+        size_t size = Schema::size_of(schema.TypeOf(i), data_ptr);
+        if (memcmp(data_ptr, other_data_ptr, size) != 0) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   void Clear(const Schema& schema) {
-    for (auto i = 0;
-         i < schema.num_inline_columns() + schema.num_pointer_columns(); ++i) {
+    for (auto i = 0; i < schema.num_columns(); ++i) {
       if (!Schema::is_inlineable(schema.TypeOf(i))) {
         DeleteOwnedData(pointed_data_[schema.RawColumnIndex(i).second],
                         schema.TypeOf(i));
@@ -72,9 +95,14 @@ class Record {
   const Schema& schema() const { return *schema_; }
 
   bool operator==(const Record& other) const {
-    // XXX(malte): deep compare of records
-    return false;
+    // records with different signs do not compare equal
+    if (positive_ != other.positive_ || schema_ != other.schema_) {
+      return false;
+    }
+    // relies on deep comparison between RecordData instances
+    return data_.cmp(other.data_, *schema_);
   }
+  bool operator!=(const Record& other) const { return !(*this == other); }
 
  private:
   // Data is interpreted according to schema stored outside the record.
