@@ -29,6 +29,7 @@ class Key {
       return memcmp(dataptr, other_dataptr, Schema::size_of(type_, dataptr));
     }
   }
+  bool operator!=(const Key& other) const { return !(*this == other); }
 
   template <typename H>
   friend H AbslHashValue(H h, const Key& k) {

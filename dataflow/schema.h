@@ -44,6 +44,7 @@ class Schema {
   }
 
   bool operator==(const Schema& other) const { return types_ == other.types_; }
+  bool operator!=(const Schema& other) const { return !(*this == other); }
 
   DataType TypeOf(size_t index) const {
     BoundsCheckIndex(index);
