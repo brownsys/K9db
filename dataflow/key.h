@@ -26,6 +26,9 @@ class Key {
           Schema::size_of(other.type_, other_dataptr)) {
         return false;
       }
+      // XXX(malte): I don't think this is quite correct. std::string, for
+      // example, stores a size as well as the data. A direct memcmp may not
+      // compare the data, but bytewise equality of metadata + data.
       return memcmp(dataptr, other_dataptr, Schema::size_of(type_, dataptr));
     }
   }
