@@ -186,6 +186,21 @@ antlrcpp::Any Stringify::visitTable_or_subquery(
   return ctx->table_name()->accept(this).as<std::string>();
 }
 
+// Delete statement.
+antlrcpp::Any Stringify::visitDelete_stmt(
+    sqlparser::SQLiteParser::Delete_stmtContext *ctx) {
+  std::string str = "DELETE FROM ";
+  str += ctx->qualified_table_name()->accept(this).as<std::string>();
+  if (ctx->WHERE() != nullptr) {
+    str += " WHERE " + ctx->expr()->accept(this).as<std::string>();
+  }
+  return str;
+}
+antlrcpp::Any Stringify::visitQualified_table_name(
+    sqlparser::SQLiteParser::Qualified_table_nameContext *ctx) {
+  return ctx->table_name()->accept(this).as<std::string>();
+}
+
 // Building blocks.
 antlrcpp::Any Stringify::visitIndexed_column(
     sqlparser::SQLiteParser::Indexed_columnContext *ctx) {

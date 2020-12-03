@@ -125,6 +125,23 @@ antlrcpp::Any Valid::visitTable_or_subquery(
   return visitChildren(ctx);
 }
 
+// Delete statement.
+antlrcpp::Any Valid::visitDelete_stmt(
+    sqlparser::SQLiteParser::Delete_stmtContext *ctx) {
+  if (ctx->with_clause() != nullptr) {
+    return false;
+  }
+  return visitChildren(ctx);
+}
+antlrcpp::Any Valid::visitQualified_table_name(
+    sqlparser::SQLiteParser::Qualified_table_nameContext *ctx) {
+  if (ctx->schema_name() != nullptr || ctx->AS() != nullptr ||
+      ctx->INDEXED() != nullptr) {
+    return false;
+  }
+  return true;
+}
+
 // Common constructs.
 antlrcpp::Any Valid::visitIndexed_column(
     sqlparser::SQLiteParser::Indexed_columnContext *ctx) {
@@ -254,10 +271,6 @@ antlrcpp::Any Valid::visitCommon_table_expression(
     sqlparser::SQLiteParser::Common_table_expressionContext *ctx) {
   return false;
 }
-antlrcpp::Any Valid::visitDelete_stmt(
-    sqlparser::SQLiteParser::Delete_stmtContext *ctx) {
-  return false;
-}
 antlrcpp::Any Valid::visitDelete_stmt_limited(
     sqlparser::SQLiteParser::Delete_stmt_limitedContext *ctx) {
   return false;
@@ -328,10 +341,6 @@ antlrcpp::Any Valid::visitColumn_name_list(
 }
 antlrcpp::Any Valid::visitUpdate_stmt_limited(
     sqlparser::SQLiteParser::Update_stmt_limitedContext *ctx) {
-  return false;
-}
-antlrcpp::Any Valid::visitQualified_table_name(
-    sqlparser::SQLiteParser::Qualified_table_nameContext *ctx) {
   return false;
 }
 antlrcpp::Any Valid::visitVacuum_stmt(

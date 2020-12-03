@@ -2,9 +2,9 @@
 
 #include "shards/sqlconnections/pool.h"
 
-#include <vector>
 #include <cstring>
 #include <iostream>
+#include <vector>
 
 namespace shards {
 namespace sqlconnections {

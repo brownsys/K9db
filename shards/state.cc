@@ -60,6 +60,11 @@ std::list<CreateStatement> SharderState::CreateShard(
   return result;
 }
 
+void SharderState::RemoveUserFromShard(const ShardKind &kind,
+                                       const UserId &user_id) {
+  this->shards_.at(kind).erase(user_id);
+}
+
 // Schema lookups.
 bool SharderState::Exists(const UnshardedTableName &table) const {
   return this->schema_.count(table) > 0 || this->sharded_by_.count(table) > 0;

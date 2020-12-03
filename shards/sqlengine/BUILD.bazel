@@ -11,6 +11,7 @@ cc_library(
     deps = [
         ":parser",
         ":create",
+        ":delete",
         ":insert",
         ":select",
         "//shards:state",
@@ -86,6 +87,25 @@ cc_library(
         "@grammars-v4//:sqlparser",
     ],
 )
+
+cc_library(
+    name = "delete",
+    srcs = [
+        "delete.cc",
+    ],
+    hdrs= [
+        "delete.h",
+    ],
+    deps = [
+        "//shards/sqlengine/visitors:visitors",
+        "//shards/sqlengine:util",
+        "//shards:state",
+        "@absl//absl/strings",
+        "@antlr4_runtimes//:cpp",
+        "@grammars-v4//:sqlparser",
+    ],
+)
+
 
 
 cc_library(

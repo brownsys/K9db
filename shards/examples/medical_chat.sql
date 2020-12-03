@@ -54,5 +54,12 @@ INSERT INTO chat VALUES (4, 20, 2, 'HELLO 2');
 INSERT INTO chat VALUES (5, 20, 1, 'HELLO 3');
 
 SELECT * FROM chat;
-GET patients 1;
+GET patients 10;
 GET doctors 2;
+
+DELETE FROM doctors 2;
+SELECT * FROM chat;
+
+DELETE FROM patients WHERE id = 10;
+SELECT * FROM patients;
+SELECT * FROM chat;

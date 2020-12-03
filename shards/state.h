@@ -127,6 +127,8 @@ class SharderState {
   std::list<CreateStatement> CreateShard(const ShardKind &shard_kind,
                                          const UserId &user);
 
+  void RemoveUserFromShard(const ShardKind &kind, const UserId &user_id);
+
   // Schema lookups.
   bool Exists(const UnshardedTableName &table) const;
 

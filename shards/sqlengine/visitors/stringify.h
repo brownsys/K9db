@@ -57,6 +57,12 @@ class Stringify : public Default {
   antlrcpp::Any visitTable_or_subquery(
       sqlparser::SQLiteParser::Table_or_subqueryContext *ctx) override;
 
+  // Delete.
+  antlrcpp::Any visitDelete_stmt(
+      sqlparser::SQLiteParser::Delete_stmtContext *ctx) override;
+  antlrcpp::Any visitQualified_table_name(
+      sqlparser::SQLiteParser::Qualified_table_nameContext *ctx) override;
+
   // Building blocks.
   antlrcpp::Any visitIndexed_column(
       sqlparser::SQLiteParser::Indexed_columnContext *ctx) override;

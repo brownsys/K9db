@@ -6,6 +6,7 @@
 // gives sqllparser::SQLiteParser::*
 #include "SQLiteParser.h"
 #include "shards/sqlengine/create.h"
+#include "shards/sqlengine/delete.h"
 #include "shards/sqlengine/insert.h"
 #include "shards/sqlengine/select.h"
 
@@ -42,6 +43,13 @@ std::list<std::tuple<ShardSuffix, SQLStatement, CallbackModifier>> Rewrite(
       statement->select_stmt();
   if (select_stmt != nullptr) {
     return select::Rewrite(select_stmt, state);
+  }
+
+  // Case 5: Delete statement.
+  sqlparser::SQLiteParser::Delete_stmtContext *delete_stmt =
+      statement->delete_stmt();
+  if (delete_stmt != nullptr) {
+    return delete_::Rewrite(delete_stmt, state);
   }
 
   throw "Unsupported SQL statement!";

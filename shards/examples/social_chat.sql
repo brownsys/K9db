@@ -25,3 +25,9 @@ INSERT INTO chat VALUES (4, 3, 2, 'HELLO from carl 2');
 
 SELECT * FROM chat;
 GET Users 1;
+
+DELETE FROM Users WHERE id = 1;
+SELECT * FROM chat;
+
+DELETE FROM Users WHERE id = 2;
+SELECT * FROM chat;
