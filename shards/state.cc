@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <iostream>
 #include <utility>
 
 namespace shards {
@@ -84,10 +83,9 @@ bool SharderState::ShardExists(const ShardKind &shard_kind,
   return this->shards_.at(shard_kind).count(user) > 0;
 }
 
-// Sqlite3 Connection pool interace.
-bool SharderState::ExecuteStatement(const std::string &shard_suffix,
-                                    const std::string &sql_statement) {
-  return this->pool_.ExecuteStatement(shard_suffix, sql_statement);
+const std::unordered_set<UserId> &SharderState::UsersOfShard(
+    const ShardKind &kind) const {
+  return this->shards_.at(kind);
 }
 
 }  // namespace shards

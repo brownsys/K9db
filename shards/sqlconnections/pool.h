@@ -5,6 +5,7 @@
 
 #include <sqlite3.h>
 
+#include <functional>
 #include <string>
 
 namespace shards {
@@ -29,17 +30,17 @@ class ConnectionPool {
 
   // Executes a statement
   bool ExecuteStatement(const std::string &shard_suffix,
-                        const std::string &statement);
+                        const std::string &statement,
+                        std::function<void(int *, char ***, char ***)> modifier,
+                        char **errmsg);
+
+  void FlushBuffer(std::function<int(void *, int, char **, char **)> cb,
+                   void *context, char **errmsg);
 
  private:
   std::string dir_path_;
   // We always keep an open connection to the main non-sharded database.
   sqlite3 *main_connection_;
-  // Default no-op callback.
-  static int default_callback(void *NotUsed, int argc, char **argv,
-                              char **azColName) {
-    return 0;
-  }
 };
 
 }  // namespace sqlconnections

@@ -7,12 +7,13 @@
 #include "SQLiteParser.h"
 #include "shards/sqlengine/create.h"
 #include "shards/sqlengine/insert.h"
+#include "shards/sqlengine/select.h"
 
 namespace shards {
 namespace sqlengine {
 
-std::list<std::pair<ShardSuffix, SQLStatement>> Rewrite(const std::string &sql,
-                                                        SharderState *state) {
+std::list<std::tuple<ShardSuffix, SQLStatement, CallbackModifier>> Rewrite(
+    const std::string &sql, SharderState *state) {
   // Parse with ANTLR.
   parser::SQLParser parser;
   if (!parser.Parse(sql)) {
@@ -34,6 +35,13 @@ std::list<std::pair<ShardSuffix, SQLStatement>> Rewrite(const std::string &sql,
       statement->insert_stmt();
   if (insert_stmt != nullptr) {
     return insert::Rewrite(insert_stmt, state);
+  }
+
+  // Case 4: Select statement.
+  sqlparser::SQLiteParser::Select_stmtContext *select_stmt =
+      statement->select_stmt();
+  if (select_stmt != nullptr) {
+    return select::Rewrite(select_stmt, state);
   }
 
   throw "Unsupported SQL statement!";

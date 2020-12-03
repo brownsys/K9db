@@ -12,6 +12,7 @@ cc_library(
         ":parser",
         ":create",
         ":insert",
+        ":select",
         "//shards:state",
         "@antlr4_runtimes//:cpp",
         "@grammars-v4//:sqlparser",
@@ -59,6 +60,23 @@ cc_library(
     ],
     hdrs= [
         "insert.h",
+    ],
+    deps = [
+        "//shards/sqlengine/visitors:visitors",
+        "//shards/sqlengine:util",
+        "//shards:state",
+        "@antlr4_runtimes//:cpp",
+        "@grammars-v4//:sqlparser",
+    ],
+)
+
+cc_library(
+    name = "select",
+    srcs = [
+        "select.cc",
+    ],
+    hdrs= [
+        "select.h",
     ],
     deps = [
         "//shards/sqlengine/visitors:visitors",

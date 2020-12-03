@@ -83,7 +83,43 @@ antlrcpp::Any Valid::visitExpr_list(
   return visitChildren(ctx);
 }
 antlrcpp::Any Valid::visitExpr(sqlparser::SQLiteParser::ExprContext *ctx) {
-  if (ctx->literal_value() == nullptr) {
+  if ((ctx->literal_value() == nullptr && ctx->ASSIGN() == nullptr &&
+       ctx->column_name() == nullptr && ctx->AND() == nullptr) ||
+      ctx->expr().size() > 2) {
+    return false;
+  }
+  return visitChildren(ctx);
+}
+
+// Select constructs.
+antlrcpp::Any Valid::visitSelect_stmt(
+    sqlparser::SQLiteParser::Select_stmtContext *ctx) {
+  if (ctx->common_table_stmt() != nullptr ||
+      ctx->compound_operator().size() != 0 || ctx->select_core().size() != 1 ||
+      ctx->order_by_stmt() != nullptr || ctx->limit_stmt() != nullptr) {
+    return false;
+  }
+  return visitChildren(ctx);
+}
+antlrcpp::Any Valid::visitSelect_core(
+    sqlparser::SQLiteParser::Select_coreContext *ctx) {
+  if (ctx->DISTINCT() != nullptr || ctx->ALL() != nullptr ||
+      ctx->result_column().size() != 1 ||
+      ctx->table_or_subquery().size() != 1 || ctx->GROUP() != nullptr ||
+      ctx->HAVING() != nullptr || ctx->WINDOW() != nullptr ||
+      ctx->VALUES() != nullptr) {
+    return false;
+  }
+  return visitChildren(ctx);
+}
+antlrcpp::Any Valid::visitResult_column(
+    sqlparser::SQLiteParser::Result_columnContext *ctx) {
+  return ctx->STAR() != nullptr;
+}
+antlrcpp::Any Valid::visitTable_or_subquery(
+    sqlparser::SQLiteParser::Table_or_subqueryContext *ctx) {
+  if (ctx->schema_name() != nullptr || ctx->AS() != nullptr ||
+      ctx->INDEXED() != nullptr) {
     return false;
   }
   return visitChildren(ctx);
@@ -254,16 +290,8 @@ antlrcpp::Any Valid::visitReindex_stmt(
     sqlparser::SQLiteParser::Reindex_stmtContext *ctx) {
   return false;
 }
-antlrcpp::Any Valid::visitSelect_stmt(
-    sqlparser::SQLiteParser::Select_stmtContext *ctx) {
-  return false;
-}
 antlrcpp::Any Valid::visitJoin_clause(
     sqlparser::SQLiteParser::Join_clauseContext *ctx) {
-  return false;
-}
-antlrcpp::Any Valid::visitSelect_core(
-    sqlparser::SQLiteParser::Select_coreContext *ctx) {
   return false;
 }
 antlrcpp::Any Valid::visitFactored_select_stmt(
@@ -276,14 +304,6 @@ antlrcpp::Any Valid::visitSimple_select_stmt(
 }
 antlrcpp::Any Valid::visitCompound_select_stmt(
     sqlparser::SQLiteParser::Compound_select_stmtContext *ctx) {
-  return false;
-}
-antlrcpp::Any Valid::visitTable_or_subquery(
-    sqlparser::SQLiteParser::Table_or_subqueryContext *ctx) {
-  return false;
-}
-antlrcpp::Any Valid::visitResult_column(
-    sqlparser::SQLiteParser::Result_columnContext *ctx) {
   return false;
 }
 antlrcpp::Any Valid::visitJoin_operator(

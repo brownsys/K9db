@@ -2,6 +2,8 @@
 
 #include "shards/sqlengine/parser.h"
 
+#include <iostream>
+
 #include "shards/sqlengine/visitors/valid.h"
 
 namespace shards {
@@ -26,6 +28,7 @@ bool SQLParser::Parse(const std::string &sql) {
 
   // Syntax errors!
   if (this->error_) {
+    std::cout << "SQL SYNTAX ERROR!" << std::endl;
     return false;
   }
 

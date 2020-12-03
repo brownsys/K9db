@@ -47,6 +47,16 @@ class Stringify : public Default {
       sqlparser::SQLiteParser::Expr_listContext *ctx) override;
   antlrcpp::Any visitExpr(sqlparser::SQLiteParser::ExprContext *ctx) override;
 
+  // Select.
+  antlrcpp::Any visitSelect_stmt(
+      sqlparser::SQLiteParser::Select_stmtContext *ctx) override;
+  antlrcpp::Any visitSelect_core(
+      sqlparser::SQLiteParser::Select_coreContext *ctx) override;
+  antlrcpp::Any visitResult_column(
+      sqlparser::SQLiteParser::Result_columnContext *ctx) override;
+  antlrcpp::Any visitTable_or_subquery(
+      sqlparser::SQLiteParser::Table_or_subqueryContext *ctx) override;
+
   // Building blocks.
   antlrcpp::Any visitIndexed_column(
       sqlparser::SQLiteParser::Indexed_columnContext *ctx) override;

@@ -16,7 +16,7 @@
 
 #include <list>
 #include <string>
-#include <utility>
+#include <tuple>
 
 #include "shards/state.h"
 
@@ -26,8 +26,8 @@ namespace sqlengine {
 using ShardSuffix = std::string;
 using SQLStatement = std::string;
 
-std::list<std::pair<ShardSuffix, SQLStatement>> Rewrite(const std::string &sql,
-                                                        SharderState *state);
+std::list<std::tuple<ShardSuffix, SQLStatement, CallbackModifier>> Rewrite(
+    const std::string &sql, SharderState *state);
 
 }  // namespace sqlengine
 }  // namespace shards

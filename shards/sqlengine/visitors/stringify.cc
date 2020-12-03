@@ -141,7 +141,49 @@ antlrcpp::Any Stringify::visitExpr_list(
 }
 
 antlrcpp::Any Stringify::visitExpr(sqlparser::SQLiteParser::ExprContext *ctx) {
-  return ctx->literal_value()->accept(this);
+  if (ctx->literal_value() != nullptr) {
+    return ctx->literal_value()->accept(this).as<std::string>();
+  } else if (ctx->column_name() != nullptr) {
+    return ctx->column_name()->accept(this).as<std::string>();
+  } else if (ctx->ASSIGN() != nullptr) {
+    return "(" + ctx->expr()[0]->accept(this).as<std::string>() + ") = (" +
+           ctx->expr()[1]->accept(this).as<std::string>() + ")";
+  } else if (ctx->AND() != nullptr) {
+    return "(" + ctx->expr()[0]->accept(this).as<std::string>() + ") AND (" +
+           ctx->expr()[1]->accept(this).as<std::string>() + ")";
+  }
+  throw "Unreachable code!";
+}
+
+// Select constructs.
+antlrcpp::Any Stringify::visitSelect_stmt(
+    sqlparser::SQLiteParser::Select_stmtContext *ctx) {
+  std::string str = ctx->select_core().at(0)->accept(this).as<std::string>();
+  str += ";";
+  return str;
+}
+
+antlrcpp::Any Stringify::visitSelect_core(
+    sqlparser::SQLiteParser::Select_coreContext *ctx) {
+  std::string str = "SELECT ";
+  str += ctx->result_column(0)->accept(this).as<std::string>();
+  str += " FROM ";
+  str += ctx->table_or_subquery().at(0)->accept(this).as<std::string>();
+  if (ctx->WHERE() != nullptr && ctx->expr().size() > 0 &&
+      ctx->expr(0) != nullptr) {
+    str += " WHERE " + ctx->expr(0)->accept(this).as<std::string>();
+  }
+  return str;
+}
+
+antlrcpp::Any Stringify::visitResult_column(
+    sqlparser::SQLiteParser::Result_columnContext *ctx) {
+  return ctx->getText();
+}
+
+antlrcpp::Any Stringify::visitTable_or_subquery(
+    sqlparser::SQLiteParser::Table_or_subqueryContext *ctx) {
+  return ctx->table_name()->accept(this).as<std::string>();
 }
 
 // Building blocks.

@@ -88,7 +88,7 @@ sqlparser::SQLiteParser::Insert_stmtContext *ShardStatement(
 
 }  // namespace
 
-std::list<std::pair<std::string, std::string>> Rewrite(
+std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
     sqlparser::SQLiteParser::Insert_stmtContext *stmt, SharderState *state) {
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt->table_name()->getText();
@@ -97,14 +97,14 @@ std::list<std::pair<std::string, std::string>> Rewrite(
   }
 
   visitors::Stringify stringify;
-  std::list<std::pair<std::string, std::string>> result;
+  std::list<std::tuple<std::string, std::string, CallbackModifier>> result;
 
   // Case 1: table is not in any shard.
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // The insertion statement is unmodified.
     std::string insert_str = stmt->accept(&stringify).as<std::string>();
-    result.push_back(std::make_pair(DEFAULT_SHARD_NAME, insert_str));
+    result.emplace_back(DEFAULT_SHARD_NAME, insert_str, identity_modifier);
   }
 
   // Case 2: table is sharded!
@@ -131,14 +131,14 @@ std::list<std::pair<std::string, std::string>> Rewrite(
       if (!state->ShardExists(sharding_info.shard_kind, value)) {
         for (auto create_stmt :
              state->CreateShard(sharding_info.shard_kind, value)) {
-          result.push_back(std::make_pair(shard_name, create_stmt));
+          result.emplace_back(shard_name, create_stmt, identity_modifier);
         }
       }
 
       // Add the modified insert statement.
       std::string insert_stmt_str =
           sharded_stmt->accept(&stringify).as<std::string>();
-      result.push_back(std::make_pair(shard_name, insert_stmt_str));
+      result.emplace_back(shard_name, insert_stmt_str, identity_modifier);
     }
   }
   return result;

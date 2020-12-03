@@ -2,7 +2,6 @@
 
 #include "shards/sqlengine/create.h"
 
-#include <iostream>
 #include <list>
 #include <optional>
 #include <string>
@@ -338,7 +337,7 @@ sqlparser::SQLiteParser::Create_table_stmtContext *UpdateTableSchema(
 
 }  // namespace
 
-std::list<std::pair<std::string, std::string>> Rewrite(
+std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
     sqlparser::SQLiteParser::Create_table_stmtContext *stmt,
     SharderState *state) {
   const std::string &table_name = stmt->table_name()->getText();
@@ -356,7 +355,7 @@ std::list<std::pair<std::string, std::string>> Rewrite(
   }
 
   visitors::Stringify stringify;
-  std::list<std::pair<std::string, std::string>> result;
+  std::list<std::tuple<std::string, std::string, CallbackModifier>> result;
   // Case 1: has pii but not linked to shards.
   // This means that this table define a type of user for which shards must be
   // created! Hence, it is a shard kind!
@@ -364,7 +363,8 @@ std::list<std::pair<std::string, std::string>> Rewrite(
     std::string create_table_str = stmt->accept(&stringify).as<std::string>();
     state->AddShardKind(table_name);
     state->AddUnshardedTable(table_name, create_table_str);
-    result.push_back(std::make_pair(DEFAULT_SHARD_NAME, create_table_str));
+    result.emplace_back(DEFAULT_SHARD_NAME, create_table_str,
+                        identity_modifier);
   }
 
   // Case 2: no pii but is linked to shards.
@@ -390,7 +390,8 @@ std::list<std::pair<std::string, std::string>> Rewrite(
   if (!has_pii && sharding_information.size() == 0) {
     std::string create_table_str = stmt->accept(&stringify).as<std::string>();
     state->AddUnshardedTable(table_name, create_table_str);
-    result.push_back(std::make_pair(DEFAULT_SHARD_NAME, create_table_str));
+    result.emplace_back(DEFAULT_SHARD_NAME, create_table_str,
+                        identity_modifier);
   }
 
   return result;

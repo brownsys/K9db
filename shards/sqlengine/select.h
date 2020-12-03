@@ -1,7 +1,7 @@
-// CREATE TABLE statements sharding and rewriting.
+// SELECT statements sharding and rewriting.
 
-#ifndef SHARDS_SQLENGINE_CREATE_H_
-#define SHARDS_SQLENGINE_CREATE_H_
+#ifndef SHARDS_SQLENGINE_SELECT_H_
+#define SHARDS_SQLENGINE_SELECT_H_
 
 #include <list>
 #include <string>
@@ -12,15 +12,14 @@
 
 namespace shards {
 namespace sqlengine {
-namespace create {
+namespace select {
 
 // <ShardSuffix, SQLStatement>
 std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
-    sqlparser::SQLiteParser::Create_table_stmtContext *stmt,
-    SharderState *state);
+    sqlparser::SQLiteParser::Select_stmtContext *stmt, SharderState *state);
 
-}  // namespace create
+}  // namespace select
 }  // namespace sqlengine
 }  // namespace shards
 
-#endif  // SHARDS_SQLENGINE_CREATE_H_
+#endif  // SHARDS_SQLENGINE_SELECT_H_

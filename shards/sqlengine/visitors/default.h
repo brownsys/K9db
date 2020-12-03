@@ -177,18 +177,8 @@ class Default : public sqlparser::SQLiteParserBaseVisitor {
     throw "Unsupported SQL Syntax!";
   }
 
-  antlrcpp::Any visitSelect_stmt(
-      sqlparser::SQLiteParser::Select_stmtContext *ctx) override {
-    throw "Unsupported SQL Syntax!";
-  }
-
   antlrcpp::Any visitJoin_clause(
       sqlparser::SQLiteParser::Join_clauseContext *ctx) override {
-    throw "Unsupported SQL Syntax!";
-  }
-
-  antlrcpp::Any visitSelect_core(
-      sqlparser::SQLiteParser::Select_coreContext *ctx) override {
     throw "Unsupported SQL Syntax!";
   }
 
@@ -204,11 +194,6 @@ class Default : public sqlparser::SQLiteParserBaseVisitor {
 
   antlrcpp::Any visitCompound_select_stmt(
       sqlparser::SQLiteParser::Compound_select_stmtContext *ctx) override {
-    throw "Unsupported SQL Syntax!";
-  }
-
-  antlrcpp::Any visitTable_or_subquery(
-      sqlparser::SQLiteParser::Table_or_subqueryContext *ctx) override {
     throw "Unsupported SQL Syntax!";
   }
 

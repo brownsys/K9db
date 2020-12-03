@@ -18,6 +18,7 @@ CREATE TABLE submissions ( \
   FOREIGN KEY (assignment_id) REFERENCES assignments(ID) \
 );
 
+
 INSERT INTO assignments VALUES (1, 'assignment 1');
 INSERT INTO assignments VALUES (2, 'assignment 2');
 INSERT INTO students VALUES (1, 'Kinan');
@@ -32,9 +33,10 @@ INSERT INTO submissions VALUES (2, 2, 6);
 INSERT INTO submissions VALUES (3, 2, 7);
 
 
-SELECT * FROM submissions WHERE student_id = 1;
+
+SELECT * FROM assignments;
+SELECT * FROM students;
 SELECT * FROM submissions;
-SELECT * FROM submissions JOIN students ON submissions.student_id = students.ID \
-WHERE students.PII_Name = 'Kinan';
-SELECT * FROM submissions JOIN students ON submissions.student_id = students.ID \
-WHERE students.PII_Name != 'Ishan';
+SELECT * FROM submissions WHERE assignment_id=1;
+SELECT * FROM submissions WHERE student_id=1;
+SELECT * FROM submissions WHERE student_id=1 AND assignment_id=2;

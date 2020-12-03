@@ -9,6 +9,7 @@ int Callback(void *context, int col_count, char **col_data, char **col_name) {
 
   // Print header the first time!
   if (*first_time) {
+    std::cout << std::endl;
     *first_time = false;
     for (int i = 0; i < col_count; i++) {
       std::cout << "| " << col_name[i] << " ";
@@ -22,7 +23,7 @@ int Callback(void *context, int col_count, char **col_data, char **col_name) {
 
   // Print row data.
   for (int i = 0; i < col_count; i++) {
-    std::cout << "| " << col_data[i] << std::endl << " ";
+    std::cout << "| " << col_data[i] << " ";
   }
   std::cout << "|" << std::endl;
 
@@ -64,9 +65,10 @@ int main(int argc, char **argv) {
 
     // Command has been fully read, execute it!
     try {
+      std::cout << command << std::endl;
       bool context = true;
       shards::exec(&state, command, &Callback,
-                   reinterpret_cast<void *>(context), nullptr);
+                   reinterpret_cast<void *>(&context), nullptr);
     } catch (const char *err_msg) {
       std::cerr << "Error: " << err_msg << std::endl;
       return 1;
