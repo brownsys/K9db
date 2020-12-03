@@ -33,7 +33,9 @@ static CallbackModifier identity_modifier = [](int *a, char ***b, char ***c) {
     size_t nlen = strlen((*c)[i]);
     data[i] = new char[dlen];
     names[i] = new char[nlen];
+    // NOLINTNEXTLINE
     strcpy(data[i], (*b)[i]);
+    // NOLINTNEXTLINE
     strcpy(names[i], (*c)[i]);
   }
   *b = data;

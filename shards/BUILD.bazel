@@ -9,8 +9,10 @@ cc_library(
         "shards.h",
     ],
     deps = [
+        "@absl//absl/strings",
         ":state",
         "//shards/sqlengine:engine",
+        "//shards/sqlengine:util",
     ],
 )
 

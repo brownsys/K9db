@@ -2,6 +2,7 @@
 
 #include "shards/sqlconnections/pool.h"
 
+#include <vector>
 #include <cstring>
 #include <iostream>
 

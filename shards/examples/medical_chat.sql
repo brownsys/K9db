@@ -54,3 +54,5 @@ INSERT INTO chat VALUES (4, 20, 2, 'HELLO 2');
 INSERT INTO chat VALUES (5, 20, 1, 'HELLO 3');
 
 SELECT * FROM chat;
+GET patients 1;
+GET doctors 2;

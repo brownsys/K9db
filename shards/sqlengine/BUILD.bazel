@@ -100,4 +100,5 @@ cc_library(
         "//shards:state",
         "@absl//absl/strings",
     ],
+    visibility = ["//shards:__subpackages__"],
 )

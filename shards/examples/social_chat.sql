@@ -24,3 +24,4 @@ INSERT INTO chat VALUES (3, 3, 1, 'HELLO from carl');
 INSERT INTO chat VALUES (4, 3, 2, 'HELLO from carl 2');
 
 SELECT * FROM chat;
+GET Users 1;
