@@ -108,6 +108,16 @@ class Record {
   }
   bool operator!=(const Record& other) const { return !(*this == other); }
 
+  // Type-based accessor/mutator calls. If used on a column that has a different
+  // type in the schema, these fail via LOG(FATAL).
+  void set_uint(size_t index, uint64_t v);
+  uint64_t as_uint(size_t index);
+  void set_int(size_t index, int64_t v);
+  int64_t as_int(size_t index);
+  // TODO(malte): consider swapping std::string for a length + buffer
+  void set_string(size_t index, std::string* s);
+  std::string* as_string(size_t index);
+
  private:
   // Data is interpreted according to schema stored outside the record.
   // RecordData itself only contains two pointers, one to the inline data
@@ -128,6 +138,13 @@ class Record {
   // *******
   // 3B SPARE on x86-64 due to 8B alignment
   // *******
+
+  inline void CheckType(size_t index, DataType t) const {
+    if (schema_->TypeOf(index) != t) {
+      LOG(FATAL) << "Type mismatch: column is " << schema_->TypeOf(index)
+                 << ", tried to access as " << t;
+    }
+  }
 
   FRIEND_TEST(RecordTest, DataRep);
 };

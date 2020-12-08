@@ -16,8 +16,8 @@ TEST(RecordTest, Size) {
   EXPECT_EQ(sizeof(Record), 32);
 }
 
-// Tests internal storage format
-TEST(RecordTest, DataRep) {
+// Tests internal storage format via raw void* APIs
+TEST(RecordTest, DataRepRaw) {
   uint64_t v = 42;
   std::string* p = new std::string("hello");
 
@@ -34,6 +34,23 @@ TEST(RecordTest, DataRep) {
   EXPECT_EQ(*static_cast<int64_t*>(r[2]), v + 1);
 }
 
+// Tests internal storage format via typed APIs
+TEST(RecordTest, DataRep) {
+  uint64_t v = 42;
+  std::string* p = new std::string("hello");
+
+  std::vector<DataType> st = {kUInt, kText, kInt};
+  Schema s(st);
+  Record r(s);
+  r.set_uint(0, v);
+  r.set_string(1, p);
+  r.set_int(2, v + 1);
+
+  EXPECT_EQ(r.as_uint(0), v);
+  EXPECT_EQ(r.as_string(1), p);
+  EXPECT_EQ(r.as_int(2), v + 1);
+}
+
 // Tests record comparisons
 TEST(RecordTest, Comparisons) {
   uint64_t v1 = 42;
@@ -44,16 +61,16 @@ TEST(RecordTest, Comparisons) {
   Schema s({kUInt, kText});
 
   Record r1(s);
-  *static_cast<uint64_t*>(r1[0]) = v1;
-  *static_cast<std::string**>(r1[1]) = s1;
+  r1.set_uint(0, v1);
+  r1.set_string(1, s1);
 
   Record r2(s);
-  *static_cast<uint64_t*>(r2[0]) = v2;
-  *static_cast<std::string**>(r2[1]) = s2;
+  r2.set_uint(0, v2);
+  r2.set_string(1, s2);
 
   Record r3(s);
-  *static_cast<uint64_t*>(r3[0]) = v1;
-  *static_cast<std::string**>(r3[1]) = new std::string(*s2);
+  r3.set_uint(0, v1);
+  r3.set_string(1, new std::string(*s2));
 
   EXPECT_EQ(r1, r1);
   EXPECT_EQ(r2, r2);
@@ -61,6 +78,21 @@ TEST(RecordTest, Comparisons) {
   EXPECT_NE(r2, r1);
   EXPECT_NE(r1, r3);
   EXPECT_NE(r3, r1);
+}
+
+TEST(RecordTest, TypeMismatch) {
+  uint64_t v1 = 42;
+  std::string* s1 = new std::string("hello");
+
+  Schema s({kUInt, kText});
+
+  Record r1(s);
+  r1.set_uint(0, v1);
+  r1.set_string(1, s1);
+
+  ASSERT_DEATH({ r1.as_string(0); }, "Type mismatch");
+  ASSERT_DEATH({ r1.as_uint(1); }, "Type mismatch");
+  ASSERT_DEATH({ r1.as_int(1); }, "Type mismatch");
 }
 
 }  // namespace dataflow
