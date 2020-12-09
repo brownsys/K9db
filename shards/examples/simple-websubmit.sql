@@ -35,11 +35,12 @@ INSERT INTO submissions VALUES (1, 2, 5);
 INSERT INTO submissions VALUES (2, 2, 6);
 INSERT INTO submissions VALUES (3, 2, 7);
 
-
-
 SELECT * FROM assignments;
 SELECT * FROM students;
 SELECT * FROM submissions;
-SELECT * FROM submissions WHERE assignment_id=1;
-SELECT * FROM submissions WHERE student_id=1;
-SELECT * FROM submissions WHERE student_id=1 AND assignment_id=2;
+SELECT * FROM submissions WHERE assignment_id = 1;
+SELECT * FROM submissions WHERE student_id = 1;
+SELECT * FROM submissions WHERE student_id = 1 AND assignment_id = 2;
+
+DELETE FROM students WHERE ID = 1;
+SELECT * FROM submissions;

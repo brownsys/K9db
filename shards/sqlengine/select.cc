@@ -101,9 +101,13 @@ std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
 
   // Case 2: table is sharded.
   if (is_sharded) {
-    // Only need to query a single one of the duplicates of the table.
+    // We will query all the different ways of sharding the table (for
+    // duplicates with many owners), de-duplication occurs later in the
+    // pipeline.
     for (const auto &info : state->GetShardingInformation(table_name)) {
       // Rename the table to match the sharded name.
+      // TODO(babman): need a way to copy stmt so that side-effects from
+      // different iterations are isolated.
       std::string user_id_val = FindAndRemoveWhere(stmt, info.shard_by);
       RenameTable(stmt, info.sharded_table_name);
       std::string select_str = stmt->accept(&stringify).as<std::string>();
