@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
     }
 
     // Ready for next command.
-    std::cout << ">>> " << std::flush;
+    std::cout << std::endl << ">>> " << std::flush;
     command = "";
   }
 

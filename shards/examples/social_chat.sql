@@ -1,3 +1,6 @@
+SET verbose;
+SET echo;
+
 CREATE TABLE Users ( \
   id int, \
   PII_name varchar(100), \

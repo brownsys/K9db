@@ -1,3 +1,6 @@
+SET verbose;
+SET echo;
+
 CREATE TABLE doctors ( \
   id int, \
   PII_name varchar(100), \

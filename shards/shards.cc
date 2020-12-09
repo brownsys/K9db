@@ -14,11 +14,35 @@ namespace shards {
 
 namespace {
 
-bool logs = false;
+// String whitespace trimming.
+// https://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring/25385766
+static inline void LTrim(std::string &s) {
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
+        return !std::isspace(ch);
+    }));
+}
+static inline void RTrim(std::string &s) {
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
+        return !std::isspace(ch);
+    }).base(), s.end());
+}
+static inline void Trim(std::string &s) {
+    LTrim(s);
+    RTrim(s);
+}
+
+// Special statements we added to SQL.
+bool log = false;
+bool echo = false;
 
 bool SpecialStatements(const std::string &sql, SharderState *state) {
-  if (sql == ".log;") {
-    logs = !logs;
+  if (sql == "SET verbose;") {
+    log = true;
+    return true;
+  }
+  if (sql == "SET echo;") {
+    echo = true;
+    return true;
   }
   if (absl::StartsWith(sql, "GET ")) {
     std::vector<std::string> v = absl::StrSplit(sql, ' ');
@@ -38,15 +62,19 @@ bool open(const std::string &directory, SharderState *state) {
   return true;
 }
 
-bool exec(SharderState *state, const std::string &sql, Callback callback,
+bool exec(SharderState *state, std::string sql, Callback callback,
           void *context, char **errmsg) {
+  Trim(sql);
+  if (echo) {
+    std::cout << sql << std::endl;
+  }
   if (SpecialStatements(sql, state)) {
     return true;
   }
 
   for (const auto &[shard_suffix, sql_statement, modifier] :
        sqlengine::Rewrite(sql, state)) {
-    if (logs) {
+    if (log) {
       std::cout << "Shard: " << shard_suffix << std::endl;
       std::cout << "Statement: " << sql_statement << std::endl;
     }

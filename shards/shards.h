@@ -10,7 +10,7 @@ namespace shards {
 
 bool open(const std::string &directory, SharderState *state);
 
-bool exec(SharderState *state, const std::string &sql, Callback callback,
+bool exec(SharderState *state, std::string sql, Callback callback,
           void *context, char **errmsg);
 
 bool close(SharderState *state);
