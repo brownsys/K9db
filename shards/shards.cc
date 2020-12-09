@@ -14,7 +14,12 @@ namespace shards {
 
 namespace {
 
+bool logs = false;
+
 bool SpecialStatements(const std::string &sql, SharderState *state) {
+  if (sql == ".log;") {
+    logs = !logs;
+  }
   if (absl::StartsWith(sql, "GET ")) {
     std::vector<std::string> v = absl::StrSplit(sql, ' ');
     v.at(2).pop_back();
@@ -41,6 +46,10 @@ bool exec(SharderState *state, const std::string &sql, Callback callback,
 
   for (const auto &[shard_suffix, sql_statement, modifier] :
        sqlengine::Rewrite(sql, state)) {
+    if (logs) {
+      std::cout << "Shard: " << shard_suffix << std::endl;
+      std::cout << "Statement: " << sql_statement << std::endl;
+    }
     bool result = state->pool_.ExecuteStatement(shard_suffix, sql_statement,
                                                 modifier, errmsg);
     if (!result) {

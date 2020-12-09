@@ -115,7 +115,7 @@ class SharderState {
   void Initialize(const std::string &dir_path);
 
   // Schema manipulations.
-  void AddShardKind(const ShardKind &kind);
+  void AddShardKind(const ShardKind &kind, const ColumnName &pk);
 
   void AddUnshardedTable(const UnshardedTableName &table,
                          const CreateStatement &create_statement);
@@ -139,6 +139,8 @@ class SharderState {
 
   bool IsPII(const UnshardedTableName &table) const;
 
+  const ColumnName &PkOfPII(const UnshardedTableName &table) const;
+
   bool ShardExists(const ShardKind &shard_kind, const UserId &user) const;
 
   const std::unordered_set<UserId> &UsersOfShard(const ShardKind &kind) const;
@@ -157,7 +159,9 @@ class SharderState {
   std::string dir_path_;
 
   // All shard kinds as determined from the schema.
-  std::unordered_set<ShardKind> kinds_;
+  // Maps a shard kind (e.g. a table name with PII) to the primary key of that
+  // table.
+  std::unordered_map<ShardKind, ColumnName> kinds_;
 
   // Maps a shard kind into the names of all contained tables.
   // Invariant: a table can at most belong to one shard kind.

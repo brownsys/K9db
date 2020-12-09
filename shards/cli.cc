@@ -65,7 +65,6 @@ int main(int argc, char **argv) {
 
     // Command has been fully read, execute it!
     try {
-      std::cout << command << std::endl;
       bool context = true;
       shards::exec(&state, command, &Callback,
                    reinterpret_cast<void *>(&context), nullptr);

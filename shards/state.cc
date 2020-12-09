@@ -23,8 +23,8 @@ void SharderState::Initialize(const std::string &dir_path) {
 }
 
 // Schema manipulations.
-void SharderState::AddShardKind(const ShardKind &kind) {
-  this->kinds_.insert(kind);
+void SharderState::AddShardKind(const ShardKind &kind, const ColumnName &pk) {
+  this->kinds_.insert({kind, pk});
   this->kind_to_tables_.insert({kind, {}});
   this->shards_.insert({kind, {}});
 }
@@ -81,6 +81,10 @@ const std::list<ShardingInformation> &SharderState::GetShardingInformation(
 
 bool SharderState::IsPII(const UnshardedTableName &table) const {
   return this->kinds_.count(table) > 0;
+}
+
+const ColumnName &SharderState::PkOfPII(const UnshardedTableName &table) const {
+  return this->kinds_.at(table);
 }
 
 bool SharderState::ShardExists(const ShardKind &shard_kind,

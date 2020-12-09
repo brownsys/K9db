@@ -48,6 +48,39 @@ bool HasPII(sqlparser::SQLiteParser::Create_table_stmtContext *stmt) {
   return false;
 }
 
+// Return the name of the PK column of the given table.
+std::string GetPK(sqlparser::SQLiteParser::Create_table_stmtContext *stmt) {
+  bool found = false;
+  std::string pk;
+  // Inline PK constraint.
+  for (sqlparser::SQLiteParser::Column_defContext *col : stmt->column_def()) {
+    for (auto *constraint : col->column_constraint()) {
+      if (constraint->PRIMARY() != nullptr) {
+        if (found) {
+          throw "Multi-column Primary Keys are not supported!";
+        }
+        found = true;
+        pk = col->column_name()->getText();
+      }
+    }
+  }
+  // Standalone PK constraint.
+  for (auto *constraint : stmt->table_constraint()) {
+    if (constraint->PRIMARY() != nullptr) {
+      if (constraint->indexed_column().size() != 1 || found) {
+        throw "Multi-column Primary Keys are not supported!";
+      }
+      found = true;
+      pk = constraint->indexed_column(0)->column_name()->getText();
+    }
+  }
+
+  if (!found) {
+    throw "Table has no Primary Key!";
+  }
+  return pk;
+}
+
 // Checks if this foreign key can be used to shard its table.
 // Specifically, if this is a foreign key to a PII table or a table that is
 // itself sharded.
@@ -360,8 +393,9 @@ std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
   // This means that this table define a type of user for which shards must be
   // created! Hence, it is a shard kind!
   if (has_pii && sharding_information.size() == 0) {
+    std::string pk = GetPK(stmt);
     std::string create_table_str = stmt->accept(&stringify).as<std::string>();
-    state->AddShardKind(table_name);
+    state->AddShardKind(table_name, pk);
     state->AddUnshardedTable(table_name, create_table_str);
     result.emplace_back(DEFAULT_SHARD_NAME, create_table_str,
                         identity_modifier);
