@@ -21,9 +21,9 @@ CREATE TABLE submissions ( \
 
 INSERT INTO assignments VALUES (1, 'assignment 1');
 INSERT INTO assignments VALUES (2, 'assignment 2');
-INSERT INTO students VALUES (1, 'Kinan');
-INSERT INTO students VALUES (2, 'Malte');
-INSERT INTO students VALUES (3, 'Ishan');
+INSERT INTO students VALUES (1, 'Jerry');
+INSERT INTO students VALUES (2, 'Layne');
+INSERT INTO students VALUES (3, 'Sean');
 INSERT INTO submissions VALUES (1, 1, 1);
 INSERT INTO submissions VALUES (2, 1, 2);
 INSERT INTO submissions VALUES (3, 1, 3);
