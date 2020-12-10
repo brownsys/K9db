@@ -86,6 +86,7 @@ bool ConnectionPool::ExecuteStatement(
         this->dir_path_ + shard_suffix + std::string(".sqlite3");
     ::sqlite3_open(shard_path.c_str(), &connection);
   }
+
   // Execute query.
   current_modifier = modifier;
   int result_code = ::sqlite3_exec(connection, statement.c_str(),

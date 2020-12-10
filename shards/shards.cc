@@ -43,6 +43,7 @@ bool SpecialStatements(const std::string &sql, SharderState *state) {
   }
   if (sql == "SET echo;") {
     echo = true;
+    std::cout << "SET echo;" << std::endl;
     return true;
   }
   if (absl::StartsWith(sql, "GET ")) {
@@ -60,6 +61,7 @@ bool SpecialStatements(const std::string &sql, SharderState *state) {
 
 bool open(const std::string &directory, SharderState *state) {
   state->Initialize(directory);
+  state->Load();
   return true;
 }
 
@@ -91,6 +93,9 @@ bool exec(SharderState *state, std::string sql, Callback callback,
   return true;
 }
 
-bool close(SharderState *state) { return true; }
+bool close(SharderState *state) {
+  state->Save();
+  return true;
+}
 
 }  // namespace shards

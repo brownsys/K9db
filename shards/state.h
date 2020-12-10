@@ -154,6 +154,12 @@ class SharderState {
   // Connection pool that manages the underlying sqlite3 databases.
   sqlconnections::ConnectionPool pool_;
 
+  // Save state to durable file.
+  void Save();
+
+  // Load state from its durable file (if exists).
+  void Load();
+
  private:
   // Directory in which all shards are stored.
   std::string dir_path_;
