@@ -33,7 +33,7 @@ class RecordData {
   RecordData(const RecordData&) = delete;
 
   bool cmp(const RecordData& other, const Schema& schema) const {
-    for (auto i = 0; i < schema.num_columns(); ++i) {
+    for (size_t i = 0; i < schema.num_columns(); ++i) {
       std::pair<bool, size_t> inline_and_index = schema.RawColumnIndex(i);
       if (inline_and_index.first) {
         // inline value
@@ -61,7 +61,7 @@ class RecordData {
   }
 
   void Clear(const Schema& schema) {
-    for (auto i = 0; i < schema.num_columns(); ++i) {
+    for (size_t i = 0; i < schema.num_columns(); ++i) {
       if (!Schema::is_inlineable(schema.TypeOf(i))) {
         DeleteOwnedData(pointed_data_[schema.RawColumnIndex(i).second],
                         schema.TypeOf(i));
