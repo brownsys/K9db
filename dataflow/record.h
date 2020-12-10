@@ -28,6 +28,10 @@ class RecordData {
              << pointed_data_;
   };
 
+  // copy construction implemented by `Record`; should never copy `RecordData`
+  // directly.
+  RecordData(const RecordData&) = delete;
+
   bool cmp(const RecordData& other, const Schema& schema) const {
     for (auto i = 0; i < schema.num_columns(); ++i) {
       std::pair<bool, size_t> inline_and_index = schema.RawColumnIndex(i);
@@ -84,6 +88,18 @@ class Record {
         schema_(&schema),
         timestamp_(0),
         positive_(positive) {}
+
+  Record(const Record& other)
+      : data_(RecordData(other.schema())),
+        schema_(other.schema_),
+        timestamp_(other.timestamp_),
+        positive_(other.positive_) {
+    // copy the data; `RecordData` constructor allocated the memory
+    std::memcpy(data_.inline_data_, other.data_.inline_data_,
+                sizeof(uint64_t) * schema_->num_inline_columns());
+    std::memcpy(data_.pointed_data_, other.data_.pointed_data_,
+                sizeof(uint64_t) * schema_->num_pointer_columns());
+  }
 
   ~Record() { data_.Clear(*schema_); }
 
