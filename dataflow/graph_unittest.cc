@@ -5,6 +5,7 @@
 #include "dataflow/ops/input.h"
 #include "dataflow/ops/matview.h"
 #include "dataflow/record.h"
+#include "dataflow/schema.h"
 
 #include <memory>
 
@@ -28,7 +29,7 @@ DataFlowGraph makeTrivialGraph() {
   return g;
 }
 
-DataFlowGraph makeFilterGraph() {
+DataFlowGraph makeFilterGraph(const Schema& schema) {
   DataFlowGraph g;
 
   auto in = std::make_shared<InputOperator>();
@@ -36,7 +37,9 @@ DataFlowGraph makeFilterGraph() {
   std::vector<ColumnID> cids = {0, 1};
   std::vector<FilterOperator::Ops> comp_ops = {
       FilterOperator::GreaterThanOrEqual, FilterOperator::Equal};
-  std::vector<RecordData> filter_vals = {RecordData(10ULL), RecordData(6ULL)};
+  Record filter_vals(schema);
+  filter_vals.set_uint(0, 10ULL);
+  filter_vals.set_uint(1, 6ULL);
   auto filter = std::make_shared<FilterOperator>(cids, comp_ops, filter_vals);
 
   EXPECT_TRUE(g.AddInputNode(in));
@@ -51,54 +54,63 @@ DataFlowGraph makeFilterGraph() {
 TEST(DataFlowGraphTest, Construct) { DataFlowGraph g = makeTrivialGraph(); }
 
 TEST(DataFlowGraphTest, Basic) {
-  DataFlowGraph g = makeTrivialGraph();
+  Schema schema({DataType::kUInt, DataType::kUInt});
+  {
+    DataFlowGraph g = makeTrivialGraph();
 
-  std::shared_ptr<InputOperator> in = g.inputs()[0];
-  std::shared_ptr<MatViewOperator> out = g.outputs()[0];
+    std::shared_ptr<InputOperator> in = g.inputs()[0];
+    std::shared_ptr<MatViewOperator> out = g.outputs()[0];
 
-  std::vector<Record> rs;
-  RecordData key(42ULL);
+    Key key(uint64_t(42));
 
-  std::vector<Record> proc_rs;
+    std::vector<Record> rs;
+    std::vector<Record> proc_rs;
 
-  EXPECT_TRUE(g.Process(*in, rs));
-  // no records should have made it to the materialized view
-  EXPECT_EQ(out->lookup(key), std::vector<Record>());
+    EXPECT_TRUE(g.Process(*in, rs));
+    // no records should have made it to the materialized view
+    EXPECT_EQ(out->lookup(key), std::vector<Record>());
 
-  std::vector<RecordData> rd = {key, RecordData(5ULL)};
-  Record r(true, rd, 3ULL);
-  rs.push_back(r);
+    Record r(schema);
+    r.set_uint(0, 42ULL);
+    r.set_uint(1, 5ULL);
+    rs.push_back(r);
 
-  EXPECT_TRUE(g.Process(*in, rs));
-  EXPECT_EQ(out->lookup(key), rs);
+    EXPECT_TRUE(g.Process(*in, rs));
+    EXPECT_EQ(out->lookup(key), rs);
+  }
 }
 
 TEST(DataFlowGraphTest, SinglePathFilter) {
-  DataFlowGraph g = makeFilterGraph();
+  Schema schema({DataType::kUInt, DataType::kUInt});
+  {
+    DataFlowGraph g = makeFilterGraph(schema);
 
-  std::shared_ptr<InputOperator> in = g.inputs()[0];
-  std::shared_ptr<MatViewOperator> out = g.outputs()[0];
+    std::shared_ptr<InputOperator> in = g.inputs()[0];
+    std::shared_ptr<MatViewOperator> out = g.outputs()[0];
 
-  RecordData key(42ULL);
+    Key key(uint64_t(42));
 
-  std::vector<Record> rs1;
-  std::vector<RecordData> rd1 = {key, RecordData(6ULL)};
-  Record r1(true, rd1, 3ULL);
-  rs1.push_back(r1);
+    std::vector<Record> rs1;
+    Record r1(schema);
+    r1.set_uint(0, uint64_t(42));
+    r1.set_uint(1, 6ULL);
+    rs1.push_back(r1);
 
-  EXPECT_TRUE(g.Process(*in, rs1));
-  // record should be in mat view
-  EXPECT_EQ(out->lookup(key), rs1);
+    EXPECT_TRUE(g.Process(*in, rs1));
+    // record should be in mat view
+    EXPECT_EQ(out->lookup(key), rs1);
 
-  std::vector<Record> rs2;
+    std::vector<Record> rs2;
 
-  std::vector<RecordData> rd2 = {key, RecordData(7ULL)};
-  Record r2(true, rd2, 3ULL);
-  rs2.push_back(r2);
+    Record r2(schema);
+    r2.set_uint(0, uint64_t(42));
+    r2.set_uint(1, 7ULL);
+    rs2.push_back(r2);
 
-  EXPECT_TRUE(g.Process(*in, rs2));
-  // should still only have the first record
-  EXPECT_EQ(out->lookup(key), rs1);
+    EXPECT_TRUE(g.Process(*in, rs2));
+    // should still only have the first record
+    EXPECT_EQ(out->lookup(key), rs1);
+  }
 }
 
 }  // namespace dataflow

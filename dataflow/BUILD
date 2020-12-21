@@ -4,8 +4,8 @@ load("//build:options.bzl", "PELTON_DEFAULT_COPTS")
 cc_library(
     name = "dataflow",
     srcs = [
-        #"edge.cc",
-        #"graph.cc",
+        "edge.cc",
+        "graph.cc",
         "operator.cc",
         "record.cc",
         "schema.cc",
@@ -45,7 +45,7 @@ cc_test(
     name = "dataflow-tests",
     srcs = [
         "record_unittest.cc",
-        #"graph_unittest.cc",
+        "graph_unittest.cc",
         "ops/filter_unittest.cc",
         "ops/union_unittest.cc",
     ],
