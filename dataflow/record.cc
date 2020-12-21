@@ -13,6 +13,12 @@ void RecordData::DeleteOwnedData(uintptr_t ptr, DataType type) {
   }
 }
 
+size_t Record::size_at(size_t index) const {
+  const uintptr_t* data = static_cast<const uintptr_t*>(at(index));
+  return schema_->size_of(schema_->TypeOf(index),
+                          reinterpret_cast<const void*>(*data));
+}
+
 const void* Record::at(size_t index) const {
   std::pair<bool, size_t> ri = schema_->RawColumnIndex(index);
   if (ri.first) {

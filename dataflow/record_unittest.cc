@@ -95,4 +95,18 @@ TEST(RecordTest, TypeMismatch) {
   ASSERT_DEATH({ r1.as_int(1); }, "Type mismatch");
 }
 
+TEST(RecordTest, DataRepSizes) {
+  uint64_t i = 42;
+  std::string* s = new std::string("hello");
+
+  Schema sch({kUInt, kText});
+
+  Record r(sch);
+  r.set_uint(0, i);
+  r.set_string(1, s);
+
+  EXPECT_EQ(r.size_at(0), sizeof(uint64_t));
+  EXPECT_EQ(r.size_at(1), s->size());
+}
+
 }  // namespace dataflow

@@ -28,10 +28,10 @@ class Schema {
     }
   }
 
-  static inline size_t size_of(DataType t, void* data) {
+  static inline size_t size_of(DataType t, const void* data) {
     switch (t) {
       case kText: {
-        std::string* s = reinterpret_cast<std::string*>(data);
+        const std::string* s = reinterpret_cast<const std::string*>(data);
         return s->size();
       }
       case kUInt:

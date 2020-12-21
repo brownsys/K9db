@@ -107,6 +107,7 @@ class Record {
   const void* operator[](size_t index) const;
   void* at_mut(size_t index);
   const void* at(size_t index) const;
+  size_t size_at(size_t index) const;
 
   bool positive() const { return positive_; }
   void set_positive(bool pos) { positive_ = pos; }
