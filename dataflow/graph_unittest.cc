@@ -20,10 +20,9 @@ DataFlowGraph makeTrivialGraph() {
   auto ident = std::make_shared<IdentityOperator>();
 
   EXPECT_TRUE(g.AddInputNode(in));
-  EXPECT_TRUE(g.AddNode(OperatorType::IDENTITY, ident, in));
+  EXPECT_TRUE(g.AddNode(ident, in));
   std::vector<ColumnID> keycol = {0};
-  EXPECT_TRUE(g.AddNode(OperatorType::MAT_VIEW,
-                        std::make_shared<MatViewOperator>(keycol), ident));
+  EXPECT_TRUE(g.AddNode(std::make_shared<MatViewOperator>(keycol), ident));
 
   return g;
 }
@@ -40,10 +39,9 @@ DataFlowGraph makeFilterGraph() {
   auto filter = std::make_shared<FilterOperator>(cids, comp_ops, filter_vals);
 
   EXPECT_TRUE(g.AddInputNode(in));
-  EXPECT_TRUE(g.AddNode(OperatorType::FILTER, filter, in));
+  EXPECT_TRUE(g.AddNode(filter, in));
   std::vector<ColumnID> keycol = {0};
-  EXPECT_TRUE(g.AddNode(OperatorType::MAT_VIEW,
-                        std::make_shared<MatViewOperator>(keycol), filter));
+  EXPECT_TRUE(g.AddNode(std::make_shared<MatViewOperator>(keycol), filter));
 
   return g;
 }

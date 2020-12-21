@@ -12,8 +12,15 @@
 namespace dataflow {
     class EquiJoin : public Operator {
     public:
-
+        EquiJoin() = delete;
         explicit EquiJoin(ColumnID left_id, ColumnID right_id);
+
+        bool process(std::vector<Record>& rs,
+                             std::vector<Record>& out_rs) override {
+                              throw std::runtime_error("do not call for EquiJoin, needs info from where data is coming.");
+        }
+
+        OperatorType type() const { return OperatorType::EQUIJOIN; }
     private:
         ColumnID left_id_;
         ColumnID right_id_;

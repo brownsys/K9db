@@ -10,7 +10,7 @@ namespace dataflow {
 
 class UnionOperator : public Operator {
  public:
-  OperatorType type() override { return OperatorType::UNION; }
+  OperatorType type() const override { return OperatorType::UNION; }
   bool process(std::vector<Record>& rs, std::vector<Record>& out_rs) override;
 };
 

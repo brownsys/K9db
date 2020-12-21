@@ -5,7 +5,6 @@
 #include "equijoin.h"
 
 namespace dataflow {
-    EquiJoin::EquiJoin(ColumnID left_id, ColumnID right_id) : left_id_(left_id), right_id_(right_id) {
+    EquiJoin::EquiJoin(ColumnID left_id, ColumnID right_id) : Operator::Operator(), left_id_(left_id), right_id_(right_id) {
     }
-
 }
