@@ -32,8 +32,10 @@ class MatViewOperator : public Operator {
     assert(key_cols_.size() == 1);
     ColumnID cid = key_cols_[0];
 
-    return std::make_pair(Key(r[cid], r.schema().TypeOf(cid)),
-		          Schema::is_inlineable(r.schema().TypeOf(cid)));
+    const void* key =
+        reinterpret_cast<const void*>(*static_cast<const uintptr_t*>(r[cid]));
+    return std::make_pair(Key(key, r.schema().TypeOf(cid)),
+                          Schema::is_inlineable(r.schema().TypeOf(cid)));
   }
 };
 
