@@ -4,36 +4,37 @@
 #include <vector>
 
 #include "dataflow/record.h"
+#include "dataflow/record_utils.h"
 
 namespace dataflow {
 
-// performs logical AND on the predicates(cid + comparison operator + value)
-// with their corresponding columns
 bool FilterOperator::process(std::vector<Record>& rs,
                              std::vector<Record>& out_rs) {
   for (Record& r : rs) {
     bool flag = false;
     for (size_t i = 0; i < cids_.size(); i++) {
-      RecordData entry = r.raw_at(cids_[i]);
+      DataType type = vals_.schema().TypeOf(i);
       switch (ops_[i]) {
         case Equal:
-          flag = entry.as_val() == vals_[i].as_val();
+          flag = Eq(type, r, vals_, i);
           break;
         case LessThan:
-          flag = entry.as_val() < vals_[i].as_val();
+          flag = Lt(type, r, vals_, i);
           break;
         case LessThanOrEqual:
-          flag = entry.as_val() <= vals_[i].as_val();
+          flag = LtEq(type, r, vals_, i);
           break;
         case GreaterThan:
-          flag = entry.as_val() > vals_[i].as_val();
+          flag = Gt(type, r, vals_, i);
           break;
         case GreaterThanOrEqual:
-          flag = entry.as_val() >= vals_[i].as_val();
+          flag = GtEq(type, r, vals_, i);
           break;
         case NotEqual:
-          flag = entry.as_val() != vals_[i].as_val();
+          flag = NotEq(type, r, vals_, i);
           break;
+        default:
+          LOG(FATAL) << "unimplemented!";
       }
       if (!flag) {
         break;
