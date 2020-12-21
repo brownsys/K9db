@@ -49,7 +49,7 @@ cc_test(
         "ops/filter_unittest.cc",
         "ops/union_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
+    copts = PELTON_DEFAULT_COPTS + ["-Iexternal/gtest/googletest/include"],
     deps = [
         "@glog//:glog",
         "@gtest//:gtest",
