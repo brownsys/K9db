@@ -40,4 +40,4 @@ class FilterOperator : public Operator {
 
 }  // namespace dataflow
 
-#endif  // PELTON_DATAFLOW_OPS_IDENTITY_H_
+#endif  // PELTON_DATAFLOW_OPS_FILTER_H_
