@@ -9,6 +9,9 @@ namespace dataflow {
 
 class Key {
  public:
+  Key(uint64_t v) : Key(reinterpret_cast<void*>(v), DataType::kUInt) {}
+  Key(int64_t v) : Key(reinterpret_cast<void*>(v), DataType::kInt) {}
+  Key(const std::string* v) : Key(v, DataType::kText) {}
   Key(const void* field, DataType type)
       : data_(reinterpret_cast<uint64_t>(field)), type_(type) {}
 
@@ -45,9 +48,25 @@ class Key {
     }
   }
 
+  uint64_t as_int() const {
+    CheckType(DataType::kUInt);
+    return data_;
+  }
+  const std::string* as_string() const {
+    CheckType(DataType::kText);
+    return reinterpret_cast<const std::string*>(data_);
+  }
+
  private:
   uint64_t data_;
   DataType type_;
+
+  inline void CheckType(DataType t) const {
+    if (type_ != t) {
+      LOG(FATAL) << "Type mismatch: key type is is " << type_
+                 << ", tried to access as " << t;
+    }
+  }
 };
 
 }  // namespace dataflow
