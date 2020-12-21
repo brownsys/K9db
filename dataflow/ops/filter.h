@@ -28,7 +28,7 @@ class FilterOperator : public Operator {
     CHECK_EQ(comp_ops.size(), comp_vals.schema().num_columns());
   };
 
-  OperatorType type() override { return OperatorType::FILTER; }
+  OperatorType type() const override { return OperatorType::FILTER; }
 
   bool process(std::vector<Record>& rs, std::vector<Record>& out_rs) override;
 

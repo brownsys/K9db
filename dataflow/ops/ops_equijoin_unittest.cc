@@ -22,10 +22,10 @@ TEST(JoinOperatorTest, Basic) {
   df.AddInputNode(leftSrc);
   df.AddInputNode(rightSrc);
 
-  auto join_op = make_shared<EquiJoin<(0ul, 0ul);
-  df.addNode(join_op, {leftSrc, rightSrc});
+  auto join_op = make_shared<EquiJoin>(0ul, 0ul);
+  df.AddNode(join_op, {leftSrc, rightSrc});
 
-  // push data into 
+  // push data into
 
   // std::vector<ColumnID> cids = {0, 1};
   // std::vector<FilterOperator::Ops> comp_ops = {FilterOperator::OpsGT_Eq,

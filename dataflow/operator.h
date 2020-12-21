@@ -18,6 +18,7 @@ enum OperatorType {
   MAT_VIEW,
   FILTER,
   UNION,
+  EQUIJOIN
 };
 
 class Operator {
@@ -38,7 +39,7 @@ class Operator {
                        std::vector<Record>& out_rs) = 0;
   bool ProcessAndForward(NodeIndex src_op_idx, std::vector<Record>& rs);
 
-  virtual OperatorType type() = 0;
+  virtual OperatorType type() const = 0;
   NodeIndex index() const { return index_; }
   void set_index(NodeIndex index) { index_ = index; }
   DataFlowGraph* graph() const { return graph_; }

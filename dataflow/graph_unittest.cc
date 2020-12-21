@@ -42,9 +42,8 @@ DataFlowGraph makeFilterGraph(const Schema& schema) {
   auto filter = std::make_shared<FilterOperator>(cids, comp_ops, filter_vals);
 
   EXPECT_TRUE(g.AddInputNode(in));
-  EXPECT_TRUE(g.AddNode(OperatorType::FILTER, filter, in));
-  EXPECT_TRUE(g.AddNode(OperatorType::MAT_VIEW,
-                        std::make_shared<MatViewOperator>(schema.key_columns()),
+  EXPECT_TRUE(g.AddNode(filter, in));
+  EXPECT_TRUE(g.AddNode(std::make_shared<MatViewOperator>(schema.key_columns()),
                         filter));
 
   return g;
