@@ -1,3 +1,6 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("//build:options.bzl", "PELTON_DEFAULT_COPTS")
+
 cc_binary(
   name = "hello_world",
   deps = [
