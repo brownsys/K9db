@@ -6,6 +6,7 @@
 #include "dataflow/ops/identity.h"
 #include "dataflow/ops/input.h"
 #include "dataflow/ops/matview.h"
+#include "dataflow/ops/equijoin.h"
 #include "dataflow/record.h"
 #include "gtest/gtest.h"
 
@@ -21,6 +22,10 @@ TEST(JoinOperatorTest, Basic) {
   df.AddInputNode(leftSrc);
   df.AddInputNode(rightSrc);
 
+  auto join_op = make_shared<EquiJoin<(0ul, 0ul);
+  df.addNode(join_op, {leftSrc, rightSrc});
+
+  // push data into 
 
   // std::vector<ColumnID> cids = {0, 1};
   // std::vector<FilterOperator::Ops> comp_ops = {FilterOperator::OpsGT_Eq,
