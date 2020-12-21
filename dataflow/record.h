@@ -103,10 +103,21 @@ class Record {
 
   ~Record() { data_.Clear(*schema_); }
 
+  // These invoke `at` and `at_mut`
   void* operator[](size_t index);
   const void* operator[](size_t index) const;
+
+  // These are RAW interfaces, which return the *address* of the column data
+  // in the record's internal buffer. Note that this is a pointer to data for
+  // inline data types, but a pointer to a *pointer* for pointer-indirect values
+  // like strings. The caller must therefore know the type of the data to
+  // interpret the return value.
+  //
+  // Use of these raw functions is *discouraged*; proceed at your own peril.
   void* at_mut(size_t index);
   const void* at(size_t index) const;
+
+  // Returns byte size of data in column `index`
   size_t size_at(size_t index) const;
 
   bool positive() const { return positive_; }
