@@ -13,8 +13,8 @@ namespace dataflow {
 
 TEST(FilterOperatorTest, Basic) {
   std::vector<ColumnID> cids = {0, 1};
-  std::vector<FilterOperator::Ops> comp_ops = {FilterOperator::OpsGT_Eq,
-                                               FilterOperator::OpsEq};
+  std::vector<FilterOperator::Ops> comp_ops = {
+      FilterOperator::GreaterThanOrEqual, FilterOperator::Equal};
   std::vector<RecordData> comp_vals = {RecordData(3ULL), RecordData(5ULL)};
 
   std::shared_ptr<FilterOperator> filter =

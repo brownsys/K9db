@@ -12,7 +12,14 @@ namespace dataflow {
 
 class FilterOperator : public Operator {
  public:
-  enum Ops : unsigned char { OpsLT, OpsLT_Eq, OpsGT, OpsGT_Eq, OpsEq, OpsN_Eq };
+  enum Ops : unsigned char {
+    LessThan,
+    LessThanOrEqual,
+    GreaterThan,
+    GreaterThanOrEqual,
+    Equal,
+    NotEqual
+  };
 
   explicit FilterOperator(std::vector<ColumnID>& cids,
                           std::vector<Ops>& comp_ops,
