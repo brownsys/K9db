@@ -67,8 +67,8 @@ class RecordData {
                         schema.TypeOf(i));
       }
     }
-    delete pointed_data_;
-    delete inline_data_;
+    delete[] pointed_data_;
+    delete[] inline_data_;
   }
 
  private:
