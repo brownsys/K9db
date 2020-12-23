@@ -48,13 +48,17 @@ class Key {
     }
   }
 
-  uint64_t as_int() const {
+  uint64_t as_uint() const {
     CheckType(DataType::kUInt);
     return data_;
   }
-  const std::string* as_string() const {
+  uint64_t as_int() const {
+    CheckType(DataType::kInt);
+    return static_cast<int64_t>(data_);
+  }
+  const std::string& as_string() const {
     CheckType(DataType::kText);
-    return reinterpret_cast<const std::string*>(data_);
+    return *reinterpret_cast<const std::string*>(data_);
   }
 
  private:

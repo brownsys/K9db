@@ -37,7 +37,8 @@ std::vector<Record> MatViewOperator::lookup(const Key& key) const {
   }
 }
 
-std::vector<Record> MatViewOperator::multi_lookup(std::vector<Key>& keys) {
+std::vector<Record> MatViewOperator::multi_lookup(
+    const std::vector<Key>& keys) {
   std::vector<Record> out;
   for (Key key : keys) {
     if (contents_.contains(key)) {

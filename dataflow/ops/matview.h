@@ -22,7 +22,7 @@ class MatViewOperator : public Operator {
   }
 
   std::vector<Record> lookup(const Key& key) const;
-  std::vector<Record> multi_lookup(std::vector<Key>& keys);
+  std::vector<Record> multi_lookup(const std::vector<Key>& keys);
 
  private:
   absl::flat_hash_map<Key, std::vector<Record>> contents_;
