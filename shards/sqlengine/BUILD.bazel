@@ -9,36 +9,19 @@ cc_library(
         "engine.h",
     ],
     deps = [
-        ":parser",
         ":create",
         ":delete",
         ":insert",
         ":select",
         "//shards:state",
         "//shards/sqlast:ast",
+        "//shards/sqlast:parser",
         "//shards/util:status",
         "@absl//absl/status:statusor",
         "@antlr4_runtimes//:cpp",
         "@grammars-v4//:sqlparser",
     ],
     visibility = ["//shards:__subpackages__"],
-)
-
-cc_library(
-    name = "parser",
-        srcs = [
-        "parser.cc",
-    ],
-    hdrs= [
-        "parser.h",
-    ],
-    deps = [
-        "//shards/sqlast:ast",
-        "//shards/sqlengine/visitors:ast",
-        "@absl//absl/status:statusor",
-        "@antlr4_runtimes//:cpp",
-        "@grammars-v4//:sqlparser",
-    ],
 )
 
 

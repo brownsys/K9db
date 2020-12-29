@@ -5,10 +5,10 @@
 #include <memory>
 
 #include "shards/sqlast/ast.h"
+#include "shards/sqlast/parser.h"
 #include "shards/sqlengine/create.h"
 #include "shards/sqlengine/delete.h"
 #include "shards/sqlengine/insert.h"
-#include "shards/sqlengine/parser.h"
 #include "shards/sqlengine/select.h"
 #include "shards/util/status.h"
 
@@ -19,7 +19,7 @@ absl::StatusOr<
     std::list<std::tuple<ShardSuffix, SQLStatement, CallbackModifier>>>
 Rewrite(const std::string &sql, SharderState *state) {
   // Parse with ANTLR into our AST.
-  parser::SQLParser parser;
+  sqlast::SQLParser parser;
   MOVE_OR_RETURN(std::unique_ptr<sqlast::AbstractStatement> statement,
                  parser.Parse(sql));
 

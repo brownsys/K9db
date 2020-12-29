@@ -1,6 +1,6 @@
 // Turn an ANTLR parse tree into a valid SQL string.
-#ifndef SHARDS_SQLENGINE_VISITORS_AST_H_
-#define SHARDS_SQLENGINE_VISITORS_AST_H_
+#ifndef SHARDS_SQLAST_TRANSFORMER_H_
+#define SHARDS_SQLAST_TRANSFORMER_H_
 
 #include <memory>
 
@@ -9,12 +9,11 @@
 #include "shards/sqlast/ast.h"
 
 namespace shards {
-namespace sqlengine {
-namespace visitors {
+namespace sqlast {
 
-class BuildAstVisitor : public sqlparser::SQLiteParserBaseVisitor {
+class AstTransformer : public sqlparser::SQLiteParserBaseVisitor {
  public:
-  BuildAstVisitor() {}
+  AstTransformer() {}
 
   // Entry point for cst to ast transformation / building.
   absl::StatusOr<std::unique_ptr<sqlast::AbstractStatement>> TransformStatement(
@@ -255,8 +254,7 @@ class BuildAstVisitor : public sqlparser::SQLiteParserBaseVisitor {
       sqlparser::SQLiteParser::Any_nameContext *context) override;
 };
 
-}  // namespace visitors
-}  // namespace sqlengine
+}  // namespace sqlast
 }  // namespace shards
 
-#endif  // SHARDS_SQLENGINE_VISITORS_AST_H_
+#endif  // SHARDS_SQLAST_TRANSFORMER_H_

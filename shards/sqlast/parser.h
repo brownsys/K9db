@@ -1,7 +1,7 @@
 // Parser responsible for parsing sql statement using ANTLR grammar.
 
-#ifndef SHARDS_SQLENGINE_PARSER_H_
-#define SHARDS_SQLENGINE_PARSER_H_
+#ifndef SHARDS_SQLAST_PARSER_H_
+#define SHARDS_SQLAST_PARSER_H_
 
 #include <memory>
 #include <string>
@@ -16,14 +16,13 @@
 #include "shards/sqlast/ast.h"
 
 namespace shards {
-namespace sqlengine {
-namespace parser {
+namespace sqlast {
 
 class SQLParser : public antlr4::BaseErrorListener {
  public:
   SQLParser() {}
 
-  absl::StatusOr<std::unique_ptr<sqlast::AbstractStatement>> Parse(
+  absl::StatusOr<std::unique_ptr<AbstractStatement>> Parse(
       const std::string &sql);
 
   void syntaxError(antlr4::Recognizer *recognizer,
@@ -39,8 +38,7 @@ class SQLParser : public antlr4::BaseErrorListener {
   std::unique_ptr<antlr4::ANTLRInputStream> input_stream_;
 };
 
-}  // namespace parser
-}  // namespace sqlengine
+}  // namespace sqlast
 }  // namespace shards
 
-#endif  // SHARDS_SQLENGINE_PARSER_H_
+#endif  // SHARDS_SQLAST_PARSER_H_

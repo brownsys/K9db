@@ -1,17 +1,16 @@
 // Parser responsible for parsing sql statement using ANTLR grammar.
 
-#include "shards/sqlengine/parser.h"
+#include "shards/sqlast/parser.h"
 
 #include <utility>
 
 #include "absl/status/status.h"
-#include "shards/sqlengine/visitors/ast.h"
+#include "shards/sqlast/transformer.h"
 
 namespace shards {
-namespace sqlengine {
-namespace parser {
+namespace sqlast {
 
-absl::StatusOr<std::unique_ptr<sqlast::AbstractStatement>> SQLParser::Parse(
+absl::StatusOr<std::unique_ptr<AbstractStatement>> SQLParser::Parse(
     const std::string &sql) {
   this->error_ = false;
   // Initialize ANTLR things.
@@ -32,8 +31,7 @@ absl::StatusOr<std::unique_ptr<sqlast::AbstractStatement>> SQLParser::Parse(
   }
 
   // Makes sure that all constructs used in the statement are supported!
-  visitors::BuildAstVisitor ast;
-  return ast.TransformStatement(statement);
+  return AstTransformer().TransformStatement(statement);
 }
 
 void SQLParser::syntaxError(antlr4::Recognizer *recognizer,
@@ -43,6 +41,5 @@ void SQLParser::syntaxError(antlr4::Recognizer *recognizer,
   this->error_ = true;
 }
 
-}  // namespace parser
-}  // namespace sqlengine
+}  // namespace sqlast
 }  // namespace shards
