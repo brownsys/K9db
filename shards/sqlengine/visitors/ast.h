@@ -1,20 +1,27 @@
 // Turn an ANTLR parse tree into a valid SQL string.
-#ifndef SHARDS_SQLENGINE_VISITORS_VALID_H_
-#define SHARDS_SQLENGINE_VISITORS_VALID_H_
+#ifndef SHARDS_SQLENGINE_VISITORS_AST_H_
+#define SHARDS_SQLENGINE_VISITORS_AST_H_
 
-#include "shards/sqlengine/visitors/default.h"
+#include <memory>
+
+#include "SQLiteParserBaseVisitor.h"
+#include "absl/status/statusor.h"
+#include "shards/sqlast/ast.h"
 
 namespace shards {
 namespace sqlengine {
 namespace visitors {
 
-class Valid : public Default {
+class BuildAstVisitor : public sqlparser::SQLiteParserBaseVisitor {
  public:
-  antlrcpp::Any defaultResult() override;
-  antlrcpp::Any visitTerminal(antlr4::tree::TerminalNode *_) override;
-  antlrcpp::Any visitErrorNode(antlr4::tree::ErrorNode *_) override;
-  antlrcpp::Any aggregateResult(antlrcpp::Any agg,
-                                const antlrcpp::Any &next) override;
+  BuildAstVisitor() {}
+
+  // Entry point for cst to ast transformation / building.
+  absl::StatusOr<std::unique_ptr<sqlast::AbstractStatement>> TransformStatement(
+      sqlparser::SQLiteParser::Sql_stmtContext *context);
+
+  // Visitors for all possible parser rules from the sqlite3 grammar, including
+  // supported (valid) and unsupported syntax.
   antlrcpp::Any visitParse(
       sqlparser::SQLiteParser::ParseContext *context) override;
   antlrcpp::Any visitError(
@@ -252,4 +259,4 @@ class Valid : public Default {
 }  // namespace sqlengine
 }  // namespace shards
 
-#endif  // SHARDS_SQLENGINE_VISITORS_VALID_H_
+#endif  // SHARDS_SQLENGINE_VISITORS_AST_H_

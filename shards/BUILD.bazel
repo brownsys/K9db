@@ -10,7 +10,7 @@ cc_library(
     ],
     deps = [
         "@absl//absl/strings",
-        ":state",
+        "//shards:state",
         "//shards/sqlengine:engine",
         "//shards/sqlengine:util",
     ],

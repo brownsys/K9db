@@ -7,8 +7,5 @@ cc_library(
         "status.h",
     ],
     visibility = ["//visibility:public"],
-    deps = [
-        "@absl//absl/status",
-        "@absl//absl/types:optional",
-    ],
+    deps = [],
 )

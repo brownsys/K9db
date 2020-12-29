@@ -1,0 +1,12 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "ast",
+    srcs = [
+        "ast.cc",
+    ],
+    hdrs = [
+        "ast.h",
+    ],
+    visibility = ["//shards:__subpackages__"],
+)

@@ -18,6 +18,7 @@
 #include <string>
 #include <tuple>
 
+#include "absl/status/statusor.h"
 #include "shards/state.h"
 
 namespace shards {
@@ -26,8 +27,9 @@ namespace sqlengine {
 using ShardSuffix = std::string;
 using SQLStatement = std::string;
 
-std::list<std::tuple<ShardSuffix, SQLStatement, CallbackModifier>> Rewrite(
-    const std::string &sql, SharderState *state);
+absl::StatusOr<
+    std::list<std::tuple<ShardSuffix, SQLStatement, CallbackModifier>>>
+Rewrite(const std::string &sql, SharderState *state);
 
 }  // namespace sqlengine
 }  // namespace shards

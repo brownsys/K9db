@@ -2,17 +2,19 @@
 
 #include "shards/sqlengine/parser.h"
 
-#include <iostream>
+#include <utility>
 
-#include "shards/sqlengine/visitors/valid.h"
+#include "absl/status/status.h"
+#include "shards/sqlengine/visitors/ast.h"
 
 namespace shards {
 namespace sqlengine {
 namespace parser {
 
-bool SQLParser::Parse(const std::string &sql) {
-  // Initialize ANTLR things
+absl::StatusOr<std::unique_ptr<sqlast::AbstractStatement>> SQLParser::Parse(
+    const std::string &sql) {
   this->error_ = false;
+  // Initialize ANTLR things.
   this->input_stream_ = std::make_unique<antlr4::ANTLRInputStream>(sql);
   this->lexer_ =
       std::make_unique<sqlparser::SQLiteLexer>(this->input_stream_.get());
@@ -24,25 +26,14 @@ bool SQLParser::Parse(const std::string &sql) {
   this->parser_->addErrorListener(this);
 
   // Make sure the parsed statement is ok!
-  this->statement_ = this->parser_->sql_stmt();
-
-  // Syntax errors!
-  if (this->error_) {
-    std::cout << "SQL SYNTAX ERROR!" << std::endl;
-    return false;
+  auto *statement = this->parser_->sql_stmt();
+  if (this->error_) {  // Syntax errors!
+    return absl::InvalidArgumentError("SQL SYNTAX ERROR");
   }
 
-  // Make sure the constructs used in the statement are all supported!
-  visitors::Valid valid;
-  if (!statement_->accept(&valid).as<bool>()) {
-    return false;
-  }
-
-  return true;
-}
-
-sqlparser::SQLiteParser::Sql_stmtContext *SQLParser::Statement() {
-  return this->statement_;
+  // Makes sure that all constructs used in the statement are supported!
+  visitors::BuildAstVisitor ast;
+  return ast.TransformStatement(statement);
 }
 
 void SQLParser::syntaxError(antlr4::Recognizer *recognizer,

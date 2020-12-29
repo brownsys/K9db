@@ -6,12 +6,14 @@
 #include <memory>
 #include <string>
 
+#include "absl/status/statusor.h"
 // ANTLR runtime library.
 // NOLINTNEXTLINE
 #include "antlr4-runtime.h"
 // C++ generated code from ANTLR Sqlite grammar.
 #include "SQLiteLexer.h"
 #include "SQLiteParser.h"
+#include "shards/sqlast/ast.h"
 
 namespace shards {
 namespace sqlengine {
@@ -21,8 +23,8 @@ class SQLParser : public antlr4::BaseErrorListener {
  public:
   SQLParser() {}
 
-  bool Parse(const std::string &sql);
-  sqlparser::SQLiteParser::Sql_stmtContext *Statement();
+  absl::StatusOr<std::unique_ptr<sqlast::AbstractStatement>> Parse(
+      const std::string &sql);
 
   void syntaxError(antlr4::Recognizer *recognizer,
                    antlr4::Token *offendingSymbol, size_t line,
@@ -35,7 +37,6 @@ class SQLParser : public antlr4::BaseErrorListener {
   std::unique_ptr<antlr4::CommonTokenStream> tokens_;
   std::unique_ptr<sqlparser::SQLiteLexer> lexer_;
   std::unique_ptr<antlr4::ANTLRInputStream> input_stream_;
-  sqlparser::SQLiteParser::Sql_stmtContext *statement_;
 };
 
 }  // namespace parser

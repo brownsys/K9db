@@ -10,11 +10,14 @@ cc_library(
     ],
     deps = [
         ":parser",
-        ":create",
-        ":delete",
-        ":insert",
-        ":select",
+        #":create",
+        #":delete",
+        #":insert",
+        #":select",
         "//shards:state",
+        "//shards/sqlast:ast",
+        "//shards/util:status",
+        "@absl//absl/status:statusor",
         "@antlr4_runtimes//:cpp",
         "@grammars-v4//:sqlparser",
     ],
@@ -30,12 +33,15 @@ cc_library(
         "parser.h",
     ],
     deps = [
-        "//shards/sqlengine/visitors:visitors",
+        "//shards/sqlast:ast",
+        "//shards/sqlengine/visitors:ast",
+        "@absl//absl/status:statusor",
         "@antlr4_runtimes//:cpp",
         "@grammars-v4//:sqlparser",
     ],
 )
 
+'''
 cc_library(
     name = "create",
     srcs = [
@@ -105,8 +111,7 @@ cc_library(
         "@grammars-v4//:sqlparser",
     ],
 )
-
-
+'''
 
 cc_library(
     name = "util",

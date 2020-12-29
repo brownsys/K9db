@@ -67,16 +67,26 @@ bool open(const std::string &directory, SharderState *state) {
 
 bool exec(SharderState *state, std::string sql, Callback callback,
           void *context, char **errmsg) {
+  // Trim statement.
   Trim(sql);
   if (echo) {
     std::cout << sql << std::endl;
   }
+
+  // If special statement, handle it separately.
   if (SpecialStatements(sql, state)) {
     return true;
   }
 
-  for (const auto &[shard_suffix, sql_statement, modifier] :
-       sqlengine::Rewrite(sql, state)) {
+  // Parse and rewrite statement.
+  auto statusor = sqlengine::Rewrite(sql, state);
+  if (!statusor.ok()) {
+    std::cout << statusor.status() << std::endl;
+    return false;
+  }
+
+  // Successfully re-written into a list of modified statements.
+  for (const auto &[shard_suffix, sql_statement, modifier] : statusor.value()) {
     if (log) {
       std::cout << "Shard: " << shard_suffix << std::endl;
       std::cout << "Statement: " << sql_statement << std::endl;
