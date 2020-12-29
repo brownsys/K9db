@@ -7,7 +7,7 @@
 #include <string>
 #include <tuple>
 
-#include "SQLiteParser.h"
+#include "shards/sqlast/ast.h"
 #include "shards/state.h"
 
 namespace shards {
@@ -15,7 +15,7 @@ namespace sqlengine {
 namespace insert {
 
 std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
-    sqlparser::SQLiteParser::Insert_stmtContext *stmt, SharderState *state);
+    const sqlast::Insert &stmt, SharderState *state);
 
 }  // namespace insert
 }  // namespace sqlengine

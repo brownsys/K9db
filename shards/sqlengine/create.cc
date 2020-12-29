@@ -10,10 +10,7 @@
 #include <vector>
 
 #include "absl/strings/match.h"
-// NOLINTNEXTLINE
-#include "antlr4-runtime.h"
 #include "shards/sqlengine/util.h"
-#include "shards/sqlengine/visitors/stringify.h"
 
 namespace shards {
 namespace sqlengine {
@@ -38,10 +35,9 @@ enum ForeignKeyType {
 using ForeignKeyShards = std::unordered_map<ColumnName, ForeignKeyType>;
 
 // Checks if the create table statement specifies any PII columns.
-bool HasPII(sqlparser::SQLiteParser::Create_table_stmtContext *stmt) {
-  for (sqlparser::SQLiteParser::Column_defContext *column :
-       stmt->column_def()) {
-    if (absl::StartsWith(column->column_name()->getText(), "PII_")) {
+bool HasPII(const sqlast::CreateTable &stmt) {
+  for (const sqlast::ColumnDefinition &column : stmt.GetColumns()) {
+    if (absl::StartsWith(column.column_name(), "PII_")) {
       return true;
     }
   }
@@ -49,32 +45,21 @@ bool HasPII(sqlparser::SQLiteParser::Create_table_stmtContext *stmt) {
 }
 
 // Return the name of the PK column of the given table.
-std::string GetPK(sqlparser::SQLiteParser::Create_table_stmtContext *stmt) {
+std::string GetPK(const sqlast::CreateTable &stmt) {
   bool found = false;
   std::string pk;
   // Inline PK constraint.
-  for (sqlparser::SQLiteParser::Column_defContext *col : stmt->column_def()) {
-    for (auto *constraint : col->column_constraint()) {
-      if (constraint->PRIMARY() != nullptr) {
+  for (const auto &col : stmt.GetColumns()) {
+    for (const auto &constraint : col.GetConstraints()) {
+      if (constraint.type() == sqlast::ColumnConstraint::Type::PRIMARY_KEY) {
         if (found) {
           throw "Multi-column Primary Keys are not supported!";
         }
         found = true;
-        pk = col->column_name()->getText();
+        pk = col.column_name();
       }
     }
   }
-  // Standalone PK constraint.
-  for (auto *constraint : stmt->table_constraint()) {
-    if (constraint->PRIMARY() != nullptr) {
-      if (constraint->indexed_column().size() != 1 || found) {
-        throw "Multi-column Primary Keys are not supported!";
-      }
-      found = true;
-      pk = constraint->indexed_column(0)->column_name()->getText();
-    }
-  }
-
   if (!found) {
     throw "Table has no Primary Key!";
   }
@@ -85,10 +70,9 @@ std::string GetPK(sqlparser::SQLiteParser::Create_table_stmtContext *stmt) {
 // Specifically, if this is a foreign key to a PII table or a table that is
 // itself sharded.
 std::optional<ShardKind> ShouldShardBy(
-    sqlparser::SQLiteParser::Foreign_key_clauseContext *foreign_key,
-    const SharderState &state) {
+    const sqlast::ColumnConstraint &foreign_key, const SharderState &state) {
   // First, determine if the foreign table is in a shard or has PII.
-  UnshardedTableName foreign_table = foreign_key->foreign_table()->getText();
+  const std::string &foreign_table = foreign_key.foreign_table();
   bool foreign_sharded = state.IsSharded(foreign_table);
   bool foreign_pii = state.IsPII(foreign_table);
 
@@ -115,31 +99,29 @@ std::optional<ShardKind> ShouldShardBy(
 //    to the shard defined by that PII table, or to the same shard that the
 //    target table is in. Having multiple such foreign keys results in a runtime
 //    error.
-std::list<ShardingInformation> ShardTable(
-    sqlparser::SQLiteParser::Create_table_stmtContext *stmt,
-    const SharderState &state) {
+std::list<ShardingInformation> ShardTable(const sqlast::CreateTable &stmt,
+                                          const SharderState &state) {
   // Result is empty by default.
   std::list<ShardingInformation> explicit_owners;
   std::list<ShardingInformation> implicit_owners;
   std::unordered_map<ColumnName, ColumnIndex> index_map;
 
-  const std::string &table_name = stmt->table_name()->getText();
+  const std::string &table_name = stmt.table_name();
   // Check column definitions for inlined foreign key constraints.
-  auto columns = stmt->column_def();
+  const auto &columns = stmt.GetColumns();
   for (size_t index = 0; index < columns.size(); index++) {
     // Record index of column for later constraint processing.
-    ColumnName column_name = columns[index]->column_name()->getText();
+    const std::string &column_name = columns[index].column_name();
     index_map.insert({column_name, index});
     // Find foreign key constraint (if exists).
-    for (auto *constraint : columns[index]->column_constraint()) {
-      auto *foreign_key = constraint->foreign_key_clause();
-      if (foreign_key == nullptr) {
+    for (const auto &constraint : columns[index].GetConstraints()) {
+      if (constraint.type() != sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
         continue;
       }
 
       // We have a foreign key constraint, check if we should shard by it.
       bool explicit_owner = absl::StartsWith(column_name, "OWNER_");
-      std::optional<ShardKind> shard_kind = ShouldShardBy(foreign_key, state);
+      std::optional<ShardKind> shard_kind = ShouldShardBy(constraint, state);
       if (shard_kind.has_value()) {
         std::string sharded_table_name =
             NameShardedTable(table_name, column_name);
@@ -151,35 +133,6 @@ std::list<ShardingInformation> ShardTable(
           implicit_owners.push_back(
               {shard_kind.value(), sharded_table_name, column_name, index});
         }
-      }
-    }
-  }
-
-  // Check standalone table constraints.
-  for (auto *constraint : stmt->table_constraint()) {
-    auto *foreign_key = constraint->foreign_key_clause();
-    if (foreign_key == nullptr) {
-      continue;
-    }
-
-    // See if we should shard by this foreign key.
-    std::optional<ShardKind> shard_kind = ShouldShardBy(foreign_key, state);
-    if (shard_kind.has_value()) {
-      if (constraint->column_name().size() > 1) {
-        throw "Multi-column foreign key shard link are not supported!";
-      }
-
-      ColumnName column_name = constraint->column_name(0)->getText();
-      std::string sharded_table_name =
-          NameShardedTable(table_name, column_name);
-      ColumnIndex column_index = index_map.at(column_name);
-      bool explicit_owner = absl::StartsWith(column_name, "OWNER_");
-      if (explicit_owner) {
-        explicit_owners.push_back({shard_kind.value(), sharded_table_name,
-                                   column_name, column_index});
-      } else {
-        implicit_owners.push_back({shard_kind.value(), sharded_table_name,
-                                   column_name, column_index});
       }
     }
   }
@@ -198,11 +151,10 @@ std::list<ShardingInformation> ShardTable(
 
 // Determine what hsould be done about a single foreign key in some
 // sharded table.
-ForeignKeyType ShardForeignKey(
-    sqlparser::SQLiteParser::Foreign_key_clauseContext *foreign_key,
-    const ShardingInformation &sharding_information,
-    const SharderState &state) {
-  const std::string &foreign_table = foreign_key->foreign_table()->getText();
+ForeignKeyType ShardForeignKey(const sqlast::ColumnConstraint &foreign_key,
+                               const ShardingInformation &sharding_information,
+                               const SharderState &state) {
+  const std::string &foreign_table = foreign_key.foreign_table();
 
   // Figure out the type of this foreign key.
   if (state.IsSharded(foreign_table)) {
@@ -221,30 +173,18 @@ ForeignKeyType ShardForeignKey(
 
 // Determine what should be done about all foreign keys in a sharded table.
 ForeignKeyShards ShardForeignKeys(
-    sqlparser::SQLiteParser::Create_table_stmtContext *stmt,
+    const sqlast::CreateTable &stmt,
     const ShardingInformation &sharding_information,
     const SharderState &state) {
   // Store the sharded resolution for every foreign key.
   ForeignKeyShards result;
   // Check column definitions for inlined foreign key constraints.
-  for (auto *column : stmt->column_def()) {
-    for (auto *constraint : column->column_constraint()) {
-      auto *foreign_key = constraint->foreign_key_clause();
-      if (foreign_key != nullptr) {
+  for (const auto &column : stmt.GetColumns()) {
+    for (const auto &constraint : column.GetConstraints()) {
+      if (constraint.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
         result.emplace(
-            column->column_name()->getText(),
-            ShardForeignKey(foreign_key, sharding_information, state));
-      }
-    }
-  }
-  // Check standalone table constraints.
-  for (auto *constraint : stmt->table_constraint()) {
-    auto *foreign_key = constraint->foreign_key_clause();
-    if (foreign_key != nullptr) {
-      ForeignKeyType type =
-          ShardForeignKey(foreign_key, sharding_information, state);
-      for (auto *column_name : constraint->column_name()) {
-        result.emplace(column_name->getText(), type);
+            column.column_name(),
+            ShardForeignKey(constraint, sharding_information, state));
       }
     }
   }
@@ -253,127 +193,37 @@ ForeignKeyShards ShardForeignKeys(
   return result;
 }
 
-// Removes any foreign key constraints attached to this column definition.
-sqlparser::SQLiteParser::Column_defContext *RemoveForeignKeyConstraint(
-    sqlparser::SQLiteParser::Column_defContext *def) {
-  // Make copy of column definition.
-  // TODO(babman): improve copying?
-  sqlparser::SQLiteParser::Column_defContext *result =
-      new sqlparser::SQLiteParser::Column_defContext(
-          static_cast<antlr4::ParserRuleContext *>(def->parent),
-          def->invokingState);
-
-  for (antlr4::tree::ParseTree *child : def->children) {
-    if (antlrcpp::is<sqlparser::SQLiteParser::Column_constraintContext *>(
-            child)) {
-      sqlparser::SQLiteParser::Column_constraintContext *constraint =
-          dynamic_cast<sqlparser::SQLiteParser::Column_constraintContext *>(
-              child);
-      if (constraint->foreign_key_clause() != nullptr) {
+// Updates the create table statement to reflect the sharding information in
+// fk_shards. Specifically, all out of shard foreign key constraints are removed
+// (but the columns are kept), and the column being sharded by is entirely
+// remove.
+sqlast::CreateTable UpdateTableSchema(sqlast::CreateTable stmt,
+                                      const ForeignKeyShards &fk_shards,
+                                      const std::string &sharded_table_name) {
+  stmt.table_name() = sharded_table_name;
+  // Drop columns marked with FK_REMOVED, and fk constraints of columns marked
+  // with FK_EXTERNAL.
+  for (const auto &[col, type] : fk_shards) {
+    switch (type) {
+      case FK_REMOVED:
+        stmt.RemoveColumn(col);
+        break;
+      case FK_EXTERNAL:
+        stmt.MutableColumn(col).RemoveConstraint(
+            sqlast::ColumnConstraint::Type::FOREIGN_KEY);
+        break;
+      default:
         continue;
-      }
     }
-    result->children.push_back(child);
   }
-  return result;
-}
-
-// Drops the given column (by name) from the create table statement along
-// with all its constraints.
-sqlparser::SQLiteParser::Create_table_stmtContext *UpdateTableSchema(
-    sqlparser::SQLiteParser::Create_table_stmtContext *stmt,
-    const ForeignKeyShards &fk_shards, const std::string &sharded_table_name) {
-  // Copy stmt.
-  // TODO(babman): improve copying?
-  sqlparser::SQLiteParser::Create_table_stmtContext *result =
-      new sqlparser::SQLiteParser::Create_table_stmtContext(
-          static_cast<antlr4::ParserRuleContext *>(stmt->parent),
-          stmt->invokingState);
-
-  for (antlr4::tree::ParseTree *child : stmt->children) {
-    // Drop matching column definition.
-    if (antlrcpp::is<sqlparser::SQLiteParser::Column_defContext *>(child)) {
-      sqlparser::SQLiteParser::Column_defContext *column_def =
-          dynamic_cast<sqlparser::SQLiteParser::Column_defContext *>(child);
-      const std::string &column_name = column_def->column_name()->getText();
-      if (fk_shards.count(column_name) == 1) {
-        ForeignKeyType type = fk_shards.at(column_name);
-        switch (type) {
-          case FK_REMOVED:
-            goto drop_child;
-          case FK_EXTERNAL:
-            column_def = RemoveForeignKeyConstraint(column_def);
-          case FK_INTERNAL:
-            goto keep_child;
-        }
-      }
-    }
-    // Remove certain constraints defined over certain columns per fk_shards!
-    if (antlrcpp::is<sqlparser::SQLiteParser::Table_constraintContext *>(
-            child)) {
-      // TODO(babman): a constraint spanning several columns is currently
-      // dropped even when only one/some of them are to be dropped.
-      // This may not be desired for unique and primary key constraints.
-      sqlparser::SQLiteParser::Table_constraintContext *constraint =
-          dynamic_cast<sqlparser::SQLiteParser::Table_constraintContext *>(
-              child);
-      // UNIQUE / PRIMARY KEY constraints: only removed if the column is to be
-      // removed completely, otherwise unchaged.
-      for (auto *constraint_column : constraint->indexed_column()) {
-        const std::string &column_name = constraint_column->getText();
-        if (fk_shards.count(column_name) == 1) {
-          ForeignKeyType type = fk_shards.at(column_name);
-          switch (type) {
-            case FK_REMOVED:
-              goto drop_child;
-            case FK_EXTERNAL:
-              break;
-            case FK_INTERNAL:
-              break;
-          }
-        }
-      }
-      // FOREIGN KEY constraints: removed if the column is to be removed
-      // or if the constraint is external, otherwise kept unchanged!
-      for (auto *constraint_column : constraint->column_name()) {
-        const std::string &column_name = constraint_column->getText();
-        if (fk_shards.count(column_name) == 1) {
-          ForeignKeyType type = fk_shards.at(column_name);
-          switch (type) {
-            case FK_REMOVED:
-              goto drop_child;
-            case FK_EXTERNAL:
-              goto drop_child;
-            case FK_INTERNAL:
-              break;
-          }
-        }
-      }
-    }
-  // Yeah, a GOTO statement, sue me...
-  // NOLINTNEXTLINE
-  keep_child:;  // Child should not be dropped, but might be modified.
-    result->children.push_back(child);
-  // NOLINTNEXTLINE
-  drop_child:;  // Child should be completely removed.
-  }
-
-  // Change table name.
-  // TODO(babman): improve copying?
-  antlr4::Token *symbol =
-      result->table_name()->any_name()->IDENTIFIER()->getSymbol();
-  *symbol = antlr4::CommonToken(symbol);
-  static_cast<antlr4::CommonToken *>(symbol)->setText(sharded_table_name);
-
-  return result;
+  return stmt;
 }
 
 }  // namespace
 
 std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
-    sqlparser::SQLiteParser::Create_table_stmtContext *stmt,
-    SharderState *state) {
-  const std::string &table_name = stmt->table_name()->getText();
+    const sqlast::CreateTable &stmt, SharderState *state) {
+  const std::string &table_name = stmt.table_name();
   if (state->Exists(table_name)) {
     throw "Table already exists!";
   }
@@ -387,14 +237,14 @@ std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
     throw "Sharded Table cannot have PII fields!";
   }
 
-  visitors::Stringify stringify;
+  sqlast::Stringifier stringifier;
   std::list<std::tuple<std::string, std::string, CallbackModifier>> result;
   // Case 1: has pii but not linked to shards.
   // This means that this table define a type of user for which shards must be
   // created! Hence, it is a shard kind!
   if (has_pii && sharding_information.size() == 0) {
     std::string pk = GetPK(stmt);
-    std::string create_table_str = stmt->accept(&stringify).as<std::string>();
+    std::string create_table_str = stmt.Visit(&stringifier);
     state->AddShardKind(table_name, pk);
     state->AddUnshardedTable(table_name, create_table_str);
     result.emplace_back(DEFAULT_SHARD_NAME, create_table_str,
@@ -410,10 +260,9 @@ std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
       // Determine what to do to each column that is a foreign key.
       ForeignKeyShards fk_shards = ShardForeignKeys(stmt, info, *state);
       // Apply sharding and come up with new schema.
-      sqlparser::SQLiteParser::Create_table_stmtContext *sharded_stmt =
+      sqlast::CreateTable sharded_stmt =
           UpdateTableSchema(stmt, fk_shards, info.sharded_table_name);
-      std::string create_table_str =
-          sharded_stmt->accept(&stringify).as<std::string>();
+      std::string create_table_str = sharded_stmt.Visit(&stringifier);
       // Add the sharding information to state.
       state->AddShardedTable(table_name, info, create_table_str);
     }
@@ -422,7 +271,7 @@ std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
   // Case 3: neither pii nor linked.
   // The table does not belong to a shard and needs no further modification!
   if (!has_pii && sharding_information.size() == 0) {
-    std::string create_table_str = stmt->accept(&stringify).as<std::string>();
+    std::string create_table_str = stmt.Visit(&stringifier);
     state->AddUnshardedTable(table_name, create_table_str);
     result.emplace_back(DEFAULT_SHARD_NAME, create_table_str,
                         identity_modifier);

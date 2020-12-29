@@ -3,7 +3,6 @@
 #include "shards/sqlconnections/pool.h"
 
 #include <cstring>
-#include <iostream>
 #include <vector>
 
 namespace shards {

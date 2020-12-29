@@ -7,7 +7,7 @@
 #include <string>
 #include <tuple>
 
-#include "SQLiteParser.h"
+#include "shards/sqlast/ast.h"
 #include "shards/state.h"
 
 namespace shards {
@@ -16,7 +16,7 @@ namespace delete_ {
 
 // <ShardSuffix, SQLStatement>
 std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
-    sqlparser::SQLiteParser::Delete_stmtContext *stmt, SharderState *state);
+    const sqlast::Delete &stmt, SharderState *state);
 
 }  // namespace delete_
 }  // namespace sqlengine
