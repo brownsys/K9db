@@ -139,12 +139,12 @@ class Record {
   // Type-based accessor/mutator calls. If used on a column that has a different
   // type in the schema, these fail via LOG(FATAL).
   void set_uint(size_t index, uint64_t v);
-  uint64_t as_uint(size_t index);
+  uint64_t as_uint(size_t index) const;
   void set_int(size_t index, int64_t v);
-  int64_t as_int(size_t index);
+  int64_t as_int(size_t index) const;
   // TODO(malte): consider swapping std::string for a length + buffer
   void set_string(size_t index, std::string* s);
-  std::string* as_string(size_t index);
+  std::string* as_string(size_t index) const;
 
  private:
   // Data is interpreted according to schema stored outside the record.

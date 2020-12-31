@@ -44,7 +44,7 @@ void Record::set_uint(size_t index, uint64_t v) {
   data_.inline_data_[ri.second] = v;
 }
 
-uint64_t Record::as_uint(size_t index) {
+uint64_t Record::as_uint(size_t index) const {
   CheckType(index, DataType::kUInt);
 
   std::pair<bool, size_t> ri = schema_->RawColumnIndex(index);
@@ -58,7 +58,7 @@ void Record::set_int(size_t index, int64_t v) {
   data_.inline_data_[ri.second] = v;
 }
 
-int64_t Record::as_int(size_t index) {
+int64_t Record::as_int(size_t index) const {
   CheckType(index, DataType::kInt);
 
   std::pair<bool, size_t> ri = schema_->RawColumnIndex(index);
@@ -72,7 +72,7 @@ void Record::set_string(size_t index, std::string* s) {
   data_.pointed_data_[ri.second] = reinterpret_cast<uintptr_t>(s);
 }
 
-std::string* Record::as_string(size_t index) {
+std::string* Record::as_string(size_t index) const {
   CheckType(index, DataType::kText);
 
   std::pair<bool, size_t> ri = schema_->RawColumnIndex(index);
