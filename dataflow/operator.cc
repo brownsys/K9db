@@ -25,8 +25,7 @@ bool Operator::ProcessAndForward(NodeIndex src_op_idx, std::vector<Record>& rs) 
     std::shared_ptr<Edge> edge = edge_ptr.lock();
     if (edge) {
       auto child = edge->to();
-      auto fwd_rs = out;
-      if (!child.lock()->ProcessAndForward(src_op_idx, fwd_rs)) {
+      if (!child.lock()->ProcessAndForward(src_op_idx, out)) {
         return false;
       }
     }

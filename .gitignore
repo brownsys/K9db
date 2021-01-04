@@ -36,3 +36,7 @@ bazel-bin
 bazel-out
 bazel-pelton
 bazel-testlogs
+
+# others
+.idea/
+cmake-build-debug/

@@ -11,38 +11,24 @@ namespace dataflow {
 bool MatViewOperator::process(std::vector<Record>& rs,
                               std::vector<Record>& out_rs) {
   for (Record& r : rs) {
-    auto key = get_key(r);
-    if (!contents_.contains(key)) {
-      // need to add key -> records entry as empty vector
-      std::vector<Record> v;
-      contents_.emplace(key, v);
-    }
-    std::vector<Record>& v = contents_[key];
-    if (r.positive()) {
-      v.push_back(r);
-    } else {
-      auto it = std::find(std::begin(v), std::end(v), r);
-      v.erase(it);
-    }
+    std::pair<Key, bool> key = get_key(r);
+    if(!contents_.insert(key.first, r))
+        return false;
   }
-
   return true;
 }
 
-std::vector<Record> MatViewOperator::lookup(const RecordData& key) const {
-  if (contents_.contains(key)) {
-    return contents_.at(key);
-  } else {
-    return std::vector<Record>();
-  }
+std::vector<Record> MatViewOperator::lookup(const Key& key) const {
+  return contents_.group(key);
 }
 
 std::vector<Record> MatViewOperator::multi_lookup(
-    std::vector<RecordData>& keys) {
+    const std::vector<Key>& keys) {
   std::vector<Record> out;
-  for (RecordData key : keys) {
+  for (Key key : keys) {
     if (contents_.contains(key)) {
       // out.push_back(contents_.at(key));
+      // ??? deprecated ???
     }
   }
   return out;

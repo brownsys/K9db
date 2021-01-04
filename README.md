@@ -30,9 +30,5 @@ please run `clang-format` on your code before pushing.
 
 
 
-## IDE Setup
-### Mac OS X
-download VS Code (<https://code.visualstudio.com/docs/?dv=osx>), install there bazel and C++ plugin. Install also via brew following dependencies.
-```
-brew install bazel buildifier
-```
+## CMake
+In order to get a CMake build, you can use a modified version of <https://github.com/lizan/bazel-cmakelists>.

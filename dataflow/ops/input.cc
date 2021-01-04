@@ -9,9 +9,7 @@ namespace dataflow {
 
 bool InputOperator::process(std::vector<Record>& rs,
                             std::vector<Record>& out_rs) {
-  for (auto r : rs) {
-    out_rs.push_back(std::move(r));
-  };
+  std::swap(rs, out_rs);
   return true;
 }
 
