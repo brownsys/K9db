@@ -20,10 +20,16 @@ namespace dataflow {
                               throw std::runtime_error("do not call for EquiJoin, needs info from where data is coming.");
         }
 
+        bool process(NodeIndex src_op_idx, std::vector<Record>& rs,
+                             std::vector<Record>& out_rs) override;
+
         OperatorType type() const { return OperatorType::EQUIJOIN; }
     private:
         ColumnID left_id_;
         ColumnID right_id_;
+
+        // hash tables for each operator side
+        
 
         std::shared_ptr<Operator> left() { assert(parents().size() == 2); return parents()[0]; }
         std::shared_ptr<Operator> right() { assert(parents().size() == 2); return parents()[1]; }
