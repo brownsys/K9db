@@ -221,8 +221,8 @@ sqlast::CreateTable UpdateTableSchema(sqlast::CreateTable stmt,
 
 }  // namespace
 
-std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
-    const sqlast::CreateTable &stmt, SharderState *state) {
+absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
+Rewrite(const sqlast::CreateTable &stmt, SharderState *state) {
   const std::string &table_name = stmt.table_name();
   if (state->Exists(table_name)) {
     throw "Table already exists!";
@@ -238,7 +238,7 @@ std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
   }
 
   sqlast::Stringifier stringifier;
-  std::list<std::tuple<std::string, std::string, CallbackModifier>> result;
+  std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>> result;
   // Case 1: has pii but not linked to shards.
   // This means that this table define a type of user for which shards must be
   // created! Hence, it is a shard kind!
@@ -247,8 +247,8 @@ std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
     std::string create_table_str = stmt.Visit(&stringifier);
     state->AddShardKind(table_name, pk);
     state->AddUnshardedTable(table_name, create_table_str);
-    result.emplace_back(DEFAULT_SHARD_NAME, create_table_str,
-                        identity_modifier);
+    result.push_back(std::make_unique<sqlexecutor::SimpleExecutableStatement>(
+        DEFAULT_SHARD_NAME, create_table_str));
   }
 
   // Case 2: no pii but is linked to shards.
@@ -273,8 +273,8 @@ std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
   if (!has_pii && sharding_information.size() == 0) {
     std::string create_table_str = stmt.Visit(&stringifier);
     state->AddUnshardedTable(table_name, create_table_str);
-    result.emplace_back(DEFAULT_SHARD_NAME, create_table_str,
-                        identity_modifier);
+    result.push_back(std::make_unique<sqlexecutor::SimpleExecutableStatement>(
+        DEFAULT_SHARD_NAME, create_table_str));
   }
 
   return result;

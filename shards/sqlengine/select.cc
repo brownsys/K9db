@@ -9,10 +9,10 @@ namespace shards {
 namespace sqlengine {
 namespace select {
 
-std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
-    const sqlast::Select &stmt, SharderState *state) {
+absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
+Rewrite(const sqlast::Select &stmt, SharderState *state) {
   sqlast::Stringifier stringifier;
-  std::list<std::tuple<std::string, std::string, CallbackModifier>> result;
+  std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>> result;
 
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
@@ -21,7 +21,8 @@ std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     std::string select_str = stmt.Visit(&stringifier);
-    result.emplace_back(DEFAULT_SHARD_NAME, select_str, identity_modifier);
+    result.push_back(std::make_unique<sqlexecutor::SimpleExecutableStatement>(
+        DEFAULT_SHARD_NAME, select_str));
   }
 
   // Case 2: table is sharded.
@@ -45,41 +46,16 @@ std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
 
       // Select from all the shards.
       std::string select_str = cloned.Visit(&stringifier);
-      char *user_id_col_name = new char[info.shard_by.size() + 1];
-      memcpy(user_id_col_name, info.shard_by.c_str(), info.shard_by.size());
-      user_id_col_name[info.shard_by.size()] = 0;
-      int user_id_col_index = info.shard_by_index;
-
       for (const auto &user_id : state->UsersOfShard(info.shard_kind)) {
         if (found && user_id != user_id_val) {
           continue;
         }
 
-        char *user_id_data = new char[user_id.size() + 1];
-        memcpy(user_id_data, user_id.c_str(), user_id.size());
-        user_id_data[user_id.size()] = 0;
-
         std::string shard_name = NameShard(info.shard_kind, user_id);
-        result.emplace_back(
-            shard_name, select_str,
-            [=](int *col_count, char ***col_data, char ***col_names) {
-              (*col_count)++;
-              char **new_data = new char *[*col_count];
-              char **new_name = new char *[*col_count];
-              new_data[user_id_col_index] = user_id_data;
-              new_name[user_id_col_index] = user_id_col_name;
-              for (int i = 0; i < user_id_col_index; i++) {
-                new_data[i] = (*col_data)[i];
-                new_name[i] = (*col_names)[i];
-              }
-              for (int i = user_id_col_index + 1; i < *col_count; i++) {
-                new_data[i] = (*col_data)[i - 1];
-                new_name[i] = (*col_names)[i - 1];
-              }
-              *col_data = new_data;
-              *col_names = new_name;
-              identity_modifier(col_count, col_data, col_names);
-            });
+        result.push_back(
+            std::make_unique<sqlexecutor::SelectExecutableStatement>(
+                shard_name, select_str, info.shard_by_index, info.shard_by,
+                user_id));
       }
     }
   }

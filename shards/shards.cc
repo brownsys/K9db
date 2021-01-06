@@ -2,6 +2,7 @@
 #include "shards/shards.h"
 
 #include <iostream>
+#include <utility>
 #include <vector>
 
 #include "absl/strings/match.h"
@@ -9,6 +10,7 @@
 #include "absl/strings/str_split.h"
 #include "shards/sqlengine/engine.h"
 #include "shards/sqlengine/util.h"
+#include "shards/sqlexecutor/executor.h"
 
 namespace shards {
 
@@ -16,20 +18,15 @@ namespace {
 
 // String whitespace trimming.
 // https://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring/25385766
-static inline void LTrim(std::string &s) {
+// NOLINTNEXTLINE
+static inline void Trim(std::string &s) {
   s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
             return !std::isspace(ch);
           }));
-}
-static inline void RTrim(std::string &s) {
   s.erase(std::find_if(s.rbegin(), s.rend(),
                        [](unsigned char ch) { return !std::isspace(ch); })
               .base(),
           s.end());
-}
-static inline void Trim(std::string &s) {
-  LTrim(s);
-  RTrim(s);
 }
 
 // Special statements we added to SQL.
@@ -86,20 +83,21 @@ bool exec(SharderState *state, std::string sql, Callback callback,
   }
 
   // Successfully re-written into a list of modified statements.
-  for (const auto &[shard_suffix, sql_statement, modifier] : statusor.value()) {
+  for (auto &executable_statement : statusor.value()) {
     if (log) {
-      std::cout << "Shard: " << shard_suffix << std::endl;
-      std::cout << "Statement: " << sql_statement << std::endl;
+      std::cout << "Shard: " << executable_statement->shard_suffix()
+                << std::endl;
+      std::cout << "Statement: " << executable_statement->sql_statement()
+                << std::endl;
     }
-    bool result = state->pool_.ExecuteStatement(shard_suffix, sql_statement,
-                                                modifier, errmsg);
+    bool result = state->SQLExecutor()->ExecuteStatement(
+        std::move(executable_statement), callback, context, errmsg);
     if (!result) {
       // TODO(babman): we probably need some *transactional* notion here
       // about failures.
       return false;
     }
   }
-  state->pool_.FlushBuffer(callback, context, errmsg);
   return true;
 }
 

@@ -15,20 +15,18 @@
 #define SHARDS_SQLENGINE_ENGINE_H_
 
 #include <list>
+#include <memory>
 #include <string>
 #include <tuple>
 
 #include "absl/status/statusor.h"
+#include "shards/sqlexecutor/executable.h"
 #include "shards/state.h"
 
 namespace shards {
 namespace sqlengine {
 
-using ShardSuffix = std::string;
-using SQLStatement = std::string;
-
-absl::StatusOr<
-    std::list<std::tuple<ShardSuffix, SQLStatement, CallbackModifier>>>
+absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
 Rewrite(const std::string &sql, SharderState *state);
 
 }  // namespace sqlengine

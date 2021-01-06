@@ -10,7 +10,7 @@
 
 namespace shards {
 
-static std::string STATE_FILE_NAME = ".state.txt";
+#define STATE_FILE_NAME ".state.txt";
 
 namespace {
 

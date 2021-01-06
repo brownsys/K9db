@@ -16,6 +16,7 @@ cc_library(
         "//shards:state",
         "//shards/sqlast:ast",
         "//shards/sqlast:parser",
+        "//shards/sqlexecutor:executor",
         "//shards/util:status",
         "@absl//absl/status:statusor",
         "@antlr4_runtimes//:cpp",
@@ -35,8 +36,10 @@ cc_library(
     ],
     deps = [
         "//shards/sqlast:ast",
+        "//shards/sqlexecutor:executor",
         "//shards/sqlengine:util",
         "//shards:state",
+        "@absl//absl/status:statusor",
         "@absl//absl/strings",
     ],
 )
@@ -51,8 +54,10 @@ cc_library(
     ],
     deps = [
         "//shards/sqlast:ast",
+        "//shards/sqlexecutor:executor",
         "//shards/sqlengine:util",
         "//shards:state",
+        "@absl//absl/status:statusor",
     ],
 )
 
@@ -66,8 +71,10 @@ cc_library(
     ],
     deps = [
         "//shards/sqlast:ast",
+        "//shards/sqlexecutor:executor",
         "//shards/sqlengine:util",
         "//shards:state",
+        "@absl//absl/status:statusor",
     ],
 )
 
@@ -81,8 +88,10 @@ cc_library(
     ],
     deps = [
         "//shards/sqlast:ast",
+        "//shards/sqlexecutor:executor",
         "//shards/sqlengine:util",
         "//shards:state",
+        "@absl//absl/status:statusor",
         "@absl//absl/strings",
     ],
 )

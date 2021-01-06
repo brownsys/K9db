@@ -15,8 +15,7 @@
 namespace shards {
 namespace sqlengine {
 
-absl::StatusOr<
-    std::list<std::tuple<ShardSuffix, SQLStatement, CallbackModifier>>>
+absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
 Rewrite(const std::string &sql, SharderState *state) {
   // Parse with ANTLR into our AST.
   sqlast::SQLParser parser;
@@ -46,7 +45,7 @@ Rewrite(const std::string &sql, SharderState *state) {
                               state);
   }
 
-  return std::list<std::tuple<ShardSuffix, SQLStatement, CallbackModifier>>();
+  return std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>();
 }
 
 }  // namespace sqlengine

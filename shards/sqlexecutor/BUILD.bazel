@@ -1,12 +1,14 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
 cc_library(
-    name = "pool",
+    name = "executor",
     srcs = [
-        "pool.cc",
+        "executor.cc",
+        "executable.cc",
     ],
     hdrs= [
-        "pool.h",
+        "executor.h",
+        "executable.h",
     ],
     deps = [],
     linkopts = [

@@ -12,9 +12,9 @@ namespace shards {
 namespace sqlengine {
 namespace delete_ {
 
-std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
-    const sqlast::Delete &stmt, SharderState *state) {
-  std::list<std::tuple<std::string, std::string, CallbackModifier>> result;
+absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
+Rewrite(const sqlast::Delete &stmt, SharderState *state) {
+  std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>> result;
 
   const std::string &table_name = stmt.table_name();
   bool is_sharded = state->IsSharded(table_name);
@@ -40,13 +40,15 @@ std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
     // Turn the delete statement back to a string, to delete relevant row in
     // PII table.
     std::string delete_str = stmt.Visit(&stringifier);
-    result.emplace_back(DEFAULT_SHARD_NAME, delete_str, identity_modifier);
+    result.push_back(std::make_unique<sqlexecutor::SimpleExecutableStatement>(
+        DEFAULT_SHARD_NAME, delete_str));
   }
 
   // Case 2: Table does not have PII and is not sharded!
   if (!is_sharded && !is_pii) {
     std::string delete_str = stmt.Visit(&stringifier);
-    result.emplace_back(DEFAULT_SHARD_NAME, delete_str, identity_modifier);
+    result.push_back(std::make_unique<sqlexecutor::SimpleExecutableStatement>(
+        DEFAULT_SHARD_NAME, delete_str));
   }
 
   // Case 3: Table is sharded!

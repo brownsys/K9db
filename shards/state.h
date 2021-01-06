@@ -17,30 +17,9 @@
 #include <unordered_set>
 #include <utility>
 
-#include "shards/sqlconnections/pool.h"
+#include "shards/sqlexecutor/executor.h"
 
 namespace shards {
-
-// (context, col_count, col_data, col_name)
-// https://www.sqlite.org/c3ref/exec.html
-using Callback = std::function<int(void *, int, char **, char **)>;
-using CallbackModifier = std::function<void(int *, char ***, char ***)>;
-static CallbackModifier identity_modifier = [](int *a, char ***b, char ***c) {
-  char **data = new char *[*a];
-  char **names = new char *[*a];
-  for (int i = 0; i < *a; i++) {
-    size_t dlen = strlen((*b)[i]);
-    size_t nlen = strlen((*c)[i]);
-    data[i] = new char[dlen];
-    names[i] = new char[nlen];
-    // NOLINTNEXTLINE
-    strcpy(data[i], (*b)[i]);
-    // NOLINTNEXTLINE
-    strcpy(names[i], (*c)[i]);
-  }
-  *b = data;
-  *c = names;
-};
 
 // Our design splits a database into many shards, each shard belongs to a unique
 // user and contains only that users data, and has the schema for tables related
@@ -145,20 +124,14 @@ class SharderState {
 
   const std::unordered_set<UserId> &UsersOfShard(const ShardKind &kind) const;
 
-  // Sqlite3 Connection pool interace.
-  bool ExecuteStatement(const std::string &shard_suffix,
-                        const std::string &sql_statement, Callback callback,
-                        void *context, char **errmsg,
-                        CallbackModifier modifier);
-
-  // Connection pool that manages the underlying sqlite3 databases.
-  sqlconnections::ConnectionPool pool_;
-
   // Save state to durable file.
   void Save();
 
   // Load state from its durable file (if exists).
   void Load();
+
+  // Return the connection pool to use for executing statements.
+  sqlexecutor::SQLExecutor *SQLExecutor();
 
  private:
   // Directory in which all shards are stored.
@@ -194,6 +167,9 @@ class SharderState {
   // Maps every table in the overall schema to its create table statement.
   // This can be used to create that table in a new shard.
   std::unordered_map<ShardedTableName, CreateStatement> schema_;
+
+  // Connection pool that manages the underlying sqlite3 databases.
+  sqlexecutor::SQLExecutor executor_;
 };
 
 }  // namespace shards

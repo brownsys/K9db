@@ -10,8 +10,8 @@ namespace shards {
 namespace sqlengine {
 namespace insert {
 
-std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
-    const sqlast::Insert &stmt, SharderState *state) {
+absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
+Rewrite(const sqlast::Insert &stmt, SharderState *state) {
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
   if (!state->Exists(table_name)) {
@@ -19,14 +19,15 @@ std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
   }
 
   sqlast::Stringifier stringifier;
-  std::list<std::tuple<std::string, std::string, CallbackModifier>> result;
+  std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>> result;
 
   // Case 1: table is not in any shard.
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // The insertion statement is unmodified.
     std::string insert_str = stmt.Visit(&stringifier);
-    result.emplace_back(DEFAULT_SHARD_NAME, insert_str, identity_modifier);
+    result.push_back(std::make_unique<sqlexecutor::SimpleExecutableStatement>(
+        DEFAULT_SHARD_NAME, insert_str));
   }
 
   // Case 2: table is sharded!
@@ -50,13 +51,16 @@ std::list<std::tuple<std::string, std::string, CallbackModifier>> Rewrite(
       if (!state->ShardExists(sharding_info.shard_kind, value)) {
         for (auto create_stmt :
              state->CreateShard(sharding_info.shard_kind, value)) {
-          result.emplace_back(shard_name, create_stmt, identity_modifier);
+          result.push_back(
+              std::make_unique<sqlexecutor::SimpleExecutableStatement>(
+                  shard_name, create_stmt));
         }
       }
 
       // Add the modified insert statement.
-      std::string insert_stmt_str = cloned.Visit(&stringifier);
-      result.emplace_back(shard_name, insert_stmt_str, identity_modifier);
+      std::string insert_str = cloned.Visit(&stringifier);
+      result.push_back(std::make_unique<sqlexecutor::SimpleExecutableStatement>(
+          shard_name, insert_str));
     }
   }
   return result;

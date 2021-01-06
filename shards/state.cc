@@ -19,7 +19,7 @@ void SharderState::Initialize(const std::string &dir_path) {
   if (dir_path.back() != '/') {
     this->dir_path_ += "/";
   }
-  this->pool_.Initialize(this->dir_path_);
+  this->executor_.Initialize(this->dir_path_);
 }
 
 // Schema manipulations.
@@ -95,6 +95,11 @@ bool SharderState::ShardExists(const ShardKind &shard_kind,
 const std::unordered_set<UserId> &SharderState::UsersOfShard(
     const ShardKind &kind) const {
   return this->shards_.at(kind);
+}
+
+// SQL Executor.
+sqlexecutor::SQLExecutor *SharderState::SQLExecutor() {
+  return &this->executor_;
 }
 
 }  // namespace shards

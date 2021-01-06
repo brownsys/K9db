@@ -13,6 +13,7 @@ cc_library(
         "//shards:state",
         "//shards/sqlengine:engine",
         "//shards/sqlengine:util",
+        "//shards/sqlexecutor:executor",
     ],
 )
 
@@ -26,7 +27,7 @@ cc_library(
         "state.h",
     ],
     deps = [
-        "//shards/sqlconnections:pool",
+        "//shards/sqlexecutor:executor",
     ],
     visibility = ["//shards:__subpackages__"],
 )
