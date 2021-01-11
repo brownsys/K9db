@@ -11,7 +11,11 @@ namespace dataflow {
 bool MatViewOperator::process(std::vector<Record>& rs,
                               std::vector<Record>& out_rs) {
   for (Record& r : rs) {
-    std::pair<Key, bool> key = get_key(r);
+    // incoming records must have the right key column set
+    CHECK(r.schema().key_columns() == key_cols_);
+
+    std::pair<Key, bool> key = r.GetKey();
+    LOG(INFO) << "processing key " << key.first.as_uint();
     if (!contents_.contains(key.first)) {
       // need to add key -> records entry as empty vector
       std::vector<Record> v;

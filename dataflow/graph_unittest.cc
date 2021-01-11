@@ -44,9 +44,9 @@ DataFlowGraph makeFilterGraph(const Schema& schema) {
 
   EXPECT_TRUE(g.AddInputNode(in));
   EXPECT_TRUE(g.AddNode(OperatorType::FILTER, filter, in));
-  std::vector<ColumnID> keycol = {0};
   EXPECT_TRUE(g.AddNode(OperatorType::MAT_VIEW,
-                        std::make_shared<MatViewOperator>(keycol), filter));
+                        std::make_shared<MatViewOperator>(schema.key_columns()),
+                        filter));
 
   return g;
 }
@@ -55,6 +55,7 @@ TEST(DataFlowGraphTest, Construct) { DataFlowGraph g = makeTrivialGraph(); }
 
 TEST(DataFlowGraphTest, Basic) {
   Schema schema({DataType::kUInt, DataType::kUInt});
+  schema.set_key_columns({0});
   {
     DataFlowGraph g = makeTrivialGraph();
 
@@ -82,6 +83,7 @@ TEST(DataFlowGraphTest, Basic) {
 
 TEST(DataFlowGraphTest, SinglePathFilter) {
   Schema schema({DataType::kUInt, DataType::kUInt});
+  schema.set_key_columns({0});
   {
     DataFlowGraph g = makeFilterGraph(schema);
 

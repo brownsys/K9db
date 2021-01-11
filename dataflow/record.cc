@@ -79,6 +79,21 @@ std::string* Record::as_string(size_t index) const {
   return reinterpret_cast<std::string*>(data_.pointed_data_[ri.second]);
 }
 
+const std::pair<Key, bool> Record::GetKey() const {
+  std::vector<ColumnID> key_cols = schema_->key_columns();
+  CHECK_EQ(key_cols.size(), 1);
+  ColumnID cid = key_cols[0];
+
+  bool is_inline = Schema::is_inlineable(schema_->TypeOf(cid));
+  if (is_inline) {
+    const uint64_t key = *reinterpret_cast<const uint64_t*>(at(cid));
+    return std::make_pair(Key(key, schema_->TypeOf(cid)), is_inline);
+  } else {
+    const void* key = at(cid);
+    return std::make_pair(Key(key, schema_->TypeOf(cid)), is_inline);
+  }
+}
+
 // Index into record, either to the inline data or to the data pointed to by the
 // pointer stored.
 void* Record::operator[](size_t index) { return at_mut(index); }
