@@ -11,13 +11,16 @@ namespace dataflow {
 bool MatViewOperator::process(std::vector<Record>& rs,
                               std::vector<Record>& out_rs) {
   for (Record& r : rs) {
-    auto key = get_key(r);
-    if (!contents_.contains(key)) {
+    // incoming records must have the right key column set
+    CHECK(r.schema().key_columns() == key_cols_);
+
+    std::pair<Key, bool> key = r.GetKey();
+    if (!contents_.contains(key.first)) {
       // need to add key -> records entry as empty vector
       std::vector<Record> v;
-      contents_.emplace(key, v);
+      contents_.emplace(key.first, v);
     }
-    std::vector<Record>& v = contents_[key];
+    std::vector<Record>& v = contents_[key.first];
     if (r.positive()) {
       v.push_back(r);
     } else {
@@ -29,7 +32,7 @@ bool MatViewOperator::process(std::vector<Record>& rs,
   return true;
 }
 
-std::vector<Record> MatViewOperator::lookup(const RecordData& key) const {
+std::vector<Record> MatViewOperator::lookup(const Key& key) const {
   if (contents_.contains(key)) {
     return contents_.at(key);
   } else {
@@ -38,9 +41,9 @@ std::vector<Record> MatViewOperator::lookup(const RecordData& key) const {
 }
 
 std::vector<Record> MatViewOperator::multi_lookup(
-    std::vector<RecordData>& keys) {
+    const std::vector<Key>& keys) {
   std::vector<Record> out;
-  for (RecordData key : keys) {
+  for (Key key : keys) {
     if (contents_.contains(key)) {
       // out.push_back(contents_.at(key));
     }

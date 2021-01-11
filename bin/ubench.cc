@@ -29,14 +29,27 @@ DEFINE_bool(verbose, false, "Verbose output");
 //  return g;
 //}
 
+static dataflow::Schema uint_schema(
+    std::vector<dataflow::DataType>({dataflow::kUInt, dataflow::kUInt}));
+
+void GenerateSimpleUIntRecords(std::vector<dataflow::Record>& vec,
+                               size_t count) {
+  for (size_t i = 0; i < count; ++i) {
+    dataflow::Record r(uint_schema);
+    r.set_uint(0, i);
+    r.set_uint(1, i + 1ULL);
+    vec.emplace_back(r);
+  }
+}
+
 static void BM_MatViewInsert(benchmark::State& state) {
   std::vector<dataflow::ColumnID> kc = {0};
+  uint_schema.set_key_columns(kc);
   auto op = std::make_shared<dataflow::MatViewOperator>(kc);
 
-  std::vector<dataflow::RecordData> rd = {dataflow::RecordData(4ULL),
-                                          dataflow::RecordData(5ULL)};
-  std::vector<dataflow::Record> rs = {dataflow::Record(true, rd, 3ULL)};
+  std::vector<dataflow::Record> rs;
   std::vector<dataflow::Record> out_rs;
+  GenerateSimpleUIntRecords(rs, 1);
 
   for (auto _ : state) {
     op->process(rs, out_rs);
@@ -45,14 +58,11 @@ static void BM_MatViewInsert(benchmark::State& state) {
 
 static void BM_MatViewBatchInsert(benchmark::State& state) {
   std::vector<dataflow::ColumnID> kc = {0};
+  uint_schema.set_key_columns(kc);
   auto op = std::make_shared<dataflow::MatViewOperator>(kc);
 
-  std::vector<dataflow::Record> rs = {};
-  for (int i = 0; i < state.range(0); ++i) {
-    std::vector<dataflow::RecordData> rd = {dataflow::RecordData(i),
-                                            dataflow::RecordData(i + 1)};
-    rs.push_back(dataflow::Record(true, rd, 3ULL));
-  }
+  std::vector<dataflow::Record> rs;
+  GenerateSimpleUIntRecords(rs, state.range(0));
   std::vector<dataflow::Record> out_rs;
 
   for (auto _ : state) {

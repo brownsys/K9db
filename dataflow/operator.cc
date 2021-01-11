@@ -25,8 +25,7 @@ bool Operator::ProcessAndForward(std::vector<Record>& rs) {
     std::shared_ptr<Edge> edge = edge_ptr.lock();
     if (edge) {
       auto child = edge->to();
-      auto fwd_rs = out;
-      if (!child.lock()->ProcessAndForward(fwd_rs)) {
+      if (!child.lock()->ProcessAndForward(out)) {
         return false;
       }
     }
@@ -36,4 +35,3 @@ bool Operator::ProcessAndForward(std::vector<Record>& rs) {
 }
 
 }  // namespace dataflow
-
