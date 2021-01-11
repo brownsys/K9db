@@ -44,6 +44,7 @@ void GenerateSimpleUIntRecords(std::vector<dataflow::Record>& vec,
 
 static void BM_MatViewInsert(benchmark::State& state) {
   std::vector<dataflow::ColumnID> kc = {0};
+  uint_schema.set_key_columns(kc);
   auto op = std::make_shared<dataflow::MatViewOperator>(kc);
 
   std::vector<dataflow::Record> rs;
@@ -57,6 +58,7 @@ static void BM_MatViewInsert(benchmark::State& state) {
 
 static void BM_MatViewBatchInsert(benchmark::State& state) {
   std::vector<dataflow::ColumnID> kc = {0};
+  uint_schema.set_key_columns(kc);
   auto op = std::make_shared<dataflow::MatViewOperator>(kc);
 
   std::vector<dataflow::Record> rs;
