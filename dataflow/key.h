@@ -61,7 +61,7 @@ class Key {
     CheckType(DataType::kUInt);
     return inline_data_;
   }
-  uint64_t as_int() const {
+  int64_t as_int() const {
     CheckType(DataType::kInt);
     return static_cast<int64_t>(inline_data_);
   }
