@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
   while (std::getline(std::cin, line)) {
     // Wait until command is fully read (in case it spans several lines).
     command += line;
-    if (command.back() == '\\') {
+    if (command.size() > 0 && command.back() == '\\') {
       command.pop_back();
       continue;
     }

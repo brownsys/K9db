@@ -83,6 +83,7 @@ bool exec(SharderState *state, std::string sql, Callback callback,
   }
 
   // Successfully re-written into a list of modified statements.
+  state->SQLExecutor()->StartBlock();
   for (auto &executable_statement : statusor.value()) {
     if (log) {
       std::cout << "Shard: " << executable_statement->shard_suffix()
