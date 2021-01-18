@@ -16,8 +16,13 @@ namespace sqlast {
 class Expression {
  public:
   enum Type { LITERAL, COLUMN, EQ, AND };
+
   explicit Expression(Type type) : type_(type) {}
+
+  virtual ~Expression() {}
+
   const Type &type() const { return this->type_; }
+
   virtual std::unique_ptr<Expression> Clone() const = 0;
 
  private:

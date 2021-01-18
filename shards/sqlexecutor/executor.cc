@@ -32,9 +32,7 @@ SQLExecutor::~SQLExecutor() {
   ::sqlite3_close(this->default_noshard_connection_);
 }
 
-void SQLExecutor::StartBlock() {
-  this->deduplication_buffer_.clear();
-}
+void SQLExecutor::StartBlock() { this->deduplication_buffer_.clear(); }
 
 // Executing a statement.
 bool SQLExecutor::ExecuteStatement(
@@ -59,7 +57,8 @@ bool SQLExecutor::ExecuteStatement(
           return callback(context, colnum, colvals, colnames);
         }
         return 0;
-      }, context, errmsg);
+      },
+      context, errmsg);
 
   // Close connection (if needed).
   if (shard_suffix != "default") {

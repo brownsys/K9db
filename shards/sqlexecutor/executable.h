@@ -21,6 +21,8 @@ class ExecutableStatement {
                       const std::string &sql_statement)
       : shard_suffix_(shard_suffix), sql_statement_(sql_statement) {}
 
+  virtual ~ExecutableStatement() {}
+
   virtual const std::string &shard_suffix() const;
   virtual const std::string &sql_statement() const;
   virtual bool Execute(::sqlite3 *connection, Callback callback, void *context,

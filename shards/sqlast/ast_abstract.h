@@ -19,6 +19,8 @@ class AbstractStatement {
   // Constructor.
   explicit AbstractStatement(Type type) : type_(type) {}
 
+  virtual ~AbstractStatement() {}
+
   // Accessors.
   const Type &type() const { return this->type_; }
 
