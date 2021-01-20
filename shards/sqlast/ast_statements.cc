@@ -54,6 +54,54 @@ std::string Insert::RemoveValue(size_t index) {
   return result;
 }
 
+// Update.
+const std::string &Update::table_name() const { return this->table_name_; }
+std::string &Update::table_name() { return this->table_name_; }
+
+void Update::AddColumnValue(const std::string &column,
+                            const std::string &value) {
+  this->columns_.push_back(column);
+  this->values_.push_back(value);
+}
+std::string Update::RemoveColumnValue(const std::string &column) {
+  auto it = std::find(this->columns_.begin(), this->columns_.end(), column);
+  if (it == this->columns_.end()) {
+    throw "Update statement does not contain column \"" + column + "\"";
+  }
+  this->columns_.erase(it);
+  size_t index = std::distance(this->columns_.begin(), it);
+  std::string result = this->values_.at(index);
+  this->values_.erase(this->values_.begin() + index);
+  return result;
+}
+bool Update::AssignsTo(const std::string &column) const {
+  return std::find(this->columns_.begin(), this->columns_.end(), column) !=
+         this->columns_.end();
+}
+
+const std::vector<std::string> &Update::GetColumns() const {
+  return this->columns_;
+}
+const std::vector<std::string> &Update::GetValues() const {
+  return this->values_;
+}
+std::vector<std::string> &Update::GetColumns() { return this->columns_; }
+std::vector<std::string> &Update::GetValues() { return this->values_; }
+
+bool Update::HasWhereClause() const { return this->where_clause_.has_value(); }
+const BinaryExpression *const Update::GetWhereClause() const {
+  return this->where_clause_->get();
+}
+BinaryExpression *const Update::GetWhereClause() {
+  return this->where_clause_->get();
+}
+void Update::SetWhereClause(std::unique_ptr<BinaryExpression> &&where) {
+  this->where_clause_ = std::optional(std::move(where));
+}
+void Update::RemoveWhereClause() {
+  this->where_clause_ = std::optional<std::unique_ptr<BinaryExpression>>();
+}
+
 // Select.
 const std::string &Select::table_name() const { return this->table_name_; }
 std::string &Select::table_name() { return this->table_name_; }

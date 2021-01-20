@@ -44,3 +44,7 @@ SELECT * FROM submissions WHERE student_id = 1 AND assignment_id = 2;
 
 DELETE FROM students WHERE ID = 1;
 SELECT * FROM submissions;
+
+UPDATE submissions SET "timestamp" = 20 WHERE student_id = 2 AND assignment_id = 1;
+UPDATE submissions SET "timestamp" = 30 WHERE assignment_id = 2;
+SELECT * FROM submissions;

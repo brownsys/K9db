@@ -13,6 +13,7 @@ cc_library(
         ":delete",
         ":insert",
         ":select",
+        ":update",
         "//shards:state",
         "//shards/sqlast:ast",
         "//shards/sqlast:parser",
@@ -93,6 +94,23 @@ cc_library(
         "//shards:state",
         "@absl//absl/status:statusor",
         "@absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "update",
+    srcs = [
+        "update.cc",
+    ],
+    hdrs= [
+        "update.h",
+    ],
+    deps = [
+        "//shards/sqlast:ast",
+        "//shards/sqlexecutor:executor",
+        "//shards/sqlengine:util",
+        "//shards:state",
+        "@absl//absl/status:statusor",
     ],
 )
 

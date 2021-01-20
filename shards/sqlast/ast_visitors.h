@@ -23,6 +23,7 @@ class AbstractVisitor {
   virtual T VisitColumnDefinition(const ColumnDefinition &ast) = 0;
   virtual T VisitColumnConstraint(const ColumnConstraint &ast) = 0;
   virtual T VisitInsert(const Insert &ast) = 0;
+  virtual T VisitUpdate(const Update &ast) = 0;
   virtual T VisitSelect(const Select &ast) = 0;
   virtual T VisitColumnExpression(const ColumnExpression &ast) = 0;
   virtual T VisitLiteralExpression(const LiteralExpression &ast) = 0;
@@ -39,6 +40,7 @@ class MutableVisitor {
   virtual T VisitColumnDefinition(ColumnDefinition *ast) = 0;
   virtual T VisitColumnConstraint(ColumnConstraint *ast) = 0;
   virtual T VisitInsert(Insert *ast) = 0;
+  virtual T VisitUpdate(Update *ast) = 0;
   virtual T VisitSelect(Select *ast) = 0;
   virtual T VisitColumnExpression(ColumnExpression *ast) = 0;
   virtual T VisitLiteralExpression(LiteralExpression *ast) = 0;
@@ -52,6 +54,7 @@ class Stringifier : public AbstractVisitor<std::string> {
   std::string VisitColumnDefinition(const ColumnDefinition &ast) override;
   std::string VisitColumnConstraint(const ColumnConstraint &ast) override;
   std::string VisitInsert(const Insert &ast) override;
+  std::string VisitUpdate(const Update &ast) override;
   std::string VisitSelect(const Select &ast) override;
   std::string VisitColumnExpression(const ColumnExpression &ast) override;
   std::string VisitLiteralExpression(const LiteralExpression &ast) override;
@@ -72,6 +75,7 @@ class ValueFinder : public AbstractVisitor<std::pair<bool, std::string>> {
   std::pair<bool, std::string> VisitColumnConstraint(
       const ColumnConstraint &ast) override;
   std::pair<bool, std::string> VisitInsert(const Insert &ast) override;
+  std::pair<bool, std::string> VisitUpdate(const Update &ast) override;
   std::pair<bool, std::string> VisitSelect(const Select &ast) override;
   std::pair<bool, std::string> VisitDelete(const Delete &ast) override;
   std::pair<bool, std::string> VisitColumnExpression(
@@ -98,6 +102,7 @@ class ExpressionRemover : public MutableVisitor<std::unique_ptr<Expression>> {
   std::unique_ptr<Expression> VisitColumnConstraint(
       ColumnConstraint *ast) override;
   std::unique_ptr<Expression> VisitInsert(Insert *ast) override;
+  std::unique_ptr<Expression> VisitUpdate(Update *ast) override;
   std::unique_ptr<Expression> VisitSelect(Select *ast) override;
   std::unique_ptr<Expression> VisitDelete(Delete *ast) override;
   std::unique_ptr<Expression> VisitColumnExpression(

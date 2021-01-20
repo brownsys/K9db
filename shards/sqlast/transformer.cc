@@ -50,6 +50,9 @@ antlrcpp::Any AstTransformer::visitSql_stmt(
   if (ctx->insert_stmt() != nullptr) {
     return ctx->insert_stmt()->accept(this);
   }
+  if (ctx->update_stmt() != nullptr) {
+    return ctx->update_stmt()->accept(this);
+  }
   if (ctx->select_stmt() != nullptr) {
     return ctx->select_stmt()->accept(this);
   }
@@ -219,6 +222,45 @@ antlrcpp::Any AstTransformer::visitExpr_list(
     values.push_back(val);
   }
   return values;
+}
+
+// Update constructs.
+antlrcpp::Any AstTransformer::visitUpdate_stmt(
+    sqlparser::SQLiteParser::Update_stmtContext *ctx) {
+  if (ctx->with_clause() != nullptr || ctx->OR() != nullptr ||
+      ctx->column_name_list().size() > 0) {
+    return absl::InvalidArgumentError("Invalid update constructs");
+  }
+
+  // Table name.
+  CAST_OR_RETURN(std::string table_name,
+                 ctx->qualified_table_name()->accept(this), std::string);
+  std::unique_ptr<Update> update = std::make_unique<Update>(table_name);
+  // Column = Value pairs.
+  for (size_t i = 0; i < ctx->column_name().size(); i++) {
+    CAST_OR_RETURN(std::string column, ctx->column_name(i)->accept(this),
+                   std::string);
+    MCAST_OR_RETURN(std::unique_ptr<Expression> value_expr,
+                    ctx->expr(i)->accept(this), std::unique_ptr<Expression>);
+    if (value_expr->type() != Expression::LITERAL) {
+      return absl::InvalidArgumentError("Update value must be a literal");
+    }
+    update->AddColumnValue(
+        column, static_cast<LiteralExpression *>(value_expr.get())->value());
+  }
+  // Where clause.
+  if (ctx->WHERE() != nullptr) {
+    MCAST_OR_RETURN(std::unique_ptr<Expression> expr,
+                    ctx->expr(ctx->column_name().size())->accept(this),
+                    std::unique_ptr<Expression>);
+    if (expr->type() != Expression::EQ && expr->type() != Expression::AND) {
+      return absl::InvalidArgumentError("Where clause must be boolean");
+    }
+    std::unique_ptr<BinaryExpression> bexpr(
+        static_cast<BinaryExpression *>(expr.release()));
+    update->SetWhereClause(std::move(bexpr));
+  }
+  return static_cast<std::unique_ptr<AbstractStatement>>(std::move(update));
 }
 
 // Select constructs.
@@ -543,10 +585,6 @@ antlrcpp::Any AstTransformer::visitJoin_constraint(
 }
 antlrcpp::Any AstTransformer::visitCompound_operator(
     sqlparser::SQLiteParser::Compound_operatorContext *ctx) {
-  return absl::InvalidArgumentError("Unsupported Syntax");
-}
-antlrcpp::Any AstTransformer::visitUpdate_stmt(
-    sqlparser::SQLiteParser::Update_stmtContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
 antlrcpp::Any AstTransformer::visitColumn_name_list(

@@ -73,6 +73,23 @@ std::string Stringifier::VisitInsert(const Insert &ast) {
   result += ");";
   return result;
 }
+std::string Stringifier::VisitUpdate(const Update &ast) {
+  std::string result = "UPDATE " + ast.table_name() + " SET ";
+  // Columns and values.
+  const std::vector<std::string> &cols = ast.GetColumns();
+  const std::vector<std::string> &vals = ast.GetValues();
+  for (size_t i = 0; i < cols.size(); i++) {
+    result += cols.at(i) + " = " + vals.at(i);
+    if (i < cols.size() - 1) {
+      result += ", ";
+    }
+  }
+  if (ast.HasWhereClause()) {
+    result += " WHERE " + ast.VisitChildren(this).at(0);
+  }
+  result += ";";
+  return result;
+}
 std::string Stringifier::VisitSelect(const Select &ast) {
   std::string result = "SELECT ";
   bool first = true;
@@ -138,6 +155,13 @@ std::pair<bool, std::string> ValueFinder::VisitInsert(const Insert &ast) {
   assert(false);
 }
 
+std::pair<bool, std::string> ValueFinder::VisitUpdate(const Update &ast) {
+  auto result = ast.VisitChildren(this);
+  if (result.size() == 1) {
+    return result.at(0);
+  }
+  return std::make_pair(false, "");
+}
 std::pair<bool, std::string> ValueFinder::VisitSelect(const Select &ast) {
   auto result = ast.VisitChildren(this);
   if (result.size() == 1) {
@@ -204,6 +228,20 @@ std::unique_ptr<Expression> ExpressionRemover::VisitInsert(Insert *ast) {
   assert(false);
 }
 
+std::unique_ptr<Expression> ExpressionRemover::VisitUpdate(Update *ast) {
+  auto result = ast->VisitChildren(this);
+  if (result.size() == 1) {
+    if (result.at(0).get() == nullptr) {
+      ast->RemoveWhereClause();
+    } else {
+      std::unique_ptr<BinaryExpression> cast =
+          std::unique_ptr<BinaryExpression>(
+              static_cast<BinaryExpression *>(result.at(0).release()));
+      ast->SetWhereClause(std::move(cast));
+    }
+  }
+  return nullptr;
+}
 std::unique_ptr<Expression> ExpressionRemover::VisitSelect(Select *ast) {
   auto result = ast->VisitChildren(this);
   if (result.size() == 1) {

@@ -10,6 +10,7 @@
 #include "shards/sqlengine/delete.h"
 #include "shards/sqlengine/insert.h"
 #include "shards/sqlengine/select.h"
+#include "shards/sqlengine/update.h"
 #include "shards/util/status.h"
 
 namespace shards {
@@ -34,12 +35,17 @@ Rewrite(const std::string &sql, SharderState *state) {
       return insert::Rewrite(*static_cast<sqlast::Insert *>(statement.get()),
                              state);
 
-    // Case 3: Select statement.
+    // Case 3: Update statement.
+    case sqlast::AbstractStatement::Type::UPDATE:
+      return update::Rewrite(*static_cast<sqlast::Update *>(statement.get()),
+                             state);
+
+    // Case 4: Select statement.
     case sqlast::AbstractStatement::Type::SELECT:
       return select::Rewrite(*static_cast<sqlast::Select *>(statement.get()),
                              state);
 
-    // Case 4: Delete statement.
+    // Case 5: Delete statement.
     case sqlast::AbstractStatement::Type::DELETE:
       return delete_::Rewrite(*static_cast<sqlast::Delete *>(statement.get()),
                               state);
