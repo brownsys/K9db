@@ -11,6 +11,7 @@
 #include "glog/logging.h"
 #include "gtest/gtest_prod.h"
 
+#include "dataflow/key.h"
 #include "dataflow/schema.h"
 #include "dataflow/types.h"
 
@@ -125,6 +126,8 @@ class Record {
   int timestamp() const { return timestamp_; }
   void set_timestamp(int time) { timestamp_ = time; }
   const Schema& schema() const { return *schema_; }
+
+  const std::pair<Key, bool> GetKey() const;
 
   bool operator==(const Record& other) const {
     // records with different signs do not compare equal

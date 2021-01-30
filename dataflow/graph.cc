@@ -22,7 +22,7 @@ bool DataFlowGraph::AddNode(std::shared_ptr<Operator> op,
 
   auto res = nodes_.emplace(idx, op);
 
-  for(auto& parent : parents)
+  for (auto& parent : parents)
     if (parent != nullptr) {
       CHECK(AddEdge(parent, op));
     }

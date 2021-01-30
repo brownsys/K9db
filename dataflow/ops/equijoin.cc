@@ -5,60 +5,64 @@
 #include "equijoin.h"
 
 namespace dataflow {
-    EquiJoin::EquiJoin(ColumnID left_id, ColumnID right_id) : Operator::Operator(), left_id_(left_id), right_id_(right_id) {
-    }
+EquiJoin::EquiJoin(ColumnID left_id, ColumnID right_id)
+    : Operator::Operator(), left_id_(left_id), right_id_(right_id) {}
 
-    // Note: use https://github.com/brownsys/pelton/blob/better-records-redux/dataflow/key.h
-    // for hashing.
+// Note: use
+// https://github.com/brownsys/pelton/blob/better-records-redux/dataflow/key.h
+// for hashing.
 
-    bool EquiJoin::process(NodeIndex src_op_idx, std::vector<Record>& rs,
-                         std::vector<Record>& out_rs) {
+bool EquiJoin::process(NodeIndex src_op_idx, std::vector<Record>& rs,
+                       std::vector<Record>& out_rs) {
+  for (const auto& r : rs) {
+    // in comparison to a normal HashJoin in a database, here
+    // record flow from one operator in.
 
-        for(const auto& r : rs) {
-            // in comparison to a normal HashJoin in a database, here
-            // record flow from one operator in.
+    // append all input records to corresponding hashtable
+    if (src_op_idx == left()->index()) {
+      // match each record with right table
+      // coming from left operator
+      // => match with right operator's table!
+      const auto record_left_key_ptr = reinterpret_cast<const void*>(
+          *static_cast<const uintptr_t*>(r[left_id_]));
+      auto left_key = Key(record_left_key_ptr, r.schema().TypeOf(left_id_));
 
-            // append all input records to corresponding hashtable
-            if(src_op_idx == left()->index()) {
-                // match each record with right table
-                // coming from left operator
-                // => match with right operator's table!
-                const auto record_left_key_ptr =
-                        reinterpret_cast<const void*>(*static_cast<const uintptr_t*>(r[left_id_]));
-                auto left_key = Key(record_left_key_ptr, r.schema().TypeOf(left_id_));
+      // TODO: emit final records if match occured
+      for (auto it = right_table_.beginGroup(left_key);
+           it != right_table_.endGroup(left_key); ++it) {
+        LOG(INFO) << "found match " << std::endl;
+      }
 
-                // TODO: emit final records if match occured
-                for(auto it = right_table_.beginGroup(left_key); it != right_table_.endGroup(left_key); ++it) {
-                    LOG(INFO) << "found match " <<std::endl;
-                }
+      // save record hashed to left table
+      left_table_.insert(left_key, r);
 
-                // save record hashed to left table
-                left_table_.insert(left_key, r);
+    } else if (src_op_idx == right()->index()) {
+      // match each record with left table
+      // coming from right operator
+      // => match with left operator's table!
+      const auto record_right_key_ptr = reinterpret_cast<const void*>(
+          *static_cast<const uintptr_t*>(r[right_id_]));
+      auto right_key = Key(record_right_key_ptr, r.schema().TypeOf(right_id_));
 
-            } else if(src_op_idx == right()->index()) {
-                // match each record with left table
-                // coming from right operator
-                // => match with left operator's table!
-                const auto record_right_key_ptr =
-                        reinterpret_cast<const void*>(*static_cast<const uintptr_t*>(r[right_id_]));
-                auto right_key = Key(record_right_key_ptr, r.schema().TypeOf(right_id_));
+      // TODO: emit final records if match occured!
+      for (auto it = left_table_.beginGroup(right_key);
+           it != left_table_.endGroup(right_key); ++it) {
+        LOG(INFO) << "found match " << std::endl;
+      }
 
-                // TODO: emit final records if match occured!
-                for(auto it = left_table_.beginGroup(right_key); it != left_table_.endGroup(right_key); ++it) {
-                    LOG(INFO) << "found match " <<std::endl;
-                }
-
-                // save record hashed to right table
-                right_table_.insert(right_key, r);
-            } else {
+      // save record hashed to right table
+      right_table_.insert(right_key, r);
+    } else {
 #ifndef NDEBUG
-                throw std::runtime_error("internal error. Received data input"
-                                         "from operator " + std::to_string(src_op_idx)
-                                         + " but join has only IDs " + std::to_string(left()->index())
-                                         + " and " + std::to_string(right()->index()) + " registered to it.");
+      throw std::runtime_error(
+          "internal error. Received data input"
+          "from operator " +
+          std::to_string(src_op_idx) + " but join has only IDs " +
+          std::to_string(left()->index()) + " and " +
+          std::to_string(right()->index()) + " registered to it.");
 #endif
-            }
-        }
     }
-
+  }
 }
+
+}  // namespace dataflow

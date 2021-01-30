@@ -5,6 +5,8 @@
 
 #include "glog/logging.h"
 
+#include "dataflow/types.h"
+
 namespace dataflow {
 
 enum DataType {
@@ -31,6 +33,9 @@ class Schema {
   static inline size_t size_of(DataType t, const void* data) {
     switch (t) {
       case kText: {
+        // TODO(malte): this returns the string's size, but discounts metadata
+        // and small string optimizations of std::string; when we move to a
+        // length+buffer representation, it will work better.
         const std::string* s = reinterpret_cast<const std::string*>(data);
         return s->size();
       }
@@ -61,9 +66,14 @@ class Schema {
   }
   size_t num_inline_columns() const { return num_inline_columns_; }
   size_t num_pointer_columns() const { return num_pointer_columns_; }
+  const std::vector<ColumnID> key_columns() const { return key_columns_; }
+  void set_key_columns(std::vector<ColumnID> columns) {
+    key_columns_ = columns;
+  }
 
  private:
   const std::vector<DataType> types_;
+  std::vector<ColumnID> key_columns_;
   size_t num_inline_columns_;
   size_t num_pointer_columns_;
   std::vector<std::pair<bool, size_t>> true_indices_;

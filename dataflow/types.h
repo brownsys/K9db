@@ -10,8 +10,10 @@ typedef uint32_t NodeIndex;
 
 typedef uint32_t ColumnID;
 
-static const EdgeIndex UNDEFINED_EDGE_INDEX = std::numeric_limits<EdgeIndex>::max();
-static const NodeIndex UNDEFINED_NODE_INDEX = std::numeric_limits<NodeIndex>::max();
+static const EdgeIndex UNDEFINED_EDGE_INDEX =
+    std::numeric_limits<EdgeIndex>::max();
+static const NodeIndex UNDEFINED_NODE_INDEX =
+    std::numeric_limits<NodeIndex>::max();
 
 }  // namespace dataflow
 
