@@ -4,9 +4,9 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 # Abseil C++ Libraries
 http_archive(
   name = "absl",
-  urls = ["https://github.com/abseil/abseil-cpp/archive/20200225.2.zip"],
-  strip_prefix = "abseil-cpp-20200225.2",
-  sha256 = "f342aac71a62861ac784cadb8127d5a42c6c61ab1cd07f00aef05f2cc4988c42",
+  urls = ["https://github.com/abseil/abseil-cpp/archive/20200923.2.zip"],
+  strip_prefix = "abseil-cpp-20200923.2",
+  sha256 = "306639352ec60dcbfc695405e989e1f63d0e55001582a5185b0a8caf2e8ea9ca",
 )
 
 # Google Test
@@ -53,4 +53,59 @@ http_archive(
   urls = ["https://github.com/bazelbuild/rules_cc/archive/9e10b8a6db775b1ecd358d8ddd3dab379a2c29a5.zip"],
   strip_prefix = "rules_cc-9e10b8a6db775b1ecd358d8ddd3dab379a2c29a5",
   sha256 = "954b7a3efc8752da957ae193a13b9133da227bdacf5ceb111f2e11264f7e8c95",
+)
+
+#
+# For the sharding system.
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "new_git_repository")
+
+# ANTLR Runtime and Parser generator from grammar files.
+http_archive(
+    name = "rules_antlr",
+    sha256 = "26e6a83c665cf6c1093b628b3a749071322f0f70305d12ede30909695ed85591",
+    strip_prefix = "rules_antlr-0.5.0",
+    urls = ["https://github.com/marcohu/rules_antlr/archive/0.5.0.tar.gz"],
+)
+
+load("@rules_antlr//antlr:repositories.bzl", "rules_antlr_dependencies")
+load("@rules_antlr//antlr:lang.bzl", "CPP")
+rules_antlr_dependencies("4.8", CPP)
+
+
+# ANTLR grammars repository (non-bazel) which includes the sqlite grammar!
+# TODO(babman): go back to using the git repo instead of the fork when my
+# PR is approved.
+new_git_repository(
+    name = "grammars-v4",
+    #remote = "https://github.com/antlr/grammars-v4",
+    remote = "https://github.com/KinanBab/grammars-v4.git",
+    #commit = "9514c04a33a0cf157853334105f32fc914e4f1de",  # My Fix on Oct 27 2020
+    commit = "ead0c4b7ec6a41a602bf35c631bf398729268af1",  # My non-merged second fix from Nov 10 2020
+    build_file_content = """
+load("@rules_antlr//antlr:antlr4.bzl", "antlr")
+
+# Compile the grammar with the antlrcpp generation tool
+antlr(
+    name = "sqlgrammar",
+    srcs = [
+        "sql/sqlite/SQLiteParser.g4",
+        "sql/sqlite/SQLiteLexer.g4",
+    ],
+    no_visitor = False,
+    visitor = True,
+    language = "Cpp",
+    package = "sqlparser",
+)
+
+# Expose compiled grammar as a Cpp library
+cc_library(
+    name = "sqlparser",
+    srcs = [":sqlgrammar"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":sqlgrammar",
+        "@antlr4_runtimes//:cpp",
+    ],
+)
+""",
 )
