@@ -8,9 +8,6 @@ namespace dataflow {
     EquiJoin::EquiJoin(ColumnID left_id, ColumnID right_id) : Operator::Operator(), left_id_(left_id), right_id_(right_id) {
     }
 
-    // Note: use https://github.com/brownsys/pelton/blob/better-records-redux/dataflow/key.h
-    // for hashing.
-
     bool EquiJoin::process(NodeIndex src_op_idx, std::vector<Record>& rs,
                          std::vector<Record>& out_rs) {
 
@@ -29,7 +26,7 @@ namespace dataflow {
 
                 // TODO: emit final records if match occured
                 for(auto it = right_table_.beginGroup(left_key); it != right_table_.endGroup(left_key); ++it) {
-                    LOG(INFO) << "found match " <<std::endl;
+                    emitRow(out_rs, r, *it);
                 }
 
                 // save record hashed to left table
@@ -45,7 +42,7 @@ namespace dataflow {
 
                 // TODO: emit final records if match occured!
                 for(auto it = left_table_.beginGroup(right_key); it != left_table_.endGroup(right_key); ++it) {
-                    LOG(INFO) << "found match " <<std::endl;
+                    emitRow(out_rs, *it, r);
                 }
 
                 // save record hashed to right table
