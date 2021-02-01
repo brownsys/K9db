@@ -2,12 +2,12 @@
 // which was previously created, closed, and then later on re-opened.
 
 // TODO(babman): save and load state from default DB instead of file.
-// TODO(babman): save and load logical schema.
 
 #include <sys/stat.h>
 
 #include <fstream>
 #include <string>
+#include <vector>
 
 #include "shards/state.h"
 
@@ -91,12 +91,49 @@ void SharderState::Load() {
     getline(state_file, line);
   }
 
-  // Read schema_.
+  // Read concrete_schema_.
   getline(state_file, line);
   while (line != "") {
     std::string create_statement;
     getline(state_file, create_statement);
     this->concrete_schema_.insert({line, create_statement});
+    getline(state_file, line);
+  }
+
+  // Read logical_schema_.
+  getline(state_file, line);
+  while (line != "") {
+    std::vector<std::string> names;
+    std::vector<dataflow::DataType> types;
+    std::string colname;
+    std::underlying_type_t<dataflow::DataType> coltype;
+    // Read the column names and types in schema.
+    getline(state_file, colname);
+    while (colname != "") {
+      state_file >> coltype;
+      names.push_back(colname);
+      types.push_back(static_cast<dataflow::DataType>(coltype));
+      getline(state_file, colname);
+      getline(state_file, colname);
+    }
+    // Read the key column ids.
+    std::vector<dataflow::ColumnID> keys;
+    dataflow::ColumnID key;
+    size_t keys_size;
+    state_file >> keys_size;
+    for (size_t i = 0; i < keys_size; i++) {
+      state_file >> key;
+      keys.push_back(key);
+    }
+
+    // Construct schema in place.
+    this->logical_schema_.emplace(std::piecewise_construct,
+                                  std::forward_as_tuple(line),
+                                  std::forward_as_tuple(types, names));
+    this->logical_schema_.at(line).set_key_columns(keys);
+
+    // Next table.
+    getline(state_file, line);
     getline(state_file, line);
   }
 
@@ -148,6 +185,22 @@ void SharderState::Save() {
 
   for (const auto &[table_name, create_statement] : this->concrete_schema_) {
     state_file << table_name << "\n" << create_statement << "\n";
+  }
+  state_file << "\n";
+
+  for (const auto &[table_name, schema] : this->logical_schema_) {
+    state_file << table_name << "\n";
+    for (size_t i = 0; i < schema.num_columns(); i++) {
+      auto type = static_cast<std::underlying_type_t<dataflow::DataType>>(
+          schema.TypeOf(i));
+      state_file << schema.NameOf(i) << "\n" << type << "\n";
+    }
+    state_file << "\n";
+    state_file << schema.key_columns().size() << " ";
+    for (auto key_id : schema.key_columns()) {
+      state_file << key_id << " ";
+    }
+    state_file << "\n";
   }
   state_file << "\n";
 
