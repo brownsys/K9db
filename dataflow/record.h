@@ -148,7 +148,6 @@ class Record {
   // TODO(malte): consider swapping std::string for a length + buffer
   void set_string(size_t index, std::string* s);
   std::string* as_string(size_t index) const;
-
  private:
   // Data is interpreted according to schema stored outside the record.
   // RecordData itself only contains two pointers, one to the inline data
