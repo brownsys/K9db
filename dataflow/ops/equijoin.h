@@ -25,18 +25,19 @@ class EquiJoin : public Operator {
         "do not call for EquiJoin, needs info from where data is coming.");
   }
 
+  /*!
+   * processes a batch of input rows and writes output to out_rs. Output schema
+   * of join (i.e. records written to out_rs) is defined as concatenated left
+   * schema and right schema w. key column dropped.
+   * @param src_op_idx
+   * @param rs
+   * @param out_rs
+   * @return
+   */
   bool process(NodeIndex src_op_idx, std::vector<Record>& rs,
                std::vector<Record>& out_rs) override;
 
   OperatorType type() const override { return OperatorType::EQUIJOIN; }
-
- private:
-  ColumnID left_id_;
-  ColumnID right_id_;
-
-  // hash tables for each operator side
-  GroupedData left_table_;
-  GroupedData right_table_;
 
   std::shared_ptr<Operator> left() const {
     assert(parents().size() == 2);
@@ -47,28 +48,47 @@ class EquiJoin : public Operator {
     return parents()[1];
   }
 
-  inline void emitRow(std::vector<Record>& out_rs, const Record& r_left, const Record& r_right) {
-    // create a concatenated record, dropping key column from left side
-    auto left_schema = r_left.schema();
-    auto right_schema = r_right.schema();
+ private:
+  ColumnID left_id_;
+  ColumnID right_id_;
+
+  // hash tables for each operator side
+  GroupedData left_table_;
+  GroupedData right_table_;
+
+  // output schema, must live here because records only own reference to it
+  Schema left_schema_;
+  Schema right_schema_;
+  Schema joined_schema_;
+
+  inline void emitRow(std::vector<Record>& out_rs, const Record& r_left,
+                      const Record& r_right) {
+
     // TODO: mapping ColumnID to index. For now assume they're the same
     unsigned right_key_idx = right_id_;
 
-    std::vector<DataType> st;
-    for(unsigned i = 0; i < left_schema.num_columns(); ++i) {
-      st.push_back(left_schema.TypeOf(i));
-    }
-    for(unsigned i = 0; i < right_schema.num_columns(); ++i) {
-      if(i != right_key_idx)
-        st.push_back(right_schema.TypeOf(i));
+    // set schemas here lazily, note this can get optimized.
+    // create a concatenated record, dropping key column from left side
+    if(joined_schema_.is_undefined()) {
+      left_schema_ = r_left.schema();
+      right_schema_ = r_right.schema();
+
+      std::vector<DataType> st;
+      for (unsigned i = 0; i < left_schema_.num_columns(); ++i) {
+        st.push_back(left_schema_.TypeOf(i));
+      }
+      for (unsigned i = 0; i < right_schema_.num_columns(); ++i) {
+        if (i != right_key_idx) st.push_back(right_schema_.TypeOf(i));
+      }
+
+      joined_schema_ = Schema(st);
     }
 
-    Schema s(st);
-    Record r(s);
+    Record r(joined_schema_);
 
     // @TODO: refactor this??
-    for(unsigned i = 0; i < left_schema.num_columns(); ++i)
-      switch(left_schema.TypeOf(i)) {
+    for (unsigned i = 0; i < left_schema_.num_columns(); ++i)
+      switch (left_schema_.TypeOf(i)) {
         case kUInt: {
           r.set_uint(i, r_left.as_uint(i));
           break;
@@ -94,10 +114,9 @@ class EquiJoin : public Operator {
 
     // @TODO: refactor this??
     unsigned i = 0;
-    for(unsigned j = 0; j < left_schema.num_columns(); ++j) {
-      if(j == right_key_idx)
-        continue; // skip key column...
-      switch(left_schema.TypeOf(i)) {
+    for (unsigned j = 0; j < right_schema_.num_columns(); ++j) {
+      if (j == right_key_idx) continue;  // skip key column...
+      switch (right_schema_.TypeOf(i)) {
         case kUInt: {
           r.set_uint(i, r_left.as_uint(i));
           break;
@@ -128,6 +147,6 @@ class EquiJoin : public Operator {
   }
 };
 
-}
+}  // namespace dataflow
 
 #endif  // PELTON_EQUIJOIN_H

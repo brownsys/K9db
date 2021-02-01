@@ -24,12 +24,36 @@ class Operator {
 
   void AddParent(std::shared_ptr<Operator> parent, std::shared_ptr<Edge> edge);
 
+  /*!
+   * push a batch of records through the dataflow graph. Order within this batch
+   * does not matter. i.e. an operator can reorder individual records to
+   * optimize processing within a single operator node. The dataflow assumes all
+   * records of this batch arrive at the same time. Records will NOT be pushed
+   * to children.
+   * @param src_op_idx index of the node to which the input batch rs belongs to.
+   * @param rs an input target vector which gets consumed (i.e. all elements
+   * removed) ??? ???
+   * @param out_rs target vector where to write outputs to.
+   * @return true when processing succeeded, false when an error occurred ???
+   * ???
+   */
   virtual bool process(NodeIndex src_op_idx, std::vector<Record>& rs,
                        std::vector<Record>& out_rs) {
     return process(rs, out_rs);
   }
+
   virtual bool process(std::vector<Record>& rs,
                        std::vector<Record>& out_rs) = 0;
+
+  /*!
+   * Take a batch of records belonging to operator src_op_idx and push it
+   * through the dataflow graph. I.e., the batch will be processed through this
+   * node and then pushed to all children nodes for further processing.
+   * Internally calls process(...) function.
+   * @param src_op_idx
+   * @param rs
+   * @return
+   */
   bool ProcessAndForward(NodeIndex src_op_idx, std::vector<Record>& rs);
 
   virtual OperatorType type() const = 0;

@@ -19,6 +19,8 @@ namespace dataflow {
 
 class RecordData {
  public:
+    RecordData() = delete;
+
   RecordData(const Schema& schema) {
     inline_data_ = new uint64_t[schema.num_inline_columns()];
     pointed_data_ = new uintptr_t[schema.num_pointer_columns()];
@@ -84,6 +86,8 @@ class RecordData {
 
 class Record {
  public:
+    Record() = delete;
+
   Record(const Schema& schema, bool positive = true)
       : data_(RecordData(schema)),
         schema_(&schema),
@@ -148,6 +152,7 @@ class Record {
   // TODO(malte): consider swapping std::string for a length + buffer
   void set_string(size_t index, std::string* s);
   std::string* as_string(size_t index) const;
+
  private:
   // Data is interpreted according to schema stored outside the record.
   // RecordData itself only contains two pointers, one to the inline data

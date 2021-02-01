@@ -10,33 +10,35 @@ EquiJoin::EquiJoin(ColumnID left_id, ColumnID right_id)
 
 bool EquiJoin::process(NodeIndex src_op_idx, std::vector<Record>& rs,
                        std::vector<Record>& out_rs) {
+
   for (const auto& r : rs) {
     // in comparison to a normal HashJoin in a database, here
     // record flow from one operator in.
 
-            // append all input records to corresponding hashtable
-            if(src_op_idx == left()->index()) {
-                // match each record with right table
-                // coming from left operator
-                // => match with right operator's table!
-                const auto record_left_key_ptr =
-                        reinterpret_cast<const void*>(*static_cast<const uintptr_t*>(r[left_id_]));
-                auto left_key = Key(record_left_key_ptr, r.schema().TypeOf(left_id_));
+    // append all input records to corresponding hashtable
+    if (src_op_idx == left()->index()) {
+      // match each record with right table
+      // coming from left operator
+      // => match with right operator's table!
+      const auto record_left_key_ptr = reinterpret_cast<const void*>(
+          *static_cast<const uintptr_t*>(r[left_id_]));
+      auto left_key = Key(record_left_key_ptr, r.schema().TypeOf(left_id_));
 
-                for(auto it = right_table_.beginGroup(left_key); it != right_table_.endGroup(left_key); ++it) {
-                    emitRow(out_rs, r, *it);
-                }
+      for (auto it = right_table_.beginGroup(left_key);
+           it != right_table_.endGroup(left_key); ++it) {
+        emitRow(out_rs, r, *it);
+      }
 
-                // save record hashed to left table
-                left_table_.insert(left_key, r);
+      // save record hashed to left table
+      left_table_.insert(left_key, r);
 
-            } else if(src_op_idx == right()->index()) {
-                // match each record with left table
-                // coming from right operator
-                // => match with left operator's table!
-                const auto record_right_key_ptr =
-                        reinterpret_cast<const void*>(*static_cast<const uintptr_t*>(r[right_id_]));
-                auto right_key = Key(record_right_key_ptr, r.schema().TypeOf(right_id_));
+    } else if (src_op_idx == right()->index()) {
+      // match each record with left table
+      // coming from right operator
+      // => match with left operator's table!
+      const auto record_right_key_ptr = reinterpret_cast<const void*>(
+          *static_cast<const uintptr_t*>(r[right_id_]));
+      auto right_key = Key(record_right_key_ptr, r.schema().TypeOf(right_id_));
 
       for (auto it = left_table_.beginGroup(right_key);
            it != left_table_.endGroup(right_key); ++it) {
@@ -56,6 +58,7 @@ bool EquiJoin::process(NodeIndex src_op_idx, std::vector<Record>& rs,
 #endif
     }
   }
+  return true;
 }
 
 }  // namespace dataflow

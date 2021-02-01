@@ -22,7 +22,10 @@ TEST(JoinOperatorTest, Basic) {
   df.AddInputNode(leftSrc);
   df.AddInputNode(rightSrc);
 
-  auto join_op = make_shared<EquiJoin>(0ul, 0ul);
+  static const auto LEFT_KEY_IDX = 0ul;
+  static const auto RIGHT_KEY_IDX = 0ul;
+
+  auto join_op = make_shared<EquiJoin>(LEFT_KEY_IDX, RIGHT_KEY_IDX);
   df.AddNode(join_op, {leftSrc, rightSrc});
 
   // push data into
@@ -47,56 +50,82 @@ TEST(JoinOperatorTest, Basic) {
   }
 
   {
-      Record r1(s_right);
-      r1.set_int(0, 10);
-      r1.set_int(1, 200);
-      Record r2(s_right);
-      r2.set_int(0, 10);
-      r2.set_int(1, 190);
-      Record r3(s_right);
-      r3.set_int(0, 30);
-      r3.set_int(1, 180);
-      r_right = vector<Record>{r1, r2, r3};
+    Record r1(s_right);
+    r1.set_int(0, 10);
+    r1.set_int(1, 200);
+    Record r2(s_right);
+    r2.set_int(0, 10);
+    r2.set_int(1, 190);
+    Record r3(s_right);
+    r3.set_int(0, 30);
+    r3.set_int(1, 180);
+    r_right = vector<Record>{r1, r2, r3};
   }
 
   // reference result:
   // for join, we basically stream both in & then push the results.
+  // => batches are processed
+  // join result should be:
+  // 10, -2 joins 10, 200
+  // 10, -2 joins 10, 190
+  // 30, 2 joins 30, 180
 
+  // output schema of join is defined as concatenated left schema w. key column
+  // dropped and right schema
+  Schema s_joined({DataType::kInt, DataType::kInt, DataType::kInt});
+  vector<Record> ref;
+  {
+    Record r1(s_joined);
+    r1.set_int(1, -2);
+    r1.set_int(0, 10);
+    r1.set_int(2, 200);
 
-  // std::vector<ColumnID> cids = {0, 1};
-  // std::vector<FilterOperator::Ops> comp_ops = {FilterOperator::OpsGT_Eq,
-  //                                              FilterOperator::OpsEq};
-  // std::vector<RecordData> comp_vals = {RecordData(3ULL), RecordData(5ULL)};
-  //
-  // std::shared_ptr<FilterOperator> filter =
-  //     std::make_shared<FilterOperator>(cids, comp_ops, comp_vals);
-  // std::vector<Record> rs;
-  // std::vector<Record> proc_rs;
-  //
-  // EXPECT_TRUE(filter->process(rs, proc_rs));
-  // // no records have been fed
-  // EXPECT_EQ(proc_rs, std::vector<Record>());
-  //
-  // // feed records
-  // std::vector<RecordData> rd1 = {RecordData(1ULL), RecordData(2ULL)};
-  // std::vector<RecordData> rd2 = {RecordData(2ULL), RecordData(2ULL)};
-  // std::vector<RecordData> rd3 = {RecordData(3ULL), RecordData(5ULL)};
-  // std::vector<RecordData> rd4 = {RecordData(4ULL), RecordData(5ULL)};
-  // Record r1(true, rd1, 3ULL);
-  // Record r2(true, rd2, 3ULL);
-  // Record r3(true, rd3, 3ULL);
-  // Record r4(true, rd4, 3ULL);
-  // rs.push_back(r1);
-  // rs.push_back(r2);
-  // rs.push_back(r3);
-  // rs.push_back(r4);
-  //
-  // std::vector<RecordData> keys = {RecordData(3ULL), RecordData(4ULL)};
-  // std::vector<Record> expected_rs = {r3, r4};
-  //
-  // EXPECT_TRUE(filter->process(rs, proc_rs));
-  // EXPECT_EQ(proc_rs.size(), expected_rs.size());
-  // EXPECT_EQ(proc_rs, expected_rs);
+    Record r2(s_joined);
+    r2.set_int(1, -2);
+    r2.set_int(0, 10);
+    r2.set_int(2, 190);
+
+    Record r3(s_joined);
+    r3.set_int(1, 2);
+    r3.set_int(0, 30);
+    r3.set_int(2, 180);
+
+    ref = vector<Record>{r1, r2, r3};
+  }
+
+  // sort ref vector after 3rd column
+  std::sort(ref.begin(), ref.end(), [](const Record& a, const Record& b) {
+    return a.as_int(2) < b.as_int(2);
+  });
+
+  vector<Record> out_rs;
+  // process left first
+  join_op->process(join_op->left()->index(), r_left, out_rs);
+  ASSERT_EQ(out_rs.size(), 0);  // no right records so output should be empty.
+                                // => Everything saved to internal hash table
+  // process right now => records should occur
+  join_op->process(join_op->right()->index(), r_right, out_rs);
+  ASSERT_EQ(out_rs.size(), 3);
+
+  // check all records have size 3
+  for (const auto& r : out_rs) {
+    ASSERT_EQ(r.schema().num_columns(), 3);
+  }
+
+    // sort result vector
+    std::sort(out_rs.begin(), out_rs.end(), [](const Record& a, const Record&
+    b) {
+      return a.as_int(2) < b.as_int(2);
+    });
+
+  // compare
+  EXPECT_EQ(out_rs.size(), ref.size());
+    for(int i = 0; i < std::min(out_rs.size(), ref.size()); ++i) {
+      EXPECT_EQ(out_rs[i], ref[i]);
+    }
+
+  // TODO: fix schema memory errors...
+  // --> i.e. schema should outlive everything...
 }
 
 }  // namespace dataflow

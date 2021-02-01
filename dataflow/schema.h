@@ -18,7 +18,25 @@ enum DataType {
 
 class Schema {
  public:
+  Schema() : num_inline_columns_(0), num_pointer_columns_(0) {}
+
   explicit Schema(std::vector<DataType> columns);
+
+  Schema(const Schema& other)
+      : types_(other.types_),
+        key_columns_(other.key_columns_),
+        num_inline_columns_(other.num_inline_columns_),
+        num_pointer_columns_(other.num_pointer_columns_),
+        true_indices_(other.true_indices_) {}
+  Schema(Schema&& other) = default;
+  Schema& operator = (const Schema& other) {
+    types_ = other.types_;
+    key_columns_ = other.key_columns_;
+    num_inline_columns_ = other.num_inline_columns_;
+    num_pointer_columns_ = other.num_pointer_columns_;
+    true_indices_ = other.true_indices_;
+    return *this;
+  }
 
   static inline bool is_inlineable(DataType t) {
     switch (t) {
@@ -46,6 +64,7 @@ class Schema {
       default:
         LOG(FATAL) << "unimplemented";
     }
+    return 0;
   }
 
   bool operator==(const Schema& other) const { return types_ == other.types_; }
@@ -71,8 +90,10 @@ class Schema {
     key_columns_ = columns;
   }
 
+  bool is_undefined() const { return types_.empty() && num_inline_columns_ == 0 && num_pointer_columns_ == 0; }
+
  private:
-  const std::vector<DataType> types_;
+  std::vector<DataType> types_;
   std::vector<ColumnID> key_columns_;
   size_t num_inline_columns_;
   size_t num_pointer_columns_;
