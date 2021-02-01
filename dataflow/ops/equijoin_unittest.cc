@@ -26,6 +26,42 @@ TEST(JoinOperatorTest, Basic) {
   df.AddNode(join_op, {leftSrc, rightSrc});
 
   // push data into
+  Schema s_left({DataType::kInt, DataType::kInt});
+  Schema s_right({DataType::kInt, DataType::kInt});
+
+  vector<Record> r_left;
+  vector<Record> r_right;
+  vector<Record> r_ref;
+
+  {
+    Record r1(s_left);
+    r1.set_int(0, 10);
+    r1.set_int(1, -2);
+    Record r2(s_left);
+    r2.set_int(0, 20);
+    r2.set_int(1, 0);
+    Record r3(s_left);
+    r3.set_int(0, 30);
+    r3.set_int(1, 2);
+    r_left = vector<Record>{r1, r2, r3};
+  }
+
+  {
+      Record r1(s_right);
+      r1.set_int(0, 10);
+      r1.set_int(1, 200);
+      Record r2(s_right);
+      r2.set_int(0, 10);
+      r2.set_int(1, 190);
+      Record r3(s_right);
+      r3.set_int(0, 30);
+      r3.set_int(1, 180);
+      r_right = vector<Record>{r1, r2, r3};
+  }
+
+  // reference result:
+  // for join, we basically stream both in & then push the results.
+
 
   // std::vector<ColumnID> cids = {0, 1};
   // std::vector<FilterOperator::Ops> comp_ops = {FilterOperator::OpsGT_Eq,
