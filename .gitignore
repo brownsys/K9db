@@ -40,3 +40,4 @@ bazel-testlogs
 # others
 .idea/
 cmake-build-debug/
+.clwb

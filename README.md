@@ -16,6 +16,8 @@ install the following via your package manager:
 
 Run `bazel build //dataflow`.
 
+To list all available targets, use `bazel query //...`.
+
 ## Testing
 
 To run the tests, run `bazel test //dataflow:dataflow-tests`.
@@ -28,7 +30,3 @@ sanitizers and provides more helpful output on memory errors (e.g., segfaults).
 We follow [the Google C++ style guide](https://google.github.io/styleguide/cppguide.html);
 please run `clang-format` on your code before pushing.
 
-
-
-## CMake
-In order to get a CMake build, you can use a modified version of <https://github.com/lizan/bazel-cmakelists>.
