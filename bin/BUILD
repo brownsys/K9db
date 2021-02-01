@@ -1,5 +1,4 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("//build:options.bzl", "PELTON_DEFAULT_COPTS")
 
 cc_binary(
   name = "hello_world",
@@ -10,7 +9,6 @@ cc_binary(
       "@glog//:glog",
       "@com_github_gflags_gflags//:gflags"
   ],
-  copts = PELTON_DEFAULT_COPTS,
   srcs = ["main.cc"],
 )
 
@@ -24,6 +22,5 @@ cc_binary(
       "@com_github_gflags_gflags//:gflags",
       "@gbenchmark//:benchmark"
   ],
-  copts = PELTON_DEFAULT_COPTS,
   srcs = ["ubench.cc"],
 )

@@ -1,0 +1,130 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "engine",
+    srcs = [
+        "engine.cc",
+    ],
+    hdrs= [
+        "engine.h",
+    ],
+    deps = [
+        ":create",
+        ":delete",
+        ":insert",
+        ":select",
+        ":update",
+        "//shards:state",
+        "//shards/sqlast:ast",
+        "//shards/sqlast:parser",
+        "//shards/sqlexecutor:executor",
+        "//shards/util:status",
+        "@absl//absl/status:statusor",
+        "@antlr4_runtimes//:cpp",
+        "@grammars-v4//:sqlparser",
+    ],
+    visibility = ["//shards:__subpackages__"],
+)
+
+
+cc_library(
+    name = "create",
+    srcs = [
+        "create.cc",
+    ],
+    hdrs= [
+        "create.h",
+    ],
+    deps = [
+        "//shards/sqlast:ast",
+        "//shards/sqlexecutor:executor",
+        "//shards/sqlengine:util",
+        "//shards:state",
+        "@absl//absl/status:statusor",
+        "@absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "insert",
+    srcs = [
+        "insert.cc",
+    ],
+    hdrs= [
+        "insert.h",
+    ],
+    deps = [
+        "//shards/sqlast:ast",
+        "//shards/sqlexecutor:executor",
+        "//shards/sqlengine:util",
+        "//shards:state",
+        "@absl//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "select",
+    srcs = [
+        "select.cc",
+    ],
+    hdrs= [
+        "select.h",
+    ],
+    deps = [
+        "//shards/sqlast:ast",
+        "//shards/sqlexecutor:executor",
+        "//shards/sqlengine:util",
+        "//shards:state",
+        "@absl//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "delete",
+    srcs = [
+        "delete.cc",
+    ],
+    hdrs= [
+        "delete.h",
+    ],
+    deps = [
+        "//shards/sqlast:ast",
+        "//shards/sqlexecutor:executor",
+        "//shards/sqlengine:util",
+        "//shards:state",
+        "@absl//absl/status:statusor",
+        "@absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "update",
+    srcs = [
+        "update.cc",
+    ],
+    hdrs= [
+        "update.h",
+    ],
+    deps = [
+        "//shards/sqlast:ast",
+        "//shards/sqlexecutor:executor",
+        "//shards/sqlengine:util",
+        "//shards:state",
+        "@absl//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "util",
+    srcs = [
+        "util.cc",
+    ],
+    hdrs= [
+        "util.h",
+    ],
+    deps = [
+        "//shards:state",
+        "@absl//absl/strings",
+    ],
+    visibility = ["//shards:__subpackages__"],
+)

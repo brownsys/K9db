@@ -1,0 +1,43 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_binary")
+
+cc_library(
+    name = "shards",
+    srcs = [
+        "shards.cc",
+    ],
+    hdrs = [
+        "shards.h",
+    ],
+    deps = [
+        "@absl//absl/strings",
+        "//shards:state",
+        "//shards/sqlengine:engine",
+        "//shards/sqlengine:util",
+        "//shards/sqlexecutor:executor",
+    ],
+)
+
+cc_library(
+    name = "state",
+    srcs = [
+        "state.cc",
+        "load.cc",
+    ],
+    hdrs = [
+        "state.h",
+    ],
+    deps = [
+        "//shards/sqlexecutor:executor",
+    ],
+    visibility = ["//shards:__subpackages__"],
+)
+
+cc_binary(
+    name = "cli",
+    srcs = [
+        "cli.cc",
+    ],
+    deps = [
+        ":shards",
+    ],
+)

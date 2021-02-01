@@ -1,5 +1,4 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("//build:options.bzl", "PELTON_DEFAULT_COPTS")
 
 cc_library(
     name = "dataflow",
@@ -33,7 +32,6 @@ cc_library(
         "ops/equijoin.h",
         "ops/union.h",
     ],
-    copts = PELTON_DEFAULT_COPTS,
     visibility = ["//visibility:public"],
     deps = [
         "@absl//absl/base:core_headers",
@@ -53,7 +51,7 @@ cc_test(
         "ops/filter_unittest.cc",
         "ops/union_unittest.cc",
     ],
-    copts = PELTON_DEFAULT_COPTS + ["-Iexternal/gtest/googletest/include"],
+    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         "@glog//:glog",
         "@gtest//:gtest",

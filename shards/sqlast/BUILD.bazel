@@ -1,0 +1,56 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "ast",
+    srcs = [
+        "ast_expressions.cc",
+        "ast_schema.cc",
+        "ast_statements.cc",
+        "ast_visitors.cc",
+    ],
+    hdrs = [
+        "ast.h",
+        "ast_abstract.h",
+        "ast_expressions.h",
+        "ast_schema.h",
+        "ast_statements.h",
+        "ast_visitors.h",
+    ],
+    visibility = ["//shards:__subpackages__"],
+)
+
+cc_library(
+    name = "parser",
+        srcs = [
+        "parser.cc",
+    ],
+    hdrs= [
+        "parser.h",
+    ],
+    deps = [
+        ":ast",
+        ":transformer",
+        "@absl//absl/status:statusor",
+        "@antlr4_runtimes//:cpp",
+        "@grammars-v4//:sqlparser",
+    ],
+    visibility = ["//shards:__subpackages__"],
+)
+
+
+cc_library(
+    name = "transformer",
+    srcs = [
+        "transformer.cc",
+    ],
+    hdrs= [
+        "transformer.h",
+    ],
+    deps = [
+        ":ast",
+        "@absl//absl/status:status",
+        "@absl//absl/status:statusor",
+        "@antlr4_runtimes//:cpp",
+        "@grammars-v4//:sqlparser",
+    ],
+)

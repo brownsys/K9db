@@ -37,6 +37,9 @@ bazel-out
 bazel-pelton
 bazel-testlogs
 
+# Output directiory for testing
+.out
+
 # others
 .idea/
 cmake-build-debug/
