@@ -16,8 +16,8 @@ jobs:
 
     - name: Dependencies
       run: |
-        sudo apt-get install -y gcc-9 g++-9
-        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 100 \
+        sudo apt-get install -y gcc-9 g++-9 libsqlite3-dev
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 90 \
                                  --slave /usr/bin/gcc-ar gcc-ar /usr/bin/gcc-ar-9 \
                                  --slave /usr/bin/gcc-nm gcc-nm /usr/bin/gcc-nm-9 \
                                  --slave /usr/bin/gcc-ranlib gcc-ranlib /usr/bin/gcc-ranlib-9 \
