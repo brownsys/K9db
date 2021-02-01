@@ -16,4 +16,23 @@ Schema::Schema(std::vector<DataType> columns) : types_(columns) {
   }
 }
 
+const Schema & SchemaFactory::create_or_get(const std::vector<DataType> &column_types) {
+  auto& f = SchemaFactory::instance();
+  auto it = f.schemas_.find(column_types);
+  if(it == f.schemas_.end())
+    f.schemas_[column_types] = new Schema(column_types);
+  Schema *schema = f.schemas_[column_types];
+  assert(schema);
+  return *schema;
+}
+
+SchemaFactory::~SchemaFactory() {
+  for(auto s : schemas_) {
+    delete s.second;
+    s.second = nullptr;
+  }
+
+  schemas_.clear();
+}
+
 }  // namespace dataflow

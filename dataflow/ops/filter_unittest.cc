@@ -12,7 +12,7 @@
 namespace dataflow {
 
 TEST(FilterOperatorTest, Basic) {
-  Schema s({kUInt, kUInt});  // must outlive records
+  auto s = SchemaFactory::create_or_get({kUInt, kUInt});  // must outlive records
 
   std::vector<ColumnID> cids = {0, 1};
   std::vector<FilterOperator::Ops> comp_ops = {

@@ -57,9 +57,9 @@ class EquiJoin : public Operator {
   GroupedData right_table_;
 
   // output schema, must live here because records only own reference to it
-  Schema left_schema_;
-  Schema right_schema_;
-  Schema joined_schema_;
+  const Schema* left_schema_;
+  const Schema* right_schema_;
+  const Schema* joined_schema_;
 
   inline void emitRow(std::vector<Record>& out_rs, const Record& r_left,
                       const Record& r_right) {
@@ -69,37 +69,38 @@ class EquiJoin : public Operator {
 
     // set schemas here lazily, note this can get optimized.
     // create a concatenated record, dropping key column from left side
-    if(joined_schema_.is_undefined()) {
-      left_schema_ = r_left.schema();
-      right_schema_ = r_right.schema();
+    if(!joined_schema_) {
+      left_schema_ = &r_left.schema();
+      right_schema_ = &r_right.schema();
 
       std::vector<DataType> st;
-      for (unsigned i = 0; i < left_schema_.num_columns(); ++i) {
-        st.push_back(left_schema_.TypeOf(i));
+      for (unsigned i = 0; i < left_schema_->num_columns(); ++i) {
+        st.push_back(left_schema_->TypeOf(i));
       }
-      for (unsigned i = 0; i < right_schema_.num_columns(); ++i) {
-        if (i != right_key_idx) st.push_back(right_schema_.TypeOf(i));
+      for (unsigned i = 0; i < right_schema_->num_columns(); ++i) {
+        if (i != right_key_idx) st.push_back(right_schema_->TypeOf(i));
       }
 
-      joined_schema_ = Schema(st);
+      joined_schema_ = &SchemaFactory::create_or_get(st);
     }
 
-    Record r(joined_schema_);
+    Record r(*joined_schema_);
 
     // @TODO: refactor this??
-    for (unsigned i = 0; i < left_schema_.num_columns(); ++i)
-      switch (left_schema_.TypeOf(i)) {
+    int pos = 0;
+    for (unsigned i = 0; i < left_schema_->num_columns(); ++i)
+      switch (left_schema_->TypeOf(i)) {
         case kUInt: {
-          r.set_uint(i, r_left.as_uint(i));
+          r.set_uint(pos++, r_left.as_uint(i));
           break;
         }
         case kInt: {
-          r.set_int(i, r_left.as_int(i));
+          r.set_int(pos++, r_left.as_int(i));
           break;
         }
         case kText: {
           auto str_copy = new std::string(*r_left.as_string(i));
-          r.set_string(i, str_copy);
+          r.set_string(pos++, str_copy);
           break;
         }
         case kDatetime: {
@@ -113,21 +114,20 @@ class EquiJoin : public Operator {
       }
 
     // @TODO: refactor this??
-    unsigned i = 0;
-    for (unsigned j = 0; j < right_schema_.num_columns(); ++j) {
-      if (j == right_key_idx) continue;  // skip key column...
-      switch (right_schema_.TypeOf(i)) {
+    for (unsigned i = 0; i < right_schema_->num_columns(); ++i) {
+      if (i == right_key_idx) continue;  // skip key column...
+      switch (right_schema_->TypeOf(i)) {
         case kUInt: {
-          r.set_uint(i, r_left.as_uint(i));
+          r.set_uint(pos++, r_right.as_uint(i));
           break;
         }
         case kInt: {
-          r.set_int(i, r_left.as_int(i));
+          r.set_int(pos++, r_right.as_int(i));
           break;
         }
         case kText: {
-          auto str_copy = new std::string(*r_left.as_string(i));
-          r.set_string(i, str_copy);
+          auto str_copy = new std::string(*r_right.as_string(i));
+          r.set_string(pos++, str_copy);
           break;
         }
         case kDatetime: {
@@ -139,7 +139,6 @@ class EquiJoin : public Operator {
           throw std::runtime_error("fatal internal error in emitRow");
 #endif
       }
-      i++;
     }
 
     // add result record to output

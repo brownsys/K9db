@@ -29,7 +29,7 @@ DEFINE_bool(verbose, false, "Verbose output");
 //  return g;
 //}
 
-static dataflow::Schema uint_schema(
+static auto uint_schema = dataflow::SchemaFactory::create_or_get(
     std::vector<dataflow::DataType>({dataflow::kUInt, dataflow::kUInt}));
 
 void GenerateSimpleUIntRecords(std::vector<dataflow::Record>& vec,

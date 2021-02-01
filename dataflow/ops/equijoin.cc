@@ -6,7 +6,7 @@
 
 namespace dataflow {
 EquiJoin::EquiJoin(ColumnID left_id, ColumnID right_id)
-    : Operator::Operator(), left_id_(left_id), right_id_(right_id) {}
+    : Operator::Operator(), left_id_(left_id), right_id_(right_id), left_schema_(nullptr), right_schema_(nullptr), joined_schema_(nullptr) {}
 
 bool EquiJoin::process(NodeIndex src_op_idx, std::vector<Record>& rs,
                        std::vector<Record>& out_rs) {

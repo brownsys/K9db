@@ -52,7 +52,7 @@ DataFlowGraph makeFilterGraph(const Schema& schema) {
 TEST(DataFlowGraphTest, Construct) { DataFlowGraph g = makeTrivialGraph(); }
 
 TEST(DataFlowGraphTest, Basic) {
-  Schema schema({DataType::kUInt, DataType::kUInt});
+  auto schema = SchemaFactory::create_or_get({DataType::kUInt, DataType::kUInt});
   schema.set_key_columns({0});
   {
     DataFlowGraph g = makeTrivialGraph();
@@ -80,7 +80,7 @@ TEST(DataFlowGraphTest, Basic) {
 }
 
 TEST(DataFlowGraphTest, SinglePathFilter) {
-  Schema schema({DataType::kUInt, DataType::kUInt});
+  auto schema = SchemaFactory::create_or_get({DataType::kUInt, DataType::kUInt});
   schema.set_key_columns({0});
   {
     DataFlowGraph g = makeFilterGraph(schema);
