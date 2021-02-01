@@ -20,6 +20,7 @@
 
 #include "dataflow/graph.h"
 #include "dataflow/ops/input.h"
+#include "shards/sqlast/ast.h"
 #include "shards/sqlexecutor/executor.h"
 
 namespace shards {
@@ -102,11 +103,13 @@ class SharderState {
   void AddShardKind(const ShardKind &kind, const ColumnName &pk);
 
   void AddUnshardedTable(const UnshardedTableName &table,
-                         const CreateStatement &create_statement);
+                         const CreateStatement &create_str,
+                         const sqlast::CreateTable &create_stmt);
 
   void AddShardedTable(const UnshardedTableName &table,
                        const ShardingInformation &sharding_information,
-                       const CreateStatement &create_statement);
+                       const CreateStatement &sharded_create_statement,
+                       const sqlast::CreateTable &logical_create_statement);
 
   std::list<CreateStatement> CreateShard(const ShardKind &shard_kind,
                                          const UserId &user);
@@ -115,6 +118,11 @@ class SharderState {
 
   // Schema lookups.
   bool Exists(const UnshardedTableName &table) const;
+  
+  CreateStatement ConcreteSchemaOf(const ShardedTableName &table) const;
+  
+  const sqlast::CreateTable &LogicalSchemaOf(
+      const UnshardedTableName &table) const;
 
   bool IsSharded(const UnshardedTableName &table) const;
 
@@ -179,9 +187,17 @@ class SharderState {
   // created for them.
   std::unordered_map<ShardKind, std::unordered_set<UserId>> shards_;
 
-  // Maps every table in the overall schema to its create table statement.
+  // Maps every table in the overall schema to its concrete schema.
   // This can be used to create that table in a new shard.
-  std::unordered_map<ShardedTableName, CreateStatement> schema_;
+  // The concrete schema matches what is stored physically in the DB after
+  // sharding and other transformations.
+  std::unordered_map<ShardedTableName, CreateStatement> concrete_schema_;
+
+  // Maps every table to its logical schema.
+  // The logical schema is the contract between client code and our DB.
+  // The stored schema may not matched the concrete/physical one due to sharding
+  // or other transformations.
+  std::unordered_map<UnshardedTableName, sqlast::CreateTable> logical_schema_;
 
   // Connection pool that manages the underlying sqlite3 databases.
   sqlexecutor::SQLExecutor executor_;

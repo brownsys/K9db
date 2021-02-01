@@ -15,7 +15,7 @@ namespace sqlast {
 const std::string &Insert::table_name() const { return this->table_name_; }
 std::string &Insert::table_name() { return this->table_name_; }
 
-bool Insert::HasColumns() { return this->columns_.size() > 0; }
+bool Insert::HasColumns() const { return this->columns_.size() > 0; }
 
 void Insert::AddColumn(const std::string &colname) {
   this->columns_.push_back(colname);

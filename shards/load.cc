@@ -1,6 +1,9 @@
 // This file contains logic to read the existing state of a sharded database,
 // which was previously created, closed, and then later on re-opened.
 
+// TODO(babman): save and load state from default DB instead of file.
+// TODO(babman): save and load logical schema.
+
 #include <sys/stat.h>
 
 #include <fstream>
@@ -93,7 +96,7 @@ void SharderState::Load() {
   while (line != "") {
     std::string create_statement;
     getline(state_file, create_statement);
-    this->schema_.insert({line, create_statement});
+    this->concrete_schema_.insert({line, create_statement});
     getline(state_file, line);
   }
 
@@ -143,7 +146,7 @@ void SharderState::Save() {
   }
   state_file << "\n";
 
-  for (const auto &[table_name, create_statement] : this->schema_) {
+  for (const auto &[table_name, create_statement] : this->concrete_schema_) {
     state_file << table_name << "\n" << create_statement << "\n";
   }
   state_file << "\n";

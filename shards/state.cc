@@ -30,22 +30,26 @@ void SharderState::AddShardKind(const ShardKind &kind, const ColumnName &pk) {
 }
 
 void SharderState::AddUnshardedTable(const UnshardedTableName &table,
-                                     const CreateStatement &create_statement) {
-  this->schema_.insert({table, create_statement});
+                                     const CreateStatement &create_str,
+                                     const sqlast::CreateTable &create_stmt) {
+  this->concrete_schema_.insert({table, create_str});
+  this->logical_schema_.insert({table, create_stmt});
 }
 
 void SharderState::AddShardedTable(
     const UnshardedTableName &table,
     const ShardingInformation &sharding_information,
-    const CreateStatement &create_statement) {
+    const CreateStatement &sharded_create_statement,
+    const sqlast::CreateTable &logical_create_statement) {
   // Record that the shard kind contains this sharded table.
   this->kind_to_tables_.at(sharding_information.shard_kind)
       .push_back(sharding_information.sharded_table_name);
   // Map the unsharded name to its sharding information.
   this->sharded_by_[table].push_back(sharding_information);
   // Store the sharded schema.
-  this->schema_.insert(
-      {sharding_information.sharded_table_name, create_statement});
+  this->concrete_schema_.insert(
+      {sharding_information.sharded_table_name, sharded_create_statement});
+  this->logical_schema_.insert({table, logical_create_statement});
 }
 
 std::list<CreateStatement> SharderState::CreateShard(
@@ -55,7 +59,7 @@ std::list<CreateStatement> SharderState::CreateShard(
   // Return the create table statements.
   std::list<CreateStatement> result;
   for (const ShardedTableName &table : this->kind_to_tables_.at(shard_kind)) {
-    result.push_back(this->schema_.at(table));
+    result.push_back(this->concrete_schema_.at(table));
   }
   return result;
 }
@@ -67,7 +71,17 @@ void SharderState::RemoveUserFromShard(const ShardKind &kind,
 
 // Schema lookups.
 bool SharderState::Exists(const UnshardedTableName &table) const {
-  return this->schema_.count(table) > 0 || this->sharded_by_.count(table) > 0;
+  return this->concrete_schema_.count(table) > 0 || this->sharded_by_.count(table) > 0;
+}
+
+CreateStatement SharderState::ConcreteSchemaOf(
+    const ShardedTableName &table) const {
+  return this->concrete_schema_.at(table);
+}
+
+const sqlast::CreateTable &SharderState::LogicalSchemaOf(
+    const UnshardedTableName &table) const {
+  return this->logical_schema_.at(table);
 }
 
 bool SharderState::IsSharded(const UnshardedTableName &table) const {

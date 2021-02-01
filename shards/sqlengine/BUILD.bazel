@@ -53,11 +53,13 @@ cc_library(
         "insert.h",
     ],
     deps = [
+        "//dataflow:dataflow",
         "//shards/sqlast:ast",
         "//shards/sqlexecutor:executor",
         "//shards/sqlengine:util",
         "//shards:state",
         "@absl//absl/status:statusor",
+        "@absl//absl/strings",
     ],
 )
 

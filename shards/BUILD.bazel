@@ -31,6 +31,7 @@ cc_library(
     ],
     deps = [
         "//dataflow:dataflow",
+        "//shards/sqlast:ast",
         "//shards/sqlexecutor:executor",
     ],
     visibility = ["//:__subpackages__"],
