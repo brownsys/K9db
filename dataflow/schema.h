@@ -1,11 +1,13 @@
 #ifndef PELTON_DATAFLOW_SCHEMA_H_
 #define PELTON_DATAFLOW_SCHEMA_H_
 
+#include <string>
 #include <vector>
 
 #include "glog/logging.h"
 
 #include "dataflow/types.h"
+#include "shards/sqlast/ast.h"
 
 namespace dataflow {
 
@@ -16,9 +18,14 @@ enum DataType {
   kDatetime,
 };
 
+DataType StringToDataType(const std::string &type_name);
+
 class Schema {
  public:
   explicit Schema(std::vector<DataType> columns);
+  explicit Schema(std::vector<DataType> columns,
+                  std::vector<std::string> names);
+  explicit Schema(const shards::sqlast::CreateTable &table_description);
 
   static inline bool is_inlineable(DataType t) {
     switch (t) {
@@ -56,6 +63,11 @@ class Schema {
     return types_[index];
   }
 
+  const std::string &NameOf(size_t index) const {
+    BoundsCheckIndex(index);
+    return names_[index];
+  }
+
   std::pair<bool, size_t> RawColumnIndex(size_t index) const {
     BoundsCheckIndex(index);
     return true_indices_[index];
@@ -72,7 +84,8 @@ class Schema {
   }
 
  private:
-  const std::vector<DataType> types_;
+  std::vector<DataType> types_;
+  std::vector<std::string> names_;
   std::vector<ColumnID> key_columns_;
   size_t num_inline_columns_;
   size_t num_pointer_columns_;

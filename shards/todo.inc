@@ -15,11 +15,7 @@ void make_view(SharderState *state, const std::string &name,
 
   // TODO(babman): schema should be deduced from CREATE TABLE statement of
   // target(s) of query.
-  // TODO(babman): schema storage and lifetime should be better than this...
-  dataflow::Schema *schema =
-    new dataflow::Schema({dataflow::DataType::kInt, dataflow::DataType::kInt,
-                          dataflow::DataType::kInt, dataflow::DataType::kInt});
-  schema->set_key_columns({0});
+  const dataflow::Schema &schema = state->LogicalSchemaOf("submissions");
 
   // TODO(babman): flow should be generated from parsing query and planning it
   // with calcite.
@@ -37,7 +33,7 @@ void make_view(SharderState *state, const std::string &name,
       dataflow::FilterOperator::GreaterThanOrEqual,
       dataflow::FilterOperator::GreaterThanOrEqual};
 
-  dataflow::Record filter_vals(*schema);
+  dataflow::Record filter_vals(schema);
   filter_vals.set_int(0, 0LL);
   filter_vals.set_int(1, 0LL);
   filter_vals.set_int(2, 0LL);
@@ -50,7 +46,7 @@ void make_view(SharderState *state, const std::string &name,
   // The output materialized view operator.
   graph.AddNode(
       dataflow::OperatorType::MAT_VIEW,
-      std::make_shared<dataflow::MatViewOperator>(schema->key_columns()),
+      std::make_shared<dataflow::MatViewOperator>(schema.key_columns()),
       filter);
 
   // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.

@@ -2,15 +2,13 @@
 
 #include "shards/sqlengine/insert.h"
 
-#include <algorithm>
-#include <cassert>
 #include <list>
 #include <vector>
 
-#include "absl/strings/match.h"
 #include "dataflow/record.h"
-#include "dataflow/schema.h"
+#include "shards/records/insert.h"
 #include "shards/sqlengine/util.h"
+#include "shards/util/status.h"
 
 namespace shards {
 namespace sqlengine {
@@ -25,61 +23,18 @@ Rewrite(const sqlast::Insert &stmt, SharderState *state) {
   }
 
   // Turn inserted values into a record and process it via corresponding flows.
-  // TODO(babman): schema lifetime should be improved.
   // TODO(babman): this should only be executed after physical insert is
   //               successfull.
-  const sqlast::CreateTable &create = state->LogicalSchemaOf(table_name);
-  std::vector<dataflow::DataType> types;
-  for (const auto &col : create.GetColumns()) {
-    if (absl::EqualsIgnoreCase(col.column_type(), "int")) {
-      types.push_back(dataflow::DataType::kInt);
-    } else if (absl::StartsWithIgnoreCase(col.column_type(), "varchar")) {
-      types.push_back(dataflow::DataType::kText);
-    } else {
-      throw "Unsupported datatype!";
-    }
-  }
-
-  dataflow::Schema *schema = new dataflow::Schema(types);
-  schema->set_key_columns({0});
-
-  std::vector<dataflow::Record> records;
-  records.emplace_back(*schema, true);
-  if (stmt.HasColumns()) {
-    const std::vector<std::string> &cols = stmt.GetColumns();
-    const std::vector<std::string> &values = stmt.GetValues();
-    for (const auto &col : create.GetColumns()) {
-      auto it = std::find(cols.cbegin(), cols.cend(), col.column_name());
-      size_t i = std::distance(cols.cbegin(), it);
-      if (schema->TypeOf(i) == dataflow::DataType::kInt) {
-        int64_t v = std::stoll(values.at(i));
-        records.at(0).set_int(i, v);
-      } else {
-        std::string *v = new std::string(values.at(i));
-        records.at(0).set_string(i, v);
-      }
-    }
-  } else {
-    const std::vector<std::string> &values = stmt.GetValues();
-    assert(values.size() == schema->num_columns());
-    for (size_t i = 0; i < values.size(); i++) {
-      if (schema->TypeOf(i) == dataflow::DataType::kInt) {
-        int64_t v = std::stoll(values.at(i));
-        records.at(0).set_int(i, v);
-      } else {
-        std::string *v = new std::string(values.at(i));
-        records.at(0).set_string(i, v);
-      }
-    }
-  }
-
   if (state->HasInputsFor(table_name)) {
+    ASSIGN_OR_RETURN(std::vector<dataflow::Record> records,
+                     records::insert::MakeRecords(stmt, state));
     for (auto input : state->InputsFor(table_name)) {
-      input->ProcessAndForward(records);
+      std::vector<dataflow::Record> copy = records;
+      input->ProcessAndForward(copy);
     }
   }
 
-  // Shard the insert statement so it is executable against the physical 
+  // Shard the insert statement so it is executable against the physical
   // sharded database.
   sqlast::Stringifier stringifier;
   std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>> result;

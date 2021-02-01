@@ -67,6 +67,15 @@ void ColumnDefinition::RemoveConstraint(ColumnConstraint::Type type) {
   }
 }
 
+bool ColumnDefinition::HasConstraint(ColumnConstraint::Type type) const {
+  for (const auto &constraint : this->constraints_) {
+    if (constraint.type() == type) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // CreateTable
 const std::string &CreateTable::table_name() const { return this->table_name_; }
 std::string &CreateTable::table_name() { return this->table_name_; }

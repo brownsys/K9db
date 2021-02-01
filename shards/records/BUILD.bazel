@@ -1,0 +1,58 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "insert",
+    srcs = [
+        "insert.cc",
+    ],
+    hdrs= [
+        "insert.h",
+    ],
+    deps = [
+        "//dataflow:dataflow",
+        "//shards/sqlast:ast",
+        "//shards:state",
+        "@absl//absl/status:statusor",
+    ],
+    visibility = [
+      "//shards/sqlengine:__subpackages__",
+    ],
+)
+
+cc_library(
+    name = "update",
+    srcs = [
+        "update.cc",
+    ],
+    hdrs= [
+        "update.h",
+    ],
+    deps = [
+        "//dataflow:dataflow",
+        "//shards/sqlast:ast",
+        "//shards:state",
+        "@absl//absl/status:statusor",
+    ],
+    visibility = [
+      "//shards/sqlengine:__subpackages__",
+    ],
+)
+
+cc_library(
+    name = "delete",
+    srcs = [
+        "delete.cc",
+    ],
+    hdrs= [
+        "delete.h",
+    ],
+    deps = [
+        "//dataflow:dataflow",
+        "//shards/sqlast:ast",
+        "//shards:state",
+        "@absl//absl/status:statusor",
+    ],
+    visibility = [
+      "//shards/sqlengine:__subpackages__",
+    ],
+)
