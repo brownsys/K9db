@@ -38,6 +38,8 @@ class Key {
           LOG(FATAL) << "unimplemented pointed data comparison on Key";
       }
     }
+
+    return false;
   }
   bool operator!=(const Key& other) const { return !(*this == other); }
 
@@ -55,6 +57,7 @@ class Key {
           LOG(FATAL) << "unimplemented pointed data hashing for Key";
       }
     }
+    return h;
   }
 
   uint64_t as_uint() const {
