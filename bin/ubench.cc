@@ -3,14 +3,13 @@
 #include <vector>
 
 #include "benchmark/benchmark.h"
-#include "gflags/gflags.h"
-#include "glog/logging.h"
-
 #include "dataflow/graph.h"
 #include "dataflow/operator.h"
 #include "dataflow/ops/matview.h"
 #include "dataflow/record.h"
 #include "dataflow/types.h"
+#include "gflags/gflags.h"
+#include "glog/logging.h"
 
 DEFINE_bool(verbose, false, "Verbose output");
 
@@ -45,7 +44,7 @@ void GenerateSimpleUIntRecords(std::vector<dataflow::Record>& vec,
 static void BM_MatViewInsert(benchmark::State& state) {
   std::vector<dataflow::ColumnID> kc = {0};
   uint_schema.set_key_columns(kc);
-  auto op = std::make_shared<dataflow::MatViewOperator>(kc);
+  auto op = std::make_shared<dataflow::MatViewOperator>(kc, uint_schema);
 
   std::vector<dataflow::Record> rs;
   std::vector<dataflow::Record> out_rs;
@@ -59,7 +58,7 @@ static void BM_MatViewInsert(benchmark::State& state) {
 static void BM_MatViewBatchInsert(benchmark::State& state) {
   std::vector<dataflow::ColumnID> kc = {0};
   uint_schema.set_key_columns(kc);
-  auto op = std::make_shared<dataflow::MatViewOperator>(kc);
+  auto op = std::make_shared<dataflow::MatViewOperator>(kc, uint_schema);
 
   std::vector<dataflow::Record> rs;
   GenerateSimpleUIntRecords(rs, state.range(0));
