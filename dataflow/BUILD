@@ -14,6 +14,7 @@ cc_library(
         "ops/filter.cc",
         "ops/union.cc",
         "ops/aggregate.cc",
+        "ops/project.cc",
     ],
     hdrs = [
         "edge.h",
@@ -30,6 +31,7 @@ cc_library(
         "ops/filter.h",
         "ops/union.h",
         "ops/aggregate.h",
+        "ops/project.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -52,6 +54,7 @@ cc_test(
         "ops/matview_unittest.cc",
         "ops/identity_unittest.cc",
         "ops/input_unittest.cc",
+        "ops/project_unittest.cc",
     ],
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [

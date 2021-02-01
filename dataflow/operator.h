@@ -18,6 +18,7 @@ enum OperatorType {
   FILTER,
   UNION,
   AGGREGATE,
+  PROJECT,
 };
 
 class Operator {
