@@ -102,4 +102,27 @@ sqlexecutor::SQLExecutor *SharderState::SQLExecutor() {
   return &this->executor_;
 }
 
+// Flows.
+void SharderState::AddFlow(const FlowName &name,
+                           const dataflow::DataFlowGraph &flow) {
+  this->flows_.insert({name, flow});
+  for (auto input : flow.inputs()) {
+    this->inputs_[input->table_name()].push_back(input);
+  }
+}
+
+const dataflow::DataFlowGraph &SharderState::GetFlow(
+    const FlowName &name) const {
+  return this->flows_.at(name);
+}
+
+bool SharderState::HasInputsFor(const UnshardedTableName &table_name) const {
+  return this->inputs_.count(table_name) > 0;
+}
+
+const std::vector<std::shared_ptr<dataflow::InputOperator>>
+    &SharderState::InputsFor(const UnshardedTableName &table_name) const {
+  return this->inputs_.at(table_name);
+}
+
 }  // namespace shards

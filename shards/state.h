@@ -16,7 +16,10 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
+#include "dataflow/graph.h"
+#include "dataflow/ops/input.h"
 #include "shards/sqlexecutor/executor.h"
 
 namespace shards {
@@ -54,6 +57,8 @@ using UserId = std::string;
 using ColumnName = std::string;
 
 using ColumnIndex = size_t;
+
+using FlowName = std::string;
 
 // Valid SQL CreateTable statement formatted and ready to use to create
 // some table.
@@ -133,6 +138,16 @@ class SharderState {
   // Return the connection pool to use for executing statements.
   sqlexecutor::SQLExecutor *SQLExecutor();
 
+  // Add and manage flows.
+  void AddFlow(const FlowName &name, const dataflow::DataFlowGraph &flow);
+
+  const dataflow::DataFlowGraph &GetFlow(const FlowName &name) const;
+
+  bool HasInputsFor(const UnshardedTableName &table_name) const;
+
+  const std::vector<std::shared_ptr<dataflow::InputOperator>> &InputsFor(
+      const UnshardedTableName &table_name) const;
+
  private:
   // Directory in which all shards are stored.
   std::string dir_path_;
@@ -170,6 +185,12 @@ class SharderState {
 
   // Connection pool that manages the underlying sqlite3 databases.
   sqlexecutor::SQLExecutor executor_;
+
+  // Dataflow graphs and views.
+  std::unordered_map<FlowName, dataflow::DataFlowGraph> flows_;
+  std::unordered_map<UnshardedTableName,
+                     std::vector<std::shared_ptr<dataflow::InputOperator>>>
+      inputs_;
 };
 
 }  // namespace shards

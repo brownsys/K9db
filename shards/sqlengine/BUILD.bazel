@@ -26,7 +26,6 @@ cc_library(
     visibility = ["//shards:__subpackages__"],
 )
 
-
 cc_library(
     name = "create",
     srcs = [

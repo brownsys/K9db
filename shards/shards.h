@@ -20,6 +20,12 @@ bool exec(SharderState *state, std::string sql, Callback callback,
 
 bool close(SharderState *state);
 
+// Materialized views.
+void make_view(SharderState *state, const std::string &name,
+               const std::string &query);
+
+void print_view(SharderState *state, const std::string &name);
+
 }  // namespace shards
 
 #endif  // SHARDS_SHARDS_H_
