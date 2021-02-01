@@ -3,9 +3,8 @@
 
 #include <vector>
 
-#include "glog/logging.h"
-
 #include "dataflow/types.h"
+#include "glog/logging.h"
 
 namespace dataflow {
 
@@ -56,6 +55,12 @@ class Schema {
     return types_[index];
   }
 
+  std::vector<DataType> ColumnSubset(const std::vector<ColumnID>& cols) const {
+    std::vector<DataType> col_subset;
+    for (auto i : cols) col_subset.push_back(types_.at(i));
+    return col_subset;
+  }
+
   std::pair<bool, size_t> RawColumnIndex(size_t index) const {
     BoundsCheckIndex(index);
     return true_indices_[index];
@@ -69,6 +74,14 @@ class Schema {
   const std::vector<ColumnID> key_columns() const { return key_columns_; }
   void set_key_columns(std::vector<ColumnID> columns) {
     key_columns_ = columns;
+  }
+
+  std::string to_string() {
+    std::string types_str = "";
+    for (auto t : types_) {
+      types_str += ", " + std::to_string(t);
+    }
+    return types_str;
   }
 
  private:

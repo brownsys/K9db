@@ -2,46 +2,105 @@
 
 #include <memory>
 
+#include "dataflow/key.h"
 #include "dataflow/operator.h"
 #include "dataflow/record.h"
+#include "dataflow/types.h"
 #include "gtest/gtest.h"
 
 namespace dataflow {
 
-TEST(MatViewOperatorTest, Basic) {
+TEST(MatViewOperatorTest, Empty) {
+  Schema s({kUInt, kUInt});  // must outlive records
   std::vector<ColumnID> keycol = {0};
-  std::shared_ptr<MatViewOperator> matview =
-      std::make_shared<MatViewOperator>(keycol);
+  std::shared_ptr<MatViewOperator> matview_op =
+      std::make_shared<MatViewOperator>(keycol, s);
   std::vector<Record> rs;
   std::vector<Record> proc_rs;
 
-  EXPECT_TRUE(matview->process(rs, proc_rs));
+  EXPECT_TRUE(matview_op->process(rs, proc_rs));
   // no records have been fed
   EXPECT_EQ(proc_rs, std::vector<Record>());
+}
 
-  // feed records
-  std::vector<RecordData> rd1 = {RecordData(1ULL), RecordData(2ULL)};
-  std::vector<RecordData> rd2 = {RecordData(2ULL), RecordData(2ULL)};
-  std::vector<RecordData> rd3 = {RecordData(3ULL), RecordData(5ULL)};
-  std::vector<RecordData> rd4 = {RecordData(4ULL), RecordData(5ULL)};
-  Record r1(true, rd1, 3ULL);
-  Record r2(true, rd2, 3ULL);
-  Record r3(true, rd3, 3ULL);
-  Record r4(true, rd4, 3ULL);
-  rs.push_back(r1);
-  rs.push_back(r2);
-  rs.push_back(r3);
-  rs.push_back(r4);
+TEST(MatViewOperatorTest, SingleLookup) {
+  Schema s({kUInt, kUInt});  // must outlive records
+  std::vector<ColumnID> keycol = {0};
+  std::shared_ptr<MatViewOperator> matview_op =
+      std::make_shared<MatViewOperator>(keycol, s);
 
-  EXPECT_TRUE(matview->process(rs, proc_rs));
+  s.set_key_columns(keycol);
+  {
+    Record r1(s);
+    r1.set_uint(0, 1ULL);
+    r1.set_uint(1, 2ULL);
+    Record r2(s);
+    r2.set_uint(0, 2ULL);
+    r2.set_uint(1, 2ULL);
+    Record r3(s);
+    r3.set_uint(0, 3ULL);
+    r3.set_uint(1, 5ULL);
+    Record r4(s);
+    r4.set_uint(0, 4ULL);
+    r4.set_uint(1, 5ULL);
 
-  std::vector<Record> expected_rs = {r3};
-  EXPECT_EQ(matview->lookup(RecordData(3ULL)), expected_rs);
+    std::vector<Record> rs;
 
-  std::vector<RecordData> keys = {RecordData(1ULL), RecordData(2ULL),
-                                  RecordData(3ULL), RecordData(4ULL)};
-  expected_rs = {r1, r2, r3, r4};
-  EXPECT_EQ(matview->multi_lookup(keys), expected_rs);
+    // feed records
+    rs.push_back(r1);
+    rs.push_back(r2);
+    rs.push_back(r3);
+    rs.push_back(r4);
+
+    std::vector<Record> expected_rs = {r3};
+    std::vector<Record> processed_rs;
+
+    EXPECT_TRUE(matview_op->process(rs, processed_rs));
+    EXPECT_EQ(matview_op->lookup(Key(static_cast<uint64_t>(3))), expected_rs);
+  }
+}
+
+TEST(MatViewOperatorTest, MultiLookup) {
+  Schema s({kUInt, kUInt});  // must outlive records
+  std::vector<ColumnID> keycol = {0};
+  std::shared_ptr<MatViewOperator> matview_op =
+      std::make_shared<MatViewOperator>(keycol, s);
+
+  s.set_key_columns(keycol);
+  {
+    Record r1(s);
+    r1.set_uint(0, 1ULL);
+    r1.set_uint(1, 2ULL);
+    Record r2(s);
+    r2.set_uint(0, 2ULL);
+    r2.set_uint(1, 2ULL);
+    Record r3(s);
+    r3.set_uint(0, 3ULL);
+    r3.set_uint(1, 5ULL);
+    Record r4(s);
+    r4.set_uint(0, 4ULL);
+    r4.set_uint(1, 5ULL);
+
+    std::vector<Record> rs;
+
+    // feed records
+    rs.push_back(r1);
+    rs.push_back(r2);
+    rs.push_back(r3);
+    rs.push_back(r4);
+
+    std::vector<Record> expected_rs = {r1, r2, r3, r4};
+    std::vector<Record> processed_rs;
+
+    EXPECT_TRUE(matview_op->process(rs, processed_rs));
+
+    Key k1(1ULL, DataType::kUInt);
+    Key k2(2ULL, DataType::kUInt);
+    Key k3(3ULL, DataType::kUInt);
+    Key k4(4ULL, DataType::kUInt);
+    std::vector<Key> keys = {k1, k2, k3, k4};
+    EXPECT_EQ(matview_op->multi_lookup(keys), expected_rs);
+  }
 }
 
 }  // namespace dataflow

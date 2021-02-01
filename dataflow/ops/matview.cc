@@ -12,7 +12,7 @@ bool MatViewOperator::process(std::vector<Record>& rs,
                               std::vector<Record>& out_rs) {
   for (Record& r : rs) {
     // incoming records must have the right key column set
-    CHECK(r.schema().key_columns() == key_cols_);
+    CHECK((*schema_).key_columns() == key_cols_);
 
     std::pair<Key, bool> key = r.GetKey();
     if (!contents_.contains(key.first)) {

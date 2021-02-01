@@ -2,15 +2,15 @@
 
 #include <memory>
 
-#include "gtest/gtest.h"
-
 #include "dataflow/operator.h"
 #include "dataflow/record.h"
+#include "gtest/gtest.h"
 
 namespace dataflow {
 
 TEST(UnionOperatorTest, Empty) {
-  std::shared_ptr<UnionOperator> union_op = std::make_shared<UnionOperator>();
+  Schema s({kUInt, kUInt});  // must outlive records
+  std::shared_ptr<UnionOperator> union_op = std::make_shared<UnionOperator>(s);
   std::vector<Record> rs;
   std::vector<Record> proc_rs;
 
@@ -20,9 +20,8 @@ TEST(UnionOperatorTest, Empty) {
 }
 
 TEST(UnionOperatorTest, Basic) {
-  std::shared_ptr<UnionOperator> union_op = std::make_shared<UnionOperator>();
-
   Schema s({kUInt, kUInt});  // must outlive records
+  std::shared_ptr<UnionOperator> union_op = std::make_shared<UnionOperator>(s);
   {
     Record r1(s);
     r1.set_uint(0, 1ULL);
@@ -46,11 +45,11 @@ TEST(UnionOperatorTest, Basic) {
     rs.push_back(r4);
 
     std::vector<Record> expected_rs = {r1, r2, r3, r4};
-    std::vector<Record> processed_rs;
+    std::vector<Record> proc_rs;
 
-    EXPECT_TRUE(union_op->process(rs, processed_rs));
-    EXPECT_EQ(processed_rs.size(), expected_rs.size());
-    EXPECT_EQ(processed_rs, expected_rs);
+    EXPECT_TRUE(union_op->process(rs, proc_rs));
+    EXPECT_EQ(proc_rs.size(), expected_rs.size());
+    EXPECT_EQ(proc_rs, expected_rs);
   }
 }
 

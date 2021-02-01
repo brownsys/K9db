@@ -1,4 +1,7 @@
 #include "dataflow/graph.h"
+
+#include <memory>
+
 #include "dataflow/operator.h"
 #include "dataflow/ops/filter.h"
 #include "dataflow/ops/identity.h"
@@ -6,25 +9,23 @@
 #include "dataflow/ops/matview.h"
 #include "dataflow/record.h"
 #include "dataflow/schema.h"
-
-#include <memory>
-
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 
 namespace dataflow {
 
-DataFlowGraph makeTrivialGraph() {
+DataFlowGraph makeTrivialGraph(const Schema& schema) {
   DataFlowGraph g;
 
-  auto in = std::make_shared<InputOperator>();
-  auto ident = std::make_shared<IdentityOperator>();
+  auto in = std::make_shared<InputOperator>(schema);
+  auto ident = std::make_shared<IdentityOperator>(in->schema());
 
   EXPECT_TRUE(g.AddInputNode(in));
   EXPECT_TRUE(g.AddNode(OperatorType::IDENTITY, ident, in));
   std::vector<ColumnID> keycol = {0};
-  EXPECT_TRUE(g.AddNode(OperatorType::MAT_VIEW,
-                        std::make_shared<MatViewOperator>(keycol), ident));
+  EXPECT_TRUE(g.AddNode(
+      OperatorType::MAT_VIEW,
+      std::make_shared<MatViewOperator>(keycol, ident->schema()), ident));
 
   return g;
 }
@@ -32,7 +33,7 @@ DataFlowGraph makeTrivialGraph() {
 DataFlowGraph makeFilterGraph(const Schema& schema) {
   DataFlowGraph g;
 
-  auto in = std::make_shared<InputOperator>();
+  auto in = std::make_shared<InputOperator>(schema);
 
   std::vector<ColumnID> cids = {0, 1};
   std::vector<FilterOperator::Ops> comp_ops = {
@@ -40,24 +41,29 @@ DataFlowGraph makeFilterGraph(const Schema& schema) {
   Record filter_vals(schema);
   filter_vals.set_uint(0, 10ULL);
   filter_vals.set_uint(1, 6ULL);
-  auto filter = std::make_shared<FilterOperator>(cids, comp_ops, filter_vals);
+  auto filter = std::make_shared<FilterOperator>(cids, comp_ops, filter_vals,
+                                                 in->schema());
 
   EXPECT_TRUE(g.AddInputNode(in));
   EXPECT_TRUE(g.AddNode(OperatorType::FILTER, filter, in));
-  EXPECT_TRUE(g.AddNode(OperatorType::MAT_VIEW,
-                        std::make_shared<MatViewOperator>(schema.key_columns()),
-                        filter));
+  EXPECT_TRUE(g.AddNode(
+      OperatorType::MAT_VIEW,
+      std::make_shared<MatViewOperator>(schema.key_columns(), filter->schema()),
+      filter));
 
   return g;
 }
 
-TEST(DataFlowGraphTest, Construct) { DataFlowGraph g = makeTrivialGraph(); }
+TEST(DataFlowGraphTest, Construct) {
+  Schema s({});
+  DataFlowGraph g = makeTrivialGraph(s);
+}
 
 TEST(DataFlowGraphTest, Basic) {
   Schema schema({DataType::kUInt, DataType::kUInt});
   schema.set_key_columns({0});
   {
-    DataFlowGraph g = makeTrivialGraph();
+    DataFlowGraph g = makeTrivialGraph(schema);
 
     std::shared_ptr<InputOperator> in = g.inputs()[0];
     std::shared_ptr<MatViewOperator> out = g.outputs()[0];

@@ -1,6 +1,8 @@
 #ifndef PELTON_DATAFLOW_TYPES_H_
 #define PELTON_DATAFLOW_TYPES_H_
 
+#include <stdint.h>
+
 namespace dataflow {
 
 typedef uint32_t EdgeIndex;

@@ -10,98 +10,120 @@ namespace dataflow {
 // input records
 class StateChange {
  public:
-  StateChange(bool is_insert) : is_insert_(is_insert) {
-    // nothing to do
-  }
-  StateChange(bool is_insert, uint64_t old_val)
-      : is_insert_(is_insert), old_val_(old_val) {
-    // nothing to do
-  }
-
+  StateChange(bool is_insert, Record old_val)
+      : is_insert_(is_insert), old_val_(old_val) {}
   bool is_insert_;
-  uint64_t old_val_;
+  Record old_val_;
 };
 
 bool AggregateOperator::process(std::vector<Record>& rs,
                                 std::vector<Record>& out_rs) {
-  absl::flat_hash_map<std::vector<RecordData>, StateChange> state_changes;
+  absl::flat_hash_map<std::vector<Key>, StateChange> first_delta;
+
   for (Record& r : rs) {
-    std::vector<RecordData> key = get_key(r);
+    std::vector<Key> key = get_key(r);
 
-    // handle negative record
-    if (!r.positive()) {
-      if (!state_.contains(key)) {
-        continue;
-      }
-      switch (agg_func_) {
-        case FuncCount:
-          if (!state_changes.contains(key)) {  // track state change
-            state_changes.emplace(key, StateChange(false, state_.at(key)));
+    switch (agg_func_) {
+      case FuncCount:
+        if (!r.positive()) {
+          if (!state_.contains(key)) {
+            LOG(FATAL)
+                << "State does not exist for corresponding negative record";
           }
-          if (state_.at(key) > 1) {
-            state_.at(key) = state_.at(key) - 1;
+          if (!first_delta.contains(key)) {  // track first state change
+            first_delta.emplace(key, StateChange(false, state_.at(key)));
+          }
+          state_.at(key).set_uint(0, state_.at(key).as_uint(0) - 1);
+        } else {  // handle positive record
+          if (!state_.contains(key)) {
+            Record dummy_r(agg_schema_);
+            first_delta.emplace(key, StateChange(true, dummy_r));
+            // new Record
+            Record agg_r(agg_schema_);
+            agg_r.set_uint(0, 1ULL);
+            state_.emplace(key, agg_r);
           } else {
-            state_.at(key) = 0;
+            if (!first_delta.contains(key)) {  // track first state change
+              first_delta.emplace(key, StateChange(false, state_.at(key)));
+            }
+            state_.at(key).set_uint(0, state_.at(key).as_uint(0) + 1);
           }
-          break;
-        case FuncSum:
-          if (!state_changes.contains(key)) {  // track state change
-            state_changes.emplace(key, StateChange(false, state_.at(key)));
+        }
+        break;
+      case FuncSum:
+        if (!r.positive()) {
+          if (!state_.contains(key)) {
+            LOG(FATAL)
+                << "State does not exist for corresponding negative record";
           }
-          if (state_.at(key) > r.raw_at(agg_col_).as_val()) {
-            state_.at(key) = state_.at(key) - r.raw_at(agg_col_).as_val();
+          if (!first_delta.contains(key)) {  // track first state change
+            first_delta.emplace(key, StateChange(false, state_.at(key)));
+          }
+          switch (agg_schema_.TypeOf(0)) {
+            case DataType::kUInt:
+              state_.at(key).set_uint(
+                  0, state_.at(key).as_uint(0) - r.as_uint(agg_col_));
+              break;
+            case DataType::kInt:
+              state_.at(key).set_int(
+                  0, state_.at(key).as_int(0) - r.as_int(agg_col_));
+              break;
+            default:
+              LOG(FATAL) << "Unexpected type when computing SUM aggregate";
+          }
+        } else {  // handle positive record
+          if (!state_.contains(key)) {
+            Record dummy_r(agg_schema_);
+            first_delta.emplace(key, StateChange(true, dummy_r));
+            // new Record
+            Record agg_r(agg_schema_);
+            switch (agg_schema_.TypeOf(0)) {
+              case DataType::kUInt:
+                agg_r.set_uint(0, r.as_uint(agg_col_));
+                break;
+              case DataType::kInt:
+                agg_r.set_int(0, r.as_int(agg_col_));
+                break;
+              default:
+                // TODO(Ishan): support for float?
+                LOG(FATAL) << "Unexpected type when computing SUM aggregate";
+            }
+            state_.emplace(key, agg_r);
           } else {
-            state_.at(key) = 0;
+            if (!first_delta.contains(key)) {  // track first state change
+              first_delta.emplace(key, StateChange(false, state_.at(key)));
+            }
+            switch (agg_schema_.TypeOf(0)) {
+              case DataType::kUInt:
+                state_.at(key).set_uint(
+                    0, state_.at(key).as_uint(0) + r.as_uint(agg_col_));
+                break;
+              case DataType::kInt:
+                state_.at(key).set_int(
+                    0, state_.at(key).as_int(0) + r.as_int(agg_col_));
+                break;
+              default:
+                LOG(FATAL) << "Unexpected type when computing SUM aggregate";
+            }
           }
-          break;
-      }
-      continue;
-    }
-
-    // handle positive record
-    if (!state_.contains(key)) {
-      switch (agg_func_) {
-        case FuncCount:
-          state_changes.emplace(key, StateChange(true));
-          state_.emplace(key, 1);
-          break;
-        case FuncSum:
-          state_changes.emplace(key, StateChange(true));
-          state_.emplace(key, r.raw_at(agg_col_).as_val());
-          break;
-      }
-    } else {
-      switch (agg_func_) {
-        case FuncCount:
-          if (!state_changes.contains(key)) {  // track state change
-            state_changes.emplace(key, StateChange(false, state_.at(key)));
-          }
-          state_.at(key) = state_.at(key) + 1;
-          break;
-        case FuncSum:
-          if (!state_changes.contains(key)) {  // track state change
-            state_changes.emplace(key, StateChange(false, state_.at(key)));
-          }
-          state_.at(key) = state_.at(key) + r.raw_at(agg_col_).as_val();
-          break;
-      }
+        }
+        break;
     }
   }
 
   // emit records only for tracked changes
-  for (auto const& item : state_changes) {
-    std::vector<RecordData> pos_record = item.first;
-    pos_record.push_back(RecordData(state_.at(item.first)));
+  for (auto const& item : first_delta) {
+    Record pos_record = gen_out_record(item.first, state_.at(item.first), true);
     if (item.second.is_insert_) {
-      out_rs.push_back(Record(true, pos_record, 3ULL));
+      out_rs.push_back(pos_record);
     } else {
-      std::vector<RecordData> neg_record = item.first;
-      neg_record.push_back(RecordData(item.second.old_val_));
-      out_rs.push_back(Record(false, neg_record, 3ULL));
-      out_rs.push_back(Record(true, pos_record, 3ULL));
+      Record neg_record =
+          gen_out_record(item.first, item.second.old_val_, false);
+      // for a negative update push negative record followed by positvie record
+      out_rs.push_back(neg_record);
+      out_rs.push_back(pos_record);
     }
   }
-
   return true;
 }
 

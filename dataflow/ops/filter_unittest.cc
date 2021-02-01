@@ -1,8 +1,9 @@
+#include "dataflow/ops/filter.h"
+
 #include <memory>
 
 #include "dataflow/graph.h"
 #include "dataflow/operator.h"
-#include "dataflow/ops/filter.h"
 #include "dataflow/ops/identity.h"
 #include "dataflow/ops/input.h"
 #include "dataflow/ops/matview.h"
@@ -22,7 +23,7 @@ TEST(FilterOperatorTest, Basic) {
   comp_vals.set_uint(1, 5ULL);
 
   std::shared_ptr<FilterOperator> filter =
-      std::make_shared<FilterOperator>(cids, comp_ops, comp_vals);
+      std::make_shared<FilterOperator>(cids, comp_ops, comp_vals, s);
 
   {
     Record r1(s);

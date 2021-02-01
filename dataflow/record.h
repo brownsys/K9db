@@ -8,12 +8,11 @@
 #include <memory>
 #include <vector>
 
-#include "glog/logging.h"
-#include "gtest/gtest_prod.h"
-
 #include "dataflow/key.h"
 #include "dataflow/schema.h"
 #include "dataflow/types.h"
+#include "glog/logging.h"
+#include "gtest/gtest_prod.h"
 
 namespace dataflow {
 
@@ -102,6 +101,20 @@ class Record {
                 sizeof(uint64_t) * schema_->num_pointer_columns());
   }
 
+  // copy assignment operator is used by std::sort
+  Record& operator=(const Record& other) {
+    data_ = RecordData(other.schema());
+    schema_ = other.schema_;
+    timestamp_ = other.timestamp_;
+    positive_ = other.positive_;
+    // copy the data; `RecordData` constructor allocated the memory
+    std::memcpy(data_.inline_data_, other.data_.inline_data_,
+                sizeof(uint64_t) * schema_->num_inline_columns());
+    std::memcpy(data_.pointed_data_, other.data_.pointed_data_,
+                sizeof(uint64_t) * schema_->num_pointer_columns());
+    return *this;
+  }
+
   ~Record() { data_.Clear(*schema_); }
 
   // These invoke `at` and `at_mut`
@@ -131,7 +144,7 @@ class Record {
 
   bool operator==(const Record& other) const {
     // records with different signs do not compare equal
-    if (positive_ != other.positive_ || schema_ != other.schema_) {
+    if (positive_ != other.positive_ || *schema_ != other.schema()) {
       return false;
     }
     // relies on deep comparison between RecordData instances
