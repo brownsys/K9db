@@ -22,7 +22,7 @@ TEST(RecordTest, DataRepRaw) {
   std::string* p = new std::string("hello");
 
   std::vector<DataType> st = {kUInt, kText, kInt};
-  Schema s(st);
+  auto s = SchemaFactory::create_or_get(st);
   Record r(s);
   *static_cast<uint64_t*>(r[0]) = v;
   std::string** sp = static_cast<std::string**>(r[1]);
@@ -40,7 +40,7 @@ TEST(RecordTest, DataRep) {
   std::string* p = new std::string("hello");
 
   std::vector<DataType> st = {kUInt, kText, kInt};
-  Schema s(st);
+  auto s = SchemaFactory::create_or_get(st);
   Record r(s);
   r.set_uint(0, v);
   r.set_string(1, p);
@@ -58,7 +58,7 @@ TEST(RecordTest, Comparisons) {
   std::string* s1 = new std::string("hello");
   std::string* s2 = new std::string("bye");
 
-  Schema s({kUInt, kText});
+  auto s = SchemaFactory::create_or_get({kUInt, kText});
 
   Record r1(s);
   r1.set_uint(0, v1);
@@ -84,7 +84,7 @@ TEST(RecordTest, TypeMismatch) {
   uint64_t v1 = 42;
   std::string* s1 = new std::string("hello");
 
-  Schema s({kUInt, kText});
+  auto s = SchemaFactory::create_or_get({kUInt, kText});
 
   Record r1(s);
   r1.set_uint(0, v1);
@@ -99,7 +99,7 @@ TEST(RecordTest, DataRepSizes) {
   uint64_t i = 42;
   std::string* s = new std::string("hello");
 
-  Schema sch({kUInt, kText});
+  auto sch = SchemaFactory::create_or_get({kUInt, kText});
 
   Record r(sch);
   r.set_uint(0, i);
@@ -107,6 +107,16 @@ TEST(RecordTest, DataRepSizes) {
 
   EXPECT_EQ(r.size_at(0), sizeof(uint64_t));
   EXPECT_EQ(r.size_at(1), s->size());
+}
+
+TEST(RecordTest, NegativeIntegers) {
+      auto schema = SchemaFactory::create_or_get({kInt, kInt});
+
+      Record r(schema);
+      r.set_int(0, -7);
+      r.set_int(1, -1000);
+      EXPECT_EQ(r.as_int(0), -7);
+      EXPECT_EQ(r.as_int(1), -1000);
 }
 
 }  // namespace dataflow

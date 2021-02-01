@@ -29,8 +29,8 @@ TEST(JoinOperatorTest, Basic) {
   df.AddNode(join_op, {leftSrc, rightSrc});
 
   // push data into
-  Schema s_left({DataType::kInt, DataType::kInt});
-  Schema s_right({DataType::kInt, DataType::kInt});
+  auto s_left = SchemaFactory::create_or_get({DataType::kInt, DataType::kInt});
+  auto s_right = SchemaFactory::create_or_get({DataType::kInt, DataType::kInt});
 
   vector<Record> r_left;
   vector<Record> r_right;
@@ -72,7 +72,7 @@ TEST(JoinOperatorTest, Basic) {
 
   // output schema of join is defined as concatenated left schema w. key column
   // dropped and right schema
-  Schema s_joined({DataType::kInt, DataType::kInt, DataType::kInt});
+  auto s_joined = SchemaFactory::create_or_get({DataType::kInt, DataType::kInt, DataType::kInt});
   vector<Record> ref;
   {
     Record r1(s_joined);
@@ -120,11 +120,12 @@ TEST(JoinOperatorTest, Basic) {
 
   // compare
   EXPECT_EQ(out_rs.size(), ref.size());
-    for(int i = 0; i < std::min(out_rs.size(), ref.size()); ++i) {
+    for(unsigned i = 0; i < std::min(out_rs.size(), ref.size()); ++i) {
       EXPECT_EQ(out_rs[i], ref[i]);
     }
 
   // TODO: fix schema memory errors...
+  // ==> global string pool???
   // --> i.e. schema should outlive everything...
 }
 

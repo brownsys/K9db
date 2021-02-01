@@ -9,6 +9,8 @@
 #include "dataflow/types.h"
 #include "shards/sqlast/ast.h"
 
+#include "absl/container/flat_hash_map.h"
+
 namespace dataflow {
 
 enum DataType {
@@ -20,14 +22,36 @@ enum DataType {
 
 DataType StringToDataType(const std::string &type_name);
 
+class Schema;
+class SchemaFactory;
+
+class SchemaFactory {
+public:
+    static const Schema& create_or_get(const std::vector<DataType>& column_types);
+    static const Schema& undefined_schema() { return create_or_get({}); }
+
+    static SchemaFactory& instance() {
+      static SchemaFactory the_one_and_only;
+      return the_one_and_only;
+    }
+
+    ~SchemaFactory();
+
+private:
+    absl::flat_hash_map<std::vector<DataType>, Schema*> schemas_;
+    SchemaFactory() {}
+};
+
 class Schema {
  public:
-  Schema() : num_inline_columns_(0), num_pointer_columns_(0) {}
 
+  explicit Schema() : num_inline_columns_(0), num_pointer_columns_(0) {}
   explicit Schema(std::vector<DataType> columns);
   explicit Schema(std::vector<DataType> columns,
                   std::vector<std::string> names);
   explicit Schema(const shards::sqlast::CreateTable &table_description);
+
+  friend class SchemaFactory;
 
   Schema(const Schema& other)
       : types_(other.types_),

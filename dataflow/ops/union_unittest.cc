@@ -22,7 +22,7 @@ TEST(UnionOperatorTest, Empty) {
 TEST(UnionOperatorTest, Basic) {
   std::shared_ptr<UnionOperator> union_op = std::make_shared<UnionOperator>();
 
-  Schema s({kUInt, kUInt});  // must outlive records
+  auto s = SchemaFactory::create_or_get({kUInt, kUInt});  // must outlive records
   {
     Record r1(s);
     r1.set_uint(0, 1ULL);
