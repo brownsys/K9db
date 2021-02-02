@@ -15,7 +15,7 @@ DataType StringToDataType(const std::string &type_name) {
 }
 
 Schema::Schema(std::vector<DataType> columns)
-    : Schema(columns, names_) {
+    : Schema(columns, std::vector<std::string>()) {
 }
 
 Schema::Schema(std::vector<DataType> columns, std::vector<std::string> names)
