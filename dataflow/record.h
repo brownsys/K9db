@@ -103,6 +103,12 @@ class Record {
 
   // copy assignment operator is used by std::sort
   Record& operator=(const Record& other) {
+    if(this == &other)
+      return *this;
+
+    delete [] data_.inline_data_;
+    delete [] data_.pointed_data_;
+
     data_ = RecordData(other.schema());
     schema_ = other.schema_;
     timestamp_ = other.timestamp_;
