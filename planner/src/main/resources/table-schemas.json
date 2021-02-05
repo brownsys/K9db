@@ -1,0 +1,13 @@
+[
+  {
+    "tableName" : "Orders",
+    "colNames" : ["id", "product", "units"],
+    "colTypes" : ["INTEGER", "VARCHAR", "INTEGER"],
+    "colSizes" : [-1, 10, -1]
+  }, {
+    "tableName" : "Products",
+    "colNames" : ["id", "name", "price"],
+    "colTypes" : ["INTEGER", "VARCHAR", "INTEGER"],
+    "colSizes" : [-1, 10, -1]
+  }
+]
