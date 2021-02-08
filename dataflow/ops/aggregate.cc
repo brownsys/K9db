@@ -30,20 +30,21 @@ bool AggregateOperator::process(std::vector<Record>& rs,
             LOG(FATAL)
                 << "State does not exist for corresponding negative record";
           }
-          if (!first_delta.contains(key)) {  // track first state change
+          if (!first_delta.contains(key)) {  // track first state change of key
             first_delta.emplace(key, StateChange(false, state_.at(key)));
           }
           state_.at(key).set_uint(0, state_.at(key).as_uint(0) - 1);
         } else {  // handle positive record
           if (!state_.contains(key)) {
             Record dummy_r(agg_schema_);
+            // track first state change of key
             first_delta.emplace(key, StateChange(true, dummy_r));
             // new Record
             Record agg_r(agg_schema_);
             agg_r.set_uint(0, 1ULL);
             state_.emplace(key, agg_r);
           } else {
-            if (!first_delta.contains(key)) {  // track first state change
+            if (!first_delta.contains(key)) {  // track first state change of key
               first_delta.emplace(key, StateChange(false, state_.at(key)));
             }
             state_.at(key).set_uint(0, state_.at(key).as_uint(0) + 1);
@@ -56,7 +57,7 @@ bool AggregateOperator::process(std::vector<Record>& rs,
             LOG(FATAL)
                 << "State does not exist for corresponding negative record";
           }
-          if (!first_delta.contains(key)) {  // track first state change
+          if (!first_delta.contains(key)) {  // track first state change of key
             first_delta.emplace(key, StateChange(false, state_.at(key)));
           }
           switch (agg_schema_.TypeOf(0)) {
@@ -74,6 +75,7 @@ bool AggregateOperator::process(std::vector<Record>& rs,
         } else {  // handle positive record
           if (!state_.contains(key)) {
             Record dummy_r(agg_schema_);
+            // track first state change of key
             first_delta.emplace(key, StateChange(true, dummy_r));
             // new Record
             Record agg_r(agg_schema_);
@@ -90,7 +92,7 @@ bool AggregateOperator::process(std::vector<Record>& rs,
             }
             state_.emplace(key, agg_r);
           } else {
-            if (!first_delta.contains(key)) {  // track first state change
+            if (!first_delta.contains(key)) {  // track first state change of key
               first_delta.emplace(key, StateChange(false, state_.at(key)));
             }
             switch (agg_schema_.TypeOf(0)) {
