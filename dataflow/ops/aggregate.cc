@@ -113,6 +113,35 @@ bool AggregateOperator::process(std::vector<Record>& rs,
 
   // emit records only for tracked changes
   for (auto const& item : first_delta) {
+    // avoid an edge case where a key is inserted via a positive record
+    // and whose effect is negated by the subsequent negative record(s)
+    // in the same batch
+    if (item.second.is_insert_) {
+      bool flag = false;
+      // in the following switch block, comparison of latest state update
+      // with 0 is semantically correct for both FuncSum and FuncCout
+      switch (agg_schema_.TypeOf(0)) {
+        case DataType::kUInt:
+          if (state_.at(item.first).as_uint(0) == 0) {
+            flag = true;
+          }
+          break;
+        case DataType::kInt:
+          if (state_.at(item.first).as_int(0) == 0) {
+            flag = true;
+          }
+          break;
+        default:
+          LOG(FATAL) << "Unexpected type when computing SUM aggregate";
+      }
+
+      if (flag) {
+        // don't emit any records since the negative records have cancelled
+        // out the effect of positive records within a single batch.
+        continue;
+      }
+    }
+
     Record pos_record = gen_out_record(item.first, state_.at(item.first), true);
     if (item.second.is_insert_) {
       out_rs.push_back(pos_record);

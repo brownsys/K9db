@@ -373,4 +373,132 @@ TEST(AggregateOperatorTest, CountPosNeg) {
   }
 }
 
+TEST(AggregateOperatorTest, SumPosNegSingleBatch) {
+  Schema s1({kUInt, kUInt, kUInt});
+  Schema s2({kUInt, kUInt});
+
+  std::vector<ColumnID> group_cols = {1};
+  AggregateOperator::Func agg_func = AggregateOperator::FuncSum;
+  ColumnID agg_col = 2;
+  std::vector<ColumnID> out_cols = group_cols;
+  out_cols.push_back(agg_col);
+
+  std::shared_ptr<AggregateOperator> aggregate_op =
+      std::make_shared<AggregateOperator>(group_cols, agg_func, agg_col, s1,
+                                          out_cols);
+
+  {
+    Record r1(s1);
+    r1.set_uint(0, 1ULL);
+    r1.set_uint(1, 2ULL);
+    r1.set_uint(2, 9ULL);
+    Record r2(s1);
+    r2.set_uint(0, 2ULL);
+    r2.set_uint(1, 2ULL);
+    r2.set_uint(2, 7ULL);
+    Record r3(s1);
+    r3.set_uint(0, 3ULL);
+    r3.set_uint(1, 5ULL);
+    r3.set_uint(2, 5ULL);
+    Record r4(s1);
+    r4.set_uint(0, 4ULL);
+    r4.set_uint(1, 5ULL);
+    r4.set_uint(2, 6ULL);
+    Record r5(s1);
+    r5.set_uint(0, 5ULL);
+    r5.set_uint(1, 7ULL);
+    r5.set_uint(2, 7ULL);
+    Record r6(s1, false);
+    r6.set_uint(0, 6ULL);
+    r6.set_uint(1, 7ULL);
+    r6.set_uint(2, 7ULL);
+
+    std::vector<Record> rs;
+    // feed records
+    rs.push_back(r1);
+    rs.push_back(r2);
+    rs.push_back(r3);
+    rs.push_back(r4);
+    rs.push_back(r5);
+    rs.push_back(r6);
+
+    std::vector<Record> proc_rs;
+    EXPECT_TRUE(aggregate_op->process(rs, proc_rs));
+
+    Record e1(s2);
+    e1.set_uint(0, 2ULL);
+    e1.set_uint(1, 16ULL);
+    Record e2(s2);
+    e2.set_uint(0, 5ULL);
+    e2.set_uint(1, 11ULL);
+    std::vector<Record> expected_rs = {e1, e2};
+
+    compareRecordStreams(proc_rs, expected_rs);
+  }
+}
+
+TEST(AggregateOperatorTest, CountPosNegSingleBatch) {
+  Schema s1({kUInt, kUInt, kUInt});
+  Schema s2({kUInt, kUInt});
+
+  std::vector<ColumnID> group_cols = {1};
+  AggregateOperator::Func agg_func = AggregateOperator::FuncCount;
+  ColumnID agg_col = 2;
+  std::vector<ColumnID> out_cols = group_cols;
+  out_cols.push_back(agg_col);
+
+  std::shared_ptr<AggregateOperator> aggregate_op =
+      std::make_shared<AggregateOperator>(group_cols, agg_func, agg_col, s1,
+                                          out_cols);
+
+  {
+    Record r1(s1);
+    r1.set_uint(0, 1ULL);
+    r1.set_uint(1, 2ULL);
+    r1.set_uint(2, 9ULL);
+    Record r2(s1);
+    r2.set_uint(0, 2ULL);
+    r2.set_uint(1, 2ULL);
+    r2.set_uint(2, 7ULL);
+    Record r3(s1);
+    r3.set_uint(0, 3ULL);
+    r3.set_uint(1, 5ULL);
+    r3.set_uint(2, 5ULL);
+    Record r4(s1);
+    r4.set_uint(0, 4ULL);
+    r4.set_uint(1, 5ULL);
+    r4.set_uint(2, 6ULL);
+    Record r5(s1);
+    r5.set_uint(0, 5ULL);
+    r5.set_uint(1, 7ULL);
+    r5.set_uint(2, 7ULL);
+    Record r6(s1, false);
+    r6.set_uint(0, 6ULL);
+    r6.set_uint(1, 7ULL);
+    r6.set_uint(2, 7ULL);
+
+    std::vector<Record> rs;
+    // feed records
+    rs.push_back(r1);
+    rs.push_back(r2);
+    rs.push_back(r3);
+    rs.push_back(r4);
+    rs.push_back(r5);
+    rs.push_back(r6);
+
+    std::vector<Record> proc_rs;
+    EXPECT_TRUE(aggregate_op->process(rs, proc_rs));
+
+    Record e1(s2);
+    e1.set_uint(0, 2ULL);
+    e1.set_uint(1, 2ULL);
+    Record e2(s2);
+    e2.set_uint(0, 5ULL);
+    e2.set_uint(1, 2ULL);
+    std::vector<Record> expected_rs = {e1, e2};
+
+    compareRecordStreams(proc_rs, expected_rs);
+  }
+}
+
 }  // namespace dataflow
