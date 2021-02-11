@@ -15,8 +15,8 @@ namespace dataflow {
 TEST(JoinOperatorTest, Basic) {
   using namespace std;
 
-  auto leftSrc = make_shared<InputOperator>();
-  auto rightSrc = make_shared<InputOperator>();
+  auto leftSrc = make_shared<InputOperator>("test-table1");
+  auto rightSrc = make_shared<InputOperator>("test-table2");
 
   DataFlowGraph df;
   df.AddInputNode(leftSrc);

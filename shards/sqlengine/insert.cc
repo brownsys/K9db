@@ -30,7 +30,7 @@ Rewrite(const sqlast::Insert &stmt, SharderState *state) {
                      records::insert::MakeRecords(stmt, state));
     for (auto input : state->InputsFor(table_name)) {
       std::vector<dataflow::Record> copy = records;
-      input->ProcessAndForward(copy);
+      input->ProcessAndForward(dataflow::UNDEFINED_NODE_INDEX, copy);
     }
   }
 

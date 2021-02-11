@@ -115,7 +115,7 @@ TEST(DataFlowGraphTest, SinglePathFilter) {
 
 TEST(DataFlowGraphTest, ParentChildren) {
   DataFlowGraph g;
-  auto in = std::make_shared<InputOperator>();
+  auto in = std::make_shared<InputOperator>("test-table");
   auto ident = std::make_shared<IdentityOperator>();
   g.AddInputNode(in);
   g.AddNode(ident, in);

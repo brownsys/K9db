@@ -55,13 +55,16 @@ class Schema {
 
   Schema(const Schema& other)
       : types_(other.types_),
+        names_(other.names_),
         key_columns_(other.key_columns_),
         num_inline_columns_(other.num_inline_columns_),
         num_pointer_columns_(other.num_pointer_columns_),
         true_indices_(other.true_indices_) {}
+
   Schema(Schema&& other) = default;
-  Schema& operator = (const Schema& other) {
+  Schema& operator=(const Schema& other) {
     types_ = other.types_;
+    names_ = other.names_;
     key_columns_ = other.key_columns_;
     num_inline_columns_ = other.num_inline_columns_;
     num_pointer_columns_ = other.num_pointer_columns_;
