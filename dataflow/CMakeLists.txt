@@ -1,5 +1,0 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.15 FATAL_ERROR)
-
-file(GLOB SOURCES *.cc)
-
-add_library(dataflow ${SOURCES})

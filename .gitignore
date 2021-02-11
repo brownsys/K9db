@@ -47,3 +47,5 @@ test3
 .idea/
 cmake-build-debug/
 .clwb
+
+**/CMakeLists.txt
