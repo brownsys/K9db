@@ -6,11 +6,15 @@
 #define PELTON_EQUIJOIN_H
 
 #include <vector>
+
+#include "absl/container/flat_hash_map.h"
+
+#include "dataflow/grouped_data.h"
+#include "dataflow/key.h"
 #include "dataflow/operator.h"
 #include "dataflow/record.h"
 
 namespace dataflow {
-
 class EquiJoin : public Operator {
  public:
   EquiJoin() = delete;
@@ -99,6 +103,15 @@ class EquiJoin : public Operator {
           r.set_string(pos++, str_copy);
           break;
         }
+        case kDatetime: {
+          throw std::runtime_error("unsupported yet in record...");
+          break;
+        }
+#ifndef NDEBUG
+        default:
+          throw std::runtime_error("fatal internal error in emitRow");
+#endif
+      }
 
     // @TODO: refactor this??
     for (unsigned i = 0; i < right_schema_->num_columns(); ++i) {
@@ -131,7 +144,8 @@ class EquiJoin : public Operator {
     // add result record to output
     out_rs.push_back(r);
   }
+};
 
 }  // namespace dataflow
 
-#endif //PELTON_EQUIJOIN_H
+#endif  // PELTON_EQUIJOIN_H

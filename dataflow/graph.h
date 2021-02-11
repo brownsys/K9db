@@ -17,7 +17,7 @@ class DataFlowGraph {
   DataFlowGraph();
 
   bool AddInputNode(std::shared_ptr<InputOperator> op);
-  bool AddNode(std:;shared_ptr<Operator> op, std::vector<std::shared_ptr<Operator>> parents);
+  bool AddNode(std::shared_ptr<Operator> op, std::vector<std::shared_ptr<Operator>> parents);
   inline bool AddNode(std::shared_ptr<Operator> op,
                std::shared_ptr<Operator> parent) {
       return AddNode(op, std::vector<std::shared_ptr<Operator>>{parent});

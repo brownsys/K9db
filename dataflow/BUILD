@@ -24,6 +24,7 @@ cc_library(
         "record_utils.h",
         "schema.h",
         "types.h",
+        "grouped_data.h",
         "ops/identity.h",
         "ops/input.h",
         "ops/matview.h",
