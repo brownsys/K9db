@@ -17,7 +17,7 @@ namespace dataflow {
 DataFlowGraph makeTrivialGraph() {
   DataFlowGraph g;
 
-  auto in = std::make_shared<InputOperator>();
+  auto in = std::make_shared<InputOperator>("test-table");
   auto ident = std::make_shared<IdentityOperator>();
 
   EXPECT_TRUE(g.AddInputNode(in));
@@ -32,7 +32,7 @@ DataFlowGraph makeTrivialGraph() {
 DataFlowGraph makeFilterGraph(const Schema& schema) {
   DataFlowGraph g;
 
-  auto in = std::make_shared<InputOperator>();
+  auto in = std::make_shared<InputOperator>("test-table");
 
   std::vector<ColumnID> cids = {0, 1};
   std::vector<FilterOperator::Ops> comp_ops = {

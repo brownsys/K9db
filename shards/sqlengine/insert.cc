@@ -3,8 +3,12 @@
 #include "shards/sqlengine/insert.h"
 
 #include <list>
+#include <vector>
 
+#include "dataflow/record.h"
+#include "shards/records/insert.h"
 #include "shards/sqlengine/util.h"
+#include "shards/util/status.h"
 
 namespace shards {
 namespace sqlengine {
@@ -18,6 +22,20 @@ Rewrite(const sqlast::Insert &stmt, SharderState *state) {
     throw "Table does not exist!";
   }
 
+  // Turn inserted values into a record and process it via corresponding flows.
+  // TODO(babman): this should only be executed after physical insert is
+  //               successfull.
+  if (state->HasInputsFor(table_name)) {
+    ASSIGN_OR_RETURN(std::vector<dataflow::Record> records,
+                     records::insert::MakeRecords(stmt, state));
+    for (auto input : state->InputsFor(table_name)) {
+      std::vector<dataflow::Record> copy = records;
+      input->ProcessAndForward(copy);
+    }
+  }
+
+  // Shard the insert statement so it is executable against the physical
+  // sharded database.
   sqlast::Stringifier stringifier;
   std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>> result;
 

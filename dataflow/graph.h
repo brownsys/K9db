@@ -22,8 +22,8 @@ class DataFlowGraph {
   bool AddEdge(std::shared_ptr<Operator> op1, std::shared_ptr<Operator> op2);
   bool Process(InputOperator& input, std::vector<Record> records);
 
-  std::vector<std::shared_ptr<InputOperator>> inputs();
-  std::vector<std::shared_ptr<MatViewOperator>> outputs();
+  std::vector<std::shared_ptr<InputOperator>> inputs() const;
+  std::vector<std::shared_ptr<MatViewOperator>> outputs() const;
 
  private:
   absl::node_hash_map<NodeIndex, std::shared_ptr<Operator>> nodes_;

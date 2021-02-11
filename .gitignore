@@ -39,3 +39,6 @@ bazel-testlogs
 
 # Output directiory for testing
 .out
+test
+test2
+test3

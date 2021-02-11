@@ -26,7 +26,7 @@ class Insert : public AbstractStatement {
   std::string &table_name();
 
   // Columns and Values.
-  bool HasColumns();
+  bool HasColumns() const;
   void AddColumn(const std::string &colname);
   const std::vector<std::string> &GetColumns() const;
   void SetValues(std::vector<std::string> &&values);

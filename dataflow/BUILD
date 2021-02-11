@@ -34,8 +34,10 @@ cc_library(
         "@absl//absl/base:core_headers",
         "@absl//absl/container:flat_hash_map",
         "@absl//absl/container:node_hash_map",
+        "@absl//absl/strings",
         "@glog//:glog",
         "@gtest//:gtest_prod",
+        "//shards/sqlast:ast",
     ],
 )
 

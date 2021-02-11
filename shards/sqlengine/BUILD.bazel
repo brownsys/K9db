@@ -26,7 +26,6 @@ cc_library(
     visibility = ["//shards:__subpackages__"],
 )
 
-
 cc_library(
     name = "create",
     srcs = [
@@ -36,6 +35,7 @@ cc_library(
         "create.h",
     ],
     deps = [
+        "//dataflow:dataflow",
         "//shards/sqlast:ast",
         "//shards/sqlexecutor:executor",
         "//shards/sqlengine:util",
@@ -54,10 +54,13 @@ cc_library(
         "insert.h",
     ],
     deps = [
+        "//dataflow:dataflow",
+        "//shards/records:insert",
         "//shards/sqlast:ast",
         "//shards/sqlexecutor:executor",
         "//shards/sqlengine:util",
         "//shards:state",
+        "//shards/util:status",
         "@absl//absl/status:statusor",
     ],
 )
@@ -88,6 +91,7 @@ cc_library(
         "delete.h",
     ],
     deps = [
+        "//shards/records:delete",
         "//shards/sqlast:ast",
         "//shards/sqlexecutor:executor",
         "//shards/sqlengine:util",
@@ -106,6 +110,7 @@ cc_library(
         "update.h",
     ],
     deps = [
+        "//shards/records:update",
         "//shards/sqlast:ast",
         "//shards/sqlexecutor:executor",
         "//shards/sqlengine:util",

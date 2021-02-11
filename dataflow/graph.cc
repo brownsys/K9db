@@ -41,7 +41,7 @@ bool DataFlowGraph::AddEdge(std::shared_ptr<Operator> parent,
   return res.second;
 }
 
-std::vector<std::shared_ptr<InputOperator>> DataFlowGraph::inputs() {
+std::vector<std::shared_ptr<InputOperator>> DataFlowGraph::inputs() const {
   std::vector<std::shared_ptr<InputOperator>> v;
 
   for (auto op : nodes_) {
@@ -53,7 +53,7 @@ std::vector<std::shared_ptr<InputOperator>> DataFlowGraph::inputs() {
   return v;
 }
 
-std::vector<std::shared_ptr<MatViewOperator>> DataFlowGraph::outputs() {
+std::vector<std::shared_ptr<MatViewOperator>> DataFlowGraph::outputs() const {
   std::vector<std::shared_ptr<MatViewOperator>> v;
 
   for (auto op : nodes_) {

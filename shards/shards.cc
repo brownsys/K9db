@@ -8,6 +8,10 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
+#include "dataflow/graph.h"
+#include "dataflow/ops/filter.h"
+#include "dataflow/ops/input.h"
+#include "dataflow/schema.h"
 #include "shards/sqlengine/engine.h"
 #include "shards/sqlengine/util.h"
 #include "shards/sqlexecutor/executor.h"
@@ -106,5 +110,8 @@ bool close(SharderState *state) {
   state->Save();
   return true;
 }
+
+// Materialized views.
+#include "shards/todo.inc"
 
 }  // namespace shards

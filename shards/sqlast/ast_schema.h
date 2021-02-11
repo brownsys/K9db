@@ -78,6 +78,8 @@ class ColumnDefinition {
   void RemoveConstraint(size_t index);
   void RemoveConstraint(ColumnConstraint::Type type);
 
+  bool HasConstraint(ColumnConstraint::Type type) const;
+
   // Visitor pattern.
   template <class T>
   T Visit(AbstractVisitor<T> *visitor) const {

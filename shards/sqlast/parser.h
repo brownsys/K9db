@@ -12,6 +12,8 @@
 #include "antlr4-runtime.h"
 // C++ generated code from ANTLR Sqlite grammar.
 #include "SQLiteLexer.h"
+#undef CHECK  // CHECK is defined by glog, but also used as a member name inside
+              // ANTLR generated classes within SQLiteParser...
 #include "SQLiteParser.h"
 #include "shards/sqlast/ast.h"
 

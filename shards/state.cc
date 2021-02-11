@@ -30,22 +30,26 @@ void SharderState::AddShardKind(const ShardKind &kind, const ColumnName &pk) {
 }
 
 void SharderState::AddUnshardedTable(const UnshardedTableName &table,
-                                     const CreateStatement &create_statement) {
-  this->schema_.insert({table, create_statement});
+                                     const CreateStatement &create_str,
+                                     const dataflow::Schema &schema) {
+  this->concrete_schema_.insert({table, create_str});
+  this->logical_schema_.insert({table, schema});
 }
 
 void SharderState::AddShardedTable(
     const UnshardedTableName &table,
     const ShardingInformation &sharding_information,
-    const CreateStatement &create_statement) {
+    const CreateStatement &sharded_create_statement,
+    const dataflow::Schema &schema) {
   // Record that the shard kind contains this sharded table.
   this->kind_to_tables_.at(sharding_information.shard_kind)
       .push_back(sharding_information.sharded_table_name);
   // Map the unsharded name to its sharding information.
   this->sharded_by_[table].push_back(sharding_information);
   // Store the sharded schema.
-  this->schema_.insert(
-      {sharding_information.sharded_table_name, create_statement});
+  this->concrete_schema_.insert(
+      {sharding_information.sharded_table_name, sharded_create_statement});
+  this->logical_schema_.insert({table, schema});
 }
 
 std::list<CreateStatement> SharderState::CreateShard(
@@ -55,7 +59,7 @@ std::list<CreateStatement> SharderState::CreateShard(
   // Return the create table statements.
   std::list<CreateStatement> result;
   for (const ShardedTableName &table : this->kind_to_tables_.at(shard_kind)) {
-    result.push_back(this->schema_.at(table));
+    result.push_back(this->concrete_schema_.at(table));
   }
   return result;
 }
@@ -67,7 +71,18 @@ void SharderState::RemoveUserFromShard(const ShardKind &kind,
 
 // Schema lookups.
 bool SharderState::Exists(const UnshardedTableName &table) const {
-  return this->schema_.count(table) > 0 || this->sharded_by_.count(table) > 0;
+  return this->concrete_schema_.count(table) > 0 ||
+         this->sharded_by_.count(table) > 0;
+}
+
+CreateStatement SharderState::ConcreteSchemaOf(
+    const ShardedTableName &table) const {
+  return this->concrete_schema_.at(table);
+}
+
+const dataflow::Schema &SharderState::LogicalSchemaOf(
+    const UnshardedTableName &table) const {
+  return this->logical_schema_.at(table);
 }
 
 bool SharderState::IsSharded(const UnshardedTableName &table) const {
@@ -100,6 +115,29 @@ const std::unordered_set<UserId> &SharderState::UsersOfShard(
 // SQL Executor.
 sqlexecutor::SQLExecutor *SharderState::SQLExecutor() {
   return &this->executor_;
+}
+
+// Flows.
+void SharderState::AddFlow(const FlowName &name,
+                           const dataflow::DataFlowGraph &flow) {
+  this->flows_.insert({name, flow});
+  for (auto input : flow.inputs()) {
+    this->inputs_[input->table_name()].push_back(input);
+  }
+}
+
+const dataflow::DataFlowGraph &SharderState::GetFlow(
+    const FlowName &name) const {
+  return this->flows_.at(name);
+}
+
+bool SharderState::HasInputsFor(const UnshardedTableName &table_name) const {
+  return this->inputs_.count(table_name) > 0;
+}
+
+const std::vector<std::shared_ptr<dataflow::InputOperator>>
+    &SharderState::InputsFor(const UnshardedTableName &table_name) const {
+  return this->inputs_.at(table_name);
 }
 
 }  // namespace shards

@@ -37,8 +37,8 @@ class ExecutableStatement {
 // Simple here means that:
 // 1. The logical statement is singular (does not consist of several statements)
 // 2. The statement is over a single shard (or the unsharded main DB).
-// 3. The statement has no (data) output: it is either a Create, Insert, or
-//    Delete.
+// 3. The statement has no (data) output: it is either a Create, Insert, Update,
+//    or Delete.
 class SimpleExecutableStatement : public ExecutableStatement {
  public:
   SimpleExecutableStatement(const std::string &shard_suffix,

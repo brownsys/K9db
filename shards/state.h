@@ -16,7 +16,12 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
+#include "dataflow/graph.h"
+#include "dataflow/ops/input.h"
+#include "dataflow/schema.h"
+#include "shards/sqlast/ast.h"
 #include "shards/sqlexecutor/executor.h"
 
 namespace shards {
@@ -54,6 +59,8 @@ using UserId = std::string;
 using ColumnName = std::string;
 
 using ColumnIndex = size_t;
+
+using FlowName = std::string;
 
 // Valid SQL CreateTable statement formatted and ready to use to create
 // some table.
@@ -97,11 +104,13 @@ class SharderState {
   void AddShardKind(const ShardKind &kind, const ColumnName &pk);
 
   void AddUnshardedTable(const UnshardedTableName &table,
-                         const CreateStatement &create_statement);
+                         const CreateStatement &create_str,
+                         const dataflow::Schema &schema);
 
   void AddShardedTable(const UnshardedTableName &table,
                        const ShardingInformation &sharding_information,
-                       const CreateStatement &create_statement);
+                       const CreateStatement &sharded_create_statement,
+                       const dataflow::Schema &schema);
 
   std::list<CreateStatement> CreateShard(const ShardKind &shard_kind,
                                          const UserId &user);
@@ -110,6 +119,11 @@ class SharderState {
 
   // Schema lookups.
   bool Exists(const UnshardedTableName &table) const;
+
+  CreateStatement ConcreteSchemaOf(const ShardedTableName &table) const;
+
+  const dataflow::Schema &LogicalSchemaOf(
+      const UnshardedTableName &table) const;
 
   bool IsSharded(const UnshardedTableName &table) const;
 
@@ -132,6 +146,16 @@ class SharderState {
 
   // Return the connection pool to use for executing statements.
   sqlexecutor::SQLExecutor *SQLExecutor();
+
+  // Add and manage flows.
+  void AddFlow(const FlowName &name, const dataflow::DataFlowGraph &flow);
+
+  const dataflow::DataFlowGraph &GetFlow(const FlowName &name) const;
+
+  bool HasInputsFor(const UnshardedTableName &table_name) const;
+
+  const std::vector<std::shared_ptr<dataflow::InputOperator>> &InputsFor(
+      const UnshardedTableName &table_name) const;
 
  private:
   // Directory in which all shards are stored.
@@ -164,12 +188,26 @@ class SharderState {
   // created for them.
   std::unordered_map<ShardKind, std::unordered_set<UserId>> shards_;
 
-  // Maps every table in the overall schema to its create table statement.
+  // Maps every table in the overall schema to its concrete schema.
   // This can be used to create that table in a new shard.
-  std::unordered_map<ShardedTableName, CreateStatement> schema_;
+  // The concrete schema matches what is stored physically in the DB after
+  // sharding and other transformations.
+  std::unordered_map<ShardedTableName, CreateStatement> concrete_schema_;
+
+  // Maps every table to its logical schema.
+  // The logical schema is the contract between client code and our DB.
+  // The stored schema may not matched the concrete/physical one due to sharding
+  // or other transformations.
+  std::unordered_map<UnshardedTableName, dataflow::Schema> logical_schema_;
 
   // Connection pool that manages the underlying sqlite3 databases.
   sqlexecutor::SQLExecutor executor_;
+
+  // Dataflow graphs and views.
+  std::unordered_map<FlowName, dataflow::DataFlowGraph> flows_;
+  std::unordered_map<UnshardedTableName,
+                     std::vector<std::shared_ptr<dataflow::InputOperator>>>
+      inputs_;
 };
 
 }  // namespace shards

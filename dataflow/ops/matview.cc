@@ -51,4 +51,12 @@ std::vector<Record> MatViewOperator::multi_lookup(
   return out;
 }
 
+std::vector<Record> MatViewOperator::contents() const {
+  std::vector<Record> out;
+  for (const auto &[_, r] : this->contents_) {
+    out.insert(out.end(), r.cbegin(), r.cend());
+  }
+  return out;
+}
+
 }  // namespace dataflow
