@@ -2,11 +2,11 @@
 
 #include "dataflow/graph.h"
 #include "dataflow/operator.h"
+#include "dataflow/ops/equijoin.h"
 #include "dataflow/ops/filter.h"
 #include "dataflow/ops/identity.h"
 #include "dataflow/ops/input.h"
 #include "dataflow/ops/matview.h"
-#include "dataflow/ops/equijoin.h"
 #include "dataflow/record.h"
 #include "gtest/gtest.h"
 

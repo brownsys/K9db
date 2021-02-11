@@ -51,7 +51,7 @@ cc_test(
         "graph_unittest.cc",
         "ops/filter_unittest.cc",
         "ops/union_unittest.cc",
-        "ops/ops_equijoin_unittest.cc",
+        "ops/equijoin_unittest.cc",
     ],
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [

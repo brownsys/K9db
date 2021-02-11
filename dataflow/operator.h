@@ -24,8 +24,8 @@ enum OperatorType {
 class Operator {
  public:
   Operator() : graph_(nullptr) {}
-  Operator(const Operator& other)=delete;
-  Operator& operator = (const Operator& other) = delete;
+  Operator(const Operator& other) = delete;
+  Operator& operator=(const Operator& other) = delete;
 
   virtual ~Operator() { graph_ = nullptr; }
 
@@ -75,7 +75,7 @@ class Operator {
   NodeIndex index_;
   std::vector<std::weak_ptr<Edge>> children_;
   std::vector<std::shared_ptr<Edge>> parents_;
-  DataFlowGraph* graph_; // to which graph the operator belongs to.
+  DataFlowGraph* graph_;  // to which graph the operator belongs to.
 };
 
 }  // namespace dataflow

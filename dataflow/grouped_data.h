@@ -51,10 +51,17 @@ class GroupedData {
     return true;
   }
 
+  inline std::vector<Record> contents() const {
+    std::vector<Record> out;
+    for (const auto &[_, r] : this->contents_) {
+      out.insert(out.end(), r.cbegin(), r.cend());
+    }
+    return out;
+  }
+
  private:
   absl::flat_hash_map<Key, std::vector<Record>> contents_;
 };
 }  // namespace dataflow
 
 #endif  // PELTON_GROUPED_DATA_H
-

@@ -15,48 +15,18 @@ bool MatViewOperator::process(std::vector<Record>& rs,
     CHECK(r.schema().key_columns() == key_cols_);
 
     std::pair<Key, bool> key = r.GetKey();
-    if (!contents_.contains(key.first)) {
-      // need to add key -> records entry as empty vector
-      std::vector<Record> v;
-      contents_.emplace(key.first, v);
-    }
-    std::vector<Record>& v = contents_[key.first];
-    if (r.positive()) {
-      v.push_back(r);
-    } else {
-      auto it = std::find(std::begin(v), std::end(v), r);
-      v.erase(it);
-    }
+    if (!contents_.insert(key.first, r)) return false;
   }
 
   return true;
 }
 
 std::vector<Record> MatViewOperator::lookup(const Key& key) const {
-  if (contents_.contains(key)) {
-    return contents_.at(key);
-  } else {
-    return std::vector<Record>();
-  }
-}
-
-std::vector<Record> MatViewOperator::multi_lookup(
-    const std::vector<Key>& keys) {
-  std::vector<Record> out;
-  for (Key key : keys) {
-    if (contents_.contains(key)) {
-      // out.push_back(contents_.at(key));
-    }
-  }
-  return out;
+  return contents_.group(key);
 }
 
 std::vector<Record> MatViewOperator::contents() const {
-  std::vector<Record> out;
-  for (const auto &[_, r] : this->contents_) {
-    out.insert(out.end(), r.cbegin(), r.cend());
-  }
-  return out;
+  return contents_.contents();
 }
 
 }  // namespace dataflow
