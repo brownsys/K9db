@@ -14,5 +14,6 @@ cc_library(
         "//pelton/dataflow",
         "//pelton/shards/sqlexecutor:executor",
         "//pelton/sqlast:ast",
+        "//pelton/util:fs",
     ],
 )

@@ -35,7 +35,6 @@ cc_library(
         "create.h",
     ],
     deps = [
-        "//pelton/dataflow",
         "//pelton/shards:state",
         "//pelton/shards/sqlengine:util",
         "//pelton/shards/sqlexecutor:executor",
@@ -54,7 +53,6 @@ cc_library(
         "insert.h",
     ],
     deps = [
-        "//pelton/dataflow",
         "//pelton/shards:state",
         "//pelton/shards/records:insert",
         "//pelton/shards/sqlengine:util",

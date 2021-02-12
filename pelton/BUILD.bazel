@@ -12,6 +12,7 @@ cc_library(
     visibility = ["//:__subpackages__"],
     deps = [
         "//pelton/dataflow",
+        "//pelton/dataflow:state",
         "//pelton/shards:state",
         "//pelton/shards/sqlengine:engine",
         "//pelton/shards/sqlengine:util",

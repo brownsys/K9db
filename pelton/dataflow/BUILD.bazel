@@ -1,6 +1,21 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 cc_library(
+    name = "state",
+    srcs = [
+        "state.cc",
+    ],
+    hdrs = [
+        "state.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow",
+        "//pelton/util:fs",
+    ],
+)
+
+cc_library(
     name = "dataflow",
     srcs = [
         "edge.cc",
@@ -32,7 +47,7 @@ cc_library(
         "schema.h",
         "types.h",
     ],
-    visibility = ["//visibility:public"],
+    visibility = ["//pelton:__subpackages__"],
     deps = [
         "//pelton/sqlast:ast",
         "@absl//absl/base:core_headers",

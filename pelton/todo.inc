@@ -1,7 +1,7 @@
 // These should be eventually replaced with something that is generic
 // using calcite or similar.
 
-void make_view(shards::SharderState *state, const std::string &name,
+void make_view(Connection *connection, const std::string &name,
                const std::string &query) {
   // Hardcoded schema for a submissions table from a simple-websubmit example.
   //   CREATE TABLE submissions (
@@ -15,7 +15,7 @@ void make_view(shards::SharderState *state, const std::string &name,
 
   // TODO(babman): schema should be deduced from CREATE TABLE statement of
   // target(s) of query.
-  const dataflow::Schema &schema = state->LogicalSchemaOf("submissions");
+  dataflow::Schema schema{};  // = connection->LogicalSchemaOf("submissions");
 
   // TODO(babman): flow should be generated from parsing query and planning it
   // with calcite.
@@ -49,11 +49,12 @@ void make_view(shards::SharderState *state, const std::string &name,
       filter);
 
   // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
-  state->AddFlow(name, graph);
+  connection->GetDataflowState()->AddFlow(name, graph);
 }
 
-void print_view(shards::SharderState *state, const std::string &name) {
-  const dataflow::DataFlowGraph &flow = state->GetFlow(name);
+void print_view(Connection *connection, const std::string &name) {
+  const dataflow::DataFlowGraph &flow =
+      connection->GetDataflowState()->GetFlow(name);
   for (auto output : flow.outputs()) {
     std::cout << name << " Matview:------------" << std::endl;
     for (const auto &record : output->contents()) {

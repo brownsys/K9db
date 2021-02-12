@@ -16,7 +16,7 @@ namespace insert {
 absl::StatusOr<std::vector<dataflow::Record>> MakeRecords(
     const sqlast::Insert &stmt, SharderState *state) {
   // Get schema of target table.
-  const dataflow::Schema &schema = state->LogicalSchemaOf(stmt.table_name());
+  dataflow::Schema schema{};  // = state->LogicalSchemaOf(stmt.table_name());
 
   // Build records.
   std::vector<dataflow::Record> output;

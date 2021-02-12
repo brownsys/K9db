@@ -91,15 +91,15 @@ int main(int argc, char **argv) {
   std::string dir(argv[1]);
 
   // Open connection to sharder.
-  pelton::shards::SharderState state;
-  pelton::open(dir, &state);
-  pelton::exec(&state, "SET echo;", &Callback, nullptr, nullptr);
+  pelton::Connection connection;
+  pelton::open(dir, &connection);
+  pelton::exec(&connection, "SET echo;", &Callback, nullptr, nullptr);
 
   // Create all the tables.
   std::cout << "Create the tables ... " << std::endl;
   for (std::string &create : CREATES) {
     std::cout << std::endl;
-    pelton::exec(&state, create, &Callback, nullptr, nullptr);
+    pelton::exec(&connection, create, &Callback, nullptr, nullptr);
   }
   std::cout << std::endl;
 
@@ -107,7 +107,7 @@ int main(int argc, char **argv) {
   std::cout << "Installing flows ... " << std::endl;
   for (const auto &[name, query] : FLOWS) {
     std::cout << std::endl;
-    pelton::make_view(&state, name, query);
+    pelton::make_view(&connection, name, query);
   }
   std::cout << std::endl;
 
@@ -115,7 +115,7 @@ int main(int argc, char **argv) {
   std::cout << "Insert data into tables ... " << std::endl;
   for (std::string &insert : INSERTS) {
     std::cout << std::endl;
-    pelton::exec(&state, insert, &Callback, nullptr, nullptr);
+    pelton::exec(&connection, insert, &Callback, nullptr, nullptr);
   }
   std::cout << std::endl;
 
@@ -124,8 +124,8 @@ int main(int argc, char **argv) {
   for (std::string &select : QUERIES) {
     std::cout << std::endl;
     bool context = true;
-    pelton::exec(&state, select, &Callback, reinterpret_cast<void *>(&context),
-                 nullptr);
+    pelton::exec(&connection, select, &Callback,
+                 reinterpret_cast<void *>(&context), nullptr);
   }
   std::cout << std::endl;
 
@@ -133,12 +133,12 @@ int main(int argc, char **argv) {
   std::cout << "Read flows ... " << std::endl;
   for (const auto &[name, _] : FLOWS) {
     std::cout << std::endl;
-    pelton::print_view(&state, name);
+    pelton::print_view(&connection, name);
   }
   std::cout << std::endl;
 
   // Close connection.
-  pelton::close(&state);
+  pelton::close(&connection);
   std::cout << "exit" << std::endl;
   return 0;
 }

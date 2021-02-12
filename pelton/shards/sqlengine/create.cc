@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "absl/strings/match.h"
-#include "pelton/dataflow/schema.h"
 #include "pelton/shards/sqlengine/util.h"
 
 namespace pelton {
@@ -230,7 +229,6 @@ Rewrite(const sqlast::CreateTable &stmt, SharderState *state) {
     throw "Table already exists!";
   }
 
-  dataflow::Schema schema(stmt);
   // Determine if this table is special: maybe it has PII fields, or maybe it
   // is linked to an existing shard via a foreign key.
   bool has_pii = HasPII(stmt);
@@ -249,7 +247,7 @@ Rewrite(const sqlast::CreateTable &stmt, SharderState *state) {
     std::string pk = GetPK(stmt);
     std::string create_table_str = stmt.Visit(&stringifier);
     state->AddShardKind(table_name, pk);
-    state->AddUnshardedTable(table_name, create_table_str, schema);
+    state->AddUnshardedTable(table_name, create_table_str);
     result.push_back(std::make_unique<sqlexecutor::SimpleExecutableStatement>(
         DEFAULT_SHARD_NAME, create_table_str));
   }
@@ -267,7 +265,7 @@ Rewrite(const sqlast::CreateTable &stmt, SharderState *state) {
           UpdateTableSchema(stmt, fk_shards, info.sharded_table_name);
       std::string create_table_str = sharded_stmt.Visit(&stringifier);
       // Add the sharding information to state.
-      state->AddShardedTable(table_name, info, create_table_str, schema);
+      state->AddShardedTable(table_name, info, create_table_str);
     }
   }
 
@@ -275,7 +273,7 @@ Rewrite(const sqlast::CreateTable &stmt, SharderState *state) {
   // The table does not belong to a shard and needs no further modification!
   if (!has_pii && sharding_information.size() == 0) {
     std::string create_table_str = stmt.Visit(&stringifier);
-    state->AddUnshardedTable(table_name, create_table_str, schema);
+    state->AddUnshardedTable(table_name, create_table_str);
     result.push_back(std::make_unique<sqlexecutor::SimpleExecutableStatement>(
         DEFAULT_SHARD_NAME, create_table_str));
   }

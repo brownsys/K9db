@@ -5,7 +5,6 @@
 #include <list>
 #include <vector>
 
-#include "pelton/dataflow/record.h"
 #include "pelton/shards/records/insert.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/status.h"
@@ -26,6 +25,8 @@ Rewrite(const sqlast::Insert &stmt, SharderState *state) {
   // Turn inserted values into a record and process it via corresponding flows.
   // TODO(babman): this should only be executed after physical insert is
   //               successfull.
+  // TODO(babman): Update this to the new design.
+  /*
   if (state->HasInputsFor(table_name)) {
     ASSIGN_OR_RETURN(std::vector<dataflow::Record> records,
                      records::insert::MakeRecords(stmt, state));
@@ -34,6 +35,7 @@ Rewrite(const sqlast::Insert &stmt, SharderState *state) {
       input->ProcessAndForward(dataflow::UNDEFINED_NODE_INDEX, copy);
     }
   }
+  */
 
   // Shard the insert statement so it is executable against the physical
   // sharded database.

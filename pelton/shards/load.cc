@@ -3,39 +3,31 @@
 
 // TODO(babman): save and load state from default DB instead of file.
 
-#include <sys/stat.h>
-
 #include <fstream>
 #include <string>
 #include <vector>
 
 #include "pelton/shards/state.h"
+#include "pelton/util/fs.h"
+
+#define STATE_FILE_NAME ".shards.state"
 
 namespace pelton {
 namespace shards {
-
-#define STATE_FILE_NAME ".state.txt";
-
-namespace {
-
-bool FileExists(const std::string &file) {
-  struct stat buffer;
-  return stat(file.c_str(), &buffer) == 0;
-}
-
-}  // namespace
 
 void SharderState::Load() {
   // State file does not exists: this is a fresh database that was not
   // created previously!
   std::string state_file_path = this->dir_path_ + STATE_FILE_NAME;
-  if (!FileExists(state_file_path)) {
+  if (!util::FileExists(state_file_path)) {
     return;
   }
 
-  // Read content of state file and fill them into state!
+  // Open file for reading.
   std::ifstream state_file;
-  state_file.open(state_file_path, std::ios::in);
+  util::OpenRead(&state_file, state_file_path);
+
+  // Read content of state file and fill them into state!
   std::string line;
   getline(state_file, line);
 
@@ -92,49 +84,12 @@ void SharderState::Load() {
     getline(state_file, line);
   }
 
-  // Read concrete_schema_.
+  // Read sharded_schema_.
   getline(state_file, line);
   while (line != "") {
     std::string create_statement;
     getline(state_file, create_statement);
-    this->concrete_schema_.insert({line, create_statement});
-    getline(state_file, line);
-  }
-
-  // Read logical_schema_.
-  getline(state_file, line);
-  while (line != "") {
-    std::vector<std::string> names;
-    std::vector<dataflow::DataType> types;
-    std::string colname;
-    std::underlying_type_t<dataflow::DataType> coltype;
-    // Read the column names and types in schema.
-    getline(state_file, colname);
-    while (colname != "") {
-      state_file >> coltype;
-      names.push_back(colname);
-      types.push_back(static_cast<dataflow::DataType>(coltype));
-      getline(state_file, colname);
-      getline(state_file, colname);
-    }
-    // Read the key column ids.
-    std::vector<dataflow::ColumnID> keys;
-    dataflow::ColumnID key;
-    size_t keys_size;
-    state_file >> keys_size;
-    for (size_t i = 0; i < keys_size; i++) {
-      state_file >> key;
-      keys.push_back(key);
-    }
-
-    // Construct schema in place.
-    this->logical_schema_.emplace(std::piecewise_construct,
-                                  std::forward_as_tuple(line),
-                                  std::forward_as_tuple(types, names));
-    this->logical_schema_.at(line).set_key_columns(keys);
-
-    // Next table.
-    getline(state_file, line);
+    this->sharded_schema_.insert({line, create_statement});
     getline(state_file, line);
   }
 
@@ -144,9 +99,8 @@ void SharderState::Load() {
 
 void SharderState::Save() {
   // Open state file for writing.
-  std::string state_file_path = this->dir_path_ + STATE_FILE_NAME;
   std::ofstream state_file;
-  state_file.open(state_file_path, std::ios::out | std::ios::trunc);
+  util::OpenWrite(&state_file, this->dir_path_ + STATE_FILE_NAME);
 
   // Begin writing.
   for (const auto &[kind, pk] : this->kinds_) {
@@ -184,24 +138,8 @@ void SharderState::Save() {
   }
   state_file << "\n";
 
-  for (const auto &[table_name, create_statement] : this->concrete_schema_) {
+  for (const auto &[table_name, create_statement] : this->sharded_schema_) {
     state_file << table_name << "\n" << create_statement << "\n";
-  }
-  state_file << "\n";
-
-  for (const auto &[table_name, schema] : this->logical_schema_) {
-    state_file << table_name << "\n";
-    for (size_t i = 0; i < schema.num_columns(); i++) {
-      auto type = static_cast<std::underlying_type_t<dataflow::DataType>>(
-          schema.TypeOf(i));
-      state_file << schema.NameOf(i) << "\n" << type << "\n";
-    }
-    state_file << "\n";
-    state_file << schema.key_columns().size() << " ";
-    for (auto key_id : schema.key_columns()) {
-      state_file << key_id << " ";
-    }
-    state_file << "\n";
   }
   state_file << "\n";
 

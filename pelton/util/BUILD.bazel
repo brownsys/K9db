@@ -9,3 +9,15 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [],
 )
+
+cc_library(
+    name = "fs",
+    srcs = [
+        "fs.cc",
+    ],
+    hdrs = [
+        "fs.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [],
+)
