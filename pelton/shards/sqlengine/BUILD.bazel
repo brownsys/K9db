@@ -1,0 +1,135 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "engine",
+    srcs = [
+        "engine.cc",
+    ],
+    hdrs = [
+        "engine.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":create",
+        ":delete",
+        ":insert",
+        ":select",
+        ":update",
+        "//pelton/shards:state",
+        "//pelton/shards/sqlexecutor:executor",
+        "//pelton/sqlast:ast",
+        "//pelton/sqlast:parser",
+        "//pelton/util:status",
+        "@absl//absl/status:statusor",
+        "@antlr4_runtimes//:cpp",
+        "@grammars-v4//:sqlparser",
+    ],
+)
+
+cc_library(
+    name = "create",
+    srcs = [
+        "create.cc",
+    ],
+    hdrs = [
+        "create.h",
+    ],
+    deps = [
+        "//pelton/dataflow",
+        "//pelton/shards:state",
+        "//pelton/shards/sqlengine:util",
+        "//pelton/shards/sqlexecutor:executor",
+        "//pelton/sqlast:ast",
+        "@absl//absl/status:statusor",
+        "@absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "insert",
+    srcs = [
+        "insert.cc",
+    ],
+    hdrs = [
+        "insert.h",
+    ],
+    deps = [
+        "//pelton/dataflow",
+        "//pelton/shards:state",
+        "//pelton/shards/records:insert",
+        "//pelton/shards/sqlengine:util",
+        "//pelton/shards/sqlexecutor:executor",
+        "//pelton/sqlast:ast",
+        "//pelton/util:status",
+        "@absl//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "select",
+    srcs = [
+        "select.cc",
+    ],
+    hdrs = [
+        "select.h",
+    ],
+    deps = [
+        "//pelton/shards:state",
+        "//pelton/shards/sqlengine:util",
+        "//pelton/shards/sqlexecutor:executor",
+        "//pelton/sqlast:ast",
+        "@absl//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "delete",
+    srcs = [
+        "delete.cc",
+    ],
+    hdrs = [
+        "delete.h",
+    ],
+    deps = [
+        "//pelton/shards:state",
+        "//pelton/shards/records:delete",
+        "//pelton/shards/sqlengine:util",
+        "//pelton/shards/sqlexecutor:executor",
+        "//pelton/sqlast:ast",
+        "@absl//absl/status:statusor",
+        "@absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "update",
+    srcs = [
+        "update.cc",
+    ],
+    hdrs = [
+        "update.h",
+    ],
+    deps = [
+        "//pelton/shards:state",
+        "//pelton/shards/records:update",
+        "//pelton/shards/sqlengine:util",
+        "//pelton/shards/sqlexecutor:executor",
+        "//pelton/sqlast:ast",
+        "@absl//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "util",
+    srcs = [
+        "util.cc",
+    ],
+    hdrs = [
+        "util.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/shards:state",
+        "@absl//absl/strings",
+    ],
+)

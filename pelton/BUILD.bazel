@@ -1,0 +1,21 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "pelton",
+    srcs = [
+        "pelton.cc",
+        "todo.inc",
+    ],
+    hdrs = [
+        "pelton.h",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//pelton/dataflow",
+        "//pelton/shards:state",
+        "//pelton/shards/sqlengine:engine",
+        "//pelton/shards/sqlengine:util",
+        "//pelton/shards/sqlexecutor:executor",
+        "@absl//absl/strings",
+    ],
+)
