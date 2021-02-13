@@ -6,6 +6,8 @@
 #include <utility>
 #include <vector>
 
+#include "absl/strings/match.h"
+
 namespace pelton {
 namespace sqlast {
 
@@ -28,14 +30,39 @@ std::string &ColumnConstraint::foreign_column() {
 }
 
 // ColumnDefinition
+ColumnDefinition::Type ColumnDefinition::StringToType(
+    const std::string &column_type) {
+  if (absl::EqualsIgnoreCase(column_type, "int")) {
+    return Type::INT;
+  } else if (absl::StartsWithIgnoreCase(column_type, "varchar") ||
+             absl::EqualsIgnoreCase(column_type, "string")) {
+    return Type::TEXT;
+  } else {
+    throw "Unsupported datatype!";
+  }
+}
+
+std::string ColumnDefinition::TypeToString(ColumnDefinition::Type type) {
+  switch (type) {
+    case Type::INT:
+      return "int";
+    case Type::TEXT:
+      return "varchar";
+    default:
+      throw "Unsupported datatype!";
+  }
+}
+
 const std::string &ColumnDefinition::column_name() const {
   return this->column_name_;
 }
 std::string &ColumnDefinition::column_name() { return this->column_name_; }
-const std::string &ColumnDefinition::column_type() const {
+ColumnDefinition::Type ColumnDefinition::column_type() const {
   return this->column_type_;
 }
-std::string &ColumnDefinition::column_type() { return this->column_type_; }
+ColumnDefinition::Type &ColumnDefinition::column_type() {
+  return this->column_type_;
+}
 
 void ColumnDefinition::AddConstraint(const ColumnConstraint &constraint) {
   this->constraints_.push_back(constraint);

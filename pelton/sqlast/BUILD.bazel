@@ -17,6 +17,9 @@ cc_library(
         "ast_visitors.h",
     ],
     visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "@absl//absl/strings",
+    ],
 )
 
 cc_library(

@@ -16,7 +16,7 @@ namespace sqlast {
 class ColumnConstraint {
  public:
   // Supported constraint types.
-  enum Type { PRIMARY_KEY, UNIQUE, NOT_NULL, FOREIGN_KEY };
+  enum class Type { PRIMARY_KEY, UNIQUE, NOT_NULL, FOREIGN_KEY };
 
   // Constructor.
   explicit ColumnConstraint(Type type) : type_(type) {}
@@ -56,15 +56,26 @@ class ColumnConstraint {
 
 class ColumnDefinition {
  public:
+  // Supported column types.
+  enum class Type { UINT, INT, TEXT, DATETIME };
+
+  // Transform type name to type enum.
+  static Type StringToType(const std::string &column_type);
+  static std::string TypeToString(Type type);
+
+  // Constructors.
   ColumnDefinition(const std::string &column_name,
                    const std::string &column_type)
+      : ColumnDefinition(column_name, StringToType(column_type)) {}
+
+  ColumnDefinition(const std::string &column_name, Type column_type)
       : column_name_(column_name), column_type_(column_type) {}
 
   // Accessors.
   const std::string &column_name() const;
   std::string &column_name();
-  const std::string &column_type() const;
-  std::string &column_type();
+  Type column_type() const;
+  Type &column_type();
 
   // Constraint manipulations.
   void AddConstraint(const ColumnConstraint &constraint);
@@ -109,7 +120,7 @@ class ColumnDefinition {
 
  private:
   std::string column_name_;
-  std::string column_type_;
+  Type column_type_;
   std::vector<ColumnConstraint> constraints_;
 };
 

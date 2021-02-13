@@ -128,13 +128,13 @@ antlrcpp::Any AstTransformer::visitColumn_constraint(
   }
 
   if (ctx->PRIMARY() != nullptr) {
-    return ColumnConstraint(ColumnConstraint::PRIMARY_KEY);
+    return ColumnConstraint(ColumnConstraint::Type::PRIMARY_KEY);
   }
   if (ctx->NOT() != nullptr) {
-    return ColumnConstraint(ColumnConstraint::NOT_NULL);
+    return ColumnConstraint(ColumnConstraint::Type::NOT_NULL);
   }
   if (ctx->UNIQUE() != nullptr) {
-    return ColumnConstraint(ColumnConstraint::UNIQUE);
+    return ColumnConstraint(ColumnConstraint::Type::UNIQUE);
   }
   return ctx->foreign_key_clause()->accept(this);
 }
@@ -150,13 +150,14 @@ antlrcpp::Any AstTransformer::visitTable_constraint(
   if (ctx->PRIMARY() != nullptr) {
     CAST_OR_RETURN(std::string col_name, ctx->indexed_column(0)->accept(this),
                    std::string);
-    return std::make_pair(col_name,
-                          ColumnConstraint(ColumnConstraint::PRIMARY_KEY));
+    return std::make_pair(
+        col_name, ColumnConstraint(ColumnConstraint::Type::PRIMARY_KEY));
   }
   if (ctx->UNIQUE() != nullptr) {
     CAST_OR_RETURN(std::string col_name, ctx->indexed_column(0)->accept(this),
                    std::string);
-    return std::make_pair(col_name, ColumnConstraint(ColumnConstraint::UNIQUE));
+    return std::make_pair(col_name,
+                          ColumnConstraint(ColumnConstraint::Type::UNIQUE));
   }
   // Can only be a foreign key.
   CAST_OR_RETURN(std::string col_name, ctx->column_name(0)->accept(this),
@@ -242,7 +243,7 @@ antlrcpp::Any AstTransformer::visitUpdate_stmt(
                    std::string);
     MCAST_OR_RETURN(std::unique_ptr<Expression> value_expr,
                     ctx->expr(i)->accept(this), std::unique_ptr<Expression>);
-    if (value_expr->type() != Expression::LITERAL) {
+    if (value_expr->type() != Expression::Type::LITERAL) {
       return absl::InvalidArgumentError("Update value must be a literal");
     }
     update->AddColumnValue(
@@ -253,7 +254,8 @@ antlrcpp::Any AstTransformer::visitUpdate_stmt(
     MCAST_OR_RETURN(std::unique_ptr<Expression> expr,
                     ctx->expr(ctx->column_name().size())->accept(this),
                     std::unique_ptr<Expression>);
-    if (expr->type() != Expression::EQ && expr->type() != Expression::AND) {
+    if (expr->type() != Expression::Type::EQ &&
+        expr->type() != Expression::Type::AND) {
       return absl::InvalidArgumentError("Where clause must be boolean");
     }
     std::unique_ptr<BinaryExpression> bexpr(
@@ -297,7 +299,8 @@ antlrcpp::Any AstTransformer::visitSelect_core(
   if (ctx->WHERE() != nullptr) {
     MCAST_OR_RETURN(std::unique_ptr<Expression> expr,
                     ctx->expr(0)->accept(this), std::unique_ptr<Expression>);
-    if (expr->type() != Expression::EQ && expr->type() != Expression::AND) {
+    if (expr->type() != Expression::Type::EQ &&
+        expr->type() != Expression::Type::AND) {
       return absl::InvalidArgumentError("Where clause must be boolean");
     }
 
@@ -339,7 +342,8 @@ antlrcpp::Any AstTransformer::visitDelete_stmt(
   if (ctx->WHERE() != nullptr) {
     MCAST_OR_RETURN(std::unique_ptr<Expression> expr, ctx->expr()->accept(this),
                     std::unique_ptr<Expression>);
-    if (expr->type() != Expression::EQ && expr->type() != Expression::AND) {
+    if (expr->type() != Expression::Type::EQ &&
+        expr->type() != Expression::Type::AND) {
       return absl::InvalidArgumentError("Where clause must be boolean");
     }
 
@@ -385,10 +389,10 @@ antlrcpp::Any AstTransformer::visitExpr(
 
   std::unique_ptr<BinaryExpression> result;
   if (ctx->ASSIGN() != nullptr) {
-    result = std::make_unique<BinaryExpression>(Expression::EQ);
+    result = std::make_unique<BinaryExpression>(Expression::Type::EQ);
   }
   if (ctx->AND() != nullptr) {
-    result = std::make_unique<BinaryExpression>(Expression::AND);
+    result = std::make_unique<BinaryExpression>(Expression::Type::AND);
   }
 
   MCAST_OR_RETURN(std::unique_ptr<Expression> expr0, ctx->expr(0)->accept(this),

@@ -25,7 +25,8 @@ std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
   return result;
 }
 std::string Stringifier::VisitColumnDefinition(const ColumnDefinition &ast) {
-  std::string result = ast.column_name() + " " + ast.column_type();
+  std::string result = ast.column_name() + " " +
+                       ColumnDefinition::TypeToString(ast.column_type());
   for (const std::string &col : ast.VisitChildren(this)) {
     result += " " + col;
   }
