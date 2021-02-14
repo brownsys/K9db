@@ -16,35 +16,94 @@ cc_library(
 )
 
 cc_library(
+    name = "schema",
+    srcs = [
+        "schema.cc",
+    ],
+    hdrs = [
+        "schema.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/sqlast:ast",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "key",
+    srcs = [
+        "key.cc",
+    ],
+    hdrs = [
+        "key.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+      "//pelton/sqlast:ast",
+      "@glog",
+    ],
+)
+
+cc_library(
+    name = "record",
+    srcs = [
+        "record.cc",
+    ],
+    hdrs = [
+        "record.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":schema",
+        ":key",
+        "//pelton/sqlast:ast",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "record-test",
+    srcs = [
+        "record_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":schema",
+        ":record",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
+
+'''
+cc_library(
+    name = "abstract_operator",
+    srcs = [
+        "abstract_operator.cc",
+    ],
+    hdrs = [
+        "abstract_operator.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":record",
+        ":schema",
+    ],
+)
+
+cc_library(
     name = "dataflow",
     srcs = [
         "edge.cc",
         "graph.cc",
-        "operator.cc",
-        "ops/equijoin.cc",
-        "ops/filter.cc",
-        "ops/identity.cc",
-        "ops/input.cc",
-        "ops/matview.cc",
-        "ops/union.cc",
-        "record.cc",
-        "schema.cc",
     ],
     hdrs = [
         "edge.h",
         "graph.h",
-        "grouped_data.h",
         "key.h",
-        "operator.h",
-        "ops/equijoin.h",
-        "ops/filter.h",
-        "ops/identity.h",
-        "ops/input.h",
-        "ops/matview.h",
-        "ops/union.h",
-        "record.h",
-        "record_utils.h",
-        "schema.h",
         "types.h",
     ],
     visibility = ["//pelton:__subpackages__"],
@@ -63,9 +122,6 @@ cc_test(
     name = "dataflow-tests",
     srcs = [
         "graph_unittest.cc",
-        "ops/equijoin_unittest.cc",
-        "ops/filter_unittest.cc",
-        "ops/union_unittest.cc",
         "record_unittest.cc",
     ],
     copts = ["-Iexternal/gtest/googletest/include"],
@@ -76,3 +132,4 @@ cc_test(
         "@gtest//:gtest_main",
     ],
 )
+'''

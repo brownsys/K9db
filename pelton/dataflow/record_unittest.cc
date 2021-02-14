@@ -2,123 +2,228 @@
 
 #include <cstdint>
 #include <string>
+#include <memory>
+#include <vector>
+#include <utility>
 
+#include <iostream>
+
+#include "pelton/dataflow/key.h"
+#include "pelton/dataflow/schema.h"
+#include "pelton/sqlast/ast.h"
 #include "gtest/gtest.h"
 
 namespace pelton {
 namespace dataflow {
 
-TEST(RecordDataTest, Size) {
-  // should be 16 bytes
-  EXPECT_EQ(sizeof(RecordData), 16);
-}
+using CType = sqlast::ColumnDefinition::Type;
 
 TEST(RecordTest, Size) {
-  // should be 32 bytes
-  EXPECT_EQ(sizeof(Record), 32);
+  // should be 24 bytes.
+  EXPECT_EQ(sizeof(Record), 24);
 }
 
 // Tests internal storage format via raw void* APIs
-TEST(RecordTest, DataRepRaw) {
-  uint64_t v = 42;
-  std::string* p = new std::string("hello");
-
-  std::vector<DataType> st = {kUInt, kText, kInt};
-  auto s = SchemaFactory::create_or_get(st);
-  Record r(s);
-  *static_cast<uint64_t*>(r[0]) = v;
-  std::string** sp = static_cast<std::string**>(r[1]);
-  *sp = p;
-  *static_cast<int64_t*>(r[2]) = v + 1;
-
-  EXPECT_EQ(*static_cast<uint64_t*>(r[0]), v);
-  EXPECT_EQ(*static_cast<std::string**>(r[1]), p);
-  EXPECT_EQ(*static_cast<int64_t*>(r[2]), v + 1);
-}
-
-// Tests internal storage format via typed APIs
 TEST(RecordTest, DataRep) {
-  uint64_t v = 42;
-  std::string* p = new std::string("hello");
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
+  std::vector<size_t> keys = {0};
+  Schema schema{names, types, keys};
 
-  std::vector<DataType> st = {kUInt, kText, kInt};
-  auto s = SchemaFactory::create_or_get(st);
-  Record r(s);
-  r.set_uint(0, v);
-  r.set_string(1, p);
-  r.set_int(2, v + 1);
+  // Make some values.
+  uint64_t v0 = 42;
+  std::unique_ptr<std::string> ptr = std::make_unique<std::string>("hello");
+  std::string *v1 = ptr.get();  // Does not release ownership.
+  int64_t v2 = -20;
 
-  EXPECT_EQ(r.as_uint(0), v);
-  EXPECT_EQ(r.as_string(1), p);
-  EXPECT_EQ(r.as_int(2), v + 1);
+  // Make the record and test.
+  Record record{schema};
+  record.SetUInt(v0, 0);
+  record.SetString(std::move(ptr), 1);
+  record.SetInt(v2, 2);
+
+  EXPECT_EQ(record.GetUInt(0), v0);
+  EXPECT_EQ(&record.GetString(1), v1);  // pointer/address equality.
+  EXPECT_EQ(record.GetString(1), *v1);  // deep equality
+  EXPECT_EQ(record.GetInt(2), v2);
 }
 
 // Tests record comparisons
 TEST(RecordTest, Comparisons) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2"};
+  std::vector<CType> types = {CType::UINT, CType::TEXT};
+  std::vector<size_t> keys = {0};
+  Schema schema{names, types, keys};
+
   uint64_t v1 = 42;
   uint64_t v2 = 43;
-  std::string* s1 = new std::string("hello");
-  std::string* s2 = new std::string("bye");
+  std::unique_ptr<std::string> s1 = std::make_unique<std::string>("hello");
+  std::unique_ptr<std::string> s2 = std::make_unique<std::string>("bye");
+  std::unique_ptr<std::string> s3 = std::make_unique<std::string>("bye");
+  std::unique_ptr<std::string> s4 = std::make_unique<std::string>("hello");
 
-  auto s = SchemaFactory::create_or_get({kUInt, kText});
+  Record r1{schema};
+  r1.SetUInt(v1, 0);
+  r1.SetString(std::move(s1), 1);
 
-  Record r1(s);
-  r1.set_uint(0, v1);
-  r1.set_string(1, s1);
+  Record r2{schema};
+  r2.SetUInt(v2, 0);
+  r2.SetString(std::move(s2), 1);
 
-  Record r2(s);
-  r2.set_uint(0, v2);
-  r2.set_string(1, s2);
+  Record r3{schema};
+  r3.SetUInt(v1, 0);
+  r3.SetString(std::move(s3), 1);
 
-  Record r3(s);
-  r3.set_uint(0, v1);
-  r3.set_string(1, new std::string(*s2));
+  Record r4{schema};
+  r4.SetUInt(v1, 0);  // string content left empty.
+  
+  Record r5{schema};
+  r5.SetUInt(v1, 0);
+  r5.SetString(std::move(s4), 1);  // Value equal but not pointer equal.
 
+  // Record equality is reflexive.
   EXPECT_EQ(r1, r1);
   EXPECT_EQ(r2, r2);
+  EXPECT_EQ(r3, r3);
+  EXPECT_EQ(r4, r4);
+  EXPECT_EQ(r5, r5);
+  // Records that are unequal appear unequal.
   EXPECT_NE(r1, r2);
-  EXPECT_NE(r2, r1);
   EXPECT_NE(r1, r3);
+  EXPECT_NE(r1, r4);
+  EXPECT_NE(r2, r1);
+  EXPECT_NE(r2, r3);
+  EXPECT_NE(r2, r4);
+  EXPECT_NE(r2, r5);
   EXPECT_NE(r3, r1);
+  EXPECT_NE(r3, r2);
+  EXPECT_NE(r3, r4);
+  EXPECT_NE(r3, r5);
+  EXPECT_NE(r4, r1);
+  EXPECT_NE(r4, r2);
+  EXPECT_NE(r4, r3);
+  EXPECT_NE(r4, r5);
+  EXPECT_NE(r5, r2);
+  EXPECT_NE(r5, r3);
+  EXPECT_NE(r5, r4);
+  // Equal records are equal.
+  EXPECT_EQ(r1, r5);
+  EXPECT_EQ(r5, r1);
 }
 
-TEST(RecordTest, TypeMismatch) {
-  uint64_t v1 = 42;
-  std::string* s1 = new std::string("hello");
+TEST(RecordTest, GetTypeMismatch) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2"};
+  std::vector<CType> types = {CType::UINT, CType::TEXT};
+  std::vector<size_t> keys = {0};
+  Schema schema{names, types, keys};
 
-  auto s = SchemaFactory::create_or_get({kUInt, kText});
+  // Make some values.
+  uint64_t v0 = 42;
+  std::unique_ptr<std::string> v1 = std::make_unique<std::string>("hello");
 
-  Record r1(s);
-  r1.set_uint(0, v1);
-  r1.set_string(1, s1);
+  Record record{schema};
+  record.SetUInt(v0, 0);
+  record.SetString(std::move(v1), 1);
 
-  ASSERT_DEATH({ r1.as_string(0); }, "Type mismatch");
-  ASSERT_DEATH({ r1.as_uint(1); }, "Type mismatch");
-  ASSERT_DEATH({ r1.as_int(1); }, "Type mismatch");
+  ASSERT_DEATH({ record.GetString(0); }, "Type mismatch");
+  ASSERT_DEATH({ record.GetUInt(1); }, "Type mismatch");
+  ASSERT_DEATH({ record.GetInt(1); }, "Type mismatch");
 }
 
-TEST(RecordTest, DataRepSizes) {
-  uint64_t i = 42;
-  std::string* s = new std::string("hello");
+TEST(RecordTest, SetTypeMismatch) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2"};
+  std::vector<CType> types = {CType::UINT, CType::TEXT};
+  std::vector<size_t> keys = {0};
+  Schema schema{names, types, keys};
 
-  auto sch = SchemaFactory::create_or_get({kUInt, kText});
+  // Make some values.
+  uint64_t v0 = 42;
+  std::unique_ptr<std::string> v1 = std::make_unique<std::string>("hello");
 
-  Record r(sch);
-  r.set_uint(0, i);
-  r.set_string(1, s);
-
-  EXPECT_EQ(r.size_at(0), sizeof(uint64_t));
-  EXPECT_EQ(r.size_at(1), s->size());
+  Record record{schema};
+  ASSERT_DEATH({ record.SetUInt(v0, 1); }, "Type mismatch");
+  ASSERT_DEATH({ record.SetString(std::move(v1), 0); }, "Type mismatch");
 }
 
 TEST(RecordTest, NegativeIntegers) {
-  auto schema = SchemaFactory::create_or_get({kInt, kInt});
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2"};
+  std::vector<CType> types = {CType::INT, CType::INT};
+  std::vector<size_t> keys = {0};
+  Schema schema{names, types, keys};
 
-  Record r(schema);
-  r.set_int(0, -7);
-  r.set_int(1, -1000);
-  EXPECT_EQ(r.as_int(0), -7);
-  EXPECT_EQ(r.as_int(1), -1000);
+  Record r{schema};
+  r.SetInt(-7, 0);
+  r.SetInt(-1000, 1);
+  EXPECT_EQ(r.GetInt(0), -7);
+  EXPECT_EQ(r.GetInt(1), -1000);
+}
+
+TEST(RecordTest, Key) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2"};
+  std::vector<CType> types = {CType::INT, CType::TEXT};
+  std::vector<size_t> keys1 = {0};
+  std::vector<size_t> keys2 = {1};
+  Schema schema1{names, types, keys1};
+  Schema schema2{names, types, keys2};
+
+  // Some values.
+  std::unique_ptr<std::string> s1 = std::make_unique<std::string>("hello");
+  std::unique_ptr<std::string> s2 = std::make_unique<std::string>("bye");
+  // Some keys.
+  int64_t k1 = -10;
+  std::string k2 = *s2;
+
+  // Create two records.
+  Record r1{schema1};
+  r1.SetInt(k1, 0);
+  r1.SetString(std::move(s1), 1);
+  Record r2{schema2};
+  r2.SetInt(500, 0);
+  r2.SetString(std::move(s2), 1);
+  Record r3{schema2};
+  r3.SetInt(500, 0);
+
+  // Test keys.
+  EXPECT_EQ(r1.GetKey().GetInt(), k1);
+  EXPECT_EQ(r2.GetKey().GetString(), k2);
+  EXPECT_EQ(r3.GetKey().GetString(), "");
+}
+
+TEST(RecordTest, KeyTypeMistmatch) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2"};
+  std::vector<CType> types = {CType::INT, CType::TEXT};
+  std::vector<size_t> keys1 = {0};
+  std::vector<size_t> keys2 = {1};
+  Schema schema1{names, types, keys1};
+  Schema schema2{names, types, keys2};
+
+  // Some values.
+  std::unique_ptr<std::string> s1 = std::make_unique<std::string>("hello");
+  std::unique_ptr<std::string> s2 = std::make_unique<std::string>("bye");
+  // Some keys.
+  int64_t k1 = -10;
+  std::string k2 = *s2;
+
+  // Create two records.
+  Record r1{schema1};
+  r1.SetInt(k1, 0);
+  r1.SetString(std::move(s1), 1);
+  Record r2{schema2};
+  r2.SetInt(500, 0);
+  r2.SetString(std::move(s2), 1);
+
+  // Test keys.
+  ASSERT_DEATH({ r1.GetKey().GetUInt(); }, "Type mismatch");
+  ASSERT_DEATH({ r1.GetKey().GetString(); }, "Type mismatch");
+  ASSERT_DEATH({ r2.GetKey().GetUInt(); }, "Type mismatch");
+  ASSERT_DEATH({ r2.GetKey().GetInt(); }, "Type mismatch");
 }
 
 }  // namespace dataflow

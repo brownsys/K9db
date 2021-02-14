@@ -12,6 +12,21 @@ namespace pelton {
 namespace sqlast {
 
 // ColumnConstraint.
+std::string ColumnConstraint::TypeToString(Type type) {
+  switch (type) {
+    case Type::PRIMARY_KEY:
+      return "PRIMARY KEY";
+    case Type::NOT_NULL:
+      return "NOT NULL";
+    case Type::UNIQUE:
+      return "UNIQUE";
+    case Type::FOREIGN_KEY:
+      return "FOREIGN KEY";
+    default:
+      throw "Unsupported constraint type!";
+  }
+}
+
 const std::string &ColumnConstraint::foreign_table() const {
   assert(this->type_ == Type::FOREIGN_KEY);
   return this->foreign_table_;
@@ -38,7 +53,7 @@ ColumnDefinition::Type ColumnDefinition::StringToType(
              absl::EqualsIgnoreCase(column_type, "string")) {
     return Type::TEXT;
   } else {
-    throw "Unsupported datatype!";
+    throw "Unsupported column type!";
   }
 }
 
@@ -49,7 +64,7 @@ std::string ColumnDefinition::TypeToString(ColumnDefinition::Type type) {
     case Type::TEXT:
       return "varchar";
     default:
-      throw "Unsupported datatype!";
+      throw "Unsupported column type!";
   }
 }
 
@@ -140,6 +155,17 @@ void CreateTable::RemoveColumn(const std::string &column_name) {
     this->columns_map_.at(this->columns_.at(i).column_name()) = i;
   }
 }
+
+std::ostream& operator<<(std::ostream &os, const ColumnConstraint::Type &r) {
+  os << ColumnConstraint::TypeToString(r);
+  return os;
+}
+
+std::ostream& operator<<(std::ostream &os, const ColumnDefinition::Type &r) {
+  os << ColumnDefinition::TypeToString(r);
+  return os;
+}
+
 
 }  // namespace sqlast
 }  // namespace pelton

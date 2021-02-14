@@ -2,6 +2,7 @@
 #ifndef PELTON_SQLAST_AST_SCHEMA_H_
 #define PELTON_SQLAST_AST_SCHEMA_H_
 
+#include <ostream>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -17,6 +18,8 @@ class ColumnConstraint {
  public:
   // Supported constraint types.
   enum class Type { PRIMARY_KEY, UNIQUE, NOT_NULL, FOREIGN_KEY };
+
+  static std::string TypeToString(Type type);
 
   // Constructor.
   explicit ColumnConstraint(Type type) : type_(type) {}
@@ -178,6 +181,9 @@ class CreateTable : public AbstractStatement {
   std::vector<ColumnDefinition> columns_;
   std::unordered_map<std::string, size_t> columns_map_;
 };
+
+std::ostream& operator<<(std::ostream &os, const ColumnConstraint::Type &r);
+std::ostream& operator<<(std::ostream &os, const ColumnDefinition::Type &r);
 
 }  // namespace sqlast
 }  // namespace pelton

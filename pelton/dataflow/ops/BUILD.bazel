@@ -1,0 +1,49 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+'''
+cc_library(
+    name = "operators",
+    srcs = [
+        "equijoin.cc",
+        "filter.cc",
+        "identity.cc",
+        "input.cc",
+        "matview.cc",
+        "union.cc",
+    ],
+    hdrs = [
+        "equijoin.h",
+        "filter.h",
+        "identity.h",
+        "input.h",
+        "matview.h",
+        "union.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/sqlast:ast",
+        "@absl//absl/base:core_headers",
+        "@absl//absl/container:flat_hash_map",
+        "@absl//absl/container:node_hash_map",
+        "@absl//absl/strings",
+        "@glog",
+        "@gtest//:gtest_prod",
+    ],
+)
+
+cc_test(
+    name = "dataflow-tests",
+    srcs = [
+        "equijoin_unittest.cc",
+        "filter_unittest.cc",
+        "union_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        "//pelton/dataflow",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
+'''

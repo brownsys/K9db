@@ -1,4 +1,4 @@
-#include "pelton/dataflow/schema.h"
+#include "pelton/dataflow/key.h"
 
 namespace pelton {
 namespace dataflow {

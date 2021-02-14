@@ -5,88 +5,95 @@
 #include <string>
 #include <utility>
 
-#include "pelton/dataflow/schema.h"
+#include "glog/logging.h"
+#include "pelton/sqlast/ast.h"
 
 namespace pelton {
 namespace dataflow {
 
 class Key {
  public:
-  explicit Key(uint64_t v) : inline_data_(v), type_(DataType::kUInt) {}
+  explicit Key(uint64_t v)
+      : type_(sqlast::ColumnDefinition::Type::UINT), uint_(v) {}
+
   explicit Key(int64_t v)
-      : inline_data_(static_cast<int64_t>(v)), type_(DataType::kInt) {}
-  explicit Key(const std::string& v)
-      : pointed_data_(reinterpret_cast<const uint8_t*>(&v)),
-        type_(DataType::kText) {}
-  Key(uint64_t inline_data, DataType type)
-      : inline_data_(inline_data), type_(type) {}
-  Key(const void* pointed_data, DataType type)
-      : pointed_data_(reinterpret_cast<const uint8_t*>(pointed_data)),
-        type_(type) {}
+      : type_(sqlast::ColumnDefinition::Type::INT), sint_(v) {}
 
-  bool operator==(const Key& other) const {
-    CHECK_EQ(type_, other.type_) << "comparing keys of different types!";
-    if (Schema::is_inlineable(type_)) {
-      return inline_data_ == other.inline_data_;
-    } else {
-      CHECK_NOTNULL(pointed_data_);
-      switch (type_) {
-        case DataType::kText: {
-          auto this_str = reinterpret_cast<const std::string*>(pointed_data_);
-          auto other_str =
-              reinterpret_cast<const std::string*>(other.pointed_data_);
-          return *this_str == *other_str;
-        }
-        default:
-          LOG(FATAL) << "unimplemented pointed data comparison on Key";
-      }
+  explicit Key(const std::string &v)
+      : type_(sqlast::ColumnDefinition::Type::TEXT), str_(v) {}
+
+  explicit Key(std::string &&v)
+      : type_(sqlast::ColumnDefinition::Type::TEXT), str_(v) {}
+
+  // Manually destruct string if key is a string.
+  ~Key() {
+    if (this->type_ == sqlast::ColumnDefinition::Type::TEXT) {
+      this->str_.~basic_string();
     }
+  }
 
-    return false;
+  // Comparisons.
+  bool operator==(const Key& other) const {
+    CHECK_EQ(this->type_, other.type_) << "comparing keys of different types!";
+    switch (this->type_) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        return this->uint_ == other.uint_;
+      case sqlast::ColumnDefinition::Type::INT:
+        return this->sint_ == other.sint_;
+      case sqlast::ColumnDefinition::Type::TEXT:
+        return this->str_ == other.str_;
+      default:
+        LOG(FATAL) << "Unsupported data type in key comparison!";
+    }
   }
   bool operator!=(const Key& other) const { return !(*this == other); }
 
+  // Hash to use as key in absl hash tables.
   template <typename H>
   friend H AbslHashValue(H h, const Key& k) {
-    if (Schema::is_inlineable(k.type_)) {
-      return H::combine(std::move(h), k.inline_data_);
-    } else {
-      switch (k.type_) {
-        case DataType::kText: {
-          auto str = reinterpret_cast<const std::string*>(k.pointed_data_);
-          return H::combine(std::move(h), str->c_str(), str->size());
-        }
-        default:
-          LOG(FATAL) << "unimplemented pointed data hashing for Key";
-      }
+    switch (k.type_) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        return H::combine(std::move(h), k.uint_);
+      case sqlast::ColumnDefinition::Type::INT:
+        return H::combine(std::move(h), k.sint_);
+      case sqlast::ColumnDefinition::Type::TEXT:
+        return H::combine(std::move(h), k.str_.c_str(), k.str_.size());
+      default:
+        LOG(FATAL) << "unimplemented pointed data hashing for Key";
     }
     return h;
   }
 
-  uint64_t as_uint() const {
-    CheckType(DataType::kUInt);
-    return inline_data_;
+  // Data access.
+  uint64_t GetUInt() const {
+    CheckType(sqlast::ColumnDefinition::Type::UINT);
+    return this->uint_;
   }
-  int64_t as_int() const {
-    CheckType(DataType::kInt);
-    return static_cast<int64_t>(inline_data_);
+  int64_t GetInt() const {
+    CheckType(sqlast::ColumnDefinition::Type::INT);
+    return this->sint_;
   }
-  const std::string& as_string() const {
-    CheckType(DataType::kText);
-    return *reinterpret_cast<const std::string*>(pointed_data_);
+  const std::string &GetString() const {
+    CheckType(sqlast::ColumnDefinition::Type::TEXT);
+    return this->str_;
+  }
+
+  sqlast::ColumnDefinition::Type Type() const {
+    return this->type_;
   }
 
  private:
+  sqlast::ColumnDefinition::Type type_;
+
   union {
-    uint64_t inline_data_;
-    const uint8_t* pointed_data_;
+    uint64_t uint_;
+    int64_t sint_;
+    std::string str_;
   };
 
-  DataType type_;
-
-  inline void CheckType(DataType t) const {
-    if (type_ != t) {
-      LOG(FATAL) << "Type mismatch: key type is is " << type_
+  inline void CheckType(sqlast::ColumnDefinition::Type t) const {
+    if (this->type_ != t) {
+      LOG(FATAL) << "Type mismatch: key type is " << this->type_
                  << ", tried to access as " << t;
     }
   }
