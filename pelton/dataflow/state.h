@@ -21,16 +21,16 @@ namespace dataflow {
 // Type aliases.
 using TableName = std::string;
 using FlowName = std::string;
-using InputOperators = std::vector<std::shared_ptr<dataflow::InputOperator>>;
+using InputOperators = std::vector<std::shared_ptr<InputOperator>>;
 
 class DataflowState {
  public:
   DataflowState() {}
 
   // Add and manage flows.
-  void AddFlow(const FlowName &name, const dataflow::DataFlowGraph &flow);
+  void AddFlow(const FlowName &name, const DataFlowGraph &flow);
 
-  const dataflow::DataFlowGraph &GetFlow(const FlowName &name) const;
+  const DataFlowGraph &GetFlow(const FlowName &name) const;
 
   bool HasInputsFor(const TableName &table_name) const;
 
@@ -47,10 +47,10 @@ class DataflowState {
   // The logical schema is the contract between client code and our DB.
   // The stored schema may not matched the concrete/physical one due to sharding
   // or other transformations.
-  std::unordered_map<TableName, dataflow::Schema> schema_;
+  std::unordered_map<TableName, Schema> schema_;
 
   // Dataflow graphs and views.
-  std::unordered_map<FlowName, dataflow::DataFlowGraph> flows_;
+  std::unordered_map<FlowName, DataFlowGraph> flows_;
   std::unordered_map<TableName, InputOperators> inputs_;
 };
 

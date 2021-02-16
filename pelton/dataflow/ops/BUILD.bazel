@@ -1,4 +1,43 @@
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "input",
+    srcs = [
+        "input.cc",
+    ],
+    hdrs = [
+        "input.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "matview",
+    srcs = [
+        "grouped_data.cc",
+        "matview.cc",
+    ],
+    hdrs = [
+        "grouped_data.h",
+        "matview.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "@absl//absl/container:flat_hash_map",
+        "@glog",
+    ],
+)
 
 '''
 cc_library(

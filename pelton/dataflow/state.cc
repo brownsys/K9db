@@ -7,6 +7,7 @@
 
 #include <fstream>
 
+#include "pelton/sqlast/ast.h"
 #include "pelton/util/fs.h"
 
 #define STATE_FILE_NAME ".dataflow.state"
@@ -14,16 +15,14 @@
 namespace pelton {
 namespace dataflow {
 
-void DataflowState::AddFlow(const FlowName &name,
-                            const dataflow::DataFlowGraph &flow) {
+void DataflowState::AddFlow(const FlowName &name, const DataFlowGraph &flow) {
   this->flows_.insert({name, flow});
   for (auto input : flow.inputs()) {
-    this->inputs_[input->table_name()].push_back(input);
+    this->inputs_[input->input_name()].push_back(input);
   }
 }
 
-const dataflow::DataFlowGraph &DataflowState::GetFlow(
-    const FlowName &name) const {
+const DataFlowGraph &DataflowState::GetFlow(const FlowName &name) const {
   return this->flows_.at(name);
 }
 
@@ -31,8 +30,8 @@ bool DataflowState::HasInputsFor(const TableName &table_name) const {
   return this->inputs_.count(table_name) > 0;
 }
 
-const std::vector<std::shared_ptr<dataflow::InputOperator>>
-    &DataflowState::InputsFor(const TableName &table_name) const {
+const std::vector<std::shared_ptr<InputOperator>> &DataflowState::InputsFor(
+    const TableName &table_name) const {
   return this->inputs_.at(table_name);
 }
 
@@ -56,21 +55,21 @@ void DataflowState::Load(const std::string &dir_path) {
   getline(state_file, line);
   while (line != "") {
     std::vector<std::string> names;
-    std::vector<dataflow::DataType> types;
+    std::vector<sqlast::ColumnDefinition::Type> types;
     std::string colname;
-    std::underlying_type_t<dataflow::DataType> coltype;
+    std::underlying_type_t<sqlast::ColumnDefinition::Type> coltype;
     // Read the column names and types in schema.
     getline(state_file, colname);
     while (colname != "") {
       state_file >> coltype;
       names.push_back(colname);
-      types.push_back(static_cast<dataflow::DataType>(coltype));
+      types.push_back(static_cast<sqlast::ColumnDefinition::Type>(coltype));
       getline(state_file, colname);
       getline(state_file, colname);
     }
     // Read the key column ids.
-    std::vector<dataflow::ColumnID> keys;
-    dataflow::ColumnID key;
+    std::vector<ColumnID> keys;
+    ColumnID key;
     size_t keys_size;
     state_file >> keys_size;
     for (size_t i = 0; i < keys_size; i++) {
@@ -80,8 +79,7 @@ void DataflowState::Load(const std::string &dir_path) {
 
     // Construct schema in place.
     this->schema_.emplace(std::piecewise_construct, std::forward_as_tuple(line),
-                          std::forward_as_tuple(types, names));
-    this->schema_.at(line).set_key_columns(keys);
+                          std::forward_as_tuple(names, types, keys));
 
     // Next table.
     getline(state_file, line);
@@ -100,14 +98,15 @@ void DataflowState::Save(const std::string &dir_path) {
 
   for (const auto &[table_name, schema] : this->schema_) {
     state_file << table_name << "\n";
-    for (size_t i = 0; i < schema.num_columns(); i++) {
-      auto type = static_cast<std::underlying_type_t<dataflow::DataType>>(
-          schema.TypeOf(i));
+    for (size_t i = 0; i < schema.Size(); i++) {
+      auto type =
+          static_cast<std::underlying_type_t<sqlast::ColumnDefinition::Type>>(
+              schema.TypeOf(i));
       state_file << schema.NameOf(i) << "\n" << type << "\n";
     }
     state_file << "\n";
-    state_file << schema.key_columns().size() << " ";
-    for (auto key_id : schema.key_columns()) {
+    state_file << schema.keys().size() << " ";
+    for (auto key_id : schema.keys()) {
       state_file << key_id << " ";
     }
     state_file << "\n";

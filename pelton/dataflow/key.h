@@ -25,6 +25,77 @@ class Key {
   explicit Key(std::string &&v)
       : type_(sqlast::ColumnDefinition::Type::TEXT), str_(v) {}
 
+  // Must be copyable to be used as a key for absl maps.
+  Key(const Key &o) : type_(o.type_), str_() {
+    switch (this->type_) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        this->uint_ = o.uint_;
+        break;
+      case sqlast::ColumnDefinition::Type::INT:
+        this->sint_ = o.sint_;
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+        this->str_ = o.str_;
+        break;
+      default:
+        LOG(FATAL) << "Unsupported data type in key copy!";
+    }
+  }
+  Key &operator=(const Key &o) {
+    CHECK(this->type_ == o.type_) << "Bad copy assign key type";
+    // Copy stuff.
+    switch (this->type_) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        this->uint_ = o.uint_;
+        break;
+      case sqlast::ColumnDefinition::Type::INT:
+        this->sint_ = o.sint_;
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+        this->str_ = o.str_;  // Frees existing string and copies target.
+        break;
+      default:
+        LOG(FATAL) << "Unsupported data type in key copy!";
+    }
+    return *this;
+  }
+
+  // Move moves the string.
+  Key(Key &&o) : type_(o.type_), str_() {
+    switch (this->type_) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        this->uint_ = o.uint_;
+        break;
+      case sqlast::ColumnDefinition::Type::INT:
+        this->sint_ = o.sint_;
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+        this->str_ = std::move(o.str_);
+        break;
+      default:
+        LOG(FATAL) << "Unsupported data type in key copy!";
+    }
+  }
+  Key &operator=(Key &&o) {
+    CHECK(this->type_ == o.type_) << "Bad move assign key type";
+    // Copy stuff (but move string if o is a string).
+    switch (this->type_) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        this->uint_ = o.uint_;
+        break;
+      case sqlast::ColumnDefinition::Type::INT:
+        this->sint_ = o.sint_;
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+        // Frees current string and moves traget.
+        this->str_ = std::move(o.str_);
+        break;
+      default:
+        LOG(FATAL) << "Unsupported data type in key copy!";
+    }
+    return *this;
+  }
+
   // Manually destruct string if key is a string.
   ~Key() {
     if (this->type_ == sqlast::ColumnDefinition::Type::TEXT) {
@@ -33,8 +104,8 @@ class Key {
   }
 
   // Comparisons.
-  bool operator==(const Key& other) const {
-    CHECK_EQ(this->type_, other.type_) << "comparing keys of different types!";
+  bool operator==(const Key &other) const {
+    CheckType(other.type_);
     switch (this->type_) {
       case sqlast::ColumnDefinition::Type::UINT:
         return this->uint_ == other.uint_;
@@ -46,11 +117,11 @@ class Key {
         LOG(FATAL) << "Unsupported data type in key comparison!";
     }
   }
-  bool operator!=(const Key& other) const { return !(*this == other); }
+  bool operator!=(const Key &other) const { return !(*this == other); }
 
   // Hash to use as key in absl hash tables.
   template <typename H>
-  friend H AbslHashValue(H h, const Key& k) {
+  friend H AbslHashValue(H h, const Key &k) {
     switch (k.type_) {
       case sqlast::ColumnDefinition::Type::UINT:
         return H::combine(std::move(h), k.uint_);
@@ -78,9 +149,7 @@ class Key {
     return this->str_;
   }
 
-  sqlast::ColumnDefinition::Type Type() const {
-    return this->type_;
-  }
+  sqlast::ColumnDefinition::Type type() const { return this->type_; }
 
  private:
   sqlast::ColumnDefinition::Type type_;

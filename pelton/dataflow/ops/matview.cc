@@ -3,32 +3,38 @@
 #include <utility>
 #include <vector>
 
-#include "pelton/dataflow/record.h"
+#include "glog/logging.h"
 
 namespace pelton {
 namespace dataflow {
 
 // Leaves out_rs empty, as materialized views are leaves of the graph.
 // We may change this if we allow mat views to have descendant nodes.
-bool MatViewOperator::process(std::vector<Record>& rs,
-                              std::vector<Record>& out_rs) {
-  for (Record& r : rs) {
+bool MatViewOperator::Process(NodeIndex source,
+                              const std::vector<Record> &records,
+                              std::vector<Record> *output) {
+  for (const Record &r : records) {
     // incoming records must have the right key column set
-    CHECK(r.schema().key_columns() == key_cols_);
+    CHECK(r.schema().keys() == this->key_cols_);  // TODO(babman): order?
 
-    std::pair<Key, bool> key = r.GetKey();
-    if (!contents_.insert(key.first, r)) return false;
+    if (!this->contents_.Insert(r)) {
+      return false;
+    }
   }
 
   return true;
 }
 
-std::vector<Record> MatViewOperator::lookup(const Key& key) const {
-  return contents_.group(key);
+const std::vector<Record> &MatViewOperator::Lookup(const Key &key) const {
+  return this->contents_.Get(key);
 }
 
-std::vector<Record> MatViewOperator::contents() const {
-  return contents_.contents();
+GroupedData::const_iterator MatViewOperator::cbegin() const {
+  return this->contents_.cbegin();
+}
+
+GroupedData::const_iterator MatViewOperator::cend() const {
+  return this->contents_.cend();
 }
 
 }  // namespace dataflow

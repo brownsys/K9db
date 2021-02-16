@@ -156,16 +156,15 @@ void CreateTable::RemoveColumn(const std::string &column_name) {
   }
 }
 
-std::ostream& operator<<(std::ostream &os, const ColumnConstraint::Type &r) {
+std::ostream &operator<<(std::ostream &os, const ColumnConstraint::Type &r) {
   os << ColumnConstraint::TypeToString(r);
   return os;
 }
 
-std::ostream& operator<<(std::ostream &os, const ColumnDefinition::Type &r) {
+std::ostream &operator<<(std::ostream &os, const ColumnDefinition::Type &r) {
   os << ColumnDefinition::TypeToString(r);
   return os;
 }
-
 
 }  // namespace sqlast
 }  // namespace pelton

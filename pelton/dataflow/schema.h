@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "glog/logging.h"
+#include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -13,7 +14,7 @@ namespace dataflow {
 
 class Schema {
  public:
-  Schema(const sqlast::CreateTable &table) {
+  explicit Schema(const sqlast::CreateTable &table) {
     const auto &cols = table.GetColumns();
     for (size_t i = 0; i < cols.size(); i++) {
       const auto &column = cols.at(i);
@@ -27,7 +28,7 @@ class Schema {
 
   Schema(const std::vector<std::string> &column_names,
          const std::vector<sqlast::ColumnDefinition::Type> &column_types,
-         const std::vector<size_t> &keys)
+         const std::vector<ColumnID> &keys)
       : column_names_(column_names), column_types_(column_types), keys_(keys) {
     assert(column_names.size() == column_types.size());
   }
@@ -40,12 +41,8 @@ class Schema {
   Schema &operator=(const Schema &&) = delete;
 
   // Equality is pointer equality.
-  bool operator==(const Schema &other) const {
-    return this == &other;
-  }
-  bool operator!=(const Schema &other) const {
-    return this != &other;
-  }
+  bool operator==(const Schema &other) const { return this == &other; }
+  bool operator!=(const Schema &other) const { return this != &other; }
 
   // Accessors.
   const std::vector<std::string> &column_names() const {
@@ -54,9 +51,7 @@ class Schema {
   const std::vector<sqlast::ColumnDefinition::Type> &column_types() const {
     return this->column_types_;
   }
-  const std::vector<size_t> &keys() const {
-    return this->keys_;
-  }
+  const std::vector<ColumnID> &keys() const { return this->keys_; }
   sqlast::ColumnDefinition::Type TypeOf(size_t i) const {
     if (i >= this->column_types_.size()) {
       LOG(FATAL) << "Schema: index out of bounds " << i << " / "
@@ -64,15 +59,20 @@ class Schema {
     }
     return this->column_types_.at(i);
   }
-  
-  size_t Size() const {
-    return this->column_names_.size();
+  const std::string &NameOf(size_t i) const {
+    if (i >= this->column_names_.size()) {
+      LOG(FATAL) << "Schema: index out of bounds " << i << " / "
+                 << this->column_names_.size();
+    }
+    return this->column_names_.at(i);
   }
+
+  size_t Size() const { return this->column_names_.size(); }
 
  private:
   std::vector<std::string> column_names_;
   std::vector<sqlast::ColumnDefinition::Type> column_types_;
-  std::vector<size_t> keys_;
+  std::vector<ColumnID> keys_;
 };
 
 }  // namespace dataflow

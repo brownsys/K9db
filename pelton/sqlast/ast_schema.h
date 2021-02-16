@@ -182,8 +182,8 @@ class CreateTable : public AbstractStatement {
   std::unordered_map<std::string, size_t> columns_map_;
 };
 
-std::ostream& operator<<(std::ostream &os, const ColumnConstraint::Type &r);
-std::ostream& operator<<(std::ostream &os, const ColumnDefinition::Type &r);
+std::ostream &operator<<(std::ostream &os, const ColumnConstraint::Type &r);
+std::ostream &operator<<(std::ostream &os, const ColumnDefinition::Type &r);
 
 }  // namespace sqlast
 }  // namespace pelton

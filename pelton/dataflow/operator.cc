@@ -1,8 +1,5 @@
 #include "pelton/dataflow/operator.h"
 
-#include <algorithm>
-#include <string>
-
 #include "glog/logging.h"
 
 namespace pelton {
@@ -10,40 +7,39 @@ namespace dataflow {
 
 void Operator::AddParent(std::shared_ptr<Operator> parent,
                          std::shared_ptr<Edge> edge) {
+  CHECK_EQ(edge->to().lock().get(), this);
+  CHECK_EQ(edge->from(), parent);
   LOG(INFO) << "Adding edge: " << edge->from()->index() << " -> "
             << edge->to().lock()->index();
-  parents_.push_back(edge);
-  parent->children_.push_back(std::weak_ptr<Edge>(edge));
+  this->parents_.push_back(edge);
+  parent->children_.emplace_back(edge);
 }
 
-bool Operator::ProcessAndForward(NodeIndex src_op_idx,
-                                 std::vector<Record>& rs) {
-  std::vector<Record> out;
+bool Operator::ProcessAndForward(NodeIndex source,
+                                 const std::vector<Record> &records) {
+  std::vector<Record> output;
 
-  if (!process(src_op_idx, rs, out)) {
+  if (!this->Process(source, records, &output)) {
     return false;
   }
 
-  for (std::weak_ptr<Edge> edge_ptr : children_) {
+  for (std::weak_ptr<Edge> edge_ptr : this->children_) {
     std::shared_ptr<Edge> edge = edge_ptr.lock();
-    if (edge) {
-      auto child = edge->to();
-      if (!child.lock()->ProcessAndForward(src_op_idx, out)) {
-        return false;
-      }
+    std::shared_ptr<Operator> child = edge->to().lock();
+    if (!child->ProcessAndForward(this->index_, output)) {
+      return false;
     }
   }
 
   return true;
 }
 
-std::vector<std::shared_ptr<Operator>> Operator::parents() const {
+std::vector<std::shared_ptr<Operator>> Operator::GetParents() const {
   // lookup from graph
-  assert(graph_);
+  assert(this->graph_);
 
   std::vector<std::shared_ptr<Operator>> nodes;
-  for (const auto& edge : parents_) {
-    CHECK_EQ(edge->to().lock().get(), this);
+  for (const auto &edge : this->parents_) {
     nodes.emplace_back(edge->from());
   }
 

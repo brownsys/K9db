@@ -10,7 +10,10 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
-        "//pelton/dataflow",
+        ":graph",
+        ":schema",
+        "//pelton/dataflow/ops:input",
+        "//pelton/sqlast:ast",
         "//pelton/util:fs",
     ],
 )
@@ -25,6 +28,7 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
+        ":types",
         "//pelton/sqlast:ast",
         "@glog",
     ],
@@ -40,8 +44,8 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
-      "//pelton/sqlast:ast",
-      "@glog",
+        "//pelton/sqlast:ast",
+        "@glog",
     ],
 )
 
@@ -55,10 +59,73 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
+        ":key",
         ":schema",
+        ":types",
+        "//pelton/sqlast:ast",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "operator",
+    srcs = [
+        "edge.cc",
+        "operator.cc",
+    ],
+    hdrs = [
+        "edge.h",
+        "operator.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":record",
+        ":schema",
+        ":types",
+    ],
+)
+
+cc_library(
+    name = "types",
+    srcs = [],
+    hdrs = [
+        "types.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+)
+
+cc_library(
+    name = "graph",
+    srcs = [
+        "graph.cc",
+    ],
+    hdrs = [
+        "graph.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":operator",
+        ":record",
+        ":types",
+        "//pelton/dataflow/ops:input",
+        "//pelton/dataflow/ops:matview",
+        "@absl//absl/container:node_hash_map",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "key-test",
+    srcs = [
+        "key_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
         ":key",
         "//pelton/sqlast:ast",
         "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
     ],
 )
 
@@ -69,8 +136,8 @@ cc_test(
     ],
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
-        ":schema",
         ":record",
+        ":schema",
         "//pelton/sqlast:ast",
         "@glog",
         "@gtest",
@@ -79,50 +146,10 @@ cc_test(
 )
 
 '''
-cc_library(
-    name = "abstract_operator",
-    srcs = [
-        "abstract_operator.cc",
-    ],
-    hdrs = [
-        "abstract_operator.h",
-    ],
-    visibility = ["//pelton:__subpackages__"],
-    deps = [
-        ":record",
-        ":schema",
-    ],
-)
-
-cc_library(
-    name = "dataflow",
-    srcs = [
-        "edge.cc",
-        "graph.cc",
-    ],
-    hdrs = [
-        "edge.h",
-        "graph.h",
-        "key.h",
-        "types.h",
-    ],
-    visibility = ["//pelton:__subpackages__"],
-    deps = [
-        "//pelton/sqlast:ast",
-        "@absl//absl/base:core_headers",
-        "@absl//absl/container:flat_hash_map",
-        "@absl//absl/container:node_hash_map",
-        "@absl//absl/strings",
-        "@glog",
-        "@gtest//:gtest_prod",
-    ],
-)
-
 cc_test(
-    name = "dataflow-tests",
+    name = "graph-test",
     srcs = [
         "graph_unittest.cc",
-        "record_unittest.cc",
     ],
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
