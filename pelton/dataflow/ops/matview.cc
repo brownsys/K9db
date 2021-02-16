@@ -15,8 +15,7 @@ bool MatViewOperator::Process(NodeIndex source,
                               std::vector<Record> *output) {
   for (const Record &r : records) {
     // incoming records must have the right key column set
-    CHECK(r.schema().keys() == this->key_cols_);  // TODO(babman): order?
-
+    CHECK(r.schema().keys() == this->key_cols_);
     if (!this->contents_.Insert(r)) {
       return false;
     }
@@ -25,16 +24,21 @@ bool MatViewOperator::Process(NodeIndex source,
   return true;
 }
 
+size_t MatViewOperator::count() const { return this->contents_.count(); }
+bool MatViewOperator::Contains(const Key &key) const {
+  return this->contents_.Contains(key);
+}
+
 const std::vector<Record> &MatViewOperator::Lookup(const Key &key) const {
   return this->contents_.Get(key);
 }
 
-GroupedData::const_iterator MatViewOperator::cbegin() const {
-  return this->contents_.cbegin();
+GroupedData::const_iterator MatViewOperator::begin() const {
+  return this->contents_.begin();
 }
 
-GroupedData::const_iterator MatViewOperator::cend() const {
-  return this->contents_.cend();
+GroupedData::const_iterator MatViewOperator::end() const {
+  return this->contents_.end();
 }
 
 }  // namespace dataflow

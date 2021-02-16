@@ -1,51 +1,79 @@
 #include "pelton/dataflow/ops/filter.h"
 
-#include <utility>
-#include <vector>
+#include <tuple>
 
+#include "glog/logging.h"
 #include "pelton/dataflow/record.h"
-#include "pelton/dataflow/record_utils.h"
+#include "pelton/sqlast/ast.h"
+
+// The value in v must be of the same type as the corresponding one in the
+// record schema.
+// TODO(babamn): do this ahead of time at operator construction.
+#define RECORD_VALUE_COMPARE_MACRO(v, col, OP)                    \
+  if (record.schema().TypeOf(col) != Record::TypeOfVariant(v)) {  \
+    LOG(FATAL) << "Type mistmatch in filter value";               \
+  }                                                               \
+  switch (record.schema().TypeOf(col)) {                          \
+    case sqlast::ColumnDefinition::Type::INT:                     \
+      if (!(record.GetInt(col) OP std::get<int64_t>(v))) {        \
+        return false;                                             \
+      }                                                           \
+      break;                                                      \
+    case sqlast::ColumnDefinition::Type::UINT:                    \
+      if (!(record.GetUInt(col) OP std::get<uint64_t>(v))) {      \
+        return false;                                             \
+      }                                                           \
+      break;                                                      \
+    case sqlast::ColumnDefinition::Type::TEXT:                    \
+      if (!(record.GetString(col) OP std::get<std::string>(v))) { \
+        return false;                                             \
+      }                                                           \
+      break;                                                      \
+    default:                                                      \
+      LOG(FATAL) << "Unsupported data type in filter operator";   \
+  }                                                               \
+  break;
+// RECORD_VALUE_COMPARE_MACRO
 
 namespace pelton {
 namespace dataflow {
 
-bool FilterOperator::process(std::vector<Record>& rs,
-                             std::vector<Record>& out_rs) {
-  for (Record& r : rs) {
-    bool flag = false;
-    for (size_t i = 0; i < cids_.size(); i++) {
-      DataType type = vals_.schema().TypeOf(i);
-      switch (ops_[i]) {
-        case Equal:
-          flag = record::Equal(type, r, vals_, i);
-          break;
-        case LessThan:
-          flag = record::LessThan(type, r, vals_, i);
-          break;
-        case LessThanOrEqual:
-          flag = record::LessThanOrEqual(type, r, vals_, i);
-          break;
-        case GreaterThan:
-          flag = record::GreaterThan(type, r, vals_, i);
-          break;
-        case GreaterThanOrEqual:
-          flag = record::GreaterThanOrEqual(type, r, vals_, i);
-          break;
-        case NotEqual:
-          flag = record::NotEqual(type, r, vals_, i);
-          break;
-        default:
-          LOG(FATAL) << "unimplemented!";
-      }
-      if (!flag) {
-        break;
-      }
-    }
-    if (flag) {
-      out_rs.push_back(std::move(r));
+bool FilterOperator::Process(NodeIndex source,
+                             const std::vector<Record> &records,
+                             std::vector<Record> *output) {
+  for (const Record &record : records) {
+    if (this->Accept(record)) {
+      output->push_back(record.Copy());
     }
   }
+  return true;
+}
 
+bool FilterOperator::Accept(const Record &record) const {
+  for (const auto &[v, col, op] : this->ops_) {
+    switch (op) {
+      case Operation::LESS_THAN:
+        RECORD_VALUE_COMPARE_MACRO(v, col, <);
+
+      case Operation::LESS_THAN_OR_EQUAL:
+        RECORD_VALUE_COMPARE_MACRO(v, col, <=);
+
+      case Operation::GREATER_THAN:
+        RECORD_VALUE_COMPARE_MACRO(v, col, >);
+
+      case Operation::GREATER_THAN_OR_EQUAL:
+        RECORD_VALUE_COMPARE_MACRO(v, col, >=);
+
+      case Operation::EQUAL:
+        RECORD_VALUE_COMPARE_MACRO(v, col, ==);
+
+      case Operation::NOT_EQUAL:
+        RECORD_VALUE_COMPARE_MACRO(v, col, !=);
+
+      default:
+        LOG(FATAL) << "Unsupported operation in filter";
+    }
+  }
   return true;
 }
 

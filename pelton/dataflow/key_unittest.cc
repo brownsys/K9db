@@ -66,9 +66,9 @@ TEST(KeyTest, Comparisons) {
 
     // Unequal values mean unequal keys.
     if (i > 0) {
-      EXPECT_NE(ukeys[i-1], ukeys[i]);
-      EXPECT_NE(ikeys[i-1], ikeys[i]);
-      EXPECT_NE(skeys[i-1], skeys[i]);
+      EXPECT_NE(ukeys[i - 1], ukeys[i]);
+      EXPECT_NE(ikeys[i - 1], ikeys[i]);
+      EXPECT_NE(skeys[i - 1], skeys[i]);
     }
   }
 
@@ -155,7 +155,7 @@ TEST(KeyTest, KeyMoveAssignment) {
   EXPECT_EQ(key1m.GetInt(), -10);
   EXPECT_EQ(key1.GetInt(), -10);
   EXPECT_EQ(key1.type(), key1m.type());
-  
+
   // Move string key and check moved things are equal.
   key3m = std::move(key2);
   EXPECT_EQ(key3m.GetString(), "hello and welcome to this long string!");
@@ -165,7 +165,7 @@ TEST(KeyTest, KeyMoveAssignment) {
   // during move!
 
 #ifndef PELTON_VALGRIND_MODE
-  // Test illegal moves.  
+  // Test illegal moves.
   ASSERT_DEATH({ key2m = std::move(key3m); }, "Bad move assign key type");
   ASSERT_DEATH({ key4m = std::move(key1m); }, "Bad move assign key type");
 #endif
@@ -213,7 +213,7 @@ TEST(KeyTest, KeyCopyAssignment) {
   EXPECT_EQ(key1.GetInt(), -10);
   EXPECT_EQ(key1c.GetInt(), -10);
   EXPECT_EQ(key1.type(), key1c.type());
-  
+
   // Copy string key and check copied things are equal.
   key3c = key2;
   EXPECT_EQ(key2.GetString(), "hello and welcome to this long string!");
@@ -225,7 +225,7 @@ TEST(KeyTest, KeyCopyAssignment) {
   // during copy!
 
 #ifndef PELTON_VALGRIND_MODE
-  // Test illegal copies.  
+  // Test illegal copies.
   ASSERT_DEATH({ key2c = key2; }, "Bad copy assign key type");
   ASSERT_DEATH({ key4c = key1; }, "Bad copy assign key type");
 #endif

@@ -5,13 +5,21 @@
 
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/record.h"
+#include "pelton/dataflow/types.h"
 
 namespace pelton {
 namespace dataflow {
 
 class IdentityOperator : public Operator {
-  OperatorType type() const override { return OperatorType::IDENTITY; }
-  bool process(std::vector<Record>& rs, std::vector<Record>& out_rs) override;
+ public:
+  IdentityOperator() : Operator(Operator::Type::IDENTITY) {}
+
+  bool ProcessAndForward(NodeIndex source,
+                         const std::vector<Record> &records) override;
+
+ protected:
+  bool Process(NodeIndex source, const std::vector<Record> &records,
+               std::vector<Record> *output) override;
 };
 
 }  // namespace dataflow

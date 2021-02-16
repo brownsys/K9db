@@ -21,13 +21,16 @@ class MatViewOperator : public Operator {
   explicit MatViewOperator(std::vector<ColumnID> &&key_cols)
       : Operator(Operator::Type::MAT_VIEW), key_cols_(key_cols) {}
 
-  bool Process(NodeIndex source, const std::vector<Record> &records,
-               std::vector<Record> *output) override;
-
+  size_t count() const;
+  bool Contains(const Key &key) const;
   const std::vector<Record> &Lookup(const Key &key) const;
 
-  GroupedData::const_iterator cbegin() const;
-  GroupedData::const_iterator cend() const;
+  GroupedData::const_iterator begin() const;
+  GroupedData::const_iterator end() const;
+
+ protected:
+  bool Process(NodeIndex source, const std::vector<Record> &records,
+               std::vector<Record> *output) override;
 
  private:
   GroupedData contents_;

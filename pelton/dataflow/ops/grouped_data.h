@@ -22,16 +22,7 @@ namespace dataflow {
 // being grouped after a key
 class GroupedData {
  public:
-  GroupedData() {}
-
-  inline std::vector<Record>::const_iterator BeginGroup(const Key &key) const {
-    if (!contents_.contains(key)) return EMPTY_VEC.cend();
-    return std::cbegin(contents_.at(key));
-  }
-  inline std::vector<Record>::const_iterator EndGroup(const Key &key) const {
-    if (!contents_.contains(key)) return EMPTY_VEC.cend();
-    return std::cend(contents_.at(key));
-  }
+  GroupedData() : count_(0) {}
 
   inline const std::vector<Record> &Get(const Key &key) const {
     if (!contents_.contains(key)) return EMPTY_VEC;
@@ -50,9 +41,11 @@ class GroupedData {
     std::vector<Record> &v = contents_.at(key);
     if (r.IsPositive()) {
       v.push_back(r.Copy());
+      this->count_++;
     } else {
       auto it = std::find(std::begin(v), std::end(v), r);
       v.erase(it);
+      this->count_--;
     }
     return true;
   }
@@ -93,6 +86,9 @@ class GroupedData {
           const auto &[_, records] = *(this->group_it_);
           this->record_it_ = std::cbegin(records);
           this->record_end_ = std::cend(records);
+        } else {
+          this->record_it_ = EMPTY_VEC.cend();
+          this->record_end_ = EMPTY_VEC.cend();
         }
       }
       return *this;
@@ -126,15 +122,19 @@ class GroupedData {
     std::vector<Record>::const_iterator record_end_;
   };
 
-  inline const_iterator cbegin() const {
+  inline const_iterator begin() const {
     return const_iterator{std::cbegin(contents_), std::cend(contents_)};
   }
-  inline const_iterator cend() const {
+  inline const_iterator end() const {
     return const_iterator{std::cend(contents_), std::cend(contents_)};
   }
 
+  inline size_t count() const { return this->count_; }
+
  private:
   static const std::vector<Record> EMPTY_VEC;
+
+  size_t count_;
   absl::flat_hash_map<Key, std::vector<Record>> contents_;
 };
 

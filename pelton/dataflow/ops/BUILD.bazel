@@ -1,4 +1,24 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+cc_library(
+    name = "filter",
+    srcs = [
+        "filter.cc",
+    ],
+    hdrs = [
+        "filter.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest//:gtest_prod",
+    ],
+)
 
 cc_library(
     name = "input",
@@ -13,6 +33,25 @@ cc_library(
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "identity",
+    srcs = [
+        "identity.cc",
+    ],
+    hdrs = [
+        "identity.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
         "@glog",
     ],
 )
@@ -36,6 +75,61 @@ cc_library(
         "//pelton/dataflow:types",
         "@absl//absl/container:flat_hash_map",
         "@glog",
+    ],
+)
+
+cc_library(
+    name = "union",
+    srcs = [
+        "union.cc",
+    ],
+    hdrs = [
+        "union.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "filter-test",
+    srcs = [
+        "filter_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":filter",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "matview-test",
+    srcs = [
+        "matview_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":matview",
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
     ],
 )
 

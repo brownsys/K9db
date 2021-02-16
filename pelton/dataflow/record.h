@@ -6,6 +6,8 @@
 #include <ostream>
 #include <string>
 #include <utility>
+// NOLINTNEXTLINE
+#include <variant>
 #include <vector>
 
 #include "glog/logging.h"
@@ -19,6 +21,22 @@ namespace dataflow {
 
 class Record {
  public:
+  // Variant with the same type options as the record data type, can be used
+  // by external code to ensure same types are supported.
+  using DataVariant = std::variant<std::string, uint64_t, int64_t>;
+  static sqlast::ColumnDefinition::Type TypeOfVariant(const DataVariant &v) {
+    switch (v.index()) {
+      case 0:
+        return sqlast::ColumnDefinition::Type::TEXT;
+      case 1:
+        return sqlast::ColumnDefinition::Type::UINT;
+      case 2:
+        return sqlast::ColumnDefinition::Type::INT;
+      default:
+        LOG(FATAL) << "Unsupported variant type!";
+    }
+  }
+
   // No default constructor.
   Record() = delete;
 

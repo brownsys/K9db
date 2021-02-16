@@ -6,6 +6,7 @@
 
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/record.h"
+#include "pelton/dataflow/types.h"
 
 namespace pelton {
 namespace dataflow {

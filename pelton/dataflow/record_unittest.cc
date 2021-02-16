@@ -237,7 +237,7 @@ TEST(RecordTest, RecordMoveConstructor) {
   ASSERT_DEATH({ record.GetInt(0); }, "Attempting to use moved record");
   ASSERT_DEATH({ record.GetString(1); }, "Attempting to use moved record");
 #endif
-  
+
   // This also calls the move constructor.
   Record record3 = std::move(record2);
   EXPECT_EQ(record3.GetInt(0), v0);
