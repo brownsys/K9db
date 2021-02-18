@@ -3,7 +3,6 @@
 
 #include <vector>
 
-#include "absl/container/flat_hash_map.h"
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/grouped_data.h"

@@ -124,6 +124,18 @@ class Record {
     this->data_[i].str = std::move(v);
   }
 
+  Key GetValue(size_t i) const {
+    switch (this->schema_.TypeOf(i)) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        return Key(this->data_[i].uint);
+      case sqlast::ColumnDefinition::Type::INT:
+        return Key(this->data_[i].sint);
+      case sqlast::ColumnDefinition::Type::TEXT:
+        return Key(*this->data_[i].str);
+      default:
+        LOG(FATAL) << "Unsupported data type in value extraction!";
+    }
+  }
   uint64_t GetUInt(size_t i) const {
     CheckType(i, sqlast::ColumnDefinition::Type::UINT);
     return this->data_[i].uint;
@@ -270,7 +282,12 @@ inline std::ostream &operator<<(std::ostream &os,
         os << r.data_[i].sint << "|";
         break;
       case sqlast::ColumnDefinition::Type::TEXT:
-        os << *r.data_[i].str << "|";
+        if (r.data_[i].str) {
+          os << *r.data_[i].str << "|";
+        } else {
+          os << "[nullptr]"
+             << "|";
+        }
         break;
       default:
         LOG(FATAL) << "Unsupported data type in record << operator";

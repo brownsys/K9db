@@ -16,7 +16,7 @@ bool MatViewOperator::Process(NodeIndex source,
   for (const Record &r : records) {
     // incoming records must have the right key column set
     CHECK(r.schema().keys() == this->key_cols_);
-    if (!this->contents_.Insert(r)) {
+    if (!this->contents_.Insert(r.GetKey(), r)) {
       return false;
     }
   }

@@ -1,6 +1,27 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 cc_library(
+    name = "equijoin",
+    srcs = [
+        "equijoin.cc",
+    ],
+    hdrs = [
+        "equijoin.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":grouped_data",
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest//:gtest_prod",
+    ],
+)
+
+cc_library(
     name = "filter",
     srcs = [
         "filter.cc",
@@ -53,27 +74,41 @@ cc_library(
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "@glog",
+        "@gtest//:gtest_prod",
+    ],
+)
+
+cc_library(
+    name = "grouped_data",
+    srcs = [
+        "grouped_data.cc",
+    ],
+    hdrs = [
+        "grouped_data.h",
+    ],
+    deps = [
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:types",
+        "@absl//absl/container:flat_hash_map",
     ],
 )
 
 cc_library(
     name = "matview",
     srcs = [
-        "grouped_data.cc",
         "matview.cc",
     ],
     hdrs = [
-        "grouped_data.h",
         "matview.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
+        ":grouped_data",
         "//pelton/dataflow:key",
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
-        "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
-        "@absl//absl/container:flat_hash_map",
         "@glog",
     ],
 )
@@ -93,6 +128,27 @@ cc_library(
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "@glog",
+    ],
+)
+
+cc_test(
+    name = "equijoin-test",
+    srcs = [
+        "equijoin_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":equijoin",
+        ":identity",
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
     ],
 )
 
@@ -132,51 +188,3 @@ cc_test(
         "@gtest//:gtest_main",
     ],
 )
-
-'''
-cc_library(
-    name = "operators",
-    srcs = [
-        "equijoin.cc",
-        "filter.cc",
-        "identity.cc",
-        "input.cc",
-        "matview.cc",
-        "union.cc",
-    ],
-    hdrs = [
-        "equijoin.h",
-        "filter.h",
-        "identity.h",
-        "input.h",
-        "matview.h",
-        "union.h",
-    ],
-    visibility = ["//pelton:__subpackages__"],
-    deps = [
-        "//pelton/sqlast:ast",
-        "@absl//absl/base:core_headers",
-        "@absl//absl/container:flat_hash_map",
-        "@absl//absl/container:node_hash_map",
-        "@absl//absl/strings",
-        "@glog",
-        "@gtest//:gtest_prod",
-    ],
-)
-
-cc_test(
-    name = "dataflow-tests",
-    srcs = [
-        "equijoin_unittest.cc",
-        "filter_unittest.cc",
-        "union_unittest.cc",
-    ],
-    copts = ["-Iexternal/gtest/googletest/include"],
-    deps = [
-        "//pelton/dataflow",
-        "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
-    ],
-)
-'''

@@ -3,6 +3,7 @@
 
 #include <vector>
 
+#include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/types.h"
@@ -20,6 +21,10 @@ class IdentityOperator : public Operator {
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,
                std::vector<Record> *output) override;
+
+  FRIEND_TEST(EquiJoinOperatorTest, BasicJoinTest);
+  FRIEND_TEST(EquiJoinOperatorTest, BasicUnjoinableTest);
+  FRIEND_TEST(EquiJoinOperatorTest, FullJoinTest);
 };
 
 }  // namespace dataflow

@@ -12,7 +12,6 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "pelton/dataflow/key.h"
-#include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/record.h"
 
 namespace pelton {
@@ -31,14 +30,13 @@ class GroupedData {
 
   inline bool Contains(const Key &key) const { return contents_.contains(key); }
 
-  inline bool Insert(const Record &r) {
-    Key key = r.GetKey();
-    if (!contents_.contains(key)) {
+  inline bool Insert(const Key &k, const Record &r) {
+    if (!contents_.contains(k)) {
       // need to add key -> records entry as empty vector
-      contents_.emplace(key, std::vector<Record>{});
+      contents_.emplace(k, std::vector<Record>{});
     }
 
-    std::vector<Record> &v = contents_.at(key);
+    std::vector<Record> &v = contents_.at(k);
     if (r.IsPositive()) {
       v.push_back(r.Copy());
       this->count_++;
