@@ -34,6 +34,7 @@ class EquiJoinOperator : public Operator {
   std::shared_ptr<Operator> right() const {
     return this->parents_.at(1)->from();
   }
+  const Schema &joined_schema() const { return *this->joined_schema_; }
 
  protected:
   /*!

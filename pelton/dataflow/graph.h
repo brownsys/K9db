@@ -33,9 +33,10 @@ class DataFlowGraph {
     return AddNode(op, std::vector<std::shared_ptr<Operator>>{});
   }
   // Special case: output operator is added to outputs_.
-  inline bool AddOutputOperator(std::shared_ptr<MatViewOperator> op) {
+  inline bool AddOutputOperator(std::shared_ptr<MatViewOperator> op,
+                                std::shared_ptr<Operator> parent) {
     this->outputs_.emplace_back(op);
-    return AddNode(op, std::vector<std::shared_ptr<Operator>>{});
+    return AddNode(op, parent);
   }
 
   bool Process(const std::string &input_name,

@@ -145,7 +145,6 @@ cc_test(
     ],
 )
 
-'''
 cc_test(
     name = "graph-test",
     srcs = [
@@ -154,9 +153,15 @@ cc_test(
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":graph",
+        ":record",
+        ":schema",
+        "//pelton/dataflow/ops:equijoin",
+        "//pelton/dataflow/ops:filter",
+        "//pelton/dataflow/ops:input",
+        "//pelton/dataflow/ops:matview",
+        "//pelton/dataflow/ops:union",
         "@glog",
         "@gtest",
         "@gtest//:gtest_main",
     ],
 )
-'''

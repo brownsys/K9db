@@ -97,8 +97,10 @@ class Record {
           record.data_[i].sint = this->data_[i].sint;
           break;
         case sqlast::ColumnDefinition::Type::TEXT:
-          record.data_[i].str =
-              std::make_unique<std::string>(*this->data_[i].str);
+          if (this->data_[i].str) {
+            record.data_[i].str =
+                std::make_unique<std::string>(*this->data_[i].str);
+          }
           break;
         default:
           LOG(FATAL) << "Unsupported data type in record copy!";
