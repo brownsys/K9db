@@ -138,6 +138,23 @@ cc_test(
     deps = [
         ":record",
         ":schema",
+        ":types",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "schema-test",
+    srcs = [
+        "schema_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":schema",
+        ":types",
         "//pelton/sqlast:ast",
         "@glog",
         "@gtest",
@@ -155,6 +172,7 @@ cc_test(
         ":graph",
         ":record",
         ":schema",
+        ":types",
         "//pelton/dataflow/ops:equijoin",
         "//pelton/dataflow/ops:filter",
         "//pelton/dataflow/ops:input",

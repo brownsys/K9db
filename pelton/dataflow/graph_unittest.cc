@@ -15,6 +15,7 @@
 #include "pelton/dataflow/ops/union.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
+#include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
