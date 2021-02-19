@@ -5,9 +5,19 @@
 
 #include "glog/logging.h"
 #include "pelton/dataflow/record.h"
+#include "pelton/dataflow/schema.h"
 
 namespace pelton {
 namespace dataflow {
+
+void UnionOperator::ComputeOutputSchema() {
+  this->output_schema_ = this->input_schemas_.at(0);
+  for (const SchemaRef &input_schema : this->input_schemas_) {
+    if (this->output_schema_ != input_schema) {
+      LOG(FATAL) << "UnionOperator has inputs with different schemas";
+    }
+  }
+}
 
 bool UnionOperator::Process(NodeIndex source,
                             const std::vector<Record> &records,

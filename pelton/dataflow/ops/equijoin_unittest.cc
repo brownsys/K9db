@@ -18,32 +18,32 @@ namespace dataflow {
 
 using CType = sqlast::ColumnDefinition::Type;
 
-inline Schema Schema1() {
+inline SchemaOwner Schema1() {
   std::vector<std::string> names = {"ID", "Item", "Category"};
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {0};
-  return Schema{names, types, keys};
+  return SchemaOwner{names, types, keys};
 }
 
-inline Schema Schema2() {
+inline SchemaOwner Schema2() {
   std::vector<std::string> names = {"Count", "Category", "Description"};
   std::vector<CType> types = {CType::UINT, CType::INT, CType::TEXT};
   std::vector<ColumnID> keys = {1};
-  return Schema{names, types, keys};
+  return SchemaOwner{names, types, keys};
 }
 
-inline Schema Schema3() {
+inline SchemaOwner Schema3() {
   std::vector<std::string> names = {"ID2", "Category", "Text"};
   std::vector<CType> types = {CType::UINT, CType::INT, CType::TEXT};
   std::vector<ColumnID> keys = {0};
-  return Schema{names, types, keys};
+  return SchemaOwner{names, types, keys};
 }
 
-inline Schema Schema4() {
+inline SchemaOwner Schema4() {
   std::vector<std::string> names = {"Category", "Text"};
   std::vector<CType> types = {CType::INT, CType::TEXT};
   std::vector<ColumnID> keys = {0};
-  return Schema{names, types, keys};
+  return SchemaOwner{names, types, keys};
 }
 
 TEST(EquiJoinOperatorTest, JoinedSchemaTest) {
@@ -51,20 +51,29 @@ TEST(EquiJoinOperatorTest, JoinedSchemaTest) {
   EquiJoinOperator op2{1, 1};
   EquiJoinOperator op3{1, 2};
   EquiJoinOperator op4{0, 2};
-  Schema schema1 = Schema1();
-  Schema schema2 = Schema2();
-  Schema schema3 = Schema3();
-  Schema schema4 = Schema4();
+  SchemaOwner schema1 = Schema1();
+  SchemaOwner schema2 = Schema2();
+  SchemaOwner schema3 = Schema3();
+  SchemaOwner schema4 = Schema4();
 
   // Compute the joined schema.
-  op1.ComputeJoinedSchema(schema1, schema2);
-  op2.ComputeJoinedSchema(schema2, schema3);
-  op3.ComputeJoinedSchema(schema3, schema1);
-  op4.ComputeJoinedSchema(schema4, schema1);
-  const Schema &joined1 = *op1.joined_schema_;
-  const Schema &joined2 = *op2.joined_schema_;
-  const Schema &joined3 = *op3.joined_schema_;
-  const Schema &joined4 = *op4.joined_schema_;
+  op1.input_schemas_.push_back(SchemaRef(schema1));
+  op1.input_schemas_.push_back(SchemaRef(schema2));
+  op1.ComputeOutputSchema();
+  op2.input_schemas_.push_back(SchemaRef(schema2));
+  op2.input_schemas_.push_back(SchemaRef(schema3));
+  op2.ComputeOutputSchema();
+  op3.input_schemas_.push_back(SchemaRef(schema3));
+  op3.input_schemas_.push_back(SchemaRef(schema1));
+  op3.ComputeOutputSchema();
+  op4.input_schemas_.push_back(SchemaRef(schema4));
+  op4.input_schemas_.push_back(SchemaRef(schema1));
+  op4.ComputeOutputSchema();
+
+  const SchemaRef &joined1 = op1.output_schema();
+  const SchemaRef &joined2 = op2.output_schema();
+  const SchemaRef &joined3 = op3.output_schema();
+  const SchemaRef &joined4 = op4.output_schema();
 
   std::vector<std::string> joined_names1 = {"ID", "Item", "Category", "Count",
                                             "Description"};
@@ -108,12 +117,12 @@ TEST(EquiJoinOperatorTest, BasicJoinTest) {
   // Make two joinable records.
   std::unique_ptr<std::string> s1 = std::make_unique<std::string>("item0");
   std::unique_ptr<std::string> s2 = std::make_unique<std::string>("descrp0");
-  Schema lschema = Schema1();
-  Schema rschema = Schema2();
+  SchemaOwner lschema = Schema1();
+  SchemaOwner rschema = Schema2();
   std::vector<Record> lrecords;
   std::vector<Record> rrecords;
-  lrecords.emplace_back(lschema);
-  rrecords.emplace_back(rschema);
+  lrecords.emplace_back(SchemaRef(lschema));
+  rrecords.emplace_back(SchemaRef(rschema));
   lrecords.at(0).SetUInt(0UL, 0);
   lrecords.at(0).SetString(std::move(s1), 1);
   lrecords.at(0).SetInt(-5L, 2);
@@ -130,6 +139,8 @@ TEST(EquiJoinOperatorTest, BasicJoinTest) {
   iop2->SetIndex(1);
   op->parents_ = {std::make_shared<Edge>(iop1, op),
                   std::make_shared<Edge>(iop2, op)};
+  op->input_schemas_ = {SchemaRef(lschema), SchemaRef(rschema)};
+  op->ComputeOutputSchema();
 
   // Process records.
   std::vector<Record> output;
@@ -155,12 +166,12 @@ TEST(EquiJoinOperatorTest, BasicUnjoinableTest) {
   // Make two unjoinable records.
   std::unique_ptr<std::string> s1 = std::make_unique<std::string>("item0");
   std::unique_ptr<std::string> s2 = std::make_unique<std::string>("descrp0");
-  Schema lschema = Schema1();
-  Schema rschema = Schema2();
+  SchemaOwner lschema = Schema1();
+  SchemaOwner rschema = Schema2();
   std::vector<Record> lrecords;
   std::vector<Record> rrecords;
-  lrecords.emplace_back(lschema);
-  rrecords.emplace_back(rschema);
+  lrecords.emplace_back(SchemaRef(lschema));
+  rrecords.emplace_back(SchemaRef(rschema));
   lrecords.at(0).SetUInt(0UL, 0);
   lrecords.at(0).SetString(std::move(s1), 1);
   lrecords.at(0).SetInt(-5L, 2);
@@ -177,6 +188,8 @@ TEST(EquiJoinOperatorTest, BasicUnjoinableTest) {
   iop2->SetIndex(1);
   op->parents_ = {std::make_shared<Edge>(iop1, op),
                   std::make_shared<Edge>(iop2, op)};
+  op->input_schemas_ = {SchemaRef(lschema), SchemaRef(rschema)};
+  op->ComputeOutputSchema();
 
   // Process records.
   std::vector<Record> output;
@@ -212,21 +225,21 @@ TEST(EquiJoinOperatorTest, FullJoinTest) {
   std::unique_ptr<std::string> jd3 = std::make_unique<std::string>("descrp2");
   std::unique_ptr<std::string> jd3_ = std::make_unique<std::string>("descrp2");
 
-  Schema lschema = Schema1();
-  Schema rschema = Schema2();
+  SchemaOwner lschema = Schema1();
+  SchemaOwner rschema = Schema2();
   std::vector<Record> lrecords1;
   std::vector<Record> lrecords2;
   std::vector<Record> lrecords3;
   std::vector<Record> rrecords1;
   std::vector<Record> rrecords2;
-  lrecords1.emplace_back(lschema);
-  lrecords1.emplace_back(lschema);
-  lrecords2.emplace_back(lschema);
-  lrecords2.emplace_back(lschema);
-  lrecords3.emplace_back(lschema);
-  rrecords1.emplace_back(rschema);
-  rrecords1.emplace_back(rschema);
-  rrecords2.emplace_back(rschema);
+  lrecords1.emplace_back(SchemaRef(lschema));
+  lrecords1.emplace_back(SchemaRef(lschema));
+  lrecords2.emplace_back(SchemaRef(lschema));
+  lrecords2.emplace_back(SchemaRef(lschema));
+  lrecords3.emplace_back(SchemaRef(lschema));
+  rrecords1.emplace_back(SchemaRef(rschema));
+  rrecords1.emplace_back(SchemaRef(rschema));
+  rrecords2.emplace_back(SchemaRef(rschema));
   // Left 1.
   lrecords1.at(0).SetUInt(0UL, 0);
   lrecords1.at(0).SetString(std::move(si1), 1);
@@ -269,6 +282,8 @@ TEST(EquiJoinOperatorTest, FullJoinTest) {
   iop2->SetIndex(1);
   op->parents_ = {std::make_shared<Edge>(iop1, op),
                   std::make_shared<Edge>(iop2, op)};
+  op->input_schemas_ = {SchemaRef(lschema), SchemaRef(rschema)};
+  op->ComputeOutputSchema();
 
   // Process records.
   std::vector<Record> output;
@@ -300,10 +315,10 @@ TEST(EquiJoinOperatorTest, FullJoinTest) {
 
   // Create the joined records.
   std::vector<Record> jrecords;
-  jrecords.emplace_back(*op->joined_schema_);
-  jrecords.emplace_back(*op->joined_schema_);
-  jrecords.emplace_back(*op->joined_schema_);
-  jrecords.emplace_back(*op->joined_schema_);
+  jrecords.emplace_back(op->output_schema());
+  jrecords.emplace_back(op->output_schema());
+  jrecords.emplace_back(op->output_schema());
+  jrecords.emplace_back(op->output_schema());
   // 1 <-> 1.
   jrecords.at(0).SetUInt(0UL, 0);
   jrecords.at(0).SetString(std::move(ji1), 1);

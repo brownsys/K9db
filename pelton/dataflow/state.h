@@ -47,7 +47,7 @@ class DataflowState {
   // The logical schema is the contract between client code and our DB.
   // The stored schema may not matched the concrete/physical one due to sharding
   // or other transformations.
-  std::unordered_map<TableName, Schema> schema_;
+  std::unordered_map<TableName, SchemaOwner> schema_;
 
   // Dataflow graphs and views.
   std::unordered_map<FlowName, DataFlowGraph> flows_;

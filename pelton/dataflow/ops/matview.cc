@@ -8,7 +8,11 @@
 namespace pelton {
 namespace dataflow {
 
-// Leaves out_rs empty, as materialized views are leaves of the graph.
+void MatViewOperator::ComputeOutputSchema() {
+  this->output_schema_ = this->input_schemas_.at(0);
+}
+
+// Leaves output empty, as materialized views are leaves of the graph.
 // We may change this if we allow mat views to have descendant nodes.
 bool MatViewOperator::Process(NodeIndex source,
                               const std::vector<Record> &records,

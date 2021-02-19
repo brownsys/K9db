@@ -49,6 +49,8 @@ class FilterOperator : public Operator {
 
   bool Accept(const Record &record) const;
 
+  void ComputeOutputSchema() override;
+
  private:
   std::vector<std::tuple<Record::DataVariant, ColumnID, Operation>> ops_;
   // Allow tests to use .Process(...) directly.

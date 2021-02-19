@@ -1,7 +1,6 @@
 #include "pelton/dataflow/ops/input.h"
 
 #include <memory>
-#include <vector>
 
 #include "glog/logging.h"
 #include "pelton/dataflow/record.h"
@@ -18,6 +17,14 @@ bool InputOperator::Process(NodeIndex source,
 
 bool InputOperator::ProcessAndForward(NodeIndex source,
                                       const std::vector<Record> &records) {
+  // Validate input records have correct schemas.
+  for (const Record &record : records) {
+    if (record.schema() != this->input_schemas_.at(0)) {
+      LOG(FATAL) << "Input record has bad schema";
+    }
+  }
+
+  // Forward input records to children.
   for (std::weak_ptr<Edge> edge_ptr : this->children_) {
     std::shared_ptr<Edge> edge = edge_ptr.lock();
     std::shared_ptr<Operator> child = edge->to().lock();

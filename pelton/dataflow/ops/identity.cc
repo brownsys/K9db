@@ -9,6 +9,10 @@
 namespace pelton {
 namespace dataflow {
 
+void IdentityOperator::ComputeOutputSchema() {
+  this->output_schema_ = this->input_schemas_.at(0);
+}
+
 bool IdentityOperator::Process(NodeIndex source,
                                const std::vector<Record> &records,
                                std::vector<Record> *output) {

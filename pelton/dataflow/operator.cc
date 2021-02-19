@@ -12,17 +12,20 @@ void Operator::AddParent(std::shared_ptr<Operator> parent,
   LOG(INFO) << "Adding edge: " << edge->from()->index() << " -> "
             << edge->to().lock()->index();
   this->parents_.push_back(edge);
+  this->input_schemas_.push_back(parent->output_schema());
   parent->children_.emplace_back(edge);
+  this->ComputeOutputSchema();
 }
 
 bool Operator::ProcessAndForward(NodeIndex source,
                                  const std::vector<Record> &records) {
+  // Process the records generating the output vector.
   std::vector<Record> output;
-
   if (!this->Process(source, records, &output)) {
     return false;
   }
 
+  // Pass output vector down to children to process.
   for (std::weak_ptr<Edge> edge_ptr : this->children_) {
     std::shared_ptr<Edge> edge = edge_ptr.lock();
     std::shared_ptr<Operator> child = edge->to().lock();
@@ -35,9 +38,6 @@ bool Operator::ProcessAndForward(NodeIndex source,
 }
 
 std::vector<std::shared_ptr<Operator>> Operator::GetParents() const {
-  // lookup from graph
-  assert(this->graph_);
-
   std::vector<std::shared_ptr<Operator>> nodes;
   for (const auto &edge : this->parents_) {
     nodes.emplace_back(edge->from());

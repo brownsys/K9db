@@ -24,29 +24,22 @@ namespace dataflow {
 using CType = sqlast::ColumnDefinition::Type;
 
 // Make schemas.
-Schema MakeLeftSchema() {
+SchemaOwner MakeLeftSchema() {
   std::vector<std::string> names = {"ID", "Item", "Category"};
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {0};
-  return Schema{names, types, keys};
+  return SchemaOwner{names, types, keys};
 }
 
-Schema MakeRightSchema() {
+SchemaOwner MakeRightSchema() {
   std::vector<std::string> names = {"Category", "Description"};
   std::vector<CType> types = {CType::INT, CType::TEXT};
   std::vector<ColumnID> keys;
-  return Schema{names, types, keys};
-}
-Schema MakeJoinSchema() {
-  std::vector<std::string> names = {"ID", "Item", "Category", "Description"};
-  std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT,
-                              CType::TEXT};
-  std::vector<ColumnID> keys = {0};
-  return Schema{names, types, keys};
+  return SchemaOwner{names, types, keys};
 }
 
 // Make records.
-inline std::vector<Record> MakeLeftRecords(const Schema &schema) {
+inline std::vector<Record> MakeLeftRecords(const SchemaRef &schema) {
   // Allocate some unique_ptrs.
   std::unique_ptr<std::string> si1 = std::make_unique<std::string>("item0");
   std::unique_ptr<std::string> si2 = std::make_unique<std::string>("item1");
@@ -82,7 +75,7 @@ inline std::vector<Record> MakeLeftRecords(const Schema &schema) {
   records.at(4).SetInt(1L, 2);
   return records;
 }
-inline std::vector<Record> MakeRightRecords(const Schema &schema) {
+inline std::vector<Record> MakeRightRecords(const SchemaRef &schema) {
   // Allocate some unique_ptrs.
   std::unique_ptr<std::string> sd1 = std::make_unique<std::string>("descrp0");
   std::unique_ptr<std::string> sd2 = std::make_unique<std::string>("descrp1");
@@ -103,7 +96,7 @@ inline std::vector<Record> MakeRightRecords(const Schema &schema) {
   records.at(2).SetString(std::move(sd3), 1);
   return records;
 }
-inline std::vector<Record> MakeJoinRecords(const Schema &schema) {
+inline std::vector<Record> MakeJoinRecords(const SchemaRef &schema) {
   // Allocate some unique_ptrs.
   std::unique_ptr<std::string> si1 = std::make_unique<std::string>("item0");
   std::unique_ptr<std::string> si3 = std::make_unique<std::string>("item2");
@@ -141,13 +134,24 @@ inline std::vector<Record> MakeJoinRecords(const Schema &schema) {
   records.at(3).SetString(std::move(sd2__), 3);
   return records;
 }
+inline std::vector<Record> MakeFilterRecords(const SchemaRef &schema) {
+  // Allocate some unique_ptrs.
+  std::unique_ptr<std::string> si4 = std::make_unique<std::string>("item3");
+  // Make records.
+  std::vector<Record> records;
+  records.emplace_back(schema);
+  records.at(0).SetUInt(7UL, 0);
+  records.at(0).SetString(std::move(si4), 1);
+  records.at(0).SetInt(1L, 2);
+  return records;
+}
 
 // Make different types of flows/graphs.
-DataFlowGraph MakeTrivialGraph(ColumnID keycol) {
+DataFlowGraph MakeTrivialGraph(ColumnID keycol, const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
   DataFlowGraph g;
 
-  auto in = std::make_shared<InputOperator>("test-table");
+  auto in = std::make_shared<InputOperator>("test-table", schema);
   auto matview = std::make_shared<MatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
@@ -159,11 +163,11 @@ DataFlowGraph MakeTrivialGraph(ColumnID keycol) {
   return g;
 }
 
-DataFlowGraph MakeFilterGraph(ColumnID keycol) {
+DataFlowGraph MakeFilterGraph(ColumnID keycol, const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
   DataFlowGraph g;
 
-  auto in = std::make_shared<InputOperator>("test-table");
+  auto in = std::make_shared<InputOperator>("test-table", schema);
   auto filter = std::make_shared<FilterOperator>();
   filter->AddOperation(5UL, 0, FilterOperator::Operation::GREATER_THAN);
   auto matview = std::make_shared<MatViewOperator>(keys);
@@ -178,12 +182,12 @@ DataFlowGraph MakeFilterGraph(ColumnID keycol) {
   return g;
 }
 
-DataFlowGraph MakeUnionGraph(ColumnID keycol) {
+DataFlowGraph MakeUnionGraph(ColumnID keycol, const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
   DataFlowGraph g;
 
-  auto in1 = std::make_shared<InputOperator>("test-table1");
-  auto in2 = std::make_shared<InputOperator>("test-table2");
+  auto in1 = std::make_shared<InputOperator>("test-table1", schema);
+  auto in2 = std::make_shared<InputOperator>("test-table2", schema);
   auto union_ = std::make_shared<UnionOperator>();
   auto matview = std::make_shared<MatViewOperator>(keys);
 
@@ -199,12 +203,14 @@ DataFlowGraph MakeUnionGraph(ColumnID keycol) {
   return g;
 }
 
-DataFlowGraph MakeEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk) {
+DataFlowGraph MakeEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
+                                const SchemaRef &lschema,
+                                const SchemaRef &rschema) {
   std::vector<ColumnID> keys = {ok};
   DataFlowGraph g;
 
-  auto in1 = std::make_shared<InputOperator>("test-table1");
-  auto in2 = std::make_shared<InputOperator>("test-table2");
+  auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
+  auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
   auto join = std::make_shared<EquiJoinOperator>(lk, rk);
   auto matview = std::make_shared<MatViewOperator>(keys);
 
@@ -233,11 +239,11 @@ inline void MatViewContentsEquals(std::shared_ptr<MatViewOperator> matview,
 // Tests!
 TEST(DataFlowGraphTest, TestTrivialGraph) {
   // Schema must survive records.
-  Schema schema = MakeLeftSchema();
+  SchemaOwner schema = MakeLeftSchema();
   // Make graph.
-  DataFlowGraph g = MakeTrivialGraph(0);
+  DataFlowGraph g = MakeTrivialGraph(0, SchemaRef(schema));
   // Make records.
-  std::vector<Record> records = MakeLeftRecords(schema);
+  std::vector<Record> records = MakeLeftRecords(SchemaRef(schema));
   // Process records.
   EXPECT_TRUE(g.Process("test-table", records));
   // Outputs must be equal.
@@ -246,27 +252,27 @@ TEST(DataFlowGraphTest, TestTrivialGraph) {
 
 TEST(DataFlowGraphTest, TestFilterGraph) {
   // Schema must survive records.
-  Schema schema = MakeLeftSchema();
+  SchemaOwner schema = MakeLeftSchema();
   // Make graph.
-  DataFlowGraph g = MakeFilterGraph(0);
+  DataFlowGraph g = MakeFilterGraph(0, SchemaRef(schema));
   // Make records.
-  std::vector<Record> records = MakeLeftRecords(schema);
+  std::vector<Record> records = MakeLeftRecords(SchemaRef(schema));
   // Process records.
   EXPECT_TRUE(g.Process("test-table", records));
   // Filter records.
-  std::vector<Record> filtered;
-  filtered.push_back(records.at(3).Copy());
+  auto op = std::dynamic_pointer_cast<FilterOperator>(g.GetNode(1));
+  std::vector<Record> filtered = MakeFilterRecords(op->output_schema());
   // Outputs must be equal.
   MatViewContentsEquals(g.outputs().at(0), filtered);
 }
 
 TEST(DataFlowGraphTest, TestUnionGraph) {
   // Schema must survive records.
-  Schema schema = MakeLeftSchema();
+  SchemaOwner schema = MakeLeftSchema();
   // Make graph.
-  DataFlowGraph g = MakeUnionGraph(0);
+  DataFlowGraph g = MakeUnionGraph(0, SchemaRef(schema));
   // Make records.
-  std::vector<Record> records = MakeLeftRecords(schema);
+  std::vector<Record> records = MakeLeftRecords(SchemaRef(schema));
   std::vector<Record> first_half;
   first_half.push_back(records.at(0).Copy());
   first_half.push_back(records.at(1).Copy());
@@ -283,20 +289,20 @@ TEST(DataFlowGraphTest, TestUnionGraph) {
 
 TEST(DataFlowGraphTest, TestEquiJoinGraph) {
   // Schema must survive records.
-  Schema lschema = MakeLeftSchema();
-  Schema rschema = MakeRightSchema();
+  SchemaOwner lschema = MakeLeftSchema();
+  SchemaOwner rschema = MakeRightSchema();
   // Make graph.
-  DataFlowGraph g = MakeEquiJoinGraph(0, 2, 0);
+  DataFlowGraph g =
+      MakeEquiJoinGraph(0, 2, 0, SchemaRef(lschema), SchemaRef(rschema));
   // Make records.
-  std::vector<Record> left = MakeLeftRecords(lschema);
-  std::vector<Record> right = MakeRightRecords(rschema);
+  std::vector<Record> left = MakeLeftRecords(SchemaRef(lschema));
+  std::vector<Record> right = MakeRightRecords(SchemaRef(rschema));
   // Process records.
   EXPECT_TRUE(g.Process("test-table1", left));
   EXPECT_TRUE(g.Process("test-table2", right));
   // Compute expected result.
   auto op = std::dynamic_pointer_cast<EquiJoinOperator>(g.GetNode(2));
-  const Schema &jschema = op->joined_schema();
-  std::vector<Record> result = MakeJoinRecords(jschema);
+  std::vector<Record> result = MakeJoinRecords(op->output_schema());
   // Outputs must be equal.
   MatViewContentsEquals(g.outputs().at(0), result);
 }

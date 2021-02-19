@@ -34,7 +34,6 @@ class EquiJoinOperator : public Operator {
   std::shared_ptr<Operator> right() const {
     return this->parents_.at(1)->from();
   }
-  const Schema &joined_schema() const { return *this->joined_schema_; }
 
  protected:
   /*!
@@ -50,17 +49,17 @@ class EquiJoinOperator : public Operator {
   bool Process(NodeIndex source, const std::vector<Record> &records,
                std::vector<Record> *output) override;
 
+  // Computes joined_schema_.
+  void ComputeOutputSchema() override;
+
  private:
   // Columns on which join is computed.
   ColumnID left_id_;
   ColumnID right_id_;
   // Schema of the output.
-  std::unique_ptr<Schema> joined_schema_;
+  SchemaOwner joined_schema_;
   GroupedData left_table_;
   GroupedData right_table_;
-
-  // Computes joined_schema_.
-  void ComputeJoinedSchema(const Schema &lschema, const Schema &rschema);
 
   // Join left and right and store it in output.
   void EmitRow(const Record &left, const Record &right,

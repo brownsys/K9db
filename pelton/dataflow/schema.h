@@ -16,6 +16,10 @@ class SchemaRef;
 
 class SchemaOwner {
  public:
+  // Empty SchemaOwner: this is used to create a temporary so that Operators can
+  // compute their output schema after creation.
+  SchemaOwner() : ptr_(nullptr) {}
+
   // Construct from a CREATE TABLE statement.
   explicit SchemaOwner(const sqlast::CreateTable &table);
 
@@ -62,8 +66,6 @@ class SchemaOwner {
   const std::string &NameOf(size_t i) const;
 
  protected:
-  SchemaOwner() : ptr_(nullptr) {}
-
   // Schema data is a protected struct inside SchemaOwner, it is never exposed
   // directly.
   struct SchemaData {
@@ -98,6 +100,10 @@ class SchemaOwner {
 
 class SchemaRef : public SchemaOwner {
  public:
+  // Empty SchemaRef: this is used to create a temporary so that Operators can
+  // compute their output schema after creation.
+  SchemaRef() : SchemaOwner() {}
+
   // Can only be constructor from an owner!
   explicit SchemaRef(const SchemaOwner &other) : SchemaOwner() {
     this->ptr_ = other.ptr_;

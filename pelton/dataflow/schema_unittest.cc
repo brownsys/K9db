@@ -61,6 +61,12 @@ inline void CheckSchema(const SchemaRef &schema) {
 #endif
 }
 
+// Size is a ptr + virtual table.
+TEST(SchemaTest, SchemaSize) {
+  EXPECT_EQ(sizeof(SchemaOwner), 16);
+  EXPECT_EQ(sizeof(SchemaRef), 16);
+}
+
 // Test construction of SchemaOwner.
 TEST(SchemaTest, ConstructOwner) {
   SchemaOwner schema = MakeSchema();

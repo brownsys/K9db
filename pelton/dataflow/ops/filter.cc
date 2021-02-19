@@ -38,6 +38,10 @@
 namespace pelton {
 namespace dataflow {
 
+void FilterOperator::ComputeOutputSchema() {
+  this->output_schema_ = this->input_schemas_.at(0);
+}
+
 bool FilterOperator::Process(NodeIndex source,
                              const std::vector<Record> &records,
                              std::vector<Record> *output) {

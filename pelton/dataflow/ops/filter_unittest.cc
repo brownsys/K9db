@@ -15,16 +15,16 @@ namespace dataflow {
 
 using CType = sqlast::ColumnDefinition::Type;
 
-inline Schema CreateSchema() {
+inline SchemaOwner CreateSchema() {
   // Create a schema.
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {0};
-  return Schema{names, types, keys};
+  return SchemaOwner{names, types, keys};
 }
 
 TEST(FilterOperatorTest, SingleAccept) {
-  Schema schema = CreateSchema();
+  SchemaOwner schema = CreateSchema();
 
   // Create some filter operators.
   FilterOperator filter1;
@@ -36,15 +36,15 @@ TEST(FilterOperatorTest, SingleAccept) {
 
   // Create some records.
   std::vector<Record> records;
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(0).SetUInt(0ULL, 0);
   records.at(0).SetString(std::make_unique<std::string>("Hello!"), 1);
   records.at(0).SetInt(-5L, 2);
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(1).SetUInt(5ULL, 0);
   records.at(1).SetString(std::make_unique<std::string>("Bye!"), 1);
   records.at(1).SetInt(7L, 2);
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(2).SetUInt(6ULL, 0);
   records.at(2).SetString(std::make_unique<std::string>("hello!"), 1);
   records.at(2).SetInt(10L, 2);
@@ -62,7 +62,7 @@ TEST(FilterOperatorTest, SingleAccept) {
 }
 
 TEST(FilterOperatorTest, AndAccept) {
-  Schema schema = CreateSchema();
+  SchemaOwner schema = CreateSchema();
 
   // Create some filter operators.
   FilterOperator filter;
@@ -72,15 +72,15 @@ TEST(FilterOperatorTest, AndAccept) {
 
   // Create some records.
   std::vector<Record> records;
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(0).SetUInt(0ULL, 0);
   records.at(0).SetString(std::make_unique<std::string>("Hello!"), 1);
   records.at(0).SetInt(7L, 2);
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(1).SetUInt(4ULL, 0);
   records.at(1).SetString(std::make_unique<std::string>("Bye!"), 1);
   records.at(1).SetInt(7L, 2);
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(2).SetUInt(6ULL, 0);
   records.at(2).SetString(std::make_unique<std::string>("Hello!"), 1);
   records.at(2).SetInt(10L, 2);
@@ -92,7 +92,7 @@ TEST(FilterOperatorTest, AndAccept) {
 }
 
 TEST(FilterOperatorTest, SeveralOpsPerColumn) {
-  Schema schema = CreateSchema();
+  SchemaOwner schema = CreateSchema();
 
   // Create some filter operators.
   FilterOperator filter;
@@ -102,15 +102,15 @@ TEST(FilterOperatorTest, SeveralOpsPerColumn) {
 
   // Create some records.
   std::vector<Record> records;
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(0).SetUInt(0ULL, 0);
   records.at(0).SetString(std::make_unique<std::string>("Hello!"), 1);
   records.at(0).SetInt(7L, 2);
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(1).SetUInt(4ULL, 0);
   records.at(1).SetString(std::make_unique<std::string>("Bye!"), 1);
   records.at(1).SetInt(7L, 2);
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(2).SetUInt(6ULL, 0);
   records.at(2).SetString(std::make_unique<std::string>("Hello!"), 1);
   records.at(2).SetInt(15L, 2);
@@ -122,7 +122,7 @@ TEST(FilterOperatorTest, SeveralOpsPerColumn) {
 }
 
 TEST(FilterOperatorTest, BatchTest) {
-  Schema schema = CreateSchema();
+  SchemaOwner schema = CreateSchema();
 
   // Create some filter operators.
   FilterOperator filter;
@@ -132,19 +132,19 @@ TEST(FilterOperatorTest, BatchTest) {
 
   // Create some records.
   std::vector<Record> records;
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(0).SetUInt(0ULL, 0);
   records.at(0).SetString(std::make_unique<std::string>("Hello!"), 1);
   records.at(0).SetInt(7L, 2);
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(1).SetUInt(4ULL, 0);
   records.at(1).SetString(std::make_unique<std::string>("Bye!"), 1);
   records.at(1).SetInt(7L, 2);
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(2).SetUInt(6ULL, 0);
   records.at(2).SetString(std::make_unique<std::string>("Bye!"), 1);
   records.at(2).SetInt(9L, 2);
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(3).SetUInt(6ULL, 0);
   records.at(3).SetString(std::make_unique<std::string>("Bye!"), 1);
   records.at(3).SetInt(15L, 2);
@@ -159,7 +159,7 @@ TEST(FilterOperatorTest, BatchTest) {
 
 #ifndef PELTON_VALGRIND_MODE
 TEST(FilterOperatorTest, TypeMistmatch) {
-  Schema schema = CreateSchema();
+  SchemaOwner schema = CreateSchema();
 
   // Create some filter operators.
   FilterOperator filter1;
@@ -170,7 +170,7 @@ TEST(FilterOperatorTest, TypeMistmatch) {
   filter3.AddOperation(7L, 1, FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
 
   // Create some records.
-  Record record{schema};
+  Record record{SchemaRef{schema}};
   record.SetUInt(0ULL, 0);
   record.SetString(std::make_unique<std::string>("Hello!"), 1);
   record.SetInt(-5L, 2);

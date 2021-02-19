@@ -98,7 +98,7 @@ void DataflowState::Save(const std::string &dir_path) {
 
   for (const auto &[table_name, schema] : this->schema_) {
     state_file << table_name << "\n";
-    for (size_t i = 0; i < schema.Size(); i++) {
+    for (size_t i = 0; i < schema.size(); i++) {
       auto type =
           static_cast<std::underlying_type_t<sqlast::ColumnDefinition::Type>>(
               schema.TypeOf(i));

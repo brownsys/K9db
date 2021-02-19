@@ -22,6 +22,8 @@ class IdentityOperator : public Operator {
   bool Process(NodeIndex source, const std::vector<Record> &records,
                std::vector<Record> *output) override;
 
+  void ComputeOutputSchema() override;
+
   FRIEND_TEST(EquiJoinOperatorTest, BasicJoinTest);
   FRIEND_TEST(EquiJoinOperatorTest, BasicUnjoinableTest);
   FRIEND_TEST(EquiJoinOperatorTest, FullJoinTest);

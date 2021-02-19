@@ -38,14 +38,14 @@ TEST(MatViewOperatorTest, SingleMatView) {
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {0};
-  Schema schema{names, types, keys};
+  SchemaOwner schema{names, types, keys};
 
   // Create materialized view.
   MatViewOperator matview{keys};
 
   // Create a single record.
   std::vector<Record> records;
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(0).SetUInt(0ULL, 0);
   records.at(0).SetString(std::make_unique<std::string>("hello!"), 1);
   records.at(0).SetInt(-5L, 2);
@@ -70,7 +70,7 @@ TEST(MatViewOperatorTest, IteratorTest) {
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {0};
-  Schema schema{names, types, keys};
+  SchemaOwner schema{names, types, keys};
 
   // Create materialized view.
   MatViewOperator matview{keys};
@@ -82,17 +82,17 @@ TEST(MatViewOperatorTest, IteratorTest) {
 
   // Create some records.
   std::vector<Record> records;
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(0).SetUInt(0ULL, 0);
   records.at(0).SetString(std::move(s1), 1);
   records.at(0).SetInt(10LL, 2);
 
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(1).SetUInt(1ULL, 0);
   records.at(1).SetString(std::move(s2), 1);
   records.at(1).SetInt(20LL, 2);
 
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(2).SetUInt(0ULL, 0);
   records.at(2).SetString(std::move(s3), 1);
   records.at(2).SetInt(30LL, 2);
@@ -115,7 +115,7 @@ TEST(MatViewOperatorTest, LookupTest) {
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {0};
-  Schema schema{names, types, keys};
+  SchemaOwner schema{names, types, keys};
 
   // Create materialized view.
   MatViewOperator matview{keys};
@@ -127,17 +127,17 @@ TEST(MatViewOperatorTest, LookupTest) {
 
   // Create some records.
   std::vector<Record> records;
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(0).SetUInt(0ULL, 0);
   records.at(0).SetString(std::move(s1), 1);
   records.at(0).SetInt(10LL, 2);
 
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(1).SetUInt(1ULL, 0);
   records.at(1).SetString(std::move(s2), 1);
   records.at(1).SetInt(20LL, 2);
 
-  records.emplace_back(schema);
+  records.emplace_back(SchemaRef(schema));
   records.at(2).SetUInt(0ULL, 0);
   records.at(2).SetString(std::move(s3), 1);
   records.at(2).SetInt(30LL, 2);

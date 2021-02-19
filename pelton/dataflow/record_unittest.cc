@@ -19,8 +19,8 @@ using CType = sqlast::ColumnDefinition::Type;
 
 // Test record size.
 TEST(RecordTest, Size) {
-  // should be 24 bytes.
-  EXPECT_EQ(sizeof(Record), 24);
+  // should be 32 bytes.
+  EXPECT_EQ(sizeof(Record), 32);
 }
 
 // Tests setting and getting data from record.
@@ -29,7 +29,7 @@ TEST(RecordTest, DataRep) {
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {0};
-  Schema schema{names, types, keys};
+  SchemaOwner schema{names, types, keys};
 
   // Make some values.
   uint64_t v0 = 42;
@@ -38,7 +38,7 @@ TEST(RecordTest, DataRep) {
   int64_t v2 = -20;
 
   // Make the record and test.
-  Record record{schema};
+  Record record{SchemaRef(schema)};
   record.SetUInt(v0, 0);
   record.SetString(std::move(ptr), 1);
   record.SetInt(v2, 2);
@@ -55,7 +55,7 @@ TEST(RecordTest, Comparisons) {
   std::vector<std::string> names = {"Col1", "Col2"};
   std::vector<CType> types = {CType::UINT, CType::TEXT};
   std::vector<ColumnID> keys = {0};
-  Schema schema{names, types, keys};
+  SchemaOwner schema{names, types, keys};
 
   uint64_t v1 = 42;
   uint64_t v2 = 43;
@@ -64,22 +64,22 @@ TEST(RecordTest, Comparisons) {
   std::unique_ptr<std::string> s3 = std::make_unique<std::string>("bye");
   std::unique_ptr<std::string> s4 = std::make_unique<std::string>("hello");
 
-  Record r1{schema};
+  Record r1{SchemaRef(schema)};
   r1.SetUInt(v1, 0);
   r1.SetString(std::move(s1), 1);
 
-  Record r2{schema};
+  Record r2{SchemaRef(schema)};
   r2.SetUInt(v2, 0);
   r2.SetString(std::move(s2), 1);
 
-  Record r3{schema};
+  Record r3{SchemaRef(schema)};
   r3.SetUInt(v1, 0);
   r3.SetString(std::move(s3), 1);
 
-  Record r4{schema};
+  Record r4{SchemaRef(schema)};
   r4.SetUInt(v1, 0);  // string content left empty.
 
-  Record r5{schema};
+  Record r5{SchemaRef(schema)};
   r5.SetUInt(v1, 0);
   r5.SetString(std::move(s4), 1);  // Value equal but not pointer equal.
 
@@ -119,13 +119,13 @@ TEST(RecordTest, GetTypeMismatch) {
   std::vector<std::string> names = {"Col1", "Col2"};
   std::vector<CType> types = {CType::UINT, CType::TEXT};
   std::vector<ColumnID> keys = {0};
-  Schema schema{names, types, keys};
+  SchemaOwner schema{names, types, keys};
 
   // Make some values.
   uint64_t v0 = 42;
   std::unique_ptr<std::string> v1 = std::make_unique<std::string>("hello");
 
-  Record record{schema};
+  Record record{SchemaRef(schema)};
   record.SetUInt(v0, 0);
   record.SetString(std::move(v1), 1);
 
@@ -143,13 +143,13 @@ TEST(RecordTest, SetTypeMismatch) {
   std::vector<std::string> names = {"Col1", "Col2"};
   std::vector<CType> types = {CType::UINT, CType::TEXT};
   std::vector<ColumnID> keys = {0};
-  Schema schema{names, types, keys};
+  SchemaOwner schema{names, types, keys};
 
   // Make some values.
   uint64_t v0 = 42;
   std::unique_ptr<std::string> v1 = std::make_unique<std::string>("hello");
 
-  Record record{schema};
+  Record record{SchemaRef(schema)};
   ASSERT_DEATH({ record.SetUInt(v0, 1); }, "Type mismatch");
   ASSERT_DEATH({ record.SetString(std::move(v1), 0); }, "Type mismatch");
 }
@@ -161,9 +161,9 @@ TEST(RecordTest, NegativeIntegers) {
   std::vector<std::string> names = {"Col1", "Col2"};
   std::vector<CType> types = {CType::INT, CType::INT};
   std::vector<ColumnID> keys = {0};
-  Schema schema{names, types, keys};
+  SchemaOwner schema{names, types, keys};
 
-  Record r{schema};
+  Record r{SchemaRef(schema)};
   r.SetInt(-7, 0);
   r.SetInt(-1000, 1);
   EXPECT_EQ(r.GetInt(0), -7);
@@ -177,8 +177,8 @@ TEST(RecordTest, GetKey) {
   std::vector<CType> types = {CType::INT, CType::TEXT};
   std::vector<ColumnID> keys1 = {0};
   std::vector<ColumnID> keys2 = {1};
-  Schema schema1{names, types, keys1};
-  Schema schema2{names, types, keys2};
+  SchemaOwner schema1{names, types, keys1};
+  SchemaOwner schema2{names, types, keys2};
 
   // Some values.
   std::unique_ptr<std::string> s1 = std::make_unique<std::string>("hello");
@@ -188,13 +188,13 @@ TEST(RecordTest, GetKey) {
   std::string k2 = *s2;
 
   // Create two records.
-  Record r1{schema1};
+  Record r1{SchemaRef(schema1)};
   r1.SetInt(k1, 0);
   r1.SetString(std::move(s1), 1);
-  Record r2{schema2};
+  Record r2{SchemaRef(schema2)};
   r2.SetInt(500, 0);
   r2.SetString(std::move(s2), 1);
-  Record r3{schema2};
+  Record r3{SchemaRef(schema2)};
   r3.SetInt(500, 0);
 
   // Test key types.
@@ -214,7 +214,7 @@ TEST(RecordTest, RecordMoveConstructor) {
   std::vector<std::string> names = {"Col1", "Col2"};
   std::vector<CType> types = {CType::INT, CType::TEXT};
   std::vector<ColumnID> keys = {0};
-  Schema schema{names, types, keys};
+  SchemaOwner schema{names, types, keys};
 
   // Values
   int64_t v0 = 5;
@@ -222,7 +222,7 @@ TEST(RecordTest, RecordMoveConstructor) {
   std::string *str = v1.get();
 
   // Create a record.
-  Record record{schema};
+  Record record{SchemaRef(schema)};
   record.SetInt(v0, 0);
   record.SetString(std::move(v1), 1);
 
@@ -257,8 +257,8 @@ TEST(RecordTest, RecordMoveAssignment) {
   std::vector<CType> types = {CType::INT, CType::TEXT};
   std::vector<ColumnID> keys = {0};
   std::vector<ColumnID> keys2 = {0};
-  Schema schema{names, types, keys};
-  Schema schema2{names, types, keys2};
+  SchemaOwner schema{names, types, keys};
+  SchemaOwner schema2{names, types, keys2};
 
   // Values
   int64_t v0 = 5;
@@ -267,12 +267,12 @@ TEST(RecordTest, RecordMoveAssignment) {
   std::string *str = v1.get();
 
   // Create a record.
-  Record record{schema};
+  Record record{SchemaRef(schema)};
   record.SetInt(v0, 0);
   record.SetString(std::move(v1), 1);
 
   // Create another record.
-  Record record2{schema};
+  Record record2{SchemaRef(schema)};
   record2.SetInt(v0, 0);
   record2.SetString(std::move(v2), 1);
 
@@ -289,7 +289,7 @@ TEST(RecordTest, RecordMoveAssignment) {
   // With valgrind, we can check that v2 is freed properly.
 
   // Move into record with different schema should fail.
-  Record record3{schema2};
+  Record record3{SchemaRef(schema2)};
   ASSERT_DEATH({ record3 = std::move(record2); },
                "Bad move assign record schema");
 #endif
@@ -300,7 +300,7 @@ TEST(RecordTest, ExplicitCopy) {
   std::vector<std::string> names = {"Col1", "Col2"};
   std::vector<CType> types = {CType::INT, CType::TEXT};
   std::vector<ColumnID> keys = {0};
-  Schema schema{names, types, keys};
+  SchemaOwner schema{names, types, keys};
 
   // Values
   int64_t v0 = 5;
@@ -308,7 +308,7 @@ TEST(RecordTest, ExplicitCopy) {
   std::string *str = v1.get();
 
   // Create a record.
-  Record record{schema, false};
+  Record record{SchemaRef(schema), false};
   record.SetInt(v0, 0);
   record.SetString(std::move(v1), 1);
 

@@ -31,6 +31,8 @@ class MatViewOperator : public Operator {
   bool Process(NodeIndex source, const std::vector<Record> &records,
                std::vector<Record> *output) override;
 
+  void ComputeOutputSchema() override;
+
  private:
   GroupedData contents_;
   std::vector<ColumnID> key_cols_;

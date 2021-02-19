@@ -20,6 +20,8 @@ class UnionOperator : public Operator {
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,
                std::vector<Record> *output) override;
+
+  void ComputeOutputSchema() override;
 };
 
 }  // namespace dataflow

@@ -13,8 +13,11 @@ namespace dataflow {
 
 class InputOperator : public Operator {
  public:
-  explicit InputOperator(const std::string &input_name)
-      : Operator(Operator::Type::INPUT), input_name_(input_name) {}
+  InputOperator(const std::string &input_name, const SchemaRef &schema)
+      : Operator(Operator::Type::INPUT), input_name_(input_name) {
+    this->input_schemas_.push_back(schema);
+    this->output_schema_ = schema;
+  }
 
   const std::string &input_name() const { return this->input_name_; }
 
@@ -24,6 +27,8 @@ class InputOperator : public Operator {
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,
                std::vector<Record> *output) override;
+
+  void ComputeOutputSchema() override {}
 
  private:
   std::string input_name_;

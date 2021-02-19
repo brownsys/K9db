@@ -74,13 +74,23 @@ bool EquiJoinOperator::Process(NodeIndex source,
   return true;
 }
 
-void EquiJoinOperator::ComputeJoinedSchema(const Schema &lschema,
-                                           const Schema &rschema) {
+void EquiJoinOperator::ComputeOutputSchema() {
+  // We only have enough information to compute the output schema when
+  // both parents are known.
+  if (this->input_schemas_.size() < 2) {
+    return;
+  }
+
+  // Get the schema's of the two parents.
+  const SchemaRef &lschema = this->input_schemas_.at(0);
+  const SchemaRef &rschema = this->input_schemas_.at(1);
+
+  // Construct joined schema.
   std::vector<sqlast::ColumnDefinition::Type> types = lschema.column_types();
   std::vector<std::string> names = lschema.column_names();
   std::vector<ColumnID> keys = lschema.keys();
 
-  for (size_t i = 0; i < rschema.Size(); i++) {
+  for (size_t i = 0; i < rschema.size(); i++) {
     if (i != this->right_id_) {
       types.push_back(rschema.TypeOf(i));
       names.push_back(rschema.NameOf(i));
@@ -107,34 +117,32 @@ void EquiJoinOperator::ComputeJoinedSchema(const Schema &lschema,
         }
       }
     } else if (key_id < this->right_id_) {
-      keys.push_back(lschema.Size() + key_id);
+      keys.push_back(lschema.size() + key_id);
     } else {
-      keys.push_back(lschema.Size() + key_id - 1);
+      keys.push_back(lschema.size() + key_id - 1);
     }
   }
-  this->joined_schema_ = std::make_unique<Schema>(names, types, keys);
+
+  // We own the joined schema.
+  this->joined_schema_ = SchemaOwner(names, types, keys);
+  this->output_schema_ = SchemaRef(this->joined_schema_);  // Inherited.
 }
 
 void EquiJoinOperator::EmitRow(const Record &left, const Record &right,
                                std::vector<Record> *output) {
-  const Schema &lschema = left.schema();
-  const Schema &rschema = right.schema();
-
-  // Set schemas here lazily, note this can get optimized.
-  if (!this->joined_schema_) {
-    this->ComputeJoinedSchema(lschema, rschema);
-  }
+  const SchemaRef &lschema = left.schema();
+  const SchemaRef &rschema = right.schema();
 
   // Create a concatenated record, dropping key column from left side.
-  Record record{*this->joined_schema_};
-  for (size_t i = 0; i < lschema.Size(); i++) {
+  Record record{this->output_schema_};
+  for (size_t i = 0; i < lschema.size(); i++) {
     CopyIntoRecord(lschema.TypeOf(i), &record, left, i, i);
   }
-  for (size_t i = 0; i < rschema.Size(); i++) {
+  for (size_t i = 0; i < rschema.size(); i++) {
     if (i == this->right_id_) {
       continue;
     }
-    size_t j = i + lschema.Size();
+    size_t j = i + lschema.size();
     if (i > this->right_id_) {
       j--;
     }
