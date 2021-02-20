@@ -2,6 +2,8 @@ package com.brownsys.pelton.planner;
 
 import com.google.common.io.Resources;
 import org.apache.calcite.config.Lex;
+import org.apache.calcite.interpreter.BindableConvention;
+import org.apache.calcite.interpreter.Bindables;
 import org.apache.calcite.jdbc.CalciteConnection;
 import org.apache.calcite.model.ModelHandler;
 import org.apache.calcite.plan.Contexts;
@@ -10,6 +12,7 @@ import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitDef;
 import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.rules.AggregateProjectMergeRule;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
@@ -50,6 +53,15 @@ public class QueryPlanner {
     traitDefs.add(ConventionTraitDef.INSTANCE);
     traitDefs.add(RelCollationTraitDef.INSTANCE);
 
+    final RuleSet customRuleSet = RuleSets.ofList(
+    		AggregateProjectMergeRule.INSTANCE,
+    		Bindables.BINDABLE_VALUES_RULE,
+    		Bindables.BINDABLE_TABLE_SCAN_RULE,
+    		Bindables.BINDABLE_PROJECT_RULE,
+    		Bindables.BINDABLE_FILTER_RULE,
+    		Bindables.BINDABLE_AGGREGATE_RULE,
+    		Bindables.BINDABLE_UNION_RULE);
+
     FrameworkConfig calciteFrameworkConfig = Frameworks.newConfigBuilder()
         .parserConfig(SqlParser.configBuilder()
             // Lexical configuration defines how identifiers are quoted, whether they are converted to upper or lower
@@ -62,7 +74,7 @@ public class QueryPlanner {
         // Context provides a way to store data within the planner session that can be accessed in planner rules.
         .context(Contexts.EMPTY_CONTEXT)
         // Rule sets to use in transformation phases. Each transformation phase can use a different set of rules.
-        .ruleSets(RuleSets.ofList())
+        .ruleSets(customRuleSet)
         // Custom cost factory to use during optimization
         .costFactory(null)
         .typeSystem(RelDataTypeSystem.DEFAULT)
@@ -71,7 +83,7 @@ public class QueryPlanner {
     this.planner = Frameworks.getPlanner(calciteFrameworkConfig);
   }
 
-  public RelNode getLogicalPlan(String query) throws ValidationException, RelConversionException {
+  public RelNode getPhysicalPlan(String query) throws ValidationException, RelConversionException {
     SqlNode sqlNode;
 
     try {
@@ -81,23 +93,25 @@ public class QueryPlanner {
     }
 
     SqlNode validatedSqlNode = planner.validate(sqlNode);
+    RelNode logicalPlan = planner.rel(validatedSqlNode).project();
+    RelNode physicalPlan = planner.transform(0, logicalPlan.getTraitSet().plus(BindableConvention.INSTANCE), logicalPlan);
 
-    return planner.rel(validatedSqlNode).project();
+    return physicalPlan;
   }
-  
-  public void traversePlan(RelNode logicalPlan) throws JsonGenerationException, JsonMappingException, IOException {
+
+  public void traversePlan(RelNode plan) throws JsonGenerationException, JsonMappingException, IOException {
 	  CustomRelShuttle shuttle = new CustomRelShuttle();
-	  logicalPlan.accept(shuttle);
-	  
+	  plan.accept(shuttle);
+
 	  ArrayList<Operator> nodes = shuttle.getNodes();
 	  ArrayList<Edge> edges = shuttle.getEdges();
-	  
+
 	  // add a matview operator; first node is the "root" of tree having max id
 	  MatviewOperator matviewOp = new MatviewOperator();
 	  matviewOp.setId(nodes.get(0).getId()+1);
 	  edges.add(0, new Edge(nodes.get(0).getId(), matviewOp.getId()));
 	  nodes.add(0,matviewOp);
-	  
+
 	  // write as JSON
 	  ObjectMapper mapper = new ObjectMapper();
 	  ObjectWriter writer = mapper.writer(new DefaultPrettyPrinter());
@@ -108,7 +122,7 @@ public class QueryPlanner {
   }
 
   public static void main(String[] args) throws IOException, SQLException, ValidationException, RelConversionException, NoSuchFieldException, SecurityException {
-	
+
 	if(args.length !=1) {
     	LOGGER.error("Enter the query as a single argument surrounded by quotes");
     }
@@ -118,10 +132,10 @@ public class QueryPlanner {
     // ModelHandler reads the  schema and loads the schema to connection's root schema and sets the default schema
     new ModelHandler(connection, "inline:" + customSchema);
 
-    QueryPlanner queryPlanner = new QueryPlanner(connection.getRootSchema().getSubSchema(connection.getSchema())); 
+    QueryPlanner queryPlanner = new QueryPlanner(connection.getRootSchema().getSubSchema(connection.getSchema()));
     LOGGER.info("Processing query: " + args[0]);
-    RelNode logicalPlan = queryPlanner.getLogicalPlan(args[0]);
-    LOGGER.info("Generated logical plan: \n" + RelOptUtil.toString(logicalPlan));
-    queryPlanner.traversePlan(logicalPlan);
+    RelNode physicalPlan = queryPlanner.getPhysicalPlan(args[0]);
+    LOGGER.info("Generated physical plan: \n" + RelOptUtil.toString(physicalPlan));
+    queryPlanner.traversePlan(physicalPlan);
   }
 }
