@@ -37,23 +37,26 @@ jobs:
     - name: Test all
       run: bazel test ...
 
+    - name: Build all with valgrind flags
+      run: bazel build ... --config=valgrind
+
     - name: Test all with valgrind
       run: bazel test ... --config=valgrind
 
     - name: Run end-2-end sample
       run: |
         rm -rf db && mkdir db
-        bazel run bin:example db
+        valgrind --error-exitcode=1 --leak-check=full ./bazel-bin/bin/example db
 
     - name: Run cli samples
       run: |
         rm -rf db && mkdir db
-        bazel run bin:cli --config=valgrind -- db < bin/examples/simple-websubmit.sql
+        valgrind --error-exitcode=1 --leak-check=full ./bazel-bin/bin/cli db < bin/examples/simple-websubmit.sql
         rm -rf db && mkdir db
-        bazel run bin:cli --config=valgrind -- db < bin/examples/medical_chat.sql
+        valgrind --error-exitcode=1 --leak-check=full ./bazel-bin/bin/cli db < bin/examples/medical_chat.sql
 
     - name: Run social chat with restart/recovery
       run: |
         rm -rf db && mkdir db
-        bazel run bin:cli --config=valgrind -- db < bin/examples/social_chat.sql
-        bazel run bin:cli --config=valgrind -- db < bin/examples/social_chat.cntd.sql
+        valgrind --error-exitcode=1 --leak-check=full ./bazel-bin/bin/cli db < bin/examples/social_chat.sql
+        valgrind --error-exitcode=1 --leak-check=full ./bazel-bin/bin/cli db < bin/examples/social_chat.cntd.sql

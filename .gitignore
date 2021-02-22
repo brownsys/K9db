@@ -42,6 +42,7 @@ bazel-testlogs
 test
 test2
 test3
+db
 
 # others
 .idea/
