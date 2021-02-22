@@ -23,14 +23,37 @@ jobs:
                                  --slave /usr/bin/gcc-ranlib gcc-ranlib /usr/bin/gcc-ranlib-9 \
                                  --slave /usr/bin/g++ g++ /usr/bin/g++-9
         sudo update-alternatives --set gcc /usr/bin/gcc-9
-
+        sudo apt-get install valgrind
 
     - name: Information
       run: |
         bazel --version
         g++ --version
+        valgrind --version
+
     - name: Build all
       run: bazel build ...
 
     - name: Test all
       run: bazel test ...
+
+    - name: Test all with valgrind
+      run: bazel test ... --config=valgrind
+
+    - name: Run end-2-end sample
+      run: |
+        rm -rf db && mkdir db
+        bazel run bin:example db
+
+    - name: Run cli samples
+      run: |
+        rm -rf db && mkdir db
+        bazel run bin:cli --config=valgrind -- db < bin/examples/simple-websubmit.sql
+        rm -rf db && mkdir db
+        bazel run bin:cli --config=valgrind -- db < bin/examples/medical_chat.sql
+
+    - name: Run social chat with restart/recovery
+      run: |
+        rm -rf db && mkdir db
+        bazel run bin:cli --config=valgrind -- db < bin/examples/social_chat.sql
+        bazel run bin:cli --config=valgrind -- db < bin/examples/social_chat.cntd.sql

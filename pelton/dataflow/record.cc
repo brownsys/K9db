@@ -107,6 +107,24 @@ Key Record::GetKey() const {
   return Key(0UL);
 }
 
+// Data type transformation.
+void Record::SetValue(const std::string &value, size_t i) {
+  CHECK_NE(this->data_, nullptr) << "Cannot set value for moved record";
+  switch (this->schema_.TypeOf(i)) {
+    case sqlast::ColumnDefinition::Type::UINT:
+      this->data_[i].uint = std::stoull(value);
+      break;
+    case sqlast::ColumnDefinition::Type::INT:
+      this->data_[i].sint = std::stoll(value);
+      break;
+    case sqlast::ColumnDefinition::Type::TEXT:
+      this->data_[i].str = std::make_unique<std::string>(value);
+      break;
+    default:
+      LOG(FATAL) << "Unsupported data type in setvalue";
+  }
+}
+
 // Equality: schema must be identical (pointer wise) and all values must be
 // equal.
 bool Record::operator==(const Record &other) const {

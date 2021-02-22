@@ -99,6 +99,31 @@ const std::unordered_set<UserId> &SharderState::UsersOfShard(
   return this->shards_.at(kind);
 }
 
+// Raw records.
+void SharderState::AddRawRecord(const std::string &table_name,
+                                const std::vector<std::string> values,
+                                const std::vector<std::string> columns,
+                                bool positive) {
+  this->raw_records_.emplace_back(table_name, values, columns, positive);
+}
+
+const std::vector<RawRecord> &SharderState::GetRawRecords() const {
+  return this->raw_records_;
+}
+
+void SharderState::ClearRawRecords() { this->raw_records_.clear(); }
+
+// Last statement.
+void SharderState::SetLastStatement(
+    std::unique_ptr<sqlast::AbstractStatement> &&st) {
+  this->last_statement_ = std::move(st);
+}
+
+std::unique_ptr<sqlast::AbstractStatement>
+SharderState::ReleaseLastStatement() {
+  return std::move(this->last_statement_);
+}
+
 // SQL Executor.
 sqlexecutor::SQLExecutor *SharderState::SQLExecutor() {
   return &this->executor_;

@@ -3,6 +3,7 @@
 #include "pelton/shards/sqlengine/engine.h"
 
 #include <memory>
+#include <utility>
 
 #include "pelton/shards/sqlengine/create.h"
 #include "pelton/shards/sqlengine/delete.h"
@@ -24,35 +25,43 @@ Rewrite(const std::string &sql, SharderState *state) {
   MOVE_OR_RETURN(std::unique_ptr<sqlast::AbstractStatement> statement,
                  parser.Parse(sql));
 
-  sqlast::Stringifier stringifier;
+  // Compute result.
+  absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
+      result;
   switch (statement->type()) {
     // Case 1: CREATE TABLE statement.
     case sqlast::AbstractStatement::Type::CREATE_TABLE:
-      return create::Rewrite(
+      result = create::Rewrite(
           *static_cast<sqlast::CreateTable *>(statement.get()), state);
+      break;
 
     // Case 2: Insert statement.
     case sqlast::AbstractStatement::Type::INSERT:
-      return insert::Rewrite(*static_cast<sqlast::Insert *>(statement.get()),
-                             state);
+      result = insert::Rewrite(*static_cast<sqlast::Insert *>(statement.get()),
+                               state);
+      break;
 
     // Case 3: Update statement.
     case sqlast::AbstractStatement::Type::UPDATE:
-      return update::Rewrite(*static_cast<sqlast::Update *>(statement.get()),
-                             state);
+      result = update::Rewrite(*static_cast<sqlast::Update *>(statement.get()),
+                               state);
+      break;
 
     // Case 4: Select statement.
     case sqlast::AbstractStatement::Type::SELECT:
-      return select::Rewrite(*static_cast<sqlast::Select *>(statement.get()),
-                             state);
+      result = select::Rewrite(*static_cast<sqlast::Select *>(statement.get()),
+                               state);
+      break;
 
     // Case 5: Delete statement.
     case sqlast::AbstractStatement::Type::DELETE:
-      return delete_::Rewrite(*static_cast<sqlast::Delete *>(statement.get()),
-                              state);
+      result = delete_::Rewrite(*static_cast<sqlast::Delete *>(statement.get()),
+                                state);
+      break;
   }
 
-  return std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>();
+  state->SetLastStatement(std::move(statement));
+  return result;
 }
 
 }  // namespace sqlengine

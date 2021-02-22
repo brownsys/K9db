@@ -65,6 +65,12 @@ class SchemaOwner {
   sqlast::ColumnDefinition::Type TypeOf(size_t i) const;
   const std::string &NameOf(size_t i) const;
 
+  // Accessor by column name.
+  size_t IndexOf(const std::string &column_name) const;
+
+  // For logging and printing...
+  friend std::ostream &operator<<(std::ostream &os, const SchemaOwner &r);
+
  protected:
   // Schema data is a protected struct inside SchemaOwner, it is never exposed
   // directly.

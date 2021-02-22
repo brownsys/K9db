@@ -7,7 +7,6 @@
 
 #include <fstream>
 
-#include "pelton/sqlast/ast.h"
 #include "pelton/util/fs.h"
 
 #define STATE_FILE_NAME ".dataflow.state"
@@ -15,10 +14,20 @@
 namespace pelton {
 namespace dataflow {
 
+// Manage schemas.
+void DataflowState::AddTableSchema(const sqlast::CreateTable &create) {
+  this->schema_.emplace(create.table_name(), create);
+}
+
+SchemaRef DataflowState::GetTableSchema(const TableName &table_name) const {
+  return SchemaRef(this->schema_.at(table_name));
+}
+
+// Manage flows.
 void DataflowState::AddFlow(const FlowName &name, const DataFlowGraph &flow) {
   this->flows_.insert({name, flow});
   for (auto input : flow.inputs()) {
-    this->inputs_[input->input_name()].push_back(input);
+    this->flows_per_input_table_[input->input_name()].push_back(name);
   }
 }
 
@@ -26,13 +35,53 @@ const DataFlowGraph &DataflowState::GetFlow(const FlowName &name) const {
   return this->flows_.at(name);
 }
 
-bool DataflowState::HasInputsFor(const TableName &table_name) const {
-  return this->inputs_.count(table_name) > 0;
+bool DataflowState::HasFlowsFor(const TableName &table_name) const {
+  return this->flows_per_input_table_.count(table_name) == 1;
 }
 
-const std::vector<std::shared_ptr<InputOperator>> &DataflowState::InputsFor(
-    const TableName &table_name) const {
-  return this->inputs_.at(table_name);
+// Process raw records from sharder into flows.
+bool DataflowState::ProcessRawRecords(
+    const std::vector<shards::RawRecord> &raw_records) {
+  // Construct schema-full records.
+  std::unordered_map<std::string, std::vector<Record>> records;
+  for (shards::RawRecord raw : raw_records) {
+    records[raw.table_name].push_back(this->CreateRecord(raw));
+  }
+
+  // Process them via flow.
+  for (const auto &[table_name, rs] : records) {
+    if (!this->ProcessRecords(table_name, rs)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool DataflowState::ProcessRecords(const TableName &table_name,
+                                   const std::vector<Record> &records) {
+  if (this->HasFlowsFor(table_name)) {
+    for (const FlowName &name : this->flows_per_input_table_.at(table_name)) {
+      DataFlowGraph &graph = this->flows_.at(name);
+      if (!graph.Process(table_name, records)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+// Creating and processing records from raw data.
+Record DataflowState::CreateRecord(const shards::RawRecord &raw_record) const {
+  SchemaRef schema = SchemaRef(this->schema_.at(raw_record.table_name));
+  Record record{schema, raw_record.positive};
+  for (size_t i = 0; i < raw_record.values.size(); i++) {
+    size_t schema_index = i;
+    if (raw_record.columns.size() > 0) {
+      schema_index = schema.IndexOf(raw_record.columns.at(i));
+    }
+    record.SetValue(raw_record.values.at(i), schema_index);
+  }
+  return record;
 }
 
 // Load state from its durable file (if exists).

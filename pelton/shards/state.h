@@ -77,6 +77,17 @@ struct ShardingInformation {
   ColumnIndex shard_by_index;
 };
 
+// Describes a raw record (a sequence of untyped values for columns of a row).
+struct RawRecord {
+  std::string table_name;
+  std::vector<std::string> values;
+  std::vector<std::string> columns;  // If empty, this is the default order.
+  bool positive;
+  RawRecord(const std::string &tn, const std::vector<std::string> &vs,
+            const std::vector<std::string> &ns, bool p)
+      : table_name(tn), values(vs), columns(ns), positive(p) {}
+};
+
 class SharderState {
  public:
   // Constructor.
@@ -128,6 +139,20 @@ class SharderState {
 
   const std::unordered_set<UserId> &UsersOfShard(const ShardKind &kind) const;
 
+  // Raw records.
+  void AddRawRecord(const std::string &table_name,
+                    const std::vector<std::string> values,
+                    const std::vector<std::string> columns, bool positive);
+
+  const std::vector<RawRecord> &GetRawRecords() const;
+
+  void ClearRawRecords();
+
+  // Last statement.
+  void SetLastStatement(std::unique_ptr<sqlast::AbstractStatement> &&st);
+
+  std::unique_ptr<sqlast::AbstractStatement> ReleaseLastStatement();
+
   // Save state to durable file.
   void Save();
 
@@ -176,6 +201,12 @@ class SharderState {
 
   // Connection pool that manages the underlying sqlite3 databases.
   sqlexecutor::SQLExecutor executor_;
+
+  // Stores RawRecords that need to be processed by the dataflow.
+  std::vector<RawRecord> raw_records_;
+
+  // Last statement that was processed by the sharder.
+  std::unique_ptr<sqlast::AbstractStatement> last_statement_;
 };
 
 }  // namespace shards

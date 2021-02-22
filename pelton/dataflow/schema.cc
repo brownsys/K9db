@@ -1,5 +1,7 @@
 #include "pelton/dataflow/schema.h"
 
+#include <algorithm>
+
 namespace pelton {
 namespace dataflow {
 
@@ -45,6 +47,27 @@ const std::string &SchemaOwner::NameOf(size_t i) const {
                << this->ptr_->column_names.size();
   }
   return this->ptr_->column_names.at(i);
+}
+
+// Accessor by column name.
+size_t SchemaOwner::IndexOf(const std::string &column_name) const {
+  auto it = find(this->ptr_->column_names.cbegin(),
+                 this->ptr_->column_names.cend(), column_name);
+  if (it == this->ptr_->column_names.cend()) {
+    LOG(FATAL) << "Schema: column does not exist " << column_name;
+  }
+  return it - this->ptr_->column_names.cbegin();
+}
+
+// Printing a record to an output stream (e.g. std::cout).
+std::ostream &operator<<(std::ostream &os,
+                         const pelton::dataflow::SchemaOwner &schema) {
+  CHECK_NE(schema.ptr_, nullptr) << "Cannot << moved record";
+  os << "|";
+  for (unsigned i = 0; i < schema.size(); ++i) {
+    os << schema.NameOf(i) << "(" << schema.TypeOf(i) << ")|";
+  }
+  return os;
 }
 
 }  // namespace dataflow

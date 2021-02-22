@@ -54,7 +54,6 @@ cc_library(
     ],
     deps = [
         "//pelton/shards:state",
-        "//pelton/shards/records:insert",
         "//pelton/shards/sqlengine:util",
         "//pelton/shards/sqlexecutor:executor",
         "//pelton/sqlast:ast",
@@ -90,7 +89,6 @@ cc_library(
     ],
     deps = [
         "//pelton/shards:state",
-        "//pelton/shards/records:delete",
         "//pelton/shards/sqlengine:util",
         "//pelton/shards/sqlexecutor:executor",
         "//pelton/sqlast:ast",
@@ -109,7 +107,6 @@ cc_library(
     ],
     deps = [
         "//pelton/shards:state",
-        "//pelton/shards/records:update",
         "//pelton/shards/sqlengine:util",
         "//pelton/shards/sqlexecutor:executor",
         "//pelton/sqlast:ast",

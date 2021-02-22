@@ -162,7 +162,19 @@ std::ostream &operator<<(std::ostream &os, const ColumnConstraint::Type &r) {
 }
 
 std::ostream &operator<<(std::ostream &os, const ColumnDefinition::Type &r) {
-  os << ColumnDefinition::TypeToString(r);
+  switch (r) {
+    case ColumnDefinition::Type::INT:
+      os << "INT";
+      break;
+    case ColumnDefinition::Type::TEXT:
+      os << "TEXT";
+      break;
+    case ColumnDefinition::Type::UINT:
+      os << "UINT";
+      break;
+    default:
+      throw "Unsupported column type!";
+  }
   return os;
 }
 

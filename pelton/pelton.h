@@ -5,8 +5,8 @@
 #include <functional>
 #include <string>
 
-#include "dataflow/state.h"
-#include "shards/state.h"
+#include "pelton/dataflow/state.h"
+#include "pelton/shards/state.h"
 
 namespace pelton {
 

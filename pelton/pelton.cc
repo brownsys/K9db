@@ -2,19 +2,21 @@
 #include "pelton/pelton.h"
 
 #include <iostream>
+#include <memory>
 #include <utility>
 #include <vector>
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
-#include "dataflow/graph.h"
-#include "dataflow/ops/filter.h"
-#include "dataflow/ops/input.h"
-#include "dataflow/schema.h"
-#include "shards/sqlengine/engine.h"
-#include "shards/sqlengine/util.h"
-#include "shards/sqlexecutor/executor.h"
+#include "pelton/dataflow/graph.h"
+#include "pelton/dataflow/ops/filter.h"
+#include "pelton/dataflow/ops/input.h"
+#include "pelton/dataflow/ops/matview.h"
+#include "pelton/dataflow/schema.h"
+#include "pelton/shards/sqlengine/engine.h"
+#include "pelton/shards/sqlengine/util.h"
+#include "pelton/shards/sqlexecutor/executor.h"
 
 namespace pelton {
 
@@ -105,6 +107,20 @@ bool exec(Connection *connection, std::string sql, Callback callback,
       return false;
     }
   }
+
+  // Update data flow schema state.
+  std::unique_ptr<sqlast::AbstractStatement> statement =
+      connection->GetSharderState()->ReleaseLastStatement();
+  if (statement->type() == sqlast::AbstractStatement::Type::CREATE_TABLE) {
+    connection->GetDataflowState()->AddTableSchema(
+        *static_cast<sqlast::CreateTable *>(statement.get()));
+  }
+
+  // Update date flow records.
+  connection->GetDataflowState()->ProcessRawRecords(
+      connection->GetSharderState()->GetRawRecords());
+  connection->GetSharderState()->ClearRawRecords();
+
   return true;
 }
 

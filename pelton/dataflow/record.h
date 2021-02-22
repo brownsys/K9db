@@ -84,6 +84,9 @@ class Record {
   Key GetValue(size_t i) const;
   Key GetKey() const;
 
+  // Data type transformation.
+  void SetValue(const std::string &value, size_t i);
+
   // Accessors.
   const SchemaRef &schema() const { return this->schema_; }
   bool IsPositive() const { return this->positive_; }

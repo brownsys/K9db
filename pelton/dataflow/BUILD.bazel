@@ -11,8 +11,10 @@ cc_library(
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":graph",
+        ":record",
         ":schema",
         "//pelton/dataflow/ops:input",
+        "//pelton/shards:state",
         "//pelton/sqlast:ast",
         "//pelton/util:fs",
     ],
