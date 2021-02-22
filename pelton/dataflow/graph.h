@@ -17,7 +17,7 @@ namespace dataflow {
 
 class DataFlowGraph {
  public:
-  DataFlowGraph() {}
+  DataFlowGraph() = default;
 
   bool AddNode(std::shared_ptr<Operator> op,
                std::vector<std::shared_ptr<Operator>> parents);

@@ -79,7 +79,7 @@ class SchemaOwner {
     std::vector<sqlast::ColumnDefinition::Type> column_types;
     std::vector<ColumnID> keys;
     // Constructors.
-    SchemaData() {}
+    SchemaData() = default;
     SchemaData(const std::vector<std::string> &cn,
                const std::vector<sqlast::ColumnDefinition::Type> &ct,
                const std::vector<ColumnID> &ks)

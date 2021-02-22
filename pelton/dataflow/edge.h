@@ -14,10 +14,9 @@ class Edge {
  public:
   Edge(std::shared_ptr<Operator> from, std::shared_ptr<Operator> to)
       : from_(from), to_(to) {}
-  ~Edge() {}
 
-  std::shared_ptr<Operator> from() { return from_; }
-  std::weak_ptr<Operator> to() { return to_; }
+  std::shared_ptr<Operator> from() const { return from_; }
+  std::weak_ptr<Operator> to() const { return to_; }
 
  private:
   std::shared_ptr<Operator> from_;

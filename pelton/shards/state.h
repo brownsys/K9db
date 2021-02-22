@@ -91,16 +91,13 @@ struct RawRecord {
 class SharderState {
  public:
   // Constructor.
-  SharderState() {}
+  SharderState() = default;
 
   // Not copyable or movable.
   SharderState(const SharderState &) = delete;
   SharderState &operator=(const SharderState &) = delete;
   SharderState(const SharderState &&) = delete;
   SharderState &operator=(const SharderState &&) = delete;
-
-  // Destructor.
-  ~SharderState() {}
 
   // Accessors.
   const std::string &dir_path() { return this->dir_path_; }

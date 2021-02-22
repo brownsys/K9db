@@ -12,7 +12,7 @@ namespace pelton {
 
 class Connection {
  public:
-  Connection() {}
+  Connection() = default;
 
   // Not copyable or movable.
   Connection(const Connection &) = delete;

@@ -19,7 +19,7 @@ namespace sqlexecutor {
 class SQLExecutor {
  public:
   // Constructor.
-  SQLExecutor() {}
+  SQLExecutor() = default;
 
   // Not copyable or movable.
   SQLExecutor(const SQLExecutor &) = delete;

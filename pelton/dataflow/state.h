@@ -26,7 +26,7 @@ using FlowName = std::string;
 
 class DataflowState {
  public:
-  DataflowState() {}
+  DataflowState() = default;
 
   // Manage schemas.
   void AddTableSchema(const sqlast::CreateTable &create);
