@@ -1,19 +1,19 @@
 {
-  version: '1.0',
-  defaultSchema: 'INVENTORY',
-  schemas: [
+  "version": "1.0",
+  "defaultSchema": "INVENTORY",
+  "schemas": [
     {
-      name: 'INVENTORY',
-      tables: [
+      "name": "INVENTORY",
+      "tables": [
         {
-          name: 'Orders',
-          type: 'custom',
-          factory: 'com.brownsys.pelton.utils.GenericTableFactory'
+          "name": "Orders",
+          "type": "custom",
+          "factory": "com.brownsys.pelton.utils.GenericTableFactory"
         },
         {
-          name: 'Products',
-          type: 'custom',
-          factory: 'com.brownsys.pelton.utils.GenericTableFactory'
+          "name": "Products",
+          "type": "custom",
+          "factory": "com.brownsys.pelton.utils.GenericTableFactory"
         }
       ]
     }
