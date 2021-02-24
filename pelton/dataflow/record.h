@@ -5,6 +5,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <type_traits>
 #include <utility>
 // NOLINTNEXTLINE
 #include <variant>
@@ -64,6 +65,13 @@ class Record {
     this->data_ = new RecordData[schema.size()];
   }
 
+  // Create record and set all the data together.
+  template <typename... Args>
+  Record(const SchemaRef &schema, bool positive, Args &&... ts)
+      : Record(schema, positive) {
+    this->SetData(std::forward<Args>(ts)...);
+  }
+
   // Destructor: we have to manually destruct all unique_ptrs in unions
   // and delete the data array on the heap (unions do not call destructors
   // of their data automatically).
@@ -71,6 +79,15 @@ class Record {
 
   // Explicit deep copying.
   Record Copy() const;
+
+  // Set all data in one shot regardless of types and counts.
+  template <typename... Args>
+  void SetData(Args &&... ts) {
+    CHECK_NE(this->data_, nullptr) << "Attempting to SetData on moved record";
+    if constexpr (sizeof...(ts) > 0) {
+      SetDataRecursive(0, std::forward<Args>(ts)...);
+    }
+  }
 
   // Data access.
   void SetUInt(uint64_t uint, size_t i);
@@ -101,6 +118,51 @@ class Record {
   friend std::ostream &operator<<(std::ostream &os, const Record &r);
 
  private:
+  // Recursive helper used in SetData(...).
+  template <typename Arg, typename... Args>
+  void SetDataRecursive(size_t index, Arg &&t, Args &&... ts) {
+    if (index >= this->schema_.size()) {
+      LOG(FATAL) << "Record data received too many arguments";
+    }
+    // Make sure Arg is of the correct type.
+    switch (this->schema_.TypeOf(index)) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                   uint64_t>::value) {
+          this->data_[index].uint = t;
+        } else {
+          LOG(FATAL) << "Type mismatch in SetData at index " << index;
+        }
+        break;
+      case sqlast::ColumnDefinition::Type::INT:
+        if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                   int64_t>::value) {
+          this->data_[index].sint = t;
+        } else {
+          LOG(FATAL) << "Type mismatch in SetData at index " << index;
+        }
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+        if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                   std::unique_ptr<std::string>>::value) {
+          this->data_[index].str = std::move(t);
+        } else {
+          LOG(FATAL) << "Type mismatch in SetData at index " << index;
+        }
+        break;
+      default:
+        LOG(FATAL) << "Unsupported data type in SetData";
+    }
+    // Handle the remaining ts.
+    if constexpr (sizeof...(ts) > 0) {
+      SetDataRecursive(index + 1, std::forward<Args>(ts)...);
+    } else {
+      if (this->schema_.size() != index + 1) {
+        LOG(FATAL) << "Record data received too few arguments";
+      }
+    }
+  }
+
   union RecordData {
     uint64_t uint;
     int64_t sint;

@@ -49,6 +49,78 @@ TEST(RecordTest, DataRep) {
   EXPECT_EQ(record.GetInt(2), v2);
 }
 
+// Tests setting and getting data from record using variadic parameter pack.
+TEST(RecordTest, VariadicDataRep) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
+  std::vector<ColumnID> keys = {0};
+  SchemaOwner schema{names, types, keys};
+
+  // Make some values.
+  uint64_t v0 = 42;
+  std::unique_ptr<std::string> ptr = std::make_unique<std::string>("hello");
+  std::string *v1 = ptr.get();  // Does not release ownership.
+  int64_t v2 = -20;
+
+  // Make the record and test.
+  Record record{SchemaRef(schema)};
+  record.SetData(v0, std::move(ptr), v2);
+
+  EXPECT_EQ(record.GetUInt(0), v0);
+  EXPECT_EQ(&record.GetString(1), v1);  // pointer/address equality.
+  EXPECT_EQ(record.GetString(1), *v1);  // deep equality
+  EXPECT_EQ(record.GetInt(2), v2);
+}
+
+// Tests setting and getting data from record using variadic constructor.
+TEST(RecordTest, VariadicConstructor) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
+  std::vector<ColumnID> keys = {0};
+  SchemaOwner schema{names, types, keys};
+
+  // Make some values.
+  uint64_t v0 = 42;
+  std::unique_ptr<std::string> ptr = std::make_unique<std::string>("hello");
+  std::string *v1 = ptr.get();  // Does not release ownership.
+  int64_t v2 = -20;
+
+  // Make the record and test.
+  Record record{SchemaRef(schema), false, v0, std::move(ptr), v2};
+  EXPECT_EQ(record.GetUInt(0), v0);
+  EXPECT_EQ(&record.GetString(1), v1);  // pointer/address equality.
+  EXPECT_EQ(record.GetString(1), *v1);  // deep equality
+  EXPECT_EQ(record.GetInt(2), v2);
+  EXPECT_EQ(record.IsPositive(), false);
+}
+
+// Tests setting and getting data from record using variadic constructor.
+#ifndef PELTON_VALGRIND_MODE
+TEST(RecordTest, VariadicConstructorTypeMistmatch) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
+  std::vector<ColumnID> keys = {0};
+  SchemaOwner schema{names, types, keys};
+
+  // Make some values.
+  uint64_t v0 = 42;
+  std::unique_ptr<std::string> ptr = std::make_unique<std::string>("hello");
+  int64_t v2 = -20;
+
+  // Make the record with bad data types and make sure we die.
+  ASSERT_DEATH(
+      { Record record(SchemaRef(schema), false, v0, v2, std::move(ptr)); },
+      "Type mismatch");
+  ASSERT_DEATH(
+      { Record record(SchemaRef(schema), false, v0, std::move(ptr), v2, v2); },
+      "too many");
+  ASSERT_DEATH({ Record record(SchemaRef(schema), false, v0); }, "too few");
+}
+#endif
+
 // Tests record equality.
 TEST(RecordTest, Comparisons) {
   // Create a schema.
