@@ -159,3 +159,40 @@ cc_library(
     #remote = "https://github.com/antlr/grammars-v4",
     remote = "https://github.com/KinanBab/grammars-v4.git",
 )
+
+# Java related tools (for planner / calcite)
+RULES_JVM_EXTERNAL_TAG = "2.5"
+RULES_JVM_EXTERNAL_SHA = "249e8129914be6d987ca57754516be35a14ea866c616041ff0cd32ea94d2f3a1"
+http_archive(
+    name = "rules_jvm_external",
+    sha256 = RULES_JVM_EXTERNAL_SHA,
+    strip_prefix = "rules_jvm_external-%s" % RULES_JVM_EXTERNAL_TAG,
+    url = "https://github.com/bazelbuild/rules_jvm_external/archive/%s.zip" % RULES_JVM_EXTERNAL_TAG,
+)
+
+# Dependencies of planner.
+load("@rules_jvm_external//:defs.bzl", "maven_install")
+
+maven_install(
+    name = "maven",
+    artifacts = [
+        "com.fasterxml.jackson.core:jackson-databind:2.10.3",
+        "com.fasterxml.jackson.core:jackson-core:2.10.3",
+        "com.fasterxml.jackson.core:jackson-databind:2.10.3",
+        "com.fasterxml.jackson.core:jackson-core:2.10.3",
+        "junit:junit:4.11",
+        "org.apache.calcite:calcite-core:1.23.0",
+        "org.apache.calcite:calcite-linq4j:1.23.0",
+        "org.apache.logging.log4j:log4j-slf4j-impl:2.12.0",
+        "org.apache.logging.log4j:log4j-api:2.11.2",
+        "org.apache.logging.log4j:log4j-core:2.11.2",
+        "org.bytedeco:javacpp:1.5.4",
+        "org.slf4j:slf4j-api:1.7.30",
+
+    ],
+    repositories = [
+        "http://uk.maven.org/maven2",
+        "https://jcenter.bintray.com/",
+    ],
+    fetch_sources = True,
+)

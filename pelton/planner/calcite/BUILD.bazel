@@ -1,0 +1,21 @@
+load("@rules_java//java:defs.bzl", "java_binary")
+
+java_binary(
+    name = "planner",
+    srcs = glob(["src/main/java/com/brownsys/pelton/planner/**/*.java"]),
+    resources = glob(["src/main/resources/*"]),
+    main_class = "com.brownsys.pelton.planner.QueryPlanner",
+    deps = [
+        "@maven//:junit_junit",
+        "@maven//:org_bytedeco_javacpp",
+        "@maven//:org_apache_calcite_calcite_core",
+        "@maven//:org_apache_calcite_calcite_linq4j",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:org_apache_logging_log4j_log4j_slf4j_impl",
+        "@maven//:org_apache_logging_log4j_log4j_api",
+        "@maven//:org_apache_logging_log4j_log4j_core",
+        "@maven//:com_google_guava_guava",
+    ],
+)

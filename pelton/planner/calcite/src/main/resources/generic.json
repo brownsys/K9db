@@ -8,12 +8,12 @@
         {
           "name": "Orders",
           "type": "custom",
-          "factory": "com.brownsys.pelton.utils.GenericTableFactory"
+          "factory": "com.brownsys.pelton.planner.schema.GenericTableFactory"
         },
         {
           "name": "Products",
           "type": "custom",
-          "factory": "com.brownsys.pelton.utils.GenericTableFactory"
+          "factory": "com.brownsys.pelton.planner.schema.GenericTableFactory"
         }
       ]
     }

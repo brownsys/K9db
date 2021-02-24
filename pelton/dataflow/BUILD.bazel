@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 
 cc_library(
     name = "state",
@@ -183,4 +183,23 @@ cc_test(
         "@gtest",
         "@gtest//:gtest_main",
     ],
+)
+
+# Used by the planner / java side of things.
+cc_binary(
+    name = "generator",
+    srcs = [
+        "generator.cc",
+        "generator.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":graph",
+        ":schema",
+        ":types",
+        "//pelton/dataflow/ops:input",
+        "//pelton/dataflow/ops:matview",
+        "@glog",
+    ],
+    linkshared = 1,
 )

@@ -136,7 +136,8 @@ public class SimpleCalciteConnection implements CalciteConnection {
   }
 
   @Override
-  public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
+  public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency)
+      throws SQLException {
     return null;
   }
 
@@ -186,17 +187,20 @@ public class SimpleCalciteConnection implements CalciteConnection {
   }
 
   @Override
-  public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
+  public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability)
+      throws SQLException {
     return null;
   }
 
   @Override
-  public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
+  public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency,
+      int resultSetHoldability) throws SQLException {
     return null;
   }
 
   @Override
-  public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
+  public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency,
+      int resultSetHoldability) throws SQLException {
     return null;
   }
 
@@ -335,8 +339,8 @@ public class SimpleCalciteConnection implements CalciteConnection {
     return false;
   }
 
-public Context createPrepareContext() {
-	// TODO Auto-generated method stub
-	return null;
-}
+  public Context createPrepareContext() {
+    // TODO Auto-generated method stub
+    return null;
+  }
 }
