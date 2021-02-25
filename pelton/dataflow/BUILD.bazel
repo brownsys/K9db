@@ -110,7 +110,6 @@ cc_library(
         ":types",
         "//pelton/dataflow/ops:input",
         "//pelton/dataflow/ops:matview",
-        "@absl//absl/container:node_hash_map",
         "@glog",
     ],
 )

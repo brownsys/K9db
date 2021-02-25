@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
   JNI_GetDefaultJavaVMInitArgs(&vm_args);
 
   // Construct a VM
-  jint res = JNI_CreateJavaVM(&vm, (void **)&env, &vm_args);
+  jint res = JNI_CreateJavaVM(&vm, reinterpret_cast<void **>(&env), &vm_args);
 
   // First get the class that contains the method you need to call
   jclass clazz = env->FindClass("com/brownsys/pelton/planner/nativelib/Main");
@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
     env->ExceptionDescribe();
     env->ExceptionClear();
   }
-  std::cout << graph.inputs().at(0)->input_name() << std::endl;
+  std::cout << graph.inputs().at("hello-world-table")->input_name() << std::endl;
   std::cout << std::static_pointer_cast<pelton::dataflow::InputOperator>(
                    graph.GetNode(0))
                    ->input_name()

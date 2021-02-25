@@ -307,5 +307,22 @@ TEST(DataFlowGraphTest, TestEquiJoinGraph) {
   MatViewContentsEquals(g.outputs().at(0), result);
 }
 
+// Tests setting and getting data from record using variadic constructor.
+#ifndef PELTON_VALGRIND_MODE
+TEST(RecordTest, TestDuplicateInputGraph) {
+  // Create a schema.
+  SchemaOwner schema = MakeLeftSchema();
+
+  // Make a graph.
+  DataFlowGraph g;
+
+  // Add two input operators to the graph for the same table, expect an error.
+  auto in1 = std::make_shared<InputOperator>("test-table", SchemaRef(schema));
+  auto in2 = std::make_shared<InputOperator>("test-table", SchemaRef(schema));
+  EXPECT_TRUE(g.AddInputNode(in1));
+  ASSERT_DEATH({ g.AddInputNode(in2); }, "input already exists");
+}
+#endif
+
 }  // namespace dataflow
 }  // namespace pelton
