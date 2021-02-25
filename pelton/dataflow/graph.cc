@@ -8,67 +8,45 @@
 namespace pelton {
 namespace dataflow {
 
-DataFlowGraph::DataFlowGraph() {}
-
-bool DataFlowGraph::AddInputNode(std::shared_ptr<InputOperator> op) {
-  return AddNode(op, std::vector<std::shared_ptr<Operator>>{});
-}
-
 bool DataFlowGraph::AddNode(std::shared_ptr<Operator> op,
                             std::vector<std::shared_ptr<Operator>> parents) {
-  NodeIndex idx = mint_node_index();
-  op->set_index(idx);
-  op->set_graph(this);
+  NodeIndex idx = this->MintNodeIndex();
+  op->SetIndex(idx);
+  op->SetGraph(this);
 
-  auto res = nodes_.emplace(idx, op);
+  const auto &[_, inserted] = this->nodes_.emplace(idx, op);
+  CHECK(inserted);
 
-  for (auto& parent : parents)
-    if (parent != nullptr) {
-      CHECK(AddEdge(parent, op));
+  for (const auto &parent : parents) {
+    if (parent) {
+      CHECK(this->AddEdge(parent, op));
     }
-
-  return res.second;
+  }
+  return inserted;
 }
 
 bool DataFlowGraph::AddEdge(std::shared_ptr<Operator> parent,
                             std::shared_ptr<Operator> child) {
-  EdgeIndex idx = mint_edge_index();
-  std::shared_ptr<Edge> edge = std::make_shared<Edge>(Edge(parent, child));
+  EdgeIndex idx = this->MintEdgeIndex();
+  std::shared_ptr<Edge> edge = std::make_shared<Edge>(parent, child);
 
-  auto res = edges_.emplace(idx, edge);
+  const auto &[_, inserted] = this->edges_.emplace(idx, edge);
+  CHECK(inserted);
 
-  // also implicitly adds op1 as child of op2
+  // Also implicitly adds op1 as child of op2.
   child->AddParent(parent, edge);
 
-  return res.second;
+  return inserted;
 }
 
-std::vector<std::shared_ptr<InputOperator>> DataFlowGraph::inputs() const {
-  std::vector<std::shared_ptr<InputOperator>> v;
-
-  for (auto op : nodes_) {
-    if (op.second->type() == OperatorType::INPUT) {
-      v.emplace_back(std::static_pointer_cast<InputOperator>(op.second));
-    }
+bool DataFlowGraph::Process(const std::string &input_name,
+                            const std::vector<Record> &records) {
+  std::shared_ptr<InputOperator> node = this->inputs_.at(input_name);
+  if (!node->ProcessAndForward(UNDEFINED_NODE_INDEX, records)) {
+    return false;
   }
 
-  return v;
-}
-
-std::vector<std::shared_ptr<MatViewOperator>> DataFlowGraph::outputs() const {
-  std::vector<std::shared_ptr<MatViewOperator>> v;
-
-  for (auto op : nodes_) {
-    if (op.second->type() == OperatorType::MAT_VIEW) {
-      v.emplace_back(std::static_pointer_cast<MatViewOperator>(op.second));
-    }
-  }
-
-  return v;
-}
-
-bool DataFlowGraph::Process(InputOperator& input, std::vector<Record> records) {
-  return input.ProcessAndForward(UNDEFINED_NODE_INDEX, records);
+  return true;
 }
 
 }  // namespace dataflow

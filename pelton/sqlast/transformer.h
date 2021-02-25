@@ -13,7 +13,7 @@ namespace sqlast {
 
 class AstTransformer : public sqlparser::SQLiteParserBaseVisitor {
  public:
-  AstTransformer() {}
+  AstTransformer() = default;
 
   // Entry point for cst to ast transformation / building.
   absl::StatusOr<std::unique_ptr<sqlast::AbstractStatement>> TransformStatement(

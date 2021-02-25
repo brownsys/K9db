@@ -3,32 +3,46 @@
 #include <utility>
 #include <vector>
 
-#include "pelton/dataflow/record.h"
+#include "glog/logging.h"
 
 namespace pelton {
 namespace dataflow {
 
-// Leaves out_rs empty, as materialized views are leaves of the graph.
-// We may change this if we allow mat views to have descendant nodes.
-bool MatViewOperator::process(std::vector<Record>& rs,
-                              std::vector<Record>& out_rs) {
-  for (Record& r : rs) {
-    // incoming records must have the right key column set
-    CHECK(r.schema().key_columns() == key_cols_);
+void MatViewOperator::ComputeOutputSchema() {
+  this->output_schema_ = this->input_schemas_.at(0);
+}
 
-    std::pair<Key, bool> key = r.GetKey();
-    if (!contents_.insert(key.first, r)) return false;
+// Leaves output empty, as materialized views are leaves of the graph.
+// We may change this if we allow mat views to have descendant nodes.
+bool MatViewOperator::Process(NodeIndex source,
+                              const std::vector<Record> &records,
+                              std::vector<Record> *output) {
+  for (const Record &r : records) {
+    // incoming records must have the right key column set
+    CHECK(r.schema().keys() == this->key_cols_);
+    if (!this->contents_.Insert(r.GetKey(), r)) {
+      return false;
+    }
   }
 
   return true;
 }
 
-std::vector<Record> MatViewOperator::lookup(const Key& key) const {
-  return contents_.group(key);
+size_t MatViewOperator::count() const { return this->contents_.count(); }
+bool MatViewOperator::Contains(const Key &key) const {
+  return this->contents_.Contains(key);
 }
 
-std::vector<Record> MatViewOperator::contents() const {
-  return contents_.contents();
+const std::vector<Record> &MatViewOperator::Lookup(const Key &key) const {
+  return this->contents_.Get(key);
+}
+
+GroupedData::const_iterator MatViewOperator::begin() const {
+  return this->contents_.begin();
+}
+
+GroupedData::const_iterator MatViewOperator::end() const {
+  return this->contents_.end();
 }
 
 }  // namespace dataflow

@@ -5,7 +5,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/container/flat_hash_map.h"
 #include "glog/logging.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
@@ -13,137 +12,126 @@
 namespace pelton {
 namespace dataflow {
 
-enum DataType {
-  kUInt,
-  kInt,
-  kText,
-  kDatetime,
-};
+class SchemaRef;
 
-DataType StringToDataType(const std::string& type_name);
-
-class Schema;
-class SchemaFactory;
-
-class SchemaFactory {
+class SchemaOwner {
  public:
-  static const Schema& create_or_get(const std::vector<DataType>& column_types);
-  static const Schema& undefined_schema() { return create_or_get({}); }
+  // Empty SchemaOwner: this is used to create a temporary so that Operators can
+  // compute their output schema after creation.
+  SchemaOwner() : ptr_(nullptr) {}
 
-  static SchemaFactory& instance() {
-    static SchemaFactory the_one_and_only;
-    return the_one_and_only;
+  // Construct from a CREATE TABLE statement.
+  explicit SchemaOwner(const sqlast::CreateTable &table);
+
+  // Construct from schema data directly.
+  SchemaOwner(const std::vector<std::string> &column_names,
+              const std::vector<sqlast::ColumnDefinition::Type> &column_types,
+              const std::vector<ColumnID> &keys) {
+    this->ptr_ = new SchemaData(column_names, column_types, keys);
   }
 
-  ~SchemaFactory();
-
- private:
-  absl::flat_hash_map<std::vector<DataType>, Schema*> schemas_;
-  SchemaFactory() {}
-};
-
-class Schema {
- public:
-  Schema() : num_inline_columns_(0), num_pointer_columns_(0) {}
-  explicit Schema(std::vector<DataType> columns);
-  explicit Schema(std::vector<DataType> columns,
-                  std::vector<std::string> names);
-  explicit Schema(const sqlast::CreateTable& table_description);
-
-  friend class SchemaFactory;
-
-  Schema(const Schema& other)
-      : types_(other.types_),
-        names_(other.names_),
-        key_columns_(other.key_columns_),
-        num_inline_columns_(other.num_inline_columns_),
-        num_pointer_columns_(other.num_pointer_columns_),
-        true_indices_(other.true_indices_) {}
-
-  Schema(Schema&& other) = default;
-  Schema& operator=(const Schema& other) {
-    types_ = other.types_;
-    names_ = other.names_;
-    key_columns_ = other.key_columns_;
-    num_inline_columns_ = other.num_inline_columns_;
-    num_pointer_columns_ = other.num_pointer_columns_;
-    true_indices_ = other.true_indices_;
+  // An owner is only movable, which moves ownership of the underlying pointer.
+  SchemaOwner(const SchemaOwner &) = delete;
+  SchemaOwner &operator=(const SchemaOwner &) = delete;
+  SchemaOwner(SchemaOwner &&other) { *this = std::move(other); }
+  SchemaOwner &operator=(SchemaOwner &&other) {
+    this->ptr_ = other.ptr_;
+    other.ptr_ = nullptr;
     return *this;
   }
 
-  static inline bool is_inlineable(DataType t) {
-    switch (t) {
-      case kUInt:
-      case kInt:
-        return true;
-      default:
-        return false;
+  // Destructor.
+  virtual ~SchemaOwner() {
+    if (this->ptr_ != nullptr) {
+      delete this->ptr_;
     }
   }
 
-  static inline size_t size_of(DataType t, const void* data) {
-    switch (t) {
-      case kText: {
-        // TODO(malte): this returns the string's size, but discounts metadata
-        // and small string optimizations of std::string; when we move to a
-        // length+buffer representation, it will work better.
-        const std::string* s = reinterpret_cast<const std::string*>(data);
-        return s->size();
+  // Equality is underlying pointer equality.
+  bool operator==(const SchemaOwner &other) const {
+    return this->ptr_ == other.ptr_;
+  }
+  bool operator!=(const SchemaOwner &other) const {
+    return this->ptr_ != other.ptr_;
+  }
+
+  // Accessors.
+  const std::vector<std::string> &column_names() const;
+  const std::vector<sqlast::ColumnDefinition::Type> &column_types() const;
+  const std::vector<ColumnID> &keys() const;
+  size_t size() const;
+
+  // Accessor by index.
+  sqlast::ColumnDefinition::Type TypeOf(size_t i) const;
+  const std::string &NameOf(size_t i) const;
+
+  // Accessor by column name.
+  size_t IndexOf(const std::string &column_name) const;
+
+  // For logging and printing...
+  friend std::ostream &operator<<(std::ostream &os, const SchemaOwner &r);
+
+ protected:
+  // Schema data is a protected struct inside SchemaOwner, it is never exposed
+  // directly.
+  struct SchemaData {
+    std::vector<std::string> column_names;
+    std::vector<sqlast::ColumnDefinition::Type> column_types;
+    std::vector<ColumnID> keys;
+    // Constructors.
+    SchemaData() = default;
+    SchemaData(const std::vector<std::string> &cn,
+               const std::vector<sqlast::ColumnDefinition::Type> &ct,
+               const std::vector<ColumnID> &ks)
+        : column_names(cn), column_types(ct), keys(ks) {
+      if (column_names.size() != column_types.size()) {
+        LOG(FATAL) << "Incosistent number of columns in schema!";
       }
-      case kUInt:
-        return sizeof(uint64_t);
-      case kInt:
-        return sizeof(int64_t);
-      default:
-        LOG(FATAL) << "unimplemented";
     }
-    return 0;
+    // Not copyable or movable, we will only pass this around by reference or
+    // pointer.
+    SchemaData(const SchemaData &) = delete;
+    SchemaData &operator=(const SchemaData &) = delete;
+    SchemaData(SchemaData &&) = delete;
+    SchemaData &operator=(SchemaData &&) = delete;
+  };
+
+  // Schema wrapper classes store a ptr to the underlying SchemaData.
+  // SchemaOwner manages creation and deletion of this pointer, while
+  // SchemaRef only uses it without management.
+  SchemaData *ptr_;
+
+  friend SchemaRef;
+};
+
+class SchemaRef : public SchemaOwner {
+ public:
+  // Empty SchemaRef: this is used to create a temporary so that Operators can
+  // compute their output schema after creation.
+  SchemaRef() : SchemaOwner() {}
+
+  // Can only be constructor from an owner!
+  explicit SchemaRef(const SchemaOwner &other) : SchemaOwner() {
+    this->ptr_ = other.ptr_;
   }
 
-  bool operator==(const Schema& other) const { return types_ == other.types_; }
-  bool operator!=(const Schema& other) const { return !(*this == other); }
-
-  DataType TypeOf(size_t index) const {
-    BoundsCheckIndex(index);
-    return types_[index];
+  // Can be moved and copied!
+  SchemaRef(const SchemaRef &other) { *this = other; }
+  SchemaRef &operator=(const SchemaRef &other) {
+    this->ptr_ = other.ptr_;
+    return *this;
   }
 
-  const std::string& NameOf(size_t index) const {
-    BoundsCheckIndex(index);
-    return names_[index];
+  SchemaRef(SchemaRef &&other) { *this = std::move(other); }
+  SchemaRef &operator=(SchemaRef &&other) {
+    this->ptr_ = other.ptr_;
+    other.ptr_ = nullptr;
+    return *this;
   }
 
-  std::pair<bool, size_t> RawColumnIndex(size_t index) const {
-    BoundsCheckIndex(index);
-    return true_indices_[index];
-  }
-
-  size_t num_columns() const {
-    return num_inline_columns_ + num_pointer_columns_;
-  }
-  size_t num_inline_columns() const { return num_inline_columns_; }
-  size_t num_pointer_columns() const { return num_pointer_columns_; }
-  const std::vector<ColumnID> key_columns() const { return key_columns_; }
-  void set_key_columns(std::vector<ColumnID> columns) {
-    key_columns_ = columns;
-  }
-
-  bool is_undefined() const {
-    return types_.empty() && num_inline_columns_ == 0 &&
-           num_pointer_columns_ == 0;
-  }
-
- private:
-  std::vector<DataType> types_;
-  std::vector<std::string> names_;
-  std::vector<ColumnID> key_columns_;
-  size_t num_inline_columns_;
-  size_t num_pointer_columns_;
-  std::vector<std::pair<bool, size_t>> true_indices_;
-
-  inline void BoundsCheckIndex(size_t index) const {
-    CHECK_LT(index, true_indices_.size())
-        << "column index " << index << " out of bounds";
+  // Unmanaged ptr_.
+  ~SchemaRef() {
+    this->ptr_ = nullptr;  // Stops base destructor from deleting ptr_.
   }
 };
 

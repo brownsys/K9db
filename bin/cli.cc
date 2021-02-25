@@ -41,8 +41,8 @@ int main(int argc, char **argv) {
   std::string dir(argv[1]);
 
   // Initialize our sharded state/connection.
-  pelton::shards::SharderState state;
-  pelton::open(dir, &state);
+  pelton::Connection connection;
+  pelton::open(dir, &connection);
 
   std::cout << "SQL Sharder" << std::endl;
   std::cout << "DB directory: " << dir << std::endl;
@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
     // Command has been fully read, execute it!
     try {
       bool context = true;
-      pelton::exec(&state, command, &Callback,
+      pelton::exec(&connection, command, &Callback,
                    reinterpret_cast<void *>(&context), nullptr);
     } catch (const char *err_msg) {
       std::cerr << "Error: " << err_msg << std::endl;
@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
   }
 
   // Close the connection
-  pelton::close(&state);
+  pelton::close(&connection);
 
   // Exit!
   std::cout << "exit" << std::endl;

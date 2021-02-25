@@ -4,67 +4,153 @@
 
 #include "pelton/dataflow/ops/equijoin.h"
 
+#include <string>
+#include <utility>
+
+#include "glog/logging.h"
+#include "pelton/sqlast/ast.h"
+
 namespace pelton {
 namespace dataflow {
 
-EquiJoin::EquiJoin(ColumnID left_id, ColumnID right_id)
-    : Operator::Operator(),
-      left_id_(left_id),
-      right_id_(right_id),
-      left_schema_(nullptr),
-      right_schema_(nullptr),
-      joined_schema_(nullptr) {}
+namespace {
 
-bool EquiJoin::process(NodeIndex src_op_idx, std::vector<Record>& rs,
-                       std::vector<Record>& out_rs) {
-  for (const auto& r : rs) {
-    // in comparison to a normal HashJoin in a database, here
-    // record flow from one operator in.
+inline void CopyIntoRecord(sqlast::ColumnDefinition::Type datatype,
+                           Record *target, const Record &source,
+                           size_t target_index, size_t source_index) {
+  switch (datatype) {
+    case sqlast::ColumnDefinition::Type::UINT:
+      target->SetUInt(source.GetUInt(source_index), target_index);
+      break;
+    case sqlast::ColumnDefinition::Type::INT:
+      target->SetInt(source.GetInt(source_index), target_index);
+      break;
+    case sqlast::ColumnDefinition::Type::TEXT:
+      // Copies the string.
+      target->SetString(
+          std::make_unique<std::string>(source.GetString(source_index)),
+          target_index);
+      break;
+    default:
+      LOG(FATAL) << "Unsupported type in equijoin emit";
+  }
+}
 
-    // append all input records to corresponding hashtable
-    if (src_op_idx == left()->index()) {
-      // match each record with right table
-      // coming from left operator
-      // => match with right operator's table!
-      const auto record_left_key_ptr = reinterpret_cast<const void*>(
-          *static_cast<const uintptr_t*>(r[left_id_]));
-      auto left_key = Key(record_left_key_ptr, r.schema().TypeOf(left_id_));
+}  // namespace
 
-      for (auto it = right_table_.beginGroup(left_key);
-           it != right_table_.endGroup(left_key); ++it) {
-        emitRow(out_rs, r, *it);
+bool EquiJoinOperator::Process(NodeIndex source,
+                               const std::vector<Record> &records,
+                               std::vector<Record> *output) {
+  for (const Record &record : records) {
+    // In comparison to a normal HashJoin in a database, here
+    // records flow from one operator in.
+
+    // Append all input records to the corresponding hashtable.
+    if (source == this->left()->index()) {
+      // Match each record in the right table with this record.
+      Key left_value = record.GetValue(this->left_id_);
+      for (const auto &right : this->right_table_.Get(left_value)) {
+        this->EmitRow(record, right, output);
       }
 
-      // save record hashed to left table
-      left_table_.insert(left_key, r);
-
-    } else if (src_op_idx == right()->index()) {
-      // match each record with left table
-      // coming from right operator
-      // => match with left operator's table!
-      const auto record_right_key_ptr = reinterpret_cast<const void*>(
-          *static_cast<const uintptr_t*>(r[right_id_]));
-      auto right_key = Key(record_right_key_ptr, r.schema().TypeOf(right_id_));
-
-      for (auto it = left_table_.beginGroup(right_key);
-           it != left_table_.endGroup(right_key); ++it) {
-        emitRow(out_rs, *it, r);
+      // Save record in the appropriate table.
+      this->left_table_.Insert(left_value, record);
+    } else if (source == this->right()->index()) {
+      // Match each record in the left table with this record.
+      Key right_value = record.GetValue(this->right_id_);
+      for (const auto &left : this->left_table_.Get(right_value)) {
+        this->EmitRow(left, record, output);
       }
 
       // save record hashed to right table
-      right_table_.insert(right_key, r);
+      this->right_table_.Insert(right_value, record);
     } else {
-#ifndef NDEBUG
-      throw std::runtime_error(
-          "internal error. Received data input"
-          "from operator " +
-          std::to_string(src_op_idx) + " but join has only IDs " +
-          std::to_string(left()->index()) + " and " +
-          std::to_string(right()->index()) + " registered to it.");
-#endif
+      LOG(FATAL) << "EquiJoinOperator got input from Node " << source
+                 << " but has parents " << this->left()->index() << " and "
+                 << this->right()->index();
+      return false;
     }
   }
   return true;
+}
+
+void EquiJoinOperator::ComputeOutputSchema() {
+  // We only have enough information to compute the output schema when
+  // both parents are known.
+  if (this->input_schemas_.size() < 2) {
+    return;
+  }
+
+  // Get the schema's of the two parents.
+  const SchemaRef &lschema = this->input_schemas_.at(0);
+  const SchemaRef &rschema = this->input_schemas_.at(1);
+
+  // Construct joined schema.
+  std::vector<sqlast::ColumnDefinition::Type> types = lschema.column_types();
+  std::vector<std::string> names = lschema.column_names();
+  std::vector<ColumnID> keys = lschema.keys();
+
+  for (size_t i = 0; i < rschema.size(); i++) {
+    if (i != this->right_id_) {
+      types.push_back(rschema.TypeOf(i));
+      names.push_back(rschema.NameOf(i));
+    }
+  }
+  for (ColumnID key_id : rschema.keys()) {
+    // right_id_ column is dropped, if it is part of the key, we must
+    // substitute it with left_id_ so that the key is complete.
+    if (key_id == this->right_id_) {
+      for (size_t i = 0; i < keys.size(); i++) {
+        // left_id_ already part of key.
+        if (keys.at(i) == this->left_id_) {
+          break;
+        }
+        // Insert left_id_ in order.
+        if (keys.at(i) > this->left_id_) {
+          keys.insert(keys.begin() + i, this->left_id_);
+          break;
+        }
+        // Push at the end.
+        if (i == keys.size() - 1) {
+          keys.push_back(this->left_id_);
+          break;
+        }
+      }
+    } else if (key_id < this->right_id_) {
+      keys.push_back(lschema.size() + key_id);
+    } else {
+      keys.push_back(lschema.size() + key_id - 1);
+    }
+  }
+
+  // We own the joined schema.
+  this->joined_schema_ = SchemaOwner(names, types, keys);
+  this->output_schema_ = SchemaRef(this->joined_schema_);  // Inherited.
+}
+
+void EquiJoinOperator::EmitRow(const Record &left, const Record &right,
+                               std::vector<Record> *output) {
+  const SchemaRef &lschema = left.schema();
+  const SchemaRef &rschema = right.schema();
+
+  // Create a concatenated record, dropping key column from left side.
+  Record record{this->output_schema_};
+  for (size_t i = 0; i < lschema.size(); i++) {
+    CopyIntoRecord(lschema.TypeOf(i), &record, left, i, i);
+  }
+  for (size_t i = 0; i < rschema.size(); i++) {
+    if (i == this->right_id_) {
+      continue;
+    }
+    size_t j = i + lschema.size();
+    if (i > this->right_id_) {
+      j--;
+    }
+    CopyIntoRecord(rschema.TypeOf(i), &record, right, j, i);
+  }
+
+  // add result record to output
+  output->push_back(std::move(record));
 }
 
 }  // namespace dataflow

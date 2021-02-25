@@ -1,107 +1,200 @@
 #include "pelton/dataflow/record.h"
 
-#include <string>
-#include <utility>
-
 namespace pelton {
 namespace dataflow {
 
-void RecordData::DeleteOwnedData(uintptr_t ptr, DataType type) {
-  switch (type) {
-    case kText:
-      delete reinterpret_cast<std::string*>(ptr);
+// Helper for Record::DataVariant.
+sqlast::ColumnDefinition::Type Record::TypeOfVariant(const DataVariant &v) {
+  switch (v.index()) {
+    case 0:
+      return sqlast::ColumnDefinition::Type::TEXT;
+    case 1:
+      return sqlast::ColumnDefinition::Type::UINT;
+    case 2:
+      return sqlast::ColumnDefinition::Type::INT;
+    default:
+      LOG(FATAL) << "Unsupported variant type!";
+  }
+}
+
+// Explicit deep copying.
+Record Record::Copy() const {
+  // Create a copy.
+  Record record{this->schema_, this->positive_};
+  record.timestamp_ = this->timestamp_;
+
+  // Copy data.
+  for (size_t i = 0; i < this->schema_.size(); i++) {
+    const auto &type = this->schema_.column_types().at(i);
+    switch (type) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        record.data_[i].uint = this->data_[i].uint;
+        break;
+      case sqlast::ColumnDefinition::Type::INT:
+        record.data_[i].sint = this->data_[i].sint;
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+        if (this->data_[i].str) {
+          record.data_[i].str =
+              std::make_unique<std::string>(*this->data_[i].str);
+        }
+        break;
+      default:
+        LOG(FATAL) << "Unsupported data type in record copy!";
+    }
+  }
+
+  return record;
+}
+
+// Data access.
+void Record::SetUInt(uint64_t uint, size_t i) {
+  CheckType(i, sqlast::ColumnDefinition::Type::UINT);
+  this->data_[i].uint = uint;
+}
+void Record::SetInt(int64_t sint, size_t i) {
+  CheckType(i, sqlast::ColumnDefinition::Type::INT);
+  this->data_[i].sint = sint;
+}
+void Record::SetString(std::unique_ptr<std::string> &&v, size_t i) {
+  CheckType(i, sqlast::ColumnDefinition::Type::TEXT);
+  this->data_[i].str = std::move(v);
+}
+uint64_t Record::GetUInt(size_t i) const {
+  CheckType(i, sqlast::ColumnDefinition::Type::UINT);
+  return this->data_[i].uint;
+}
+int64_t Record::GetInt(size_t i) const {
+  CheckType(i, sqlast::ColumnDefinition::Type::INT);
+  return this->data_[i].sint;
+}
+const std::string &Record::GetString(size_t i) const {
+  CheckType(i, sqlast::ColumnDefinition::Type::TEXT);
+  return *(this->data_[i].str);
+}
+
+// Data access with generic type.
+Key Record::GetValue(size_t i) const {
+  switch (this->schema_.TypeOf(i)) {
+    case sqlast::ColumnDefinition::Type::UINT:
+      return Key(this->data_[i].uint);
+    case sqlast::ColumnDefinition::Type::INT:
+      return Key(this->data_[i].sint);
+    case sqlast::ColumnDefinition::Type::TEXT:
+      return Key(*this->data_[i].str);
+    default:
+      LOG(FATAL) << "Unsupported data type in value extraction!";
+  }
+}
+Key Record::GetKey() const {
+  CHECK_NE(this->data_, nullptr) << "Cannot get key for moved record";
+  const std::vector<ColumnID> &keys = this->schema_.keys();
+  CHECK_EQ(keys.size(), 1U);
+  size_t key_index = keys.at(0);
+  switch (this->schema_.TypeOf(key_index)) {
+    case sqlast::ColumnDefinition::Type::UINT:
+      return Key(this->data_[key_index].uint);
+    case sqlast::ColumnDefinition::Type::INT:
+      return Key(this->data_[key_index].sint);
+    case sqlast::ColumnDefinition::Type::TEXT:
+      if (this->data_[key_index].str) {
+        return Key(*(this->data_[key_index].str));
+      }
+      return Key("");
+    default:
+      LOG(FATAL) << "Unsupported data type in key extraction!";
+  }
+  return Key(0UL);
+}
+
+// Data type transformation.
+void Record::SetValue(const std::string &value, size_t i) {
+  CHECK_NE(this->data_, nullptr) << "Cannot set value for moved record";
+  switch (this->schema_.TypeOf(i)) {
+    case sqlast::ColumnDefinition::Type::UINT:
+      this->data_[i].uint = std::stoull(value);
+      break;
+    case sqlast::ColumnDefinition::Type::INT:
+      this->data_[i].sint = std::stoll(value);
+      break;
+    case sqlast::ColumnDefinition::Type::TEXT:
+      this->data_[i].str = std::make_unique<std::string>(value);
       break;
     default:
-      LOG(FATAL)
-          << "Tried to delete inline data as if it was an owned pointer!";
+      LOG(FATAL) << "Unsupported data type in setvalue";
   }
 }
 
-size_t Record::size_at(size_t index) const {
-  const uintptr_t* data = static_cast<const uintptr_t*>(at(index));
-  return schema_->size_of(schema_->TypeOf(index),
-                          reinterpret_cast<const void*>(*data));
-}
-
-const void* Record::at(size_t index) const {
-  std::pair<bool, size_t> ri = schema_->RawColumnIndex(index);
-  if (ri.first) {
-    return &data_.inline_data_[ri.second];
-  } else {
-    return static_cast<void*>(&data_.pointed_data_[ri.second]);
+// Equality: schema must be identical (pointer wise) and all values must be
+// equal.
+bool Record::operator==(const Record &other) const {
+  CHECK_NE(this->data_, nullptr) << "Left record == has been moved";
+  CHECK_NE(other.data_, nullptr) << "Right record == has been moved";
+  // Compare schemas (as pointers).
+  if (this->schema_ != other.schema_) {
+    return false;
   }
-}
-
-void* Record::at_mut(size_t index) {
-  std::pair<bool, size_t> ri = schema_->RawColumnIndex(index);
-  if (ri.first) {
-    return &data_.inline_data_[ri.second];
-  } else {
-    return static_cast<void*>(&data_.pointed_data_[ri.second]);
+  // Compare data (deep compare).
+  for (size_t i = 0; i < this->schema_.size(); i++) {
+    const auto &type = this->schema_.column_types().at(i);
+    switch (type) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        if (this->data_[i].uint != other.data_[i].uint) {
+          return false;
+        }
+        break;
+      case sqlast::ColumnDefinition::Type::INT:
+        if (this->data_[i].sint != other.data_[i].sint) {
+          return false;
+        }
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+        // If the pointers are not literally identical pointers.
+        if (this->data_[i].str != other.data_[i].str) {
+          // Either is null but not both.
+          if (!this->data_[i].str || !other.data_[i].str) {
+            return false;
+          }
+          // Compare contents.
+          if (*this->data_[i].str != *other.data_[i].str) {
+            return false;
+          }
+        }
+        break;
+      default:
+        LOG(FATAL) << "Unsupported data type in record ==";
+        return false;
+    }
   }
+  return true;
 }
 
-void Record::set_uint(size_t index, uint64_t v) {
-  CheckType(index, DataType::kUInt);
-
-  std::pair<bool, size_t> ri = schema_->RawColumnIndex(index);
-  data_.inline_data_[ri.second] = v;
-}
-
-uint64_t Record::as_uint(size_t index) const {
-  CheckType(index, DataType::kUInt);
-
-  std::pair<bool, size_t> ri = schema_->RawColumnIndex(index);
-  return static_cast<uint64_t>(data_.inline_data_[ri.second]);
-}
-
-void Record::set_int(size_t index, int64_t v) {
-  CheckType(index, DataType::kInt);
-
-  std::pair<bool, size_t> ri = schema_->RawColumnIndex(index);
-  data_.inline_data_[ri.second] = v;
-}
-
-int64_t Record::as_int(size_t index) const {
-  CheckType(index, DataType::kInt);
-
-  std::pair<bool, size_t> ri = schema_->RawColumnIndex(index);
-  return static_cast<int64_t>(data_.inline_data_[ri.second]);
-}
-
-void Record::set_string(size_t index, std::string* s) {
-  CheckType(index, DataType::kText);
-
-  std::pair<bool, size_t> ri = schema_->RawColumnIndex(index);
-  data_.pointed_data_[ri.second] = reinterpret_cast<uintptr_t>(s);
-}
-
-std::string* Record::as_string(size_t index) const {
-  CheckType(index, DataType::kText);
-
-  std::pair<bool, size_t> ri = schema_->RawColumnIndex(index);
-  return reinterpret_cast<std::string*>(data_.pointed_data_[ri.second]);
-}
-
-const std::pair<Key, bool> Record::GetKey() const {
-  std::vector<ColumnID> key_cols = schema_->key_columns();
-  CHECK_EQ(key_cols.size(), 1);
-  ColumnID cid = key_cols[0];
-
-  bool is_inline = Schema::is_inlineable(schema_->TypeOf(cid));
-  if (is_inline) {
-    const uint64_t key = *reinterpret_cast<const uint64_t*>(at(cid));
-    return std::make_pair(Key(key, schema_->TypeOf(cid)), is_inline);
-  } else {
-    const void* key = at(cid);
-    return std::make_pair(Key(key, schema_->TypeOf(cid)), is_inline);
+// Printing a record to an output stream (e.g. std::cout).
+std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Record &r) {
+  CHECK_NE(r.data_, nullptr) << "Cannot << moved record";
+  os << "|";
+  for (unsigned i = 0; i < r.schema_.size(); ++i) {
+    switch (r.schema_.TypeOf(i)) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        os << r.data_[i].uint << "|";
+        break;
+      case sqlast::ColumnDefinition::Type::INT:
+        os << r.data_[i].sint << "|";
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+        if (r.data_[i].str) {
+          os << *r.data_[i].str << "|";
+        } else {
+          os << "[nullptr]"
+             << "|";
+        }
+        break;
+      default:
+        LOG(FATAL) << "Unsupported data type in record << operator";
+    }
   }
+  return os;
 }
-
-// Index into record, either to the inline data or to the data pointed to by the
-// pointer stored.
-void* Record::operator[](size_t index) { return at_mut(index); }
-const void* Record::operator[](size_t index) const { return at(index); }
 
 }  // namespace dataflow
 }  // namespace pelton

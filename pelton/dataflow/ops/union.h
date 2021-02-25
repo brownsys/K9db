@@ -5,14 +5,23 @@
 
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/record.h"
+#include "pelton/dataflow/types.h"
 
 namespace pelton {
 namespace dataflow {
 
 class UnionOperator : public Operator {
  public:
-  OperatorType type() const override { return OperatorType::UNION; }
-  bool process(std::vector<Record>& rs, std::vector<Record>& out_rs) override;
+  UnionOperator() : Operator(Operator::Type::UNION) {}
+
+  bool ProcessAndForward(NodeIndex source,
+                         const std::vector<Record> &records) override;
+
+ protected:
+  bool Process(NodeIndex source, const std::vector<Record> &records,
+               std::vector<Record> *output) override;
+
+  void ComputeOutputSchema() override;
 };
 
 }  // namespace dataflow

@@ -15,7 +15,7 @@ namespace sqlast {
 // Select and delete statements.
 class Expression {
  public:
-  enum Type { LITERAL, COLUMN, EQ, AND };
+  enum class Type { LITERAL, COLUMN, EQ, AND };
 
   explicit Expression(Type type) : type_(type) {}
 

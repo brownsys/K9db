@@ -2,19 +2,21 @@
 #include "pelton/pelton.h"
 
 #include <iostream>
+#include <memory>
 #include <utility>
 #include <vector>
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
-#include "dataflow/graph.h"
-#include "dataflow/ops/filter.h"
-#include "dataflow/ops/input.h"
-#include "dataflow/schema.h"
-#include "shards/sqlengine/engine.h"
-#include "shards/sqlengine/util.h"
-#include "shards/sqlexecutor/executor.h"
+#include "pelton/dataflow/graph.h"
+#include "pelton/dataflow/ops/filter.h"
+#include "pelton/dataflow/ops/input.h"
+#include "pelton/dataflow/ops/matview.h"
+#include "pelton/dataflow/schema.h"
+#include "pelton/shards/sqlengine/engine.h"
+#include "pelton/shards/sqlengine/util.h"
+#include "pelton/shards/sqlexecutor/executor.h"
 
 namespace pelton {
 
@@ -37,7 +39,7 @@ static inline void Trim(std::string &s) {
 bool log = false;
 bool echo = false;
 
-bool SpecialStatements(const std::string &sql, shards::SharderState *state) {
+bool SpecialStatements(const std::string &sql, Connection *connection) {
   if (sql == "SET verbose;") {
     log = true;
     return true;
@@ -51,8 +53,8 @@ bool SpecialStatements(const std::string &sql, shards::SharderState *state) {
     std::vector<std::string> v = absl::StrSplit(sql, ' ');
     v.at(2).pop_back();
     std::string shard_name = shards::sqlengine::NameShard(v.at(1), v.at(2));
-    std::cout << absl::StrCat(state->dir_path(), shard_name, ".sqlite3")
-              << std::endl;
+    const std::string &dir_path = connection->GetSharderState()->dir_path();
+    std::cout << absl::StrCat(dir_path, shard_name, ".sqlite3") << std::endl;
     return true;
   }
   return false;
@@ -60,13 +62,13 @@ bool SpecialStatements(const std::string &sql, shards::SharderState *state) {
 
 }  // namespace
 
-bool open(const std::string &directory, shards::SharderState *state) {
-  state->Initialize(directory);
-  state->Load();
+bool open(const std::string &directory, Connection *connection) {
+  connection->GetSharderState()->Initialize(directory);
+  connection->Load();
   return true;
 }
 
-bool exec(shards::SharderState *state, std::string sql, Callback callback,
+bool exec(Connection *connection, std::string sql, Callback callback,
           void *context, char **errmsg) {
   // Trim statement.
   Trim(sql);
@@ -75,19 +77,20 @@ bool exec(shards::SharderState *state, std::string sql, Callback callback,
   }
 
   // If special statement, handle it separately.
-  if (SpecialStatements(sql, state)) {
+  if (SpecialStatements(sql, connection)) {
     return true;
   }
 
   // Parse and rewrite statement.
-  auto statusor = shards::sqlengine::Rewrite(sql, state);
+  auto statusor =
+      shards::sqlengine::Rewrite(sql, connection->GetSharderState());
   if (!statusor.ok()) {
     std::cout << statusor.status() << std::endl;
     return false;
   }
 
   // Successfully re-written into a list of modified statements.
-  state->SQLExecutor()->StartBlock();
+  connection->GetSharderState()->SQLExecutor()->StartBlock();
   for (auto &executable_statement : statusor.value()) {
     if (log) {
       std::cout << "Shard: " << executable_statement->shard_suffix()
@@ -95,19 +98,34 @@ bool exec(shards::SharderState *state, std::string sql, Callback callback,
       std::cout << "Statement: " << executable_statement->sql_statement()
                 << std::endl;
     }
-    bool result = state->SQLExecutor()->ExecuteStatement(
-        std::move(executable_statement), callback, context, errmsg);
+    bool result =
+        connection->GetSharderState()->SQLExecutor()->ExecuteStatement(
+            std::move(executable_statement), callback, context, errmsg);
     if (!result) {
       // TODO(babman): we probably need some *transactional* notion here
       // about failures.
       return false;
     }
   }
+
+  // Update data flow schema state.
+  std::unique_ptr<sqlast::AbstractStatement> statement =
+      connection->GetSharderState()->ReleaseLastStatement();
+  if (statement->type() == sqlast::AbstractStatement::Type::CREATE_TABLE) {
+    connection->GetDataflowState()->AddTableSchema(
+        *static_cast<sqlast::CreateTable *>(statement.get()));
+  }
+
+  // Update date flow records.
+  connection->GetDataflowState()->ProcessRawRecords(
+      connection->GetSharderState()->GetRawRecords());
+  connection->GetSharderState()->ClearRawRecords();
+
   return true;
 }
 
-bool close(shards::SharderState *state) {
-  state->Save();
+bool close(Connection *connection) {
+  connection->Save();
   return true;
 }
 

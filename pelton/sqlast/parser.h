@@ -22,7 +22,7 @@ namespace sqlast {
 
 class SQLParser : public antlr4::BaseErrorListener {
  public:
-  SQLParser() {}
+  SQLParser() = default;
 
   absl::StatusOr<std::unique_ptr<AbstractStatement>> Parse(
       const std::string &sql);

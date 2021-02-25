@@ -18,7 +18,7 @@ namespace sqlast {
 template <class T>
 class AbstractVisitor {
  public:
-  AbstractVisitor() {}
+  AbstractVisitor() = default;
   virtual T VisitCreateTable(const CreateTable &ast) = 0;
   virtual T VisitColumnDefinition(const ColumnDefinition &ast) = 0;
   virtual T VisitColumnConstraint(const ColumnConstraint &ast) = 0;
@@ -35,7 +35,7 @@ class AbstractVisitor {
 template <class T>
 class MutableVisitor {
  public:
-  MutableVisitor() {}
+  MutableVisitor() = default;
   virtual T VisitCreateTable(CreateTable *ast) = 0;
   virtual T VisitColumnDefinition(ColumnDefinition *ast) = 0;
   virtual T VisitColumnConstraint(ColumnConstraint *ast) = 0;

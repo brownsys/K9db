@@ -1,278 +1,208 @@
 #ifndef PELTON_DATAFLOW_RECORD_H_
 #define PELTON_DATAFLOW_RECORD_H_
 
-#include <algorithm>
-#include <cassert>
 #include <cstdint>
-#include <cstring>
-#include <limits>
 #include <memory>
+#include <ostream>
 #include <string>
+#include <type_traits>
 #include <utility>
+// NOLINTNEXTLINE
+#include <variant>
 #include <vector>
 
 #include "glog/logging.h"
-#include "gtest/gtest_prod.h"
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
+#include "pelton/sqlast/ast.h"
 
 namespace pelton {
 namespace dataflow {
 
-class Record;
-class RecordData;
-
-class RecordData {
- public:
-  RecordData() = delete;
-
-  explicit RecordData(const Schema& schema) {
-    inline_data_ = new uint64_t[schema.num_inline_columns()];
-    pointed_data_ = new uintptr_t[schema.num_pointer_columns()];
-
-    VLOG(10) << "creating record with schema of " << schema.num_inline_columns()
-             << ", " << schema.num_pointer_columns() << " columns";
-    VLOG(10) << "inlined data @ " << inline_data_ << "; pointed data @ "
-             << pointed_data_;
-  }
-
-  // copy construction implemented by `Record`; should never copy `RecordData`
-  // directly.
-  RecordData(const RecordData&) = delete;
-
-  bool compare_equal(const Schema& schema, const RecordData& other,
-                     const Schema& otherSchema) const {
-    if (schema.num_pointer_columns() != otherSchema.num_pointer_columns() ||
-        schema.num_inline_columns() != otherSchema.num_inline_columns())
-      return false;
-
-    // simply compare inline elements via memcmp.
-    if (0 != memcmp(inline_data_, other.inline_data_,
-                    sizeof(uint64_t) * schema.num_inline_columns()))
-      return false;
-
-    // for pointed elements, need to perform deep compare.
-    // => b.c. pointed elements are buggy, skip
-    if (schema.num_pointer_columns() > 0) {
-      LOG(FATAL) << " not yet implemeneted ";
-    }
-
-    return true;
-
-    // this is wrong, deprecate.
-    for (size_t i = 0; i < schema.num_columns(); ++i) {
-      std::pair<bool, size_t> inline_and_index = schema.RawColumnIndex(i);
-      if (inline_and_index.first) {
-        // inline value
-        if (inline_data_[inline_and_index.second] !=
-            other.inline_data_[inline_and_index.second]) {
-          return false;
-        }
-      } else {
-        // pointer-indirect value
-        void* data_ptr =
-            reinterpret_cast<void*>(pointed_data_[inline_and_index.second]);
-        void* other_data_ptr = reinterpret_cast<void*>(
-            other.pointed_data_[inline_and_index.second]);
-        size_t size = Schema::size_of(schema.TypeOf(i), data_ptr);
-        size_t other_size = Schema::size_of(schema.TypeOf(i), other_data_ptr);
-        // XXX(malte): I don't think this is quite correct. std::string, for
-        // example, stores a size as well as the data. A direct memcmp may not
-        // compare the data, but bytewise equality of metadata + data.
-        if (memcmp(data_ptr, other_data_ptr, std::min(size, other_size)) != 0) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  void Clear(const Schema& schema) {
-    // for some reason always pointed_data is allocated. Only delete if actual
-    // entries are there! else this leads to a bug...
-    if (schema.num_pointer_columns() > 0) {
-      for (size_t i = 0; i < schema.num_columns(); ++i) {
-        if (!Schema::is_inlineable(schema.TypeOf(i))) {
-          DeleteOwnedData(pointed_data_[schema.RawColumnIndex(i).second],
-                          schema.TypeOf(i));
-        }
-      }
-    }
-
-    delete[] pointed_data_;
-    delete[] inline_data_;
-  }
-
- private:
-  uint64_t* inline_data_;
-  uintptr_t* pointed_data_;
-
-  void DeleteOwnedData(uintptr_t ptr, DataType type);
-
-  friend class Record;
-  FRIEND_TEST(RecordTest, DataRep);
-};
-
 class Record {
  public:
+  // Variant with the same type options as the record data type, can be used
+  // by external code to ensure same types are supported.
+  using DataVariant = std::variant<std::string, uint64_t, int64_t>;
+  static sqlast::ColumnDefinition::Type TypeOfVariant(const DataVariant &v);
+
+  // No default constructor.
   Record() = delete;
 
-  explicit Record(const Schema& schema, bool positive = true)
-      : data_(RecordData(schema)),
-        schema_(&schema),
-        timestamp_(0),
-        positive_(positive) {}
+  // No copy constructor. We want (expensive) record copying
+  // to be explicit.
+  Record(const Record &) = delete;
+  Record &operator=(const Record &) = delete;
 
-  Record(const Record& other)
-      : data_(RecordData(other.schema())),
-        schema_(other.schema_),
-        timestamp_(other.timestamp_),
-        positive_(other.positive_) {
-    deep_copy(other);
+  // Records can move (e.g. for inserting into vectors and maps).
+  Record(Record &&o)
+      : data_(o.data_),
+        schema_(o.schema_),
+        timestamp_(o.timestamp_),
+        positive_(o.positive_) {
+    o.data_ = nullptr;
   }
-
-  Record& operator=(const Record& other) {
-    if (this == &other) return *this;
-
-    delete[] data_.inline_data_;
-    delete[] data_.pointed_data_;
-
-    data_.inline_data_ = new uint64_t[other.schema().num_inline_columns()];
-    data_.pointed_data_ = new uintptr_t[other.schema().num_pointer_columns()];
-
-    deep_copy(other);
-
+  // Need to be able to move-assign for cases when std::vector<Record>
+  // has elements deleted in the middle, and has to move the remaining
+  // elements backwards to overwrite deleted element.
+  Record &operator=(Record &&o) {
+    CHECK(this->schema_ == o.schema_) << "Bad move assign record schema";
+    // Free this.
+    this->FreeRecordData();
+    // Move things.
+    this->data_ = o.data_;
+    this->timestamp_ = o.timestamp_;
+    this->positive_ = o.positive_;
+    // Invalidate other.
+    o.data_ = nullptr;
     return *this;
   }
 
-  ~Record() { data_.Clear(*schema_); }
-
-  // These invoke `at` and `at_mut`
-  void* operator[](size_t index);
-  const void* operator[](size_t index) const;
-
-  // These are RAW interfaces, which return the *address* of the column data
-  // in the record's internal buffer. Note that this is a pointer to data for
-  // inline data types, but a pointer to a *pointer* for pointer-indirect values
-  // like strings. The caller must therefore know the type of the data to
-  // interpret the return value.
-  //
-  // Use of these raw functions is *discouraged*; proceed at your own peril.
-  void* at_mut(size_t index);
-  const void* at(size_t index) const;
-
-  // Returns byte size of data in column `index`
-  size_t size_at(size_t index) const;
-
-  bool positive() const { return positive_; }
-  void set_positive(bool pos) { positive_ = pos; }
-  int timestamp() const { return timestamp_; }
-  void set_timestamp(int time) { timestamp_ = time; }
-  const Schema& schema() const { return *schema_; }
-
-  const std::pair<Key, bool> GetKey() const;
-
-  bool operator==(const Record& other) const {
-    // schemas different?
-    if (schema() != other.schema()) return false;
-
-    // records with different signs do not compare equal
-    if (positive_ != other.positive_) {
-      return false;
-    }
-    // relies on deep comparison between RecordData instances
-    return data_.compare_equal(*schema_, other.data_, *other.schema_);
+  // Allocate memory but do not put any values in yet!
+  explicit Record(const SchemaRef &schema, bool positive = true)
+      : schema_(schema), timestamp_(0), positive_(positive) {
+    this->data_ = new RecordData[schema.size()];
   }
-  bool operator!=(const Record& other) const { return !(*this == other); }
 
-  friend std::ostream& operator<<(std::ostream& os, const Record& r);
+  // Create record and set all the data together.
+  template <typename... Args>
+  Record(const SchemaRef &schema, bool positive, Args &&... ts)
+      : Record(schema, positive) {
+    this->SetData(std::forward<Args>(ts)...);
+  }
 
-  // Type-based accessor/mutator calls. If used on a column that has a different
-  // type in the schema, these fail via LOG(FATAL).
-  void set_uint(size_t index, uint64_t v);
-  uint64_t as_uint(size_t index) const;
-  void set_int(size_t index, int64_t v);
-  int64_t as_int(size_t index) const;
-  // TODO(malte): consider swapping std::string for a length + buffer
-  void set_string(size_t index, std::string* s);
-  std::string* as_string(size_t index) const;
+  // Destructor: we have to manually destruct all unique_ptrs in unions
+  // and delete the data array on the heap (unions do not call destructors
+  // of their data automatically).
+  ~Record() { this->FreeRecordData(); }
+
+  // Explicit deep copying.
+  Record Copy() const;
+
+  // Set all data in one shot regardless of types and counts.
+  template <typename... Args>
+  void SetData(Args &&... ts) {
+    CHECK_NE(this->data_, nullptr) << "Attempting to SetData on moved record";
+    if constexpr (sizeof...(ts) > 0) {
+      SetDataRecursive(0, std::forward<Args>(ts)...);
+    }
+  }
+
+  // Data access.
+  void SetUInt(uint64_t uint, size_t i);
+  void SetInt(int64_t sint, size_t i);
+  void SetString(std::unique_ptr<std::string> &&v, size_t i);
+  uint64_t GetUInt(size_t i) const;
+  int64_t GetInt(size_t i) const;
+  const std::string &GetString(size_t i) const;
+
+  // Data access with generic type.
+  Key GetValue(size_t i) const;
+  Key GetKey() const;
+
+  // Data type transformation.
+  void SetValue(const std::string &value, size_t i);
+
+  // Accessors.
+  const SchemaRef &schema() const { return this->schema_; }
+  bool IsPositive() const { return this->positive_; }
+  int GetTimestamp() const { return this->timestamp_; }
+
+  // Equality: schema must be identical (pointer wise) and all values must be
+  // equal.
+  bool operator==(const Record &other) const;
+  bool operator!=(const Record &other) const { return !(*this == other); }
+
+  // For logging and printing...
+  friend std::ostream &operator<<(std::ostream &os, const Record &r);
 
  private:
-  // Data is interpreted according to schema stored outside the record.
-  // RecordData itself only contains two pointers, one to the inline data
-  // storage and one to the storage of pointers for referenced data.
-  // [16 B]
-  RecordData data_;
-  // Schema for the record.
-  // TODO(malte): figure out if we want to store this here.
-  // [8 B]
-  const Schema* schema_;
-  // Timestamp of this record.
-  // [4 B]
-  int timestamp_;
-  // Is this a positive or negative record?
-  // [1 B]
-  bool positive_;
+  // Recursive helper used in SetData(...).
+  template <typename Arg, typename... Args>
+  void SetDataRecursive(size_t index, Arg &&t, Args &&... ts) {
+    if (index >= this->schema_.size()) {
+      LOG(FATAL) << "Record data received too many arguments";
+    }
+    // Make sure Arg is of the correct type.
+    switch (this->schema_.TypeOf(index)) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                   uint64_t>::value) {
+          this->data_[index].uint = t;
+        } else {
+          LOG(FATAL) << "Type mismatch in SetData at index " << index;
+        }
+        break;
+      case sqlast::ColumnDefinition::Type::INT:
+        if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                   int64_t>::value) {
+          this->data_[index].sint = t;
+        } else {
+          LOG(FATAL) << "Type mismatch in SetData at index " << index;
+        }
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+        if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                   std::unique_ptr<std::string>>::value) {
+          this->data_[index].str = std::move(t);
+        } else {
+          LOG(FATAL) << "Type mismatch in SetData at index " << index;
+        }
+        break;
+      default:
+        LOG(FATAL) << "Unsupported data type in SetData";
+    }
+    // Handle the remaining ts.
+    if constexpr (sizeof...(ts) > 0) {
+      SetDataRecursive(index + 1, std::forward<Args>(ts)...);
+    } else {
+      if (this->schema_.size() != index + 1) {
+        LOG(FATAL) << "Record data received too few arguments";
+      }
+    }
+  }
 
-  // *******
-  // 3B SPARE on x86-64 due to 8B alignment
-  // *******
+  union RecordData {
+    uint64_t uint;
+    int64_t sint;
+    std::unique_ptr<std::string> str;
+    // Initially garbage.
+    RecordData() : str() {}
+    // We cant tell if we are using str or not, destructing it must be done
+    // by the Record class externally.
+    ~RecordData() {}
+  };
 
-  inline void CheckType(size_t index, DataType t) const {
-    if (schema_->TypeOf(index) != t) {
-      LOG(FATAL) << "Type mismatch: column is " << schema_->TypeOf(index)
+  // 29 bytes but with alignment it is really 32 bytes.
+  RecordData *data_;  // [8 B]
+  SchemaRef schema_;  // [16 B]
+  int timestamp_;     // [4 B]
+  bool positive_;     // [1 B]
+
+  inline void CheckType(size_t i, sqlast::ColumnDefinition::Type t) const {
+    CHECK_NE(this->data_, nullptr) << "Attempting to use moved record";
+    if (this->schema_.TypeOf(i) != t) {
+      LOG(FATAL) << "Type mismatch: record type is " << this->schema_.TypeOf(i)
                  << ", tried to access as " << t;
     }
   }
 
-  inline void deep_copy(const Record& other) {
-    schema_ = other.schema_;
-    timestamp_ = other.timestamp_;
-    positive_ = other.positive_;
-
-    // copy inline members
-    std::memcpy(data_.inline_data_, other.data_.inline_data_,
-                sizeof(uint64_t) * schema_->num_inline_columns());
-
-    // this is wrong. Destructor deletes deleted data. hence, need to perform
-    // proper deepcopy... std::memcpy(data_.pointed_data_,
-    // other.data_.pointed_data_, sizeof(uint64_t) *
-    // schema_->num_pointer_columns());
-    for (unsigned i = 0; i < other.schema().num_pointer_columns(); ++i) {
-      // deep copy string (only allowed pointer type)
-      throw std::runtime_error(
-          "not yet supported, proper string mgmt needs to be implemented "
-          "first...!");
+  inline void FreeRecordData() {
+    if (this->data_ != nullptr) {
+      // Destruct unique_ptrs.
+      for (size_t i = 0; i < this->schema_.size(); i++) {
+        const auto &type = this->schema_.column_types().at(i);
+        if (type == sqlast::ColumnDefinition::Type::TEXT) {
+          this->data_[i].str = std::unique_ptr<std::string>();
+        }
+      }
+      // Delete allocated unions.
+      delete[] this->data_;
+      this->data_ = nullptr;
     }
   }
-
-  FRIEND_TEST(RecordTest, DataRep);
 };
-
-inline std::ostream& operator<<(std::ostream& os, const dataflow::Record& r) {
-  os << "|";
-  for (unsigned i = 0; i < r.schema().num_columns(); ++i) {
-    switch (r.schema().TypeOf(i)) {
-      case DataType::kInt: {
-        os << r.as_int(i) << "|";
-        break;
-      }
-      case DataType::kUInt: {
-        os << r.as_uint(i) << "|";
-        break;
-      }
-      case DataType::kText: {
-        auto str = r.as_string(i) ? *r.as_string(i) : "NULL";
-        os << str << "|";
-        break;
-      }
-      default:
-        LOG(FATAL) << "unsupported data type in ostream << operator";
-    }
-  }
-  return os;
-}
 
 }  // namespace dataflow
 }  // namespace pelton

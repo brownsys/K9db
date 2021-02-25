@@ -1,79 +1,73 @@
 #include "pelton/dataflow/schema.h"
 
-#include "absl/strings/match.h"
+#include <algorithm>
 
 namespace pelton {
 namespace dataflow {
 
-DataType StringToDataType(const std::string &type_name) {
-  if (absl::EqualsIgnoreCase(type_name, "int")) {
-    return dataflow::DataType::kInt;
-  } else if (absl::StartsWithIgnoreCase(type_name, "varchar")) {
-    return dataflow::DataType::kText;
-  } else {
-    throw "Unsupported datatype!";
-  }
-}
-
-Schema::Schema(std::vector<DataType> columns)
-    : Schema(columns, std::vector<std::string>()) {}
-
-Schema::Schema(std::vector<DataType> columns, std::vector<std::string> names)
-    : types_(columns), names_(names) {
-  num_inline_columns_ = 0;
-  num_pointer_columns_ = 0;
-  for (auto t : columns) {
-    if (is_inlineable(t)) {
-      true_indices_.push_back(std::make_pair(true, num_inline_columns_));
-      num_inline_columns_++;
-    } else {
-      true_indices_.push_back(std::make_pair(false, num_pointer_columns_));
-      num_pointer_columns_++;
+// Construct from a CREATE TABLE statement.
+SchemaOwner::SchemaOwner(const sqlast::CreateTable &table) {
+  this->ptr_ = new SchemaData();
+  // Fill ptr_ with the schema data from the CREATE TABLE statement.
+  const auto &cols = table.GetColumns();
+  for (size_t i = 0; i < cols.size(); i++) {
+    const auto &column = cols.at(i);
+    this->ptr_->column_names.push_back(column.column_name());
+    this->ptr_->column_types.push_back(column.column_type());
+    if (column.HasConstraint(sqlast::ColumnConstraint::Type::PRIMARY_KEY)) {
+      this->ptr_->keys.push_back(i);
     }
   }
 }
 
-Schema::Schema(const sqlast::CreateTable &table_description) {
-  auto pk = sqlast::ColumnConstraint::Type::PRIMARY_KEY;
+// Accessors.
+const std::vector<std::string> &SchemaOwner::column_names() const {
+  return this->ptr_->column_names;
+}
+const std::vector<sqlast::ColumnDefinition::Type> &SchemaOwner::column_types()
+    const {
+  return this->ptr_->column_types;
+}
+const std::vector<ColumnID> &SchemaOwner::keys() const {
+  return this->ptr_->keys;
+}
+size_t SchemaOwner::size() const { return this->ptr_->column_names.size(); }
 
-  this->num_inline_columns_ = 0;
-  this->num_pointer_columns_ = 0;
-  for (const auto &column : table_description.GetColumns()) {
-    DataType t = StringToDataType(column.column_type());
-    this->types_.push_back(t);
-    this->names_.push_back(column.column_name());
-    if (column.HasConstraint(pk)) {
-      this->key_columns_.push_back(this->num_inline_columns_ +
-                                   this->num_pointer_columns_);
-    }
-    if (is_inlineable(t)) {
-      true_indices_.push_back(std::make_pair(true, num_inline_columns_));
-      num_inline_columns_++;
-    } else {
-      true_indices_.push_back(std::make_pair(false, num_pointer_columns_));
-      num_pointer_columns_++;
-    }
+// Accessor by index.
+sqlast::ColumnDefinition::Type SchemaOwner::TypeOf(size_t i) const {
+  if (i >= this->ptr_->column_types.size()) {
+    LOG(FATAL) << "Schema: index out of bounds " << i << " / "
+               << this->ptr_->column_types.size();
   }
+  return this->ptr_->column_types.at(i);
+}
+const std::string &SchemaOwner::NameOf(size_t i) const {
+  if (i >= this->ptr_->column_names.size()) {
+    LOG(FATAL) << "Schema: index out of bounds " << i << " / "
+               << this->ptr_->column_names.size();
+  }
+  return this->ptr_->column_names.at(i);
 }
 
-const Schema &SchemaFactory::create_or_get(
-    const std::vector<DataType> &column_types) {
-  auto &f = SchemaFactory::instance();
-  auto it = f.schemas_.find(column_types);
-  if (it == f.schemas_.end())
-    f.schemas_[column_types] = new Schema(column_types);
-  Schema *schema = f.schemas_[column_types];
-  assert(schema);
-  return *schema;
+// Accessor by column name.
+size_t SchemaOwner::IndexOf(const std::string &column_name) const {
+  auto it = find(this->ptr_->column_names.cbegin(),
+                 this->ptr_->column_names.cend(), column_name);
+  if (it == this->ptr_->column_names.cend()) {
+    LOG(FATAL) << "Schema: column does not exist " << column_name;
+  }
+  return it - this->ptr_->column_names.cbegin();
 }
 
-SchemaFactory::~SchemaFactory() {
-  for (auto s : schemas_) {
-    delete s.second;
-    s.second = nullptr;
+// Printing a record to an output stream (e.g. std::cout).
+std::ostream &operator<<(std::ostream &os,
+                         const pelton::dataflow::SchemaOwner &schema) {
+  CHECK_NE(schema.ptr_, nullptr) << "Cannot << moved record";
+  os << "|";
+  for (unsigned i = 0; i < schema.size(); ++i) {
+    os << schema.NameOf(i) << "(" << schema.TypeOf(i) << ")|";
   }
-
-  schemas_.clear();
+  return os;
 }
 
 }  // namespace dataflow

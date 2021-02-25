@@ -6,21 +6,32 @@
 
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/record.h"
+#include "pelton/dataflow/types.h"
 
 namespace pelton {
 namespace dataflow {
 
 class InputOperator : public Operator {
  public:
-  explicit InputOperator(const std::string& table_name)
-      : Operator(), table_name_(table_name) {}
+  InputOperator(const std::string &input_name, const SchemaRef &schema)
+      : Operator(Operator::Type::INPUT), input_name_(input_name) {
+    this->input_schemas_.push_back(schema);
+    this->output_schema_ = schema;
+  }
 
-  const std::string& table_name() const { return this->table_name_; }
-  OperatorType type() const override { return OperatorType::INPUT; }
-  bool process(std::vector<Record>& rs, std::vector<Record>& out_rs) override;
+  const std::string &input_name() const { return this->input_name_; }
+
+  bool ProcessAndForward(NodeIndex source,
+                         const std::vector<Record> &records) override;
+
+ protected:
+  bool Process(NodeIndex source, const std::vector<Record> &records,
+               std::vector<Record> *output) override;
+
+  void ComputeOutputSchema() override {}
 
  private:
-  std::string table_name_;
+  std::string input_name_;
 };
 
 }  // namespace dataflow

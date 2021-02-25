@@ -1,41 +1,64 @@
 #ifndef PELTON_DATAFLOW_OPS_FILTER_H_
 #define PELTON_DATAFLOW_OPS_FILTER_H_
 
+#include <cstdint>
+#include <string>
+#include <tuple>
+// NOLINTNEXTLINE
+#include <variant>
 #include <vector>
 
-#include "glog/logging.h"
+#include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/record.h"
+#include "pelton/dataflow/schema.h"
+#include "pelton/dataflow/types.h"
 
 namespace pelton {
 namespace dataflow {
 
 class FilterOperator : public Operator {
  public:
-  enum Ops : unsigned char {
-    LessThan,
-    LessThanOrEqual,
-    GreaterThan,
-    GreaterThanOrEqual,
-    Equal,
-    NotEqual
+  // The operations we can use to filter (on a value in a record).
+  enum class Operation : unsigned char {
+    LESS_THAN,
+    LESS_THAN_OR_EQUAL,
+    GREATER_THAN,
+    GREATER_THAN_OR_EQUAL,
+    EQUAL,
+    NOT_EQUAL
   };
 
-  explicit FilterOperator(std::vector<ColumnID>& cids,
-                          std::vector<Ops>& comp_ops, Record comp_vals)
-      : cids_(cids), ops_(comp_ops), vals_(comp_vals) {
-    CHECK_EQ(cids.size(), comp_ops.size());
-    CHECK_EQ(comp_ops.size(), comp_vals.schema().num_columns());
+  // Construct the filter operator by first providing the input schema.
+  FilterOperator() : Operator(Operator::Type::FILTER) {}
+
+  // Add filter conditions/operations.
+  void AddOperation(const std::string &value, ColumnID column, Operation op) {
+    this->ops_.push_back(std::make_tuple(value, column, op));
+  }
+  void AddOperation(uint64_t value, ColumnID column, Operation op) {
+    this->ops_.push_back(std::make_tuple(value, column, op));
+  }
+  void AddOperation(int64_t value, ColumnID column, Operation op) {
+    this->ops_.push_back(std::make_tuple(value, column, op));
   }
 
-  OperatorType type() const override { return OperatorType::FILTER; }
+ protected:
+  bool Process(NodeIndex source, const std::vector<Record> &records,
+               std::vector<Record> *output) override;
 
-  bool process(std::vector<Record>& rs, std::vector<Record>& out_rs) override;
+  bool Accept(const Record &record) const;
+
+  void ComputeOutputSchema() override;
 
  private:
-  std::vector<ColumnID> cids_;
-  std::vector<Ops> ops_;
-  Record vals_;
+  std::vector<std::tuple<Record::DataVariant, ColumnID, Operation>> ops_;
+  // Allow tests to use .Process(...) directly.
+  FRIEND_TEST(FilterOperatorTest, SingleAccept);
+  FRIEND_TEST(FilterOperatorTest, AndAccept);
+  FRIEND_TEST(FilterOperatorTest, SeveralOpsPerColumn);
+  FRIEND_TEST(FilterOperatorTest, BatchTest);
+  FRIEND_TEST(FilterOperatorTest, TypeMistmatch);
 };
 
 }  // namespace dataflow

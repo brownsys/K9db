@@ -5,8 +5,6 @@
 #include <list>
 #include <vector>
 
-#include "pelton/dataflow/record.h"
-#include "pelton/shards/records/insert.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/status.h"
 
@@ -24,16 +22,7 @@ Rewrite(const sqlast::Insert &stmt, SharderState *state) {
   }
 
   // Turn inserted values into a record and process it via corresponding flows.
-  // TODO(babman): this should only be executed after physical insert is
-  //               successfull.
-  if (state->HasInputsFor(table_name)) {
-    ASSIGN_OR_RETURN(std::vector<dataflow::Record> records,
-                     records::insert::MakeRecords(stmt, state));
-    for (auto input : state->InputsFor(table_name)) {
-      std::vector<dataflow::Record> copy = records;
-      input->ProcessAndForward(dataflow::UNDEFINED_NODE_INDEX, copy);
-    }
-  }
+  state->AddRawRecord(table_name, stmt.GetValues(), stmt.GetColumns(), true);
 
   // Shard the insert statement so it is executable against the physical
   // sharded database.
