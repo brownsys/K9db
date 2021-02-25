@@ -1,9 +1,9 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary")
 
 cc_binary(
-    name = "wrapper",
+    name = "planner",
     srcs = [
-        "wrapper.cc",
+        "planner.cc",
         "@bazel_tools//tools/jdk:current_java_runtime",
     ],
     copts = [
@@ -19,5 +19,6 @@ cc_binary(
         "//pelton/dataflow:types",
         "//pelton/dataflow/ops:input",
         "@bazel_tools//tools/jdk:jni",
+        "@glog",
     ],
 )
