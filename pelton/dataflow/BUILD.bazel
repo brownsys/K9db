@@ -1,0 +1,186 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+cc_library(
+    name = "state",
+    srcs = [
+        "state.cc",
+    ],
+    hdrs = [
+        "state.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":graph",
+        ":record",
+        ":schema",
+        "//pelton/dataflow/ops:input",
+        "//pelton/shards:state",
+        "//pelton/sqlast:ast",
+        "//pelton/util:fs",
+    ],
+)
+
+cc_library(
+    name = "schema",
+    srcs = [
+        "schema.cc",
+    ],
+    hdrs = [
+        "schema.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":types",
+        "//pelton/sqlast:ast",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "key",
+    srcs = [
+        "key.cc",
+    ],
+    hdrs = [
+        "key.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/sqlast:ast",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "record",
+    srcs = [
+        "record.cc",
+    ],
+    hdrs = [
+        "record.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":key",
+        ":schema",
+        ":types",
+        "//pelton/sqlast:ast",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "operator",
+    srcs = [
+        "operator.cc",
+    ],
+    hdrs = [
+        "edge.h",
+        "operator.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":record",
+        ":schema",
+        ":types",
+    ],
+)
+
+cc_library(
+    name = "types",
+    srcs = [],
+    hdrs = [
+        "types.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+)
+
+cc_library(
+    name = "graph",
+    srcs = [
+        "graph.cc",
+    ],
+    hdrs = [
+        "graph.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":operator",
+        ":record",
+        ":types",
+        "//pelton/dataflow/ops:input",
+        "//pelton/dataflow/ops:matview",
+        "@absl//absl/container:node_hash_map",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "key-test",
+    srcs = [
+        "key_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":key",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "record-test",
+    srcs = [
+        "record_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":record",
+        ":schema",
+        ":types",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "schema-test",
+    srcs = [
+        "schema_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":schema",
+        ":types",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "graph-test",
+    srcs = [
+        "graph_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":graph",
+        ":record",
+        ":schema",
+        ":types",
+        "//pelton/dataflow/ops:equijoin",
+        "//pelton/dataflow/ops:filter",
+        "//pelton/dataflow/ops:input",
+        "//pelton/dataflow/ops:matview",
+        "//pelton/dataflow/ops:union",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)

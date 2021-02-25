@@ -1,0 +1,23 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "status",
+    srcs = [],
+    hdrs = [
+        "status.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [],
+)
+
+cc_library(
+    name = "fs",
+    srcs = [
+        "fs.cc",
+    ],
+    hdrs = [
+        "fs.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [],
+)

@@ -1,0 +1,190 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+cc_library(
+    name = "equijoin",
+    srcs = [
+        "equijoin.cc",
+    ],
+    hdrs = [
+        "equijoin.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":grouped_data",
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest//:gtest_prod",
+    ],
+)
+
+cc_library(
+    name = "filter",
+    srcs = [
+        "filter.cc",
+    ],
+    hdrs = [
+        "filter.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest//:gtest_prod",
+    ],
+)
+
+cc_library(
+    name = "input",
+    srcs = [
+        "input.cc",
+    ],
+    hdrs = [
+        "input.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "identity",
+    srcs = [
+        "identity.cc",
+    ],
+    hdrs = [
+        "identity.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "@glog",
+        "@gtest//:gtest_prod",
+    ],
+)
+
+cc_library(
+    name = "grouped_data",
+    srcs = [
+        "grouped_data.cc",
+    ],
+    hdrs = [
+        "grouped_data.h",
+    ],
+    deps = [
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:types",
+        "@absl//absl/container:flat_hash_map",
+    ],
+)
+
+cc_library(
+    name = "matview",
+    srcs = [
+        "matview.cc",
+    ],
+    hdrs = [
+        "matview.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":grouped_data",
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:types",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "union",
+    srcs = [
+        "union.cc",
+    ],
+    hdrs = [
+        "union.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "equijoin-test",
+    srcs = [
+        "equijoin_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":equijoin",
+        ":identity",
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "filter-test",
+    srcs = [
+        "filter_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":filter",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "matview-test",
+    srcs = [
+        "matview_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":matview",
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)

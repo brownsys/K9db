@@ -1,0 +1,26 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "pelton",
+    srcs = [
+        "pelton.cc",
+        "todo.inc",
+    ],
+    hdrs = [
+        "pelton.h",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:graph",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:state",
+        "//pelton/dataflow/ops:filter",
+        "//pelton/dataflow/ops:input",
+        "//pelton/dataflow/ops:matview",
+        "//pelton/shards:state",
+        "//pelton/shards/sqlengine:engine",
+        "//pelton/shards/sqlengine:util",
+        "//pelton/shards/sqlexecutor:executor",
+        "@absl//absl/strings",
+    ],
+)
