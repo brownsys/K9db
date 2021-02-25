@@ -26,8 +26,8 @@ SchemaRef DataflowState::GetTableSchema(const TableName &table_name) const {
 // Manage flows.
 void DataflowState::AddFlow(const FlowName &name, const DataFlowGraph &flow) {
   this->flows_.insert({name, flow});
-  for (auto input : flow.inputs()) {
-    this->flows_per_input_table_[input->input_name()].push_back(name);
+  for (const auto &[input_name, input] : flow.inputs()) {
+    this->flows_per_input_table_[input_name].push_back(name);
   }
 }
 

@@ -22,15 +22,16 @@ class DataFlowGraph {
   bool AddNode(std::shared_ptr<Operator> op,
                std::vector<std::shared_ptr<Operator>> parents);
 
+  // Special case: input node has no parents.
+  inline bool AddInputNode(std::shared_ptr<InputOperator> op) {
+    CHECK(this->inputs_.find(op->input_name()) == this->inputs_.end());
+    this->inputs_.emplace(op->input_name(), op);
+    return AddNode(op, std::vector<std::shared_ptr<Operator>>{});
+  }
   // Special case: node with single parent.
   inline bool AddNode(std::shared_ptr<Operator> op,
                       std::shared_ptr<Operator> parent) {
     return AddNode(op, std::vector<std::shared_ptr<Operator>>{parent});
-  }
-  // Special case: input node has no parents.
-  inline bool AddInputNode(std::shared_ptr<InputOperator> op) {
-    this->inputs_.emplace_back(op);
-    return AddNode(op, std::vector<std::shared_ptr<Operator>>{});
   }
   // Special case: output operator is added to outputs_.
   inline bool AddOutputOperator(std::shared_ptr<MatViewOperator> op,
@@ -43,7 +44,8 @@ class DataFlowGraph {
                const std::vector<Record> &records);
 
   // Accessors.
-  const std::vector<std::shared_ptr<InputOperator>> &inputs() const {
+  const absl::node_hash_map<std::string, std::shared_ptr<InputOperator>>
+      &inputs() const {
     return this->inputs_;
   }
   const std::vector<std::shared_ptr<MatViewOperator>> &outputs() const {
@@ -60,7 +62,8 @@ class DataFlowGraph {
   bool AddEdge(std::shared_ptr<Operator> parent,
                std::shared_ptr<Operator> child);
 
-  std::vector<std::shared_ptr<InputOperator>> inputs_;
+  // Maps input name to associated input operator.
+  absl::node_hash_map<std::string, std::shared_ptr<InputOperator>> inputs_;
   std::vector<std::shared_ptr<MatViewOperator>> outputs_;
 
   absl::node_hash_map<NodeIndex, std::shared_ptr<Operator>> nodes_;

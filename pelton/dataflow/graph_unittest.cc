@@ -158,7 +158,7 @@ DataFlowGraph MakeTrivialGraph(ColumnID keycol, const SchemaRef &schema) {
   EXPECT_TRUE(g.AddOutputOperator(matview, in));
   EXPECT_EQ(g.inputs().size(), 1);
   EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at(0).get(), in.get());
+  EXPECT_EQ(g.inputs().at("test-table").get(), in.get());
   EXPECT_EQ(g.outputs().at(0).get(), matview.get());
   return g;
 }
@@ -177,7 +177,7 @@ DataFlowGraph MakeFilterGraph(ColumnID keycol, const SchemaRef &schema) {
   EXPECT_TRUE(g.AddOutputOperator(matview, filter));
   EXPECT_EQ(g.inputs().size(), 1);
   EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at(0).get(), in.get());
+  EXPECT_EQ(g.inputs().at("test-table").get(), in.get());
   EXPECT_EQ(g.outputs().at(0).get(), matview.get());
   return g;
 }
@@ -197,8 +197,8 @@ DataFlowGraph MakeUnionGraph(ColumnID keycol, const SchemaRef &schema) {
   EXPECT_TRUE(g.AddOutputOperator(matview, union_));
   EXPECT_EQ(g.inputs().size(), 2);
   EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at(0).get(), in1.get());
-  EXPECT_EQ(g.inputs().at(1).get(), in2.get());
+  EXPECT_EQ(g.inputs().at("test-table1").get(), in1.get());
+  EXPECT_EQ(g.inputs().at("test-table2").get(), in2.get());
   EXPECT_EQ(g.outputs().at(0).get(), matview.get());
   return g;
 }
@@ -220,8 +220,8 @@ DataFlowGraph MakeEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
   EXPECT_TRUE(g.AddOutputOperator(matview, join));
   EXPECT_EQ(g.inputs().size(), 2);
   EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at(0).get(), in1.get());
-  EXPECT_EQ(g.inputs().at(1).get(), in2.get());
+  EXPECT_EQ(g.inputs().at("test-table1").get(), in1.get());
+  EXPECT_EQ(g.inputs().at("test-table2").get(), in2.get());
   EXPECT_EQ(g.outputs().at(0).get(), matview.get());
   return g;
 }
