@@ -10,6 +10,7 @@
 
 #include "pelton/dataflow/ops/filter_enum.h"
 #include "pelton/dataflow/types.h"
+#include "pelton/sqlast/ast_schema_enums.h"
 
 namespace pelton {
 namespace dataflow {
@@ -34,6 +35,14 @@ class DataFlowGraphGenerator {
                           ColumnID column, FilterOperationEnum fop);
   void AddFilterOperation(NodeIndex filter_operator, int64_t value,
                           ColumnID column, FilterOperationEnum fop);
+
+  // Reading schema.
+  std::vector<std::string> GetTables() const;
+  size_t GetTableColumnCount(const std::string &table_name) const;
+  std::string GetTableColumnName(const std::string &table_name,
+                                 ColumnID column) const;
+  sqlast::ColumnDefinitionTypeEnum GetTableColumnType(
+      const std::string &table_name, ColumnID column) const;
 
  private:
   uint64_t graph_ptr_;

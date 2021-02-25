@@ -70,6 +70,7 @@ public class GenericTableFactory implements TableFactory<Table> {
 
     public GenericTable(ImmutableList<Object[]> rows, final TableSchema tableSchema) {
       this.protoRowType = new RelProtoDataType() {
+        // deprecated use this instead: https://calcite.apache.org/javadocAggregate/org/apache/calcite/rel/type/RelDataTypeFactory.Builder.html
         public RelDataType apply(RelDataTypeFactory a) {
           FieldInfoBuilder builder = new RelDataTypeFactory.FieldInfoBuilder(a);
           for (int i = 0; i < tableSchema.getColNames().size(); i++) {

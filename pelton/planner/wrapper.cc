@@ -72,7 +72,8 @@ int main(int argc, char **argv) {
     env->ExceptionDescribe();
     env->ExceptionClear();
   }
-  std::cout << graph.inputs().at("hello-world-table")->input_name() << std::endl;
+  std::cout << graph.inputs().at("hello-world-table")->input_name()
+            << std::endl;
   std::cout << std::static_pointer_cast<pelton::dataflow::InputOperator>(
                    graph.GetNode(0))
                    ->input_name()

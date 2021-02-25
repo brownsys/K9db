@@ -14,7 +14,7 @@ The planner is built with bazel.
 
 ```bash
 # from pelton root directory
-bazel build //planner/...
+bazel build //pelton/planner/...
 ```
 
 ## Running and examples
@@ -28,15 +28,15 @@ There are three steps to generate and export the plan:
 3. Build the java files as above.
 4. Run the planner and provide the query as a command line argument:
 ```bash
-bazel run //planner/calcite:planner -- "query"
+bazel run //pelton/planner/calcite:planner -- "query"
 ```
 
 The planner currently supports very basic queries which can be mapped to pelton.
 Following are some examples of supported queries specific to schema in
 `table-schemas.json`:
 ```bash
-bazel run //planner/calcite:planner -- "select * from orders where product='xzy'"
-bazel run //planner/calcite:planner -- "select * from orders where units>4 and id>3"
-bazel run //planner/calcite:planner -- "select product,sum(units) from orders group by product"
-bazel run //planner/calcite:planner -- "(select id from orders) union (select id from products)"
+bazel run //pelton/planner/calcite:planner -- "select * from orders where product='xzy'"
+bazel run //pelton/planner/calcite:planner -- "select * from orders where units>4 and id>3"
+bazel run //pelton/planner/calcite:planner -- "select product,sum(units) from orders group by product"
+bazel run //pelton/planner/calcite:planner -- "(select id from orders) union (select id from products)"
 ```

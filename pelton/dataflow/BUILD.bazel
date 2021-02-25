@@ -191,6 +191,7 @@ filegroup(
         "generator.h",
         "types.h",
         "//pelton/dataflow/ops:filter_enum.h",
+        "//pelton/sqlast:ast_schema_enums.h",
     ],
     visibility = ["//pelton:__subpackages__"],
 )
@@ -214,6 +215,7 @@ cc_binary(
         "//pelton/dataflow/ops:input",
         "//pelton/dataflow/ops:matview",
         "//pelton/dataflow/ops:union",
+        "//pelton/sqlast:ast",
         "@glog",
     ],
 )

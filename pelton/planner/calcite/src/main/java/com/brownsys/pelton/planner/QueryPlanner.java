@@ -120,16 +120,19 @@ public class QueryPlanner {
 
   public static void main(String[] args) throws IOException, SQLException, ValidationException, RelConversionException,
       NoSuchFieldException, SecurityException {
-
     if (args.length != 1) {
       LOGGER.error("Enter the query as a single argument surrounded by quotes");
+      return;
     }
+
     // Simple connection implementation for loading schema
     CalciteConnection connection = new SimpleCalciteConnection();
     String customSchema = Resources.toString(QueryPlanner.class.getResource("/generic.json"), Charset.defaultCharset());
+    System.out.println(customSchema);
     // ModelHandler reads the schema and loads the schema to connection's root
     // schema and sets the default schema
     new ModelHandler(connection, "inline:" + customSchema);
+    System.out.println(connection.getSchema());
 
     QueryPlanner queryPlanner = new QueryPlanner(connection.getRootSchema().getSubSchema(connection.getSchema()));
     LOGGER.info("Processing query: " + args[0]);

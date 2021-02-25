@@ -129,5 +129,26 @@ void DataFlowGraphGenerator::AddFilterOperation(NodeIndex filter_operator,
   filter->AddOperation(value, column, fop);
 }
 
+// Reading schema.
+std::vector<std::string> DataFlowGraphGenerator::GetTables() const {
+  DataflowState *state = CAST_STATE();
+  return state->GetTables();
+}
+size_t DataFlowGraphGenerator::GetTableColumnCount(
+    const std::string &table_name) const {
+  DataflowState *state = CAST_STATE();
+  return state->GetTableSchema(table_name).size();
+}
+std::string DataFlowGraphGenerator::GetTableColumnName(
+    const std::string &table_name, ColumnID column) const {
+  DataflowState *state = CAST_STATE();
+  return state->GetTableSchema(table_name).NameOf(column);
+}
+sqlast::ColumnDefinitionTypeEnum DataFlowGraphGenerator::GetTableColumnType(
+    const std::string &table_name, ColumnID column) const {
+  DataflowState *state = CAST_STATE();
+  return state->GetTableSchema(table_name).TypeOf(column);
+}
+
 }  // namespace dataflow
 }  // namespace pelton

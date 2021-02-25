@@ -32,6 +32,7 @@ class DataflowState {
   void AddTableSchema(const sqlast::CreateTable &create);
   void AddTableSchema(const std::string &table_name, SchemaOwner &&schema);
 
+  std::vector<std::string> GetTables() const;
   SchemaRef GetTableSchema(const TableName &table_name) const;
 
   // Add and manage flows.

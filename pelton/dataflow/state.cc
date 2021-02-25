@@ -24,6 +24,14 @@ void DataflowState::AddTableSchema(const std::string &table_name,
   this->schema_.emplace(table_name, std::move(schema));
 }
 
+std::vector<std::string> DataflowState::GetTables() const {
+  std::vector<std::string> result;
+  result.reserve(this->schema_.size());
+  for (const auto &[table_name, _] : this->schema_) {
+    result.push_back(table_name);
+  }
+  return result;
+}
 SchemaRef DataflowState::GetTableSchema(const TableName &table_name) const {
   return SchemaRef(this->schema_.at(table_name));
 }
