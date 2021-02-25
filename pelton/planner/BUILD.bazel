@@ -1,0 +1,23 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
+cc_binary(
+    name = "wrapper",
+    srcs = [
+        "wrapper.cc",
+        "@bazel_tools//tools/jdk:current_java_runtime",
+    ],
+    copts = [
+        "-L/usr/lib/jvm/default-java/lib/server/",
+    ],
+    data = [
+        "//pelton/planner/calcite/src/main/java/com/brownsys/pelton/planner/nativelib:Main",
+    ],
+    deps = [
+        "//pelton/dataflow:graph",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:state",
+        "//pelton/dataflow:types",
+        "//pelton/dataflow/ops:input",
+        "@bazel_tools//tools/jdk:jni",
+    ],
+)

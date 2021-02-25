@@ -162,7 +162,9 @@ cc_library(
 
 # Java related tools (for planner / calcite)
 RULES_JVM_EXTERNAL_TAG = "2.5"
+
 RULES_JVM_EXTERNAL_SHA = "249e8129914be6d987ca57754516be35a14ea866c616041ff0cd32ea94d2f3a1"
+
 http_archive(
     name = "rules_jvm_external",
     sha256 = RULES_JVM_EXTERNAL_SHA,
@@ -188,11 +190,10 @@ maven_install(
         "org.apache.logging.log4j:log4j-core:2.11.2",
         "org.bytedeco:javacpp:1.5.4",
         "org.slf4j:slf4j-api:1.7.30",
-
     ],
+    fetch_sources = True,
     repositories = [
         "http://uk.maven.org/maven2",
         "https://jcenter.bintray.com/",
     ],
-    fetch_sources = True,
 )
