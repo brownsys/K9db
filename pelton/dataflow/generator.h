@@ -4,20 +4,40 @@
 #ifndef PELTON_DATAFLOW_GENERATOR_H_
 #define PELTON_DATAFLOW_GENERATOR_H_
 
+#include <cstdint>
 #include <string>
+#include <vector>
+
+#include "pelton/dataflow/ops/filter_enum.h"
+#include "pelton/dataflow/types.h"
 
 namespace pelton {
 namespace dataflow {
 
 class DataFlowGraphGenerator {
  public:
-  DataFlowGraphGenerator();
-  ~DataFlowGraphGenerator();
+  DataFlowGraphGenerator(uint64_t graph_ptr, uint64_t state_ptr);
 
-  int AddInputNode(const std::string &name);
+  // Adding operators.
+  NodeIndex AddInputOperator(const std::string &table_name);
+  NodeIndex AddUnionOperator(const std::vector<NodeIndex> &parents);
+  NodeIndex AddFilterOperator(NodeIndex parent);
+  NodeIndex AddEquiJoinOperator(NodeIndex left_parent, NodeIndex right_parent,
+                                ColumnID left_column, ColumnID right_column);
+  NodeIndex AddMatviewOperator(NodeIndex parent,
+                               const std::vector<ColumnID> &key_cols);
+
+  // Setting properties on existing operators.
+  void AddFilterOperation(NodeIndex filter_operator, const std::string &value,
+                          ColumnID column, FilterOperationEnum fop);
+  void AddFilterOperation(NodeIndex filter_operator, uint64_t value,
+                          ColumnID column, FilterOperationEnum fop);
+  void AddFilterOperation(NodeIndex filter_operator, int64_t value,
+                          ColumnID column, FilterOperationEnum fop);
 
  private:
-  void* graph_;
+  uint64_t graph_ptr_;
+  uint64_t state_ptr_;
 };
 
 }  // namespace dataflow

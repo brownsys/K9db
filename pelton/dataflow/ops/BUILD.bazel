@@ -1,5 +1,10 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
+exports_files(
+    ["filter_enum.h"],
+    ["//pelton/dataflow:__subpackages__"],
+)
+
 cc_library(
     name = "equijoin",
     srcs = [
@@ -28,6 +33,7 @@ cc_library(
     ],
     hdrs = [
         "filter.h",
+        "filter_enum.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [

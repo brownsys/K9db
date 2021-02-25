@@ -6,6 +6,7 @@
 #include "pelton/dataflow/state.h"
 
 #include <fstream>
+#include <utility>
 
 #include "pelton/util/fs.h"
 
@@ -17,6 +18,10 @@ namespace dataflow {
 // Manage schemas.
 void DataflowState::AddTableSchema(const sqlast::CreateTable &create) {
   this->schema_.emplace(create.table_name(), create);
+}
+void DataflowState::AddTableSchema(const std::string &table_name,
+                                   SchemaOwner &&schema) {
+  this->schema_.emplace(table_name, std::move(schema));
 }
 
 SchemaRef DataflowState::GetTableSchema(const TableName &table_name) const {
