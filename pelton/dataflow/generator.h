@@ -31,10 +31,10 @@ class DataFlowGraphGenerator {
   // Setting properties on existing operators.
   void AddFilterOperation(NodeIndex filter_operator, const std::string &value,
                           ColumnID column, FilterOperationEnum fop);
-  void AddFilterOperation(NodeIndex filter_operator, uint64_t value,
-                          ColumnID column, FilterOperationEnum fop);
-  void AddFilterOperation(NodeIndex filter_operator, int64_t value,
-                          ColumnID column, FilterOperationEnum fop);
+  void AddFilterOperationUnsigned(NodeIndex filter_operator, uint64_t value,
+                                  ColumnID column, FilterOperationEnum fop);
+  void AddFilterOperationSigned(NodeIndex filter_operator, int64_t value,
+                                ColumnID column, FilterOperationEnum fop);
 
   // Reading schema.
   std::vector<std::string> GetTables() const;

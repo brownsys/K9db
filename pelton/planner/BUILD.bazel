@@ -1,9 +1,10 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
-cc_binary(
+cc_library(
     name = "planner",
     srcs = [
         "planner.cc",
+        "planner.h",
         "@bazel_tools//tools/jdk:current_java_runtime",
     ],
     copts = [
@@ -12,13 +13,33 @@ cc_binary(
     data = [
         "//pelton/planner/calcite/src/main/java/com/brownsys/pelton/planner/nativelib:Main",
     ],
+    visibility = ["//pelton:__subpackages__"],
     deps = [
         "//pelton/dataflow:graph",
+        "//pelton/dataflow:state",
+        "@bazel_tools//tools/jdk:jni",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "planner-test",
+    srcs = [
+        "planner.h",
+        "planner_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    linkstatic = 1,
+    deps = [
+        ":planner",
+        "//pelton/dataflow:graph",
+        "//pelton/dataflow:operator",
         "//pelton/dataflow:schema",
         "//pelton/dataflow:state",
         "//pelton/dataflow:types",
         "//pelton/dataflow/ops:input",
-        "@bazel_tools//tools/jdk:jni",
         "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
     ],
 )

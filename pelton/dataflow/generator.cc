@@ -86,7 +86,7 @@ NodeIndex DataFlowGraphGenerator::AddMatviewOperator(
   // Add the operator to the graph.
   std::shared_ptr<Operator> parent_ptr = graph->GetNode(parent);
   CHECK(parent_ptr);
-  CHECK(graph->AddNode(op, parent_ptr));
+  CHECK(graph->AddOutputOperator(op, parent_ptr));
   return op->index();
 }
 
@@ -104,9 +104,9 @@ void DataFlowGraphGenerator::AddFilterOperation(NodeIndex filter_operator,
   // Add the operation to filter.
   filter->AddOperation(value, column, fop);
 }
-void DataFlowGraphGenerator::AddFilterOperation(NodeIndex filter_operator,
-                                                uint64_t value, ColumnID column,
-                                                FilterOperationEnum fop) {
+void DataFlowGraphGenerator::AddFilterOperationUnsigned(
+    NodeIndex filter_operator, uint64_t value, ColumnID column,
+    FilterOperationEnum fop) {
   DataFlowGraph *graph = CAST_GRAPH();
   // Get filter operator.
   std::shared_ptr<Operator> op = graph->GetNode(filter_operator);
@@ -116,9 +116,10 @@ void DataFlowGraphGenerator::AddFilterOperation(NodeIndex filter_operator,
   // Add the operation to filter.
   filter->AddOperation(value, column, fop);
 }
-void DataFlowGraphGenerator::AddFilterOperation(NodeIndex filter_operator,
-                                                int64_t value, ColumnID column,
-                                                FilterOperationEnum fop) {
+void DataFlowGraphGenerator::AddFilterOperationSigned(NodeIndex filter_operator,
+                                                      int64_t value,
+                                                      ColumnID column,
+                                                      FilterOperationEnum fop) {
   DataFlowGraph *graph = CAST_GRAPH();
   // Get filter operator.
   std::shared_ptr<Operator> op = graph->GetNode(filter_operator);

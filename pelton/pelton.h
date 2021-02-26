@@ -54,6 +54,11 @@ bool close(Connection *connection);
 void make_view(Connection *connection, const std::string &name,
                const std::string &query);
 
+// Call this if you are certain you are not going to make more calls to
+// make_view to shutdown the JVM.
+void shutdown_planner();
+
+// Print the content of the outputs of the given flow.
 void print_view(Connection *connection, const std::string &name);
 
 }  // namespace pelton
