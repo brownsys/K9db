@@ -1,11 +1,15 @@
 package com.brownsys.pelton.planner.schema;
 
+import com.brownsys.pelton.planner.QueryPlanner;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableList;
+import com.google.common.io.Resources;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.calcite.DataContext;
 import org.apache.calcite.config.CalciteConnectionConfig;
 import org.apache.calcite.linq4j.Enumerable;
@@ -25,24 +29,20 @@ import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.type.SqlTypeName;
 
-import com.brownsys.pelton.planner.QueryPlanner;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableList;
-import com.google.common.io.Resources;
-
 public class GenericTableFactory implements TableFactory<Table> {
   private HashMap<String, TableSchema> tableSchemaMap = new HashMap<String, TableSchema>();
 
   @Override
-  public Table create(SchemaPlus schema, String name, Map<String, Object> operand, RelDataType rowType) {
+  public Table create(
+      SchemaPlus schema, String name, Map<String, Object> operand, RelDataType rowType) {
     // Dummy
     final Object[][] rows = {};
     if (tableSchemaMap.isEmpty()) {
       String tableSchemas = null;
       try {
-        tableSchemas = Resources.toString(QueryPlanner.class.getResource("/table-schemas.json"),
-            Charset.defaultCharset());
+        tableSchemas =
+            Resources.toString(
+                QueryPlanner.class.getResource("/table-schemas.json"), Charset.defaultCharset());
       } catch (IOException e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
@@ -50,8 +50,7 @@ public class GenericTableFactory implements TableFactory<Table> {
       ObjectMapper objectMapper = new ObjectMapper();
       List<TableSchema> schemas = null;
       try {
-        schemas = objectMapper.readValue(tableSchemas, new TypeReference<List<TableSchema>>() {
-        });
+        schemas = objectMapper.readValue(tableSchemas, new TypeReference<List<TableSchema>>() {});
       } catch (IOException e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
@@ -69,21 +68,27 @@ public class GenericTableFactory implements TableFactory<Table> {
     private final ImmutableList<Object[]> rows;
 
     public GenericTable(ImmutableList<Object[]> rows, final TableSchema tableSchema) {
-      this.protoRowType = new RelProtoDataType() {
-        // deprecated use this instead: https://calcite.apache.org/javadocAggregate/org/apache/calcite/rel/type/RelDataTypeFactory.Builder.html
-        public RelDataType apply(RelDataTypeFactory a) {
-          FieldInfoBuilder builder = new RelDataTypeFactory.FieldInfoBuilder(a);
-          for (int i = 0; i < tableSchema.getColNames().size(); i++) {
-            if (tableSchema.getColSizes().get(i) > 0) {
-              builder.add(tableSchema.getColNames().get(i), SqlTypeName.valueOf(tableSchema.getColTypes().get(i)),
-                  tableSchema.getColSizes().get(i));
-            } else {
-              builder.add(tableSchema.getColNames().get(i), SqlTypeName.valueOf(tableSchema.getColTypes().get(i)));
+      this.protoRowType =
+          new RelProtoDataType() {
+            // deprecated use this instead:
+            // https://calcite.apache.org/javadocAggregate/org/apache/calcite/rel/type/RelDataTypeFactory.Builder.html
+            public RelDataType apply(RelDataTypeFactory a) {
+              FieldInfoBuilder builder = new RelDataTypeFactory.FieldInfoBuilder(a);
+              for (int i = 0; i < tableSchema.getColNames().size(); i++) {
+                if (tableSchema.getColSizes().get(i) > 0) {
+                  builder.add(
+                      tableSchema.getColNames().get(i),
+                      SqlTypeName.valueOf(tableSchema.getColTypes().get(i)),
+                      tableSchema.getColSizes().get(i));
+                } else {
+                  builder.add(
+                      tableSchema.getColNames().get(i),
+                      SqlTypeName.valueOf(tableSchema.getColTypes().get(i)));
+                }
+              }
+              return builder.build();
             }
-          }
-          return builder.build();
-        }
-      };
+          };
       this.rows = rows;
     }
 
@@ -111,8 +116,8 @@ public class GenericTableFactory implements TableFactory<Table> {
       return false;
     }
 
-    public boolean rolledUpColumnValidInsideAgg(String column, SqlCall call, SqlNode parent,
-        CalciteConnectionConfig config) {
+    public boolean rolledUpColumnValidInsideAgg(
+        String column, SqlCall call, SqlNode parent, CalciteConnectionConfig config) {
       // TODO Auto-generated method stub
       return false;
     }

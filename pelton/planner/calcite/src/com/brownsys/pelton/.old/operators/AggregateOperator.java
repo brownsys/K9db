@@ -1,8 +1,7 @@
 package com.brownsys.pelton.planner.operators;
 
-import java.util.List;
-
 import com.brownsys.pelton.planner.graph.Operator;
+import java.util.List;
 
 public class AggregateOperator extends Operator {
   private List<Integer> groupCols;
@@ -43,5 +42,4 @@ public class AggregateOperator extends Operator {
   public void setAggCols(List<Integer> aggCols) {
     this.aggCols = aggCols;
   }
-
 }

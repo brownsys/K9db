@@ -8,11 +8,12 @@ public class TableSchema {
   private ArrayList<String> colTypes;
   private ArrayList<Integer> colSizes;
 
-  public TableSchema() {
+  public TableSchema() {}
 
-  }
-
-  public TableSchema(String tableName, ArrayList<String> colNames, ArrayList<String> colTypes,
+  public TableSchema(
+      String tableName,
+      ArrayList<String> colNames,
+      ArrayList<String> colTypes,
       ArrayList<Integer> size) {
     this.tableName = tableName;
     this.colNames = colNames;
@@ -51,5 +52,4 @@ public class TableSchema {
   public void setColSizes(ArrayList<Integer> colSizes) {
     this.colSizes = colSizes;
   }
-
 }

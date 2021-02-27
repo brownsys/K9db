@@ -1,8 +1,7 @@
 package com.brownsys.pelton.planner.operators;
 
-import java.util.ArrayList;
-
 import com.brownsys.pelton.planner.graph.Operator;
+import java.util.ArrayList;
 
 public class FilterOperator extends Operator {
   ArrayList<Integer> cids;
@@ -14,8 +13,13 @@ public class FilterOperator extends Operator {
     this.name = "Filter";
   }
 
-  public FilterOperator(Integer id, ArrayList<Integer> cids, ArrayList<String> ops, ArrayList<String> vals,
-      ArrayList<String> valTypes, ArrayList<String> outSchema) {
+  public FilterOperator(
+      Integer id,
+      ArrayList<Integer> cids,
+      ArrayList<String> ops,
+      ArrayList<String> vals,
+      ArrayList<String> valTypes,
+      ArrayList<String> outSchema) {
     this.id = id;
     this.name = "Filter";
     this.cids = cids;
@@ -64,5 +68,4 @@ public class FilterOperator extends Operator {
   public void setVals(ArrayList<String> vals) {
     this.vals = vals;
   }
-
 }

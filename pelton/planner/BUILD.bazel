@@ -11,7 +11,7 @@ cc_library(
         "-L/usr/lib/jvm/default-java/lib/server/",
     ],
     data = [
-        "//pelton/planner/calcite/src/main/java/com/brownsys/pelton/planner/nativelib:Main",
+        "//pelton/planner/calcite",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [

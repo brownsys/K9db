@@ -12,9 +12,7 @@ public class Operator {
   // as input schema will not be stored here.
   protected ArrayList<String> outSchema;
 
-  public Operator() {
-
-  }
+  public Operator() {}
 
   public Operator(Integer id, String type) {
     this.id = id;

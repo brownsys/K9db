@@ -1,8 +1,7 @@
 package com.brownsys.pelton.planner.operators;
 
-import java.util.ArrayList;
-
 import com.brownsys.pelton.planner.graph.Operator;
+import java.util.ArrayList;
 
 public class InputOperator extends Operator {
   private String tableName;

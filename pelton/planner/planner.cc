@@ -8,12 +8,12 @@
 #include "jni.h"
 
 #define MAVEN_PATH "external/maven/v1/"
-#define PELTON_PATH "pelton/"
 #define JAVACPP_PATH \
   "https/jcenter.bintray.com/org/bytedeco/javacpp/1.5.4/javacpp-1.5.4.jar"
-#define NATIVELIB_PATH \
-  "planner/calcite/src/main/java/com/brownsys/pelton/planner/nativelib/"
-#define JAVA_MAIN "Main.jar"
+
+#define CALCITE_PATH "pelton/planner/calcite/src/com/brownsys/pelton/"
+#define JAVA_MAIN "QueryPlanner.jar"
+#define NATIVELIB_PATH "nativelib/"
 
 #define CLASS_PATH_ARG "-Djava.class.path="
 #define LIBRARY_PATH_ARG "-Djava.library.path="
@@ -30,8 +30,8 @@ namespace {
 void InitializeJVMArgs(JavaVMInitArgs *args) {
   // Path to jars or so libraries required by the jvm.
   std::string javacpp = MAVEN_PATH JAVACPP_PATH;
-  std::string javamain = PELTON_PATH NATIVELIB_PATH JAVA_MAIN;
-  std::string generator_so = PELTON_PATH NATIVELIB_PATH;
+  std::string javamain = CALCITE_PATH JAVA_MAIN;
+  std::string generator_so = CALCITE_PATH NATIVELIB_PATH;
 
   // Class path and library path arguments to the JVM.
   std::string cp = CLASS_PATH_ARG + javacpp + ":" + javamain;
@@ -83,20 +83,21 @@ dataflow::DataFlowGraph PlanGraph(dataflow::DataflowState *state,
   auto [jvm, env] = StartJVM();
 
   // First get the java/calcite entry point class.
-  jclass clazz = env->FindClass("com/brownsys/pelton/planner/nativelib/Main");
+  jclass QueryPlannerClass = env->FindClass("com/brownsys/pelton/QueryPlanner");
 
   // Get the (static) entry method from that class.
-  jmethodID main =
-      env->GetStaticMethodID(clazz, "main", "(JJLjava/lang/String;)V");
+  const char *sig = "(JJLjava/lang/String;)V";
+  jmethodID planMethod = env->GetStaticMethodID(QueryPlannerClass, "plan", sig);
 
   // Create the required shared state to pass to the java code.
   dataflow::DataFlowGraph graph;
-  jlong graph_ptr = reinterpret_cast<jlong>(&graph);
-  jlong state_ptr = reinterpret_cast<jlong>(state);
+  jlong graph_jptr = reinterpret_cast<jlong>(&graph);
+  jlong state_jptr = reinterpret_cast<jlong>(state);
   jstring query_jstr = env->NewStringUTF(query.c_str());
 
   // Call the method on the object
-  env->CallStaticVoidMethod(clazz, main, graph_ptr, state_ptr, query_jstr);
+  env->CallStaticVoidMethod(QueryPlannerClass, planMethod, graph_jptr,
+                            state_jptr, query_jstr);
   if (env->ExceptionCheck()) {  // Handle any exception.
     env->ExceptionDescribe();
     env->ExceptionClear();

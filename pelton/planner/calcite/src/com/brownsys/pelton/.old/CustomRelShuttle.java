@@ -1,8 +1,15 @@
 package com.brownsys.pelton.planner;
 
+import com.brownsys.pelton.planner.graph.Edge;
+import com.brownsys.pelton.planner.graph.Operator;
+import com.brownsys.pelton.planner.operators.AggregateOperator;
+import com.brownsys.pelton.planner.operators.FilterOperator;
+import com.brownsys.pelton.planner.operators.InputOperator;
+import com.brownsys.pelton.planner.operators.ProjectOperator;
+import com.brownsys.pelton.planner.operators.UnionOperator;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.core.AggregateCall;
@@ -20,15 +27,6 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.brownsys.pelton.planner.graph.Edge;
-import com.brownsys.pelton.planner.graph.Operator;
-import com.brownsys.pelton.planner.operators.AggregateOperator;
-import com.brownsys.pelton.planner.operators.FilterOperator;
-import com.brownsys.pelton.planner.operators.InputOperator;
-import com.brownsys.pelton.planner.operators.ProjectOperator;
-import com.brownsys.pelton.planner.operators.UnionOperator;
-import com.google.common.collect.ImmutableList;
 
 public class CustomRelShuttle extends RelShuttleImpl {
   final Logger LOGGER = LoggerFactory.getLogger(CustomRelShuttle.class);
@@ -176,5 +174,4 @@ public class CustomRelShuttle extends RelShuttleImpl {
     edges.add(new Edge(aggregate.getInput().getId(), aggregateOp.getId()));
     return visitChild(aggregate, 0, aggregate.getInput());
   }
-
 }

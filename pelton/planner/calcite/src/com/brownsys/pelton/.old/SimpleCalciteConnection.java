@@ -1,5 +1,10 @@
 package com.brownsys.pelton.planner;
 
+import java.lang.reflect.Type;
+import java.sql.*;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.Executor;
 import org.apache.calcite.adapter.java.JavaTypeFactory;
 import org.apache.calcite.config.CalciteConnectionConfig;
 import org.apache.calcite.jdbc.CalciteConnection;
@@ -9,12 +14,6 @@ import org.apache.calcite.linq4j.Queryable;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.tools.Frameworks;
-
-import java.lang.reflect.Type;
-import java.sql.*;
-import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.Executor;
 
 public class SimpleCalciteConnection implements CalciteConnection {
   private final SchemaPlus rootSchema = Frameworks.createRootSchema(true);
@@ -56,9 +55,7 @@ public class SimpleCalciteConnection implements CalciteConnection {
   }
 
   @Override
-  public void setAutoCommit(boolean autoCommit) throws SQLException {
-
-  }
+  public void setAutoCommit(boolean autoCommit) throws SQLException {}
 
   @Override
   public boolean getAutoCommit() throws SQLException {
@@ -66,19 +63,13 @@ public class SimpleCalciteConnection implements CalciteConnection {
   }
 
   @Override
-  public void commit() throws SQLException {
-
-  }
+  public void commit() throws SQLException {}
 
   @Override
-  public void rollback() throws SQLException {
-
-  }
+  public void rollback() throws SQLException {}
 
   @Override
-  public void close() throws SQLException {
-
-  }
+  public void close() throws SQLException {}
 
   @Override
   public boolean isClosed() throws SQLException {
@@ -91,9 +82,7 @@ public class SimpleCalciteConnection implements CalciteConnection {
   }
 
   @Override
-  public void setReadOnly(boolean readOnly) throws SQLException {
-
-  }
+  public void setReadOnly(boolean readOnly) throws SQLException {}
 
   @Override
   public boolean isReadOnly() throws SQLException {
@@ -101,9 +90,7 @@ public class SimpleCalciteConnection implements CalciteConnection {
   }
 
   @Override
-  public void setCatalog(String catalog) throws SQLException {
-
-  }
+  public void setCatalog(String catalog) throws SQLException {}
 
   @Override
   public String getCatalog() throws SQLException {
@@ -111,9 +98,7 @@ public class SimpleCalciteConnection implements CalciteConnection {
   }
 
   @Override
-  public void setTransactionIsolation(int level) throws SQLException {
-
-  }
+  public void setTransactionIsolation(int level) throws SQLException {}
 
   @Override
   public int getTransactionIsolation() throws SQLException {
@@ -126,12 +111,11 @@ public class SimpleCalciteConnection implements CalciteConnection {
   }
 
   @Override
-  public void clearWarnings() throws SQLException {
-
-  }
+  public void clearWarnings() throws SQLException {}
 
   @Override
-  public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
+  public Statement createStatement(int resultSetType, int resultSetConcurrency)
+      throws SQLException {
     return null;
   }
 
@@ -142,7 +126,8 @@ public class SimpleCalciteConnection implements CalciteConnection {
   }
 
   @Override
-  public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
+  public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency)
+      throws SQLException {
     return null;
   }
 
@@ -152,14 +137,10 @@ public class SimpleCalciteConnection implements CalciteConnection {
   }
 
   @Override
-  public void setTypeMap(Map<String, Class<?>> map) throws SQLException {
-
-  }
+  public void setTypeMap(Map<String, Class<?>> map) throws SQLException {}
 
   @Override
-  public void setHoldability(int holdability) throws SQLException {
-
-  }
+  public void setHoldability(int holdability) throws SQLException {}
 
   @Override
   public int getHoldability() throws SQLException {
@@ -177,30 +158,28 @@ public class SimpleCalciteConnection implements CalciteConnection {
   }
 
   @Override
-  public void rollback(Savepoint savepoint) throws SQLException {
+  public void rollback(Savepoint savepoint) throws SQLException {}
 
+  @Override
+  public void releaseSavepoint(Savepoint savepoint) throws SQLException {}
+
+  @Override
+  public Statement createStatement(
+      int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
+    return null;
   }
 
   @Override
-  public void releaseSavepoint(Savepoint savepoint) throws SQLException {
-
-  }
-
-  @Override
-  public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability)
+  public PreparedStatement prepareStatement(
+      String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability)
       throws SQLException {
     return null;
   }
 
   @Override
-  public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency,
-      int resultSetHoldability) throws SQLException {
-    return null;
-  }
-
-  @Override
-  public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency,
-      int resultSetHoldability) throws SQLException {
+  public CallableStatement prepareCall(
+      String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability)
+      throws SQLException {
     return null;
   }
 
@@ -245,14 +224,10 @@ public class SimpleCalciteConnection implements CalciteConnection {
   }
 
   @Override
-  public void setClientInfo(String name, String value) throws SQLClientInfoException {
-
-  }
+  public void setClientInfo(String name, String value) throws SQLClientInfoException {}
 
   @Override
-  public void setClientInfo(Properties properties) throws SQLClientInfoException {
-
-  }
+  public void setClientInfo(Properties properties) throws SQLClientInfoException {}
 
   @Override
   public String getClientInfo(String name) throws SQLException {
@@ -285,14 +260,10 @@ public class SimpleCalciteConnection implements CalciteConnection {
   }
 
   @Override
-  public void abort(Executor executor) throws SQLException {
-
-  }
+  public void abort(Executor executor) throws SQLException {}
 
   @Override
-  public void setNetworkTimeout(Executor executor, int milliseconds) throws SQLException {
-
-  }
+  public void setNetworkTimeout(Executor executor, int milliseconds) throws SQLException {}
 
   @Override
   public int getNetworkTimeout() throws SQLException {

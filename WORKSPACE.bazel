@@ -182,6 +182,7 @@ maven_install(
         "com.fasterxml.jackson.core:jackson-core:2.10.3",
         "com.fasterxml.jackson.core:jackson-databind:2.10.3",
         "com.fasterxml.jackson.core:jackson-core:2.10.3",
+        "com.google.googlejavaformat:google-java-format:1.9",
         "junit:junit:4.11",
         "org.apache.calcite:calcite-core:1.23.0",
         "org.apache.calcite:calcite-linq4j:1.23.0",
