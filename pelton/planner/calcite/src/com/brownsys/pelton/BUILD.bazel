@@ -8,15 +8,12 @@ java_binary(
         "//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:DataFlowGraphLibraryConfig_java",
     ],
     data = [
-        "//pelton/dataflow:generator_so",
         "//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:libjniDataFlowGraphLibrary_so",
-    ],
-    jvm_flags = [
-        "-Djava.library.path=$$(dirname $${BASH_SOURCE[0]})/nativelib",
     ],
     main_class = "com.brownsys.pelton.QueryPlanner",
     visibility = ["//pelton/planner:__subpackages__"],
     deps = [
+        "@maven//:org_apache_calcite_calcite_core",
         "@maven//:org_bytedeco_javacpp",
     ],
 )

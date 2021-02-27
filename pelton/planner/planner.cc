@@ -7,12 +7,8 @@
 // NOLINTNEXTLINE
 #include "jni.h"
 
-#define MAVEN_PATH "external/maven/v1/"
-#define JAVACPP_PATH \
-  "https/jcenter.bintray.com/org/bytedeco/javacpp/1.5.4/javacpp-1.5.4.jar"
-
 #define CALCITE_PATH "pelton/planner/calcite/src/com/brownsys/pelton/"
-#define JAVA_MAIN "QueryPlanner.jar"
+#define JAR_NAME "QueryPlanner_deploy.jar"
 #define NATIVELIB_PATH "nativelib/"
 
 #define CLASS_PATH_ARG "-Djava.class.path="
@@ -24,36 +20,6 @@ namespace planner {
 // Internal helpers for starting a JVM.
 namespace {
 
-// Specify the class path and library path arguments to the JVM
-// so that it can locate our calcite java package, and can load
-// the needed C++ JNI interfaces.
-void InitializeJVMArgs(JavaVMInitArgs *args) {
-  // Path to jars or so libraries required by the jvm.
-  std::string javacpp = MAVEN_PATH JAVACPP_PATH;
-  std::string javamain = CALCITE_PATH JAVA_MAIN;
-  std::string generator_so = CALCITE_PATH NATIVELIB_PATH;
-
-  // Class path and library path arguments to the JVM.
-  std::string cp = CLASS_PATH_ARG + javacpp + ":" + javamain;
-  std::string lp = LIBRARY_PATH_ARG + generator_so;
-
-  // Create c-style strings that jvm understands.
-  char *cp_ptr = new char[cp.size() + 1];
-  char *lp_ptr = new char[lp.size() + 1];
-  memcpy(cp_ptr, cp.c_str(), cp.size() + 1);
-  memcpy(lp_ptr, lp.c_str(), lp.size() + 1);
-
-  // Finally, add all these arguments to *args.
-  JavaVMOption options[2];
-  options[0].optionString = cp_ptr;
-  options[1].optionString = lp_ptr;
-  args->version = JNI_VERSION_10;
-  args->nOptions = 2;
-  args->options = options;
-  args->ignoreUnrecognized = JNI_TRUE;
-  JNI_GetDefaultJavaVMInitArgs(args);
-}
-
 // Start a JVM embedded in this process.
 std::pair<JavaVM *, JNIEnv *> StartJVM(bool run = true) {
   // JVM is created once and kept until no longer needed.
@@ -61,12 +27,35 @@ std::pair<JavaVM *, JNIEnv *> StartJVM(bool run = true) {
   static JNIEnv *env = nullptr;
 
   if (run && jvm == nullptr) {
-    // Start JVM.
+    // Specify the class path and library path arguments to the JVM
+    // so that it can locate our calcite java package, and can load
+    // the needed C++ JNI interfaces.
     JavaVMInitArgs jvm_args;
-    InitializeJVMArgs(&jvm_args);
-    jint res =
-        JNI_CreateJavaVM(&jvm, reinterpret_cast<void **>(&env), &jvm_args);
-    CHECK(res == 0) << "failed to start JVM";
+
+    // Class path and library path arguments to the JVM.
+    std::string cp = CLASS_PATH_ARG CALCITE_PATH JAR_NAME;
+    std::string lp = LIBRARY_PATH_ARG CALCITE_PATH NATIVELIB_PATH;
+
+    // Create c-style strings that jvm understands.
+    char *cp_ptr = new char[cp.size() + 1];
+    char *lp_ptr = new char[lp.size() + 1];
+    memcpy(cp_ptr, cp.c_str(), cp.size() + 1);
+    memcpy(lp_ptr, lp.c_str(), lp.size() + 1);
+
+    // Finally, add all these arguments to *args.
+    JavaVMOption options[2];
+    options[0].optionString = cp_ptr;
+    options[1].optionString = lp_ptr;
+
+    // options[2].optionString = "-verbose:jni";
+    jvm_args.version = JNI_VERSION_10;
+    jvm_args.options = options;
+    jvm_args.nOptions = 2;
+    jvm_args.ignoreUnrecognized = JNI_TRUE;
+
+    // Start the JVM.
+    CHECK(!JNI_CreateJavaVM(&jvm, reinterpret_cast<void **>(&env), &jvm_args))
+        << "failed to start JVM";
   }
 
   // All good.

@@ -197,7 +197,7 @@ filegroup(
 )
 
 cc_binary(
-    name = "generator_so",
+    name = "generator",
     srcs = [
         "generator.cc",
         "generator.h",

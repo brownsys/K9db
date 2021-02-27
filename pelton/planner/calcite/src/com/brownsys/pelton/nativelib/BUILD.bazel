@@ -51,7 +51,7 @@ genrule(
     name = "libjniDataFlowGraphLibrary_so",
     srcs = [
         ":DataDataFlowGraphLibrary_java",
-        "//pelton/dataflow:generator_so",
+        "//pelton/dataflow:generator",
         "//pelton/dataflow:generator_h",
         "DataFlowGraphLibraryConfig.java",
     ],
@@ -68,10 +68,10 @@ genrule(
     READ_PATH=$$(dirname $${READ_PATH})
   done
   READ_PATH=$$(dirname $${READ_PATH})/execroot/pelton
-
   # Get the location of javacpp.jar, libgenerator.so, and include path.
   JAVACPP_JAR=$$(pwd)/$(location @maven//:org_bytedeco_javacpp)
-  LINK_PATH=$${READ_PATH}/$$(dirname $(location //pelton/dataflow:generator_so))
+  LINK_PATH=$${READ_PATH}/$$(dirname $(location //pelton/dataflow:generator))
+  echo $${LINK_PATH}
   INCLUDE_PATH=$$(pwd)
 
   # Create a clean tmp directory and copy input files to it.
@@ -93,7 +93,7 @@ genrule(
   # Move outputs to proper directory and remove tmp directory.
   cd $${EXEC_PATH}
   mv $${PCKG_DIR}/linux-x86_64/libjniDataFlowGraphLibrary.so $@
-  # rm -rf $${TMP_DIR}
+  rm -rf $${TMP_DIR}
 """,
     tools = ["@maven//:org_bytedeco_javacpp"],
     visibility = ["//pelton/planner/calcite:__subpackages__"],

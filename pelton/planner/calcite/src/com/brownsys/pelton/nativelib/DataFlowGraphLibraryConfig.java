@@ -13,7 +13,7 @@ import org.bytedeco.javacpp.tools.*;
               "pelton/sqlast/ast_schema_enums.h",
               "pelton/dataflow/generator.h"
             },
-            link = {"generator_so"}),
+            link = {"generator"}),
     target = "com.brownsys.pelton.nativelib.DataFlowGraphLibrary")
 public class DataFlowGraphLibraryConfig implements InfoMapper {
   public void map(InfoMap infoMap) {
