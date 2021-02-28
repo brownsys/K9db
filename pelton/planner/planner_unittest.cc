@@ -3,57 +3,65 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/input.h"
+#include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/state.h"
+#include "pelton/dataflow/types.h"
+#include "pelton/sqlast/ast.h"
 
-int main(int argc, char **argv) {
+namespace pelton {
+namespace planner {
+
+using CType = sqlast::ColumnDefinition::Type;
+
+TEST(PlannerTest, SimpleFilter) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
+  std::vector<dataflow::ColumnID> keys = {0};
+  dataflow::SchemaOwner schema{names, types, keys};
+  dataflow::SchemaRef schema_ref{schema};
+
   // Make a dummy query.
-  std::string dummy_query = "";
+  std::string query = "SELECT * FROM test_table WHERE Col2 = 'hello!'";
 
   // Create a dummy state.
-  pelton::dataflow::DataflowState state;
-  state.AddTableSchema("submissions",
-                       pelton::dataflow::SchemaOwner({}, {}, {}));
+  dataflow::DataflowState state;
+  state.AddTableSchema("test_table", std::move(schema));
 
   // Plan the graph via calcite.
-  pelton::dataflow::DataFlowGraph graph =
-      pelton::planner::PlanGraph(&state, dummy_query);
+  dataflow::DataFlowGraph graph = PlanGraph(&state, query);
+  ShutdownPlanner();
 
   // Check that the graph is what we expect!
-  std::shared_ptr<pelton::dataflow::Operator> op = graph.GetNode(0);
-  std::shared_ptr<pelton::dataflow::InputOperator> input =
-      graph.inputs().at("submissions");
-  std::cout << input->input_name() << std::endl;
-  CHECK(op.get() == input.get()) << "Operator and InputOperator are different";
+  EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
+  EXPECT_EQ(graph.GetNode(0).get(), graph.inputs().at("test_table").get());
+  EXPECT_EQ(graph.GetNode(1)->type(), dataflow::Operator::Type::FILTER);
+  EXPECT_EQ(graph.GetNode(2)->type(), dataflow::Operator::Type::MAT_VIEW);
 
-  // All good.
-  return 0;
+  // Try to process some records through flow.
+  std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
+  std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
+  std::vector<dataflow::Record> records;
+  records.emplace_back(schema_ref, true, 10L, std::move(str1), 20L);
+  records.emplace_back(schema_ref, true, 2L, std::move(str2), 50L);
+  graph.Process("test_table", records);
+
+  // Look at flow output.
+  std::shared_ptr<dataflow::MatViewOperator> output = graph.outputs().at(0);
+  EXPECT_EQ(output->count(), 1);
+  for (const dataflow::Record &record : *output) {
+    EXPECT_EQ(record, records.at(0));
+  }
 }
 
-/*
-TEST(DataFlowGraphTest, TestEquiJoinGraph) {
-  // Schema must survive records.
-  SchemaOwner lschema = MakeLeftSchema();
-  SchemaOwner rschema = MakeRightSchema();
-  // Make graph.
-  DataFlowGraph g =
-      MakeEquiJoinGraph(0, 2, 0, SchemaRef(lschema), SchemaRef(rschema));
-  // Make records.
-  std::vector<Record> left = MakeLeftRecords(SchemaRef(lschema));
-  std::vector<Record> right = MakeRightRecords(SchemaRef(rschema));
-  // Process records.
-  EXPECT_TRUE(g.Process("test-table1", left));
-  EXPECT_TRUE(g.Process("test-table2", right));
-  // Compute expected result.
-  auto op = std::dynamic_pointer_cast<EquiJoinOperator>(g.GetNode(2));
-  std::vector<Record> result = MakeJoinRecords(op->output_schema());
-  // Outputs must be equal.
-  MatViewContentsEquals(g.outputs().at(0), result);
-}
-*/
+}  // namespace planner
+}  // namespace pelton

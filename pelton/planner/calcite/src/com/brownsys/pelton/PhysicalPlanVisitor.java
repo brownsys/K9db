@@ -134,6 +134,7 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
             filterOperator, RexLiteral.intValue(value), columnId, operationEnum);
         break;
       case VARCHAR:
+      case CHAR:
         this.generator.AddFilterOperation(
             filterOperator, RexLiteral.stringValue(value), columnId, operationEnum);
         break;
