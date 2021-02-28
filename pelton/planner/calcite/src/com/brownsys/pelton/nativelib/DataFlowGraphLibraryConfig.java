@@ -1,8 +1,10 @@
 package com.brownsys.pelton.nativelib;
 
-import org.bytedeco.javacpp.*;
-import org.bytedeco.javacpp.annotation.*;
-import org.bytedeco.javacpp.tools.*;
+import org.bytedeco.javacpp.annotation.Platform;
+import org.bytedeco.javacpp.annotation.Properties;
+import org.bytedeco.javacpp.tools.Info;
+import org.bytedeco.javacpp.tools.InfoMap;
+import org.bytedeco.javacpp.tools.InfoMapper;
 
 @Properties(
     value =

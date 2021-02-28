@@ -178,19 +178,9 @@ load("@rules_jvm_external//:defs.bzl", "maven_install")
 maven_install(
     name = "maven",
     artifacts = [
-        "com.fasterxml.jackson.core:jackson-databind:2.10.3",
-        "com.fasterxml.jackson.core:jackson-core:2.10.3",
-        "com.fasterxml.jackson.core:jackson-databind:2.10.3",
-        "com.fasterxml.jackson.core:jackson-core:2.10.3",
         "com.google.googlejavaformat:google-java-format:1.9",
-        "junit:junit:4.11",
         "org.apache.calcite:calcite-core:1.23.0",
-        "org.apache.calcite:calcite-linq4j:1.23.0",
-        "org.apache.logging.log4j:log4j-slf4j-impl:2.12.0",
-        "org.apache.logging.log4j:log4j-api:2.11.2",
-        "org.apache.logging.log4j:log4j-core:2.11.2",
         "org.bytedeco:javacpp:1.5.4",
-        "org.slf4j:slf4j-api:1.7.30",
     ],
     fetch_sources = True,
     repositories = [

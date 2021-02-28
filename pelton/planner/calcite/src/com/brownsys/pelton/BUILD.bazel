@@ -3,7 +3,10 @@ load("@rules_java//java:defs.bzl", "java_binary")
 java_binary(
     name = "QueryPlanner",
     srcs = [
+        "PhysicalPlanVisitor.java",
         "QueryPlanner.java",
+        "schema/PeltonSchemaFactory.java",
+        "schema/PeltonTable.java",
         "//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:DataDataFlowGraphLibrary_java",
         "//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:DataFlowGraphLibraryConfig_java",
     ],
