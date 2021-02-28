@@ -77,6 +77,19 @@ NodeIndex DataFlowGraphGenerator::AddEquiJoinOperator(NodeIndex left_parent,
   CHECK(graph->AddNode(op, {left_ptr, right_ptr}));
   return op->index();
 }
+NodeIndex DataFlowGraphGenerator::AddMatviewOperator(NodeIndex parent) {
+  DataFlowGraph *graph = CAST_GRAPH();
+  // Find parent.
+  std::shared_ptr<Operator> parent_ptr = graph->GetNode(parent);
+  CHECK(parent_ptr);
+  // Find the key of the output schema of parent, use as key for this matview.
+  std::vector<ColumnID> key_cols = parent_ptr->output_schema().keys();
+  // TODO(babman): Key.h and Record.h only support single key.
+  while (key_cols.size() > 1) {
+    key_cols.pop_back();
+  }
+  return this->AddMatviewOperator(parent, key_cols);
+}
 NodeIndex DataFlowGraphGenerator::AddMatviewOperator(
     NodeIndex parent, const std::vector<ColumnID> &key_cols) {
   DataFlowGraph *graph = CAST_GRAPH();

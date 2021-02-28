@@ -52,7 +52,10 @@ std::vector<std::pair<std::string, std::string>> FLOWS{
                    "assignment_id = 2 AND ID > 5"),
     std::make_pair("UNION_FLOW",
                    "(SELECT * FROM submissions WHERE ts >= 100) UNION (SELECT "
-                   "* FROM submissions WHERE ts < 100)")};
+                   "* FROM submissions WHERE ts < 100)"),
+    std::make_pair("JOIN_FLOW",
+                   "SELECT * from submissions INNER JOIN students ON "
+                   "submissions.student_id = students.ID WHERE ts >= 100")};
 
 // Selects.
 std::vector<std::string> QUERIES{
