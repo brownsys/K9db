@@ -50,31 +50,38 @@ Record Record::Copy() const {
 // Data access.
 void Record::SetUInt(uint64_t uint, size_t i) {
   CheckType(i, sqlast::ColumnDefinition::Type::UINT);
+  CHECK(!IsNull(i));
   this->data_[i].uint = uint;
 }
 void Record::SetInt(int64_t sint, size_t i) {
   CheckType(i, sqlast::ColumnDefinition::Type::INT);
+  CHECK(!IsNull(i));
   this->data_[i].sint = sint;
 }
 void Record::SetString(std::unique_ptr<std::string> &&v, size_t i) {
   CheckType(i, sqlast::ColumnDefinition::Type::TEXT);
+  CHECK(!IsNull(i));
   this->data_[i].str = std::move(v);
 }
 uint64_t Record::GetUInt(size_t i) const {
   CheckType(i, sqlast::ColumnDefinition::Type::UINT);
+  CHECK(!IsNull(i));
   return this->data_[i].uint;
 }
 int64_t Record::GetInt(size_t i) const {
   CheckType(i, sqlast::ColumnDefinition::Type::INT);
+  CHECK(!IsNull(i));
   return this->data_[i].sint;
 }
 const std::string &Record::GetString(size_t i) const {
   CheckType(i, sqlast::ColumnDefinition::Type::TEXT);
+  CHECK(!IsNull(i));
   return *(this->data_[i].str);
 }
 
 // Data access with generic type.
 Key Record::GetValue(size_t i) const {
+  CHECK(!IsNull(i));
   switch (this->schema_.TypeOf(i)) {
     case sqlast::ColumnDefinition::Type::UINT:
       return Key(this->data_[i].uint);
@@ -110,6 +117,7 @@ Key Record::GetKey() const {
 // Data type transformation.
 void Record::SetValue(const std::string &value, size_t i) {
   CHECK_NE(this->data_, nullptr) << "Cannot set value for moved record";
+  CHECK(!IsNull(i));
   switch (this->schema_.TypeOf(i)) {
     case sqlast::ColumnDefinition::Type::UINT:
       this->data_[i].uint = std::stoull(value);
@@ -134,6 +142,12 @@ bool Record::operator==(const Record &other) const {
   if (this->schema_ != other.schema_) {
     return false;
   }
+
+  // compare bitmaps
+  CHECK_EQ(NumBits(), other.NumBits());
+  if(0 != memcmp(bitmap_, other.bitmap_, NumBits() * sizeof(uint64_t)))
+    return false;
+
   // Compare data (deep compare).
   for (size_t i = 0; i < this->schema_.size(); i++) {
     const auto &type = this->schema_.column_types().at(i);
@@ -174,6 +188,11 @@ std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Record &r) {
   CHECK_NE(r.data_, nullptr) << "Cannot << moved record";
   os << "|";
   for (unsigned i = 0; i < r.schema_.size(); ++i) {
+    if(r.IsNull(i)) {
+      os << "NULL" << "|";
+      continue;
+    }
+
     switch (r.schema_.TypeOf(i)) {
       case sqlast::ColumnDefinition::Type::UINT:
         os << r.data_[i].uint << "|";
