@@ -17,7 +17,15 @@ class DataFlowGraph;
 
 class Operator {
  public:
-  enum class Type { INPUT, IDENTITY, MAT_VIEW, FILTER, UNION, EQUIJOIN };
+  enum class Type {
+    INPUT,
+    IDENTITY,
+    MAT_VIEW,
+    FILTER,
+    UNION,
+    EQUIJOIN,
+    AGGREGATE
+  };
 
   // Cannot copy an operator.
   Operator(const Operator &other) = delete;
