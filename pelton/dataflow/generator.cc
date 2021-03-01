@@ -76,12 +76,10 @@ NodeIndex DataFlowGraphGenerator::AddMatviewOperator(NodeIndex parent) {
   std::shared_ptr<Operator> parent_ptr = this->graph_->GetNode(parent);
   CHECK(parent_ptr);
   // Find the key of the output schema of parent, use as key for this matview.
-  std::vector<ColumnID> key_cols = parent_ptr->output_schema().keys();
+  const std::vector<ColumnID> &key_cols = parent_ptr->output_schema().keys();
   // TODO(babman): Key.h and Record.h only support single key.
-  while (key_cols.size() > 1) {
-    key_cols.pop_back();
-  }
-  return this->AddMatviewOperator(parent, key_cols);
+  return this->AddMatviewOperator(
+      parent, std::vector<ColumnID>(key_cols.cbegin(), key_cols.cbegin() + 1));
 }
 NodeIndex DataFlowGraphGenerator::AddMatviewOperator(
     NodeIndex parent, const std::vector<ColumnID> &key_cols) {
