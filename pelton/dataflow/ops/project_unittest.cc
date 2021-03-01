@@ -25,7 +25,7 @@ inline SchemaOwner CreateSchema() {
 
 TEST(ProjectOperatorTest, BatchTest) {
   SchemaOwner schema = CreateSchema();
-  std::vector<ColumnID> cids = {0,1};
+  std::vector<ColumnID> cids = {0, 1};
   // create project operator..
   ProjectOperator project = ProjectOperator(cids);
   project.input_schemas_.push_back(SchemaRef(schema));
@@ -33,15 +33,21 @@ TEST(ProjectOperatorTest, BatchTest) {
 
   // Records to be fed
   std::vector<Record> records;
-  records.emplace_back(SchemaRef(schema), true, (uint64_t)0ULL, std::make_unique<std::string>("Hello!"), -5L);
-  records.emplace_back(SchemaRef(schema), true, (uint64_t)5ULL, std::make_unique<std::string>("Bye!"), 7L);
-  records.emplace_back(SchemaRef(schema), true, (uint64_t)6ULL, std::make_unique<std::string>("hello!"), 10L);
+  records.emplace_back(SchemaRef(schema), true, (uint64_t)0ULL,
+                       std::make_unique<std::string>("Hello!"), -5L);
+  records.emplace_back(SchemaRef(schema), true, (uint64_t)5ULL,
+                       std::make_unique<std::string>("Bye!"), 7L);
+  records.emplace_back(SchemaRef(schema), true, (uint64_t)6ULL,
+                       std::make_unique<std::string>("hello!"), 10L);
 
   // expected output
   std::vector<Record> expected_records;
-  expected_records.emplace_back(project.output_schema_, true, (uint64_t)0ULL, std::make_unique<std::string>("Hello!"));
-  expected_records.emplace_back(project.output_schema_, true, (uint64_t)5ULL, std::make_unique<std::string>("Bye!"));
-  expected_records.emplace_back(project.output_schema_, true, (uint64_t)6ULL, std::make_unique<std::string>("hello!"));
+  expected_records.emplace_back(project.output_schema_, true, (uint64_t)0ULL,
+                                std::make_unique<std::string>("Hello!"));
+  expected_records.emplace_back(project.output_schema_, true, (uint64_t)5ULL,
+                                std::make_unique<std::string>("Bye!"));
+  expected_records.emplace_back(project.output_schema_, true, (uint64_t)6ULL,
+                                std::make_unique<std::string>("hello!"));
 
   // Feed records and test
   std::vector<Record> outputs;
