@@ -24,9 +24,9 @@ namespace dataflow {
 using TableName = std::string;
 using FlowName = std::string;
 
-class DataflowState {
+class DataFlowState {
  public:
-  DataflowState() = default;
+  DataFlowState() = default;
 
   // Manage schemas.
   void AddTableSchema(const sqlast::CreateTable &create);
@@ -64,7 +64,7 @@ class DataflowState {
   // or other transformations.
   std::unordered_map<TableName, SchemaOwner> schema_;
 
-  // Dataflow graphs and views.
+  // DataFlow graphs and views.
   std::unordered_map<FlowName, DataFlowGraph> flows_;
   std::unordered_map<TableName, std::vector<FlowName>> flows_per_input_table_;
 };

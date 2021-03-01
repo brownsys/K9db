@@ -12,7 +12,7 @@ namespace planner {
 
 // Given a query, use calcite to plan its execution, and generate
 // a DataFlowGraph with all the operators from that plan.
-dataflow::DataFlowGraph PlanGraph(dataflow::DataflowState *state,
+dataflow::DataFlowGraph PlanGraph(dataflow::DataFlowState *state,
                                   const std::string &query);
 
 void ShutdownPlanner();

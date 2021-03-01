@@ -22,7 +22,7 @@ class Connection {
 
   // Getters.
   shards::SharderState *GetSharderState() { return &this->sharder_state_; }
-  dataflow::DataflowState *GetDataflowState() { return &this->dataflow_state_; }
+  dataflow::DataFlowState *GetDataFlowState() { return &this->dataflow_state_; }
 
   // State persistance.
   void Save() {
@@ -36,7 +36,7 @@ class Connection {
 
  private:
   shards::SharderState sharder_state_;
-  dataflow::DataflowState dataflow_state_;
+  dataflow::DataFlowState dataflow_state_;
 };
 
 // (context, col_count, col_data, col_name)

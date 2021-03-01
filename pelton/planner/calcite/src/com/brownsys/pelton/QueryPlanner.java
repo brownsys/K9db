@@ -69,7 +69,7 @@ public class QueryPlanner {
   // This is the entry function that is invoked from pelton c++.
   // It is given two C-pointers: the first points to the output dataflow::DataFlowGraph that will be
   // populated
-  // with the output graph. The second points to the current dataflow::DataflowState of the system.
+  // with the output graph. The second points to the current dataflow::DataFlowState of the system.
   // These pointers are passed to the native DataFlowGraphLibrary interface which interfaces between
   // C++ implementations
   // for reading and populating elements in these two pointers, and this java code.

@@ -13,7 +13,7 @@ void make_view(Connection *connection, const std::string &name,
   // Hardcoded flow for:
   //   SELECT * FROM submissions WHERE timestamp >= 100;
   dataflow::SchemaRef schema =
-      connection->GetDataflowState()->GetTableSchema("submissions");
+      connection->GetDataFlowState()->GetTableSchema("submissions");
 
   // TODO(babman): flow should be generated from parsing query and planning it
   // with calcite.
@@ -36,13 +36,13 @@ void make_view(Connection *connection, const std::string &name,
   graph.AddOutputOperator(matview, filter);
 
   // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
-  connection->GetDataflowState()->AddFlow(name, graph);
+  connection->GetDataFlowState()->AddFlow(name, graph);
 }
 */
 
 void print_view(Connection *connection, const std::string &name) {
   const dataflow::DataFlowGraph &flow =
-      connection->GetDataflowState()->GetFlow(name);
+      connection->GetDataFlowState()->GetFlow(name);
   for (auto output : flow.outputs()) {
     std::cout << name << " Matview:------------" << std::endl;
     std::cout << output->output_schema() << std::endl;

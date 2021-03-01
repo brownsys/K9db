@@ -34,7 +34,7 @@ TEST(PlannerTest, SimpleFilter) {
   std::string query = "SELECT * FROM test_table WHERE Col2 = 'hello!'";
 
   // Create a dummy state.
-  dataflow::DataflowState state;
+  dataflow::DataFlowState state;
   state.AddTableSchema("test_table", std::move(schema));
 
   // Plan the graph via calcite.
