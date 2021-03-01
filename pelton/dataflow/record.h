@@ -63,6 +63,8 @@ class Record {
   explicit Record(const SchemaRef &schema, bool positive = true)
       : schema_(schema), timestamp_(0), positive_(positive) {
     this->data_ = new RecordData[schema.size()];
+    this->bitmap_ = new uint64_t[NumBits()];
+    memset(bitmap_, 0, NumBits() * sizeof(uint64_t));
   }
 
   // Create record and set all the data together.
@@ -96,6 +98,25 @@ class Record {
   uint64_t GetUInt(size_t i) const;
   int64_t GetInt(size_t i) const;
   const std::string &GetString(size_t i) const;
+
+  inline bool IsNull(size_t i) const {
+    CHECK(bitmap_);
+    auto bitmap_block_idx = i / 64;
+    auto bitmap_idx = i % 64;
+    CHECK_LT(bitmap_block_idx, NumBits());
+    return bitmap_[bitmap_block_idx] & (0x1ul << bitmap_idx);
+  }
+
+  inline void SetNull(bool isnull, size_t i) {
+    CHECK(bitmap_);
+    auto bitmap_block_idx = i / 64;
+    auto bitmap_idx = i % 64;
+    CHECK_LT(bitmap_block_idx, NumBits());
+    if(isnull)
+      bitmap_[bitmap_block_idx] |= (0x1ul << bitmap_idx);
+    else
+      bitmap_[bitmap_block_idx] &= ~(0x1ul << bitmap_idx);
+  }
 
   // Data access with generic type.
   Key GetValue(size_t i) const;
@@ -176,9 +197,14 @@ class Record {
 
   // 29 bytes but with alignment it is really 32 bytes.
   RecordData *data_;  // [8 B]
+  uint64_t *bitmap_;
   SchemaRef schema_;  // [16 B]
   int timestamp_;     // [4 B]
   bool positive_;     // [1 B]
+
+  inline size_t NumBits() const {
+    return schema_.size() / 64 + 1;
+  }
 
   inline void CheckType(size_t i, sqlast::ColumnDefinition::Type t) const {
     CHECK_NE(this->data_, nullptr) << "Attempting to use moved record";
