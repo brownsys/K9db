@@ -35,7 +35,7 @@ class SQLExecutor {
   // Executes a statement.
   void StartBlock();
   bool ExecuteStatement(std::unique_ptr<ExecutableStatement> statement,
-                        Callback callback, void *context, char **errmsg);
+                        const Callback &callback, void *context, char **errmsg);
 
  private:
   std::string dir_path_;

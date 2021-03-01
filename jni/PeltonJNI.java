@@ -1,5 +1,7 @@
 package edu.brown.pelton;
 
+import java.util.ArrayList;
+
 public class PeltonJNI {
   static {
       System.loadLibrary("PeltonJNISO");
@@ -12,7 +14,7 @@ public class PeltonJNI {
   private native void Open(String directory);
   public native boolean ExecuteDDL(String sql);
   public native int ExecuteUpdate(String sql);
-  public native String[][] ExecuteQuery(String sql);
+  public native ArrayList<String[]> ExecuteQuery(String sql);
   
   // Closes the DB connection.
   public native void Close();

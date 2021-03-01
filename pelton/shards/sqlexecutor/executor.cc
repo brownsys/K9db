@@ -37,7 +37,7 @@ void SQLExecutor::StartBlock() { this->deduplication_buffer_.clear(); }
 
 // Executing a statement.
 bool SQLExecutor::ExecuteStatement(
-    std::unique_ptr<ExecutableStatement> statement, Callback callback,
+    std::unique_ptr<ExecutableStatement> statement, const Callback &callback,
     void *context, char **errmsg) {
   // Open connection (if needed).
   ::sqlite3 *connection = this->default_noshard_connection_;

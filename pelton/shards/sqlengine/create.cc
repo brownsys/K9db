@@ -226,7 +226,7 @@ absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
 Rewrite(const sqlast::CreateTable &stmt, SharderState *state) {
   const std::string &table_name = stmt.table_name();
   if (state->Exists(table_name)) {
-    throw "Table already exists!";
+    return absl::InvalidArgumentError("Table already exists!");
   }
 
   // Determine if this table is special: maybe it has PII fields, or maybe it
