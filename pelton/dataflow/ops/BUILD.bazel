@@ -146,6 +146,7 @@ cc_library(
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "@glog",
+        "@gtest//:gtest_prod",
     ],
 )
 
@@ -223,6 +224,5 @@ cc_test(
         "@glog",
         "@gtest",
         "@gtest//:gtest_main",
-        "@gtest//:gtest_prod",
     ],
 )
