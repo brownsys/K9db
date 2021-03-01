@@ -223,5 +223,6 @@ cc_test(
         "@glog",
         "@gtest",
         "@gtest//:gtest_main",
+        "@gtest//:gtest_prod",
     ],
 )
