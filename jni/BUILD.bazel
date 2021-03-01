@@ -1,0 +1,23 @@
+load("@rules_java//java:defs.bzl", "java_binary", "java_library")
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+genrule(
+  name = "PeltonJNI.h",
+  srcs = ["PeltonJNI.java"],
+  outs = ["edu_brown_pelton_PeltonJNI.h"],
+  cmd = "javac -h $(@D) -d $(@D) $<",
+)
+
+cc_library(
+  name = "PeltonJNISO",
+  srcs = ["PeltonJNI.cc"],
+  hdrs = [":PeltonJNI.h"],
+  deps = ["@bazel_tools//tools/jdk:jni"],
+  alwayslink = True
+)
+
+java_library(
+    name = "PeltonJNI",
+    srcs = ["PeltonJNI.java"],
+    data = [":PeltonJNISO"],
+)
