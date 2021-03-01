@@ -1,0 +1,3 @@
+[submodule "experiments/GDPRbench"]
+	path = experiments/GDPRbench
+	url = https://github.com/GDPRbench/GDPRbench.git
