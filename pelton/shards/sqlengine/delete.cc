@@ -55,7 +55,35 @@ Rewrite(const sqlast::Delete &stmt, SharderState *state) {
 
   // Case 3: Table is sharded!
   if (is_sharded) {
-    return absl::InvalidArgumentError("Unsupported case for DELETE statement!");
+    // The table might be sharded according to different column/owners.
+    // We must delete from all these different duplicates.
+    for (const auto &info : state->GetShardingInformation(table_name)) {
+      // Rename the table to match the sharded name.
+      sqlast::Delete cloned = stmt;
+      cloned.table_name() = info.sharded_table_name;
+
+      // Find the value assigned to shard_by column in the where clause, and
+      // remove it from the where clause.
+      sqlast::ValueFinder value_finder(info.shard_by);
+      auto [found, user_id_val] = cloned.Visit(&value_finder);
+      if (found) {
+        sqlast::ExpressionRemover expression_remover(info.shard_by);
+        cloned.Visit(&expression_remover);
+      }
+
+      // Update against the relevant shards.
+      std::string delete_str = cloned.Visit(&stringifier);
+      for (const auto &user_id : state->UsersOfShard(info.shard_kind)) {
+        if (found && user_id != user_id_val) {
+          continue;
+        }
+
+        std::string shard_name = NameShard(info.shard_kind, user_id);
+        result.push_back(
+            std::make_unique<sqlexecutor::SimpleExecutableStatement>(
+                shard_name, delete_str));
+      }
+    }
   }
 
   return result;
