@@ -29,7 +29,8 @@ Rewrite(const sqlast::Delete &stmt, SharderState *state) {
     // We are deleting a user, we should also delete their shard!
     auto [found, user_id] = stmt.Visit(&value_finder);
     if (!found) {
-      throw "DELETE PII statement does not specify an exact user to delete!";
+      return absl::InvalidArgumentError(
+          "DELETE PII statement does not specify an exact user to delete!");
     }
 
     // Remove user shard.
@@ -54,7 +55,7 @@ Rewrite(const sqlast::Delete &stmt, SharderState *state) {
 
   // Case 3: Table is sharded!
   if (is_sharded) {
-    throw "Unsupported case for DELETE statement!";
+    return absl::InvalidArgumentError("Unsupported case for DELETE statement!");
   }
 
   return result;
