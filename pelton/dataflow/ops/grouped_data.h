@@ -31,19 +31,22 @@ class GroupedData {
   inline bool Contains(const Key &key) const { return contents_.contains(key); }
 
   inline bool Insert(const Key &k, const Record &r) {
-    if (!contents_.contains(k)) {
-      // need to add key -> records entry as empty vector
-      contents_.emplace(k, std::vector<Record>{});
-    }
+    // Insert an empty vector for k if k does not exist in the map.
+    std::vector<Record> &v = contents_[k];
 
-    std::vector<Record> &v = contents_.at(k);
+    // Add or remove r from the vector of k in the map.
     if (r.IsPositive()) {
       v.push_back(r.Copy());
       this->count_++;
     } else {
       auto it = std::find(std::begin(v), std::end(v), r);
-      v.erase(it);
-      this->count_--;
+      if (it != std::end(v)) {
+        v.erase(it);
+        this->count_--;
+        if (v.empty()) {
+          contents_.erase(k);
+        }
+      }
     }
     return true;
   }
@@ -63,17 +66,22 @@ class GroupedData {
         : group_it_(begin), group_end_(end) {
       // Unless the iterator is empty, get the first key and set up
       // internal record iterator to point to the first record of that key.
-      if (this->group_it_ != this->group_end_) {
+      while (this->group_it_ != this->group_end_) {
         const auto &[_, records] = *(this->group_it_);
         this->record_it_ = std::cbegin(records);
         this->record_end_ = std::cend(records);
-      } else {
-        this->record_it_ = EMPTY_VEC.cend();
-        this->record_end_ = EMPTY_VEC.cend();
+        if (this->record_it_ != this->record_end_) {
+          return;
+        }
+        this->group_it_++;
       }
+
+      // If we got here, it means all the vectors we traversed were empty.
+      this->record_it_ = EMPTY_VEC.cend();
+      this->record_end_ = EMPTY_VEC.cend();
     }
 
-    // Increment: increment internal record iterator, if reach the end,
+    // Increment: increment internal record iterator, if we reach the end,
     // increment the key iterator, and update the record iterator to go over
     // records of that key.
     const_iterator &operator++() {

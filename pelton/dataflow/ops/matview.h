@@ -1,6 +1,7 @@
 #ifndef PELTON_DATAFLOW_OPS_MATVIEW_H_
 #define PELTON_DATAFLOW_OPS_MATVIEW_H_
 
+#include <utility>
 #include <vector>
 
 #include "pelton/dataflow/key.h"
@@ -14,11 +15,10 @@ namespace dataflow {
 
 class MatViewOperator : public Operator {
  public:
-  explicit MatViewOperator(const std::vector<ColumnID> &key_cols)
-      : Operator(Operator::Type::MAT_VIEW), key_cols_(key_cols) {}
-
-  explicit MatViewOperator(std::vector<ColumnID> &&key_cols)
-      : Operator(Operator::Type::MAT_VIEW), key_cols_(key_cols) {}
+  // Explicitly specified keys for this Materialized view may differ from
+  // PrimaryKey.
+  explicit MatViewOperator(const std::vector<ColumnID> &key_cols);
+  explicit MatViewOperator(std::vector<ColumnID> &&key_cols);
 
   size_t count() const;
   bool Contains(const Key &key) const;

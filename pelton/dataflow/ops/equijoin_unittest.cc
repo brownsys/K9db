@@ -147,13 +147,13 @@ TEST(EquiJoinOperatorTest, BasicJoinTest) {
   EXPECT_TRUE(op->Process(0, lrecords, &output));
   EXPECT_EQ(output.size(), 0);
   EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_EQ(op->left_table_.Get(Key(-5L)), lrecords);
+  EXPECT_EQ(op->left_table_.Get(lrecords.at(0).GetValues({2})), lrecords);
   EXPECT_EQ(op->right_table_.count(), 0);
   EXPECT_TRUE(op->Process(1, rrecords, &output));
   EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_EQ(op->left_table_.Get(Key(-5L)), lrecords);
+  EXPECT_EQ(op->left_table_.Get(lrecords.at(0).GetValues({2})), lrecords);
   EXPECT_EQ(op->right_table_.count(), 1);
-  EXPECT_EQ(op->right_table_.Get(Key(-5L)), rrecords);
+  EXPECT_EQ(op->right_table_.Get(rrecords.at(0).GetValues({1})), rrecords);
   EXPECT_EQ(output.size(), 1);
   EXPECT_EQ(output.at(0).GetUInt(0), 0UL);
   EXPECT_EQ(output.at(0).GetString(1), "item0");
@@ -196,13 +196,13 @@ TEST(EquiJoinOperatorTest, BasicUnjoinableTest) {
   EXPECT_TRUE(op->Process(0, lrecords, &output));
   EXPECT_EQ(output.size(), 0);
   EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_EQ(op->left_table_.Get(Key(-5L)), lrecords);
+  EXPECT_EQ(op->left_table_.Get(lrecords.at(0).GetValues({2})), lrecords);
   EXPECT_EQ(op->right_table_.count(), 0);
   EXPECT_TRUE(op->Process(1, rrecords, &output));
   EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_EQ(op->left_table_.Get(Key(-5L)), lrecords);
+  EXPECT_EQ(op->left_table_.Get(lrecords.at(0).GetValues({2})), lrecords);
   EXPECT_EQ(op->right_table_.count(), 1);
-  EXPECT_EQ(op->right_table_.Get(Key(50L)), rrecords);
+  EXPECT_EQ(op->right_table_.Get(rrecords.at(0).GetValues({1})), rrecords);
   EXPECT_EQ(output.size(), 0);
 }
 

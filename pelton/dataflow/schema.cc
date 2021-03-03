@@ -63,9 +63,14 @@ size_t SchemaOwner::IndexOf(const std::string &column_name) const {
 std::ostream &operator<<(std::ostream &os,
                          const pelton::dataflow::SchemaOwner &schema) {
   CHECK_NE(schema.ptr_, nullptr) << "Cannot << moved record";
+  const auto &keys = schema.ptr_->keys;
   os << "|";
   for (unsigned i = 0; i < schema.size(); ++i) {
-    os << schema.NameOf(i) << "(" << schema.TypeOf(i) << ")|";
+    os << schema.NameOf(i) << "(" << schema.TypeOf(i) << "";
+    if (std::find(keys.cbegin(), keys.cend(), i) != keys.cend()) {
+      os << ",KEY";
+    }
+    os << ")|";
   }
   return os;
 }
