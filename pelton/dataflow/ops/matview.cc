@@ -1,6 +1,5 @@
 #include "pelton/dataflow/ops/matview.h"
 
-#include <utility>
 #include <vector>
 
 #include "glog/logging.h"
@@ -8,6 +7,19 @@
 namespace pelton {
 namespace dataflow {
 
+// Explicitly specified keys for this Materialized view may differ from
+// PrimaryKey.
+MatViewOperator::MatViewOperator(const std::vector<ColumnID> &key_cols)
+    : Operator(Operator::Type::MAT_VIEW), key_cols_(key_cols) {
+  CHECK(!key_cols_.empty()) << "Matview keys cannot be empty";
+}
+
+MatViewOperator::MatViewOperator(std::vector<ColumnID> &&key_cols)
+    : Operator(Operator::Type::MAT_VIEW), key_cols_(std::move(key_cols)) {
+  CHECK(!key_cols_.empty()) << "Matview keys cannot be empty";
+}
+
+// Compute the output schema when the input schema is available.
 void MatViewOperator::ComputeOutputSchema() {
   this->output_schema_ = this->input_schemas_.at(0);
 }
@@ -18,9 +30,7 @@ bool MatViewOperator::Process(NodeIndex source,
                               const std::vector<Record> &records,
                               std::vector<Record> *output) {
   for (const Record &r : records) {
-    // incoming records must have the right key column set
-    CHECK_EQ(this->key_cols_.size(), 1U);
-    if (!this->contents_.Insert(r.GetValue(this->key_cols_.at(0)), r)) {
+    if (!this->contents_.Insert(r.GetValues(this->key_cols_), r)) {
       return false;
     }
   }

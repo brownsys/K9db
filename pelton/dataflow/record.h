@@ -15,6 +15,7 @@
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
+#include "pelton/dataflow/value.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -98,8 +99,9 @@ class Record {
   const std::string &GetString(size_t i) const;
 
   // Data access with generic type.
-  Key GetValue(size_t i) const;
   Key GetKey() const;
+  Key GetValues(const std::vector<ColumnID> &cols) const;
+  Value GetValue(ColumnID col) const;
 
   // Data type transformation.
   void SetValue(const std::string &value, size_t i);

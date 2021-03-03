@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "glog/logging.h"
+#include "pelton/dataflow/value.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -48,7 +49,7 @@ bool EquiJoinOperator::Process(NodeIndex source,
     // Append all input records to the corresponding hashtable.
     if (source == this->left()->index()) {
       // Match each record in the right table with this record.
-      Key left_value = record.GetValue(this->left_id_);
+      Key left_value = record.GetValues({this->left_id_});
       for (const auto &right : this->right_table_.Get(left_value)) {
         this->EmitRow(record, right, output);
       }
@@ -57,7 +58,7 @@ bool EquiJoinOperator::Process(NodeIndex source,
       this->left_table_.Insert(left_value, record);
     } else if (source == this->right()->index()) {
       // Match each record in the left table with this record.
-      Key right_value = record.GetValue(this->right_id_);
+      Key right_value = record.GetValues({this->right_id_});
       for (const auto &left : this->left_table_.Get(right_value)) {
         this->EmitRow(left, record, output);
       }
