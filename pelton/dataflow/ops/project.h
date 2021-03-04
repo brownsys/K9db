@@ -34,6 +34,8 @@ class ProjectOperator : public Operator {
   SchemaOwner owned_output_schema_;
   // Allow tests to use .Process(...) directly.
   FRIEND_TEST(ProjectOperatorTest, BatchTest);
+  FRIEND_TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest);
+  FRIEND_TEST(ProjectOperatorTest, OutputSchemaCompositeKeyTest);
 };
 
 }  // namespace dataflow
