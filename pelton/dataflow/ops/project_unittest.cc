@@ -26,7 +26,8 @@ inline SchemaOwner CreateSchemaPrimaryKey() {
 inline SchemaOwner CreateSchemaCompositeKey() {
   // Create a schema.
   std::vector<std::string> names = {"Col1", "Col2", "Col3", "Col4", "Col5"};
-  std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT, CType::INT, CType::INT};
+  std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT, CType::INT,
+                              CType::INT};
   std::vector<ColumnID> keys = {1, 4};
   return SchemaOwner{names, types, keys};
 }
@@ -63,7 +64,7 @@ TEST(ProjectOperatorTest, BatchTest) {
   EXPECT_EQ(outputs, expected_records);
 }
 
-TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest){
+TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest) {
   // TEST 1: Primary keyed schema's keycolumn included in projected schema
   SchemaOwner schema = CreateSchemaPrimaryKey();
   std::vector<ColumnID> cids = {0, 1};
@@ -94,7 +95,7 @@ TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest){
   EXPECT_EQ(project2.output_schema_.keys(), expected_keys);
 }
 
-TEST(ProjectOperatorTest, OutputSchemaCompositeKeyTest){
+TEST(ProjectOperatorTest, OutputSchemaCompositeKeyTest) {
   // TEST 1: Composite keyed schema's keycolumns included in projected schema
   SchemaOwner schema = CreateSchemaCompositeKey();
   std::vector<ColumnID> cids = {1, 3, 4};
@@ -111,7 +112,8 @@ TEST(ProjectOperatorTest, OutputSchemaCompositeKeyTest){
   EXPECT_EQ(project1.output_schema_.column_types(), expected_types);
   EXPECT_EQ(project1.output_schema_.keys(), expected_keys);
 
-  // TEST 2: Subset of composite keyed schema's keycolumns included in projected schema
+  // TEST 2: Subset of composite keyed schema's keycolumns included in projected
+  // schema
   cids = {0, 1, 2};
   ProjectOperator project2 = ProjectOperator(cids);
   project2.input_schemas_.push_back(SchemaRef(schema));

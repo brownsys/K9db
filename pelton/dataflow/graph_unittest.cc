@@ -12,8 +12,8 @@
 #include "pelton/dataflow/ops/filter.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/ops/matview.h"
-#include "pelton/dataflow/ops/union.h"
 #include "pelton/dataflow/ops/project.h"
+#include "pelton/dataflow/ops/union.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
@@ -162,7 +162,8 @@ inline std::vector<Record> MakeProjectOnFilterRecords(const SchemaRef &schema) {
   records.emplace_back(schema, true, (uint64_t)7ULL, 1L);
   return records;
 }
-inline std::vector<Record> MakeProjectOnEquiJoinRecords(const SchemaRef &schema) {
+inline std::vector<Record> MakeProjectOnEquiJoinRecords(
+    const SchemaRef &schema) {
   std::unique_ptr<std::string> sd1 = std::make_unique<std::string>("descrp0");
   std::unique_ptr<std::string> sd2 = std::make_unique<std::string>("descrp1");
   std::unique_ptr<std::string> sd2_ = std::make_unique<std::string>("descrp1");
@@ -257,11 +258,10 @@ DataFlowGraph MakeEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
   return g;
 }
 
-DataFlowGraph MakeProjectGraph(ColumnID keycol, const SchemaRef &schema){
+DataFlowGraph MakeProjectGraph(ColumnID keycol, const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  std::vector<ColumnID> column_ids = {0,2};
+  std::vector<ColumnID> column_ids = {0, 2};
   DataFlowGraph g;
-
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto project = std::make_shared<ProjectOperator>(column_ids);
@@ -277,9 +277,10 @@ DataFlowGraph MakeProjectGraph(ColumnID keycol, const SchemaRef &schema){
   return g;
 }
 
-DataFlowGraph MakeProjectOnFilterGraph(ColumnID keycol, const SchemaRef &schema){
+DataFlowGraph MakeProjectOnFilterGraph(ColumnID keycol,
+                                       const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  std::vector<ColumnID> column_ids = {0,2};
+  std::vector<ColumnID> column_ids = {0, 2};
   DataFlowGraph g;
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
@@ -300,10 +301,10 @@ DataFlowGraph MakeProjectOnFilterGraph(ColumnID keycol, const SchemaRef &schema)
 }
 
 DataFlowGraph MakeProjectOnEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
-                                const SchemaRef &lschema,
-                                const SchemaRef &rschema){
+                                         const SchemaRef &lschema,
+                                         const SchemaRef &rschema) {
   std::vector<ColumnID> keys = {ok};
-  std::vector<ColumnID> column_ids = {0,3};
+  std::vector<ColumnID> column_ids = {0, 3};
   DataFlowGraph g;
 
   auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
@@ -443,8 +444,8 @@ TEST(DataFlowGraphTest, TestProjectOnEquiJoinGraph) {
   SchemaOwner lschema = MakeLeftSchema();
   SchemaOwner rschema = MakeRightSchema();
   // Make graph.
-  DataFlowGraph g =
-      MakeProjectOnEquiJoinGraph(0, 2, 0, SchemaRef(lschema), SchemaRef(rschema));
+  DataFlowGraph g = MakeProjectOnEquiJoinGraph(0, 2, 0, SchemaRef(lschema),
+                                               SchemaRef(rschema));
   // Make records.
   std::vector<Record> left = MakeLeftRecords(SchemaRef(lschema));
   std::vector<Record> right = MakeRightRecords(SchemaRef(rschema));
@@ -453,7 +454,8 @@ TEST(DataFlowGraphTest, TestProjectOnEquiJoinGraph) {
   EXPECT_TRUE(g.Process("test-table2", right));
   // Compute expected result.
   auto op = std::dynamic_pointer_cast<ProjectOperator>(g.GetNode(3));
-  std::vector<Record> result = MakeProjectOnEquiJoinRecords(op->output_schema());
+  std::vector<Record> result =
+      MakeProjectOnEquiJoinRecords(op->output_schema());
   // Outputs must be equal.
   MatViewContentsEquals(g.outputs().at(0), result);
 }
