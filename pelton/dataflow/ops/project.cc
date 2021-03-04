@@ -9,10 +9,38 @@
 namespace pelton {
 namespace dataflow {
 
+bool EnclosedKeyCols(const std::vector<ColumnID> &input_keycols,
+                     const std::vector<ColumnID> &cids) {
+  for (const auto &keycol : input_keycols) {
+    bool is_present = false;
+    for (const auto &cid : cids)
+      if (keycol == cid) is_present = true;
+
+    // at least one key column of the composite key is not being projected
+    if (!is_present) return false;
+  }
+  // all input key columns are present in the projected schema
+  return true;
+}
+
 void ProjectOperator::ComputeOutputSchema() {
   std::vector<std::string> output_column_names = {};
   std::vector<sqlast::ColumnDefinition::Type> output_column_types = {};
-  std::vector<ColumnID> output_keys = {0};
+  std::vector<ColumnID> input_keys = this->input_schemas_.at(0).keys();
+  std::vector<ColumnID> output_keys = {};
+
+  // If the input key set is a subset of the projected columns only then form an
+  // output keyset. Else do not assign keys for the output schema. Because the
+  // subset of input keycols can no longer uniqely identify records. This is
+  // only for semantic purposes as, as of now, this does not have an effect on
+  // the materialized view.
+  if (EnclosedKeyCols(input_keys, cids_))
+    for (size_t i = 0; i < input_keys.size(); i++)
+      for (size_t j = 0; j < cids_.size(); j++)
+        if (input_keys.at(i) == cids_.at(j)) {
+          output_keys.push_back(j);
+          break;
+        }
 
   // obtain column names and types
   for (const auto &cid : cids_) {
