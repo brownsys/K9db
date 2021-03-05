@@ -14,16 +14,19 @@ void AggregateOperator::ComputeOutputSchema() {
   std::vector<sqlast::ColumnDefinition::Type> output_column_types = {};
   std::vector<ColumnID> key_columns = {0};
 
-  std::vector<std::string> aggregate_column_name{
-      this->input_schemas_.at(0).NameOf(aggregate_column_)};
+  std::vector<std::string> aggregate_column_name;
   std::vector<sqlast::ColumnDefinition::Type> aggregate_column_type;
   // The calcite planner does not supply a column id for count function, hence
   // be independent of it
-  if (aggregate_function_ == Function::COUNT)
+  if (aggregate_function_ == Function::COUNT){
+    aggregate_column_name.push_back("Count");
     aggregate_column_type.push_back(sqlast::ColumnDefinition::Type::UINT);
-  else
+  }
+  else{
+    aggregate_column_name.push_back("Sum");
     aggregate_column_type.push_back(
         this->input_schemas_.at(0).TypeOf(aggregate_column_));
+  }
 
   // obtain column names and types
   for (const auto &cid : group_columns_) {
