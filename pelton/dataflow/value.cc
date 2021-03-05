@@ -88,6 +88,19 @@ bool Value::operator==(const Value &other) const {
       LOG(FATAL) << "Unsupported data type in value comparison!";
   }
 }
+bool Value::operator<(const Value &other) const {
+  CheckType(other.type_);
+  switch (this->type_) {
+    case sqlast::ColumnDefinition::Type::UINT:
+      return this->uint_ < other.uint_;
+    case sqlast::ColumnDefinition::Type::INT:
+      return this->sint_ < other.sint_;
+    case sqlast::ColumnDefinition::Type::TEXT:
+      return this->str_ < other.str_;
+    default:
+      LOG(FATAL) << "Unsupported data type in value comparison!";
+  }
+}
 
 // Data access.
 uint64_t Value::GetUInt() const {

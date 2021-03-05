@@ -25,6 +25,18 @@ bool Key::operator==(const Key &other) const {
   return this->values_ == other.values_;
 }
 bool Key::operator!=(const Key &other) const { return !(*this == other); }
+bool Key::operator<(const Key &other) const {
+  CHECK_EQ(this->values_.size(), other.values_.size())
+      << "Comparing keys of different sizes";
+  for (size_t i = 0; i < this->values_.size(); i++) {
+    if (this->values_.at(i) < other.values_.at(i)) {
+      return true;
+    } else if (this->values_.at(i) != other.values_.at(i)) {
+      break;
+    }
+  }
+  return false;
+}
 
 // Adding values.
 void Key::AddValue(uint64_t v) {

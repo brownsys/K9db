@@ -119,6 +119,20 @@ class Record {
   // For logging and printing...
   friend std::ostream &operator<<(std::ostream &os, const Record &r);
 
+  // Custom comparison between records (for ordering).
+  struct Compare {
+   public:
+    explicit Compare(const std::vector<ColumnID> &cols) {
+      this->cols = std::make_shared<std::vector<ColumnID>>(cols);
+    }
+    bool operator()(const Record &l, const Record &r) const {
+      return l.GetValues(*cols) < r.GetValues(*cols);
+    }
+
+   private:
+    std::shared_ptr<std::vector<ColumnID>> cols;
+  };
+
  private:
   // Recursive helper used in SetData(...).
   template <typename Arg, typename... Args>

@@ -13,30 +13,83 @@
 namespace pelton {
 namespace dataflow {
 
+// Virtual parent class: this is what the rest of our system uses and interacts
+// with. Allows reading and writing into the materialized view without knowing
+// the underlying storage layout and order.
 class MatViewOperator : public Operator {
  public:
-  // Explicitly specified keys for this Materialized view may differ from
-  // PrimaryKey.
-  explicit MatViewOperator(const std::vector<ColumnID> &key_cols);
-  explicit MatViewOperator(std::vector<ColumnID> &&key_cols);
+  virtual size_t count() const = 0;
+  virtual bool Contains(const Key &key) const = 0;
+  virtual RecordIterable Lookup(const Key &key) const = 0;
+  virtual KeyIterable Keys() const = 0;
 
-  size_t count() const;
-  bool Contains(const Key &key) const;
-  const std::vector<Record> &Lookup(const Key &key) const;
+ protected:
+  // We do not know if we are ordered or unordered, this type is revealed
+  // to us by the derived class as an argument.
+  MatViewOperator() : Operator(Operator::Type::MAT_VIEW) {}
+};
 
-  GroupedData::const_iterator begin() const;
-  GroupedData::const_iterator end() const;
+// Actual implementation is generic over T: the underlying GroupedDataT
+// storage layout.
+// A concrete instance of this class is constructor by providing a vector of
+// columns, which constitute the keys of this view.
+// Furthermore, if T specifies an underlying storage that is ordered over
+// records, the constructor also expects an instance of Record::Compare, which
+// the underlying storage uses to determine the ordering of records.
+// Explicitly specified keys for this Materialized view may differ from
+// PrimaryKey.
+// For a detailed description of usage and the various cases, check out the
+// extended comment inside ./grouped_data.h
+template <typename T>
+class MatViewOperatorT : public MatViewOperator {
+ public:
+  template <typename = typename std::enable_if<
+                !std::is_same<T, RecordOrderedGroupedData>::value>>
+  explicit MatViewOperatorT(const std::vector<ColumnID> &key_cols)
+      : MatViewOperator(), key_cols_(key_cols), contents_() {}
+
+  template <typename = typename std::enable_if<
+                std::is_same<T, RecordOrderedGroupedData>::value>>
+  explicit MatViewOperatorT(const std::vector<ColumnID> &key_cols,
+                            const Record::Compare &compare)
+      : MatViewOperator(), key_cols_(key_cols), contents_(compare) {}
+
+  size_t count() const override { return this->contents_.count(); }
+
+  bool Contains(const Key &key) const override {
+    return this->contents_.Contains(key);
+  }
+
+  RecordIterable Lookup(const Key &key) const override {
+    return this->contents_.Lookup(key);
+  }
+
+  KeyIterable Keys() const override { return this->contents_.Keys(); }
 
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,
-               std::vector<Record> *output) override;
+               std::vector<Record> *output) override {
+    for (const Record &r : records) {
+      if (!this->contents_.Insert(r.GetValues(this->key_cols_), r)) {
+        return false;
+      }
+    }
 
-  void ComputeOutputSchema() override;
+    return true;
+  }
+
+  void ComputeOutputSchema() override {
+    this->output_schema_ = this->input_schemas_.at(0);
+  }
 
  private:
-  GroupedData contents_;
   std::vector<ColumnID> key_cols_;
+  T contents_;
 };
+
+using UnorderedMatViewOperator = MatViewOperatorT<UnorderedGroupedData>;
+using RecordOrderedMatViewOperator = MatViewOperatorT<RecordOrderedGroupedData>;
+using KeyOrderedMatViewOperator = MatViewOperatorT<KeyOrderedGroupedData>;
 
 }  // namespace dataflow
 }  // namespace pelton

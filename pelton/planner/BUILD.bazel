@@ -34,6 +34,7 @@ cc_test(
     deps = [
         ":planner",
         "//pelton/dataflow:graph",
+        "//pelton/dataflow:key",
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",

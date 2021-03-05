@@ -239,6 +239,7 @@ cc_binary(
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":graph",
+        ":key",
         ":operator",
         ":schema",
         ":state",

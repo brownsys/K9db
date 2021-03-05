@@ -58,8 +58,8 @@ class EquiJoinOperator : public Operator {
   ColumnID right_id_;
   // Schema of the output.
   SchemaOwner joined_schema_;
-  GroupedData left_table_;
-  GroupedData right_table_;
+  UnorderedGroupedData left_table_;
+  UnorderedGroupedData right_table_;
 
   // Join left and right and store it in output.
   void EmitRow(const Record &left, const Record &right,
