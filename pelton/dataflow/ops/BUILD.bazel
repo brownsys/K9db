@@ -147,6 +147,7 @@ cc_library(
         "//pelton/dataflow:types",
         "@glog",
         "@absl//absl/container:flat_hash_map",
+        "@gtest//:gtest_prod",
     ],
 )
 
