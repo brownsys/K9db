@@ -53,7 +53,7 @@ class Key {
       case sqlast::ColumnDefinition::Type::INT:
         return H::combine(std::move(h), k.sint_);
       case sqlast::ColumnDefinition::Type::TEXT:
-        return H::combine(std::move(h), k.str_.c_str(), k.str_.size());
+        return H::combine(std::move(h), k.str_, k.str_.size());
       default:
         LOG(FATAL) << "unimplemented pointed data hashing for Key";
     }
