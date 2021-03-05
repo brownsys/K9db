@@ -49,7 +49,7 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     assert children.size() == 1;
 
     // The key of this matview is automatically determine by the input schema to it.
-    this.generator.AddMatviewOperator(children.get(0));
+    this.generator.AddMatviewOperator(children.get(0), new int[0], new int[0]);
     assert this.childrenOperators.isEmpty();
   }
 
@@ -230,7 +230,7 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
         throw new IllegalArgumentException("Unsupported join type " + join.getJoinType());
     }
 
-    // Propogate up to parents.
+    // Propagate up to parents.
     this.childrenOperators.peek().add(joinOperator);
     return join;
   }

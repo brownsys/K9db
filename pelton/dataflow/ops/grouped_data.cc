@@ -3,7 +3,10 @@
 namespace pelton {
 namespace dataflow {
 
-const std::vector<Record> GroupedData::EMPTY_VEC = std::vector<Record>();
+/*
+ * UntemplatedGroupedData.
+ */
+const std::vector<Record> UntemplatedGroupedData::EMPTY_VEC = {};
 
 }  // namespace dataflow
 }  // namespace pelton

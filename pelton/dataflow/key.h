@@ -31,10 +31,12 @@ class Key {
   // Comparisons.
   bool operator==(const Key &other) const;
   bool operator!=(const Key &other) const;
+  bool operator<(const Key &other) const;
 
   // Hash to use as a key in absl hash tables.
   template <typename H>
   friend H AbslHashValue(H h, const Key &k) {
+    h = H::combine(std::move(h), k.values_.size());
     for (const Value &value : k.values_) {
       h = H::combine(std::move(h), value);
     }

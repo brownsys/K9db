@@ -44,6 +44,7 @@ class Value {
   // Comparisons.
   bool operator==(const Value &other) const;
   bool operator!=(const Value &other) const { return !(*this == other); }
+  bool operator<(const Value &other) const;
 
   // Hash to use as a key in absl hash tables.
   template <typename H>

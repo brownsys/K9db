@@ -46,8 +46,10 @@ void print_view(Connection *connection, const std::string &name) {
   for (auto output : flow.outputs()) {
     std::cout << name << " Matview:------------" << std::endl;
     std::cout << output->output_schema() << std::endl;
-    for (const auto &record : *output) {
-      std::cout << record << std::endl;
+    for (const auto &key : output->Keys()) {
+      for (const auto &record : output->Lookup(key)) {
+        std::cout << record << std::endl;
+      }
     }
     std::cout << std::endl;
   }

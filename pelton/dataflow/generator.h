@@ -36,9 +36,9 @@ class DataFlowGraphGenerator {
   NodeIndex AddFilterOperator(NodeIndex parent);
   NodeIndex AddEquiJoinOperator(NodeIndex left_parent, NodeIndex right_parent,
                                 ColumnID left_column, ColumnID right_column);
-  NodeIndex AddMatviewOperator(NodeIndex parent);  // Deduce key from parent.
   NodeIndex AddMatviewOperator(NodeIndex parent,
-                               const std::vector<ColumnID> &key_cols);
+                               const std::vector<ColumnID> &key_cols,
+                               const std::vector<ColumnID> &sort_cols);
 
   // Setting properties on existing operators.
   void AddFilterOperation(NodeIndex filter_operator, const std::string &value,

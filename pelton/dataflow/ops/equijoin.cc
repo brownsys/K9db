@@ -50,7 +50,7 @@ bool EquiJoinOperator::Process(NodeIndex source,
     if (source == this->left()->index()) {
       // Match each record in the right table with this record.
       Key left_value = record.GetValues({this->left_id_});
-      for (const auto &right : this->right_table_.Get(left_value)) {
+      for (const auto &right : this->right_table_.Lookup(left_value)) {
         this->EmitRow(record, right, output);
       }
 
@@ -59,7 +59,7 @@ bool EquiJoinOperator::Process(NodeIndex source,
     } else if (source == this->right()->index()) {
       // Match each record in the left table with this record.
       Key right_value = record.GetValues({this->right_id_});
-      for (const auto &left : this->left_table_.Get(right_value)) {
+      for (const auto &left : this->left_table_.Lookup(right_value)) {
         this->EmitRow(left, record, output);
       }
 

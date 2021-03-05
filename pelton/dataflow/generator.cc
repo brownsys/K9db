@@ -10,6 +10,7 @@
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/ops/union.h"
+#include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/state.h"
 
@@ -71,19 +72,19 @@ NodeIndex DataFlowGraphGenerator::AddEquiJoinOperator(NodeIndex left_parent,
   CHECK(this->graph_->AddNode(op, {left_ptr, right_ptr}));
   return op->index();
 }
-NodeIndex DataFlowGraphGenerator::AddMatviewOperator(NodeIndex parent) {
-  // Find parent.
-  std::shared_ptr<Operator> parent_ptr = this->graph_->GetNode(parent);
-  CHECK(parent_ptr);
-  // Find the key of the output schema of parent, use as key for this matview.
-  const std::vector<ColumnID> &key_cols = parent_ptr->output_schema().keys();
-  return this->AddMatviewOperator(parent, key_cols);
-}
 NodeIndex DataFlowGraphGenerator::AddMatviewOperator(
-    NodeIndex parent, const std::vector<ColumnID> &key_cols) {
-  // Create filter operator.
-  std::shared_ptr<MatViewOperator> op =
-      std::make_shared<MatViewOperator>(key_cols);
+    NodeIndex parent, const std::vector<ColumnID> &key_cols,
+    const std::vector<ColumnID> &sort_cols) {
+  std::shared_ptr<MatViewOperator> op;
+  // Determine which type of MatView we need.
+  if (sort_cols.empty()) {
+    op = std::make_shared<UnorderedMatViewOperator>(key_cols);
+  } else if (sort_cols == key_cols) {
+    op = std::make_shared<KeyOrderedMatViewOperator>(key_cols);
+  } else {
+    Record::Compare compare{sort_cols};
+    op = std::make_shared<RecordOrderedMatViewOperator>(key_cols, compare);
+  }
   // Add the operator to the graph.
   std::shared_ptr<Operator> parent_ptr = this->graph_->GetNode(parent);
   CHECK(parent_ptr);

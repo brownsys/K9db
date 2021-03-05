@@ -97,6 +97,7 @@ cc_library(
         "//pelton/dataflow:key",
         "//pelton/dataflow:record",
         "//pelton/dataflow:types",
+        "@absl//absl/container:btree",
         "@absl//absl/container:flat_hash_map",
     ],
 )
