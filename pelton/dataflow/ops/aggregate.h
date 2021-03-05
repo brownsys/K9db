@@ -60,8 +60,12 @@ class AggregateOperator : public Operator {
                   bool positive, std::vector<Record> *output) const;
 
   // Allow tests to use .Process(...) directly.
-  FRIEND_TEST(AggregateOperatorTest, BasicCount);
-  FRIEND_TEST(AggregateOperatorTest, BasicCountStringFail);
+  FRIEND_TEST(AggregateOperatorTest, MultipleGroupColumnsCountPositive);
+  FRIEND_TEST(AggregateOperatorTest, MultipleGroupColumnsSumPositive);
+  FRIEND_TEST(AggregateOperatorTest, CountPositiveNegative);
+  FRIEND_TEST(AggregateOperatorTest, SumPositiveNegative);
+  FRIEND_TEST(AggregateOperatorTest, CountPositiveNegativeSingleBatch);
+  FRIEND_TEST(AggregateOperatorTest, SumPositiveNegativeSingleBatch);
 };
 
 }  // namespace dataflow
