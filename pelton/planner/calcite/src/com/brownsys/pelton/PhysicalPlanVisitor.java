@@ -11,8 +11,10 @@ import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
+import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexDynamicParam;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
@@ -44,18 +46,63 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     // Start visting.
     plan.accept(this);
 
+    // Check if a mat view operator was already created, otherwise create one.
+    ArrayList<Integer> children = this.childrenOperators.pop();
+    if (children.size() > 0) {
+      // Add a materialized view linked to the last node in the graph.
+      assert children.size() == 1;
+
+      // The key of this matview is automatically determine by the input schema to it.
+      int[] keyCols = new int[0]; // TODO(babman): figure out key from query.
+      this.generator.AddMatviewOperator(children.get(0), keyCols);
+      assert this.childrenOperators.isEmpty();
+    }
+  }
+
+  // Created for queries that have an explicit order by, as well as unordered queries
+  // that have a limit.
+  @Override
+  public RelNode visit(LogicalSort sort) {
+    this.childrenOperators.push(new ArrayList<Integer>());
+
+    // Start visting.
+    visitChildren(sort);
+
     // Add a materialized view linked to the last node in the graph.
     ArrayList<Integer> children = this.childrenOperators.pop();
     assert children.size() == 1;
 
-    // The key of this matview is automatically determine by the input schema to it.
-    this.generator.AddMatviewOperator(children.get(0), new int[0], new int[0]);
-    assert this.childrenOperators.isEmpty();
+    // Find the sorting parameters.
+    List<RexNode> exps = sort.getChildExps();
+    int[] keyCols = new int[0]; // TODO(babman): figure out key from query.
+    int[] sortingCols = new int[exps.size()];
+    int limit = -1;
+    int offset = 0;
+    for (int i = 0; i < exps.size(); i++) {
+      RexNode exp = exps.get(i);
+      assert exp instanceof RexInputRef;
+      sortingCols[i] = ((RexInputRef) exp).getIndex();
+    }
+
+    // If offset or fetch (e.g. limit) is null, it means the query does not contain a LIMIT (, )
+    // expression. If they are not null, they may also be "?", in which case we keep the default
+    // unspecified -1 values for them.
+    if (sort.offset != null && !(sort.offset instanceof RexDynamicParam)) {
+      assert sort.offset instanceof RexLiteral;
+      offset = RexLiteral.intValue(sort.offset);
+    }
+    if (sort.fetch != null && !(sort.fetch instanceof RexDynamicParam)) {
+      assert sort.fetch instanceof RexLiteral;
+      limit = RexLiteral.intValue(sort.fetch);
+    }
+
+    // We do not add this to children, a matview cannot be a parent for other operators.
+    this.generator.AddMatviewOperator(children.get(0), keyCols, sortingCols, limit, offset);
+    return sort;
   }
 
   @Override
   public RelNode visit(TableScan scan) {
-    System.out.println("input");
     String tableName = scan.getTable().getQualifiedName().get(0);
     Integer inputOperator = this.tableToInputOperator.get(tableName);
     if (inputOperator == null) {
@@ -68,7 +115,6 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
 
   @Override
   public RelNode visit(LogicalUnion union) {
-    System.out.println("union");
     // Add a new level in the stack to store ids of the direct children operators.
     this.childrenOperators.push(new ArrayList<Integer>());
 
@@ -146,7 +192,6 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
 
   @Override
   public RelNode visit(LogicalFilter filter) {
-    System.out.println("filter");
     RexNode condition = filter.getCondition();
     assert condition instanceof RexCall;
     assert condition.isA(SqlKind.AND) || condition.isA(FILTER_OPERATIONS);
@@ -182,7 +227,6 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
 
   @Override
   public RelNode visit(LogicalJoin join) {
-    System.out.println("join");
     // Add a new level in the stack to store ids of the direct children operators.
     this.childrenOperators.push(new ArrayList<Integer>());
 
@@ -216,7 +260,6 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
 
     // Find the right join operator per join type.
     int joinOperator = -1;
-    System.out.println(join.getJoinType());
     switch (join.getJoinType()) {
       case INNER:
         joinOperator =

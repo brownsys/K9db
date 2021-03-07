@@ -55,7 +55,11 @@ std::vector<std::pair<std::string, std::string>> FLOWS{
                    "* FROM submissions WHERE ts < 100)"),
     std::make_pair("JOIN_FLOW",
                    "SELECT * from submissions INNER JOIN students ON "
-                   "submissions.student_id = students.ID WHERE ts >= 100")};
+                   "submissions.student_id = students.ID WHERE ts >= 100"),
+    std::make_pair("LIMIT_CONSTANT",
+                   "SELECT * from submissions ORDER BY ts LIMIT 2 OFFSET 5"),
+    std::make_pair("LIMIT_VARIABLE",
+                   "SELECT * from submissions ORDER BY ts LIMIT ?")};
 
 // Selects.
 std::vector<std::string> QUERIES{

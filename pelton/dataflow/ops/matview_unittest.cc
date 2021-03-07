@@ -62,6 +62,16 @@ inline void EXPECT_EQ_MSET(GenericIterable<T> &&l, const std::vector<T> &r) {
   EXPECT_TRUE(tmp.empty());
 }
 
+// Expects that the size of an iterable is equal to the given size.
+template <typename T>
+inline void EXPECT_SIZE_EQ(GenericIterable<T> &&l, size_t size) {
+  size_t i = 0;
+  for (const T &v : l) {
+    i++;
+  }
+  EXPECT_EQ(i, size);
+}
+
 // Empty matview.
 TEST(MatViewOperatorTest, EmptyMatView) {
   Record::Compare compare{{}};
@@ -361,6 +371,87 @@ TEST(MatViewOperatorTest, EmptyKeyTest) {
     // Get all keys.
     EXPECT_EQ_MSET(matview->Keys(), all_keys);
   }
+  EXPECT_EQ_ORDER(views.at(2)->Lookup(Key(0)), ordered);
+}
+
+TEST(MatViewOperatorTest, LimitTest) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
+  std::vector<ColumnID> keys = {0};
+  Record::Compare compare{{1}};
+  SchemaOwner schema{names, types, keys};
+  SchemaRef ref{schema};
+
+  // Some string values.
+  std::unique_ptr<std::string> s1 = std::make_unique<std::string>("Hello!");
+  std::unique_ptr<std::string> s2 = std::make_unique<std::string>("Bye!");
+  std::unique_ptr<std::string> s3 = std::make_unique<std::string>("Hellobye!");
+
+  // Create some records.
+  Record r1{ref, true, 0UL, std::move(s1), 10L};
+  Record r2{ref, true, 1UL, std::move(s2), 20L};
+  Record r3{ref, true, 1UL, std::move(s3), 30L};
+
+  std::vector<Record> records;
+  records.push_back(r1.Copy());
+  records.push_back(r2.Copy());
+  records.push_back(r3.Copy());
+
+  // The expected result of Looking up with various limits and offsets.
+  std::vector<Record> empty;
+
+  std::vector<Record> ordered0;
+  ordered0.push_back(r2.Copy());
+  ordered0.push_back(r1.Copy());
+
+  std::vector<Record> ordered1;
+  ordered1.push_back(r1.Copy());
+
+  std::vector<Record> ordered2;
+  ordered2.push_back(r1.Copy());
+  ordered2.push_back(r3.Copy());
+
+  std::vector<Record> ordered3;
+  ordered3.push_back(r2.Copy());
+  ordered3.push_back(r1.Copy());
+  ordered3.push_back(r3.Copy());
+
+  // Create keys.
+  std::vector<Key> all_keys = {Key(0)};
+
+  // Create materialized views.
+  std::vector<std::unique_ptr<MatViewOperator>> views;
+  views.emplace_back(new UnorderedMatViewOperator({}));
+  views.emplace_back(new KeyOrderedMatViewOperator({}));
+  views.emplace_back(new RecordOrderedMatViewOperator({}, compare));
+
+  // Test all views.
+  for (std::unique_ptr<MatViewOperator> &matview : views) {
+    // Process and check.
+    EXPECT_TRUE(matview->ProcessAndForward(UNDEFINED_NODE_INDEX, records));
+
+    EXPECT_EQ(matview->count(), records.size());
+    EXPECT_TRUE(matview->Contains(Key(0)));
+    // Get all keys.
+    EXPECT_EQ_MSET(matview->Keys(), all_keys);
+  }
+
+  // Test lookup with limit and offset.
+  for (size_t i = 0; i < 2; i++) {
+    EXPECT_SIZE_EQ(views.at(i)->Lookup(Key(0), 0), 0);
+    EXPECT_SIZE_EQ(views.at(i)->Lookup(Key(0), 2), 2);
+    EXPECT_SIZE_EQ(views.at(i)->Lookup(Key(0), 1, 1), 1);
+    EXPECT_SIZE_EQ(views.at(i)->Lookup(Key(0), 2, 1), 2);
+    EXPECT_SIZE_EQ(views.at(i)->Lookup(Key(0), 5), 3);
+    EXPECT_SIZE_EQ(views.at(i)->Lookup(Key(0), 1, 4), 0);
+  }
+  EXPECT_EQ_ORDER(views.at(2)->Lookup(Key(0), 0), empty);
+  EXPECT_EQ_ORDER(views.at(2)->Lookup(Key(0), 2), ordered0);
+  EXPECT_EQ_ORDER(views.at(2)->Lookup(Key(0), 1, 1), ordered1);
+  EXPECT_EQ_ORDER(views.at(2)->Lookup(Key(0), 2, 1), ordered2);
+  EXPECT_EQ_ORDER(views.at(2)->Lookup(Key(0), 5), ordered3);
+  EXPECT_EQ_ORDER(views.at(2)->Lookup(Key(0), 1, 4), empty);
 }
 
 }  // namespace dataflow

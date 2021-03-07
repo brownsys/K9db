@@ -289,14 +289,26 @@ class GroupedDataT : public UntemplatedGroupedData {
 
   // Return an Iterable set of records corresponding to the given key, in the
   // underlying order (specified by V).
-  RecordIterable Lookup(const Key &key) const {
+  RecordIterable Lookup(const Key &key, int limit = -1,
+                        size_t offset = 0) const {
     auto it = this->contents_.find(key);
-    if (it == this->contents_.end()) {
+    if (it == this->contents_.end() ||
+        static_cast<size_t>(it->second.size()) <= offset) {
       return RecordIterable::CreateEmpty();
     }
-    return RecordIterable{
-        RecordIterator{std::make_unique<R_impl>(it->second.cbegin())},
-        RecordIterator{std::make_unique<R_impl>(it->second.cend())}};
+
+    // Key exists and its associated records count is > offset.
+    auto begin = it->second.cbegin();
+    auto end = it->second.cend();
+    size_t size = it->second.size();
+    if (offset > 0) {
+      begin = std::next(begin, offset);
+    }
+    if (limit > -1 && static_cast<size_t>(limit) + offset < size) {
+      end = std::next(begin, limit);
+    }
+    return RecordIterable{RecordIterator{std::make_unique<R_impl>(begin)},
+                          RecordIterator{std::make_unique<R_impl>(end)}};
   }
 
   // Return an Iterable set of keys contained by this group, in the underlying
