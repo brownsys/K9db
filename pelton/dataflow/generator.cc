@@ -72,18 +72,25 @@ NodeIndex DataFlowGraphGenerator::AddEquiJoinOperator(NodeIndex left_parent,
   CHECK(this->graph_->AddNode(op, {left_ptr, right_ptr}));
   return op->index();
 }
+
+// Output materialized views.
+NodeIndex DataFlowGraphGenerator::AddMatviewOperator(
+    NodeIndex parent, const std::vector<ColumnID> &key_cols) {
+  return this->AddMatviewOperator(parent, key_cols, {}, -1, 0);
+}
 NodeIndex DataFlowGraphGenerator::AddMatviewOperator(
     NodeIndex parent, const std::vector<ColumnID> &key_cols,
-    const std::vector<ColumnID> &sort_cols) {
+    const std::vector<ColumnID> &sort_cols, int limit, size_t offset) {
   std::shared_ptr<MatViewOperator> op;
   // Determine which type of MatView we need.
   if (sort_cols.empty()) {
-    op = std::make_shared<UnorderedMatViewOperator>(key_cols);
+    op = std::make_shared<UnorderedMatViewOperator>(key_cols, limit, offset);
   } else if (sort_cols == key_cols) {
-    op = std::make_shared<KeyOrderedMatViewOperator>(key_cols);
+    op = std::make_shared<KeyOrderedMatViewOperator>(key_cols, limit, offset);
   } else {
     Record::Compare compare{sort_cols};
-    op = std::make_shared<RecordOrderedMatViewOperator>(key_cols, compare);
+    op = std::make_shared<RecordOrderedMatViewOperator>(key_cols, compare,
+                                                        limit, offset);
   }
   // Add the operator to the graph.
   std::shared_ptr<Operator> parent_ptr = this->graph_->GetNode(parent);

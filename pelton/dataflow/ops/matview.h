@@ -20,7 +20,8 @@ class MatViewOperator : public Operator {
  public:
   virtual size_t count() const = 0;
   virtual bool Contains(const Key &key) const = 0;
-  virtual RecordIterable Lookup(const Key &key) const = 0;
+  virtual RecordIterable Lookup(const Key &key, int limit = -1,
+                                size_t offset = 0) const = 0;
   virtual KeyIterable Keys() const = 0;
 
  protected:
@@ -45,14 +46,24 @@ class MatViewOperatorT : public MatViewOperator {
  public:
   template <typename = typename std::enable_if<
                 !std::is_same<T, RecordOrderedGroupedData>::value>>
-  explicit MatViewOperatorT(const std::vector<ColumnID> &key_cols)
-      : MatViewOperator(), key_cols_(key_cols), contents_() {}
+  explicit MatViewOperatorT(const std::vector<ColumnID> &key_cols,
+                            int limit = -1, size_t offset = 0)
+      : MatViewOperator(),
+        key_cols_(key_cols),
+        contents_(),
+        limit_(limit),
+        offset_(offset) {}
 
   template <typename = typename std::enable_if<
                 std::is_same<T, RecordOrderedGroupedData>::value>>
   explicit MatViewOperatorT(const std::vector<ColumnID> &key_cols,
-                            const Record::Compare &compare)
-      : MatViewOperator(), key_cols_(key_cols), contents_(compare) {}
+                            const Record::Compare &compare, int limit = -1,
+                            size_t offset = 0)
+      : MatViewOperator(),
+        key_cols_(key_cols),
+        contents_(compare),
+        limit_(limit),
+        offset_(offset) {}
 
   size_t count() const override { return this->contents_.count(); }
 
@@ -60,8 +71,11 @@ class MatViewOperatorT : public MatViewOperator {
     return this->contents_.Contains(key);
   }
 
-  RecordIterable Lookup(const Key &key) const override {
-    return this->contents_.Lookup(key);
+  RecordIterable Lookup(const Key &key, int limit = -1,
+                        size_t offset = 0) const override {
+    limit = limit == -1 ? this->limit_ : limit;
+    offset = offset == 0 ? this->offset_ : offset;
+    return this->contents_.Lookup(key, limit, offset);
   }
 
   KeyIterable Keys() const override { return this->contents_.Keys(); }
@@ -85,6 +99,8 @@ class MatViewOperatorT : public MatViewOperator {
  private:
   std::vector<ColumnID> key_cols_;
   T contents_;
+  int limit_;
+  size_t offset_;
 };
 
 using UnorderedMatViewOperator = MatViewOperatorT<UnorderedGroupedData>;
