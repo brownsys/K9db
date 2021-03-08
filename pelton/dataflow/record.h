@@ -67,8 +67,7 @@ class Record {
   explicit Record(const SchemaRef &schema, bool positive = true)
       : schema_(schema), timestamp_(0), positive_(positive) {
     this->data_ = new RecordData[schema.size()];
-    this->bitmap_ = new uint64_t[NumBits()];
-    memset(bitmap_, 0, NumBits() * sizeof(uint64_t));
+    this->bitmap_ = nullptr;
   }
 
   // Create record and set all the data together.
@@ -104,6 +103,9 @@ class Record {
   const std::string &GetString(size_t i) const;
 
   inline bool IsNull(size_t i) const {
+    if(!bitmap_)
+      return false;
+
     CHECK(bitmap_);
     auto bitmap_block_idx = i / 64;
     auto bitmap_idx = i % 64;
@@ -112,6 +114,14 @@ class Record {
   }
 
   inline void SetNull(bool isnull, size_t i) {
+
+    // shortcut: if isnull=false and no bitmap, no change
+    if(!isnull && !bitmap_)
+      return;
+
+    // lazy init bitmap
+    lazyBitmap();
+
     CHECK(bitmap_);
     auto bitmap_block_idx = i / 64;
     auto bitmap_idx = i % 64;
@@ -120,6 +130,16 @@ class Record {
       bitmap_[bitmap_block_idx] |= (0x1ul << bitmap_idx);
     else
       bitmap_[bitmap_block_idx] &= ~(0x1ul << bitmap_idx);
+
+    // compact bitmap, i.e. when all fields become 0, then release bitmap
+    // --> important when using == comparison invariant to remove a couple checks there as well.
+    uint64_t reduced_bitmap = 0;
+    for(unsigned i = 0; i < NumBits(); ++i)
+      reduced_bitmap |= bitmap_[i];
+    if(0 == reduced_bitmap) {
+      delete[] bitmap_;
+      bitmap_ = nullptr;
+    }
   }
 
   // Data access with generic type.
@@ -237,6 +257,13 @@ class Record {
       // Delete allocated unions.
       delete[] this->data_;
       this->data_ = nullptr;
+    }
+  }
+
+  void lazyBitmap() {
+    if(!this->bitmap_) {
+      this->bitmap_ = new uint64_t[NumBits()];
+      memset(bitmap_, 0, NumBits() * sizeof(uint64_t));
     }
   }
 };
