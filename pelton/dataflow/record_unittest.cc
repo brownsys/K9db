@@ -19,8 +19,8 @@ using CType = sqlast::ColumnDefinition::Type;
 
 // Test record size.
 TEST(RecordTest, Size) {
-  // should be 32 bytes.
-  EXPECT_EQ(sizeof(Record), 32);
+  // should be 40 bytes.
+  EXPECT_EQ(sizeof(Record), 40);
 }
 
 // Tests setting and getting data from record.
