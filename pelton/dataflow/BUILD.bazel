@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 
 cc_library(
     name = "state",
@@ -110,7 +110,6 @@ cc_library(
         ":types",
         "//pelton/dataflow/ops:input",
         "//pelton/dataflow/ops:matview",
-        "@absl//absl/container:node_hash_map",
         "@glog",
     ],
 )
@@ -182,5 +181,41 @@ cc_test(
         "@glog",
         "@gtest",
         "@gtest//:gtest_main",
+    ],
+)
+
+# Used by the planner / java side of things.
+filegroup(
+    name = "generator_h",
+    srcs = [
+        "generator.h",
+        "types.h",
+        "//pelton/dataflow/ops:filter_enum.h",
+        "//pelton/sqlast:ast_schema_enums.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+)
+
+cc_binary(
+    name = "generator",
+    srcs = [
+        "generator.cc",
+        "generator.h",
+    ],
+    linkshared = 1,
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":graph",
+        ":operator",
+        ":schema",
+        ":state",
+        ":types",
+        "//pelton/dataflow/ops:equijoin",
+        "//pelton/dataflow/ops:filter",
+        "//pelton/dataflow/ops:input",
+        "//pelton/dataflow/ops:matview",
+        "//pelton/dataflow/ops:union",
+        "//pelton/sqlast:ast",
+        "@glog",
     ],
 )

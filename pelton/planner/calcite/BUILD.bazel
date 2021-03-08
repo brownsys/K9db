@@ -1,0 +1,36 @@
+alias(
+    name = "calcite",
+    # *_deploy.jar bundles all java (maven) dependencies (transitively) into the
+    # jar.
+    actual = "//pelton/planner/calcite/src/com/brownsys/pelton:QueryPlanner_deploy.jar",
+    visibility = ["//pelton/planner:__subpackages__"],
+)
+
+alias(
+    # runtime depedency that the JVM needs to load to be able to run :calcite.
+    name = "calcite_so",
+    actual = "//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:libjniDataFlowGraphLibrary_so",
+    visibility = ["//pelton/planner:__subpackages__"],
+)
+
+"""
+java_binary(
+    name = "planner",
+    srcs = glob(["src/main/java/com/brownsys/pelton/planner/**/*.java"]),
+    main_class = "com.brownsys.pelton.planner.QueryPlanner",
+    resources = glob(["src/main/resources/*"]),
+    deps = [
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_guava_guava",
+        "@maven//:junit_junit",
+        "@maven//:org_apache_calcite_calcite_core",
+        "@maven//:org_apache_calcite_calcite_linq4j",
+        "@maven//:org_apache_logging_log4j_log4j_api",
+        "@maven//:org_apache_logging_log4j_log4j_core",
+        "@maven//:org_apache_logging_log4j_log4j_slf4j_impl",
+        "@maven//:org_bytedeco_javacpp",
+        "@maven//:org_slf4j_slf4j_api",
+    ],
+)
+"""
