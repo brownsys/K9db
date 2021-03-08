@@ -25,7 +25,7 @@ Record Record::Copy() const {
 
   // Copy bitmap
   record.bitmap_ = new uint64_t[NumBits()];
-  memcpy(record.bitmap_, this->bitmap_, NumBits());
+  memcpy(record.bitmap_, this->bitmap_, NumBits() * sizeof(uint64_t));
 
   // Copy data.
   for (size_t i = 0; i < this->schema_.size(); i++) {
