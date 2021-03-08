@@ -24,8 +24,11 @@ Record Record::Copy() const {
   record.timestamp_ = this->timestamp_;
 
   // Copy bitmap
-  record.bitmap_ = new uint64_t[NumBits()];
-  memcpy(record.bitmap_, this->bitmap_, NumBits() * sizeof(uint64_t));
+  record.bitmap_ = nullptr;
+  if(bitmap_) {
+    record.bitmap_ = new uint64_t[NumBits()];
+    memcpy(record.bitmap_, this->bitmap_, NumBits() * sizeof(uint64_t));
+  }
 
   // Copy data.
   for (size_t i = 0; i < this->schema_.size(); i++) {
@@ -149,9 +152,16 @@ bool Record::operator==(const Record &other) const {
 
   // compare bitmaps
   CHECK_EQ(NumBits(), other.NumBits());
-  if(0 != memcmp(bitmap_, other.bitmap_, NumBits() * sizeof(uint64_t)))
-    return false;
 
+  // check whether bitmaps are different
+  if((!bitmap_ && other.bitmap_) || (bitmap_ && !other.bitmap_))
+    return false;
+  if(bitmap_) {
+    CHECK(other.bitmap_);
+    if(0 != memcmp(bitmap_, other.bitmap_, NumBits() * sizeof(uint64_t)))
+        return false;
+  }
+  
   // Compare data (deep compare).
   for (size_t i = 0; i < this->schema_.size(); i++) {
     const auto &type = this->schema_.column_types().at(i);
