@@ -24,7 +24,7 @@ void make_view(Connection *connection, const std::string &name,
   // Filter operator: filter on timestamp >= 100.
   auto filter = std::make_shared<dataflow::FilterOperator>();
   filter->AddOperation(
-      100L, 3, dataflow::FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
+      100LL, 3, dataflow::FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
 
   // Materialized view output.
   std::vector<dataflow::ColumnID> keys = {0};

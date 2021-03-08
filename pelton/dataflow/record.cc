@@ -23,6 +23,10 @@ Record Record::Copy() const {
   Record record{this->schema_, this->positive_};
   record.timestamp_ = this->timestamp_;
 
+  // Copy bitmap
+  record.bitmap_ = new uint64_t[NumBits()];
+  memcpy(record.bitmap_, this->bitmap_, NumBits());
+
   // Copy data.
   for (size_t i = 0; i < this->schema_.size(); i++) {
     const auto &type = this->schema_.column_types().at(i);
@@ -111,7 +115,7 @@ Key Record::GetKey() const {
     default:
       LOG(FATAL) << "Unsupported data type in key extraction!";
   }
-  return Key(0UL);
+  return Key(0ULL);
 }
 
 // Data type transformation.

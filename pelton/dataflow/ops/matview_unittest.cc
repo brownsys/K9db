@@ -28,8 +28,8 @@ TEST(MatViewOperatorTest, EmptyMatView) {
   MatViewOperator matview{std::vector<ColumnID>{0}};
   EXPECT_EQ(std::begin(matview), std::end(matview));
   EXPECT_EQ(matview.count(), 0);
-  EXPECT_EQ(matview.Lookup(Key(0UL)), std::vector<Record>{});
-  EXPECT_TRUE(!matview.Contains(Key(0UL)));
+  EXPECT_EQ(matview.Lookup(Key(0ULL)), std::vector<Record>{});
+  EXPECT_TRUE(!matview.Contains(Key(0ULL)));
 }
 
 // Single entry matview.
