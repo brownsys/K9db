@@ -59,6 +59,7 @@ class Record {
     this->bitmap_ = o.bitmap_;
     // Invalidate other.
     o.data_ = nullptr;
+    o.bitmap_ = nullptr;
     return *this;
   }
 
@@ -220,8 +221,8 @@ class Record {
   inline void FreeRecordData() {
 
     // Free bitmap
-    if(this->bitmap_) {
-      delete [] this->bitmap_;
+    if(this->bitmap_ != nullptr) {
+      delete[] this->bitmap_;
       this->bitmap_ = nullptr;
     }
 
