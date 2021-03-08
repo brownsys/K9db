@@ -147,13 +147,13 @@ TEST(EquiJoinOperatorTest, BasicJoinTest) {
   EXPECT_TRUE(op->Process(0, lrecords, &output));
   EXPECT_EQ(output.size(), 0);
   EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_EQ(op->left_table_.Get(Key(-5L)), lrecords);
+  EXPECT_EQ(op->left_table_.Get(Key(-5LL)), lrecords);
   EXPECT_EQ(op->right_table_.count(), 0);
   EXPECT_TRUE(op->Process(1, rrecords, &output));
   EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_EQ(op->left_table_.Get(Key(-5L)), lrecords);
+  EXPECT_EQ(op->left_table_.Get(Key(-5LL)), lrecords);
   EXPECT_EQ(op->right_table_.count(), 1);
-  EXPECT_EQ(op->right_table_.Get(Key(-5L)), rrecords);
+  EXPECT_EQ(op->right_table_.Get(Key(-5LL)), rrecords);
   EXPECT_EQ(output.size(), 1);
   EXPECT_EQ(output.at(0).GetUInt(0), 0UL);
   EXPECT_EQ(output.at(0).GetString(1), "item0");
@@ -176,7 +176,7 @@ TEST(EquiJoinOperatorTest, BasicUnjoinableTest) {
   lrecords.at(0).SetString(std::move(s1), 1);
   lrecords.at(0).SetInt(-5L, 2);
   rrecords.at(0).SetUInt(100UL, 0);
-  rrecords.at(0).SetInt(50L, 1);
+  rrecords.at(0).SetInt(50UL, 1);
   rrecords.at(0).SetString(std::move(s2), 2);
 
   // Setup join operator with two parents, left with id 0 and right with id 1.
@@ -196,13 +196,13 @@ TEST(EquiJoinOperatorTest, BasicUnjoinableTest) {
   EXPECT_TRUE(op->Process(0, lrecords, &output));
   EXPECT_EQ(output.size(), 0);
   EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_EQ(op->left_table_.Get(Key(-5L)), lrecords);
+  EXPECT_EQ(op->left_table_.Get(Key(-5LL)), lrecords);
   EXPECT_EQ(op->right_table_.count(), 0);
   EXPECT_TRUE(op->Process(1, rrecords, &output));
   EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_EQ(op->left_table_.Get(Key(-5L)), lrecords);
+  EXPECT_EQ(op->left_table_.Get(Key(-5LL)), lrecords);
   EXPECT_EQ(op->right_table_.count(), 1);
-  EXPECT_EQ(op->right_table_.Get(Key(50L)), rrecords);
+  EXPECT_EQ(op->right_table_.Get(Key(50LL)), rrecords);
   EXPECT_EQ(output.size(), 0);
 }
 

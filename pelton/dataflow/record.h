@@ -38,10 +38,12 @@ class Record {
   // Records can move (e.g. for inserting into vectors and maps).
   Record(Record &&o)
       : data_(o.data_),
+        bitmap_(o.bitmap_),
         schema_(o.schema_),
         timestamp_(o.timestamp_),
         positive_(o.positive_) {
     o.data_ = nullptr;
+    o.bitmap_ = nullptr;
   }
   // Need to be able to move-assign for cases when std::vector<Record>
   // has elements deleted in the middle, and has to move the remaining
@@ -54,6 +56,7 @@ class Record {
     this->data_ = o.data_;
     this->timestamp_ = o.timestamp_;
     this->positive_ = o.positive_;
+    this->bitmap_ = o.bitmap_;
     // Invalidate other.
     o.data_ = nullptr;
     return *this;
@@ -215,6 +218,13 @@ class Record {
   }
 
   inline void FreeRecordData() {
+
+    // Free bitmap
+    if(this->bitmap_) {
+      delete [] this->bitmap_;
+      this->bitmap_ = nullptr;
+    }
+
     if (this->data_ != nullptr) {
       // Destruct unique_ptrs.
       for (size_t i = 0; i < this->schema_.size(); i++) {

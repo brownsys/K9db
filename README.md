@@ -21,7 +21,7 @@ To list all available targets, use `bazel query //...`.
 
 ## Testing
 
-To run the tests, run `bazel test //dataflow:dataflow-tests`.
+To run all tests, run `bazel test ...`.
 
 For debugging, you may want to use the `--config asan` option, which enables C++
 sanitizers and provides more helpful output on memory errors (e.g., segfaults).

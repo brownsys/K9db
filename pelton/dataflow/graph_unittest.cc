@@ -201,7 +201,7 @@ DataFlowGraph MakeFilterGraph(ColumnID keycol, const SchemaRef &schema) {
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto filter = std::make_shared<FilterOperator>();
-  filter->AddOperation(5UL, 0, FilterOperator::Operation::GREATER_THAN);
+  filter->AddOperation(5ULL, 0, FilterOperator::Operation::GREATER_THAN);
   auto matview = std::make_shared<MatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
