@@ -307,7 +307,6 @@ TEST(DataFlowGraphTest, TestEquiJoinGraph) {
   MatViewContentsEquals(g.outputs().at(0), result);
 }
 
-// Tests setting and getting data from record using variadic constructor.
 #ifndef PELTON_VALGRIND_MODE
 TEST(RecordTest, TestDuplicateInputGraph) {
   // Create a schema.
