@@ -22,7 +22,7 @@ class Connection {
 
   // Getters.
   shards::SharderState *GetSharderState() { return &this->sharder_state_; }
-  dataflow::DataflowState *GetDataflowState() { return &this->dataflow_state_; }
+  dataflow::DataFlowState *GetDataFlowState() { return &this->dataflow_state_; }
 
   // State persistance.
   void Save() {
@@ -36,7 +36,7 @@ class Connection {
 
  private:
   shards::SharderState sharder_state_;
-  dataflow::DataflowState dataflow_state_;
+  dataflow::DataFlowState dataflow_state_;
 };
 
 // (context, col_count, col_data, col_name)
@@ -54,6 +54,11 @@ bool close(Connection *connection);
 void make_view(Connection *connection, const std::string &name,
                const std::string &query);
 
+// Call this if you are certain you are not going to make more calls to
+// make_view to shutdown the JVM.
+void shutdown_planner();
+
+// Print the content of the outputs of the given flow.
 void print_view(Connection *connection, const std::string &name);
 
 }  // namespace pelton

@@ -3,9 +3,9 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
-#include "absl/container/node_hash_map.h"
 #include "pelton/dataflow/edge.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/input.h"
@@ -24,7 +24,8 @@ class DataFlowGraph {
 
   // Special case: input node has no parents.
   inline bool AddInputNode(std::shared_ptr<InputOperator> op) {
-    CHECK(this->inputs_.find(op->input_name()) == this->inputs_.end());
+    CHECK(this->inputs_.count(op->input_name()) == 0)
+        << "An operator for this input already exists";
     this->inputs_.emplace(op->input_name(), op);
     return AddNode(op, std::vector<std::shared_ptr<Operator>>{});
   }
@@ -44,7 +45,7 @@ class DataFlowGraph {
                const std::vector<Record> &records);
 
   // Accessors.
-  const absl::node_hash_map<std::string, std::shared_ptr<InputOperator>>
+  const std::unordered_map<std::string, std::shared_ptr<InputOperator>>
       &inputs() const {
     return this->inputs_;
   }
@@ -63,11 +64,11 @@ class DataFlowGraph {
                std::shared_ptr<Operator> child);
 
   // Maps input name to associated input operator.
-  absl::node_hash_map<std::string, std::shared_ptr<InputOperator>> inputs_;
+  std::unordered_map<std::string, std::shared_ptr<InputOperator>> inputs_;
   std::vector<std::shared_ptr<MatViewOperator>> outputs_;
 
-  absl::node_hash_map<NodeIndex, std::shared_ptr<Operator>> nodes_;
-  absl::node_hash_map<EdgeIndex, std::shared_ptr<Edge>> edges_;
+  std::unordered_map<NodeIndex, std::shared_ptr<Operator>> nodes_;
+  std::unordered_map<EdgeIndex, std::shared_ptr<Edge>> edges_;
 
   inline EdgeIndex MintEdgeIndex() { return this->edges_.size(); }
   inline NodeIndex MintNodeIndex() { return this->nodes_.size(); }

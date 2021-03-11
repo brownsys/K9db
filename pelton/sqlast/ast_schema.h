@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "pelton/sqlast/ast_abstract.h"
+#include "pelton/sqlast/ast_schema_enums.h"
 
 namespace pelton {
 namespace sqlast {
@@ -17,7 +18,7 @@ namespace sqlast {
 class ColumnConstraint {
  public:
   // Supported constraint types.
-  enum class Type { PRIMARY_KEY, UNIQUE, NOT_NULL, FOREIGN_KEY };
+  using Type = ColumnConstraintTypeEnum;
 
   static std::string TypeToString(Type type);
 
@@ -60,7 +61,7 @@ class ColumnConstraint {
 class ColumnDefinition {
  public:
   // Supported column types.
-  enum class Type { UINT, INT, TEXT, DATETIME };
+  using Type = ColumnDefinitionTypeEnum;
 
   // Transform type name to type enum.
   static Type StringToType(const std::string &column_type);

@@ -32,7 +32,7 @@
     default:                                                      \
       LOG(FATAL) << "Unsupported data type in filter operator";   \
   }                                                               \
-  break;
+  break
 // RECORD_VALUE_COMPARE_MACRO
 
 namespace pelton {

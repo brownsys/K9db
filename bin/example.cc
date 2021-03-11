@@ -22,7 +22,7 @@ std::vector<std::string> CREATES{
     "ID int,"
     "student_id int,"
     "assignment_id int,"
-    "timestamp int,"
+    "ts int,"
     "PRIMARY KEY(ID),"
     "FOREIGN KEY (student_id) REFERENCES students(ID),"
     "FOREIGN KEY (assignment_id) REFERENCES assignments(ID)"
@@ -44,8 +44,18 @@ std::vector<std::string> INSERTS{
     "INSERT INTO submissions VALUES (7, 3, 2, 7);"};
 
 // Flows.
-std::vector<std::pair<std::string, std::string>> FLOWS{std::make_pair(
-    "FILTER FLOW", "SELECT * FROM submissions WHERE timestamp >= 100;")};
+std::vector<std::pair<std::string, std::string>> FLOWS{
+    std::make_pair("FILTER FLOW", "SELECT * FROM submissions WHERE ts >= 100"),
+    std::make_pair("FILTER_FLOW2", "SELECT * FROM submissions WHERE ts < 100"),
+    std::make_pair("FILTER FLOW3",
+                   "SELECT * FROM submissions WHERE ts >= 100 AND "
+                   "assignment_id = 2 AND ID > 5"),
+    std::make_pair("UNION_FLOW",
+                   "(SELECT * FROM submissions WHERE ts >= 100) UNION (SELECT "
+                   "* FROM submissions WHERE ts < 100)"),
+    std::make_pair("JOIN_FLOW",
+                   "SELECT * from submissions INNER JOIN students ON "
+                   "submissions.student_id = students.ID WHERE ts >= 100")};
 
 // Selects.
 std::vector<std::string> QUERIES{
@@ -106,9 +116,10 @@ int main(int argc, char **argv) {
   // Add flows.
   std::cout << "Installing flows ... " << std::endl;
   for (const auto &[name, query] : FLOWS) {
-    std::cout << std::endl;
+    std::cout << name << std::endl;
     pelton::make_view(&connection, name, query);
   }
+  pelton::shutdown_planner();
   std::cout << std::endl;
 
   // Insert some data into the tables.
