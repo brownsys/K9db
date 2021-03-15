@@ -1,7 +1,7 @@
 cc_binary(
   name = "matview",
   deps = [
-      "//pelton/dataflow:graph",
+      "//pelton/dataflow/ops:matview",
       "@absl//absl/flags:flag",
       "@absl//absl/flags:parse",
       "@glog//:glog",
