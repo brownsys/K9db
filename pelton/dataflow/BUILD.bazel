@@ -178,6 +178,7 @@ cc_test(
         "//pelton/dataflow/ops:input",
         "//pelton/dataflow/ops:matview",
         "//pelton/dataflow/ops:union",
+        "//pelton/dataflow/ops:project",
         "@glog",
         "@gtest",
         "@gtest//:gtest_main",

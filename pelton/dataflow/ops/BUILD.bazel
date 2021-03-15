@@ -137,6 +137,25 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "project",
+    srcs = [
+        "project.cc",
+    ],
+    hdrs = [
+        "project.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "@glog",
+        "@gtest//:gtest_prod",
+    ],
+)
+
 cc_test(
     name = "equijoin-test",
     srcs = [
@@ -184,6 +203,25 @@ cc_test(
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":matview",
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "project-test",
+    srcs = [
+        "project_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":project",
         "//pelton/dataflow:key",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
