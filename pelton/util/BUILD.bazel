@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 cc_library(
     name = "status",
@@ -20,4 +20,29 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [],
+)
+
+cc_library(
+    name = "ints",
+    srcs = [
+        "ints.cc",
+    ],
+    hdrs = [
+        "ints.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [],
+)
+
+cc_test(
+    name = "ints-test",
+    srcs = [
+        "ints_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":ints",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
 )

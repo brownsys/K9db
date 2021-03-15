@@ -97,32 +97,32 @@ TEST(RecordTest, VariadicConstructor) {
 }
 
 TEST(RecordTest, NulLValues) {
-    // Create a schema.
-    std::vector<std::string> names = {"Col1", "Col2", "Col3"};
-    std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
-    std::vector<ColumnID> keys = {0};
-    SchemaOwner schema{names, types, keys};
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
+  std::vector<ColumnID> keys = {0};
+  SchemaOwner schema{names, types, keys};
 
-    // Make some values.
-    uint64_t v0 = 42;
-    std::unique_ptr<std::string> ptr = std::make_unique<std::string>("hello");
-    std::string *v1 = ptr.get();  // Does not release ownership.
-    int64_t v2 = -20;
+  // Make some values.
+  uint64_t v0 = 42;
+  std::unique_ptr<std::string> ptr = std::make_unique<std::string>("hello");
+  std::string *v1 = ptr.get();  // Does not release ownership.
+  int64_t v2 = -20;
 
-    // Make the record and test.
-    Record record{SchemaRef(schema)};
-    record.SetUInt(v0, 0);
-    record.SetString(std::move(ptr), 1);
-    record.SetInt(v2, 2);
-    record.SetNull(true, 0);
-    record.SetNull(false, 1);
-    record.SetNull(true, 2);
+  // Make the record and test.
+  Record record{SchemaRef(schema)};
+  record.SetUInt(v0, 0);
+  record.SetString(std::move(ptr), 1);
+  record.SetInt(v2, 2);
+  record.SetNull(true, 0);
+  record.SetNull(false, 1);
+  record.SetNull(true, 2);
 
-    EXPECT_TRUE(record.IsNull(0));
-    EXPECT_FALSE(record.IsNull(1));
-    EXPECT_EQ(&record.GetString(1), v1);  // pointer/address equality.
-    EXPECT_EQ(record.GetString(1), *v1);  // deep equality
-    EXPECT_TRUE(record.IsNull(2));
+  EXPECT_TRUE(record.IsNull(0));
+  EXPECT_FALSE(record.IsNull(1));
+  EXPECT_EQ(&record.GetString(1), v1);  // pointer/address equality.
+  EXPECT_EQ(record.GetString(1), *v1);  // deep equality
+  EXPECT_TRUE(record.IsNull(2));
 }
 
 // Tests setting and getting data from record using variadic constructor.

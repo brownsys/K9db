@@ -12,6 +12,7 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
+#include "pelton/util/ints.h"
 
 namespace pelton {
 namespace dataflow {
@@ -123,11 +124,11 @@ TEST(EquiJoinOperatorTest, BasicJoinTest) {
   std::vector<Record> rrecords;
   lrecords.emplace_back(SchemaRef(lschema));
   rrecords.emplace_back(SchemaRef(rschema));
-  lrecords.at(0).SetUInt(0UL, 0);
+  lrecords.at(0).SetUInt(0, 0);
   lrecords.at(0).SetString(std::move(s1), 1);
-  lrecords.at(0).SetInt(-5L, 2);
-  rrecords.at(0).SetUInt(100UL, 0);
-  rrecords.at(0).SetInt(-5LL, 1);
+  lrecords.at(0).SetInt(-5, 2);
+  rrecords.at(0).SetUInt(100, 0);
+  rrecords.at(0).SetInt(-5, 1);
   rrecords.at(0).SetString(std::move(s2), 2);
 
   // Setup join operator with two parents, left with id 0 and right with id 1.
@@ -147,18 +148,18 @@ TEST(EquiJoinOperatorTest, BasicJoinTest) {
   EXPECT_TRUE(op->Process(0, lrecords, &output));
   EXPECT_EQ(output.size(), 0);
   EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_EQ(op->left_table_.Get(Key(-5LL)), lrecords);
+  EXPECT_EQ(op->left_table_.Get(Key(-5_s)), lrecords);
   EXPECT_EQ(op->right_table_.count(), 0);
   EXPECT_TRUE(op->Process(1, rrecords, &output));
   EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_EQ(op->left_table_.Get(Key(-5LL)), lrecords);
+  EXPECT_EQ(op->left_table_.Get(Key(-5_s)), lrecords);
   EXPECT_EQ(op->right_table_.count(), 1);
-  EXPECT_EQ(op->right_table_.Get(Key(-5LL)), rrecords);
+  EXPECT_EQ(op->right_table_.Get(Key(-5_s)), rrecords);
   EXPECT_EQ(output.size(), 1);
-  EXPECT_EQ(output.at(0).GetUInt(0), 0UL);
+  EXPECT_EQ(output.at(0).GetUInt(0), 0);
   EXPECT_EQ(output.at(0).GetString(1), "item0");
-  EXPECT_EQ(output.at(0).GetInt(2), -5L);
-  EXPECT_EQ(output.at(0).GetUInt(3), 100UL);
+  EXPECT_EQ(output.at(0).GetInt(2), -5);
+  EXPECT_EQ(output.at(0).GetUInt(3), 100);
   EXPECT_EQ(output.at(0).GetString(4), "descrp0");
 }
 
@@ -172,11 +173,11 @@ TEST(EquiJoinOperatorTest, BasicUnjoinableTest) {
   std::vector<Record> rrecords;
   lrecords.emplace_back(SchemaRef(lschema));
   rrecords.emplace_back(SchemaRef(rschema));
-  lrecords.at(0).SetUInt(0UL, 0);
+  lrecords.at(0).SetUInt(0, 0);
   lrecords.at(0).SetString(std::move(s1), 1);
-  lrecords.at(0).SetInt(-5L, 2);
-  rrecords.at(0).SetUInt(100UL, 0);
-  rrecords.at(0).SetInt(50UL, 1);
+  lrecords.at(0).SetInt(-5, 2);
+  rrecords.at(0).SetUInt(100, 0);
+  rrecords.at(0).SetInt(50, 1);
   rrecords.at(0).SetString(std::move(s2), 2);
 
   // Setup join operator with two parents, left with id 0 and right with id 1.
@@ -196,13 +197,13 @@ TEST(EquiJoinOperatorTest, BasicUnjoinableTest) {
   EXPECT_TRUE(op->Process(0, lrecords, &output));
   EXPECT_EQ(output.size(), 0);
   EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_EQ(op->left_table_.Get(Key(-5LL)), lrecords);
+  EXPECT_EQ(op->left_table_.Get(Key(-5_s)), lrecords);
   EXPECT_EQ(op->right_table_.count(), 0);
   EXPECT_TRUE(op->Process(1, rrecords, &output));
   EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_EQ(op->left_table_.Get(Key(-5LL)), lrecords);
+  EXPECT_EQ(op->left_table_.Get(Key(-5_s)), lrecords);
   EXPECT_EQ(op->right_table_.count(), 1);
-  EXPECT_EQ(op->right_table_.Get(Key(50LL)), rrecords);
+  EXPECT_EQ(op->right_table_.Get(Key(50_s)), rrecords);
   EXPECT_EQ(output.size(), 0);
 }
 
@@ -241,36 +242,36 @@ TEST(EquiJoinOperatorTest, FullJoinTest) {
   rrecords1.emplace_back(SchemaRef(rschema));
   rrecords2.emplace_back(SchemaRef(rschema));
   // Left 1.
-  lrecords1.at(0).SetUInt(0UL, 0);
+  lrecords1.at(0).SetUInt(0, 0);
   lrecords1.at(0).SetString(std::move(si1), 1);
-  lrecords1.at(0).SetInt(1L, 2);
+  lrecords1.at(0).SetInt(1, 2);
   // Left 2.
-  lrecords1.at(1).SetUInt(1UL, 0);
+  lrecords1.at(1).SetUInt(1, 0);
   lrecords1.at(1).SetString(std::move(si2), 1);
-  lrecords1.at(1).SetInt(2L, 2);
+  lrecords1.at(1).SetInt(2, 2);
   // Left 3.
-  lrecords2.at(0).SetUInt(2UL, 0);
+  lrecords2.at(0).SetUInt(2, 0);
   lrecords2.at(0).SetString(std::move(si3), 1);
-  lrecords2.at(0).SetInt(0L, 2);
+  lrecords2.at(0).SetInt(0, 2);
   // Left 4.
-  lrecords2.at(1).SetUInt(3UL, 0);
+  lrecords2.at(1).SetUInt(3, 0);
   lrecords2.at(1).SetString(std::move(si4), 1);
-  lrecords2.at(1).SetInt(2L, 2);
+  lrecords2.at(1).SetInt(2, 2);
   // Left 5.
-  lrecords3.at(0).SetUInt(4UL, 0);
+  lrecords3.at(0).SetUInt(4, 0);
   lrecords3.at(0).SetString(std::move(si5), 1);
-  lrecords3.at(0).SetInt(1L, 2);
+  lrecords3.at(0).SetInt(1, 2);
   // Right 1, joins with left 1 and 5.
-  rrecords1.at(0).SetUInt(100UL, 0);
-  rrecords1.at(0).SetInt(1L, 1);
+  rrecords1.at(0).SetUInt(100, 0);
+  rrecords1.at(0).SetInt(1, 1);
   rrecords1.at(0).SetString(std::move(sd1), 2);
   // Right 2, does not join.
-  rrecords1.at(1).SetUInt(100UL, 0);
-  rrecords1.at(1).SetInt(-1L, 1);
+  rrecords1.at(1).SetUInt(100, 0);
+  rrecords1.at(1).SetInt(-1, 1);
   rrecords1.at(1).SetString(std::move(sd2), 2);
   // Right 3, joins with left 2 and 4.
-  rrecords2.at(0).SetUInt(50UL, 0);
-  rrecords2.at(0).SetInt(2L, 1);
+  rrecords2.at(0).SetUInt(50, 0);
+  rrecords2.at(0).SetInt(2, 1);
   rrecords2.at(0).SetString(std::move(sd3), 2);
 
   // Setup join operator with two parents, left with id 0 and right with id 1.
@@ -320,28 +321,28 @@ TEST(EquiJoinOperatorTest, FullJoinTest) {
   jrecords.emplace_back(op->output_schema());
   jrecords.emplace_back(op->output_schema());
   // 1 <-> 1.
-  jrecords.at(0).SetUInt(0UL, 0);
+  jrecords.at(0).SetUInt(0, 0);
   jrecords.at(0).SetString(std::move(ji1), 1);
-  jrecords.at(0).SetInt(1L, 2);
-  jrecords.at(0).SetUInt(100UL, 3);
+  jrecords.at(0).SetInt(1, 2);
+  jrecords.at(0).SetUInt(100, 3);
   jrecords.at(0).SetString(std::move(jd1), 4);
   // 5 <-> 1.
-  jrecords.at(1).SetUInt(4UL, 0);
+  jrecords.at(1).SetUInt(4, 0);
   jrecords.at(1).SetString(std::move(ji5), 1);
-  jrecords.at(1).SetInt(1L, 2);
-  jrecords.at(1).SetUInt(100UL, 3);
+  jrecords.at(1).SetInt(1, 2);
+  jrecords.at(1).SetUInt(100, 3);
   jrecords.at(1).SetString(std::move(jd1_), 4);
   // 2 <-> 3.
-  jrecords.at(2).SetUInt(1UL, 0);
+  jrecords.at(2).SetUInt(1, 0);
   jrecords.at(2).SetString(std::move(ji2), 1);
-  jrecords.at(2).SetInt(2L, 2);
-  jrecords.at(2).SetUInt(50UL, 3);
+  jrecords.at(2).SetInt(2, 2);
+  jrecords.at(2).SetUInt(50, 3);
   jrecords.at(2).SetString(std::move(jd3), 4);
   // 4 <-> 3.
-  jrecords.at(3).SetUInt(3UL, 0);
+  jrecords.at(3).SetUInt(3, 0);
   jrecords.at(3).SetString(std::move(ji4), 1);
-  jrecords.at(3).SetInt(2L, 2);
-  jrecords.at(3).SetUInt(50UL, 3);
+  jrecords.at(3).SetInt(2, 2);
+  jrecords.at(3).SetUInt(50, 3);
   jrecords.at(3).SetString(std::move(jd3_), 4);
 
   // Test the output records are identical.
