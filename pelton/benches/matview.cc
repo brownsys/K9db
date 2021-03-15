@@ -36,17 +36,23 @@ using ColumnID = dataflow::ColumnID;
 //}
 //
 
-dataflow::SchemaOwner MakeSchema() {
+dataflow::SchemaOwner MakeSchema(bool use_strings) {
   std::vector<std::string> names = {"Col1", "Col2"};
-  std::vector<CType> types = {CType::UINT, CType::UINT};
+  CType t;
+  if (use_strings) {
+    t = CType::TEXT;
+  } else {
+    t = CType::UINT;
+  }
+  std::vector<CType> types = {CType::UINT, t};
   std::vector<ColumnID> keys = {0};
   dataflow::SchemaOwner schema{names, types, keys};
 
   return schema;
 }
 
-static void BM_MatViewInsert(benchmark::State& state) {
-  dataflow::SchemaOwner schema = MakeSchema();
+static void BM_MatViewInsert2UInts(benchmark::State& state) {
+  dataflow::SchemaOwner schema = MakeSchema(false);
   auto op = std::make_shared<dataflow::MatViewOperator>(schema.keys());
 
   dataflow::Record r(dataflow::SchemaRef(schema), true,
@@ -59,24 +65,39 @@ static void BM_MatViewInsert(benchmark::State& state) {
   }
 }
 
-//static void BM_MatViewBatchInsert(benchmark::State& state) {
-//  std::vector<dataflow::ColumnID> kc = {0};
-//  auto op = std::make_shared<dataflow::MatViewOperator>(kc);
-//
-//  std::vector<dataflow::Record> rs = {};
-//  for (int i = 0; i < state.range(0); ++i) {
-//    std::vector<dataflow::RecordData> rd = {dataflow::RecordData(i),
-//                                            dataflow::RecordData(i + 1)};
-//    rs.push_back(dataflow::Record(true, rd, 3ULL));
-//  }
-//  std::vector<dataflow::Record> out_rs;
-//
-//  for (auto _ : state) {
-//    op->process(rs, out_rs);
-//  }
-//}
+static void BM_MatViewInsert2Strings(benchmark::State& state) {
+  dataflow::SchemaOwner schema = MakeSchema(true);
+  auto op = std::make_shared<dataflow::MatViewOperator>(schema.keys());
 
-BENCHMARK(BM_MatViewInsert);
-//BENCHMARK(BM_MatViewBatchInsert)->Arg(10)->Arg(100)->Arg(1000);
+  std::unique_ptr<std::string> s = std::make_unique<std::string>("world");
+  dataflow::Record r(dataflow::SchemaRef(schema), true,
+		     static_cast<uint64_t>(4), std::move(s));
+  std::vector<dataflow::Record> rs;
+  rs.emplace_back(std::move(r));
+
+  for (auto _ : state) {
+    op->ProcessAndForward(dataflow::UNDEFINED_NODE_INDEX, rs);
+  }
+}
+
+static void BM_MatViewBatchInsert(benchmark::State& state) {
+  dataflow::SchemaOwner schema = MakeSchema(false);
+  auto op = std::make_shared<dataflow::MatViewOperator>(schema.keys());
+
+  std::vector<dataflow::Record> rs = {};
+  for (int i = 0; i < state.range(0); ++i) {
+    dataflow::Record r(dataflow::SchemaRef(schema), true,
+                       static_cast<uint64_t>(i), static_cast<uint64_t>(i + 1));
+    rs.emplace_back(std::move(r));
+  }
+
+  for (auto _ : state) {
+    op->ProcessAndForward(dataflow::UNDEFINED_NODE_INDEX, rs);
+  }
+}
+
+BENCHMARK(BM_MatViewInsert2UInts);
+BENCHMARK(BM_MatViewInsert2Strings);
+BENCHMARK(BM_MatViewBatchInsert)->Arg(10)->Arg(100)->Arg(1000);
 
 BENCHMARK_MAIN();
