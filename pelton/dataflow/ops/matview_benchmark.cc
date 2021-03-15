@@ -33,8 +33,8 @@ static void MatViewInsert2UInts(benchmark::State& state) {
   SchemaOwner schema = MakeSchema(false);
   auto op = std::make_shared<MatViewOperator>(schema.keys());
 
-  Record r(SchemaRef(schema), true,
-                     static_cast<uint64_t>(4), static_cast<uint64_t>(5));
+  Record r(SchemaRef(schema), true, static_cast<uint64_t>(4),
+           static_cast<uint64_t>(5));
   std::vector<Record> rs;
   rs.emplace_back(std::move(r));
 
@@ -51,8 +51,7 @@ static void MatViewInsertUIntString(benchmark::State& state) {
   auto op = std::make_shared<MatViewOperator>(schema.keys());
 
   std::unique_ptr<std::string> s = std::make_unique<std::string>("world");
-  Record r(SchemaRef(schema), true,
-                     static_cast<uint64_t>(4), std::move(s));
+  Record r(SchemaRef(schema), true, static_cast<uint64_t>(4), std::move(s));
   std::vector<Record> rs;
   rs.emplace_back(std::move(r));
 
@@ -70,8 +69,8 @@ static void MatViewBatchInsert(benchmark::State& state) {
 
   std::vector<Record> rs = {};
   for (int i = 0; i < state.range(0); ++i) {
-    Record r(SchemaRef(schema), true,
-                       static_cast<uint64_t>(i), static_cast<uint64_t>(i + 1));
+    Record r(SchemaRef(schema), true, static_cast<uint64_t>(i),
+             static_cast<uint64_t>(i + 1));
     rs.emplace_back(std::move(r));
   }
 
