@@ -197,6 +197,21 @@ cc_test(
     ],
 )
 
+cc_library(
+    name = "filter-benchmark",
+    srcs = [
+        "filter_benchmark.cc",
+    ],
+    deps = [
+        ":filter",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@gbenchmark//:benchmark"
+    ],
+)
+
 cc_test(
     name = "matview-test",
     srcs = [
@@ -232,5 +247,30 @@ cc_test(
         "@glog",
         "@gtest",
         "@gtest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "matview-benchmark",
+    srcs = [
+        "matview_benchmark.cc",
+    ],
+    deps = [
+        ":matview",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@gbenchmark//:benchmark"
+    ],
+)
+
+cc_test(
+    name = "benchmarks",
+    tags = ["benchmark"],
+    deps = [
+        ":filter-benchmark",
+        ":matview-benchmark",
+        "@gbenchmark//:benchmark_main"
     ],
 )
