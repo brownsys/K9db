@@ -41,6 +41,7 @@ cc_test(
         "//pelton/dataflow:types",
         "//pelton/dataflow/ops:input",
         "//pelton/sqlast:ast",
+        "//pelton/util:ints",
         "@glog",
         "@gtest",
         "@gtest//:gtest_main",

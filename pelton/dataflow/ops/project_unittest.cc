@@ -9,6 +9,7 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/ints.h"
 
 namespace pelton {
 namespace dataflow {
@@ -42,20 +43,20 @@ TEST(ProjectOperatorTest, BatchTest) {
 
   // Records to be fed
   std::vector<Record> records;
-  records.emplace_back(SchemaRef(schema), true, (uint64_t)0ULL,
+  records.emplace_back(SchemaRef(schema), true, 0_u,
                        std::make_unique<std::string>("Hello!"), -5L);
-  records.emplace_back(SchemaRef(schema), true, (uint64_t)5ULL,
+  records.emplace_back(SchemaRef(schema), true, 5_u,
                        std::make_unique<std::string>("Bye!"), 7L);
-  records.emplace_back(SchemaRef(schema), true, (uint64_t)6ULL,
+  records.emplace_back(SchemaRef(schema), true, 6_u,
                        std::make_unique<std::string>("hello!"), 10L);
 
   // expected output
   std::vector<Record> expected_records;
-  expected_records.emplace_back(project.output_schema_, true, (uint64_t)0ULL,
+  expected_records.emplace_back(project.output_schema_, true, 0_u,
                                 std::make_unique<std::string>("Hello!"));
-  expected_records.emplace_back(project.output_schema_, true, (uint64_t)5ULL,
+  expected_records.emplace_back(project.output_schema_, true, 5_u,
                                 std::make_unique<std::string>("Bye!"));
-  expected_records.emplace_back(project.output_schema_, true, (uint64_t)6ULL,
+  expected_records.emplace_back(project.output_schema_, true, 6_u,
                                 std::make_unique<std::string>("hello!"));
 
   // Feed records and test

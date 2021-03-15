@@ -18,6 +18,7 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/ints.h"
 
 namespace pelton {
 namespace dataflow {
@@ -55,25 +56,25 @@ inline std::vector<Record> MakeLeftRecords(const SchemaRef &schema) {
   records.emplace_back(schema);
   records.emplace_back(schema);
   // Record 1.
-  records.at(0).SetUInt(0UL, 0);
+  records.at(0).SetUInt(0, 0);
   records.at(0).SetString(std::move(si1), 1);
-  records.at(0).SetInt(1L, 2);
+  records.at(0).SetInt(1, 2);
   // Record 2.
-  records.at(1).SetUInt(4UL, 0);
+  records.at(1).SetUInt(4, 0);
   records.at(1).SetString(std::move(si2), 1);
-  records.at(1).SetInt(3L, 2);
+  records.at(1).SetInt(3, 2);
   // Record 3.
-  records.at(2).SetUInt(5UL, 0);
+  records.at(2).SetUInt(5, 0);
   records.at(2).SetString(std::move(si3), 1);
-  records.at(2).SetInt(5L, 2);
+  records.at(2).SetInt(5, 2);
   // Record 4.
-  records.at(3).SetUInt(7UL, 0);
+  records.at(3).SetUInt(7, 0);
   records.at(3).SetString(std::move(si4), 1);
-  records.at(3).SetInt(1L, 2);
+  records.at(3).SetInt(1, 2);
   // Record 5.
-  records.at(4).SetUInt(2UL, 0);
+  records.at(4).SetUInt(2, 0);
   records.at(4).SetString(std::move(si5), 1);
-  records.at(4).SetInt(1L, 2);
+  records.at(4).SetInt(1, 2);
   return records;
 }
 inline std::vector<Record> MakeRightRecords(const SchemaRef &schema) {
@@ -87,13 +88,13 @@ inline std::vector<Record> MakeRightRecords(const SchemaRef &schema) {
   records.emplace_back(schema);
   records.emplace_back(schema);
   // Record 1.
-  records.at(0).SetInt(5L, 0);
+  records.at(0).SetInt(5, 0);
   records.at(0).SetString(std::move(sd1), 1);
   // Record 2.
-  records.at(1).SetInt(1L, 0);
+  records.at(1).SetInt(1, 0);
   records.at(1).SetString(std::move(sd2), 1);
   // Record 3.
-  records.at(2).SetInt(-2L, 0);
+  records.at(2).SetInt(-2, 0);
   records.at(2).SetString(std::move(sd3), 1);
   return records;
 }
@@ -114,24 +115,24 @@ inline std::vector<Record> MakeJoinRecords(const SchemaRef &schema) {
   records.emplace_back(schema);
   records.emplace_back(schema);
   // Record 1.
-  records.at(0).SetUInt(5UL, 0);
+  records.at(0).SetUInt(5, 0);
   records.at(0).SetString(std::move(si3), 1);
-  records.at(0).SetInt(5L, 2);
+  records.at(0).SetInt(5, 2);
   records.at(0).SetString(std::move(sd1), 3);
   // Record 2.
-  records.at(1).SetUInt(0UL, 0);
+  records.at(1).SetUInt(0, 0);
   records.at(1).SetString(std::move(si1), 1);
-  records.at(1).SetInt(1L, 2);
+  records.at(1).SetInt(1, 2);
   records.at(1).SetString(std::move(sd2), 3);
   // Record 3.
-  records.at(2).SetUInt(7UL, 0);
+  records.at(2).SetUInt(7, 0);
   records.at(2).SetString(std::move(si4), 1);
-  records.at(2).SetInt(1L, 2);
+  records.at(2).SetInt(1, 2);
   records.at(2).SetString(std::move(sd2_), 3);
   // Record 4.
-  records.at(3).SetUInt(2UL, 0);
+  records.at(3).SetUInt(2, 0);
   records.at(3).SetString(std::move(si5), 1);
-  records.at(3).SetInt(1L, 2);
+  records.at(3).SetInt(1, 2);
   records.at(3).SetString(std::move(sd2__), 3);
   return records;
 }
@@ -141,25 +142,25 @@ inline std::vector<Record> MakeFilterRecords(const SchemaRef &schema) {
   // Make records.
   std::vector<Record> records;
   records.emplace_back(schema);
-  records.at(0).SetUInt(7UL, 0);
+  records.at(0).SetUInt(7, 0);
   records.at(0).SetString(std::move(si4), 1);
-  records.at(0).SetInt(1L, 2);
+  records.at(0).SetInt(1, 2);
   return records;
 }
 inline std::vector<Record> MakeProjectRecords(const SchemaRef &schema) {
   // Make records.
   std::vector<Record> records;
-  records.emplace_back(schema, true, (uint64_t)0ULL, 1L);
-  records.emplace_back(schema, true, (uint64_t)4ULL, 3L);
-  records.emplace_back(schema, true, (uint64_t)5ULL, 5L);
-  records.emplace_back(schema, true, (uint64_t)7ULL, 1L);
-  records.emplace_back(schema, true, (uint64_t)2ULL, 1L);
+  records.emplace_back(schema, true, 0_u, 1L);
+  records.emplace_back(schema, true, 4_u, 3L);
+  records.emplace_back(schema, true, 5_u, 5L);
+  records.emplace_back(schema, true, 7_u, 1L);
+  records.emplace_back(schema, true, 2_u, 1L);
   return records;
 }
 inline std::vector<Record> MakeProjectOnFilterRecords(const SchemaRef &schema) {
   // Make records.
   std::vector<Record> records;
-  records.emplace_back(schema, true, (uint64_t)7ULL, 1L);
+  records.emplace_back(schema, true, 7_u, 1L);
   return records;
 }
 inline std::vector<Record> MakeProjectOnEquiJoinRecords(
@@ -171,10 +172,10 @@ inline std::vector<Record> MakeProjectOnEquiJoinRecords(
 
   // Make records.
   std::vector<Record> records;
-  records.emplace_back(schema, true, (uint64_t)5ULL, sd1);
-  records.emplace_back(schema, true, (uint64_t)0ULL, sd2);
-  records.emplace_back(schema, true, (uint64_t)7ULL, sd2_);
-  records.emplace_back(schema, true, (uint64_t)2ULL, sd2__);
+  records.emplace_back(schema, true, 5_u, sd1);
+  records.emplace_back(schema, true, 0_u, sd2);
+  records.emplace_back(schema, true, 7_u, sd2_);
+  records.emplace_back(schema, true, 2_u, sd2__);
   return records;
 }
 
@@ -201,7 +202,7 @@ DataFlowGraph MakeFilterGraph(ColumnID keycol, const SchemaRef &schema) {
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto filter = std::make_shared<FilterOperator>();
-  filter->AddOperation(5ULL, 0, FilterOperator::Operation::GREATER_THAN);
+  filter->AddOperation(5_u, 0, FilterOperator::Operation::GREATER_THAN);
   auto matview = std::make_shared<MatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
@@ -285,7 +286,7 @@ DataFlowGraph MakeProjectOnFilterGraph(ColumnID keycol,
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto filter = std::make_shared<FilterOperator>();
-  filter->AddOperation(5UL, 0, FilterOperator::Operation::GREATER_THAN);
+  filter->AddOperation(5_u, 0, FilterOperator::Operation::GREATER_THAN);
   auto project = std::make_shared<ProjectOperator>(column_ids);
   auto matview = std::make_shared<MatViewOperator>(keys);
 

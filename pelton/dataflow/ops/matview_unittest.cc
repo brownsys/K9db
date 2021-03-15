@@ -12,6 +12,7 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/ints.h"
 
 namespace pelton {
 namespace dataflow {
@@ -28,8 +29,8 @@ TEST(MatViewOperatorTest, EmptyMatView) {
   MatViewOperator matview{std::vector<ColumnID>{0}};
   EXPECT_EQ(std::begin(matview), std::end(matview));
   EXPECT_EQ(matview.count(), 0);
-  EXPECT_EQ(matview.Lookup(Key(0ULL)), std::vector<Record>{});
-  EXPECT_TRUE(!matview.Contains(Key(0ULL)));
+  EXPECT_EQ(matview.Lookup(Key(0_u)), std::vector<Record>{});
+  EXPECT_TRUE(!matview.Contains(Key(0_u)));
 }
 
 // Single entry matview.
@@ -46,9 +47,9 @@ TEST(MatViewOperatorTest, SingleMatView) {
   // Create a single record.
   std::vector<Record> records;
   records.emplace_back(SchemaRef(schema));
-  records.at(0).SetUInt(0ULL, 0);
+  records.at(0).SetUInt(0, 0);
   records.at(0).SetString(std::make_unique<std::string>("hello!"), 1);
-  records.at(0).SetInt(-5L, 2);
+  records.at(0).SetInt(-5, 2);
 
   // Process and check.
   EXPECT_TRUE(matview.ProcessAndForward(UNDEFINED_NODE_INDEX, records));
@@ -83,19 +84,19 @@ TEST(MatViewOperatorTest, IteratorTest) {
   // Create some records.
   std::vector<Record> records;
   records.emplace_back(SchemaRef(schema));
-  records.at(0).SetUInt(0ULL, 0);
+  records.at(0).SetUInt(0, 0);
   records.at(0).SetString(std::move(s1), 1);
-  records.at(0).SetInt(10LL, 2);
+  records.at(0).SetInt(10, 2);
 
   records.emplace_back(SchemaRef(schema));
-  records.at(1).SetUInt(1ULL, 0);
+  records.at(1).SetUInt(1, 0);
   records.at(1).SetString(std::move(s2), 1);
-  records.at(1).SetInt(20LL, 2);
+  records.at(1).SetInt(20, 2);
 
   records.emplace_back(SchemaRef(schema));
-  records.at(2).SetUInt(0ULL, 0);
+  records.at(2).SetUInt(0, 0);
   records.at(2).SetString(std::move(s3), 1);
-  records.at(2).SetInt(30LL, 2);
+  records.at(2).SetInt(30, 2);
 
   // Process records.
   EXPECT_TRUE(matview.ProcessAndForward(UNDEFINED_NODE_INDEX, records));
@@ -128,19 +129,19 @@ TEST(MatViewOperatorTest, LookupTest) {
   // Create some records.
   std::vector<Record> records;
   records.emplace_back(SchemaRef(schema));
-  records.at(0).SetUInt(0ULL, 0);
+  records.at(0).SetUInt(0, 0);
   records.at(0).SetString(std::move(s1), 1);
-  records.at(0).SetInt(10LL, 2);
+  records.at(0).SetInt(10, 2);
 
   records.emplace_back(SchemaRef(schema));
-  records.at(1).SetUInt(1ULL, 0);
+  records.at(1).SetUInt(1, 0);
   records.at(1).SetString(std::move(s2), 1);
-  records.at(1).SetInt(20LL, 2);
+  records.at(1).SetInt(20, 2);
 
   records.emplace_back(SchemaRef(schema));
-  records.at(2).SetUInt(0ULL, 0);
+  records.at(2).SetUInt(0, 0);
   records.at(2).SetString(std::move(s3), 1);
-  records.at(2).SetInt(30LL, 2);
+  records.at(2).SetInt(30, 2);
 
   // Process records.
   EXPECT_TRUE(matview.ProcessAndForward(UNDEFINED_NODE_INDEX, records));

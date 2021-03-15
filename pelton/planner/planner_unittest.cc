@@ -16,6 +16,7 @@
 #include "pelton/dataflow/state.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/ints.h"
 
 namespace pelton {
 namespace planner {
@@ -51,8 +52,8 @@ TEST(PlannerTest, SimpleFilter) {
   std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
   std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema_ref, true, 10L, std::move(str1), 20L);
-  records.emplace_back(schema_ref, true, 2L, std::move(str2), 50L);
+  records.emplace_back(schema_ref, true, 10_s, std::move(str1), 20_s);
+  records.emplace_back(schema_ref, true, 2_s, std::move(str2), 50_s);
   graph.Process("test_table", records);
 
   // Look at flow output.

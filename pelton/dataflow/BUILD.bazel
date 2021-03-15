@@ -123,6 +123,7 @@ cc_test(
     deps = [
         ":key",
         "//pelton/sqlast:ast",
+        "//pelton/util:ints",
         "@glog",
         "@gtest",
         "@gtest//:gtest_main",
@@ -179,6 +180,7 @@ cc_test(
         "//pelton/dataflow/ops:matview",
         "//pelton/dataflow/ops:project",
         "//pelton/dataflow/ops:union",
+        "//pelton/util:ints",
         "@glog",
         "@gtest",
         "@gtest//:gtest_main",

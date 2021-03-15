@@ -9,6 +9,7 @@
 
 #include "gtest/gtest.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/ints.h"
 
 namespace pelton {
 namespace dataflow {
@@ -54,8 +55,8 @@ TEST(KeyTest, DataRep) {
 // Tests key equality check.
 TEST(KeyTest, Comparisons) {
   // Make keys.
-  Key ukeys[3] = {Key(5ULL), Key(6ULL), Key(5ULL)};
-  Key ikeys[3] = {Key(-1LL), Key(5LL), Key(-1LL)};
+  Key ukeys[3] = {Key(5_u), Key(6_u), Key(5_u)};
+  Key ikeys[3] = {Key(-1_s), Key(5_s), Key(-1_s)};
   Key skeys[3] = {Key("hello"), Key("bye"), Key("hello")};
 
   for (size_t i = 0; i < 3; i++) {
@@ -95,7 +96,7 @@ TEST(KeyTest, Comparisons) {
 // Test getting data with wrong types from key.
 #ifndef PELTON_VALGRIND_MODE
 TEST(KeyTest, TypeMismatch) {
-  Key key1(1LL);
+  Key key1(1_s);
   Key key2("hello");
 
   ASSERT_DEATH({ key1.GetString(); }, "Type mismatch");
@@ -107,8 +108,8 @@ TEST(KeyTest, TypeMismatch) {
 
 // Test key with negative integers.
 TEST(KeyTest, NegativeIntegers) {
-  Key key1(-7LL);
-  Key key2(-100LL);
+  Key key1(-7_s);
+  Key key2(-100_s);
 
   EXPECT_EQ(key1.GetInt(), -7);
   EXPECT_EQ(key2.GetInt(), -100);
@@ -117,7 +118,7 @@ TEST(KeyTest, NegativeIntegers) {
 // Test move constructor and move assignment.
 TEST(KeyTest, KeyMoveConstructor) {
   // Create some keys.
-  Key key1(10LL);
+  Key key1(10_s);
   Key key2("hello and welcome to this long string!");
 
   // Address of "hello..." in key2.
@@ -138,15 +139,15 @@ TEST(KeyTest, KeyMoveConstructor) {
 }
 TEST(KeyTest, KeyMoveAssignment) {
   // Create some keys.
-  Key key1(-10LL);
+  Key key1(-10_s);
   Key key2("hello and welcome to this long string!");
 
   // Address of "hello..." in key2.
   const char *ptr = &key2.GetString()[0];
 
   // Keys to move to.
-  Key key1m(-1000LL);
-  Key key2m(100ULL);
+  Key key1m(-1000_s);
+  Key key2m(100_u);
   Key key3m("hello from second big and long string!");
   Key key4m("hello from third big and long string!");
 
@@ -174,7 +175,7 @@ TEST(KeyTest, KeyMoveAssignment) {
 // Test copy constructor and assignments.
 TEST(KeyTest, KeyCopyConstructor) {
   // Create some keys.
-  Key key1(10LL);
+  Key key1(10_s);
   Key key2("hello and welcome to this long string!");
 
   // Address of "hello..." in key2.
@@ -196,15 +197,15 @@ TEST(KeyTest, KeyCopyConstructor) {
 }
 TEST(KeyTest, KeyCopyAssignment) {
   // Create some keys.
-  Key key1(-10LL);
+  Key key1(-10_s);
   Key key2("hello and welcome to this long string!");
 
   // Address of "hello..." in key2.
   const char *ptr = &key2.GetString()[0];
 
   // Keys to move to.
-  Key key1c(-1000LL);
-  Key key2c(100ULL);
+  Key key1c(-1000_s);
+  Key key2c(100_u);
   Key key3c("hello from second big and long string!");
   Key key4c("hello from third big and long string!");
 
