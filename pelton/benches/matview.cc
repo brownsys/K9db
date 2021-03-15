@@ -20,22 +20,6 @@ namespace dataflow = pelton::dataflow;
 using CType = pelton::sqlast::ColumnDefinition::Type;
 using ColumnID = dataflow::ColumnID;
 
-// void simpleGraphSetup() {
-//  DataFlowGraph g;
-//
-//  auto in = std::make_shared<InputOperator>();
-//  auto ident = std::make_shared<IdentityOperator>();
-//
-//  CHECK(g.AddInputNode(in));
-//  CHECK(g.AddNode(OperatorType::IDENTITY, ident, in));
-//  std::vector<ColumnID> keycol = {0};
-//  CHECK(g.AddNode(OperatorType::MAT_VIEW,
-//                  std::make_shared<MatViewOperator>(keycol), ident));
-//
-//  return g;
-//}
-//
-
 dataflow::SchemaOwner MakeSchema(bool use_strings) {
   std::vector<std::string> names = {"Col1", "Col2"};
   CType t;
@@ -56,7 +40,7 @@ static void BM_MatViewInsert2UInts(benchmark::State& state) {
   auto op = std::make_shared<dataflow::MatViewOperator>(schema.keys());
 
   dataflow::Record r(dataflow::SchemaRef(schema), true,
-		     static_cast<uint64_t>(4), static_cast<uint64_t>(5));
+                     static_cast<uint64_t>(4), static_cast<uint64_t>(5));
   std::vector<dataflow::Record> rs;
   rs.emplace_back(std::move(r));
 
@@ -71,7 +55,7 @@ static void BM_MatViewInsert2Strings(benchmark::State& state) {
 
   std::unique_ptr<std::string> s = std::make_unique<std::string>("world");
   dataflow::Record r(dataflow::SchemaRef(schema), true,
-		     static_cast<uint64_t>(4), std::move(s));
+                     static_cast<uint64_t>(4), std::move(s));
   std::vector<dataflow::Record> rs;
   rs.emplace_back(std::move(r));
 
