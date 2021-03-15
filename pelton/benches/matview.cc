@@ -44,9 +44,12 @@ static void BM_MatViewInsert2UInts(benchmark::State& state) {
   std::vector<dataflow::Record> rs;
   rs.emplace_back(std::move(r));
 
+  size_t processed = 0;
   for (auto _ : state) {
     op->ProcessAndForward(dataflow::UNDEFINED_NODE_INDEX, rs);
+    processed++;
   }
+  state.SetItemsProcessed(processed);
 }
 
 static void BM_MatViewInsert2Strings(benchmark::State& state) {
@@ -59,9 +62,12 @@ static void BM_MatViewInsert2Strings(benchmark::State& state) {
   std::vector<dataflow::Record> rs;
   rs.emplace_back(std::move(r));
 
+  size_t processed = 0;
   for (auto _ : state) {
     op->ProcessAndForward(dataflow::UNDEFINED_NODE_INDEX, rs);
+    processed++;
   }
+  state.SetItemsProcessed(processed);
 }
 
 static void BM_MatViewBatchInsert(benchmark::State& state) {
@@ -75,9 +81,12 @@ static void BM_MatViewBatchInsert(benchmark::State& state) {
     rs.emplace_back(std::move(r));
   }
 
+  size_t processed = 0;
   for (auto _ : state) {
+    processed += rs.size();
     op->ProcessAndForward(dataflow::UNDEFINED_NODE_INDEX, rs);
   }
+  state.SetItemsProcessed(processed);
 }
 
 BENCHMARK(BM_MatViewInsert2UInts);
