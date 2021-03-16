@@ -19,10 +19,10 @@ namespace dataflow {
 
 class ProjectOperator : public Operator {
  public:
-  explicit ProjectOperator(std::vector<ColumnID> &cids)
+  explicit ProjectOperator(const std::vector<ColumnID> &cids)
       : Operator(Operator::Type::PROJECT),
         cids_(cids),
-        owned_output_schema_(SchemaOwner()) {}
+        owned_output_schema_() {}
 
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,

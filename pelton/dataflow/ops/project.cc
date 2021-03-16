@@ -1,7 +1,9 @@
 #include "pelton/dataflow/ops/project.h"
 
-#include <tuple>
 #include <algorithm>
+#include <memory>
+#include <tuple>
+#include <utility>
 
 #include "glog/logging.h"
 #include "pelton/dataflow/record.h"
@@ -35,10 +37,10 @@ void ProjectOperator::ComputeOutputSchema() {
   // subset of input keycols can no longer uniqely identify records. This is
   // only for semantic purposes as, as of now, this does not have an effect on
   // the materialized view.
-  if (EnclosedKeyCols(input_keys, cids_)){
-    for(auto ik : input_keys){
+  if (EnclosedKeyCols(input_keys, cids_)) {
+    for (auto ik : input_keys) {
       auto it = std::find(cids_.begin(), cids_.end(), ik);
-      if(it != cids_.end()){
+      if (it != cids_.end()) {
         output_keys.push_back(std::distance(cids_.begin(), it));
       }
     }
