@@ -184,7 +184,6 @@ maven_install(
     ],
     fetch_sources = True,
     repositories = [
-        "http://uk.maven.org/maven2",
         "https://jcenter.bintray.com/",
     ],
 )
