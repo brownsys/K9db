@@ -8,6 +8,7 @@
 #include <memory>
 #include <vector>
 
+#include "benchmark/benchmark.h"
 #include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/grouped_data.h"
@@ -17,6 +18,8 @@
 
 namespace pelton {
 namespace dataflow {
+
+static void JoinOneToOne(benchmark::State& state);
 
 class EquiJoinOperator : public Operator {
  public:
@@ -35,7 +38,6 @@ class EquiJoinOperator : public Operator {
     return this->parents_.at(1)->from();
   }
 
- protected:
   /*!
    * processes a batch of input rows and writes output to output.
    * Output schema of join (i.e. records written to output) is defined as
@@ -69,6 +71,7 @@ class EquiJoinOperator : public Operator {
   FRIEND_TEST(EquiJoinOperatorTest, BasicJoinTest);
   FRIEND_TEST(EquiJoinOperatorTest, BasicUnjoinableTest);
   FRIEND_TEST(EquiJoinOperatorTest, FullJoinTest);
+  friend void pelton::dataflow::JoinOneToOne(benchmark::State& state);
 };
 
 }  // namespace dataflow

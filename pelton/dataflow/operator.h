@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 
+#include "benchmark/benchmark.h"
 #include "pelton/dataflow/edge.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
@@ -14,6 +15,8 @@ namespace dataflow {
 
 class Edge;
 class DataFlowGraph;
+
+static void JoinOneToOne(benchmark::State& state);
 
 class Operator {
  public:
@@ -102,6 +105,7 @@ class Operator {
 
   // Allow DataFlowGraph to use SetGraph, SetIndex, and AddParent functions.
   friend class DataFlowGraph;
+  friend void JoinOneToOne(benchmark::State& state);
 };
 
 }  // namespace dataflow
