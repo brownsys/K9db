@@ -25,7 +25,7 @@ Record Record::Copy() const {
 
   // Copy bitmap
   record.bitmap_ = nullptr;
-  if(bitmap_) {
+  if (bitmap_) {
     record.bitmap_ = new uint64_t[NumBits()];
     memcpy(record.bitmap_, this->bitmap_, NumBits() * sizeof(uint64_t));
   }
@@ -103,7 +103,7 @@ Key Record::GetValue(size_t i) const {
 Key Record::GetKey() const {
   CHECK_NE(this->data_, nullptr) << "Cannot get key for moved record";
   const std::vector<ColumnID> &keys = this->schema_.keys();
-  CHECK_EQ(keys.size(), 1U);
+  CHECK_EQ(keys.size(), 1);
   size_t key_index = keys.at(0);
   switch (this->schema_.TypeOf(key_index)) {
     case sqlast::ColumnDefinition::Type::UINT:
@@ -118,7 +118,6 @@ Key Record::GetKey() const {
     default:
       LOG(FATAL) << "Unsupported data type in key extraction!";
   }
-  return Key(0ULL);
 }
 
 // Data type transformation.
@@ -154,14 +153,13 @@ bool Record::operator==(const Record &other) const {
   CHECK_EQ(NumBits(), other.NumBits());
 
   // check whether bitmaps are different
-  if((!bitmap_ && other.bitmap_) || (bitmap_ && !other.bitmap_))
-    return false;
-  if(bitmap_) {
+  if ((!bitmap_ && other.bitmap_) || (bitmap_ && !other.bitmap_)) return false;
+  if (bitmap_) {
     CHECK(other.bitmap_);
-    if(0 != memcmp(bitmap_, other.bitmap_, NumBits() * sizeof(uint64_t)))
-        return false;
+    if (0 != memcmp(bitmap_, other.bitmap_, NumBits() * sizeof(uint64_t)))
+      return false;
   }
-  
+
   // Compare data (deep compare).
   for (size_t i = 0; i < this->schema_.size(); i++) {
     const auto &type = this->schema_.column_types().at(i);
@@ -202,8 +200,9 @@ std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Record &r) {
   CHECK_NE(r.data_, nullptr) << "Cannot << moved record";
   os << "|";
   for (unsigned i = 0; i < r.schema_.size(); ++i) {
-    if(r.IsNull(i)) {
-      os << "NULL" << "|";
+    if (r.IsNull(i)) {
+      os << "NULL"
+         << "|";
       continue;
     }
 

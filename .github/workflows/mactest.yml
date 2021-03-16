@@ -1,0 +1,43 @@
+name: "Test on Mac"
+on: [push]
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+    - name: Information
+      run: |
+        bazel --version
+        g++ --version
+        java -version
+        javac -version
+        xcode-select -p
+        xcodebuild -version
+        clang -v
+
+    - name: build javacpp
+      run: bazel build //pelton/planner/calcite/src/com/brownsys/pelton/nativelib/...
+
+    - name: Build all
+      run: bazel build ...
+
+    - name: Test all
+      run: bazel test ...
+
+    - name: Run end-2-end sample
+      run: |
+        rm -rf /tmp/db && mkdir /tmp/db
+        bazel run bin:example -- /tmp/db
+    - name: Run cli samples
+      run: |
+        rm -rf db && mkdir db
+        ./bazel-bin/bin/cli db < bin/examples/simple-websubmit.sql
+        rm -rf db && mkdir db
+        ./bazel-bin/bin/cli db < bin/examples/medical_chat.sql
+    - name: Run social chat with restart/recovery
+      run: |
+        rm -rf db && mkdir db
+        ./bazel-bin/bin/cli db < bin/examples/social_chat.sql
+        ./bazel-bin/bin/cli db < bin/examples/social_chat.cntd.sql

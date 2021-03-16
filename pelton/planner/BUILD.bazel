@@ -1,0 +1,49 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+cc_library(
+    name = "planner",
+    srcs = [
+        "planner.cc",
+        "planner.h",
+        "@bazel_tools//tools/jdk:current_java_runtime",
+    ],
+    copts = [
+        "-L/usr/lib/jvm/default-java/lib/server/",
+    ],
+    data = [
+        "//pelton/planner/calcite",
+        "//pelton/planner/calcite:calcite_so",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:graph",
+        "//pelton/dataflow:state",
+        "@bazel_tools//tools/jdk:jni",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "planner-test",
+    srcs = [
+        "planner.h",
+        "planner_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    linkstatic = 1,
+    deps = [
+        ":planner",
+        "//pelton/dataflow:graph",
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:state",
+        "//pelton/dataflow:types",
+        "//pelton/dataflow/ops:input",
+        "//pelton/sqlast:ast",
+        "//pelton/util:ints",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)

@@ -103,8 +103,7 @@ class Record {
   const std::string &GetString(size_t i) const;
 
   inline bool IsNull(size_t i) const {
-    if(!bitmap_)
-      return false;
+    if (!bitmap_) return false;
 
     CHECK(bitmap_);
     auto bitmap_block_idx = i / 64;
@@ -114,10 +113,8 @@ class Record {
   }
 
   inline void SetNull(bool isnull, size_t i) {
-
     // shortcut: if isnull=false and no bitmap, no change
-    if(!isnull && !bitmap_)
-      return;
+    if (!isnull && !bitmap_) return;
 
     // lazy init bitmap
     lazyBitmap();
@@ -126,17 +123,17 @@ class Record {
     auto bitmap_block_idx = i / 64;
     auto bitmap_idx = i % 64;
     CHECK_LT(bitmap_block_idx, NumBits());
-    if(isnull)
+    if (isnull)
       bitmap_[bitmap_block_idx] |= (0x1ul << bitmap_idx);
     else
       bitmap_[bitmap_block_idx] &= ~(0x1ul << bitmap_idx);
 
     // compact bitmap, i.e. when all fields become 0, then release bitmap
-    // --> important when using == comparison invariant to remove a couple checks there as well.
+    // --> important when using == comparison invariant to remove a couple
+    // checks there as well.
     uint64_t reduced_bitmap = 0;
-    for(unsigned i = 0; i < NumBits(); ++i)
-      reduced_bitmap |= bitmap_[i];
-    if(0 == reduced_bitmap) {
+    for (unsigned i = 0; i < NumBits(); ++i) reduced_bitmap |= bitmap_[i];
+    if (0 == reduced_bitmap) {
       delete[] bitmap_;
       bitmap_ = nullptr;
     }
@@ -226,9 +223,7 @@ class Record {
   int timestamp_;     // [4 B]
   bool positive_;     // [1 B]
 
-  inline size_t NumBits() const {
-    return schema_.size() / 64 + 1;
-  }
+  inline size_t NumBits() const { return schema_.size() / 64 + 1; }
 
   inline void CheckType(size_t i, sqlast::ColumnDefinition::Type t) const {
     CHECK_NE(this->data_, nullptr) << "Attempting to use moved record";
@@ -239,9 +234,8 @@ class Record {
   }
 
   inline void FreeRecordData() {
-
     // Free bitmap
-    if(this->bitmap_ != nullptr) {
+    if (this->bitmap_ != nullptr) {
       delete[] this->bitmap_;
       this->bitmap_ = nullptr;
     }
@@ -261,7 +255,7 @@ class Record {
   }
 
   void lazyBitmap() {
-    if(!this->bitmap_) {
+    if (!this->bitmap_) {
       this->bitmap_ = new uint64_t[NumBits()];
       memset(bitmap_, 0, NumBits() * sizeof(uint64_t));
     }

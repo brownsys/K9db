@@ -1,13 +1,7 @@
-name: "All Tests and Build"
-
-on:
-  push:
-    branches: [ "*" ]
-  pull_request:
-    branches: [ "*" ]
-
+name: "Tests on Ubuntu"
+on: [push]
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -24,12 +18,16 @@ jobs:
                                  --slave /usr/bin/g++ g++ /usr/bin/g++-9
         sudo update-alternatives --set gcc /usr/bin/gcc-9
         sudo apt-get install valgrind
-
     - name: Information
       run: |
         bazel --version
         g++ --version
         valgrind --version
+        java -version
+        javac -version
+
+    - name: Test dataflow with valgrind
+      run: bazel test //pelton/dataflow/... --config=valgrind
 
     - name: Build all
       run: bazel build ...
@@ -37,26 +35,26 @@ jobs:
     - name: Test all
       run: bazel test ...
 
-    - name: Build all with valgrind flags
-      run: bazel build ... --config=valgrind
-
-    - name: Test all with valgrind
-      run: bazel test ... --config=valgrind
-
     - name: Run end-2-end sample
       run: |
-        rm -rf db && mkdir db
-        valgrind --error-exitcode=1 --leak-check=full ./bazel-bin/bin/example db
-
+        rm -rf /tmp/db && mkdir /tmp/db
+        bazel run bin:example -- /tmp/db
     - name: Run cli samples
       run: |
         rm -rf db && mkdir db
-        valgrind --error-exitcode=1 --leak-check=full ./bazel-bin/bin/cli db < bin/examples/simple-websubmit.sql
+        valgrind --error-exitcode=1 --errors-for-leak-kinds=definite \
+                 --show-leak-kinds=definite ./bazel-bin/bin/cli db \
+                 < bin/examples/simple-websubmit.sql
         rm -rf db && mkdir db
-        valgrind --error-exitcode=1 --leak-check=full ./bazel-bin/bin/cli db < bin/examples/medical_chat.sql
-
+        valgrind --error-exitcode=1 --errors-for-leak-kinds=definite \
+                 --show-leak-kinds=definite ./bazel-bin/bin/cli db \
+                 < bin/examples/medical_chat.sql
     - name: Run social chat with restart/recovery
       run: |
         rm -rf db && mkdir db
-        valgrind --error-exitcode=1 --leak-check=full ./bazel-bin/bin/cli db < bin/examples/social_chat.sql
-        valgrind --error-exitcode=1 --leak-check=full ./bazel-bin/bin/cli db < bin/examples/social_chat.cntd.sql
+        valgrind --error-exitcode=1 --errors-for-leak-kinds=definite \
+                 --show-leak-kinds=definite ./bazel-bin/bin/cli db \
+                 < bin/examples/social_chat.sql
+        valgrind --error-exitcode=1 --errors-for-leak-kinds=definite \
+                 --show-leak-kinds=definite ./bazel-bin/bin/cli db \
+                 < bin/examples/social_chat.cntd.sql

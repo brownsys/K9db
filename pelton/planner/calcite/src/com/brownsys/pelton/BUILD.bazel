@@ -1,0 +1,23 @@
+load("@rules_java//java:defs.bzl", "java_binary")
+
+java_binary(
+    name = "QueryPlanner",
+    srcs = [
+        "PhysicalPlanVisitor.java",
+        "QueryPlanner.java",
+        "schema/PeltonSchemaFactory.java",
+        "schema/PeltonTable.java",
+        "//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:DataDataFlowGraphLibrary_java",
+        "//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:DataFlowGraphLibraryConfig_java",
+    ],
+    data = select({
+        "@platforms//os:linux": ["//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:libjniDataFlowGraphLibrary_so"],
+        "@platforms//os:macos": ["//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:libjniDataFlowGraphLibrary_dylib"],
+    }),
+    main_class = "com.brownsys.pelton.QueryPlanner",
+    visibility = ["//pelton/planner:__subpackages__"],
+    deps = [
+        "@maven//:org_apache_calcite_calcite_core",
+        "@maven//:org_bytedeco_javacpp",
+    ],
+)
