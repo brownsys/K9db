@@ -18,6 +18,7 @@ cc_binary(
     deps = [
         "//pelton",
         "@bazel_tools//tools/jdk:jni",
+        "@glog",
     ],
 )
 
