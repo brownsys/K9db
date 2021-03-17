@@ -28,8 +28,8 @@ class AggregateOperator : public Operator {
         group_columns_(group_columns),
         aggregate_function_(aggregate_function),
         aggregate_column_(aggregate_column),
-        owned_output_schema_(SchemaOwner()),
-        aggregate_schema_(SchemaOwner()) {}
+        owned_output_schema_(),
+        aggregate_schema_() {}
 
   ~AggregateOperator() {
     // ensure that schemas are not destructed first
@@ -59,6 +59,10 @@ class AggregateOperator : public Operator {
   void EmitRecord(const std::vector<Key> &key, const Record &aggregate_record,
                   bool positive, std::vector<Record> *output) const;
 
+  // A helper function to improve code readability inside the process function
+  inline void InitAggregateValue(Record &aggregate_record,
+                                 const Record &from_record,
+                                 ColumnID from_column) const;
   // Allow tests to use .Process(...) directly.
   FRIEND_TEST(AggregateOperatorTest, MultipleGroupColumnsCountPositive);
   FRIEND_TEST(AggregateOperatorTest, MultipleGroupColumnsSumPositive);

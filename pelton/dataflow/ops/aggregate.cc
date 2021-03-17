@@ -6,41 +6,88 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/sqlast/ast.h"
 
+#define SUMFUNC_UPDATE_AGGREGATE_MACRO(OP)                                    \
+  {                                                                           \
+    switch (aggregate_schema_ref_.TypeOf(0)) {                                \
+      case sqlast::ColumnDefinition::Type::UINT:                              \
+        state_.at(key).SetUInt(                                               \
+            state_.at(key).GetUInt(0) OP record.GetUInt(aggregate_column_),   \
+            0);                                                               \
+        break;                                                                \
+      case sqlast::ColumnDefinition::Type::INT:                               \
+        state_.at(key).SetInt(                                                \
+            state_.at(key).GetInt(0) OP record.GetInt(aggregate_column_), 0); \
+        break;                                                                \
+      default:                                                                \
+        LOG(FATAL) << "Unsupported type when computing SUM aggregate";        \
+    }                                                                         \
+  }
+// SUMFUNC_UPDATE_AGGREGATE_MACRO
+
 namespace pelton {
 namespace dataflow {
+
+bool EnclosedKeyCols(const std::vector<ColumnID> &input_keycols,
+                     const std::vector<ColumnID> &cids) {
+  for (const auto &keycol : input_keycols) {
+    bool is_present = false;
+    for (const auto &cid : cids)
+      if (keycol == cid) is_present = true;
+
+    // at least one key column of the composite key is not being projected
+    if (!is_present) return false;
+  }
+  // all input key columns are present in the projected schema
+  return true;
+}
 
 void AggregateOperator::ComputeOutputSchema() {
   std::vector<std::string> output_column_names = {};
   std::vector<sqlast::ColumnDefinition::Type> output_column_types = {};
-  std::vector<ColumnID> key_columns = {0};
+  std::vector<ColumnID> input_keys = this->input_schemas_.at(0).keys();
+  std::vector<ColumnID> output_keys = {};
+
+  // Construct output_keys
+  // If the input key set is a subset of the projected columns only then form an
+  // output keyset. Else do not assign keys for the output schema. Because the
+  // subset of input keycols can no longer uniqely identify records. This is
+  // only for semantic purposes as, as of now, this does not have an effect on
+  // the materialized view.
+  if (EnclosedKeyCols(input_keys, group_columns_)) {
+    for (auto ik : input_keys) {
+      auto it = std::find(group_columns_.begin(), group_columns_.end(), ik);
+      if (it != output_keys.end()) {
+        output_keys.push_back(std::distance(group_columns_.begin(), it));
+      }
+    }
+  }
 
   std::vector<std::string> aggregate_column_name;
   std::vector<sqlast::ColumnDefinition::Type> aggregate_column_type;
-  // The calcite planner does not supply a column id for count function, hence
+  // Calcite does not supply a column id for count function, hence
   // be independent of it
-  if (aggregate_function_ == Function::COUNT){
+  if (aggregate_function_ == Function::COUNT) {
     aggregate_column_name.push_back("Count");
     aggregate_column_type.push_back(sqlast::ColumnDefinition::Type::UINT);
-  }
-  else{
+  } else {
     aggregate_column_name.push_back("Sum");
     aggregate_column_type.push_back(
         this->input_schemas_.at(0).TypeOf(aggregate_column_));
   }
 
-  // obtain column names and types
+  // Obtain column names and types
   for (const auto &cid : group_columns_) {
     output_column_names.push_back(this->input_schemas_.at(0).NameOf(cid));
     output_column_types.push_back(this->input_schemas_.at(0).TypeOf(cid));
   }
-  // add another column for the aggregate
+  // Add another column for the aggregate
   output_column_names.push_back(aggregate_column_name.at(0));
   output_column_types.push_back(aggregate_column_type.at(0));
 
   owned_output_schema_ =
-      SchemaOwner(output_column_names, output_column_types, key_columns);
+      SchemaOwner(output_column_names, output_column_types, output_keys);
   aggregate_schema_ =
-      SchemaOwner(aggregate_column_name, aggregate_column_type, key_columns);
+      SchemaOwner(aggregate_column_name, aggregate_column_type, output_keys);
   aggregate_schema_ref_ = SchemaRef(aggregate_schema_);
   this->output_schema_ = SchemaRef(owned_output_schema_);
 }
@@ -93,6 +140,21 @@ void AggregateOperator::EmitRecord(const std::vector<Key> &key,
   output->push_back(std::move(output_record));
 }
 
+inline void AggregateOperator::InitAggregateValue(Record &aggregate_record,
+                                                  const Record &from_record,
+                                                  ColumnID from_column) const {
+  switch (aggregate_schema_ref_.TypeOf(0)) {
+    case sqlast::ColumnDefinition::Type::UINT:
+      aggregate_record.SetUInt(from_record.GetUInt(from_column), 0);
+      break;
+    case sqlast::ColumnDefinition::Type::INT:
+      aggregate_record.SetInt(from_record.GetInt(from_column), 0);
+      break;
+    default:
+      LOG(FATAL) << "Unsupported type when computing SUM aggregate";
+  }
+}
+
 // This class is used to track state changes when processing given batch of
 // input records
 class StateChange {
@@ -124,8 +186,8 @@ bool AggregateOperator::Process(NodeIndex source,
           if (!first_delta.contains(key)) {  // track first state change of key
             first_delta.emplace(key, StateChange(false, aggregate_schema_ref_));
             // need to explicitly set value since records cannot be copied
-            first_delta.at(key).old_value_.SetUInt(state_.at(key).GetUInt(0),
-                                                   0);
+            InitAggregateValue(first_delta.at(key).old_value_, state_.at(key),
+                               0);
           }
           state_.at(key).SetUInt(state_.at(key).GetUInt(0) - 1, 0);
         } else {  // handle positive record
@@ -141,11 +203,9 @@ bool AggregateOperator::Process(NodeIndex source,
                     key)) {  // track first state change of key
               first_delta.emplace(key,
                                   StateChange(false, aggregate_schema_ref_));
-              first_delta.emplace(key,
-                                  StateChange(false, aggregate_schema_ref_));
               // need to explicitly set value since records cannot be copied
-              first_delta.at(key).old_value_.SetUInt(state_.at(key).GetUInt(0),
-                                                     0);
+              InitAggregateValue(first_delta.at(key).old_value_, state_.at(key),
+                                 0);
             }
             state_.at(key).SetUInt(state_.at(key).GetUInt(0) + 1, 0);
           }
@@ -165,49 +225,17 @@ bool AggregateOperator::Process(NodeIndex source,
           if (!first_delta.contains(key)) {  // track first state change of key
             first_delta.emplace(key, StateChange(false, aggregate_schema_ref_));
             // need to explicitly set value since records cannot be copied
-            switch (aggregate_schema_ref_.TypeOf(0)) {
-              case sqlast::ColumnDefinition::Type::UINT:
-                first_delta.at(key).old_value_.SetUInt(
-                    state_.at(key).GetUInt(0), 0);
-                break;
-              case sqlast::ColumnDefinition::Type::INT:
-                first_delta.at(key).old_value_.SetInt(state_.at(key).GetInt(0),
-                                                      0);
-                break;
-              default:
-                LOG(FATAL) << "Unsupported type when computing SUM aggregate";
-            }
+            InitAggregateValue(first_delta.at(key).old_value_, state_.at(key),
+                               0);
           }
-          switch (aggregate_schema_ref_.TypeOf(0)) {
-            case sqlast::ColumnDefinition::Type::UINT:
-              state_.at(key).SetUInt(
-                  state_.at(key).GetUInt(0) - record.GetUInt(aggregate_column_),
-                  0);
-              break;
-            case sqlast::ColumnDefinition::Type::INT:
-              state_.at(key).SetInt(
-                  state_.at(key).GetInt(0) - record.GetInt(aggregate_column_),
-                  0);
-              break;
-            default:
-              LOG(FATAL) << "Unsupported type when computing SUM aggregate";
-          }
+          SUMFUNC_UPDATE_AGGREGATE_MACRO(-)
         } else {  // handle positive record
           if (!state_.contains(key)) {
             // track first state change of key. old_value_ does not exist.
             first_delta.emplace(key, StateChange(true, aggregate_schema_ref_));
             // new aggregate record
             Record aggregate_record(aggregate_schema_ref_);
-            switch (aggregate_schema_ref_.TypeOf(0)) {
-              case sqlast::ColumnDefinition::Type::UINT:
-                aggregate_record.SetUInt(record.GetUInt(aggregate_column_), 0);
-                break;
-              case sqlast::ColumnDefinition::Type::INT:
-                aggregate_record.SetInt(record.GetInt(aggregate_column_), 0);
-                break;
-              default:
-                LOG(FATAL) << "Unsupported type when computing SUM aggregate";
-            }
+            InitAggregateValue(aggregate_record, record, aggregate_column_);
             state_.emplace(key, std::move(aggregate_record));
           } else {
             if (!first_delta.contains(
@@ -215,33 +243,10 @@ bool AggregateOperator::Process(NodeIndex source,
               first_delta.emplace(key,
                                   StateChange(false, aggregate_schema_ref_));
               // need to explicitly set value since records cannot be copied
-              switch (aggregate_schema_ref_.TypeOf(0)) {
-                case sqlast::ColumnDefinition::Type::UINT:
-                  first_delta.at(key).old_value_.SetUInt(
-                      state_.at(key).GetUInt(0), 0);
-                  break;
-                case sqlast::ColumnDefinition::Type::INT:
-                  first_delta.at(key).old_value_.SetInt(
-                      state_.at(key).GetInt(0), 0);
-                  break;
-                default:
-                  LOG(FATAL) << "Unsupported type when computing SUM aggregate";
-              }
+              InitAggregateValue(first_delta.at(key).old_value_, state_.at(key),
+                                 0);
             }
-            switch (aggregate_schema_ref_.TypeOf(0)) {
-              case sqlast::ColumnDefinition::Type::UINT:
-                state_.at(key).SetUInt(state_.at(key).GetUInt(0) +
-                                           record.GetUInt(aggregate_column_),
-                                       0);
-                break;
-              case sqlast::ColumnDefinition::Type::INT:
-                state_.at(key).SetInt(
-                    state_.at(key).GetInt(0) + record.GetInt(aggregate_column_),
-                    0);
-                break;
-              default:
-                LOG(FATAL) << "Unsupported type when computing SUM aggregate";
-            }
+            SUMFUNC_UPDATE_AGGREGATE_MACRO(+)
           }
         }
         break;
@@ -250,36 +255,61 @@ bool AggregateOperator::Process(NodeIndex source,
 
   // emit records only for tracked changes
   for (auto const &item : first_delta) {
-    // avoid an edge case where a key is inserted via a positive record
-    // and whose effect is negated by the subsequent negative record(s)
-    // in the same batch
+    // Logic for emitting records:
+    // When emitting record(s), the key deciding factor is if the final
+    // update of a record consists of 0. Following are two outcomes when final
+    // state update = 0:
+    // CASE 1: If the state change for item corresponds to an insert
+    // then it implies that a record with key item.first was inserted
+    // into state_ but it's effect got negated via subsequent negative
+    // record(s) in the same batch. Hence, don't emit any output records
+    // CASE 2: If the state change for item corresponds to an update then only
+    // emit negative record. This will ensure that corresponding
+    // state in the down stream operators will get cleared. Which would not
+    // happen if a positive record if emitted for the corresponding key with
+    // value 0.
+    // NOTE: The comparision of final state update with 0 is semantically
+    // correct for both FuncSum and FuncCount.
     if (item.second.is_insert_) {
-      bool flag = false;
-      // in the following switch block, comparison of latest state update
-      // with 0 is semantically correct for both FuncSum and FuncCout
       switch (aggregate_schema_ref_.TypeOf(0)) {
         case sqlast::ColumnDefinition::Type::UINT:
-          if (state_.at(item.first).GetUInt(0) == 0ULL) flag = true;
+          if (state_.at(item.first).GetUInt(0) == 0ULL) {
+            state_.erase(item.first);
+            continue;
+          }
           break;
         case sqlast::ColumnDefinition::Type::INT:
-          if (state_.at(item.first).GetInt(0) == 0L) flag = true;
+          if (state_.at(item.first).GetInt(0) == 0L) {
+            state_.erase(item.first);
+            continue;
+          }
           break;
         default:
           // The aggregate value does not support Type::TEXT
           LOG(FATAL) << "Unsupported type in aggregate";
       }
-
-      if (flag) {
-        // don't emit any records since the negative records have cancelled
-        // out the effect of positive records within a single batch.
-        continue;
-      }
-    }  // end of handling edge case
-
-    if (item.second.is_insert_) {
       EmitRecord(item.first, state_.at(item.first), true, output);
     } else {
-      // for a negative update push negative record followed by positvie record
+      switch (aggregate_schema_ref_.TypeOf(0)) {
+        case sqlast::ColumnDefinition::Type::UINT:
+          if (state_.at(item.first).GetUInt(0) == 0ULL) {
+            state_.erase(item.first);
+            EmitRecord(item.first, item.second.old_value_, false, output);
+            continue;
+          }
+          break;
+        case sqlast::ColumnDefinition::Type::INT:
+          if (state_.at(item.first).GetInt(0) == 0L) {
+            state_.erase(item.first);
+            EmitRecord(item.first, item.second.old_value_, false, output);
+            continue;
+          }
+          break;
+        default:
+          // The aggregate value does not support Type::TEXT
+          LOG(FATAL) << "Unsupported type in aggregate";
+      }
+      // for a negative update push negative record followed by positive record
       EmitRecord(item.first, item.second.old_value_, false, output);
       EmitRecord(item.first, state_.at(item.first), true, output);
     }

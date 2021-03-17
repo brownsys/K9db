@@ -156,6 +156,26 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "aggregate",
+    srcs = [
+        "aggregate.cc",
+    ],
+    hdrs = [
+        "aggregate.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "@glog",
+        "@gtest//:gtest_prod",
+        "@absl//absl/container:flat_hash_map",
+    ],
+)
+
 cc_test(
     name = "equijoin-test",
     srcs = [
@@ -222,6 +242,25 @@ cc_test(
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":project",
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "aggregate-test",
+    srcs = [
+        "aggregate_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":aggregate",
         "//pelton/dataflow:key",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
