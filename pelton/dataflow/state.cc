@@ -6,6 +6,7 @@
 #include "pelton/dataflow/state.h"
 
 #include <fstream>
+#include <utility>
 
 #include "pelton/util/fs.h"
 
@@ -15,32 +16,44 @@ namespace pelton {
 namespace dataflow {
 
 // Manage schemas.
-void DataflowState::AddTableSchema(const sqlast::CreateTable &create) {
+void DataFlowState::AddTableSchema(const sqlast::CreateTable &create) {
   this->schema_.emplace(create.table_name(), create);
 }
+void DataFlowState::AddTableSchema(const std::string &table_name,
+                                   SchemaOwner &&schema) {
+  this->schema_.emplace(table_name, std::move(schema));
+}
 
-SchemaRef DataflowState::GetTableSchema(const TableName &table_name) const {
+std::vector<std::string> DataFlowState::GetTables() const {
+  std::vector<std::string> result;
+  result.reserve(this->schema_.size());
+  for (const auto &[table_name, _] : this->schema_) {
+    result.push_back(table_name);
+  }
+  return result;
+}
+SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
   return SchemaRef(this->schema_.at(table_name));
 }
 
 // Manage flows.
-void DataflowState::AddFlow(const FlowName &name, const DataFlowGraph &flow) {
+void DataFlowState::AddFlow(const FlowName &name, const DataFlowGraph &flow) {
   this->flows_.insert({name, flow});
   for (const auto &[input_name, input] : flow.inputs()) {
     this->flows_per_input_table_[input_name].push_back(name);
   }
 }
 
-const DataFlowGraph &DataflowState::GetFlow(const FlowName &name) const {
+const DataFlowGraph &DataFlowState::GetFlow(const FlowName &name) const {
   return this->flows_.at(name);
 }
 
-bool DataflowState::HasFlowsFor(const TableName &table_name) const {
+bool DataFlowState::HasFlowsFor(const TableName &table_name) const {
   return this->flows_per_input_table_.count(table_name) == 1;
 }
 
 // Process raw records from sharder into flows.
-bool DataflowState::ProcessRawRecords(
+bool DataFlowState::ProcessRawRecords(
     const std::vector<shards::RawRecord> &raw_records) {
   // Construct schema-full records.
   std::unordered_map<std::string, std::vector<Record>> records;
@@ -57,7 +70,7 @@ bool DataflowState::ProcessRawRecords(
   return true;
 }
 
-bool DataflowState::ProcessRecords(const TableName &table_name,
+bool DataFlowState::ProcessRecords(const TableName &table_name,
                                    const std::vector<Record> &records) {
   if (this->HasFlowsFor(table_name)) {
     for (const FlowName &name : this->flows_per_input_table_.at(table_name)) {
@@ -71,7 +84,7 @@ bool DataflowState::ProcessRecords(const TableName &table_name,
 }
 
 // Creating and processing records from raw data.
-Record DataflowState::CreateRecord(const shards::RawRecord &raw_record) const {
+Record DataFlowState::CreateRecord(const shards::RawRecord &raw_record) const {
   SchemaRef schema = SchemaRef(this->schema_.at(raw_record.table_name));
   Record record{schema, raw_record.positive};
   for (size_t i = 0; i < raw_record.values.size(); i++) {
@@ -85,7 +98,7 @@ Record DataflowState::CreateRecord(const shards::RawRecord &raw_record) const {
 }
 
 // Load state from its durable file (if exists).
-void DataflowState::Load(const std::string &dir_path) {
+void DataFlowState::Load(const std::string &dir_path) {
   // State file does not exists: this is a fresh database that was not
   // created previously!
   std::string state_file_path = dir_path + STATE_FILE_NAME;
@@ -140,7 +153,7 @@ void DataflowState::Load(const std::string &dir_path) {
 }
 
 // Save state to durable file.
-void DataflowState::Save(const std::string &dir_path) {
+void DataFlowState::Save(const std::string &dir_path) {
   // Open state file for writing.
   std::ofstream state_file;
   util::OpenWrite(&state_file, dir_path + STATE_FILE_NAME);

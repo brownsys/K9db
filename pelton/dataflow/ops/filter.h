@@ -10,6 +10,7 @@
 
 #include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"
+#include "pelton/dataflow/ops/filter_enum.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
@@ -20,14 +21,7 @@ namespace dataflow {
 class FilterOperator : public Operator {
  public:
   // The operations we can use to filter (on a value in a record).
-  enum class Operation : unsigned char {
-    LESS_THAN,
-    LESS_THAN_OR_EQUAL,
-    GREATER_THAN,
-    GREATER_THAN_OR_EQUAL,
-    EQUAL,
-    NOT_EQUAL
-  };
+  using Operation = FilterOperationEnum;
 
   // Construct the filter operator by first providing the input schema.
   FilterOperator() : Operator(Operator::Type::FILTER) {}

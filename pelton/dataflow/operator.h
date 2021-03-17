@@ -24,7 +24,7 @@ class Operator {
     FILTER,
     UNION,
     EQUIJOIN,
-    AGGREGATE
+    PROJECT
   };
 
   // Cannot copy an operator.

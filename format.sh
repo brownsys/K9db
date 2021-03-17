@@ -15,3 +15,6 @@ find . -not -path "./third_party/**" \
 
 # Run buildifier (Bazel file formatter).
 bazel run //:buildifier
+
+# Run google-java-format.
+bazel run //:format_java

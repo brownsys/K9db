@@ -1,5 +1,10 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
+exports_files(
+    ["ast_schema_enums.h"],
+    ["//pelton/dataflow:__subpackages__"],
+)
+
 cc_library(
     name = "ast",
     srcs = [
@@ -13,6 +18,7 @@ cc_library(
         "ast_abstract.h",
         "ast_expressions.h",
         "ast_schema.h",
+        "ast_schema_enums.h",
         "ast_statements.h",
         "ast_visitors.h",
     ],

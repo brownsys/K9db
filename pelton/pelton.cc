@@ -10,10 +10,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "pelton/dataflow/graph.h"
-#include "pelton/dataflow/ops/filter.h"
-#include "pelton/dataflow/ops/input.h"
-#include "pelton/dataflow/ops/matview.h"
-#include "pelton/dataflow/schema.h"
+#include "pelton/planner/planner.h"
 #include "pelton/shards/sqlengine/engine.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/shards/sqlexecutor/executor.h"
@@ -112,20 +109,32 @@ bool exec(Connection *connection, std::string sql, Callback callback,
   std::unique_ptr<sqlast::AbstractStatement> statement =
       connection->GetSharderState()->ReleaseLastStatement();
   if (statement->type() == sqlast::AbstractStatement::Type::CREATE_TABLE) {
-    connection->GetDataflowState()->AddTableSchema(
+    connection->GetDataFlowState()->AddTableSchema(
         *static_cast<sqlast::CreateTable *>(statement.get()));
   }
 
   // Update date flow records.
-  connection->GetDataflowState()->ProcessRawRecords(
+  connection->GetDataFlowState()->ProcessRawRecords(
       connection->GetSharderState()->GetRawRecords());
   connection->GetSharderState()->ClearRawRecords();
 
   return true;
 }
 
+void make_view(Connection *connection, const std::string &name,
+               const std::string &query) {
+  // Plan the query using calcite and generate a concrete graph for it.
+  dataflow::DataFlowGraph graph =
+      planner::PlanGraph(connection->GetDataFlowState(), query);
+  // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
+  connection->GetDataFlowState()->AddFlow(name, graph);
+}
+
+void shutdown_planner() { planner::ShutdownPlanner(); }
+
 bool close(Connection *connection) {
   connection->Save();
+  planner::ShutdownPlanner();
   return true;
 }
 
