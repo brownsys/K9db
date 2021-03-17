@@ -101,7 +101,7 @@ Key Record::GetValue(size_t i) const {
   }
 }
 Key Record::GetKey() const {
-  CHECK_NE(this->data_, nullptr) << "Cannot get key for moved record";
+  CHECK_NOTNULL(this->data_);
   const std::vector<ColumnID> &keys = this->schema_.keys();
   CHECK_EQ(keys.size(), 1);
   size_t key_index = keys.at(0);
@@ -122,7 +122,7 @@ Key Record::GetKey() const {
 
 // Data type transformation.
 void Record::SetValue(const std::string &value, size_t i) {
-  CHECK_NE(this->data_, nullptr) << "Cannot set value for moved record";
+  CHECK_NOTNULL(this->data_);
   CHECK(!IsNull(i));
   switch (this->schema_.TypeOf(i)) {
     case sqlast::ColumnDefinition::Type::UINT:
@@ -142,8 +142,8 @@ void Record::SetValue(const std::string &value, size_t i) {
 // Equality: schema must be identical (pointer wise) and all values must be
 // equal.
 bool Record::operator==(const Record &other) const {
-  CHECK_NE(this->data_, nullptr) << "Left record == has been moved";
-  CHECK_NE(other.data_, nullptr) << "Right record == has been moved";
+  CHECK_NOTNULL(this->data_);
+  CHECK_NOTNULL(other.data_);
   // Compare schemas (as pointers).
   if (this->schema_ != other.schema_) {
     return false;
@@ -197,7 +197,7 @@ bool Record::operator==(const Record &other) const {
 
 // Printing a record to an output stream (e.g. std::cout).
 std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Record &r) {
-  CHECK_NE(r.data_, nullptr) << "Cannot << moved record";
+  CHECK_NOTNULL(r.data_);
   os << "|";
   for (unsigned i = 0; i < r.schema_.size(); ++i) {
     if (r.IsNull(i)) {
