@@ -125,7 +125,7 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
-        "//pelton/shards:state",
+        "//pelton/shards:types",
         "@absl//absl/strings",
     ],
 )

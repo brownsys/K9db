@@ -11,8 +11,19 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
-        "//pelton/shards/sqlexecutor:executor",
+        ":types",
+        "//pelton/shards/sqlexecutor:pool",
         "//pelton/sqlast:ast",
         "//pelton/util:fs",
     ],
+)
+
+cc_library(
+    name = "types",
+    srcs = [],
+    hdrs = [
+        "types.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [],
 )

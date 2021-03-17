@@ -20,7 +20,7 @@ void SharderState::Initialize(const std::string &dir_path) {
   if (dir_path.back() != '/') {
     this->dir_path_ += "/";
   }
-  this->executor_.Initialize(this->dir_path_);
+  this->connection_pool_.Initialize(this->dir_path_);
 }
 
 // Schema manipulations.
@@ -122,11 +122,6 @@ void SharderState::SetLastStatement(
 std::unique_ptr<sqlast::AbstractStatement>
 SharderState::ReleaseLastStatement() {
   return std::move(this->last_statement_);
-}
-
-// SQL Executor.
-sqlexecutor::SQLExecutor *SharderState::SQLExecutor() {
-  return &this->executor_;
 }
 
 }  // namespace shards

@@ -1,71 +1,98 @@
-// Manages sqlite3 connections to the different shard/mini-databases.
-
 #include "pelton/shards/sqlexecutor/executable.h"
 
-#include <cassert>
+#include "glog/logging.h"
 
 namespace pelton {
 namespace shards {
 namespace sqlexecutor {
 
-// ExecutableStatement.
-const std::string &ExecutableStatement::shard_suffix() const {
-  return this->shard_suffix_;
+// Construct a simple statement executed against the default shard.
+std::unique_ptr<SimpleExecutableStatement>
+SimpleExecutableStatement::DefaultShard(const std::string &stmt) {
+  std::unique_ptr<SimpleExecutableStatement> statement(
+      new SimpleExecutableStatement());
+  statement->sql_statement_ = stmt;
+  statement->default_shard_ = true;
+  return statement;
 }
 
-const std::string &ExecutableStatement::sql_statement() const {
-  return this->sql_statement_;
+// Construct a simple statement executed against a particular user shard.
+std::unique_ptr<SimpleExecutableStatement> SimpleExecutableStatement::UserShard(
+    const std::string &stmt, const std::string &shard_kind,
+    const std::string &user_id) {
+  std::unique_ptr<SimpleExecutableStatement> statement{
+      new SimpleExecutableStatement()};
+  statement->sql_statement_ = stmt;
+  statement->default_shard_ = false;
+  statement->shard_kind_ = shard_kind;
+  statement->all_users_ = false;
+  statement->user_ids_.insert(user_id);
+  return statement;
 }
 
-// SimpleExecutableStatement.
+// Construct a simple statement executed against all user shards of a given
+// kind.
+std::unique_ptr<SimpleExecutableStatement> SimpleExecutableStatement::AllShards(
+    const std::string &stmt, const std::string &shard_kind) {
+  std::unique_ptr<SimpleExecutableStatement> statement{
+      new SimpleExecutableStatement()};
+  statement->sql_statement_ = stmt;
+  statement->default_shard_ = false;
+  statement->shard_kind_ = shard_kind;
+  statement->all_users_ = true;
+  return statement;
+}
+
+// Override interface.
+bool SimpleExecutableStatement::Execute(SharderState *state,
+                                        const Callback &callback, void *context,
+                                        char **errmsg) {
+  // Execute against default shard.
+  if (this->default_shard_) {
+    ::sqlite3 *conn = state->connection_pool().GetDefaultConnection();
+    return this->Execute(conn, callback, context, errmsg);
+  }
+
+  // Execute against particular user shards.
+  if (!this->all_users_) {
+    for (const std::string &user_id : this->user_ids_) {
+      ::sqlite3 *conn =
+          state->connection_pool().GetConnection(this->shard_kind_, user_id);
+      if (!this->Execute(conn, callback, context, errmsg)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // Execute against all user shards.
+  if (this->all_users_) {
+    const auto &user_ids = state->UsersOfShard(this->shard_kind_);
+    for (const std::string &user_id : user_ids) {
+      ::sqlite3 *conn =
+          state->connection_pool().GetConnection(this->shard_kind_, user_id);
+      if (!this->Execute(conn, callback, context, errmsg)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  LOG(FATAL) << "Illegal configuration for SimpleExecutableStatement";
+}
+
 bool SimpleExecutableStatement::Execute(::sqlite3 *connection,
                                         const Callback &callback, void *context,
                                         char **errmsg) {
+  // Turn c++ style callback into a c-style function pointer.
   CALLBACK_NO_CAPTURE = &callback;
-  return ::sqlite3_exec(
-             connection, this->sql_statement_.c_str(),
-             [](void *context, int colnum, char **colvals, char **colnames) {
-               return (*CALLBACK_NO_CAPTURE)(context, colnum, colvals,
-                                             colnames);
-             },
-             context, errmsg) == SQLITE_OK;
-}
+  auto cb = [](void *context, int colnum, char **colvals, char **colnames) {
+    return (*CALLBACK_NO_CAPTURE)(context, colnum, colvals, colnames);
+  };
 
-// SelectExecutableStatement.
-bool SelectExecutableStatement::Execute(::sqlite3 *connection,
-                                        const Callback &callback, void *context,
-                                        char **errmsg) {
-  CALLBACK_NO_CAPTURE = &callback;
-  THIS_NO_CAPTURE = this;
-  int result = ::sqlite3_exec(
-      connection, this->sql_statement_.c_str(),
-      [](void *context, int _colnum, char **colvals, char **colnames) {
-        size_t colnum = static_cast<size_t>(_colnum);
-        assert(colnum >= THIS_NO_CAPTURE->coli_);
-        // Append stored column name and value to result at the stored index.
-        char **appended_colvals = new char *[colnum + 1];
-        char **appended_colnames = new char *[colnum + 1];
-        appended_colvals[THIS_NO_CAPTURE->coli_] = THIS_NO_CAPTURE->colv_;
-        appended_colnames[THIS_NO_CAPTURE->coli_] = THIS_NO_CAPTURE->coln_;
-        for (size_t i = 0; i < THIS_NO_CAPTURE->coli_; i++) {
-          appended_colvals[i] = colvals[i];
-          appended_colnames[i] = colnames[i];
-        }
-        for (size_t i = THIS_NO_CAPTURE->coli_; i < colnum; i++) {
-          appended_colvals[i + 1] = colvals[i];
-          appended_colnames[i + 1] = colnames[i];
-        }
-        // Forward appended results to callback.
-        int result = (*CALLBACK_NO_CAPTURE)(
-            context, colnum + 1, appended_colvals, appended_colnames);
-        // Deallocate appended results.
-        delete[] appended_colvals;
-        delete[] appended_colnames;
-        return result;
-      },
-      context, errmsg);
-
-  return result == SQLITE_OK;
+  // Execute using c-style function pointer.
+  const char *sql = this->sql_statement_.c_str();
+  return ::sqlite3_exec(connection, sql, cb, context, errmsg) == SQLITE_OK;
 }
 
 }  // namespace sqlexecutor

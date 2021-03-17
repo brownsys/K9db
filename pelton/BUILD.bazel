@@ -15,6 +15,7 @@ cc_library(
         "//pelton/dataflow:state",
         "//pelton/planner",
         "//pelton/shards:state",
+        "//pelton/shards:types",
         "//pelton/shards/sqlengine:engine",
         "//pelton/shards/sqlengine:util",
         "//pelton/shards/sqlexecutor:executor",

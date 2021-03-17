@@ -9,7 +9,7 @@
 #include <string>
 
 #include "absl/strings/str_cat.h"
-#include "pelton/shards/state.h"
+#include "pelton/shards/types.h"
 
 namespace pelton {
 namespace shards {

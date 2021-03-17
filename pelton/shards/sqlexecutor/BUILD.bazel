@@ -4,15 +4,35 @@ cc_library(
     name = "executor",
     srcs = [
         "executable.cc",
-        "executor.cc",
     ],
     hdrs = [
         "executable.h",
-        "executor.h",
     ],
     linkopts = [
         "-lsqlite3",
     ],
     visibility = ["//pelton:__subpackages__"],
-    deps = [],
+    deps = [
+        ":pool",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "pool",
+    srcs = [
+        "pool.cc",
+    ],
+    hdrs = [
+        "pool.h",
+    ],
+    linkopts = [
+        "-lsqlite3",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/shards/sqlengine:util",
+    ],
 )
