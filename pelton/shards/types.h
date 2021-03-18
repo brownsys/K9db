@@ -12,6 +12,15 @@ namespace shards {
 // https://www.sqlite.org/c3ref/exec.html
 using Callback = std::function<int(void *, int, char **, char **)>;
 
+// Stores output and error reporting channels passed from host code.
+// E.g. the callback is how a row in the query result set is reported back to
+// the host code.
+struct OutputChannel {
+  Callback callback;
+  void *context;
+  char **errmsg;
+};
+
 // The name of the table representing users that own shards of this kind.
 using ShardKind = std::string;
 

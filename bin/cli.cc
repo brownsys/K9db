@@ -69,8 +69,14 @@ int main(int argc, char **argv) {
 
       // Command has been fully read, execute it!
       bool context = true;
+      char *errmsg = nullptr;
       if (!pelton::exec(&connection, command, &Callback,
-                        reinterpret_cast<void *>(&context), nullptr)) {
+                        reinterpret_cast<void *>(&context), &errmsg)) {
+        std::cout << "Fatal error" << std::endl;
+        if (errmsg != nullptr) {
+          std::cout << errmsg << std::endl;
+          ::sqlite3_free(errmsg);
+        }
         break;
       }
 

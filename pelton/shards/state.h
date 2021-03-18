@@ -91,11 +91,6 @@ class SharderState {
 
   void ClearRawRecords();
 
-  // Last statement.
-  void SetLastStatement(std::unique_ptr<sqlast::AbstractStatement> &&st);
-
-  std::unique_ptr<sqlast::AbstractStatement> ReleaseLastStatement();
-
   // Save state to durable file.
   void Save();
 
@@ -144,9 +139,6 @@ class SharderState {
 
   // Stores RawRecords that need to be processed by the dataflow.
   std::vector<RawRecord> raw_records_;
-
-  // Last statement that was processed by the sharder.
-  std::unique_ptr<sqlast::AbstractStatement> last_statement_;
 };
 
 }  // namespace shards

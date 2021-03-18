@@ -1,6 +1,7 @@
 // Manages sqlite3 connections to the different shard/mini-databases.
 #include "pelton/shards/pool.h"
 
+#include "absl/strings/str_cat.h"
 #include "glog/logging.h"
 #include "pelton/shards/sqlengine/util.h"
 
@@ -43,51 +44,58 @@ void ConnectionPool::Initialize(const std::string &dir_path) {
 
 // Execution of SQL statements.
 // Execute statement against the default un-sharded database.
-bool ConnectionPool::ExecuteDefault(const std::string &sql,
-                                    const Callback &callback, void *context,
-                                    char **errmsg) {
+absl::Status ConnectionPool::ExecuteDefault(const std::string &sql,
+                                            const OutputChannel &output) {
   ::sqlite3 *connection = this->GetDefaultConnection();
-  return this->Execute(sql, connection, callback, context, errmsg);
+  return this->Execute(sql, connection, output);
 }
 
 // Execute statement against given user shard(s).
-bool ConnectionPool::ExecuteShard(const std::string &sql,
-                                  const ShardKind &shard_kind,
-                                  const UserId &user_id,
-                                  const Callback &callback, void *context,
-                                  char **errmsg) {
+absl::Status ConnectionPool::ExecuteShard(const std::string &sql,
+                                          const ShardKind &shard_kind,
+                                          const UserId &user_id,
+                                          const OutputChannel &output) {
   ::sqlite3 *connection = this->GetConnection(shard_kind, user_id);
-  return this->Execute(sql, connection, callback, context, errmsg);
+  return this->Execute(sql, connection, output);
 }
 
-bool ConnectionPool::ExecuteShard(const std::string &sql,
-                                  const ShardKind &shard_kind,
-                                  const std::unordered_set<UserId> &user_ids,
-                                  const Callback &callback, void *context,
-                                  char **errmsg) {
+absl::Status ConnectionPool::ExecuteShard(
+    const std::string &sql, const ShardKind &shard_kind,
+    const std::unordered_set<UserId> &user_ids, const OutputChannel &output) {
   for (const UserId &user_id : user_ids) {
     ::sqlite3 *connection = this->GetConnection(shard_kind, user_id);
-    if (!this->Execute(sql, connection, callback, context, errmsg)) {
-      return false;
+    absl::Status result = this->Execute(sql, connection, output);
+    if (!result.ok()) {
+      return result;
     }
   }
-  return true;
+  return absl::OkStatus();
 }
 
 // Actually execute statements after their connection has been resolved.
-bool ConnectionPool::Execute(const std::string &sql, ::sqlite3 *connection,
-                             const Callback &callback, void *context,
-                             char **errmsg) {
+absl::Status ConnectionPool::Execute(const std::string &sql,
+                                     ::sqlite3 *connection,
+                                     const OutputChannel &output) {
   LOG(INFO) << "Statement: " << sql;
   // Turn c++ style callback into a c-style function pointer.
-  static const Callback *CALLBACK_NO_CAPTURE = &callback;
+  static const Callback *CALLBACK_NO_CAPTURE = &output.callback;
   auto cb = [](void *context, int colnum, char **colvals, char **colnames) {
     return (*CALLBACK_NO_CAPTURE)(context, colnum, colvals, colnames);
   };
 
   // Execute using c-style function pointer.
   const char *str = sql.c_str();
-  return ::sqlite3_exec(connection, str, cb, context, errmsg) == SQLITE_OK;
+  void *context = output.context;
+  char **errmsg = output.errmsg;
+  if (::sqlite3_exec(connection, str, cb, context, errmsg) == SQLITE_OK) {
+    return absl::OkStatus();
+  } else {
+    std::string error = "Sqlite3 statement failed";
+    if (*errmsg != nullptr) {
+      error = absl::StrCat(error, ": ", *errmsg);
+    }
+    return absl::AbortedError(error);
+  }
 }
 
 }  // namespace shards

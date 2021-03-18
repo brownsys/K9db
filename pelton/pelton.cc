@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
@@ -13,7 +14,6 @@
 #include "pelton/planner/planner.h"
 #include "pelton/shards/sqlengine/engine.h"
 #include "pelton/shards/sqlengine/util.h"
-#include "pelton/shards/sqlexecutor/executor.h"
 
 namespace pelton {
 
@@ -61,8 +61,7 @@ bool open(const std::string &directory, Connection *connection) {
 }
 
 bool exec(Connection *connection, std::string sql,
-          const shards::sqlexecutor::Callback &callback, void *context,
-          char **errmsg) {
+          const shards::Callback &callback, void *context, char **errmsg) {
   // Trim statement.
   Trim(sql);
   if (echo) {
@@ -75,38 +74,18 @@ bool exec(Connection *connection, std::string sql,
   }
 
   // Parse and rewrite statement.
-  auto statusor =
-      shards::sqlengine::Rewrite(sql, connection->GetSharderState());
-  if (!statusor.ok()) {
-    std::cout << statusor.status() << std::endl;
+  shards::SharderState *sstate = connection->GetSharderState();
+  dataflow::DataFlowState *dstate = connection->GetDataFlowState();
+  shards::OutputChannel output = {callback, context, errmsg};
+  absl::Status status = shards::sqlengine::Shard(sql, sstate, dstate, output);
+  if (!status.ok()) {
+    std::cout << status << std::endl;
     return false;
   }
 
-  // Successfully re-written into a list of modified statements.
-  connection->GetSharderState()->SQLExecutor()->StartBlock();
-  for (auto &executable_statement : statusor.value()) {
-    bool result =
-        connection->GetSharderState()->SQLExecutor()->ExecuteStatement(
-            std::move(executable_statement), callback, context, errmsg);
-    if (!result) {
-      // TODO(babman): we probably need some *transactional* notion here
-      // about failures.
-      return false;
-    }
-  }
-
-  // Update data flow schema state.
-  std::unique_ptr<sqlast::AbstractStatement> statement =
-      connection->GetSharderState()->ReleaseLastStatement();
-  if (statement->type() == sqlast::AbstractStatement::Type::CREATE_TABLE) {
-    connection->GetDataFlowState()->AddTableSchema(
-        *static_cast<sqlast::CreateTable *>(statement.get()));
-  }
-
   // Update date flow records.
-  connection->GetDataFlowState()->ProcessRawRecords(
-      connection->GetSharderState()->GetRawRecords());
-  connection->GetSharderState()->ClearRawRecords();
+  dstate->ProcessRawRecords(sstate->GetRawRecords());
+  sstate->ClearRawRecords();
 
   return true;
 }

@@ -18,7 +18,7 @@ cc_library(
         "//pelton/shards:types",
         "//pelton/shards/sqlengine:engine",
         "//pelton/shards/sqlengine:util",
-        "//pelton/shards/sqlexecutor:executor",
+        "@absl//absl/status",
         "@absl//absl/strings",
     ],
 )

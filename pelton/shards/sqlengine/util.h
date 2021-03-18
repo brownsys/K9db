@@ -4,8 +4,6 @@
 #ifndef PELTON_SHARDS_SQLENGINE_UTIL_H_
 #define PELTON_SHARDS_SQLENGINE_UTIL_H_
 
-#define DEFAULT_SHARD_NAME "default"
-
 #include <string>
 
 #include "absl/strings/str_cat.h"

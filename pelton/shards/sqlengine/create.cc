@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/statusor.h"
 #include "absl/strings/match.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/status.h"
@@ -229,8 +230,9 @@ sqlast::CreateTable UpdateTableSchema(sqlast::CreateTable stmt,
 
 }  // namespace
 
-absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
-Rewrite(const sqlast::CreateTable &stmt, SharderState *state) {
+absl::Status Shard(const sqlast::CreateTable &stmt, SharderState *state,
+                   dataflow::DataFlowState *dataflow_state,
+                   const OutputChannel &output) {
   const std::string &table_name = stmt.table_name();
   if (state->Exists(table_name)) {
     return absl::InvalidArgumentError("Table already exists!");
@@ -241,12 +243,8 @@ Rewrite(const sqlast::CreateTable &stmt, SharderState *state) {
   bool has_pii = HasPII(stmt);
   ASSIGN_OR_RETURN(std::list<ShardingInformation> sharding_information,
                    ShardTable(stmt, *state));
-  if (has_pii && sharding_information.size() > 0) {
-    return absl::InvalidArgumentError("Sharded Table cannot have PII fields!");
-  }
 
   sqlast::Stringifier stringifier;
-  std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>> result;
   // Case 1: has pii but not linked to shards.
   // This means that this table define a type of user for which shards must be
   // created! Hence, it is a shard kind!
@@ -255,8 +253,7 @@ Rewrite(const sqlast::CreateTable &stmt, SharderState *state) {
     std::string create_table_str = stmt.Visit(&stringifier);
     state->AddShardKind(table_name, pk);
     state->AddUnshardedTable(table_name, create_table_str);
-    result.push_back(std::make_unique<sqlexecutor::SimpleExecutableStatement>(
-        DEFAULT_SHARD_NAME, create_table_str));
+    return state->connection_pool().ExecuteDefault(create_table_str, output);
   }
 
   // Case 2: no pii but is linked to shards.
@@ -275,6 +272,7 @@ Rewrite(const sqlast::CreateTable &stmt, SharderState *state) {
       // Add the sharding information to state.
       state->AddShardedTable(table_name, info, create_table_str);
     }
+    return absl::OkStatus();
   }
 
   // Case 3: neither pii nor linked.
@@ -282,11 +280,11 @@ Rewrite(const sqlast::CreateTable &stmt, SharderState *state) {
   if (!has_pii && sharding_information.size() == 0) {
     std::string create_table_str = stmt.Visit(&stringifier);
     state->AddUnshardedTable(table_name, create_table_str);
-    result.push_back(std::make_unique<sqlexecutor::SimpleExecutableStatement>(
-        DEFAULT_SHARD_NAME, create_table_str));
+    return state->connection_pool().ExecuteDefault(create_table_str, output);
   }
 
-  return result;
+  // Has pii and linked to a shard is a logical schema error.
+  return absl::UnimplementedError("Sharded Table cannot have PII fields!");
 }
 
 }  // namespace create

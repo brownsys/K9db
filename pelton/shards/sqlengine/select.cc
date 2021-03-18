@@ -1,36 +1,35 @@
 // SELECT statements sharding and rewriting.
 #include "pelton/shards/sqlengine/select.h"
 
-#include <utility>
+#include <string>
 
-#include "pelton/shards/sqlengine/util.h"
+#include "pelton/util/status.h"
 
 namespace pelton {
 namespace shards {
 namespace sqlengine {
 namespace select {
 
-absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
-Rewrite(const sqlast::Select &stmt, SharderState *state) {
+absl::Status Shard(const sqlast::Select &stmt, SharderState *state,
+                   dataflow::DataFlowState *dataflow_state,
+                   const OutputChannel &output) {
   sqlast::Stringifier stringifier;
-  std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>> result;
 
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
 
-  // Case 1: table is not in any shard.
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
+    // Case 1: table is not in any shard.
     std::string select_str = stmt.Visit(&stringifier);
-    result.push_back(std::make_unique<sqlexecutor::SimpleExecutableStatement>(
-        DEFAULT_SHARD_NAME, select_str));
-  }
+    return state->connection_pool().ExecuteDefault(select_str, output);
 
-  // Case 2: table is sharded.
-  if (is_sharded) {
+  } else {  // is_sharded == true
+    // Case 2: table is sharded.
     // We will query all the different ways of sharding the table (for
     // duplicates with many owners), de-duplication occurs later in the
     // pipeline.
+    // TODO(babman): put back deduplication code here.
     for (const auto &info : state->GetShardingInformation(table_name)) {
       // Rename the table to match the sharded name.
       sqlast::Select cloned = stmt;
@@ -39,29 +38,28 @@ Rewrite(const sqlast::Select &stmt, SharderState *state) {
       // Find the value assigned to shard_by column in the where clause, and
       // remove it from the where clause.
       sqlast::ValueFinder value_finder(info.shard_by);
-      auto [found, user_id_val] = cloned.Visit(&value_finder);
+      auto [found, user_id] = cloned.Visit(&value_finder);
       if (found) {
+        // Remove where condition on the shard by column, since it does not
+        // exist in the sharded table.
         sqlast::ExpressionRemover expression_remover(info.shard_by);
         cloned.Visit(&expression_remover);
-      }
 
-      // Select from all the relevant shards.
-      std::string select_str = cloned.Visit(&stringifier);
-      for (const auto &user_id : state->UsersOfShard(info.shard_kind)) {
-        if (found && user_id != user_id_val) {
-          continue;
-        }
-
-        std::string shard_name = NameShard(info.shard_kind, user_id);
-        result.push_back(
-            std::make_unique<sqlexecutor::SelectExecutableStatement>(
-                shard_name, select_str, info.shard_by_index, info.shard_by,
-                user_id));
+        // Execute statement directly against shard.
+        std::string select_str = cloned.Visit(&stringifier);
+        CHECK_STATUS(state->connection_pool().ExecuteShard(
+            select_str, info.shard_kind, user_id, output));
+      } else {
+        // Select from all the relevant shards.
+        std::string select_str = cloned.Visit(&stringifier);
+        CHECK_STATUS(state->connection_pool().ExecuteShard(
+            select_str, info.shard_kind, state->UsersOfShard(info.shard_kind),
+            output));
       }
     }
-  }
 
-  return result;
+    return absl::OkStatus();
+  }
 }
 
 }  // namespace select

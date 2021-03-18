@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_set>
 
+#include "absl/status/status.h"
 #include "pelton/shards/types.h"
 
 namespace pelton {
@@ -30,16 +31,15 @@ class ConnectionPool {
   void Initialize(const std::string &dir_path);
 
   // Execute statement against the default un-sharded database.
-  bool ExecuteDefault(const std::string &sql, const Callback &callback,
-                      void *context, char **errmsg);
+  absl::Status ExecuteDefault(const std::string &sql,
+                              const OutputChannel &output);
 
   // Execute statement against given user shard(s).
-  bool ExecuteShard(const std::string &sql, const ShardKind &shard_kind,
-                    const UserId &user_id, const Callback &callback,
-                    void *context, char **errmsg);
-  bool ExecuteShard(const std::string &sql, const ShardKind &shard_kind,
-                    const std::unordered_set<UserId> &user_ids,
-                    const Callback &callback, void *context, char **errmsg);
+  absl::Status ExecuteShard(const std::string &sql, const ShardKind &shard_kind,
+                            const UserId &user_id, const OutputChannel &output);
+  absl::Status ExecuteShard(const std::string &sql, const ShardKind &shard_kind,
+                            const std::unordered_set<UserId> &user_ids,
+                            const OutputChannel &output);
 
  private:
   // Connection management.
@@ -48,8 +48,8 @@ class ConnectionPool {
                            const UserId &user_id) const;
 
   // Actually execute statements after their connection has been resolved.
-  bool Execute(const std::string &sql, ::sqlite3 *connection,
-               const Callback &callback, void *context, char **errmsg);
+  absl::Status Execute(const std::string &sql, ::sqlite3 *connection,
+                       const OutputChannel &output);
 
   std::string dir_path_;
   // We always keep an open connection to the main non-sharded database.

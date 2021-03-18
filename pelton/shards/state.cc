@@ -113,16 +113,5 @@ const std::vector<RawRecord> &SharderState::GetRawRecords() const {
 
 void SharderState::ClearRawRecords() { this->raw_records_.clear(); }
 
-// Last statement.
-void SharderState::SetLastStatement(
-    std::unique_ptr<sqlast::AbstractStatement> &&st) {
-  this->last_statement_ = std::move(st);
-}
-
-std::unique_ptr<sqlast::AbstractStatement>
-SharderState::ReleaseLastStatement() {
-  return std::move(this->last_statement_);
-}
-
 }  // namespace shards
 }  // namespace pelton
