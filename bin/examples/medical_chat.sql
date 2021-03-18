@@ -1,5 +1,4 @@
 SET echo;
-SET verbose;
 
 CREATE TABLE doctors ( \
   id int, \

@@ -1,5 +1,4 @@
 SET echo;
-SET verbose;
 
 CREATE TABLE students ( \
   ID int, \

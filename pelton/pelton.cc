@@ -33,14 +33,9 @@ static inline void Trim(std::string &s) {
 }
 
 // Special statements we added to SQL.
-bool log = false;
 bool echo = false;
 
 bool SpecialStatements(const std::string &sql, Connection *connection) {
-  if (sql == "SET verbose;") {
-    log = true;
-    return true;
-  }
   if (sql == "SET echo;") {
     echo = true;
     std::cout << "SET echo;" << std::endl;
@@ -90,12 +85,6 @@ bool exec(Connection *connection, std::string sql,
   // Successfully re-written into a list of modified statements.
   connection->GetSharderState()->SQLExecutor()->StartBlock();
   for (auto &executable_statement : statusor.value()) {
-    if (log) {
-      std::cout << "Shard: " << executable_statement->shard_suffix()
-                << std::endl;
-      std::cout << "Statement: " << executable_statement->sql_statement()
-                << std::endl;
-    }
     bool result =
         connection->GetSharderState()->SQLExecutor()->ExecuteStatement(
             std::move(executable_statement), callback, context, errmsg);

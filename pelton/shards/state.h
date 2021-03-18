@@ -14,7 +14,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "pelton/shards/sqlexecutor/pool.h"
+#include "pelton/shards/pool.h"
 #include "pelton/shards/types.h"
 #include "pelton/sqlast/ast.h"
 
@@ -46,9 +46,7 @@ class SharderState {
   // Accessors.
   const std::string &dir_path() const { return this->dir_path_; }
 
-  sqlexecutor::ConnectionPool &connection_pool() {
-    return this->connection_pool_;
-  }
+  ConnectionPool &connection_pool() { return this->connection_pool_; }
 
   // Initialization.
   void Initialize(const std::string &dir_path);
@@ -142,7 +140,7 @@ class SharderState {
   std::unordered_map<ShardedTableName, CreateStatement> sharded_schema_;
 
   // Connection pool that manages the underlying sqlite3 databases.
-  sqlexecutor::ConnectionPool connection_pool_;
+  ConnectionPool connection_pool_;
 
   // Stores RawRecords that need to be processed by the dataflow.
   std::vector<RawRecord> raw_records_;
