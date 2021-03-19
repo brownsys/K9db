@@ -105,7 +105,7 @@ void compareRecordStreams(std::vector<Record> &rs1, std::vector<Record> &rs2) {
   EXPECT_EQ(rs1, rs2);
 }
 
-inline SchemaOwner CreateSchema() {
+inline SchemaOwner CreateSchemaPrimaryKey() {
   // Create a schema.
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
   std::vector<CType> types = {CType::INT, CType::INT, CType::INT};
@@ -118,6 +118,15 @@ inline SchemaOwner CreateSchemaString() {
   std::vector<std::string> names = {"ID", "Department", "Quantity", "Location"};
   std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT, CType::INT};
   std::vector<ColumnID> keys = {0};
+  return SchemaOwner{names, types, keys};
+}
+
+inline SchemaOwner CreateSchemaCompositeKey() {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3", "Col4", "Col5"};
+  std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT, CType::INT,
+                              CType::INT};
+  std::vector<ColumnID> keys = {1, 4};
   return SchemaOwner{names, types, keys};
 }
 
@@ -197,7 +206,7 @@ TEST(AggregateOperatorTest, MultipleGroupColumnsSumPositive) {
 }
 
 TEST(AggregateOperatorTest, CountPositiveNegative) {
-  SchemaOwner schema = CreateSchema();
+  SchemaOwner schema = CreateSchemaPrimaryKey();
   std::vector<ColumnID> group_columns = {1};
   ColumnID aggregate_column = -1;
   AggregateOperator::Function aggregate_function =
@@ -249,7 +258,7 @@ TEST(AggregateOperatorTest, CountPositiveNegative) {
 }
 
 TEST(AggregateOperatorTest, SumPositiveNegative) {
-  SchemaOwner schema = CreateSchema();
+  SchemaOwner schema = CreateSchemaPrimaryKey();
   std::vector<ColumnID> group_columns = {1};
   ColumnID aggregate_column = 2;
   AggregateOperator::Function aggregate_function =
@@ -294,7 +303,7 @@ TEST(AggregateOperatorTest, SumPositiveNegative) {
 }
 
 TEST(AggregateOperatorTest, CountPositiveNegativeSingleBatch) {
-  SchemaOwner schema = CreateSchema();
+  SchemaOwner schema = CreateSchemaPrimaryKey();
   std::vector<ColumnID> group_columns = {1};
   ColumnID aggregate_column = -1;
   AggregateOperator::Function aggregate_function =
@@ -327,7 +336,7 @@ TEST(AggregateOperatorTest, CountPositiveNegativeSingleBatch) {
 }
 
 TEST(AggregateOperatorTest, SumPositiveNegativeSingleBatch) {
-  SchemaOwner schema = CreateSchema();
+  SchemaOwner schema = CreateSchemaPrimaryKey();
   std::vector<ColumnID> group_columns = {1};
   ColumnID aggregate_column = 2;
   AggregateOperator::Function aggregate_function =
@@ -355,6 +364,73 @@ TEST(AggregateOperatorTest, SumPositiveNegativeSingleBatch) {
   std::vector<Record> outputs;
   EXPECT_TRUE(aggregate.Process(UNDEFINED_NODE_INDEX, records, &outputs));
   compareRecordStreams(expected_records, outputs);
+}
+
+TEST(AggregateOperatorTest, OutputSchemaPrimaryKeyTest) {
+  // TEST 1: Primary keyed schema's keycolumn included in projected schema
+  SchemaOwner schema = CreateSchemaPrimaryKey();
+  std::vector<ColumnID> group_columns = {0};
+  // create project operator..
+  AggregateOperator aggregate1 =
+      AggregateOperator(group_columns, AggregateOperator::Function::SUM, 2);
+  aggregate1.input_schemas_.push_back(SchemaRef(schema));
+  aggregate1.ComputeOutputSchema();
+  // expected data in output schema
+  std::vector<std::string> expected_names = {"Col1", "Sum"};
+  std::vector<CType> expected_types = {CType::INT, CType::INT};
+  std::vector<ColumnID> expected_keys = {0};
+  // test schema data
+  EXPECT_EQ(aggregate1.output_schema_.column_names(), expected_names);
+  EXPECT_EQ(aggregate1.output_schema_.column_types(), expected_types);
+  EXPECT_EQ(aggregate1.output_schema_.keys(), expected_keys);
+
+  // TEST 2: Primary keyed schema's keycolumn not included in projected schema
+  group_columns = {1};
+  AggregateOperator aggregate2 =
+      AggregateOperator(group_columns, AggregateOperator::Function::SUM, 2);
+  aggregate2.input_schemas_.push_back(SchemaRef(schema));
+  aggregate2.ComputeOutputSchema();
+  // expected data in output schema
+  expected_names = {"Col2", "Sum"};
+  expected_types = {CType::INT, CType::INT};
+  expected_keys = {};
+  EXPECT_EQ(aggregate2.output_schema_.column_names(), expected_names);
+  EXPECT_EQ(aggregate2.output_schema_.column_types(), expected_types);
+  EXPECT_EQ(aggregate2.output_schema_.keys(), expected_keys);
+}
+
+TEST(AggregateOperatorTest, OutputSchemaCompositeKeyTest) {
+  // TEST 1: Primary keyed schema's keycolumn included in projected schema
+  SchemaOwner schema = CreateSchemaCompositeKey();
+  std::vector<ColumnID> group_columns = {0, 1, 4};
+  // create project operator..
+  AggregateOperator aggregate1 =
+      AggregateOperator(group_columns, AggregateOperator::Function::SUM, 2);
+  aggregate1.input_schemas_.push_back(SchemaRef(schema));
+  aggregate1.ComputeOutputSchema();
+  // expected data in output schema
+  std::vector<std::string> expected_names = {"Col1", "Col2", "Col5", "Sum"};
+  std::vector<CType> expected_types = {CType::UINT, CType::TEXT, CType::INT,
+                                       CType::INT};
+  std::vector<ColumnID> expected_keys = {1, 2};
+  // test schema data
+  EXPECT_EQ(aggregate1.output_schema_.column_names(), expected_names);
+  EXPECT_EQ(aggregate1.output_schema_.column_types(), expected_types);
+  EXPECT_EQ(aggregate1.output_schema_.keys(), expected_keys);
+
+  // TEST 2: Primary keyed schema's keycolumn not included in projected schema
+  group_columns = {0, 1};
+  AggregateOperator aggregate2 =
+      AggregateOperator(group_columns, AggregateOperator::Function::SUM, 2);
+  aggregate2.input_schemas_.push_back(SchemaRef(schema));
+  aggregate2.ComputeOutputSchema();
+  // expected data in output schema
+  expected_names = {"Col1", "Col2", "Sum"};
+  expected_types = {CType::UINT, CType::TEXT, CType::INT};
+  expected_keys = {};
+  EXPECT_EQ(aggregate2.output_schema_.column_names(), expected_names);
+  EXPECT_EQ(aggregate2.output_schema_.column_types(), expected_types);
+  EXPECT_EQ(aggregate2.output_schema_.keys(), expected_keys);
 }
 
 }  // namespace dataflow

@@ -269,7 +269,7 @@ bool AggregateOperator::Process(NodeIndex source,
     // happen if a positive record if emitted for the corresponding key with
     // value 0.
     // NOTE: The comparision of final state update with 0 is semantically
-    // correct for both FuncSum and FuncCount.
+    // correct for both SUM and COUNT.
     if (item.second.is_insert_) {
       switch (aggregate_schema_ref_.TypeOf(0)) {
         case sqlast::ColumnDefinition::Type::UINT:

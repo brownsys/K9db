@@ -52,7 +52,7 @@ class AggregateOperator : public Operator {
   SchemaOwner aggregate_schema_;
   SchemaRef aggregate_schema_ref_;
 
-  // equivalent of doing a logical project on record
+  // Equivalent of doing a logical project on record
   std::vector<Key> GenerateKey(const Record &record) const;
   // Combine key from state with computed aggregate and emit record. Used for
   // emitting both positive and negative records
@@ -70,6 +70,8 @@ class AggregateOperator : public Operator {
   FRIEND_TEST(AggregateOperatorTest, SumPositiveNegative);
   FRIEND_TEST(AggregateOperatorTest, CountPositiveNegativeSingleBatch);
   FRIEND_TEST(AggregateOperatorTest, SumPositiveNegativeSingleBatch);
+  FRIEND_TEST(AggregateOperatorTest, OutputSchemaPrimaryKeyTest);
+  FRIEND_TEST(AggregateOperatorTest, OutputSchemaCompositeKeyTest);
 };
 
 }  // namespace dataflow
