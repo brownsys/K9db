@@ -91,6 +91,23 @@ absl::Status Shard(const sqlast::Select &stmt, SharderState *state,
   }
 }
 
+absl::Status Query(std::vector<RawRecord> *output, const sqlast::Select &stmt,
+                   SharderState *state, dataflow::DataFlowState *dataflow_state,
+                   bool positive) {
+  Callback cb = [=](void *ctx, int cols, char **vals, char **names) {
+    std::vector<std::string> vs;
+    std::vector<std::string> ns;
+    for (int i = 0; i < cols; i++) {
+      vs.emplace_back(vals[i]);
+      ns.emplace_back(names[i]);
+    }
+    output->emplace_back(stmt.table_name(), vs, ns, positive);
+    return 0;
+  };
+
+  return Shard(stmt, state, dataflow_state, {cb, nullptr, nullptr});
+}
+
 }  // namespace select
 }  // namespace sqlengine
 }  // namespace shards

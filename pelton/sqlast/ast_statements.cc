@@ -106,6 +106,16 @@ void Update::RemoveWhereClause() {
   this->where_clause_ = std::optional<std::unique_ptr<BinaryExpression>>();
 }
 
+Select Update::SelectDomain() const {
+  Select select{this->table_name()};
+  select.AddColumn("*");
+  if (this->HasWhereClause()) {
+    select.SetWhereClause(
+        std::make_unique<BinaryExpression>(*this->where_clause_->get()));
+  }
+  return select;
+}
+
 // Select.
 const std::string &Select::table_name() const { return this->table_name_; }
 std::string &Select::table_name() { return this->table_name_; }
@@ -152,6 +162,16 @@ void Delete::SetWhereClause(std::unique_ptr<BinaryExpression> &&where) {
 }
 void Delete::RemoveWhereClause() {
   this->where_clause_ = std::optional<std::unique_ptr<BinaryExpression>>();
+}
+
+Select Delete::SelectDomain() const {
+  Select select{this->table_name()};
+  select.AddColumn("*");
+  if (this->HasWhereClause()) {
+    select.SetWhereClause(
+        std::make_unique<BinaryExpression>(*this->where_clause_->get()));
+  }
+  return select;
 }
 
 }  // namespace sqlast

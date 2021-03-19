@@ -5,8 +5,11 @@
 
 #include <utility>
 
-#define CHECK_STATUS(status) \
-  if (!status.ok()) return status
+#define __CHECK_STATUS_VAR_NAME(arg) __ASSIGN_OR_RETURN_RESULT_##arg
+#define __CHECK_STATUS_VAL(arg) __CHECK_STATUS_VAR_NAME(arg)
+#define CHECK_STATUS(status)                  \
+  auto __CHECK_STATUS_VAL(__LINE__) = status; \
+  if (!__CHECK_STATUS_VAL(__LINE__).ok()) return __CHECK_STATUS_VAL(__LINE__)
 
 #define __ASSIGN_OR_RETURN_VAR_NAME(arg) __ASSIGN_OR_RETURN_RESULT_##arg
 #define __ASSIGN_OR_RETURN_VAL(arg) __ASSIGN_OR_RETURN_VAR_NAME(arg)

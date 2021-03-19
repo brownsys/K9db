@@ -52,6 +52,9 @@ class SharderState {
   void Initialize(const std::string &dir_path);
 
   // Schema manipulations.
+  void AddSchema(const UnshardedTableName &table_name,
+                 const sqlast::CreateTable &table_schema);
+
   void AddShardKind(const ShardKind &kind, const ColumnName &pk);
 
   void AddUnshardedTable(const UnshardedTableName &table,
@@ -67,6 +70,9 @@ class SharderState {
   void RemoveUserFromShard(const ShardKind &kind, const UserId &user_id);
 
   // Schema lookups.
+  const sqlast::CreateTable &GetSchema(
+      const UnshardedTableName &table_name) const;
+
   bool Exists(const UnshardedTableName &table) const;
 
   bool IsSharded(const UnshardedTableName &table) const;
@@ -91,6 +97,8 @@ class SharderState {
  private:
   // Directory in which all shards are stored.
   std::string dir_path_;
+
+  std::unordered_map<UnshardedTableName, sqlast::CreateTable> schema_;
 
   // All shard kinds as determined from the schema.
   // Maps a shard kind (e.g. a table name with PII) to the primary key of that

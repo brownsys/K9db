@@ -63,7 +63,7 @@ class EquiJoinOperator : public Operator {
 
   // Join left and right and store it in output.
   void EmitRow(const Record &left, const Record &right,
-               std::vector<Record> *output);
+               std::vector<Record> *output, bool positive);
 
   FRIEND_TEST(EquiJoinOperatorTest, JoinedSchemaTest);
   FRIEND_TEST(EquiJoinOperatorTest, BasicJoinTest);

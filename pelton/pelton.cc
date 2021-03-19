@@ -46,7 +46,7 @@ bool SpecialStatements(const std::string &sql, Connection *connection) {
     v.at(2).pop_back();
     std::string shard_name = shards::sqlengine::NameShard(v.at(1), v.at(2));
     const std::string &dir_path = connection->GetSharderState()->dir_path();
-    std::cout << absl::StrCat(dir_path, shard_name, ".sqlite3") << std::endl;
+    std::cout << absl::StrCat(dir_path, shard_name) << std::endl;
     return true;
   }
   return false;

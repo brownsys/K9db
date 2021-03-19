@@ -24,6 +24,11 @@ void SharderState::Initialize(const std::string &dir_path) {
 }
 
 // Schema manipulations.
+void SharderState::AddSchema(const UnshardedTableName &table_name,
+                             const sqlast::CreateTable &table_schema) {
+  this->schema_.insert({table_name, table_schema});
+}
+
 void SharderState::AddShardKind(const ShardKind &kind, const ColumnName &pk) {
   this->kinds_.insert({kind, pk});
   this->kind_to_tables_.insert({kind, {}});
@@ -67,6 +72,11 @@ void SharderState::RemoveUserFromShard(const ShardKind &kind,
 }
 
 // Schema lookups.
+const sqlast::CreateTable &SharderState::GetSchema(
+    const UnshardedTableName &table_name) const {
+  return this->schema_.at(table_name);
+}
+
 bool SharderState::Exists(const UnshardedTableName &table) const {
   return this->sharded_schema_.count(table) > 0 ||
          this->sharded_by_.count(table) > 0;

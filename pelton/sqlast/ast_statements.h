@@ -60,73 +60,6 @@ class Insert : public AbstractStatement {
   std::vector<std::string> values_;
 };
 
-class Update : public AbstractStatement {
- public:
-  explicit Update(const std::string &table_name)
-      : AbstractStatement(AbstractStatement::Type::UPDATE),
-        table_name_(table_name) {}
-
-  Update(const Update &update)
-      : AbstractStatement(AbstractStatement::Type::UPDATE) {
-    this->table_name_ = update.table_name_;
-    this->columns_ = update.columns_;
-    this->values_ = update.values_;
-    if (update.where_clause_.has_value()) {
-      this->where_clause_ = std::optional(
-          std::make_unique<BinaryExpression>(*update.where_clause_->get()));
-    }
-  }
-
-  const std::string &table_name() const;
-  std::string &table_name();
-
-  void AddColumnValue(const std::string &column, const std::string &value);
-  absl::StatusOr<std::string> RemoveColumnValue(const std::string &column);
-  bool AssignsTo(const std::string &column) const;
-
-  const std::vector<std::string> &GetColumns() const;
-  std::vector<std::string> &GetColumns();
-  const std::vector<std::string> &GetValues() const;
-  std::vector<std::string> &GetValues();
-
-  bool HasWhereClause() const;
-  const BinaryExpression *const GetWhereClause() const;
-  BinaryExpression *const GetWhereClause();
-  void SetWhereClause(std::unique_ptr<BinaryExpression> &&where);
-  void RemoveWhereClause();
-
-  template <class T>
-  T Visit(AbstractVisitor<T> *visitor) const {
-    return visitor->VisitUpdate(*this);
-  }
-  template <class T>
-  T Visit(MutableVisitor<T> *visitor) {
-    return visitor->VisitUpdate(this);
-  }
-  template <class T>
-  std::vector<T> VisitChildren(AbstractVisitor<T> *visitor) const {
-    std::vector<T> result;
-    if (this->where_clause_.has_value()) {
-      result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
-    }
-    return result;
-  }
-  template <class T>
-  std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
-    std::vector<T> result;
-    if (this->where_clause_.has_value()) {
-      result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
-    }
-    return result;
-  }
-
- private:
-  std::string table_name_;
-  std::vector<std::string> columns_;
-  std::vector<std::string> values_;
-  std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
-};
-
 class Select : public AbstractStatement {
  public:
   explicit Select(const std::string &table_name)
@@ -188,6 +121,75 @@ class Select : public AbstractStatement {
   std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
 };
 
+class Update : public AbstractStatement {
+ public:
+  explicit Update(const std::string &table_name)
+      : AbstractStatement(AbstractStatement::Type::UPDATE),
+        table_name_(table_name) {}
+
+  Update(const Update &update)
+      : AbstractStatement(AbstractStatement::Type::UPDATE) {
+    this->table_name_ = update.table_name_;
+    this->columns_ = update.columns_;
+    this->values_ = update.values_;
+    if (update.where_clause_.has_value()) {
+      this->where_clause_ = std::optional(
+          std::make_unique<BinaryExpression>(*update.where_clause_->get()));
+    }
+  }
+
+  const std::string &table_name() const;
+  std::string &table_name();
+
+  void AddColumnValue(const std::string &column, const std::string &value);
+  absl::StatusOr<std::string> RemoveColumnValue(const std::string &column);
+  bool AssignsTo(const std::string &column) const;
+
+  const std::vector<std::string> &GetColumns() const;
+  std::vector<std::string> &GetColumns();
+  const std::vector<std::string> &GetValues() const;
+  std::vector<std::string> &GetValues();
+
+  bool HasWhereClause() const;
+  const BinaryExpression *const GetWhereClause() const;
+  BinaryExpression *const GetWhereClause();
+  void SetWhereClause(std::unique_ptr<BinaryExpression> &&where);
+  void RemoveWhereClause();
+
+  Select SelectDomain() const;
+
+  template <class T>
+  T Visit(AbstractVisitor<T> *visitor) const {
+    return visitor->VisitUpdate(*this);
+  }
+  template <class T>
+  T Visit(MutableVisitor<T> *visitor) {
+    return visitor->VisitUpdate(this);
+  }
+  template <class T>
+  std::vector<T> VisitChildren(AbstractVisitor<T> *visitor) const {
+    std::vector<T> result;
+    if (this->where_clause_.has_value()) {
+      result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
+    }
+    return result;
+  }
+  template <class T>
+  std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
+    std::vector<T> result;
+    if (this->where_clause_.has_value()) {
+      result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
+    }
+    return result;
+  }
+
+ private:
+  std::string table_name_;
+  std::vector<std::string> columns_;
+  std::vector<std::string> values_;
+  std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
+};
+
 class Delete : public AbstractStatement {
  public:
   explicit Delete(const std::string &table_name)
@@ -211,6 +213,8 @@ class Delete : public AbstractStatement {
   BinaryExpression *const GetWhereClause();
   void SetWhereClause(std::unique_ptr<BinaryExpression> &&where);
   void RemoveWhereClause();
+
+  Select SelectDomain() const;
 
   template <class T>
   T Visit(AbstractVisitor<T> *visitor) const {

@@ -92,6 +92,7 @@ cc_library(
         "delete.h",
     ],
     deps = [
+        ":select",
         "//pelton/dataflow:state",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -112,6 +113,7 @@ cc_library(
         "update.h",
     ],
     deps = [
+        ":select",
         "//pelton/dataflow:state",
         "//pelton/shards:state",
         "//pelton/shards:types",

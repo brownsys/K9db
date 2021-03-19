@@ -3,8 +3,10 @@
 #include "pelton/shards/sqlengine/delete.h"
 
 #include <string>
+#include <vector>
 
 #include "absl/strings/str_cat.h"
+#include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/status.h"
 
@@ -16,6 +18,14 @@ namespace delete_ {
 absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
                    dataflow::DataFlowState *dataflow_state,
                    const OutputChannel &output) {
+  // Get the rows that are going to be deleted prior to deletion to use them
+  // to update the dataflows.
+  std::vector<RawRecord> records;
+  CHECK_STATUS(select::Query(&records, stmt.SelectDomain(), state,
+                             dataflow_state, false));
+
+  // Must transform the delete statement into one that is compatible with
+  // the sharded schema.
   const std::string &table_name = stmt.table_name();
   bool is_sharded = state->IsSharded(table_name);
   bool is_pii = state->IsPII(table_name);
@@ -35,14 +45,17 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
 
     // Remove user shard.
     std::string shard = sqlengine::NameShard(table_name, user_id);
-    std::string path = absl::StrCat(state->dir_path(), shard, ".sqlite3");
+    std::string path = absl::StrCat(state->dir_path(), shard);
     remove(path.c_str());
     state->RemoveUserFromShard(table_name, user_id);
 
     // Turn the delete statement back to a string, to delete relevant row in
     // PII table.
     std::string delete_str = stmt.Visit(&stringifier);
-    return state->connection_pool().ExecuteDefault(delete_str, output);
+    CHECK_STATUS(state->connection_pool().ExecuteDefault(delete_str, output));
+
+    // TODO(babman): Update dataflow after user has been deleted.
+    return absl::UnimplementedError("Dataflow not updated after a user delete");
 
   } else if (!is_sharded && !is_pii) {
     // Case 2: Table does not have PII and is not sharded!
@@ -79,9 +92,12 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
             delete_str, info, state->UsersOfShard(info.shard_kind), output));
       }
     }
-
-    return absl::OkStatus();
   }
+
+  // Delete was successful, time to update dataflows.
+  dataflow_state->ProcessRawRecords(records);
+
+  return absl::OkStatus();
 }
 
 }  // namespace delete_

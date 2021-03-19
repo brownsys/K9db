@@ -37,7 +37,7 @@ ConnectionPool::~ConnectionPool() {
 // Initialization: open a connection to the default unsharded database.
 void ConnectionPool::Initialize(const std::string &dir_path) {
   this->dir_path_ = dir_path;
-  std::string shard_path = dir_path + std::string("default.sqlite3");
+  std::string shard_path = absl::StrCat(dir_path, "default.sqlite3");
   ::sqlite3_open(shard_path.c_str(), &this->default_noshard_connection_);
 }
 
@@ -52,7 +52,7 @@ void ConnectionPool::Initialize(const std::string &dir_path) {
                                          const UserId &user_id) const {
   // Find the shard path.
   std::string shard_name = sqlengine::NameShard(shard_kind, user_id);
-  std::string shard_path = this->dir_path_ + shard_name;
+  std::string shard_path = absl::StrCat(this->dir_path_, shard_name);
   // Open and return connection.
   LOG(INFO) << "Shard: " << shard_name;
   ::sqlite3 *connection;
