@@ -49,14 +49,13 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
 
         // Execute statement directly against shard.
         std::string update_str = cloned.Visit(&stringifier);
-        CHECK_STATUS(state->connection_pool().ExecuteShard(
-            update_str, info.shard_kind, user_id, output));
+        CHECK_STATUS(state->connection_pool().ExecuteShard(update_str, info,
+                                                           user_id, output));
       } else {
         // Update against the relevant shards.
         std::string update_str = cloned.Visit(&stringifier);
         CHECK_STATUS(state->connection_pool().ExecuteShard(
-            update_str, info.shard_kind, state->UsersOfShard(info.shard_kind),
-            output));
+            update_str, info, state->UsersOfShard(info.shard_kind), output));
       }
     }
 

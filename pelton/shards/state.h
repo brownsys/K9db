@@ -82,15 +82,6 @@ class SharderState {
 
   const std::unordered_set<UserId> &UsersOfShard(const ShardKind &kind) const;
 
-  // Raw records.
-  void AddRawRecord(const std::string &table_name,
-                    const std::vector<std::string> values,
-                    const std::vector<std::string> columns, bool positive);
-
-  const std::vector<RawRecord> &GetRawRecords() const;
-
-  void ClearRawRecords();
-
   // Save state to durable file.
   void Save();
 
@@ -136,9 +127,6 @@ class SharderState {
 
   // Connection pool that manages the underlying sqlite3 databases.
   ConnectionPool connection_pool_;
-
-  // Stores RawRecords that need to be processed by the dataflow.
-  std::vector<RawRecord> raw_records_;
 };
 
 }  // namespace shards

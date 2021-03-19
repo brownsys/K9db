@@ -83,10 +83,6 @@ bool exec(Connection *connection, std::string sql,
     return false;
   }
 
-  // Update date flow records.
-  dstate->ProcessRawRecords(sstate->GetRawRecords());
-  sstate->ClearRawRecords();
-
   return true;
 }
 

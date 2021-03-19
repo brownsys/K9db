@@ -70,14 +70,13 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
 
         // Execute statement directly against shard.
         std::string delete_str = cloned.Visit(&stringifier);
-        CHECK_STATUS(state->connection_pool().ExecuteShard(
-            delete_str, info.shard_kind, user_id, output));
+        CHECK_STATUS(state->connection_pool().ExecuteShard(delete_str, info,
+                                                           user_id, output));
       } else {
         // Execute statement against all shards of this kind.
         std::string delete_str = cloned.Visit(&stringifier);
         CHECK_STATUS(state->connection_pool().ExecuteShard(
-            delete_str, info.shard_kind, state->UsersOfShard(info.shard_kind),
-            output));
+            delete_str, info, state->UsersOfShard(info.shard_kind), output));
       }
     }
 

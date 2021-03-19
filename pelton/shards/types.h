@@ -63,9 +63,10 @@ struct ShardingInformation {
 
 // Describes a raw record (a sequence of untyped values for columns of a row).
 struct RawRecord {
-  std::string table_name;
-  std::vector<std::string> values;
-  std::vector<std::string> columns;  // If empty, this is the default order.
+  const std::string &table_name;
+  const std::vector<std::string> &values;
+  // If empty, this is the default order.
+  const std::vector<std::string> &columns;
   bool positive;
   RawRecord(const std::string &tn, const std::vector<std::string> &vs,
             const std::vector<std::string> &ns, bool p)

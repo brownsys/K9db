@@ -35,9 +35,11 @@ class ConnectionPool {
                               const OutputChannel &output);
 
   // Execute statement against given user shard(s).
-  absl::Status ExecuteShard(const std::string &sql, const ShardKind &shard_kind,
+  absl::Status ExecuteShard(const std::string &sql,
+                            const ShardingInformation &info,
                             const UserId &user_id, const OutputChannel &output);
-  absl::Status ExecuteShard(const std::string &sql, const ShardKind &shard_kind,
+  absl::Status ExecuteShard(const std::string &sql,
+                            const ShardingInformation &info,
                             const std::unordered_set<UserId> &user_ids,
                             const OutputChannel &output);
 
@@ -48,12 +50,23 @@ class ConnectionPool {
                            const UserId &user_id) const;
 
   // Actually execute statements after their connection has been resolved.
-  absl::Status Execute(const std::string &sql, ::sqlite3 *connection,
-                       const OutputChannel &output);
+  absl::Status ExecuteDefault(const std::string &sql, ::sqlite3 *connection,
+                              const OutputChannel &output);
+  absl::Status ExecuteShard(const std::string &sql, ::sqlite3 *connection,
+                            const ShardingInformation &info,
+                            const UserId &user_id, const OutputChannel &output);
 
   std::string dir_path_;
   // We always keep an open connection to the main non-sharded database.
   ::sqlite3 *default_noshard_connection_;
+
+  // We use these private static fields to remove captures from std::function
+  // and lambdas, so that they can be passed to SQLITE3 API as old C-style
+  // func pointers.
+  static const Callback *CALLBACK_NO_CAPTURE;
+  static size_t SHARD_BY_INDEX_NO_CAPTURE;
+  static char *SHARD_BY_NO_CAPTURE;
+  static char *USER_ID_NO_CAPTURE;
 };
 
 }  // namespace shards
