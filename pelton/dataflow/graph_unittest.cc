@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "gtest/gtest.h"
+#include "pelton/dataflow/ops/aggregate.h"
 #include "pelton/dataflow/ops/equijoin.h"
 #include "pelton/dataflow/ops/filter.h"
 #include "pelton/dataflow/ops/input.h"
@@ -177,6 +178,22 @@ inline std::vector<Record> MakeProjectOnEquiJoinRecords(
   records.emplace_back(schema, true, (uint64_t)2ULL, sd2__);
   return records;
 }
+inline std::vector<Record> MakeAggregateRecords(const SchemaRef &schema) {
+  // Make records.
+  std::vector<Record> records;
+  records.emplace_back(schema, true, 1L, (uint64_t)3ULL);
+  records.emplace_back(schema, true, 3L, (uint64_t)1ULL);
+  records.emplace_back(schema, true, 5L, (uint64_t)1ULL);
+  return records;
+}
+inline std::vector<Record> MakeAggregateOnEquiJoinRecords(
+    const SchemaRef &schema) {
+  // Make records.
+  std::vector<Record> records;
+  records.emplace_back(schema, true, 1L, (uint64_t)3ULL);
+  records.emplace_back(schema, true, 5L, (uint64_t)1ULL);
+  return records;
+}
 
 // Make different types of flows/graphs.
 DataFlowGraph MakeTrivialGraph(ColumnID keycol, const SchemaRef &schema) {
@@ -326,6 +343,54 @@ DataFlowGraph MakeProjectOnEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
   return g;
 }
 
+DataFlowGraph MakeAggregateGraph(ColumnID keycol, const SchemaRef &schema) {
+  std::vector<ColumnID> keys = {keycol};
+  std::vector<ColumnID> group_columns = {2};
+  DataFlowGraph g;
+
+  auto in = std::make_shared<InputOperator>("test-table", schema);
+  auto aggregate = std::make_shared<AggregateOperator>(
+      group_columns, AggregateOperator::Function::COUNT, -1);
+  auto matview = std::make_shared<MatViewOperator>(keys);
+
+  EXPECT_TRUE(g.AddInputNode(in));
+  EXPECT_TRUE(g.AddNode(aggregate, in));
+  EXPECT_TRUE(g.AddOutputOperator(matview, aggregate));
+  EXPECT_EQ(g.inputs().size(), 1);
+  EXPECT_EQ(g.outputs().size(), 1);
+  EXPECT_EQ(g.inputs().at("test-table").get(), in.get());
+  EXPECT_EQ(g.outputs().at(0).get(), matview.get());
+  return g;
+}
+
+DataFlowGraph MakeAggregateOnEquiJoinGraph(ColumnID ok, ColumnID lk,
+                                           ColumnID rk,
+                                           const SchemaRef &lschema,
+                                           const SchemaRef &rschema) {
+  std::vector<ColumnID> keys = {ok};
+  std::vector<ColumnID> group_columns = {2};
+  DataFlowGraph g;
+
+  auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
+  auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
+  auto join = std::make_shared<EquiJoinOperator>(lk, rk);
+  auto aggregate = std::make_shared<AggregateOperator>(
+      group_columns, AggregateOperator::Function::COUNT, -1);
+  auto matview = std::make_shared<MatViewOperator>(keys);
+
+  EXPECT_TRUE(g.AddInputNode(in1));
+  EXPECT_TRUE(g.AddInputNode(in2));
+  EXPECT_TRUE(g.AddNode(join, {in1, in2}));
+  EXPECT_TRUE(g.AddNode(aggregate, join));
+  EXPECT_TRUE(g.AddOutputOperator(matview, aggregate));
+  EXPECT_EQ(g.inputs().size(), 2);
+  EXPECT_EQ(g.outputs().size(), 1);
+  EXPECT_EQ(g.inputs().at("test-table1").get(), in1.get());
+  EXPECT_EQ(g.inputs().at("test-table2").get(), in2.get());
+  EXPECT_EQ(g.outputs().at(0).get(), matview.get());
+  return g;
+}
+
 inline void MatViewContentsEquals(std::shared_ptr<MatViewOperator> matview,
                                   const std::vector<Record> &records) {
   EXPECT_EQ(matview->count(), records.size());
@@ -333,6 +398,17 @@ inline void MatViewContentsEquals(std::shared_ptr<MatViewOperator> matview,
     std::vector<Record> singleton;
     singleton.push_back(record.Copy());
     EXPECT_EQ(singleton, matview->Lookup(record.GetKey()));
+  }
+}
+
+inline void MatViewContentsEqualsIndexed(
+    std::shared_ptr<MatViewOperator> matview,
+    const std::vector<Record> &records, size_t index) {
+  EXPECT_EQ(matview->count(), records.size());
+  for (const Record &record : records) {
+    std::vector<Record> singleton;
+    singleton.push_back(record.Copy());
+    EXPECT_EQ(singleton, matview->Lookup(record.GetValue(index)));
   }
 }
 
@@ -459,6 +535,44 @@ TEST(DataFlowGraphTest, TestProjectOnEquiJoinGraph) {
   // Outputs must be equal.
   MatViewContentsEquals(g.outputs().at(0), result);
 }
+
+TEST(DataFlowGraphTest, TestAggregateGraph) {
+  // Schema must survive records.
+  SchemaOwner schema = MakeLeftSchema();
+  // Make graph.
+  DataFlowGraph g = MakeAggregateGraph(0, SchemaRef(schema));
+  // Make records.
+  std::vector<Record> records = MakeLeftRecords(SchemaRef(schema));
+  // Process records.
+  EXPECT_TRUE(g.Process("test-table", records));
+  // Compute expected result.
+  auto op = std::dynamic_pointer_cast<AggregateOperator>(g.GetNode(1));
+  std::vector<Record> result = MakeAggregateRecords(op->output_schema());
+  // Outputs must be equal.
+  MatViewContentsEqualsIndexed(g.outputs().at(0), result, 0);
+}
+
+TEST(DataFlowGraphTest, TestAggregateOnEquiJoinGraph) {
+  // Schema must survive records.
+  SchemaOwner lschema = MakeLeftSchema();
+  SchemaOwner rschema = MakeRightSchema();
+  // Make graph.
+  DataFlowGraph g = MakeAggregateOnEquiJoinGraph(0, 2, 0, SchemaRef(lschema),
+                                                 SchemaRef(rschema));
+  // Make records.
+  std::vector<Record> left = MakeLeftRecords(SchemaRef(lschema));
+  std::vector<Record> right = MakeRightRecords(SchemaRef(rschema));
+  // Process records.
+  EXPECT_TRUE(g.Process("test-table1", left));
+  EXPECT_TRUE(g.Process("test-table2", right));
+  // Compute expected result.
+  auto op = std::dynamic_pointer_cast<AggregateOperator>(g.GetNode(3));
+  std::vector<Record> result =
+      MakeAggregateOnEquiJoinRecords(op->output_schema());
+  // Outputs must be equal.
+  MatViewContentsEqualsIndexed(g.outputs().at(0), result, 0);
+}
+
 #ifndef PELTON_VALGRIND_MODE
 TEST(RecordTest, TestDuplicateInputGraph) {
   // Create a schema.
