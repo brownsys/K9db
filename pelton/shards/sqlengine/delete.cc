@@ -17,12 +17,14 @@ namespace delete_ {
 
 absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
                    dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output) {
+                   const OutputChannel &output, bool update_flows) {
   // Get the rows that are going to be deleted prior to deletion to use them
   // to update the dataflows.
   std::vector<RawRecord> records;
-  CHECK_STATUS(select::Query(&records, stmt.SelectDomain(), state,
-                             dataflow_state, false));
+  if (update_flows) {
+    CHECK_STATUS(select::Query(&records, stmt.SelectDomain(), state,
+                               dataflow_state, false));
+  }
 
   // Must transform the delete statement into one that is compatible with
   // the sharded schema.
@@ -76,15 +78,17 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
       sqlast::ValueFinder value_finder(info.shard_by);
       auto [found, user_id] = cloned.Visit(&value_finder);
       if (found) {
-        // Remove where condition on the shard by column, since it does not
-        // exist in the sharded table.
-        sqlast::ExpressionRemover expression_remover(info.shard_by);
-        cloned.Visit(&expression_remover);
+        if (state->ShardExists(info.shard_kind, user_id)) {
+          // Remove where condition on the shard by column, since it does not
+          // exist in the sharded table.
+          sqlast::ExpressionRemover expression_remover(info.shard_by);
+          cloned.Visit(&expression_remover);
 
-        // Execute statement directly against shard.
-        std::string delete_str = cloned.Visit(&stringifier);
-        CHECK_STATUS(state->connection_pool().ExecuteShard(delete_str, info,
-                                                           user_id, output));
+          // Execute statement directly against shard.
+          std::string delete_str = cloned.Visit(&stringifier);
+          CHECK_STATUS(state->connection_pool().ExecuteShard(delete_str, info,
+                                                             user_id, output));
+        }
       } else {
         // Execute statement against all shards of this kind.
         std::string delete_str = cloned.Visit(&stringifier);
@@ -95,7 +99,9 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
   }
 
   // Delete was successful, time to update dataflows.
-  dataflow_state->ProcessRawRecords(records);
+  if (update_flows) {
+    dataflow_state->ProcessRawRecords(records);
+  }
 
   return absl::OkStatus();
 }

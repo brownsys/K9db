@@ -14,7 +14,7 @@ namespace insert {
 
 absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
                    dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output) {
+                   const OutputChannel &output, bool update_flows) {
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
   if (!state->Exists(table_name)) {
@@ -65,9 +65,11 @@ absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
 
   // Insert was successful, time to update dataflows.
   // Turn inserted values into a record and process it via corresponding flows.
-  std::vector<RawRecord> records;
-  records.emplace_back(table_name, stmt.GetValues(), stmt.GetColumns(), true);
-  dataflow_state->ProcessRawRecords(records);
+  if (update_flows) {
+    std::vector<RawRecord> records;
+    records.emplace_back(table_name, stmt.GetValues(), stmt.GetColumns(), true);
+    dataflow_state->ProcessRawRecords(records);
+  }
 
   return absl::OkStatus();
 }

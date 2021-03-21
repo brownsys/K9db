@@ -70,15 +70,17 @@ absl::Status Shard(const sqlast::Select &stmt, SharderState *state,
       sqlast::ValueFinder value_finder(info.shard_by);
       auto [found, user_id] = cloned.Visit(&value_finder);
       if (found) {
-        // Remove where condition on the shard by column, since it does not
-        // exist in the sharded table.
-        sqlast::ExpressionRemover expression_remover(info.shard_by);
-        cloned.Visit(&expression_remover);
+        if (state->ShardExists(info.shard_kind, user_id)) {
+          // Remove where condition on the shard by column, since it does not
+          // exist in the sharded table.
+          sqlast::ExpressionRemover expression_remover(info.shard_by);
+          cloned.Visit(&expression_remover);
 
-        // Execute statement directly against shard.
-        std::string select_str = cloned.Visit(&stringifier);
-        CHECK_STATUS(state->connection_pool().ExecuteShard(select_str, info,
-                                                           user_id, coutput));
+          // Execute statement directly against shard.
+          std::string select_str = cloned.Visit(&stringifier);
+          CHECK_STATUS(state->connection_pool().ExecuteShard(select_str, info,
+                                                             user_id, coutput));
+        }
       } else {
         // Select from all the relevant shards.
         std::string select_str = cloned.Visit(&stringifier);

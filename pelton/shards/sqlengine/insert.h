@@ -16,7 +16,7 @@ namespace insert {
 
 absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
                    dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output);
+                   const OutputChannel &output, bool update_flows = true);
 
 }  // namespace insert
 }  // namespace sqlengine

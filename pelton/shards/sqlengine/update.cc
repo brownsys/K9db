@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "pelton/shards/sqlengine/delete.h"
+#include "pelton/shards/sqlengine/insert.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/util/status.h"
 
@@ -25,6 +27,8 @@ int IndexOfColumn(const std::string &col_name,
   return -1;
 }
 
+// Apply the update statement to every record in records, using table_schema
+// to resolve order of columns.
 absl::Status UpdateRawRecords(std::vector<RawRecord> *records,
                               const sqlast::Update &stmt,
                               const sqlast::CreateTable &table_schema) {
@@ -52,6 +56,39 @@ absl::Status UpdateRawRecords(std::vector<RawRecord> *records,
   return absl::OkStatus();
 }
 
+// Returns true if the update statement might change the shard of the target
+// rows.
+bool ModifiesShardBy(const sqlast::Update &stmt, SharderState *state) {
+  for (const auto &info : state->GetShardingInformation(stmt.table_name())) {
+    if (stmt.AssignsTo(info.shard_by)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Creates a corresponding Insert statement for the given record, using given
+// table_schema to resolve types of values.
+sqlast::Insert InsertRaw(const RawRecord &record,
+                         const sqlast::CreateTable &table_schema) {
+  sqlast::Insert stmt{record.table_name};
+  for (size_t i = 0; i < record.values.size(); i++) {
+    sqlast::ColumnDefinition::Type type =
+        table_schema.GetColumns().at(i).column_type();
+    switch (type) {
+      case sqlast::ColumnDefinition::Type::UINT:
+      case sqlast::ColumnDefinition::Type::INT:
+        stmt.AddValue(record.values.at(i));
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+      case sqlast::ColumnDefinition::Type::DATETIME:
+        stmt.AddValue("\'" + record.values.at(i) + "\'");
+        break;
+    }
+  }
+  return stmt;
+}
+
 }  // namespace
 
 absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
@@ -65,6 +102,7 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
   std::vector<RawRecord> records;
   CHECK_STATUS(select::Query(&records, stmt.SelectDomain(), state,
                              dataflow_state, false));
+  size_t old_records_size = records.size();
   CHECK_STATUS(UpdateRawRecords(&records, stmt, state->GetSchema(table_name)));
 
   sqlast::Stringifier stringifier;
@@ -76,36 +114,51 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
 
   } else {  // is_sharded == true
     // Case 2: table is sharded.
-    // The table might be sharded according to different column/owners.
-    // We must update all these different duplicates.
-    for (const auto &info : state->GetShardingInformation(table_name)) {
-      if (stmt.AssignsTo(info.shard_by)) {
-        return absl::InvalidArgumentError("Update cannot modify owner column");
+    if (ModifiesShardBy(stmt, state)) {
+      // The update statement might move the rows from one shard to another.
+      // We can only perform this update by splitting it into a DELETE-INSERT
+      // pair.
+      CHECK_STATUS(delete_::Shard(stmt.DeleteDomain(), state, dataflow_state,
+                                  output, false));
+
+      // Insert updated records.
+      for (size_t i = old_records_size; i < records.size(); i++) {
+        sqlast::Insert insert_stmt =
+            InsertRaw(records.at(i), state->GetSchema(table_name));
+        CHECK_STATUS(
+            insert::Shard(insert_stmt, state, dataflow_state, output, false));
       }
 
-      // Rename the table to match the sharded name.
-      sqlast::Update cloned = stmt;
-      cloned.table_name() = info.sharded_table_name;
+    } else {
+      // The table might be sharded according to different column/owners.
+      // We must update all these different duplicates.
+      for (const auto &info : state->GetShardingInformation(table_name)) {
+        // Rename the table to match the sharded name.
+        sqlast::Update cloned = stmt;
+        cloned.table_name() = info.sharded_table_name;
 
-      // Find the value assigned to shard_by column in the where clause, and
-      // remove it from the where clause.
-      sqlast::ValueFinder value_finder(info.shard_by);
-      auto [found, user_id] = cloned.Visit(&value_finder);
-      if (found) {
-        // Remove where condition on the shard by column, since it does not
-        // exist in the sharded table.
-        sqlast::ExpressionRemover expression_remover(info.shard_by);
-        cloned.Visit(&expression_remover);
+        // Find the value assigned to shard_by column in the where clause, and
+        // remove it from the where clause.
+        sqlast::ValueFinder value_finder(info.shard_by);
+        auto [found, user_id] = cloned.Visit(&value_finder);
+        if (found) {
+          if (state->ShardExists(info.shard_kind, user_id)) {
+            // Remove where condition on the shard by column, since it does not
+            // exist in the sharded table.
+            sqlast::ExpressionRemover expression_remover(info.shard_by);
+            cloned.Visit(&expression_remover);
 
-        // Execute statement directly against shard.
-        std::string update_str = cloned.Visit(&stringifier);
-        CHECK_STATUS(state->connection_pool().ExecuteShard(update_str, info,
-                                                           user_id, output));
-      } else {
-        // Update against the relevant shards.
-        std::string update_str = cloned.Visit(&stringifier);
-        CHECK_STATUS(state->connection_pool().ExecuteShard(
-            update_str, info, state->UsersOfShard(info.shard_kind), output));
+            // Execute statement directly against shard.
+            std::string update_str = cloned.Visit(&stringifier);
+            CHECK_STATUS(state->connection_pool().ExecuteShard(
+                update_str, info, user_id, output));
+          }
+        } else {
+          // Update against the relevant shards.
+          std::string update_str = cloned.Visit(&stringifier);
+          CHECK_STATUS(state->connection_pool().ExecuteShard(
+              update_str, info, state->UsersOfShard(info.shard_kind), output));
+        }
       }
     }
   }

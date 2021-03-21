@@ -31,6 +31,11 @@ const std::vector<std::string> &Insert::GetValues() const {
   return this->values_;
 }
 
+void Insert::AddValue(const std::string &val) { this->values_.push_back(val); }
+void Insert::AddValue(std::string &&val) {
+  this->values_.push_back(std::move(val));
+}
+
 absl::StatusOr<std::string> Insert::RemoveValue(const std::string &colname) {
   if (this->columns_.size() > 0) {
     auto it = std::find(this->columns_.begin(), this->columns_.end(), colname);
@@ -114,6 +119,15 @@ Select Update::SelectDomain() const {
         std::make_unique<BinaryExpression>(*this->where_clause_->get()));
   }
   return select;
+}
+
+Delete Update::DeleteDomain() const {
+  Delete del{this->table_name()};
+  if (this->HasWhereClause()) {
+    del.SetWhereClause(
+        std::make_unique<BinaryExpression>(*this->where_clause_->get()));
+  }
+  return del;
 }
 
 // Select.

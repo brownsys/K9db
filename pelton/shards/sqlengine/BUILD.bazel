@@ -113,6 +113,8 @@ cc_library(
         "update.h",
     ],
     deps = [
+        ":delete",
+        ":insert",
         ":select",
         "//pelton/dataflow:state",
         "//pelton/shards:state",
