@@ -335,8 +335,8 @@ TEST(RecordTest, RecordMoveConstructor) {
 
 #ifndef PELTON_VALGRIND_MODE
   // Accessing moved record must cause error.
-  ASSERT_DEATH({ record.GetInt(0); }, "Attempting to use moved record");
-  ASSERT_DEATH({ record.GetString(1); }, "Attempting to use moved record");
+  ASSERT_DEATH({ record.GetInt(0); }, "");
+  ASSERT_DEATH({ record.GetString(1); }, "");
 #endif
 
   // This also calls the move constructor.
@@ -347,8 +347,8 @@ TEST(RecordTest, RecordMoveConstructor) {
 
 #ifndef PELTON_VALGRIND_MODE
   // Accessing moved record must cause error.
-  ASSERT_DEATH({ record2.GetInt(0); }, "Attempting to use moved record");
-  ASSERT_DEATH({ record2.GetString(1); }, "Attempting to use moved record");
+  ASSERT_DEATH({ record2.GetInt(0); }, "");
+  ASSERT_DEATH({ record2.GetString(1); }, "");
 #endif
 }
 
@@ -385,8 +385,8 @@ TEST(RecordTest, RecordMoveAssignment) {
 
 #ifndef PELTON_VALGRIND_MODE
   // Accessing moved record must cause error.
-  ASSERT_DEATH({ record.GetInt(0); }, "Attempting to use moved record");
-  ASSERT_DEATH({ record.GetString(1); }, "Attempting to use moved record");
+  ASSERT_DEATH({ record.GetInt(0); }, "");
+  ASSERT_DEATH({ record.GetString(1); }, "");
   // With valgrind, we can check that v2 is freed properly.
 
   // Move into record with different schema should fail.

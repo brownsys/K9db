@@ -286,7 +286,7 @@ DataFlowGraph MakeProjectOnFilterGraph(ColumnID keycol,
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto filter = std::make_shared<FilterOperator>();
-  filter->AddOperation(5UL, 0, FilterOperator::Operation::GREATER_THAN);
+  filter->AddOperation(5_u, 0, FilterOperator::Operation::GREATER_THAN);
   auto project = std::make_shared<ProjectOperator>(column_ids);
   auto matview = std::make_shared<MatViewOperator>(keys);
 

@@ -88,7 +88,7 @@ class Record {
   // Set all data in one shot regardless of types and counts.
   template <typename... Args>
   void SetData(Args &&... ts) {
-    CHECK_NE(this->data_, nullptr) << "Attempting to SetData on moved record";
+    CHECK_NOTNULL(this->data_);
     if constexpr (sizeof...(ts) > 0) {
       SetDataRecursive(0, std::forward<Args>(ts)...);
     }
@@ -226,7 +226,7 @@ class Record {
   inline size_t NumBits() const { return schema_.size() / 64 + 1; }
 
   inline void CheckType(size_t i, sqlast::ColumnDefinition::Type t) const {
-    CHECK_NE(this->data_, nullptr) << "Attempting to use moved record";
+    CHECK_NOTNULL(this->data_);
     if (this->schema_.TypeOf(i) != t) {
       LOG(FATAL) << "Type mismatch: record type is " << this->schema_.TypeOf(i)
                  << ", tried to access as " << t;

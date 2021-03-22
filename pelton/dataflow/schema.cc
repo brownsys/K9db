@@ -62,7 +62,7 @@ size_t SchemaOwner::IndexOf(const std::string &column_name) const {
 // Printing a record to an output stream (e.g. std::cout).
 std::ostream &operator<<(std::ostream &os,
                          const pelton::dataflow::SchemaOwner &schema) {
-  CHECK_NE(schema.ptr_, nullptr) << "Cannot << moved record";
+  CHECK_NOTNULL(schema.ptr_);
   os << "|";
   for (unsigned i = 0; i < schema.size(); ++i) {
     os << schema.NameOf(i) << "(" << schema.TypeOf(i) << ")|";
