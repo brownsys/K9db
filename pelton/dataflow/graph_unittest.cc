@@ -150,17 +150,17 @@ inline std::vector<Record> MakeFilterRecords(const SchemaRef &schema) {
 inline std::vector<Record> MakeProjectRecords(const SchemaRef &schema) {
   // Make records.
   std::vector<Record> records;
-  records.emplace_back(schema, true, 0_u, 1L);
-  records.emplace_back(schema, true, 4_u, 3L);
-  records.emplace_back(schema, true, 5_u, 5L);
-  records.emplace_back(schema, true, 7_u, 1L);
-  records.emplace_back(schema, true, 2_u, 1L);
+  records.emplace_back(schema, true, 0_u, 1_s);
+  records.emplace_back(schema, true, 4_u, 3_s);
+  records.emplace_back(schema, true, 5_u, 5_s);
+  records.emplace_back(schema, true, 7_u, 1_s);
+  records.emplace_back(schema, true, 2_u, 1_s);
   return records;
 }
 inline std::vector<Record> MakeProjectOnFilterRecords(const SchemaRef &schema) {
   // Make records.
   std::vector<Record> records;
-  records.emplace_back(schema, true, 7_u, 1L);
+  records.emplace_back(schema, true, 7_u, 1_s);
   return records;
 }
 inline std::vector<Record> MakeProjectOnEquiJoinRecords(

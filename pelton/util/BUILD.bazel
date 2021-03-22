@@ -46,3 +46,11 @@ cc_test(
         "@gtest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "type_utils",
+    hdrs = [
+        "type_utils.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+)

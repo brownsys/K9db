@@ -65,6 +65,7 @@ cc_library(
         ":schema",
         ":types",
         "//pelton/sqlast:ast",
+        "//pelton/util:type_utils",
         "@glog",
     ],
 )

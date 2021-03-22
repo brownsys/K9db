@@ -16,6 +16,7 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/type_utils.h"
 
 namespace pelton {
 namespace dataflow {
@@ -173,7 +174,9 @@ class Record {
                                    uint64_t>::value) {
           this->data_[index].uint = t;
         } else {
-          LOG(FATAL) << "Type mismatch in SetData at index " << index;
+          LOG(FATAL) << "Type mismatch in SetData at index " << index
+                     << ", expected " << this->schema_.TypeOf(index)
+                     << ", got " << TypeNameFor(t);
         }
         break;
       case sqlast::ColumnDefinition::Type::INT:
@@ -181,7 +184,9 @@ class Record {
                                    int64_t>::value) {
           this->data_[index].sint = t;
         } else {
-          LOG(FATAL) << "Type mismatch in SetData at index " << index;
+          LOG(FATAL) << "Type mismatch in SetData at index " << index
+                     << ", expected " << this->schema_.TypeOf(index)
+                     << ", got " << TypeNameFor(t);
         }
         break;
       case sqlast::ColumnDefinition::Type::TEXT:
@@ -189,7 +194,9 @@ class Record {
                                    std::unique_ptr<std::string>>::value) {
           this->data_[index].str = std::move(t);
         } else {
-          LOG(FATAL) << "Type mismatch in SetData at index " << index;
+          LOG(FATAL) << "Type mismatch in SetData at index " << index
+                     << ", expected " << this->schema_.TypeOf(index)
+                     << ", got " << TypeNameFor(t);
         }
         break;
       default:
