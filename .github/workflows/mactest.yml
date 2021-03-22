@@ -17,8 +17,9 @@ jobs:
         xcodebuild -version
         clang -v
 
-    - name: build javacpp
-      run: bazel build //pelton/planner/calcite/src/com/brownsys/pelton/nativelib/...
+    - name: Dependencies
+      run: |
+        brew install freetype
 
     - name: Build all
       run: bazel build ...

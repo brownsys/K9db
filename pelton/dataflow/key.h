@@ -13,21 +13,11 @@ namespace dataflow {
 
 class Key {
  public:
-
   explicit Key(uint64_t v)
       : type_(sqlast::ColumnDefinition::Type::UINT), uint_(v) {}
 
   explicit Key(int64_t v)
       : type_(sqlast::ColumnDefinition::Type::INT), sint_(v) {}
-
-explicit Key(uint8_t v) : Key(static_cast<uint64_t>(v)) {} 
-explicit Key(uint16_t v) : Key(static_cast<uint64_t>(v)) {}
-  explicit Key(uint32_t v) : Key(static_cast<uint64_t>(v)) {}
-
-explicit Key(int8_t v) : Key(static_cast<int64_t>(v))  {}
-explicit Key(int16_t v) : Key(static_cast<int64_t>(v))  {}
-  explicit Key(int32_t v) : Key(static_cast<int64_t>(v))  {}
-  
 
   explicit Key(const std::string &v)
       : type_(sqlast::ColumnDefinition::Type::TEXT), str_(v) {}
