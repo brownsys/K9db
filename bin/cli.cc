@@ -52,6 +52,9 @@ int main(int argc, char **argv) {
   std::string line;
   std::string command = "";
   while (std::getline(std::cin, line)) {
+    if (line.size() == 0 || line.front() == '#') {
+      continue;
+    }
     // Wait until command is fully read (in case it spans several lines).
     command += line;
     if (command.size() > 0 && command.back() == '\\') {

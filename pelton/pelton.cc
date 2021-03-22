@@ -65,8 +65,9 @@ bool open(const std::string &directory, Connection *connection) {
   return true;
 }
 
-bool exec(Connection *connection, std::string sql, Callback callback,
-          void *context, char **errmsg) {
+bool exec(Connection *connection, std::string sql,
+          const shards::sqlexecutor::Callback &callback, void *context,
+          char **errmsg) {
   // Trim statement.
   Trim(sql);
   if (echo) {

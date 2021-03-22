@@ -13,6 +13,8 @@ namespace pelton {
 namespace shards {
 namespace sqlexecutor {
 
+// (context, col_count, col_data, col_name)
+// https://www.sqlite.org/c3ref/exec.html
 using Callback = std::function<int(void *, int, char **, char **)>;
 
 // Abstract interface for a logical SQL executable statement.
@@ -26,8 +28,8 @@ class ExecutableStatement {
 
   virtual const std::string &shard_suffix() const;
   virtual const std::string &sql_statement() const;
-  virtual bool Execute(::sqlite3 *connection, Callback callback, void *context,
-                       char **errmsg) = 0;
+  virtual bool Execute(::sqlite3 *connection, const Callback &callback,
+                       void *context, char **errmsg) = 0;
 
  protected:
   std::string shard_suffix_;
@@ -47,8 +49,11 @@ class SimpleExecutableStatement : public ExecutableStatement {
       : ExecutableStatement(shard_suffix, sql_statement) {}
 
   // Override interface.
-  bool Execute(::sqlite3 *connection, Callback callback, void *context,
+  bool Execute(::sqlite3 *connection, const Callback &callback, void *context,
                char **errmsg) override;
+
+ private:
+  inline static const Callback *CALLBACK_NO_CAPTURE = nullptr;
 };
 
 // An executable select SQL statement.
@@ -75,7 +80,7 @@ class SelectExecutableStatement : public ExecutableStatement {
   }
 
   // Override interface.
-  bool Execute(::sqlite3 *connection, Callback callback, void *context,
+  bool Execute(::sqlite3 *connection, const Callback &callback, void *context,
                char **errmsg) override;
 
  private:
@@ -83,7 +88,7 @@ class SelectExecutableStatement : public ExecutableStatement {
   char *coln_;
   char *colv_;
 
-  inline static Callback *CALLBACK_NO_CAPTURE = nullptr;
+  inline static const Callback *CALLBACK_NO_CAPTURE = nullptr;
   inline static SelectExecutableStatement *THIS_NO_CAPTURE = nullptr;
 };
 
