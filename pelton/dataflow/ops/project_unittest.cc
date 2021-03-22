@@ -44,11 +44,11 @@ TEST(ProjectOperatorTest, BatchTest) {
   // Records to be fed
   std::vector<Record> records;
   records.emplace_back(SchemaRef(schema), true, 0_u,
-                       std::make_unique<std::string>("Hello!"), -5L);
+                       std::make_unique<std::string>("Hello!"), -5_s);
   records.emplace_back(SchemaRef(schema), true, 5_u,
-                       std::make_unique<std::string>("Bye!"), 7L);
+                       std::make_unique<std::string>("Bye!"), 7_s);
   records.emplace_back(SchemaRef(schema), true, 6_u,
-                       std::make_unique<std::string>("hello!"), 10L);
+                       std::make_unique<std::string>("hello!"), 10_s);
 
   // expected output
   std::vector<Record> expected_records;
