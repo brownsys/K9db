@@ -39,6 +39,7 @@ cc_library(
         "//pelton/shards/sqlengine:util",
         "//pelton/shards/sqlexecutor:executor",
         "//pelton/sqlast:ast",
+        "//pelton/util:status",
         "@absl//absl/status:statusor",
         "@absl//absl/strings",
     ],

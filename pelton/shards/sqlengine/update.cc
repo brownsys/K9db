@@ -28,9 +28,8 @@ Rewrite(const sqlast::Update &stmt, SharderState *state) {
 
   // Case 2: table is sharded.
   if (is_sharded) {
-    // We will query all the different ways of sharding the table (for
-    // duplicates with many owners), de-duplication occurs later in the
-    // pipeline.
+    // The table might be sharded according to different column/owners.
+    // We must update all these different duplicates.
     for (const auto &info : state->GetShardingInformation(table_name)) {
       if (stmt.AssignsTo(info.shard_by)) {
         return absl::InvalidArgumentError("Update cannot modify owner column");

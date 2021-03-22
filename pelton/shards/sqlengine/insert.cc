@@ -18,7 +18,7 @@ Rewrite(const sqlast::Insert &stmt, SharderState *state) {
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
   if (!state->Exists(table_name)) {
-    throw "Table does not exist!";
+    return absl::InvalidArgumentError("Table does not exist!");
   }
 
   // Turn inserted values into a record and process it via corresponding flows.
@@ -48,7 +48,7 @@ Rewrite(const sqlast::Insert &stmt, SharderState *state) {
       // Find the value corresponding to the shard by column.
       std::string value;
       if (cloned.HasColumns()) {
-        value = cloned.RemoveValue(sharding_info.shard_by);
+        ASSIGN_OR_RETURN(value, cloned.RemoveValue(sharding_info.shard_by));
       } else {
         value = cloned.RemoveValue(sharding_info.shard_by_index);
       }

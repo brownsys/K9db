@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/statusor.h"
 #include "pelton/sqlast/ast_abstract.h"
 #include "pelton/sqlast/ast_expressions.h"
 
@@ -32,7 +33,7 @@ class Insert : public AbstractStatement {
   void SetValues(std::vector<std::string> &&values);
   const std::vector<std::string> &GetValues() const;
 
-  std::string RemoveValue(const std::string &colname);
+  absl::StatusOr<std::string> RemoveValue(const std::string &colname);
   std::string RemoveValue(size_t index);
 
   // Visitor pattern.
@@ -80,7 +81,7 @@ class Update : public AbstractStatement {
   std::string &table_name();
 
   void AddColumnValue(const std::string &column, const std::string &value);
-  std::string RemoveColumnValue(const std::string &column);
+  absl::StatusOr<std::string> RemoveColumnValue(const std::string &column);
   bool AssignsTo(const std::string &column) const;
 
   const std::vector<std::string> &GetColumns() const;
