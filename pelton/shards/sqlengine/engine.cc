@@ -52,9 +52,14 @@ absl::Status Shard(const std::string &sql, SharderState *state,
     }
 
     // Case 4: Select statement.
+    // Might be a select from a matview or a table.
     case sqlast::AbstractStatement::Type::SELECT: {
       auto *stmt = static_cast<sqlast::Select *>(statement.get());
-      return select::Shard(*stmt, state, dataflow_state, output);
+      if (dataflow_state->HasFlow(stmt->table_name())) {
+        return view::SelectView(*stmt, state, dataflow_state, output);
+      } else {
+        return select::Shard(*stmt, state, dataflow_state, output);
+      }
     }
 
     // Case 5: Delete statement.

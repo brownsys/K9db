@@ -17,6 +17,10 @@ namespace view {
 absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
                         dataflow::DataFlowState *dataflow_state);
 
+absl::Status SelectView(const sqlast::Select &stmt, SharderState *state,
+                        dataflow::DataFlowState *dataflow_state,
+                        const OutputChannel &output);
+
 }  // namespace view
 }  // namespace sqlengine
 }  // namespace shards

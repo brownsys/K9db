@@ -51,9 +51,6 @@ bool close(Connection *connection);
 // make_view to shutdown the JVM.
 void shutdown_planner();
 
-// Print the content of the outputs of the given flow.
-void print_view(Connection *connection, const std::string &name);
-
 }  // namespace pelton
 
 #endif  // PELTON_PELTON_H_

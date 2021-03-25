@@ -85,6 +85,12 @@ std::vector<std::pair<std::string, std::string>> FLOWS{
                    "CREATE VIEW limit_variable AS "
                    "'\"SELECT * from submissions ORDER BY ts LIMIT ?\"'")};
 
+std::vector<std::string> FLOW_READS{
+    "SELECT * FROM filter_row;",    "SELECT * FROM filter_row2;",
+    "SELECT * FROM filter_row3;",   "SELECT * FROM union_flow;",
+    "SELECT * FROM join_flow;",     "SELECT * FROM limit_constant;",
+    "SELECT * FROM limit_variable;"};
+
 // Selects.
 std::vector<std::string> QUERIES{
     "SELECT * FROM submissions;",
@@ -160,9 +166,11 @@ int main(int argc, char **argv) {
 
   // Read flow.
   std::cout << "Read flows ... " << std::endl;
-  for (const auto &[name, _] : FLOWS) {
+  for (const auto &query : FLOW_READS) {
     std::cout << std::endl;
-    pelton::print_view(&connection, name);
+    bool context = true;
+    assert(pelton::exec(&connection, query, &Callback,
+                        reinterpret_cast<void *>(&context), nullptr));
   }
   std::cout << std::endl;
 
@@ -176,9 +184,11 @@ int main(int argc, char **argv) {
 
   // Read flow.
   std::cout << "Read flows ... " << std::endl;
-  for (const auto &[name, _] : FLOWS) {
+  for (const auto &query : FLOW_READS) {
     std::cout << std::endl;
-    pelton::print_view(&connection, name);
+    bool context = true;
+    assert(pelton::exec(&connection, query, &Callback,
+                        reinterpret_cast<void *>(&context), nullptr));
   }
   std::cout << std::endl;
 
@@ -202,9 +212,11 @@ int main(int argc, char **argv) {
 
   // Read flow.
   std::cout << "Read flows ... " << std::endl;
-  for (const auto &[name, _] : FLOWS) {
+  for (const auto &query : FLOW_READS) {
     std::cout << std::endl;
-    pelton::print_view(&connection, name);
+    bool context = true;
+    assert(pelton::exec(&connection, query, &Callback,
+                        reinterpret_cast<void *>(&context), nullptr));
   }
   std::cout << std::endl;
 

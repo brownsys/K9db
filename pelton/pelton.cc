@@ -2,15 +2,12 @@
 #include "pelton/pelton.h"
 
 #include <iostream>
-#include <memory>
-#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
-#include "pelton/dataflow/graph.h"
 #include "pelton/planner/planner.h"
 #include "pelton/shards/sqlengine/engine.h"
 #include "pelton/shards/sqlengine/util.h"
@@ -93,8 +90,5 @@ bool close(Connection *connection) {
   planner::ShutdownPlanner();
   return true;
 }
-
-// Materialized views.
-#include "pelton/todo.inc"
 
 }  // namespace pelton
