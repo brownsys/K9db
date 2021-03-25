@@ -250,6 +250,22 @@ class Update : public AbstractStatement {
   std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
 };
 
+class CreateView : public AbstractStatement {
+ public:
+  CreateView(const std::string &view_name, const std::string &query)
+      : AbstractStatement(AbstractStatement::Type::CREATE_VIEW),
+        view_name_(view_name),
+        query_(query) {}
+
+  // Accessors.
+  const std::string &view_name() const { return this->view_name_; }
+  const std::string &query() const { return this->query_; }
+
+ private:
+  std::string view_name_;
+  std::string query_;
+};
+
 }  // namespace sqlast
 }  // namespace pelton
 

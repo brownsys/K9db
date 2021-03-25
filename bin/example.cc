@@ -58,21 +58,32 @@ std::vector<std::string> DELETES{
 
 // Flows.
 std::vector<std::pair<std::string, std::string>> FLOWS{
-    std::make_pair("FILTER FLOW", "SELECT * FROM submissions WHERE ts >= 100"),
-    std::make_pair("FILTER_FLOW2", "SELECT * FROM submissions WHERE ts < 100"),
-    std::make_pair("FILTER FLOW3",
-                   "SELECT * FROM submissions WHERE ts >= 100 AND "
-                   "assignment_id = 2 AND ID > 5"),
-    std::make_pair("UNION_FLOW",
-                   "(SELECT * FROM submissions WHERE ts >= 100) UNION (SELECT "
-                   "* FROM submissions WHERE ts < 100)"),
-    std::make_pair("JOIN_FLOW",
-                   "SELECT * from submissions INNER JOIN students ON "
-                   "submissions.student_id = students.ID WHERE ts >= 100"),
-    std::make_pair("LIMIT_CONSTANT",
-                   "SELECT * from submissions ORDER BY ts LIMIT 2 OFFSET 5"),
-    std::make_pair("LIMIT_VARIABLE",
-                   "SELECT * from submissions ORDER BY ts LIMIT ?")};
+    std::make_pair("filter_row",
+                   "CREATE VIEW filter_row AS "
+                   "'\"SELECT * FROM submissions WHERE ts >= 100\"'"),
+    std::make_pair("filter_row2",
+                   "CREATE VIEW filter_row2 AS "
+                   "'\"SELECT * FROM submissions WHERE ts < 100\"'"),
+    std::make_pair("filter_row3",
+                   "CREATE VIEW filter_row3 AS "
+                   "'\"SELECT * FROM submissions WHERE ts >= 100 AND "
+                   "assignment_id = 2 AND ID > 5\"'"),
+    std::make_pair(
+        "union_flow",
+        "CREATE VIEW union_flow AS "
+        "'\"(SELECT * FROM submissions WHERE ts >= 100) UNION (SELECT "
+        "* FROM submissions WHERE ts < 100)\"'"),
+    std::make_pair("join_flow",
+                   "CREATE VIEW join_flow AS "
+                   "'\"SELECT * from submissions INNER JOIN students ON "
+                   "submissions.student_id = students.ID WHERE ts >= 100\"'"),
+    std::make_pair(
+        "limit_constant",
+        "CREATE VIEW limit_constant AS "
+        "'\"SELECT * from submissions ORDER BY ts LIMIT 2 OFFSET 5\"'"),
+    std::make_pair("limit_variable",
+                   "CREATE VIEW limit_variable AS "
+                   "'\"SELECT * from submissions ORDER BY ts LIMIT ?\"'")};
 
 // Selects.
 std::vector<std::string> QUERIES{
@@ -134,7 +145,7 @@ int main(int argc, char **argv) {
   std::cout << "Installing flows ... " << std::endl;
   for (const auto &[name, query] : FLOWS) {
     std::cout << name << std::endl;
-    pelton::make_view(&connection, name, query);
+    assert(pelton::exec(&connection, query, &Callback, nullptr, nullptr));
   }
   pelton::shutdown_planner();
   std::cout << std::endl;

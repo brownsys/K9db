@@ -15,6 +15,7 @@ cc_library(
         ":insert",
         ":select",
         ":update",
+        ":view",
         "//pelton/dataflow:state",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -137,5 +138,24 @@ cc_library(
     deps = [
         "//pelton/shards:types",
         "@absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "view",
+    srcs = [
+        "view.cc",
+    ],
+    hdrs = [
+        "view.h",
+    ],
+    deps = [
+        "//pelton/dataflow:state",
+        "//pelton/planner",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/sqlast:ast",
+        "//pelton/util:status",
+        "@absl//absl/status",
     ],
 )

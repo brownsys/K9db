@@ -10,6 +10,7 @@
 #include "pelton/shards/sqlengine/insert.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/update.h"
+#include "pelton/shards/sqlengine/view.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/sqlast/parser.h"
 #include "pelton/util/status.h"
@@ -60,6 +61,12 @@ absl::Status Shard(const std::string &sql, SharderState *state,
     case sqlast::AbstractStatement::Type::DELETE: {
       auto *stmt = static_cast<sqlast::Delete *>(statement.get());
       return delete_::Shard(*stmt, state, dataflow_state, output);
+    }
+
+    // Case 6: CREATE VIEW statement (e.g. dataflow).
+    case sqlast::AbstractStatement::Type::CREATE_VIEW: {
+      auto *stmt = static_cast<sqlast::CreateView *>(statement.get());
+      return view::CreateView(*stmt, state, dataflow_state);
     }
 
     // Unsupported (this should not be reachable).

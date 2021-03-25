@@ -86,15 +86,6 @@ bool exec(Connection *connection, std::string sql,
   return true;
 }
 
-void make_view(Connection *connection, const std::string &name,
-               const std::string &query) {
-  // Plan the query using calcite and generate a concrete graph for it.
-  dataflow::DataFlowGraph graph =
-      planner::PlanGraph(connection->GetDataFlowState(), query);
-  // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
-  connection->GetDataFlowState()->AddFlow(name, graph);
-}
-
 void shutdown_planner() { planner::ShutdownPlanner(); }
 
 bool close(Connection *connection) {

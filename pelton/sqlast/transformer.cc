@@ -59,7 +59,34 @@ antlrcpp::Any AstTransformer::visitSql_stmt(
   if (ctx->delete_stmt() != nullptr) {
     return ctx->delete_stmt()->accept(this);
   }
+  if (ctx->create_view_stmt() != nullptr) {
+    return ctx->create_view_stmt()->accept(this);
+  }
+
   return absl::InvalidArgumentError("Unsupported statement type");
+}
+
+// Create a view.
+antlrcpp::Any AstTransformer::visitCreate_view_stmt(
+    sqlparser::SQLiteParser::Create_view_stmtContext *ctx) {
+  if (ctx->TEMP() != nullptr || ctx->TEMPORARY() != nullptr ||
+      ctx->EXISTS() != nullptr || ctx->schema_name() != nullptr ||
+      ctx->column_name().size() != 0) {
+    return absl::InvalidArgumentError("Unsupported constructs in create view");
+  }
+
+  // Parse view name.
+  CAST_OR_RETURN(std::string view_name, ctx->view_name()->accept(this),
+                 std::string);
+
+  // Select statement is not parsed and treated as a literal, the planner
+  // will parse and handle it.
+  std::string query = ctx->QUERY_LITERAL()->getText();
+  query = query.substr(2);
+  query = query.substr(0, query.size() - 2);
+
+  return static_cast<std::unique_ptr<AbstractStatement>>(
+      std::make_unique<CreateView>(view_name, query));
 }
 
 // Create Table constructs.
@@ -426,6 +453,10 @@ antlrcpp::Any AstTransformer::visitTable_name(
     sqlparser::SQLiteParser::Table_nameContext *ctx) {
   return ctx->any_name()->accept(this);
 }
+antlrcpp::Any AstTransformer::visitView_name(
+    sqlparser::SQLiteParser::View_nameContext *ctx) {
+  return ctx->any_name()->accept(this);
+}
 antlrcpp::Any AstTransformer::visitForeign_table(
     sqlparser::SQLiteParser::Foreign_tableContext *ctx) {
   return ctx->any_name()->accept(this);
@@ -505,10 +536,6 @@ antlrcpp::Any AstTransformer::visitConflict_clause(
 }
 antlrcpp::Any AstTransformer::visitCreate_trigger_stmt(
     sqlparser::SQLiteParser::Create_trigger_stmtContext *ctx) {
-  return absl::InvalidArgumentError("Unsupported Syntax");
-}
-antlrcpp::Any AstTransformer::visitCreate_view_stmt(
-    sqlparser::SQLiteParser::Create_view_stmtContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
 antlrcpp::Any AstTransformer::visitCreate_virtual_table_stmt(
@@ -749,10 +776,6 @@ antlrcpp::Any AstTransformer::visitIndex_name(
 }
 antlrcpp::Any AstTransformer::visitTrigger_name(
     sqlparser::SQLiteParser::Trigger_nameContext *ctx) {
-  return absl::InvalidArgumentError("Unsupported Syntax");
-}
-antlrcpp::Any AstTransformer::visitView_name(
-    sqlparser::SQLiteParser::View_nameContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
 antlrcpp::Any AstTransformer::visitModule_name(

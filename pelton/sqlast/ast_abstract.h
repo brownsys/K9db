@@ -14,7 +14,7 @@ class MutableVisitor;
 // Top-level statements derive this class.
 class AbstractStatement {
  public:
-  enum class Type { CREATE_TABLE, INSERT, UPDATE, SELECT, DELETE };
+  enum class Type { CREATE_TABLE, INSERT, UPDATE, SELECT, DELETE, CREATE_VIEW };
 
   // Constructor.
   explicit AbstractStatement(Type type) : type_(type) {}
