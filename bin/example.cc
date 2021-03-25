@@ -86,10 +86,13 @@ std::vector<std::pair<std::string, std::string>> FLOWS{
                    "'\"SELECT * from submissions ORDER BY ts LIMIT ?\"'")};
 
 std::vector<std::string> FLOW_READS{
-    "SELECT * FROM filter_row;",    "SELECT * FROM filter_row2;",
-    "SELECT * FROM filter_row3;",   "SELECT * FROM union_flow;",
-    "SELECT * FROM join_flow;",     "SELECT * FROM limit_constant;",
-    "SELECT * FROM limit_variable;"};
+    "SELECT * FROM filter_row;",
+    "SELECT * FROM filter_row2;",
+    "SELECT * FROM filter_row3;",
+    "SELECT * FROM union_flow;",
+    "SELECT * FROM join_flow;",
+    "SELECT * FROM limit_constant;",
+    "SELECT * FROM limit_variable WHERE ts > 100 LIMIT 2 OFFSET 1;"};
 
 // Selects.
 std::vector<std::string> QUERIES{

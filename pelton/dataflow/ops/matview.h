@@ -22,6 +22,9 @@ class MatViewOperator : public Operator {
   virtual bool Contains(const Key &key) const = 0;
   virtual const_RecordIterable Lookup(const Key &key, int limit = -1,
                                       size_t offset = 0) const = 0;
+  virtual const_RecordIterable LookupGreater(const Key &key, const Record &cmp,
+                                             int limit = -1,
+                                             size_t offset = 0) const = 0;
   virtual const_KeyIterable Keys() const = 0;
   virtual bool RecordOrdered() const = 0;
   virtual bool KeyOrdered() const = 0;
@@ -97,11 +100,9 @@ class MatViewOperatorT : public MatViewOperator {
     }
   }
 
-  // Only available when RecordOrdered.
-  template <typename = typename std::enable_if<
-                std::is_same<T, RecordOrderedGroupedData>::value>>
   const_RecordIterable LookupGreater(const Key &key, const Record &cmp,
-                               int limit = -1, size_t offset = 0) const {
+                                     int limit = -1,
+                                     size_t offset = 0) const override {
     limit = limit == -1 ? this->limit_ : limit;
     offset = offset == 0 ? this->offset_ : offset;
     return this->contents_.LookupGreater(key, cmp, limit, offset);
