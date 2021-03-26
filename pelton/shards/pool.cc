@@ -6,6 +6,7 @@
 #include "absl/strings/str_cat.h"
 #include "glog/logging.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/util/perf.h"
 
 namespace pelton {
 namespace shards {
@@ -117,6 +118,7 @@ absl::Status ConnectionPool::ExecuteShard(
 absl::Status ConnectionPool::ExecuteDefault(const std::string &sql,
                                             ::sqlite3 *connection,
                                             const OutputChannel &output) {
+  perf::Start("ExecuteDefault");
   LOG(INFO) << "Statement: " << sql;
   // Turn c++ style callback into a c-style function pointer.
   CALLBACK_NO_CAPTURE = &output.callback;
@@ -129,12 +131,14 @@ absl::Status ConnectionPool::ExecuteDefault(const std::string &sql,
   void *context = output.context;
   char **errmsg = output.errmsg;
   if (::sqlite3_exec(connection, str, cb, context, errmsg) == SQLITE_OK) {
+    perf::End("ExecuteDefault");
     return absl::OkStatus();
   } else {
     std::string error = "Sqlite3 statement failed";
     if (*errmsg != nullptr) {
       error = absl::StrCat(error, ": ", *errmsg);
     }
+    perf::End("ExecuteDefault");
     return absl::AbortedError(error);
   }
 }
@@ -144,6 +148,7 @@ absl::Status ConnectionPool::ExecuteShard(const std::string &sql,
                                           const ShardingInformation &info,
                                           const UserId &user_id,
                                           const OutputChannel &output) {
+  perf::Start("ExecuteShard");
   LOG(INFO) << "Statement: " << sql;
   // Turn c++ style callback into a c-style function pointer.
   CALLBACK_NO_CAPTURE = &output.callback;
@@ -179,12 +184,14 @@ absl::Status ConnectionPool::ExecuteShard(const std::string &sql,
   void *context = output.context;
   char **errmsg = output.errmsg;
   if (::sqlite3_exec(connection, str, cb, context, errmsg) == SQLITE_OK) {
+    perf::End("ExecuteShard");
     return absl::OkStatus();
   } else {
     std::string error = "Sqlite3 statement failed";
     if (*errmsg != nullptr) {
       error = absl::StrCat(error, ": ", *errmsg);
     }
+    perf::End("ExecuteShard");
     return absl::AbortedError(error);
   }
 }

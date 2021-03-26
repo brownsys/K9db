@@ -24,6 +24,7 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
+        "//pelton/util:perf",
         "@absl//absl/status:statusor",
         "@absl//absl/strings",
         "@glog",
@@ -42,6 +43,7 @@ cc_library(
     deps = [
         ":ast",
         ":transformer",
+        "//pelton/util:perf",
         "@absl//absl/status:statusor",
         "@antlr4_runtimes//:cpp",
         "@grammars-v4//:sqlparser",

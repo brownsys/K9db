@@ -6,6 +6,7 @@
 #include "absl/flags/usage.h"
 #include "glog/logging.h"
 #include "pelton/pelton.h"
+#include "pelton/util/perf.h"
 
 ABSL_FLAG(bool, print, true, "Print results to the screen");
 ABSL_FLAG(std::string, db_path, "", "Path to database directory (required)");
@@ -63,6 +64,8 @@ int main(int argc, char **argv) {
     LOG(FATAL) << "Please provide the database dir as a command line argument!";
   }
 
+  pelton::perf::Start("all");
+
   // Initialize our sharded state/connection.
   try {
     pelton::Connection connection;
@@ -117,6 +120,10 @@ int main(int argc, char **argv) {
   } catch (const char *err_msg) {
     LOG(FATAL) << "Error: " << err_msg;
   }
+
+  // Print performance profile.
+  pelton::perf::End("all");
+  pelton::perf::PrintAll();
 
   // Exit!
   std::cout << "exit" << std::endl;

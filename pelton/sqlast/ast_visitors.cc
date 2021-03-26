@@ -7,11 +7,14 @@
 #include <utility>
 #include <vector>
 
+#include "pelton/util/perf.h"
+
 namespace pelton {
 namespace sqlast {
 
 // Stringifier.
 std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
+  perf::Start("Stringify (create)");
   std::string result = "CREATE TABLE " + ast.table_name() + " (";
   bool first = true;
   for (const std::string &col : ast.VisitChildren(this)) {
@@ -22,6 +25,7 @@ std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
     result += col;
   }
   result += ");";
+  perf::End("Stringify (create)");
   return result;
 }
 std::string Stringifier::VisitColumnDefinition(const ColumnDefinition &ast) {
@@ -47,6 +51,7 @@ std::string Stringifier::VisitColumnConstraint(const ColumnConstraint &ast) {
 }
 
 std::string Stringifier::VisitInsert(const Insert &ast) {
+  perf::Start("Stringify (insert)");
   std::string result = "INSERT INTO " + ast.table_name();
   // Columns if explicitly specified.
   if (ast.GetColumns().size() > 0) {
@@ -72,9 +77,11 @@ std::string Stringifier::VisitInsert(const Insert &ast) {
     result += val;
   }
   result += ");";
+  perf::End("Stringify (insert)");
   return result;
 }
 std::string Stringifier::VisitUpdate(const Update &ast) {
+  perf::Start("Stringify (update)");
   std::string result = "UPDATE " + ast.table_name() + " SET ";
   // Columns and values.
   const std::vector<std::string> &cols = ast.GetColumns();
@@ -89,9 +96,11 @@ std::string Stringifier::VisitUpdate(const Update &ast) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
   result += ";";
+  perf::End("Stringify (update)");
   return result;
 }
 std::string Stringifier::VisitSelect(const Select &ast) {
+  perf::Start("Stringify (select)");
   std::string result = "SELECT ";
   bool first = true;
   for (const std::string &col : ast.GetColumns()) {
@@ -106,14 +115,17 @@ std::string Stringifier::VisitSelect(const Select &ast) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
   result += ";";
+  perf::End("Stringify (select)");
   return result;
 }
 std::string Stringifier::VisitDelete(const Delete &ast) {
+  perf::Start("Stringify (delete)");
   std::string result = "DELETE FROM " + ast.table_name();
   if (ast.HasWhereClause()) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
   result += ";";
+  perf::End("Stringify (delete)");
   return result;
 }
 

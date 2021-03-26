@@ -13,6 +13,7 @@
 #include "pelton/shards/sqlengine/view.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/sqlast/parser.h"
+#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -23,9 +24,11 @@ absl::Status Shard(const std::string &sql, SharderState *state,
                    dataflow::DataFlowState *dataflow_state,
                    const OutputChannel &output) {
   // Parse with ANTLR into our AST.
+  perf::Start("parsing");
   sqlast::SQLParser parser;
   MOVE_OR_RETURN(std::unique_ptr<sqlast::AbstractStatement> statement,
                  parser.Parse(sql));
+  perf::End("parsing");
 
   // Compute result.
   switch (statement->type()) {

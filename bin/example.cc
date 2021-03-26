@@ -7,6 +7,7 @@
 #include "absl/flags/usage.h"
 #include "glog/logging.h"
 #include "pelton/pelton.h"
+#include "pelton/util/perf.h"
 
 ABSL_FLAG(std::string, db_path, "", "Path to database directory (required)");
 
@@ -149,6 +150,8 @@ int main(int argc, char **argv) {
     LOG(FATAL) << "Please provide the database dir as a command line argument!";
   }
 
+  pelton::perf::Start("all");
+
   // Open connection to sharder.
   pelton::Connection connection;
   pelton::open(dir, &connection);
@@ -237,6 +240,12 @@ int main(int argc, char **argv) {
 
   // Close connection.
   pelton::close(&connection);
+
+  // Print performance profile.
+  pelton::perf::End("all");
+  pelton::perf::PrintAll();
+
+  // Done.
   std::cout << "exit" << std::endl;
   return 0;
 }

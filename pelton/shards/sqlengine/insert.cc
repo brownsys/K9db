@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -15,6 +16,7 @@ namespace insert {
 absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
                    dataflow::DataFlowState *dataflow_state,
                    const OutputChannel &output, bool update_flows) {
+  perf::Start("Insert");
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
   if (!state->Exists(table_name)) {
@@ -71,6 +73,7 @@ absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
     dataflow_state->ProcessRawRecords(records);
   }
 
+  perf::End("Insert");
   return absl::OkStatus();
 }
 

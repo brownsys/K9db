@@ -7,6 +7,7 @@
 #include "pelton/shards/sqlengine/delete.h"
 #include "pelton/shards/sqlengine/insert.h"
 #include "pelton/shards/sqlengine/select.h"
+#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -102,6 +103,7 @@ sqlast::Insert InsertRaw(const RawRecord &record,
 absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
                    dataflow::DataFlowState *dataflow_state,
                    const OutputChannel &output) {
+  perf::Start("Update");
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
 
@@ -174,6 +176,7 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
   // Delete was successful, time to update dataflows.
   dataflow_state->ProcessRawRecords(records);
 
+  perf::End("Update");
   return absl::OkStatus();
 }
 

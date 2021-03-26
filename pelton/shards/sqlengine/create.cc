@@ -12,6 +12,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/match.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -233,6 +234,8 @@ sqlast::CreateTable UpdateTableSchema(sqlast::CreateTable stmt,
 absl::Status Shard(const sqlast::CreateTable &stmt, SharderState *state,
                    dataflow::DataFlowState *dataflow_state,
                    const OutputChannel &output) {
+  perf::Start("Create");
+
   const std::string &table_name = stmt.table_name();
   if (state->Exists(table_name)) {
     return absl::InvalidArgumentError("Table already exists!");
@@ -285,6 +288,8 @@ absl::Status Shard(const sqlast::CreateTable &stmt, SharderState *state,
   }
 
   state->AddSchema(table_name, stmt);
+
+  perf::End("Create");
   return absl::OkStatus();
 }
 

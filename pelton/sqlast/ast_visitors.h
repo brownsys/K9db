@@ -50,6 +50,7 @@ class MutableVisitor {
 
 // Turns ASTs to strings.
 class Stringifier : public AbstractVisitor<std::string> {
+ public:
   std::string VisitCreateTable(const CreateTable &ast) override;
   std::string VisitColumnDefinition(const ColumnDefinition &ast) override;
   std::string VisitColumnConstraint(const ColumnConstraint &ast) override;

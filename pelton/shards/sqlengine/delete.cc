@@ -8,6 +8,7 @@
 #include "absl/strings/str_cat.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -18,6 +19,7 @@ namespace delete_ {
 absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
                    dataflow::DataFlowState *dataflow_state,
                    const OutputChannel &output, bool update_flows) {
+  perf::Start("Delete");
   // Get the rows that are going to be deleted prior to deletion to use them
   // to update the dataflows.
   std::vector<RawRecord> records;
@@ -102,6 +104,7 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
     dataflow_state->ProcessRawRecords(records);
   }
 
+  perf::End("Delete");
   return absl::OkStatus();
 }
 

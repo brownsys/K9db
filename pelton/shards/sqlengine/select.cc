@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_set>
 
+#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -27,6 +28,7 @@ std::string Concatenate(int colnum, char **colvals) {
 absl::Status Shard(const sqlast::Select &stmt, SharderState *state,
                    dataflow::DataFlowState *dataflow_state,
                    const OutputChannel &output) {
+  perf::Start("Select");
   // Disqualifiy LIMIT and OFFSET queries.
   if (!stmt.SupportedByShards()) {
     return absl::InvalidArgumentError("Query contains unsupported features");
@@ -40,7 +42,9 @@ absl::Status Shard(const sqlast::Select &stmt, SharderState *state,
   if (!is_sharded) {
     // Case 1: table is not in any shard.
     std::string select_str = stmt.Visit(&stringifier);
-    return state->connection_pool().ExecuteDefault(select_str, output);
+    auto result = state->connection_pool().ExecuteDefault(select_str, output);
+    perf::End("Select");
+    return result;
 
   } else {  // is_sharded == true
     // Case 2: table is sharded.
@@ -93,6 +97,7 @@ absl::Status Shard(const sqlast::Select &stmt, SharderState *state,
       }
     }
 
+    perf::End("Select");
     return absl::OkStatus();
   }
 }
