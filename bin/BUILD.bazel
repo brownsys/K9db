@@ -29,3 +29,19 @@ cc_binary(
         "@glog",
     ],
 )
+
+cc_binary(
+    name = "sqlite",
+    srcs = [
+        "sqlite.cc",
+    ],
+    linkopts = [
+        "-lsqlite3",
+    ],
+    deps = [
+        "@absl//absl/flags:flag",
+        "@absl//absl/flags:parse",
+        "@absl//absl/flags:usage",
+        "@glog",
+    ],
+)

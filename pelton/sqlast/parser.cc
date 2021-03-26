@@ -25,6 +25,8 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> SQLParser::Parse(
       std::make_unique<antlr4::CommonTokenStream>(this->lexer_.get());
   this->parser_ =
       std::make_unique<sqlparser::SQLiteParser>(this->tokens_.get());
+  this->parser_->getInterpreter<antlr4::atn::ParserATNSimulator>()
+      ->setPredictionMode(antlr4::atn::PredictionMode::SLL);
   this->parser_->addErrorListener(this);
 
   // Make sure the parsed statement is ok!
