@@ -1,10 +1,17 @@
 #include <iostream>
 #include <string>
 
+#include "absl/flags/flag.h"
+#include "absl/flags/parse.h"
+#include "absl/flags/usage.h"
+#include "glog/logging.h"
 #include "pelton/pelton.h"
 
+ABSL_FLAG(bool, print, true, "Print results to the screen");
+ABSL_FLAG(std::string, db_path, "", "Path to database directory (required)");
+
 // Print query results!
-int Callback(void *context, int col_count, char **col_data, char **col_name) {
+int PrintCb(void *context, int col_count, char **col_data, char **col_name) {
   bool *first_time = reinterpret_cast<bool *>(context);
 
   // Print header the first time!
@@ -30,15 +37,31 @@ int Callback(void *context, int col_count, char **col_data, char **col_name) {
   return 0;
 }
 
+// No-op.
+int NoCb(void *context, int col_count, char **col_data, char **col_name) {
+  return 0;
+}
+
 int main(int argc, char **argv) {
-  // Read command line arguments.
-  if (argc < 2) {
-    std::cout << "Please provide the database directory as a command line "
-                 "argument!"
-              << std::endl;
-    return 1;
+  // Command line arugments and help message.
+  absl::SetProgramUsageMessage(
+      "usage: bazel run //bin:cli "
+      "--db_path=/path/to/db/directory "
+      "--print=<yes/no>");
+  absl::ParseCommandLine(argc, argv);
+
+  // Should we print outputs to the screen?
+  bool print = absl::GetFlag(FLAGS_print);
+  auto callback = print ? &PrintCb : NoCb;
+
+  // Initialize Google’s logging library.
+  google::InitGoogleLogging(argv[0]);
+
+  // Find database directory.
+  const std::string &dir = absl::GetFlag(FLAGS_db_path);
+  if (dir == "") {
+    LOG(FATAL) << "Please provide the database dir as a command line argument!";
   }
-  std::string dir(argv[1]);
 
   // Initialize our sharded state/connection.
   try {
@@ -47,7 +70,9 @@ int main(int argc, char **argv) {
 
     std::cout << "SQL Sharder" << std::endl;
     std::cout << "DB directory: " << dir << std::endl;
-    std::cout << ">>> " << std::flush;
+    if (print) {
+      std::cout << ">>> " << std::flush;
+    }
 
     // Read SQL statements one at a time!
     std::string line;
@@ -70,7 +95,7 @@ int main(int argc, char **argv) {
       // Command has been fully read, execute it!
       bool context = true;
       char *errmsg = nullptr;
-      if (!pelton::exec(&connection, command, &Callback,
+      if (!pelton::exec(&connection, command, callback,
                         reinterpret_cast<void *>(&context), &errmsg)) {
         std::cerr << "Fatal error" << std::endl;
         if (errmsg != nullptr) {
@@ -81,15 +106,16 @@ int main(int argc, char **argv) {
       }
 
       // Ready for next command.
-      std::cout << std::endl << ">>> " << std::flush;
+      if (print) {
+        std::cout << std::endl << ">>> " << std::flush;
+      }
       command = "";
     }
 
     // Close the connection
     pelton::close(&connection);
   } catch (const char *err_msg) {
-    std::cerr << "Error: " << err_msg << std::endl;
-    return 1;
+    LOG(FATAL) << "Error: " << err_msg;
   }
 
   // Exit!

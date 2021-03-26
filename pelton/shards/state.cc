@@ -16,11 +16,15 @@ namespace shards {
 
 // Initialization.
 void SharderState::Initialize(const std::string &dir_path) {
+  this->in_memory_ = false;
   this->dir_path_ = dir_path;
-  if (dir_path.back() != '/') {
+
+  if (this->dir_path_ == ":memory:") {
+    this->in_memory_ = true;
+  } else if (dir_path.back() != '/') {
     this->dir_path_ += "/";
   }
-  this->connection_pool_.Initialize(this->dir_path_);
+  this->connection_pool_.Initialize(this->dir_path_, this->in_memory_);
 }
 
 // Schema manipulations.

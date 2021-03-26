@@ -19,6 +19,11 @@ char *CopyCString(const std::string &str) {
   return result;
 }
 
+inline std::string ShardPath(bool in_memory, const std::string &dir_path,
+                             const std::string &shard_name) {
+  return in_memory ? dir_path : absl::StrCat(dir_path, shard_name);
+}
+
 }  // namespace
 
 const Callback *ConnectionPool::CALLBACK_NO_CAPTURE = nullptr;
@@ -32,12 +37,17 @@ ConnectionPool::~ConnectionPool() {
     ::sqlite3_close(this->default_noshard_connection_);
   }
   this->default_noshard_connection_ = nullptr;
+  for (const auto &[_, conn] : this->connections_) {
+    ::sqlite3_close(conn);
+  }
+  this->connections_.clear();
 }
 
 // Initialization: open a connection to the default unsharded database.
-void ConnectionPool::Initialize(const std::string &dir_path) {
+void ConnectionPool::Initialize(const std::string &dir_path, bool in_memory) {
   this->dir_path_ = dir_path;
-  std::string shard_path = absl::StrCat(dir_path, "default.sqlite3");
+  this->in_memory_ = in_memory;
+  std::string shard_path = ShardPath(in_memory, dir_path, "default.sqlite3");
   ::sqlite3_open(shard_path.c_str(), &this->default_noshard_connection_);
 }
 
@@ -49,15 +59,28 @@ void ConnectionPool::Initialize(const std::string &dir_path) {
 
 // Open a connection to a shard.
 ::sqlite3 *ConnectionPool::GetConnection(const ShardKind &shard_kind,
-                                         const UserId &user_id) const {
+                                         const UserId &user_id) {
   // Find the shard path.
   std::string shard_name = sqlengine::NameShard(shard_kind, user_id);
-  std::string shard_path = absl::StrCat(this->dir_path_, shard_name);
+  std::string shard_path =
+      ShardPath(this->in_memory_, this->dir_path_, shard_name);
   // Open and return connection.
   LOG(INFO) << "Shard: " << shard_name;
-  ::sqlite3 *connection;
-  ::sqlite3_open(shard_path.c_str(), &connection);
-  return connection;
+  if (this->connections_.count(shard_name) != 1) {
+    ::sqlite3 *connection;
+    ::sqlite3_open(shard_path.c_str(), &connection);
+    this->connections_.insert({shard_name, connection});
+    return connection;
+  }
+  return this->connections_.at(shard_name);
+}
+
+void ConnectionPool::RemoveShard(const std::string &shard_name) {
+  std::string path = ShardPath(this->in_memory_, this->dir_path_, shard_name);
+  this->connections_.erase(path);
+  if (!this->in_memory_) {
+    remove(path.c_str());
+  }
 }
 
 // Execution of SQL statements.

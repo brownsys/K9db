@@ -2,7 +2,13 @@
 #include <iostream>
 #include <utility>
 
+#include "absl/flags/flag.h"
+#include "absl/flags/parse.h"
+#include "absl/flags/usage.h"
+#include "glog/logging.h"
 #include "pelton/pelton.h"
+
+ABSL_FLAG(std::string, db_path, "", "Path to database directory (required)");
 
 // CREATE TABLE queries.
 std::vector<std::string> CREATES{
@@ -128,14 +134,20 @@ int Callback(void *context, int col_count, char **col_data, char **col_name) {
 }
 
 int main(int argc, char **argv) {
-  // Read command line arguments.
-  if (argc < 2) {
-    std::cout << "Please provide the database directory as a command line "
-                 "argument!"
-              << std::endl;
-    return 1;
+  // Command line arugments and help message.
+  absl::SetProgramUsageMessage(
+      "usage: bazel run //bin:example "
+      "--db_path=/path/to/db/directory ");
+  absl::ParseCommandLine(argc, argv);
+
+  // Initialize Google’s logging library.
+  google::InitGoogleLogging(argv[0]);
+
+  // Find database directory.
+  const std::string &dir = absl::GetFlag(FLAGS_db_path);
+  if (dir == "") {
+    LOG(FATAL) << "Please provide the database dir as a command line argument!";
   }
-  std::string dir(argv[1]);
 
   // Open connection to sharder.
   pelton::Connection connection;

@@ -5,6 +5,7 @@
 #include <sqlite3.h>
 
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "absl/status/status.h"
@@ -28,7 +29,7 @@ class ConnectionPool {
   ~ConnectionPool();
 
   // Initialize (when the state is initialized).
-  void Initialize(const std::string &dir_path);
+  void Initialize(const std::string &dir_path, bool in_memory);
 
   // Execute statement against the default un-sharded database.
   absl::Status ExecuteDefault(const std::string &sql,
@@ -43,11 +44,12 @@ class ConnectionPool {
                             const std::unordered_set<UserId> &user_ids,
                             const OutputChannel &output);
 
+  void RemoveShard(const std::string &shard_name);
+
  private:
   // Connection management.
   ::sqlite3 *GetDefaultConnection() const;
-  ::sqlite3 *GetConnection(const ShardKind &shard_kind,
-                           const UserId &user_id) const;
+  ::sqlite3 *GetConnection(const ShardKind &shard_kind, const UserId &user_id);
 
   // Actually execute statements after their connection has been resolved.
   absl::Status ExecuteDefault(const std::string &sql, ::sqlite3 *connection,
@@ -57,8 +59,11 @@ class ConnectionPool {
                             const UserId &user_id, const OutputChannel &output);
 
   std::string dir_path_;
+  bool in_memory_;
   // We always keep an open connection to the main non-sharded database.
   ::sqlite3 *default_noshard_connection_;
+  // Pool for keeping connections active in the background.
+  std::unordered_map<std::string, ::sqlite3 *> connections_;
 
   // We use these private static fields to remove captures from std::function
   // and lambdas, so that they can be passed to SQLITE3 API as old C-style

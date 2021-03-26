@@ -21,7 +21,7 @@ void SharderState::Load() {
   // State file does not exists: this is a fresh database that was not
   // created previously!
   std::string state_file_path = this->dir_path_ + STATE_FILE_NAME;
-  if (!util::FileExists(state_file_path)) {
+  if (this->in_memory_ || !util::FileExists(state_file_path)) {
     return;
   }
 
@@ -112,6 +112,10 @@ void SharderState::Load() {
 }
 
 void SharderState::Save() {
+  if (this->in_memory_) {
+    return;
+  }
+
   // Open state file for writing.
   std::ofstream state_file;
   util::OpenWrite(&state_file, this->dir_path_ + STATE_FILE_NAME);

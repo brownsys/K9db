@@ -47,8 +47,7 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
 
     // Remove user shard.
     std::string shard = sqlengine::NameShard(table_name, user_id);
-    std::string path = absl::StrCat(state->dir_path(), shard);
-    remove(path.c_str());
+    state->connection_pool().RemoveShard(shard);
     state->RemoveUserFromShard(table_name, user_id);
 
     // Turn the delete statement back to a string, to delete relevant row in

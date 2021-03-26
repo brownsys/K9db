@@ -7,6 +7,10 @@ cc_binary(
     ],
     deps = [
         "//pelton",
+        "@absl//absl/flags:flag",
+        "@absl//absl/flags:parse",
+        "@absl//absl/flags:usage",
+        "@glog",
     ],
 )
 
@@ -17,5 +21,9 @@ cc_binary(
     ],
     deps = [
         "//pelton",
+        "@absl//absl/flags:flag",
+        "@absl//absl/flags:parse",
+        "@absl//absl/flags:usage",
+        "@glog",
     ],
 )
