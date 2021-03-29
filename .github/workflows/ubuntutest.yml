@@ -38,7 +38,7 @@ jobs:
     - name: Run end-2-end sample
       run: |
         rm -rf /tmp/db && mkdir /tmp/db
-        bazel run bin:example -- /tmp/db
+        bazel run bin:example -- --db_path=/tmp/db
     - name: Run cli samples
       run: |
         rm -rf db && mkdir db
