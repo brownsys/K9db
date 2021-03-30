@@ -39,6 +39,7 @@ cc_binary(
         "-lsqlite3",
     ],
     deps = [
+        "//pelton/util:perf",
         "@absl//absl/flags:flag",
         "@absl//absl/flags:parse",
         "@absl//absl/flags:usage",

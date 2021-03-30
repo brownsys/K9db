@@ -3,6 +3,8 @@ try-import user.bazelrc
 
 build --cxxopt="-std=c++17"
 build --host_cxxopt="-std=c++17"
+build --copt -g
+build --host_copt -g
 
 build:asan --strip=never
 build:asan --copt -fsanitize=address

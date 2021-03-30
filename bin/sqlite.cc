@@ -1,15 +1,14 @@
 #include <sqlite3.h>
 
 #include <iostream>
+#include <limits>
 #include <string>
 
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
 #include "glog/logging.h"
-
-ABSL_FLAG(bool, print, true, "Print results to the screen");
-ABSL_FLAG(std::string, db_path, "", "Path to database file (required)");
+#include "pelton/util/perf.h"
 
 // Print query results!
 int PrintCb(void *context, int col_count, char **col_data, char **col_name) {
@@ -43,6 +42,34 @@ int NoCb(void *context, int col_count, char **col_data, char **col_name) {
   return 0;
 }
 
+bool ReadCommand(std::string *ptr) {
+  pelton::perf::Start("Read std::cin");
+  ptr->clear();
+  std::string line;
+  while (std::getline(std::cin, line)) {
+    if (line.size() == 0 || line.front() == '#' || line.front() == '.' ||
+        line.find_first_not_of(" \t\n") == std::string::npos) {
+      continue;
+    }
+    // Wait until command is fully read (in case it spans several lines).
+    *ptr += line;
+    if (line.back() == '\\') {
+      ptr->pop_back();
+      continue;
+    }
+
+    // Done, read command successfully.
+    pelton::perf::End("Read std::cin");
+    return true;
+  }
+
+  pelton::perf::End("Read std::cin");
+  return false;
+}
+
+ABSL_FLAG(bool, print, true, "Print results to the screen");
+ABSL_FLAG(std::string, db_path, "", "Path to database file (required)");
+
 int main(int argc, char **argv) {
   // Command line arugments and help message.
   absl::SetProgramUsageMessage(
@@ -64,6 +91,8 @@ int main(int argc, char **argv) {
     LOG(FATAL) << "Please provide the database dir as a command line argument!";
   }
 
+  pelton::perf::Start("All");
+
   // Initialize our sharded state/connection.
   try {
     ::sqlite3 *connection;
@@ -76,26 +105,13 @@ int main(int argc, char **argv) {
     }
 
     // Read SQL statements one at a time!
-    std::string line;
-    std::string command = "";
-    while (std::getline(std::cin, line)) {
-      if (line.size() == 0 || line.front() == '#' || line.front() == '.') {
-        continue;
-      }
-      // Wait until command is fully read (in case it spans several lines).
-      command += line;
-      if (command.size() > 0 && command.back() == '\\') {
-        command.pop_back();
-        continue;
-      }
-      if (command.find_first_not_of(" \t\n") == std::string::npos) {
-        // all white space
-        continue;
-      }
-
+    std::string command;
+    while (ReadCommand(&command)) {
       // Command has been fully read, execute it!
       bool context = true;
       char *errmsg = nullptr;
+
+      pelton::perf::Start("exec");
       if (sqlite3_exec(connection, command.c_str(), callback, &context,
                        &errmsg) != SQLITE_OK) {
         std::cout << "Fatal error" << std::endl;
@@ -105,12 +121,12 @@ int main(int argc, char **argv) {
         }
         break;
       }
+      pelton::perf::End("exec");
 
       // Ready for next command.
       if (print) {
         std::cout << std::endl << ">>> " << std::flush;
       }
-      command = "";
     }
 
     // Close the connection
@@ -118,6 +134,9 @@ int main(int argc, char **argv) {
   } catch (const char *err_msg) {
     LOG(FATAL) << "Error: " << err_msg;
   }
+
+  pelton::perf::End("All");
+  pelton::perf::PrintAll();
 
   // Exit!
   std::cout << "exit" << std::endl;
