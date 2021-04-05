@@ -13,9 +13,9 @@
 namespace pelton {
 namespace dataflow {
 
-static void MatViewInsert2UInts(benchmark::State& state) {
+static void UnorderedMatViewInsert2UInts(benchmark::State& state) {
   SchemaOwner schema = MakeSchema(false);
-  auto op = std::make_shared<MatViewOperator>(schema.keys());
+  auto op = new UnorderedMatViewOperator(schema.keys());
 
   Record r(SchemaRef(schema), true, static_cast<uint64_t>(4),
            static_cast<uint64_t>(5));
@@ -28,11 +28,13 @@ static void MatViewInsert2UInts(benchmark::State& state) {
     processed++;
   }
   state.SetItemsProcessed(processed);
+
+  delete op;
 }
 
-static void MatViewInsertUIntString(benchmark::State& state) {
+static void UnorderedMatViewInsertUIntString(benchmark::State& state) {
   SchemaOwner schema = MakeSchema(true);
-  auto op = std::make_shared<MatViewOperator>(schema.keys());
+  auto op = new UnorderedMatViewOperator(schema.keys());
 
   std::unique_ptr<std::string> s = std::make_unique<std::string>("world");
   Record r(SchemaRef(schema), true, static_cast<uint64_t>(4), std::move(s));
@@ -45,11 +47,13 @@ static void MatViewInsertUIntString(benchmark::State& state) {
     processed++;
   }
   state.SetItemsProcessed(processed);
+
+  delete op;
 }
 
-static void MatViewBatchInsert(benchmark::State& state) {
+static void UnorderedMatViewBatchInsert(benchmark::State& state) {
   SchemaOwner schema = MakeSchema(false);
-  auto op = std::make_shared<MatViewOperator>(schema.keys());
+  auto op = new UnorderedMatViewOperator(schema.keys());
 
   std::vector<Record> rs = {};
   for (int i = 0; i < state.range(0); ++i) {
@@ -64,11 +68,13 @@ static void MatViewBatchInsert(benchmark::State& state) {
     op->ProcessAndForward(UNDEFINED_NODE_INDEX, rs);
   }
   state.SetItemsProcessed(processed);
+
+  delete op;
 }
 
-BENCHMARK(MatViewInsert2UInts);
-BENCHMARK(MatViewInsertUIntString);
-BENCHMARK(MatViewBatchInsert)->Arg(10)->Arg(100)->Arg(1000);
+BENCHMARK(UnorderedMatViewInsert2UInts);
+BENCHMARK(UnorderedMatViewInsertUIntString);
+BENCHMARK(UnorderedMatViewBatchInsert)->Arg(10)->Arg(100)->Arg(1000);
 
 }  // namespace dataflow
 }  // namespace pelton
