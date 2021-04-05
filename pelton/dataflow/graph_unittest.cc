@@ -201,7 +201,7 @@ DataFlowGraph MakeTrivialGraph(ColumnID keycol, const SchemaRef &schema) {
   DataFlowGraph g;
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
-  auto matview = std::make_shared<MatViewOperator>(keys);
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
   EXPECT_TRUE(g.AddOutputOperator(matview, in));
@@ -219,7 +219,7 @@ DataFlowGraph MakeFilterGraph(ColumnID keycol, const SchemaRef &schema) {
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto filter = std::make_shared<FilterOperator>();
   filter->AddOperation(5UL, 0, FilterOperator::Operation::GREATER_THAN);
-  auto matview = std::make_shared<MatViewOperator>(keys);
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
   EXPECT_TRUE(g.AddNode(filter, in));
@@ -238,7 +238,7 @@ DataFlowGraph MakeUnionGraph(ColumnID keycol, const SchemaRef &schema) {
   auto in1 = std::make_shared<InputOperator>("test-table1", schema);
   auto in2 = std::make_shared<InputOperator>("test-table2", schema);
   auto union_ = std::make_shared<UnionOperator>();
-  auto matview = std::make_shared<MatViewOperator>(keys);
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in1));
   EXPECT_TRUE(g.AddInputNode(in2));
@@ -261,7 +261,7 @@ DataFlowGraph MakeEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
   auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
   auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
   auto join = std::make_shared<EquiJoinOperator>(lk, rk);
-  auto matview = std::make_shared<MatViewOperator>(keys);
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in1));
   EXPECT_TRUE(g.AddInputNode(in2));
@@ -282,7 +282,7 @@ DataFlowGraph MakeProjectGraph(ColumnID keycol, const SchemaRef &schema) {
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto project = std::make_shared<ProjectOperator>(column_ids);
-  auto matview = std::make_shared<MatViewOperator>(keys);
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
   EXPECT_TRUE(g.AddNode(project, in));
@@ -304,7 +304,7 @@ DataFlowGraph MakeProjectOnFilterGraph(ColumnID keycol,
   auto filter = std::make_shared<FilterOperator>();
   filter->AddOperation(5UL, 0, FilterOperator::Operation::GREATER_THAN);
   auto project = std::make_shared<ProjectOperator>(column_ids);
-  auto matview = std::make_shared<MatViewOperator>(keys);
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
   EXPECT_TRUE(g.AddNode(filter, in));
@@ -328,7 +328,7 @@ DataFlowGraph MakeProjectOnEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
   auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
   auto join = std::make_shared<EquiJoinOperator>(lk, rk);
   auto project = std::make_shared<ProjectOperator>(column_ids);
-  auto matview = std::make_shared<MatViewOperator>(keys);
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in1));
   EXPECT_TRUE(g.AddInputNode(in2));
@@ -395,9 +395,7 @@ inline void MatViewContentsEquals(std::shared_ptr<MatViewOperator> matview,
                                   const std::vector<Record> &records) {
   EXPECT_EQ(matview->count(), records.size());
   for (const Record &record : records) {
-    std::vector<Record> singleton;
-    singleton.push_back(record.Copy());
-    EXPECT_EQ(singleton, matview->Lookup(record.GetKey()));
+    EXPECT_EQ(record, *matview->Lookup(record.GetKey()).begin());
   }
 }
 

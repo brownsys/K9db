@@ -3,104 +3,66 @@
 namespace pelton {
 namespace dataflow {
 
+// Constructor reserves values according to schema.
+Key::Key(size_t capacity) : values_() { this->values_.reserve(capacity); }
+
 // Must be copyable to be used as a key for absl maps.
-Key::Key(const Key &o) : type_(o.type_), str_() {
-  switch (this->type_) {
-    case sqlast::ColumnDefinition::Type::UINT:
-      this->uint_ = o.uint_;
-      break;
-    case sqlast::ColumnDefinition::Type::INT:
-      this->sint_ = o.sint_;
-      break;
-    case sqlast::ColumnDefinition::Type::TEXT:
-      this->str_ = o.str_;
-      break;
-    default:
-      LOG(FATAL) << "Unsupported data type in key copy!";
-  }
-}
+Key::Key(const Key &o) { this->values_ = o.values_; }
 Key &Key::operator=(const Key &o) {
-  CHECK(this->type_ == o.type_) << "Bad copy assign key type";
-  // Copy stuff.
-  switch (this->type_) {
-    case sqlast::ColumnDefinition::Type::UINT:
-      this->uint_ = o.uint_;
-      break;
-    case sqlast::ColumnDefinition::Type::INT:
-      this->sint_ = o.sint_;
-      break;
-    case sqlast::ColumnDefinition::Type::TEXT:
-      this->str_ = o.str_;  // Frees existing string and copies target.
-      break;
-    default:
-      LOG(FATAL) << "Unsupported data type in key copy!";
-  }
+  this->values_ = o.values_;
   return *this;
 }
 
-// Move moves the string.
-Key::Key(Key &&o) : type_(o.type_), str_() {
-  switch (this->type_) {
-    case sqlast::ColumnDefinition::Type::UINT:
-      this->uint_ = o.uint_;
-      break;
-    case sqlast::ColumnDefinition::Type::INT:
-      this->sint_ = o.sint_;
-      break;
-    case sqlast::ColumnDefinition::Type::TEXT:
-      this->str_ = std::move(o.str_);
-      break;
-    default:
-      LOG(FATAL) << "Unsupported data type in key copy!";
-  }
-}
+// Move moves contained strings.
+Key::Key(Key &&o) { this->values_ = std::move(o.values_); }
 Key &Key::operator=(Key &&o) {
-  CHECK(this->type_ == o.type_) << "Bad move assign key type";
-  // Copy stuff (but move string if o is a string).
-  switch (this->type_) {
-    case sqlast::ColumnDefinition::Type::UINT:
-      this->uint_ = o.uint_;
-      break;
-    case sqlast::ColumnDefinition::Type::INT:
-      this->sint_ = o.sint_;
-      break;
-    case sqlast::ColumnDefinition::Type::TEXT:
-      // Frees current string and moves traget.
-      this->str_ = std::move(o.str_);
-      break;
-    default:
-      LOG(FATAL) << "Unsupported data type in key copy!";
-  }
+  this->values_ = std::move(o.values_);
   return *this;
 }
 
 // Comparisons.
 bool Key::operator==(const Key &other) const {
-  CheckType(other.type_);
-  switch (this->type_) {
-    case sqlast::ColumnDefinition::Type::UINT:
-      return this->uint_ == other.uint_;
-    case sqlast::ColumnDefinition::Type::INT:
-      return this->sint_ == other.sint_;
-    case sqlast::ColumnDefinition::Type::TEXT:
-      return this->str_ == other.str_;
-    default:
-      LOG(FATAL) << "Unsupported data type in key comparison!";
+  return this->values_ == other.values_;
+}
+bool Key::operator!=(const Key &other) const { return !(*this == other); }
+bool Key::operator<(const Key &other) const {
+  CHECK_EQ(this->values_.size(), other.values_.size())
+      << "Comparing keys of different sizes";
+  for (size_t i = 0; i < this->values_.size(); i++) {
+    if (this->values_.at(i) < other.values_.at(i)) {
+      return true;
+    } else if (this->values_.at(i) != other.values_.at(i)) {
+      break;
+    }
   }
+  return false;
 }
 
-// Data access.
-uint64_t Key::GetUInt() const {
-  CheckType(sqlast::ColumnDefinition::Type::UINT);
-  return this->uint_;
+// Adding values.
+void Key::AddValue(uint64_t v) {
+  this->CheckSize();
+  this->values_.emplace_back(v);
 }
-int64_t Key::GetInt() const {
-  CheckType(sqlast::ColumnDefinition::Type::INT);
-  return this->sint_;
+void Key::AddValue(int64_t v) {
+  this->CheckSize();
+  this->values_.emplace_back(v);
 }
-const std::string &Key::GetString() const {
-  CheckType(sqlast::ColumnDefinition::Type::TEXT);
-  return this->str_;
+void Key::AddValue(const std::string &v) {
+  this->CheckSize();
+  this->values_.emplace_back(v);
+}
+void Key::AddValue(std::string &&v) {
+  this->CheckSize();
+  this->values_.emplace_back(std::move(v));
+}
+
+// Printing a record to an output stream (e.g. std::cout).
+std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Key &k) {
+  os << "Key = |";
+  for (const pelton::dataflow::Value &value : k.values_) {
+    os << value << "|";
+  }
+  return os;
 }
 
 }  // namespace dataflow

@@ -1,86 +1,67 @@
 #ifndef PELTON_DATAFLOW_KEY_H_
 #define PELTON_DATAFLOW_KEY_H_
 
-#include <cstring>
 #include <string>
 #include <utility>
+#include <vector>
 
-#include "glog/logging.h"
-#include "pelton/sqlast/ast.h"
+#include "pelton/dataflow/schema.h"
+#include "pelton/dataflow/types.h"
+#include "pelton/dataflow/value.h"
 
 namespace pelton {
 namespace dataflow {
 
 class Key {
  public:
-  explicit Key(uint64_t v)
-      : type_(sqlast::ColumnDefinition::Type::UINT), uint_(v) {}
-
-  explicit Key(int64_t v)
-      : type_(sqlast::ColumnDefinition::Type::INT), sint_(v) {}
-
-  explicit Key(const std::string &v)
-      : type_(sqlast::ColumnDefinition::Type::TEXT), str_(v) {}
-
-  explicit Key(std::string &&v)
-      : type_(sqlast::ColumnDefinition::Type::TEXT), str_(v) {}
+  // Constructor reserves values according to schema.
+  explicit Key(size_t capacity);
 
   // Must be copyable to be used as a key for absl maps.
   Key(const Key &o);
   Key &operator=(const Key &o);
 
-  // Move moves the string.
+  // Move moves contained strings.
   Key(Key &&o);
   Key &operator=(Key &&o);
 
   // Manually destruct string if key is a string.
-  ~Key() {
-    if (this->type_ == sqlast::ColumnDefinition::Type::TEXT) {
-      this->str_.~basic_string();
-    }
-  }
+  ~Key() = default;
 
   // Comparisons.
   bool operator==(const Key &other) const;
-  bool operator!=(const Key &other) const { return !(*this == other); }
+  bool operator!=(const Key &other) const;
+  bool operator<(const Key &other) const;
 
-  // Hash to use as key in absl hash tables.
+  // Hash to use as a key in absl hash tables.
   template <typename H>
   friend H AbslHashValue(H h, const Key &k) {
-    switch (k.type_) {
-      case sqlast::ColumnDefinition::Type::UINT:
-        return H::combine(std::move(h), k.uint_);
-      case sqlast::ColumnDefinition::Type::INT:
-        return H::combine(std::move(h), k.sint_);
-      case sqlast::ColumnDefinition::Type::TEXT:
-        return H::combine(std::move(h), k.str_.c_str(), k.str_.size());
-      default:
-        LOG(FATAL) << "unimplemented pointed data hashing for Key";
+    h = H::combine(std::move(h), k.values_.size());
+    for (const Value &value : k.values_) {
+      h = H::combine(std::move(h), value);
     }
     return h;
   }
 
   // Data access.
-  uint64_t GetUInt() const;
-  int64_t GetInt() const;
-  const std::string &GetString() const;
+  const Value &value(size_t i) const { return this->values_.at(i); }
+  size_t size() const { return this->values_.size(); }
 
-  // Access the underlying type.
-  sqlast::ColumnDefinition::Type type() const { return this->type_; }
+  // Adding values.
+  void AddValue(uint64_t v);
+  void AddValue(int64_t v);
+  void AddValue(const std::string &v);
+  void AddValue(std::string &&v);
+
+  // For logging and printing...
+  friend std::ostream &operator<<(std::ostream &os, const Key &k);
 
  private:
-  sqlast::ColumnDefinition::Type type_;
+  std::vector<Value> values_;
 
-  union {
-    uint64_t uint_;
-    int64_t sint_;
-    std::string str_;
-  };
-
-  inline void CheckType(sqlast::ColumnDefinition::Type t) const {
-    if (this->type_ != t) {
-      LOG(FATAL) << "Type mismatch: key type is " << this->type_
-                 << ", tried to access as " << t;
+  inline void CheckSize() const {
+    if (this->values_.size() == this->values_.capacity()) {
+      LOG(FATAL) << "Key is already full";
     }
   }
 };

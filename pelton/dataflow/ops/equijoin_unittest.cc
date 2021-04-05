@@ -46,6 +46,14 @@ inline SchemaOwner Schema4() {
   return SchemaOwner{names, types, keys};
 }
 
+inline void EXPECT_IT_EQ(RecordIterable &&l, const std::vector<Record> &r) {
+  size_t i = 0;
+  for (const Record &record : l) {
+    EXPECT_EQ(record, r.at(i++));
+  }
+  EXPECT_EQ(i, r.size());
+}
+
 TEST(EquiJoinOperatorTest, JoinedSchemaTest) {
   EquiJoinOperator op1{2, 1};
   EquiJoinOperator op2{1, 1};
@@ -147,13 +155,14 @@ TEST(EquiJoinOperatorTest, BasicJoinTest) {
   EXPECT_TRUE(op->Process(0, lrecords, &output));
   EXPECT_EQ(output.size(), 0);
   EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_EQ(op->left_table_.Get(Key(-5L)), lrecords);
+  EXPECT_IT_EQ(op->left_table_.Lookup(lrecords.at(0).GetValues({2})), lrecords);
   EXPECT_EQ(op->right_table_.count(), 0);
   EXPECT_TRUE(op->Process(1, rrecords, &output));
   EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_EQ(op->left_table_.Get(Key(-5L)), lrecords);
+  EXPECT_IT_EQ(op->left_table_.Lookup(lrecords.at(0).GetValues({2})), lrecords);
   EXPECT_EQ(op->right_table_.count(), 1);
-  EXPECT_EQ(op->right_table_.Get(Key(-5L)), rrecords);
+  EXPECT_IT_EQ(op->right_table_.Lookup(rrecords.at(0).GetValues({1})),
+               rrecords);
   EXPECT_EQ(output.size(), 1);
   EXPECT_EQ(output.at(0).GetUInt(0), 0UL);
   EXPECT_EQ(output.at(0).GetString(1), "item0");
@@ -196,13 +205,14 @@ TEST(EquiJoinOperatorTest, BasicUnjoinableTest) {
   EXPECT_TRUE(op->Process(0, lrecords, &output));
   EXPECT_EQ(output.size(), 0);
   EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_EQ(op->left_table_.Get(Key(-5L)), lrecords);
+  EXPECT_IT_EQ(op->left_table_.Lookup(lrecords.at(0).GetValues({2})), lrecords);
   EXPECT_EQ(op->right_table_.count(), 0);
   EXPECT_TRUE(op->Process(1, rrecords, &output));
   EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_EQ(op->left_table_.Get(Key(-5L)), lrecords);
+  EXPECT_IT_EQ(op->left_table_.Lookup(lrecords.at(0).GetValues({2})), lrecords);
   EXPECT_EQ(op->right_table_.count(), 1);
-  EXPECT_EQ(op->right_table_.Get(Key(50L)), rrecords);
+  EXPECT_IT_EQ(op->right_table_.Lookup(rrecords.at(0).GetValues({1})),
+               rrecords);
   EXPECT_EQ(output.size(), 0);
 }
 

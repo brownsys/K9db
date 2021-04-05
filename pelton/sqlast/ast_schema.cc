@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "absl/strings/match.h"
+#include "glog/logging.h"
 
 namespace pelton {
 namespace sqlast {
@@ -23,7 +24,7 @@ std::string ColumnConstraint::TypeToString(Type type) {
     case Type::FOREIGN_KEY:
       return "FOREIGN KEY";
     default:
-      throw "Unsupported constraint type!";
+      LOG(FATAL) << "Unsupported constraint type!";
   }
 }
 
@@ -53,7 +54,7 @@ ColumnDefinition::Type ColumnDefinition::StringToType(
              absl::EqualsIgnoreCase(column_type, "string")) {
     return Type::TEXT;
   } else {
-    throw "Unsupported column type!";
+    LOG(FATAL) << "Unsupported column type!";
   }
 }
 
@@ -64,7 +65,7 @@ std::string ColumnDefinition::TypeToString(ColumnDefinition::Type type) {
     case Type::TEXT:
       return "varchar";
     default:
-      throw "Unsupported column type!";
+      LOG(FATAL) << "Unsupported column type!";
   }
 }
 
@@ -173,7 +174,7 @@ std::ostream &operator<<(std::ostream &os, const ColumnDefinition::Type &r) {
       os << "UINT";
       break;
     default:
-      throw "Unsupported column type!";
+      LOG(FATAL) << "Unsupported column type!";
   }
   return os;
 }

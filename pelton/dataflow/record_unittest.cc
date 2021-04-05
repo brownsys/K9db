@@ -47,6 +47,14 @@ TEST(RecordTest, DataRep) {
   EXPECT_EQ(&record.GetString(1), v1);  // pointer/address equality.
   EXPECT_EQ(record.GetString(1), *v1);  // deep equality
   EXPECT_EQ(record.GetInt(2), v2);
+
+  // Using GetValue()...
+  EXPECT_EQ(record.GetValue(0).type(), CType::UINT);
+  EXPECT_EQ(record.GetValue(0).GetUInt(), v0);
+  EXPECT_EQ(record.GetValue(1).type(), CType::TEXT);
+  EXPECT_EQ(record.GetValue(1).GetString(), *v1);
+  EXPECT_EQ(record.GetValue(2).type(), CType::INT);
+  EXPECT_EQ(record.GetValue(2).GetInt(), v2);
 }
 
 // Tests setting and getting data from record using variadic parameter pack.
@@ -247,7 +255,7 @@ TEST(RecordTest, GetKey) {
   // Create a schema.
   std::vector<std::string> names = {"Col1", "Col2"};
   std::vector<CType> types = {CType::INT, CType::TEXT};
-  std::vector<ColumnID> keys1 = {0};
+  std::vector<ColumnID> keys1 = {1, 0};
   std::vector<ColumnID> keys2 = {1};
   SchemaOwner schema1{names, types, keys1};
   SchemaOwner schema2{names, types, keys2};
@@ -256,12 +264,13 @@ TEST(RecordTest, GetKey) {
   std::unique_ptr<std::string> s1 = std::make_unique<std::string>("hello");
   std::unique_ptr<std::string> s2 = std::make_unique<std::string>("bye");
   // Some keys.
-  int64_t k1 = -10;
+  int64_t k12 = -10;
+  std::string k11 = *s1;
   std::string k2 = *s2;
 
   // Create two records.
   Record r1{SchemaRef(schema1)};
-  r1.SetInt(k1, 0);
+  r1.SetInt(k12, 0);
   r1.SetString(std::move(s1), 1);
   Record r2{SchemaRef(schema2)};
   r2.SetInt(500, 0);
@@ -270,14 +279,46 @@ TEST(RecordTest, GetKey) {
   r3.SetInt(500, 0);
 
   // Test key types.
-  EXPECT_EQ(r1.GetKey().type(), CType::INT);
-  EXPECT_EQ(r2.GetKey().type(), CType::TEXT);
-  EXPECT_EQ(r3.GetKey().type(), CType::TEXT);
+  EXPECT_EQ(r1.GetKey().value(0).type(), CType::TEXT);
+  EXPECT_EQ(r1.GetKey().value(1).type(), CType::INT);
+  EXPECT_EQ(r2.GetKey().value(0).type(), CType::TEXT);
+  EXPECT_EQ(r3.GetKey().value(0).type(), CType::TEXT);
 
   // Test keys.
-  EXPECT_EQ(r1.GetKey().GetInt(), k1);
-  EXPECT_EQ(r2.GetKey().GetString(), k2);
-  EXPECT_EQ(r3.GetKey().GetString(), "");
+  EXPECT_EQ(r1.GetKey().value(0).GetString(), k11);
+  EXPECT_EQ(r1.GetKey().value(1).GetInt(), k12);
+  EXPECT_EQ(r2.GetKey().value(0).GetString(), k2);
+  EXPECT_EQ(r3.GetKey().value(0).GetString(), "");
+}
+
+// Test getting values by columns from record.
+TEST(RecordTest, GetValues) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
+  std::vector<ColumnID> keys = {0};
+  SchemaOwner schema{names, types, keys};
+
+  // Create a record.
+  std::unique_ptr<std::string> s = std::make_unique<std::string>("hello");
+  Record record{SchemaRef(schema), true, 0UL, std::move(s), -10L};
+
+  // Get values.
+  Key vals1 = record.GetValues({0});
+  Key vals2 = record.GetValues({0, 2});
+  Key vals3 = record.GetValues({2, 1});
+
+  // Check values are what we expect.
+  EXPECT_EQ(vals1.size(), 1);
+  EXPECT_EQ(vals1.value(0).GetUInt(), 0UL);
+
+  EXPECT_EQ(vals2.size(), 2);
+  EXPECT_EQ(vals2.value(0).GetUInt(), 0UL);
+  EXPECT_EQ(vals2.value(1).GetInt(), -10L);
+
+  EXPECT_EQ(vals3.size(), 2);
+  EXPECT_EQ(vals3.value(0).GetInt(), -10L);
+  EXPECT_EQ(vals3.value(1).GetString(), "hello");
 }
 
 // Test move and copy.

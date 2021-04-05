@@ -6,10 +6,15 @@
 #define PELTON_DATAFLOW_OPS_GROUPED_DATA_H_
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <iterator>
+#include <memory>
+#include <utility>
 #include <vector>
 
+#include "absl/container/btree_map.h"
+#include "absl/container/btree_set.h"
 #include "absl/container/flat_hash_map.h"
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/record.h"
@@ -17,124 +22,364 @@
 namespace pelton {
 namespace dataflow {
 
-// class to handle multiple records
-// being grouped after a key
-class GroupedData {
+// A static/compile time way to test if type T has a desired member function.
+// This works for inherited functions, as well as functions with variable number
+// of arguments, and various modifiers of record (ref, const ref, etc).
+template <class F>
+struct HasFunction {
+ private:
+  // if p->find(*r) does not exist, this will not cause an error, rather
+  // it will just cause this overloaded variant of Test not to be defined.
+  // This Test(...) has return type std::true_type() only when p->find(*r)
+  // exists and is defined and callable, and std::false_type otherwise.
+  template <typename T>
+  static auto FindTest(T *p, Record *r)
+      -> decltype(p->find(*r), std::true_type());
+
+  template <class>
+  static auto FindTest(...) -> std::false_type;
+
+  // Similar but for insert.
+  template <typename T>
+  static auto InsertTest(T *p, Record *r)
+      -> decltype(p->insert(*r), std::true_type());
+
+  template <class>
+  static auto InsertTest(...) -> std::false_type;
+
  public:
-  GroupedData() : count_(0) {}
-
-  inline const std::vector<Record> &Get(const Key &key) const {
-    if (!contents_.contains(key)) return EMPTY_VEC;
-    return contents_.at(key);
+  static constexpr bool Find() {
+    return decltype(FindTest<F>(nullptr, nullptr))::value;
   }
+  static constexpr bool Insert() {
+    return decltype(InsertTest<F>(nullptr, nullptr))::value;
+  }
+};
 
-  inline bool Contains(const Key &key) const { return contents_.contains(key); }
+// Cannot easily initialize static member of a templated class without
+// doing messy template magic. Instead, we have this super untemplated class
+// contain that static member.
+class UntemplatedGroupedData {
+ protected:
+  static const std::vector<Record> EMPTY_VEC;
+};
 
-  inline bool Insert(const Key &k, const Record &r) {
-    if (!contents_.contains(k)) {
-      // need to add key -> records entry as empty vector
-      contents_.emplace(k, std::vector<Record>{});
+// A generic iterator that can iterate over any container producing the
+// specified generic type.
+// This generic iterator is merely a wrapper around the iterator of that
+// underlying container. The underlying container's iterator is generically
+// stored inside GenericIterator<T>::Impl, which exposes functionality to
+// compare, increment, and access the iterator. GenericIterator stores a pointer
+// to Impl, and defers all operations to it.
+// Most of the code here is templates + inheritance to get this to work in a
+// type-safe way.
+template <typename T>
+class GenericIterator {
+ private:
+  // Abstract concept of an iterator wrapper, we store and interact with
+  // pointers to this class to hid the genericity of Impl<I>.
+  class AbsImpl {
+   public:
+    virtual std::unique_ptr<AbsImpl> Clone() const = 0;
+    virtual void Increment() = 0;
+    virtual bool Equals(const std::unique_ptr<AbsImpl> &o) const = 0;
+    virtual const T &Access() const = 0;
+  };  // AbsImpl.
+
+ public:
+  // Iterator traits.
+  using difference_type = int64_t;
+  using value_type = T;
+  using pointer = const T *;
+  using reference = const T &;
+  using iterator_category = std::input_iterator_tag;
+
+  // This is our wrapper around generic underlying iterators.
+  template <typename I>  // I is an iterator for some container.
+  class Impl : public AbsImpl {
+   public:
+    explicit Impl(I start_it) : it_(start_it) {}
+    std::unique_ptr<AbsImpl> Clone() const override {
+      return std::make_unique<Impl<I>>(this->it_);
+    }
+    void Increment() { this->it_++; }
+    bool Equals(const std::unique_ptr<AbsImpl> &o) const {
+      // Because AbsImpl is private, we know that Impl is the only possible
+      // concrete class derived from it.
+      return this->it_ == static_cast<Impl<I> *>(o.get())->it_;
+    }
+    const T &Access() const {
+      if constexpr (std::is_same<T, Key>::value) {
+        return this->it_->first;
+      } else {
+        return *(this->it_);
+      }
     }
 
-    std::vector<Record> &v = contents_.at(k);
+   private:
+    I it_;
+  };  // Impl.
+
+  // Empty impl for an empty iterator.
+  using EmptyImpl = Impl<typename std::vector<T>::const_iterator>;
+
+  // Construct the generic iterator by providing a concrete implemenation.
+  explicit GenericIterator(std::unique_ptr<AbsImpl> impl)
+      : impl_(std::move(impl)) {}
+
+  // All operations translate to operation on the underlying implementation.
+  GenericIterator<T> &operator++() {
+    // Increment in place.
+    this->impl_->Increment();
+    return *this;
+  }
+  GenericIterator<T> operator++(int n) {
+    // Increment copy, leave this unchanged.
+    GenericIterator copy(this->impl_->Clone());
+    ++this;
+    return copy;
+  }
+  bool operator==(const GenericIterator<T> &o) const {
+    return this->impl_->Equals(o.impl_);
+  }
+  bool operator!=(const GenericIterator<T> &o) const {
+    return !this->impl_->Equals(o.impl_);
+  }
+  const T &operator*() const { return this->impl_->Access(); }
+
+ private:
+  std::unique_ptr<AbsImpl> impl_;
+};
+
+// Host code only sees two types of (semi-concrete) iterators: one that produces
+// records and another that produces keys. The source of the iterators are still
+// generic (could be a vector or map, etc).
+using KeyIterator = GenericIterator<Key>;
+using RecordIterator = GenericIterator<Record>;
+
+// Represents an abstract container that can be iterated over in some generic
+// way. We return instances of this class instead of the underlying iterator
+// directly to make it easy for client code to iterate (e.g. using for-each
+// loops).
+// Note: an instance of this class can only be used once, using it (e.g. in a
+// for-each loop) consumes it because of moves. Further usage of such instance
+// will cause a failure.
+template <typename T>
+class GenericIterable {
+ public:
+  GenericIterable(GenericIterator<T> &&begin, GenericIterator<T> &&end)
+      : begin_(std::move(begin)), end_(std::move(end)) {}
+
+  GenericIterator<T> begin() { return std::move(this->begin_); }
+  GenericIterator<T> end() { return std::move(this->end_); }
+  bool IsEmpty() const { return this->begin_ == this->end_; }
+  // Create an empty iterable.
+  static GenericIterable<T> CreateEmpty() {
+    static std::vector<T> empty = {};
+    return GenericIterable{
+        GenericIterator<T>{std::make_unique<EImpl>(empty.cbegin())},
+        GenericIterator<T>{std::make_unique<EImpl>(empty.cend())}};
+  }
+
+ private:
+  GenericIterator<T> begin_;
+  GenericIterator<T> end_;
+  using EImpl = typename GenericIterator<T>::template Impl<
+      typename std::vector<T>::const_iterator>;
+};
+
+using KeyIterable = GenericIterable<Key>;
+using RecordIterable = GenericIterable<Record>;
+
+// This class stores a set of records, this set is divided into groups,
+// each mapped by a key. This class is used as the underlying storage for
+// stateful operators. Most notably, MatviewOperator.
+//
+// The key used in this class is not necessarily the same as the PK key of the
+// records stored. Instead, it is externally specified by the operators and
+// planner. The key corresponds to the values that determine which records
+// to lookup when a concrete query must be looked up by the host application.
+// This key is deduced by the planner from the underlying query/flow.
+//
+// For example, the following query:
+//   SELECT id, department, course_name FROM courses WHERE department = ?
+// yields an instance of this class where records are keyed by department, even
+// though the primary key of records from the courses tables is id.
+// This way, when a specific concrete query (say one looking up the CS
+// department) needs to be looked up, this can be done efficiently.
+//
+// In cases where a query does not have such ? arguments (i.e. it is fully known
+// at flow construction time), the planner yields a materialized view without
+// any key. Thus, the corresponding instance of this class consists of a single
+// group, stored as a single entry in the underling map type.
+//
+// The records inside this data are stored in a two-layer/nested container
+// of the shape: MapType<Key, VectorType<Record>>.
+// The class is generic over these two container types, which are specified by
+// template variables M and V respectively.
+//
+// This class provide three ways of accessing the underyling data:
+// 1. Lookup by key via #Lookup(key): these return an Iterable set of records
+//    corresponding to the given key in whatever underlying order they are
+//    stored in.
+//    These also have a version with optional arguments for an offset and limit.
+// 2. Key iteration via #Keys(): this returns an Iterable set of keys for going
+//    through all keys in the underlying order.
+// 3. Insert(Key, record): inserts a copy of record into the group of the given
+//    key.
+//
+// We provide three concrete instantiations of this generic type at the end of
+// this file:
+//
+// 1. GroupedDataT<absl::flat_hash_map, std::vector>:
+//    A completely unsorted set, used for storing views of completely unordered
+//    queries. For example: SELECT * FROM <table> WHERE <col> = ?.
+//    A key in such a case is a value from <col>, and the associated vector
+//    contains all records that has that value from <col>.
+//    Both #Lookup(key) and #Keys() give us the data in some arbitrary order.
+//
+// 2. GroupedDataT<absl::flat_hash_map, absl::btree_set>:
+//    A set of sorted records, where the records are sorted by different set of
+//    column(s) than what they are keyed by.
+//    For example: SELECT * FROM <table> WHERE <col1> = ? ORDER BY <col2>.
+//    Iterating over this class's contents produces records in order of <col>,
+//    multiple records with the same value of <col> are traversed in arrival
+//    order, which determines their location in the underlying vector.
+//    #Lookup(key) gives us the records ordered by <col2>, while #Keys gives us
+//    the available values of <col1> in some arbitrary order.
+//    Note: this does not give us a global ordering over *all* the records by
+//          <col2>. We only know the order of records that have the same <col1>.
+//          This is intentional: records in such a view are only meant to be
+//          accessed for a single specific group (i.e. value for <col1>) at a
+//          time.
+//    Note: when the view has no key (SELECT * FROM <table> ORDER BY <col2>),
+//          then the underlying map only contains a single record set (for the
+//          empty key), giving us a global order over all records.
+//
+// 3. GroupedDataT<absl::btree_map, std::vector>:
+//    This is a set of unsorted records grouped by sorted keys. This is used
+//    when the key column set and sorting column set are identical.
+//    For example: SELECT * FROM <table> WHERE <col> = ? ORDER BY <col>.
+//    The output of such a query is ordered by <col>, but records that have the
+//    same value for <col> have no particular order.
+//    In this case, #Lookup(key) API gives us the records belonging to that key
+//    in some arbitrary order (order of arrival). However, #Keys() gives us the
+//    keys in order.
+template <typename M, typename V, typename RecordCompare = nullptr_t>
+class GroupedDataT : public UntemplatedGroupedData {
+ private:
+  using M_citerator = typename M::const_iterator;
+  using V_citerator = typename V::const_iterator;
+  using K_impl = typename KeyIterator::template Impl<M_citerator>;
+  using R_impl = typename RecordIterator::template Impl<V_citerator>;
+
+ public:
+  // If this is not ordered, we do not need to provide anything.
+  template <typename = typename std::enable_if<
+                std::is_null_pointer<RecordCompare>::value>>
+  GroupedDataT() {}
+
+  // If this is ordered, we need to provide a custom comparator.
+  template <typename = typename std::enable_if<
+                !std::is_null_pointer<RecordCompare>::value>>
+  explicit GroupedDataT(const RecordCompare &compare) : compare_(compare) {}
+
+  // Count of elements in the entire map.
+  size_t count() const { return this->count_; }
+
+  // Return an Iterable set of records corresponding to the given key, in the
+  // underlying order (specified by V).
+  RecordIterable Lookup(const Key &key, int limit = -1,
+                        size_t offset = 0) const {
+    auto it = this->contents_.find(key);
+    if (it == this->contents_.end() ||
+        static_cast<size_t>(it->second.size()) <= offset) {
+      return RecordIterable::CreateEmpty();
+    }
+
+    // Key exists and its associated records count is > offset.
+    auto begin = it->second.cbegin();
+    auto end = it->second.cend();
+    size_t size = it->second.size();
+    if (offset > 0) {
+      begin = std::next(begin, offset);
+    }
+    if (limit > -1 && static_cast<size_t>(limit) + offset < size) {
+      end = std::next(begin, limit);
+    }
+    return RecordIterable{RecordIterator{std::make_unique<R_impl>(begin)},
+                          RecordIterator{std::make_unique<R_impl>(end)}};
+  }
+
+  // Return an Iterable set of keys contained by this group, in the underlying
+  // order (specified by M).
+  KeyIterable Keys() const {
+    return KeyIterable{
+        KeyIterator{std::make_unique<K_impl>(this->contents_.cbegin())},
+        KeyIterator{std::make_unique<K_impl>(this->contents_.cend())}};
+  }
+
+  // Checks if we have any records mapped to the given key.
+  bool Contains(const Key &key) const {
+    return this->contents_.find(key) != this->contents_.end();
+  }
+
+  // Insert a record mapped by given key.
+  bool Insert(const Key &k, const Record &r) {
+    // Insert an empty vector for k if k does not exist in the map.
+    V *v;
+    if constexpr (std::is_null_pointer<RecordCompare>::value) {
+      v = &this->contents_[k];
+    } else {
+      v = &this->contents_.emplace(k, compare_).first->second;
+    }
+
+    // Add or remove r from the vector of k in the map.
     if (r.IsPositive()) {
-      v.push_back(r.Copy());
+      if constexpr (HasFunction<V>::Insert()) {
+        v->insert(r.Copy());
+      } else {
+        v->push_back(r.Copy());
+      }
       this->count_++;
     } else {
-      auto it = std::find(std::begin(v), std::end(v), r);
-      v.erase(it);
-      this->count_--;
+      // We need to find r in v in the most efficient way possible.
+      // If V supports .find() we use it (e.g. sorted containers).
+      // Otherwise, we use a linear scan.
+      V_citerator it;
+      if constexpr (HasFunction<V>::Find()) {
+        it = v->find(r);
+      } else {
+        it = std::find(std::begin(*v), std::end(*v), r);
+      }
+      // If we found the record, we erase it, and remove all of v from
+      // the map if it becomes empty.
+      if (it != std::end(*v)) {
+        v->erase(it);
+        this->count_--;
+        if (v->empty()) {
+          this->contents_.erase(k);
+        }
+      }
     }
     return true;
   }
 
-  // Our own iterator over all the records in all the groups.
-  // The iterator exposes an API as if all the data was a single flat
-  // vector of records.
-  // It iterates over keys one at a time, each time it retrieves a new key
-  // it iterates over all its records first, and when they are all consumed,
-  // it moves to the next key, until all are consumed.
-  class const_iterator {
-   public:
-    // Constructor: takes the iterator of the groups/keys.
-    const_iterator(
-        absl::flat_hash_map<Key, std::vector<Record>>::const_iterator begin,
-        absl::flat_hash_map<Key, std::vector<Record>>::const_iterator end)
-        : group_it_(begin), group_end_(end) {
-      // Unless the iterator is empty, get the first key and set up
-      // internal record iterator to point to the first record of that key.
-      if (this->group_it_ != this->group_end_) {
-        const auto &[_, records] = *(this->group_it_);
-        this->record_it_ = std::cbegin(records);
-        this->record_end_ = std::cend(records);
-      } else {
-        this->record_it_ = EMPTY_VEC.cend();
-        this->record_end_ = EMPTY_VEC.cend();
-      }
-    }
-
-    // Increment: increment internal record iterator, if reach the end,
-    // increment the key iterator, and update the record iterator to go over
-    // records of that key.
-    const_iterator &operator++() {
-      this->record_it_++;
-      if (this->record_it_ == this->record_end_) {
-        this->group_it_++;
-        if (this->group_it_ != this->group_end_) {
-          const auto &[_, records] = *(this->group_it_);
-          this->record_it_ = std::cbegin(records);
-          this->record_end_ = std::cend(records);
-        } else {
-          this->record_it_ = EMPTY_VEC.cend();
-          this->record_end_ = EMPTY_VEC.cend();
-        }
-      }
-      return *this;
-    }
-    const_iterator operator++(int) {
-      const_iterator retval = *this;
-      ++(*this);
-      return retval;
-    }
-
-    // All internal iterators must be equal.
-    bool operator==(const_iterator o) const {
-      return this->group_it_ == o.group_it_ && this->record_it_ == o.record_it_;
-    }
-    bool operator!=(const_iterator o) const { return !(*this == o); }
-
-    // Get next record.
-    const Record &operator*() { return *this->record_it_; }
-
-    // iterator traits
-    using difference_type = int64_t;
-    using value_type = Record;
-    using pointer = const Record *;
-    using reference = const Record &;
-    using iterator_category = std::input_iterator_tag;
-
-   private:
-    absl::flat_hash_map<Key, std::vector<Record>>::const_iterator group_it_;
-    absl::flat_hash_map<Key, std::vector<Record>>::const_iterator group_end_;
-    std::vector<Record>::const_iterator record_it_;
-    std::vector<Record>::const_iterator record_end_;
-  };
-
-  inline const_iterator begin() const {
-    return const_iterator{std::cbegin(contents_), std::cend(contents_)};
-  }
-  inline const_iterator end() const {
-    return const_iterator{std::cend(contents_), std::cend(contents_)};
-  }
-
-  inline size_t count() const { return this->count_; }
-
  private:
-  static const std::vector<Record> EMPTY_VEC;
-
-  size_t count_;
-  absl::flat_hash_map<Key, std::vector<Record>> contents_;
+  RecordCompare compare_;
+  size_t count_ = 0;
+  M contents_;
 };
+
+using UnorderedGroupedData =
+    GroupedDataT<absl::flat_hash_map<Key, std::vector<Record>>,
+                 std::vector<Record>>;
+using KeyOrderedGroupedData =
+    GroupedDataT<absl::btree_map<Key, std::vector<Record>>,
+                 std::vector<Record>>;
+using RecordOrderedGroupedData = GroupedDataT<
+    absl::flat_hash_map<Key, absl::btree_multiset<Record, Record::Compare>>,
+    absl::btree_multiset<Record, Record::Compare>, Record::Compare>;
 
 }  // namespace dataflow
 }  // namespace pelton

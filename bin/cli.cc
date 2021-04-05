@@ -41,47 +41,53 @@ int main(int argc, char **argv) {
   std::string dir(argv[1]);
 
   // Initialize our sharded state/connection.
-  pelton::Connection connection;
-  pelton::open(dir, &connection);
+  try {
+    pelton::Connection connection;
+    pelton::open(dir, &connection);
 
-  std::cout << "SQL Sharder" << std::endl;
-  std::cout << "DB directory: " << dir << std::endl;
-  std::cout << ">>> " << std::flush;
+    std::cout << "SQL Sharder" << std::endl;
+    std::cout << "DB directory: " << dir << std::endl;
+    std::cout << ">>> " << std::flush;
 
-  // Read SQL statements one at a time!
-  std::string line;
-  std::string command = "";
-  while (std::getline(std::cin, line)) {
-    // Wait until command is fully read (in case it spans several lines).
-    command += line;
-    if (command.size() > 0 && command.back() == '\\') {
-      command.pop_back();
-      continue;
-    }
-    if (command.find_first_not_of(" \t\n") == std::string::npos) {
-      // all white space
-      continue;
-    }
+    // Read SQL statements one at a time!
+    std::string line;
+    std::string command = "";
+    while (std::getline(std::cin, line)) {
+      if (line.size() == 0 || line.front() == '#') {
+        continue;
+      }
+      // Wait until command is fully read (in case it spans several lines).
+      command += line;
+      if (command.size() > 0 && command.back() == '\\') {
+        command.pop_back();
+        continue;
+      }
+      if (command.find_first_not_of(" \t\n") == std::string::npos) {
+        // all white space
+        continue;
+      }
 
-    // Command has been fully read, execute it!
-    try {
+      // Command has been fully read, execute it!
       bool context = true;
-      pelton::exec(&connection, command, &Callback,
-                   reinterpret_cast<void *>(&context), nullptr);
-    } catch (const char *err_msg) {
-      std::cerr << "Error: " << err_msg << std::endl;
-      return 1;
+      if (!pelton::exec(&connection, command, &Callback,
+                        reinterpret_cast<void *>(&context), nullptr)) {
+        break;
+      }
+
+      // Ready for next command.
+      std::cout << std::endl << ">>> " << std::flush;
+      command = "";
     }
 
-    // Ready for next command.
-    std::cout << std::endl << ">>> " << std::flush;
-    command = "";
+    // Close the connection
+    pelton::close(&connection);
+  } catch (const char *err_msg) {
+    std::cerr << "Error: " << err_msg << std::endl;
+    return 1;
   }
-
-  // Close the connection
-  pelton::close(&connection);
 
   // Exit!
   std::cout << "exit" << std::endl;
+
   return 0;
 }

@@ -31,11 +31,12 @@ const std::vector<std::string> &Insert::GetValues() const {
   return this->values_;
 }
 
-std::string Insert::RemoveValue(const std::string &colname) {
+absl::StatusOr<std::string> Insert::RemoveValue(const std::string &colname) {
   if (this->columns_.size() > 0) {
     auto it = std::find(this->columns_.begin(), this->columns_.end(), colname);
     if (it == this->columns_.end()) {
-      throw "Insert statement does not contain column \"" + colname + "\"";
+      return absl::InvalidArgumentError(
+          "Insert statement does not contain column \"" + colname + "\"");
     }
     this->columns_.erase(it);
     size_t index = std::distance(this->columns_.begin(), it);
@@ -43,7 +44,8 @@ std::string Insert::RemoveValue(const std::string &colname) {
     this->values_.erase(this->values_.begin() + index);
     return result;
   }
-  throw "Insert statement does not have column names set explicitly";
+  return absl::InvalidArgumentError(
+      "Insert statement does not have column names set explicitly");
 }
 std::string Insert::RemoveValue(size_t index) {
   if (this->columns_.size() > 0) {
@@ -63,10 +65,12 @@ void Update::AddColumnValue(const std::string &column,
   this->columns_.push_back(column);
   this->values_.push_back(value);
 }
-std::string Update::RemoveColumnValue(const std::string &column) {
+absl::StatusOr<std::string> Update::RemoveColumnValue(
+    const std::string &column) {
   auto it = std::find(this->columns_.begin(), this->columns_.end(), column);
   if (it == this->columns_.end()) {
-    throw "Update statement does not contain column \"" + column + "\"";
+    return absl::InvalidArgumentError(
+        "Update statement does not contain column \"" + column + "\"");
   }
   this->columns_.erase(it);
   size_t index = std::distance(this->columns_.begin(), it);

@@ -19,20 +19,21 @@ const std::string &ExecutableStatement::sql_statement() const {
 
 // SimpleExecutableStatement.
 bool SimpleExecutableStatement::Execute(::sqlite3 *connection,
-                                        Callback callback, void *context,
+                                        const Callback &callback, void *context,
                                         char **errmsg) {
-  static Callback callback_no_capture = callback;
+  CALLBACK_NO_CAPTURE = &callback;
   return ::sqlite3_exec(
              connection, this->sql_statement_.c_str(),
              [](void *context, int colnum, char **colvals, char **colnames) {
-               return callback_no_capture(context, colnum, colvals, colnames);
+               return (*CALLBACK_NO_CAPTURE)(context, colnum, colvals,
+                                             colnames);
              },
              context, errmsg) == SQLITE_OK;
 }
 
 // SelectExecutableStatement.
 bool SelectExecutableStatement::Execute(::sqlite3 *connection,
-                                        Callback callback, void *context,
+                                        const Callback &callback, void *context,
                                         char **errmsg) {
   CALLBACK_NO_CAPTURE = &callback;
   THIS_NO_CAPTURE = this;
