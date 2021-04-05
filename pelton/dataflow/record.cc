@@ -103,7 +103,7 @@ Key Record::GetValue(size_t i) const {
 Key Record::GetKey() const {
   CHECK_NOTNULL(this->data_);
   const std::vector<ColumnID> &keys = this->schema_.keys();
-  CHECK_EQ(keys.size(), 1);
+  CHECK_EQ(keys.size(), 1UL);
   size_t key_index = keys.at(0);
   switch (this->schema_.TypeOf(key_index)) {
     case sqlast::ColumnDefinition::Type::UINT:

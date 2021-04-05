@@ -19,7 +19,7 @@ bool MatViewOperator::Process(NodeIndex source,
                               std::vector<Record> *output) {
   for (const Record &r : records) {
     // incoming records must have the right key column set
-    CHECK_EQ(this->key_cols_.size(), 1);
+    CHECK_EQ(this->key_cols_.size(), 1UL);
     if (!this->contents_.Insert(r.GetValue(this->key_cols_.at(0)), r)) {
       return false;
     }
