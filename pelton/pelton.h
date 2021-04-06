@@ -6,8 +6,8 @@
 #include <string>
 
 #include "pelton/dataflow/state.h"
-#include "pelton/shards/sqlexecutor/executor.h"
 #include "pelton/shards/state.h"
+#include "pelton/shards/types.h"
 
 namespace pelton {
 
@@ -43,8 +43,7 @@ class Connection {
 bool open(const std::string &directory, Connection *connection);
 
 bool exec(Connection *connection, std::string sql,
-          const shards::sqlexecutor::Callback &callback, void *context,
-          char **errmsg);
+          const shards::Callback &callback, void *context, char **errmsg);
 
 bool close(Connection *connection);
 

@@ -4,12 +4,10 @@
 #ifndef PELTON_SHARDS_SQLENGINE_UTIL_H_
 #define PELTON_SHARDS_SQLENGINE_UTIL_H_
 
-#define DEFAULT_SHARD_NAME "default"
-
 #include <string>
 
 #include "absl/strings/str_cat.h"
-#include "pelton/shards/state.h"
+#include "pelton/shards/types.h"
 
 namespace pelton {
 namespace shards {
@@ -22,7 +20,7 @@ inline ShardedTableName NameShardedTable(const UnshardedTableName &table_name,
 
 inline std::string NameShard(const ShardKind &shard_kind,
                              const UserId &user_id) {
-  return absl::StrCat(shard_kind, "_", user_id);
+  return absl::StrCat(shard_kind, "_", user_id, ".sqlite3");
 }
 
 }  // namespace sqlengine

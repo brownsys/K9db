@@ -31,6 +31,11 @@ const std::vector<std::string> &Insert::GetValues() const {
   return this->values_;
 }
 
+void Insert::AddValue(const std::string &val) { this->values_.push_back(val); }
+void Insert::AddValue(std::string &&val) {
+  this->values_.push_back(std::move(val));
+}
+
 absl::StatusOr<std::string> Insert::RemoveValue(const std::string &colname) {
   if (this->columns_.size() > 0) {
     auto it = std::find(this->columns_.begin(), this->columns_.end(), colname);
@@ -106,6 +111,25 @@ void Update::RemoveWhereClause() {
   this->where_clause_ = std::optional<std::unique_ptr<BinaryExpression>>();
 }
 
+Select Update::SelectDomain() const {
+  Select select{this->table_name()};
+  select.AddColumn("*");
+  if (this->HasWhereClause()) {
+    select.SetWhereClause(
+        std::make_unique<BinaryExpression>(*this->where_clause_->get()));
+  }
+  return select;
+}
+
+Delete Update::DeleteDomain() const {
+  Delete del{this->table_name()};
+  if (this->HasWhereClause()) {
+    del.SetWhereClause(
+        std::make_unique<BinaryExpression>(*this->where_clause_->get()));
+  }
+  return del;
+}
+
 // Select.
 const std::string &Select::table_name() const { return this->table_name_; }
 std::string &Select::table_name() { return this->table_name_; }
@@ -152,6 +176,16 @@ void Delete::SetWhereClause(std::unique_ptr<BinaryExpression> &&where) {
 }
 void Delete::RemoveWhereClause() {
   this->where_clause_ = std::optional<std::unique_ptr<BinaryExpression>>();
+}
+
+Select Delete::SelectDomain() const {
+  Select select{this->table_name()};
+  select.AddColumn("*");
+  if (this->HasWhereClause()) {
+    select.SetWhereClause(
+        std::make_unique<BinaryExpression>(*this->where_clause_->get()));
+  }
+  return select;
 }
 
 }  // namespace sqlast

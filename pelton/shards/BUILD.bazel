@@ -1,6 +1,27 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
 cc_library(
+    name = "pool",
+    srcs = [
+        "pool.cc",
+    ],
+    hdrs = [
+        "pool.h",
+    ],
+    linkopts = [
+        "-lsqlite3",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":types",
+        "//pelton/shards/sqlengine:util",
+        "@absl//absl/status",
+        "@absl//absl/strings",
+        "@glog",
+    ],
+)
+
+cc_library(
     name = "state",
     srcs = [
         "load.cc",
@@ -11,8 +32,20 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
-        "//pelton/shards/sqlexecutor:executor",
+        ":pool",
+        ":types",
         "//pelton/sqlast:ast",
+        "//pelton/sqlast:parser",
         "//pelton/util:fs",
     ],
+)
+
+cc_library(
+    name = "types",
+    srcs = [],
+    hdrs = [
+        "types.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [],
 )
