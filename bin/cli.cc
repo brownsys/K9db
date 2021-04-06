@@ -72,9 +72,9 @@ int main(int argc, char **argv) {
       char *errmsg = nullptr;
       if (!pelton::exec(&connection, command, &Callback,
                         reinterpret_cast<void *>(&context), &errmsg)) {
-        std::cout << "Fatal error" << std::endl;
+        std::cerr << "Fatal error" << std::endl;
         if (errmsg != nullptr) {
-          std::cout << errmsg << std::endl;
+          std::cerr << errmsg << std::endl;
           ::sqlite3_free(errmsg);
         }
         break;
