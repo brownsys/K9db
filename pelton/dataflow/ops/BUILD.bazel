@@ -24,6 +24,7 @@ cc_library(
         "//pelton/sqlast:ast",
         "@glog",
         "@gtest//:gtest_prod",
+        "@gbenchmark//:benchmark",
     ],
 )
 
@@ -233,4 +234,26 @@ cc_test(
         "@gtest",
         "@gtest//:gtest_main",
     ],
+)
+
+cc_test(
+    name = "benchmarks",
+    tags = ["benchmark"],
+    deps = [
+        ":filter",
+        ":equijoin",
+        ":identity",
+        ":matview",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@gbenchmark//:benchmark_main"
+    ],
+    srcs = ["benchmark-utils.h",
+            "benchmark-utils.cc",
+            "equijoin_benchmark.cc",
+            "filter_benchmark.cc",
+            "identity_benchmark.cc",
+            "matview_benchmark.cc"],
 )
