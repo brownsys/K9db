@@ -95,12 +95,6 @@ void AggregateOperator::ComputeOutputSchema() {
   this->output_schema_ = SchemaRef(owned_output_schema_);
 }
 
-// std::vector<Key> AggregateOperator::GenerateKey(const Record &record) const {
-//   std::vector<Key> key;
-//   for (auto i : group_columns_) key.push_back(record.GetValue(i));
-//   return key;
-// }
-
 void AggregateOperator::EmitRecord(const Key &key,
                                    const Record &aggregate_record,
                                    bool positive,
