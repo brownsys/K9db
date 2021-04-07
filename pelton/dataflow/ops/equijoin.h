@@ -19,7 +19,7 @@
 namespace pelton {
 namespace dataflow {
 
-static void JoinOneToOne(benchmark::State& state);
+static void JoinOneToOne(benchmark::State &state);
 
 class EquiJoinOperator : public Operator {
  public:
@@ -71,7 +71,7 @@ class EquiJoinOperator : public Operator {
   FRIEND_TEST(EquiJoinOperatorTest, BasicJoinTest);
   FRIEND_TEST(EquiJoinOperatorTest, BasicUnjoinableTest);
   FRIEND_TEST(EquiJoinOperatorTest, FullJoinTest);
-  friend void pelton::dataflow::JoinOneToOne(benchmark::State& state);
+  friend void pelton::dataflow::JoinOneToOne(benchmark::State &state);
 };
 
 }  // namespace dataflow

@@ -1,6 +1,8 @@
 #include "pelton/dataflow/ops/aggregate.h"
 
+#include <memory>
 #include <tuple>
+#include <utility>
 
 #include "glog/logging.h"
 #include "pelton/dataflow/record.h"

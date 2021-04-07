@@ -1,7 +1,6 @@
 #include <vector>
 
 #include "benchmark/benchmark.h"
-
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/ops/benchmark-utils.h"
 #include "pelton/dataflow/ops/matview.h"

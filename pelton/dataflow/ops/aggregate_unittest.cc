@@ -1,5 +1,6 @@
 #include "pelton/dataflow/ops/aggregate.h"
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>

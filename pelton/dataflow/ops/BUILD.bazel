@@ -22,9 +22,9 @@ cc_library(
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
+        "@gbenchmark//:benchmark",
         "@glog",
         "@gtest//:gtest_prod",
-        "@gbenchmark//:benchmark",
     ],
 )
 
@@ -173,9 +173,9 @@ cc_library(
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
+        "@absl//absl/container:flat_hash_map",
         "@glog",
         "@gtest//:gtest_prod",
-        "@absl//absl/container:flat_hash_map",
     ],
 )
 
@@ -277,22 +277,24 @@ cc_test(
 
 cc_test(
     name = "benchmarks",
+    srcs = [
+        "benchmark-utils.cc",
+        "benchmark-utils.h",
+        "equijoin_benchmark.cc",
+        "filter_benchmark.cc",
+        "identity_benchmark.cc",
+        "matview_benchmark.cc",
+    ],
     tags = ["benchmark"],
     deps = [
-        ":filter",
         ":equijoin",
+        ":filter",
         ":identity",
         ":matview",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
-        "@gbenchmark//:benchmark_main"
+        "@gbenchmark//:benchmark_main",
     ],
-    srcs = ["benchmark-utils.h",
-            "benchmark-utils.cc",
-            "equijoin_benchmark.cc",
-            "filter_benchmark.cc",
-            "identity_benchmark.cc",
-            "matview_benchmark.cc"],
 )

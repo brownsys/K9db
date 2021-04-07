@@ -1,7 +1,6 @@
 #include <vector>
 
 #include "benchmark/benchmark.h"
-
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/ops/benchmark-utils.h"
 #include "pelton/dataflow/ops/equijoin.h"
@@ -19,7 +18,7 @@ using CType = sqlast::ColumnDefinition::Type;
 static void JoinOneToOne(benchmark::State& state) {
   SchemaOwner leftSchema = MakeSchema(false);
   SchemaOwner rightSchema = MakeSchema(false);
-  
+
   std::shared_ptr<IdentityOperator> iop1 = std::make_shared<IdentityOperator>();
   std::shared_ptr<IdentityOperator> iop2 = std::make_shared<IdentityOperator>();
   std::shared_ptr<EquiJoinOperator> op =
@@ -31,10 +30,10 @@ static void JoinOneToOne(benchmark::State& state) {
   op->input_schemas_ = {SchemaRef(leftSchema), SchemaRef(rightSchema)};
   op->ComputeOutputSchema();
 
-  Record lr1(SchemaRef(leftSchema), true,
-             static_cast<uint64_t>(4), static_cast<uint64_t>(5));
-  Record rr1(SchemaRef(rightSchema), true,
-             static_cast<uint64_t>(4), static_cast<uint64_t>(5));
+  Record lr1(SchemaRef(leftSchema), true, static_cast<uint64_t>(4),
+             static_cast<uint64_t>(5));
+  Record rr1(SchemaRef(rightSchema), true, static_cast<uint64_t>(4),
+             static_cast<uint64_t>(5));
   std::vector<Record> leftRecords;
   std::vector<Record> rightRecords;
   leftRecords.emplace_back(std::move(lr1));
