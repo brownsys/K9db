@@ -26,12 +26,15 @@ inline std::string GetString(JNIEnv *env, jstring string) {
 }  // namespace
 
 void Java_edu_brown_pelton_PeltonJNI_Open(JNIEnv *env, jobject this_,
-                                          jstring directory) {
+                                          jstring directory,
+                                          jstring username,
+                                          jstring password) {
   LOG(INFO) << "Open pelton connection";
   int64_t ptr = env->GetLongField(this_, GetConnectionFieldID(env, this_));
   if (ptr == 0) {
     pelton::Connection *connection = new pelton::Connection();
-    pelton::open(GetString(env, directory), connection);
+    pelton::open(GetString(env, directory), GetString(env, username),
+                 GetString(env, password), connection);
     env->SetLongField(this_, GetConnectionFieldID(env, this_),
                       reinterpret_cast<int64_t>(connection));
   }
