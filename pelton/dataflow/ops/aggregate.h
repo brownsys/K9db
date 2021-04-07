@@ -11,6 +11,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"
+#include "pelton/dataflow/ops/grouped_data.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
@@ -33,7 +34,7 @@ class AggregateOperator : public Operator {
 
   ~AggregateOperator() {
     // ensure that schemas are not destructed first
-    state_.~flat_hash_map();
+    state_.~GroupedDataT();
   }
 
  protected:
@@ -42,7 +43,7 @@ class AggregateOperator : public Operator {
   void ComputeOutputSchema() override;
 
  private:
-  absl::flat_hash_map<std::vector<Value>, Record> state_;
+  UnorderedGroupedData state_;
   std::vector<ColumnID> group_columns_;
   Function aggregate_function_;
   ColumnID aggregate_column_;
@@ -53,11 +54,11 @@ class AggregateOperator : public Operator {
   SchemaRef aggregate_schema_ref_;
 
   // Equivalent of doing a logical project on record
-  std::vector<Value> GenerateKey(const Record &record) const;
+  // std::vector<Key> GenerateKey(const Record &record) const;
   // Combine key from state with computed aggregate and emit record. Used for
   // emitting both positive and negative records
-  void EmitRecord(const std::vector<Value> &key, const Record &aggregate_record,
-                  bool positive, std::vector<Record> *output) const;
+  void EmitRecord(const Key &key, const Record &aggregate_record, bool positive,
+                  std::vector<Record> *output) const;
 
   // A helper function to improve code readability inside the process function
   inline void InitAggregateValue(Record &aggregate_record,

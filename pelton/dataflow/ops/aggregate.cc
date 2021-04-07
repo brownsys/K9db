@@ -1,28 +1,29 @@
 #include "pelton/dataflow/ops/aggregate.h"
 
-#include <memory>
 #include <tuple>
-#include <utility>
 
 #include "glog/logging.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/sqlast/ast.h"
 
-#define SUMFUNC_UPDATE_AGGREGATE_MACRO(OP)                                    \
-  {                                                                           \
-    switch (aggregate_schema_ref_.TypeOf(0)) {                                \
-      case sqlast::ColumnDefinition::Type::UINT:                              \
-        state_.at(key).SetUInt(                                               \
-            state_.at(key).GetUInt(0) OP record.GetUInt(aggregate_column_),   \
-            0);                                                               \
-        break;                                                                \
-      case sqlast::ColumnDefinition::Type::INT:                               \
-        state_.at(key).SetInt(                                                \
-            state_.at(key).GetInt(0) OP record.GetInt(aggregate_column_), 0); \
-        break;                                                                \
-      default:                                                                \
-        LOG(FATAL) << "Unsupported type when computing SUM aggregate";        \
-    }                                                                         \
+#define SUMFUNC_UPDATE_AGGREGATE_MACRO(OP)                                 \
+  {                                                                        \
+    switch (aggregate_schema_ref_.TypeOf(0)) {                             \
+      case sqlast::ColumnDefinition::Type::UINT:                           \
+        (*state_.Lookup(key).begin())                                      \
+            .SetUInt((*state_.Lookup(key).begin())                         \
+                         .GetUInt(0) OP record.GetUInt(aggregate_column_), \
+                     0);                                                   \
+        break;                                                             \
+      case sqlast::ColumnDefinition::Type::INT:                            \
+        (*state_.Lookup(key).begin())                                      \
+            .SetInt((*state_.Lookup(key).begin())                          \
+                        .GetInt(0) OP record.GetInt(aggregate_column_),    \
+                    0);                                                    \
+        break;                                                             \
+      default:                                                             \
+        LOG(FATAL) << "Unsupported type when computing SUM aggregate";     \
+    }                                                                      \
   }
 // SUMFUNC_UPDATE_AGGREGATE_MACRO
 
@@ -94,13 +95,13 @@ void AggregateOperator::ComputeOutputSchema() {
   this->output_schema_ = SchemaRef(owned_output_schema_);
 }
 
-std::vector<Value> AggregateOperator::GenerateKey(const Record &record) const {
-  std::vector<Value> key;
-  for (auto i : group_columns_) key.push_back(record.GetValue(i));
-  return key;
-}
+// std::vector<Key> AggregateOperator::GenerateKey(const Record &record) const {
+//   std::vector<Key> key;
+//   for (auto i : group_columns_) key.push_back(record.GetValue(i));
+//   return key;
+// }
 
-void AggregateOperator::EmitRecord(const std::vector<Value> &key,
+void AggregateOperator::EmitRecord(const Key &key,
                                    const Record &aggregate_record,
                                    bool positive,
                                    std::vector<Record> *output) const {
@@ -109,15 +110,15 @@ void AggregateOperator::EmitRecord(const std::vector<Value> &key,
   for (size_t i = 0; i < key.size(); i++) {
     switch (this->output_schema_.TypeOf(i)) {
       case sqlast::ColumnDefinition::Type::UINT:
-        output_record.SetUInt(key.at(i).GetUInt(), i);
+        output_record.SetUInt(key.value(i).GetUInt(), i);
         break;
       case sqlast::ColumnDefinition::Type::INT:
-        output_record.SetInt(key.at(i).GetInt(), i);
+        output_record.SetInt(key.value(i).GetInt(), i);
         break;
       case sqlast::ColumnDefinition::Type::TEXT:
         // records have to own their pointed data
         output_record.SetString(
-            std::make_unique<std::string>(key.at(i).GetString()), i);
+            std::make_unique<std::string>(key.value(i).GetString()), i);
         break;
       default:
         LOG(FATAL) << "Unsupported type when forming output record";
@@ -170,10 +171,10 @@ class StateChange {
 bool AggregateOperator::Process(NodeIndex source,
                                 const std::vector<Record> &records,
                                 std::vector<Record> *output) {
-  absl::flat_hash_map<std::vector<Value>, StateChange> first_delta;
+  absl::flat_hash_map<Key, StateChange> first_delta;
 
   for (const Record &record : records) {
-    const std::vector<Value> key = GenerateKey(record);
+    const Key key = record.GetValues(group_columns_);
     switch (aggregate_function_) {
       case Function::COUNT:
         /*
@@ -181,35 +182,38 @@ bool AggregateOperator::Process(NodeIndex source,
          * positive records value in state is incremented by 1
          */
         if (!record.IsPositive()) {
-          if (!state_.contains(key)) {  // handle negative record
+          if (!state_.Contains(key)) {  // handle negative record
             LOG(FATAL)
                 << "State does not exist for corresponding negative record";
           }
           if (!first_delta.contains(key)) {  // track first state change of key
             first_delta.emplace(key, StateChange(false, aggregate_schema_ref_));
             // need to explicitly set value since records cannot be copied
-            InitAggregateValue(first_delta.at(key).old_value_, state_.at(key),
-                               0);
+            InitAggregateValue(first_delta.at(key).old_value_,
+                               *state_.Lookup(key).begin(), 0);
           }
-          state_.at(key).SetUInt(state_.at(key).GetUInt(0) - 1, 0);
+          auto state_record = state_.Lookup(key).begin();
+          (*state_.Lookup(key).begin())
+              .SetUInt((*state_.Lookup(key).begin()).GetUInt(0) - 1, 0);
         } else {  // handle positive record
-          if (!state_.contains(key)) {
+          if (!state_.Contains(key)) {
             // track first state change of key. old_value_ does not exist.
             first_delta.emplace(key, StateChange(true, aggregate_schema_ref_));
             // new aggregate record
             Record aggregate_record(aggregate_schema_ref_);
             aggregate_record.SetUInt(1ULL, 0);
-            state_.emplace(key, std::move(aggregate_record));
+            state_.Insert(key, std::move(aggregate_record));
           } else {
             if (!first_delta.contains(
                     key)) {  // track first state change of key
               first_delta.emplace(key,
                                   StateChange(false, aggregate_schema_ref_));
               // need to explicitly set value since records cannot be copied
-              InitAggregateValue(first_delta.at(key).old_value_, state_.at(key),
-                                 0);
+              InitAggregateValue(first_delta.at(key).old_value_,
+                                 *state_.Lookup(key).begin(), 0);
             }
-            state_.at(key).SetUInt(state_.at(key).GetUInt(0) + 1, 0);
+            (*state_.Lookup(key).begin())
+                .SetUInt((*state_.Lookup(key).begin()).GetUInt(0) + 1, 0);
           }
         }
         break;
@@ -220,33 +224,33 @@ bool AggregateOperator::Process(NodeIndex source,
          * @record.
          */
         if (!record.IsPositive()) {  // handle negative record
-          if (!state_.contains(key)) {
+          if (!state_.Contains(key)) {
             LOG(FATAL)
                 << "State does not exist for corresponding negative record";
           }
           if (!first_delta.contains(key)) {  // track first state change of key
             first_delta.emplace(key, StateChange(false, aggregate_schema_ref_));
             // need to explicitly set value since records cannot be copied
-            InitAggregateValue(first_delta.at(key).old_value_, state_.at(key),
-                               0);
+            InitAggregateValue(first_delta.at(key).old_value_,
+                               *state_.Lookup(key).begin(), 0);
           }
           SUMFUNC_UPDATE_AGGREGATE_MACRO(-)
         } else {  // handle positive record
-          if (!state_.contains(key)) {
+          if (!state_.Contains(key)) {
             // track first state change of key. old_value_ does not exist.
             first_delta.emplace(key, StateChange(true, aggregate_schema_ref_));
             // new aggregate record
             Record aggregate_record(aggregate_schema_ref_);
             InitAggregateValue(aggregate_record, record, aggregate_column_);
-            state_.emplace(key, std::move(aggregate_record));
+            state_.Insert(key, std::move(aggregate_record));
           } else {
             if (!first_delta.contains(
                     key)) {  // track first state change of key
               first_delta.emplace(key,
                                   StateChange(false, aggregate_schema_ref_));
               // need to explicitly set value since records cannot be copied
-              InitAggregateValue(first_delta.at(key).old_value_, state_.at(key),
-                                 0);
+              InitAggregateValue(first_delta.at(key).old_value_,
+                                 *state_.Lookup(key).begin(), 0);
             }
             SUMFUNC_UPDATE_AGGREGATE_MACRO(+)
           }
@@ -275,14 +279,14 @@ bool AggregateOperator::Process(NodeIndex source,
     if (item.second.is_insert_) {
       switch (aggregate_schema_ref_.TypeOf(0)) {
         case sqlast::ColumnDefinition::Type::UINT:
-          if (state_.at(item.first).GetUInt(0) == 0ULL) {
-            state_.erase(item.first);
+          if ((*state_.Lookup(item.first).begin()).GetUInt(0) == 0ULL) {
+            state_.Erase(item.first);
             continue;
           }
           break;
         case sqlast::ColumnDefinition::Type::INT:
-          if (state_.at(item.first).GetInt(0) == 0L) {
-            state_.erase(item.first);
+          if ((*state_.Lookup(item.first).begin()).GetInt(0) == 0L) {
+            state_.Erase(item.first);
             continue;
           }
           break;
@@ -290,19 +294,19 @@ bool AggregateOperator::Process(NodeIndex source,
           // The aggregate value does not support Type::TEXT
           LOG(FATAL) << "Unsupported type in aggregate";
       }
-      EmitRecord(item.first, state_.at(item.first), true, output);
+      EmitRecord(item.first, *state_.Lookup(item.first).begin(), true, output);
     } else {
       switch (aggregate_schema_ref_.TypeOf(0)) {
         case sqlast::ColumnDefinition::Type::UINT:
-          if (state_.at(item.first).GetUInt(0) == 0ULL) {
-            state_.erase(item.first);
+          if ((*state_.Lookup(item.first).begin()).GetUInt(0) == 0ULL) {
+            state_.Erase(item.first);
             EmitRecord(item.first, item.second.old_value_, false, output);
             continue;
           }
           break;
         case sqlast::ColumnDefinition::Type::INT:
-          if (state_.at(item.first).GetInt(0) == 0L) {
-            state_.erase(item.first);
+          if ((*state_.Lookup(item.first).begin()).GetInt(0) == 0L) {
+            state_.Erase(item.first);
             EmitRecord(item.first, item.second.old_value_, false, output);
             continue;
           }
@@ -313,7 +317,7 @@ bool AggregateOperator::Process(NodeIndex source,
       }
       // for a negative update push negative record followed by positive record
       EmitRecord(item.first, item.second.old_value_, false, output);
-      EmitRecord(item.first, state_.at(item.first), true, output);
+      EmitRecord(item.first, *state_.Lookup(item.first).begin(), true, output);
     }
   }
   return true;

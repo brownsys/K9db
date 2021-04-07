@@ -412,6 +412,12 @@ class GroupedDataT : public UntemplatedGroupedData {
     return true;
   }
 
+  // Erase entry keyed on @param k
+  bool Erase(const Key &k) {
+    this->contents_.erase(k);
+    return true;
+  }
+
  private:
   RecordCompare compare_;
   size_t count_ = 0;
