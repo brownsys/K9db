@@ -2,20 +2,20 @@ SET echo;
 
 CREATE TABLE students ( \
   ID int, \
-  PII_Name varchar(100), \
+  PII_Name text, \
   PRIMARY KEY(ID) \
 );
 
 CREATE TABLE assignments ( \
   ID int, \
-  Name varchar(100), \
+  Name text, \
   PRIMARY KEY(ID) \
 );
 
 CREATE TABLE submissions ( \
   student_id int, \
   assignment_id int, \
-  "timestamp" int, \
+  timestamp int, \
   FOREIGN KEY (student_id) REFERENCES students(ID), \
   FOREIGN KEY (assignment_id) REFERENCES assignments(ID) \
 );

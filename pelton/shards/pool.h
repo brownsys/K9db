@@ -1,8 +1,6 @@
-// Manages sqlite3 connections to the different shard/mini-databases.
+// Manages mysql connections to the different shard/mini-databases.
 #ifndef PELTON_SHARDS_POOL_H_
 #define PELTON_SHARDS_POOL_H_
-
-#include <sqlite3.h>
 
 #include <string>
 #include <unordered_map>
@@ -17,7 +15,7 @@ namespace shards {
 class ConnectionPool {
  public:
   // Constructor.
-  ConnectionPool() = default;
+  ConnectionPool() : session_(nullptr) {}
 
   // Not copyable or movable.
   ConnectionPool(const ConnectionPool &) = delete;
@@ -29,7 +27,7 @@ class ConnectionPool {
   ~ConnectionPool();
 
   // Initialize (when the state is initialized).
-  void Initialize(const std::string &dir_path, bool in_memory);
+  void Initialize(const std::string &username, const std::string &password);
 
   // Execute statement against the default un-sharded database.
   absl::Status ExecuteDefault(const std::string &sql,
@@ -39,39 +37,20 @@ class ConnectionPool {
   absl::Status ExecuteShard(const std::string &sql,
                             const ShardingInformation &info,
                             const UserId &user_id, const OutputChannel &output);
-  absl::Status ExecuteShard(const std::string &sql,
-                            const ShardingInformation &info,
-                            const std::unordered_set<UserId> &user_ids,
-                            const OutputChannel &output);
+  absl::Status ExecuteShards(const std::string &sql,
+                             const ShardingInformation &info,
+                             const std::unordered_set<UserId> &user_ids,
+                             const OutputChannel &output);
 
   void RemoveShard(const std::string &shard_name);
 
  private:
   // Connection management.
-  ::sqlite3 *GetDefaultConnection() const;
-  ::sqlite3 *GetConnection(const ShardKind &shard_kind, const UserId &user_id);
+  void *session_;
 
-  // Actually execute statements after their connection has been resolved.
-  absl::Status ExecuteDefault(const std::string &sql, ::sqlite3 *connection,
-                              const OutputChannel &output);
-  absl::Status ExecuteShard(const std::string &sql, ::sqlite3 *connection,
-                            const ShardingInformation &info,
-                            const UserId &user_id, const OutputChannel &output);
-
-  std::string dir_path_;
-  bool in_memory_;
-  // We always keep an open connection to the main non-sharded database.
-  ::sqlite3 *default_noshard_connection_;
-  // Pool for keeping connections active in the background.
-  std::unordered_map<std::string, ::sqlite3 *> connections_;
-
-  // We use these private static fields to remove captures from std::function
-  // and lambdas, so that they can be passed to SQLITE3 API as old C-style
-  // func pointers.
-  static const Callback *CALLBACK_NO_CAPTURE;
-  static size_t SHARD_BY_INDEX_NO_CAPTURE;
-  static char *SHARD_BY_NO_CAPTURE;
-  static char *USER_ID_NO_CAPTURE;
+  // Manage using shards in session_.
+  void OpenDefaultShard();
+  void OpenShard(const ShardKind &shard_kind, const UserId &user_id);
 };
 
 }  // namespace shards

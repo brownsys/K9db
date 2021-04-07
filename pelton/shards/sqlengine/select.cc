@@ -92,7 +92,7 @@ absl::Status Shard(const sqlast::Select &stmt, SharderState *state,
       } else {
         // Select from all the relevant shards.
         std::string select_str = cloned.Visit(&stringifier);
-        CHECK_STATUS(state->connection_pool().ExecuteShard(
+        CHECK_STATUS(state->connection_pool().ExecuteShards(
             select_str, info, state->UsersOfShard(info.shard_kind), coutput));
       }
     }

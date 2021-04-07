@@ -69,6 +69,8 @@ bool ReadCommand(std::string *ptr) {
 
 ABSL_FLAG(bool, print, true, "Print results to the screen");
 ABSL_FLAG(std::string, db_path, "", "Path to database directory (required)");
+ABSL_FLAG(std::string, db_username, "root", "MYSQL username to connect with");
+ABSL_FLAG(std::string, db_password, "password", "MYSQL pwd to connect with");
 
 int main(int argc, char **argv) {
   // Command line arugments and help message.
@@ -89,17 +91,16 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
 
   // Find database directory.
+  const std::string &db_username = absl::GetFlag(FLAGS_db_username);
+  const std::string &db_password = absl::GetFlag(FLAGS_db_password);
   const std::string &dir = absl::GetFlag(FLAGS_db_path);
-  if (dir == "") {
-    LOG(FATAL) << "Please provide the database dir as a command line argument!";
-  }
 
   pelton::perf::Start("all");
 
   // Initialize our sharded state/connection.
   try {
     pelton::Connection connection;
-    pelton::open(dir, &connection);
+    pelton::open(dir, db_username, db_password, &connection);
 
     std::cout << "SQL Sharder" << std::endl;
     std::cout << "DB directory: " << dir << std::endl;
@@ -120,7 +121,7 @@ int main(int argc, char **argv) {
         std::cerr << "Fatal error" << std::endl;
         if (errmsg != nullptr) {
           std::cerr << errmsg << std::endl;
-          ::sqlite3_free(errmsg);
+          delete[] errmsg;
         }
         break;
       }

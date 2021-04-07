@@ -9,6 +9,8 @@
 #include "pelton/util/perf.h"
 
 ABSL_FLAG(std::string, db_path, "", "Path to database directory (required)");
+ABSL_FLAG(std::string, db_username, "root", "MYSQL username to connect with");
+ABSL_FLAG(std::string, db_password, "password", "MYSQL pwd to connect with");
 
 namespace {
 
@@ -17,13 +19,13 @@ std::vector<std::string> CREATES{
     // Students.
     "CREATE TABLE students ("
     "ID int,"
-    "PII_Name varchar(100),"
+    "PII_Name text,"
     "PRIMARY KEY(ID)"
     ");",
     // Assignments.
     "CREATE TABLE assignments ("
     "ID int,"
-    "Name varchar(100),"
+    "Name text,"
     "PRIMARY KEY(ID)"
     ");",
     // Submissions.
@@ -154,16 +156,15 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
 
   // Find database directory.
+  const std::string &db_username = absl::GetFlag(FLAGS_db_username);
+  const std::string &db_password = absl::GetFlag(FLAGS_db_password);
   const std::string &dir = absl::GetFlag(FLAGS_db_path);
-  if (dir == "") {
-    LOG(FATAL) << "Please provide the database dir as a command line argument!";
-  }
 
   pelton::perf::Start("all");
 
   // Open connection to sharder.
   pelton::Connection connection;
-  pelton::open(dir, &connection);
+  pelton::open(dir, db_username, db_password, &connection);
   Assert(pelton::exec(&connection, "SET echo;", &Callback, nullptr, nullptr));
 
   // Create all the tables.

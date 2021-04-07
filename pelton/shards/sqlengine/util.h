@@ -20,7 +20,7 @@ inline ShardedTableName NameShardedTable(const UnshardedTableName &table_name,
 
 inline std::string NameShard(const ShardKind &shard_kind,
                              const UserId &user_id) {
-  return absl::StrCat(shard_kind, "_", user_id, ".sqlite3");
+  return absl::StrCat(shard_kind, "_", user_id);
 }
 
 }  // namespace sqlengine

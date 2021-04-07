@@ -106,7 +106,7 @@ void DataFlowState::Load(const std::string &dir_path) {
   // State file does not exists: this is a fresh database that was not
   // created previously!
   std::string state_file_path = dir_path + STATE_FILE_NAME;
-  if (dir_path == ":memory:" || !util::FileExists(state_file_path)) {
+  if (!util::FileExists(state_file_path)) {
     return;
   }
 
@@ -158,10 +158,6 @@ void DataFlowState::Load(const std::string &dir_path) {
 
 // Save state to durable file.
 void DataFlowState::Save(const std::string &dir_path) {
-  if (dir_path == ":memory:") {
-    return;
-  }
-
   // Open state file for writing.
   std::ofstream state_file;
   util::OpenWrite(&state_file, dir_path + STATE_FILE_NAME);

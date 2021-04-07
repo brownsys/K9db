@@ -42,8 +42,7 @@ bool SpecialStatements(const std::string &sql, Connection *connection) {
     std::vector<std::string> v = absl::StrSplit(sql, ' ');
     v.at(2).pop_back();
     std::string shard_name = shards::sqlengine::NameShard(v.at(1), v.at(2));
-    const std::string &dir_path = connection->GetSharderState()->dir_path();
-    std::cout << absl::StrCat(dir_path, shard_name) << std::endl;
+    std::cout << shard_name << std::endl;
     return true;
   }
   return false;
@@ -51,8 +50,10 @@ bool SpecialStatements(const std::string &sql, Connection *connection) {
 
 }  // namespace
 
-bool open(const std::string &directory, Connection *connection) {
-  connection->GetSharderState()->Initialize(directory);
+bool open(const std::string &directory, const std::string &db_username,
+          const std::string &db_password, Connection *connection) {
+  connection->Initialize(directory);
+  connection->GetSharderState()->Initialize(db_username, db_password);
   connection->Load();
   return true;
 }

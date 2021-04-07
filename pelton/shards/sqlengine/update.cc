@@ -166,7 +166,7 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
         } else {
           // Update against the relevant shards.
           std::string update_str = cloned.Visit(&stringifier);
-          CHECK_STATUS(state->connection_pool().ExecuteShard(
+          CHECK_STATUS(state->connection_pool().ExecuteShards(
               update_str, info, state->UsersOfShard(info.shard_kind), output));
         }
       }

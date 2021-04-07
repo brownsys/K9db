@@ -12,7 +12,10 @@ install the following via your package manager:
  * [Abseil](https://abseil.io/) (v2020-02-25)
  * [googletest](https://github.com/google/googletest) (v1.10)
  * GCC-9 (`apt-get install gcc-9 g++-9`)
- * sqlite3 (`apt-get install libsqlite3-dev`)
+ * mysql8 and mysqlcppconn8 (the c++ mysql connector), follow instructions here
+   to install for [ubuntu](https://dev.mysql.com/doc/mysql-apt-repo-quick-guide/en/).
+   Make sure to afterwards run `apt-get install libmysqlcppconn8-2 libmysqlcppconn-dev` (the
+   exact version is not important as long as it is 8).
 ## Building
 
 Run `bazel build //dataflow`.
