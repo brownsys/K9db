@@ -20,10 +20,15 @@ void SharderState::Initialize(const std::string &dir_path) {
   if (dir_path.back() != '/') {
     this->dir_path_ += "/";
   }
-  this->executor_.Initialize(this->dir_path_);
+  this->connection_pool_.Initialize(this->dir_path_);
 }
 
 // Schema manipulations.
+void SharderState::AddSchema(const UnshardedTableName &table_name,
+                             const sqlast::CreateTable &table_schema) {
+  this->schema_.insert({table_name, table_schema});
+}
+
 void SharderState::AddShardKind(const ShardKind &kind, const ColumnName &pk) {
   this->kinds_.insert({kind, pk});
   this->kind_to_tables_.insert({kind, {}});
@@ -67,6 +72,11 @@ void SharderState::RemoveUserFromShard(const ShardKind &kind,
 }
 
 // Schema lookups.
+const sqlast::CreateTable &SharderState::GetSchema(
+    const UnshardedTableName &table_name) const {
+  return this->schema_.at(table_name);
+}
+
 bool SharderState::Exists(const UnshardedTableName &table) const {
   return this->sharded_schema_.count(table) > 0 ||
          this->sharded_by_.count(table) > 0;
@@ -97,36 +107,6 @@ bool SharderState::ShardExists(const ShardKind &shard_kind,
 const std::unordered_set<UserId> &SharderState::UsersOfShard(
     const ShardKind &kind) const {
   return this->shards_.at(kind);
-}
-
-// Raw records.
-void SharderState::AddRawRecord(const std::string &table_name,
-                                const std::vector<std::string> values,
-                                const std::vector<std::string> columns,
-                                bool positive) {
-  this->raw_records_.emplace_back(table_name, values, columns, positive);
-}
-
-const std::vector<RawRecord> &SharderState::GetRawRecords() const {
-  return this->raw_records_;
-}
-
-void SharderState::ClearRawRecords() { this->raw_records_.clear(); }
-
-// Last statement.
-void SharderState::SetLastStatement(
-    std::unique_ptr<sqlast::AbstractStatement> &&st) {
-  this->last_statement_ = std::move(st);
-}
-
-std::unique_ptr<sqlast::AbstractStatement>
-SharderState::ReleaseLastStatement() {
-  return std::move(this->last_statement_);
-}
-
-// SQL Executor.
-sqlexecutor::SQLExecutor *SharderState::SQLExecutor() {
-  return &this->executor_;
 }
 
 }  // namespace shards

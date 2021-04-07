@@ -37,10 +37,10 @@ class FilterOperator : public Operator {
     this->ops_.push_back(std::make_tuple(value, column, op));
   }
 
- protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,
                std::vector<Record> *output) override;
 
+ protected:
   bool Accept(const Record &record) const;
 
   void ComputeOutputSchema() override;

@@ -1,5 +1,4 @@
 SET echo;
-SET verbose;
 
 INSERT INTO Users VALUES (1, 'Alice');
 INSERT INTO Users VALUES (2, 'Bob');

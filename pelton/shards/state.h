@@ -7,19 +7,15 @@
 #ifndef PELTON_SHARDS_STATE_H_
 #define PELTON_SHARDS_STATE_H_
 
-#include <cstring>
-#include <functional>
 #include <list>
 #include <memory>
-#include <optional>
 #include <string>
-#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
-#include <utility>
 #include <vector>
 
-#include "pelton/shards/sqlexecutor/executor.h"
+#include "pelton/shards/pool.h"
+#include "pelton/shards/types.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -36,58 +32,6 @@ namespace shards {
 // schema they have, and how many shards (and for which user) exists for these
 // kinds. It also keeps an in-memory cache of the user tables, and uses them
 // as a shard directory.
-
-// The name of the table representing users that own shards of this kind.
-using ShardKind = std::string;
-
-// The name of a table from the original unsharded schema.
-using UnshardedTableName = std::string;
-
-// The name of a table in the sharded schema.
-// Usually, this is the name of the original table this table corresponds to,
-// but has the sharding column name appended to it as a suffix.
-// This could also be exactly the same as the unsharded name if the table
-// is not sharded.
-using ShardedTableName = std::string;
-
-// A unique identifier that represents a user.
-// This is used to come up with shard names for new users, and to track
-// which shard belongs to which user.
-using UserId = std::string;
-
-using ColumnName = std::string;
-
-using ColumnIndex = size_t;
-
-// Valid SQL CreateTable statement formatted and ready to use to create
-// some table.
-using CreateStatement = std::string;
-
-// Contains the details of how a given table is sharded.
-struct ShardingInformation {
-  // Which shard does this belong to (e.g. User, Doctor, Patient, etc)
-  ShardKind shard_kind;
-  // Name of the table after sharding.
-  ShardedTableName sharded_table_name;
-  // The column the table is sharded by. This is a column from the unsharded
-  // schema that is removed post-sharding, it can be deduced from the shard
-  // name.
-  ColumnName shard_by;
-  // The index of the sharding column in the table definition.
-  ColumnIndex shard_by_index;
-};
-
-// Describes a raw record (a sequence of untyped values for columns of a row).
-struct RawRecord {
-  std::string table_name;
-  std::vector<std::string> values;
-  std::vector<std::string> columns;  // If empty, this is the default order.
-  bool positive;
-  RawRecord(const std::string &tn, const std::vector<std::string> &vs,
-            const std::vector<std::string> &ns, bool p)
-      : table_name(tn), values(vs), columns(ns), positive(p) {}
-};
-
 class SharderState {
  public:
   // Constructor.
@@ -100,12 +44,17 @@ class SharderState {
   SharderState &operator=(const SharderState &&) = delete;
 
   // Accessors.
-  const std::string &dir_path() { return this->dir_path_; }
+  const std::string &dir_path() const { return this->dir_path_; }
+
+  ConnectionPool &connection_pool() { return this->connection_pool_; }
 
   // Initialization.
   void Initialize(const std::string &dir_path);
 
   // Schema manipulations.
+  void AddSchema(const UnshardedTableName &table_name,
+                 const sqlast::CreateTable &table_schema);
+
   void AddShardKind(const ShardKind &kind, const ColumnName &pk);
 
   void AddUnshardedTable(const UnshardedTableName &table,
@@ -121,6 +70,9 @@ class SharderState {
   void RemoveUserFromShard(const ShardKind &kind, const UserId &user_id);
 
   // Schema lookups.
+  const sqlast::CreateTable &GetSchema(
+      const UnshardedTableName &table_name) const;
+
   bool Exists(const UnshardedTableName &table) const;
 
   bool IsSharded(const UnshardedTableName &table) const;
@@ -136,32 +88,17 @@ class SharderState {
 
   const std::unordered_set<UserId> &UsersOfShard(const ShardKind &kind) const;
 
-  // Raw records.
-  void AddRawRecord(const std::string &table_name,
-                    const std::vector<std::string> values,
-                    const std::vector<std::string> columns, bool positive);
-
-  const std::vector<RawRecord> &GetRawRecords() const;
-
-  void ClearRawRecords();
-
-  // Last statement.
-  void SetLastStatement(std::unique_ptr<sqlast::AbstractStatement> &&st);
-
-  std::unique_ptr<sqlast::AbstractStatement> ReleaseLastStatement();
-
   // Save state to durable file.
   void Save();
 
   // Load state from its durable file (if exists).
   void Load();
 
-  // Return the connection pool to use for executing statements.
-  sqlexecutor::SQLExecutor *SQLExecutor();
-
  private:
   // Directory in which all shards are stored.
   std::string dir_path_;
+
+  std::unordered_map<UnshardedTableName, sqlast::CreateTable> schema_;
 
   // All shard kinds as determined from the schema.
   // Maps a shard kind (e.g. a table name with PII) to the primary key of that
@@ -197,13 +134,7 @@ class SharderState {
   std::unordered_map<ShardedTableName, CreateStatement> sharded_schema_;
 
   // Connection pool that manages the underlying sqlite3 databases.
-  sqlexecutor::SQLExecutor executor_;
-
-  // Stores RawRecords that need to be processed by the dataflow.
-  std::vector<RawRecord> raw_records_;
-
-  // Last statement that was processed by the sharder.
-  std::unique_ptr<sqlast::AbstractStatement> last_statement_;
+  ConnectionPool connection_pool_;
 };
 
 }  // namespace shards

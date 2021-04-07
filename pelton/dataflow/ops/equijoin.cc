@@ -51,7 +51,7 @@ bool EquiJoinOperator::Process(NodeIndex source,
       // Match each record in the right table with this record.
       Key left_value = record.GetValues({this->left_id_});
       for (const auto &right : this->right_table_.Lookup(left_value)) {
-        this->EmitRow(record, right, output);
+        this->EmitRow(record, right, output, record.IsPositive());
       }
 
       // Save record in the appropriate table.
@@ -60,7 +60,7 @@ bool EquiJoinOperator::Process(NodeIndex source,
       // Match each record in the left table with this record.
       Key right_value = record.GetValues({this->right_id_});
       for (const auto &left : this->left_table_.Lookup(right_value)) {
-        this->EmitRow(left, record, output);
+        this->EmitRow(left, record, output, record.IsPositive());
       }
 
       // save record hashed to right table
@@ -130,12 +130,12 @@ void EquiJoinOperator::ComputeOutputSchema() {
 }
 
 void EquiJoinOperator::EmitRow(const Record &left, const Record &right,
-                               std::vector<Record> *output) {
+                               std::vector<Record> *output, bool positive) {
   const SchemaRef &lschema = left.schema();
   const SchemaRef &rschema = right.schema();
 
   // Create a concatenated record, dropping key column from left side.
-  Record record{this->output_schema_};
+  Record record{this->output_schema_, positive};
   for (size_t i = 0; i < lschema.size(); i++) {
     CopyIntoRecord(lschema.TypeOf(i), &record, left, i, i);
   }

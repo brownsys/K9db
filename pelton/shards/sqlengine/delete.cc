@@ -2,28 +2,40 @@
 
 #include "pelton/shards/sqlengine/delete.h"
 
-#include <cstdio>
-#include <utility>
+#include <string>
+#include <vector>
 
 #include "absl/strings/str_cat.h"
+#include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/util/status.h"
 
 namespace pelton {
 namespace shards {
 namespace sqlengine {
 namespace delete_ {
 
-absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
-Rewrite(const sqlast::Delete &stmt, SharderState *state) {
-  std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>> result;
+absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
+                   dataflow::DataFlowState *dataflow_state,
+                   const OutputChannel &output, bool update_flows) {
+  // Get the rows that are going to be deleted prior to deletion to use them
+  // to update the dataflows.
+  std::vector<RawRecord> records;
+  if (update_flows) {
+    CHECK_STATUS(select::Query(&records, stmt.SelectDomain(), state,
+                               dataflow_state, false));
+  }
 
+  // Must transform the delete statement into one that is compatible with
+  // the sharded schema.
   const std::string &table_name = stmt.table_name();
   bool is_sharded = state->IsSharded(table_name);
   bool is_pii = state->IsPII(table_name);
   sqlast::Stringifier stringifier;
 
-  // Case 1: Table has PII.
+  // Sharding scenarios.
   if (is_pii) {
+    // Case 1: Table has PII.
     sqlast::ValueFinder value_finder(state->PkOfPII(table_name));
 
     // We are deleting a user, we should also delete their shard!
@@ -35,26 +47,25 @@ Rewrite(const sqlast::Delete &stmt, SharderState *state) {
 
     // Remove user shard.
     std::string shard = sqlengine::NameShard(table_name, user_id);
-    std::string path = absl::StrCat(state->dir_path(), shard, ".sqlite3");
+    std::string path = absl::StrCat(state->dir_path(), shard);
     remove(path.c_str());
     state->RemoveUserFromShard(table_name, user_id);
 
     // Turn the delete statement back to a string, to delete relevant row in
     // PII table.
     std::string delete_str = stmt.Visit(&stringifier);
-    result.push_back(std::make_unique<sqlexecutor::SimpleExecutableStatement>(
-        DEFAULT_SHARD_NAME, delete_str));
-  }
+    CHECK_STATUS(state->connection_pool().ExecuteDefault(delete_str, output));
 
-  // Case 2: Table does not have PII and is not sharded!
-  if (!is_sharded && !is_pii) {
+    // TODO(babman): Update dataflow after user has been deleted.
+    return absl::UnimplementedError("Dataflow not updated after a user delete");
+
+  } else if (!is_sharded && !is_pii) {
+    // Case 2: Table does not have PII and is not sharded!
     std::string delete_str = stmt.Visit(&stringifier);
-    result.push_back(std::make_unique<sqlexecutor::SimpleExecutableStatement>(
-        DEFAULT_SHARD_NAME, delete_str));
-  }
+    return state->connection_pool().ExecuteDefault(delete_str, output);
 
-  // Case 3: Table is sharded!
-  if (is_sharded) {
+  } else {  // is_shared == true
+    // Case 3: Table is sharded!
     // The table might be sharded according to different column/owners.
     // We must delete from all these different duplicates.
     for (const auto &info : state->GetShardingInformation(table_name)) {
@@ -65,28 +76,34 @@ Rewrite(const sqlast::Delete &stmt, SharderState *state) {
       // Find the value assigned to shard_by column in the where clause, and
       // remove it from the where clause.
       sqlast::ValueFinder value_finder(info.shard_by);
-      auto [found, user_id_val] = cloned.Visit(&value_finder);
+      auto [found, user_id] = cloned.Visit(&value_finder);
       if (found) {
-        sqlast::ExpressionRemover expression_remover(info.shard_by);
-        cloned.Visit(&expression_remover);
-      }
+        if (state->ShardExists(info.shard_kind, user_id)) {
+          // Remove where condition on the shard by column, since it does not
+          // exist in the sharded table.
+          sqlast::ExpressionRemover expression_remover(info.shard_by);
+          cloned.Visit(&expression_remover);
 
-      // Update against the relevant shards.
-      std::string delete_str = cloned.Visit(&stringifier);
-      for (const auto &user_id : state->UsersOfShard(info.shard_kind)) {
-        if (found && user_id != user_id_val) {
-          continue;
+          // Execute statement directly against shard.
+          std::string delete_str = cloned.Visit(&stringifier);
+          CHECK_STATUS(state->connection_pool().ExecuteShard(delete_str, info,
+                                                             user_id, output));
         }
-
-        std::string shard_name = NameShard(info.shard_kind, user_id);
-        result.push_back(
-            std::make_unique<sqlexecutor::SimpleExecutableStatement>(
-                shard_name, delete_str));
+      } else {
+        // Execute statement against all shards of this kind.
+        std::string delete_str = cloned.Visit(&stringifier);
+        CHECK_STATUS(state->connection_pool().ExecuteShard(
+            delete_str, info, state->UsersOfShard(info.shard_kind), output));
       }
     }
   }
 
-  return result;
+  // Delete was successful, time to update dataflows.
+  if (update_flows) {
+    dataflow_state->ProcessRawRecords(records);
+  }
+
+  return absl::OkStatus();
 }
 
 }  // namespace delete_

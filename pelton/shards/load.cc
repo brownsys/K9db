@@ -8,6 +8,8 @@
 #include <vector>
 
 #include "pelton/shards/state.h"
+#include "pelton/sqlast/ast.h"
+#include "pelton/sqlast/parser.h"
 #include "pelton/util/fs.h"
 
 #define STATE_FILE_NAME ".shards.state"
@@ -31,7 +33,19 @@ void SharderState::Load() {
   std::string line;
   getline(state_file, line);
 
+  // Read schemas.
+  while (line != "") {
+    std::string serialized_schema;
+    getline(state_file, serialized_schema);
+    sqlast::SQLParser parser;
+    auto ptr = std::move(parser.Parse(serialized_schema).value());
+    sqlast::CreateTable *schema = static_cast<sqlast::CreateTable *>(ptr.get());
+    this->schema_.insert({line, *schema});
+    getline(state_file, line);
+  }
+
   // Read kinds_.
+  getline(state_file, line);
   while (line != "") {
     std::string pk;
     getline(state_file, pk);
@@ -103,6 +117,13 @@ void SharderState::Save() {
   util::OpenWrite(&state_file, this->dir_path_ + STATE_FILE_NAME);
 
   // Begin writing.
+  for (const auto &[table, schema] : this->schema_) {
+    sqlast::Stringifier stringifier;
+    std::string serialized_schema = schema.Visit(&stringifier);
+    state_file << table << "\n" << serialized_schema << "\n";
+  }
+  state_file << "\n";
+
   for (const auto &[kind, pk] : this->kinds_) {
     state_file << kind << "\n" << pk << "\n";
   }

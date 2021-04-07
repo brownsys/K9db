@@ -285,6 +285,7 @@ std::unique_ptr<Expression> ExpressionRemover::VisitLiteralExpression(
 }
 std::unique_ptr<Expression> ExpressionRemover::VisitBinaryExpression(
     BinaryExpression *ast) {
+  Stringifier str;
   auto result = ast->VisitChildren(this);
   switch (ast->type()) {
     case Expression::Type::EQ:
@@ -292,14 +293,25 @@ std::unique_ptr<Expression> ExpressionRemover::VisitBinaryExpression(
         return nullptr;
       }
       return ast->Clone();
-    case Expression::Type::AND:
-      if (result.at(0).get() == nullptr) {
-        return std::move(result.at(1));
+    case Expression::Type::AND: {
+      std::unique_ptr<Expression> &left = result.at(0);
+      std::unique_ptr<Expression> &right = result.at(1);
+      if (left.get() == nullptr && right.get() == nullptr) {
+        return nullptr;
       }
-      if (result.at(1).get() == nullptr) {
-        return std::move(result.at(0));
+      if (left.get() == nullptr) {
+        return std::move(right);
       }
-      return ast->Clone();
+      if (right.get() == nullptr) {
+        return std::move(left);
+      }
+
+      std::unique_ptr<BinaryExpression> binary =
+          std::make_unique<BinaryExpression>(Expression::Type::AND);
+      binary->SetLeft(std::move(left));
+      binary->SetRight(std::move(right));
+      return std::move(binary);
+    }
     default:
       assert(false);
   }
