@@ -3,4 +3,4 @@
 bazel build -c opt ...
 
 bazel run //bin:cli -c opt -- \
-  --print=no --db_path=:memory: < experiments/GDPRbench/src/traces/pelton.sql
+  --print=no < experiments/GDPRbench/src/traces/pelton.sql
