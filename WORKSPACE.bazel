@@ -1,7 +1,7 @@
 workspace(name = "pelton")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_repository")
 
 # Buildifier
 # buildifier is written in Go and hence needs rules_go to be built.
@@ -93,7 +93,7 @@ http_archive(
 git_repository(
     name = "gflags",
     remote = "https://github.com/gflags/gflags.git",
-    tag = "v2.2.2"
+    tag = "v2.2.2",
 )
 
 # Google Benchmark library for microbenchmarks
@@ -111,10 +111,6 @@ http_archive(
     strip_prefix = "rules_cc-9e10b8a6db775b1ecd358d8ddd3dab379a2c29a5",
     urls = ["https://github.com/bazelbuild/rules_cc/archive/9e10b8a6db775b1ecd358d8ddd3dab379a2c29a5.zip"],
 )
-
-#
-# For the sharding system.
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "new_git_repository")
 
 # ANTLR Runtime and Parser generator from grammar files.
 http_archive(

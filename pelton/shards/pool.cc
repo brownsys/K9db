@@ -5,8 +5,8 @@
 #include <sstream>
 
 #include "absl/strings/str_cat.h"
-#include "mysql-cppconn-8/mysqlx/xdevapi.h"
 #include "glog/logging.h"
+#include "mysql-cppconn-8/mysqlx/xdevapi.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/perf.h"
 

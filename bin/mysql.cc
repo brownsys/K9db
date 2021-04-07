@@ -24,7 +24,7 @@ void PrintRow(size_t column_count, mysqlx::Row *row) {
   for (size_t i = 0; i < column_count; i++) {
     std::cout << "| ";
     row->get(i).print(std::cout);
-    std::cout <<  " ";
+    std::cout << " ";
   }
   std::cout << "|" << std::endl;
 }
@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
             PrintRow(result.getColumnCount(), &row);
           }
         }
-      }  
+      }
       pelton::perf::End("exec");
 
       // Ready for next command.

@@ -26,8 +26,7 @@ inline std::string GetString(JNIEnv *env, jstring string) {
 }  // namespace
 
 void Java_edu_brown_pelton_PeltonJNI_Open(JNIEnv *env, jobject this_,
-                                          jstring directory,
-                                          jstring username,
+                                          jstring directory, jstring username,
                                           jstring password) {
   LOG(INFO) << "Open pelton connection";
   int64_t ptr = env->GetLongField(this_, GetConnectionFieldID(env, this_));

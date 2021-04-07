@@ -186,7 +186,7 @@ int main(int argc, char **argv) {
     std::cout << std::endl;
     bool context = true;
     CHECK(pelton::exec(&connection, query, &Callback,
-                        reinterpret_cast<void *>(&context), nullptr));
+                       reinterpret_cast<void *>(&context), nullptr));
   }
   std::cout << std::endl;
 
@@ -204,7 +204,7 @@ int main(int argc, char **argv) {
     std::cout << std::endl;
     bool context = true;
     CHECK(pelton::exec(&connection, query, &Callback,
-                        reinterpret_cast<void *>(&context), nullptr));
+                       reinterpret_cast<void *>(&context), nullptr));
   }
   std::cout << std::endl;
 
@@ -222,7 +222,7 @@ int main(int argc, char **argv) {
     std::cout << std::endl;
     bool context = true;
     CHECK(pelton::exec(&connection, select, &Callback,
-                        reinterpret_cast<void *>(&context), nullptr));
+                       reinterpret_cast<void *>(&context), nullptr));
   }
   std::cout << std::endl;
 
@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
     std::cout << std::endl;
     bool context = true;
     CHECK(pelton::exec(&connection, query, &Callback,
-                        reinterpret_cast<void *>(&context), nullptr));
+                       reinterpret_cast<void *>(&context), nullptr));
   }
   std::cout << std::endl;
 

@@ -50,7 +50,8 @@ ColumnDefinition::Type ColumnDefinition::StringToType(
     const std::string &column_type) {
   if (absl::EqualsIgnoreCase(column_type, "INT")) {
     return Type::INT;
-  } else if (absl::StartsWithIgnoreCase(column_type, "VARCHAR") || absl::EqualsIgnoreCase(column_type, "TEXT")) {
+  } else if (absl::StartsWithIgnoreCase(column_type, "VARCHAR") ||
+             absl::EqualsIgnoreCase(column_type, "TEXT")) {
     return Type::TEXT;
   } else {
     LOG(FATAL) << "Unsupported column type!";
