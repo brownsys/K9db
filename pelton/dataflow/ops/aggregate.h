@@ -42,7 +42,7 @@ class AggregateOperator : public Operator {
   void ComputeOutputSchema() override;
 
  private:
-  absl::flat_hash_map<std::vector<Key>, Record> state_;
+  absl::flat_hash_map<std::vector<Value>, Record> state_;
   std::vector<ColumnID> group_columns_;
   Function aggregate_function_;
   ColumnID aggregate_column_;
@@ -53,10 +53,10 @@ class AggregateOperator : public Operator {
   SchemaRef aggregate_schema_ref_;
 
   // Equivalent of doing a logical project on record
-  std::vector<Key> GenerateKey(const Record &record) const;
+  std::vector<Value> GenerateKey(const Record &record) const;
   // Combine key from state with computed aggregate and emit record. Used for
   // emitting both positive and negative records
-  void EmitRecord(const std::vector<Key> &key, const Record &aggregate_record,
+  void EmitRecord(const std::vector<Value> &key, const Record &aggregate_record,
                   bool positive, std::vector<Record> *output) const;
 
   // A helper function to improve code readability inside the process function

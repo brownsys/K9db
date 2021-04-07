@@ -92,13 +92,13 @@ void AggregateOperator::ComputeOutputSchema() {
   this->output_schema_ = SchemaRef(owned_output_schema_);
 }
 
-std::vector<Key> AggregateOperator::GenerateKey(const Record &record) const {
-  std::vector<Key> key;
+std::vector<Value> AggregateOperator::GenerateKey(const Record &record) const {
+  std::vector<Value> key;
   for (auto i : group_columns_) key.push_back(record.GetValue(i));
   return key;
 }
 
-void AggregateOperator::EmitRecord(const std::vector<Key> &key,
+void AggregateOperator::EmitRecord(const std::vector<Value> &key,
                                    const Record &aggregate_record,
                                    bool positive,
                                    std::vector<Record> *output) const {
@@ -168,10 +168,10 @@ class StateChange {
 bool AggregateOperator::Process(NodeIndex source,
                                 const std::vector<Record> &records,
                                 std::vector<Record> *output) {
-  absl::flat_hash_map<std::vector<Key>, StateChange> first_delta;
+  absl::flat_hash_map<std::vector<Value>, StateChange> first_delta;
 
   for (const Record &record : records) {
-    const std::vector<Key> key = GenerateKey(record);
+    const std::vector<Value> key = GenerateKey(record);
     switch (aggregate_function_) {
       case Function::COUNT:
         /*

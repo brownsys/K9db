@@ -351,7 +351,7 @@ DataFlowGraph MakeAggregateGraph(ColumnID keycol, const SchemaRef &schema) {
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto aggregate = std::make_shared<AggregateOperator>(
       group_columns, AggregateOperator::Function::COUNT, -1);
-  auto matview = std::make_shared<MatViewOperator>(keys);
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
   EXPECT_TRUE(g.AddNode(aggregate, in));
@@ -376,7 +376,7 @@ DataFlowGraph MakeAggregateOnEquiJoinGraph(ColumnID ok, ColumnID lk,
   auto join = std::make_shared<EquiJoinOperator>(lk, rk);
   auto aggregate = std::make_shared<AggregateOperator>(
       group_columns, AggregateOperator::Function::COUNT, -1);
-  auto matview = std::make_shared<MatViewOperator>(keys);
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in1));
   EXPECT_TRUE(g.AddInputNode(in2));
@@ -399,14 +399,18 @@ inline void MatViewContentsEquals(std::shared_ptr<MatViewOperator> matview,
   }
 }
 
+// This method is used specifically for tests involving aggregate graphs.
+// The output records in those specific test cases are not keyed because the
+// group by columns are not a subset of the keyed columns of input records.
+// Hence the following method compares matview contents indexed on @param index,
+// which should be 0 for most of the aggregate tests.
 inline void MatViewContentsEqualsIndexed(
     std::shared_ptr<MatViewOperator> matview,
     const std::vector<Record> &records, size_t index) {
   EXPECT_EQ(matview->count(), records.size());
+  std::vector<ColumnID> indexed_keys{index};
   for (const Record &record : records) {
-    std::vector<Record> singleton;
-    singleton.push_back(record.Copy());
-    EXPECT_EQ(singleton, matview->Lookup(record.GetValue(index)));
+    EXPECT_EQ(record, *matview->Lookup(record.GetValues(indexed_keys)).begin());
   }
 }
 
