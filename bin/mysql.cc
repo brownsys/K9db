@@ -1,51 +1,40 @@
+#include <sqlite3.h>
+
 #include <iostream>
 #include <limits>
 #include <string>
 
 #include "gflags/gflags.h"
 #include "glog/logging.h"
-#include "pelton/pelton.h"
+#include "mysql-cppconn-8/mysqlx/xdevapi.h"
 #include "pelton/util/perf.h"
 
-// Print query results!
-int PrintCb(void *context, int col_count, char **col_data, char **col_name) {
-  bool *first_time = reinterpret_cast<bool *>(context);
-
-  // Print header the first time!
-  if (*first_time) {
-    std::cout << std::endl;
-    *first_time = false;
-    for (int i = 0; i < col_count; i++) {
-      std::cout << "| " << col_name[i] << " ";
-    }
-    std::cout << "|" << std::endl;
-    for (int i = 0; i < col_count * 10; i++) {
-      std::cout << "-";
-    }
-    std::cout << std::endl;
-  }
-
-  // Print row data.
-  for (int i = 0; i < col_count; i++) {
-    std::cout << "| " << col_data[i] << " ";
+void PrintHeader(mysqlx::SqlResult *result) {
+  for (size_t i = 0; i < result->getColumnCount(); i++) {
+    std::cout << "| " << result->getColumn(i).getColumnName() << " ";
   }
   std::cout << "|" << std::endl;
-
-  return 0;
+  for (size_t i = 0; i < result->getColumnCount() * 10; i++) {
+    std::cout << "-";
+  }
+  std::cout << std::endl;
 }
 
-// No-op.
-int NoCb(void *context, int col_count, char **col_data, char **col_name) {
-  return 0;
+void PrintRow(size_t column_count, mysqlx::Row *row) {
+  for (size_t i = 0; i < column_count; i++) {
+    std::cout << "| ";
+    row->get(i).print(std::cout);
+    std::cout <<  " ";
+  }
+  std::cout << "|" << std::endl;
 }
 
-// Read SQL commands one at a time.
 bool ReadCommand(std::string *ptr) {
   pelton::perf::Start("Read std::cin");
   ptr->clear();
   std::string line;
   while (std::getline(std::cin, line)) {
-    if (line.size() == 0 || line.front() == '#' ||
+    if (line.size() == 0 || line.front() == '#' || line.front() == '.' ||
         line.find_first_not_of(" \t\n") == std::string::npos) {
       continue;
     }
@@ -66,7 +55,6 @@ bool ReadCommand(std::string *ptr) {
 }
 
 DEFINE_bool(print, true, "Print results to the screen");
-DEFINE_string(db_path, "", "Path to database directory (required)");
 DEFINE_string(db_username, "root", "MYSQL username to connect with");
 DEFINE_string(db_password, "password", "MYSQL pwd to connect with");
 
@@ -79,7 +67,6 @@ int main(int argc, char **argv) {
 
   // Should we print outputs to the screen?
   bool print = FLAGS_print;
-  auto callback = print ? &PrintCb : NoCb;
 
   // Initialize Google’s logging library.
   google::InitGoogleLogging("argc");
@@ -87,17 +74,16 @@ int main(int argc, char **argv) {
   // Find database directory.
   const std::string &db_username = FLAGS_db_username;
   const std::string &db_password = FLAGS_db_password;
-  const std::string &dir = FLAGS_db_path;
 
-  pelton::perf::Start("all");
+  pelton::perf::Start("All");
 
   // Initialize our sharded state/connection.
   try {
-    pelton::Connection connection;
-    pelton::open(dir, db_username, db_password, &connection);
+    mysqlx::Session session(db_username + ":" + db_password + "@localhost");
+    session.sql("CREATE DATABASE IF NOT EXISTS gdprbench").execute();
+    session.sql("USE gdprbench").execute();
 
-    std::cout << "SQL Sharder" << std::endl;
-    std::cout << "DB directory: " << dir << std::endl;
+    std::cout << "Vanilla MySql" << std::endl;
     if (print) {
       std::cout << ">>> " << std::flush;
     }
@@ -105,20 +91,19 @@ int main(int argc, char **argv) {
     // Read SQL statements one at a time!
     std::string command;
     while (ReadCommand(&command)) {
-      // Command has been fully read, execute it!
-      bool context = true;
-      char *errmsg = nullptr;
-
       pelton::perf::Start("exec");
-      if (!pelton::exec(&connection, command, callback,
-                        reinterpret_cast<void *>(&context), &errmsg)) {
-        std::cerr << "Fatal error" << std::endl;
-        if (errmsg != nullptr) {
-          std::cerr << errmsg << std::endl;
-          delete[] errmsg;
+      mysqlx::SqlResult result = session.sql(command).execute();
+      if (result.hasData()) {
+        if (print) {
+          PrintHeader(&result);
         }
-        break;
-      }
+        while (result.count() > 0) {
+          mysqlx::Row row = result.fetchOne();
+          if (print) {
+            PrintRow(result.getColumnCount(), &row);
+          }
+        }
+      }  
       pelton::perf::End("exec");
 
       // Ready for next command.
@@ -128,13 +113,12 @@ int main(int argc, char **argv) {
     }
 
     // Close the connection
-    pelton::close(&connection);
+    session.close();
   } catch (const char *err_msg) {
     LOG(FATAL) << "Error: " << err_msg;
   }
 
-  // Print performance profile.
-  pelton::perf::End("all");
+  pelton::perf::End("All");
   pelton::perf::PrintAll();
 
   // Exit!

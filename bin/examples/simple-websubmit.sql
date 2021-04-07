@@ -1,4 +1,4 @@
-SET echo;
+# SET echo;
 
 CREATE TABLE students ( \
   ID int, \

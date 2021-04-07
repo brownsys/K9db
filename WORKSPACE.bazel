@@ -1,6 +1,7 @@
 workspace(name = "pelton")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 # Buildifier
 # buildifier is written in Go and hence needs rules_go to be built.
@@ -87,6 +88,12 @@ http_archive(
     sha256 = "f28359aeba12f30d73d9e4711ef356dc842886968112162bc73002645139c39c",
     strip_prefix = "glog-0.4.0",
     urls = ["https://github.com/google/glog/archive/v0.4.0.tar.gz"],
+)
+
+git_repository(
+    name = "gflags",
+    remote = "https://github.com/gflags/gflags.git",
+    tag = "v2.2.2"
 )
 
 # Google Benchmark library for microbenchmarks
