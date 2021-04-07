@@ -5,8 +5,8 @@
 #include <sstream>
 
 #include "absl/strings/str_cat.h"
-#include "glog/logging.h"
 #include "mysql-cppconn-8/mysqlx/xdevapi.h"
+#include "glog/logging.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/perf.h"
 
@@ -49,11 +49,9 @@ inline void ReturnResult(mysqlx::SqlResult *result, const OutputChannel &out) {
   // Allocate memory.
   char **names = GetColumnNames(result);
   char **values = new char *[result->getColumnCount()];
-  std::cout << "here?" << std::endl;
 
   // Callback for each row.
   while (result->count() > 0) {
-    std::cout << "in loop" << std::endl;
     mysqlx::Row row = result->fetchOne();
     for (size_t i = 0; i < result->getColumnCount(); i++) {
       std::ostringstream stream;
