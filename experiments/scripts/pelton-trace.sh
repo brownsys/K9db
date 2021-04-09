@@ -3,4 +3,4 @@
 bazel build -c opt ...
 
 bazel run //bin:cli -c opt -- \
-  --print=no < experiments/GDPRbench/src/traces/pelton.sql
+  --print=yes --logtostderr=yes < experiments/GDPRbench/src/traces/pelton.sql

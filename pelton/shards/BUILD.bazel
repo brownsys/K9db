@@ -14,10 +14,10 @@ cc_library(
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":types",
+        "//pelton:types",
         "//pelton/shards/sqlengine:util",
         "//pelton/util:perf",
         "@absl//absl/status",
-        "@absl//absl/strings",
         "@glog",
     ],
 )

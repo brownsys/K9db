@@ -14,8 +14,7 @@ namespace sqlengine {
 namespace insert {
 
 absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
-                   dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output, bool update_flows) {
+                   dataflow::DataFlowState *dataflow_state, bool update_flows) {
   perf::Start("Insert");
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
@@ -32,7 +31,7 @@ absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
     // Case 1: table is not in any shard.
     // The insertion statement is unmodified.
     std::string insert_str = stmt.Visit(&stringifier);
-    CHECK_STATUS(state->connection_pool().ExecuteDefault(insert_str, output));
+    state->connection_pool().ExecuteDefault(insert_str);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded!
@@ -53,15 +52,13 @@ absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
       //               insert.
       if (!state->ShardExists(info.shard_kind, user_id)) {
         for (auto create_stmt : state->CreateShard(info.shard_kind, user_id)) {
-          CHECK_STATUS(state->connection_pool().ExecuteShard(create_stmt, info,
-                                                             user_id, output));
+          state->connection_pool().ExecuteShard(create_stmt, info, user_id);
         }
       }
 
       // Add the modified insert statement.
       std::string insert_str = cloned.Visit(&stringifier);
-      CHECK_STATUS(state->connection_pool().ExecuteShard(insert_str, info,
-                                                         user_id, output));
+      state->connection_pool().ExecuteShard(insert_str, info, user_id);
     }
   }
 
@@ -69,7 +66,9 @@ absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
   // Turn inserted values into a record and process it via corresponding flows.
   if (update_flows) {
     std::vector<RawRecord> records;
-    records.emplace_back(table_name, stmt.GetValues(), stmt.GetColumns(), true);
+    // TODO(babman): fix this.
+    // records.emplace_back(table_name, stmt.GetValues(), stmt.GetColumns(),
+    // true);
     dataflow_state->ProcessRawRecords(records);
   }
 

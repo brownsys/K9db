@@ -20,9 +20,8 @@ namespace pelton {
 namespace shards {
 namespace sqlengine {
 
-absl::Status Shard(const std::string &sql, SharderState *state,
-                   dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output) {
+absl::StatusOr<SqlResult> Shard(const std::string &sql, SharderState *state,
+                                dataflow::DataFlowState *dataflow_state) {
   // Parse with ANTLR into our AST.
   perf::Start("parsing");
   sqlast::SQLParser parser;
@@ -35,23 +34,22 @@ absl::Status Shard(const std::string &sql, SharderState *state,
     // Case 1: CREATE TABLE statement.
     case sqlast::AbstractStatement::Type::CREATE_TABLE: {
       auto *stmt = static_cast<sqlast::CreateTable *>(statement.get());
-      auto result = create::Shard(*stmt, state, dataflow_state, output);
-      if (result.ok()) {
-        dataflow_state->AddTableSchema(*stmt);
-      }
-      return result;
+      CHECK_STATUS(create::Shard(*stmt, state, dataflow_state));
+      return SqlResult();
     }
 
     // Case 2: Insert statement.
     case sqlast::AbstractStatement::Type::INSERT: {
       auto *stmt = static_cast<sqlast::Insert *>(statement.get());
-      return insert::Shard(*stmt, state, dataflow_state, output);
+      CHECK_STATUS(insert::Shard(*stmt, state, dataflow_state));
+      return SqlResult();
     }
 
     // Case 3: Update statement.
     case sqlast::AbstractStatement::Type::UPDATE: {
       auto *stmt = static_cast<sqlast::Update *>(statement.get());
-      return update::Shard(*stmt, state, dataflow_state, output);
+      CHECK_STATUS(update::Shard(*stmt, state, dataflow_state));
+      return SqlResult();
     }
 
     // Case 4: Select statement.
@@ -59,22 +57,24 @@ absl::Status Shard(const std::string &sql, SharderState *state,
     case sqlast::AbstractStatement::Type::SELECT: {
       auto *stmt = static_cast<sqlast::Select *>(statement.get());
       if (dataflow_state->HasFlow(stmt->table_name())) {
-        return view::SelectView(*stmt, state, dataflow_state, output);
+        return view::SelectView(*stmt, state, dataflow_state);
       } else {
-        return select::Shard(*stmt, state, dataflow_state, output);
+        return select::Shard(*stmt, state, dataflow_state);
       }
     }
 
     // Case 5: Delete statement.
     case sqlast::AbstractStatement::Type::DELETE: {
       auto *stmt = static_cast<sqlast::Delete *>(statement.get());
-      return delete_::Shard(*stmt, state, dataflow_state, output);
+      CHECK_STATUS(delete_::Shard(*stmt, state, dataflow_state));
+      return SqlResult();
     }
 
     // Case 6: CREATE VIEW statement (e.g. dataflow).
     case sqlast::AbstractStatement::Type::CREATE_VIEW: {
       auto *stmt = static_cast<sqlast::CreateView *>(statement.get());
-      return view::CreateView(*stmt, state, dataflow_state);
+      CHECK_STATUS(view::CreateView(*stmt, state, dataflow_state));
+      return SqlResult();
     }
 
     // Unsupported (this should not be reachable).

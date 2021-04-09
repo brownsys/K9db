@@ -8,35 +8,31 @@
 #include "pelton/util/perf.h"
 
 // Print query results!
-int PrintCb(void *context, int col_count, char **col_data, char **col_name) {
-  bool *first_time = reinterpret_cast<bool *>(context);
-
-  // Print header the first time!
-  if (*first_time) {
-    std::cout << std::endl;
-    *first_time = false;
-    for (int i = 0; i < col_count; i++) {
-      std::cout << "| " << col_name[i] << " ";
-    }
-    std::cout << "|" << std::endl;
-    for (int i = 0; i < col_count * 10; i++) {
-      std::cout << "-";
-    }
-    std::cout << std::endl;
-  }
-
-  // Print row data.
-  for (int i = 0; i < col_count; i++) {
-    std::cout << "| " << col_data[i] << " ";
+void PrintHeader(const pelton::SqlResult &result) {
+  for (size_t i = 0; i < result.getColumnCount(); i++) {
+    std::cout << "| " << result.getColumn(i).getColumnName() << " ";
   }
   std::cout << "|" << std::endl;
-
-  return 0;
+  for (size_t i = 0; i < result.getColumnCount() * 10; i++) {
+    std::cout << "-";
+  }
+  std::cout << std::endl;
 }
 
-// No-op.
-int NoCb(void *context, int col_count, char **col_data, char **col_name) {
-  return 0;
+void PrintRow(size_t column_count, const pelton::Row &row) {
+  for (size_t i = 0; i < column_count; i++) {
+    std::cout << "| ";
+    row[i].print(std::cout);
+    std::cout << " ";
+  }
+  std::cout << "|" << std::endl;
+}
+
+void Print(pelton::SqlResult &&result) {
+  PrintHeader(result);
+  while (result.hasData()) {
+    PrintRow(result.getColumnCount(), result.fetchOne());
+  }
 }
 
 // Read SQL commands one at a time.
@@ -79,7 +75,6 @@ int main(int argc, char **argv) {
 
   // Should we print outputs to the screen?
   bool print = FLAGS_print;
-  auto callback = print ? &PrintCb : NoCb;
 
   // Initialize Google’s logging library.
   google::InitGoogleLogging("argc");
@@ -106,25 +101,21 @@ int main(int argc, char **argv) {
     std::string command;
     while (ReadCommand(&command)) {
       // Command has been fully read, execute it!
-      bool context = true;
-      char *errmsg = nullptr;
-
       pelton::perf::Start("exec");
-      if (!pelton::exec(&connection, command, callback,
-                        reinterpret_cast<void *>(&context), &errmsg)) {
+      absl::StatusOr<pelton::SqlResult> status =
+          pelton::exec(&connection, command);
+      if (!status.ok()) {
         std::cerr << "Fatal error" << std::endl;
-        if (errmsg != nullptr) {
-          std::cerr << errmsg << std::endl;
-          delete[] errmsg;
-        }
+        std::cerr << status.status() << std::endl;
         break;
       }
-      pelton::perf::End("exec");
 
-      // Ready for next command.
+      // Print result.
       if (print) {
+        Print(std::move(status.value()));
         std::cout << std::endl << ">>> " << std::flush;
       }
+      pelton::perf::End("exec");
     }
 
     // Close the connection

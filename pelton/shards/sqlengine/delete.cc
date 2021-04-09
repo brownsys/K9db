@@ -17,8 +17,7 @@ namespace sqlengine {
 namespace delete_ {
 
 absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
-                   dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output, bool update_flows) {
+                   dataflow::DataFlowState *dataflow_state, bool update_flows) {
   perf::Start("Delete");
   // Get the rows that are going to be deleted prior to deletion to use them
   // to update the dataflows.
@@ -55,7 +54,7 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
     // Turn the delete statement back to a string, to delete relevant row in
     // PII table.
     std::string delete_str = stmt.Visit(&stringifier);
-    CHECK_STATUS(state->connection_pool().ExecuteDefault(delete_str, output));
+    state->connection_pool().ExecuteDefault(delete_str);
 
     // TODO(babman): Update dataflow after user has been deleted.
     return absl::UnimplementedError("Dataflow not updated after a user delete");
@@ -63,7 +62,7 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
   } else if (!is_sharded && !is_pii) {
     // Case 2: Table does not have PII and is not sharded!
     std::string delete_str = stmt.Visit(&stringifier);
-    return state->connection_pool().ExecuteDefault(delete_str, output);
+    state->connection_pool().ExecuteDefault(delete_str);
 
   } else {  // is_shared == true
     // Case 3: Table is sharded!
@@ -87,14 +86,13 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
 
           // Execute statement directly against shard.
           std::string delete_str = cloned.Visit(&stringifier);
-          CHECK_STATUS(state->connection_pool().ExecuteShard(delete_str, info,
-                                                             user_id, output));
+          state->connection_pool().ExecuteShard(delete_str, info, user_id);
         }
       } else {
         // Execute statement against all shards of this kind.
         std::string delete_str = cloned.Visit(&stringifier);
-        CHECK_STATUS(state->connection_pool().ExecuteShards(
-            delete_str, info, state->UsersOfShard(info.shard_kind), output));
+        state->connection_pool().ExecuteShards(
+            delete_str, info, state->UsersOfShard(info.shard_kind));
       }
     }
   }

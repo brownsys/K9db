@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 
-#include "absl/status/statusor.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/value.h"
 #include "pelton/planner/planner.h"
@@ -85,9 +84,12 @@ absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
   return absl::OkStatus();
 }
 
-absl::Status SelectView(const sqlast::Select &stmt, SharderState *state,
-                        dataflow::DataFlowState *dataflow_state,
-                        const OutputChannel &output) {
+absl::StatusOr<SqlResult> SelectView(const sqlast::Select &stmt,
+                                     SharderState *state,
+                                     dataflow::DataFlowState *dataflow_state) {
+  return SqlResult();
+  /*
+  // TODO(babman): fix this.
   perf::Start("SelectView");
 
   // Get the corresponding flow.
@@ -195,6 +197,7 @@ absl::Status SelectView(const sqlast::Select &stmt, SharderState *state,
   perf::End("SelectView");
 
   return absl::OkStatus();
+  */
 }
 
 }  // namespace view

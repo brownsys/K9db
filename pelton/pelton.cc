@@ -58,8 +58,7 @@ bool open(const std::string &directory, const std::string &db_username,
   return true;
 }
 
-bool exec(Connection *connection, std::string sql,
-          const shards::Callback &callback, void *context, char **errmsg) {
+absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
   // Trim statement.
   Trim(sql);
   if (echo) {
@@ -68,20 +67,13 @@ bool exec(Connection *connection, std::string sql,
 
   // If special statement, handle it separately.
   if (SpecialStatements(sql, connection)) {
-    return true;
+    return SqlResult();
   }
 
   // Parse and rewrite statement.
   shards::SharderState *sstate = connection->GetSharderState();
   dataflow::DataFlowState *dstate = connection->GetDataFlowState();
-  shards::OutputChannel output = {callback, context, errmsg};
-  absl::Status status = shards::sqlengine::Shard(sql, sstate, dstate, output);
-  if (!status.ok()) {
-    std::cout << status << std::endl;
-    return false;
-  }
-
-  return true;
+  return shards::sqlengine::Shard(sql, sstate, dstate);
 }
 
 void shutdown_planner() { planner::ShutdownPlanner(); }

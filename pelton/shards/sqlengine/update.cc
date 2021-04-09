@@ -51,7 +51,8 @@ absl::Status UpdateRawRecords(std::vector<RawRecord> *records,
       }
       updated_record.at(val_index) = updated_vals.at(c);
     }
-    records->emplace_back(table_name, updated_record, record.columns, true);
+    // TODO(babman): fix this.
+    records->emplace_back(table_name, /*updated_record, record.columns,*/ true);
   }
 
   return absl::OkStatus();
@@ -101,8 +102,7 @@ sqlast::Insert InsertRaw(const RawRecord &record,
 }  // namespace
 
 absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
-                   dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output) {
+                   dataflow::DataFlowState *dataflow_state) {
   perf::Start("Update");
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
@@ -120,7 +120,7 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
   if (!is_sharded) {
     // Case 1: table is not in any shard.
     std::string update_str = stmt.Visit(&stringifier);
-    CHECK_STATUS(state->connection_pool().ExecuteDefault(update_str, output));
+    state->connection_pool().ExecuteDefault(update_str);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded.
@@ -128,15 +128,14 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
       // The update statement might move the rows from one shard to another.
       // We can only perform this update by splitting it into a DELETE-INSERT
       // pair.
-      CHECK_STATUS(delete_::Shard(stmt.DeleteDomain(), state, dataflow_state,
-                                  output, false));
+      CHECK_STATUS(
+          delete_::Shard(stmt.DeleteDomain(), state, dataflow_state, false));
 
       // Insert updated records.
       for (size_t i = old_records_size; i < records.size(); i++) {
         sqlast::Insert insert_stmt =
             InsertRaw(records.at(i), state->GetSchema(table_name));
-        CHECK_STATUS(
-            insert::Shard(insert_stmt, state, dataflow_state, output, false));
+        CHECK_STATUS(insert::Shard(insert_stmt, state, dataflow_state, false));
       }
 
     } else {
@@ -160,14 +159,13 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
 
             // Execute statement directly against shard.
             std::string update_str = cloned.Visit(&stringifier);
-            CHECK_STATUS(state->connection_pool().ExecuteShard(
-                update_str, info, user_id, output));
+            state->connection_pool().ExecuteShard(update_str, info, user_id);
           }
         } else {
           // Update against the relevant shards.
           std::string update_str = cloned.Visit(&stringifier);
-          CHECK_STATUS(state->connection_pool().ExecuteShards(
-              update_str, info, state->UsersOfShard(info.shard_kind), output));
+          state->connection_pool().ExecuteShards(
+              update_str, info, state->UsersOfShard(info.shard_kind));
         }
       }
     }

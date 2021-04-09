@@ -5,9 +5,11 @@
 #include <functional>
 #include <string>
 
+#include "absl/status/statusor.h"
 #include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
+#include "pelton/types.h"
 
 namespace pelton {
 
@@ -55,8 +57,7 @@ class Connection {
 bool open(const std::string &directory, const std::string &db_username,
           const std::string &db_password, Connection *connection);
 
-bool exec(Connection *connection, std::string sql,
-          const shards::Callback &callback, void *context, char **errmsg);
+absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql);
 
 bool close(Connection *connection);
 
