@@ -48,6 +48,12 @@ NodeIndex DataFlowGraphGenerator::AddUnionOperator(
   CHECK(this->graph_->AddNode(op, parents_ptrs));
   return op->index();
 }
+NodeIndex DataFlowGraphGenerator::AddFilterOperator() {
+  // Create filter operator.
+  std::shared_ptr<FilterOperator> op = std::make_shared<FilterOperator>();
+  CHECK(this->graph_->AddNode(op));
+  return op->index();
+}
 NodeIndex DataFlowGraphGenerator::AddFilterOperator(NodeIndex parent) {
   // Create filter operator.
   std::shared_ptr<FilterOperator> op = std::make_shared<FilterOperator>();
@@ -56,6 +62,14 @@ NodeIndex DataFlowGraphGenerator::AddFilterOperator(NodeIndex parent) {
   CHECK(parent_ptr);
   CHECK(this->graph_->AddNode(op, parent_ptr));
   return op->index();
+}
+void DataFlowGraphGenerator::AddFilterOperatorParent(NodeIndex isolated_filter,
+                                                     NodeIndex parent) {
+  // Get filter operator.
+  std::shared_ptr<Operator> op = this->graph_->GetNode(isolated_filter);
+  std::shared_ptr<Operator> parent_ptr = this->graph_->GetNode(parent);
+  CHECK(parent_ptr);
+  CHECK(this->graph_->AddNode(op, parent_ptr));
 }
 NodeIndex DataFlowGraphGenerator::AddEquiJoinOperator(NodeIndex left_parent,
                                                       NodeIndex right_parent,

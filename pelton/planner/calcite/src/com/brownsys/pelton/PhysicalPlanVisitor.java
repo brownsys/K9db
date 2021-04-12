@@ -33,11 +33,18 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
   private final DataFlowGraphLibrary.DataFlowGraphGenerator generator;
   private final Stack<ArrayList<Integer>> childrenOperators;
   private final Hashtable<String, Integer> tableToInputOperator;
+  // Each filter operator in pelton performs either an OR or an AND operation
+  // on it's operands. Nested conditions are represented as separae filter
+  // operators and chained together after construction. The following map is
+  // used to maintain a list of filter operators(either AND or OR) at a
+  // particular LEVEL.
+  private final Hashtable<Integer, ArrayList<Integer>> filterOperators;
 
   public PhysicalPlanVisitor(DataFlowGraphLibrary.DataFlowGraphGenerator generator) {
     this.generator = generator;
     this.childrenOperators = new Stack<ArrayList<Integer>>();
     this.tableToInputOperator = new Hashtable<String, Integer>();
+    this.filterOperators = new Hashtable<Integer, ArrayList<Integer>>();
   }
 
   public void populateGraph(RelNode plan) {
@@ -135,8 +142,7 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     return union;
   }
 
-  private void visitFilterOperands(int filterOperator, RexNode condition, List<RexNode> operands) {
-    // Must be a binary condition with one side being a column and the other being a literal.
+  private void addFilterOperation(int filterOperator, RexNode condition, List<RexNode> operands){
     assert operands.size() == 2;
     assert operands.get(0) instanceof RexInputRef || operands.get(1) instanceof RexInputRef;
     assert operands.get(0) instanceof RexLiteral || operands.get(1) instanceof RexLiteral;
@@ -190,6 +196,45 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     }
   }
 
+  private void visitFilterOperands(Integer level, RexNode condition, List<RexNode> operands) {
+      List<RexNode> operations = new ArrayList<RexNode>();
+      if(condition.isA(SqlKind.AND) || condition.isA(SqlKind.OR)){
+        for(RexNode operand : operands){
+          if(operand.isA(SqlKind.AND) || operand.isA(SqlKind.OR)){
+            visitFilterOperands(level+1, operand, ((RexCall) condition).getOperands());
+          } else{
+            operations.add(operand);
+          }
+        }
+      }
+
+      System.out.println("[INFO] Adding operations to filter: " + operations);
+
+      // Will reach here in two cases:
+      // 1. Either all of the operands of @param condition are of kind
+      // FILTER_OPERATIONS
+      // 2. Or all of the nested conditions have been visited.
+
+      // Create a new filter operator (parent for this operator will be added
+      // later, once all the operands have been visited)
+      // TODO(Ishan): Update this to accound for AND vs OR filters
+      int filterOperator = this.generator.AddFilterOperator();
+      // Add operations to the operator
+      for(RexNode operation: operations){
+        addFilterOperation(filterOperator, condition, ((RexCall) operation).getOperands());
+      }
+      if(!this.filterOperators.containsKey(level)){
+        ArrayList<Integer> filterOps = new ArrayList<Integer>();
+        filterOps.add(filterOperator);
+        this.filterOperators.put(level, filterOps);
+      } else{
+        ArrayList<Integer> filterOps = this.filterOperators.get(level);
+        filterOps.add(filterOperator);
+        this.filterOperators.replace(level, filterOps);
+      }
+
+  }
+
   @Override
   public RelNode visit(LogicalFilter filter) {
     RexNode condition = filter.getCondition();
@@ -206,22 +251,45 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     ArrayList<Integer> children = this.childrenOperators.pop();
     assert children.size() == 1;
 
-    // Add a filter operator.
-    int filterOperator = this.generator.AddFilterOperator(children.get(0));
-    this.childrenOperators.peek().add(filterOperator);
-
-    // Fill the filter operator with the appropriate condition(s).
-    if (condition.isA(FILTER_OPERATIONS)) {
-      List<RexNode> operands = ((RexCall) condition).getOperands();
-      this.visitFilterOperands(filterOperator, condition, operands);
-    }
-
-    if (condition.isA(SqlKind.AND)) {
-      for (RexNode operand : ((RexCall) condition).getOperands()) {
-        List<RexNode> operands = ((RexCall) operand).getOperands();
-        this.visitFilterOperands(filterOperator, operand, operands);
+    List<RexNode> operands = ((RexCall) condition).getOperands();
+    if(condition.isA(FILTER_OPERATIONS)){
+      // A basic filter operator, does not contain AND/OR
+      int filterOperator = this.generator.AddFilterOperator(children.get(0));
+      addFilterOperation(filterOperator, condition, operands);
+      this.childrenOperators.peek().add(filterOperator);
+    } else{
+      this.visitFilterOperands(0, condition, operands);
+      // Chain the various filter operators in the stack
+      // 1. Link the deepest nested filter operator to the child of @param filter
+      // operator in the plan
+      Integer maxLevel = -1;
+      for(Integer level : this.filterOperators.keySet()){
+        if(level > maxLevel){
+          maxLevel = level;
+        }
       }
+      // Picking the last one (any one is fine since they are at the same level)
+      System.out.println(this.filterOperators);
+      Integer deepestFilter = this.filterOperators.get(maxLevel).get(this.filterOperators.get(maxLevel).size()-1);
+      // this.filterOperators.replace(maxlevel, deepestFilters);
+      this.generator.AddFilterOperatorParent(deepestFilter, children.get(0));
+
+      // 2. Link the filter operators in between, start from maxLevel and go to
+      // the topmost filter
+      // Flatten the hastable into an array
+      ArrayList<Integer> flatFilterOperators = new ArrayList<Integer>();
+      for(Integer i = 0; i<=maxLevel; i++){
+        flatFilterOperators.addAll(this.filterOperators.get(i));
+      }
+      for(Integer i=0; i< flatFilterOperators.size()-2; i++){
+        this.generator.AddFilterOperatorParent(flatFilterOperators.get(i), flatFilterOperators.get(i+1));
+      }
+      // 3. Link the topmost filter operator to the parent of @param filter
+      // operator in the plan. previousFilterIndex from above represents topmost
+      // filter operator.
+      this.childrenOperators.peek().add(flatFilterOperators.get(0));
     }
+
     return filter;
   }
 
