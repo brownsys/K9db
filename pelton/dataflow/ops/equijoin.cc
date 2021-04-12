@@ -22,15 +22,18 @@ inline void CopyIntoRecord(sqlast::ColumnDefinition::Type datatype,
   switch (datatype) {
     case sqlast::ColumnDefinition::Type::UINT:
       target->SetUInt(source.GetUInt(source_index), target_index);
+      target->SetNull(false, target_index);
       break;
     case sqlast::ColumnDefinition::Type::INT:
       target->SetInt(source.GetInt(source_index), target_index);
+      target->SetNull(false, target_index);
       break;
     case sqlast::ColumnDefinition::Type::TEXT:
       // Copies the string.
       target->SetString(
           std::make_unique<std::string>(source.GetString(source_index)),
           target_index);
+      target->SetNull(false, target_index);
       break;
     default:
       LOG(FATAL) << "Unsupported type in equijoin emit";
@@ -54,6 +57,11 @@ bool EquiJoinOperator::Process(NodeIndex source,
         this->EmitRow(record, right, output, record.IsPositive());
       }
 
+      // additional check for left join
+      if(mode_ == JoinMode::LEFT && 0 ==this->right_table_.Count(left_value)) {
+          this->EmitRow(record, Record::NULLRecord(this->right()->schema()), output, record.IsPositive());
+      }
+
       // Save record in the appropriate table.
       this->left_table_.Insert(left_value, record);
     } else if (source == this->right()->index()) {
@@ -61,6 +69,11 @@ bool EquiJoinOperator::Process(NodeIndex source,
       Key right_value = record.GetValues({this->right_id_});
       for (const auto &left : this->left_table_.Lookup(right_value)) {
         this->EmitRow(left, record, output, record.IsPositive());
+      }
+
+      // additional check for right join
+      if(mode_ == JoinMode::RIGHT && 0 ==this->left_table_.Count(left_value)) {
+          this->EmitRow(record, Record::NULLRecord(this->left()->schema()), output, record.IsPositive());
       }
 
       // save record hashed to right table
@@ -137,7 +150,10 @@ void EquiJoinOperator::EmitRow(const Record &left, const Record &right,
   // Create a concatenated record, dropping key column from left side.
   Record record{this->output_schema_, positive};
   for (size_t i = 0; i < lschema.size(); i++) {
-    CopyIntoRecord(lschema.TypeOf(i), &record, left, i, i);
+      if(left.IsNull(i))
+        record.SetNull(i);
+      else
+        CopyIntoRecord(lschema.TypeOf(i), &record, left, i, i);
   }
   for (size_t i = 0; i < rschema.size(); i++) {
     if (i == this->right_id_) {
@@ -147,7 +163,10 @@ void EquiJoinOperator::EmitRow(const Record &left, const Record &right,
     if (i > this->right_id_) {
       j--;
     }
-    CopyIntoRecord(rschema.TypeOf(i), &record, right, j, i);
+    if(right.IsNull(i))
+      record.SetNull(j);
+    else
+      CopyIntoRecord(rschema.TypeOf(i), &record, right, j, i);
   }
 
   // add result record to output

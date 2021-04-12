@@ -84,6 +84,15 @@ class Record {
   // of their data automatically).
   ~Record() { this->FreeRecordData(); }
 
+  // Helper function to create a record consisting onyl of nulls
+  static Record NULLRecord(const SchemaRef& schema, bool positive = true) {
+      Record r(schema, positive);
+      for(size_t i = 0; i < schema.size(); ++i) {
+          r.SetNull(true, i);
+      }
+      return r;
+  }
+
   // Explicit deep copying.
   Record Copy() const;
 

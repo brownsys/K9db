@@ -21,15 +21,21 @@ namespace dataflow {
 
 static void JoinOneToOne(benchmark::State& state);
 
+enum class JoinMode {
+    INNER,
+    LEFT,
+    RIGHT
+};
+
 class EquiJoinOperator : public Operator {
  public:
   EquiJoinOperator() = delete;
 
-  EquiJoinOperator(ColumnID left_id, ColumnID right_id)
+  EquiJoinOperator(ColumnID left_id, ColumnID right_id, JoinMode mode=JoinMode::INNER)
       : Operator(Operator::Type::EQUIJOIN),
         left_id_(left_id),
         right_id_(right_id),
-        joined_schema_() {}
+        joined_schema_(), mode_(mode) {}
 
   std::shared_ptr<Operator> left() const {
     return this->parents_.at(0)->from();
@@ -60,6 +66,7 @@ class EquiJoinOperator : public Operator {
   ColumnID right_id_;
   // Schema of the output.
   SchemaOwner joined_schema_;
+  JoinMode mode_;
   UnorderedGroupedData left_table_;
   UnorderedGroupedData right_table_;
 

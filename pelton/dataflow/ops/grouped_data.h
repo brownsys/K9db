@@ -311,6 +311,14 @@ class GroupedDataT : public UntemplatedGroupedData {
                           RecordIterator{std::make_unique<R_impl>(end)}};
   }
 
+  // Count of records corresponding to a given key
+  size_t Count(const Key& key) const {
+      auto it = this->contents_.find(key);
+      if (it == this->contents_.end())
+          return 0;
+      return it->second.size();
+  }
+
   // Return an Iterable set of keys contained by this group, in the underlying
   // order (specified by M).
   KeyIterable Keys() const {
