@@ -74,7 +74,7 @@ class Record {
 
   // Create record and set all the data together.
   template <typename... Args>
-  Record(const SchemaRef &schema, bool positive, Args &&... ts)
+  Record(const SchemaRef &schema, bool positive, Args &&...ts)
       : Record(schema, positive) {
     this->SetData(std::forward<Args>(ts)...);
   }
@@ -85,12 +85,12 @@ class Record {
   ~Record() { this->FreeRecordData(); }
 
   // Helper function to create a record consisting onyl of nulls
-  static Record NULLRecord(const SchemaRef& schema, bool positive = true) {
-      Record r(schema, positive);
-      for(size_t i = 0; i < schema.size(); ++i) {
-          r.SetNull(true, i);
-      }
-      return r;
+  static Record NULLRecord(const SchemaRef &schema, bool positive = true) {
+    Record r(schema, positive);
+    for (size_t i = 0; i < schema.size(); ++i) {
+      r.SetNull(true, i);
+    }
+    return r;
   }
 
   // Explicit deep copying.
@@ -98,7 +98,7 @@ class Record {
 
   // Set all data in one shot regardless of types and counts.
   template <typename... Args>
-  void SetData(Args &&... ts) {
+  void SetData(Args &&...ts) {
     CHECK_NOTNULL(this->data_);
     if constexpr (sizeof...(ts) > 0) {
       SetDataRecursive(0, std::forward<Args>(ts)...);
@@ -188,7 +188,7 @@ class Record {
  private:
   // Recursive helper used in SetData(...).
   template <typename Arg, typename... Args>
-  void SetDataRecursive(size_t index, Arg &&t, Args &&... ts) {
+  void SetDataRecursive(size_t index, Arg &&t, Args &&...ts) {
     if (index >= this->schema_.size()) {
       LOG(FATAL) << "Record data received too many arguments";
     }
@@ -200,8 +200,8 @@ class Record {
           this->data_[index].uint = t;
         } else {
           LOG(FATAL) << "Type mismatch in SetData at index " << index
-                     << ", expected " << this->schema_.TypeOf(index)
-                     << ", got " << TypeNameFor(t);
+                     << ", expected " << this->schema_.TypeOf(index) << ", got "
+                     << TypeNameFor(t);
         }
         break;
       case sqlast::ColumnDefinition::Type::INT:
@@ -210,8 +210,8 @@ class Record {
           this->data_[index].sint = t;
         } else {
           LOG(FATAL) << "Type mismatch in SetData at index " << index
-                     << ", expected " << this->schema_.TypeOf(index)
-                     << ", got " << TypeNameFor(t);
+                     << ", expected " << this->schema_.TypeOf(index) << ", got "
+                     << TypeNameFor(t);
         }
         break;
       case sqlast::ColumnDefinition::Type::TEXT:
@@ -220,8 +220,8 @@ class Record {
           this->data_[index].str = std::move(t);
         } else {
           LOG(FATAL) << "Type mismatch in SetData at index " << index
-                     << ", expected " << this->schema_.TypeOf(index)
-                     << ", got " << TypeNameFor(t);
+                     << ", expected " << this->schema_.TypeOf(index) << ", got "
+                     << TypeNameFor(t);
         }
         break;
       default:

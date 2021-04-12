@@ -16,7 +16,7 @@ namespace dataflow {
 class Edge;
 class DataFlowGraph;
 
-static void JoinOneToOne(benchmark::State& state);
+static void JoinOneToOne(benchmark::State &state);
 
 class Operator {
  public:
@@ -105,7 +105,7 @@ class Operator {
 
   // Allow DataFlowGraph to use SetGraph, SetIndex, and AddParent functions.
   friend class DataFlowGraph;
-  friend void JoinOneToOne(benchmark::State& state);
+  friend void JoinOneToOne(benchmark::State &state);
 };
 
 }  // namespace dataflow
