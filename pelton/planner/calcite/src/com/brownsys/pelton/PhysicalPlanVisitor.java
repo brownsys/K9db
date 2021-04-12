@@ -259,7 +259,6 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
       this.childrenOperators.peek().add(filterOperator);
     } else{
       this.visitFilterOperands(0, condition, operands);
-      // Chain the various filter operators in the stack
       // 1. Link the deepest nested filter operator to the child of @param filter
       // operator in the plan
       Integer maxLevel = -1;
@@ -274,8 +273,7 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
       // this.filterOperators.replace(maxlevel, deepestFilters);
       this.generator.AddFilterOperatorParent(deepestFilter, children.get(0));
 
-      // 2. Link the filter operators in between, start from maxLevel and go to
-      // the topmost filter
+      // 2. Chain the "internal" filter operators
       // Flatten the hastable into an array
       ArrayList<Integer> flatFilterOperators = new ArrayList<Integer>();
       for(Integer i = 0; i<=maxLevel; i++){
@@ -285,8 +283,7 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
         this.generator.AddFilterOperatorParent(flatFilterOperators.get(i), flatFilterOperators.get(i+1));
       }
       // 3. Link the topmost filter operator to the parent of @param filter
-      // operator in the plan. previousFilterIndex from above represents topmost
-      // filter operator.
+      // operator in the plan.
       this.childrenOperators.peek().add(flatFilterOperators.get(0));
     }
 
