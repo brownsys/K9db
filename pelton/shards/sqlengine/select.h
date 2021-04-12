@@ -3,14 +3,12 @@
 #ifndef PELTON_SHARDS_SQLENGINE_SELECT_H_
 #define PELTON_SHARDS_SQLENGINE_SELECT_H_
 
-#include <list>
-#include <memory>
-#include <string>
-#include <tuple>
+#include <vector>
 
-#include "absl/status/statusor.h"
-#include "pelton/shards/sqlexecutor/executable.h"
+#include "absl/status/status.h"
+#include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
+#include "pelton/shards/types.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -18,9 +16,13 @@ namespace shards {
 namespace sqlengine {
 namespace select {
 
-// <ShardSuffix, SQLStatement>
-absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
-Rewrite(const sqlast::Select &stmt, SharderState *state);
+absl::Status Shard(const sqlast::Select &stmt, SharderState *state,
+                   dataflow::DataFlowState *dataflow_state,
+                   const OutputChannel &output);
+
+absl::Status Query(std::vector<RawRecord> *output, const sqlast::Select &stmt,
+                   SharderState *state, dataflow::DataFlowState *dataflow_state,
+                   bool positive);
 
 }  // namespace select
 }  // namespace sqlengine

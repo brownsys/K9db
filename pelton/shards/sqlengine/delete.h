@@ -3,14 +3,10 @@
 #ifndef PELTON_SHARDS_SQLENGINE_DELETE_H_
 #define PELTON_SHARDS_SQLENGINE_DELETE_H_
 
-#include <list>
-#include <memory>
-#include <string>
-#include <tuple>
-
-#include "absl/status/statusor.h"
-#include "pelton/shards/sqlexecutor/executable.h"
+#include "absl/status/status.h"
+#include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
+#include "pelton/shards/types.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -18,9 +14,9 @@ namespace shards {
 namespace sqlengine {
 namespace delete_ {
 
-// <ShardSuffix, SQLStatement>
-absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
-Rewrite(const sqlast::Delete &stmt, SharderState *state);
+absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
+                   dataflow::DataFlowState *dataflow_state,
+                   const OutputChannel &output, bool update_flows = true);
 
 }  // namespace delete_
 }  // namespace sqlengine

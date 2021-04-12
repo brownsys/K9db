@@ -15,12 +15,13 @@ cc_library(
         ":insert",
         ":select",
         ":update",
+        "//pelton/dataflow:state",
         "//pelton/shards:state",
-        "//pelton/shards/sqlexecutor:executor",
+        "//pelton/shards:types",
         "//pelton/sqlast:ast",
         "//pelton/sqlast:parser",
         "//pelton/util:status",
-        "@absl//absl/status:statusor",
+        "@absl//absl/status",
         "@antlr4_runtimes//:cpp",
         "@grammars-v4//:sqlparser",
     ],
@@ -35,11 +36,13 @@ cc_library(
         "create.h",
     ],
     deps = [
+        "//pelton/dataflow:state",
         "//pelton/shards:state",
+        "//pelton/shards:types",
         "//pelton/shards/sqlengine:util",
-        "//pelton/shards/sqlexecutor:executor",
         "//pelton/sqlast:ast",
-        "@absl//absl/status:statusor",
+        "//pelton/util:status",
+        "@absl//absl/status",
         "@absl//absl/strings",
     ],
 )
@@ -53,12 +56,12 @@ cc_library(
         "insert.h",
     ],
     deps = [
+        "//pelton/dataflow:state",
         "//pelton/shards:state",
-        "//pelton/shards/sqlengine:util",
-        "//pelton/shards/sqlexecutor:executor",
+        "//pelton/shards:types",
         "//pelton/sqlast:ast",
         "//pelton/util:status",
-        "@absl//absl/status:statusor",
+        "@absl//absl/status",
     ],
 )
 
@@ -71,11 +74,12 @@ cc_library(
         "select.h",
     ],
     deps = [
+        "//pelton/dataflow:state",
         "//pelton/shards:state",
-        "//pelton/shards/sqlengine:util",
-        "//pelton/shards/sqlexecutor:executor",
+        "//pelton/shards:types",
         "//pelton/sqlast:ast",
-        "@absl//absl/status:statusor",
+        "//pelton/util:status",
+        "@absl//absl/status",
     ],
 )
 
@@ -88,11 +92,14 @@ cc_library(
         "delete.h",
     ],
     deps = [
+        ":select",
+        "//pelton/dataflow:state",
         "//pelton/shards:state",
+        "//pelton/shards:types",
         "//pelton/shards/sqlengine:util",
-        "//pelton/shards/sqlexecutor:executor",
         "//pelton/sqlast:ast",
-        "@absl//absl/status:statusor",
+        "//pelton/util:status",
+        "@absl//absl/status",
         "@absl//absl/strings",
     ],
 )
@@ -106,11 +113,15 @@ cc_library(
         "update.h",
     ],
     deps = [
+        ":delete",
+        ":insert",
+        ":select",
+        "//pelton/dataflow:state",
         "//pelton/shards:state",
-        "//pelton/shards/sqlengine:util",
-        "//pelton/shards/sqlexecutor:executor",
+        "//pelton/shards:types",
         "//pelton/sqlast:ast",
-        "@absl//absl/status:statusor",
+        "//pelton/util:status",
+        "@absl//absl/status",
     ],
 )
 
@@ -124,7 +135,7 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
-        "//pelton/shards:state",
+        "//pelton/shards:types",
         "@absl//absl/strings",
     ],
 )

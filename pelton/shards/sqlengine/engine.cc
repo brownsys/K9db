@@ -18,50 +18,54 @@ namespace pelton {
 namespace shards {
 namespace sqlengine {
 
-absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
-Rewrite(const std::string &sql, SharderState *state) {
+absl::Status Shard(const std::string &sql, SharderState *state,
+                   dataflow::DataFlowState *dataflow_state,
+                   const OutputChannel &output) {
   // Parse with ANTLR into our AST.
   sqlast::SQLParser parser;
   MOVE_OR_RETURN(std::unique_ptr<sqlast::AbstractStatement> statement,
                  parser.Parse(sql));
 
   // Compute result.
-  absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
-      result;
   switch (statement->type()) {
     // Case 1: CREATE TABLE statement.
-    case sqlast::AbstractStatement::Type::CREATE_TABLE:
-      result = create::Rewrite(
-          *static_cast<sqlast::CreateTable *>(statement.get()), state);
-      break;
+    case sqlast::AbstractStatement::Type::CREATE_TABLE: {
+      auto *stmt = static_cast<sqlast::CreateTable *>(statement.get());
+      auto result = create::Shard(*stmt, state, dataflow_state, output);
+      if (result.ok()) {
+        dataflow_state->AddTableSchema(*stmt);
+      }
+      return result;
+    }
 
     // Case 2: Insert statement.
-    case sqlast::AbstractStatement::Type::INSERT:
-      result = insert::Rewrite(*static_cast<sqlast::Insert *>(statement.get()),
-                               state);
-      break;
+    case sqlast::AbstractStatement::Type::INSERT: {
+      auto *stmt = static_cast<sqlast::Insert *>(statement.get());
+      return insert::Shard(*stmt, state, dataflow_state, output);
+    }
 
     // Case 3: Update statement.
-    case sqlast::AbstractStatement::Type::UPDATE:
-      result = update::Rewrite(*static_cast<sqlast::Update *>(statement.get()),
-                               state);
-      break;
+    case sqlast::AbstractStatement::Type::UPDATE: {
+      auto *stmt = static_cast<sqlast::Update *>(statement.get());
+      return update::Shard(*stmt, state, dataflow_state, output);
+    }
 
     // Case 4: Select statement.
-    case sqlast::AbstractStatement::Type::SELECT:
-      result = select::Rewrite(*static_cast<sqlast::Select *>(statement.get()),
-                               state);
-      break;
+    case sqlast::AbstractStatement::Type::SELECT: {
+      auto *stmt = static_cast<sqlast::Select *>(statement.get());
+      return select::Shard(*stmt, state, dataflow_state, output);
+    }
 
     // Case 5: Delete statement.
-    case sqlast::AbstractStatement::Type::DELETE:
-      result = delete_::Rewrite(*static_cast<sqlast::Delete *>(statement.get()),
-                                state);
-      break;
-  }
+    case sqlast::AbstractStatement::Type::DELETE: {
+      auto *stmt = static_cast<sqlast::Delete *>(statement.get());
+      return delete_::Shard(*stmt, state, dataflow_state, output);
+    }
 
-  state->SetLastStatement(std::move(statement));
-  return result;
+    // Unsupported (this should not be reachable).
+    default:
+      return absl::InvalidArgumentError("Unsupported statement type");
+  }
 }
 
 }  // namespace sqlengine

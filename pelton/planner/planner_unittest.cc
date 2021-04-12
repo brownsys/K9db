@@ -9,6 +9,7 @@
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 #include "pelton/dataflow/graph.h"
+#include "pelton/dataflow/key.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/record.h"
@@ -59,8 +60,10 @@ TEST(PlannerTest, SimpleFilter) {
   // Look at flow output.
   std::shared_ptr<dataflow::MatViewOperator> output = graph.outputs().at(0);
   EXPECT_EQ(output->count(), 1);
-  for (const dataflow::Record &record : *output) {
-    EXPECT_EQ(record, records.at(0));
+  for (const auto &key : output->Keys()) {
+    for (const auto &record : output->Lookup(key)) {
+      EXPECT_EQ(record, records.at(0));
+    }
   }
 }
 

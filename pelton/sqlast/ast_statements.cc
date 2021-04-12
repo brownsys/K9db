@@ -31,11 +31,17 @@ const std::vector<std::string> &Insert::GetValues() const {
   return this->values_;
 }
 
-std::string Insert::RemoveValue(const std::string &colname) {
+void Insert::AddValue(const std::string &val) { this->values_.push_back(val); }
+void Insert::AddValue(std::string &&val) {
+  this->values_.push_back(std::move(val));
+}
+
+absl::StatusOr<std::string> Insert::RemoveValue(const std::string &colname) {
   if (this->columns_.size() > 0) {
     auto it = std::find(this->columns_.begin(), this->columns_.end(), colname);
     if (it == this->columns_.end()) {
-      throw "Insert statement does not contain column \"" + colname + "\"";
+      return absl::InvalidArgumentError(
+          "Insert statement does not contain column \"" + colname + "\"");
     }
     this->columns_.erase(it);
     size_t index = std::distance(this->columns_.begin(), it);
@@ -43,7 +49,8 @@ std::string Insert::RemoveValue(const std::string &colname) {
     this->values_.erase(this->values_.begin() + index);
     return result;
   }
-  throw "Insert statement does not have column names set explicitly";
+  return absl::InvalidArgumentError(
+      "Insert statement does not have column names set explicitly");
 }
 std::string Insert::RemoveValue(size_t index) {
   if (this->columns_.size() > 0) {
@@ -63,10 +70,12 @@ void Update::AddColumnValue(const std::string &column,
   this->columns_.push_back(column);
   this->values_.push_back(value);
 }
-std::string Update::RemoveColumnValue(const std::string &column) {
+absl::StatusOr<std::string> Update::RemoveColumnValue(
+    const std::string &column) {
   auto it = std::find(this->columns_.begin(), this->columns_.end(), column);
   if (it == this->columns_.end()) {
-    throw "Update statement does not contain column \"" + column + "\"";
+    return absl::InvalidArgumentError(
+        "Update statement does not contain column \"" + column + "\"");
   }
   this->columns_.erase(it);
   size_t index = std::distance(this->columns_.begin(), it);
@@ -100,6 +109,25 @@ void Update::SetWhereClause(std::unique_ptr<BinaryExpression> &&where) {
 }
 void Update::RemoveWhereClause() {
   this->where_clause_ = std::optional<std::unique_ptr<BinaryExpression>>();
+}
+
+Select Update::SelectDomain() const {
+  Select select{this->table_name()};
+  select.AddColumn("*");
+  if (this->HasWhereClause()) {
+    select.SetWhereClause(
+        std::make_unique<BinaryExpression>(*this->where_clause_->get()));
+  }
+  return select;
+}
+
+Delete Update::DeleteDomain() const {
+  Delete del{this->table_name()};
+  if (this->HasWhereClause()) {
+    del.SetWhereClause(
+        std::make_unique<BinaryExpression>(*this->where_clause_->get()));
+  }
+  return del;
 }
 
 // Select.
@@ -148,6 +176,16 @@ void Delete::SetWhereClause(std::unique_ptr<BinaryExpression> &&where) {
 }
 void Delete::RemoveWhereClause() {
   this->where_clause_ = std::optional<std::unique_ptr<BinaryExpression>>();
+}
+
+Select Delete::SelectDomain() const {
+  Select select{this->table_name()};
+  select.AddColumn("*");
+  if (this->HasWhereClause()) {
+    select.SetWhereClause(
+        std::make_unique<BinaryExpression>(*this->where_clause_->get()));
+  }
+  return select;
 }
 
 }  // namespace sqlast

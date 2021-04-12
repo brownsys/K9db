@@ -14,21 +14,20 @@
 #ifndef PELTON_SHARDS_SQLENGINE_ENGINE_H_
 #define PELTON_SHARDS_SQLENGINE_ENGINE_H_
 
-#include <list>
-#include <memory>
 #include <string>
-#include <tuple>
 
-#include "absl/status/statusor.h"
-#include "pelton/shards/sqlexecutor/executable.h"
+#include "absl/status/status.h"
+#include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
+#include "pelton/shards/types.h"
 
 namespace pelton {
 namespace shards {
 namespace sqlengine {
 
-absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
-Rewrite(const std::string &sql, SharderState *state);
+absl::Status Shard(const std::string &sql, SharderState *sharder_state,
+                   dataflow::DataFlowState *dataflow_state,
+                   const OutputChannel &output);
 
 }  // namespace sqlengine
 }  // namespace shards

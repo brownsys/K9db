@@ -87,36 +87,45 @@ const std::string &Record::GetString(size_t i) const {
 }
 
 // Data access with generic type.
-Key Record::GetValue(size_t i) const {
-  CHECK(!IsNull(i));
-  switch (this->schema_.TypeOf(i)) {
+Key Record::GetKey() const {
+  CHECK_NE(this->data_, nullptr) << "Cannot get key for moved record";
+  return this->GetValues(this->schema_.keys());
+}
+Key Record::GetValues(const std::vector<ColumnID> &cols) const {
+  // Construct key with given capacity, and fill it up with values.
+  Key key{cols.size()};
+  for (ColumnID col : cols) {
+    switch (this->schema_.TypeOf(col)) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        key.AddValue(this->data_[col].uint);
+        break;
+      case sqlast::ColumnDefinition::Type::INT:
+        key.AddValue(this->data_[col].sint);
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+        if (this->data_[col].str) {
+          key.AddValue(*(this->data_[col].str));
+        } else {
+          key.AddValue("");
+        }
+        break;
+      default:
+        LOG(FATAL) << "Unsupported data type in key extraction!";
+    }
+  }
+  return key;
+}
+Value Record::GetValue(ColumnID col) const {
+  CHECK_NE(this->data_, nullptr) << "Cannot get value for moved record";
+  switch (this->schema_.TypeOf(col)) {
     case sqlast::ColumnDefinition::Type::UINT:
-      return Key(this->data_[i].uint);
+      return Value(this->data_[col].uint);
     case sqlast::ColumnDefinition::Type::INT:
-      return Key(this->data_[i].sint);
+      return Value(this->data_[col].sint);
     case sqlast::ColumnDefinition::Type::TEXT:
-      return Key(*this->data_[i].str);
+      return Value(*this->data_[col].str);
     default:
       LOG(FATAL) << "Unsupported data type in value extraction!";
-  }
-}
-Key Record::GetKey() const {
-  CHECK_NOTNULL(this->data_);
-  const std::vector<ColumnID> &keys = this->schema_.keys();
-  CHECK_EQ(keys.size(), 1UL);
-  size_t key_index = keys.at(0);
-  switch (this->schema_.TypeOf(key_index)) {
-    case sqlast::ColumnDefinition::Type::UINT:
-      return Key(this->data_[key_index].uint);
-    case sqlast::ColumnDefinition::Type::INT:
-      return Key(this->data_[key_index].sint);
-    case sqlast::ColumnDefinition::Type::TEXT:
-      if (this->data_[key_index].str) {
-        return Key(*(this->data_[key_index].str));
-      }
-      return Key("");
-    default:
-      LOG(FATAL) << "Unsupported data type in key extraction!";
   }
 }
 

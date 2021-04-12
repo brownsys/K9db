@@ -7,6 +7,7 @@
 
 #include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
+#include "pelton/shards/types.h"
 
 namespace pelton {
 
@@ -39,14 +40,10 @@ class Connection {
   dataflow::DataFlowState dataflow_state_;
 };
 
-// (context, col_count, col_data, col_name)
-// https://www.sqlite.org/c3ref/exec.html
-using Callback = std::function<int(void *, int, char **, char **)>;
-
 bool open(const std::string &directory, Connection *connection);
 
-bool exec(Connection *connection, std::string sql, Callback callback,
-          void *context, char **errmsg);
+bool exec(Connection *connection, std::string sql,
+          const shards::Callback &callback, void *context, char **errmsg);
 
 bool close(Connection *connection);
 

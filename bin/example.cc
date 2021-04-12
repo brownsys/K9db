@@ -1,3 +1,4 @@
+#include <cassert>
 #include <iostream>
 #include <utility>
 
@@ -41,7 +42,19 @@ std::vector<std::string> INSERTS{
     "INSERT INTO submissions VALUES (4, 1, 1, 400);",
     "INSERT INTO submissions VALUES (5, 1, 2, 500);",
     "INSERT INTO submissions VALUES (6, 2, 2, 600);",
-    "INSERT INTO submissions VALUES (7, 3, 2, 7);"};
+    "INSERT INTO submissions VALUES (7, 3, 2, 7);",
+    "INSERT INTO submissions VALUES (8, 3, 2, 700);"};
+
+// Updates.
+std::vector<std::string> UPDATES{
+    "UPDATE submissions SET ts = 2000 WHERE ts = 200;",
+    "UPDATE submissions SET assignment_id = 1, ts = 1000 WHERE student_id = "
+    "3;"};
+
+// Deletes.
+std::vector<std::string> DELETES{
+    "DELETE FROM submissions WHERE ID = 6;",
+    "DELETE FROM submissions WHERE student_id = 3;"};
 
 // Flows.
 std::vector<std::pair<std::string, std::string>> FLOWS{
@@ -55,7 +68,11 @@ std::vector<std::pair<std::string, std::string>> FLOWS{
                    "* FROM submissions WHERE ts < 100)"),
     std::make_pair("JOIN_FLOW",
                    "SELECT * from submissions INNER JOIN students ON "
-                   "submissions.student_id = students.ID WHERE ts >= 100")};
+                   "submissions.student_id = students.ID WHERE ts >= 100"),
+    std::make_pair("LIMIT_CONSTANT",
+                   "SELECT * from submissions ORDER BY ts LIMIT 2 OFFSET 5"),
+    std::make_pair("LIMIT_VARIABLE",
+                   "SELECT * from submissions ORDER BY ts LIMIT ?")};
 
 // Selects.
 std::vector<std::string> QUERIES{
@@ -103,13 +120,13 @@ int main(int argc, char **argv) {
   // Open connection to sharder.
   pelton::Connection connection;
   pelton::open(dir, &connection);
-  pelton::exec(&connection, "SET echo;", &Callback, nullptr, nullptr);
+  assert(pelton::exec(&connection, "SET echo;", &Callback, nullptr, nullptr));
 
   // Create all the tables.
   std::cout << "Create the tables ... " << std::endl;
   for (std::string &create : CREATES) {
     std::cout << std::endl;
-    pelton::exec(&connection, create, &Callback, nullptr, nullptr);
+    assert(pelton::exec(&connection, create, &Callback, nullptr, nullptr));
   }
   std::cout << std::endl;
 
@@ -126,7 +143,39 @@ int main(int argc, char **argv) {
   std::cout << "Insert data into tables ... " << std::endl;
   for (std::string &insert : INSERTS) {
     std::cout << std::endl;
-    pelton::exec(&connection, insert, &Callback, nullptr, nullptr);
+    assert(pelton::exec(&connection, insert, &Callback, nullptr, nullptr));
+  }
+  std::cout << std::endl;
+
+  // Read flow.
+  std::cout << "Read flows ... " << std::endl;
+  for (const auto &[name, _] : FLOWS) {
+    std::cout << std::endl;
+    pelton::print_view(&connection, name);
+  }
+  std::cout << std::endl;
+
+  // Update data in tables (see if it is reflected in the flows correctly).
+  std::cout << "Update data in tables ... " << std::endl;
+  for (std::string &update : UPDATES) {
+    std::cout << std::endl;
+    assert(pelton::exec(&connection, update, &Callback, nullptr, nullptr));
+  }
+  std::cout << std::endl;
+
+  // Read flow.
+  std::cout << "Read flows ... " << std::endl;
+  for (const auto &[name, _] : FLOWS) {
+    std::cout << std::endl;
+    pelton::print_view(&connection, name);
+  }
+  std::cout << std::endl;
+
+  // Deletes.
+  std::cout << "Delete data from tables ... " << std::endl;
+  for (std::string &del : DELETES) {
+    std::cout << std::endl;
+    assert(pelton::exec(&connection, del, &Callback, nullptr, nullptr));
   }
   std::cout << std::endl;
 
@@ -135,8 +184,8 @@ int main(int argc, char **argv) {
   for (std::string &select : QUERIES) {
     std::cout << std::endl;
     bool context = true;
-    pelton::exec(&connection, select, &Callback,
-                 reinterpret_cast<void *>(&context), nullptr);
+    assert(pelton::exec(&connection, select, &Callback,
+                        reinterpret_cast<void *>(&context), nullptr));
   }
   std::cout << std::endl;
 

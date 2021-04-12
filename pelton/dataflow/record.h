@@ -15,6 +15,7 @@
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
+#include "pelton/dataflow/value.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/type_utils.h"
 
@@ -141,8 +142,9 @@ class Record {
   }
 
   // Data access with generic type.
-  Key GetValue(size_t i) const;
   Key GetKey() const;
+  Key GetValues(const std::vector<ColumnID> &cols) const;
+  Value GetValue(ColumnID col) const;
 
   // Data type transformation.
   void SetValue(const std::string &value, size_t i);
@@ -159,6 +161,20 @@ class Record {
 
   // For logging and printing...
   friend std::ostream &operator<<(std::ostream &os, const Record &r);
+
+  // Custom comparison between records (for ordering).
+  struct Compare {
+   public:
+    explicit Compare(const std::vector<ColumnID> &cols) {
+      this->cols = std::make_shared<std::vector<ColumnID>>(cols);
+    }
+    bool operator()(const Record &l, const Record &r) const {
+      return l.GetValues(*cols) < r.GetValues(*cols);
+    }
+
+   private:
+    std::shared_ptr<std::vector<ColumnID>> cols;
+  };
 
  private:
   // Recursive helper used in SetData(...).

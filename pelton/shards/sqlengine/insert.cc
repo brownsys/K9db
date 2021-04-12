@@ -2,10 +2,9 @@
 
 #include "pelton/shards/sqlengine/insert.h"
 
-#include <list>
+#include <string>
 #include <vector>
 
-#include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -13,65 +12,66 @@ namespace shards {
 namespace sqlengine {
 namespace insert {
 
-absl::StatusOr<std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>>>
-Rewrite(const sqlast::Insert &stmt, SharderState *state) {
+absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
+                   dataflow::DataFlowState *dataflow_state,
+                   const OutputChannel &output, bool update_flows) {
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
   if (!state->Exists(table_name)) {
-    throw "Table does not exist!";
+    return absl::InvalidArgumentError("Table does not exist!");
   }
-
-  // Turn inserted values into a record and process it via corresponding flows.
-  state->AddRawRecord(table_name, stmt.GetValues(), stmt.GetColumns(), true);
 
   // Shard the insert statement so it is executable against the physical
   // sharded database.
   sqlast::Stringifier stringifier;
-  std::list<std::unique_ptr<sqlexecutor::ExecutableStatement>> result;
 
-  // Case 1: table is not in any shard.
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
+    // Case 1: table is not in any shard.
     // The insertion statement is unmodified.
     std::string insert_str = stmt.Visit(&stringifier);
-    result.push_back(std::make_unique<sqlexecutor::SimpleExecutableStatement>(
-        DEFAULT_SHARD_NAME, insert_str));
-  }
+    CHECK_STATUS(state->connection_pool().ExecuteDefault(insert_str, output));
 
-  // Case 2: table is sharded!
-  if (is_sharded) {
+  } else {  // is_sharded == true
+    // Case 2: table is sharded!
     // Duplicate the value for every shard this table has.
-    for (const ShardingInformation &sharding_info :
+    for (const ShardingInformation &info :
          state->GetShardingInformation(table_name)) {
       sqlast::Insert cloned = stmt;
-      cloned.table_name() = sharding_info.sharded_table_name;
+      cloned.table_name() = info.sharded_table_name;
       // Find the value corresponding to the shard by column.
-      std::string value;
+      std::string user_id;
       if (cloned.HasColumns()) {
-        value = cloned.RemoveValue(sharding_info.shard_by);
+        ASSIGN_OR_RETURN(user_id, cloned.RemoveValue(info.shard_by));
       } else {
-        value = cloned.RemoveValue(sharding_info.shard_by_index);
+        user_id = cloned.RemoveValue(info.shard_by_index);
       }
 
       // TODO(babman): better to do this after user insert rather than user data
       //               insert.
-      std::string shard_name = NameShard(sharding_info.shard_kind, value);
-      if (!state->ShardExists(sharding_info.shard_kind, value)) {
-        for (auto create_stmt :
-             state->CreateShard(sharding_info.shard_kind, value)) {
-          result.push_back(
-              std::make_unique<sqlexecutor::SimpleExecutableStatement>(
-                  shard_name, create_stmt));
+      if (!state->ShardExists(info.shard_kind, user_id)) {
+        for (auto create_stmt : state->CreateShard(info.shard_kind, user_id)) {
+          CHECK_STATUS(state->connection_pool().ExecuteShard(create_stmt, info,
+                                                             user_id, output));
         }
       }
 
       // Add the modified insert statement.
       std::string insert_str = cloned.Visit(&stringifier);
-      result.push_back(std::make_unique<sqlexecutor::SimpleExecutableStatement>(
-          shard_name, insert_str));
+      CHECK_STATUS(state->connection_pool().ExecuteShard(insert_str, info,
+                                                         user_id, output));
     }
   }
-  return result;
+
+  // Insert was successful, time to update dataflows.
+  // Turn inserted values into a record and process it via corresponding flows.
+  if (update_flows) {
+    std::vector<RawRecord> records;
+    records.emplace_back(table_name, stmt.GetValues(), stmt.GetColumns(), true);
+    dataflow_state->ProcessRawRecords(records);
+  }
+
+  return absl::OkStatus();
 }
 
 }  // namespace insert

@@ -1,5 +1,5 @@
 // A default ANTLR visitor that only visist explicitly supported
-// syntax and throws an error if unsupproted syntax was used.
+// syntax and returns an error if unsupproted syntax was used.
 
 #include "pelton/sqlast/transformer.h"
 

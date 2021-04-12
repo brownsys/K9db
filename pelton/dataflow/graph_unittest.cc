@@ -56,25 +56,25 @@ inline std::vector<Record> MakeLeftRecords(const SchemaRef &schema) {
   records.emplace_back(schema);
   records.emplace_back(schema);
   // Record 1.
-  records.at(0).SetUInt(0, 0);
+  records.at(0).SetUInt(0UL, 0);
   records.at(0).SetString(std::move(si1), 1);
-  records.at(0).SetInt(1, 2);
+  records.at(0).SetInt(1L, 2);
   // Record 2.
-  records.at(1).SetUInt(4, 0);
+  records.at(1).SetUInt(4UL, 0);
   records.at(1).SetString(std::move(si2), 1);
-  records.at(1).SetInt(3, 2);
+  records.at(1).SetInt(3L, 2);
   // Record 3.
-  records.at(2).SetUInt(5, 0);
+  records.at(2).SetUInt(5UL, 0);
   records.at(2).SetString(std::move(si3), 1);
-  records.at(2).SetInt(5, 2);
+  records.at(2).SetInt(5L, 2);
   // Record 4.
-  records.at(3).SetUInt(7, 0);
+  records.at(3).SetUInt(7UL, 0);
   records.at(3).SetString(std::move(si4), 1);
-  records.at(3).SetInt(1, 2);
+  records.at(3).SetInt(1L, 2);
   // Record 5.
-  records.at(4).SetUInt(2, 0);
+  records.at(4).SetUInt(2UL, 0);
   records.at(4).SetString(std::move(si5), 1);
-  records.at(4).SetInt(1, 2);
+  records.at(4).SetInt(1L, 2);
   return records;
 }
 inline std::vector<Record> MakeRightRecords(const SchemaRef &schema) {
@@ -88,13 +88,13 @@ inline std::vector<Record> MakeRightRecords(const SchemaRef &schema) {
   records.emplace_back(schema);
   records.emplace_back(schema);
   // Record 1.
-  records.at(0).SetInt(5, 0);
+  records.at(0).SetInt(5L, 0);
   records.at(0).SetString(std::move(sd1), 1);
   // Record 2.
-  records.at(1).SetInt(1, 0);
+  records.at(1).SetInt(1L, 0);
   records.at(1).SetString(std::move(sd2), 1);
   // Record 3.
-  records.at(2).SetInt(-2, 0);
+  records.at(2).SetInt(-2L, 0);
   records.at(2).SetString(std::move(sd3), 1);
   return records;
 }
@@ -115,24 +115,24 @@ inline std::vector<Record> MakeJoinRecords(const SchemaRef &schema) {
   records.emplace_back(schema);
   records.emplace_back(schema);
   // Record 1.
-  records.at(0).SetUInt(5, 0);
+  records.at(0).SetUInt(5UL, 0);
   records.at(0).SetString(std::move(si3), 1);
-  records.at(0).SetInt(5, 2);
+  records.at(0).SetInt(5L, 2);
   records.at(0).SetString(std::move(sd1), 3);
   // Record 2.
-  records.at(1).SetUInt(0, 0);
+  records.at(1).SetUInt(0UL, 0);
   records.at(1).SetString(std::move(si1), 1);
-  records.at(1).SetInt(1, 2);
+  records.at(1).SetInt(1L, 2);
   records.at(1).SetString(std::move(sd2), 3);
   // Record 3.
-  records.at(2).SetUInt(7, 0);
+  records.at(2).SetUInt(7UL, 0);
   records.at(2).SetString(std::move(si4), 1);
-  records.at(2).SetInt(1, 2);
+  records.at(2).SetInt(1L, 2);
   records.at(2).SetString(std::move(sd2_), 3);
   // Record 4.
-  records.at(3).SetUInt(2, 0);
+  records.at(3).SetUInt(2UL, 0);
   records.at(3).SetString(std::move(si5), 1);
-  records.at(3).SetInt(1, 2);
+  records.at(3).SetInt(1L, 2);
   records.at(3).SetString(std::move(sd2__), 3);
   return records;
 }
@@ -142,9 +142,9 @@ inline std::vector<Record> MakeFilterRecords(const SchemaRef &schema) {
   // Make records.
   std::vector<Record> records;
   records.emplace_back(schema);
-  records.at(0).SetUInt(7, 0);
+  records.at(0).SetUInt(7UL, 0);
   records.at(0).SetString(std::move(si4), 1);
-  records.at(0).SetInt(1, 2);
+  records.at(0).SetInt(1L, 2);
   return records;
 }
 inline std::vector<Record> MakeProjectRecords(const SchemaRef &schema) {
@@ -185,7 +185,7 @@ DataFlowGraph MakeTrivialGraph(ColumnID keycol, const SchemaRef &schema) {
   DataFlowGraph g;
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
-  auto matview = std::make_shared<MatViewOperator>(keys);
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
   EXPECT_TRUE(g.AddOutputOperator(matview, in));
@@ -202,8 +202,8 @@ DataFlowGraph MakeFilterGraph(ColumnID keycol, const SchemaRef &schema) {
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto filter = std::make_shared<FilterOperator>();
-  filter->AddOperation(5_u, 0, FilterOperator::Operation::GREATER_THAN);
-  auto matview = std::make_shared<MatViewOperator>(keys);
+  filter->AddOperation(5UL, 0, FilterOperator::Operation::GREATER_THAN);
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
   EXPECT_TRUE(g.AddNode(filter, in));
@@ -222,7 +222,7 @@ DataFlowGraph MakeUnionGraph(ColumnID keycol, const SchemaRef &schema) {
   auto in1 = std::make_shared<InputOperator>("test-table1", schema);
   auto in2 = std::make_shared<InputOperator>("test-table2", schema);
   auto union_ = std::make_shared<UnionOperator>();
-  auto matview = std::make_shared<MatViewOperator>(keys);
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in1));
   EXPECT_TRUE(g.AddInputNode(in2));
@@ -245,7 +245,7 @@ DataFlowGraph MakeEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
   auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
   auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
   auto join = std::make_shared<EquiJoinOperator>(lk, rk);
-  auto matview = std::make_shared<MatViewOperator>(keys);
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in1));
   EXPECT_TRUE(g.AddInputNode(in2));
@@ -266,7 +266,7 @@ DataFlowGraph MakeProjectGraph(ColumnID keycol, const SchemaRef &schema) {
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto project = std::make_shared<ProjectOperator>(column_ids);
-  auto matview = std::make_shared<MatViewOperator>(keys);
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
   EXPECT_TRUE(g.AddNode(project, in));
@@ -288,7 +288,7 @@ DataFlowGraph MakeProjectOnFilterGraph(ColumnID keycol,
   auto filter = std::make_shared<FilterOperator>();
   filter->AddOperation(5_u, 0, FilterOperator::Operation::GREATER_THAN);
   auto project = std::make_shared<ProjectOperator>(column_ids);
-  auto matview = std::make_shared<MatViewOperator>(keys);
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
   EXPECT_TRUE(g.AddNode(filter, in));
@@ -312,7 +312,7 @@ DataFlowGraph MakeProjectOnEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
   auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
   auto join = std::make_shared<EquiJoinOperator>(lk, rk);
   auto project = std::make_shared<ProjectOperator>(column_ids);
-  auto matview = std::make_shared<MatViewOperator>(keys);
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in1));
   EXPECT_TRUE(g.AddInputNode(in2));
@@ -331,9 +331,7 @@ inline void MatViewContentsEquals(std::shared_ptr<MatViewOperator> matview,
                                   const std::vector<Record> &records) {
   EXPECT_EQ(matview->count(), records.size());
   for (const Record &record : records) {
-    std::vector<Record> singleton;
-    singleton.push_back(record.Copy());
-    EXPECT_EQ(singleton, matview->Lookup(record.GetKey()));
+    EXPECT_EQ(record, *matview->Lookup(record.GetKey()).begin());
   }
 }
 
