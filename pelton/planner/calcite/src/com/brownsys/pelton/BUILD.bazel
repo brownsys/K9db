@@ -12,7 +12,7 @@ java_binary(
     ],
     data = select({
         "@platforms//os:linux": ["//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:libjniDataFlowGraphLibrary_so"],
-        "@platforms//os:macos": ["//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:libjniDataFlowGraphLibrary_dylib"],
+        "@platforms//os:macos": ["//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:libjniDataFlowGraphLibrary_so"],
     }),
     main_class = "com.brownsys.pelton.QueryPlanner",
     visibility = ["//pelton/planner:__subpackages__"],

@@ -46,4 +46,7 @@ cc_test(
         "@gtest",
         "@gtest//:gtest_main",
     ],
+    target_compatible_with = [
+	"@platforms//os:linux",
+    ]
 )
