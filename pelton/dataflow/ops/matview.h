@@ -20,9 +20,9 @@ class MatViewOperator : public Operator {
  public:
   virtual size_t count() const = 0;
   virtual bool Contains(const Key &key) const = 0;
-  virtual RecordIterable Lookup(const Key &key, int limit = -1,
-                                size_t offset = 0) const = 0;
-  virtual KeyIterable Keys() const = 0;
+  virtual const_RecordIterable Lookup(const Key &key, int limit = -1,
+                                      size_t offset = 0) const = 0;
+  virtual const_KeyIterable Keys() const = 0;
 
  protected:
   // We do not know if we are ordered or unordered, this type is revealed
@@ -71,14 +71,14 @@ class MatViewOperatorT : public MatViewOperator {
     return this->contents_.Contains(key);
   }
 
-  RecordIterable Lookup(const Key &key, int limit = -1,
-                        size_t offset = 0) const override {
+  const_RecordIterable Lookup(const Key &key, int limit = -1,
+                              size_t offset = 0) const override {
     limit = limit == -1 ? this->limit_ : limit;
     offset = offset == 0 ? this->offset_ : offset;
     return this->contents_.Lookup(key, limit, offset);
   }
 
-  KeyIterable Keys() const override { return this->contents_.Keys(); }
+  const_KeyIterable Keys() const override { return this->contents_.Keys(); }
 
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,

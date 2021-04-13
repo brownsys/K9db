@@ -1,7 +1,8 @@
+#include "pelton/dataflow/ops/benchmark-utils.h"
+
 #include <string>
 #include <vector>
 
-#include "pelton/dataflow/ops/benchmark-utils.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"

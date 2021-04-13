@@ -22,9 +22,9 @@ cc_library(
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
+        "@gbenchmark//:benchmark",
         "@glog",
         "@gtest//:gtest_prod",
-        "@gbenchmark//:benchmark",
     ],
 )
 
@@ -159,6 +159,26 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "aggregate",
+    srcs = [
+        "aggregate.cc",
+    ],
+    hdrs = [
+        "aggregate.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":grouped_data",
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "@glog",
+        "@gtest//:gtest_prod",
+    ],
+)
+
 cc_test(
     name = "equijoin-test",
     srcs = [
@@ -237,23 +257,44 @@ cc_test(
 )
 
 cc_test(
+    name = "aggregate-test",
+    srcs = [
+        "aggregate_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":aggregate",
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "benchmarks",
+    srcs = [
+        "benchmark-utils.cc",
+        "benchmark-utils.h",
+        "equijoin_benchmark.cc",
+        "filter_benchmark.cc",
+        "identity_benchmark.cc",
+        "matview_benchmark.cc",
+    ],
     tags = ["benchmark"],
     deps = [
-        ":filter",
         ":equijoin",
+        ":filter",
         ":identity",
         ":matview",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
-        "@gbenchmark//:benchmark_main"
+        "@gbenchmark//:benchmark_main",
     ],
-    srcs = ["benchmark-utils.h",
-            "benchmark-utils.cc",
-            "equijoin_benchmark.cc",
-            "filter_benchmark.cc",
-            "identity_benchmark.cc",
-            "matview_benchmark.cc"],
 )
