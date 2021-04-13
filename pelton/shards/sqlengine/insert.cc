@@ -65,11 +65,9 @@ absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
   // Insert was successful, time to update dataflows.
   // Turn inserted values into a record and process it via corresponding flows.
   if (update_flows) {
-    std::vector<RawRecord> records;
-    // TODO(babman): fix this.
-    // records.emplace_back(table_name, stmt.GetValues(), stmt.GetColumns(),
-    // true);
-    dataflow_state->ProcessRawRecords(records);
+    std::vector<dataflow::Record> records;
+    records.push_back(dataflow_state->CreateRecord(stmt));
+    dataflow_state->ProcessRecords(stmt.table_name(), records);
   }
 
   perf::End("Insert");

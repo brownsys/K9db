@@ -3,6 +3,7 @@
 #include "pelton/shards/sqlengine/delete.h"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/strings/str_cat.h"
@@ -19,17 +20,20 @@ namespace delete_ {
 absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
                    dataflow::DataFlowState *dataflow_state, bool update_flows) {
   perf::Start("Delete");
+  const std::string &table_name = stmt.table_name();
+
   // Get the rows that are going to be deleted prior to deletion to use them
   // to update the dataflows.
-  std::vector<RawRecord> records;
+  std::vector<dataflow::Record> records;
   if (update_flows) {
-    CHECK_STATUS(select::Query(&records, stmt.SelectDomain(), state,
-                               dataflow_state, false));
+    MOVE_OR_RETURN(SqlResult result,
+                   select::Shard(stmt.SelectDomain(), state, dataflow_state));
+    records =
+        dataflow_state->CreateRecords(table_name, std::move(result), false);
   }
 
   // Must transform the delete statement into one that is compatible with
   // the sharded schema.
-  const std::string &table_name = stmt.table_name();
   bool is_sharded = state->IsSharded(table_name);
   bool is_pii = state->IsPII(table_name);
   sqlast::Stringifier stringifier;
@@ -57,7 +61,8 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
     state->connection_pool().ExecuteDefault(delete_str);
 
     // TODO(babman): Update dataflow after user has been deleted.
-    return absl::UnimplementedError("Dataflow not updated after a user delete");
+    // return absl::UnimplementedError("Dataflow not updated after a user
+    // delete");
 
   } else if (!is_sharded && !is_pii) {
     // Case 2: Table does not have PII and is not sharded!
@@ -99,7 +104,7 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
 
   // Delete was successful, time to update dataflows.
   if (update_flows) {
-    dataflow_state->ProcessRawRecords(records);
+    dataflow_state->ProcessRecords(table_name, records);
   }
 
   perf::End("Delete");

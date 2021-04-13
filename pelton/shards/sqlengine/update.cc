@@ -2,6 +2,7 @@
 #include "pelton/shards/sqlengine/update.h"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "pelton/shards/sqlengine/delete.h"
@@ -30,29 +31,26 @@ int IndexOfColumn(const std::string &col_name,
 
 // Apply the update statement to every record in records, using table_schema
 // to resolve order of columns.
-absl::Status UpdateRawRecords(std::vector<RawRecord> *records,
-                              const sqlast::Update &stmt,
-                              const sqlast::CreateTable &table_schema) {
+absl::Status UpdateRecords(std::vector<dataflow::Record> *records,
+                           const sqlast::Update &stmt,
+                           const sqlast::CreateTable &table_schema) {
   // What is being updated.
-  const std::string &table_name = stmt.table_name();
   const std::vector<std::string> &updated_cols = stmt.GetColumns();
   const std::vector<std::string> &updated_vals = stmt.GetValues();
 
   // Loop over records and apply update.
   size_t size = records->size();
   for (size_t i = 0; i < size; i++) {
-    const RawRecord &record = records->at(i);
-    std::vector<std::string> updated_record = record.values;
+    dataflow::Record record = records->at(i).Copy();
     for (size_t c = 0; c < updated_cols.size(); c++) {
       const std::string &col_name = updated_cols.at(c);
       int val_index = IndexOfColumn(col_name, table_schema);
       if (val_index < 0) {
         return absl::InvalidArgumentError("Unrecognized column " + col_name);
       }
-      updated_record.at(val_index) = updated_vals.at(c);
+      record.SetValue(updated_vals.at(c), val_index);
     }
-    // TODO(babman): fix this.
-    records->emplace_back(table_name, /*updated_record, record.columns,*/ true);
+    records->push_back(std::move(record));
   }
 
   return absl::OkStatus();
@@ -71,16 +69,16 @@ bool ModifiesShardBy(const sqlast::Update &stmt, SharderState *state) {
 
 // Creates a corresponding Insert statement for the given record, using given
 // table_schema to resolve types of values.
-sqlast::Insert InsertRaw(const RawRecord &record,
-                         const sqlast::CreateTable &table_schema) {
-  sqlast::Insert stmt{record.table_name};
-  for (size_t i = 0; i < record.values.size(); i++) {
+sqlast::Insert InsertRecord(const dataflow::Record &record,
+                            const sqlast::CreateTable &table_schema) {
+  sqlast::Insert stmt{table_schema.table_name()};
+  for (size_t i = 0; i < table_schema.GetColumns().size(); i++) {
     sqlast::ColumnDefinition::Type type =
         table_schema.GetColumns().at(i).column_type();
     switch (type) {
       case sqlast::ColumnDefinition::Type::UINT:
       case sqlast::ColumnDefinition::Type::INT:
-        stmt.AddValue(record.values.at(i));
+        stmt.AddValue(record.GetValueString(i));
         break;
       case sqlast::ColumnDefinition::Type::TEXT:
       case sqlast::ColumnDefinition::Type::DATETIME:
@@ -88,10 +86,10 @@ sqlast::Insert InsertRaw(const RawRecord &record,
         // Values acquired from selecting from the database do not have an
         // enclosing ', while those we get from the ANTLR-parsed queries do
         // (e.g. the value set by an UPDATE statement).
-        if (record.values.at(i)[0] != '\'') {
-          stmt.AddValue("\'" + record.values.at(i) + "\'");
+        if (record.GetString(i)[0] != '\'') {
+          stmt.AddValue("\'" + record.GetString(i) + "\'");
         } else {
-          stmt.AddValue(record.values.at(i));
+          stmt.AddValue(record.GetString(i));
         }
         break;
     }
@@ -109,11 +107,12 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
 
   // Get the rows that are going to be deleted prior to deletion to use them
   // to update the dataflows.
-  std::vector<RawRecord> records;
-  CHECK_STATUS(select::Query(&records, stmt.SelectDomain(), state,
-                             dataflow_state, false));
+  MOVE_OR_RETURN(SqlResult result,
+                 select::Shard(stmt.SelectDomain(), state, dataflow_state));
+  std::vector<dataflow::Record> records =
+      dataflow_state->CreateRecords(table_name, std::move(result), false);
   size_t old_records_size = records.size();
-  CHECK_STATUS(UpdateRawRecords(&records, stmt, state->GetSchema(table_name)));
+  CHECK_STATUS(UpdateRecords(&records, stmt, state->GetSchema(table_name)));
 
   sqlast::Stringifier stringifier;
   bool is_sharded = state->IsSharded(table_name);
@@ -134,7 +133,7 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
       // Insert updated records.
       for (size_t i = old_records_size; i < records.size(); i++) {
         sqlast::Insert insert_stmt =
-            InsertRaw(records.at(i), state->GetSchema(table_name));
+            InsertRecord(records.at(i), state->GetSchema(table_name));
         CHECK_STATUS(insert::Shard(insert_stmt, state, dataflow_state, false));
       }
 
@@ -172,7 +171,7 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
   }
 
   // Delete was successful, time to update dataflows.
-  dataflow_state->ProcessRawRecords(records);
+  dataflow_state->ProcessRecords(table_name, records);
 
   perf::End("Update");
   return absl::OkStatus();

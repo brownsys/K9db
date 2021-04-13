@@ -2,10 +2,8 @@
 #include "pelton/shards/sqlengine/select.h"
 
 #include <string>
-#include <unordered_set>
 
 #include "pelton/util/perf.h"
-#include "pelton/util/status.h"
 
 namespace pelton {
 namespace shards {
@@ -88,20 +86,6 @@ absl::StatusOr<SqlResult> Shard(const sqlast::Select &stmt, SharderState *state,
 
   perf::End("Select");
   return result;
-}
-
-absl::Status Query(std::vector<RawRecord> *output, const sqlast::Select &stmt,
-                   SharderState *state, dataflow::DataFlowState *dataflow_state,
-                   bool positive) {
-  MOVE_OR_RETURN(SqlResult result, Shard(stmt, state, dataflow_state));
-  /*
-  // TODO(babman): transform query result to RawRecord with minimal copies.
-  while (result.hasData()) {
-    output->emplace_back(stmt.table_name(), result, result.fetchOne(),
-  positive);
-  }
-  */
-  return absl::OkStatus();
 }
 
 }  // namespace select

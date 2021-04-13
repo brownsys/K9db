@@ -3,8 +3,6 @@
 #ifndef PELTON_SHARDS_SQLENGINE_SELECT_H_
 #define PELTON_SHARDS_SQLENGINE_SELECT_H_
 
-#include <vector>
-
 #include "absl/status/statusor.h"
 #include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
@@ -19,10 +17,6 @@ namespace select {
 
 absl::StatusOr<SqlResult> Shard(const sqlast::Select &stmt, SharderState *state,
                                 dataflow::DataFlowState *dataflow_state);
-
-absl::Status Query(std::vector<RawRecord> *output, const sqlast::Select &stmt,
-                   SharderState *state, dataflow::DataFlowState *dataflow_state,
-                   bool positive);
 
 }  // namespace select
 }  // namespace sqlengine

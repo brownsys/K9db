@@ -88,7 +88,7 @@ jobject Java_edu_brown_pelton_PeltonJNI_ExecuteQuery(JNIEnv *env, jobject this_,
       size_t col_count = sqlresult.getColumnCount();
       // First element in result contains column names / headers.
       jobjectArray column_names =
-            env->NewObjectArray(col_count, string_class, NULL);
+          env->NewObjectArray(col_count, string_class, NULL);
       for (size_t i = 0; i < col_count; i++) {
         jstring column_name =
             env->NewStringUTF(sqlresult.getColumn(i).getColumnName().c_str());

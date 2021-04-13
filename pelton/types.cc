@@ -12,62 +12,77 @@ Column::Column(mysqlx::Type type, const std::string &name)
 
 mysqlx::Type Column::getType() const { return this->type_; }
 
-const mysqlx::string &Column::getColumnName() const { return this->name_; }
+const std::string &Column::getColumnName() const { return this->name_; }
 
 // Row.
-Row::Row(mysqlx::Row &&row, int index, const mysqlx::Value &value)
-    : row_(std::move(row)), augmented_index_(index), augmented_value_(value) {}
+Row::Row(mysqlx::Row &&row, const std::vector<size_t> &aug_indices,
+         const std::vector<mysqlx::Value> &aug_values)
+    : row_(std::move(row)),
+      aug_indices_(aug_indices),
+      aug_values_(aug_values) {}
 
-const mysqlx::Value &Row::get(size_t pos) {
-  if (this->augmented_index_ < 0 ||
-      pos < static_cast<size_t>(this->augmented_index_)) {
-    return this->row_.get(pos);
-  } else if (pos > static_cast<size_t>(this->augmented_index_)) {
-    return this->row_.get(pos - 1);
-  } else {
-    return this->augmented_value_;
-  }
-}
+const mysqlx::Value &Row::get(size_t pos) const { return (*this)[pos]; }
 
-const mysqlx::Value &Row::operator[](size_t pos) const {
-  if (this->augmented_index_ < 0 ||
-      pos < static_cast<size_t>(this->augmented_index_)) {
-    return this->row_[pos];
-  } else if (pos > static_cast<size_t>(this->augmented_index_)) {
-    return this->row_[pos - 1];
-  } else {
-    return this->augmented_value_;
+const mysqlx::Value &Row::operator[](size_t i) const {
+  size_t index = i;
+  for (size_t c = 0; c < this->aug_indices_.size(); c++) {
+    size_t a = this->aug_indices_.at(c);
+    if (a == i) {
+      return this->aug_values_.at(c);
+    }
+    if (i < a) {
+      break;
+    }
+    if (i > a) {
+      index--;
+    }
   }
+
+  return this->row_[index];
 }
 
 bool Row::isNull() const {
-  return this->augmented_index_ == -1 && this->row_.isNull();
+  return this->aug_values_.size() == 0 && this->row_.isNull();
 }
 
 // SqlResult.
-SqlResult::SqlResult()
-    : result_index_(0), count_(0), augmented_index_(-1), augmented_column_() {}
-
-SqlResult::SqlResult(int augmented_index, Column augmented_column)
+SqlResult::SqlResult(std::vector<size_t> &&aug_indices,
+                     std::vector<Column> &&aug_cols)
     : result_index_(0),
       count_(0),
-      augmented_index_(augmented_index),
-      augmented_column_(augmented_column) {}
+      aug_indices_(std::move(aug_indices)),
+      aug_columns_(std::move(aug_cols)) {}
 
 void SqlResult::AddResult(mysqlx::SqlResult &&result) {
   this->count_ += result.count();
   this->results_.push_back(std::move(result));
-  this->augmented_values_.emplace_back(nullptr);
+  this->aug_values_.push_back({});
 }
 
-bool SqlResult::hasData() {
-  while (this->result_index_ < this->results_.size()) {
-    if (this->results_.at(this->result_index_).hasData()) {
-      return true;
-    }
-    this->result_index_++;
+void SqlResult::Consume(SqlResult *other) {
+  this->count_ += other->count_;
+  if (this->aug_indices_.size() == 0 && other->aug_indices_.size() > 0) {
+    this->aug_indices_ = std::move(other->aug_indices_);
+    this->aug_columns_ = std::move(other->aug_columns_);
   }
-  return false;
+  for (size_t i = 0; i < other->results_.size(); i++) {
+    this->results_.push_back(std::move(other->results_.at(i)));
+  }
+  for (size_t i = 0; i < other->aug_values_.size(); i++) {
+    this->aug_values_.push_back(std::move(other->aug_values_.at(i)));
+  }
+}
+
+bool SqlResult::hasData() const {
+  if (this->results_.size() > 0) {
+    for (size_t i = this->result_index_; i < this->results_.size(); i++) {
+      if (this->results_.at(i).hasData()) {
+        return true;
+      }
+    }
+    return false;
+  }
+  return this->aug_columns_.size() > 0;
 }
 
 uint64_t SqlResult::getAutoIncrementValue() {
@@ -75,31 +90,45 @@ uint64_t SqlResult::getAutoIncrementValue() {
 }
 
 size_t SqlResult::getColumnCount() const {
-  if (this->results_.size() == 0) {
-    return 0;
+  if (this->results_.size() > 0) {
+    return this->results_.at(0).getColumnCount() + this->aug_columns_.size();
   }
-  size_t augmented = this->augmented_index_ > 1 ? 1 : 0;
-  return this->results_.at(0).getColumnCount() + augmented;
+
+  return this->aug_columns_.size();
 }
 
 Column SqlResult::getColumn(size_t i) const {
-  if (this->augmented_index_ < 0 ||
-      i < static_cast<size_t>(this->augmented_index_)) {
-    return Column(this->results_.at(0).getColumn(i));
-  } else if (i > static_cast<size_t>(this->augmented_index_)) {
-    return Column(this->results_.at(0).getColumn(i - 1));
-  } else {
-    return this->augmented_column_;
+  size_t index = i;
+  for (size_t c = 0; c < this->aug_indices_.size(); c++) {
+    size_t a = this->aug_indices_.at(c);
+    if (a == i) {
+      return this->aug_columns_.at(c);
+    }
+    if (i < a) {
+      break;
+    }
+    if (i > a) {
+      index--;
+    }
   }
+
+  return Column(this->results_.at(0).getColumn(index));
 }
 
 Row SqlResult::fetchOne() {
-  while (!this->results_.at(this->result_index_).hasData()) {
-    this->result_index_++;
+  this->count_--;
+  if (this->results_.size() > 0) {
+    // MySql result with potential augmentation.
+    while (!this->results_.at(this->result_index_).hasData() ||
+           this->results_.at(this->result_index_).count() == 0) {
+      this->result_index_++;
+    }
+    return Row(results_.at(this->result_index_).fetchOne(), this->aug_indices_,
+               this->aug_values_.at(this->result_index_));
+  } else {
+    // No MySql result, only augmented things!
+    return Row(this->aug_indices_, this->aug_values_.at(this->result_index_++));
   }
-  return Row(results_.at(this->result_index_).fetchOne(),
-             this->augmented_index_,
-             this->augmented_values_.at(this->result_index_));
 }
 
 size_t SqlResult::count() const { return this->count_; }

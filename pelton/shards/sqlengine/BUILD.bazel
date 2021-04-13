@@ -87,7 +87,6 @@ cc_library(
         "//pelton/shards:types",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
-        "//pelton/util:status",
         "@absl//absl/status",
     ],
 )

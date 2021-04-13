@@ -6,8 +6,10 @@
 #include "pelton/dataflow/state.h"
 
 #include <fstream>
+#include <memory>
 #include <utility>
 
+#include "glog/logging.h"
 #include "pelton/util/fs.h"
 
 #define STATE_FILE_NAME ".dataflow.state"
@@ -56,22 +58,62 @@ bool DataFlowState::HasFlowsFor(const TableName &table_name) const {
   return this->flows_per_input_table_.count(table_name) == 1;
 }
 
-// Process raw records from sharder into flows.
-bool DataFlowState::ProcessRawRecords(
-    const std::vector<shards::RawRecord> &raw_records) {
-  // Construct schema-full records.
-  std::unordered_map<std::string, std::vector<Record>> records;
-  for (shards::RawRecord raw : raw_records) {
-    records[raw.table_name].push_back(this->CreateRecord(raw));
-  }
-
-  // Process them via flow.
-  for (const auto &[table_name, rs] : records) {
-    if (!this->ProcessRecords(table_name, rs)) {
-      return false;
+// Process raw data from sharder and use it to update flows.
+std::vector<Record> DataFlowState::CreateRecords(const std::string &table_name,
+                                                 SqlResult &&sqlresult,
+                                                 bool positive) const {
+  std::vector<Record> records;
+  SchemaRef schema = SchemaRef(this->schema_.at(table_name));
+  // Process each row in result set.
+  while (sqlresult.hasData()) {
+    Row row = sqlresult.fetchOne();
+    records.emplace_back(schema, positive);
+    for (size_t i = 0; i < schema.size(); i++) {
+      const mysqlx::Value &val = row.get(i);
+      // TODO(babman): it should be the case that augmented values have the
+      //               expected type directly...
+      if (val.getType() == mysqlx::Value::STRING) {
+        records.back().SetValue(val.get<std::string>(), i);
+        continue;
+      }
+      switch (schema.TypeOf(i)) {
+        case sqlast::ColumnDefinition::Type::TEXT:
+          records.back().SetString(std::make_unique<std::string>(val), i);
+          break;
+        case sqlast::ColumnDefinition::Type::INT:
+          records.back().SetInt(val, i);
+          break;
+        case sqlast::ColumnDefinition::Type::UINT:
+          records.back().SetUInt(val, i);
+          break;
+        default:
+          LOG(FATAL) << "Unsupported type in CreateRecord " << schema.TypeOf(i);
+      }
     }
   }
-  return true;
+
+  return records;
+}
+
+Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
+  // Create an empty positive record with appropriate schema.
+  const std::string &table_name = insert_stmt.table_name();
+  SchemaRef schema = SchemaRef(this->schema_.at(table_name));
+  Record record{schema, true};
+
+  // Fill in record with data.
+  bool has_cols = insert_stmt.HasColumns();
+  const std::vector<std::string> &cols = insert_stmt.GetColumns();
+  const std::vector<std::string> &vals = insert_stmt.GetValues();
+  for (size_t i = 0; i < vals.size(); i++) {
+    size_t schema_index = i;
+    if (has_cols) {
+      schema_index = schema.IndexOf(cols.at(i));
+    }
+    record.SetValue(vals.at(i), schema_index);
+  }
+
+  return record;
 }
 
 bool DataFlowState::ProcessRecords(const TableName &table_name,
@@ -85,20 +127,6 @@ bool DataFlowState::ProcessRecords(const TableName &table_name,
     }
   }
   return true;
-}
-
-// Creating and processing records from raw data.
-Record DataFlowState::CreateRecord(const shards::RawRecord &raw_record) const {
-  SchemaRef schema = SchemaRef(this->schema_.at(raw_record.table_name));
-  Record record{schema, raw_record.positive};
-  for (size_t i = 0; i < raw_record.values.size(); i++) {
-    size_t schema_index = i;
-    if (raw_record.columns.size() > 0) {
-      schema_index = schema.IndexOf(raw_record.columns.at(i));
-    }
-    record.SetValue(raw_record.values.at(i), schema_index);
-  }
-  return record;
 }
 
 // Load state from its durable file (if exists).

@@ -5,6 +5,7 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "pelton/dataflow/record.h"
@@ -20,28 +21,26 @@ namespace view {
 
 namespace {
 
-void CopyColumns(const std::vector<std::string> cols, char **out) {
-  for (size_t i = 0; i < cols.size(); i++) {
-    const std::string &str = cols.at(i);
-    out[i] = new char[str.size() + 1];
-    // NOLINTNEXTLINE
-    strcpy(out[i], str.c_str());
-  }
-}
-
-void CopyValues(const dataflow::Record &record, char **out) {
+absl::Status AddRecordToResult(SqlResult *result,
+                               const dataflow::Record &record) {
+  std::vector<mysqlx::Value> values;
   for (size_t i = 0; i < record.schema().size(); i++) {
-    std::string str = record.GetValueString(i);
-    out[i] = new char[str.size() + 1];
-    // NOLINTNEXTLINE
-    strcpy(out[i], str.c_str());
+    switch (record.schema().TypeOf(i)) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        values.emplace_back(record.GetUInt(i));
+        break;
+      case sqlast::ColumnDefinition::Type::INT:
+        values.emplace_back(record.GetInt(i));
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+        values.emplace_back(record.GetString(i));
+        break;
+      default:
+        return absl::InvalidArgumentError("Unknown column type in SelectView");
+    }
   }
-}
-
-void DeleteValues(size_t n, char **vs) {
-  for (size_t i = 0; i < n; i++) {
-    delete[] vs[i];
-  }
+  result->AddAugResult(std::move(values));
+  return absl::OkStatus();
 }
 
 absl::StatusOr<std::string> GetColumnName(const sqlast::BinaryExpression *exp) {
@@ -87,8 +86,6 @@ absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
 absl::StatusOr<SqlResult> SelectView(const sqlast::Select &stmt,
                                      SharderState *state,
                                      dataflow::DataFlowState *dataflow_state) {
-  return SqlResult();
-  /*
   // TODO(babman): fix this.
   perf::Start("SelectView");
 
@@ -105,12 +102,27 @@ absl::StatusOr<SqlResult> SelectView(const sqlast::Select &stmt,
   auto matview = flow.outputs().at(0);
   const dataflow::SchemaRef &schema = matview->output_schema();
 
-  // Allocate memory for data to read into.
-  std::vector<std::string> cols = schema.column_names();
-  size_t colnum = cols.size();
-  char **colnames = new char *[colnum];
-  char **colvals = new char *[colnum];
-  CopyColumns(cols, colnames);
+  // Store result column names and types.
+  std::vector<size_t> indices;
+  std::vector<Column> cols;
+  for (size_t i = 0; i < schema.size(); i++) {
+    const std::string &col_name = schema.NameOf(i);
+    indices.push_back(i);
+    switch (schema.TypeOf(i)) {
+      case sqlast::ColumnDefinition::Type::UINT:
+      case sqlast::ColumnDefinition::Type::INT:
+        cols.emplace_back(mysqlx::Type::INT, col_name);
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+        cols.emplace_back(mysqlx::Type::STRING, col_name);
+        break;
+      default:
+        return absl::InvalidArgumentError("Unknown column type in SelectView");
+    }
+  }
+
+  // The result to return.
+  SqlResult result{std::move(indices), std::move(cols)};
 
   // Check parameters.
   size_t offset = stmt.offset();
@@ -141,9 +153,7 @@ absl::StatusOr<SqlResult> SelectView(const sqlast::Select &stmt,
         for (const auto &key : matview->Keys()) {
           for (const auto &record :
                matview->LookupGreater(key, cmp, limit, offset)) {
-            CopyValues(record, colvals);
-            output.callback(output.context, colnum, colvals, colnames);
-            DeleteValues(colnum, colvals);
+            CHECK_STATUS(AddRecordToResult(&result, record));
           }
         }
         break;
@@ -169,9 +179,7 @@ absl::StatusOr<SqlResult> SelectView(const sqlast::Select &stmt,
 
         // Read records attached to key.
         for (const auto &record : matview->Lookup(key, limit, offset)) {
-          CopyValues(record, colvals);
-          output.callback(output.context, colnum, colvals, colnames);
-          DeleteValues(colnum, colvals);
+          CHECK_STATUS(AddRecordToResult(&result, record));
         }
         break;
       }
@@ -183,21 +191,13 @@ absl::StatusOr<SqlResult> SelectView(const sqlast::Select &stmt,
     // No where condition: we are reading everything (keys and records).
     for (const auto &key : matview->Keys()) {
       for (const auto &record : matview->Lookup(key, limit, offset)) {
-        CopyValues(record, colvals);
-        output.callback(output.context, colnum, colvals, colnames);
-        DeleteValues(colnum, colvals);
+        CHECK_STATUS(AddRecordToResult(&result, record));
       }
     }
   }
 
-  DeleteValues(colnum, colnames);
-  delete[] colnames;
-  delete[] colvals;
-
   perf::End("SelectView");
-
-  return absl::OkStatus();
-  */
+  return result;
 }
 
 }  // namespace view

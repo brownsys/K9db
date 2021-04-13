@@ -2,7 +2,7 @@
 #include "pelton/shards/pool.h"
 
 #include <cstring>
-#include <sstream>
+#include <utility>
 
 #include "glog/logging.h"
 #include "mysql-cppconn-8/mysqlx/xdevapi.h"
@@ -67,22 +67,28 @@ SqlResult ConnectionPool::ExecuteShard(const std::string &sql,
   this->OpenShard(info.shard_kind, user_id);
   LOG(INFO) << "Statement:" << sql;
 
-  int augmenting_index = static_cast<int>(info.shard_by_index);
-  Column augmenting_column{mysqlx::Type::STRING, info.shard_by};
-  SqlResult result{augmenting_index, augmenting_column};
-  result.AddResult(SESSION->sql(sql).execute(), mysqlx::Value(user_id));
+  mysqlx::SqlResult result = SESSION->sql(sql).execute();
+  if (result.hasData()) {
+    SqlResult wrapper{info.shard_by_index,
+                      Column{mysqlx::Type::STRING, info.shard_by}};
+    wrapper.AddResult(std::move(result), mysqlx::Value(user_id));
 
-  perf::End("ExecuteShard");
-  return result;
+    perf::End("ExecuteShard");
+    return wrapper;
+  } else {
+    SqlResult wrapper;
+    wrapper.AddResult(std::move(result));
+
+    perf::End("ExecuteShard");
+    return wrapper;
+  }
 }
 
 SqlResult ConnectionPool::ExecuteShards(
     const std::string &sql, const ShardingInformation &info,
     const std::unordered_set<UserId> &user_ids) {
   // This result set is a proxy that allows access to results from all shards.
-  int augmenting_index = static_cast<int>(info.shard_by_index);
-  Column augmenting_column{mysqlx::Type::STRING, info.shard_by};
-  SqlResult result{augmenting_index, augmenting_column};
+  SqlResult result;
 
   for (const UserId &user_id : user_ids) {
     SqlResult inner_result = this->ExecuteShard(sql, info, user_id);

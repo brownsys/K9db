@@ -23,64 +23,80 @@ class Column {
   Column(mysqlx::Type type, const std::string &name);
 
   mysqlx::Type getType() const;
-  const mysqlx::string &getColumnName() const;
+  const std::string &getColumnName() const;
 
  private:
   // https://github.com/mysql/mysql-connector-cpp/blob/857a8d63d817a17160ca6062ceef6e9d6d0dd128/include/mysqlx/common_constants.h#L204
   mysqlx::Type type_;
-  mysqlx::string name_;
+  std::string name_;
 };
 
 // Our version of a single row in a query result.
 // https://dev.mysql.com/doc/dev/connector-cpp/8.0/classmysqlx_1_1abi2_1_1r0_1_1_row.html
 class Row {
  public:
-  Row(mysqlx::Row &&row, int index, const mysqlx::Value &value);
+  Row(const std::vector<size_t> &aug_indices,
+      const std::vector<mysqlx::Value> &aug_values)
+      : Row({}, aug_indices, aug_values) {}
 
-  const mysqlx::Value &get(size_t pos);
+  Row(mysqlx::Row &&row, const std::vector<size_t> &aug_indices,
+      const std::vector<mysqlx::Value> &aug_values);
+
+  const mysqlx::Value &get(size_t pos) const;
   const mysqlx::Value &operator[](size_t pos) const;
   bool isNull() const;
 
  private:
   mysqlx::Row row_;
-  int augmented_index_;
-  const mysqlx::Value &augmented_value_;
+  const std::vector<size_t> &aug_indices_;
+  const std::vector<mysqlx::Value> &aug_values_;
 };
 
 // Our version of Mysql's mysqlx::SqlResult.
 // https://dev.mysql.com/doc/dev/connector-cpp/8.0/class_sql_result.html
 class SqlResult {
  public:
-  SqlResult();
-  SqlResult(int augmented_index, Column augmented_column);
+  SqlResult() : SqlResult(std::vector<size_t>{}, {}) {}
 
-  // Add result and no augmented value.
+  SqlResult(size_t aug_index, Column aug_column)
+      : SqlResult(std::vector<size_t>{aug_index}, {aug_column}) {}
+
+  // Sorted by indices.
+  SqlResult(std::vector<size_t> &&aug_indices, std::vector<Column> &&aug_cols);
+
+  // Add a wrapped mysql result with no augmented values.
   void AddResult(mysqlx::SqlResult &&result);
 
-  // Add result with augmented value.
-  template <typename V>
-  void AddResult(mysqlx::SqlResult &&result, const V &value) {
-    this->count_ += result.count();
-    this->results_.push_back(std::move(result));
-    this->augmented_values_.emplace_back(value);
+  // Add augmented value(s) with no wrapped mysql result.
+  void AddAugResult(const mysqlx::Value &value) { this->AddAugResult({value}); }
+  void AddAugResult(mysqlx::Value &&value) {
+    this->AddAugResult({std::move(value)});
   }
-  template <typename V>
-  void AddResult(mysqlx::SqlResult &&result, V &&value) {
-    this->count_ += result.count();
-    this->results_.push_back(std::move(result));
-    this->augmented_values_.emplace_back(std::move(value));
+  void AddAugResult(std::vector<mysqlx::Value> &&value) {
+    this->count_++;
+    this->aug_values_.push_back(std::move(value));
   }
 
-  void Consume(SqlResult *other) {
-    for (size_t i = 0; i < other->results_.size(); i++) {
-      this->results_.push_back(std::move(other->results_.at(i)));
-      this->augmented_values_.push_back(
-          std::move(other->augmented_values_.at(i)));
-    }
+  // Add a wrapped mysql result with augmented value(s).
+  void AddResult(mysqlx::SqlResult &&result, const mysqlx::Value &value) {
+    this->AddResult(std::move(result), std::vector<mysqlx::Value>{value});
   }
+  void AddResult(mysqlx::SqlResult &&result, mysqlx::Value &&value) {
+    this->AddResult(std::move(result),
+                    std::vector<mysqlx::Value>{std::move(value)});
+  }
+  void AddResult(mysqlx::SqlResult &&result,
+                 std::vector<mysqlx::Value> &&values) {
+    this->count_ += result.count();
+    this->results_.push_back(std::move(result));
+    this->aug_values_.push_back(std::move(values));
+  }
+
+  // Merge/append another SqlResult to this.
+  void Consume(SqlResult *other);
 
   // mysqlx::SqlResult API.
-  bool hasData();
+  bool hasData() const;
 
   uint64_t getAutoIncrementValue();
 
@@ -91,11 +107,17 @@ class SqlResult {
   size_t count() const;
 
  private:
+  // Used to determine which row to fetch next and how many are left.
   size_t result_index_;
   size_t count_;
-  int augmented_index_;
-  Column augmented_column_;
-  std::vector<mysqlx::Value> augmented_values_;
+  // Inlined columns/values. These are used to augment the result with values
+  // that are not stored in the database physically (e.g. the shard_by column).
+  std::vector<size_t> aug_indices_;
+  std::vector<Column> aug_columns_;
+  // aug_values_[x][i] corresponds to aug_indices_[i] and aug_columns_[i].
+  // aug_values_[i] corresponds to all rows in results_[i].
+  std::vector<std::vector<mysqlx::Value>> aug_values_;
+  // Wrapped mysql results.
   std::vector<mysqlx::SqlResult> results_;
 };
 

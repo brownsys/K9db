@@ -48,15 +48,6 @@ struct ShardingInformation {
   ColumnIndex shard_by_index;
 };
 
-struct RawRecord {
-  std::string table_name;
-  std::vector<std::string> values;
-  // If empty, this is the default order.
-  std::vector<std::string> columns;
-  bool positive;
-  RawRecord(const std::string &tn, bool p) : table_name(tn), positive(p) {}
-};
-
 }  // namespace shards
 }  // namespace pelton
 
