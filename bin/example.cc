@@ -107,31 +107,34 @@ std::vector<std::string> QUERIES{
     "SELECT * FROM submissions WHERE student_id = 1;",
     "SELECT * FROM submissions WHERE assignment_id = 2;"};
 
-// Print query results!
-int Callback(void *context, int col_count, char **col_data, char **col_name) {
-  bool *first_time = reinterpret_cast<bool *>(context);
-
-  // Print header the first time!
-  if (*first_time) {
-    std::cout << std::endl;
-    *first_time = false;
-    for (int i = 0; i < col_count; i++) {
-      std::cout << "| " << col_name[i] << " ";
-    }
-    std::cout << "|" << std::endl;
-    for (int i = 0; i < col_count * 10; i++) {
-      std::cout << "-";
-    }
-    std::cout << std::endl;
-  }
-
-  // Print row data.
-  for (int i = 0; i < col_count; i++) {
-    std::cout << "| " << col_data[i] << " ";
+// Printing query results.
+void PrintHeader(const pelton::SqlResult &result) {
+  for (size_t i = 0; i < result.getColumnCount(); i++) {
+    std::cout << "| " << result.getColumn(i).getColumnName() << " ";
   }
   std::cout << "|" << std::endl;
+  for (size_t i = 0; i < result.getColumnCount() * 10; i++) {
+    std::cout << "-";
+  }
+  std::cout << std::endl;
+}
 
-  return 0;
+void PrintRow(size_t column_count, const pelton::Row &row) {
+  for (size_t i = 0; i < column_count; i++) {
+    std::cout << "| ";
+    row[i].print(std::cout);
+    std::cout << " ";
+  }
+  std::cout << "|" << std::endl;
+}
+
+void Print(pelton::SqlResult &&result) {
+  if (result.hasData()) {
+    PrintHeader(result);
+    while (result.count() > 0) {
+      PrintRow(result.getColumnCount(), result.fetchOne());
+    }
+  }
 }
 
 }  // namespace
@@ -153,13 +156,13 @@ int main(int argc, char **argv) {
   // Open connection to sharder.
   pelton::Connection connection;
   pelton::open("", db_username, db_password, &connection);
-  CHECK(pelton::exec(&connection, "SET echo;", &Callback, nullptr, nullptr));
+  CHECK(pelton::exec(&connection, "SET echo;").ok());
 
   // Create all the tables.
   std::cout << "Create the tables ... " << std::endl;
   for (std::string &create : CREATES) {
     std::cout << std::endl;
-    CHECK(pelton::exec(&connection, create, &Callback, nullptr, nullptr));
+    CHECK(pelton::exec(&connection, create).ok());
   }
   std::cout << std::endl;
 
@@ -167,7 +170,7 @@ int main(int argc, char **argv) {
   std::cout << "Installing flows ... " << std::endl;
   for (const auto &[name, query] : FLOWS) {
     std::cout << name << std::endl;
-    CHECK(pelton::exec(&connection, query, &Callback, nullptr, nullptr));
+    CHECK(pelton::exec(&connection, query).ok());
   }
   pelton::shutdown_planner();
   std::cout << std::endl;
@@ -176,7 +179,7 @@ int main(int argc, char **argv) {
   std::cout << "Insert data into tables ... " << std::endl;
   for (std::string &insert : INSERTS) {
     std::cout << std::endl;
-    CHECK(pelton::exec(&connection, insert, &Callback, nullptr, nullptr));
+    CHECK(pelton::exec(&connection, insert).ok());
   }
   std::cout << std::endl;
 
@@ -184,9 +187,9 @@ int main(int argc, char **argv) {
   std::cout << "Read flows ... " << std::endl;
   for (const auto &query : FLOW_READS) {
     std::cout << std::endl;
-    bool context = true;
-    CHECK(pelton::exec(&connection, query, &Callback,
-                       reinterpret_cast<void *>(&context), nullptr));
+    auto status = pelton::exec(&connection, query);
+    CHECK(status.ok());
+    Print(std::move(status.value()));
   }
   std::cout << std::endl;
 
@@ -194,7 +197,7 @@ int main(int argc, char **argv) {
   std::cout << "Update data in tables ... " << std::endl;
   for (std::string &update : UPDATES) {
     std::cout << std::endl;
-    CHECK(pelton::exec(&connection, update, &Callback, nullptr, nullptr));
+    CHECK(pelton::exec(&connection, update).ok());
   }
   std::cout << std::endl;
 
@@ -202,9 +205,9 @@ int main(int argc, char **argv) {
   std::cout << "Read flows ... " << std::endl;
   for (const auto &query : FLOW_READS) {
     std::cout << std::endl;
-    bool context = true;
-    CHECK(pelton::exec(&connection, query, &Callback,
-                       reinterpret_cast<void *>(&context), nullptr));
+    auto status = pelton::exec(&connection, query);
+    CHECK(status.ok());
+    Print(std::move(status.value()));
   }
   std::cout << std::endl;
 
@@ -212,7 +215,7 @@ int main(int argc, char **argv) {
   std::cout << "Delete data from tables ... " << std::endl;
   for (std::string &del : DELETES) {
     std::cout << std::endl;
-    CHECK(pelton::exec(&connection, del, &Callback, nullptr, nullptr));
+    CHECK(pelton::exec(&connection, del).ok());
   }
   std::cout << std::endl;
 
@@ -220,9 +223,7 @@ int main(int argc, char **argv) {
   std::cout << "Run queries ... " << std::endl;
   for (std::string &select : QUERIES) {
     std::cout << std::endl;
-    bool context = true;
-    CHECK(pelton::exec(&connection, select, &Callback,
-                       reinterpret_cast<void *>(&context), nullptr));
+    CHECK(pelton::exec(&connection, select).ok());
   }
   std::cout << std::endl;
 
@@ -230,9 +231,9 @@ int main(int argc, char **argv) {
   std::cout << "Read flows ... " << std::endl;
   for (const auto &query : FLOW_READS) {
     std::cout << std::endl;
-    bool context = true;
-    CHECK(pelton::exec(&connection, query, &Callback,
-                       reinterpret_cast<void *>(&context), nullptr));
+    auto status = pelton::exec(&connection, query);
+    CHECK(status.ok());
+    Print(std::move(status.value()));
   }
   std::cout << std::endl;
 

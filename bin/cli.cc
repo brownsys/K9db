@@ -29,9 +29,11 @@ void PrintRow(size_t column_count, const pelton::Row &row) {
 }
 
 void Print(pelton::SqlResult &&result) {
-  PrintHeader(result);
-  while (result.hasData()) {
-    PrintRow(result.getColumnCount(), result.fetchOne());
+  if (result.hasData()) {
+    PrintHeader(result);
+    while (result.count() > 0) {
+      PrintRow(result.getColumnCount(), result.fetchOne());
+    }
   }
 }
 
