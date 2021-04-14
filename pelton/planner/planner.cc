@@ -48,7 +48,7 @@ std::pair<JavaVM *, JNIEnv *> StartJVM(bool run = true) {
     options[1].optionString = lp_ptr;
 
     // options[2].optionString = "-verbose:jni";
-    jvm_args.version = JNI_VERSION_10;
+    jvm_args.version = JNI_VERSION_1_8;
     jvm_args.options = options;
     jvm_args.nOptions = 2;
     jvm_args.ignoreUnrecognized = JNI_TRUE;

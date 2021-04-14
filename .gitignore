@@ -50,3 +50,6 @@ cmake-build-debug/
 .clwb
 
 **/CMakeLists.txt
+
+.DS_Store
+.vscode/

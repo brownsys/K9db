@@ -9,6 +9,7 @@
 
 #include "gtest/gtest.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/ints.h"
 
 namespace pelton {
 namespace dataflow {

@@ -23,6 +23,13 @@ Record Record::Copy() const {
   Record record{this->schema_, this->positive_};
   record.timestamp_ = this->timestamp_;
 
+  // Copy bitmap
+  record.bitmap_ = nullptr;
+  if (bitmap_) {
+    record.bitmap_ = new uint64_t[NumBits()];
+    memcpy(record.bitmap_, this->bitmap_, NumBits() * sizeof(uint64_t));
+  }
+
   // Copy data.
   for (size_t i = 0; i < this->schema_.size(); i++) {
     const auto &type = this->schema_.column_types().at(i);
@@ -50,26 +57,32 @@ Record Record::Copy() const {
 // Data access.
 void Record::SetUInt(uint64_t uint, size_t i) {
   CheckType(i, sqlast::ColumnDefinition::Type::UINT);
+  CHECK(!IsNull(i));
   this->data_[i].uint = uint;
 }
 void Record::SetInt(int64_t sint, size_t i) {
   CheckType(i, sqlast::ColumnDefinition::Type::INT);
+  CHECK(!IsNull(i));
   this->data_[i].sint = sint;
 }
 void Record::SetString(std::unique_ptr<std::string> &&v, size_t i) {
   CheckType(i, sqlast::ColumnDefinition::Type::TEXT);
+  CHECK(!IsNull(i));
   this->data_[i].str = std::move(v);
 }
 uint64_t Record::GetUInt(size_t i) const {
   CheckType(i, sqlast::ColumnDefinition::Type::UINT);
+  CHECK(!IsNull(i));
   return this->data_[i].uint;
 }
 int64_t Record::GetInt(size_t i) const {
   CheckType(i, sqlast::ColumnDefinition::Type::INT);
+  CHECK(!IsNull(i));
   return this->data_[i].sint;
 }
 const std::string &Record::GetString(size_t i) const {
   CheckType(i, sqlast::ColumnDefinition::Type::TEXT);
+  CHECK(!IsNull(i));
   return *(this->data_[i].str);
 }
 
@@ -118,7 +131,8 @@ Value Record::GetValue(ColumnID col) const {
 
 // Data type transformation.
 void Record::SetValue(const std::string &value, size_t i) {
-  CHECK_NE(this->data_, nullptr) << "Cannot set value for moved record";
+  CHECK_NOTNULL(this->data_);
+  CHECK(!IsNull(i));
   switch (this->schema_.TypeOf(i)) {
     case sqlast::ColumnDefinition::Type::UINT:
       this->data_[i].uint = std::stoull(value);
@@ -137,12 +151,24 @@ void Record::SetValue(const std::string &value, size_t i) {
 // Equality: schema must be identical (pointer wise) and all values must be
 // equal.
 bool Record::operator==(const Record &other) const {
-  CHECK_NE(this->data_, nullptr) << "Left record == has been moved";
-  CHECK_NE(other.data_, nullptr) << "Right record == has been moved";
+  CHECK_NOTNULL(this->data_);
+  CHECK_NOTNULL(other.data_);
   // Compare schemas (as pointers).
   if (this->schema_ != other.schema_) {
     return false;
   }
+
+  // compare bitmaps
+  CHECK_EQ(NumBits(), other.NumBits());
+
+  // check whether bitmaps are different
+  if ((!bitmap_ && other.bitmap_) || (bitmap_ && !other.bitmap_)) return false;
+  if (bitmap_) {
+    CHECK(other.bitmap_);
+    if (0 != memcmp(bitmap_, other.bitmap_, NumBits() * sizeof(uint64_t)))
+      return false;
+  }
+
   // Compare data (deep compare).
   for (size_t i = 0; i < this->schema_.size(); i++) {
     const auto &type = this->schema_.column_types().at(i);
@@ -180,9 +206,15 @@ bool Record::operator==(const Record &other) const {
 
 // Printing a record to an output stream (e.g. std::cout).
 std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Record &r) {
-  CHECK_NE(r.data_, nullptr) << "Cannot << moved record";
+  CHECK_NOTNULL(r.data_);
   os << "|";
   for (unsigned i = 0; i < r.schema_.size(); ++i) {
+    if (r.IsNull(i)) {
+      os << "NULL"
+         << "|";
+      continue;
+    }
+
     switch (r.schema_.TypeOf(i)) {
       case sqlast::ColumnDefinition::Type::UINT:
         os << r.data_[i].uint << "|";

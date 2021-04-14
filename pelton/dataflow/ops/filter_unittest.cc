@@ -9,6 +9,7 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/ints.h"
 
 namespace pelton {
 namespace dataflow {
@@ -30,24 +31,25 @@ TEST(FilterOperatorTest, SingleAccept) {
   FilterOperator filter1;
   FilterOperator filter2;
   FilterOperator filter3;
-  filter1.AddOperation(5UL, 0, FilterOperator::Operation::LESS_THAN);
+  filter1.AddOperation(5_u, 0, FilterOperator::Operation::LESS_THAN);
   filter2.AddOperation("Hello!", 1, FilterOperator::Operation::EQUAL);
-  filter3.AddOperation(7L, 2, FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
+  filter3.AddOperation(7_s, 2,
+                       FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
 
   // Create some records.
   std::vector<Record> records;
   records.emplace_back(SchemaRef(schema));
-  records.at(0).SetUInt(0ULL, 0);
+  records.at(0).SetUInt(0, 0);
   records.at(0).SetString(std::make_unique<std::string>("Hello!"), 1);
-  records.at(0).SetInt(-5L, 2);
+  records.at(0).SetInt(-5, 2);
   records.emplace_back(SchemaRef(schema));
-  records.at(1).SetUInt(5ULL, 0);
+  records.at(1).SetUInt(5, 0);
   records.at(1).SetString(std::make_unique<std::string>("Bye!"), 1);
-  records.at(1).SetInt(7L, 2);
+  records.at(1).SetInt(7, 2);
   records.emplace_back(SchemaRef(schema));
-  records.at(2).SetUInt(6ULL, 0);
+  records.at(2).SetUInt(6, 0);
   records.at(2).SetString(std::make_unique<std::string>("hello!"), 1);
-  records.at(2).SetInt(10L, 2);
+  records.at(2).SetInt(10, 2);
 
   // Test filtering out records.
   EXPECT_TRUE(filter1.Accept(records.at(0)));
@@ -66,24 +68,24 @@ TEST(FilterOperatorTest, AndAccept) {
 
   // Create some filter operators.
   FilterOperator filter;
-  filter.AddOperation(5UL, 0, FilterOperator::Operation::LESS_THAN);
+  filter.AddOperation(5_u, 0, FilterOperator::Operation::LESS_THAN);
   filter.AddOperation("Hello!", 1, FilterOperator::Operation::EQUAL);
-  filter.AddOperation(7L, 2, FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
+  filter.AddOperation(7_s, 2, FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
 
   // Create some records.
   std::vector<Record> records;
   records.emplace_back(SchemaRef(schema));
-  records.at(0).SetUInt(0ULL, 0);
+  records.at(0).SetUInt(0, 0);
   records.at(0).SetString(std::make_unique<std::string>("Hello!"), 1);
-  records.at(0).SetInt(7L, 2);
+  records.at(0).SetInt(7, 2);
   records.emplace_back(SchemaRef(schema));
-  records.at(1).SetUInt(4ULL, 0);
+  records.at(1).SetUInt(4, 0);
   records.at(1).SetString(std::make_unique<std::string>("Bye!"), 1);
-  records.at(1).SetInt(7L, 2);
+  records.at(1).SetInt(7, 2);
   records.emplace_back(SchemaRef(schema));
-  records.at(2).SetUInt(6ULL, 0);
+  records.at(2).SetUInt(6, 0);
   records.at(2).SetString(std::make_unique<std::string>("Hello!"), 1);
-  records.at(2).SetInt(10L, 2);
+  records.at(2).SetInt(10, 2);
 
   // Test filtering out records.
   EXPECT_TRUE(filter.Accept(records.at(0)));
@@ -97,23 +99,23 @@ TEST(FilterOperatorTest, SeveralOpsPerColumn) {
   // Create some filter operators.
   FilterOperator filter;
   filter.AddOperation("Hello!", 1, FilterOperator::Operation::EQUAL);
-  filter.AddOperation(7L, 2, FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
-  filter.AddOperation(10L, 2, FilterOperator::Operation::LESS_THAN_OR_EQUAL);
+  filter.AddOperation(7_s, 2, FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
+  filter.AddOperation(10_s, 2, FilterOperator::Operation::LESS_THAN_OR_EQUAL);
 
   // Create some records.
   std::vector<Record> records;
   records.emplace_back(SchemaRef(schema));
-  records.at(0).SetUInt(0ULL, 0);
+  records.at(0).SetUInt(0, 0);
   records.at(0).SetString(std::make_unique<std::string>("Hello!"), 1);
-  records.at(0).SetInt(7L, 2);
+  records.at(0).SetInt(7, 2);
   records.emplace_back(SchemaRef(schema));
-  records.at(1).SetUInt(4ULL, 0);
+  records.at(1).SetUInt(4, 0);
   records.at(1).SetString(std::make_unique<std::string>("Bye!"), 1);
-  records.at(1).SetInt(7L, 2);
+  records.at(1).SetInt(7, 2);
   records.emplace_back(SchemaRef(schema));
-  records.at(2).SetUInt(6ULL, 0);
+  records.at(2).SetUInt(6, 0);
   records.at(2).SetString(std::make_unique<std::string>("Hello!"), 1);
-  records.at(2).SetInt(15L, 2);
+  records.at(2).SetInt(15, 2);
 
   // Test filtering out records.
   EXPECT_TRUE(filter.Accept(records.at(0)));
@@ -127,27 +129,27 @@ TEST(FilterOperatorTest, BatchTest) {
   // Create some filter operators.
   FilterOperator filter;
   filter.AddOperation("Hello!", 1, FilterOperator::Operation::NOT_EQUAL);
-  filter.AddOperation(5L, 2, FilterOperator::Operation::GREATER_THAN);
-  filter.AddOperation(10L, 2, FilterOperator::Operation::LESS_THAN);
+  filter.AddOperation(5_s, 2, FilterOperator::Operation::GREATER_THAN);
+  filter.AddOperation(10_s, 2, FilterOperator::Operation::LESS_THAN);
 
   // Create some records.
   std::vector<Record> records;
   records.emplace_back(SchemaRef(schema));
-  records.at(0).SetUInt(0ULL, 0);
+  records.at(0).SetUInt(0, 0);
   records.at(0).SetString(std::make_unique<std::string>("Hello!"), 1);
-  records.at(0).SetInt(7L, 2);
+  records.at(0).SetInt(7, 2);
   records.emplace_back(SchemaRef(schema));
-  records.at(1).SetUInt(4ULL, 0);
+  records.at(1).SetUInt(4, 0);
   records.at(1).SetString(std::make_unique<std::string>("Bye!"), 1);
-  records.at(1).SetInt(7L, 2);
+  records.at(1).SetInt(7, 2);
   records.emplace_back(SchemaRef(schema));
-  records.at(2).SetUInt(6ULL, 0);
+  records.at(2).SetUInt(6, 0);
   records.at(2).SetString(std::make_unique<std::string>("Bye!"), 1);
-  records.at(2).SetInt(9L, 2);
+  records.at(2).SetInt(9, 2);
   records.emplace_back(SchemaRef(schema));
-  records.at(3).SetUInt(6ULL, 0);
+  records.at(3).SetUInt(6, 0);
   records.at(3).SetString(std::make_unique<std::string>("Bye!"), 1);
-  records.at(3).SetInt(15L, 2);
+  records.at(3).SetInt(15, 2);
 
   // Test filtering out records.
   std::vector<Record> outputs;
@@ -165,15 +167,16 @@ TEST(FilterOperatorTest, TypeMistmatch) {
   FilterOperator filter1;
   FilterOperator filter2;
   FilterOperator filter3;
-  filter1.AddOperation(5UL, 2, FilterOperator::Operation::LESS_THAN);
+  filter1.AddOperation(5_u, 2, FilterOperator::Operation::LESS_THAN);
   filter2.AddOperation("Hello!", 0, FilterOperator::Operation::EQUAL);
-  filter3.AddOperation(7L, 1, FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
+  filter3.AddOperation(7_s, 1,
+                       FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
 
   // Create some records.
   Record record{SchemaRef{schema}};
-  record.SetUInt(0ULL, 0);
+  record.SetUInt(0, 0);
   record.SetString(std::make_unique<std::string>("Hello!"), 1);
-  record.SetInt(-5L, 2);
+  record.SetInt(-5, 2);
 
   // Test filtering out records.
   ASSERT_DEATH({ filter1.Accept(record); }, "Type mistmatch");

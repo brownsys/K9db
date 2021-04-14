@@ -17,6 +17,7 @@
 #include "pelton/dataflow/types.h"
 #include "pelton/dataflow/value.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/type_utils.h"
 
 namespace pelton {
 namespace dataflow {
@@ -39,10 +40,12 @@ class Record {
   // Records can move (e.g. for inserting into vectors and maps).
   Record(Record &&o)
       : data_(o.data_),
+        bitmap_(o.bitmap_),
         schema_(o.schema_),
         timestamp_(o.timestamp_),
         positive_(o.positive_) {
     o.data_ = nullptr;
+    o.bitmap_ = nullptr;
   }
   // Need to be able to move-assign for cases when std::vector<Record>
   // has elements deleted in the middle, and has to move the remaining
@@ -55,8 +58,10 @@ class Record {
     this->data_ = o.data_;
     this->timestamp_ = o.timestamp_;
     this->positive_ = o.positive_;
+    this->bitmap_ = o.bitmap_;
     // Invalidate other.
     o.data_ = nullptr;
+    o.bitmap_ = nullptr;
     return *this;
   }
 
@@ -64,6 +69,7 @@ class Record {
   explicit Record(const SchemaRef &schema, bool positive = true)
       : schema_(schema), timestamp_(0), positive_(positive) {
     this->data_ = new RecordData[schema.size()];
+    this->bitmap_ = nullptr;
   }
 
   // Create record and set all the data together.
@@ -84,7 +90,7 @@ class Record {
   // Set all data in one shot regardless of types and counts.
   template <typename... Args>
   void SetData(Args &&... ts) {
-    CHECK_NE(this->data_, nullptr) << "Attempting to SetData on moved record";
+    CHECK_NOTNULL(this->data_);
     if constexpr (sizeof...(ts) > 0) {
       SetDataRecursive(0, std::forward<Args>(ts)...);
     }
@@ -97,6 +103,43 @@ class Record {
   uint64_t GetUInt(size_t i) const;
   int64_t GetInt(size_t i) const;
   const std::string &GetString(size_t i) const;
+
+  inline bool IsNull(size_t i) const {
+    if (!bitmap_) return false;
+
+    CHECK(bitmap_);
+    auto bitmap_block_idx = i / 64;
+    auto bitmap_idx = i % 64;
+    CHECK_LT(bitmap_block_idx, NumBits());
+    return bitmap_[bitmap_block_idx] & (0x1ul << bitmap_idx);
+  }
+
+  inline void SetNull(bool isnull, size_t i) {
+    // shortcut: if isnull=false and no bitmap, no change
+    if (!isnull && !bitmap_) return;
+
+    // lazy init bitmap
+    lazyBitmap();
+
+    CHECK(bitmap_);
+    auto bitmap_block_idx = i / 64;
+    auto bitmap_idx = i % 64;
+    CHECK_LT(bitmap_block_idx, NumBits());
+    if (isnull)
+      bitmap_[bitmap_block_idx] |= (0x1ul << bitmap_idx);
+    else
+      bitmap_[bitmap_block_idx] &= ~(0x1ul << bitmap_idx);
+
+    // compact bitmap, i.e. when all fields become 0, then release bitmap
+    // --> important when using == comparison invariant to remove a couple
+    // checks there as well.
+    uint64_t reduced_bitmap = 0;
+    for (unsigned i = 0; i < NumBits(); ++i) reduced_bitmap |= bitmap_[i];
+    if (0 == reduced_bitmap) {
+      delete[] bitmap_;
+      bitmap_ = nullptr;
+    }
+  }
 
   // Data access with generic type.
   Key GetKey() const;
@@ -147,7 +190,9 @@ class Record {
                                    uint64_t>::value) {
           this->data_[index].uint = t;
         } else {
-          LOG(FATAL) << "Type mismatch in SetData at index " << index;
+          LOG(FATAL) << "Type mismatch in SetData at index " << index
+                     << ", expected " << this->schema_.TypeOf(index)
+                     << ", got " << TypeNameFor(t);
         }
         break;
       case sqlast::ColumnDefinition::Type::INT:
@@ -155,7 +200,9 @@ class Record {
                                    int64_t>::value) {
           this->data_[index].sint = t;
         } else {
-          LOG(FATAL) << "Type mismatch in SetData at index " << index;
+          LOG(FATAL) << "Type mismatch in SetData at index " << index
+                     << ", expected " << this->schema_.TypeOf(index)
+                     << ", got " << TypeNameFor(t);
         }
         break;
       case sqlast::ColumnDefinition::Type::TEXT:
@@ -163,7 +210,9 @@ class Record {
                                    std::unique_ptr<std::string>>::value) {
           this->data_[index].str = std::move(t);
         } else {
-          LOG(FATAL) << "Type mismatch in SetData at index " << index;
+          LOG(FATAL) << "Type mismatch in SetData at index " << index
+                     << ", expected " << this->schema_.TypeOf(index)
+                     << ", got " << TypeNameFor(t);
         }
         break;
       default:
@@ -192,12 +241,15 @@ class Record {
 
   // 29 bytes but with alignment it is really 32 bytes.
   RecordData *data_;  // [8 B]
+  uint64_t *bitmap_;
   SchemaRef schema_;  // [16 B]
   int timestamp_;     // [4 B]
   bool positive_;     // [1 B]
 
+  inline size_t NumBits() const { return schema_.size() / 64 + 1; }
+
   inline void CheckType(size_t i, sqlast::ColumnDefinition::Type t) const {
-    CHECK_NE(this->data_, nullptr) << "Attempting to use moved record";
+    CHECK_NOTNULL(this->data_);
     if (this->schema_.TypeOf(i) != t) {
       LOG(FATAL) << "Type mismatch: record type is " << this->schema_.TypeOf(i)
                  << ", tried to access as " << t;
@@ -205,6 +257,12 @@ class Record {
   }
 
   inline void FreeRecordData() {
+    // Free bitmap
+    if (this->bitmap_ != nullptr) {
+      delete[] this->bitmap_;
+      this->bitmap_ = nullptr;
+    }
+
     if (this->data_ != nullptr) {
       // Destruct unique_ptrs.
       for (size_t i = 0; i < this->schema_.size(); i++) {
@@ -216,6 +274,13 @@ class Record {
       // Delete allocated unions.
       delete[] this->data_;
       this->data_ = nullptr;
+    }
+  }
+
+  void lazyBitmap() {
+    if (!this->bitmap_) {
+      this->bitmap_ = new uint64_t[NumBits()];
+      memset(bitmap_, 0, NumBits() * sizeof(uint64_t));
     }
   }
 };

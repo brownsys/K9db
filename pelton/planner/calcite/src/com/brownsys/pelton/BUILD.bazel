@@ -10,9 +10,10 @@ java_binary(
         "//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:DataDataFlowGraphLibrary_java",
         "//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:DataFlowGraphLibraryConfig_java",
     ],
-    data = [
-        "//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:libjniDataFlowGraphLibrary_so",
-    ],
+    data = select({
+        "@platforms//os:linux": ["//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:libjniDataFlowGraphLibrary_so"],
+        "@platforms//os:macos": ["//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:libjniDataFlowGraphLibrary_so"],
+    }),
     main_class = "com.brownsys.pelton.QueryPlanner",
     visibility = ["//pelton/planner:__subpackages__"],
     deps = [

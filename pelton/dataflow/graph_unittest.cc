@@ -19,6 +19,7 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/ints.h"
 
 namespace pelton {
 namespace dataflow {
@@ -150,17 +151,17 @@ inline std::vector<Record> MakeFilterRecords(const SchemaRef &schema) {
 inline std::vector<Record> MakeProjectRecords(const SchemaRef &schema) {
   // Make records.
   std::vector<Record> records;
-  records.emplace_back(schema, true, (uint64_t)0ULL, 1L);
-  records.emplace_back(schema, true, (uint64_t)4ULL, 3L);
-  records.emplace_back(schema, true, (uint64_t)5ULL, 5L);
-  records.emplace_back(schema, true, (uint64_t)7ULL, 1L);
-  records.emplace_back(schema, true, (uint64_t)2ULL, 1L);
+  records.emplace_back(schema, true, 0_u, 1_s);
+  records.emplace_back(schema, true, 4_u, 3_s);
+  records.emplace_back(schema, true, 5_u, 5_s);
+  records.emplace_back(schema, true, 7_u, 1_s);
+  records.emplace_back(schema, true, 2_u, 1_s);
   return records;
 }
 inline std::vector<Record> MakeProjectOnFilterRecords(const SchemaRef &schema) {
   // Make records.
   std::vector<Record> records;
-  records.emplace_back(schema, true, (uint64_t)7ULL, 1L);
+  records.emplace_back(schema, true, 7_u, 1_s);
   return records;
 }
 inline std::vector<Record> MakeProjectOnEquiJoinRecords(
@@ -172,10 +173,10 @@ inline std::vector<Record> MakeProjectOnEquiJoinRecords(
 
   // Make records.
   std::vector<Record> records;
-  records.emplace_back(schema, true, (uint64_t)5ULL, sd1);
-  records.emplace_back(schema, true, (uint64_t)0ULL, sd2);
-  records.emplace_back(schema, true, (uint64_t)7ULL, sd2_);
-  records.emplace_back(schema, true, (uint64_t)2ULL, sd2__);
+  records.emplace_back(schema, true, 5_u, sd1);
+  records.emplace_back(schema, true, 0_u, sd2);
+  records.emplace_back(schema, true, 7_u, sd2_);
+  records.emplace_back(schema, true, 2_u, sd2__);
   return records;
 }
 inline std::vector<Record> MakeAggregateRecords(const SchemaRef &schema) {
@@ -302,7 +303,7 @@ DataFlowGraph MakeProjectOnFilterGraph(ColumnID keycol,
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto filter = std::make_shared<FilterOperator>();
-  filter->AddOperation(5UL, 0, FilterOperator::Operation::GREATER_THAN);
+  filter->AddOperation(5_u, 0, FilterOperator::Operation::GREATER_THAN);
   auto project = std::make_shared<ProjectOperator>(column_ids);
   auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
