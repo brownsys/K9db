@@ -1,3 +1,5 @@
+#include <sqlite3.h>
+
 #include <iostream>
 #include <limits>
 #include <string>
@@ -6,7 +8,6 @@
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
 #include "glog/logging.h"
-#include "pelton/pelton.h"
 #include "pelton/util/perf.h"
 
 // Print query results!
@@ -41,13 +42,12 @@ int NoCb(void *context, int col_count, char **col_data, char **col_name) {
   return 0;
 }
 
-// Read SQL commands one at a time.
 bool ReadCommand(std::string *ptr) {
   pelton::perf::Start("Read std::cin");
   ptr->clear();
   std::string line;
   while (std::getline(std::cin, line)) {
-    if (line.size() == 0 || line.front() == '#' ||
+    if (line.size() == 0 || line.front() == '#' || line.front() == '.' ||
         line.find_first_not_of(" \t\n") == std::string::npos) {
       continue;
     }
@@ -68,18 +68,15 @@ bool ReadCommand(std::string *ptr) {
 }
 
 ABSL_FLAG(bool, print, true, "Print results to the screen");
-ABSL_FLAG(std::string, db_path, "", "Path to database directory (required)");
+ABSL_FLAG(std::string, db_path, "", "Path to database file (required)");
 
 int main(int argc, char **argv) {
   // Command line arugments and help message.
   absl::SetProgramUsageMessage(
-      "usage: bazel run //bin:cli "
-      "--db_path=/path/to/db/directory "
+      "usage: bazel run //bin:sqlite "
+      "--db_path=/path/to/db "
       "--print=<yes/no>");
   absl::ParseCommandLine(argc, argv);
-
-  // don't skip the whitespace while reading
-  std::cin >> std::noskipws;
 
   // Should we print outputs to the screen?
   bool print = absl::GetFlag(FLAGS_print);
@@ -89,20 +86,20 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
 
   // Find database directory.
-  const std::string &dir = absl::GetFlag(FLAGS_db_path);
-  if (dir == "") {
+  const std::string &db_path = absl::GetFlag(FLAGS_db_path);
+  if (db_path == "") {
     LOG(FATAL) << "Please provide the database dir as a command line argument!";
   }
 
-  pelton::perf::Start("all");
+  pelton::perf::Start("All");
 
   // Initialize our sharded state/connection.
   try {
-    pelton::Connection connection;
-    pelton::open(dir, &connection);
+    ::sqlite3 *connection;
+    ::sqlite3_open(db_path.c_str(), &connection);
 
-    std::cout << "SQL Sharder" << std::endl;
-    std::cout << "DB directory: " << dir << std::endl;
+    std::cout << "Vanilla SQLITE" << std::endl;
+    std::cout << "DB path: " << db_path << std::endl;
     if (print) {
       std::cout << ">>> " << std::flush;
     }
@@ -115,11 +112,11 @@ int main(int argc, char **argv) {
       char *errmsg = nullptr;
 
       pelton::perf::Start("exec");
-      if (!pelton::exec(&connection, command, callback,
-                        reinterpret_cast<void *>(&context), &errmsg)) {
-        std::cerr << "Fatal error" << std::endl;
+      if (sqlite3_exec(connection, command.c_str(), callback, &context,
+                       &errmsg) != SQLITE_OK) {
+        std::cout << "Fatal error" << std::endl;
         if (errmsg != nullptr) {
-          std::cerr << errmsg << std::endl;
+          std::cout << errmsg << std::endl;
           ::sqlite3_free(errmsg);
         }
         break;
@@ -133,13 +130,12 @@ int main(int argc, char **argv) {
     }
 
     // Close the connection
-    pelton::close(&connection);
+    ::sqlite3_close(connection);
   } catch (const char *err_msg) {
     LOG(FATAL) << "Error: " << err_msg;
   }
 
-  // Print performance profile.
-  pelton::perf::End("all");
+  pelton::perf::End("All");
   pelton::perf::PrintAll();
 
   // Exit!

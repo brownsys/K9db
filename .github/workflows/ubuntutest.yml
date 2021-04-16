@@ -38,23 +38,27 @@ jobs:
     - name: Run end-2-end sample
       run: |
         rm -rf /tmp/db && mkdir /tmp/db
-        bazel run bin:example -- /tmp/db
+        bazel run bin:example -- --db_path=/tmp/db
     - name: Run cli samples
       run: |
         rm -rf db && mkdir db
         valgrind --error-exitcode=1 --errors-for-leak-kinds=definite \
-                 --show-leak-kinds=definite ./bazel-bin/bin/cli db \
+                 --show-leak-kinds=definite ./bazel-bin/bin/cli \
+                 --db_path=db \
                  < bin/examples/simple-websubmit.sql
         rm -rf db && mkdir db
         valgrind --error-exitcode=1 --errors-for-leak-kinds=definite \
-                 --show-leak-kinds=definite ./bazel-bin/bin/cli db \
+                 --show-leak-kinds=definite ./bazel-bin/bin/cli \
+                 --db_path=db \
                  < bin/examples/medical_chat.sql
     - name: Run social chat with restart/recovery
       run: |
         rm -rf db && mkdir db
         valgrind --error-exitcode=1 --errors-for-leak-kinds=definite \
-                 --show-leak-kinds=definite ./bazel-bin/bin/cli db \
+                 --show-leak-kinds=definite ./bazel-bin/bin/cli \
+                 --db_path=db \
                  < bin/examples/social_chat.sql
         valgrind --error-exitcode=1 --errors-for-leak-kinds=definite \
-                 --show-leak-kinds=definite ./bazel-bin/bin/cli db \
-                 < bin/examples/social_chat.cntd.sql
+                 --show-leak-kinds=definite ./bazel-bin/bin/cli \
+                 --db_path=db \
+                 db < bin/examples/social_chat.cntd.sql

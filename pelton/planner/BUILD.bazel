@@ -18,6 +18,7 @@ cc_library(
     deps = [
         "//pelton/dataflow:graph",
         "//pelton/dataflow:state",
+        "//pelton/util:perf",
         "@bazel_tools//tools/jdk:jni",
         "@glog",
     ],

@@ -11,6 +11,7 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/value.h"
 #include "pelton/planner/planner.h"
+#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -72,6 +73,7 @@ absl::StatusOr<std::string> GetCondValue(const sqlast::BinaryExpression *exp) {
 
 absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
                         dataflow::DataFlowState *dataflow_state) {
+  perf::Start("CreateView");
   // Plan the query using calcite and generate a concrete graph for it.
   dataflow::DataFlowGraph graph =
       planner::PlanGraph(dataflow_state, stmt.query());
@@ -79,12 +81,15 @@ absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
   // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
   dataflow_state->AddFlow(stmt.view_name(), graph);
 
+  perf::End("CreateView");
   return absl::OkStatus();
 }
 
 absl::Status SelectView(const sqlast::Select &stmt, SharderState *state,
                         dataflow::DataFlowState *dataflow_state,
                         const OutputChannel &output) {
+  perf::Start("SelectView");
+
   // Get the corresponding flow.
   const std::string &view_name = stmt.table_name();
   const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(view_name);
@@ -186,6 +191,8 @@ absl::Status SelectView(const sqlast::Select &stmt, SharderState *state,
   DeleteValues(colnum, colnames);
   delete[] colnames;
   delete[] colvals;
+
+  perf::End("SelectView");
 
   return absl::OkStatus();
 }

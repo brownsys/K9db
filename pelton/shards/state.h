@@ -97,6 +97,7 @@ class SharderState {
  private:
   // Directory in which all shards are stored.
   std::string dir_path_;
+  bool in_memory_;
 
   std::unordered_map<UnshardedTableName, sqlast::CreateTable> schema_;
 

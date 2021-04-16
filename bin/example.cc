@@ -1,8 +1,16 @@
-#include <cassert>
 #include <iostream>
 #include <utility>
 
+#include "absl/flags/flag.h"
+#include "absl/flags/parse.h"
+#include "absl/flags/usage.h"
+#include "glog/logging.h"
 #include "pelton/pelton.h"
+#include "pelton/util/perf.h"
+
+ABSL_FLAG(std::string, db_path, "", "Path to database directory (required)");
+
+namespace {
 
 // CREATE TABLE queries.
 std::vector<std::string> CREATES{
@@ -127,26 +135,42 @@ int Callback(void *context, int col_count, char **col_data, char **col_name) {
   return 0;
 }
 
-int main(int argc, char **argv) {
-  // Read command line arguments.
-  if (argc < 2) {
-    std::cout << "Please provide the database directory as a command line "
-                 "argument!"
-              << std::endl;
-    return 1;
+void Assert(bool status) {
+  if (!status) {
+    LOG(FATAL) << "Did not execute successfully";
   }
-  std::string dir(argv[1]);
+}
+
+}  // namespace
+
+int main(int argc, char **argv) {
+  // Command line arugments and help message.
+  absl::SetProgramUsageMessage(
+      "usage: bazel run //bin:example "
+      "--db_path=/path/to/db/directory ");
+  absl::ParseCommandLine(argc, argv);
+
+  // Initialize Google’s logging library.
+  google::InitGoogleLogging(argv[0]);
+
+  // Find database directory.
+  const std::string &dir = absl::GetFlag(FLAGS_db_path);
+  if (dir == "") {
+    LOG(FATAL) << "Please provide the database dir as a command line argument!";
+  }
+
+  pelton::perf::Start("all");
 
   // Open connection to sharder.
   pelton::Connection connection;
   pelton::open(dir, &connection);
-  assert(pelton::exec(&connection, "SET echo;", &Callback, nullptr, nullptr));
+  Assert(pelton::exec(&connection, "SET echo;", &Callback, nullptr, nullptr));
 
   // Create all the tables.
   std::cout << "Create the tables ... " << std::endl;
   for (std::string &create : CREATES) {
     std::cout << std::endl;
-    assert(pelton::exec(&connection, create, &Callback, nullptr, nullptr));
+    Assert(pelton::exec(&connection, create, &Callback, nullptr, nullptr));
   }
   std::cout << std::endl;
 
@@ -154,7 +178,7 @@ int main(int argc, char **argv) {
   std::cout << "Installing flows ... " << std::endl;
   for (const auto &[name, query] : FLOWS) {
     std::cout << name << std::endl;
-    assert(pelton::exec(&connection, query, &Callback, nullptr, nullptr));
+    Assert(pelton::exec(&connection, query, &Callback, nullptr, nullptr));
   }
   pelton::shutdown_planner();
   std::cout << std::endl;
@@ -163,7 +187,7 @@ int main(int argc, char **argv) {
   std::cout << "Insert data into tables ... " << std::endl;
   for (std::string &insert : INSERTS) {
     std::cout << std::endl;
-    assert(pelton::exec(&connection, insert, &Callback, nullptr, nullptr));
+    Assert(pelton::exec(&connection, insert, &Callback, nullptr, nullptr));
   }
   std::cout << std::endl;
 
@@ -172,7 +196,7 @@ int main(int argc, char **argv) {
   for (const auto &query : FLOW_READS) {
     std::cout << std::endl;
     bool context = true;
-    assert(pelton::exec(&connection, query, &Callback,
+    Assert(pelton::exec(&connection, query, &Callback,
                         reinterpret_cast<void *>(&context), nullptr));
   }
   std::cout << std::endl;
@@ -181,7 +205,7 @@ int main(int argc, char **argv) {
   std::cout << "Update data in tables ... " << std::endl;
   for (std::string &update : UPDATES) {
     std::cout << std::endl;
-    assert(pelton::exec(&connection, update, &Callback, nullptr, nullptr));
+    Assert(pelton::exec(&connection, update, &Callback, nullptr, nullptr));
   }
   std::cout << std::endl;
 
@@ -190,7 +214,7 @@ int main(int argc, char **argv) {
   for (const auto &query : FLOW_READS) {
     std::cout << std::endl;
     bool context = true;
-    assert(pelton::exec(&connection, query, &Callback,
+    Assert(pelton::exec(&connection, query, &Callback,
                         reinterpret_cast<void *>(&context), nullptr));
   }
   std::cout << std::endl;
@@ -199,7 +223,7 @@ int main(int argc, char **argv) {
   std::cout << "Delete data from tables ... " << std::endl;
   for (std::string &del : DELETES) {
     std::cout << std::endl;
-    assert(pelton::exec(&connection, del, &Callback, nullptr, nullptr));
+    Assert(pelton::exec(&connection, del, &Callback, nullptr, nullptr));
   }
   std::cout << std::endl;
 
@@ -208,7 +232,7 @@ int main(int argc, char **argv) {
   for (std::string &select : QUERIES) {
     std::cout << std::endl;
     bool context = true;
-    assert(pelton::exec(&connection, select, &Callback,
+    Assert(pelton::exec(&connection, select, &Callback,
                         reinterpret_cast<void *>(&context), nullptr));
   }
   std::cout << std::endl;
@@ -218,13 +242,19 @@ int main(int argc, char **argv) {
   for (const auto &query : FLOW_READS) {
     std::cout << std::endl;
     bool context = true;
-    assert(pelton::exec(&connection, query, &Callback,
+    Assert(pelton::exec(&connection, query, &Callback,
                         reinterpret_cast<void *>(&context), nullptr));
   }
   std::cout << std::endl;
 
   // Close connection.
   pelton::close(&connection);
+
+  // Print performance profile.
+  pelton::perf::End("all");
+  pelton::perf::PrintAll();
+
+  // Done.
   std::cout << "exit" << std::endl;
   return 0;
 }

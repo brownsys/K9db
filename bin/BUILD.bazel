@@ -7,6 +7,11 @@ cc_binary(
     ],
     deps = [
         "//pelton",
+        "//pelton/util:perf",
+        "@absl//absl/flags:flag",
+        "@absl//absl/flags:parse",
+        "@absl//absl/flags:usage",
+        "@glog",
     ],
 )
 
@@ -17,5 +22,27 @@ cc_binary(
     ],
     deps = [
         "//pelton",
+        "//pelton/util:perf",
+        "@absl//absl/flags:flag",
+        "@absl//absl/flags:parse",
+        "@absl//absl/flags:usage",
+        "@glog",
+    ],
+)
+
+cc_binary(
+    name = "sqlite",
+    srcs = [
+        "sqlite.cc",
+    ],
+    linkopts = [
+        "-lsqlite3",
+    ],
+    deps = [
+        "//pelton/util:perf",
+        "@absl//absl/flags:flag",
+        "@absl//absl/flags:parse",
+        "@absl//absl/flags:usage",
+        "@glog",
     ],
 )
