@@ -154,8 +154,8 @@ cc_library(
     ],
 )
 """,
-    #commit = "9514c04a33a0cf157853334105f32fc914e4f1de",  # My Fix on Oct 27 2020
-    commit = "ead0c4b7ec6a41a602bf35c631bf398729268af1",  # My non-merged second fix from Nov 10 2020
+    # My non-merged change for create_view_stmt QUERY_LITERAL from Mar 25 2021.
+    commit = "d01851e98aafd7f111708d03d65d07d8466db20a",
     #remote = "https://github.com/antlr/grammars-v4",
     remote = "https://github.com/KinanBab/grammars-v4.git",
 )

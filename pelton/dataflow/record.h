@@ -145,6 +145,7 @@ class Record {
   Key GetKey() const;
   Key GetValues(const std::vector<ColumnID> &cols) const;
   Value GetValue(ColumnID col) const;
+  std::string GetValueString(ColumnID col) const;
 
   // Data type transformation.
   void SetValue(const std::string &value, size_t i);

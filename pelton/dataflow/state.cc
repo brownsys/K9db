@@ -48,6 +48,10 @@ const DataFlowGraph &DataFlowState::GetFlow(const FlowName &name) const {
   return this->flows_.at(name);
 }
 
+bool DataFlowState::HasFlow(const FlowName &name) const {
+  return this->flows_.count(name) == 1;
+}
+
 bool DataFlowState::HasFlowsFor(const TableName &table_name) const {
   return this->flows_per_input_table_.count(table_name) == 1;
 }

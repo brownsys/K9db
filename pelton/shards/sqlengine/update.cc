@@ -82,7 +82,15 @@ sqlast::Insert InsertRaw(const RawRecord &record,
         break;
       case sqlast::ColumnDefinition::Type::TEXT:
       case sqlast::ColumnDefinition::Type::DATETIME:
-        stmt.AddValue("\'" + record.values.at(i) + "\'");
+        // TODO(babman): This can be improved later.
+        // Values acquired from selecting from the database do not have an
+        // enclosing ', while those we get from the ANTLR-parsed queries do
+        // (e.g. the value set by an UPDATE statement).
+        if (record.values.at(i)[0] != '\'') {
+          stmt.AddValue("\'" + record.values.at(i) + "\'");
+        } else {
+          stmt.AddValue(record.values.at(i));
+        }
         break;
     }
   }

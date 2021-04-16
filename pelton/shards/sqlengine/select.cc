@@ -27,8 +27,12 @@ std::string Concatenate(int colnum, char **colvals) {
 absl::Status Shard(const sqlast::Select &stmt, SharderState *state,
                    dataflow::DataFlowState *dataflow_state,
                    const OutputChannel &output) {
-  sqlast::Stringifier stringifier;
+  // Disqualifiy LIMIT and OFFSET queries.
+  if (!stmt.SupportedByShards()) {
+    return absl::InvalidArgumentError("Query contains unsupported features");
+  }
 
+  sqlast::Stringifier stringifier;
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
 

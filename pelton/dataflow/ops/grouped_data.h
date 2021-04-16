@@ -353,6 +353,37 @@ class GroupedDataT : public UntemplatedGroupedData {
                           RecordIterator{std::make_unique<R_impl>(end)}};
   }
 
+  // Return an Iterable set of records from the given key that are larger than
+  // a given record. Should only be used on record ordered containers.
+  const_RecordIterable LookupGreater(const Key &key, const Record &cmp,
+                                     int limit = -1, size_t offset = 0) const {
+    if constexpr (!std::is_null_pointer<RecordCompare>::value) {
+      auto it = this->contents_.find(key);
+      if (it == this->contents_.end() ||
+          static_cast<size_t>(it->second.size()) <= offset) {
+        return const_RecordIterable::CreateEmpty();
+      }
+
+      // Key exists and its associated records count is > offset.
+      auto cbeg = it->second.cbegin();
+      auto end = it->second.cend();
+      auto begin = std::upper_bound(cbeg, end, cmp, this->compare_);
+      size_t size = std::distance(begin, end);
+      if (offset > 0) {
+        begin = std::next(begin, offset);
+      }
+      if (limit > -1 && static_cast<size_t>(limit) + offset < size) {
+        end = std::next(begin, limit);
+      }
+
+      return const_RecordIterable{
+          const_RecordIterator{std::make_unique<R_cimpl>(begin)},
+          const_RecordIterator{std::make_unique<R_cimpl>(end)}};
+    }
+
+    return const_RecordIterable::CreateEmpty();
+  }
+
   // Return an Iterable set of keys contained by this group, in the underlying
   // order (specified by M).
   const_KeyIterable Keys() const {

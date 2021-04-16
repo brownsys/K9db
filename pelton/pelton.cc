@@ -2,15 +2,12 @@
 #include "pelton/pelton.h"
 
 #include <iostream>
-#include <memory>
-#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
-#include "pelton/dataflow/graph.h"
 #include "pelton/planner/planner.h"
 #include "pelton/shards/sqlengine/engine.h"
 #include "pelton/shards/sqlengine/util.h"
@@ -86,15 +83,6 @@ bool exec(Connection *connection, std::string sql,
   return true;
 }
 
-void make_view(Connection *connection, const std::string &name,
-               const std::string &query) {
-  // Plan the query using calcite and generate a concrete graph for it.
-  dataflow::DataFlowGraph graph =
-      planner::PlanGraph(connection->GetDataFlowState(), query);
-  // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
-  connection->GetDataFlowState()->AddFlow(name, graph);
-}
-
 void shutdown_planner() { planner::ShutdownPlanner(); }
 
 bool close(Connection *connection) {
@@ -102,8 +90,5 @@ bool close(Connection *connection) {
   planner::ShutdownPlanner();
   return true;
 }
-
-// Materialized views.
-#include "pelton/todo.inc"
 
 }  // namespace pelton

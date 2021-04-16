@@ -314,7 +314,7 @@ TEST(MatViewOperatorTest, OrderedRecordTest) {
 
   EXPECT_EQ(matview.count(), records.size());
   EXPECT_TRUE(matview.Contains(all_keys.at(0)));
-  EXPECT_TRUE(matview.Contains(all_keys.at(0)));
+  EXPECT_TRUE(matview.Contains(all_keys.at(1)));
   // Get records by key.
   EXPECT_EQ_ORDER(matview.Lookup(all_keys.at(0)), records1);
   EXPECT_EQ_ORDER(matview.Lookup(all_keys.at(1)), records2);
@@ -453,6 +453,60 @@ TEST(MatViewOperatorTest, LimitTest) {
   EXPECT_EQ_ORDER(views.at(2)->Lookup(Key(0), 2, 1), ordered2);
   EXPECT_EQ_ORDER(views.at(2)->Lookup(Key(0), 5), ordered3);
   EXPECT_EQ_ORDER(views.at(2)->Lookup(Key(0), 1, 4), empty);
+}
+
+TEST(MatViewOperatorTest, LookupGreater) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
+  std::vector<ColumnID> keys = {0};
+  Record::Compare compare{{2, 1}};
+  SchemaOwner schema{names, types, keys};
+  SchemaRef ref{schema};
+
+  // Some string values.
+  std::unique_ptr<std::string> s1 = std::make_unique<std::string>("Hello!");
+  std::unique_ptr<std::string> s2 = std::make_unique<std::string>("Zoo!");
+  std::unique_ptr<std::string> s3 = std::make_unique<std::string>("Bye!");
+  std::unique_ptr<std::string> s4 = std::make_unique<std::string>("ABC!");
+
+  // Create some records.
+  Record r1{ref, true, 0UL, std::move(s1), 10L};
+  Record r2{ref, true, 1UL, std::move(s2), 20L};
+  Record r3{ref, true, 1UL, std::move(s3), 20L};
+  Record r4{ref, true, 1UL, std::move(s4), 30L};
+
+  std::vector<Record> records;
+  records.push_back(r4.Copy());
+  records.push_back(r1.Copy());
+  records.push_back(r3.Copy());
+  records.push_back(r2.Copy());
+  records.push_back(r4.Copy());
+
+  // Expected output.
+  std::vector<Record> records1;
+  records1.push_back(r2.Copy());
+  records1.push_back(r4.Copy());
+  records1.push_back(r4.Copy());
+
+  std::vector<Record> records2;
+  records2.push_back(r4.Copy());
+
+  // Create materialized view.
+  RecordOrderedMatViewOperator matview{{}, compare};
+
+  // Process and check.
+  EXPECT_TRUE(matview.ProcessAndForward(UNDEFINED_NODE_INDEX, records));
+
+  EXPECT_EQ(matview.count(), records.size());
+  EXPECT_TRUE(matview.Contains(Key(0)));
+
+  // Get records by key greater than some given record..
+  EXPECT_EQ_ORDER(matview.LookupGreater(Key(0), r3), records1);
+  EXPECT_EQ_ORDER(matview.LookupGreater(Key(0), r3, 1, 1), records2);
+
+  // Get all keys.
+  EXPECT_EQ_MSET(matview.Keys(), std::vector<Key>{Key(0)});
 }
 
 }  // namespace dataflow

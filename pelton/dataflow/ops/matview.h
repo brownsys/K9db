@@ -22,7 +22,12 @@ class MatViewOperator : public Operator {
   virtual bool Contains(const Key &key) const = 0;
   virtual const_RecordIterable Lookup(const Key &key, int limit = -1,
                                       size_t offset = 0) const = 0;
+  virtual const_RecordIterable LookupGreater(const Key &key, const Record &cmp,
+                                             int limit = -1,
+                                             size_t offset = 0) const = 0;
   virtual const_KeyIterable Keys() const = 0;
+  virtual bool RecordOrdered() const = 0;
+  virtual bool KeyOrdered() const = 0;
 
  protected:
   // We do not know if we are ordered or unordered, this type is revealed
@@ -79,6 +84,29 @@ class MatViewOperatorT : public MatViewOperator {
   }
 
   const_KeyIterable Keys() const override { return this->contents_.Keys(); }
+
+  bool RecordOrdered() const override {
+    if constexpr (std::is_same<T, RecordOrderedGroupedData>::value) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+  bool KeyOrdered() const override {
+    if constexpr (std::is_same<T, KeyOrderedGroupedData>::value) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  const_RecordIterable LookupGreater(const Key &key, const Record &cmp,
+                                     int limit = -1,
+                                     size_t offset = 0) const override {
+    limit = limit == -1 ? this->limit_ : limit;
+    offset = offset == 0 ? this->offset_ : offset;
+    return this->contents_.LookupGreater(key, cmp, limit, offset);
+  }
 
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,
