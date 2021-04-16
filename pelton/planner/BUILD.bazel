@@ -32,6 +32,9 @@ cc_test(
     ],
     copts = ["-Iexternal/gtest/googletest/include"],
     linkstatic = 1,
+    target_compatible_with = [
+        "@platforms//os:linux",
+    ],
     deps = [
         ":planner",
         "//pelton/dataflow:graph",
@@ -48,7 +51,4 @@ cc_test(
         "@gtest",
         "@gtest//:gtest_main",
     ],
-    target_compatible_with = [
-	"@platforms//os:linux",
-    ]
 )
