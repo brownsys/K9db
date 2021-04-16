@@ -145,6 +145,10 @@ cc_library(
     hdrs = [
         "util.h",
     ],
+    linkopts = [
+        "-lssl",
+        "-lcrypto",
+    ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
         "//pelton/shards:types",
