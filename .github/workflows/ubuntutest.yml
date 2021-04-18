@@ -32,13 +32,14 @@ jobs:
         wget https://dev.mysql.com/get/mysql-apt-config_0.8.16-1_all.deb
         sudo DEBIAN_FRONTEND=noninteractive dpkg -i mysql-apt-config_0.8.16-1_all.deb
         sudo apt-get update
-        sudo apt-get install -y libmysqlcppconn8-2 libmysqlcppconn8-2-dbgsym libmysqlcppconn-dev libmysqlclient21
-        # Start mysql.
-        sudo systemctl start mysql.service
+        sudo apt-get install -y libmysqlcppconn8-2 libmysqlcppconn-dev
         # openssl headers
         sudo apt-get install -y libssl-dev
     - name: Information
       run: |
+        # Start mysql.
+        sudo systemctl start mysql.service
+        # Output versions.
         bazel --version
         g++ --version
         valgrind --version

@@ -149,7 +149,6 @@ int main(int argc, char **argv) {
   // Read MySql configurations.
   const std::string &db_username = FLAGS_db_username;
   const std::string &db_password = FLAGS_db_password;
-  std::cout << db_username << db_password << std::endl;
 
   pelton::perf::Start("all");
 
