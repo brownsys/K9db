@@ -26,7 +26,8 @@ ConnectionPool::~ConnectionPool() {
 // Initialization: open a connection to the default unsharded database.
 void ConnectionPool::Initialize(const std::string &username,
                                 const std::string &password) {
-  this->session_ = new mysqlx::Session("root:password@localhost");
+  std::string connection_str = username + ":" + password + "@localhost";
+  this->session_ = new mysqlx::Session(connection_str);
 }
 
 // Manage using shards in session_.
