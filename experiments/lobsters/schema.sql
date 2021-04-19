@@ -5,8 +5,8 @@ CREATE TABLE `comments` (
 	`updated_at` datetime,
 	`short_id` varchar(10) DEFAULT '' NOT NULL,
 	`story_id` int unsigned NOT NULL,
-	-- PII, OWNER
-	`PII_user_id` int unsigned NOT NULL,
+	-- OWNER (author)
+	`OWNER_user_id` int unsigned NOT NULL,
 	`parent_comment_id` int unsigned,
 	`thread_id` int unsigned,
 	`comment` mediumtext NOT NULL,
@@ -30,8 +30,8 @@ CREATE TABLE `hat_requests` (
 	`id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	`created_at` datetime,
 	`updated_at` datetime,
-	-- PII, OWNER
-	`PII_user_id` int,
+	-- OWNER (requester)
+	`OWNER_user_id` int,
 	`hat` varchar(255) COLLATE utf8mb4_general_ci,
 	`link` varchar(255) COLLATE utf8mb4_general_ci,
 	`comment` text COLLATE utf8mb4_general_ci
@@ -41,9 +41,9 @@ CREATE TABLE `hats` (
 	`id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	`created_at` datetime,
 	`updated_at` datetime,
-	-- PII, OWNER
-	`PII_user_id` int,
-	-- OWNER
+	-- OWNER (hat wearer)
+	`OWNER_user_id` int,
+	-- OWNER (grantor)
 	`OWNER_granted_by_user_id` int,
 	`hat` varchar(255) NOT NULL,
 	`link` varchar(255) COLLATE utf8mb4_general_ci,
@@ -53,8 +53,8 @@ CREATE TABLE `hats` (
 DROP TABLE IF EXISTS `hidden_stories` CASCADE;
 CREATE TABLE `hidden_stories` (
 	`id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	-- PII
-	`PII_user_id` int,
+	-- OWNER (hiding user)
+	`OWNER_user_id` int,
 	`story_id` int,
 	UNIQUE INDEX `index_hidden_stories_on_user_id_and_story_id`  (`user_id`, `story_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -63,7 +63,7 @@ CREATE TABLE `invitation_requests` (
 	`id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	`code` varchar(255),
 	`is_verified` tinyint(1) DEFAULT 0,
-	-- PII? This one is tricky.
+	-- OWNER? This one is tricky.
 	`email` varchar(255),
 	`name` varchar(255),
 	`memo` text,
@@ -74,9 +74,9 @@ CREATE TABLE `invitation_requests` (
 DROP TABLE IF EXISTS `invitations` CASCADE;
 CREATE TABLE `invitations` (
 	`id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	-- PII (of inviter)
-	`PII_user_id` int,
-	-- PII/OWNER? (invitee)
+	-- OWNER (inviter)
+	`OWNER_user_id` int,
+	-- OWNER? (invitee)
 	`email` varchar(255),
 	`code` varchar(255),
 	`created_at` datetime NOT NULL,
@@ -109,11 +109,11 @@ CREATE TABLE `moderations` (
 	`id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	`created_at` datetime NOT NULL,
 	`updated_at` datetime NOT NULL,
-	-- PII, OWNER
+	-- OWNER (moderator)
 	`OWNER_moderator_user_id` int,
 	`story_id` int,
 	`comment_id` int,
-	-- PII? OWNER
+	-- OWNER? (moderated user) Does this require redaction?
 	`OWNER_user_id` int,
 	`action` mediumtext,
 	`reason` mediumtext,
@@ -126,8 +126,8 @@ CREATE TABLE `read_ribbons` (
 	`is_following` tinyint(1) DEFAULT 1,
 	`created_at` datetime NOT NULL,
 	`updated_at` datetime NOT NULL,
-	-- PII, OWNER
-	`PII_user_id` bigint,
+	-- OWNER
+	`OWNER_user_id` bigint,
 	`story_id` bigint,
 	INDEX `index_read_ribbons_on_story_id` (`story_id`),
 	INDEX `index_read_ribbons_on_user_id` (`user_id`)
@@ -137,8 +137,8 @@ CREATE TABLE `saved_stories` (
 	`id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	`created_at` datetime NOT NULL,
 	`updated_at` datetime NOT NULL,
-	-- PII
-	`PII_user_id` int,
+	-- OWNER
+	`OWNER_user_id` int,
 	`story_id` int,
 	UNIQUE INDEX `index_saved_stories_on_user_id_and_story_id` (`user_id`, `story_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -146,8 +146,8 @@ DROP TABLE IF EXISTS `stories` CASCADE;
 CREATE TABLE `stories` (
 	`id` int unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	`created_at` datetime,
-	-- PII, OWNER (author)
-	`PII_user_id` int unsigned,
+	-- OWNER (author)
+	`OWNER_user_id` int unsigned,
 	`url` varchar(250) DEFAULT '',
 	`title` varchar(150) DEFAULT '' NOT NULL,
 	`description` mediumtext,
@@ -183,15 +183,15 @@ CREATE TABLE `suggested_taggings` (
 	`id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	`story_id` int,
 	`tag_id` int,
-	-- PII
-	`PII_user_id` int
+	-- OWNER
+	`OWNER_user_id` int
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 DROP TABLE IF EXISTS `suggested_titles` CASCADE;
 CREATE TABLE `suggested_titles` (
 	`id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	`story_id` int,
-	-- PII
-	`PII_user_id` int,
+	-- OWNER
+	`OWNER_user_id` int,
 	`title` varchar(150) COLLATE utf8mb4_general_ci DEFAULT '' NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 DROP TABLE IF EXISTS `tag_filters` CASCADE;
@@ -199,8 +199,8 @@ CREATE TABLE `tag_filters` (
 	`id` int NOT NULL AUTO_INCREMENT PRIMARY KEY, 
 	`created_at` datetime NOT NULL,
 	`updated_at` datetime NOT NULL,
-	-- PII
-	`PII_user_id` int,
+	-- OWNER
+	`OWNER_user_id` int,
 	`tag_id` int, 
 	INDEX `user_tag_idx` (`user_id`, `tag_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -234,8 +234,8 @@ CREATE TABLE `users` (
 DROP TABLE IF EXISTS `votes` CASCADE;
 CREATE TABLE `votes` (
 	`id` bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	-- PII
-	`PII_user_id` int unsigned NOT NULL,
+	-- OWNER (voter)
+	`OWNER_user_id` int unsigned NOT NULL,
 	`story_id` int unsigned NOT NULL,
 	`comment_id` int unsigned,
 	`vote` tinyint NOT NULL,
