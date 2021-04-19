@@ -58,9 +58,9 @@ jobs:
 
     - name: Run end-2-end sample
       run: |
-        rm -rf /tmp/db && mkdir /tmp/db
         bazel run bin:example -- --db_username=root --db_password=root \
                                  --logtostderr=1
+        ./bin/drop.sh root root
     - name: Run cli samples
       run: |
         valgrind --error-exitcode=1 --errors-for-leak-kinds=definite \
