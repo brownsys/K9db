@@ -5,18 +5,19 @@
 
 #include "absl/status/statusor.h"
 #include "pelton/dataflow/state.h"
+#include "pelton/mysql/result.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
 #include "pelton/sqlast/ast.h"
-#include "pelton/types.h"
 
 namespace pelton {
 namespace shards {
 namespace sqlengine {
 namespace select {
 
-absl::StatusOr<SqlResult> Shard(const sqlast::Select &stmt, SharderState *state,
-                                dataflow::DataFlowState *dataflow_state);
+absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Select &stmt,
+                                       SharderState *state,
+                                       dataflow::DataFlowState *dataflow_state);
 
 }  // namespace select
 }  // namespace sqlengine

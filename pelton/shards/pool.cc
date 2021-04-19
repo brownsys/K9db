@@ -2,6 +2,7 @@
 #include "pelton/shards/pool.h"
 
 #include <cstring>
+#include <memory>
 #include <utility>
 
 #include "glog/logging.h"
@@ -46,23 +47,24 @@ void ConnectionPool::OpenShard(const ShardKind &shard_kind,
 
 // Execution of SQL statements.
 // Execute statement against the default un-sharded database.
-SqlResult ConnectionPool::ExecuteDefault(const std::string &sql) {
+mysql::SqlResult ConnectionPool::ExecuteDefault(const std::string &sql) {
   perf::Start("ExecuteDefault");
 
   this->OpenDefaultShard();
   LOG(INFO) << "Statement: " << sql;
 
-  SqlResult result;
-  result.AddResult(SESSION->sql(sql).execute());
+  mysqlx::SqlResult result = SESSION->sql(sql).execute();
+  mysql::SqlResult wrapper{
+      std::make_unique<mysql::MySqlResult>(std::move(result))};
 
   perf::End("ExecuteDefault");
-  return result;
+  return wrapper;
 }
 
 // Execute statement against given user shard(s).
-SqlResult ConnectionPool::ExecuteShard(const std::string &sql,
-                                       const ShardingInformation &info,
-                                       const UserId &user_id) {
+mysql::SqlResult ConnectionPool::ExecuteShard(const std::string &sql,
+                                              const ShardingInformation &info,
+                                              const UserId &user_id) {
   perf::Start("ExecuteShard");
 
   this->OpenShard(info.shard_kind, user_id);
@@ -70,30 +72,28 @@ SqlResult ConnectionPool::ExecuteShard(const std::string &sql,
 
   mysqlx::SqlResult result = SESSION->sql(sql).execute();
   if (result.hasData()) {
-    SqlResult wrapper{info.shard_by_index,
-                      Column{mysqlx::Type::STRING, info.shard_by}};
-    wrapper.AddResult(std::move(result), mysqlx::Value(user_id));
+    mysql::SqlResult wrapper{std::make_unique<mysql::AugmentedSqlResult>(
+        std::move(result), info.shard_by_index, mysqlx::Value(user_id),
+        mysql::Column{mysqlx::Type::STRING, info.shard_by})};
 
     perf::End("ExecuteShard");
     return wrapper;
   } else {
-    SqlResult wrapper;
-    wrapper.AddResult(std::move(result));
+    mysql::SqlResult wrapper{
+        std::make_unique<mysql::MySqlResult>(std::move(result))};
 
     perf::End("ExecuteShard");
     return wrapper;
   }
 }
 
-SqlResult ConnectionPool::ExecuteShards(
+mysql::SqlResult ConnectionPool::ExecuteShards(
     const std::string &sql, const ShardingInformation &info,
     const std::unordered_set<UserId> &user_ids) {
   // This result set is a proxy that allows access to results from all shards.
-  SqlResult result;
-
+  mysql::SqlResult result;
   for (const UserId &user_id : user_ids) {
-    SqlResult inner_result = this->ExecuteShard(sql, info, user_id);
-    result.Consume(&inner_result);
+    result.Append(this->ExecuteShard(sql, info, user_id));
   }
 
   return result;

@@ -107,7 +107,7 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
 
   // Get the rows that are going to be deleted prior to deletion to use them
   // to update the dataflows.
-  MOVE_OR_RETURN(SqlResult result,
+  MOVE_OR_RETURN(mysql::SqlResult result,
                  select::Shard(stmt.SelectDomain(), state, dataflow_state));
   std::vector<dataflow::Record> records =
       dataflow_state->CreateRecords(table_name, std::move(result), false);

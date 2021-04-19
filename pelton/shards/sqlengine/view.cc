@@ -21,7 +21,7 @@ namespace view {
 
 namespace {
 
-absl::Status AddRecordToResult(SqlResult *result,
+absl::Status AddRecordToResult(std::vector<mysql::Row> *rows,
                                const dataflow::Record &record) {
   std::vector<mysqlx::Value> values;
   for (size_t i = 0; i < record.schema().size(); i++) {
@@ -39,7 +39,8 @@ absl::Status AddRecordToResult(SqlResult *result,
         return absl::InvalidArgumentError("Unknown column type in SelectView");
     }
   }
-  result->AddAugResult(std::move(values));
+
+  rows->emplace_back(std::make_unique<mysql::InlinedRow>(std::move(values)));
   return absl::OkStatus();
 }
 
@@ -83,9 +84,9 @@ absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
   return absl::OkStatus();
 }
 
-absl::StatusOr<SqlResult> SelectView(const sqlast::Select &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<mysql::SqlResult> SelectView(
+    const sqlast::Select &stmt, SharderState *state,
+    dataflow::DataFlowState *dataflow_state) {
   // TODO(babman): fix this.
   perf::Start("SelectView");
 
@@ -103,11 +104,10 @@ absl::StatusOr<SqlResult> SelectView(const sqlast::Select &stmt,
   const dataflow::SchemaRef &schema = matview->output_schema();
 
   // Store result column names and types.
-  std::vector<size_t> indices;
-  std::vector<Column> cols;
+  std::vector<mysql::Row> rows;
+  std::vector<mysql::Column> cols;
   for (size_t i = 0; i < schema.size(); i++) {
     const std::string &col_name = schema.NameOf(i);
-    indices.push_back(i);
     switch (schema.TypeOf(i)) {
       case sqlast::ColumnDefinition::Type::UINT:
       case sqlast::ColumnDefinition::Type::INT:
@@ -120,9 +120,6 @@ absl::StatusOr<SqlResult> SelectView(const sqlast::Select &stmt,
         return absl::InvalidArgumentError("Unknown column type in SelectView");
     }
   }
-
-  // The result to return.
-  SqlResult result{std::move(indices), std::move(cols)};
 
   // Check parameters.
   size_t offset = stmt.offset();
@@ -153,7 +150,7 @@ absl::StatusOr<SqlResult> SelectView(const sqlast::Select &stmt,
         for (const auto &key : matview->Keys()) {
           for (const auto &record :
                matview->LookupGreater(key, cmp, limit, offset)) {
-            CHECK_STATUS(AddRecordToResult(&result, record));
+            CHECK_STATUS(AddRecordToResult(&rows, record));
           }
         }
         break;
@@ -179,7 +176,7 @@ absl::StatusOr<SqlResult> SelectView(const sqlast::Select &stmt,
 
         // Read records attached to key.
         for (const auto &record : matview->Lookup(key, limit, offset)) {
-          CHECK_STATUS(AddRecordToResult(&result, record));
+          CHECK_STATUS(AddRecordToResult(&rows, record));
         }
         break;
       }
@@ -191,13 +188,14 @@ absl::StatusOr<SqlResult> SelectView(const sqlast::Select &stmt,
     // No where condition: we are reading everything (keys and records).
     for (const auto &key : matview->Keys()) {
       for (const auto &record : matview->Lookup(key, limit, offset)) {
-        CHECK_STATUS(AddRecordToResult(&result, record));
+        CHECK_STATUS(AddRecordToResult(&rows, record));
       }
     }
   }
 
   perf::End("SelectView");
-  return result;
+  return mysql::SqlResult(std::make_unique<mysql::InlinedSqlResult>(
+      std::move(rows), std::move(cols)));
 }
 
 }  // namespace view

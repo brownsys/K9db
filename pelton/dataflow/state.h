@@ -11,8 +11,8 @@
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
+#include "pelton/mysql/result.h"
 #include "pelton/sqlast/ast.h"
-#include "pelton/types.h"
 
 #ifndef PELTON_DATAFLOW_STATE_H_
 #define PELTON_DATAFLOW_STATE_H_
@@ -52,7 +52,8 @@ class DataFlowState {
 
   // Creating and processing records from raw data.
   std::vector<Record> CreateRecords(const std::string &table_name,
-                                    SqlResult &&sqlresult, bool positive) const;
+                                    mysql::SqlResult &&sqlresult,
+                                    bool positive) const;
 
   Record CreateRecord(const sqlast::Insert &insert_stmt) const;
 

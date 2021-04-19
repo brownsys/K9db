@@ -20,8 +20,9 @@ namespace pelton {
 namespace shards {
 namespace sqlengine {
 
-absl::StatusOr<SqlResult> Shard(const std::string &sql, SharderState *state,
-                                dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<mysql::SqlResult> Shard(
+    const std::string &sql, SharderState *state,
+    dataflow::DataFlowState *dataflow_state) {
   // Parse with ANTLR into our AST.
   perf::Start("parsing");
   sqlast::SQLParser parser;
@@ -35,21 +36,21 @@ absl::StatusOr<SqlResult> Shard(const std::string &sql, SharderState *state,
     case sqlast::AbstractStatement::Type::CREATE_TABLE: {
       auto *stmt = static_cast<sqlast::CreateTable *>(statement.get());
       CHECK_STATUS(create::Shard(*stmt, state, dataflow_state));
-      return SqlResult();
+      return mysql::SqlResult();
     }
 
     // Case 2: Insert statement.
     case sqlast::AbstractStatement::Type::INSERT: {
       auto *stmt = static_cast<sqlast::Insert *>(statement.get());
       CHECK_STATUS(insert::Shard(*stmt, state, dataflow_state));
-      return SqlResult();
+      return mysql::SqlResult();
     }
 
     // Case 3: Update statement.
     case sqlast::AbstractStatement::Type::UPDATE: {
       auto *stmt = static_cast<sqlast::Update *>(statement.get());
       CHECK_STATUS(update::Shard(*stmt, state, dataflow_state));
-      return SqlResult();
+      return mysql::SqlResult();
     }
 
     // Case 4: Select statement.
@@ -67,14 +68,14 @@ absl::StatusOr<SqlResult> Shard(const std::string &sql, SharderState *state,
     case sqlast::AbstractStatement::Type::DELETE: {
       auto *stmt = static_cast<sqlast::Delete *>(statement.get());
       CHECK_STATUS(delete_::Shard(*stmt, state, dataflow_state));
-      return SqlResult();
+      return mysql::SqlResult();
     }
 
     // Case 6: CREATE VIEW statement (e.g. dataflow).
     case sqlast::AbstractStatement::Type::CREATE_VIEW: {
       auto *stmt = static_cast<sqlast::CreateView *>(statement.get());
       CHECK_STATUS(view::CreateView(*stmt, state, dataflow_state));
-      return SqlResult();
+      return mysql::SqlResult();
     }
 
     // Unsupported (this should not be reachable).

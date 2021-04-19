@@ -26,7 +26,7 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
   // to update the dataflows.
   std::vector<dataflow::Record> records;
   if (update_flows) {
-    MOVE_OR_RETURN(SqlResult result,
+    MOVE_OR_RETURN(mysql::SqlResult result,
                    select::Shard(stmt.SelectDomain(), state, dataflow_state));
     records =
         dataflow_state->CreateRecords(table_name, std::move(result), false);

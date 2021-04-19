@@ -18,16 +18,16 @@
 
 #include "absl/status/statusor.h"
 #include "pelton/dataflow/state.h"
+#include "pelton/mysql/result.h"
 #include "pelton/shards/state.h"
-#include "pelton/types.h"
 
 namespace pelton {
 namespace shards {
 namespace sqlengine {
 
-absl::StatusOr<SqlResult> Shard(const std::string &sql,
-                                SharderState *sharder_state,
-                                dataflow::DataFlowState *dataflow_state);
+absl::StatusOr<mysql::SqlResult> Shard(const std::string &sql,
+                                       SharderState *sharder_state,
+                                       dataflow::DataFlowState *dataflow_state);
 
 }  // namespace sqlengine
 }  // namespace shards

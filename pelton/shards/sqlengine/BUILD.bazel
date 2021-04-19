@@ -16,8 +16,8 @@ cc_library(
         ":select",
         ":update",
         ":view",
-        "//pelton:types",
         "//pelton/dataflow:state",
+        "//pelton/mysql",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sqlast:ast",
@@ -39,7 +39,6 @@ cc_library(
         "create.h",
     ],
     deps = [
-        "//pelton:types",
         "//pelton/dataflow:state",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -61,7 +60,6 @@ cc_library(
         "insert.h",
     ],
     deps = [
-        "//pelton:types",
         "//pelton/dataflow:state",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -81,8 +79,8 @@ cc_library(
         "select.h",
     ],
     deps = [
-        "//pelton:types",
         "//pelton/dataflow:state",
+        "//pelton/mysql",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sqlast:ast",
@@ -101,7 +99,6 @@ cc_library(
     ],
     deps = [
         ":select",
-        "//pelton:types",
         "//pelton/dataflow:state",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -126,7 +123,6 @@ cc_library(
         ":delete",
         ":insert",
         ":select",
-        "//pelton:types",
         "//pelton/dataflow:state",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -165,8 +161,8 @@ cc_library(
         "view.h",
     ],
     deps = [
-        "//pelton:types",
         "//pelton/dataflow:state",
+        "//pelton/mysql",
         "//pelton/planner",
         "//pelton/shards:state",
         "//pelton/shards:types",

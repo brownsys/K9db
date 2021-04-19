@@ -7,8 +7,8 @@
 #include <unordered_set>
 
 #include "absl/status/status.h"
+#include "pelton/mysql/result.h"
 #include "pelton/shards/types.h"
-#include "pelton/types.h"
 
 namespace pelton {
 namespace shards {
@@ -31,15 +31,15 @@ class ConnectionPool {
   void Initialize(const std::string &username, const std::string &password);
 
   // Execute statement against the default un-sharded database.
-  SqlResult ExecuteDefault(const std::string &sql);
+  mysql::SqlResult ExecuteDefault(const std::string &sql);
 
   // Execute statement against given user shard(s).
-  SqlResult ExecuteShard(const std::string &sql,
-                         const ShardingInformation &info,
-                         const UserId &user_id);
-  SqlResult ExecuteShards(const std::string &sql,
-                          const ShardingInformation &info,
-                          const std::unordered_set<UserId> &user_ids);
+  mysql::SqlResult ExecuteShard(const std::string &sql,
+                                const ShardingInformation &info,
+                                const UserId &user_id);
+  mysql::SqlResult ExecuteShards(const std::string &sql,
+                                 const ShardingInformation &info,
+                                 const std::unordered_set<UserId> &user_ids);
 
   void RemoveShard(const std::string &shard_name);
 

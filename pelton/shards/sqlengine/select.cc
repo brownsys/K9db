@@ -10,28 +10,16 @@ namespace shards {
 namespace sqlengine {
 namespace select {
 
-namespace {
-
-std::string Concatenate(int colnum, char **colvals) {
-  std::string delim("\0", 1);
-  std::string concatenate = "";
-  for (int i = 0; i < colnum; i++) {
-    concatenate += colvals[i] + delim;
-  }
-  return concatenate;
-}
-
-}  // namespace
-
-absl::StatusOr<SqlResult> Shard(const sqlast::Select &stmt, SharderState *state,
-                                dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<mysql::SqlResult> Shard(
+    const sqlast::Select &stmt, SharderState *state,
+    dataflow::DataFlowState *dataflow_state) {
   perf::Start("Select");
   // Disqualifiy LIMIT and OFFSET queries.
   if (!stmt.SupportedByShards()) {
     return absl::InvalidArgumentError("Query contains unsupported features");
   }
 
-  SqlResult result;
+  mysql::SqlResult result;
   sqlast::Stringifier stringifier;
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
@@ -40,7 +28,7 @@ absl::StatusOr<SqlResult> Shard(const sqlast::Select &stmt, SharderState *state,
   if (!is_sharded) {
     // Case 1: table is not in any shard.
     std::string select_str = stmt.Visit(&stringifier);
-    result = state->connection_pool().ExecuteDefault(select_str);
+    result.Append(state->connection_pool().ExecuteDefault(select_str));
 
   } else {  // is_sharded == true
     // Case 2: table is sharded.
@@ -70,16 +58,14 @@ absl::StatusOr<SqlResult> Shard(const sqlast::Select &stmt, SharderState *state,
 
           // Execute statement directly against shard.
           std::string select_str = cloned.Visit(&stringifier);
-          SqlResult tmp =
-              state->connection_pool().ExecuteShard(select_str, info, user_id);
-          result.Consume(&tmp);
+          result.AppendDeduplicate(
+              state->connection_pool().ExecuteShard(select_str, info, user_id));
         }
       } else {
         // Select from all the relevant shards.
         std::string select_str = cloned.Visit(&stringifier);
-        SqlResult tmp = state->connection_pool().ExecuteShards(
-            select_str, info, state->UsersOfShard(info.shard_kind));
-        result.Consume(&tmp);
+        result.AppendDeduplicate(state->connection_pool().ExecuteShards(
+            select_str, info, state->UsersOfShard(info.shard_kind)));
       }
     }
   }

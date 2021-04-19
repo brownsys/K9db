@@ -60,13 +60,13 @@ bool DataFlowState::HasFlowsFor(const TableName &table_name) const {
 
 // Process raw data from sharder and use it to update flows.
 std::vector<Record> DataFlowState::CreateRecords(const std::string &table_name,
-                                                 SqlResult &&sqlresult,
+                                                 mysql::SqlResult &&sqlresult,
                                                  bool positive) const {
   std::vector<Record> records;
   SchemaRef schema = SchemaRef(this->schema_.at(table_name));
   // Process each row in result set.
   while (sqlresult.hasData()) {
-    Row row = sqlresult.fetchOne();
+    mysql::Row row = sqlresult.fetchOne();
     records.emplace_back(schema, positive);
     for (size_t i = 0; i < schema.size(); i++) {
       const mysqlx::Value &val = row.get(i);

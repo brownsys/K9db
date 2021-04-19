@@ -10,9 +10,9 @@ cc_library(
     ],
     visibility = ["//:__subpackages__"],
     deps = [
-        ":types",
         "//pelton/dataflow:graph",
         "//pelton/dataflow:state",
+        "//pelton/mysql",
         "//pelton/planner",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -21,19 +21,4 @@ cc_library(
         "@absl//absl/status",
         "@absl//absl/strings",
     ],
-)
-
-cc_library(
-    name = "types",
-    srcs = [
-        "types.cc",
-    ],
-    hdrs = [
-        "types.h",
-    ],
-    linkopts = [
-        "-lmysqlcppconn8",
-    ],
-    visibility = ["//:__subpackages__"],
-    deps = [],
 )
