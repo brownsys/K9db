@@ -89,71 +89,13 @@ genrule(
       -nodelete                               \
       -Dplatform.includepath=$${INCLUDE_PATH} \
       -Dplatform.linkpath=$${LINK_PATH}       \
-      -Dplatform.compiler=clang               \
+      -Dplatform.compiler=gcc                 \
       com/brownsys/pelton/nativelib/DataFlowGraphLibrary.java
 
   # Move outputs to proper directory and remove tmp directory.
   cd $${EXEC_PATH}
   if [ -f $${PCKG_DIR}linux-x86_64/libjniDataFlowGraphLibrary.so ]; then
     mv $${PCKG_DIR}linux-x86_64/libjniDataFlowGraphLibrary.so $@
-  else
-    touch $@
-  fi
-  rm -rf $${TMP_DIR}
-""",
-    tools = ["@maven//:org_bytedeco_javacpp"],
-    visibility = ["//pelton/planner/calcite:__subpackages__"],
-)
-
-# For MacOS.
-genrule(
-    name = "libjniDataFlowGraphLibrary_dylib",
-    srcs = [
-        ":DataDataFlowGraphLibrary_java",
-        "//pelton/dataflow:generator",
-        "//pelton/dataflow:generator_h",
-        "DataFlowGraphLibraryConfig.java",
-    ],
-    outs = [
-        "libjniDataFlowGraphLibrary.dylib",
-    ],
-    cmd = """
-  # Similar to above, we need to process things in a tmp directory.
-  # Remember where we should have been executing from within the bazel fs.
-  EXEC_PATH=$$(pwd)
-  READ_PATH=$${EXEC_PATH}
-  while [ $$(basename $${READ_PATH}) != "sandbox" ]
-  do
-    READ_PATH=$$(dirname $${READ_PATH})
-  done
-  READ_PATH=$$(dirname $${READ_PATH})/execroot/pelton
-  # Get the location of javacpp.jar, libgenerator.so, and include path.
-  JAVACPP_JAR=$$(pwd)/$(location @maven//:org_bytedeco_javacpp)
-  LINK_PATH=$${READ_PATH}/$$(dirname $(location //pelton/dataflow:generator))
-  echo $${LINK_PATH}
-  INCLUDE_PATH=$$(pwd)
-
-  # Create a clean tmp directory and copy input files to it.
-  TMP_DIR="/tmp/__libjniDataFlowGraphLibrary_dylib_tmp"
-  rm -rf $${TMP_DIR}
-  PCKG_DIR=$${TMP_DIR}/com/brownsys/pelton/nativelib/
-  mkdir -p $${PCKG_DIR}
-  cp $(location DataFlowGraphLibraryConfig.java) $${PCKG_DIR}
-  cp $(location :DataDataFlowGraphLibrary_java) $${PCKG_DIR}
-
-  # Execute javacpp.jar in tmp directory
-  cd $${TMP_DIR}
-  java -jar "$${JAVACPP_JAR}"                 \
-      -nodelete                               \
-      -Dplatform.includepath=$${INCLUDE_PATH} \
-      -Dplatform.linkpath=$${LINK_PATH}       \
-      -Dplatform.compiler=clang               \
-      com/brownsys/pelton/nativelib/DataFlowGraphLibrary.java
-
-  # Move outputs to proper directory and remove tmp directory.
-  cd $${EXEC_PATH}
-  if [ -f $${PCKG_DIR}macosx-x86_64/libjniDataFlowGraphLibrary.dylib ]; then
-    mv $${PCKG_DIR}macosx-x86_64/libjniDataFlowGraphLibrary.dylib $@
   else
     touch $@
   fi
