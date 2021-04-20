@@ -29,11 +29,6 @@ class DataFlowGraph {
     this->inputs_.emplace(op->input_name(), op);
     return AddNode(op, std::vector<std::shared_ptr<Operator>>{});
   }
-  // To be used for initiating the operator, parents should be added
-  // subsequently
-  inline bool AddNode(std::shared_ptr<Operator> op) {
-    return AddNode(op, std::vector<std::shared_ptr<Operator>>{});
-  }
   // Special case: node with single parent.
   inline bool AddNode(std::shared_ptr<Operator> op,
                       std::shared_ptr<Operator> parent) {
