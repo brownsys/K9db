@@ -21,7 +21,7 @@ namespace view {
 
 namespace {
 
-absl::Status AddRecordToResult(std::vector<mysql::Row> *rows,
+absl::Status AddRecordToResult(std::vector<mysql::InlinedRow> *rows,
                                const dataflow::Record &record) {
   std::vector<mysqlx::Value> values;
   for (size_t i = 0; i < record.schema().size(); i++) {
@@ -40,7 +40,7 @@ absl::Status AddRecordToResult(std::vector<mysql::Row> *rows,
     }
   }
 
-  rows->emplace_back(std::make_unique<mysql::InlinedRow>(std::move(values)));
+  rows->emplace_back(std::move(values));
   return absl::OkStatus();
 }
 
@@ -104,7 +104,7 @@ absl::StatusOr<mysql::SqlResult> SelectView(
   const dataflow::SchemaRef &schema = matview->output_schema();
 
   // Store result column names and types.
-  std::vector<mysql::Row> rows;
+  std::vector<mysql::InlinedRow> rows;
   std::vector<mysql::Column> cols;
   for (size_t i = 0; i < schema.size(); i++) {
     const std::string &col_name = schema.NameOf(i);

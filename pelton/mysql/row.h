@@ -21,7 +21,6 @@ class Row {
   class AbstractRowImpl {
    public:
     virtual const mysqlx::Value &get(size_t post) const = 0;
-    virtual bool isInlined() const = 0;
   };
 
   explicit Row(std::unique_ptr<Row::AbstractRowImpl> &&impl)
@@ -31,8 +30,6 @@ class Row {
   const mysqlx::Value &operator[](size_t pos) const {
     return this->impl_->get(pos);
   }
-
-  bool isInlined() const { return this->impl_->isInlined(); }
 
   std::string StringRepr(size_t colnum) const;
 
@@ -46,7 +43,6 @@ class MySqlRow : public Row::AbstractRowImpl {
   explicit MySqlRow(mysqlx::Row &&row) : row_(std::move(row)) {}
 
   const mysqlx::Value &get(size_t pos) const override;
-  bool isInlined() const override;
 
  private:
   mysqlx::Row row_;
@@ -63,12 +59,11 @@ class AugmentedRow : public Row::AbstractRowImpl {
         aug_value_(std::move(aug_value)) {}
 
   const mysqlx::Value &get(size_t pos) const override;
-  bool isInlined() const override;
 
  private:
   mysqlx::Row row_;
   size_t aug_index_;
-  const mysqlx::Value &aug_value_;
+  mysqlx::Value aug_value_;
 };
 
 // A row with inlined values.
@@ -77,8 +72,9 @@ class InlinedRow : public Row::AbstractRowImpl {
   explicit InlinedRow(std::vector<mysqlx::Value> &&values)
       : values_(std::move(values)) {}
 
+  explicit InlinedRow(const Row &row, size_t colnum);
+
   const mysqlx::Value &get(size_t pos) const override;
-  bool isInlined() const override;
 
  private:
   std::vector<mysqlx::Value> values_;

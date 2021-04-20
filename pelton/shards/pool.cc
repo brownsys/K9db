@@ -40,7 +40,7 @@ void ConnectionPool::OpenDefaultShard() {
 void ConnectionPool::OpenShard(const ShardKind &shard_kind,
                                const UserId &user_id) {
   std::string shard_name = sqlengine::NameShard(shard_kind, user_id);
-  LOG(INFO) << "Shard: " << shard_name;
+  LOG(INFO) << "Shard: " << shard_name << " (userid: " << user_id << ")";
   SESSION->sql("CREATE DATABASE IF NOT EXISTS " + shard_name).execute();
   SESSION->sql("USE " + shard_name).execute();
 }

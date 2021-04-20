@@ -33,7 +33,6 @@ class SqlResult {
     virtual Row fetchOne() = 0;
     virtual size_t count() = 0;
     virtual bool isInlined() const = 0;
-    virtual bool isNested() const = 0;
   };
 
   // Empty results.
@@ -57,6 +56,7 @@ class SqlResult {
   // result is moved and becomes empty after append.
   void Append(SqlResult &&other);
   void AppendDeduplicate(SqlResult &&other);
+  void MakeInline();
 
  private:
   std::unique_ptr<SqlResult::SqlResultImpl> impl_;
@@ -77,7 +77,6 @@ class MySqlResult : public SqlResult::SqlResultImpl {
   Row fetchOne() override;
   size_t count() override;
   bool isInlined() const override;
-  bool isNested() const override;
 
  private:
   mysqlx::SqlResult result_;
@@ -103,7 +102,6 @@ class AugmentedSqlResult : public SqlResult::SqlResultImpl {
   Row fetchOne() override;
   size_t count() override;
   bool isInlined() const override;
-  bool isNested() const override;
 
  private:
   mysqlx::SqlResult result_;
@@ -115,8 +113,7 @@ class AugmentedSqlResult : public SqlResult::SqlResultImpl {
 // A result set with inlined values.
 class InlinedSqlResult : public SqlResult::SqlResultImpl {
  public:
-  InlinedSqlResult(std::vector<Row> &&rows, std::vector<Column> cols)
-      : rows_(std::move(rows)), cols_(std::move(cols)), index_(0) {}
+  InlinedSqlResult(std::vector<InlinedRow> &&rows, std::vector<Column> &&cols);
 
   bool hasData() const override;
   uint64_t getAutoIncrementValue() override;
@@ -127,42 +124,16 @@ class InlinedSqlResult : public SqlResult::SqlResultImpl {
   Row fetchOne() override;
   size_t count() override;
   bool isInlined() const override;
-  bool isNested() const override;
 
   // For deduplication: create an unordered set that can be checked to
   // determine duplicates.
   std::unordered_set<std::string> RowSet() const;
-  void AddRow(Row &&row);
+  void AddRow(InlinedRow &&row);
 
  private:
   std::vector<Row> rows_;
   std::vector<Column> cols_;
   size_t index_;
-};
-
-// A composite result set created by multiple inner result sets.
-class NestedSqlResult : public SqlResult::SqlResultImpl {
- public:
-  NestedSqlResult() : results_(), count_(0) {}
-
-  bool hasData() const override;
-  uint64_t getAutoIncrementValue() override;
-
-  size_t getColumnCount() const override;
-  Column getColumn(size_t i) const override;
-
-  Row fetchOne() override;
-  size_t count() override;
-  bool isInlined() const override;
-  bool isNested() const override;
-
-  // Appending and Prepending.
-  void Append(std::unique_ptr<SqlResultImpl> &&other);
-  void Prepend(std::unique_ptr<SqlResultImpl> &&other);
-
- private:
-  std::list<std::unique_ptr<SqlResultImpl>> results_;
-  size_t count_;
 };
 
 }  // namespace mysql

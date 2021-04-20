@@ -3,74 +3,65 @@
 namespace pelton {
 namespace mysql {
 
-namespace {
-
-std::unique_ptr<InlinedSqlResult> InlineSqlResult(SqlResult *input) {
-  std::vector<Row> rows;
-  std::vector<Column> cols;
-  size_t colnum = input->getColumnCount();
-  for (size_t i = 0; i < colnum; i++) {
-    cols.push_back(input->getColumn(i));
-  }
-  while (input->count() > 0) {
-    Row row = input->fetchOne();
-    rows.push_back(std::move(row));
-  }
-
-  return std::make_unique<InlinedSqlResult>(std::move(rows), std::move(cols));
-}
-
-}  // namespace
-
 // SqlResult.
 void SqlResult::Append(SqlResult &&other) {
-  if (other.impl_) {
-    if (!this->impl_) {
+  if (other.hasData()) {
+    if (!this->hasData()) {
       this->impl_ = std::move(other.impl_);
       return;
     }
 
-    if (this->impl_->isNested()) {
-      reinterpret_cast<NestedSqlResult *>(this->impl_.get())
-          ->Append(std::move(other.impl_));
-    } else if (other.impl_->isNested()) {
-      reinterpret_cast<NestedSqlResult *>(other.impl_.get())
-          ->Prepend(std::move(this->impl_));
-      this->impl_ = std::move(other.impl_);
-    } else {
-      std::unique_ptr<NestedSqlResult> tmp =
-          std::make_unique<NestedSqlResult>();
-      tmp->Append(std::move(this->impl_));
-      tmp->Append(std::move(other.impl_));
-      this->impl_ = std::move(tmp);
+    this->MakeInline();
+    InlinedSqlResult *ptr =
+        reinterpret_cast<InlinedSqlResult *>(this->impl_.get());
+    size_t colnum = other.getColumnCount();
+    while (other.count() > 0) {
+      Row row = other.fetchOne();
+      ptr->AddRow(InlinedRow(row, colnum));
     }
   }
 }
 
 void SqlResult::AppendDeduplicate(SqlResult &&other) {
-  if (other.impl_) {
-    if (!this->impl_) {
+  if (other.hasData()) {
+    if (!this->hasData()) {
       this->impl_ = std::move(other.impl_);
       return;
     }
 
-    // Turn rows to inlined rows.
-    if (!this->impl_->isInlined()) {
-      this->impl_ = InlineSqlResult(this);
-    }
-
-    // Only add unduplicated rows.
-    size_t colnum = other.getColumnCount();
+    this->MakeInline();
     InlinedSqlResult *ptr =
         reinterpret_cast<InlinedSqlResult *>(this->impl_.get());
+    size_t colnum = other.getColumnCount();
+    // Only add unduplicated rows.
     std::unordered_set<std::string> row_set = ptr->RowSet();
     while (other.count() > 0) {
       Row row = other.fetchOne();
       if (row_set.count(row.StringRepr(colnum)) == 0) {
-        ptr->AddRow(std::move(row));
+        ptr->AddRow(InlinedRow(row, colnum));
       }
     }
   }
+}
+
+void SqlResult::MakeInline() {
+  if (this->impl_->isInlined()) {
+    return;
+  }
+
+  std::vector<InlinedRow> rows;
+  std::vector<Column> cols;
+  size_t colnum = this->getColumnCount();
+  for (size_t i = 0; i < colnum; i++) {
+    cols.push_back(this->getColumn(i));
+  }
+  while (this->count() > 0) {
+    Row row = this->fetchOne();
+    rows.emplace_back(row, colnum);
+  }
+
+  this->impl_ =
+      std::make_unique<InlinedSqlResult>(std::move(rows), std::move(cols));
 }
 
 // MySqlResult.
@@ -91,7 +82,6 @@ Row MySqlResult::fetchOne() {
 }
 size_t MySqlResult::count() { return this->result_.count(); }
 bool MySqlResult::isInlined() const { return false; }
-bool MySqlResult::isNested() const { return false; }
 
 // AugmentedSqlResult.
 bool AugmentedSqlResult::hasData() const { return this->result_.hasData(); }
@@ -118,9 +108,17 @@ Row AugmentedSqlResult::fetchOne() {
 }
 size_t AugmentedSqlResult::count() { return this->result_.count(); }
 bool AugmentedSqlResult::isInlined() const { return false; }
-bool AugmentedSqlResult::isNested() const { return false; }
 
 // InlinedSqlResult.
+InlinedSqlResult::InlinedSqlResult(std::vector<InlinedRow> &&rows,
+                                   std::vector<Column> &&cols)
+    : rows_(), cols_(std::move(cols)), index_(0) {
+  rows_.reserve(rows.size());
+  for (size_t i = 0; i < rows.size(); i++) {
+    rows_.emplace_back(std::make_unique<InlinedRow>(std::move(rows.at(i))));
+  }
+}
+
 bool InlinedSqlResult::hasData() const { return true; }
 uint64_t InlinedSqlResult::getAutoIncrementValue() { return 0; }
 
@@ -132,7 +130,6 @@ Row InlinedSqlResult::fetchOne() {
 }
 size_t InlinedSqlResult::count() { return this->rows_.size() - this->index_; }
 bool InlinedSqlResult::isInlined() const { return true; }
-bool InlinedSqlResult::isNested() const { return false; }
 
 std::unordered_set<std::string> InlinedSqlResult::RowSet() const {
   size_t colnum = this->getColumnCount();
@@ -142,61 +139,8 @@ std::unordered_set<std::string> InlinedSqlResult::RowSet() const {
   }
   return result;
 }
-void InlinedSqlResult::AddRow(Row &&row) {
-  this->rows_.push_back(std::move(row));
-}
-
-// NestedSqlResult.
-bool NestedSqlResult::hasData() const {
-  for (const auto &ptr : this->results_) {
-    if (ptr->hasData()) {
-      return true;
-    }
-  }
-  return false;
-}
-uint64_t NestedSqlResult::getAutoIncrementValue() {
-  return this->results_.front()->getAutoIncrementValue();
-}
-
-size_t NestedSqlResult::getColumnCount() const {
-  return this->results_.front()->getColumnCount();
-}
-Column NestedSqlResult::getColumn(size_t i) const {
-  return this->results_.front()->getColumn(i);
-}
-
-Row NestedSqlResult::fetchOne() {
-  this->count_--;
-  while (this->results_.front()->count() == 0) {
-    this->results_.pop_front();
-  }
-  return this->results_.front()->fetchOne();
-}
-size_t NestedSqlResult::count() { return this->count_; }
-bool NestedSqlResult::isInlined() const { return false; }
-bool NestedSqlResult::isNested() const { return true; }
-
-// Appending and Prepending.
-void NestedSqlResult::Append(std::unique_ptr<SqlResultImpl> &&other) {
-  this->count_ += other->count();
-  if (other->isNested()) {
-    this->results_.splice(
-        this->results_.end(),
-        reinterpret_cast<NestedSqlResult *>(other.get())->results_);
-  } else {
-    this->results_.push_back(std::move(other));
-  }
-}
-void NestedSqlResult::Prepend(std::unique_ptr<SqlResultImpl> &&other) {
-  this->count_ += other->count();
-  if (other->isNested()) {
-    this->results_.splice(
-        this->results_.begin(),
-        reinterpret_cast<NestedSqlResult *>(other.get())->results_);
-  } else {
-    this->results_.push_front(std::move(other));
-  }
+void InlinedSqlResult::AddRow(InlinedRow &&row) {
+  this->rows_.emplace_back(std::make_unique<InlinedRow>(std::move(row)));
 }
 
 }  // namespace mysql

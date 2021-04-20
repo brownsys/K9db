@@ -32,7 +32,6 @@ std::string Row::StringRepr(size_t colnum) const {
 
 // MySqlRow.
 const mysqlx::Value &MySqlRow::get(size_t pos) const { return this->row_[pos]; }
-bool MySqlRow::isInlined() const { return false; }
 
 // AugmentedRow.
 const mysqlx::Value &AugmentedRow::get(size_t pos) const {
@@ -44,13 +43,18 @@ const mysqlx::Value &AugmentedRow::get(size_t pos) const {
     return this->row_[pos - 1];
   }
 }
-bool AugmentedRow::isInlined() const { return false; }
 
 // InlinedRow.
+InlinedRow::InlinedRow(const Row &row, size_t colnum) : values_() {
+  this->values_.reserve(colnum);
+  for (size_t i = 0; i < colnum; i++) {
+    this->values_.push_back(row.get(i));
+  }
+}
+
 const mysqlx::Value &InlinedRow::get(size_t pos) const {
   return this->values_.at(pos);
 }
-bool InlinedRow::isInlined() const { return true; }
 
 }  // namespace mysql
 }  // namespace pelton
