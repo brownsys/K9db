@@ -16,7 +16,9 @@ namespace dataflow {
 class Edge;
 class DataFlowGraph;
 
+#ifdef PELTON_BENCHMARK  // shuts up compiler warnings
 static void JoinOneToOne(benchmark::State &state);
+#endif
 
 class Operator {
  public:
@@ -106,7 +108,9 @@ class Operator {
 
   // Allow DataFlowGraph to use SetGraph, SetIndex, and AddParent functions.
   friend class DataFlowGraph;
+#ifdef PELTON_BENCHMARK  // shuts up compiler warnings
   friend void JoinOneToOne(benchmark::State &state);
+#endif
 };
 
 }  // namespace dataflow

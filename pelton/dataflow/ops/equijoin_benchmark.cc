@@ -1,5 +1,7 @@
 #include <vector>
 
+#define PELTON_BENCHMARK
+
 #include "benchmark/benchmark.h"
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/ops/benchmark-utils.h"
