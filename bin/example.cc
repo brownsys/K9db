@@ -108,32 +108,13 @@ std::vector<std::string> QUERIES{
     "SELECT * FROM submissions WHERE assignment_id = 2;"};
 
 // Printing query results.
-void PrintHeader(const pelton::SqlResult &result) {
-  for (size_t i = 0; i < result.getColumnCount(); i++) {
-    std::cout << "| " << result.getColumn(i).getColumnName() << " ";
-  }
-  std::cout << "|" << std::endl;
-  for (size_t i = 0; i < result.getColumnCount() * 10; i++) {
-    std::cout << "-";
-  }
-  std::cout << std::endl;
-}
-
-void PrintRow(size_t column_count, const pelton::Row &row) {
-  for (size_t i = 0; i < column_count; i++) {
-    std::cout << "| ";
-    row[i].print(std::cout);
-    std::cout << " ";
-  }
-  std::cout << "|" << std::endl;
-}
-
 void Print(pelton::SqlResult &&result) {
-  if (result.hasData()) {
-    PrintHeader(result);
-    while (result.count() > 0) {
-      PrintRow(result.getColumnCount(), result.fetchOne());
-    }
+  if (result.getSchema().size() > 0) {
+    std::cout << result.getSchema() << std::endl;
+  }
+
+  while (result.hasData()) {
+    std::cout << result.fetchOne() << std::endl;
   }
 }
 

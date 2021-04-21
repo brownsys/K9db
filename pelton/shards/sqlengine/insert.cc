@@ -31,7 +31,7 @@ absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
     // Case 1: table is not in any shard.
     // The insertion statement is unmodified.
     std::string insert_str = stmt.Visit(&stringifier);
-    state->connection_pool().ExecuteDefault(insert_str);
+    state->connection_pool().ExecuteDefault(insert_str, {});
 
   } else {  // is_sharded == true
     // Case 2: table is sharded!
@@ -52,13 +52,13 @@ absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
       //               insert.
       if (!state->ShardExists(info.shard_kind, user_id)) {
         for (auto create_stmt : state->CreateShard(info.shard_kind, user_id)) {
-          state->connection_pool().ExecuteShard(create_stmt, info, user_id);
+          state->connection_pool().ExecuteShard(create_stmt, info, user_id, {});
         }
       }
 
       // Add the modified insert statement.
       std::string insert_str = cloned.Visit(&stringifier);
-      state->connection_pool().ExecuteShard(insert_str, info, user_id);
+      state->connection_pool().ExecuteShard(insert_str, info, user_id, {});
     }
   }
 

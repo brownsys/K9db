@@ -42,6 +42,7 @@ absl::Status UpdateRecords(std::vector<dataflow::Record> *records,
   size_t size = records->size();
   for (size_t i = 0; i < size; i++) {
     dataflow::Record record = records->at(i).Copy();
+    record.SetPositive(true);
     for (size_t c = 0; c < updated_cols.size(); c++) {
       const std::string &col_name = updated_cols.at(c);
       int val_index = IndexOfColumn(col_name, table_schema);
@@ -109,8 +110,7 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
   // to update the dataflows.
   MOVE_OR_RETURN(mysql::SqlResult result,
                  select::Shard(stmt.SelectDomain(), state, dataflow_state));
-  std::vector<dataflow::Record> records =
-      dataflow_state->CreateRecords(table_name, std::move(result), false);
+  std::vector<dataflow::Record> records = result.Vectorize();
   size_t old_records_size = records.size();
   CHECK_STATUS(UpdateRecords(&records, stmt, state->GetSchema(table_name)));
 
@@ -119,7 +119,7 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
   if (!is_sharded) {
     // Case 1: table is not in any shard.
     std::string update_str = stmt.Visit(&stringifier);
-    state->connection_pool().ExecuteDefault(update_str);
+    state->connection_pool().ExecuteDefault(update_str, {});
 
   } else {  // is_sharded == true
     // Case 2: table is sharded.
@@ -158,13 +158,14 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
 
             // Execute statement directly against shard.
             std::string update_str = cloned.Visit(&stringifier);
-            state->connection_pool().ExecuteShard(update_str, info, user_id);
+            state->connection_pool().ExecuteShard(update_str, info, user_id,
+                                                  {});
           }
         } else {
           // Update against the relevant shards.
           std::string update_str = cloned.Visit(&stringifier);
           state->connection_pool().ExecuteShards(
-              update_str, info, state->UsersOfShard(info.shard_kind));
+              update_str, info, state->UsersOfShard(info.shard_kind), {});
         }
       }
     }

@@ -58,43 +58,6 @@ bool DataFlowState::HasFlowsFor(const TableName &table_name) const {
   return this->flows_per_input_table_.count(table_name) == 1;
 }
 
-// Process raw data from sharder and use it to update flows.
-std::vector<Record> DataFlowState::CreateRecords(const std::string &table_name,
-                                                 mysql::SqlResult &&sqlresult,
-                                                 bool positive) const {
-  std::vector<Record> records;
-  SchemaRef schema = SchemaRef(this->schema_.at(table_name));
-  // Process each row in result set.
-  while (sqlresult.hasData()) {
-    mysql::Row row = sqlresult.fetchOne();
-    records.emplace_back(schema, positive);
-    for (size_t i = 0; i < schema.size(); i++) {
-      const mysqlx::Value &val = row.get(i);
-      // TODO(babman): it should be the case that augmented values have the
-      //               expected type directly...
-      if (val.getType() == mysqlx::Value::STRING) {
-        records.back().SetValue(val.get<std::string>(), i);
-        continue;
-      }
-      switch (schema.TypeOf(i)) {
-        case sqlast::ColumnDefinition::Type::TEXT:
-          records.back().SetString(std::make_unique<std::string>(val), i);
-          break;
-        case sqlast::ColumnDefinition::Type::INT:
-          records.back().SetInt(val, i);
-          break;
-        case sqlast::ColumnDefinition::Type::UINT:
-          records.back().SetUInt(val, i);
-          break;
-        default:
-          LOG(FATAL) << "Unsupported type in CreateRecord " << schema.TypeOf(i);
-      }
-    }
-  }
-
-  return records;
-}
-
 Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
   // Create an empty positive record with appropriate schema.
   const std::string &table_name = insert_stmt.table_name();

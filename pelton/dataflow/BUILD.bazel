@@ -14,7 +14,6 @@ cc_library(
         ":record",
         ":schema",
         "//pelton/dataflow/ops:input",
-        "//pelton/mysql",
         "//pelton/sqlast:ast",
         "//pelton/util:fs",
         "@glog",

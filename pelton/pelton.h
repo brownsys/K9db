@@ -6,6 +6,8 @@
 #include <string>
 
 #include "absl/status/statusor.h"
+#include "pelton/dataflow/record.h"
+#include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/state.h"
 #include "pelton/mysql/result.h"
 #include "pelton/shards/state.h"
@@ -15,8 +17,8 @@ namespace pelton {
 
 // Expose our mysql-like API to host applications.
 using SqlResult = mysql::SqlResult;
-using Row = mysql::Row;
-using Column = mysql::Column;
+using Schema = dataflow::SchemaRef;
+using Record = dataflow::Record;
 
 class Connection {
  public:

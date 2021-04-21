@@ -60,33 +60,28 @@ jobs:
       run: |
         bazel run bin:example -- --db_username=root --db_password=root \
                                  --logtostderr=1
-        ./bin/drop.sh root root
+
     - name: Run cli samples
       run: |
-        valgrind --error-exitcode=1 --errors-for-leak-kinds=definite \
-                 --show-leak-kinds=definite \
-                 ./bazel-bin/bin/cli --db_username=root --db_password=root \
-                                     --logtostderr=1 \
-                                     < bin/examples/simple-websubmit.sql
+        ./bin/drop.sh root root
+        bazel run bin:cli --config=valgrind -- \
+            --db_username=root --db_password=root --logtostderr=1 \
+            < bin/examples/simple-websubmit.sql
 
         ./bin/drop.sh root root
-        valgrind --error-exitcode=1 --errors-for-leak-kinds=definite \
-                 --show-leak-kinds=definite \
-                 ./bazel-bin/bin/cli --db_username=root --db_password=root \
-                                     --logtostderr=1 \
-                                     < bin/examples/medical_chat.sql
-        ./bin/drop.sh root root
+        bazel run bin:cli --config=valgrind -- \
+            --db_username=root --db_password=root --logtostderr=1 \
+            < bin/examples/medical_chat.sql
+
     - name: Run social chat with restart/recovery
       run: |
         rm -rf /tmp/db && mkdir /tmp/db
-        valgrind --error-exitcode=1 --errors-for-leak-kinds=definite \
-                 --show-leak-kinds=definite \
-                 ./bazel-bin/bin/cli --db_username=root --db_password=root \
-                                     --db_path=/tmp/db --logtostderr=1 \
-                                     < bin/examples/social_chat.sql
-        valgrind --error-exitcode=1 --errors-for-leak-kinds=definite \
-                 --show-leak-kinds=definite \
-                 ./bazel-bin/bin/cli --db_username=root --db_password=root \
-                                     --db_path=/tmp/db --logtostderr=1 \
-                                     < bin/examples/social_chat.cntd.sql
         ./bin/drop.sh root root
+
+        bazel run bin:cli --config=valgrind -- \
+            --db_username=root --db_password=root --logtostderr=1 \
+            --db_path=/tmp/db < bin/examples/social_chat.sql
+
+        bazel run bin:cli --config=valgrind -- \
+            --db_username=root --db_password=root --logtostderr=1 \
+            --db_path=/tmp/db < bin/examples/social_chat.cntd.sql

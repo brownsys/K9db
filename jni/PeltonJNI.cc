@@ -85,39 +85,24 @@ jobject Java_edu_brown_pelton_PeltonJNI_ExecuteQuery(JNIEnv *env, jobject this_,
     absl::StatusOr<pelton::SqlResult> result = pelton::exec(connection, str);
     if (result.ok()) {
       pelton::SqlResult &sqlresult = result.value();
-      size_t col_count = sqlresult.getColumnCount();
+      size_t col_count = sqlresult.getSchema().size();
       // First element in result contains column names / headers.
       jobjectArray column_names =
           env->NewObjectArray(col_count, string_class, NULL);
       for (size_t i = 0; i < col_count; i++) {
         jstring column_name =
-            env->NewStringUTF(sqlresult.getColumn(i).getColumnName().c_str());
+            env->NewStringUTF(sqlresult.getSchema().NameOf(i).c_str());
         env->SetObjectArrayElement(column_names, i, column_name);
       }
       env->CallBooleanMethod(array_list_obj, add_id, column_names);
 
       // Remaining elements contain actual rows.
       while (sqlresult.hasData()) {
-        pelton::Row row = sqlresult.fetchOne();
+        pelton::Record row = sqlresult.fetchOne();
         jobjectArray row_data =
             env->NewObjectArray(col_count, string_class, NULL);
         for (size_t i = 0; i < col_count; i++) {
-          std::string str;
-          const mysqlx::Value &value = row.get(i);
-          switch (value.getType()) {
-            case mysqlx::Value::UINT64:
-              str = std::to_string(value.get<uint64_t>());
-              break;
-            case mysqlx::Value::INT64:
-              str = std::to_string(value.get<int64_t>());
-              break;
-            case mysqlx::Value::STRING:
-              str = static_cast<std::string>(value);
-              break;
-            default:
-              str = "Unrecognized type!";
-          }
-          jstring data = env->NewStringUTF(str.c_str());
+          jstring data = env->NewStringUTF(row.GetValueString(i).c_str());
           env->SetObjectArrayElement(row_data, i, data);
         }
         env->CallBooleanMethod(array_list_obj, add_id, row_data);

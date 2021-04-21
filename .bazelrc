@@ -19,4 +19,4 @@ build:valgrind --copt -g
 build:valgrind --copt -DPELTON_VALGRIND_MODE
 test:valgrind --run_under "valgrind --error-exitcode=1 --leak-check=full"
 test:valgrind --test_output all
-run:valgrind --run_under "valgrind --error-exitcode=1 --errors-for-leak-kinds=definite --show-leak-kinds=definite"
+run:valgrind --run_under "valgrind --error-exitcode=1 --errors-for-leak-kinds=definite --leak-check=full --show-leak-kinds=definite"

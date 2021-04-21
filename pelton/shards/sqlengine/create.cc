@@ -255,7 +255,7 @@ absl::Status Shard(const sqlast::CreateTable &stmt, SharderState *state,
     std::string create_table_str = stmt.Visit(&stringifier);
     state->AddShardKind(table_name, pk);
     state->AddUnshardedTable(table_name, create_table_str);
-    state->connection_pool().ExecuteDefault(create_table_str);
+    state->connection_pool().ExecuteDefault(create_table_str, {});
   } else if (!has_pii && sharding_information.size() > 0) {
     // Case 2: no pii but is linked to shards.
     // This means that this table should be created inside shards of the kind it
@@ -277,7 +277,7 @@ absl::Status Shard(const sqlast::CreateTable &stmt, SharderState *state,
     // The table does not belong to a shard and needs no further modification!
     std::string create_table_str = stmt.Visit(&stringifier);
     state->AddUnshardedTable(table_name, create_table_str);
-    state->connection_pool().ExecuteDefault(create_table_str);
+    state->connection_pool().ExecuteDefault(create_table_str, {});
   } else {
     // Has pii and linked to a shard is a logical schema error.
     return absl::UnimplementedError("Sharded Table cannot have PII fields!");

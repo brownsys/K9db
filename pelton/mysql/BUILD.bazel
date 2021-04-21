@@ -1,20 +1,39 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
 cc_library(
-    name = "mysql",
+    name = "result",
     srcs = [
-        "column.cc",
         "result.cc",
-        "row.cc",
     ],
     hdrs = [
-        "column.h",
         "result.h",
-        "row.h",
     ],
     linkopts = [
         "-lmysqlcppconn8",
     ],
     visibility = ["//:__subpackages__"],
-    deps = [],
+    deps = [
+        ":util",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+    ],
+)
+
+cc_library(
+    name = "util",
+    srcs = [
+        "util.cc",
+    ],
+    hdrs = [
+        "util.h",
+    ],
+    linkopts = [
+        "-lmysqlcppconn8",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "@glog",
+    ],
 )

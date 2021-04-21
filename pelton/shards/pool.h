@@ -31,15 +31,18 @@ class ConnectionPool {
   void Initialize(const std::string &username, const std::string &password);
 
   // Execute statement against the default un-sharded database.
-  mysql::SqlResult ExecuteDefault(const std::string &sql);
+  mysql::SqlResult ExecuteDefault(const std::string &sql,
+                                  const dataflow::SchemaRef &schema);
 
   // Execute statement against given user shard(s).
   mysql::SqlResult ExecuteShard(const std::string &sql,
                                 const ShardingInformation &info,
-                                const UserId &user_id);
+                                const UserId &user_id,
+                                const dataflow::SchemaRef &schema);
   mysql::SqlResult ExecuteShards(const std::string &sql,
                                  const ShardingInformation &info,
-                                 const std::unordered_set<UserId> &user_ids);
+                                 const std::unordered_set<UserId> &user_ids,
+                                 const dataflow::SchemaRef &schema);
 
   void RemoveShard(const std::string &shard_name);
 

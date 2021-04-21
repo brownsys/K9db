@@ -28,8 +28,7 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
   if (update_flows) {
     MOVE_OR_RETURN(mysql::SqlResult result,
                    select::Shard(stmt.SelectDomain(), state, dataflow_state));
-    records =
-        dataflow_state->CreateRecords(table_name, std::move(result), false);
+    records = result.Vectorize();
   }
 
   // Must transform the delete statement into one that is compatible with
@@ -58,7 +57,7 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
     // Turn the delete statement back to a string, to delete relevant row in
     // PII table.
     std::string delete_str = stmt.Visit(&stringifier);
-    state->connection_pool().ExecuteDefault(delete_str);
+    state->connection_pool().ExecuteDefault(delete_str, {});
 
     // TODO(babman): Update dataflow after user has been deleted.
     // return absl::UnimplementedError("Dataflow not updated after a user
@@ -67,7 +66,7 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
   } else if (!is_sharded && !is_pii) {
     // Case 2: Table does not have PII and is not sharded!
     std::string delete_str = stmt.Visit(&stringifier);
-    state->connection_pool().ExecuteDefault(delete_str);
+    state->connection_pool().ExecuteDefault(delete_str, {});
 
   } else {  // is_shared == true
     // Case 3: Table is sharded!
@@ -91,13 +90,13 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
 
           // Execute statement directly against shard.
           std::string delete_str = cloned.Visit(&stringifier);
-          state->connection_pool().ExecuteShard(delete_str, info, user_id);
+          state->connection_pool().ExecuteShard(delete_str, info, user_id, {});
         }
       } else {
         // Execute statement against all shards of this kind.
         std::string delete_str = cloned.Visit(&stringifier);
         state->connection_pool().ExecuteShards(
-            delete_str, info, state->UsersOfShard(info.shard_kind));
+            delete_str, info, state->UsersOfShard(info.shard_kind), {});
       }
     }
   }

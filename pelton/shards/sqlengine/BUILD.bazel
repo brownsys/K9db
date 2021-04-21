@@ -17,7 +17,7 @@ cc_library(
         ":update",
         ":view",
         "//pelton/dataflow:state",
-        "//pelton/mysql",
+        "//pelton/mysql:result",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sqlast:ast",
@@ -80,7 +80,7 @@ cc_library(
     ],
     deps = [
         "//pelton/dataflow:state",
-        "//pelton/mysql",
+        "//pelton/mysql:result",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sqlast:ast",
@@ -162,7 +162,7 @@ cc_library(
     ],
     deps = [
         "//pelton/dataflow:state",
-        "//pelton/mysql",
+        "//pelton/mysql:result",
         "//pelton/planner",
         "//pelton/shards:state",
         "//pelton/shards:types",
