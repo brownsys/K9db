@@ -46,3 +46,7 @@ CREATE TABLE hats ( \
   FOREIGN KEY (OWNER_user_id) REFERENCES users(id), \
   FOREIGN KEY (OWNER_granted_by_user_id) REFERENCES users(id) \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+INSERT INTO users VALUES (1, 'admin', 1);
+INSERT INTO users VALUES (2, 'joe', 0);
+INSERT INTO comments VALUES (1, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 'asdf', 1, 2, NULL, NULL, 'yo', 0, 0, 0, NULL, 0, 0, 0, NULL);
