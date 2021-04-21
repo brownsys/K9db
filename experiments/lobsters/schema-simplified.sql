@@ -63,6 +63,48 @@ CREATE TABLE invitation_requests ( \
 	created_at datetime NOT NULL, \
 	updated_at datetime NOT NULL \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE invitations ( \
+	id int NOT NULL PRIMARY KEY, \
+	OWNER_user_id int, \
+	email varchar(255), \
+	code varchar(255), \
+	created_at datetime NOT NULL, \
+	updated_at datetime NOT NULL, \
+  memo text, \
+  FOREIGN KEY (OWNER_user_id) REFERENCES users(id) \
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE keystores ( \
+	`key` varchar(50) NOT NULL, \
+	value int, \
+	PRIMARY KEY (`key`) \
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+CREATE TABLE messages ( \
+	id int NOT NULL PRIMARY KEY, \
+	created_at datetime, \
+	OWNER_author_user_id int, \
+	OWNER_recipient_user_id int, \
+	has_been_read int, \
+	subject varchar(100), \
+	body text, \
+	short_id varchar(30), \
+	deleted_by_author int, \
+	deleted_by_recipient int, \
+  FOREIGN KEY (OWNER_author_user_id) REFERENCES users(id), \
+  FOREIGN KEY (OWNER_recipient_user_id) REFERENCES users(id) \
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE moderations ( \
+	id int NOT NULL PRIMARY KEY, \
+	created_at datetime NOT NULL, \
+	updated_at datetime NOT NULL, \
+	OWNER_moderator_user_id int, \
+	story_id int, \
+	comment_id int, \
+	OWNER_user_id int, \
+	`action` text, \
+	reason text, \
+	is_from_suggestions int, \
+  FOREIGN KEY (OWNER_moderator_user_id) REFERENCES users(id) \
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 INSERT INTO users VALUES (1, 'admin', 1);
