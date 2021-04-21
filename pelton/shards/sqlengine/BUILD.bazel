@@ -17,6 +17,7 @@ cc_library(
         ":update",
         ":view",
         "//pelton/dataflow:state",
+        "//pelton/mysql:result",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sqlast:ast",
@@ -79,11 +80,11 @@ cc_library(
     ],
     deps = [
         "//pelton/dataflow:state",
+        "//pelton/mysql:result",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
-        "//pelton/util:status",
         "@absl//absl/status",
     ],
 )
@@ -140,6 +141,10 @@ cc_library(
     hdrs = [
         "util.h",
     ],
+    linkopts = [
+        "-lssl",
+        "-lcrypto",
+    ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
         "//pelton/shards:types",
@@ -157,6 +162,7 @@ cc_library(
     ],
     deps = [
         "//pelton/dataflow:state",
+        "//pelton/mysql:result",
         "//pelton/planner",
         "//pelton/shards:state",
         "//pelton/shards:types",

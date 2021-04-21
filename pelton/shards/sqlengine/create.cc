@@ -9,7 +9,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/status/statusor.h"
 #include "absl/strings/match.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/perf.h"
@@ -232,8 +231,7 @@ sqlast::CreateTable UpdateTableSchema(sqlast::CreateTable stmt,
 }  // namespace
 
 absl::Status Shard(const sqlast::CreateTable &stmt, SharderState *state,
-                   dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output) {
+                   dataflow::DataFlowState *dataflow_state) {
   perf::Start("Create");
 
   const std::string &table_name = stmt.table_name();
@@ -257,8 +255,7 @@ absl::Status Shard(const sqlast::CreateTable &stmt, SharderState *state,
     std::string create_table_str = stmt.Visit(&stringifier);
     state->AddShardKind(table_name, pk);
     state->AddUnshardedTable(table_name, create_table_str);
-    CHECK_STATUS(
-        state->connection_pool().ExecuteDefault(create_table_str, output));
+    state->connection_pool().ExecuteDefault(create_table_str, {});
   } else if (!has_pii && sharding_information.size() > 0) {
     // Case 2: no pii but is linked to shards.
     // This means that this table should be created inside shards of the kind it
@@ -280,14 +277,14 @@ absl::Status Shard(const sqlast::CreateTable &stmt, SharderState *state,
     // The table does not belong to a shard and needs no further modification!
     std::string create_table_str = stmt.Visit(&stringifier);
     state->AddUnshardedTable(table_name, create_table_str);
-    CHECK_STATUS(
-        state->connection_pool().ExecuteDefault(create_table_str, output));
+    state->connection_pool().ExecuteDefault(create_table_str, {});
   } else {
     // Has pii and linked to a shard is a logical schema error.
     return absl::UnimplementedError("Sharded Table cannot have PII fields!");
   }
 
   state->AddSchema(table_name, stmt);
+  dataflow_state->AddTableSchema(stmt);
 
   perf::End("Create");
   return absl::OkStatus();

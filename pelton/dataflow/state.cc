@@ -6,8 +6,10 @@
 #include "pelton/dataflow/state.h"
 
 #include <fstream>
+#include <memory>
 #include <utility>
 
+#include "glog/logging.h"
 #include "pelton/util/fs.h"
 
 #define STATE_FILE_NAME ".dataflow.state"
@@ -56,22 +58,25 @@ bool DataFlowState::HasFlowsFor(const TableName &table_name) const {
   return this->flows_per_input_table_.count(table_name) == 1;
 }
 
-// Process raw records from sharder into flows.
-bool DataFlowState::ProcessRawRecords(
-    const std::vector<shards::RawRecord> &raw_records) {
-  // Construct schema-full records.
-  std::unordered_map<std::string, std::vector<Record>> records;
-  for (shards::RawRecord raw : raw_records) {
-    records[raw.table_name].push_back(this->CreateRecord(raw));
+Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
+  // Create an empty positive record with appropriate schema.
+  const std::string &table_name = insert_stmt.table_name();
+  SchemaRef schema = SchemaRef(this->schema_.at(table_name));
+  Record record{schema, true};
+
+  // Fill in record with data.
+  bool has_cols = insert_stmt.HasColumns();
+  const std::vector<std::string> &cols = insert_stmt.GetColumns();
+  const std::vector<std::string> &vals = insert_stmt.GetValues();
+  for (size_t i = 0; i < vals.size(); i++) {
+    size_t schema_index = i;
+    if (has_cols) {
+      schema_index = schema.IndexOf(cols.at(i));
+    }
+    record.SetValue(vals.at(i), schema_index);
   }
 
-  // Process them via flow.
-  for (const auto &[table_name, rs] : records) {
-    if (!this->ProcessRecords(table_name, rs)) {
-      return false;
-    }
-  }
-  return true;
+  return record;
 }
 
 bool DataFlowState::ProcessRecords(const TableName &table_name,
@@ -87,26 +92,12 @@ bool DataFlowState::ProcessRecords(const TableName &table_name,
   return true;
 }
 
-// Creating and processing records from raw data.
-Record DataFlowState::CreateRecord(const shards::RawRecord &raw_record) const {
-  SchemaRef schema = SchemaRef(this->schema_.at(raw_record.table_name));
-  Record record{schema, raw_record.positive};
-  for (size_t i = 0; i < raw_record.values.size(); i++) {
-    size_t schema_index = i;
-    if (raw_record.columns.size() > 0) {
-      schema_index = schema.IndexOf(raw_record.columns.at(i));
-    }
-    record.SetValue(raw_record.values.at(i), schema_index);
-  }
-  return record;
-}
-
 // Load state from its durable file (if exists).
 void DataFlowState::Load(const std::string &dir_path) {
   // State file does not exists: this is a fresh database that was not
   // created previously!
   std::string state_file_path = dir_path + STATE_FILE_NAME;
-  if (dir_path == ":memory:" || !util::FileExists(state_file_path)) {
+  if (!util::FileExists(state_file_path)) {
     return;
   }
 
@@ -158,10 +149,6 @@ void DataFlowState::Load(const std::string &dir_path) {
 
 // Save state to durable file.
 void DataFlowState::Save(const std::string &dir_path) {
-  if (dir_path == ":memory:") {
-    return;
-  }
-
   // Open state file for writing.
   std::ofstream state_file;
   util::OpenWrite(&state_file, dir_path + STATE_FILE_NAME);

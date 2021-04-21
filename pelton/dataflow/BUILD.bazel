@@ -14,9 +14,9 @@ cc_library(
         ":record",
         ":schema",
         "//pelton/dataflow/ops:input",
-        "//pelton/shards:state",
         "//pelton/sqlast:ast",
         "//pelton/util:fs",
+        "@glog",
     ],
 )
 

@@ -9,15 +9,16 @@ cc_library(
         "pool.h",
     ],
     linkopts = [
-        "-lsqlite3",
+        "-lmysqlcppconn8",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":types",
+        "//pelton/dataflow:schema",
+        "//pelton/mysql:result",
         "//pelton/shards/sqlengine:util",
         "//pelton/util:perf",
         "@absl//absl/status",
-        "@absl//absl/strings",
         "@glog",
     ],
 )

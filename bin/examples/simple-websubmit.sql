@@ -2,20 +2,20 @@ SET echo;
 
 CREATE TABLE students ( \
   ID int, \
-  PII_Name varchar(100), \
+  PII_Name text, \
   PRIMARY KEY(ID) \
 );
 
 CREATE TABLE assignments ( \
   ID int, \
-  Name varchar(100), \
+  Name text, \
   PRIMARY KEY(ID) \
 );
 
 CREATE TABLE submissions ( \
   student_id int, \
   assignment_id int, \
-  "timestamp" int, \
+  timestamp int, \
   FOREIGN KEY (student_id) REFERENCES students(ID), \
   FOREIGN KEY (assignment_id) REFERENCES assignments(ID) \
 );
@@ -44,6 +44,6 @@ SELECT * FROM submissions WHERE student_id = 1 AND assignment_id = 2;
 DELETE FROM students WHERE ID = 1;
 SELECT * FROM submissions;
 
-UPDATE submissions SET "timestamp" = 20 WHERE student_id = 2 AND assignment_id = 1;
-UPDATE submissions SET "timestamp" = 30 WHERE assignment_id = 2;
+UPDATE submissions SET timestamp = 20 WHERE student_id = 2 AND assignment_id = 1;
+UPDATE submissions SET timestamp = 30 WHERE assignment_id = 2;
 SELECT * FROM submissions;

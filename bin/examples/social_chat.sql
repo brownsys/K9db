@@ -2,7 +2,7 @@ SET echo;
 
 CREATE TABLE Users ( \
   id int, \
-  PII_name varchar(100), \
+  PII_name text, \
   PRIMARY KEY(id) \
 );
 
@@ -10,7 +10,7 @@ CREATE TABLE chat ( \
   id int, \
   OWNER_sender_id int, \
   OWNER_receiver_id int, \
-  message varchar, \
+  message text, \
   PRIMARY KEY(id), \
   FOREIGN KEY (OWNER_sender_id) REFERENCES Users(id), \
   FOREIGN KEY (OWNER_receiver_id) REFERENCES Users(id) \

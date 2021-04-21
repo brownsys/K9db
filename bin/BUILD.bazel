@@ -8,9 +8,7 @@ cc_binary(
     deps = [
         "//pelton",
         "//pelton/util:perf",
-        "@absl//absl/flags:flag",
-        "@absl//absl/flags:parse",
-        "@absl//absl/flags:usage",
+        "@gflags",
         "@glog",
     ],
 )
@@ -23,26 +21,22 @@ cc_binary(
     deps = [
         "//pelton",
         "//pelton/util:perf",
-        "@absl//absl/flags:flag",
-        "@absl//absl/flags:parse",
-        "@absl//absl/flags:usage",
+        "@gflags",
         "@glog",
     ],
 )
 
 cc_binary(
-    name = "sqlite",
+    name = "mysql",
     srcs = [
-        "sqlite.cc",
+        "mysql.cc",
     ],
     linkopts = [
-        "-lsqlite3",
+        "-lmysqlcppconn8",
     ],
     deps = [
         "//pelton/util:perf",
-        "@absl//absl/flags:flag",
-        "@absl//absl/flags:parse",
-        "@absl//absl/flags:usage",
+        "@gflags",
         "@glog",
     ],
 )

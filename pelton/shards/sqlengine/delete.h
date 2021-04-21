@@ -16,7 +16,7 @@ namespace delete_ {
 
 absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
                    dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output, bool update_flows = true);
+                   bool update_flows = true);
 
 }  // namespace delete_
 }  // namespace sqlengine

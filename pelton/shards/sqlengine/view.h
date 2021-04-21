@@ -3,8 +3,9 @@
 #ifndef PELTON_SHARDS_SQLENGINE_VIEW_H_
 #define PELTON_SHARDS_SQLENGINE_VIEW_H_
 
-#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "pelton/dataflow/state.h"
+#include "pelton/mysql/result.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
 #include "pelton/sqlast/ast.h"
@@ -17,9 +18,9 @@ namespace view {
 absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
                         dataflow::DataFlowState *dataflow_state);
 
-absl::Status SelectView(const sqlast::Select &stmt, SharderState *state,
-                        dataflow::DataFlowState *dataflow_state,
-                        const OutputChannel &output);
+absl::StatusOr<mysql::SqlResult> SelectView(
+    const sqlast::Select &stmt, SharderState *state,
+    dataflow::DataFlowState *dataflow_state);
 
 }  // namespace view
 }  // namespace sqlengine

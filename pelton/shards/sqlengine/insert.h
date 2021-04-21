@@ -3,7 +3,7 @@
 #ifndef PELTON_SHARDS_SQLENGINE_INSERT_H_
 #define PELTON_SHARDS_SQLENGINE_INSERT_H_
 
-#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
@@ -16,7 +16,7 @@ namespace insert {
 
 absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
                    dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output, bool update_flows = true);
+                   bool update_flows = true);
 
 }  // namespace insert
 }  // namespace sqlengine

@@ -5,11 +5,20 @@
 #include <functional>
 #include <string>
 
+#include "absl/status/statusor.h"
+#include "pelton/dataflow/record.h"
+#include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/state.h"
+#include "pelton/mysql/result.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
 
 namespace pelton {
+
+// Expose our mysql-like API to host applications.
+using SqlResult = mysql::SqlResult;
+using Schema = dataflow::SchemaRef;
+using Record = dataflow::Record;
 
 class Connection {
  public:
@@ -21,29 +30,41 @@ class Connection {
   Connection(const Connection &&) = delete;
   Connection &operator=(const Connection &&) = delete;
 
+  void Initialize(const std::string &path) {
+    this->path_ = path;
+    if (this->path_.size() > 0 && this->path_.back() != '/') {
+      this->path_ += "/";
+    }
+  }
+
   // Getters.
   shards::SharderState *GetSharderState() { return &this->sharder_state_; }
   dataflow::DataFlowState *GetDataFlowState() { return &this->dataflow_state_; }
 
   // State persistance.
   void Save() {
-    this->sharder_state_.Save();
-    this->dataflow_state_.Save(this->sharder_state_.dir_path());
+    if (this->path_.size() > 0) {
+      this->sharder_state_.Save(this->path_);
+      this->dataflow_state_.Save(this->path_);
+    }
   }
   void Load() {
-    this->sharder_state_.Load();
-    this->dataflow_state_.Load(this->sharder_state_.dir_path());
+    if (this->path_.size() > 0) {
+      this->sharder_state_.Load(this->path_);
+      this->dataflow_state_.Load(this->path_);
+    }
   }
 
  private:
   shards::SharderState sharder_state_;
   dataflow::DataFlowState dataflow_state_;
+  std::string path_;
 };
 
-bool open(const std::string &directory, Connection *connection);
+bool open(const std::string &directory, const std::string &db_username,
+          const std::string &db_password, Connection *connection);
 
-bool exec(Connection *connection, std::string sql,
-          const shards::Callback &callback, void *context, char **errmsg);
+absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql);
 
 bool close(Connection *connection);
 

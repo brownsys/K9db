@@ -24,7 +24,7 @@ std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
     first = false;
     result += col;
   }
-  result += ");";
+  result += ")";
   perf::End("Stringify (create)");
   return result;
 }
@@ -76,7 +76,7 @@ std::string Stringifier::VisitInsert(const Insert &ast) {
     first = false;
     result += val;
   }
-  result += ");";
+  result += ")";
   perf::End("Stringify (insert)");
   return result;
 }
@@ -95,7 +95,6 @@ std::string Stringifier::VisitUpdate(const Update &ast) {
   if (ast.HasWhereClause()) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
-  result += ";";
   perf::End("Stringify (update)");
   return result;
 }
@@ -114,7 +113,6 @@ std::string Stringifier::VisitSelect(const Select &ast) {
   if (ast.HasWhereClause()) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
-  result += ";";
   perf::End("Stringify (select)");
   return result;
 }
@@ -124,7 +122,6 @@ std::string Stringifier::VisitDelete(const Delete &ast) {
   if (ast.HasWhereClause()) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
-  result += ";";
   perf::End("Stringify (delete)");
   return result;
 }

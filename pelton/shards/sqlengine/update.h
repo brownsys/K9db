@@ -15,8 +15,7 @@ namespace sqlengine {
 namespace update {
 
 absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
-                   dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output);
+                   dataflow::DataFlowState *dataflow_state);
 
 }  // namespace update
 }  // namespace sqlengine
