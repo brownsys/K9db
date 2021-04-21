@@ -64,10 +64,12 @@ std::string ColumnDefinition::TypeToString(ColumnDefinition::Type type) {
   switch (type) {
     case Type::INT:
       return "INT";
+    case Type::DATETIME:
+      return "DATETIME";
     case Type::TEXT:
       return "VARCHAR(100)";
     default:
-      LOG(FATAL) << "Unsupported column type!";
+      LOG(FATAL) << "Unsupported column type: " << type;
   }
 }
 
@@ -175,8 +177,11 @@ std::ostream &operator<<(std::ostream &os, const ColumnDefinition::Type &r) {
     case ColumnDefinition::Type::UINT:
       os << "UINT";
       break;
+    case ColumnDefinition::Type::DATETIME:
+      os << "DATETIME";
+      break;
     default:
-      LOG(FATAL) << "Unsupported column type!";
+      LOG(FATAL) << "Unsupported column type: " << r;
   }
   return os;
 }
