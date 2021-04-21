@@ -10,9 +10,12 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalFilter;
+import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalUnion;
+import org.apache.calcite.rel.logical.LogicalAggregate;
+import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexDynamicParam;
 import org.apache.calcite.rex.RexInputRef;
@@ -276,5 +279,66 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     // Propagate up to parents.
     this.childrenOperators.peek().add(joinOperator);
     return join;
+  }
+
+  @Override
+  public RelNode visit(LogicalProject project){
+    // Add a new level in the stack to store ids of the direct children operators.
+    this.childrenOperators.push(new ArrayList<Integer>());
+
+    // Visit children.
+    visitChildren(project);
+
+    // Get IDs of generated children.
+    ArrayList<Integer> children = this.childrenOperators.pop();
+    assert children.size() == 1;
+
+    ArrayList<Integer> cids = new ArrayList<Integer>();
+		for(RexNode item : project.getProjects()) {
+			cids.add(Integer.parseInt(item.toString().substring(1)));
+		}
+    int projectOperator = this.generator.AddProjectOperator(children.get(0), cids.stream().mapToInt(i -> i).toArray());
+    this.childrenOperators.peek().add(projectOperator);
+    return project;
+  }
+
+  @Override
+  public RelNode visit(LogicalAggregate aggregate){
+    // Add a new level in the stack to store ids of the direct children operators.
+    this.childrenOperators.push(new ArrayList<Integer>());
+
+    // Visit children.
+    visitChildren(aggregate);
+
+    // Get IDs of generated children.
+    ArrayList<Integer> children = this.childrenOperators.pop();
+    assert children.size() == 1;
+
+    List<Integer> groupCols = aggregate.getGroupSet().toList();
+    // We only support a single aggregate function per operator at the moment
+    assert aggregate.getAggCallList().size() == 1;
+    AggregateCall aggCall = aggregate.getAggCallList().get(0);
+    int functionEnum = -1;
+    int aggCol = -1;
+    switch(aggCall.getAggregation().getKind()){
+      case COUNT:
+        functionEnum = DataFlowGraphLibrary.COUNT;
+        // Count does not have an aggregate column, for safety the data flow
+        // operator also does not depend on it.
+        assert aggCall.getArgList().size() == 0;
+        aggCol = -1;
+        break;
+      case SUM:
+        functionEnum = DataFlowGraphLibrary.SUM;
+        assert aggCall.getArgList().size() == 1;
+        aggCol = aggCall.getArgList().get(0);
+        break;
+      default:
+        throw new IllegalArgumentException("Invalid aggregate function");
+    }
+
+    int aggregateOperator = this.generator.AddAggregateOperator(children.get(0), groupCols.stream().mapToInt(i -> i).toArray(), functionEnum, aggCol);
+    this.childrenOperators.peek().add(aggregateOperator);
+    return aggregate;
   }
 }

@@ -12,8 +12,8 @@
 namespace pelton {
 namespace dataflow {
 
-bool EnclosedKeyCols(const std::vector<ColumnID> &input_keycols,
-                     const std::vector<ColumnID> &cids) {
+bool ProjectOperator::EnclosedKeyCols(const std::vector<ColumnID> &input_keycols,
+                     const std::vector<ColumnID> &cids) const {
   for (const auto &keycol : input_keycols) {
     bool is_present = false;
     for (const auto &cid : cids)

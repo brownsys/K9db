@@ -32,6 +32,7 @@ class ProjectOperator : public Operator {
  private:
   const std::vector<ColumnID> cids_;
   SchemaOwner owned_output_schema_;
+  bool EnclosedKeyCols(const std::vector<ColumnID> &input_keycols, const std::vector<ColumnID> &cids) const;
   // Allow tests to use .Process(...) directly.
   FRIEND_TEST(ProjectOperatorTest, BatchTest);
   FRIEND_TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest);
