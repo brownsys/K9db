@@ -151,6 +151,7 @@ class Record {
   void SetValue(const std::string &value, size_t i);
 
   // Accessors.
+  void SetPositive(bool positive) { this->positive_ = positive; }
   const SchemaRef &schema() const { return this->schema_; }
   bool IsPositive() const { return this->positive_; }
   int GetTimestamp() const { return this->timestamp_; }

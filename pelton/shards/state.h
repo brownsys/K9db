@@ -44,12 +44,11 @@ class SharderState {
   SharderState &operator=(const SharderState &&) = delete;
 
   // Accessors.
-  const std::string &dir_path() const { return this->dir_path_; }
-
   ConnectionPool &connection_pool() { return this->connection_pool_; }
 
   // Initialization.
-  void Initialize(const std::string &dir_path);
+  void Initialize(const std::string &db_username,
+                  const std::string &db_password);
 
   // Schema manipulations.
   void AddSchema(const UnshardedTableName &table_name,
@@ -89,16 +88,13 @@ class SharderState {
   const std::unordered_set<UserId> &UsersOfShard(const ShardKind &kind) const;
 
   // Save state to durable file.
-  void Save();
+  void Save(const std::string &dir_path);
 
   // Load state from its durable file (if exists).
-  void Load();
+  void Load(const std::string &dir_path);
 
  private:
-  // Directory in which all shards are stored.
-  std::string dir_path_;
-  bool in_memory_;
-
+  // The logical (unsharded) schema of every table.
   std::unordered_map<UnshardedTableName, sqlast::CreateTable> schema_;
 
   // All shard kinds as determined from the schema.

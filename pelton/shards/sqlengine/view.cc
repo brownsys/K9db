@@ -5,9 +5,9 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
-#include "absl/status/statusor.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/value.h"
 #include "pelton/planner/planner.h"
@@ -20,30 +20,6 @@ namespace sqlengine {
 namespace view {
 
 namespace {
-
-void CopyColumns(const std::vector<std::string> cols, char **out) {
-  for (size_t i = 0; i < cols.size(); i++) {
-    const std::string &str = cols.at(i);
-    out[i] = new char[str.size() + 1];
-    // NOLINTNEXTLINE
-    strcpy(out[i], str.c_str());
-  }
-}
-
-void CopyValues(const dataflow::Record &record, char **out) {
-  for (size_t i = 0; i < record.schema().size(); i++) {
-    std::string str = record.GetValueString(i);
-    out[i] = new char[str.size() + 1];
-    // NOLINTNEXTLINE
-    strcpy(out[i], str.c_str());
-  }
-}
-
-void DeleteValues(size_t n, char **vs) {
-  for (size_t i = 0; i < n; i++) {
-    delete[] vs[i];
-  }
-}
 
 absl::StatusOr<std::string> GetColumnName(const sqlast::BinaryExpression *exp) {
   const sqlast::Expression *left = exp->GetLeft();
@@ -85,9 +61,10 @@ absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
   return absl::OkStatus();
 }
 
-absl::Status SelectView(const sqlast::Select &stmt, SharderState *state,
-                        dataflow::DataFlowState *dataflow_state,
-                        const OutputChannel &output) {
+absl::StatusOr<mysql::SqlResult> SelectView(
+    const sqlast::Select &stmt, SharderState *state,
+    dataflow::DataFlowState *dataflow_state) {
+  // TODO(babman): fix this.
   perf::Start("SelectView");
 
   // Get the corresponding flow.
@@ -103,12 +80,7 @@ absl::Status SelectView(const sqlast::Select &stmt, SharderState *state,
   auto matview = flow.outputs().at(0);
   const dataflow::SchemaRef &schema = matview->output_schema();
 
-  // Allocate memory for data to read into.
-  std::vector<std::string> cols = schema.column_names();
-  size_t colnum = cols.size();
-  char **colnames = new char *[colnum];
-  char **colvals = new char *[colnum];
-  CopyColumns(cols, colnames);
+  std::vector<dataflow::Record> records;
 
   // Check parameters.
   size_t offset = stmt.offset();
@@ -139,9 +111,7 @@ absl::Status SelectView(const sqlast::Select &stmt, SharderState *state,
         for (const auto &key : matview->Keys()) {
           for (const auto &record :
                matview->LookupGreater(key, cmp, limit, offset)) {
-            CopyValues(record, colvals);
-            output.callback(output.context, colnum, colvals, colnames);
-            DeleteValues(colnum, colvals);
+            records.push_back(record.Copy());
           }
         }
         break;
@@ -167,9 +137,7 @@ absl::Status SelectView(const sqlast::Select &stmt, SharderState *state,
 
         // Read records attached to key.
         for (const auto &record : matview->Lookup(key, limit, offset)) {
-          CopyValues(record, colvals);
-          output.callback(output.context, colnum, colvals, colnames);
-          DeleteValues(colnum, colvals);
+          records.push_back(record.Copy());
         }
         break;
       }
@@ -181,20 +149,14 @@ absl::Status SelectView(const sqlast::Select &stmt, SharderState *state,
     // No where condition: we are reading everything (keys and records).
     for (const auto &key : matview->Keys()) {
       for (const auto &record : matview->Lookup(key, limit, offset)) {
-        CopyValues(record, colvals);
-        output.callback(output.context, colnum, colvals, colnames);
-        DeleteValues(colnum, colvals);
+        records.push_back(record.Copy());
       }
     }
   }
 
-  DeleteValues(colnum, colnames);
-  delete[] colnames;
-  delete[] colvals;
-
   perf::End("SelectView");
-
-  return absl::OkStatus();
+  return mysql::SqlResult(
+      std::make_unique<mysql::InlinedSqlResult>(std::move(records)), schema);
 }
 
 }  // namespace view

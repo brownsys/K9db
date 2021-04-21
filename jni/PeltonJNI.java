@@ -11,7 +11,7 @@ public class PeltonJNI {
   private long connection = 0;
 
   // Opens a DB connection.
-  private native void Open(String directory);
+  private native void Open(String directory, String username, String password);
   public native boolean ExecuteDDL(String sql);
   public native int ExecuteUpdate(String sql);
   public native ArrayList<String[]> ExecuteQuery(String sql);
@@ -19,7 +19,7 @@ public class PeltonJNI {
   // Closes the DB connection.
   public native void Close();
   
-  public PeltonJNI(String directory) {
-    this.Open(directory);
+  public PeltonJNI(String directory, String username, String password) {
+    this.Open(directory, username, password);
   }  
 }

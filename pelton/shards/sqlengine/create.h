@@ -15,8 +15,7 @@ namespace sqlengine {
 namespace create {
 
 absl::Status Shard(const sqlast::CreateTable &stmt, SharderState *state,
-                   dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output);
+                   dataflow::DataFlowState *dataflow_state);
 
 }  // namespace create
 }  // namespace sqlengine

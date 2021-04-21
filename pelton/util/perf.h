@@ -2,7 +2,7 @@
 #ifndef PELTON_UTIL_PERF_H_
 #define PELTON_UTIL_PERF_H_
 
-// #define PELTON_USE_PERF
+#define PELTON_USE_PERF
 
 // NOLINTNEXTLINE
 #include <chrono>

@@ -11,7 +11,6 @@
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
-#include "pelton/shards/state.h"
 #include "pelton/sqlast/ast.h"
 
 #ifndef PELTON_DATAFLOW_STATE_H_
@@ -50,16 +49,13 @@ class DataFlowState {
   // Load state from its durable file (if exists).
   void Load(const std::string &dir_path);
 
-  // Process raw records from sharder into flows.
-  bool ProcessRawRecords(const std::vector<shards::RawRecord> &raw_records);
+  Record CreateRecord(const sqlast::Insert &insert_stmt) const;
 
- private:
+  // Process raw data from sharder and use it to update flows.
   bool ProcessRecords(const TableName &table_name,
                       const std::vector<Record> &records);
 
-  // Creating and processing records from raw data.
-  Record CreateRecord(const shards::RawRecord &raw_record) const;
-
+ private:
   // Maps every table to its logical schema.
   // The logical schema is the contract between client code and our DB.
   // The stored schema may not matched the concrete/physical one due to sharding

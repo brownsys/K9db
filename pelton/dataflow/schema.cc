@@ -31,7 +31,13 @@ const std::vector<sqlast::ColumnDefinition::Type> &SchemaOwner::column_types()
 const std::vector<ColumnID> &SchemaOwner::keys() const {
   return this->ptr_->keys;
 }
-size_t SchemaOwner::size() const { return this->ptr_->column_names.size(); }
+size_t SchemaOwner::size() const {
+  if (this->ptr_ == nullptr) {
+    return 0;
+  } else {
+    return this->ptr_->column_names.size();
+  }
+}
 
 // Accessor by index.
 sqlast::ColumnDefinition::Type SchemaOwner::TypeOf(size_t i) const {

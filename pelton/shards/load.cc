@@ -17,11 +17,11 @@
 namespace pelton {
 namespace shards {
 
-void SharderState::Load() {
+void SharderState::Load(const std::string &dir_path) {
   // State file does not exists: this is a fresh database that was not
   // created previously!
-  std::string state_file_path = this->dir_path_ + STATE_FILE_NAME;
-  if (this->in_memory_ || !util::FileExists(state_file_path)) {
+  std::string state_file_path = dir_path + STATE_FILE_NAME;
+  if (!util::FileExists(state_file_path)) {
     return;
   }
 
@@ -111,14 +111,10 @@ void SharderState::Load() {
   state_file.close();
 }
 
-void SharderState::Save() {
-  if (this->in_memory_) {
-    return;
-  }
-
+void SharderState::Save(const std::string &dir_path) {
   // Open state file for writing.
   std::ofstream state_file;
-  util::OpenWrite(&state_file, this->dir_path_ + STATE_FILE_NAME);
+  util::OpenWrite(&state_file, dir_path + STATE_FILE_NAME);
 
   // Begin writing.
   for (const auto &[table, schema] : this->schema_) {
