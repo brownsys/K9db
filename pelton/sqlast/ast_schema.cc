@@ -53,8 +53,10 @@ ColumnDefinition::Type ColumnDefinition::StringToType(
   } else if (absl::StartsWithIgnoreCase(column_type, "VARCHAR") ||
              absl::EqualsIgnoreCase(column_type, "TEXT")) {
     return Type::TEXT;
+  } else if (absl::StartsWithIgnoreCase(column_type, "DATETIME")) {
+    return Type::DATETIME;
   } else {
-    LOG(FATAL) << "Unsupported column type!";
+    LOG(FATAL) << "Unsupported column type: " << column_type;
   }
 }
 
