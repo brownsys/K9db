@@ -46,6 +46,24 @@ CREATE TABLE hats ( \
   FOREIGN KEY (OWNER_user_id) REFERENCES users(id), \
   FOREIGN KEY (OWNER_granted_by_user_id) REFERENCES users(id) \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+CREATE TABLE hidden_stories ( \
+	id int NOT NULL PRIMARY KEY, \
+	OWNER_user_id int, \
+	story_id int, \
+  FOREIGN KEY (OWNER_user_id) REFERENCES users(id) \
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+CREATE TABLE invitation_requests ( \
+	id int NOT NULL PRIMARY KEY, \
+	code varchar(255), \
+	is_verified int, \
+	email varchar(255), \
+	name varchar(255), \
+	memo text, \
+	ip_address varchar(255), \
+	created_at datetime NOT NULL, \
+	updated_at datetime NOT NULL \
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 
 INSERT INTO users VALUES (1, 'admin', 1);
 INSERT INTO users VALUES (2, 'joe', 0);
