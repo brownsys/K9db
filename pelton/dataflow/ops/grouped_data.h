@@ -86,6 +86,7 @@ class GenericIterator {
     virtual void Increment() = 0;
     virtual bool Equals(const std::unique_ptr<AbsImpl> &o) const = 0;
     virtual typename GenericIterator<T, C>::reference Access() const = 0;
+    virtual ~AbsImpl() = default;
   };  // AbsImpl.
 
  public:
