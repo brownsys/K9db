@@ -19,4 +19,5 @@ mysql -u $1 -p$2 --execute="DROP DATABASE users_c4ca4238a0b923820dcc509a6f75849b
 
 # Lobsters
 mysql -u $1 -p$2 --execute="DROP DATABASE users_c81e728d9d4c2f636f067f89cc14862c"
+mysql -u $1 -p$2 --execute="DROP DATABASE users_c4ca4238a0b923820dcc509a6f75849b"
 exit 0
