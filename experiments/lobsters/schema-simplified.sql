@@ -190,4 +190,4 @@ CREATE TABLE `votes` ( \
 
 INSERT INTO users VALUES (1, 'admin', 1);
 INSERT INTO users VALUES (2, 'joe', 0);
-INSERT INTO comments VALUES (1, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 'asdf', 1, 2, NULL, NULL, 'yo', 0, 0, 0, NULL, 0, 0, 0, NULL);
+INSERT INTO comments VALUES (1, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 'asdf', 1, 2, 0, 0, 'yo', 0, 0, 0, 0, 0, 0, 0, 0);
