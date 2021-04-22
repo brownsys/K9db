@@ -4,10 +4,7 @@
 namespace pelton {
 namespace dataflow {
 
-enum AggregateFunctionEnum {
-  COUNT,
-  SUM
-};
+enum AggregateFunctionEnum { COUNT, SUM };
 
 }  // namespace dataflow
 }  // namespace pelton

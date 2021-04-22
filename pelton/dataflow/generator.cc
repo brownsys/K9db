@@ -5,13 +5,13 @@
 #include "glog/logging.h"
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/operator.h"
+#include "pelton/dataflow/ops/aggregate.h"
 #include "pelton/dataflow/ops/equijoin.h"
 #include "pelton/dataflow/ops/filter.h"
-#include "pelton/dataflow/ops/project.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/ops/matview.h"
+#include "pelton/dataflow/ops/project.h"
 #include "pelton/dataflow/ops/union.h"
-#include "pelton/dataflow/ops/aggregate.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/state.h"
@@ -59,18 +59,23 @@ NodeIndex DataFlowGraphGenerator::AddFilterOperator(NodeIndex parent) {
   CHECK(this->graph_->AddNode(op, parent_ptr));
   return op->index();
 }
-NodeIndex DataFlowGraphGenerator::AddProjectOperator(NodeIndex parent, const std::vector<NodeIndex> &column_ids){
+NodeIndex DataFlowGraphGenerator::AddProjectOperator(
+    NodeIndex parent, const std::vector<NodeIndex> &column_ids) {
   // Create project operator.
-  std::shared_ptr<ProjectOperator> op = std::make_shared<ProjectOperator>(column_ids);
+  std::shared_ptr<ProjectOperator> op =
+      std::make_shared<ProjectOperator>(column_ids);
   // Add the operator to the graph.
   std::shared_ptr<Operator> parent_ptr = this->graph_->GetNode(parent);
   CHECK(parent_ptr);
   CHECK(this->graph_->AddNode(op, parent_ptr));
   return op->index();
 }
-NodeIndex DataFlowGraphGenerator::AddAggregateOperator(NodeIndex parent, const std::vector<ColumnID> &group_cols, AggregateFunctionEnum agg_func, ColumnID agg_col){
+NodeIndex DataFlowGraphGenerator::AddAggregateOperator(
+    NodeIndex parent, const std::vector<ColumnID> &group_cols,
+    AggregateFunctionEnum agg_func, ColumnID agg_col) {
   // Create aggregate operator.
-  std::shared_ptr<AggregateOperator> op = std::make_shared<AggregateOperator>(group_cols, agg_func, agg_col);
+  std::shared_ptr<AggregateOperator> op =
+      std::make_shared<AggregateOperator>(group_cols, agg_func, agg_col);
   // Add the operator to the graph.
   std::shared_ptr<Operator> parent_ptr = this->graph_->GetNode(parent);
   CHECK(parent_ptr);

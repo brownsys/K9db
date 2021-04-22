@@ -10,8 +10,8 @@
 
 #include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"
-#include "pelton/dataflow/ops/grouped_data.h"
 #include "pelton/dataflow/ops/aggregate_enum.h"
+#include "pelton/dataflow/ops/grouped_data.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
@@ -64,7 +64,8 @@ class AggregateOperator : public Operator {
   inline void InitAggregateValue(Record &aggregate_record,
                                  const Record &from_record,
                                  ColumnID from_column) const;
-  bool EnclosedKeyCols(const std::vector<ColumnID> &input_keycols, const std::vector<ColumnID> &cids) const;
+  bool EnclosedKeyCols(const std::vector<ColumnID> &input_keycols,
+                       const std::vector<ColumnID> &cids) const;
   // Allow tests to use .Process(...) directly.
   FRIEND_TEST(AggregateOperatorTest, MultipleGroupColumnsCountPositive);
   FRIEND_TEST(AggregateOperatorTest, MultipleGroupColumnsSumPositive);
