@@ -192,5 +192,8 @@ CREATE TABLE votes ( \
 
 INSERT INTO users VALUES (1, 'admin', 1);
 INSERT INTO users VALUES (2, 'joe', 0);
-INSERT INTO comments VALUES (1, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 'asdf', 1, 2, 0, 0, 'yo', 0, 0, 0, 0, 0, 0, 0, 0);
-INSERT INTO comments VALUES (2, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 'asdf2', 2, 1, 0, 0, 'yo2', 0, 0, 0, 0, 0, 0, 0, 0);
+INSERT INTO comments VALUES (1, '2021-04-21 01:00:00', NULL, 'asdf', 1, 2, NULL, NULL, 'yo', 0, 0, 0, 0, 0, 0, 0, 0);
+INSERT INTO comments VALUES (2, '2021-04-21 01:00:00', NULL, 'asdf2', 2, 1, NULL, NULL, 'yo2', 0, 0, 0, 0, 0, 0, 0, 0);
+
+CREATE VIEW comments_view AS '"SELECT * FROM comments"';
+SELECT * FROM comments_view;
