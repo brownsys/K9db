@@ -9,7 +9,7 @@ CREATE TABLE comments ( \
   updated_at datetime, \
   short_id varchar(10) NOT NULL, \
   story_id int NOT NULL, \
-  OWNER_user_id int NOT NULL, \
+  user_id int NOT NULL, \
   parent_comment_id int, \
   thread_id int, \
   comment text NOT NULL, \
@@ -21,17 +21,17 @@ CREATE TABLE comments ( \
   is_moderated int, \
   is_from_email int, \
   hat_id int, \
-  FOREIGN KEY (OWNER_user_id) REFERENCES users(id) \
+  FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE hat_requests ( \
   id int NOT NULL PRIMARY KEY, \
   created_at datetime, \
   updated_at datetime, \
-  OWNER_user_id int, \
+  user_id int, \
   hat varchar(255), \
   link varchar(255), \
   comment text, \
-  FOREIGN KEY (OWNER_user_id) REFERENCES users(id) \
+  FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 CREATE TABLE hats ( \
   id int NOT NULL PRIMARY KEY, \
@@ -48,9 +48,9 @@ CREATE TABLE hats ( \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 CREATE TABLE hidden_stories ( \
   id int NOT NULL PRIMARY KEY, \
-  OWNER_user_id int, \
+  user_id int, \
   story_id int, \
-  FOREIGN KEY (OWNER_user_id) REFERENCES users(id) \
+  FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 CREATE TABLE invitation_requests ( \
   id int NOT NULL PRIMARY KEY, \
@@ -65,13 +65,13 @@ CREATE TABLE invitation_requests ( \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE invitations ( \
   id int NOT NULL PRIMARY KEY, \
-  OWNER_user_id int, \
+  user_id int, \
   email varchar(255), \
   code varchar(255), \
   created_at datetime NOT NULL, \
   updated_at datetime NOT NULL, \
   memo text, \
-  FOREIGN KEY (OWNER_user_id) REFERENCES users(id) \
+  FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE keystores ( \
   `key` varchar(50) NOT NULL PRIMARY KEY, \
@@ -102,6 +102,7 @@ CREATE TABLE moderations ( \
   `action` text, \
   reason text, \
   is_from_suggestions int, \
+  FOREIGN KEY (OWNER_user_id) REFERENCES users(id), \
   FOREIGN KEY (OWNER_moderator_user_id) REFERENCES users(id) \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE read_ribbons ( \
@@ -109,22 +110,22 @@ CREATE TABLE read_ribbons ( \
   is_following int, \
   created_at datetime NOT NULL, \
   updated_at datetime NOT NULL, \
-  OWNER_user_id int, \
+  user_id int, \
   story_id int, \
-  FOREIGN KEY (OWNER_user_id) REFERENCES users(id) \
+  FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE saved_stories ( \
   id int NOT NULL PRIMARY KEY, \
   created_at datetime NOT NULL, \
   updated_at datetime NOT NULL, \
-  OWNER_user_id int, \
+  user_id int, \
   story_id int, \
-  FOREIGN KEY (OWNER_user_id) REFERENCES users(id) \
+  FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 CREATE TABLE stories ( \
   id int NOT NULL PRIMARY KEY, \
   created_at datetime, \
-  OWNER_user_id int, \
+  user_id int, \
   url varchar(250), \
   title varchar(150) NOT NULL, \
   description text, \
@@ -141,29 +142,29 @@ CREATE TABLE stories ( \
   unavailable_at datetime, \
   twitter_id varchar(20), \
   user_is_author int, \
-  FOREIGN KEY (OWNER_user_id) REFERENCES users(id) \
+  FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE suggested_taggings ( \
   id int NOT NULL PRIMARY KEY, \
   story_id int, \
   tag_id int, \
-  OWNER_user_id int, \
-  FOREIGN KEY (OWNER_user_id) REFERENCES users(id) \
+  user_id int, \
+  FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 CREATE TABLE suggested_titles ( \
   id int NOT NULL PRIMARY KEY, \
   story_id int, \
-  OWNER_user_id int, \
+  user_id int, \
   title varchar(150) NOT NULL, \
-  FOREIGN KEY (OWNER_user_id) REFERENCES users(id) \
+  FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 CREATE TABLE tag_filters ( \
   id int NOT NULL PRIMARY KEY, \
   created_at datetime NOT NULL, \
   updated_at datetime NOT NULL, \
-  OWNER_user_id int, \
+  user_id int, \
   tag_id int, \
-  FOREIGN KEY (OWNER_user_id) REFERENCES users(id) \
+  FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 CREATE TABLE taggings ( \
   id int NOT NULL PRIMARY KEY, \
@@ -181,12 +182,12 @@ CREATE TABLE tags ( \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 CREATE TABLE votes ( \
   id int NOT NULL PRIMARY KEY, \
-  OWNER_user_id int NOT NULL, \
+  user_id int NOT NULL, \
   story_id int NOT NULL, \
   comment_id int, \
   vote int NOT NULL, \
   reason varchar(1), \
-  FOREIGN KEY (OWNER_user_id) REFERENCES users(id) \
+  FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 INSERT INTO users VALUES (1, 'admin', 1);
