@@ -45,7 +45,7 @@ TEST(PlannerTest, SimpleFilter) {
 
   // Plan the graph via calcite.
   dataflow::DataFlowGraph graph = PlanGraph(&state, query);
-  ShutdownPlanner();
+  
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
@@ -95,7 +95,7 @@ TEST(PlannerTest, SimpleProject) {
 
   // Plan the graph via calcite.
   dataflow::DataFlowGraph graph = PlanGraph(&state, query);
-  ShutdownPlanner();
+  
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
@@ -150,7 +150,7 @@ TEST(PlannerTest, SimpleAggregate) {
 
   // Plan the graph via calcite.
   dataflow::DataFlowGraph graph = PlanGraph(&state, query);
-  ShutdownPlanner();
+  
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
@@ -216,7 +216,7 @@ TEST(PlannerTest, SingleConditionFilter) {
 
   // Plan the graph via calcite.
   dataflow::DataFlowGraph graph = PlanGraph(&state, query);
-  ShutdownPlanner();
+  
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
@@ -274,7 +274,7 @@ TEST(PlannerTest, FilterSingleORCondition) {
 
   // Plan the graph via calcite.
   dataflow::DataFlowGraph graph = PlanGraph(&state, query);
-  ShutdownPlanner();
+  
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
@@ -327,7 +327,7 @@ TEST(PlannerTest, FilterSingleANDCondition) {
 
   // Plan the graph via calcite.
   dataflow::DataFlowGraph graph = PlanGraph(&state, query);
-  ShutdownPlanner();
+  
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
@@ -386,7 +386,7 @@ TEST(PlannerTest, FilterNestedORCondition) {
 
   // Plan the graph via calcite.
   dataflow::DataFlowGraph graph = PlanGraph(&state, query);
-  ShutdownPlanner();
+  
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
@@ -448,7 +448,7 @@ TEST(PlannerTest, FilterNestedANDCondition) {
 
   // Plan the graph via calcite.
   dataflow::DataFlowGraph graph = PlanGraph(&state, query);
-  ShutdownPlanner();
+  
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
