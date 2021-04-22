@@ -25,6 +25,7 @@ std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
     result += col;
   }
   result += ")";
+  result += " ENGINE MEMORY";
   perf::End("Stringify (create)");
   return result;
 }
