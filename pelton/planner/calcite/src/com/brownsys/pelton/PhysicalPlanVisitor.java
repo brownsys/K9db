@@ -36,11 +36,18 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
   private final DataFlowGraphLibrary.DataFlowGraphGenerator generator;
   private final Stack<ArrayList<Integer>> childrenOperators;
   private final Hashtable<String, Integer> tableToInputOperator;
+  // Each filter operator in pelton performs either an OR or an AND operation
+  // on it's operands. Nested conditions are represented as separae filter
+  // operators and chained together after construction. The following map is
+  // used to maintain a list of filter operators(either AND or OR) at a
+  // particular LEVEL.
+  // private final Hashtable<Integer, ArrayList<Integer>> filterOperators;
 
   public PhysicalPlanVisitor(DataFlowGraphLibrary.DataFlowGraphGenerator generator) {
     this.generator = generator;
     this.childrenOperators = new Stack<ArrayList<Integer>>();
     this.tableToInputOperator = new Hashtable<String, Integer>();
+    // this.filterOperators = new Hashtable<Integer, ArrayList<Integer>>();
   }
 
   public void populateGraph(RelNode plan) {
@@ -138,12 +145,10 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     return union;
   }
 
-  private void visitFilterOperands(int filterOperator, RexNode condition, List<RexNode> operands) {
-    // Must be a binary condition with one side being a column and the other being a literal.
+  private void addFilterOperation(int filterOperator, RexNode condition, List<RexNode> operands){
     assert operands.size() == 2;
     assert operands.get(0) instanceof RexInputRef || operands.get(1) instanceof RexInputRef;
     assert operands.get(0) instanceof RexLiteral || operands.get(1) instanceof RexLiteral;
-
     // Get the input and the value expressions.
     int inputIndex = operands.get(0) instanceof RexInputRef ? 0 : 1;
     int valueIndex = (inputIndex + 1) % 2;
@@ -193,6 +198,77 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     }
   }
 
+  private Integer visitFilterOperands(RexNode condition, List<RexNode> operands, Integer deepestFilterParent) {
+      if(condition.isA(SqlKind.AND)){
+        // If there are >1 nested conditions then connect them via a new union
+        // operator else link the single child operator directly.
+        // NOTE(Ishan): There is room for optimization here regarding chaining of
+        // operators in certain scenarios instead of using a union operator,
+        // but for lobesters' queries it won't make a difference.
+
+        // Operands inserted in the following list are not nested
+        List<RexNode> operations = new ArrayList<RexNode>();
+        List<Integer> nestedOperators = new ArrayList<Integer>();
+        for(RexNode operand : operands){
+          if(operand.isA(SqlKind.OR)){
+            nestedOperators.add(visitFilterOperands(operand, ((RexCall) operand).getOperands(), deepestFilterParent));
+          } else if(operand.isA(SqlKind.AND)){
+            nestedOperators.add(visitFilterOperands(operand, ((RexCall) operand).getOperands(), deepestFilterParent));
+          } else{
+            operations.add(operand);
+          }
+        }
+        // We currently do not support 0 "base" operations, for example AND(OR, OR)
+        assert operations.size()!=0;
+        // Decide on parent(w.r.t the dataflow) of this filter operator
+        int filterOperator;
+        if(nestedOperators.size()==0){
+          // Deepest filter operator with no further nested conditions
+          filterOperator = this.generator.AddFilterOperator(deepestFilterParent);
+        } else if(nestedOperators.size()==1){
+          // Link the nested operator directly.
+          filterOperator = this.generator.AddFilterOperator(nestedOperators.get(0));
+        } else {
+          // Link the nested operators via a union and link the current operator
+          // with that union.
+          int[] primitiveArray = nestedOperators.stream().mapToInt(i -> i).toArray();
+          int unionOperator = this.generator.AddUnionOperator(primitiveArray);
+          filterOperator = this.generator.AddFilterOperator(unionOperator);
+        }
+        // Add operations to the newly generated operator
+        for(RexNode operation: operations){
+          addFilterOperation(filterOperator, operation, ((RexCall) operation).getOperands());
+        }
+        return filterOperator;
+      } else if (condition.isA(SqlKind.OR)){
+        // We are following a pure union based  approach. Treat all the
+        // operands as children of the union operator.
+        // It does not matter whether the operand is nested or not.
+        List<Integer> unionParents = new ArrayList<Integer>();
+        for(RexNode operand: operands){
+          unionParents.add(visitFilterOperands(operand, ((RexCall) operand).getOperands(), deepestFilterParent));
+        }
+        // Add union operator
+        int[] primitiveArray = unionParents.stream().mapToInt(i -> i).toArray();
+        int unionOperator = this.generator.AddUnionOperator(primitiveArray);
+        return unionOperator;
+      } else if (condition.isA(FILTER_OPERATIONS)){
+        // Will only reach here if
+        // 1. Either the core filter operator does not contain any nested conditions,
+        // 2. or @param condition is part of the OR
+        // condition. In this scenario, the constructed filter operator (a default AND
+        // filter operator) will be the leaf. Hence it's parent will be
+        // @deepestFilterParent
+        int filterOperator = this.generator.AddFilterOperator(deepestFilterParent);
+        addFilterOperation(filterOperator, condition, ((RexCall) condition).getOperands());
+        return filterOperator;
+      }
+
+      // Should not reach here
+      System.exit(-1);
+      return -1;
+  }
+
   @Override
   public RelNode visit(LogicalFilter filter) {
     RexNode condition = filter.getCondition();
@@ -209,22 +285,12 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     ArrayList<Integer> children = this.childrenOperators.pop();
     assert children.size() == 1;
 
-    // Add a filter operator.
-    int filterOperator = this.generator.AddFilterOperator(children.get(0));
-    this.childrenOperators.peek().add(filterOperator);
+    List<RexNode> operands = ((RexCall) condition).getOperands();
+    // Visit the operands of the filter operator
+    Integer filterOrUnionOperator = visitFilterOperands(condition, operands, children.get(0));
+    assert filterOrUnionOperator!=-1;
+    this.childrenOperators.peek().add(filterOrUnionOperator);
 
-    // Fill the filter operator with the appropriate condition(s).
-    if (condition.isA(FILTER_OPERATIONS)) {
-      List<RexNode> operands = ((RexCall) condition).getOperands();
-      this.visitFilterOperands(filterOperator, condition, operands);
-    }
-
-    if (condition.isA(SqlKind.AND)) {
-      for (RexNode operand : ((RexCall) condition).getOperands()) {
-        List<RexNode> operands = ((RexCall) operand).getOperands();
-        this.visitFilterOperands(filterOperator, operand, operands);
-      }
-    }
     return filter;
   }
 
