@@ -21,6 +21,7 @@ class UnionOperator : public Operator {
   bool Process(NodeIndex source, const std::vector<Record> &records,
                std::vector<Record> *output) override;
 
+  bool DeepCompareSchemas(const SchemaRef s1, const SchemaRef s2);
   void ComputeOutputSchema() override;
 };
 
