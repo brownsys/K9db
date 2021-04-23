@@ -36,18 +36,11 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
   private final DataFlowGraphLibrary.DataFlowGraphGenerator generator;
   private final Stack<ArrayList<Integer>> childrenOperators;
   private final Hashtable<String, Integer> tableToInputOperator;
-  // Each filter operator in pelton performs either an OR or an AND operation
-  // on it's operands. Nested conditions are represented as separae filter
-  // operators and chained together after construction. The following map is
-  // used to maintain a list of filter operators(either AND or OR) at a
-  // particular LEVEL.
-  // private final Hashtable<Integer, ArrayList<Integer>> filterOperators;
 
   public PhysicalPlanVisitor(DataFlowGraphLibrary.DataFlowGraphGenerator generator) {
     this.generator = generator;
     this.childrenOperators = new Stack<ArrayList<Integer>>();
     this.tableToInputOperator = new Hashtable<String, Integer>();
-    // this.filterOperators = new Hashtable<Integer, ArrayList<Integer>>();
   }
 
   public void populateGraph(RelNode plan) {
