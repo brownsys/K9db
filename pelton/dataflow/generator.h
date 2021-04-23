@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "pelton/dataflow/ops/aggregate_enum.h"
 #include "pelton/dataflow/ops/filter_enum.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast_schema_enums.h"
@@ -34,6 +35,12 @@ class DataFlowGraphGenerator {
   NodeIndex AddInputOperator(const std::string &table_name);
   NodeIndex AddUnionOperator(const std::vector<NodeIndex> &parents);
   NodeIndex AddFilterOperator(NodeIndex parent);
+  NodeIndex AddProjectOperator(NodeIndex parent,
+                               const std::vector<ColumnID> &column_ids);
+  NodeIndex AddAggregateOperator(NodeIndex parent,
+                                 const std::vector<ColumnID> &group_cols,
+                                 AggregateFunctionEnum agg_func,
+                                 ColumnID agg_col);
   NodeIndex AddEquiJoinOperator(NodeIndex left_parent, NodeIndex right_parent,
                                 ColumnID left_column, ColumnID right_column);
 
