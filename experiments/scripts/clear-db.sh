@@ -8,4 +8,6 @@ mysql -u root -ppassword --execute="DROP DATABASE main_2541acf6383da54e4044f9d3a
 mysql -u root -ppassword --execute="DROP DATABASE main_58e42b48502f2ab9793be0e226dcf67d;"
 mysql -u root -ppassword --execute="DROP DATABASE main_f8d4ae448b914fe9473e92f5d934951e;"
 
+sleep 3
+
 exit 0

@@ -6,27 +6,56 @@
 
 #include "gflags/gflags.h"
 #include "glog/logging.h"
-#include "mysql-cppconn-8/mysqlx/xdevapi.h"
+#include "mysql-cppconn-8/jdbc/cppconn/datatype.h"
+#include "mysql-cppconn-8/jdbc/cppconn/resultset.h"
+#include "mysql-cppconn-8/jdbc/cppconn/resultset_metadata.h"
+#include "mysql-cppconn-8/jdbc/cppconn/sqlstring.h"
+#include "mysql-cppconn-8/jdbc/cppconn/statement.h"
+#include "mysql-cppconn-8/jdbc/mysql_connection.h"
+#include "mysql-cppconn-8/jdbc/mysql_driver.h"
 #include "pelton/util/perf.h"
 
-void PrintHeader(mysqlx::SqlResult *result) {
-  for (size_t i = 0; i < result->getColumnCount(); i++) {
-    std::cout << "| " << result->getColumn(i).getColumnName() << " ";
+void PrintHeader(bool print, sql::ResultSet *result) {
+  if (print) {
+    sql::ResultSetMetaData *metadata = result->getMetaData();
+    for (size_t i = 1; i <= metadata->getColumnCount(); i++) {
+      std::cout << "| " << metadata->getColumnName(i) << " ";
+    }
+    std::cout << "|" << std::endl;
+    for (size_t i = 0; i < metadata->getColumnCount() * 10; i++) {
+      std::cout << "-";
+    }
+    std::cout << std::endl;
   }
-  std::cout << "|" << std::endl;
-  for (size_t i = 0; i < result->getColumnCount() * 10; i++) {
-    std::cout << "-";
-  }
-  std::cout << std::endl;
 }
 
-void PrintRow(size_t column_count, mysqlx::Row *row) {
-  for (size_t i = 0; i < column_count; i++) {
-    std::cout << "| ";
-    row->get(i).print(std::cout);
-    std::cout << " ";
+void PrintData(bool print, sql::ResultSet *result) {
+  while (result->next()) {
+    for (size_t i = 1; i <= result->getMetaData()->getColumnCount(); i++) {
+      switch (result->getMetaData()->getColumnType(i)) {
+        case sql::DataType::VARCHAR:
+        case sql::DataType::CHAR:
+        case sql::DataType::LONGVARCHAR:
+          if (print) {
+            std::cout << "| " << result->getString(i) << " ";
+          }
+          break;
+        case sql::DataType::TINYINT:
+        case sql::DataType::SMALLINT:
+        case sql::DataType::MEDIUMINT:
+        case sql::DataType::INTEGER:
+          if (print) {
+            std::cout << "| " << result->getInt(i) << " ";
+          }
+          break;
+        default:
+          std::cout << std::endl;
+          std::cout << "Unknown column type: "
+                    << result->getMetaData()->getColumnTypeName(i) << std::endl;
+      }
+    }
+    std::cout << std::endl;
   }
-  std::cout << "|" << std::endl;
 }
 
 bool ReadCommand(std::string *ptr) {
@@ -79,9 +108,14 @@ int main(int argc, char **argv) {
 
   // Initialize our sharded state/connection.
   try {
-    mysqlx::Session session(db_username + ":" + db_password + "@localhost");
-    session.sql("CREATE DATABASE IF NOT EXISTS gdprbench").execute();
-    session.sql("USE gdprbench").execute();
+    sql::Driver *driver = sql::mysql::get_driver_instance();
+    std::unique_ptr<sql::Connection> con{
+        driver->connect("localhost", db_username, db_password)};
+
+    // We execute things via this statement.
+    std::unique_ptr<sql::Statement> stmt{con->createStatement()};
+    stmt->execute("CREATE DATABASE IF NOT EXISTS gdprbench");
+    stmt->execute("USE gdprbench");
 
     std::cout << "Vanilla MySql" << std::endl;
     if (print) {
@@ -91,19 +125,29 @@ int main(int argc, char **argv) {
     // Read SQL statements one at a time!
     std::string command;
     while (ReadCommand(&command)) {
-      pelton::perf::Start("exec");
-      mysqlx::SqlResult result = session.sql(command).execute();
-      if (result.hasData()) {
-        if (print) {
-          PrintHeader(&result);
-        }
-        while (result.count() > 0) {
-          mysqlx::Row row = result.fetchOne();
-          if (print) {
-            PrintRow(result.getColumnCount(), &row);
-          }
-        }
+      if (command[0] == '#') {
+        continue;
       }
+
+      if (print) {
+        std::cout << command << std::endl;
+      }
+
+      pelton::perf::Start("exec");
+      if (command[0] == 'S' || command[0] == 's') {
+        std::unique_ptr<sql::ResultSet> result{stmt->executeQuery(command)};
+        PrintHeader(print, result.get());
+        PrintData(print, result.get());
+      } else if (command[0] == 'I' || command[0] == 'i' || command[0] == 'U' ||
+                 command[0] == 'u' || command[0] == 'D' || command[0] == 'd') {
+        int count = stmt->executeUpdate(command);
+        if (print) {
+          std::cout << count << " updated." << std::endl;
+        }
+      } else if (command[0] == 'C' || command[0] == 'c') {
+        stmt->execute(command);
+      }
+
       pelton::perf::End("exec");
 
       // Ready for next command.
@@ -111,9 +155,6 @@ int main(int argc, char **argv) {
         std::cout << std::endl << ">>> " << std::flush;
       }
     }
-
-    // Close the connection
-    session.close();
   } catch (const char *err_msg) {
     LOG(FATAL) << "Error: " << err_msg;
   }

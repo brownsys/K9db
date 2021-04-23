@@ -13,8 +13,10 @@ namespace shards {
 namespace sqlengine {
 namespace insert {
 
-absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
-                   dataflow::DataFlowState *dataflow_state, bool update_flows) {
+absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Insert &stmt,
+                                       SharderState *state,
+                                       dataflow::DataFlowState *dataflow_state,
+                                       bool update_flows) {
   perf::Start("Insert");
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
@@ -25,13 +27,15 @@ absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
   // Shard the insert statement so it is executable against the physical
   // sharded database.
   sqlast::Stringifier stringifier;
+  mysql::SqlResult result;
 
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
     // The insertion statement is unmodified.
     std::string insert_str = stmt.Visit(&stringifier);
-    state->connection_pool().ExecuteDefault(insert_str, {});
+    result = state->connection_pool().ExecuteDefault(
+        ConnectionPool::Operation::UPDATE, insert_str);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded!
@@ -52,13 +56,19 @@ absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
       //               insert.
       if (!state->ShardExists(info.shard_kind, user_id)) {
         for (auto create_stmt : state->CreateShard(info.shard_kind, user_id)) {
-          state->connection_pool().ExecuteShard(create_stmt, info, user_id, {});
+          mysql::SqlResult tmp = state->connection_pool().ExecuteShard(
+              ConnectionPool::Operation::STATEMENT, create_stmt, info, user_id);
+          if (!tmp.IsStatement() || !tmp.Success()) {
+            return absl::InternalError("Could not created sharded table " +
+                                       create_stmt);
+          }
         }
       }
 
       // Add the modified insert statement.
       std::string insert_str = cloned.Visit(&stringifier);
-      state->connection_pool().ExecuteShard(insert_str, info, user_id, {});
+      result.Append(state->connection_pool().ExecuteShard(
+          ConnectionPool::Operation::UPDATE, insert_str, info, user_id));
     }
   }
 
@@ -71,7 +81,7 @@ absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
   }
 
   perf::End("Insert");
-  return absl::OkStatus();
+  return result;
 }
 
 }  // namespace insert

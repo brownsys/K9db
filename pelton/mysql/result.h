@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include "mysql-cppconn-8/mysqlx/xdevapi.h"
+#include "mysql-cppconn-8/jdbc/cppconn/resultset.h"
 // TODO(babmen): fix this.
 #undef PRAGMA
 
@@ -26,9 +26,25 @@ class SqlResult {
    public:
     virtual ~SqlResultImpl() = default;
 
-    virtual bool hasData() = 0;
-    virtual dataflow::Record fetchOne(const dataflow::SchemaRef &schema) = 0;
-    virtual bool isInlined() const = 0;
+    virtual bool IsStatement() const { return false; }
+    virtual bool IsUpdate() const { return false; }
+    virtual bool IsQuery() const { return false; }
+
+    // Statement API.
+    virtual bool Success() const { return false; }
+
+    // Update API.
+    virtual int UpdateCount() const { return -1; }
+
+    // Query API.
+    virtual bool HasNext() { return false; }
+    virtual dataflow::Record FetchOne(const dataflow::SchemaRef &schema) {
+      return dataflow::Record{schema, false};
+    }
+    virtual bool IsInlined() const {
+      // Checks if the data has been pulled in to memory and is inlined.
+      return false;
+    }
   };
 
   class SqlResultIterator {
@@ -41,9 +57,6 @@ class SqlResult {
     using reference = dataflow::Record &;
 
     // Construct the generic iterator by providing a concrete implemenation.
-    explicit SqlResultIterator(const dataflow::SchemaRef &schema)
-        : impl_(nullptr), record_(schema, true) {}
-
     explicit SqlResultIterator(SqlResult::SqlResultImpl *impl,
                                const dataflow::SchemaRef &schema)
         : impl_(impl), record_(schema, true) {
@@ -52,8 +65,8 @@ class SqlResult {
 
     // All operations translate to operation on the underlying implementation.
     SqlResultIterator &operator++() {
-      if (this->impl_ && this->impl_->hasData()) {
-        this->record_ = this->impl_->fetchOne(this->record_.schema());
+      if (this->impl_ && this->impl_->HasNext()) {
+        this->record_ = this->impl_->FetchOne(this->record_.schema());
       } else {
         this->impl_ = nullptr;
       }
@@ -74,29 +87,33 @@ class SqlResult {
   };
 
   // Constructor
-  SqlResult() = default;
+  SqlResult();
 
   explicit SqlResult(std::unique_ptr<SqlResult::SqlResultImpl> &&impl,
-                     const dataflow::SchemaRef &schema)
+                     const dataflow::SchemaRef &schema = {})
       : impl_(std::move(impl)), schema_(schema) {}
 
-  bool hasData() { return this->impl_ && this->impl_->hasData(); }
-  dataflow::SchemaRef getSchema() const { return this->schema_; }
-  dataflow::Record fetchOne() { return this->impl_->fetchOne(this->schema_); }
+  // API for accessing the result.
+  bool IsStatement() const { return this->impl_->IsStatement(); }
+  bool IsUpdate() const { return this->impl_->IsUpdate(); }
+  bool IsQuery() const { return this->impl_->IsQuery(); }
 
-  // Appends the provided SqlResult to this SqlResult, appeneded
-  // result is moved and becomes empty after append.
-  void Append(SqlResult &&other);
-  void AppendDeduplicate(SqlResult &&other);
-  void MakeInline();
+  // Only safe to use if IsStatement() returns true.
+  bool Success() const { return this->impl_->Success(); }
 
+  // Only safe to use if IsUpdate() returns true.
+  int UpdateCount() const { return this->impl_->UpdateCount(); }
+
+  // Only safe to use if IsQuery() returns true.
+  dataflow::SchemaRef GetSchema() const { return this->schema_; }
+  bool HasNext() { return this->impl_->HasNext(); }
+  dataflow::Record FetchOne() { return this->impl_->FetchOne(this->schema_); }
   SqlResult::SqlResultIterator begin() {
     return SqlResult::SqlResultIterator{this->impl_.get(), this->schema_};
   }
   SqlResult::SqlResultIterator end() {
-    return SqlResult::SqlResultIterator{this->schema_};
+    return SqlResult::SqlResultIterator{nullptr, this->schema_};
   }
-
   std::vector<dataflow::Record> Vectorize() {
     std::vector<dataflow::Record> result;
     for (dataflow::Record &record : *this) {
@@ -105,43 +122,82 @@ class SqlResult {
     return result;
   }
 
+  // Internal API: do not use outside of pelton code.
+  // Appends the provided SqlResult to this SqlResult, appeneded
+  // result is moved and becomes empty after append.
+  void Append(SqlResult &&other);
+  void AppendDeduplicate(SqlResult &&other);
+  void MakeInline();
+
  private:
   std::unique_ptr<SqlResult::SqlResultImpl> impl_;
   dataflow::SchemaRef schema_;
 };
 
-// Wrapper around an unmodified mysqlx::Result.
-class MySqlResult : public SqlResult::SqlResultImpl {
+// A non-query result.
+class StatementResult : public SqlResult::SqlResultImpl {
  public:
-  explicit MySqlResult(mysqlx::SqlResult &&result)
-      : result_(std::move(result)) {}
+  explicit StatementResult(bool success) : success_(success) {}
 
-  bool hasData() override;
-  dataflow::Record fetchOne(const dataflow::SchemaRef &schema) override;
-  bool isInlined() const override;
+  bool IsStatement() const override { return true; }
+  bool Success() const override { return this->success_; }
 
  private:
-  mysqlx::SqlResult result_;
+  bool success_;
+};
+class UpdateResult : public SqlResult::SqlResultImpl {
+ public:
+  explicit UpdateResult(int row_count) : row_count_(row_count) {}
+
+  bool IsUpdate() const override { return true; }
+  int UpdateCount() const override { return this->row_count_; }
+
+  void IncrementCount(int count) {
+    if (this->row_count_ >= 0) {
+      if (count < 0) {
+        this->row_count_ = count;
+      } else {
+        this->row_count_ += count;
+      }
+    }
+  }
+
+ private:
+  int row_count_;
 };
 
-// Wrapper around a mysqlx::Result that is augmented with an additional value at
+// Wrapper around an unmodified sql::ResultSet.
+class MySqlResult : public SqlResult::SqlResultImpl {
+ public:
+  explicit MySqlResult(std::unique_ptr<sql::ResultSet> &&result)
+      : result_(std::move(result)) {}
+
+  bool IsQuery() const override;
+  bool HasNext() override;
+  dataflow::Record FetchOne(const dataflow::SchemaRef &schema) override;
+
+ private:
+  std::unique_ptr<sql::ResultSet> result_;
+};
+
+// Wrapper around a sql::ResultSet that is augmented with an additional value at
 // some column.
 class AugmentedSqlResult : public SqlResult::SqlResultImpl {
  public:
-  AugmentedSqlResult(mysqlx::SqlResult &&result, size_t aug_index,
-                     mysqlx::Value &&aug_value)
+  AugmentedSqlResult(std::unique_ptr<sql::ResultSet> &&result, size_t aug_index,
+                     const std::string &aug_value)
       : result_(std::move(result)),
         aug_index_(aug_index),
-        aug_value_(std::make_unique<mysqlx::Value>(std::move(aug_value))) {}
+        aug_value_(aug_value) {}
 
-  bool hasData() override;
-  dataflow::Record fetchOne(const dataflow::SchemaRef &schema) override;
-  bool isInlined() const override;
+  bool IsQuery() const override;
+  bool HasNext() override;
+  dataflow::Record FetchOne(const dataflow::SchemaRef &schema) override;
 
  private:
-  mysqlx::SqlResult result_;
+  std::unique_ptr<sql::ResultSet> result_;
   size_t aug_index_;
-  std::unique_ptr<mysqlx::Value> aug_value_;
+  std::string aug_value_;
 };
 
 // A result set with inlined values.
@@ -150,9 +206,10 @@ class InlinedSqlResult : public SqlResult::SqlResultImpl {
   explicit InlinedSqlResult(std::vector<dataflow::Record> &&records)
       : records_(std::move(records)), index_(0) {}
 
-  bool hasData() override;
-  dataflow::Record fetchOne(const dataflow::SchemaRef &schema) override;
-  bool isInlined() const override;
+  bool IsQuery() const override;
+  bool HasNext() override;
+  dataflow::Record FetchOne(const dataflow::SchemaRef &schema) override;
+  bool IsInlined() const override;
 
   // For deduplication: create an unordered set that can be checked to
   // determine duplicates.

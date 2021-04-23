@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "absl/status/status.h"
+#include "pelton/sqlast/hacky.h"
 #include "pelton/sqlast/transformer.h"
 #include "pelton/util/perf.h"
 
@@ -13,6 +14,11 @@ namespace sqlast {
 
 absl::StatusOr<std::unique_ptr<AbstractStatement>> SQLParser::Parse(
     const std::string &sql) {
+  auto hacky_result = HackyParse(sql);
+  if (hacky_result.ok()) {
+    return std::move(hacky_result.value());
+  }
+
   this->error_ = false;
 
   // Initialize ANTLR things.

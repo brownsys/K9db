@@ -1,5 +1,6 @@
 #include "pelton/mysql/result.h"
 
+#include "glog/logging.h"
 #include "pelton/mysql/util.h"
 
 namespace pelton {
@@ -19,84 +20,109 @@ std::string StringifyRecord(const dataflow::Record &record) {
 }  // namespace
 
 // SqlResult.
+SqlResult::SqlResult()
+    : impl_(std::make_unique<StatementResult>(true)), schema_() {}
+
 void SqlResult::Append(SqlResult &&other) {
-  if (other.hasData()) {
-    if (!this->hasData()) {
-      this->impl_ = std::move(other.impl_);
-      this->schema_ = other.schema_;
-    } else {
-      InlinedSqlResult *ptr =
-          reinterpret_cast<InlinedSqlResult *>(this->impl_.get());
-      while (other.hasData()) {
-        ptr->AddRecord(other.fetchOne());
-      }
+  if (this->IsStatement()) {
+    this->impl_ = std::move(other.impl_);
+    this->schema_ = other.schema_;
+  } else if (this->IsUpdate()) {
+    if (!other.IsUpdate()) {
+      LOG(FATAL) << "Appending non update to update result";
+    }
+    UpdateResult *ptr = reinterpret_cast<UpdateResult *>(this->impl_.get());
+    ptr->IncrementCount(other.UpdateCount());
+  } else if (this->IsQuery()) {
+    if (!other.IsQuery()) {
+      LOG(FATAL) << "Appending non query to query result";
+    }
+    if (!this->impl_->IsInlined()) {
+      LOG(FATAL) << "Appending to non-inlined query result";
+    }
+
+    InlinedSqlResult *ptr =
+        reinterpret_cast<InlinedSqlResult *>(this->impl_.get());
+    while (other.HasNext()) {
+      ptr->AddRecord(other.FetchOne());
     }
   }
 }
 
 void SqlResult::AppendDeduplicate(SqlResult &&other) {
-  if (other.hasData()) {
-    if (!this->hasData()) {
-      this->impl_ = std::move(other.impl_);
-      this->schema_ = other.schema_;
-    } else {
-      InlinedSqlResult *ptr =
-          reinterpret_cast<InlinedSqlResult *>(this->impl_.get());
-      // Only add unduplicated rows.
-      std::unordered_set<std::string> row_set = ptr->RowSet();
-      while (other.hasData()) {
-        dataflow::Record record = other.fetchOne();
-        if (row_set.count(StringifyRecord(record)) == 0) {
-          ptr->AddRecord(std::move(record));
-        }
+  if (this->IsStatement()) {
+    this->impl_ = std::move(other.impl_);
+    this->schema_ = other.schema_;
+  } else if (this->IsUpdate()) {
+    if (!other.IsUpdate()) {
+      LOG(FATAL) << "Appending non update to update result";
+    }
+    UpdateResult *ptr = reinterpret_cast<UpdateResult *>(this->impl_.get());
+    ptr->IncrementCount(other.UpdateCount());
+  } else if (this->IsQuery()) {
+    if (!other.IsQuery()) {
+      LOG(FATAL) << "Appending non query to query result";
+    }
+    if (!this->impl_->IsInlined()) {
+      LOG(FATAL) << "Appending to non-inlined query result";
+    }
+
+    InlinedSqlResult *ptr =
+        reinterpret_cast<InlinedSqlResult *>(this->impl_.get());
+    // Only add unduplicated rows.
+    std::unordered_set<std::string> row_set = ptr->RowSet();
+    while (other.HasNext()) {
+      dataflow::Record record = other.FetchOne();
+      if (row_set.count(StringifyRecord(record)) == 0) {
+        ptr->AddRecord(std::move(record));
       }
     }
   }
 }
 
 void SqlResult::MakeInline() {
-  if (this->impl_ && !this->impl_->isInlined()) {
+  if (this->impl_->IsQuery() && !this->impl_->IsInlined()) {
     std::vector<dataflow::Record> records;
-    while (this->impl_->hasData()) {
-      records.push_back(std::move(this->fetchOne()));
+    while (this->impl_->HasNext()) {
+      records.push_back(std::move(this->FetchOne()));
     }
     this->impl_ = std::make_unique<InlinedSqlResult>(std::move(records));
   }
 }
 
 // MySqlResult.
-bool MySqlResult::hasData() {
-  return this->result_.hasData() && this->result_.count() > 0;
-}
+bool MySqlResult::IsQuery() const { return true; }
 
-dataflow::Record MySqlResult::fetchOne(const dataflow::SchemaRef &schema) {
-  mysqlx::Row row = this->result_.fetchOne();
-  return MySqlRowToRecord(std::move(row), schema, false);
+bool MySqlResult::HasNext() { return this->result_->next(); }
+
+dataflow::Record MySqlResult::FetchOne(const dataflow::SchemaRef &schema) {
+  return MySqlRowToRecord(*this->result_, schema, false);
 }
-bool MySqlResult::isInlined() const { return false; }
 
 // AugmentedSqlResult.
-bool AugmentedSqlResult::hasData() {
-  return this->result_.hasData() && this->result_.count() > 0;
-}
-dataflow::Record AugmentedSqlResult::fetchOne(
+bool AugmentedSqlResult::IsQuery() const { return true; }
+
+bool AugmentedSqlResult::HasNext() { return this->result_->next(); }
+
+dataflow::Record AugmentedSqlResult::FetchOne(
     const dataflow::SchemaRef &schema) {
-  mysqlx::Row row = this->result_.fetchOne();
   dataflow::Record record =
-      MySqlRowToRecordSkipping(std::move(row), schema, false, this->aug_index_);
-  MySqlValueIntoRecord(*this->aug_value_, this->aug_index_, &record);
+      MySqlRowToRecordSkipping(*this->result_, schema, false, this->aug_index_);
+  record.SetValue(this->aug_value_, this->aug_index_);
   return record;
 }
-bool AugmentedSqlResult::isInlined() const { return false; }
 
 // InlinedSqlResult.
-bool InlinedSqlResult::hasData() {
+bool InlinedSqlResult::IsQuery() const { return true; }
+
+bool InlinedSqlResult::HasNext() {
   return this->index_ < this->records_.size();
 }
-dataflow::Record InlinedSqlResult::fetchOne(const dataflow::SchemaRef &schema) {
+
+dataflow::Record InlinedSqlResult::FetchOne(const dataflow::SchemaRef &schema) {
   return std::move(this->records_.at(this->index_++));
 }
-bool InlinedSqlResult::isInlined() const { return true; }
+bool InlinedSqlResult::IsInlined() const { return true; }
 
 std::unordered_set<std::string> InlinedSqlResult::RowSet() const {
   std::unordered_set<std::string> result;

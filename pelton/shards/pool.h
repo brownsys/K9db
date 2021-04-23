@@ -2,11 +2,14 @@
 #ifndef PELTON_SHARDS_POOL_H_
 #define PELTON_SHARDS_POOL_H_
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 
 #include "absl/status/status.h"
+#include "mysql-cppconn-8/jdbc/cppconn/statement.h"
+#include "mysql-cppconn-8/jdbc/mysql_connection.h"
 #include "pelton/mysql/result.h"
 #include "pelton/shards/types.h"
 
@@ -15,8 +18,9 @@ namespace shards {
 
 class ConnectionPool {
  public:
-  // Constructor.
-  ConnectionPool() : session_(nullptr) {}
+  enum class Operation { STATEMENT, UPDATE, QUERY };
+
+  ConnectionPool() = default;
 
   // Not copyable or movable.
   ConnectionPool(const ConnectionPool &) = delete;
@@ -24,35 +28,38 @@ class ConnectionPool {
   ConnectionPool(const ConnectionPool &&) = delete;
   ConnectionPool &operator=(const ConnectionPool &&) = delete;
 
-  // Destructor.
-  ~ConnectionPool();
-
   // Initialize (when the state is initialized).
   void Initialize(const std::string &username, const std::string &password);
 
   // Execute statement against the default un-sharded database.
-  mysql::SqlResult ExecuteDefault(const std::string &sql,
-                                  const dataflow::SchemaRef &schema);
+  mysql::SqlResult ExecuteDefault(Operation op, const std::string &sql,
+                                  const dataflow::SchemaRef &schema = {});
 
   // Execute statement against given user shard(s).
-  mysql::SqlResult ExecuteShard(const std::string &sql,
+  mysql::SqlResult ExecuteShard(Operation op, const std::string &sql,
                                 const ShardingInformation &info,
                                 const UserId &user_id,
-                                const dataflow::SchemaRef &schema);
-  mysql::SqlResult ExecuteShards(const std::string &sql,
+                                const dataflow::SchemaRef &schema = {});
+
+  mysql::SqlResult ExecuteShards(Operation op, const std::string &sql,
                                  const ShardingInformation &info,
                                  const std::unordered_set<UserId> &user_ids,
-                                 const dataflow::SchemaRef &schema);
+                                 const dataflow::SchemaRef &schema = {});
 
   void RemoveShard(const std::string &shard_name);
 
  private:
-  // Connection management.
-  void *session_;
+  mysql::SqlResult ExecuteMySQL(ConnectionPool::Operation op,
+                                const std::string &sql,
+                                const dataflow::SchemaRef &schema,
+                                const std::string &shard_name = "default_db",
+                                int aug_index = -1,
+                                const std::string &aug_value = "");
 
-  // Manage using shards in session_.
-  void OpenDefaultShard();
-  void OpenShard(const ShardKind &shard_kind, const UserId &user_id);
+  // Connection management.
+  std::unique_ptr<sql::Connection> conn_;
+  std::unique_ptr<sql::Statement> stmt_;
+  std::unordered_set<std::string> databases_;
 };
 
 }  // namespace shards
