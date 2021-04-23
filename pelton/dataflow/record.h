@@ -241,9 +241,9 @@ class Record {
     ~RecordData() {}
   };
 
-  // 29 bytes but with alignment it is really 32 bytes.
+  // 37 bytes but with alignment it is really 40 bytes.
   RecordData *data_;  // [8 B]
-  uint64_t *bitmap_;
+  uint64_t *bitmap_;  // [8 B]
   SchemaRef schema_;  // [16 B]
   int timestamp_;     // [4 B]
   bool positive_;     // [1 B]
