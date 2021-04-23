@@ -65,6 +65,8 @@ std::vector<std::string> DELETES{
 
 // Flows.
 std::vector<std::pair<std::string, std::string>> FLOWS{
+    std::make_pair("all_rows",
+                   "CREATE VIEW all_rows AS '\"SELECT * FROM submissions\"'"),
     std::make_pair("filter_row",
                    "CREATE VIEW filter_row AS "
                    "'\"SELECT * FROM submissions WHERE ts >= 100\"'"),
@@ -93,6 +95,7 @@ std::vector<std::pair<std::string, std::string>> FLOWS{
                    "'\"SELECT * from submissions ORDER BY ts LIMIT ?\"'")};
 
 std::vector<std::string> FLOW_READS{
+    "SELECT * FROM all_rows;",
     "SELECT * FROM filter_row;",
     "SELECT * FROM filter_row2;",
     "SELECT * FROM filter_row3;",

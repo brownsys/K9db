@@ -2,6 +2,7 @@
 #define PELTON_DATAFLOW_OPERATOR_H_
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "benchmark/benchmark.h"
@@ -62,6 +63,9 @@ class Operator {
 
   // Constructs a vector of parent operators from parents_ edge vector.
   std::vector<std::shared_ptr<Operator>> GetParents() const;
+
+  // For debugging.
+  virtual std::string DebugString() const;
 
  protected:
   explicit Operator(Type type)

@@ -90,5 +90,7 @@ public class QueryPlanner {
     // Extract pelton operators from plan and populate them into the c++ DataFlowGraph.
     planner.PopulateDataFlowGraph(physicalPlan);
     System.out.println("Java: Added all operators");
+    System.out.println(generator.DebugString().getString());
+    System.out.println("");
   }
 }

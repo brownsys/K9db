@@ -49,5 +49,14 @@ bool DataFlowGraph::Process(const std::string &input_name,
   return true;
 }
 
+std::string DataFlowGraph::DebugString() const {
+  std::string str = "[";
+  for (const auto &[_, node] : this->nodes_) {
+    str += "\n\t" + node->DebugString() + ",";
+  }
+  str += "\n]";
+  return str;
+}
+
 }  // namespace dataflow
 }  // namespace pelton

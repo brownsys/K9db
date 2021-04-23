@@ -153,5 +153,10 @@ sqlast::ColumnDefinitionTypeEnum DataFlowGraphGenerator::GetTableColumnType(
   return this->state_->GetTableSchema(table_name).TypeOf(column);
 }
 
+// Debugging string.
+std::string DataFlowGraphGenerator::DebugString() const {
+  return this->graph_->DebugString();
+}
+
 }  // namespace dataflow
 }  // namespace pelton

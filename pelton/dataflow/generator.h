@@ -63,6 +63,9 @@ class DataFlowGraphGenerator {
   sqlast::ColumnDefinitionTypeEnum GetTableColumnType(
       const std::string &table_name, ColumnID column) const;
 
+  // Debugging string.
+  std::string DebugString() const;
+
  private:
   DataFlowGraph *graph_;
   DataFlowState *state_;

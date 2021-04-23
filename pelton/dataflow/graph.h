@@ -59,6 +59,9 @@ class DataFlowGraph {
     return it == nodes_.end() ? nullptr : it->second;
   }
 
+  // Debugging.
+  std::string DebugString() const;
+
  private:
   bool AddEdge(std::shared_ptr<Operator> parent,
                std::shared_ptr<Operator> child);
