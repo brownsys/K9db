@@ -46,7 +46,9 @@ jboolean Java_edu_brown_pelton_PeltonJNI_ExecuteDDL(JNIEnv *env, jobject this_,
   if (ptr != 0) {
     pelton::Connection *connection =
         reinterpret_cast<pelton::Connection *>(ptr);
-    if (pelton::exec(connection, str).ok()) {
+    absl::StatusOr<pelton::SqlResult> result = pelton::exec(connection, str);
+    if (result.ok() && result.value().IsStatement() &&
+        result.value().Success()) {
       return JNI_TRUE;
     }
   }
@@ -60,11 +62,12 @@ jint Java_edu_brown_pelton_PeltonJNI_ExecuteUpdate(JNIEnv *env, jobject this_,
   if (ptr != 0) {
     pelton::Connection *connection =
         reinterpret_cast<pelton::Connection *>(ptr);
-    if (pelton::exec(connection, str).ok()) {
-      return 1;
+    absl::StatusOr<pelton::SqlResult> result = pelton::exec(connection, str);
+    if (result.ok() && result.value().IsUpdate()) {
+      return result.value().UpdateCount();
     }
   }
-  return 0;
+  return -1;
 }
 
 jobject Java_edu_brown_pelton_PeltonJNI_ExecuteQuery(JNIEnv *env, jobject this_,
@@ -83,22 +86,22 @@ jobject Java_edu_brown_pelton_PeltonJNI_ExecuteQuery(JNIEnv *env, jobject this_,
     jobject array_list_obj = env->NewObject(array_class, constructor_id);
     // Execute query with pelton.
     absl::StatusOr<pelton::SqlResult> result = pelton::exec(connection, str);
-    if (result.ok()) {
+    if (result.ok() && result.value().IsQuery()) {
       pelton::SqlResult &sqlresult = result.value();
-      size_t col_count = sqlresult.getSchema().size();
+      size_t col_count = sqlresult.GetSchema().size();
       // First element in result contains column names / headers.
       jobjectArray column_names =
           env->NewObjectArray(col_count, string_class, NULL);
       for (size_t i = 0; i < col_count; i++) {
         jstring column_name =
-            env->NewStringUTF(sqlresult.getSchema().NameOf(i).c_str());
+            env->NewStringUTF(sqlresult.GetSchema().NameOf(i).c_str());
         env->SetObjectArrayElement(column_names, i, column_name);
       }
       env->CallBooleanMethod(array_list_obj, add_id, column_names);
 
       // Remaining elements contain actual rows.
-      while (sqlresult.hasData()) {
-        pelton::Record row = sqlresult.fetchOne();
+      while (sqlresult.HasNext()) {
+        pelton::Record row = sqlresult.FetchOne();
         jobjectArray row_data =
             env->NewObjectArray(col_count, string_class, NULL);
         for (size_t i = 0; i < col_count; i++) {

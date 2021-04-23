@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "pelton/shards/sqlengine/delete.h"
 #include "pelton/shards/sqlengine/insert.h"
 #include "pelton/shards/sqlengine/select.h"
@@ -100,26 +101,29 @@ sqlast::Insert InsertRecord(const dataflow::Record &record,
 
 }  // namespace
 
-absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
-                   dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<mysql::SqlResult> Shard(
+    const sqlast::Update &stmt, SharderState *state,
+    dataflow::DataFlowState *dataflow_state) {
   perf::Start("Update");
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
 
   // Get the rows that are going to be deleted prior to deletion to use them
   // to update the dataflows.
-  MOVE_OR_RETURN(mysql::SqlResult result,
+  MOVE_OR_RETURN(mysql::SqlResult domain_result,
                  select::Shard(stmt.SelectDomain(), state, dataflow_state));
-  std::vector<dataflow::Record> records = result.Vectorize();
+  std::vector<dataflow::Record> records = domain_result.Vectorize();
   size_t old_records_size = records.size();
   CHECK_STATUS(UpdateRecords(&records, stmt, state->GetSchema(table_name)));
 
   sqlast::Stringifier stringifier;
+  mysql::SqlResult result;
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
     std::string update_str = stmt.Visit(&stringifier);
-    state->connection_pool().ExecuteDefault(update_str, {});
+    result = state->connection_pool().ExecuteDefault(
+        ConnectionPool::Operation::UPDATE, update_str);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded.
@@ -127,14 +131,18 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
       // The update statement might move the rows from one shard to another.
       // We can only perform this update by splitting it into a DELETE-INSERT
       // pair.
-      CHECK_STATUS(
+      MOVE_OR_RETURN(
+          mysql::SqlResult tmp,
           delete_::Shard(stmt.DeleteDomain(), state, dataflow_state, false));
+      result.Append(std::move(tmp));
 
       // Insert updated records.
       for (size_t i = old_records_size; i < records.size(); i++) {
         sqlast::Insert insert_stmt =
             InsertRecord(records.at(i), state->GetSchema(table_name));
-        CHECK_STATUS(insert::Shard(insert_stmt, state, dataflow_state, false));
+        MOVE_OR_RETURN(
+            tmp, insert::Shard(insert_stmt, state, dataflow_state, false));
+        result.Append(std::move(tmp));
       }
 
     } else {
@@ -158,14 +166,15 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
 
             // Execute statement directly against shard.
             std::string update_str = cloned.Visit(&stringifier);
-            state->connection_pool().ExecuteShard(update_str, info, user_id,
-                                                  {});
+            result.Append(state->connection_pool().ExecuteShard(
+                ConnectionPool::Operation::UPDATE, update_str, info, user_id));
           }
         } else {
           // Update against the relevant shards.
           std::string update_str = cloned.Visit(&stringifier);
-          state->connection_pool().ExecuteShards(
-              update_str, info, state->UsersOfShard(info.shard_kind), {});
+          result.Append(state->connection_pool().ExecuteShards(
+              ConnectionPool::Operation::UPDATE, update_str, info,
+              state->UsersOfShard(info.shard_kind)));
         }
       }
     }
@@ -175,7 +184,7 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
   dataflow_state->ProcessRecords(table_name, records);
 
   perf::End("Update");
-  return absl::OkStatus();
+  return result;
 }
 
 }  // namespace update

@@ -6,7 +6,8 @@
 namespace pelton {
 namespace sqlast {
 
-inline bool StartsWith(const char **ptr, size_t *sz1, const char *s2, size_t sz2) {
+inline bool StartsWith(const char **ptr, size_t *sz1, const char *s2,
+                       size_t sz2) {
   if (*sz1 < sz2) {
     return false;
   }
@@ -20,7 +21,7 @@ inline bool StartsWith(const char **ptr, size_t *sz1, const char *s2, size_t sz2
   }
 
   *ptr += i;
-  *sz1 -= i;  
+  *sz1 -= i;
   return true;
 }
 

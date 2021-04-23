@@ -28,7 +28,7 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
     return absl::InvalidArgumentError("Hacky insert: table name");
   }
   ConsumeWhiteSpace(&str, &size);
-  
+
   // Create the insert statement.
   std::unique_ptr<Insert> stmt = std::make_unique<Insert>(table_name);
 
@@ -43,7 +43,7 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
     return absl::InvalidArgumentError("Hacky insert: (");
   }
   ConsumeWhiteSpace(&str, &size);
-  
+
   do {
     stmt->AddValue(ExtractValue(&str, &size));
     ConsumeWhiteSpace(&str, &size);
@@ -54,15 +54,13 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
     return absl::InvalidArgumentError("Hacky insert: );");
   }
   ConsumeWhiteSpace(&str, &size);
-  
+
   if (size != 0) {
     return absl::InvalidArgumentError("Hacky insert: EOF");
   }
 
   return stmt;
 }
-
-
 
 absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyParse(
     const std::string &sql) {

@@ -29,7 +29,8 @@ absl::StatusOr<mysql::SqlResult> Shard(
   if (!is_sharded) {
     // Case 1: table is not in any shard.
     std::string select_str = stmt.Visit(&stringifier);
-    result = state->connection_pool().ExecuteDefault(select_str, schema);
+    result = state->connection_pool().ExecuteDefault(
+        ConnectionPool::Operation::QUERY, select_str, schema);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded.
@@ -61,14 +62,16 @@ absl::StatusOr<mysql::SqlResult> Shard(
           std::string select_str = cloned.Visit(&stringifier);
           result.MakeInline();
           result.AppendDeduplicate(state->connection_pool().ExecuteShard(
-              select_str, info, user_id, schema));
+              ConnectionPool::Operation::QUERY, select_str, info, user_id,
+              schema));
         }
       } else {
         // Select from all the relevant shards.
         std::string select_str = cloned.Visit(&stringifier);
         result.MakeInline();
         result.AppendDeduplicate(state->connection_pool().ExecuteShards(
-            select_str, info, state->UsersOfShard(info.shard_kind), schema));
+            ConnectionPool::Operation::QUERY, select_str, info,
+            state->UsersOfShard(info.shard_kind), schema));
       }
     }
   }

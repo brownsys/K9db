@@ -17,8 +17,10 @@ namespace shards {
 namespace sqlengine {
 namespace delete_ {
 
-absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
-                   dataflow::DataFlowState *dataflow_state, bool update_flows) {
+absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
+                                       SharderState *state,
+                                       dataflow::DataFlowState *dataflow_state,
+                                       bool update_flows) {
   perf::Start("Delete");
   const std::string &table_name = stmt.table_name();
 
@@ -36,6 +38,7 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
   bool is_sharded = state->IsSharded(table_name);
   bool is_pii = state->IsPII(table_name);
   sqlast::Stringifier stringifier;
+  mysql::SqlResult result;
 
   // Sharding scenarios.
   if (is_pii) {
@@ -57,7 +60,8 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
     // Turn the delete statement back to a string, to delete relevant row in
     // PII table.
     std::string delete_str = stmt.Visit(&stringifier);
-    state->connection_pool().ExecuteDefault(delete_str, {});
+    result = state->connection_pool().ExecuteDefault(
+        ConnectionPool::Operation::UPDATE, delete_str);
 
     // TODO(babman): Update dataflow after user has been deleted.
     // return absl::UnimplementedError("Dataflow not updated after a user
@@ -66,7 +70,8 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
   } else if (!is_sharded && !is_pii) {
     // Case 2: Table does not have PII and is not sharded!
     std::string delete_str = stmt.Visit(&stringifier);
-    state->connection_pool().ExecuteDefault(delete_str, {});
+    result = state->connection_pool().ExecuteDefault(
+        ConnectionPool::Operation::UPDATE, delete_str);
 
   } else {  // is_shared == true
     // Case 3: Table is sharded!
@@ -90,13 +95,15 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
 
           // Execute statement directly against shard.
           std::string delete_str = cloned.Visit(&stringifier);
-          state->connection_pool().ExecuteShard(delete_str, info, user_id, {});
+          result.Append(state->connection_pool().ExecuteShard(
+              ConnectionPool::Operation::UPDATE, delete_str, info, user_id));
         }
       } else {
         // Execute statement against all shards of this kind.
         std::string delete_str = cloned.Visit(&stringifier);
-        state->connection_pool().ExecuteShards(
-            delete_str, info, state->UsersOfShard(info.shard_kind), {});
+        result.Append(state->connection_pool().ExecuteShards(
+            ConnectionPool::Operation::UPDATE, delete_str, info,
+            state->UsersOfShard(info.shard_kind)));
       }
     }
   }
@@ -107,7 +114,7 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
   }
 
   perf::End("Delete");
-  return absl::OkStatus();
+  return result;
 }
 
 }  // namespace delete_

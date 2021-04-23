@@ -2,94 +2,116 @@
 #include "pelton/shards/pool.h"
 
 #include <cstring>
-#include <memory>
 #include <utility>
 
 #include "glog/logging.h"
-#include "mysql-cppconn-8/mysqlx/xdevapi.h"
+#include "mysql-cppconn-8/jdbc/cppconn/resultset.h"
+#include "mysql-cppconn-8/jdbc/cppconn/statement.h"
+#include "mysql-cppconn-8/jdbc/mysql_driver.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/perf.h"
 
 namespace pelton {
 namespace shards {
 
-#define SESSION reinterpret_cast<mysqlx::Session *>(this->session_)
+namespace {
 
-// Destructor.
-ConnectionPool::~ConnectionPool() {
-  if (SESSION != nullptr) {
-    SESSION->close();
-    delete SESSION;
-    this->session_ = nullptr;
+mysql::SqlResult ExecuteMySQL(sql::Connection *conn,
+                              ConnectionPool::Operation op,
+                              const std::string &sql,
+                              const dataflow::SchemaRef &schema,
+                              const std::string &shard_name = "default_db",
+                              int aug_index = -1,
+                              const std::string &aug_value = "") {
+  perf::Start("MySQL");
+  std::unique_ptr<sql::Statement> stmt =
+      std::unique_ptr<sql::Statement>(conn->createStatement());
+  stmt->execute("CREATE DATABASE IF NOT EXISTS " + shard_name);
+  stmt->execute("USE " + shard_name);
+
+  mysql::SqlResult res;
+  switch (op) {
+    case ConnectionPool::Operation::STATEMENT: {
+      stmt->execute(sql);
+      res = mysql::SqlResult(std::make_unique<mysql::StatementResult>(true));
+      break;
+    }
+    case ConnectionPool::Operation::UPDATE: {
+      int row_count = stmt->executeUpdate(sql);
+      res = mysql::SqlResult(std::make_unique<mysql::UpdateResult>(row_count));
+      break;
+    }
+    case ConnectionPool::Operation::QUERY: {
+      sql::ResultSet *tmp = stmt->executeQuery(sql);
+      if (aug_index > -1) {
+        res = mysql::SqlResult(
+            std::make_unique<mysql::AugmentedSqlResult>(
+                std::unique_ptr<sql::ResultSet>(tmp), aug_index, aug_value),
+            schema);
+      } else {
+        res = mysql::SqlResult(std::make_unique<mysql::MySqlResult>(
+                                   std::unique_ptr<sql::ResultSet>(tmp)),
+                               schema);
+      }
+      break;
+    }
   }
+  perf::End("MySQL");
+  return res;
 }
+
+}  // namespace
 
 // Initialization: open a connection to the default unsharded database.
 void ConnectionPool::Initialize(const std::string &username,
                                 const std::string &password) {
-  std::string connection_str = username + ":" + password + "@localhost";
-  this->session_ = new mysqlx::Session(connection_str);
-}
-
-// Manage using shards in session_.
-void ConnectionPool::OpenDefaultShard() {
-  LOG(INFO) << "Shard: default shard";
-  SESSION->sql("CREATE DATABASE IF NOT EXISTS default_db;").execute();
-  SESSION->sql("USE default_db").execute();
-}
-void ConnectionPool::OpenShard(const ShardKind &shard_kind,
-                               const UserId &user_id) {
-  std::string shard_name = sqlengine::NameShard(shard_kind, user_id);
-  LOG(INFO) << "Shard: " << shard_name << " (userid: " << user_id << ")";
-  SESSION->sql("CREATE DATABASE IF NOT EXISTS " + shard_name).execute();
-  SESSION->sql("USE " + shard_name).execute();
+  sql::Driver *driver = sql::mysql::get_driver_instance();
+  this->conn_ = std::unique_ptr<sql::Connection>(
+      driver->connect("localhost", username, password));
 }
 
 // Execution of SQL statements.
 // Execute statement against the default un-sharded database.
 mysql::SqlResult ConnectionPool::ExecuteDefault(
-    const std::string &sql, const dataflow::SchemaRef &schema) {
+    Operation op, const std::string &sql, const dataflow::SchemaRef &schema) {
   perf::Start("ExecuteDefault");
 
-  this->OpenDefaultShard();
+  LOG(INFO) << "Shard: default shard";
   LOG(INFO) << "Statement: " << sql;
 
-  mysqlx::SqlResult result = SESSION->sql(sql).execute();
-  mysql::SqlResult wrapper{
-      std::make_unique<mysql::MySqlResult>(std::move(result)), schema};
+  mysql::SqlResult result = ExecuteMySQL(this->conn_.get(), op, sql, schema);
 
   perf::End("ExecuteDefault");
-  return wrapper;
+  return result;
 }
 
 // Execute statement against given user shard(s).
 mysql::SqlResult ConnectionPool::ExecuteShard(
-    const std::string &sql, const ShardingInformation &info,
+    Operation op, const std::string &sql, const ShardingInformation &info,
     const UserId &user_id, const dataflow::SchemaRef &schema) {
   perf::Start("ExecuteShard");
 
-  this->OpenShard(info.shard_kind, user_id);
+  std::string shard_name = sqlengine::NameShard(info.shard_kind, user_id);
+  LOG(INFO) << "Shard: " << shard_name << " (userid: " << user_id << ")";
   LOG(INFO) << "Statement:" << sql;
 
-  mysqlx::SqlResult result = SESSION->sql(sql).execute();
-  mysql::SqlResult wrapper{
-      std::make_unique<mysql::AugmentedSqlResult>(
-          std::move(result), info.shard_by_index, mysqlx::Value(user_id)),
-      schema};
+  mysql::SqlResult result =
+      ExecuteMySQL(this->conn_.get(), op, sql, schema, shard_name,
+                   info.shard_by_index, user_id);
 
   perf::End("ExecuteShard");
-  return wrapper;
+  return result;
 }
 
 mysql::SqlResult ConnectionPool::ExecuteShards(
-    const std::string &sql, const ShardingInformation &info,
+    Operation op, const std::string &sql, const ShardingInformation &info,
     const std::unordered_set<UserId> &user_ids,
     const dataflow::SchemaRef &schema) {
   // This result set is a proxy that allows access to results from all shards.
   mysql::SqlResult result;
   for (const UserId &user_id : user_ids) {
     result.MakeInline();
-    result.Append(this->ExecuteShard(sql, info, user_id, schema));
+    result.Append(this->ExecuteShard(op, sql, info, user_id, schema));
   }
 
   return result;
@@ -98,7 +120,8 @@ mysql::SqlResult ConnectionPool::ExecuteShards(
 // Removing a shard is equivalent to deleting its database.
 void ConnectionPool::RemoveShard(const std::string &shard_name) {
   LOG(INFO) << "Remove Shard: " << shard_name;
-  SESSION->sql("DROP DATABASE " + shard_name).execute();
+  ExecuteMySQL(this->conn_.get(), ConnectionPool::Operation::STATEMENT,
+               "DROP DATABASE " + shard_name, {});
 }
 
 }  // namespace shards

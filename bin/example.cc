@@ -112,12 +112,15 @@ std::vector<std::string> QUERIES{
 
 // Printing query results.
 void Print(pelton::SqlResult &&result) {
-  if (result.getSchema().size() > 0) {
-    std::cout << result.getSchema() << std::endl;
-  }
-
-  while (result.hasData()) {
-    std::cout << result.fetchOne() << std::endl;
+  if (result.IsStatement()) {
+    std::cout << "Success: " << result.Success() << std::endl;
+  } else if (result.IsUpdate()) {
+    std::cout << "Affected rows: " << result.UpdateCount() << std::endl;
+  } else if (result.IsQuery()) {
+    std::cout << result.GetSchema() << std::endl;
+    for (const pelton::Record &record : result) {
+      std::cout << record << std::endl;
+    }
   }
 }
 
