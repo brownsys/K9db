@@ -36,11 +36,17 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
   private final DataFlowGraphLibrary.DataFlowGraphGenerator generator;
   private final Stack<ArrayList<Integer>> childrenOperators;
   private final Hashtable<String, Integer> tableToInputOperator;
+  private final ArrayList<ArrayList<Integer>> joinDuplicateColumns;
 
   public PhysicalPlanVisitor(DataFlowGraphLibrary.DataFlowGraphGenerator generator) {
     this.generator = generator;
     this.childrenOperators = new Stack<ArrayList<Integer>>();
     this.tableToInputOperator = new Hashtable<String, Integer>();
+    // NOTE(Ishan): Lobsters queries are very neat, i.e. they never "select *"
+    // after a join, they always disambiguate the columns in projection.
+    // Nevertheless, if things break we can fall back to avoiding deduplication
+    // in join.
+    this.joinDuplicateColumns = new ArrayList<ArrayList<Integer>>();
   }
 
   public void populateGraph(RelNode plan) {
@@ -313,6 +319,10 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     assert rightCondition instanceof RexInputRef;
     int leftColIndex = ((RexInputRef) leftCondition).getIndex();
     int rightColIndex = ((RexInputRef) rightCondition).getIndex();
+    ArrayList duplicateCols = new ArrayList<Integer>();
+    duplicateCols.add(leftColIndex);
+    duplicateCols.add(rightColIndex);
+    this.joinDuplicateColumns.add(duplicateCols);
     rightColIndex -= leftCount;
 
     // Set up all join operator parameters.
@@ -356,6 +366,17 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
 		for(RexNode item : project.getProjects()) {
 			cids.add(Integer.parseInt(item.toString().substring(1)));
 		}
+    for(ArrayList entry : this.joinDuplicateColumns){
+      if(cids.contains(entry.get(0))){
+        if(cids.contains(entry.get(1))){
+          // Delete duplicate column and update subsequent column indices
+          int del_index = cids.indexOf(entry.get(1));
+          cids.remove(entry.get(1));
+          for(int i = del_index; i<cids.size(); i++)
+            cids.set(i, cids.get(i)-1);
+        }
+      }
+    }
     int projectOperator = this.generator.AddProjectOperator(children.get(0), cids.stream().mapToInt(i -> i).toArray());
     this.childrenOperators.peek().add(projectOperator);
     return project;
