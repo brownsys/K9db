@@ -8,6 +8,7 @@
 #include <unordered_set>
 
 #include "absl/status/status.h"
+#include "mysql-cppconn-8/jdbc/cppconn/statement.h"
 #include "mysql-cppconn-8/jdbc/mysql_connection.h"
 #include "pelton/mysql/result.h"
 #include "pelton/shards/types.h"
@@ -48,8 +49,17 @@ class ConnectionPool {
   void RemoveShard(const std::string &shard_name);
 
  private:
+  mysql::SqlResult ExecuteMySQL(ConnectionPool::Operation op,
+                                const std::string &sql,
+                                const dataflow::SchemaRef &schema,
+                                const std::string &shard_name = "default_db",
+                                int aug_index = -1,
+                                const std::string &aug_value = "");
+
   // Connection management.
   std::unique_ptr<sql::Connection> conn_;
+  std::unique_ptr<sql::Statement> stmt_;
+  std::unordered_set<std::string> databases_;
 };
 
 }  // namespace shards

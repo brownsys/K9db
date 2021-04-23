@@ -15,32 +15,38 @@
 #include "mysql-cppconn-8/jdbc/mysql_driver.h"
 #include "pelton/util/perf.h"
 
-void PrintHeader(sql::ResultSet *result) {
-  sql::ResultSetMetaData *metadata = result->getMetaData();
-  for (size_t i = 1; i <= metadata->getColumnCount(); i++) {
-    std::cout << "| " << metadata->getColumnName(i) << " ";
+void PrintHeader(bool print, sql::ResultSet *result) {
+  if (print) {
+    sql::ResultSetMetaData *metadata = result->getMetaData();
+    for (size_t i = 1; i <= metadata->getColumnCount(); i++) {
+      std::cout << "| " << metadata->getColumnName(i) << " ";
+    }
+    std::cout << "|" << std::endl;
+    for (size_t i = 0; i < metadata->getColumnCount() * 10; i++) {
+      std::cout << "-";
+    }
+    std::cout << std::endl;
   }
-  std::cout << "|" << std::endl;
-  for (size_t i = 0; i < metadata->getColumnCount() * 10; i++) {
-    std::cout << "-";
-  }
-  std::cout << std::endl;
 }
 
-void PrintData(sql::ResultSet *result) {
+void PrintData(bool print, sql::ResultSet *result) {
   while (result->next()) {
     for (size_t i = 1; i <= result->getMetaData()->getColumnCount(); i++) {
       switch (result->getMetaData()->getColumnType(i)) {
         case sql::DataType::VARCHAR:
         case sql::DataType::CHAR:
         case sql::DataType::LONGVARCHAR:
-          std::cout << "| " << result->getString(i) << " ";
+          if (print) {
+            std::cout << "| " << result->getString(i) << " ";
+          }
           break;
         case sql::DataType::TINYINT:
         case sql::DataType::SMALLINT:
         case sql::DataType::MEDIUMINT:
         case sql::DataType::INTEGER:
-          std::cout << "| " << result->getInt(i) << " ";
+          if (print) {
+            std::cout << "| " << result->getInt(i) << " ";
+          }
           break;
         default:
           std::cout << std::endl;
@@ -130,14 +136,13 @@ int main(int argc, char **argv) {
       pelton::perf::Start("exec");
       if (command[0] == 'S' || command[0] == 's') {
         std::unique_ptr<sql::ResultSet> result{stmt->executeQuery(command)};
-        if (print) {
-          PrintHeader(result.get());
-          PrintData(result.get());
-        }
+        PrintHeader(print, result.get());
+        PrintData(print, result.get());
       } else if (command[0] == 'I' || command[0] == 'i' || command[0] == 'U' ||
                  command[0] == 'u' || command[0] == 'D' || command[0] == 'd') {
+        int count = stmt->executeUpdate(command);
         if (print) {
-          std::cout << stmt->executeUpdate(command) << " updated." << std::endl;
+          std::cout << count << " updated." << std::endl;
         }
       } else if (command[0] == 'C' || command[0] == 'c') {
         stmt->execute(command);
