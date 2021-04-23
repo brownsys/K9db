@@ -131,6 +131,9 @@ absl::StatusOr<mysql::SqlResult> SelectView(
           case sqlast::ColumnDefinition::Type::TEXT:
             key.AddValue(value);
             break;
+          case sqlast::ColumnDefinition::Type::DATETIME:
+            key.AddValue(value);
+            break;
           default:
             return absl::InvalidArgumentError("Unsupported type in view read");
         }
