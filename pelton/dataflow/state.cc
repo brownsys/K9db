@@ -73,7 +73,11 @@ Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
     if (has_cols) {
       schema_index = schema.IndexOf(cols.at(i));
     }
-    record.SetValue(vals.at(i), schema_index);
+    if (vals.at(i) == "NULL") {
+      record.SetNull(true, i);
+    } else {
+      record.SetValue(vals.at(i), schema_index);
+    }
   }
 
   return record;
