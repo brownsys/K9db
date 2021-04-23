@@ -1,3 +1,4 @@
+SET echo;
 CREATE TABLE users ( \
   id int NOT NULL PRIMARY KEY, \
   PII_username varchar(50), \
