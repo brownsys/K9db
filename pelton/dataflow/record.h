@@ -185,40 +185,45 @@ class Record {
     if (index >= this->schema_.size()) {
       LOG(FATAL) << "Record data received too many arguments";
     }
-    // Make sure Arg is of the correct type.
-    switch (this->schema_.TypeOf(index)) {
-      case sqlast::ColumnDefinition::Type::UINT:
-        if constexpr (std::is_same<std::remove_reference_t<Arg>,
-                                   uint64_t>::value) {
-          this->data_[index].uint = t;
-        } else {
-          LOG(FATAL) << "Type mismatch in SetData at index " << index
-                     << ", expected " << this->schema_.TypeOf(index) << ", got "
-                     << TypeNameFor(t);
-        }
-        break;
-      case sqlast::ColumnDefinition::Type::INT:
-        if constexpr (std::is_same<std::remove_reference_t<Arg>,
-                                   int64_t>::value) {
-          this->data_[index].sint = t;
-        } else {
-          LOG(FATAL) << "Type mismatch in SetData at index " << index
-                     << ", expected " << this->schema_.TypeOf(index) << ", got "
-                     << TypeNameFor(t);
-        }
-        break;
-      case sqlast::ColumnDefinition::Type::TEXT:
-        if constexpr (std::is_same<std::remove_reference_t<Arg>,
-                                   std::unique_ptr<std::string>>::value) {
-          this->data_[index].str = std::move(t);
-        } else {
-          LOG(FATAL) << "Type mismatch in SetData at index " << index
-                     << ", expected " << this->schema_.TypeOf(index) << ", got "
-                     << TypeNameFor(t);
-        }
-        break;
-      default:
-        LOG(FATAL) << "Unsupported data type in SetData";
+    if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                               NullValue>::value) {
+      this->SetNull(true, index);
+    } else {
+      // Make sure Arg is of the correct type.
+      switch (this->schema_.TypeOf(index)) {
+        case sqlast::ColumnDefinition::Type::UINT:
+          if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                     uint64_t>::value) {
+            this->data_[index].uint = t;
+          } else {
+            LOG(FATAL) << "Type mismatch in SetData at index " << index
+                       << ", expected " << this->schema_.TypeOf(index) << ", got "
+                       << TypeNameFor(t);
+          }
+          break;
+        case sqlast::ColumnDefinition::Type::INT:
+          if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                     int64_t>::value) {
+            this->data_[index].sint = t;
+          } else {
+            LOG(FATAL) << "Type mismatch in SetData at index " << index
+                       << ", expected " << this->schema_.TypeOf(index) << ", got "
+                       << TypeNameFor(t);
+          }
+          break;
+        case sqlast::ColumnDefinition::Type::TEXT:
+          if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                     std::unique_ptr<std::string>>::value) {
+            this->data_[index].str = std::move(t);
+          } else {
+            LOG(FATAL) << "Type mismatch in SetData at index " << index
+                       << ", expected " << this->schema_.TypeOf(index) << ", got "
+                       << TypeNameFor(t);
+          }
+          break;
+        default:
+          LOG(FATAL) << "Unsupported data type in SetData";
+      }
     }
     // Handle the remaining ts.
     if constexpr (sizeof...(ts) > 0) {

@@ -157,6 +157,32 @@ TEST(RecordTest, VariadicConstructorTypeMistmatch) {
 }
 #endif
 
+// Tests null values using variadic constructor.
+#ifndef PELTON_VALGRIND_MODE
+TEST(RecordTest, VariadicConstructorNullValue) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2"};
+  std::vector<CType> types = {CType::UINT, CType::TEXT};
+  std::vector<ColumnID> keys = {0};
+  SchemaOwner schema{names, types, keys};
+
+  // Make some values.
+  uint64_t v0 = 42;
+  std::unique_ptr<std::string> ptr = std::make_unique<std::string>("hello");
+  NullValue n;
+
+  // Make the record with bad data types and make sure we die.
+  Record r1(SchemaRef(schema), false, n, std::move(ptr));
+  Record r2(SchemaRef(schema), false, v0, n);
+
+  EXPECT_TRUE(r1.IsNull(0));
+  EXPECT_FALSE(r1.IsNull(1));
+  EXPECT_TRUE(r2.IsNull(1));
+  EXPECT_FALSE(r2.IsNull(0));
+}
+#endif
+
+
 // Tests record equality.
 TEST(RecordTest, Comparisons) {
   // Create a schema.
