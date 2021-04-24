@@ -8,6 +8,7 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
+#include "pelton/dataflow/value.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/ints.h"
 
@@ -126,6 +127,36 @@ TEST(ProjectOperatorTest, OutputSchemaCompositeKeyTest) {
   EXPECT_EQ(project2.output_schema_.column_names(), expected_names);
   EXPECT_EQ(project2.output_schema_.column_types(), expected_types);
   EXPECT_EQ(project2.output_schema_.keys(), expected_keys);
+}
+
+TEST(ProjectOperatorTest, NullValueTest) {
+  SchemaOwner schema = CreateSchemaPrimaryKey();
+  std::vector<ColumnID> cids = {0, 1};
+  // create project operator..
+  ProjectOperator project = ProjectOperator(cids);
+  project.input_schemas_.push_back(SchemaRef(schema));
+  project.ComputeOutputSchema();
+
+  // Records to be fed
+  std::vector<Record> records;
+  records.emplace_back(SchemaRef(schema), true, 0_u,
+                       std::make_unique<std::string>("Hello!"), NullValue());
+  records.emplace_back(SchemaRef(schema), true, 5_u, NullValue(), 7_s);
+  records.emplace_back(SchemaRef(schema), true, NullValue(),
+                       std::make_unique<std::string>("hello!"), 10_s);
+
+  // expected output
+  std::vector<Record> expected_records;
+  expected_records.emplace_back(project.output_schema_, true, 0_u,
+                                std::make_unique<std::string>("Hello!"));
+  expected_records.emplace_back(project.output_schema_, true, 5_u, NullValue());
+  expected_records.emplace_back(project.output_schema_, true, NullValue(),
+                                std::make_unique<std::string>("hello!"));
+
+  // Feed records and test
+  std::vector<Record> outputs;
+  EXPECT_TRUE(project.Process(UNDEFINED_NODE_INDEX, records, &outputs));
+  EXPECT_EQ(outputs, expected_records);
 }
 
 }  // namespace dataflow

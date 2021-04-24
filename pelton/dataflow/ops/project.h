@@ -35,6 +35,7 @@ class ProjectOperator : public Operator {
   FRIEND_TEST(ProjectOperatorTest, BatchTest);
   FRIEND_TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest);
   FRIEND_TEST(ProjectOperatorTest, OutputSchemaCompositeKeyTest);
+  FRIEND_TEST(ProjectOperatorTest, NullValueTest);
 };
 
 }  // namespace dataflow
