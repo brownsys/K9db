@@ -171,7 +171,6 @@ TEST(RecordTest, VariadicConstructorNullValue) {
   std::unique_ptr<std::string> ptr = std::make_unique<std::string>("hello");
   NullValue n;
 
-  // Make the record with bad data types and make sure we die.
   Record r1(SchemaRef(schema), false, n, std::move(ptr));
   Record r2(SchemaRef(schema), false, v0, n);
 
