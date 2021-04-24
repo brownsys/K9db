@@ -1,6 +1,6 @@
-#include <vector>
-
 #define PELTON_BENCHMARK
+
+#include <vector>
 
 #include "benchmark/benchmark.h"
 #include "pelton/dataflow/key.h"
@@ -11,15 +11,17 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/ints.h"
 
 namespace pelton {
 namespace dataflow {
 
 using CType = sqlast::ColumnDefinition::Type;
 
-static void JoinOneToOne(benchmark::State& state) {
-  SchemaOwner leftSchema = MakeSchema(false);
-  SchemaOwner rightSchema = MakeSchema(false);
+// NOLINTNEXTLINE
+void JoinOneToOne(benchmark::State& state) {
+  SchemaRef leftSchema = MakeSchema(false);
+  SchemaRef rightSchema = MakeSchema(false);
 
   std::shared_ptr<IdentityOperator> iop1 = std::make_shared<IdentityOperator>();
   std::shared_ptr<IdentityOperator> iop2 = std::make_shared<IdentityOperator>();
@@ -29,13 +31,11 @@ static void JoinOneToOne(benchmark::State& state) {
   iop2->SetIndex(1);
   op->parents_ = {std::make_shared<Edge>(iop1, op),
                   std::make_shared<Edge>(iop2, op)};
-  op->input_schemas_ = {SchemaRef(leftSchema), SchemaRef(rightSchema)};
+  op->input_schemas_ = {leftSchema, rightSchema};
   op->ComputeOutputSchema();
 
-  Record lr1(SchemaRef(leftSchema), true, static_cast<uint64_t>(4),
-             static_cast<uint64_t>(5));
-  Record rr1(SchemaRef(rightSchema), true, static_cast<uint64_t>(4),
-             static_cast<uint64_t>(5));
+  Record lr1{leftSchema, true, 4_u, 5_u};
+  Record rr1{rightSchema, true, 4_u, 5_u};
   std::vector<Record> leftRecords;
   std::vector<Record> rightRecords;
   leftRecords.emplace_back(std::move(lr1));

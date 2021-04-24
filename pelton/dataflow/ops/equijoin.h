@@ -19,8 +19,6 @@
 namespace pelton {
 namespace dataflow {
 
-static void JoinOneToOne(benchmark::State &state);
-
 class EquiJoinOperator : public Operator {
  public:
   EquiJoinOperator() = delete;
@@ -28,8 +26,7 @@ class EquiJoinOperator : public Operator {
   EquiJoinOperator(ColumnID left_id, ColumnID right_id)
       : Operator(Operator::Type::EQUIJOIN),
         left_id_(left_id),
-        right_id_(right_id),
-        joined_schema_() {}
+        right_id_(right_id) {}
 
   std::shared_ptr<Operator> left() const {
     return this->parents_.at(0)->from();
@@ -58,8 +55,6 @@ class EquiJoinOperator : public Operator {
   // Columns on which join is computed.
   ColumnID left_id_;
   ColumnID right_id_;
-  // Schema of the output.
-  SchemaOwner joined_schema_;
   UnorderedGroupedData left_table_;
   UnorderedGroupedData right_table_;
 
@@ -71,7 +66,11 @@ class EquiJoinOperator : public Operator {
   FRIEND_TEST(EquiJoinOperatorTest, BasicJoinTest);
   FRIEND_TEST(EquiJoinOperatorTest, BasicUnjoinableTest);
   FRIEND_TEST(EquiJoinOperatorTest, FullJoinTest);
-  friend void pelton::dataflow::JoinOneToOne(benchmark::State &state);
+
+#ifdef PELTON_BENCHMARK  // shuts up compiler warnings
+  // NOLINTNEXTLINE
+  friend void JoinOneToOne(benchmark::State &state);
+#endif
 };
 
 }  // namespace dataflow

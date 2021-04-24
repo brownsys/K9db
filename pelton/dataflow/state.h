@@ -29,7 +29,7 @@ class DataFlowState {
 
   // Manage schemas.
   void AddTableSchema(const sqlast::CreateTable &create);
-  void AddTableSchema(const std::string &table_name, SchemaOwner &&schema);
+  void AddTableSchema(const std::string &table_name, SchemaRef schema);
 
   std::vector<std::string> GetTables() const;
   SchemaRef GetTableSchema(const TableName &table_name) const;
@@ -60,7 +60,7 @@ class DataFlowState {
   // The logical schema is the contract between client code and our DB.
   // The stored schema may not matched the concrete/physical one due to sharding
   // or other transformations.
-  std::unordered_map<TableName, SchemaOwner> schema_;
+  std::unordered_map<TableName, SchemaRef> schema_;
 
   // DataFlow graphs and views.
   std::unordered_map<FlowName, DataFlowGraph> flows_;

@@ -8,17 +8,18 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/ints.h"
 
 namespace pelton {
 namespace dataflow {
 
+// NOLINTNEXTLINE
 static void FilterPasses(benchmark::State& state) {
-  SchemaOwner schema = MakeSchema(false);
+  SchemaRef schema = MakeSchema(false);
   FilterOperator filter;
-  filter.AddOperation(5UL, 0, FilterOperator::Operation::LESS_THAN);
+  filter.AddOperation(5_u, 0, FilterOperator::Operation::LESS_THAN);
 
-  Record r(SchemaRef(schema), true, static_cast<uint64_t>(4),
-           static_cast<uint64_t>(5));
+  Record r{schema, true, 4_u, 5_u};
   std::vector<Record> rs;
   rs.emplace_back(std::move(r));
 
@@ -31,13 +32,13 @@ static void FilterPasses(benchmark::State& state) {
   state.SetItemsProcessed(processed);
 }
 
+// NOLINTNEXTLINE
 static void FilterDiscards(benchmark::State& state) {
-  SchemaOwner schema = MakeSchema(false);
+  SchemaRef schema = MakeSchema(false);
   FilterOperator filter;
-  filter.AddOperation(5UL, 0, FilterOperator::Operation::LESS_THAN);
+  filter.AddOperation(5_u, 0, FilterOperator::Operation::LESS_THAN);
 
-  Record r(SchemaRef(schema), true, static_cast<uint64_t>(6),
-           static_cast<uint64_t>(5));
+  Record r{schema, true, 6_u, 5_u};
   std::vector<Record> rs;
   rs.emplace_back(std::move(r));
 

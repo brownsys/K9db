@@ -1,8 +1,8 @@
 #ifndef PELTON_DATAFLOW_SCHEMA_H_
 #define PELTON_DATAFLOW_SCHEMA_H_
 
+#include <list>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "glog/logging.h"
@@ -12,46 +12,48 @@
 namespace pelton {
 namespace dataflow {
 
-class SchemaRef;
-
-class SchemaOwner {
- public:
-  // Empty SchemaOwner: this is used to create a temporary so that Operators can
-  // compute their output schema after creation.
-  SchemaOwner() : ptr_(nullptr) {}
-
-  // Construct from a CREATE TABLE statement.
-  explicit SchemaOwner(const sqlast::CreateTable &table);
-
-  // Construct from schema data directly.
-  SchemaOwner(const std::vector<std::string> &column_names,
-              const std::vector<sqlast::ColumnDefinition::Type> &column_types,
-              const std::vector<ColumnID> &keys) {
-    this->ptr_ = new SchemaData(column_names, column_types, keys);
-  }
-
-  // An owner is only movable, which moves ownership of the underlying pointer.
-  SchemaOwner(const SchemaOwner &) = delete;
-  SchemaOwner &operator=(const SchemaOwner &) = delete;
-  SchemaOwner(SchemaOwner &&other) { *this = std::move(other); }
-  SchemaOwner &operator=(SchemaOwner &&other) {
-    this->ptr_ = other.ptr_;
-    other.ptr_ = nullptr;
-    return *this;
-  }
-
-  // Destructor.
-  virtual ~SchemaOwner() {
-    if (this->ptr_ != nullptr) {
-      delete this->ptr_;
+// We never use this directly in host code.
+struct SchemaData {
+  std::vector<std::string> column_names;
+  std::vector<sqlast::ColumnDefinition::Type> column_types;
+  std::vector<ColumnID> keys;
+  // Constructors.
+  SchemaData(const std::vector<std::string> &cn,
+             const std::vector<sqlast::ColumnDefinition::Type> &ct,
+             const std::vector<ColumnID> &ks)
+      : column_names(cn), column_types(ct), keys(ks) {
+    if (column_names.size() != column_types.size()) {
+      LOG(FATAL) << "Incosistent number of columns in schema!";
     }
   }
+  // Semantic equality (not pointer based).
+  bool Is(const std::vector<std::string> &cn,
+          const std::vector<sqlast::ColumnDefinition::Type> &ct,
+          const std::vector<ColumnID> &ks) const {
+    return column_names == cn && column_types == ct && keys == ks;
+  }
+};
+
+// Forward declartion so that factory can be a friend.
+class SchemaFactory;
+
+class SchemaRef {
+ public:
+  // Empty SchemaRef: this is used to create a temporary so that Operators can
+  // compute their output schema after creation.
+  SchemaRef() = default;
+
+  // Can be moved and copied!
+  SchemaRef(const SchemaRef &other) = default;
+  SchemaRef &operator=(const SchemaRef &other) = default;
+  SchemaRef(SchemaRef &&other) = default;
+  SchemaRef &operator=(SchemaRef &&other) = default;
 
   // Equality is underlying pointer equality.
-  bool operator==(const SchemaOwner &other) const {
+  bool operator==(const SchemaRef &other) const {
     return this->ptr_ == other.ptr_;
   }
-  bool operator!=(const SchemaOwner &other) const {
+  bool operator!=(const SchemaRef &other) const {
     return this->ptr_ != other.ptr_;
   }
 
@@ -69,70 +71,32 @@ class SchemaOwner {
   size_t IndexOf(const std::string &column_name) const;
 
   // For logging and printing...
-  friend std::ostream &operator<<(std::ostream &os, const SchemaOwner &r);
+  friend std::ostream &operator<<(std::ostream &os, const SchemaRef &r);
 
- protected:
-  // Schema data is a protected struct inside SchemaOwner, it is never exposed
-  // directly.
-  struct SchemaData {
-    std::vector<std::string> column_names;
-    std::vector<sqlast::ColumnDefinition::Type> column_types;
-    std::vector<ColumnID> keys;
-    // Constructors.
-    SchemaData() = default;
-    SchemaData(const std::vector<std::string> &cn,
-               const std::vector<sqlast::ColumnDefinition::Type> &ct,
-               const std::vector<ColumnID> &ks)
-        : column_names(cn), column_types(ct), keys(ks) {
-      if (column_names.size() != column_types.size()) {
-        LOG(FATAL) << "Incosistent number of columns in schema!";
-      }
-    }
-    // Not copyable or movable, we will only pass this around by reference or
-    // pointer.
-    SchemaData(const SchemaData &) = delete;
-    SchemaData &operator=(const SchemaData &) = delete;
-    SchemaData(SchemaData &&) = delete;
-    SchemaData &operator=(SchemaData &&) = delete;
-  };
+ private:
+  // Can only be constructor from an existing SchemaData!
+  explicit SchemaRef(const SchemaData *ptr) : ptr_(ptr) {}
 
-  // Schema wrapper classes store a ptr to the underlying SchemaData.
-  // SchemaOwner manages creation and deletion of this pointer, while
-  // SchemaRef only uses it without management.
-  SchemaData *ptr_;
+  // SchemaRef is a wrapper class that stores an unmanged ptr to the underlying
+  // SchemaData. An instance of SchemaData may be shared between instances of
+  // SchemaRef.
+  const SchemaData *ptr_;
 
-  friend SchemaRef;
+  // SchemaFactory can use private constructor!
+  friend SchemaFactory;
 };
 
-class SchemaRef : public SchemaOwner {
+// We create schemas via this factory.
+class SchemaFactory {
  public:
-  // Empty SchemaRef: this is used to create a temporary so that Operators can
-  // compute their output schema after creation.
-  SchemaRef() : SchemaOwner() {}
+  static SchemaRef Create(const sqlast::CreateTable &table);
+  static SchemaRef Create(
+      const std::vector<std::string> &column_names,
+      const std::vector<sqlast::ColumnDefinition::Type> &column_types,
+      const std::vector<ColumnID> &keys);
 
-  // Can only be constructor from an owner!
-  explicit SchemaRef(const SchemaOwner &other) : SchemaOwner() {
-    this->ptr_ = other.ptr_;
-  }
-
-  // Can be moved and copied!
-  SchemaRef(const SchemaRef &other) { *this = other; }
-  SchemaRef &operator=(const SchemaRef &other) {
-    this->ptr_ = other.ptr_;
-    return *this;
-  }
-
-  SchemaRef(SchemaRef &&other) { *this = std::move(other); }
-  SchemaRef &operator=(SchemaRef &&other) {
-    this->ptr_ = other.ptr_;
-    other.ptr_ = nullptr;
-    return *this;
-  }
-
-  // Unmanaged ptr_.
-  ~SchemaRef() {
-    this->ptr_ = nullptr;  // Stops base destructor from deleting ptr_.
-  }
+ private:
+  static std::list<SchemaData> SCHEMAS;
 };
 
 }  // namespace dataflow

@@ -9,6 +9,7 @@
 
 #include "gtest/gtest.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/ints.h"
 
 namespace pelton {
 namespace dataflow {
@@ -54,8 +55,8 @@ TEST(ValueTest, DataRep) {
 // Tests value equality check.
 TEST(ValueTest, Comparisons) {
   // Make values.
-  Value uvalues[3] = {Value(5UL), Value(6UL), Value(5UL)};
-  Value ivalues[3] = {Value(-1L), Value(5L), Value(-1L)};
+  Value uvalues[3] = {Value(5_u), Value(6_u), Value(5_u)};
+  Value ivalues[3] = {Value(-1_s), Value(5_s), Value(-1_s)};
   Value svalues[3] = {Value("hello"), Value("bye"), Value("hello")};
 
   for (size_t i = 0; i < 3; i++) {
@@ -95,7 +96,7 @@ TEST(ValueTest, Comparisons) {
 // Test getting data with wrong types from value.
 #ifndef PELTON_VALGRIND_MODE
 TEST(ValueTest, TypeMismatch) {
-  Value value1(1L);
+  Value value1(1_s);
   Value value2("hello");
 
   ASSERT_DEATH({ value1.GetString(); }, "Type mismatch");
@@ -107,8 +108,8 @@ TEST(ValueTest, TypeMismatch) {
 
 // Test value with negative integers.
 TEST(ValueTest, NegativeIntegers) {
-  Value value1(-7L);
-  Value value2(-100L);
+  Value value1(-7_s);
+  Value value2(-100_s);
 
   EXPECT_EQ(value1.GetInt(), -7);
   EXPECT_EQ(value2.GetInt(), -100);
@@ -117,7 +118,7 @@ TEST(ValueTest, NegativeIntegers) {
 // Test move constructor and move assignment.
 TEST(ValueTest, ValueMoveConstructor) {
   // Create some values.
-  Value value1(10L);
+  Value value1(10_s);
   Value value2("hello and welcome to this long string!");
 
   // Address of "hello..." in value2.
@@ -138,15 +139,15 @@ TEST(ValueTest, ValueMoveConstructor) {
 }
 TEST(ValueTest, ValueMoveAssignment) {
   // Create some values.
-  Value value1(-10L);
+  Value value1(-10_s);
   Value value2("hello and welcome to this long string!");
 
   // Address of "hello..." in value2.
   const char *ptr = &value2.GetString()[0];
 
   // Values to move to.
-  Value value1m(-1000L);
-  Value value2m(100UL);
+  Value value1m(-1000_s);
+  Value value2m(100_u);
   Value value3m("hello from second big and long string!");
   Value value4m("hello from third big and long string!");
 
@@ -174,7 +175,7 @@ TEST(ValueTest, ValueMoveAssignment) {
 // Test copy constructor and assignments.
 TEST(ValueTest, ValueCopyConstructor) {
   // Create some values.
-  Value value1(10L);
+  Value value1(10_s);
   Value value2("hello and welcome to this long string!");
 
   // Address of "hello..." in value2.
@@ -196,15 +197,15 @@ TEST(ValueTest, ValueCopyConstructor) {
 }
 TEST(ValueTest, ValueCopyAssignment) {
   // Create some values.
-  Value value1(-10L);
+  Value value1(-10_s);
   Value value2("hello and welcome to this long string!");
 
   // Address of "hello..." in value2.
   const char *ptr = &value2.GetString()[0];
 
   // Values to move to.
-  Value value1c(-1000L);
-  Value value2c(100UL);
+  Value value1c(-1000_s);
+  Value value2c(100_u);
   Value value3c("hello from second big and long string!");
   Value value4c("hello from third big and long string!");
 

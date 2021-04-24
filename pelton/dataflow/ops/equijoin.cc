@@ -125,8 +125,7 @@ void EquiJoinOperator::ComputeOutputSchema() {
   }
 
   // We own the joined schema.
-  this->joined_schema_ = SchemaOwner(names, types, keys);
-  this->output_schema_ = SchemaRef(this->joined_schema_);  // Inherited.
+  this->output_schema_ = SchemaFactory::Create(names, types, keys);
 }
 
 void EquiJoinOperator::EmitRow(const Record &left, const Record &right,

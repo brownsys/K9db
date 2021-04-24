@@ -19,11 +19,11 @@ namespace dataflow {
 
 // Manage schemas.
 void DataFlowState::AddTableSchema(const sqlast::CreateTable &create) {
-  this->schema_.emplace(create.table_name(), create);
+  this->schema_.emplace(create.table_name(), SchemaFactory::Create(create));
 }
 void DataFlowState::AddTableSchema(const std::string &table_name,
-                                   SchemaOwner &&schema) {
-  this->schema_.emplace(table_name, std::move(schema));
+                                   SchemaRef schema) {
+  this->schema_.emplace(table_name, schema);
 }
 
 std::vector<std::string> DataFlowState::GetTables() const {
@@ -35,7 +35,7 @@ std::vector<std::string> DataFlowState::GetTables() const {
   return result;
 }
 SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
-  return SchemaRef(this->schema_.at(table_name));
+  return this->schema_.at(table_name);
 }
 
 // Manage flows.
@@ -61,7 +61,7 @@ bool DataFlowState::HasFlowsFor(const TableName &table_name) const {
 Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
   // Create an empty positive record with appropriate schema.
   const std::string &table_name = insert_stmt.table_name();
-  SchemaRef schema = SchemaRef(this->schema_.at(table_name));
+  SchemaRef schema = this->schema_.at(table_name);
   Record record{schema, true};
 
   // Fill in record with data.
@@ -135,8 +135,7 @@ void DataFlowState::Load(const std::string &dir_path) {
     }
 
     // Construct schema in place.
-    this->schema_.emplace(std::piecewise_construct, std::forward_as_tuple(line),
-                          std::forward_as_tuple(names, types, keys));
+    this->schema_.insert({line, SchemaFactory::Create(names, types, keys)});
 
     // Next table.
     getline(state_file, line);

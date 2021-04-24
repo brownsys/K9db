@@ -99,12 +99,12 @@ TEST(MatViewOperatorTest, SingleMatView) {
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {0};
   Record::Compare compare{{2}};
-  SchemaOwner schema{names, types, keys};
+  SchemaRef schema = SchemaFactory::Create(names, types, keys);
 
   // Create some records.
   std::vector<Record> records;
-  records.emplace_back(SchemaRef(schema), true, 0UL,
-                       std::make_unique<std::string>("hello!"), -5L);
+  records.emplace_back(schema, true, 0_u,
+                       std::make_unique<std::string>("hello!"), -5_s);
 
   // Create materialized views.
   std::vector<std::unique_ptr<MatViewOperator>> views;
@@ -132,12 +132,12 @@ TEST(MatViewOperatorTest, SingleMatViewDifferentKey) {
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {1};
   Record::Compare compare{{2}};
-  SchemaOwner schema{names, types, keys};
+  SchemaRef schema = SchemaFactory::Create(names, types, keys);
 
   // Create some records.
   std::vector<Record> records;
-  records.emplace_back(SchemaRef(schema), true, 0UL,
-                       std::make_unique<std::string>("hello!"), -5L);
+  records.emplace_back(schema, true, 0_u,
+                       std::make_unique<std::string>("hello!"), -5_s);
 
   // Create materialized views.
   std::vector<std::unique_ptr<MatViewOperator>> views;
@@ -165,8 +165,7 @@ TEST(MatViewOperatorTest, ProcessBatchTest) {
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {0};
   Record::Compare compare{{2}};
-  SchemaOwner schema{names, types, keys};
-  SchemaRef ref{schema};
+  SchemaRef schema = SchemaFactory::Create(names, types, keys);
 
   // Some string values.
   std::unique_ptr<std::string> s1 = std::make_unique<std::string>("Hello!");
@@ -174,9 +173,9 @@ TEST(MatViewOperatorTest, ProcessBatchTest) {
   std::unique_ptr<std::string> s3 = std::make_unique<std::string>("Hellobye!");
 
   // Create some records.
-  Record r1{ref, true, 0UL, std::move(s1), 10L};
-  Record r2{ref, true, 1UL, std::move(s2), 20L};
-  Record r3{ref, true, 1UL, std::move(s3), 30L};
+  Record r1{schema, true, 0_u, std::move(s1), 10_s};
+  Record r2{schema, true, 1_u, std::move(s2), 20_s};
+  Record r3{schema, true, 1_u, std::move(s3), 30_s};
 
   std::vector<Record> records;
   records.push_back(r1.Copy());
@@ -220,8 +219,7 @@ TEST(MatViewOperatorTest, OrderedKeyTest) {
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {1};
-  SchemaOwner schema{names, types, keys};
-  SchemaRef ref{schema};
+  SchemaRef schema = SchemaFactory::Create(names, types, keys);
 
   // Some string values.
   std::unique_ptr<std::string> s1 = std::make_unique<std::string>("Hello!");
@@ -229,9 +227,9 @@ TEST(MatViewOperatorTest, OrderedKeyTest) {
   std::unique_ptr<std::string> s3 = std::make_unique<std::string>("Hellobye!");
 
   // Create some records.
-  Record r1{ref, true, 0UL, std::move(s1), 10L};
-  Record r2{ref, true, 1UL, std::move(s2), 20L};
-  Record r3{ref, true, 1UL, std::move(s3), 30L};
+  Record r1{schema, true, 0_u, std::move(s1), 10_s};
+  Record r2{schema, true, 1_u, std::move(s2), 20_s};
+  Record r3{schema, true, 1_u, std::move(s3), 30_s};
 
   std::vector<Record> records;
   records.push_back(r1.Copy());
@@ -272,8 +270,7 @@ TEST(MatViewOperatorTest, OrderedRecordTest) {
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {0};
   Record::Compare compare{{2, 1}};
-  SchemaOwner schema{names, types, keys};
-  SchemaRef ref{schema};
+  SchemaRef schema = SchemaFactory::Create(names, types, keys);
 
   // Some string values.
   std::unique_ptr<std::string> s1 = std::make_unique<std::string>("Hello!");
@@ -282,10 +279,10 @@ TEST(MatViewOperatorTest, OrderedRecordTest) {
   std::unique_ptr<std::string> s4 = std::make_unique<std::string>("ABC!");
 
   // Create some records.
-  Record r1{ref, true, 0UL, std::move(s1), 10L};
-  Record r2{ref, true, 1UL, std::move(s2), 20L};
-  Record r3{ref, true, 1UL, std::move(s3), 30L};
-  Record r4{ref, true, 1UL, std::move(s4), 30L};
+  Record r1{schema, true, 0_u, std::move(s1), 10_s};
+  Record r2{schema, true, 1_u, std::move(s2), 20_s};
+  Record r3{schema, true, 1_u, std::move(s3), 30_s};
+  Record r4{schema, true, 1_u, std::move(s4), 30_s};
 
   std::vector<Record> records;
   records.push_back(r4.Copy());
@@ -328,8 +325,7 @@ TEST(MatViewOperatorTest, EmptyKeyTest) {
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {0};
   Record::Compare compare{{1}};
-  SchemaOwner schema{names, types, keys};
-  SchemaRef ref{schema};
+  SchemaRef schema = SchemaFactory::Create(names, types, keys);
 
   // Some string values.
   std::unique_ptr<std::string> s1 = std::make_unique<std::string>("Hello!");
@@ -337,9 +333,9 @@ TEST(MatViewOperatorTest, EmptyKeyTest) {
   std::unique_ptr<std::string> s3 = std::make_unique<std::string>("Hellobye!");
 
   // Create some records.
-  Record r1{ref, true, 0UL, std::move(s1), 10L};
-  Record r2{ref, true, 1UL, std::move(s2), 20L};
-  Record r3{ref, true, 1UL, std::move(s3), 30L};
+  Record r1{schema, true, 0_u, std::move(s1), 10_s};
+  Record r2{schema, true, 1_u, std::move(s2), 20_s};
+  Record r3{schema, true, 1_u, std::move(s3), 30_s};
 
   std::vector<Record> records;
   records.push_back(r1.Copy());
@@ -381,8 +377,7 @@ TEST(MatViewOperatorTest, LimitTest) {
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {0};
   Record::Compare compare{{1}};
-  SchemaOwner schema{names, types, keys};
-  SchemaRef ref{schema};
+  SchemaRef schema = SchemaFactory::Create(names, types, keys);
 
   // Some string values.
   std::unique_ptr<std::string> s1 = std::make_unique<std::string>("Hello!");
@@ -390,9 +385,9 @@ TEST(MatViewOperatorTest, LimitTest) {
   std::unique_ptr<std::string> s3 = std::make_unique<std::string>("Hellobye!");
 
   // Create some records.
-  Record r1{ref, true, 0UL, std::move(s1), 10L};
-  Record r2{ref, true, 1UL, std::move(s2), 20L};
-  Record r3{ref, true, 1UL, std::move(s3), 30L};
+  Record r1{schema, true, 0_u, std::move(s1), 10_s};
+  Record r2{schema, true, 1_u, std::move(s2), 20_s};
+  Record r3{schema, true, 1_u, std::move(s3), 30_s};
 
   std::vector<Record> records;
   records.push_back(r1.Copy());
@@ -461,8 +456,7 @@ TEST(MatViewOperatorTest, LookupGreater) {
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {0};
   Record::Compare compare{{2, 1}};
-  SchemaOwner schema{names, types, keys};
-  SchemaRef ref{schema};
+  SchemaRef schema = SchemaFactory::Create(names, types, keys);
 
   // Some string values.
   std::unique_ptr<std::string> s1 = std::make_unique<std::string>("Hello!");
@@ -471,10 +465,10 @@ TEST(MatViewOperatorTest, LookupGreater) {
   std::unique_ptr<std::string> s4 = std::make_unique<std::string>("ABC!");
 
   // Create some records.
-  Record r1{ref, true, 0UL, std::move(s1), 10L};
-  Record r2{ref, true, 1UL, std::move(s2), 20L};
-  Record r3{ref, true, 1UL, std::move(s3), 20L};
-  Record r4{ref, true, 1UL, std::move(s4), 30L};
+  Record r1{schema, true, 0_u, std::move(s1), 10_s};
+  Record r2{schema, true, 1_u, std::move(s2), 20_s};
+  Record r3{schema, true, 1_u, std::move(s3), 20_s};
+  Record r4{schema, true, 1_u, std::move(s4), 30_s};
 
   std::vector<Record> records;
   records.push_back(r4.Copy());

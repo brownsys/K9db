@@ -1,7 +1,10 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 exports_files(
-    ["filter_enum.h", "aggregate_enum.h"],
+    [
+        "filter_enum.h",
+        "aggregate_enum.h",
+    ],
     ["//pelton/dataflow:__subpackages__"],
 )
 
@@ -274,6 +277,7 @@ cc_test(
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
+        "//pelton/util:ints",
         "@glog",
         "@gtest",
         "@gtest//:gtest_main",
@@ -300,6 +304,7 @@ cc_test(
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
+        "//pelton/util:ints",
         "@gbenchmark//:benchmark_main",
     ],
 )

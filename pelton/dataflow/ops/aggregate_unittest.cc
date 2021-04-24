@@ -10,6 +10,7 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/ints.h"
 
 namespace pelton {
 namespace dataflow {
@@ -68,71 +69,71 @@ bool compareRecordsLT(const Record &r1, const Record &r2) {
   return true;
 }
 
-void splitSort(std::vector<Record> &rs) {
+void splitSort(std::vector<Record> *rs) {
   // The sorting for postitive and negative records is done separately
   // in order to avoid the algorithm flipping records at the positive boundary
 
   // find the split index (w.r.t the positive boundary)
   size_t splitIndex;
-  for (size_t i = 0; i < rs.size(); i++) {
-    if (rs[i].IsPositive() == 1) {
+  for (size_t i = 0; i < rs->size(); i++) {
+    if (rs->at(i).IsPositive() == 1) {
       splitIndex = i;
       break;
     }
   }
 
   if (splitIndex == 0) {
-    std::sort(rs.begin(), rs.end(), compareRecordsLT);
+    std::sort(rs->begin(), rs->end(), compareRecordsLT);
     return;
   }
 
   // sort the positives and negatives separately
-  std::sort(rs.begin(), rs.begin() + splitIndex, compareRecordsLT);
-  std::sort(rs.begin() + splitIndex, rs.end(), compareRecordsLT);
+  std::sort(rs->begin(), rs->begin() + splitIndex, compareRecordsLT);
+  std::sort(rs->begin() + splitIndex, rs->end(), compareRecordsLT);
 }
 
-void compareRecordStreams(std::vector<Record> &rs1, std::vector<Record> &rs2) {
-  EXPECT_EQ(rs1.size(), rs2.size());
+void compareRecordStreams(std::vector<Record> *rs1, std::vector<Record> *rs2) {
+  EXPECT_EQ(rs1->size(), rs2->size());
 
   // first sort the records based positves
-  std::sort(rs1.begin(), rs1.end(), comparePositives);
-  std::sort(rs2.begin(), rs2.end(), comparePositives);
+  std::sort(rs1->begin(), rs1->end(), comparePositives);
+  std::sort(rs2->begin(), rs2->end(), comparePositives);
 
   // then sort the subsets based on the actual values
   splitSort(rs1);
   splitSort(rs2);
 
   // Two records are equal if their positives, schemas and values are equal
-  EXPECT_EQ(rs1, rs2);
+  EXPECT_EQ(*rs1, *rs2);
 }
 
-inline SchemaOwner CreateSchemaPrimaryKey() {
+inline SchemaRef CreateSchemaPrimaryKey() {
   // Create a schema.
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
   std::vector<CType> types = {CType::INT, CType::INT, CType::INT};
   std::vector<ColumnID> keys = {0};
-  return SchemaOwner{names, types, keys};
+  return SchemaFactory::Create(names, types, keys);
 }
 
-inline SchemaOwner CreateSchemaString() {
+inline SchemaRef CreateSchemaString() {
   // Create a schema.
   std::vector<std::string> names = {"ID", "Department", "Quantity", "Location"};
   std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT, CType::INT};
   std::vector<ColumnID> keys = {0};
-  return SchemaOwner{names, types, keys};
+  return SchemaFactory::Create(names, types, keys);
 }
 
-inline SchemaOwner CreateSchemaCompositeKey() {
+inline SchemaRef CreateSchemaCompositeKey() {
   // Create a schema.
   std::vector<std::string> names = {"Col1", "Col2", "Col3", "Col4", "Col5"};
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT, CType::INT,
                               CType::INT};
   std::vector<ColumnID> keys = {1, 4};
-  return SchemaOwner{names, types, keys};
+  return SchemaFactory::Create(names, types, keys);
 }
 
 TEST(AggregateOperatorTest, MultipleGroupColumnsCountPositive) {
-  SchemaOwner schema = CreateSchemaString();
+  SchemaRef schema = CreateSchemaString();
   std::vector<ColumnID> group_columns = {1, 3};
   ColumnID aggregate_column = -1;
   AggregateOperator::Function aggregate_function =
@@ -140,37 +141,36 @@ TEST(AggregateOperatorTest, MultipleGroupColumnsCountPositive) {
   // create aggregate operator..
   AggregateOperator aggregate =
       AggregateOperator(group_columns, aggregate_function, aggregate_column);
-  aggregate.input_schemas_.push_back(SchemaRef(schema));
+  aggregate.input_schemas_.push_back(schema);
   aggregate.ComputeOutputSchema();
 
   // Records to be fed
   std::vector<Record> records;
-  records.emplace_back(SchemaRef(schema), true, 1L,
-                       std::make_unique<std::string>("CS"), 9L, 2L);
-  records.emplace_back(SchemaRef(schema), true, 2L,
-                       std::make_unique<std::string>("CS"), 7L, 2L);
-  records.emplace_back(SchemaRef(schema), true, 3L,
-                       std::make_unique<std::string>("Mechanical"), 5L, 6L);
-  records.emplace_back(SchemaRef(schema), true, 4L,
-                       std::make_unique<std::string>("Mechanical"), 7L, 6L);
+  records.emplace_back(schema, true, 1_s, std::make_unique<std::string>("CS"),
+                       9_s, 2_s);
+  records.emplace_back(schema, true, 2_s, std::make_unique<std::string>("CS"),
+                       7_s, 2_s);
+  records.emplace_back(schema, true, 3_s,
+                       std::make_unique<std::string>("Mechanical"), 5_s, 6_s);
+  records.emplace_back(schema, true, 4_s,
+                       std::make_unique<std::string>("Mechanical"), 7_s, 6_s);
 
   // expected output
   std::vector<Record> expected_records;
   expected_records.emplace_back(aggregate.output_schema_, true,
-                                std::make_unique<std::string>("CS"), 2L,
-                                (uint64_t)2ULL);
+                                std::make_unique<std::string>("CS"), 2_s, 2_u);
   expected_records.emplace_back(aggregate.output_schema_, true,
-                                std::make_unique<std::string>("Mechanical"), 6L,
-                                (uint64_t)2ULL);
+                                std::make_unique<std::string>("Mechanical"),
+                                6_s, 2_u);
 
   // Feed records and test
   std::vector<Record> outputs;
   EXPECT_TRUE(aggregate.Process(UNDEFINED_NODE_INDEX, records, &outputs));
-  // compareRecordStreams(expected_records, outputs);
+  // compareRecordStreams(&expected_records, &outputs);
 }
 
 TEST(AggregateOperatorTest, MultipleGroupColumnsSumPositive) {
-  SchemaOwner schema = CreateSchemaString();
+  SchemaRef schema = CreateSchemaString();
   std::vector<ColumnID> group_columns = {1, 3};
   ColumnID aggregate_column = 2;
   AggregateOperator::Function aggregate_function =
@@ -178,36 +178,36 @@ TEST(AggregateOperatorTest, MultipleGroupColumnsSumPositive) {
   // create aggregate operator..
   AggregateOperator aggregate =
       AggregateOperator(group_columns, aggregate_function, aggregate_column);
-  aggregate.input_schemas_.push_back(SchemaRef(schema));
+  aggregate.input_schemas_.push_back(schema);
   aggregate.ComputeOutputSchema();
 
   // Records to be fed
   std::vector<Record> records;
-  records.emplace_back(SchemaRef(schema), true, 1L,
-                       std::make_unique<std::string>("CS"), 9L, 2L);
-  records.emplace_back(SchemaRef(schema), true, 2L,
-                       std::make_unique<std::string>("CS"), 7L, 2L);
-  records.emplace_back(SchemaRef(schema), true, 3L,
-                       std::make_unique<std::string>("Mechanical"), 5L, 6L);
-  records.emplace_back(SchemaRef(schema), true, 4L,
-                       std::make_unique<std::string>("Mechanical"), 7L, 6L);
+  records.emplace_back(schema, true, 1_s, std::make_unique<std::string>("CS"),
+                       9_s, 2_s);
+  records.emplace_back(schema, true, 2_s, std::make_unique<std::string>("CS"),
+                       7_s, 2_s);
+  records.emplace_back(schema, true, 3_s,
+                       std::make_unique<std::string>("Mechanical"), 5_s, 6_s);
+  records.emplace_back(schema, true, 4_s,
+                       std::make_unique<std::string>("Mechanical"), 7_s, 6_s);
 
   // expected output
   std::vector<Record> expected_records;
   expected_records.emplace_back(aggregate.output_schema_, true,
-                                std::make_unique<std::string>("CS"), 2L, 16L);
+                                std::make_unique<std::string>("CS"), 2_s, 16_s);
   expected_records.emplace_back(aggregate.output_schema_, true,
-                                std::make_unique<std::string>("Mechanical"), 6L,
-                                12L);
+                                std::make_unique<std::string>("Mechanical"),
+                                6_s, 12_s);
 
   // Feed records and test
   std::vector<Record> outputs;
   EXPECT_TRUE(aggregate.Process(UNDEFINED_NODE_INDEX, records, &outputs));
-  compareRecordStreams(expected_records, outputs);
+  compareRecordStreams(&expected_records, &outputs);
 }
 
 TEST(AggregateOperatorTest, CountPositiveNegative) {
-  SchemaOwner schema = CreateSchemaPrimaryKey();
+  SchemaRef schema = CreateSchemaPrimaryKey();
   std::vector<ColumnID> group_columns = {1};
   ColumnID aggregate_column = -1;
   AggregateOperator::Function aggregate_function =
@@ -215,7 +215,7 @@ TEST(AggregateOperatorTest, CountPositiveNegative) {
   // create aggregate operator..
   AggregateOperator aggregate =
       AggregateOperator(group_columns, aggregate_function, aggregate_column);
-  aggregate.input_schemas_.push_back(SchemaRef(schema));
+  aggregate.input_schemas_.push_back(schema);
   aggregate.ComputeOutputSchema();
 
   // Description: The test consists of two stages:
@@ -225,10 +225,10 @@ TEST(AggregateOperatorTest, CountPositiveNegative) {
 
   // Records to be fed
   std::vector<Record> records1;
-  records1.emplace_back(SchemaRef(schema), true, 1L, 2L, 9L);
-  records1.emplace_back(SchemaRef(schema), true, 2L, 2L, 7L);
-  records1.emplace_back(SchemaRef(schema), true, 3L, 5L, 5L);
-  records1.emplace_back(SchemaRef(schema), true, 4L, 5L, 6L);
+  records1.emplace_back(schema, true, 1_s, 2_s, 9_s);
+  records1.emplace_back(schema, true, 2_s, 2_s, 7_s);
+  records1.emplace_back(schema, true, 3_s, 5_s, 5_s);
+  records1.emplace_back(schema, true, 4_s, 5_s, 6_s);
 
   // STAGE1
   std::vector<Record> outputs1;
@@ -236,30 +236,26 @@ TEST(AggregateOperatorTest, CountPositiveNegative) {
 
   // Records to be fed
   std::vector<Record> records2;
-  records2.emplace_back(SchemaRef(schema), false, 5L, 2L, 6L);
-  records2.emplace_back(SchemaRef(schema), true, 6L, 5L, 7L);
-  records2.emplace_back(SchemaRef(schema), true, 7L, 7L, 7L);
-  records2.emplace_back(SchemaRef(schema), false, 5L, 2L, 6L);
+  records2.emplace_back(schema, false, 5_s, 2_s, 6_s);
+  records2.emplace_back(schema, true, 6_s, 5_s, 7_s);
+  records2.emplace_back(schema, true, 7_s, 7_s, 7_s);
+  records2.emplace_back(schema, false, 5_s, 2_s, 6_s);
 
   // expected output
   std::vector<Record> expected_records;
-  expected_records.emplace_back(aggregate.output_schema_, false, 2L,
-                                (uint64_t)2ULL);
-  expected_records.emplace_back(aggregate.output_schema_, false, 5L,
-                                (uint64_t)2ULL);
-  expected_records.emplace_back(aggregate.output_schema_, true, 5L,
-                                (uint64_t)3ULL);
-  expected_records.emplace_back(aggregate.output_schema_, true, 7L,
-                                (uint64_t)1ULL);
+  expected_records.emplace_back(aggregate.output_schema_, false, 2_s, 2_u);
+  expected_records.emplace_back(aggregate.output_schema_, false, 5_s, 2_u);
+  expected_records.emplace_back(aggregate.output_schema_, true, 5_s, 3_u);
+  expected_records.emplace_back(aggregate.output_schema_, true, 7_s, 1_u);
 
   // STAGE2
   std::vector<Record> outputs2;
   EXPECT_TRUE(aggregate.Process(UNDEFINED_NODE_INDEX, records2, &outputs2));
-  compareRecordStreams(expected_records, outputs2);
+  compareRecordStreams(&expected_records, &outputs2);
 }
 
 TEST(AggregateOperatorTest, SumPositiveNegative) {
-  SchemaOwner schema = CreateSchemaPrimaryKey();
+  SchemaRef schema = CreateSchemaPrimaryKey();
   std::vector<ColumnID> group_columns = {1};
   ColumnID aggregate_column = 2;
   AggregateOperator::Function aggregate_function =
@@ -267,7 +263,7 @@ TEST(AggregateOperatorTest, SumPositiveNegative) {
   // create aggregate operator..
   AggregateOperator aggregate =
       AggregateOperator(group_columns, aggregate_function, aggregate_column);
-  aggregate.input_schemas_.push_back(SchemaRef(schema));
+  aggregate.input_schemas_.push_back(schema);
   aggregate.ComputeOutputSchema();
 
   // Description: The test consists of two stages:
@@ -277,10 +273,10 @@ TEST(AggregateOperatorTest, SumPositiveNegative) {
 
   // Records to be fed
   std::vector<Record> records1;
-  records1.emplace_back(SchemaRef(schema), true, 1L, 2L, 9L);
-  records1.emplace_back(SchemaRef(schema), true, 2L, 2L, 7L);
-  records1.emplace_back(SchemaRef(schema), true, 3L, 5L, 5L);
-  records1.emplace_back(SchemaRef(schema), true, 4L, 5L, 6L);
+  records1.emplace_back(schema, true, 1_s, 2_s, 9_s);
+  records1.emplace_back(schema, true, 2_s, 2_s, 7_s);
+  records1.emplace_back(schema, true, 3_s, 5_s, 5_s);
+  records1.emplace_back(schema, true, 4_s, 5_s, 6_s);
 
   // STAGE1
   std::vector<Record> outputs1;
@@ -288,23 +284,23 @@ TEST(AggregateOperatorTest, SumPositiveNegative) {
 
   // Records to be fed
   std::vector<Record> records2;
-  records2.emplace_back(SchemaRef(schema), false, 5L, 2L, 6L);
-  records2.emplace_back(SchemaRef(schema), true, 6L, 7L, 7L);
+  records2.emplace_back(schema, false, 5_s, 2_s, 6_s);
+  records2.emplace_back(schema, true, 6_s, 7_s, 7_s);
 
   // expected output
   std::vector<Record> expected_records;
-  expected_records.emplace_back(aggregate.output_schema_, false, 2L, 16L);
-  expected_records.emplace_back(aggregate.output_schema_, true, 2L, 10L);
-  expected_records.emplace_back(aggregate.output_schema_, true, 7L, 7L);
+  expected_records.emplace_back(aggregate.output_schema_, false, 2_s, 16_s);
+  expected_records.emplace_back(aggregate.output_schema_, true, 2_s, 10_s);
+  expected_records.emplace_back(aggregate.output_schema_, true, 7_s, 7_s);
 
   // STAGE2
   std::vector<Record> outputs2;
   EXPECT_TRUE(aggregate.Process(UNDEFINED_NODE_INDEX, records2, &outputs2));
-  compareRecordStreams(expected_records, outputs2);
+  compareRecordStreams(&expected_records, &outputs2);
 }
 
 TEST(AggregateOperatorTest, CountPositiveNegativeSingleBatch) {
-  SchemaOwner schema = CreateSchemaPrimaryKey();
+  SchemaRef schema = CreateSchemaPrimaryKey();
   std::vector<ColumnID> group_columns = {1};
   ColumnID aggregate_column = -1;
   AggregateOperator::Function aggregate_function =
@@ -312,32 +308,30 @@ TEST(AggregateOperatorTest, CountPositiveNegativeSingleBatch) {
   // create aggregate operator..
   AggregateOperator aggregate =
       AggregateOperator(group_columns, aggregate_function, aggregate_column);
-  aggregate.input_schemas_.push_back(SchemaRef(schema));
+  aggregate.input_schemas_.push_back(schema);
   aggregate.ComputeOutputSchema();
 
   // Records to be fed
   std::vector<Record> records;
-  records.emplace_back(SchemaRef(schema), true, 1L, 2L, 9L);
-  records.emplace_back(SchemaRef(schema), true, 2L, 2L, 7L);
-  records.emplace_back(SchemaRef(schema), true, 3L, 5L, 5L);
-  records.emplace_back(SchemaRef(schema), true, 4L, 5L, 6L);
-  records.emplace_back(SchemaRef(schema), true, 5L, 7L, 7L);
-  records.emplace_back(SchemaRef(schema), false, 6L, 7L, 7L);
+  records.emplace_back(schema, true, 1_s, 2_s, 9_s);
+  records.emplace_back(schema, true, 2_s, 2_s, 7_s);
+  records.emplace_back(schema, true, 3_s, 5_s, 5_s);
+  records.emplace_back(schema, true, 4_s, 5_s, 6_s);
+  records.emplace_back(schema, true, 5_s, 7_s, 7_s);
+  records.emplace_back(schema, false, 6_s, 7_s, 7_s);
 
   // expected output
   std::vector<Record> expected_records;
-  expected_records.emplace_back(aggregate.output_schema_, true, 2L,
-                                (uint64_t)2ULL);
-  expected_records.emplace_back(aggregate.output_schema_, true, 5L,
-                                (uint64_t)2ULL);
+  expected_records.emplace_back(aggregate.output_schema_, true, 2_s, 2_u);
+  expected_records.emplace_back(aggregate.output_schema_, true, 5_s, 2_u);
 
   std::vector<Record> outputs;
   EXPECT_TRUE(aggregate.Process(UNDEFINED_NODE_INDEX, records, &outputs));
-  compareRecordStreams(expected_records, outputs);
+  compareRecordStreams(&expected_records, &outputs);
 }
 
 TEST(AggregateOperatorTest, SumPositiveNegativeSingleBatch) {
-  SchemaOwner schema = CreateSchemaPrimaryKey();
+  SchemaRef schema = CreateSchemaPrimaryKey();
   std::vector<ColumnID> group_columns = {1};
   ColumnID aggregate_column = 2;
   AggregateOperator::Function aggregate_function =
@@ -345,36 +339,36 @@ TEST(AggregateOperatorTest, SumPositiveNegativeSingleBatch) {
   // create aggregate operator..
   AggregateOperator aggregate =
       AggregateOperator(group_columns, aggregate_function, aggregate_column);
-  aggregate.input_schemas_.push_back(SchemaRef(schema));
+  aggregate.input_schemas_.push_back(schema);
   aggregate.ComputeOutputSchema();
 
   // Records to be fed
   std::vector<Record> records;
-  records.emplace_back(SchemaRef(schema), true, 1L, 2L, 9L);
-  records.emplace_back(SchemaRef(schema), true, 2L, 2L, 7L);
-  records.emplace_back(SchemaRef(schema), true, 3L, 5L, 5L);
-  records.emplace_back(SchemaRef(schema), true, 4L, 5L, 6L);
-  records.emplace_back(SchemaRef(schema), true, 5L, 7L, 7L);
-  records.emplace_back(SchemaRef(schema), false, 6L, 7L, 7L);
+  records.emplace_back(schema, true, 1_s, 2_s, 9_s);
+  records.emplace_back(schema, true, 2_s, 2_s, 7_s);
+  records.emplace_back(schema, true, 3_s, 5_s, 5_s);
+  records.emplace_back(schema, true, 4_s, 5_s, 6_s);
+  records.emplace_back(schema, true, 5_s, 7_s, 7_s);
+  records.emplace_back(schema, false, 6_s, 7_s, 7_s);
 
   // expected output
   std::vector<Record> expected_records;
-  expected_records.emplace_back(aggregate.output_schema_, true, 2L, 16L);
-  expected_records.emplace_back(aggregate.output_schema_, true, 5L, 11L);
+  expected_records.emplace_back(aggregate.output_schema_, true, 2_s, 16_s);
+  expected_records.emplace_back(aggregate.output_schema_, true, 5_s, 11_s);
 
   std::vector<Record> outputs;
   EXPECT_TRUE(aggregate.Process(UNDEFINED_NODE_INDEX, records, &outputs));
-  compareRecordStreams(expected_records, outputs);
+  compareRecordStreams(&expected_records, &outputs);
 }
 
 TEST(AggregateOperatorTest, OutputSchemaPrimaryKeyTest) {
   // TEST 1: Primary keyed schema's keycolumn included in projected schema
-  SchemaOwner schema = CreateSchemaPrimaryKey();
+  SchemaRef schema = CreateSchemaPrimaryKey();
   std::vector<ColumnID> group_columns = {0};
   // create project operator..
   AggregateOperator aggregate1 =
       AggregateOperator(group_columns, AggregateOperator::Function::SUM, 2);
-  aggregate1.input_schemas_.push_back(SchemaRef(schema));
+  aggregate1.input_schemas_.push_back(schema);
   aggregate1.ComputeOutputSchema();
   // expected data in output schema
   std::vector<std::string> expected_names = {"Col1", "Sum"};
@@ -389,7 +383,7 @@ TEST(AggregateOperatorTest, OutputSchemaPrimaryKeyTest) {
   group_columns = {1};
   AggregateOperator aggregate2 =
       AggregateOperator(group_columns, AggregateOperator::Function::SUM, 2);
-  aggregate2.input_schemas_.push_back(SchemaRef(schema));
+  aggregate2.input_schemas_.push_back(schema);
   aggregate2.ComputeOutputSchema();
   // expected data in output schema
   expected_names = {"Col2", "Sum"};
@@ -402,12 +396,12 @@ TEST(AggregateOperatorTest, OutputSchemaPrimaryKeyTest) {
 
 TEST(AggregateOperatorTest, OutputSchemaCompositeKeyTest) {
   // TEST 1: Primary keyed schema's keycolumn included in projected schema
-  SchemaOwner schema = CreateSchemaCompositeKey();
+  SchemaRef schema = CreateSchemaCompositeKey();
   std::vector<ColumnID> group_columns = {0, 1, 4};
   // create project operator..
   AggregateOperator aggregate1 =
       AggregateOperator(group_columns, AggregateOperator::Function::SUM, 2);
-  aggregate1.input_schemas_.push_back(SchemaRef(schema));
+  aggregate1.input_schemas_.push_back(schema);
   aggregate1.ComputeOutputSchema();
   // expected data in output schema
   std::vector<std::string> expected_names = {"Col1", "Col2", "Col5", "Sum"};
@@ -423,7 +417,7 @@ TEST(AggregateOperatorTest, OutputSchemaCompositeKeyTest) {
   group_columns = {0, 1};
   AggregateOperator aggregate2 =
       AggregateOperator(group_columns, AggregateOperator::Function::SUM, 2);
-  aggregate2.input_schemas_.push_back(SchemaRef(schema));
+  aggregate2.input_schemas_.push_back(schema);
   aggregate2.ComputeOutputSchema();
   // expected data in output schema
   expected_names = {"Col1", "Col2", "Sum"};

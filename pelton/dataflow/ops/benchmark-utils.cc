@@ -10,7 +10,7 @@
 namespace pelton {
 namespace dataflow {
 
-SchemaOwner MakeSchema(bool use_strings) {
+SchemaRef MakeSchema(bool use_strings) {
   std::vector<std::string> names = {"Col1", "Col2"};
   CType t;
   if (use_strings) {
@@ -20,9 +20,7 @@ SchemaOwner MakeSchema(bool use_strings) {
   }
   std::vector<CType> types = {CType::UINT, t};
   std::vector<ColumnID> keys = {0};
-  SchemaOwner schema{names, types, keys};
-
-  return schema;
+  return SchemaFactory::Create(names, types, keys);
 }
 
 }  // namespace dataflow

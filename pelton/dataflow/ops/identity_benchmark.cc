@@ -8,16 +8,17 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/ints.h"
 
 namespace pelton {
 namespace dataflow {
 
+// NOLINTNEXTLINE
 static void IdentityForwards(benchmark::State& state) {
-  SchemaOwner schema = MakeSchema(false);
+  SchemaRef schema = MakeSchema(false);
   IdentityOperator op;
 
-  Record r(SchemaRef(schema), true, static_cast<uint64_t>(4),
-           static_cast<uint64_t>(5));
+  Record r{schema, true, 4_u, 5_u};
   std::vector<Record> rs;
   rs.emplace_back(std::move(r));
 
