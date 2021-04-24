@@ -26,7 +26,7 @@ class Record {
  public:
   // Variant with the same type options as the record data type, can be used
   // by external code to ensure same types are supported.
-  using DataVariant = std::variant<std::string, uint64_t, int64_t>;
+  using DataVariant = std::variant<std::string, uint64_t, int64_t, NullValue>;
   static sqlast::ColumnDefinition::Type TypeOfVariant(const DataVariant &v);
 
   // No default constructor.

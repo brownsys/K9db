@@ -12,6 +12,8 @@ sqlast::ColumnDefinition::Type Record::TypeOfVariant(const DataVariant &v) {
       return sqlast::ColumnDefinition::Type::UINT;
     case 2:
       return sqlast::ColumnDefinition::Type::INT;
+    case 3:
+      LOG(FATAL) << "NULL value variant can't be converted to a type!";
     default:
       LOG(FATAL) << "Unsupported variant type!";
   }
