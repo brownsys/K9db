@@ -27,18 +27,25 @@ Perf Perf::PERF = Perf();
 // Get singleton.
 Perf &Perf::INSTANCE() { return Perf::PERF; }
 
+void Perf::Start() { this->begin_ = true; }
+
 // Timing.
 void Perf::Start(const std::string &label) {
-  auto time = std::chrono::high_resolution_clock::now();
-  this->start_times_.insert({label, time});
+  if (this->begin_) {
+    auto time = std::chrono::high_resolution_clock::now();
+    this->start_times_.insert({label, time});
+  }
 }
 
 void Perf::End(const std::string &label) {
-  auto end = std::chrono::high_resolution_clock::now();
-  auto start = this->start_times_.at(label);
-  this->start_times_.erase(label);
-  uint64_t diff = std::chrono::duration_cast<DurationType>(end - start).count();
-  this->times_[label] += diff;
+  if (this->begin_) {
+    auto end = std::chrono::high_resolution_clock::now();
+    auto start = this->start_times_.at(label);
+    this->start_times_.erase(label);
+    uint64_t diff =
+        std::chrono::duration_cast<DurationType>(end - start).count();
+    this->times_[label] += diff;
+  }
 }
 
 // Display results of timing.

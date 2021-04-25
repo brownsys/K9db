@@ -54,7 +54,9 @@ void PrintData(bool print, sql::ResultSet *result) {
                     << result->getMetaData()->getColumnTypeName(i) << std::endl;
       }
     }
-    std::cout << std::endl;
+    if (print) {
+      std::cout << std::endl;
+    }
   }
 }
 
@@ -65,7 +67,9 @@ bool ReadCommand(std::string *ptr) {
   while (std::getline(std::cin, line)) {
     if (line.size() == 0 || line.front() == '#' || line.front() == '.' ||
         line.find_first_not_of(" \t\n") == std::string::npos) {
-      continue;
+      *ptr = line;
+      pelton::perf::End("Read std::cin");
+      return true;
     }
     // Wait until command is fully read (in case it spans several lines).
     *ptr += line;
@@ -104,8 +108,6 @@ int main(int argc, char **argv) {
   const std::string &db_username = FLAGS_db_username;
   const std::string &db_password = FLAGS_db_password;
 
-  pelton::perf::Start("All");
-
   // Initialize our sharded state/connection.
   try {
     sql::Driver *driver = sql::mysql::get_driver_instance();
@@ -126,6 +128,10 @@ int main(int argc, char **argv) {
     std::string command;
     while (ReadCommand(&command)) {
       if (command[0] == '#') {
+        if (command == "# perf start") {
+          std::cout << "Perf start" << std::endl;
+          pelton::perf::Start();
+        }
         continue;
       }
 
@@ -159,7 +165,6 @@ int main(int argc, char **argv) {
     LOG(FATAL) << "Error: " << err_msg;
   }
 
-  pelton::perf::End("All");
   pelton::perf::PrintAll();
 
   // Exit!

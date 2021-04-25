@@ -16,8 +16,9 @@ class Perf {
  public:
   static Perf &INSTANCE();
 
-  Perf() {}
+  Perf() : begin_(false), start_times_(), times_() {}
 
+  void Start();
   void Start(const std::string &label);
   void End(const std::string &label);
   void PrintAll();
@@ -28,9 +29,17 @@ class Perf {
 
   static Perf PERF;
 
+  bool begin_;
   std::unordered_map<std::string, TimeType> start_times_;
   std::unordered_map<std::string, uint64_t> times_;
 };
+
+inline void Start() {
+#ifdef PELTON_USE_PERF
+  Perf::INSTANCE().Start();
+  Perf::INSTANCE().Start("all");
+#endif
+}
 
 inline void Start(const std::string &label) {
 #ifdef PELTON_USE_PERF
@@ -44,6 +53,7 @@ inline void End(const std::string &label) {
 }
 inline void PrintAll() {
 #ifdef PELTON_USE_PERF
+  Perf::INSTANCE().End("all");
   Perf::INSTANCE().PrintAll();
 #endif
 }

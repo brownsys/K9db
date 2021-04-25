@@ -29,7 +29,9 @@ bool ReadCommand(std::string *ptr) {
   while (std::getline(std::cin, line)) {
     if (line.size() == 0 || line.front() == '#' ||
         line.find_first_not_of(" \t\n") == std::string::npos) {
-      continue;
+      *ptr = line;
+      pelton::perf::End("Read std::cin");
+      return true;
     }
     // Wait until command is fully read (in case it spans several lines).
     *ptr += line;
@@ -70,8 +72,6 @@ int main(int argc, char **argv) {
   const std::string &db_password = FLAGS_db_password;
   const std::string &dir = FLAGS_db_path;
 
-  pelton::perf::Start("all");
-
   // Initialize our sharded state/connection.
   try {
     pelton::Connection connection;
@@ -86,6 +86,14 @@ int main(int argc, char **argv) {
     // Read SQL statements one at a time!
     std::string command;
     while (ReadCommand(&command)) {
+      if (command[0] == '#') {
+        if (command == "# perf start") {
+          std::cout << "Perf start" << std::endl;
+          pelton::perf::Start();
+        }
+        continue;
+      }
+
       // Command has been fully read, execute it!
       pelton::perf::Start("exec");
       absl::StatusOr<pelton::SqlResult> status =
@@ -111,7 +119,6 @@ int main(int argc, char **argv) {
   }
 
   // Print performance profile.
-  pelton::perf::End("all");
   pelton::perf::PrintAll();
 
   // Exit!
