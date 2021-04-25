@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
     // Read SQL statements one at a time!
     std::string command;
     while (ReadCommand(&command)) {
-      if (command[0] == '#') {
+      if (command[0] == '#' || (command[0] == '-' && command[1] == '-')) {
         if (command == "# perf start") {
           std::cout << "Perf start" << std::endl;
           pelton::perf::Start();
