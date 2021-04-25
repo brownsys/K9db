@@ -9,6 +9,7 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.Planner;
@@ -34,7 +35,10 @@ public class QueryPlanner {
     FrameworkConfig calciteFrameworkConfig =
         Frameworks.newConfigBuilder()
             // MySQL dialect.
-            .parserConfig(SqlParser.configBuilder().setLex(Lex.MYSQL).build())
+            .parserConfig(
+                SqlParser.configBuilder().setLex(Lex.MYSQL)
+                                         .setConformance(SqlConformanceEnum.MYSQL_5)
+                                         .build())
             // Sets the schema to use by the planner
             .defaultSchema(this.schema)
             // Context provides a way to store data within the planner session that can be
