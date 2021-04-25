@@ -1,5 +1,5 @@
-SELECT 1 AS one FROM users WHERE users.username = ?;
-SELECT tags.id, tags.tag, tags.description, tags.privileged, tags.is_media, tags.inactive, tags.hotness_mod FROM tags WHERE tags.inactive = 0 AND tags.tag = ?;
+CREATE VIEW q1 AS '"SELECT 1 AS one FROM users WHERE users.username = ?"';
+CREATE VIEW q2 AS '"SELECT tags.id, tags.tag, tags.description, tags.privileged, tags.is_media, tags.inactive, tags.hotness_mod FROM tags WHERE tags.inactive = 0 AND tags.tag = ?"';
 SELECT 1 AS one FROM stories WHERE stories.short_id = ?;
 SELECT keystores.`key`, keystores.value FROM keystores WHERE keystores.`key` = ?;
 SELECT votes.id, votes.user_id, votes.story_id, votes.comment_id, votes.vote, votes.reason FROM votes WHERE votes.user_id = ? AND votes.story_id = ? AND votes.comment_id = NULL;
