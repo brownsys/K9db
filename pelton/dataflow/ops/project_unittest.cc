@@ -16,38 +16,38 @@ namespace dataflow {
 
 using CType = sqlast::ColumnDefinition::Type;
 
-inline SchemaOwner CreateSchemaPrimaryKey() {
+inline SchemaRef CreateSchemaPrimaryKey() {
   // Create a schema.
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {0};
-  return SchemaOwner{names, types, keys};
+  return SchemaFactory::Create(names, types, keys);
 }
 
-inline SchemaOwner CreateSchemaCompositeKey() {
+inline SchemaRef CreateSchemaCompositeKey() {
   // Create a schema.
   std::vector<std::string> names = {"Col1", "Col2", "Col3", "Col4", "Col5"};
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT, CType::INT,
                               CType::INT};
   std::vector<ColumnID> keys = {1, 4};
-  return SchemaOwner{names, types, keys};
+  return SchemaFactory::Create(names, types, keys);
 }
 
 TEST(ProjectOperatorTest, BatchTest) {
-  SchemaOwner schema = CreateSchemaPrimaryKey();
+  SchemaRef schema = CreateSchemaPrimaryKey();
   std::vector<ColumnID> cids = {0, 1};
   // create project operator..
   ProjectOperator project = ProjectOperator(cids);
-  project.input_schemas_.push_back(SchemaRef(schema));
+  project.input_schemas_.push_back(schema);
   project.ComputeOutputSchema();
 
   // Records to be fed
   std::vector<Record> records;
-  records.emplace_back(SchemaRef(schema), true, 0_u,
+  records.emplace_back(schema, true, 0_u,
                        std::make_unique<std::string>("Hello!"), -5_s);
-  records.emplace_back(SchemaRef(schema), true, 5_u,
-                       std::make_unique<std::string>("Bye!"), 7_s);
-  records.emplace_back(SchemaRef(schema), true, 6_u,
+  records.emplace_back(schema, true, 5_u, std::make_unique<std::string>("Bye!"),
+                       7_s);
+  records.emplace_back(schema, true, 6_u,
                        std::make_unique<std::string>("hello!"), 10_s);
 
   // expected output
@@ -67,11 +67,11 @@ TEST(ProjectOperatorTest, BatchTest) {
 
 TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest) {
   // TEST 1: Primary keyed schema's keycolumn included in projected schema
-  SchemaOwner schema = CreateSchemaPrimaryKey();
+  SchemaRef schema = CreateSchemaPrimaryKey();
   std::vector<ColumnID> cids = {0, 1};
   // create project operator..
   ProjectOperator project1 = ProjectOperator(cids);
-  project1.input_schemas_.push_back(SchemaRef(schema));
+  project1.input_schemas_.push_back(schema);
   project1.ComputeOutputSchema();
   // expected data in output schema
   std::vector<std::string> expected_names = {"Col1", "Col2"};
@@ -85,7 +85,7 @@ TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest) {
   // TEST 2: Primary keyed schema's keycolumn not included in projected schema
   cids = {1};
   ProjectOperator project2 = ProjectOperator(cids);
-  project2.input_schemas_.push_back(SchemaRef(schema));
+  project2.input_schemas_.push_back(schema);
   project2.ComputeOutputSchema();
   // expected data in output schema
   expected_names = {"Col2"};
@@ -98,11 +98,11 @@ TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest) {
 
 TEST(ProjectOperatorTest, OutputSchemaCompositeKeyTest) {
   // TEST 1: Composite keyed schema's keycolumns included in projected schema
-  SchemaOwner schema = CreateSchemaCompositeKey();
+  SchemaRef schema = CreateSchemaCompositeKey();
   std::vector<ColumnID> cids = {1, 3, 4};
   // create project operator..
   ProjectOperator project1 = ProjectOperator(cids);
-  project1.input_schemas_.push_back(SchemaRef(schema));
+  project1.input_schemas_.push_back(schema);
   project1.ComputeOutputSchema();
   // expected data in output schema
   std::vector<std::string> expected_names = {"Col2", "Col4", "Col5"};
@@ -117,7 +117,7 @@ TEST(ProjectOperatorTest, OutputSchemaCompositeKeyTest) {
   // schema
   cids = {0, 1, 2};
   ProjectOperator project2 = ProjectOperator(cids);
-  project2.input_schemas_.push_back(SchemaRef(schema));
+  project2.input_schemas_.push_back(schema);
   project2.ComputeOutputSchema();
   // expected data in output schema
   expected_names = {"Col1", "Col2", "Col3"};

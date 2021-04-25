@@ -27,18 +27,18 @@ namespace dataflow {
 using CType = sqlast::ColumnDefinition::Type;
 
 // Make schemas.
-SchemaOwner MakeLeftSchema() {
+SchemaRef MakeLeftSchema() {
   std::vector<std::string> names = {"ID", "Item", "Category"};
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
   std::vector<ColumnID> keys = {0};
-  return SchemaOwner{names, types, keys};
+  return SchemaFactory::Create(names, types, keys);
 }
 
-SchemaOwner MakeRightSchema() {
+SchemaRef MakeRightSchema() {
   std::vector<std::string> names = {"Category", "Description"};
   std::vector<CType> types = {CType::INT, CType::TEXT};
   std::vector<ColumnID> keys;
-  return SchemaOwner{names, types, keys};
+  return SchemaFactory::Create(names, types, keys);
 }
 
 // Make records.
@@ -418,11 +418,11 @@ inline void MatViewContentsEqualsIndexed(
 // Tests!
 TEST(DataFlowGraphTest, TestTrivialGraph) {
   // Schema must survive records.
-  SchemaOwner schema = MakeLeftSchema();
+  SchemaRef schema = MakeLeftSchema();
   // Make graph.
-  DataFlowGraph g = MakeTrivialGraph(0, SchemaRef(schema));
+  DataFlowGraph g = MakeTrivialGraph(0, schema);
   // Make records.
-  std::vector<Record> records = MakeLeftRecords(SchemaRef(schema));
+  std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
   EXPECT_TRUE(g.Process("test-table", records));
   // Outputs must be equal.
@@ -431,11 +431,11 @@ TEST(DataFlowGraphTest, TestTrivialGraph) {
 
 TEST(DataFlowGraphTest, TestFilterGraph) {
   // Schema must survive records.
-  SchemaOwner schema = MakeLeftSchema();
+  SchemaRef schema = MakeLeftSchema();
   // Make graph.
-  DataFlowGraph g = MakeFilterGraph(0, SchemaRef(schema));
+  DataFlowGraph g = MakeFilterGraph(0, schema);
   // Make records.
-  std::vector<Record> records = MakeLeftRecords(SchemaRef(schema));
+  std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
   EXPECT_TRUE(g.Process("test-table", records));
   // Filter records.
@@ -447,11 +447,11 @@ TEST(DataFlowGraphTest, TestFilterGraph) {
 
 TEST(DataFlowGraphTest, TestUnionGraph) {
   // Schema must survive records.
-  SchemaOwner schema = MakeLeftSchema();
+  SchemaRef schema = MakeLeftSchema();
   // Make graph.
-  DataFlowGraph g = MakeUnionGraph(0, SchemaRef(schema));
+  DataFlowGraph g = MakeUnionGraph(0, schema);
   // Make records.
-  std::vector<Record> records = MakeLeftRecords(SchemaRef(schema));
+  std::vector<Record> records = MakeLeftRecords(schema);
   std::vector<Record> first_half;
   first_half.push_back(records.at(0).Copy());
   first_half.push_back(records.at(1).Copy());
@@ -468,14 +468,13 @@ TEST(DataFlowGraphTest, TestUnionGraph) {
 
 TEST(DataFlowGraphTest, TestEquiJoinGraph) {
   // Schema must survive records.
-  SchemaOwner lschema = MakeLeftSchema();
-  SchemaOwner rschema = MakeRightSchema();
+  SchemaRef lschema = MakeLeftSchema();
+  SchemaRef rschema = MakeRightSchema();
   // Make graph.
-  DataFlowGraph g =
-      MakeEquiJoinGraph(0, 2, 0, SchemaRef(lschema), SchemaRef(rschema));
+  DataFlowGraph g = MakeEquiJoinGraph(0, 2, 0, lschema, rschema);
   // Make records.
-  std::vector<Record> left = MakeLeftRecords(SchemaRef(lschema));
-  std::vector<Record> right = MakeRightRecords(SchemaRef(rschema));
+  std::vector<Record> left = MakeLeftRecords(lschema);
+  std::vector<Record> right = MakeRightRecords(rschema);
   // Process records.
   EXPECT_TRUE(g.Process("test-table1", left));
   EXPECT_TRUE(g.Process("test-table2", right));
@@ -488,11 +487,11 @@ TEST(DataFlowGraphTest, TestEquiJoinGraph) {
 
 TEST(DataFlowGraphTest, TestProjectGraph) {
   // Schema must survive records.
-  SchemaOwner schema = MakeLeftSchema();
+  SchemaRef schema = MakeLeftSchema();
   // Make graph.
-  DataFlowGraph g = MakeProjectGraph(0, SchemaRef(schema));
+  DataFlowGraph g = MakeProjectGraph(0, schema);
   // Make records.
-  std::vector<Record> records = MakeLeftRecords(SchemaRef(schema));
+  std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
   EXPECT_TRUE(g.Process("test-table", records));
   // Compute expected result.
@@ -504,11 +503,11 @@ TEST(DataFlowGraphTest, TestProjectGraph) {
 
 TEST(DataFlowGraphTest, TestProjectOnFilterGraph) {
   // Schema must survive records.
-  SchemaOwner schema = MakeLeftSchema();
+  SchemaRef schema = MakeLeftSchema();
   // Make graph.
-  DataFlowGraph g = MakeProjectOnFilterGraph(0, SchemaRef(schema));
+  DataFlowGraph g = MakeProjectOnFilterGraph(0, schema);
   // Make records.
-  std::vector<Record> records = MakeLeftRecords(SchemaRef(schema));
+  std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
   EXPECT_TRUE(g.Process("test-table", records));
   // Compute expected result.
@@ -520,14 +519,13 @@ TEST(DataFlowGraphTest, TestProjectOnFilterGraph) {
 
 TEST(DataFlowGraphTest, TestProjectOnEquiJoinGraph) {
   // Schema must survive records.
-  SchemaOwner lschema = MakeLeftSchema();
-  SchemaOwner rschema = MakeRightSchema();
+  SchemaRef lschema = MakeLeftSchema();
+  SchemaRef rschema = MakeRightSchema();
   // Make graph.
-  DataFlowGraph g = MakeProjectOnEquiJoinGraph(0, 2, 0, SchemaRef(lschema),
-                                               SchemaRef(rschema));
+  DataFlowGraph g = MakeProjectOnEquiJoinGraph(0, 2, 0, lschema, rschema);
   // Make records.
-  std::vector<Record> left = MakeLeftRecords(SchemaRef(lschema));
-  std::vector<Record> right = MakeRightRecords(SchemaRef(rschema));
+  std::vector<Record> left = MakeLeftRecords(lschema);
+  std::vector<Record> right = MakeRightRecords(rschema);
   // Process records.
   EXPECT_TRUE(g.Process("test-table1", left));
   EXPECT_TRUE(g.Process("test-table2", right));
@@ -541,11 +539,11 @@ TEST(DataFlowGraphTest, TestProjectOnEquiJoinGraph) {
 
 TEST(DataFlowGraphTest, TestAggregateGraph) {
   // Schema must survive records.
-  SchemaOwner schema = MakeLeftSchema();
+  SchemaRef schema = MakeLeftSchema();
   // Make graph.
-  DataFlowGraph g = MakeAggregateGraph(0, SchemaRef(schema));
+  DataFlowGraph g = MakeAggregateGraph(0, schema);
   // Make records.
-  std::vector<Record> records = MakeLeftRecords(SchemaRef(schema));
+  std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
   EXPECT_TRUE(g.Process("test-table", records));
   // Compute expected result.
@@ -557,14 +555,13 @@ TEST(DataFlowGraphTest, TestAggregateGraph) {
 
 TEST(DataFlowGraphTest, TestAggregateOnEquiJoinGraph) {
   // Schema must survive records.
-  SchemaOwner lschema = MakeLeftSchema();
-  SchemaOwner rschema = MakeRightSchema();
+  SchemaRef lschema = MakeLeftSchema();
+  SchemaRef rschema = MakeRightSchema();
   // Make graph.
-  DataFlowGraph g = MakeAggregateOnEquiJoinGraph(0, 2, 0, SchemaRef(lschema),
-                                                 SchemaRef(rschema));
+  DataFlowGraph g = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
   // Make records.
-  std::vector<Record> left = MakeLeftRecords(SchemaRef(lschema));
-  std::vector<Record> right = MakeRightRecords(SchemaRef(rschema));
+  std::vector<Record> left = MakeLeftRecords(lschema);
+  std::vector<Record> right = MakeRightRecords(rschema);
   // Process records.
   EXPECT_TRUE(g.Process("test-table1", left));
   EXPECT_TRUE(g.Process("test-table2", right));
@@ -579,14 +576,14 @@ TEST(DataFlowGraphTest, TestAggregateOnEquiJoinGraph) {
 #ifndef PELTON_VALGRIND_MODE
 TEST(RecordTest, TestDuplicateInputGraph) {
   // Create a schema.
-  SchemaOwner schema = MakeLeftSchema();
+  SchemaRef schema = MakeLeftSchema();
 
   // Make a graph.
   DataFlowGraph g;
 
   // Add two input operators to the graph for the same table, expect an error.
-  auto in1 = std::make_shared<InputOperator>("test-table", SchemaRef(schema));
-  auto in2 = std::make_shared<InputOperator>("test-table", SchemaRef(schema));
+  auto in1 = std::make_shared<InputOperator>("test-table", schema);
+  auto in2 = std::make_shared<InputOperator>("test-table", schema);
   EXPECT_TRUE(g.AddInputNode(in1));
   ASSERT_DEATH({ g.AddInputNode(in2); }, "input already exists");
 }

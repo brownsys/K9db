@@ -243,8 +243,8 @@ class Record {
 
   // 29 bytes but with alignment it is really 32 bytes.
   RecordData *data_;  // [8 B]
-  uint64_t *bitmap_;
-  SchemaRef schema_;  // [16 B]
+  uint64_t *bitmap_;  // [8 B]
+  SchemaRef schema_;  // [8 B]
   int timestamp_;     // [4 B]
   bool positive_;     // [1 B]
 

@@ -33,8 +33,8 @@ TEST(PlannerTest, SimpleFilter) {
   std::vector<dataflow::ColumnID> cols = {0, 1, 2};
   std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
   std::vector<dataflow::ColumnID> keys = {0};
-  dataflow::SchemaOwner schema{names, types, keys};
-  dataflow::SchemaRef schema_ref{schema};
+  dataflow::SchemaRef schema =
+      dataflow::SchemaFactory::Create(names, types, keys);
 
   // Make a dummy query.
   std::string query = "SELECT * FROM test_table WHERE Col2 = 'hello!'";
@@ -45,7 +45,6 @@ TEST(PlannerTest, SimpleFilter) {
 
   // Plan the graph via calcite.
   dataflow::DataFlowGraph graph = PlanGraph(&state, query);
-
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
@@ -62,8 +61,8 @@ TEST(PlannerTest, SimpleFilter) {
   std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
   std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema_ref, true, 10_s, std::move(str1), 20_s);
-  records.emplace_back(schema_ref, true, 2_s, std::move(str2), 50_s);
+  records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
+  records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
   graph.Process("test_table", records);
 
   // Look at flow output.
@@ -83,8 +82,8 @@ TEST(PlannerTest, SimpleProject) {
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
   std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
   std::vector<dataflow::ColumnID> keys = {0};
-  dataflow::SchemaOwner schema{names, types, keys};
-  dataflow::SchemaRef schema_ref{schema};
+  dataflow::SchemaRef schema =
+      dataflow::SchemaFactory::Create(names, types, keys);
 
   // Make a dummy query.
   std::string query = "SELECT Col3 FROM test_table WHERE Col2 = 'hello!'";
@@ -95,7 +94,6 @@ TEST(PlannerTest, SimpleProject) {
 
   // Plan the graph via calcite.
   dataflow::DataFlowGraph graph = PlanGraph(&state, query);
-
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
@@ -112,8 +110,8 @@ TEST(PlannerTest, SimpleProject) {
   std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
   std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema_ref, true, 10_s, std::move(str1), 20_s);
-  records.emplace_back(schema_ref, true, 2_s, std::move(str2), 50_s);
+  records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
+  records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
   graph.Process("test_table", records);
 
   // LOG(INFO) << projectOp->output_schema();
@@ -137,8 +135,8 @@ TEST(PlannerTest, SimpleAggregate) {
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
   std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
   std::vector<dataflow::ColumnID> keys = {0};
-  dataflow::SchemaOwner schema{names, types, keys};
-  dataflow::SchemaRef schema_ref{schema};
+  dataflow::SchemaRef schema =
+      dataflow::SchemaFactory::Create(names, types, keys);
 
   // Make a dummy query.
   std::string query =
@@ -150,7 +148,6 @@ TEST(PlannerTest, SimpleAggregate) {
 
   // Plan the graph via calcite.
   dataflow::DataFlowGraph graph = PlanGraph(&state, query);
-
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
@@ -168,9 +165,9 @@ TEST(PlannerTest, SimpleAggregate) {
   std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
   std::unique_ptr<std::string> str3 = std::make_unique<std::string>("nope");
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema_ref, true, 10_s, std::move(str1), 20_s);
-  records.emplace_back(schema_ref, true, 20_s, std::move(str2), 20_s);
-  records.emplace_back(schema_ref, true, 30_s, std::move(str3), 50_s);
+  records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
+  records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
+  records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
   graph.Process("test_table", records);
 
   // Expected records
@@ -204,8 +201,8 @@ TEST(PlannerTest, SingleConditionFilter) {
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
   std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
   std::vector<dataflow::ColumnID> keys = {0};
-  dataflow::SchemaOwner schema{names, types, keys};
-  dataflow::SchemaRef schema_ref{schema};
+  dataflow::SchemaRef schema =
+      dataflow::SchemaFactory::Create(names, types, keys);
 
   // Make a dummy query.
   std::string query = "SELECT * FROM test_table WHERE Col3=20";
@@ -216,7 +213,6 @@ TEST(PlannerTest, SingleConditionFilter) {
 
   // Plan the graph via calcite.
   dataflow::DataFlowGraph graph = PlanGraph(&state, query);
-
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
@@ -230,16 +226,16 @@ TEST(PlannerTest, SingleConditionFilter) {
   std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
   std::unique_ptr<std::string> str3 = std::make_unique<std::string>("nope");
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema_ref, true, 10_s, std::move(str1), 20_s);
-  records.emplace_back(schema_ref, true, 20_s, std::move(str2), 20_s);
-  records.emplace_back(schema_ref, true, 30_s, std::move(str3), 50_s);
+  records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
+  records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
+  records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
   graph.Process("test_table", records);
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
-  expected_records.emplace_back(schema_ref, true, 10_s,
+  expected_records.emplace_back(schema, true, 10_s,
                                 std::make_unique<std::string>("hello!"), 20_s);
-  expected_records.emplace_back(schema_ref, true, 20_s,
+  expected_records.emplace_back(schema, true, 20_s,
                                 std::make_unique<std::string>("bye!"), 20_s);
 
   // Look at flow output.
@@ -260,8 +256,8 @@ TEST(PlannerTest, FilterSingleORCondition) {
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
   std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
   std::vector<dataflow::ColumnID> keys = {0};
-  dataflow::SchemaOwner schema{names, types, keys};
-  dataflow::SchemaRef schema_ref{schema};
+  dataflow::SchemaRef schema =
+      dataflow::SchemaFactory::Create(names, types, keys);
 
   // Make a dummy query.
   std::string query = "SELECT * FROM test_table WHERE Col3=20 OR Col3=50";
@@ -272,7 +268,6 @@ TEST(PlannerTest, FilterSingleORCondition) {
 
   // Plan the graph via calcite.
   dataflow::DataFlowGraph graph = PlanGraph(&state, query);
-
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
@@ -288,9 +283,9 @@ TEST(PlannerTest, FilterSingleORCondition) {
   std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
   std::unique_ptr<std::string> str3 = std::make_unique<std::string>("nope");
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema_ref, true, 10_s, std::move(str1), 20_s);
-  records.emplace_back(schema_ref, true, 20_s, std::move(str2), 20_s);
-  records.emplace_back(schema_ref, true, 30_s, std::move(str3), 50_s);
+  records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
+  records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
+  records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
   graph.Process("test_table", records);
 
   // Look at flow output.
@@ -311,8 +306,8 @@ TEST(PlannerTest, FilterSingleANDCondition) {
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
   std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
   std::vector<dataflow::ColumnID> keys = {0};
-  dataflow::SchemaOwner schema{names, types, keys};
-  dataflow::SchemaRef schema_ref{schema};
+  dataflow::SchemaRef schema =
+      dataflow::SchemaFactory::Create(names, types, keys);
 
   // Make a dummy query.
   std::string query = "SELECT * FROM test_table WHERE Col3=20 AND Col1>5";
@@ -323,7 +318,6 @@ TEST(PlannerTest, FilterSingleANDCondition) {
 
   // Plan the graph via calcite.
   dataflow::DataFlowGraph graph = PlanGraph(&state, query);
-
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
@@ -337,16 +331,16 @@ TEST(PlannerTest, FilterSingleANDCondition) {
   std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
   std::unique_ptr<std::string> str3 = std::make_unique<std::string>("nope");
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema_ref, true, 10_s, std::move(str1), 20_s);
-  records.emplace_back(schema_ref, true, 20_s, std::move(str2), 20_s);
-  records.emplace_back(schema_ref, true, 30_s, std::move(str3), 50_s);
+  records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
+  records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
+  records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
   graph.Process("test_table", records);
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
-  expected_records.emplace_back(schema_ref, true, 10_s,
+  expected_records.emplace_back(schema, true, 10_s,
                                 std::make_unique<std::string>("hello!"), 20_s);
-  expected_records.emplace_back(schema_ref, true, 20_s,
+  expected_records.emplace_back(schema, true, 20_s,
                                 std::make_unique<std::string>("bye!"), 20_s);
 
   // Look at flow output.
@@ -367,8 +361,8 @@ TEST(PlannerTest, FilterNestedORCondition) {
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
   std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
   std::vector<dataflow::ColumnID> keys = {0};
-  dataflow::SchemaOwner schema{names, types, keys};
-  dataflow::SchemaRef schema_ref{schema};
+  dataflow::SchemaRef schema =
+      dataflow::SchemaFactory::Create(names, types, keys);
 
   // Make a dummy query.
   std::string query =
@@ -380,7 +374,6 @@ TEST(PlannerTest, FilterNestedORCondition) {
 
   // Plan the graph via calcite.
   dataflow::DataFlowGraph graph = PlanGraph(&state, query);
-
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
@@ -397,16 +390,16 @@ TEST(PlannerTest, FilterNestedORCondition) {
   std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
   std::unique_ptr<std::string> str3 = std::make_unique<std::string>("nope");
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema_ref, true, 10_s, std::move(str1), 20_s);
-  records.emplace_back(schema_ref, true, 20_s, std::move(str2), 20_s);
-  records.emplace_back(schema_ref, true, 30_s, std::move(str3), 50_s);
+  records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
+  records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
+  records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
   graph.Process("test_table", records);
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
-  expected_records.emplace_back(schema_ref, true, 10_s,
+  expected_records.emplace_back(schema, true, 10_s,
                                 std::make_unique<std::string>("hello!"), 20_s);
-  expected_records.emplace_back(schema_ref, true, 20_s,
+  expected_records.emplace_back(schema, true, 20_s,
                                 std::make_unique<std::string>("bye!"), 20_s);
 
   // Look at flow output.
@@ -427,8 +420,8 @@ TEST(PlannerTest, FilterNestedANDCondition) {
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
   std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
   std::vector<dataflow::ColumnID> keys = {0};
-  dataflow::SchemaOwner schema{names, types, keys};
-  dataflow::SchemaRef schema_ref{schema};
+  dataflow::SchemaRef schema =
+      dataflow::SchemaFactory::Create(names, types, keys);
 
   // Make a dummy query.
   std::string query =
@@ -440,7 +433,6 @@ TEST(PlannerTest, FilterNestedANDCondition) {
 
   // Plan the graph via calcite.
   dataflow::DataFlowGraph graph = PlanGraph(&state, query);
-
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
@@ -456,16 +448,16 @@ TEST(PlannerTest, FilterNestedANDCondition) {
   std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
   std::unique_ptr<std::string> str3 = std::make_unique<std::string>("nope");
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema_ref, true, 10_s, std::move(str1), 20_s);
-  records.emplace_back(schema_ref, true, 20_s, std::move(str2), 20_s);
-  records.emplace_back(schema_ref, true, 30_s, std::move(str3), 50_s);
+  records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
+  records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
+  records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
   graph.Process("test_table", records);
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
-  expected_records.emplace_back(schema_ref, true, 30_s,
+  expected_records.emplace_back(schema, true, 30_s,
                                 std::make_unique<std::string>("nope"), 50_s);
-  expected_records.emplace_back(schema_ref, true, 20_s,
+  expected_records.emplace_back(schema, true, 20_s,
                                 std::make_unique<std::string>("bye!"), 20_s);
 
   // Look at flow output.

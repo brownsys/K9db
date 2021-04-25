@@ -28,10 +28,10 @@ bool ProjectOperator::EnclosedKeyCols(
 }
 
 void ProjectOperator::ComputeOutputSchema() {
-  std::vector<std::string> output_column_names = {};
-  std::vector<sqlast::ColumnDefinition::Type> output_column_types = {};
+  std::vector<std::string> out_column_names = {};
+  std::vector<sqlast::ColumnDefinition::Type> out_column_types = {};
   std::vector<ColumnID> input_keys = this->input_schemas_.at(0).keys();
-  std::vector<ColumnID> output_keys = {};
+  std::vector<ColumnID> out_keys = {};
 
   // If the input key set is a subset of the projected columns only then form an
   // output keyset. Else do not assign keys for the output schema. Because the
@@ -42,19 +42,18 @@ void ProjectOperator::ComputeOutputSchema() {
     for (auto ik : input_keys) {
       auto it = std::find(cids_.begin(), cids_.end(), ik);
       if (it != cids_.end()) {
-        output_keys.push_back(std::distance(cids_.begin(), it));
+        out_keys.push_back(std::distance(cids_.begin(), it));
       }
     }
   }
 
   // obtain column names and types
   for (const auto &cid : cids_) {
-    output_column_names.push_back(this->input_schemas_.at(0).NameOf(cid));
-    output_column_types.push_back(this->input_schemas_.at(0).TypeOf(cid));
+    out_column_names.push_back(this->input_schemas_.at(0).NameOf(cid));
+    out_column_types.push_back(this->input_schemas_.at(0).TypeOf(cid));
   }
-  owned_output_schema_ =
-      SchemaOwner(output_column_names, output_column_types, output_keys);
-  this->output_schema_ = SchemaRef(owned_output_schema_);
+  this->output_schema_ =
+      SchemaFactory::Create(out_column_names, out_column_types, out_keys);
 }
 
 bool ProjectOperator::Process(NodeIndex source,

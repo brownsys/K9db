@@ -18,6 +18,7 @@ class Edge;
 class DataFlowGraph;
 
 #ifdef PELTON_BENCHMARK  // shuts up compiler warnings
+// NOLINTNEXTLINE
 static void JoinOneToOne(benchmark::State &state);
 #endif
 
@@ -112,7 +113,9 @@ class Operator {
 
   // Allow DataFlowGraph to use SetGraph, SetIndex, and AddParent functions.
   friend class DataFlowGraph;
+
 #ifdef PELTON_BENCHMARK  // shuts up compiler warnings
+  // NOLINTNEXTLINE
   friend void JoinOneToOne(benchmark::State &state);
 #endif
 };

@@ -29,21 +29,21 @@ TEST(KeyTest, DataRep) {
   // Add values to keys.
   std::string str = "Hello from a long movable string!";
   char *ptr = &str[0];
-  k1.AddValue(0UL);
-  k2.AddValue(1UL);
+  k1.AddValue(0_u);
+  k2.AddValue(1_u);
   k2.AddValue(str);
-  k3.AddValue(2UL);
+  k3.AddValue(2_u);
   k3.AddValue(std::move(str));
-  k3.AddValue(5L);
+  k3.AddValue(5_s);
 
   // Values are what we expect.
   EXPECT_EQ(str, "");
-  EXPECT_EQ(k1.value(0).GetUInt(), 0UL);
-  EXPECT_EQ(k2.value(0).GetUInt(), 1UL);
+  EXPECT_EQ(k1.value(0).GetUInt(), 0_u);
+  EXPECT_EQ(k2.value(0).GetUInt(), 1_u);
   EXPECT_EQ(k2.value(1).GetString(), "Hello from a long movable string!");
-  EXPECT_EQ(k3.value(0).GetUInt(), 2UL);
+  EXPECT_EQ(k3.value(0).GetUInt(), 2_u);
   EXPECT_EQ(k3.value(1).GetString(), "Hello from a long movable string!");
-  EXPECT_EQ(k3.value(2).GetInt(), 5L);
+  EXPECT_EQ(k3.value(2).GetInt(), 5_s);
   EXPECT_EQ(&k3.value(1).GetString()[0], ptr);
 }
 
@@ -53,7 +53,7 @@ TEST(KeyTest, Capacity) {
   Key k{2};
   k.AddValue("hi");
   k.AddValue("bye");
-  ASSERT_DEATH({ k.AddValue(-5L); }, "Key is already full");
+  ASSERT_DEATH({ k.AddValue(-5_s); }, "Key is already full");
 }
 #endif
 
@@ -66,19 +66,19 @@ TEST(KeyTest, Comparisons) {
   Key key4{2};
 
   // Add values.
-  key1.AddValue(0UL);
+  key1.AddValue(0_u);
   key1.AddValue("Hello!");
-  key1.AddValue(-5L);
+  key1.AddValue(-5_s);
 
-  key2.AddValue(0UL);
+  key2.AddValue(0_u);
   key2.AddValue("Hello!");
-  key2.AddValue(-5L);
+  key2.AddValue(-5_s);
 
-  key3.AddValue(0UL);
+  key3.AddValue(0_u);
   key3.AddValue("Bye!");
-  key3.AddValue(-5L);
+  key3.AddValue(-5_s);
 
-  key4.AddValue(-5L);
+  key4.AddValue(-5_s);
   key4.AddValue("Hello!");
 
   // Equal values mean equal keys.

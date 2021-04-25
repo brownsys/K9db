@@ -10,7 +10,7 @@
 
 #define SUMFUNC_UPDATE_AGGREGATE_MACRO(OP)                                 \
   {                                                                        \
-    switch (aggregate_schema_ref_.TypeOf(0)) {                             \
+    switch (aggregate_schema_.TypeOf(0)) {                                 \
       case sqlast::ColumnDefinition::Type::UINT:                           \
         (*state_.Lookup(key).begin())                                      \
             .SetUInt((*state_.Lookup(key).begin())                         \
@@ -32,6 +32,20 @@
 namespace pelton {
 namespace dataflow {
 
+namespace {
+
+// This class is used to track state changes when processing given batch of
+// input records
+class StateChange {
+ public:
+  StateChange(bool is_insert, const SchemaRef &aggregate_schema)
+      : is_insert_(is_insert), old_value_(Record(aggregate_schema, true)) {}
+  bool is_insert_;
+  Record old_value_;
+};
+
+}  // namespace
+
 bool AggregateOperator::EnclosedKeyCols(
     const std::vector<ColumnID> &input_keycols,
     const std::vector<ColumnID> &cids) const {
@@ -48,12 +62,12 @@ bool AggregateOperator::EnclosedKeyCols(
 }
 
 void AggregateOperator::ComputeOutputSchema() {
-  std::vector<std::string> output_column_names = {};
-  std::vector<sqlast::ColumnDefinition::Type> output_column_types = {};
-  std::vector<ColumnID> input_keys = this->input_schemas_.at(0).keys();
-  std::vector<ColumnID> output_keys = {};
+  std::vector<std::string> out_column_names = {};
+  std::vector<sqlast::ColumnDefinition::Type> out_column_types = {};
+  std::vector<ColumnID> out_keys = {};
+  const std::vector<ColumnID> &input_keys = this->input_schemas_.at(0).keys();
 
-  // Construct output_keys
+  // Construct out_keys
   // If the input key set is a subset of the projected columns only then form an
   // output keyset. Else do not assign keys for the output schema. Because the
   // subset of input keycols can no longer uniqely identify records. This is
@@ -62,40 +76,38 @@ void AggregateOperator::ComputeOutputSchema() {
   if (EnclosedKeyCols(input_keys, group_columns_)) {
     for (auto ik : input_keys) {
       auto it = std::find(group_columns_.begin(), group_columns_.end(), ik);
-      if (it != output_keys.end()) {
-        output_keys.push_back(std::distance(group_columns_.begin(), it));
+      if (it != out_keys.end()) {
+        out_keys.push_back(std::distance(group_columns_.begin(), it));
       }
     }
   }
 
-  std::vector<std::string> aggregate_column_name;
-  std::vector<sqlast::ColumnDefinition::Type> aggregate_column_type;
+  std::vector<std::string> agg_column_name;
+  std::vector<sqlast::ColumnDefinition::Type> agg_column_type;
   // Calcite does not supply a column id for count function, hence
   // be independent of it
   if (aggregate_function_ == Function::COUNT) {
-    aggregate_column_name.push_back("Count");
-    aggregate_column_type.push_back(sqlast::ColumnDefinition::Type::UINT);
+    agg_column_name.push_back("Count");
+    agg_column_type.push_back(sqlast::ColumnDefinition::Type::UINT);
   } else {
-    aggregate_column_name.push_back("Sum");
-    aggregate_column_type.push_back(
+    agg_column_name.push_back("Sum");
+    agg_column_type.push_back(
         this->input_schemas_.at(0).TypeOf(aggregate_column_));
   }
 
   // Obtain column names and types
   for (const auto &cid : group_columns_) {
-    output_column_names.push_back(this->input_schemas_.at(0).NameOf(cid));
-    output_column_types.push_back(this->input_schemas_.at(0).TypeOf(cid));
+    out_column_names.push_back(this->input_schemas_.at(0).NameOf(cid));
+    out_column_types.push_back(this->input_schemas_.at(0).TypeOf(cid));
   }
   // Add another column for the aggregate
-  output_column_names.push_back(aggregate_column_name.at(0));
-  output_column_types.push_back(aggregate_column_type.at(0));
+  out_column_names.push_back(agg_column_name.at(0));
+  out_column_types.push_back(agg_column_type.at(0));
 
-  owned_output_schema_ =
-      SchemaOwner(output_column_names, output_column_types, output_keys);
-  aggregate_schema_ =
-      SchemaOwner(aggregate_column_name, aggregate_column_type, output_keys);
-  aggregate_schema_ref_ = SchemaRef(aggregate_schema_);
-  this->output_schema_ = SchemaRef(owned_output_schema_);
+  this->aggregate_schema_ =
+      SchemaFactory::Create(agg_column_name, agg_column_type, {});
+  this->output_schema_ =
+      SchemaFactory::Create(out_column_names, out_column_types, out_keys);
 }
 
 void AggregateOperator::EmitRecord(const Key &key,
@@ -124,7 +136,7 @@ void AggregateOperator::EmitRecord(const Key &key,
 
   // Add aggregate value to the last column
   size_t aggregate_index = this->output_schema_.size() - 1;
-  switch (aggregate_schema_ref_.TypeOf(0)) {
+  switch (aggregate_schema_.TypeOf(0)) {
     case sqlast::ColumnDefinition::Type::UINT:
       output_record.SetUInt(aggregate_record.GetUInt(0), aggregate_index);
       break;
@@ -140,30 +152,20 @@ void AggregateOperator::EmitRecord(const Key &key,
   output->push_back(std::move(output_record));
 }
 
-inline void AggregateOperator::InitAggregateValue(Record &aggregate_record,
+inline void AggregateOperator::InitAggregateValue(Record *aggregate_record,
                                                   const Record &from_record,
                                                   ColumnID from_column) const {
-  switch (aggregate_schema_ref_.TypeOf(0)) {
+  switch (aggregate_schema_.TypeOf(0)) {
     case sqlast::ColumnDefinition::Type::UINT:
-      aggregate_record.SetUInt(from_record.GetUInt(from_column), 0);
+      aggregate_record->SetUInt(from_record.GetUInt(from_column), 0);
       break;
     case sqlast::ColumnDefinition::Type::INT:
-      aggregate_record.SetInt(from_record.GetInt(from_column), 0);
+      aggregate_record->SetInt(from_record.GetInt(from_column), 0);
       break;
     default:
       LOG(FATAL) << "Unsupported type when computing SUM aggregate";
   }
 }
-
-// This class is used to track state changes when processing given batch of
-// input records
-class StateChange {
- public:
-  StateChange(bool is_insert, const SchemaRef &aggregate_schema)
-      : is_insert_(is_insert), old_value_(Record(aggregate_schema, true)) {}
-  bool is_insert_;
-  Record old_value_;
-};
 
 bool AggregateOperator::Process(NodeIndex source,
                                 const std::vector<Record> &records,
@@ -184,9 +186,9 @@ bool AggregateOperator::Process(NodeIndex source,
                 << "State does not exist for corresponding negative record";
           }
           if (!first_delta.contains(key)) {  // track first state change of key
-            first_delta.emplace(key, StateChange(false, aggregate_schema_ref_));
+            first_delta.emplace(key, StateChange(false, aggregate_schema_));
             // need to explicitly set value since records cannot be copied
-            InitAggregateValue(first_delta.at(key).old_value_,
+            InitAggregateValue(&first_delta.at(key).old_value_,
                                *state_.Lookup(key).begin(), 0);
           }
           auto state_record = state_.Lookup(key).begin();
@@ -195,18 +197,17 @@ bool AggregateOperator::Process(NodeIndex source,
         } else {  // handle positive record
           if (!state_.Contains(key)) {
             // track first state change of key. old_value_ does not exist.
-            first_delta.emplace(key, StateChange(true, aggregate_schema_ref_));
+            first_delta.emplace(key, StateChange(true, aggregate_schema_));
             // new aggregate record
-            Record aggregate_record(aggregate_schema_ref_);
+            Record aggregate_record(aggregate_schema_);
             aggregate_record.SetUInt(1ULL, 0);
             state_.Insert(key, std::move(aggregate_record));
           } else {
             if (!first_delta.contains(
                     key)) {  // track first state change of key
-              first_delta.emplace(key,
-                                  StateChange(false, aggregate_schema_ref_));
+              first_delta.emplace(key, StateChange(false, aggregate_schema_));
               // need to explicitly set value since records cannot be copied
-              InitAggregateValue(first_delta.at(key).old_value_,
+              InitAggregateValue(&first_delta.at(key).old_value_,
                                  *state_.Lookup(key).begin(), 0);
             }
             (*state_.Lookup(key).begin())
@@ -226,27 +227,26 @@ bool AggregateOperator::Process(NodeIndex source,
                 << "State does not exist for corresponding negative record";
           }
           if (!first_delta.contains(key)) {  // track first state change of key
-            first_delta.emplace(key, StateChange(false, aggregate_schema_ref_));
+            first_delta.emplace(key, StateChange(false, aggregate_schema_));
             // need to explicitly set value since records cannot be copied
-            InitAggregateValue(first_delta.at(key).old_value_,
+            InitAggregateValue(&first_delta.at(key).old_value_,
                                *state_.Lookup(key).begin(), 0);
           }
           SUMFUNC_UPDATE_AGGREGATE_MACRO(-)
         } else {  // handle positive record
           if (!state_.Contains(key)) {
             // track first state change of key. old_value_ does not exist.
-            first_delta.emplace(key, StateChange(true, aggregate_schema_ref_));
+            first_delta.emplace(key, StateChange(true, aggregate_schema_));
             // new aggregate record
-            Record aggregate_record(aggregate_schema_ref_);
-            InitAggregateValue(aggregate_record, record, aggregate_column_);
+            Record aggregate_record(aggregate_schema_);
+            InitAggregateValue(&aggregate_record, record, aggregate_column_);
             state_.Insert(key, std::move(aggregate_record));
           } else {
             if (!first_delta.contains(
                     key)) {  // track first state change of key
-              first_delta.emplace(key,
-                                  StateChange(false, aggregate_schema_ref_));
+              first_delta.emplace(key, StateChange(false, aggregate_schema_));
               // need to explicitly set value since records cannot be copied
-              InitAggregateValue(first_delta.at(key).old_value_,
+              InitAggregateValue(&first_delta.at(key).old_value_,
                                  *state_.Lookup(key).begin(), 0);
             }
             SUMFUNC_UPDATE_AGGREGATE_MACRO(+)
@@ -274,7 +274,7 @@ bool AggregateOperator::Process(NodeIndex source,
     // NOTE: The comparision of final state update with 0 is semantically
     // correct for both SUM and COUNT.
     if (item.second.is_insert_) {
-      switch (aggregate_schema_ref_.TypeOf(0)) {
+      switch (aggregate_schema_.TypeOf(0)) {
         case sqlast::ColumnDefinition::Type::UINT:
           if ((*state_.Lookup(item.first).begin()).GetUInt(0) == 0ULL) {
             state_.Erase(item.first);
@@ -293,7 +293,7 @@ bool AggregateOperator::Process(NodeIndex source,
       }
       EmitRecord(item.first, *state_.Lookup(item.first).begin(), true, output);
     } else {
-      switch (aggregate_schema_ref_.TypeOf(0)) {
+      switch (aggregate_schema_.TypeOf(0)) {
         case sqlast::ColumnDefinition::Type::UINT:
           if ((*state_.Lookup(item.first).begin()).GetUInt(0) == 0ULL) {
             state_.Erase(item.first);
