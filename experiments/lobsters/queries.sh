@@ -5,4 +5,4 @@ cat experiments/lobsters/schema-simplified.sql >> /tmp/trace.sql
 cat experiments/lobsters/queries.sql >> /tmp/trace.sql
 
 bin/drop.sh pelton pelton
-bazel run //bin:cli < /tmp/trace.sql
+bazel run //bin:cli -- --logtostderr < /tmp/trace.sql
