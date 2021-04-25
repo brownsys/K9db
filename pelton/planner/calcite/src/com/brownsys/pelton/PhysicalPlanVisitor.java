@@ -3,6 +3,7 @@ package com.brownsys.pelton;
 import com.brownsys.pelton.nativelib.DataFlowGraphLibrary;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Stack;
@@ -40,6 +41,7 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
   private final Stack<ArrayList<Integer>> childrenOperators;
   private final Hashtable<String, Integer> tableToInputOperator;
   private final ArrayList<ArrayList<Integer>> joinDuplicateColumns;
+  private final ArrayList<Integer> keyColumns;
 
   public PhysicalPlanVisitor(DataFlowGraphLibrary.DataFlowGraphGenerator generator) {
     this.generator = generator;
@@ -50,6 +52,7 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     // Nevertheless, if things break we can fall back to avoiding deduplication
     // in join.
     this.joinDuplicateColumns = new ArrayList<ArrayList<Integer>>();
+    this.keyColumns = new ArrayList<Integer>();
   }
 
   public void populateGraph(RelNode plan) {
@@ -64,7 +67,16 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
       // Add a materialized view linked to the last node in the graph.
       assert children.size() == 1;
 
-      int[] keyCols = new int[0]; // TODO(babman): figure out key from query.
+      if (this.keyColumns.size() == 0) {
+        this.keyColumns.add(new Integer(0));
+      }
+      int[] keyCols = new int[this.keyColumns.size()];
+
+      Iterator<Integer> iterator = this.keyColumns.iterator();
+      for (int i = 0; i < keyCols.length; i++) {
+        keyCols[i] = iterator.next().intValue();
+      }
+
       this.generator.AddMatviewOperator(children.get(0), keyCols);
       assert this.childrenOperators.isEmpty();
     }
@@ -149,11 +161,19 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
   private void addFilterOperation(int filterOperator, RexNode condition, List<RexNode> operands) {
     assert operands.size() == 2;
     assert operands.get(0) instanceof RexInputRef || operands.get(1) instanceof RexInputRef;
-    assert operands.get(0) instanceof RexLiteral || operands.get(1) instanceof RexLiteral;
+    assert operands.get(0) instanceof RexLiteral || operands.get(1) instanceof RexLiteral
+      || operands.get(0) instanceof RexDynamicParam || operands.get(1) instanceof RexDynamicParam;
     // Get the input and the value expressions.
     int inputIndex = operands.get(0) instanceof RexInputRef ? 0 : 1;
     int valueIndex = (inputIndex + 1) % 2;
     RexInputRef input = (RexInputRef) operands.get(inputIndex);
+
+    // Handle parameters (`?` in query)
+    if (operands.get(valueIndex) instanceof RexDynamicParam) {
+      this.keyColumns.add(new Integer(valueIndex));
+      return;
+    }
+
     RexLiteral value = (RexLiteral) operands.get(valueIndex);
 
     // Determine the condition operation.
