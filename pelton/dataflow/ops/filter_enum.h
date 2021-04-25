@@ -10,7 +10,9 @@ enum FilterOperationEnum {
   GREATER_THAN,
   GREATER_THAN_OR_EQUAL,
   EQUAL,
-  NOT_EQUAL
+  NOT_EQUAL,
+  IS_NULL,
+  IS_NOT_NULL
 };
 
 }  // namespace dataflow

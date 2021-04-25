@@ -185,5 +185,35 @@ TEST(FilterOperatorTest, TypeMistmatch) {
 }
 #endif
 
+TEST(FilterOperatorTest, IsNullAccept) {
+  SchemaRef schema = CreateSchema();
+
+  // Create some filter operators.
+  FilterOperator filter1;
+  FilterOperator filter2;
+  filter1.AddOperation(0, FilterOperator::Operation::IS_NULL);
+  filter2.AddOperation(1, FilterOperator::Operation::IS_NOT_NULL);
+
+  // Create some records.
+  std::vector<Record> records;
+  records.emplace_back(schema);
+  records.at(0).SetUInt(0, 0);
+  records.at(0).SetString(std::make_unique<std::string>("Hello!"), 1);
+  records.emplace_back(schema);
+  records.at(1).SetNull(true, 0);
+  records.at(1).SetString(std::make_unique<std::string>("Bye!"), 1);
+  records.emplace_back(schema);
+  records.at(2).SetUInt(6, 0);
+  records.at(2).SetNull(true, 1);
+
+  // Test filtering out records.
+  EXPECT_FALSE(filter1.Accept(records.at(0)));
+  EXPECT_TRUE(filter2.Accept(records.at(0)));
+  EXPECT_TRUE(filter1.Accept(records.at(1)));
+  EXPECT_TRUE(filter2.Accept(records.at(1)));
+  EXPECT_FALSE(filter1.Accept(records.at(2)));
+  EXPECT_FALSE(filter2.Accept(records.at(2)));
+}
+
 }  // namespace dataflow
 }  // namespace pelton

@@ -11,6 +11,10 @@
 namespace pelton {
 namespace dataflow {
 
+class NullValue {
+  // nothing to see here
+};
+
 class Value {
  public:
   // Actual value constructors.

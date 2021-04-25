@@ -62,6 +62,10 @@ bool ProjectOperator::Process(NodeIndex source,
   for (const Record &record : records) {
     Record out_record{this->output_schema_};
     for (size_t i = 0; i < cids_.size(); i++) {
+      if (record.IsNull(i)) {
+        out_record.SetNull(true, i);
+        continue;
+      }
       switch (this->output_schema_.TypeOf(i)) {
         case sqlast::ColumnDefinition::Type::UINT:
           out_record.SetUInt(record.GetUInt(cids_.at(i)), i);

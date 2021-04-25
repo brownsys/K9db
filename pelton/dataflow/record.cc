@@ -12,6 +12,8 @@ sqlast::ColumnDefinition::Type Record::TypeOfVariant(const DataVariant &v) {
       return sqlast::ColumnDefinition::Type::UINT;
     case 2:
       return sqlast::ColumnDefinition::Type::INT;
+    case 3:
+      LOG(FATAL) << "NULL value variant can't be converted to a type!";
     default:
       LOG(FATAL) << "Unsupported variant type!";
   }
@@ -157,8 +159,14 @@ void Record::SetValue(const std::string &value, size_t i) {
     case sqlast::ColumnDefinition::Type::TEXT:
       this->data_[i].str = std::make_unique<std::string>(value);
       break;
+    case sqlast::ColumnDefinition::Type::DATETIME:
+      // TODO(malte): DATETIME shouldn't be stored as a string, but as
+      // a timestamp since the epoch
+      this->data_[i].str = std::make_unique<std::string>(value);
+      break;
     default:
-      LOG(FATAL) << "Unsupported data type in setvalue";
+      LOG(FATAL) << "Unsupported data type in setvalue: "
+                 << this->schema_.TypeOf(i);
   }
 }
 

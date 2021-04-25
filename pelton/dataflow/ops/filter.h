@@ -14,6 +14,7 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
+#include "pelton/dataflow/value.h"
 
 namespace pelton {
 namespace dataflow {
@@ -36,6 +37,13 @@ class FilterOperator : public Operator {
   void AddOperation(int64_t value, ColumnID column, Operation op) {
     this->ops_.push_back(std::make_tuple(value, column, op));
   }
+  void AddOperation(NullValue value, ColumnID column, Operation op) {
+    CHECK(op == Operation::IS_NULL || op == Operation::IS_NOT_NULL);
+    this->ops_.push_back(std::make_tuple(value, column, op));
+  }
+  void AddOperation(ColumnID column, Operation op) {
+    return AddOperation(NullValue(), column, op);
+  }
 
   bool Process(NodeIndex source, const std::vector<Record> &records,
                std::vector<Record> *output) override;
@@ -53,6 +61,7 @@ class FilterOperator : public Operator {
   FRIEND_TEST(FilterOperatorTest, SeveralOpsPerColumn);
   FRIEND_TEST(FilterOperatorTest, BatchTest);
   FRIEND_TEST(FilterOperatorTest, TypeMistmatch);
+  FRIEND_TEST(FilterOperatorTest, IsNullAccept);
 };
 
 }  // namespace dataflow

@@ -31,7 +31,9 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
           SqlKind.LESS_THAN,
           SqlKind.LESS_THAN_OR_EQUAL,
           SqlKind.GREATER_THAN,
-          SqlKind.GREATER_THAN_OR_EQUAL);
+          SqlKind.GREATER_THAN_OR_EQUAL,
+          SqlKind.IS_NULL,
+          SqlKind.IS_NOT_NULL);
 
   private final DataFlowGraphLibrary.DataFlowGraphGenerator generator;
   private final Stack<ArrayList<Integer>> childrenOperators;
@@ -173,6 +175,12 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
         break;
       case GREATER_THAN_OR_EQUAL:
         operationEnum = DataFlowGraphLibrary.GREATER_THAN_OR_EQUAL;
+        break;
+      case IS_NULL:
+        operationEnum = DataFlowGraphLibrary.IS_NULL;
+        break;
+      case IS_NOT_NULL:
+        operationEnum = DataFlowGraphLibrary.IS_NOT_NULL;
         break;
       default:
         assert false;

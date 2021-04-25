@@ -74,6 +74,12 @@ bool FilterOperator::Accept(const Record &record) const {
       case Operation::NOT_EQUAL:
         RECORD_VALUE_COMPARE_MACRO(v, col, !=);
 
+      case Operation::IS_NULL:
+        return record.IsNull(col);
+
+      case Operation::IS_NOT_NULL:
+        return !record.IsNull(col);
+
       default:
         LOG(FATAL) << "Unsupported operation in filter";
     }
