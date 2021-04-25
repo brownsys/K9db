@@ -130,11 +130,11 @@ TEST(ProjectOperatorTest, OutputSchemaCompositeKeyTest) {
 }
 
 TEST(ProjectOperatorTest, NullValueTest) {
-  SchemaOwner schema = CreateSchemaPrimaryKey();
+  SchemaRef schema = CreateSchemaPrimaryKey();
   std::vector<ColumnID> cids = {0, 1};
   // create project operator..
   ProjectOperator project = ProjectOperator(cids);
-  project.input_schemas_.push_back(SchemaRef(schema));
+  project.input_schemas_.push_back(schema);
   project.ComputeOutputSchema();
 
   // Records to be fed

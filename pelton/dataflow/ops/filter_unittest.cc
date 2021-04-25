@@ -186,7 +186,7 @@ TEST(FilterOperatorTest, TypeMistmatch) {
 #endif
 
 TEST(FilterOperatorTest, IsNullAccept) {
-  SchemaOwner schema = CreateSchema();
+  SchemaRef schema = CreateSchema();
 
   // Create some filter operators.
   FilterOperator filter1;
@@ -196,13 +196,13 @@ TEST(FilterOperatorTest, IsNullAccept) {
 
   // Create some records.
   std::vector<Record> records;
-  records.emplace_back(SchemaRef(schema));
+  records.emplace_back(schema);
   records.at(0).SetUInt(0, 0);
   records.at(0).SetString(std::make_unique<std::string>("Hello!"), 1);
-  records.emplace_back(SchemaRef(schema));
+  records.emplace_back(schema);
   records.at(1).SetNull(true, 0);
   records.at(1).SetString(std::make_unique<std::string>("Bye!"), 1);
-  records.emplace_back(SchemaRef(schema));
+  records.emplace_back(schema);
   records.at(2).SetUInt(6, 0);
   records.at(2).SetNull(true, 1);
 
