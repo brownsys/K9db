@@ -173,7 +173,7 @@ TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest) {
   project1.AddProjection(schema.NameOf(0), 0);
   project1.AddProjection(schema.NameOf(1), 1);
   project1.ComputeOutputSchema();
-  
+
   // expected data in output schema
   std::vector<std::string> expected_names = {"Col1", "Col2"};
   std::vector<CType> expected_types = {CType::UINT, CType::TEXT};

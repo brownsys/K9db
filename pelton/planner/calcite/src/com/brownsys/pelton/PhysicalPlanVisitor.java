@@ -362,9 +362,9 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     return join;
   }
 
-  int UpdateIndexIfRequired(int columnId, ArrayList<Integer> duplicateColumns){
-    for(Integer dupCol : duplicateColumns){
-      if(columnId > dupCol){
+  int UpdateIndexIfRequired(int columnId, ArrayList<Integer> duplicateColumns) {
+    for (Integer dupCol : duplicateColumns) {
+      if (columnId > dupCol) {
         columnId = columnId - 1;
       }
     }
@@ -372,7 +372,7 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
   }
 
   @Override
-  public RelNode visit(LogicalProject project){
+  public RelNode visit(LogicalProject project) {
     // Add a new level in the stack to store ids of the direct children operators.
     this.childrenOperators.push(new ArrayList<Integer>());
 
@@ -388,26 +388,25 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
 
     ArrayList<Integer> duplicateColumns = new ArrayList<Integer>();
     boolean deduplicated = false;
-    for(Pair<RexNode, String> item : project.getNamedProjects()) {
-      switch(item.getKey().getKind()){
+    for (Pair<RexNode, String> item : project.getNamedProjects()) {
+      switch (item.getKey().getKind()) {
         case INPUT_REF:
           int projectedCid = ((RexInputRef) item.getKey()).getIndex();
           // Check if this column as to be deduplicated
-          for(Integer cid : duplicateColumns){
-            if(cid == projectedCid){
+          for (Integer cid : duplicateColumns) {
+            if (cid == projectedCid) {
               deduplicated = true;
               continue;
             }
           }
           // Track potential duplicates (if any)
-          for(ArrayList<Integer> entry : this.joinDuplicateColumns){
-            if(entry.get(0) == projectedCid){
+          for (ArrayList<Integer> entry : this.joinDuplicateColumns) {
+            if (entry.get(0) == projectedCid) {
               duplicateColumns.add(entry.get(1));
             }
           }
           // Update column index if deduplication has occured
-          if(deduplicated)
-            projectedCid = UpdateIndexIfRequired(projectedCid, duplicateColumns);
+          if (deduplicated) projectedCid = UpdateIndexIfRequired(projectedCid, duplicateColumns);
           this.generator.AddProjectionColumn(projectOperator, item.getValue(), projectedCid);
           break;
         case LITERAL:
@@ -416,13 +415,16 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
             case DECIMAL:
             case INTEGER:
               this.generator.AddProjectionLiteralSigned(
-                  projectOperator, item.getValue(), RexLiteral.intValue(value), DataFlowGraphLibrary.LITERAL);
+                  projectOperator,
+                  item.getValue(),
+                  RexLiteral.intValue(value),
+                  DataFlowGraphLibrary.LITERAL);
               break;
             default:
               throw new IllegalArgumentException("Unsupported value type in literal projection");
           }
           break;
-        // TODO(Ishan): Add support for desired operations
+          // TODO(Ishan): Add support for desired operations
         case PLUS:
         case MINUS:
           RexCall operation = (RexCall) item.getKey();
@@ -432,26 +434,37 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
           assert operands.get(1) instanceof RexInputRef || operands.get(1) instanceof RexLiteral;
           Integer leftColumnId = ((RexInputRef) operands.get(0)).getIndex();
           int arithmeticEnum = -1;
-          if(item.getKey().getKind()== SqlKind.PLUS){
+          if (item.getKey().getKind() == SqlKind.PLUS) {
             arithmeticEnum = DataFlowGraphLibrary.PLUS;
-          } else if(item.getKey().getKind()== SqlKind.MINUS){
+          } else if (item.getKey().getKind() == SqlKind.MINUS) {
             arithmeticEnum = DataFlowGraphLibrary.MINUS;
           }
           // Update column index if deduplication has occured
-          if(deduplicated)
-            leftColumnId = UpdateIndexIfRequired(leftColumnId, duplicateColumns);
-          if(operands.get(1) instanceof RexInputRef){
+          if (deduplicated) leftColumnId = UpdateIndexIfRequired(leftColumnId, duplicateColumns);
+          if (operands.get(1) instanceof RexInputRef) {
             Integer rightColumnId = ((RexInputRef) operands.get(1)).getIndex();
             // Update column index if deduplication has occured
-            if(deduplicated)
+            if (deduplicated)
               rightColumnId = UpdateIndexIfRequired(rightColumnId, duplicateColumns);
-            this.generator.AddProjectionArithmeticWithLiteralUnsignedOrColumn(projectOperator, item.getValue(), leftColumnId, arithmeticEnum, rightColumnId, DataFlowGraphLibrary.ARITHMETIC_WITH_COLUMN);
-          } else{
+            this.generator.AddProjectionArithmeticWithLiteralUnsignedOrColumn(
+                projectOperator,
+                item.getValue(),
+                leftColumnId,
+                arithmeticEnum,
+                rightColumnId,
+                DataFlowGraphLibrary.ARITHMETIC_WITH_COLUMN);
+          } else {
             RexLiteral rightValue = (RexLiteral) operands.get(1);
             switch (rightValue.getTypeName()) {
               case DECIMAL:
               case INTEGER:
-              this.generator.AddProjectionArithmeticWithLiteralSigned(projectOperator, item.getValue(), leftColumnId, arithmeticEnum, RexLiteral.intValue(rightValue), DataFlowGraphLibrary.ARITHMETIC_WITH_LITERAL);
+                this.generator.AddProjectionArithmeticWithLiteralSigned(
+                    projectOperator,
+                    item.getValue(),
+                    leftColumnId,
+                    arithmeticEnum,
+                    RexLiteral.intValue(rightValue),
+                    DataFlowGraphLibrary.ARITHMETIC_WITH_LITERAL);
                 break;
               default:
                 throw new IllegalArgumentException("Unsupported value type in literal projection");
@@ -462,10 +475,10 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
         default:
           throw new IllegalArgumentException("Unsupported projection type");
       }
+    }
+    this.childrenOperators.peek().add(projectOperator);
+    return project;
   }
-  this.childrenOperators.peek().add(projectOperator);
-  return project;
-}
 
   @Override
   public RelNode visit(LogicalAggregate aggregate) {
