@@ -169,7 +169,8 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     RexInputRef input = (RexInputRef) operands.get(inputIndex);
 
     // Handle parameters (`?` in query)
-    if (operands.get(valueIndex) instanceof RexDynamicParam) {
+    if (operands.get(valueIndex) instanceof RexDynamicParam &&
+        !(operands.get(valueIndex) instanceof RexLiteral)) {
       this.keyColumns.add(new Integer(valueIndex));
       return;
     }
