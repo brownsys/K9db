@@ -107,7 +107,6 @@ TEST(ProjectOperatorTest, BatchTestOperationRightColumn) {
                         ProjectOperator::Metadata::ARITHMETIC_WITH_COLUMN);
   project.ComputeOutputSchema();
 
-  // LOG(INFO) << project.output_schema_;
   // Records to be fed
   std::vector<Record> records;
   records.emplace_back(SchemaRef(schema), true, 0_u,
@@ -127,9 +126,6 @@ TEST(ProjectOperatorTest, BatchTestOperationRightColumn) {
   // Feed records and test
   std::vector<Record> outputs;
   EXPECT_TRUE(project.Process(UNDEFINED_NODE_INDEX, records, &outputs));
-  // for(const auto &record: outputs){
-  //   LOG(INFO) << record;
-  // }
   EXPECT_EQ(outputs, expected_records);
 }
 
@@ -177,7 +173,7 @@ TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest) {
   project1.AddProjection(schema.NameOf(0), 0);
   project1.AddProjection(schema.NameOf(1), 1);
   project1.ComputeOutputSchema();
-  // LOG(INFO) << project1.output_schema_;
+  
   // expected data in output schema
   std::vector<std::string> expected_names = {"Col1", "Col2"};
   std::vector<CType> expected_types = {CType::UINT, CType::TEXT};
