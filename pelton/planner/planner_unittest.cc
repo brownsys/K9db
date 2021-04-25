@@ -114,7 +114,6 @@ TEST(PlannerTest, SimpleProject) {
   records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
   graph.Process("test_table", records);
 
-  // LOG(INFO) << projectOp->output_schema();
   // Look at flow output.
   std::shared_ptr<dataflow::MatViewOperator> output = graph.outputs().at(0);
   EXPECT_EQ(output->count(), 1);
@@ -207,7 +206,6 @@ TEST(PlannerTest, ProjectArithmeticRightLiteral) {
   auto projectOp =
       std::dynamic_pointer_cast<dataflow::ProjectOperator>(graph.GetNode(1));
 
-  LOG(INFO) << projectOp->output_schema();
   // Try to process some records through flow.
   std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
   std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
@@ -266,7 +264,6 @@ TEST(PlannerTest, ProjectArithmeticRightColumn) {
   auto projectOp =
       std::dynamic_pointer_cast<dataflow::ProjectOperator>(graph.GetNode(1));
 
-  LOG(INFO) << projectOp->output_schema();
   // Try to process some records through flow.
   std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
   std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");

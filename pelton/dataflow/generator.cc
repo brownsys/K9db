@@ -191,7 +191,7 @@ void DataFlowGraphGenerator::AddProjectionLiteralUnsigned(
   // Add projection to project
   project->AddProjection(column_name, value, metadata);
 }
-void DataFlowGraphGenerator::AddProjectionOperationRightLiteralSigned(
+void DataFlowGraphGenerator::AddProjectionArithmeticWithLiteralSigned(
     NodeIndex project_operator, const std::string &column_name,
     ColumnID left_operand, ProjectOperationEnum operation,
     int64_t right_operand, ProjectMetadataEnum metadata) {
@@ -204,7 +204,7 @@ void DataFlowGraphGenerator::AddProjectionOperationRightLiteralSigned(
   project->AddProjection(column_name, left_operand, operation, right_operand,
                          metadata);
 }
-void DataFlowGraphGenerator::AddProjectionOperationRightLiteralUnsignedOrColumn(
+void DataFlowGraphGenerator::AddProjectionArithmeticWithLiteralUnsignedOrColumn(
     NodeIndex project_operator, const std::string &column_name,
     ColumnID left_operand, ProjectOperationEnum operation,
     uint64_t right_operand, ProjectMetadataEnum metadata) {

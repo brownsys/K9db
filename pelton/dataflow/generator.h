@@ -70,13 +70,13 @@ class DataFlowGraphGenerator {
                                     const std::string &column_name,
                                     uint64_t value,
                                     ProjectMetadataEnum metadata);
-  void AddProjectionOperationRightLiteralSigned(NodeIndex project_operator,
+  void AddProjectionArithmeticWithLiteralSigned(NodeIndex project_operator,
                                                 const std::string &column_name,
                                                 ColumnID left_operand,
                                                 ProjectOperationEnum operation,
                                                 int64_t right_operand,
                                                 ProjectMetadataEnum metadata);
-  void AddProjectionOperationRightLiteralUnsignedOrColumn(
+  void AddProjectionArithmeticWithLiteralUnsignedOrColumn(
       NodeIndex project_operator, const std::string &column_name,
       ColumnID left_operand, ProjectOperationEnum operation,
       uint64_t right_operand, ProjectMetadataEnum metadata);

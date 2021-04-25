@@ -366,7 +366,6 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     for(Integer dupCol : duplicateColumns){
       if(columnId > dupCol){
         columnId = columnId - 1;
-        return columnId;
       }
     }
     return columnId;
@@ -446,13 +445,13 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
             // Update column index if deduplication has occured
             if(deduplicated)
               rightColumnId = UpdateIndexIfRequired(rightColumnId, duplicateColumns);
-            this.generator.AddProjectionOperationRightLiteralUnsignedOrColumn(projectOperator, item.getValue(), leftColumnId, arithmeticEnum, rightColumnId, DataFlowGraphLibrary.OPERATION_RIGHT_COLUMN);
+            this.generator.AddProjectionArithmeticWithLiteralUnsignedOrColumn(projectOperator, item.getValue(), leftColumnId, arithmeticEnum, rightColumnId, DataFlowGraphLibrary.ARITHMETIC_WITH_COLUMN);
           } else{
             RexLiteral rightValue = (RexLiteral) operands.get(1);
             switch (rightValue.getTypeName()) {
               case DECIMAL:
               case INTEGER:
-              this.generator.AddProjectionOperationRightLiteralSigned(projectOperator, item.getValue(), leftColumnId, arithmeticEnum, RexLiteral.intValue(rightValue), DataFlowGraphLibrary.OPERATION_RIGHT_LITERAL);
+              this.generator.AddProjectionArithmeticWithLiteralSigned(projectOperator, item.getValue(), leftColumnId, arithmeticEnum, RexLiteral.intValue(rightValue), DataFlowGraphLibrary.ARITHMETIC_WITH_LITERAL);
                 break;
               default:
                 throw new IllegalArgumentException("Unsupported value type in literal projection");

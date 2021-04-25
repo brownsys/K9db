@@ -104,7 +104,7 @@ TEST(ProjectOperatorTest, BatchTestOperationRightColumn) {
   project.input_schemas_.push_back(SchemaRef(schema));
   project.AddProjection(schema.NameOf(0), 0);
   project.AddProjection("Delta", 4, ProjectOperator::Operation::MINUS, 3_u,
-                        ProjectOperator::Metadata::OPERATION_RIGHT_COLUMN);
+                        ProjectOperator::Metadata::ARITHMETIC_WITH_COLUMN);
   project.ComputeOutputSchema();
 
   // LOG(INFO) << project.output_schema_;
@@ -140,7 +140,7 @@ TEST(ProjectOperatorTest, BatchTestOperationRightLiteral) {
   project.input_schemas_.push_back(SchemaRef(schema));
   project.AddProjection(schema.NameOf(0), 0);
   project.AddProjection("Delta", 0, ProjectOperator::Operation::MINUS, 0_u,
-                        ProjectOperator::Metadata::OPERATION_RIGHT_LITERAL);
+                        ProjectOperator::Metadata::ARITHMETIC_WITH_LITERAL);
   project.ComputeOutputSchema();
   // uint MINUS uint would result in int
   EXPECT_EQ(project.output_schema_.TypeOf(1),

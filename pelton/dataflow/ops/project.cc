@@ -9,7 +9,7 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/sqlast/ast.h"
 
-#define OPERATION_RIGHT_LITERAL_MACRO(OP)                                      \
+#define ARITHMETIC_WITH_LITERAL_MACRO(OP)                                      \
   {                                                                            \
     switch (this->output_schema_.TypeOf(i)) {                                  \
       case sqlast::ColumnDefinition::Type::UINT:                               \
@@ -38,9 +38,9 @@
     }                                                                          \
   }
 // In above macro an edge case is being handled for (uint MINUS uint)
-// OPERATION_RIGHT_LITERAL_MACRO
+// ARITHMETIC_WITH_LITERAL_MACRO
 
-#define OPERATION_RIGHT_COLUMN_MACRO(OP)                                      \
+#define ARITHMETIC_WITH_COLUMN_MACRO(OP)                                      \
   {                                                                           \
     switch (this->output_schema_.TypeOf(i)) {                                 \
       case sqlast::ColumnDefinition::Type::UINT:                              \
@@ -69,7 +69,7 @@
     }                                                                         \
   }
 // In above macro an edge case is being handled for (uint MINUS uint)
-// OPERATION_RIGHT_COLUMN_MACRO
+// ARITHMETIC_WITH_COLUMN_MACRO
 
 namespace pelton {
 namespace dataflow {
@@ -146,7 +146,7 @@ void ProjectOperator::ComputeOutputSchema() {
       case Metadata::LITERAL:
         out_column_types.push_back(GetLiteralType(right_operand));
         break;
-      case Metadata::OPERATION_RIGHT_LITERAL:
+      case Metadata::ARITHMETIC_WITH_LITERAL:
         if (this->input_schemas_.at(0).TypeOf(left_operand) !=
             GetLiteralType(right_operand))
           LOG(FATAL) << "Column and literal do not have same types for "
@@ -159,7 +159,7 @@ void ProjectOperator::ComputeOutputSchema() {
               this->input_schemas_.at(0).TypeOf(left_operand));
         }
         break;
-      case Metadata::OPERATION_RIGHT_COLUMN:
+      case Metadata::ARITHMETIC_WITH_COLUMN:
         if (this->input_schemas_.at(0).TypeOf(left_operand) !=
             this->input_schemas_.at(0).TypeOf(
                 std::get<uint64_t>(right_operand)))
@@ -221,25 +221,25 @@ bool ProjectOperator::Process(NodeIndex source,
               LOG(FATAL) << "Unsupported literal type";
           }
           break;
-        case Metadata::OPERATION_RIGHT_LITERAL:
+        case Metadata::ARITHMETIC_WITH_LITERAL:
           switch (op) {
             case Operation::MINUS:
-              OPERATION_RIGHT_LITERAL_MACRO(-)
+              ARITHMETIC_WITH_LITERAL_MACRO(-)
               break;
             case Operation::PLUS:
-              OPERATION_RIGHT_LITERAL_MACRO(+)
+              ARITHMETIC_WITH_LITERAL_MACRO(+)
               break;
             default:
               LOG(FATAL) << "Unsupported arithmetic operation in project";
           }
           break;
-        case Metadata::OPERATION_RIGHT_COLUMN:
+        case Metadata::ARITHMETIC_WITH_COLUMN:
           switch (op) {
             case Operation::MINUS:
-              OPERATION_RIGHT_COLUMN_MACRO(-)
+              ARITHMETIC_WITH_COLUMN_MACRO(-)
               break;
             case Operation::PLUS:
-              OPERATION_RIGHT_COLUMN_MACRO(+)
+              ARITHMETIC_WITH_COLUMN_MACRO(+)
               break;
             default:
               LOG(FATAL) << "Unsupported arithmetic operation in project";

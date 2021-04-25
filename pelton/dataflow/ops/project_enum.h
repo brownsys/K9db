@@ -16,9 +16,9 @@ enum ProjectMetadataEnum {
   // Projection does not involve column. Eg. SELECT 1 AS one FROM table_name;
   LITERAL,
   // Arithmetic operation with right operand as literal.
-  OPERATION_RIGHT_LITERAL,
+  ARITHMETIC_WITH_LITERAL,
   // Arithmetic operation with right operand as another column.
-  OPERATION_RIGHT_COLUMN
+  ARITHMETIC_WITH_COLUMN
 
 };
 
