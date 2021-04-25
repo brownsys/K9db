@@ -99,10 +99,8 @@ mysql::SqlResult ConnectionPool::ExecuteMySQL(ConnectionPool::Operation op,
     case ConnectionPool::Operation::STATEMENT: {
       perf::Start("MySQL");
       this->stmt_->execute(exec_str);
-      for (size_t i = 0; i < 2; i++) {
-        this->stmt_->getResultSet();
-        this->stmt_->getMoreResults();
-      }
+      this->stmt_->getMoreResults();
+      this->stmt_->getMoreResults();
       perf::End("MySQL");
       res = mysql::SqlResult(std::make_unique<mysql::StatementResult>(true));
       break;
@@ -111,10 +109,8 @@ mysql::SqlResult ConnectionPool::ExecuteMySQL(ConnectionPool::Operation op,
       perf::Start("MySQL");
       this->stmt_->execute(exec_str);
       int row_count = this->stmt_->getUpdateCount();
-      for (size_t i = 0; i < 2; i++) {
-        this->stmt_->getResultSet();
-        this->stmt_->getMoreResults();
-      }
+      this->stmt_->getMoreResults();  // Skip all results.
+      this->stmt_->getMoreResults();
       perf::End("MySQL");
       res = mysql::SqlResult(std::make_unique<mysql::UpdateResult>(row_count));
       break;
@@ -123,10 +119,9 @@ mysql::SqlResult ConnectionPool::ExecuteMySQL(ConnectionPool::Operation op,
       perf::Start("MySQL");
       sql::ResultSet *tmp;
       this->stmt_->execute(exec_str);
-      for (size_t i = 0; i < 2; i++) {
-        tmp = this->stmt_->getResultSet();
-        this->stmt_->getMoreResults();
-      }
+      this->stmt_->getMoreResults();  // Skip the USE <db>; result.
+      tmp = this->stmt_->getResultSet();
+      this->stmt_->getMoreResults();
       perf::End("MySQL");
       if (aug_index > -1) {
         res = mysql::SqlResult(
