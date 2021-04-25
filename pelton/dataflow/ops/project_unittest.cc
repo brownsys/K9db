@@ -34,21 +34,22 @@ inline SchemaRef CreateSchemaCompositeKey() {
   return SchemaFactory::Create(names, types, keys);
 }
 
-TEST(ProjectOperatorTest, BatchTest) {
+TEST(ProjectOperatorTest, BatchTestColumn) {
   SchemaRef schema = CreateSchemaPrimaryKey();
-  std::vector<ColumnID> cids = {0, 1};
   // create project operator..
-  ProjectOperator project = ProjectOperator(cids);
-  project.input_schemas_.push_back(schema);
+  ProjectOperator project = ProjectOperator();
+  project.input_schemas_.push_back(SchemaRef(schema));
+  project.AddProjection(schema.NameOf(0), 0);
+  project.AddProjection(schema.NameOf(1), 1);
   project.ComputeOutputSchema();
 
   // Records to be fed
   std::vector<Record> records;
-  records.emplace_back(schema, true, 0_u,
+  records.emplace_back(SchemaRef(schema), true, 0_u,
                        std::make_unique<std::string>("Hello!"), -5_s);
-  records.emplace_back(schema, true, 5_u, std::make_unique<std::string>("Bye!"),
-                       7_s);
-  records.emplace_back(schema, true, 6_u,
+  records.emplace_back(SchemaRef(schema), true, 5_u,
+                       std::make_unique<std::string>("Bye!"), 7_s);
+  records.emplace_back(SchemaRef(schema), true, 6_u,
                        std::make_unique<std::string>("hello!"), 10_s);
 
   // expected output
@@ -66,14 +67,117 @@ TEST(ProjectOperatorTest, BatchTest) {
   EXPECT_EQ(outputs, expected_records);
 }
 
+TEST(ProjectOperatorTest, BatchTestLiteral) {
+  SchemaRef schema = CreateSchemaPrimaryKey();
+  // create project operator..
+  ProjectOperator project = ProjectOperator();
+  project.input_schemas_.push_back(SchemaRef(schema));
+  project.AddProjection(schema.NameOf(0), 0);
+  project.AddProjection("One", uint64_t(1), ProjectOperator::Metadata::LITERAL);
+  project.ComputeOutputSchema();
+
+  // Records to be fed
+  std::vector<Record> records;
+  records.emplace_back(SchemaRef(schema), true, 0_u,
+                       std::make_unique<std::string>("Hello!"), -5_s);
+  records.emplace_back(SchemaRef(schema), true, 5_u,
+                       std::make_unique<std::string>("Bye!"), 7_s);
+  records.emplace_back(SchemaRef(schema), true, 6_u,
+                       std::make_unique<std::string>("hello!"), 10_s);
+
+  // expected output
+  std::vector<Record> expected_records;
+  expected_records.emplace_back(project.output_schema_, true, 0_u, 1_u);
+  expected_records.emplace_back(project.output_schema_, true, 5_u, 1_u);
+  expected_records.emplace_back(project.output_schema_, true, 6_u, 1_u);
+
+  // Feed records and test
+  std::vector<Record> outputs;
+  EXPECT_TRUE(project.Process(UNDEFINED_NODE_INDEX, records, &outputs));
+  EXPECT_EQ(outputs, expected_records);
+}
+
+TEST(ProjectOperatorTest, BatchTestOperationRightColumn) {
+  SchemaRef schema = CreateSchemaCompositeKey();
+  // create project operator..
+  ProjectOperator project = ProjectOperator();
+  project.input_schemas_.push_back(SchemaRef(schema));
+  project.AddProjection(schema.NameOf(0), 0);
+  project.AddProjection("Delta", 4, ProjectOperator::Operation::MINUS, 3_u,
+                        ProjectOperator::Metadata::OPERATION_RIGHT_COLUMN);
+  project.ComputeOutputSchema();
+
+  // LOG(INFO) << project.output_schema_;
+  // Records to be fed
+  std::vector<Record> records;
+  records.emplace_back(SchemaRef(schema), true, 0_u,
+                       std::make_unique<std::string>("Hello!"), -5_s, 5_s,
+                       10_s);
+  records.emplace_back(SchemaRef(schema), true, 5_u,
+                       std::make_unique<std::string>("Bye!"), 7_s, 4_s, 8_s);
+  records.emplace_back(SchemaRef(schema), true, 6_u,
+                       std::make_unique<std::string>("hello!"), 10_s, 3_s, 6_s);
+
+  // expected output
+  std::vector<Record> expected_records;
+  expected_records.emplace_back(project.output_schema_, true, 0_u, 5_s);
+  expected_records.emplace_back(project.output_schema_, true, 5_u, 4_s);
+  expected_records.emplace_back(project.output_schema_, true, 6_u, 3_s);
+
+  // Feed records and test
+  std::vector<Record> outputs;
+  EXPECT_TRUE(project.Process(UNDEFINED_NODE_INDEX, records, &outputs));
+  // for(const auto &record: outputs){
+  //   LOG(INFO) << record;
+  // }
+  EXPECT_EQ(outputs, expected_records);
+}
+
+TEST(ProjectOperatorTest, BatchTestOperationRightLiteral) {
+  SchemaRef schema = CreateSchemaCompositeKey();
+  // create project operator..
+  ProjectOperator project = ProjectOperator();
+  project.input_schemas_.push_back(SchemaRef(schema));
+  project.AddProjection(schema.NameOf(0), 0);
+  project.AddProjection("Delta", 0, ProjectOperator::Operation::MINUS, 0_u,
+                        ProjectOperator::Metadata::OPERATION_RIGHT_LITERAL);
+  project.ComputeOutputSchema();
+  // uint MINUS uint would result in int
+  EXPECT_EQ(project.output_schema_.TypeOf(1),
+            sqlast::ColumnDefinition::Type::INT);
+
+  // Records to be fed
+  std::vector<Record> records;
+  records.emplace_back(SchemaRef(schema), true, 0_u,
+                       std::make_unique<std::string>("Hello!"), -5_s, 5_s,
+                       10_s);
+  records.emplace_back(SchemaRef(schema), true, 5_u,
+                       std::make_unique<std::string>("Bye!"), 7_s, 4_s, 8_s);
+  records.emplace_back(SchemaRef(schema), true, 6_u,
+                       std::make_unique<std::string>("hello!"), 10_s, 3_s, 6_s);
+
+  // expected output
+  std::vector<Record> expected_records;
+  expected_records.emplace_back(project.output_schema_, true, 0_u, 0_s);
+  expected_records.emplace_back(project.output_schema_, true, 5_u, 5_s);
+  expected_records.emplace_back(project.output_schema_, true, 6_u, 6_s);
+
+  // Feed records and test
+  std::vector<Record> outputs;
+  EXPECT_TRUE(project.Process(UNDEFINED_NODE_INDEX, records, &outputs));
+  EXPECT_EQ(outputs, expected_records);
+}
+
 TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest) {
   // TEST 1: Primary keyed schema's keycolumn included in projected schema
   SchemaRef schema = CreateSchemaPrimaryKey();
-  std::vector<ColumnID> cids = {0, 1};
   // create project operator..
-  ProjectOperator project1 = ProjectOperator(cids);
-  project1.input_schemas_.push_back(schema);
+  ProjectOperator project1 = ProjectOperator();
+  project1.input_schemas_.push_back(SchemaRef(schema));
+  project1.AddProjection(schema.NameOf(0), 0);
+  project1.AddProjection(schema.NameOf(1), 1);
   project1.ComputeOutputSchema();
+  // LOG(INFO) << project1.output_schema_;
   // expected data in output schema
   std::vector<std::string> expected_names = {"Col1", "Col2"};
   std::vector<CType> expected_types = {CType::UINT, CType::TEXT};
@@ -84,9 +188,9 @@ TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest) {
   EXPECT_EQ(project1.output_schema_.keys(), expected_keys);
 
   // TEST 2: Primary keyed schema's keycolumn not included in projected schema
-  cids = {1};
-  ProjectOperator project2 = ProjectOperator(cids);
-  project2.input_schemas_.push_back(schema);
+  ProjectOperator project2 = ProjectOperator();
+  project2.input_schemas_.push_back(SchemaRef(schema));
+  project2.AddProjection(schema.NameOf(1), 1);
   project2.ComputeOutputSchema();
   // expected data in output schema
   expected_names = {"Col2"};
@@ -100,10 +204,12 @@ TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest) {
 TEST(ProjectOperatorTest, OutputSchemaCompositeKeyTest) {
   // TEST 1: Composite keyed schema's keycolumns included in projected schema
   SchemaRef schema = CreateSchemaCompositeKey();
-  std::vector<ColumnID> cids = {1, 3, 4};
   // create project operator..
-  ProjectOperator project1 = ProjectOperator(cids);
-  project1.input_schemas_.push_back(schema);
+  ProjectOperator project1 = ProjectOperator();
+  project1.input_schemas_.push_back(SchemaRef(schema));
+  project1.AddProjection(schema.NameOf(1), 1);
+  project1.AddProjection(schema.NameOf(3), 3);
+  project1.AddProjection(schema.NameOf(4), 4);
   project1.ComputeOutputSchema();
   // expected data in output schema
   std::vector<std::string> expected_names = {"Col2", "Col4", "Col5"};
@@ -116,9 +222,11 @@ TEST(ProjectOperatorTest, OutputSchemaCompositeKeyTest) {
 
   // TEST 2: Subset of composite keyed schema's keycolumns included in projected
   // schema
-  cids = {0, 1, 2};
-  ProjectOperator project2 = ProjectOperator(cids);
-  project2.input_schemas_.push_back(schema);
+  ProjectOperator project2 = ProjectOperator();
+  project2.input_schemas_.push_back(SchemaRef(schema));
+  project2.AddProjection(schema.NameOf(0), 0);
+  project2.AddProjection(schema.NameOf(1), 1);
+  project2.AddProjection(schema.NameOf(2), 2);
   project2.ComputeOutputSchema();
   // expected data in output schema
   expected_names = {"Col1", "Col2", "Col3"};
@@ -131,9 +239,10 @@ TEST(ProjectOperatorTest, OutputSchemaCompositeKeyTest) {
 
 TEST(ProjectOperatorTest, NullValueTest) {
   SchemaRef schema = CreateSchemaPrimaryKey();
-  std::vector<ColumnID> cids = {0, 1};
   // create project operator..
-  ProjectOperator project = ProjectOperator(cids);
+  ProjectOperator project = ProjectOperator();
+  project.AddProjection(schema.NameOf(0), 0);
+  project.AddProjection(schema.NameOf(0), 1);
   project.input_schemas_.push_back(schema);
   project.ComputeOutputSchema();
 

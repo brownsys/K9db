@@ -10,9 +10,16 @@ void Operator::AddParent(std::shared_ptr<Operator> parent,
   CHECK_EQ(edge->to().lock().get(), this);
   CHECK_EQ(edge->from(), parent);
   this->parents_.push_back(edge);
+  // Project operator's schema should be computed after operations have been
+  // added.
+  if (parent->type() == Operator::Type::PROJECT) {
+    parent->ComputeOutputSchema();
+  }
   this->input_schemas_.push_back(parent->output_schema());
   parent->children_.emplace_back(edge);
-  this->ComputeOutputSchema();
+  if (this->type() != Operator::Type::PROJECT) {
+    this->ComputeOutputSchema();
+  }
 }
 
 bool Operator::ProcessAndForward(NodeIndex source,

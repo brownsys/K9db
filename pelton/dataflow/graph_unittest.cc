@@ -278,11 +278,12 @@ DataFlowGraph MakeEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
 
 DataFlowGraph MakeProjectGraph(ColumnID keycol, const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  std::vector<ColumnID> column_ids = {0, 2};
   DataFlowGraph g;
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
-  auto project = std::make_shared<ProjectOperator>(column_ids);
+  auto project = std::make_shared<ProjectOperator>();
+  project->AddProjection(schema.NameOf(0), 0);
+  project->AddProjection(schema.NameOf(2), 2);
   auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
@@ -298,13 +299,14 @@ DataFlowGraph MakeProjectGraph(ColumnID keycol, const SchemaRef &schema) {
 DataFlowGraph MakeProjectOnFilterGraph(ColumnID keycol,
                                        const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  std::vector<ColumnID> column_ids = {0, 2};
   DataFlowGraph g;
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto filter = std::make_shared<FilterOperator>();
   filter->AddOperation(5_u, 0, FilterOperator::Operation::GREATER_THAN);
-  auto project = std::make_shared<ProjectOperator>(column_ids);
+  auto project = std::make_shared<ProjectOperator>();
+  project->AddProjection(schema.NameOf(0), 0);
+  project->AddProjection(schema.NameOf(2), 2);
   auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
@@ -322,13 +324,14 @@ DataFlowGraph MakeProjectOnEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
                                          const SchemaRef &lschema,
                                          const SchemaRef &rschema) {
   std::vector<ColumnID> keys = {ok};
-  std::vector<ColumnID> column_ids = {0, 3};
   DataFlowGraph g;
 
   auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
   auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
   auto join = std::make_shared<EquiJoinOperator>(lk, rk);
-  auto project = std::make_shared<ProjectOperator>(column_ids);
+  auto project = std::make_shared<ProjectOperator>();
+  project->AddProjection(lschema.NameOf(0), 0);
+  project->AddProjection(rschema.NameOf(0), 3);
   auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in1));
