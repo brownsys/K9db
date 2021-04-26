@@ -3,8 +3,8 @@ package com.brownsys.pelton;
 import com.brownsys.pelton.nativelib.DataFlowGraphLibrary;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Stack;
 import org.apache.calcite.rel.RelNode;
@@ -162,16 +162,18 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
   private void addFilterOperation(int filterOperator, RexNode condition, List<RexNode> operands) {
     assert operands.size() == 2;
     assert operands.get(0) instanceof RexInputRef || operands.get(1) instanceof RexInputRef;
-    assert operands.get(0) instanceof RexLiteral || operands.get(1) instanceof RexLiteral
-      || operands.get(0) instanceof RexDynamicParam || operands.get(1) instanceof RexDynamicParam;
+    assert operands.get(0) instanceof RexLiteral
+        || operands.get(1) instanceof RexLiteral
+        || operands.get(0) instanceof RexDynamicParam
+        || operands.get(1) instanceof RexDynamicParam;
     // Get the input and the value expressions.
     int inputIndex = operands.get(0) instanceof RexInputRef ? 0 : 1;
     int valueIndex = (inputIndex + 1) % 2;
     RexInputRef input = (RexInputRef) operands.get(inputIndex);
 
     // Handle parameters (`?` in query)
-    if (operands.get(valueIndex) instanceof RexDynamicParam &&
-        !(operands.get(valueIndex) instanceof RexLiteral)) {
+    if (operands.get(valueIndex) instanceof RexDynamicParam
+        && !(operands.get(valueIndex) instanceof RexLiteral)) {
       this.keyColumns.add(new Integer(valueIndex));
       return;
     }
@@ -414,7 +416,7 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
         }
       }
     }
-  
+
     // Add a new level in the stack to store ids of the direct children operators.
     this.childrenOperators.push(new ArrayList<Integer>());
 

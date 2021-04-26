@@ -6,10 +6,10 @@
 namespace pelton {
 namespace dataflow {
 
-std::string dequote(const std::string& st) {
+std::string dequote(const std::string &st) {
   std::string s(st);
-  s.erase(remove(s.begin(), s.end(), '\"' ), s.end());
-  s.erase(remove(s.begin(), s.end(), '\'' ), s.end());
+  s.erase(remove(s.begin(), s.end(), '\"'), s.end());
+  s.erase(remove(s.begin(), s.end(), '\''), s.end());
   return s;
 }
 
