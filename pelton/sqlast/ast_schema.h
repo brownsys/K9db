@@ -183,6 +183,46 @@ class CreateTable : public AbstractStatement {
   std::unordered_map<std::string, size_t> columns_map_;
 };
 
+class CreateIndex : public AbstractStatement {
+ public:
+  explicit CreateIndex(const std::string &index_name,
+                       const std::string &table_name,
+                       const std::string &column_name)
+      : AbstractStatement(AbstractStatement::Type::CREATE_INDEX),
+        index_name_(index_name),
+        table_name_(table_name),
+        column_name_(column_name) {}
+
+  // Accessors.
+  const std::string &index_name() const { return this->index_name_; }
+  const std::string &table_name() const { return this->table_name_; }
+  const std::string &column_name() const { return this->column_name_; }
+
+  // Visitor pattern.
+  template <class T>
+  T Visit(AbstractVisitor<T> *visitor) const {
+    return visitor->VisitCreateIndex(*this);
+  }
+  template <class T>
+  T Visit(MutableVisitor<T> *visitor) {
+    return visitor->VisitCreateIndex(this);
+  }
+
+  template <class T>
+  std::vector<T> VisitChildren(AbstractVisitor<T> *visitor) const {
+    return {};
+  }
+  template <class T>
+  std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
+    return {};
+  }
+
+ private:
+  std::string index_name_;
+  std::string table_name_;
+  std::string column_name_;
+};
+
 std::ostream &operator<<(std::ostream &os, const ColumnConstraint::Type &r);
 std::ostream &operator<<(std::ostream &os, const ColumnDefinition::Type &r);
 
