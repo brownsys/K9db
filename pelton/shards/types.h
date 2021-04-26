@@ -8,6 +8,9 @@
 namespace pelton {
 namespace shards {
 
+// The name of a dataflow.
+using FlowName = std::string;
+
 // The name of the table representing users that own shards of this kind.
 using ShardKind = std::string;
 

@@ -87,6 +87,19 @@ class SharderState {
 
   const std::unordered_set<UserId> &UsersOfShard(const ShardKind &kind) const;
 
+  // Manage secondary indices.
+  bool HasIndexFor(const UnshardedTableName &table_name,
+                   const ColumnName &column_name) const;
+
+  const std::vector<ColumnName> &IndicesFor(
+      const UnshardedTableName &table_name);
+
+  const FlowName &IndexFlow(const UnshardedTableName &table_name,
+                            const ColumnName &column_name) const;
+
+  void CreateIndex(const UnshardedTableName &table_name,
+                   const ColumnName &column_name, const FlowName &index_name);
+
   // Save state to durable file.
   void Save(const std::string &dir_path);
 
@@ -132,6 +145,13 @@ class SharderState {
 
   // Connection pool that manages the underlying sqlite3 databases.
   ConnectionPool connection_pool_;
+
+  // Secondary indices.
+  std::unordered_map<UnshardedTableName, std::vector<ColumnName>> indices_;
+
+  std::unordered_map<UnshardedTableName,
+                     std::unordered_map<ColumnName, FlowName>>
+      index_to_flow_;
 };
 
 }  // namespace shards

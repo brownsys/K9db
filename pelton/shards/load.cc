@@ -107,6 +107,18 @@ void SharderState::Load(const std::string &dir_path) {
     getline(state_file, line);
   }
 
+  // Read secondary indices.
+  getline(state_file, line);
+  while (line != "") {
+    std::string column_name;
+    std::string flow_name;
+    getline(state_file, column_name);
+    getline(state_file, flow_name);
+    // TODO(babman): put this back in when flows are also loaded at restart.
+    // this->CreateIndex(line, column_name, flow_name);
+    getline(state_file, line);
+  }
+
   // Done reading!
   state_file.close();
 }
@@ -161,6 +173,15 @@ void SharderState::Save(const std::string &dir_path) {
 
   for (const auto &[table_name, create_statement] : this->sharded_schema_) {
     state_file << table_name << "\n" << create_statement << "\n";
+  }
+  state_file << "\n";
+
+  for (const auto &[table_name, col_to_ind] : this->index_to_flow_) {
+    for (const auto &[column_name, index_flow] : col_to_ind) {
+      state_file << table_name << "\n"
+                 << column_name << "\n"
+                 << index_flow << "\n";
+    }
   }
   state_file << "\n";
 

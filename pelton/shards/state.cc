@@ -106,5 +106,30 @@ const std::unordered_set<UserId> &SharderState::UsersOfShard(
   return this->shards_.at(kind);
 }
 
+// Manage secondary indices.
+bool SharderState::HasIndexFor(const UnshardedTableName &table_name,
+                               const ColumnName &column_name) const {
+  if (this->index_to_flow_.count(table_name) == 0) {
+    return false;
+  }
+  return this->index_to_flow_.at(table_name).count(column_name) > 0;
+}
+
+const std::vector<ColumnName> &SharderState::IndicesFor(
+    const UnshardedTableName &table_name) {
+  return this->indices_[table_name];
+}
+
+const FlowName &SharderState::IndexFlow(const UnshardedTableName &table_name,
+                                        const ColumnName &column_name) const {
+  return this->index_to_flow_.at(table_name).at(column_name);
+}
+
+void SharderState::CreateIndex(const UnshardedTableName &table_name,
+                               const ColumnName &column_name,
+                               const FlowName &index_name) {
+  this->index_to_flow_[table_name][column_name] = index_name;
+}
+
 }  // namespace shards
 }  // namespace pelton
