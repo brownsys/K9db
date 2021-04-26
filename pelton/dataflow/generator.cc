@@ -60,9 +60,10 @@ NodeIndex DataFlowGraphGenerator::AddFilterOperator(NodeIndex parent) {
   CHECK(this->graph_->AddNode(op, parent_ptr));
   return op->index();
 }
-NodeIndex DataFlowGraphGenerator::AddProjectOperator(NodeIndex parent) {
+NodeIndex DataFlowGraphGenerator::AddProjectOperator(
+    NodeIndex parent, const std::vector<ColumnID> keys) {
   // Create project operator.
-  std::shared_ptr<ProjectOperator> op = std::make_shared<ProjectOperator>();
+  std::shared_ptr<ProjectOperator> op = std::make_shared<ProjectOperator>(keys);
   // Add the operator to the graph.
   std::shared_ptr<Operator> parent_ptr = this->graph_->GetNode(parent);
   CHECK(parent_ptr);

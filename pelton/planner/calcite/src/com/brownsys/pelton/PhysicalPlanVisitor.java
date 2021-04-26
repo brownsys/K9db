@@ -3,9 +3,7 @@ package com.brownsys.pelton;
 import com.brownsys.pelton.nativelib.DataFlowGraphLibrary;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.Hashtable;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Stack;
 import org.apache.calcite.rel.RelNode;
@@ -69,14 +67,9 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
       // Add a materialized view linked to the last node in the graph.
       assert children.size() == 1;
 
-      if (this.keyColumns.size() == 0) {
-        this.keyColumns.add(new Integer(0));
-      }
       int[] keyCols = new int[this.keyColumns.size()];
-
-      Iterator<Integer> iterator = this.keyColumns.iterator();
       for (int i = 0; i < keyCols.length; i++) {
-        keyCols[i] = iterator.next().intValue();
+        keyCols[i] = this.keyColumns.get(i);
       }
 
       this.generator.AddMatviewOperator(children.get(0), keyCols);
@@ -98,8 +91,12 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     assert children.size() == 1;
 
     // Find the sorting parameters.
+    int[] keyCols = new int[this.keyColumns.size()];
+    for (int i = 0; i < keyCols.length; i++) {
+      keyCols[i] = this.keyColumns.get(i);
+    }
+
     List<RexNode> exps = sort.getChildExps();
-    int[] keyCols = new int[0]; // TODO(babman): figure out key from query.
     int[] sortingCols = new int[exps.size()];
     int limit = -1;
     int offset = 0;
@@ -199,11 +196,13 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
       if (!is_unary) {
         throw new IllegalArgumentException("Too few operands to filter!");
       }
+
       assert operands.get(0) instanceof RexInputRef;
       RexInputRef input = (RexInputRef) operands.get(0);
       int columnId = input.getIndex();
       this.generator.AddFilterOperationNull(filterOperator, columnId, operationEnum);
       return;
+
     } else {
       assert operands.size() == 2;
       assert operands.get(0) instanceof RexInputRef || operands.get(1) instanceof RexInputRef;
@@ -219,7 +218,7 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
       // Handle parameters (`?` in query)
       if (operands.get(valueIndex) instanceof RexDynamicParam
           && !(operands.get(valueIndex) instanceof RexLiteral)) {
-        this.keyColumns.add(new Integer(valueIndex));
+        this.keyColumns.add(valueIndex);
         return;
       }
 
@@ -233,17 +232,30 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
           this.generator.AddFilterOperationSigned(
               filterOperator, RexLiteral.intValue(value), columnId, operationEnum);
           break;
+
         case VARCHAR:
         case CHAR:
           this.generator.AddFilterOperation(
               filterOperator, RexLiteral.stringValue(value), columnId, operationEnum);
           break;
+
         case NULL:
-          this.generator.AddFilterOperationNull(
-              filterOperator, columnId, operationEnum);
+          switch (operationEnum) {
+            case DataFlowGraphLibrary.EQUAL:
+              operationEnum = DataFlowGraphLibrary.IS_NULL;
+              break;
+            case DataFlowGraphLibrary.NOT_EQUAL:
+              operationEnum = DataFlowGraphLibrary.IS_NOT_NULL;
+              break;
+            default:
+              throw new IllegalArgumentException("Illegal operation on null");
+          }
+          this.generator.AddFilterOperationNull(filterOperator, columnId, operationEnum);
           break;
+
         default:
-          throw new IllegalArgumentException("Invalid literal type in filter: " + value.getTypeName());
+          throw new IllegalArgumentException(
+              "Invalid literal type in filter: " + value.getTypeName());
       }
     }
   }
@@ -446,7 +458,7 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     ArrayList<Integer> children = this.childrenOperators.pop();
     assert children.size() == 1;
 
-    int projectOperator = this.generator.AddProjectOperator(children.get(0));
+    int projectOperator = this.generator.AddProjectOperator(children.get(0), new int[] {0});
 
     ArrayList<Integer> duplicateColumns = new ArrayList<Integer>();
     boolean deduplicated = false;

@@ -562,5 +562,182 @@ TEST(PlannerTest, FilterNestedANDCondition) {
   EXPECT_EQ_MSET(graph.outputs().at(0), expected_records);
 }
 
+TEST(PlannerTest, UniqueSecondaryIndexFlow) {
+  // Create a schema.
+  std::vector<std::string> names = {"IndexCol", "ShardByCol", "DataCol"};
+  std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
+  std::vector<dataflow::ColumnID> keys = {0};
+  dataflow::SchemaRef schema =
+      dataflow::SchemaFactory::Create(names, types, keys);
+
+  // Make a dummy query.
+  std::string query = "SELECT IndexCol, ShardByCol FROM test_table";
+
+  // Create a dummy state.
+  dataflow::DataFlowState state;
+  state.AddTableSchema("test_table", schema);
+
+  // Plan the graph via calcite.
+  dataflow::DataFlowGraph graph = PlanGraph(&state, query);
+
+  // Check that the graph is what we expect!
+  EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
+  EXPECT_EQ(graph.GetNode(0).get(), graph.inputs().at("test_table").get());
+  EXPECT_EQ(graph.GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
+  EXPECT_EQ(graph.GetNode(2)->type(), dataflow::Operator::Type::MAT_VIEW);
+  EXPECT_EQ(graph.GetNode(2).get(), graph.outputs().at(0).get());
+
+  // Materialized View.
+  std::shared_ptr<dataflow::MatViewOperator> matview = graph.outputs().at(0);
+  EXPECT_EQ(matview->output_schema().column_names(),
+            (std::vector<std::string>{"IndexCol", "ShardByCol"}));
+  EXPECT_EQ(matview->output_schema().column_types(),
+            (std::vector<CType>{CType::INT, CType::TEXT}));
+  EXPECT_EQ(matview->output_schema().keys(),
+            std::vector<dataflow::ColumnID>{0});
+
+  // Try to process some records through flow.
+  std::vector<dataflow::Record> records;
+  records.emplace_back(schema, true, 10_s,
+                       std::make_unique<std::string>("shard1"), 20_s);
+  records.emplace_back(schema, true, 20_s,
+                       std::make_unique<std::string>("shard2"), 20_s);
+  records.emplace_back(schema, true, 30_s,
+                       std::make_unique<std::string>("shard3"), 50_s);
+  graph.Process("test_table", records);
+
+  // Expected records.
+  std::vector<dataflow::Record> expected_records;
+  expected_records.emplace_back(matview->output_schema(), true, 10_s,
+                                std::make_unique<std::string>("shard1"));
+  expected_records.emplace_back(matview->output_schema(), true, 20_s,
+                                std::make_unique<std::string>("shard2"));
+  expected_records.emplace_back(matview->output_schema(), true, 30_s,
+                                std::make_unique<std::string>("shard3"));
+
+  // Look at flow output.
+  EXPECT_EQ_MSET(matview, expected_records);
+
+  // Delete some records see if everything is fine.
+  std::vector<dataflow::Record> records2;
+  records2.emplace_back(schema, false, 10_s,
+                        std::make_unique<std::string>("shard1"), 20_s);
+  records2.emplace_back(schema, false, 20_s,
+                        std::make_unique<std::string>("shard2"), 20_s);
+  records2.emplace_back(schema, true, 100_s,
+                        std::make_unique<std::string>("shard5"), 50_s);
+  graph.Process("test_table", records2);
+
+  // Expected records.
+  std::vector<dataflow::Record> expected_records2;
+  expected_records2.emplace_back(expected_records.back().Copy());
+  expected_records2.emplace_back(matview->output_schema(), true, 100_s,
+                                 std::make_unique<std::string>("shard5"));
+
+  EXPECT_EQ_MSET(matview, expected_records2);
+}
+
+TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
+  // Create a schema.
+  std::vector<std::string> names = {"PK", "IndexCol", "ShardByCol", "DataCol"};
+  std::vector<CType> types = {CType::INT, CType::INT, CType::TEXT, CType::INT};
+  std::vector<dataflow::ColumnID> keys = {0};
+  dataflow::SchemaRef schema =
+      dataflow::SchemaFactory::Create(names, types, keys);
+
+  // Make a dummy query.
+  std::string query =
+      "SELECT IndexCol as I, ShardByCol as S, COUNT(*) "
+      "FROM test_table GROUP BY IndexCol, ShardByCol";
+
+  // Create a dummy state.
+  dataflow::DataFlowState state;
+  state.AddTableSchema("test_table", schema);
+
+  // Plan the graph via calcite.
+  dataflow::DataFlowGraph graph = PlanGraph(&state, query);
+
+  // Check that the graph is what we expect!
+  EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
+  EXPECT_EQ(graph.GetNode(0).get(), graph.inputs().at("test_table").get());
+  EXPECT_EQ(graph.GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
+  EXPECT_EQ(graph.GetNode(2)->type(), dataflow::Operator::Type::AGGREGATE);
+  EXPECT_EQ(graph.GetNode(3)->type(), dataflow::Operator::Type::MAT_VIEW);
+  EXPECT_EQ(graph.GetNode(3).get(), graph.outputs().at(0).get());
+
+  // Materialized View.
+  std::shared_ptr<dataflow::MatViewOperator> matview = graph.outputs().at(0);
+  EXPECT_EQ(matview->output_schema().column_names(),
+            (std::vector<std::string>{"I", "S", "Count"}));
+  EXPECT_EQ(matview->output_schema().column_types(),
+            (std::vector<CType>{CType::INT, CType::TEXT, CType::UINT}));
+  EXPECT_EQ(matview->output_schema().keys(),
+            std::vector<dataflow::ColumnID>{0});
+
+  // Try to process some records through flow.
+  std::vector<dataflow::Record> records;
+  records.emplace_back(schema, true, 0_s, 10_s,
+                       std::make_unique<std::string>("shard1"), 20_s);
+  records.emplace_back(schema, true, 1_s, 10_s,
+                       std::make_unique<std::string>("shard1"), 20_s);
+  graph.Process("test_table", records);
+
+  // Check that processing was correct.
+  std::vector<dataflow::Record> expected_records;
+  expected_records.emplace_back(matview->output_schema(), true, 10_s,
+                                std::make_unique<std::string>("shard1"), 2_u);
+  EXPECT_EQ_MSET(matview, expected_records);
+
+  // Another round of processing and checking.
+  records.emplace_back(schema, true, 2_s, 10_s,
+                       std::make_unique<std::string>("shard1"), 50_s);
+  records.emplace_back(schema, true, 3_s, 20_s,
+                       std::make_unique<std::string>("shard2"), 150_s);
+  records.emplace_back(schema, true, 2_s, 30_s,
+                       std::make_unique<std::string>("shard1"), 200_s);
+  graph.Process("test_table", records);
+
+  expected_records.clear();
+  expected_records.emplace_back(matview->output_schema(), true, 10_s,
+                                std::make_unique<std::string>("shard1"), 5_u);
+  expected_records.emplace_back(matview->output_schema(), true, 20_s,
+                                std::make_unique<std::string>("shard2"), 1_u);
+  expected_records.emplace_back(matview->output_schema(), true, 30_s,
+                                std::make_unique<std::string>("shard1"), 1_u);
+  EXPECT_EQ_MSET(matview, expected_records);
+
+  // Another round of processing and checking.
+  std::vector<dataflow::Record> records2;
+  records2.emplace_back(schema, false, 0_s, 10_s,
+                        std::make_unique<std::string>("shard1"), 20_s);
+  records2.emplace_back(schema, false, 1_s, 10_s,
+                        std::make_unique<std::string>("shard1"), 20_s);
+  graph.Process("test_table", records2);
+
+  expected_records.clear();
+  expected_records.emplace_back(matview->output_schema(), true, 10_s,
+                                std::make_unique<std::string>("shard1"), 3_u);
+  expected_records.emplace_back(matview->output_schema(), true, 20_s,
+                                std::make_unique<std::string>("shard2"), 1_u);
+  expected_records.emplace_back(matview->output_schema(), true, 30_s,
+                                std::make_unique<std::string>("shard1"), 1_u);
+  EXPECT_EQ_MSET(matview, expected_records);
+
+  // A last round of processing and checking.
+  records2.pop_back();
+  records2.emplace_back(schema, false, 2_s, 10_s,
+                        std::make_unique<std::string>("shard1"), 50_s);
+  records2.emplace_back(schema, false, 2_s, 30_s,
+                        std::make_unique<std::string>("shard1"), 200_s);
+  graph.Process("test_table", records2);
+
+  expected_records.clear();
+  expected_records.emplace_back(matview->output_schema(), true, 10_s,
+                                std::make_unique<std::string>("shard1"), 1_u);
+  expected_records.emplace_back(matview->output_schema(), true, 20_s,
+                                std::make_unique<std::string>("shard2"), 1_u);
+  EXPECT_EQ_MSET(matview, expected_records);
+}
+
 }  // namespace planner
 }  // namespace pelton

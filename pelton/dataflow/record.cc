@@ -267,6 +267,11 @@ std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Record &r) {
         LOG(FATAL) << "Unsupported data type in record << operator";
     }
   }
+
+  if (!r.IsPositive()) {
+    os << " -- negative";
+  }
+
   return os;
 }
 
