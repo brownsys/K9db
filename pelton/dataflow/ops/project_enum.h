@@ -19,7 +19,6 @@ enum ProjectMetadataEnum {
   ARITHMETIC_WITH_LITERAL,
   // Arithmetic operation with right operand as another column.
   ARITHMETIC_WITH_COLUMN
-
 };
 
 }  // namespace dataflow

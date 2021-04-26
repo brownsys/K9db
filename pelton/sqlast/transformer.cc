@@ -115,8 +115,8 @@ antlrcpp::Any AstTransformer::visitCreate_table_stmt(
                    constraint->accept(this),
                    std::pair<std::string _COMMA ColumnConstraint>);
     if (!table->HasColumn(col_name)) {
-      return absl::InvalidArgumentError(
-          "Constraint over non-existing column " + col_name);
+      return absl::InvalidArgumentError("Constraint over non-existing column " +
+                                        col_name);
     }
     table->MutableColumn(col_name).AddConstraint(ast_constraint);
   }

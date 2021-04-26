@@ -181,7 +181,6 @@ TEST(RecordTest, VariadicConstructorNullValue) {
 }
 #endif
 
-
 // Tests record equality.
 TEST(RecordTest, Comparisons) {
   // Create a schema.
