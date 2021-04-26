@@ -197,8 +197,8 @@ class Record {
             this->data_[index].uint = t;
           } else {
             LOG(FATAL) << "Type mismatch in SetData at index " << index
-                       << ", expected " << this->schema_.TypeOf(index) << ", got "
-                       << TypeNameFor(t);
+                       << ", expected " << this->schema_.TypeOf(index)
+                       << ", got " << TypeNameFor(t);
           }
           break;
         case sqlast::ColumnDefinition::Type::INT:
@@ -207,8 +207,8 @@ class Record {
             this->data_[index].sint = t;
           } else {
             LOG(FATAL) << "Type mismatch in SetData at index " << index
-                       << ", expected " << this->schema_.TypeOf(index) << ", got "
-                       << TypeNameFor(t);
+                       << ", expected " << this->schema_.TypeOf(index)
+                       << ", got " << TypeNameFor(t);
           }
           break;
         case sqlast::ColumnDefinition::Type::TEXT:
@@ -217,8 +217,8 @@ class Record {
             this->data_[index].str = std::move(t);
           } else {
             LOG(FATAL) << "Type mismatch in SetData at index " << index
-                       << ", expected " << this->schema_.TypeOf(index) << ", got "
-                       << TypeNameFor(t);
+                       << ", expected " << this->schema_.TypeOf(index)
+                       << ", got " << TypeNameFor(t);
           }
           break;
         default:

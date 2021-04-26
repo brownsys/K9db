@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Stack;
 import org.apache.calcite.rel.RelNode;
@@ -24,6 +25,7 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.util.Pair;
+import org.apache.calcite.util.Permutation;
 
 public class PhysicalPlanVisitor extends RelShuttleImpl {
   private static final List<SqlKind> FILTER_OPERATIONS =
@@ -161,16 +163,18 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
   private void addFilterOperation(int filterOperator, RexNode condition, List<RexNode> operands) {
     assert operands.size() == 2;
     assert operands.get(0) instanceof RexInputRef || operands.get(1) instanceof RexInputRef;
-    assert operands.get(0) instanceof RexLiteral || operands.get(1) instanceof RexLiteral
-      || operands.get(0) instanceof RexDynamicParam || operands.get(1) instanceof RexDynamicParam;
+    assert operands.get(0) instanceof RexLiteral
+        || operands.get(1) instanceof RexLiteral
+        || operands.get(0) instanceof RexDynamicParam
+        || operands.get(1) instanceof RexDynamicParam;
     // Get the input and the value expressions.
     int inputIndex = operands.get(0) instanceof RexInputRef ? 0 : 1;
     int valueIndex = (inputIndex + 1) % 2;
     RexInputRef input = (RexInputRef) operands.get(inputIndex);
 
     // Handle parameters (`?` in query)
-    if (operands.get(valueIndex) instanceof RexDynamicParam &&
-        !(operands.get(valueIndex) instanceof RexLiteral)) {
+    if (operands.get(valueIndex) instanceof RexDynamicParam
+        && !(operands.get(valueIndex) instanceof RexLiteral)) {
       this.keyColumns.add(new Integer(valueIndex));
       return;
     }
@@ -394,6 +398,26 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
 
   @Override
   public RelNode visit(LogicalProject project) {
+    // This may be a no-op project, in which case we can just skip it!
+    Permutation permutation = project.getPermutation();
+    if (permutation != null) {
+      // Project is a permutation (does not drop or add columns).
+      if (permutation.getSourceCount() == permutation.getTargetCount()) {
+        boolean isIdentity = true;
+        for (int i = 0; i < permutation.getSourceCount(); i++) {
+          if (permutation.getTarget(i) != i) {
+            isIdentity = false;
+            break;
+          }
+        }
+        // Permutation is indeed an identity.
+        if (isIdentity) {
+          visitChildren(project);
+          return project;
+        }
+      }
+    }
+
     // Add a new level in the stack to store ids of the direct children operators.
     this.childrenOperators.push(new ArrayList<Integer>());
 
@@ -404,7 +428,6 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     ArrayList<Integer> children = this.childrenOperators.pop();
     assert children.size() == 1;
 
-    ArrayList<Integer> cids = new ArrayList<Integer>();
     int projectOperator = this.generator.AddProjectOperator(children.get(0));
 
     ArrayList<Integer> duplicateColumns = new ArrayList<Integer>();

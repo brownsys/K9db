@@ -23,8 +23,7 @@ class ProjectOperator : public Operator {
   using Operation = ProjectOperationEnum;
   using Metadata = ProjectMetadataEnum;
 
-  explicit ProjectOperator()
-      : Operator(Operator::Type::PROJECT), projections_() {}
+  ProjectOperator() : Operator(Operator::Type::PROJECT), projections_() {}
 
   void AddProjection(const std::string &column_name, ColumnID cid) {
     this->projections_.push_back(std::make_tuple(
