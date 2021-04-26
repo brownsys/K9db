@@ -24,6 +24,7 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.util.Pair;
+import org.apache.calcite.util.Permutation;
 
 public class PhysicalPlanVisitor extends RelShuttleImpl {
   private static final List<SqlKind> FILTER_OPERATIONS =
@@ -394,6 +395,26 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
 
   @Override
   public RelNode visit(LogicalProject project) {
+    // This may be a no-op project, in which case we can just skip it!
+    Permutation permutation = project.getPermutation();
+    if (permutation != null) {
+      // Project is a permutation (does not drop or add columns).
+      if (permutation.getSourceCount() == permutation.getTargetCount()) {
+        boolean isIdentity = true;
+        for (int i = 0; i < permutation.getSourceCount(); i++) {
+          if (permutation.getTarget(i) != i) {
+            isIdentity = false;
+            break;
+          }
+        }
+        // Permutation is indeed an identity.
+        if (isIdentity) {
+          visitChildren(project);
+          return project;
+        }
+      }
+    }
+  
     // Add a new level in the stack to store ids of the direct children operators.
     this.childrenOperators.push(new ArrayList<Integer>());
 
@@ -404,7 +425,6 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     ArrayList<Integer> children = this.childrenOperators.pop();
     assert children.size() == 1;
 
-    ArrayList<Integer> cids = new ArrayList<Integer>();
     int projectOperator = this.generator.AddProjectOperator(children.get(0));
 
     ArrayList<Integer> duplicateColumns = new ArrayList<Integer>();
