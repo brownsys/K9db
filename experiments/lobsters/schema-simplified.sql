@@ -2,7 +2,28 @@ SET echo;
 CREATE TABLE users ( \
   id int NOT NULL PRIMARY KEY, \
   PII_username varchar(50), \
-  karma int NOT NULL \
+  email varchar(100), \
+  password_digest varchar(75), \
+  created_at datetime, \
+  is_admin int, \
+  password_reset_token varchar(75), \
+  session_token varchar(75) NOT NULL, \
+  about text, \
+  invited_by_user_id int, \
+  is_moderator int, \
+  pushover_mentions int, \
+  rss_token varchar(75), \
+  mailing_list_token varchar(75), \
+  mailing_list_mode int, \
+  karma int NOT NULL, \
+  banned_at datetime, \
+  banned_by_user_id int, \
+  banned_reason varchar(200), \
+  deleted_at datetime, \
+  disabled_invite_at datetime, \
+  disabled_invite_by_user_id int, \
+  disabled_invite_reason varchar(200), \
+  settings text \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 CREATE TABLE comments ( \
   id int NOT NULL PRIMARY KEY, \
