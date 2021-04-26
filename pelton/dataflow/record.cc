@@ -1,7 +1,17 @@
 #include "pelton/dataflow/record.h"
 
+#include <algorithm>
+#include <string>
+
 namespace pelton {
 namespace dataflow {
+
+std::string dequote(const std::string& st) {
+  std::string s(st);
+  s.erase(remove(s.begin(), s.end(), '\"' ), s.end());
+  s.erase(remove(s.begin(), s.end(), '\'' ), s.end());
+  return s;
+}
 
 // Helper for Record::DataVariant.
 sqlast::ColumnDefinition::Type Record::TypeOfVariant(const DataVariant &v) {
@@ -156,9 +166,10 @@ void Record::SetValue(const std::string &value, size_t i) {
     case sqlast::ColumnDefinition::Type::INT:
       this->data_[i].sint = std::stoll(value);
       break;
-    case sqlast::ColumnDefinition::Type::TEXT:
-      this->data_[i].str = std::make_unique<std::string>(value);
+    case sqlast::ColumnDefinition::Type::TEXT: {
+      this->data_[i].str = std::make_unique<std::string>(dequote(value));
       break;
+    }
     case sqlast::ColumnDefinition::Type::DATETIME:
       // TODO(malte): DATETIME shouldn't be stored as a string, but as
       // a timestamp since the epoch
