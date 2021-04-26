@@ -424,7 +424,7 @@ TEST(PlannerTest, FilterSingleORCondition) {
       dataflow::SchemaFactory::Create(names, types, keys);
 
   // Make a dummy query.
-  std::string query = "SELECT * FROM test_table WHERE Col3=20 OR Col3=50";
+  std::string query = "SELECT * FROM test_table WHERE Col3=20 OR Col3=50 ORDER BY Col3";
 
   // Create a dummy state.
   dataflow::DataFlowState state;
