@@ -24,7 +24,7 @@ CREATE VIEW q19 AS '"SELECT users.id, users.PII_username, users.email, users.pas
 CREATE VIEW q20 AS '"SELECT hidden_stories.id, hidden_stories.user_id, hidden_stories.story_id FROM hidden_stories WHERE hidden_stories.user_id = ? AND hidden_stories.story_id = ?"';
 CREATE VIEW q21 AS '"SELECT tag_filters.id, tag_filters.created_at, tag_filters.updated_at, tag_filters.user_id, tag_filters.tag_id FROM tag_filters WHERE tag_filters.user_id = ?"';
 --needs alias support on aggregation column
---CREATE VIEW q22 AS '"SELECT tags.id, count(*) AS count FROM taggings INNER JOIN tags ON taggings.tag_id = tags.id INNER JOIN stories ON stories.id = taggings.story_id WHERE tags.inactive = 0 AND stories.user_id = ? GROUP BY tags.id ORDER BY count DESC LIMIT 1"';
+CREATE VIEW q22 AS '"SELECT tags.id, count(*) AS `count` FROM taggings INNER JOIN tags ON taggings.tag_id = tags.id INNER JOIN stories ON stories.id = taggings.story_id WHERE tags.inactive = 0 AND stories.user_id = ? GROUP BY tags.id ORDER BY `count` DESC LIMIT 1"';
 CREATE VIEW q23 AS '"SELECT taggings.story_id FROM taggings WHERE taggings.story_id = ?"';
 CREATE VIEW q24 AS '"SELECT saved_stories.id, saved_stories.created_at, saved_stories.updated_at, saved_stories.user_id, saved_stories.story_id FROM saved_stories WHERE saved_stories.user_id = ? AND saved_stories.story_id = ?"';
 CREATE VIEW q25 AS '"SELECT suggested_titles.id, suggested_titles.story_id, suggested_titles.user_id, suggested_titles.title FROM suggested_titles WHERE suggested_titles.story_id = ?"';
