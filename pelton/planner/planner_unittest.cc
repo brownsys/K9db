@@ -114,7 +114,6 @@ TEST(PlannerTest, SimpleProject) {
   records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
   graph.Process("test_table", records);
 
-  // LOG(INFO) << projectOp->output_schema();
   // Look at flow output.
   std::shared_ptr<dataflow::MatViewOperator> output = graph.outputs().at(0);
   EXPECT_EQ(output->count(), 1);
@@ -126,6 +125,171 @@ TEST(PlannerTest, SimpleProject) {
                 std::vector<std::string>{names.at(2)});
       EXPECT_EQ(projectOp->output_schema().column_types(),
                 std::vector<CType>{types.at(2)});
+    }
+  }
+}
+
+TEST(PlannerTest, SimpleProjectLiteral) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
+  std::vector<dataflow::ColumnID> keys = {0};
+  dataflow::SchemaRef schema =
+      dataflow::SchemaFactory::Create(names, types, keys);
+
+  // Make a dummy query.
+  std::string query = "select 1 as `one` from  test_table";
+
+  // Create a dummy state.
+  dataflow::DataFlowState state;
+  state.AddTableSchema("test_table", std::move(schema));
+
+  // Plan the graph via calcite.
+  dataflow::DataFlowGraph graph = PlanGraph(&state, query);
+
+  // Check that the graph is what we expect!
+  EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
+  EXPECT_EQ(graph.GetNode(0).get(), graph.inputs().at("test_table").get());
+  EXPECT_EQ(graph.GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
+  EXPECT_EQ(graph.GetNode(2)->type(), dataflow::Operator::Type::MAT_VIEW);
+
+  // Get project operator for performing deep schema checks
+  auto projectOp =
+      std::dynamic_pointer_cast<dataflow::ProjectOperator>(graph.GetNode(1));
+
+  // Try to process some records through flow.
+  std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
+  std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
+  std::vector<dataflow::Record> records;
+  records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
+  records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
+  graph.Process("test_table", records);
+
+  // Look at flow output.
+  std::shared_ptr<dataflow::MatViewOperator> output = graph.outputs().at(0);
+  EXPECT_EQ(projectOp->output_schema().column_names(),
+            std::vector<std::string>{"one"});
+  EXPECT_EQ(projectOp->output_schema().column_types(),
+            std::vector<CType>{CType::INT});
+  for (const auto &key : output->Keys()) {
+    for (const auto &record : output->Lookup(key)) {
+      EXPECT_EQ(record.GetInt(0), 1);
+    }
+  }
+}
+
+TEST(PlannerTest, ProjectArithmeticRightLiteral) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
+  std::vector<dataflow::ColumnID> keys = {0};
+  dataflow::SchemaRef schema =
+      dataflow::SchemaFactory::Create(names, types, keys);
+
+  // Make a dummy query.
+  std::string query = "SELECT Col1, Col3 - 5 as Delta5 FROM test_table";
+
+  // Create a dummy state.
+  dataflow::DataFlowState state;
+  state.AddTableSchema("test_table", std::move(schema));
+
+  // Plan the graph via calcite.
+  dataflow::DataFlowGraph graph = PlanGraph(&state, query);
+
+  // Check that the graph is what we expect!
+  EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
+  EXPECT_EQ(graph.GetNode(0).get(), graph.inputs().at("test_table").get());
+  EXPECT_EQ(graph.GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
+  EXPECT_EQ(graph.GetNode(2)->type(), dataflow::Operator::Type::MAT_VIEW);
+
+  // Get project operator for performing deep schema checks
+  auto projectOp =
+      std::dynamic_pointer_cast<dataflow::ProjectOperator>(graph.GetNode(1));
+
+  // Try to process some records through flow.
+  std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
+  std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
+  std::vector<dataflow::Record> records;
+  records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
+  records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
+  graph.Process("test_table", records);
+
+  // Expected records
+  std::vector<dataflow::Record> expected_records;
+  expected_records.emplace_back(projectOp->output_schema(), true, 10_s, 15_s);
+  expected_records.emplace_back(projectOp->output_schema(), true, 2_s, 45_s);
+  std::vector<std::string> expected_col_names = {"Col1", "Delta5"};
+  std::vector<CType> expected_col_types = {CType::INT, CType::INT};
+
+  // Look at flow output.
+  std::shared_ptr<dataflow::MatViewOperator> output = graph.outputs().at(0);
+  EXPECT_EQ(projectOp->output_schema().column_names(), expected_col_names);
+  EXPECT_EQ(projectOp->output_schema().column_types(), expected_col_types);
+  int counter = 0;
+  for (const auto &key : output->Keys()) {
+    for (const auto &record : output->Lookup(key)) {
+      EXPECT_EQ(record.GetValues(std::vector<dataflow::ColumnID>{0, 1}),
+                expected_records.at(counter).GetValues(
+                    std::vector<dataflow::ColumnID>{0, 1}));
+      counter++;
+    }
+  }
+}
+
+TEST(PlannerTest, ProjectArithmeticRightColumn) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
+  std::vector<dataflow::ColumnID> keys = {0};
+  dataflow::SchemaRef schema =
+      dataflow::SchemaFactory::Create(names, types, keys);
+
+  // Make a dummy query.
+  std::string query = "SELECT Col3 - Col1 as DeltaCol FROM test_table";
+
+  // Create a dummy state.
+  dataflow::DataFlowState state;
+  state.AddTableSchema("test_table", std::move(schema));
+
+  // Plan the graph via calcite.
+  dataflow::DataFlowGraph graph = PlanGraph(&state, query);
+
+  // Check that the graph is what we expect!
+  EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
+  EXPECT_EQ(graph.GetNode(0).get(), graph.inputs().at("test_table").get());
+  EXPECT_EQ(graph.GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
+  EXPECT_EQ(graph.GetNode(2)->type(), dataflow::Operator::Type::MAT_VIEW);
+
+  // Get project operator for performing deep schema checks
+  auto projectOp =
+      std::dynamic_pointer_cast<dataflow::ProjectOperator>(graph.GetNode(1));
+
+  // Try to process some records through flow.
+  std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
+  std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
+  std::vector<dataflow::Record> records;
+  records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
+  records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
+  graph.Process("test_table", records);
+
+  // Expected records
+  std::vector<dataflow::Record> expected_records;
+  expected_records.emplace_back(projectOp->output_schema(), true, 10_s);
+  expected_records.emplace_back(projectOp->output_schema(), true, 48_s);
+  std::vector<std::string> expected_col_names = {"DeltaCol"};
+  std::vector<CType> expected_col_types = {CType::INT};
+
+  // // Look at flow output.
+  std::shared_ptr<dataflow::MatViewOperator> output = graph.outputs().at(0);
+  EXPECT_EQ(projectOp->output_schema().column_names(), expected_col_names);
+  EXPECT_EQ(projectOp->output_schema().column_types(), expected_col_types);
+  int counter = 0;
+  for (const auto &key : output->Keys()) {
+    for (const auto &record : output->Lookup(key)) {
+      EXPECT_EQ(record.GetValues(std::vector<dataflow::ColumnID>{0}),
+                expected_records.at(counter).GetValues(
+                    std::vector<dataflow::ColumnID>{0}));
+      counter++;
     }
   }
 }

@@ -22,6 +22,7 @@ import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.util.Pair;
 
 public class PhysicalPlanVisitor extends RelShuttleImpl {
   private static final List<SqlKind> FILTER_OPERATIONS =
@@ -361,6 +362,15 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     return join;
   }
 
+  int UpdateIndexIfRequired(int columnId, ArrayList<Integer> duplicateColumns) {
+    for (Integer dupCol : duplicateColumns) {
+      if (columnId > dupCol) {
+        columnId = columnId - 1;
+      }
+    }
+    return columnId;
+  }
+
   @Override
   public RelNode visit(LogicalProject project) {
     // Add a new level in the stack to store ids of the direct children operators.
@@ -374,22 +384,98 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     assert children.size() == 1;
 
     ArrayList<Integer> cids = new ArrayList<Integer>();
-    for (RexNode item : project.getProjects()) {
-      cids.add(Integer.parseInt(item.toString().substring(1)));
-    }
-    for (ArrayList entry : this.joinDuplicateColumns) {
-      if (cids.contains(entry.get(0))) {
-        if (cids.contains(entry.get(1))) {
-          // Delete duplicate column and update subsequent column indices
-          int del_index = cids.indexOf(entry.get(1));
-          cids.remove(entry.get(1));
-          for (int i = del_index; i < cids.size(); i++) cids.set(i, cids.get(i) - 1);
-        }
+    int projectOperator = this.generator.AddProjectOperator(children.get(0));
+
+    ArrayList<Integer> duplicateColumns = new ArrayList<Integer>();
+    boolean deduplicated = false;
+    for (Pair<RexNode, String> item : project.getNamedProjects()) {
+      switch (item.getKey().getKind()) {
+        case INPUT_REF:
+          int projectedCid = ((RexInputRef) item.getKey()).getIndex();
+          // Check if this column as to be deduplicated
+          for (Integer cid : duplicateColumns) {
+            if (cid == projectedCid) {
+              deduplicated = true;
+              continue;
+            }
+          }
+          // Track potential duplicates (if any)
+          for (ArrayList<Integer> entry : this.joinDuplicateColumns) {
+            if (entry.get(0) == projectedCid) {
+              duplicateColumns.add(entry.get(1));
+            }
+          }
+          // Update column index if deduplication has occured
+          if (deduplicated) projectedCid = UpdateIndexIfRequired(projectedCid, duplicateColumns);
+          this.generator.AddProjectionColumn(projectOperator, item.getValue(), projectedCid);
+          break;
+        case LITERAL:
+          RexLiteral value = (RexLiteral) item.getKey();
+          switch (value.getTypeName()) {
+            case DECIMAL:
+            case INTEGER:
+              this.generator.AddProjectionLiteralSigned(
+                  projectOperator,
+                  item.getValue(),
+                  RexLiteral.intValue(value),
+                  DataFlowGraphLibrary.LITERAL);
+              break;
+            default:
+              throw new IllegalArgumentException("Unsupported value type in literal projection");
+          }
+          break;
+          // TODO(Ishan): Add support for desired operations
+        case PLUS:
+        case MINUS:
+          RexCall operation = (RexCall) item.getKey();
+          List<RexNode> operands = operation.getOperands();
+          assert operands.size() == 2;
+          assert operands.get(0) instanceof RexInputRef;
+          assert operands.get(1) instanceof RexInputRef || operands.get(1) instanceof RexLiteral;
+          Integer leftColumnId = ((RexInputRef) operands.get(0)).getIndex();
+          int arithmeticEnum = -1;
+          if (item.getKey().getKind() == SqlKind.PLUS) {
+            arithmeticEnum = DataFlowGraphLibrary.PLUS;
+          } else if (item.getKey().getKind() == SqlKind.MINUS) {
+            arithmeticEnum = DataFlowGraphLibrary.MINUS;
+          }
+          // Update column index if deduplication has occured
+          if (deduplicated) leftColumnId = UpdateIndexIfRequired(leftColumnId, duplicateColumns);
+          if (operands.get(1) instanceof RexInputRef) {
+            Integer rightColumnId = ((RexInputRef) operands.get(1)).getIndex();
+            // Update column index if deduplication has occured
+            if (deduplicated)
+              rightColumnId = UpdateIndexIfRequired(rightColumnId, duplicateColumns);
+            this.generator.AddProjectionArithmeticWithLiteralUnsignedOrColumn(
+                projectOperator,
+                item.getValue(),
+                leftColumnId,
+                arithmeticEnum,
+                rightColumnId,
+                DataFlowGraphLibrary.ARITHMETIC_WITH_COLUMN);
+          } else {
+            RexLiteral rightValue = (RexLiteral) operands.get(1);
+            switch (rightValue.getTypeName()) {
+              case DECIMAL:
+              case INTEGER:
+                this.generator.AddProjectionArithmeticWithLiteralSigned(
+                    projectOperator,
+                    item.getValue(),
+                    leftColumnId,
+                    arithmeticEnum,
+                    RexLiteral.intValue(rightValue),
+                    DataFlowGraphLibrary.ARITHMETIC_WITH_LITERAL);
+                break;
+              default:
+                throw new IllegalArgumentException("Unsupported value type in literal projection");
+            }
+            break;
+          }
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported projection type");
       }
     }
-    int projectOperator =
-        this.generator.AddProjectOperator(
-            children.get(0), cids.stream().mapToInt(i -> i).toArray());
     this.childrenOperators.peek().add(projectOperator);
     return project;
   }

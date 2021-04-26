@@ -59,11 +59,9 @@ NodeIndex DataFlowGraphGenerator::AddFilterOperator(NodeIndex parent) {
   CHECK(this->graph_->AddNode(op, parent_ptr));
   return op->index();
 }
-NodeIndex DataFlowGraphGenerator::AddProjectOperator(
-    NodeIndex parent, const std::vector<NodeIndex> &column_ids) {
+NodeIndex DataFlowGraphGenerator::AddProjectOperator(NodeIndex parent) {
   // Create project operator.
-  std::shared_ptr<ProjectOperator> op =
-      std::make_shared<ProjectOperator>(column_ids);
+  std::shared_ptr<ProjectOperator> op = std::make_shared<ProjectOperator>();
   // Add the operator to the graph.
   std::shared_ptr<Operator> parent_ptr = this->graph_->GetNode(parent);
   CHECK(parent_ptr);
@@ -159,6 +157,65 @@ void DataFlowGraphGenerator::AddFilterOperationSigned(NodeIndex filter_operator,
       std::static_pointer_cast<FilterOperator>(op);
   // Add the operation to filter.
   filter->AddOperation(value, column, fop);
+}
+void DataFlowGraphGenerator::AddProjectionColumn(NodeIndex project_operator,
+                                                 const std::string &column_name,
+                                                 ColumnID cid) {
+  // Get project operator.
+  std::shared_ptr<Operator> op = this->graph_->GetNode(project_operator);
+  CHECK(op->type() == Operator::Type::PROJECT);
+  std::shared_ptr<ProjectOperator> project =
+      std::static_pointer_cast<ProjectOperator>(op);
+  // Add projection to project
+  project->AddProjection(column_name, cid);
+}
+void DataFlowGraphGenerator::AddProjectionLiteralSigned(
+    NodeIndex project_operator, const std::string &column_name, int64_t value,
+    ProjectMetadataEnum metadata) {
+  // Get project operator.
+  std::shared_ptr<Operator> op = this->graph_->GetNode(project_operator);
+  CHECK(op->type() == Operator::Type::PROJECT);
+  std::shared_ptr<ProjectOperator> project =
+      std::static_pointer_cast<ProjectOperator>(op);
+  // Add projection to project
+  project->AddProjection(column_name, value, metadata);
+}
+void DataFlowGraphGenerator::AddProjectionLiteralUnsigned(
+    NodeIndex project_operator, const std::string &column_name, uint64_t value,
+    ProjectMetadataEnum metadata) {
+  // Get project operator.
+  std::shared_ptr<Operator> op = this->graph_->GetNode(project_operator);
+  CHECK(op->type() == Operator::Type::PROJECT);
+  std::shared_ptr<ProjectOperator> project =
+      std::static_pointer_cast<ProjectOperator>(op);
+  // Add projection to project
+  project->AddProjection(column_name, value, metadata);
+}
+void DataFlowGraphGenerator::AddProjectionArithmeticWithLiteralSigned(
+    NodeIndex project_operator, const std::string &column_name,
+    ColumnID left_operand, ProjectOperationEnum operation,
+    int64_t right_operand, ProjectMetadataEnum metadata) {
+  // Get project operator.
+  std::shared_ptr<Operator> op = this->graph_->GetNode(project_operator);
+  CHECK(op->type() == Operator::Type::PROJECT);
+  std::shared_ptr<ProjectOperator> project =
+      std::static_pointer_cast<ProjectOperator>(op);
+  // Add projection to project
+  project->AddProjection(column_name, left_operand, operation, right_operand,
+                         metadata);
+}
+void DataFlowGraphGenerator::AddProjectionArithmeticWithLiteralUnsignedOrColumn(
+    NodeIndex project_operator, const std::string &column_name,
+    ColumnID left_operand, ProjectOperationEnum operation,
+    uint64_t right_operand, ProjectMetadataEnum metadata) {
+  // Get project operator.
+  std::shared_ptr<Operator> op = this->graph_->GetNode(project_operator);
+  CHECK(op->type() == Operator::Type::PROJECT);
+  std::shared_ptr<ProjectOperator> project =
+      std::static_pointer_cast<ProjectOperator>(op);
+  // Add projection to project
+  project->AddProjection(column_name, left_operand, operation, right_operand,
+                         metadata);
 }
 
 // Reading schema.
