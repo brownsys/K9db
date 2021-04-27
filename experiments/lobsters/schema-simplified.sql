@@ -97,7 +97,7 @@ CREATE TABLE invitations ( \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE keystores ( \
   `key` varchar(50) NOT NULL PRIMARY KEY, \
-  value int \
+  `value` int \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 CREATE TABLE messages ( \
   id int NOT NULL PRIMARY KEY, \

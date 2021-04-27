@@ -1,8 +1,35 @@
+--needs column/column filter, left join
+--CREATE VIEW replying_comments_for_count AS \
+--	'"SELECT read_ribbons.user_id, read_ribbons.story_id, comments.id \
+--	FROM read_ribbons \
+--	JOIN stories ON (stories.id = read_ribbons.story_id) \
+--	JOIN comments ON (comments.story_id = read_ribbons.story_id) \
+--	LEFT JOIN comments AS parent_comments \
+--	ON (parent_comments.id = comments.parent_comment_id) \
+--	WHERE read_ribbons.is_following = 1 \
+--	AND comments.user_id <> read_ribbons.user_id \
+--	AND comments.is_deleted = 0 \
+--	AND comments.is_moderated = 0 \
+--	AND ( comments.upvotes - comments.downvotes ) >= 0 \
+--	AND read_ribbons.updated_at < comments.created_at \
+--	AND ( \
+--     ( \
+--            parent_comments.user_id = read_ribbons.user_id \
+--            AND \
+--            ( parent_comments.upvotes - parent_comments.downvotes ) >= 0 \
+--     ) \
+--     OR \
+--     ( \
+--            parent_comments.id IS NULL \
+--            AND \
+--            stories.user_id = read_ribbons.user_id \
+--     ) \
+--     )"';
 CREATE VIEW q1 AS '"SELECT 1 AS `one` FROM users WHERE users.PII_username = ?"';
 CREATE VIEW q2 AS '"SELECT 1 AS `one` FROM stories WHERE stories.short_id = ?"';
 CREATE VIEW q3 AS '"SELECT tags.id, tags.tag, tags.description, tags.privileged, tags.is_media, tags.inactive, tags.hotness_mod FROM tags WHERE tags.inactive = 0 AND tags.tag = ?"';
 --needs support for `key` column names (backticks to escape keywords)
---CREATE VIEW q4 AS '"SELECT keystores.`key`, keystores.value FROM keystores WHERE keystores.`key` = ?"';
+--CREATE VIEW q4 AS '"SELECT keystores.`key`, keystores.`value` FROM keystores WHERE keystores.`key` = ?"';
 CREATE VIEW q5 AS '"SELECT votes.id, votes.user_id, votes.story_id, votes.comment_id, votes.vote, votes.reason FROM votes WHERE votes.user_id = ? AND votes.story_id = ? AND votes.comment_id IS NULL"';
 --needs support for column/column comparison in planner
 --CREATE VIEW q6 AS '"SELECT comments.upvotes, comments.downvotes FROM comments JOIN stories ON stories.id = comments.story_id WHERE comments.story_id = ? AND comments.user_id != stories.user_id"';
@@ -31,7 +58,7 @@ CREATE VIEW q27 AS '"SELECT 1 AS `one` FROM hats WHERE hats.OWNER_user_id = ? LI
 CREATE VIEW q27 AS '"SELECT suggested_taggings.id, suggested_taggings.story_id, suggested_taggings.tag_id, suggested_taggings.user_id FROM suggested_taggings WHERE suggested_taggings.story_id = ?"';
 CREATE VIEW q28 AS '"SELECT tags.id, tags.tag, tags.description, tags.privileged, tags.is_media, tags.inactive, tags.hotness_mod FROM tags WHERE tags.id = ?"';
 --needs the big matview
---CREATE VIEW q29 AS '"SELECT BOUNDARY_notifications.notifications FROM BOUNDARY_notifications WHERE BOUNDARY_notifications.user_id = ?"';
+--CREATE VIEW q29 AS '"SELECT replying_comments_for_count.user_id, count(*) AS notifications FROM replying_comments_for_count WHERE replying_comments_for_count.user_id = ?"';
 CREATE VIEW q30 AS '"SELECT comments.id, comments.created_at, comments.updated_at, comments.short_id, comments.story_id, comments.user_id, comments.parent_comment_id, comments.thread_id, comments.comment, comments.upvotes, comments.downvotes, comments.confidence, comments.markeddown_comment, comments.is_deleted, comments.is_moderated, comments.is_from_email, comments.hat_id FROM comments WHERE comments.is_deleted = 0 AND comments.is_moderated = 0 ORDER BY id DESC LIMIT 40"';
 CREATE VIEW q31 AS '"SELECT 1 FROM hidden_stories WHERE user_id = ? AND hidden_stories.story_id = ?"';
 CREATE VIEW q32 AS '"SELECT stories.id, stories.created_at, stories.user_id, stories.url, stories.title, stories.description, stories.short_id, stories.is_expired, stories.upvotes, stories.downvotes, stories.is_moderated, stories.hotness, stories.markeddown_description, stories.story_cache, stories.comments_count, stories.merged_story_id, stories.unavailable_at, stories.twitter_id, stories.user_is_author FROM stories WHERE stories.id = ?"';
