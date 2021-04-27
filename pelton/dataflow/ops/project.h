@@ -23,17 +23,7 @@ class ProjectOperator : public Operator {
   using Operation = ProjectOperationEnum;
   using Metadata = ProjectMetadataEnum;
 
-  ProjectOperator()
-      : Operator(Operator::Type::PROJECT),
-        has_keys_(false),
-        keys_(),
-        projections_() {}
-
-  explicit ProjectOperator(const std::vector<ColumnID> &keys)
-      : Operator(Operator::Type::PROJECT),
-        has_keys_(true),
-        keys_(keys),
-        projections_() {}
+  ProjectOperator() : Operator(Operator::Type::PROJECT), projections_() {}
 
   void AddProjection(const std::string &column_name, ColumnID cid) {
     this->projections_.push_back(std::make_tuple(
@@ -67,14 +57,10 @@ class ProjectOperator : public Operator {
   void ComputeOutputSchema() override;
 
  private:
-  bool has_keys_;
-  std::vector<ColumnID> keys_;
-
   std::vector<std::tuple<std::string, ColumnID, Operation, Record::DataVariant,
                          Metadata>>
       projections_;
-  bool EnclosedKeyCols(const std::vector<ColumnID> &input_keycols,
-                       const std::vector<ColumnID> &cids) const;
+
   // Allow tests to use .Process(...) directly.
   FRIEND_TEST(ProjectOperatorTest, BatchTestColumn);
   FRIEND_TEST(ProjectOperatorTest, BatchTestLiteral);

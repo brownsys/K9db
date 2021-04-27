@@ -373,11 +373,10 @@ TEST(AggregateOperatorTest, OutputSchemaPrimaryKeyTest) {
   // expected data in output schema
   std::vector<std::string> expected_names = {"Col1", "Sum"};
   std::vector<CType> expected_types = {CType::INT, CType::INT};
-  std::vector<ColumnID> expected_keys = {0};
   // test schema data
   EXPECT_EQ(aggregate1.output_schema_.column_names(), expected_names);
   EXPECT_EQ(aggregate1.output_schema_.column_types(), expected_types);
-  EXPECT_EQ(aggregate1.output_schema_.keys(), expected_keys);
+  EXPECT_EQ(aggregate1.output_schema_.keys(), group_columns);
 
   // TEST 2: Primary keyed schema's keycolumn not included in projected schema
   group_columns = {1};
@@ -388,10 +387,9 @@ TEST(AggregateOperatorTest, OutputSchemaPrimaryKeyTest) {
   // expected data in output schema
   expected_names = {"Col2", "Sum"};
   expected_types = {CType::INT, CType::INT};
-  expected_keys = {};
   EXPECT_EQ(aggregate2.output_schema_.column_names(), expected_names);
   EXPECT_EQ(aggregate2.output_schema_.column_types(), expected_types);
-  EXPECT_EQ(aggregate2.output_schema_.keys(), expected_keys);
+  EXPECT_EQ(aggregate2.output_schema_.keys(), group_columns);
 }
 
 TEST(AggregateOperatorTest, OutputSchemaCompositeKeyTest) {
@@ -407,11 +405,10 @@ TEST(AggregateOperatorTest, OutputSchemaCompositeKeyTest) {
   std::vector<std::string> expected_names = {"Col1", "Col2", "Col5", "Sum"};
   std::vector<CType> expected_types = {CType::UINT, CType::TEXT, CType::INT,
                                        CType::INT};
-  std::vector<ColumnID> expected_keys = {1, 2};
   // test schema data
   EXPECT_EQ(aggregate1.output_schema_.column_names(), expected_names);
   EXPECT_EQ(aggregate1.output_schema_.column_types(), expected_types);
-  EXPECT_EQ(aggregate1.output_schema_.keys(), expected_keys);
+  EXPECT_EQ(aggregate1.output_schema_.keys(), group_columns);
 
   // TEST 2: Primary keyed schema's keycolumn not included in projected schema
   group_columns = {0, 1};
@@ -422,10 +419,9 @@ TEST(AggregateOperatorTest, OutputSchemaCompositeKeyTest) {
   // expected data in output schema
   expected_names = {"Col1", "Col2", "Sum"};
   expected_types = {CType::UINT, CType::TEXT, CType::INT};
-  expected_keys = {};
   EXPECT_EQ(aggregate2.output_schema_.column_names(), expected_names);
   EXPECT_EQ(aggregate2.output_schema_.column_types(), expected_types);
-  EXPECT_EQ(aggregate2.output_schema_.keys(), expected_keys);
+  EXPECT_EQ(aggregate2.output_schema_.keys(), group_columns);
 }
 
 }  // namespace dataflow

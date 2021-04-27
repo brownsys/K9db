@@ -46,66 +46,40 @@ class StateChange {
 
 }  // namespace
 
-bool AggregateOperator::EnclosedKeyCols(
-    const std::vector<ColumnID> &input_keycols,
-    const std::vector<ColumnID> &cids) const {
-  for (const auto &keycol : input_keycols) {
-    bool is_present = false;
-    for (const auto &cid : cids)
-      if (keycol == cid) is_present = true;
-
-    // at least one key column of the composite key is not being projected
-    if (!is_present) return false;
-  }
-  // all input key columns are present in the projected schema
-  return true;
-}
-
 void AggregateOperator::ComputeOutputSchema() {
-  std::vector<std::string> out_column_names = {};
-  std::vector<sqlast::ColumnDefinition::Type> out_column_types = {};
-  std::vector<ColumnID> out_keys = {};
-  const std::vector<ColumnID> &input_keys = this->input_schemas_.at(0).keys();
-
-  // Construct out_keys
-  // If the input key set is a subset of the projected columns only then form an
-  // output keyset. Else do not assign keys for the output schema. Because the
-  // subset of input keycols can no longer uniqely identify records. This is
-  // only for semantic purposes as, as of now, this does not have an effect on
-  // the materialized view.
-  if (EnclosedKeyCols(input_keys, group_columns_)) {
-    for (auto ik : input_keys) {
-      auto it = std::find(group_columns_.begin(), group_columns_.end(), ik);
-      if (it != out_keys.end()) {
-        out_keys.push_back(std::distance(group_columns_.begin(), it));
-      }
-    }
-  }
-
-  std::vector<std::string> agg_column_name;
-  std::vector<sqlast::ColumnDefinition::Type> agg_column_type;
+  std::string result_column_name;
+  sqlast::ColumnDefinition::Type result_column_type;
   // Calcite does not supply a column id for count function, hence
   // be independent of it
   if (aggregate_function_ == Function::COUNT) {
-    agg_column_name.push_back("Count");
-    agg_column_type.push_back(sqlast::ColumnDefinition::Type::UINT);
+    result_column_name = "Count";
+    result_column_type = sqlast::ColumnDefinition::Type::UINT;
   } else {
-    agg_column_name.push_back("Sum");
-    agg_column_type.push_back(
-        this->input_schemas_.at(0).TypeOf(aggregate_column_));
+    result_column_name = "Sum";
+    result_column_type = this->input_schemas_.at(0).TypeOf(aggregate_column_);
   }
 
-  // Obtain column names and types
+  this->aggregate_schema_ =
+      SchemaFactory::Create({result_column_name}, {result_column_type}, {});
+
+  // Obtain column names and types.
+  std::vector<std::string> out_column_names = {};
+  std::vector<sqlast::ColumnDefinition::Type> out_column_types = {};
   for (const auto &cid : group_columns_) {
     out_column_names.push_back(this->input_schemas_.at(0).NameOf(cid));
     out_column_types.push_back(this->input_schemas_.at(0).TypeOf(cid));
   }
-  // Add another column for the aggregate
-  out_column_names.push_back(agg_column_name.at(0));
-  out_column_types.push_back(agg_column_type.at(0));
+  // Add another column for the aggregate.
+  out_column_names.push_back(result_column_name);
+  out_column_types.push_back(result_column_type);
 
-  this->aggregate_schema_ =
-      SchemaFactory::Create(agg_column_name, agg_column_type, {});
+  // Construct out_keys.
+  // The key for the produced aggregated records are the columns that were
+  // grouped by on. The combined value of these columns are unique, as all rows
+  // that had that value are aggregated into a single one. This is only for
+  // semantic purposes as, as of now, this does not have an effect on
+  std::vector<ColumnID> out_keys = group_columns_;
+
   this->output_schema_ =
       SchemaFactory::Create(out_column_names, out_column_types, out_keys);
 }

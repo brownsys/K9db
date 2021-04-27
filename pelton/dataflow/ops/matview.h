@@ -70,6 +70,8 @@ class MatViewOperatorT : public MatViewOperator {
         limit_(limit),
         offset_(offset) {}
 
+  const std::vector<ColumnID> &key_cols() const { return this->key_cols_; }
+
   size_t count() const override { return this->contents_.count(); }
 
   bool Contains(const Key &key) const override {

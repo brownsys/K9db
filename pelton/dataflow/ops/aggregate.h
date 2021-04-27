@@ -59,8 +59,7 @@ class AggregateOperator : public Operator {
   inline void InitAggregateValue(Record *aggregate_record,
                                  const Record &from_record,
                                  ColumnID from_column) const;
-  bool EnclosedKeyCols(const std::vector<ColumnID> &input_keycols,
-                       const std::vector<ColumnID> &cids) const;
+
   // Allow tests to use .Process(...) directly.
   FRIEND_TEST(AggregateOperatorTest, MultipleGroupColumnsCountPositive);
   FRIEND_TEST(AggregateOperatorTest, MultipleGroupColumnsSumPositive);

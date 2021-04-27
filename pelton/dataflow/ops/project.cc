@@ -74,20 +74,7 @@
 namespace pelton {
 namespace dataflow {
 
-bool ProjectOperator::EnclosedKeyCols(
-    const std::vector<ColumnID> &input_keycols,
-    const std::vector<ColumnID> &cids) const {
-  for (const auto &keycol : input_keycols) {
-    bool is_present = false;
-    for (const auto &cid : cids)
-      if (keycol == cid) is_present = true;
-
-    // at least one key column of the composite key is not being projected
-    if (!is_present) return false;
-  }
-  // all input key columns are present in the projected schema
-  return true;
-}
+namespace {
 
 inline sqlast::ColumnDefinition::Type GetLiteralType(
     const Record::DataVariant &literal) {
@@ -101,27 +88,26 @@ inline sqlast::ColumnDefinition::Type GetLiteralType(
   }
 }
 
+}  // namespace
+
 void ProjectOperator::ComputeOutputSchema() {
   // If keys are not provided, we can compute them ourselves by checking
   // if the primary key survives the projection.
-  std::vector<ColumnID> out_keys = this->keys_;
-  if (!this->has_keys_) {
-    out_keys = {};
-    for (ColumnID key : this->input_schemas_.at(0).keys()) {
-      bool found_key = false;
-      for (size_t i = 0; i < this->projections_.size(); i++) {
-        const auto &[column_name, left_operand, op, right_operand, metadata] =
-            this->projections_.at(i);
-        if (metadata == Metadata::COLUMN && left_operand == key) {
-          out_keys.push_back(i);
-          found_key = true;
-          break;
-        }
-      }
-      if (!found_key) {
-        out_keys.clear();
+  std::vector<ColumnID> out_keys = {};
+  for (ColumnID key : this->input_schemas_.at(0).keys()) {
+    bool found_key = false;
+    for (size_t i = 0; i < this->projections_.size(); i++) {
+      const auto &[column_name, left_operand, op, right_operand, metadata] =
+          this->projections_.at(i);
+      if (metadata == Metadata::COLUMN && left_operand == key) {
+        out_keys.push_back(i);
+        found_key = true;
         break;
       }
+    }
+    if (!found_key) {
+      out_keys.clear();
+      break;
     }
   }
 
