@@ -60,8 +60,10 @@ std::list<CreateStatement> SharderState::CreateShard(
   for (const ShardedTableName &table : this->kind_to_tables_.at(shard_kind)) {
     result.push_back(this->sharded_schema_.at(table));
   }
-  for (const std::string &create_index : this->create_index_.at(shard_kind)) {
-    result.push_back(create_index);
+  if (this->create_index_.count(shard_kind) > 0) {
+    for (const std::string &create_index : this->create_index_.at(shard_kind)) {
+      result.push_back(create_index);
+    }
   }
   return result;
 }
