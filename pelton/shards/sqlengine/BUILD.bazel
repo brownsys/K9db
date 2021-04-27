@@ -63,6 +63,9 @@ cc_library(
     ],
     deps = [
         ":view",
+        "//pelton/dataflow:graph",
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:record",
         "//pelton/dataflow:state",
         "//pelton/shards:state",
         "//pelton/shards:types",

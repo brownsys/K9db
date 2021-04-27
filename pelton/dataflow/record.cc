@@ -6,7 +6,7 @@
 namespace pelton {
 namespace dataflow {
 
-std::string dequote(const std::string &st) {
+std::string Record::Dequote(const std::string &st) {
   std::string s(st);
   s.erase(remove(s.begin(), s.end(), '\"'), s.end());
   s.erase(remove(s.begin(), s.end(), '\''), s.end());
@@ -167,7 +167,7 @@ void Record::SetValue(const std::string &value, size_t i) {
       this->data_[i].sint = std::stoll(value);
       break;
     case sqlast::ColumnDefinition::Type::TEXT: {
-      this->data_[i].str = std::make_unique<std::string>(dequote(value));
+      this->data_[i].str = std::make_unique<std::string>(Dequote(value));
       break;
     }
     case sqlast::ColumnDefinition::Type::DATETIME:

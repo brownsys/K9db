@@ -1,8 +1,9 @@
 // Creation and management of secondary indices.
 #include "pelton/shards/sqlengine/index.h"
 
-#include <string>
-
+#include "pelton/dataflow/graph.h"
+#include "pelton/dataflow/key.h"
+#include "pelton/dataflow/record.h"
 #include "pelton/shards/sqlengine/view.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
@@ -66,6 +67,52 @@ absl::Status CreateIndex(const sqlast::CreateIndex &stmt, SharderState *state,
 
   perf::End("Create Index");
   return absl::OkStatus();
+}
+
+absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
+    const std::string &index_name, const std::string &value,
+    dataflow::DataFlowState *dataflow_state) {
+  perf::Start("Lookup Index");
+  // Find flow.
+  const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(index_name);
+  if (flow.outputs().size() == 0) {
+    return absl::InvalidArgumentError("Read from index with no matviews");
+  } else if (flow.outputs().size() > 1) {
+    return absl::InvalidArgumentError("Read from index with several matviews");
+  }
+
+  // Materialized view that we want to look up in.
+  auto matview = flow.outputs().at(0);
+
+  // Construct look up key.
+  dataflow::Key lookup_key{1};
+  switch (matview->output_schema().TypeOf(0)) {
+    case sqlast::ColumnDefinition::Type::UINT:
+      lookup_key.AddValue(static_cast<uint64_t>(std::stoull(value)));
+      break;
+    case sqlast::ColumnDefinition::Type::INT:
+      lookup_key.AddValue(static_cast<int64_t>(std::stoll(value)));
+      break;
+    case sqlast::ColumnDefinition::Type::TEXT: {
+      lookup_key.AddValue(dataflow::Record::Dequote(value));
+      break;
+    }
+    case sqlast::ColumnDefinition::Type::DATETIME:
+      lookup_key.AddValue(value);
+      break;
+    default:
+      LOG(FATAL) << "Unsupported data type in LookupIndex: "
+                 << matview->output_schema().TypeOf(0);
+  }
+
+  // Lookup.
+  std::unordered_set<UserId> result;
+  for (const dataflow::Record &record : matview->Lookup(lookup_key)) {
+    result.insert(record.GetValueString(1));
+  }
+
+  perf::End("Lookup Index");
+  return result;
 }
 
 }  // namespace index
