@@ -65,8 +65,11 @@ bool ReadCommand(std::string *ptr) {
   ptr->clear();
   std::string line;
   while (std::getline(std::cin, line)) {
-    if (line.size() == 0 || line.front() == '#' || line.front() == '.' ||
+    if (line.size() == 0 || line.front() == '.' ||
         line.find_first_not_of(" \t\n") == std::string::npos) {
+      continue;
+    }
+    if (line.front() == '#') {
       *ptr = line;
       pelton::perf::End("Read std::cin");
       return true;

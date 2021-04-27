@@ -7,6 +7,7 @@
 
 #include "pelton/shards/sqlengine/create.h"
 #include "pelton/shards/sqlengine/delete.h"
+#include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/insert.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/update.h"
@@ -71,6 +72,13 @@ absl::StatusOr<mysql::SqlResult> Shard(
     case sqlast::AbstractStatement::Type::CREATE_VIEW: {
       auto *stmt = static_cast<sqlast::CreateView *>(statement.get());
       CHECK_STATUS(view::CreateView(*stmt, state, dataflow_state));
+      return mysql::SqlResult();
+    }
+
+    // Case 7: CREATE INEDX statement.
+    case sqlast::AbstractStatement::Type::CREATE_INDEX: {
+      auto *stmt = static_cast<sqlast::CreateIndex *>(statement.get());
+      CHECK_STATUS(index::CreateIndex(*stmt, state, dataflow_state));
       return mysql::SqlResult();
     }
 

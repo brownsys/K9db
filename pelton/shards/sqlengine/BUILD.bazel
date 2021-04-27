@@ -12,6 +12,7 @@ cc_library(
     deps = [
         ":create",
         ":delete",
+        ":index",
         ":insert",
         ":select",
         ":update",
@@ -49,6 +50,26 @@ cc_library(
         "//pelton/util:status",
         "@absl//absl/status",
         "@absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "index",
+    srcs = [
+        "index.cc",
+    ],
+    hdrs = [
+        "index.h",
+    ],
+    deps = [
+        ":view",
+        "//pelton/dataflow:state",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/sqlast:ast",
+        "//pelton/util:perf",
+        "//pelton/util:status",
+        "@absl//absl/status",
     ],
 )
 
