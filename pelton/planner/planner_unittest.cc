@@ -672,7 +672,7 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
   EXPECT_EQ(matview->output_schema().column_types(),
             (std::vector<CType>{CType::INT, CType::TEXT, CType::UINT}));
   EXPECT_EQ(matview->output_schema().keys(),
-            std::vector<dataflow::ColumnID>{0});
+            (std::vector<dataflow::ColumnID>{0, 1}));
 
   // Try to process some records through flow.
   std::vector<dataflow::Record> records;
