@@ -124,21 +124,11 @@ NodeIndex DataFlowGraphGenerator::AddMatviewOperator(
 }
 
 // Setting properties on existing operators.
-void DataFlowGraphGenerator::AddFilterOperationNull(NodeIndex filter_operator,
-                                                    ColumnID column,
-                                                    FilterOperationEnum fop) {
-  // Get filter operator.
-  std::shared_ptr<Operator> op = this->graph_->GetNode(filter_operator);
-  CHECK(op->type() == Operator::Type::FILTER);
-  std::shared_ptr<FilterOperator> filter =
-      std::static_pointer_cast<FilterOperator>(op);
-  // Add the operation to filter.
-  filter->AddOperation(NullValue(), column, fop);
-}
-void DataFlowGraphGenerator::AddFilterOperation(NodeIndex filter_operator,
-                                                const std::string &value,
-                                                ColumnID column,
-                                                FilterOperationEnum fop) {
+// Filter.
+void DataFlowGraphGenerator::AddFilterOperationString(NodeIndex filter_operator,
+                                                      const std::string &value,
+                                                      ColumnID column,
+                                                      FilterOperationEnum fop) {
   // Get filter operator.
   std::shared_ptr<Operator> op = this->graph_->GetNode(filter_operator);
   CHECK(op->type() == Operator::Type::FILTER);
@@ -170,6 +160,19 @@ void DataFlowGraphGenerator::AddFilterOperationSigned(NodeIndex filter_operator,
   // Add the operation to filter.
   filter->AddOperation(value, column, fop);
 }
+void DataFlowGraphGenerator::AddFilterOperationNull(NodeIndex filter_operator,
+                                                    ColumnID column,
+                                                    FilterOperationEnum fop) {
+  // Get filter operator.
+  std::shared_ptr<Operator> op = this->graph_->GetNode(filter_operator);
+  CHECK(op->type() == Operator::Type::FILTER);
+  std::shared_ptr<FilterOperator> filter =
+      std::static_pointer_cast<FilterOperator>(op);
+  // Add the operation to filter.
+  filter->AddOperation(column, fop);
+}
+
+// Projection.
 void DataFlowGraphGenerator::AddProjectionColumn(NodeIndex project_operator,
                                                  const std::string &column_name,
                                                  ColumnID cid) {

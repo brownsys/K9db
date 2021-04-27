@@ -55,14 +55,17 @@ class DataFlowGraphGenerator {
                                int limit, size_t offset);
 
   // Setting properties on existing operators.
-  void AddFilterOperation(NodeIndex filter_operator, const std::string &value,
-                          ColumnID column, FilterOperationEnum fop);
-  void AddFilterOperationNull(NodeIndex filter_operator, ColumnID column,
-                              FilterOperationEnum fop);
+  // Filter.
+  void AddFilterOperationString(NodeIndex filter_operator,
+                                const std::string &value, ColumnID column,
+                                FilterOperationEnum fop);
   void AddFilterOperationUnsigned(NodeIndex filter_operator, uint64_t value,
                                   ColumnID column, FilterOperationEnum fop);
   void AddFilterOperationSigned(NodeIndex filter_operator, int64_t value,
                                 ColumnID column, FilterOperationEnum fop);
+  void AddFilterOperationNull(NodeIndex filter_operator, ColumnID column,
+                              FilterOperationEnum fop);
+  // Projection.
   void AddProjectionColumn(NodeIndex project_operator,
                            const std::string &column_name, ColumnID cid);
   void AddProjectionLiteralSigned(NodeIndex project_operator,
