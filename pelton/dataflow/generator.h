@@ -65,6 +65,8 @@ class DataFlowGraphGenerator {
                                 ColumnID column, FilterOperationEnum fop);
   void AddFilterOperationNull(NodeIndex filter_operator, ColumnID column,
                               FilterOperationEnum fop);
+  void AddFilterOperationColumn(NodeIndex filter_operator, ColumnID left_column,
+                                ColumnID right_column, FilterOperationEnum fop);
   // Projection.
   void AddProjectionColumn(NodeIndex project_operator,
                            const std::string &column_name, ColumnID cid);

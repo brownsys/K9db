@@ -171,6 +171,17 @@ void DataFlowGraphGenerator::AddFilterOperationNull(NodeIndex filter_operator,
   // Add the operation to filter.
   filter->AddOperation(column, fop);
 }
+void DataFlowGraphGenerator::AddFilterOperationColumn(NodeIndex filter_operator,
+                                                      ColumnID left_column,
+                                                      ColumnID right_column,
+                                                      FilterOperationEnum fop) {
+  // Get filter operator.
+  std::shared_ptr<Operator> op = this->graph_->GetNode(filter_operator);
+  CHECK(op->type() == Operator::Type::FILTER);
+  std::shared_ptr<FilterOperator> filter =
+      std::static_pointer_cast<FilterOperator>(op);
+  filter->AddOperation(left_column, fop, right_column);
+}
 
 // Projection.
 void DataFlowGraphGenerator::AddProjectionColumn(NodeIndex project_operator,

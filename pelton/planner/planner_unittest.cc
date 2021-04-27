@@ -586,11 +586,53 @@ TEST(PlannerTest, FilterNestedANDCondition) {
   EXPECT_EQ_MSET(graph.outputs().at(0), expected_records);
 }
 
+TEST(PlannerTest, FilterColumnComparison) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
+  std::vector<dataflow::ColumnID> keys = {0};
+  dataflow::SchemaRef schema =
+      dataflow::SchemaFactory::Create(names, types, keys);
+
+  // Make a dummy query.
+  std::string query = "SELECT * FROM test_table WHERE Col1 >= Col3";
+
+  // Create a dummy state.
+  dataflow::DataFlowState state;
+  state.AddTableSchema("test_table", schema);
+
+  // Plan the graph via calcite.
+  dataflow::DataFlowGraph graph = PlanGraph(&state, query);
+
+  // Check that the graph is what we expect!
+  EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
+  EXPECT_EQ(graph.GetNode(0).get(), graph.inputs().at("test_table").get());
+  EXPECT_EQ(graph.GetNode(1)->type(), dataflow::Operator::Type::FILTER);
+  EXPECT_EQ(graph.GetNode(2)->type(), dataflow::Operator::Type::MAT_VIEW);
+
+  // Try to process some records through flow.
+  std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
+  std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
+  std::unique_ptr<std::string> str3 = std::make_unique<std::string>("nope");
+  std::vector<dataflow::Record> records;
+  records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
+  records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
+  records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
+  graph.Process("test_table", records);
+
+  // Expected records
+  std::vector<dataflow::Record> expected_records;
+  expected_records.push_back(records.at(1).Copy());
+
+  // Look at flow output.
+  EXPECT_EQ_MSET(graph.outputs().at(0), expected_records);
+}
+
 /*
 TEST(PlannerTest, FilterArithmeticCondition) {
   // Create a schema.
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
-  std::vector<CType> types = {CType::INT, CType::UINT, CType::INT};
+  std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
   std::vector<dataflow::ColumnID> keys = {0};
   dataflow::SchemaRef schema =
       dataflow::SchemaFactory::Create(names, types, keys);
@@ -615,32 +657,45 @@ TEST(PlannerTest, FilterArithmeticCondition) {
   EXPECT_EQ(graph.GetNode(4)->type(), dataflow::Operator::Type::MAT_VIEW);
 
   // Try to process some records through flow.
+  std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
+  std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
+  std::unique_ptr<std::string> str3 = std::make_unique<std::string>("nope");
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema, true, 10_s, 1_u, 20_s);
-  records.emplace_back(schema, true, 20_s, 2_u, 20_s);
-  records.emplace_back(schema, true, 30_s, 3_u, 50_s);
+  records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
+  records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
+  records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
   graph.Process("test_table", records);
 
   // Get project operator for performing deep schema checks
-  auto projectOp =
+  auto projectOpBefore =
       std::dynamic_pointer_cast<dataflow::ProjectOperator>(graph.GetNode(1));
+  auto projectOpAfter =
+      std::dynamic_pointer_cast<dataflow::ProjectOperator>(graph.GetNode(3));
 
   // Expected records
+  std::unique_ptr<std::string> str4 = std::make_unique<std::string>("hello!");
+  std::unique_ptr<std::string> str5 = std::make_unique<std::string>("bye!");
   std::vector<dataflow::Record> expected_records;
-  expected_records.push_back(records.at(0).Copy());
-  expected_records.push_back(records.at(1).Copy());
+  expected_records.emplace_back(projectOpAfter->output_schema(), true, 10_s,
+                                std::move(str4), 20_s);
+  expected_records.emplace_back(projectOpAfter->output_schema(), true, 20_s,
+                                std::move(str5), 20_s);
 
+  // Expected properties of first project's schema
+  std::vector<std::string> expected_col_names = {"Col1", "Col2", "Col3",
+                                                 "TempArithmetic3"};
+  std::vector<CType> expected_col_types = {CType::INT, CType::TEXT, CType::INT,
+                                           CType::INT};
+
+  EXPECT_EQ(projectOpBefore->output_schema().column_names(),
+            expected_col_names);
+  EXPECT_EQ(projectOpBefore->output_schema().column_types(),
+            expected_col_types);
   // Look at flow output.
   std::shared_ptr<dataflow::MatViewOperator> output = graph.outputs().at(0);
-  // EXPECT_EQ_MSET(graph.outputs().at(0), expected_records);
-  int counter = 0;
-  for (const auto &key : output->Keys()) {
-    for (const auto &record : output->Lookup(key)) {
-      EXPECT_EQ(record, expected_records.at(counter));
-      counter++;
-    }
-  }
+  EXPECT_EQ_MSET(graph.outputs().at(0), expected_records);
 }
+
 */
 
 // Secondary index.

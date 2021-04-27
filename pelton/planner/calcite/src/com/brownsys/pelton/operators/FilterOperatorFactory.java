@@ -198,8 +198,9 @@ public class FilterOperatorFactory {
       RexInputRef left, RexInputRef right, int operationEnum, int filterOperator) {
     int leftId = this.context.getPeltonIndex(left.getIndex());
     int rightId = this.context.getPeltonIndex(right.getIndex());
-    // this.context.getGenerator().AddFilterOperationColumn(filterOperator, leftId, operationEnum,
-    // rightId);
+    this.context
+        .getGenerator()
+        .AddFilterOperationColumn(filterOperator, leftId, rightId, operationEnum);
   }
 
   private void addLeftValueBinaryCondition(
