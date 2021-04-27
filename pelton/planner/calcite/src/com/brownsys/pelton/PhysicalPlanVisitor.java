@@ -3,6 +3,7 @@ package com.brownsys.pelton;
 import com.brownsys.pelton.nativelib.DataFlowGraphLibrary;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
@@ -160,28 +161,9 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
   }
 
   private void addFilterOperation(int filterOperator, RexNode condition, List<RexNode> operands) {
-    assert operands.size() == 2;
-    assert operands.get(0) instanceof RexInputRef || operands.get(1) instanceof RexInputRef;
-    assert operands.get(0) instanceof RexLiteral
-        || operands.get(1) instanceof RexLiteral
-        || operands.get(0) instanceof RexDynamicParam
-        || operands.get(1) instanceof RexDynamicParam;
-    // Get the input and the value expressions.
-    int inputIndex = operands.get(0) instanceof RexInputRef ? 0 : 1;
-    int valueIndex = (inputIndex + 1) % 2;
-    RexInputRef input = (RexInputRef) operands.get(inputIndex);
-
-    // Handle parameters (`?` in query)
-    if (operands.get(valueIndex) instanceof RexDynamicParam
-        && !(operands.get(valueIndex) instanceof RexLiteral)) {
-      this.keyColumns.add(new Integer(valueIndex));
-      return;
-    }
-
-    RexLiteral value = (RexLiteral) operands.get(valueIndex);
-
     // Determine the condition operation.
     int operationEnum = -1;
+    boolean is_unary = false;
     switch (condition.getKind()) {
       case EQUALS:
         operationEnum = DataFlowGraphLibrary.EQUAL;
@@ -203,29 +185,66 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
         break;
       case IS_NULL:
         operationEnum = DataFlowGraphLibrary.IS_NULL;
+        is_unary = true;
         break;
       case IS_NOT_NULL:
         operationEnum = DataFlowGraphLibrary.IS_NOT_NULL;
+        is_unary = true;
         break;
       default:
         assert false;
     }
 
-    // Determine the value type.
-    int columnId = input.getIndex();
-    switch (value.getTypeName()) {
-      case DECIMAL:
-      case INTEGER:
-        this.generator.AddFilterOperationSigned(
-            filterOperator, RexLiteral.intValue(value), columnId, operationEnum);
-        break;
-      case VARCHAR:
-      case CHAR:
-        this.generator.AddFilterOperation(
-            filterOperator, RexLiteral.stringValue(value), columnId, operationEnum);
-        break;
-      default:
-        throw new IllegalArgumentException("Invalid literal type in filter");
+    if (operands.size() == 1) {
+      if (!is_unary) {
+        throw new IllegalArgumentException("Too few operands to filter!");
+      }
+      assert operands.get(0) instanceof RexInputRef;
+      RexInputRef input = (RexInputRef) operands.get(0);
+      int columnId = input.getIndex();
+      this.generator.AddFilterOperationNull(filterOperator, columnId, operationEnum);
+      return;
+    } else {
+      assert operands.size() == 2;
+      assert operands.get(0) instanceof RexInputRef || operands.get(1) instanceof RexInputRef;
+      assert operands.get(0) instanceof RexLiteral
+          || operands.get(1) instanceof RexLiteral
+          || operands.get(0) instanceof RexDynamicParam
+          || operands.get(1) instanceof RexDynamicParam;
+      // Get the input and the value expressions.
+      int inputIndex = operands.get(0) instanceof RexInputRef ? 0 : 1;
+      int valueIndex = (inputIndex + 1) % 2;
+      RexInputRef input = (RexInputRef) operands.get(inputIndex);
+
+      // Handle parameters (`?` in query)
+      if (operands.get(valueIndex) instanceof RexDynamicParam
+          && !(operands.get(valueIndex) instanceof RexLiteral)) {
+        this.keyColumns.add(new Integer(valueIndex));
+        return;
+      }
+
+      RexLiteral value = (RexLiteral) operands.get(valueIndex);
+
+      // Determine the value type.
+      int columnId = input.getIndex();
+      switch (value.getTypeName()) {
+        case DECIMAL:
+        case INTEGER:
+          this.generator.AddFilterOperationSigned(
+              filterOperator, RexLiteral.intValue(value), columnId, operationEnum);
+          break;
+        case VARCHAR:
+        case CHAR:
+          this.generator.AddFilterOperation(
+              filterOperator, RexLiteral.stringValue(value), columnId, operationEnum);
+          break;
+        case NULL:
+          this.generator.AddFilterOperationNull(
+              filterOperator, columnId, operationEnum);
+          break;
+        default:
+          throw new IllegalArgumentException("Invalid literal type in filter: " + value.getTypeName());
+      }
     }
   }
 
