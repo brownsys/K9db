@@ -89,16 +89,21 @@ class SharderState {
 
   // Manage secondary indices.
   bool HasIndexFor(const UnshardedTableName &table_name,
-                   const ColumnName &column_name) const;
+                   const ColumnName &column_name,
+                   const ColumnName &shard_by) const;
 
-  const std::vector<ColumnName> &IndicesFor(
+  const std::unordered_set<ColumnName> &IndicesFor(
       const UnshardedTableName &table_name);
 
   const FlowName &IndexFlow(const UnshardedTableName &table_name,
-                            const ColumnName &column_name) const;
+                            const ColumnName &column_name,
+                            const ColumnName &shard_by) const;
 
-  void CreateIndex(const UnshardedTableName &table_name,
-                   const ColumnName &column_name, const FlowName &index_name);
+  void CreateIndex(const ShardKind &shard_kind,
+                   const UnshardedTableName &table_name,
+                   const ColumnName &column_name, const ColumnName &shard_by,
+                   const FlowName &flow_name,
+                   const std::string &create_index_stmt);
 
   // Save state to durable file.
   void Save(const std::string &dir_path);
@@ -147,10 +152,17 @@ class SharderState {
   ConnectionPool connection_pool_;
 
   // Secondary indices.
-  std::unordered_map<UnshardedTableName, std::vector<ColumnName>> indices_;
+  std::unordered_map<ShardKind, std::vector<std::string>> create_index_;
 
-  std::unordered_map<UnshardedTableName,
-                     std::unordered_map<ColumnName, FlowName>>
+  // All columns in a table that have an index.
+  std::unordered_map<UnshardedTableName, std::unordered_set<ColumnName>>
+      indices_;
+
+  // table-name -> column with an index name -> shard by column for which
+  //    the index provide values -> the corresponding flow name of the index.
+  std::unordered_map<
+      UnshardedTableName,
+      std::unordered_map<ColumnName, std::unordered_map<ColumnName, FlowName>>>
       index_to_flow_;
 };
 

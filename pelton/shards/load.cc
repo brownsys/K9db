@@ -107,15 +107,31 @@ void SharderState::Load(const std::string &dir_path) {
     getline(state_file, line);
   }
 
+  // Read all create index statements.
+  getline(state_file, line);
+  while (line != "") {
+    std::string create_index;
+    getline(state_file, create_index);
+    while (create_index != "") {
+      // TODO(babman): put this back in when flows are also loaded at restart.
+      // this->create_index_[line].push_back(create_index);
+      getline(state_file, create_index);
+    }
+    getline(state_file, line);
+  }
+
   // Read secondary indices.
   getline(state_file, line);
   while (line != "") {
     std::string column_name;
+    std::string shard_by;
     std::string flow_name;
     getline(state_file, column_name);
+    getline(state_file, shard_by);
     getline(state_file, flow_name);
     // TODO(babman): put this back in when flows are also loaded at restart.
-    // this->CreateIndex(line, column_name, flow_name);
+    // this->indices_[line].insert(column_name);
+    // this->index_to_flow_[line][column_name][shard_by] = flow_name;
     getline(state_file, line);
   }
 
@@ -176,11 +192,23 @@ void SharderState::Save(const std::string &dir_path) {
   }
   state_file << "\n";
 
+  for (const auto &[shard_kind, index_vec] : this->create_index_) {
+    state_file << shard_kind << "\n";
+    for (const auto &create_index : index_vec) {
+      state_file << create_index << "\n";
+    }
+    state_file << "\n";
+  }
+  state_file << "\n";
+
   for (const auto &[table_name, col_to_ind] : this->index_to_flow_) {
-    for (const auto &[column_name, index_flow] : col_to_ind) {
-      state_file << table_name << "\n"
-                 << column_name << "\n"
-                 << index_flow << "\n";
+    for (const auto &[column_name, shard_to_ind] : col_to_ind) {
+      for (const auto &[shard_by, index_flow] : shard_to_ind) {
+        state_file << table_name << "\n"
+                   << column_name << "\n"
+                   << shard_by << "\n"
+                   << index_flow << "\n";
+      }
     }
   }
   state_file << "\n";

@@ -60,6 +60,9 @@ std::list<CreateStatement> SharderState::CreateShard(
   for (const ShardedTableName &table : this->kind_to_tables_.at(shard_kind)) {
     result.push_back(this->sharded_schema_.at(table));
   }
+  for (const std::string &create_index : this->create_index_.at(shard_kind)) {
+    result.push_back(create_index);
+  }
   return result;
 }
 
@@ -108,27 +111,41 @@ const std::unordered_set<UserId> &SharderState::UsersOfShard(
 
 // Manage secondary indices.
 bool SharderState::HasIndexFor(const UnshardedTableName &table_name,
-                               const ColumnName &column_name) const {
+                               const ColumnName &column_name,
+                               const ColumnName &shard_by) const {
   if (this->index_to_flow_.count(table_name) == 0) {
     return false;
   }
-  return this->index_to_flow_.at(table_name).count(column_name) > 0;
+
+  auto &tbl = this->index_to_flow_.at(table_name);
+  if (this->index_to_flow_.at(table_name).count(column_name) == 0) {
+    return false;
+  }
+
+  auto &col = tbl.at(column_name);
+  return col.count(shard_by) > 0;
 }
 
-const std::vector<ColumnName> &SharderState::IndicesFor(
+const std::unordered_set<ColumnName> &SharderState::IndicesFor(
     const UnshardedTableName &table_name) {
   return this->indices_[table_name];
 }
 
 const FlowName &SharderState::IndexFlow(const UnshardedTableName &table_name,
-                                        const ColumnName &column_name) const {
-  return this->index_to_flow_.at(table_name).at(column_name);
+                                        const ColumnName &column_name,
+                                        const ColumnName &shard_by) const {
+  return this->index_to_flow_.at(table_name).at(column_name).at(shard_by);
 }
 
-void SharderState::CreateIndex(const UnshardedTableName &table_name,
+void SharderState::CreateIndex(const ShardKind &shard_kind,
+                               const UnshardedTableName &table_name,
                                const ColumnName &column_name,
-                               const FlowName &index_name) {
-  this->index_to_flow_[table_name][column_name] = index_name;
+                               const ColumnName &shard_by,
+                               const FlowName &flow_name,
+                               const std::string &create_index_stmt) {
+  this->indices_[table_name].insert(column_name);
+  this->index_to_flow_[table_name][column_name][shard_by] = flow_name;
+  this->create_index_[shard_kind].push_back(create_index_stmt);
 }
 
 }  // namespace shards
