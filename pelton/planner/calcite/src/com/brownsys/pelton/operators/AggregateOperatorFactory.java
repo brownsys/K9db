@@ -3,6 +3,7 @@ package com.brownsys.pelton.operators;
 import com.brownsys.pelton.PlanningContext;
 import com.brownsys.pelton.nativelib.DataFlowGraphLibrary;
 import java.util.ArrayList;
+import java.util.HashMap;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 
@@ -16,7 +17,13 @@ public class AggregateOperatorFactory {
   public int createOperator(LogicalAggregate aggregate, ArrayList<Integer> children) {
     assert children.size() == 1;
 
+    HashMap<Integer, Integer> keyTranslation = new HashMap<Integer, Integer>();
     int[] groupCols = aggregate.getGroupSet().toArray();
+    for (int i = 0; i < groupCols.length; i++) {
+      groupCols[i] = this.context.getPeltonIndex(groupCols[i]);
+      keyTranslation.put(groupCols[i], i);
+    }
+
     // We only support a single aggregate function per operator at the moment
     assert aggregate.getAggCallList().size() == 1;
     AggregateCall aggCall = aggregate.getAggCallList().get(0);
@@ -33,11 +40,13 @@ public class AggregateOperatorFactory {
       case SUM:
         functionEnum = DataFlowGraphLibrary.SUM;
         assert aggCall.getArgList().size() == 1;
-        aggCol = aggCall.getArgList().get(0);
+        aggCol = this.context.getPeltonIndex(aggCall.getArgList().get(0));
         break;
       default:
         throw new IllegalArgumentException("Invalid aggregate function");
     }
+
+    this.context.identityTranslation(groupCols.length + 1, keyTranslation);
 
     return this.context
         .getGenerator()

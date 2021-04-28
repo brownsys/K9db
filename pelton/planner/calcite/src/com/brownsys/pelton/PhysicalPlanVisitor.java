@@ -19,14 +19,17 @@ import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalUnion;
+import org.apache.calcite.util.Pair;
 
 public class PhysicalPlanVisitor extends RelShuttleImpl {
-  private final PlanningContext context;
+  private final DataFlowGraphLibrary.DataFlowGraphGenerator generator;
   private final Stack<ArrayList<Integer>> childrenOperators;
+  private final Stack<ArrayList<PlanningContext>> childrenContexts;
 
   public PhysicalPlanVisitor(DataFlowGraphLibrary.DataFlowGraphGenerator generator) {
-    this.context = new PlanningContext(generator);
+    this.generator = generator;
     this.childrenOperators = new Stack<ArrayList<Integer>>();
+    this.childrenContexts = new Stack<ArrayList<PlanningContext>>();
   }
 
   /*
@@ -35,14 +38,19 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
    */
   public void populateGraph(RelNode plan) {
     this.childrenOperators.push(new ArrayList<Integer>());
+    this.childrenContexts.push(new ArrayList<PlanningContext>());
 
     // Start visiting.
     plan.accept(this);
 
     // Check if a mat view operator was already created, otherwise create one.
     ArrayList<Integer> children = this.childrenOperators.pop();
+    ArrayList<PlanningContext> contexts = this.childrenContexts.pop();
     if (children.size() > 0) {
-      MatViewOperatorFactory matviewFactory = new MatViewOperatorFactory(this.context);
+      assert children.size() == 1;
+      assert contexts.size() == 1;
+
+      MatViewOperatorFactory matviewFactory = new MatViewOperatorFactory(contexts.get(0));
       matviewFactory.createOperator(children);
 
       assert this.childrenOperators.isEmpty();
@@ -53,73 +61,100 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
    * Actual planning code.
    */
 
-  private int analyzeTableScan(TableScan scan) {
-    InputOperatorFactory inputFactory = new InputOperatorFactory(this.context);
-    return inputFactory.createOperator(scan);
+  private Pair<Integer, PlanningContext> analyzeTableScan(TableScan scan) {
+    PlanningContext context = new PlanningContext(this.generator);
+    InputOperatorFactory inputFactory = new InputOperatorFactory(context);
+    return new Pair<>(inputFactory.createOperator(scan), context);
   }
 
-  private int analyzeLogicalUnion(LogicalUnion union) {
-    ArrayList<Integer> children = this.constructChildrenOperators(union);
+  private Pair<Integer, PlanningContext> analyzeLogicalUnion(LogicalUnion union) {
+    Pair<ArrayList<Integer>, PlanningContext> pair =
+        this.constructChildrenOperators(union, PlanningContext.MergeOperation.UNION);
+    ArrayList<Integer> children = pair.left;
+    PlanningContext context = pair.right;
 
-    UnionOperatorFactory unionFactory = new UnionOperatorFactory(this.context);
-    return unionFactory.createOperator(union, children);
+    UnionOperatorFactory unionFactory = new UnionOperatorFactory(context);
+    return new Pair<>(unionFactory.createOperator(union, children), context);
   }
 
-  private int analyzeLogicalFilter(LogicalFilter filter) {
-    ArrayList<Integer> children = this.constructChildrenOperators(filter);
+  private Pair<Integer, PlanningContext> analyzeLogicalFilter(LogicalFilter filter) {
+    Pair<ArrayList<Integer>, PlanningContext> pair =
+        this.constructChildrenOperators(filter, PlanningContext.MergeOperation.OTHER);
+    ArrayList<Integer> children = pair.left;
+    PlanningContext context = pair.right;
 
-    FilterOperatorFactory filterFactory = new FilterOperatorFactory(this.context);
-    return filterFactory.createOperator(filter, children);
+    FilterOperatorFactory filterFactory = new FilterOperatorFactory(context);
+    return new Pair<>(filterFactory.createOperator(filter, children), context);
   }
 
-  private int analyzeLogicalJoin(LogicalJoin join) {
-    ArrayList<Integer> children = this.constructChildrenOperators(join);
+  private Pair<Integer, PlanningContext> analyzeLogicalJoin(LogicalJoin join) {
+    Pair<ArrayList<Integer>, PlanningContext> pair =
+        this.constructChildrenOperators(join, PlanningContext.MergeOperation.JOIN);
+    ArrayList<Integer> children = pair.left;
+    PlanningContext context = pair.right;
 
-    JoinOperatorFactory joinFactory = new JoinOperatorFactory(this.context);
-    return joinFactory.createOperator(join, children);
+    JoinOperatorFactory joinFactory = new JoinOperatorFactory(context);
+    return new Pair<>(joinFactory.createOperator(join, children), context);
   }
 
-  private ArrayList<Integer> analyzeLogicalProject(LogicalProject project) {
-    ArrayList<Integer> children = this.constructChildrenOperators(project);
+  private Pair<ArrayList<Integer>, PlanningContext> analyzeLogicalProject(LogicalProject project) {
+    Pair<ArrayList<Integer>, PlanningContext> pair =
+        this.constructChildrenOperators(project, PlanningContext.MergeOperation.OTHER);
+    ArrayList<Integer> children = pair.left;
+    PlanningContext context = pair.right;
 
-    ProjectOperatorFactory projectFactory = new ProjectOperatorFactory(this.context);
+    ProjectOperatorFactory projectFactory = new ProjectOperatorFactory(context);
     if (projectFactory.isIdentity(project)) {
-      return children;
+      return new Pair<>(children, context);
     } else {
       ArrayList<Integer> result = new ArrayList<Integer>();
       result.add(projectFactory.createOperator(project, children));
-      return result;
+      return new Pair<>(result, context);
     }
   }
 
-  private int analyzeLogicalAggregate(LogicalAggregate aggregate) {
-    ArrayList<Integer> children = this.constructChildrenOperators(aggregate);
+  private Pair<Integer, PlanningContext> analyzeLogicalAggregate(LogicalAggregate aggregate) {
+    Pair<ArrayList<Integer>, PlanningContext> pair =
+        this.constructChildrenOperators(aggregate, PlanningContext.MergeOperation.OTHER);
+    ArrayList<Integer> children = pair.left;
+    PlanningContext context = pair.right;
 
-    AggregateOperatorFactory aggregateFactory = new AggregateOperatorFactory(this.context);
-    return aggregateFactory.createOperator(aggregate, children);
+    AggregateOperatorFactory aggregateFactory = new AggregateOperatorFactory(context);
+    return new Pair<>(aggregateFactory.createOperator(aggregate, children), context);
   }
 
   // LogicalSort applies to queries that have an explicit order by, as well as unordered queries
   // that have a limit / offset clause.
   private void analyzeLogicalSort(LogicalSort sort) {
-    ArrayList<Integer> children = this.constructChildrenOperators(sort);
+    Pair<ArrayList<Integer>, PlanningContext> pair =
+        this.constructChildrenOperators(sort, PlanningContext.MergeOperation.OTHER);
+    ArrayList<Integer> children = pair.left;
+    PlanningContext context = pair.right;
 
-    MatViewOperatorFactory matviewFactory = new MatViewOperatorFactory(this.context);
+    MatViewOperatorFactory matviewFactory = new MatViewOperatorFactory(context);
     matviewFactory.createOperator(sort, children);
   }
 
   /*
    * Plumbing so that our planning looks like simple recursion.
    */
-  public ArrayList<Integer> constructChildrenOperators(RelNode operator) {
+  public Pair<ArrayList<Integer>, PlanningContext> constructChildrenOperators(
+      RelNode operator, PlanningContext.MergeOperation op) {
     // Add a new stack frame in which children can store their results.
     this.childrenOperators.push(new ArrayList<Integer>());
+    this.childrenContexts.push(new ArrayList<PlanningContext>());
 
     // Actually visit children.
     visitChildren(operator);
 
     // Pop the stack frame and return it.
-    return this.childrenOperators.pop();
+    ArrayList<PlanningContext> contexts = this.childrenContexts.pop();
+    PlanningContext context = contexts.get(0);
+    for (int i = 1; i < contexts.size(); i++) {
+      context.merge(op, contexts.get(i));
+    }
+
+    return new Pair<>(this.childrenOperators.pop(), context);
   }
 
   /*
@@ -128,43 +163,67 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
    */
   @Override
   public RelNode visit(TableScan scan) {
-    int operator = this.analyzeTableScan(scan);
+    Pair<Integer, PlanningContext> pair = this.analyzeTableScan(scan);
+    int operator = pair.left;
+    PlanningContext context = pair.right;
+
     this.childrenOperators.peek().add(operator);
+    this.childrenContexts.peek().add(context);
     return scan;
   }
 
   @Override
   public RelNode visit(LogicalUnion union) {
-    int operator = this.analyzeLogicalUnion(union);
+    Pair<Integer, PlanningContext> pair = this.analyzeLogicalUnion(union);
+    int operator = pair.left;
+    PlanningContext context = pair.right;
+
     this.childrenOperators.peek().add(operator);
+    this.childrenContexts.peek().add(context);
     return union;
   }
 
   @Override
   public RelNode visit(LogicalFilter filter) {
-    int operator = this.analyzeLogicalFilter(filter);
+    Pair<Integer, PlanningContext> pair = this.analyzeLogicalFilter(filter);
+    int operator = pair.left;
+    PlanningContext context = pair.right;
+
     this.childrenOperators.peek().add(operator);
+    this.childrenContexts.peek().add(context);
     return filter;
   }
 
   @Override
   public RelNode visit(LogicalJoin join) {
-    int operator = this.analyzeLogicalJoin(join);
+    Pair<Integer, PlanningContext> pair = this.analyzeLogicalJoin(join);
+    int operator = pair.left;
+    PlanningContext context = pair.right;
+
     this.childrenOperators.peek().add(operator);
+    this.childrenContexts.peek().add(context);
     return join;
   }
 
   @Override
   public RelNode visit(LogicalProject project) {
-    ArrayList<Integer> operators = this.analyzeLogicalProject(project);
+    Pair<ArrayList<Integer>, PlanningContext> pair = this.analyzeLogicalProject(project);
+    ArrayList<Integer> operators = pair.left;
+    PlanningContext context = pair.right;
+
     this.childrenOperators.peek().addAll(operators);
+    this.childrenContexts.peek().add(context);
     return project;
   }
 
   @Override
   public RelNode visit(LogicalAggregate aggregate) {
-    int operator = this.analyzeLogicalAggregate(aggregate);
+    Pair<Integer, PlanningContext> pair = this.analyzeLogicalAggregate(aggregate);
+    int operator = pair.left;
+    PlanningContext context = pair.right;
+
     this.childrenOperators.peek().add(operator);
+    this.childrenContexts.peek().add(context);
     return aggregate;
   }
 

@@ -36,7 +36,8 @@ public class MatViewOperatorFactory {
     for (int i = 0; i < exps.size(); i++) {
       RexNode exp = exps.get(i);
       assert exp instanceof RexInputRef;
-      sortingCols[i] = ((RexInputRef) exp).getIndex();
+      int calciteIndex = ((RexInputRef) exp).getIndex();
+      sortingCols[i] = this.context.getPeltonIndex(calciteIndex);
     }
 
     // If offset or fetch (e.g. limit) is null, it means the query does not contain a LIMIT (, )

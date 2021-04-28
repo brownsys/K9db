@@ -3,6 +3,7 @@ package com.brownsys.pelton.operators;
 import com.brownsys.pelton.PlanningContext;
 import com.brownsys.pelton.nativelib.DataFlowGraphLibrary;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rex.RexCall;
@@ -43,118 +44,131 @@ public class ProjectOperatorFactory {
     return false;
   }
 
-  private int UpdateIndexIfRequired(int columnId, ArrayList<Integer> duplicateColumns) {
-    for (Integer dupCol : duplicateColumns) {
-      if (columnId > dupCol) {
-        columnId = columnId - 1;
-      }
-    }
-    return columnId;
-  }
-
   public int createOperator(LogicalProject project, ArrayList<Integer> children) {
     assert children.size() == 1;
 
     int projectOperator = this.context.getGenerator().AddProjectOperator(children.get(0));
 
-    ArrayList<Integer> duplicateColumns = new ArrayList<Integer>();
-    boolean deduplicated = false;
-    for (Pair<RexNode, String> item : project.getNamedProjects()) {
-      switch (item.getKey().getKind()) {
+    // Stores all column indices that were already projected!
+    HashMap<Integer, Integer> peltonSourceToTarget = new HashMap<Integer, Integer>();
+    HashMap<Integer, Integer> calciteToPeltonTarget = new HashMap<Integer, Integer>();
+    int targetPeltonIndex = 0;
+
+    List<Pair<RexNode, String>> namedProjections = project.getNamedProjects();
+    for (int targetCalciteIndex = 0;
+        targetCalciteIndex < namedProjections.size();
+        targetCalciteIndex++) {
+
+      Pair<RexNode, String> item = namedProjections.get(targetCalciteIndex);
+      RexNode projectedNode = item.getKey();
+      String projectedName = item.getValue();
+
+      switch (projectedNode.getKind()) {
         case INPUT_REF:
-          int projectedCid = ((RexInputRef) item.getKey()).getIndex();
-          // Check if this column as to be deduplicated
-          for (Integer cid : duplicateColumns) {
-            if (cid == projectedCid) {
-              deduplicated = true;
-              continue;
-            }
-          }
-          // Track potential duplicates (if any)
-          for (ArrayList<Integer> entry : this.context.joinDuplicateColumns) {
-            if (entry.get(0) == projectedCid) {
-              duplicateColumns.add(entry.get(1));
-            }
-          }
-          // Update column index if deduplication has occured
-          if (deduplicated) projectedCid = UpdateIndexIfRequired(projectedCid, duplicateColumns);
-          this.context
-              .getGenerator()
-              .AddProjectionColumn(projectOperator, item.getValue(), projectedCid);
-          break;
-        case LITERAL:
-          RexLiteral value = (RexLiteral) item.getKey();
-          switch (value.getTypeName()) {
-            case DECIMAL:
-            case INTEGER:
+          {
+            int sourceCalciteIndex = ((RexInputRef) projectedNode).getIndex();
+            int sourcePeltonIndex = this.context.getPeltonIndex(sourceCalciteIndex);
+            if (peltonSourceToTarget.containsKey(sourcePeltonIndex)) {
+              calciteToPeltonTarget.put(
+                  targetCalciteIndex, peltonSourceToTarget.get(sourcePeltonIndex));
+            } else {
+              peltonSourceToTarget.put(sourcePeltonIndex, targetPeltonIndex);
+              calciteToPeltonTarget.put(targetCalciteIndex, targetPeltonIndex);
+              targetPeltonIndex++;
               this.context
                   .getGenerator()
-                  .AddProjectionLiteralSigned(
-                      projectOperator,
-                      item.getValue(),
-                      RexLiteral.intValue(value),
-                      DataFlowGraphLibrary.LITERAL);
-              break;
-            default:
-              throw new IllegalArgumentException("Unsupported value type in literal projection");
+                  .AddProjectionColumn(projectOperator, projectedName, sourcePeltonIndex);
+            }
+            break;
           }
-          break;
-          // TODO(Ishan): Add support for desired operations
-        case PLUS:
-        case MINUS:
-          RexCall operation = (RexCall) item.getKey();
-          List<RexNode> operands = operation.getOperands();
-          assert operands.size() == 2;
-          assert operands.get(0) instanceof RexInputRef;
-          assert operands.get(1) instanceof RexInputRef || operands.get(1) instanceof RexLiteral;
-          Integer leftColumnId = ((RexInputRef) operands.get(0)).getIndex();
-          int arithmeticEnum = -1;
-          if (item.getKey().getKind() == SqlKind.PLUS) {
-            arithmeticEnum = DataFlowGraphLibrary.PLUS;
-          } else if (item.getKey().getKind() == SqlKind.MINUS) {
-            arithmeticEnum = DataFlowGraphLibrary.MINUS;
-          }
-          // Update column index if deduplication has occured
-          if (deduplicated) leftColumnId = UpdateIndexIfRequired(leftColumnId, duplicateColumns);
-          if (operands.get(1) instanceof RexInputRef) {
-            Integer rightColumnId = ((RexInputRef) operands.get(1)).getIndex();
-            // Update column index if deduplication has occured
-            if (deduplicated)
-              rightColumnId = UpdateIndexIfRequired(rightColumnId, duplicateColumns);
-            this.context
-                .getGenerator()
-                .AddProjectionArithmeticWithLiteralUnsignedOrColumn(
-                    projectOperator,
-                    item.getValue(),
-                    leftColumnId,
-                    arithmeticEnum,
-                    rightColumnId,
-                    DataFlowGraphLibrary.ARITHMETIC_WITH_COLUMN);
-          } else {
-            RexLiteral rightValue = (RexLiteral) operands.get(1);
-            switch (rightValue.getTypeName()) {
+        case LITERAL:
+          {
+            RexLiteral value = (RexLiteral) projectedNode;
+            switch (value.getTypeName()) {
               case DECIMAL:
               case INTEGER:
+                calciteToPeltonTarget.put(targetCalciteIndex, targetPeltonIndex);
+                targetPeltonIndex++;
                 this.context
                     .getGenerator()
-                    .AddProjectionArithmeticWithLiteralSigned(
+                    .AddProjectionLiteralSigned(
                         projectOperator,
-                        item.getValue(),
-                        leftColumnId,
-                        arithmeticEnum,
-                        RexLiteral.intValue(rightValue),
-                        DataFlowGraphLibrary.ARITHMETIC_WITH_LITERAL);
+                        projectedName,
+                        RexLiteral.intValue(value),
+                        DataFlowGraphLibrary.LITERAL);
                 break;
               default:
                 throw new IllegalArgumentException("Unsupported value type in literal projection");
             }
             break;
           }
-          break;
+        case PLUS:
+        case MINUS:
+          {
+            int arithmeticEnum =
+                projectedNode.getKind() == SqlKind.PLUS
+                    ? DataFlowGraphLibrary.PLUS
+                    : DataFlowGraphLibrary.MINUS;
+
+            RexCall operation = (RexCall) projectedNode;
+            List<RexNode> operands = operation.getOperands();
+
+            // Must be binary.
+            assert operands.size() == 2;
+            // Left side must be a column.
+            assert operands.get(0) instanceof RexInputRef;
+            // Right side must be a column or literal.
+            assert operands.get(1) instanceof RexInputRef || operands.get(1) instanceof RexLiteral;
+
+            // Update column index in case of de-duplication
+            int leftSourceCalciteId = ((RexInputRef) operands.get(0)).getIndex();
+            int leftSourcePeltonId = this.context.getPeltonIndex(leftSourceCalciteId);
+
+            if (operands.get(1) instanceof RexInputRef) {
+              int rightSourceCalciteId = ((RexInputRef) operands.get(1)).getIndex();
+              int rightSourcePeltonId = this.context.getPeltonIndex(rightSourceCalciteId);
+              calciteToPeltonTarget.put(targetCalciteIndex, targetPeltonIndex);
+              targetPeltonIndex++;
+              this.context
+                  .getGenerator()
+                  .AddProjectionArithmeticWithLiteralUnsignedOrColumn(
+                      projectOperator,
+                      projectedName,
+                      leftSourcePeltonId,
+                      arithmeticEnum,
+                      rightSourcePeltonId,
+                      DataFlowGraphLibrary.ARITHMETIC_WITH_COLUMN);
+            } else {
+              RexLiteral rightValue = (RexLiteral) operands.get(1);
+              switch (rightValue.getTypeName()) {
+                case DECIMAL:
+                case INTEGER:
+                  calciteToPeltonTarget.put(targetCalciteIndex, targetPeltonIndex);
+                  targetPeltonIndex++;
+                  this.context
+                      .getGenerator()
+                      .AddProjectionArithmeticWithLiteralSigned(
+                          projectOperator,
+                          projectedName,
+                          leftSourcePeltonId,
+                          arithmeticEnum,
+                          RexLiteral.intValue(rightValue),
+                          DataFlowGraphLibrary.ARITHMETIC_WITH_LITERAL);
+                  break;
+                default:
+                  throw new IllegalArgumentException(
+                      "Unsupported value type in literal projection");
+              }
+            }
+            break;
+          }
         default:
-          throw new IllegalArgumentException("Unsupported projection type");
+          throw new IllegalArgumentException(
+              "Unsupported projection type " + projectedNode.getKind());
       }
     }
+
+    this.context.setColumnTranslation(calciteToPeltonTarget, peltonSourceToTarget);
 
     return projectOperator;
   }

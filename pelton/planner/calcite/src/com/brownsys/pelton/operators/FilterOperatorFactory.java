@@ -73,7 +73,7 @@ public class FilterOperatorFactory {
 
       assert operands.get(0) instanceof RexInputRef;
       RexInputRef input = (RexInputRef) operands.get(0);
-      int columnId = input.getIndex();
+      int columnId = this.context.getPeltonIndex(input.getIndex());
       this.context.getGenerator().AddFilterOperationNull(filterOperator, columnId, operationEnum);
       return;
 
@@ -88,18 +88,17 @@ public class FilterOperatorFactory {
       int inputIndex = operands.get(0) instanceof RexInputRef ? 0 : 1;
       int valueIndex = (inputIndex + 1) % 2;
       RexInputRef input = (RexInputRef) operands.get(inputIndex);
+      int columnId = this.context.getPeltonIndex(input.getIndex());
 
       // Handle parameters (`?` in query)
-      if (operands.get(valueIndex) instanceof RexDynamicParam
-          && !(operands.get(valueIndex) instanceof RexLiteral)) {
-        this.context.addMatViewKey(valueIndex);
+      if (operands.get(valueIndex) instanceof RexDynamicParam) {
+        this.context.addMatViewKey(columnId);
         return;
       }
 
       RexLiteral value = (RexLiteral) operands.get(valueIndex);
 
       // Determine the value type.
-      int columnId = input.getIndex();
       switch (value.getTypeName()) {
         case DECIMAL:
         case INTEGER:
@@ -182,7 +181,7 @@ public class FilterOperatorFactory {
       }
       // Add operations to the newly generated operator
       for (RexNode operation : operations) {
-        addFilterOperation(filterOperator, operation, ((RexCall) operation).getOperands());
+        this.addFilterOperation(filterOperator, operation, ((RexCall) operation).getOperands());
       }
       return filterOperator;
     } else if (condition.isA(SqlKind.OR)) {
@@ -206,7 +205,7 @@ public class FilterOperatorFactory {
       // filter operator) will be the leaf. Hence it's parent will be
       // @deepestFilterParent
       int filterOperator = this.context.getGenerator().AddFilterOperator(deepestFilterParent);
-      addFilterOperation(filterOperator, condition, ((RexCall) condition).getOperands());
+      this.addFilterOperation(filterOperator, condition, ((RexCall) condition).getOperands());
       return filterOperator;
     }
 

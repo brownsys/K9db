@@ -2,6 +2,7 @@ package com.brownsys.pelton.operators;
 
 import com.brownsys.pelton.PlanningContext;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rex.RexCall;
@@ -18,7 +19,16 @@ public class JoinOperatorFactory {
 
   public int createOperator(LogicalJoin join, ArrayList<Integer> children) {
     // Find the size of the schema of the left relation.
-    int leftCount = join.getLeft().getRowType().getFieldCount();
+    int leftCalciteCount = join.getLeft().getRowType().getFieldCount();
+    int leftPeltonCount = 0;
+    HashSet<Integer> dups = new HashSet<>();
+    for (int i = 0; i < leftCalciteCount; i++) {
+      int p = this.context.getPeltonIndex(i);
+      if (!dups.contains(p)) {
+        dups.add(p);
+        leftPeltonCount++;
+      }
+    }
 
     // Visit the join condition, extract the column ids for the left and right relation.
     RexNode condition = join.getCondition();
@@ -33,13 +43,13 @@ public class JoinOperatorFactory {
     RexNode rightCondition = operands.get(1);
     assert leftCondition instanceof RexInputRef;
     assert rightCondition instanceof RexInputRef;
-    int leftColIndex = ((RexInputRef) leftCondition).getIndex();
-    int rightColIndex = ((RexInputRef) rightCondition).getIndex();
-    ArrayList<Integer> duplicateCols = new ArrayList<Integer>();
-    duplicateCols.add(leftColIndex);
-    duplicateCols.add(rightColIndex);
-    this.context.joinDuplicateColumns.add(duplicateCols);
-    rightColIndex -= leftCount;
+
+    int leftCalciteIndex = ((RexInputRef) leftCondition).getIndex();
+    int rightClaciteIndex = ((RexInputRef) rightCondition).getIndex();
+    int leftPeltonIndex = this.context.getPeltonIndex(leftCalciteIndex);
+    int rightPeltonIndex = this.context.getPeltonIndex(rightClaciteIndex);
+    this.context.setDuplicate(rightPeltonIndex, leftPeltonIndex);
+    rightPeltonIndex -= leftPeltonCount;
 
     // Set up all join operator parameters.
     int leftInput = children.get(0);
@@ -52,7 +62,7 @@ public class JoinOperatorFactory {
         joinOperator =
             this.context
                 .getGenerator()
-                .AddEquiJoinOperator(leftInput, rightInput, leftColIndex, rightColIndex);
+                .AddEquiJoinOperator(leftInput, rightInput, leftPeltonIndex, rightPeltonIndex);
         break;
       case ANTI:
       case FULL:
