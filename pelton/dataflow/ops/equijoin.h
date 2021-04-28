@@ -15,17 +15,18 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
+#include "pelton/dataflow/ops/equijoin_enum.h"
 
 namespace pelton {
 namespace dataflow {
 
-enum class JoinMode { INNER, LEFT, RIGHT };
 class EquiJoinOperator : public Operator {
  public:
+  using Mode = JoinModeEnum;
   EquiJoinOperator() = delete;
 
   EquiJoinOperator(ColumnID left_id, ColumnID right_id,
-                   JoinMode mode = JoinMode::INNER)
+                   Mode mode = Mode::INNER)
       : Operator(Operator::Type::EQUIJOIN),
         left_id_(left_id),
         right_id_(right_id),
@@ -58,7 +59,7 @@ class EquiJoinOperator : public Operator {
   // Columns on which join is computed.
   ColumnID left_id_;
   ColumnID right_id_;
-  JoinMode mode_;
+  Mode mode_;
   UnorderedGroupedData left_table_;
   UnorderedGroupedData right_table_;
 
@@ -70,6 +71,7 @@ class EquiJoinOperator : public Operator {
   FRIEND_TEST(EquiJoinOperatorTest, BasicJoinTest);
   FRIEND_TEST(EquiJoinOperatorTest, BasicUnjoinableTest);
   FRIEND_TEST(EquiJoinOperatorTest, FullJoinTest);
+  FRIEND_TEST(EquiJoinOperatorTest, LeftJoinTest);
 
 #ifdef PELTON_BENCHMARK  // shuts up compiler warnings
   // NOLINTNEXTLINE

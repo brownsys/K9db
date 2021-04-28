@@ -58,9 +58,9 @@ bool EquiJoinOperator::Process(NodeIndex source,
       }
 
       // additional check for left join
-      if (mode_ == JoinMode::LEFT &&
+      if (mode_ == Mode::LEFT &&
           0 == this->right_table_.Count(left_value)) {
-        this->EmitRow(record, Record::NULLRecord(this->right()->schema()),
+        this->EmitRow(record, Record::NULLRecord(this->right()->output_schema()),
                       output, record.IsPositive());
       }
 
@@ -74,9 +74,9 @@ bool EquiJoinOperator::Process(NodeIndex source,
       }
 
       // additional check for right join
-      if (mode_ == JoinMode::RIGHT &&
-          0 == this->left_table_.Count(left_value)) {
-        this->EmitRow(record, Record::NULLRecord(this->left()->schema()),
+      if (mode_ == Mode::RIGHT &&
+          0 == this->left_table_.Count(right_value)) {
+        this->EmitRow(record, Record::NULLRecord(this->left()->output_schema()),
                       output, record.IsPositive());
       }
 
@@ -154,7 +154,7 @@ void EquiJoinOperator::EmitRow(const Record &left, const Record &right,
   Record record{this->output_schema_, positive};
   for (size_t i = 0; i < lschema.size(); i++) {
     if (left.IsNull(i))
-      record.SetNull(i);
+      record.SetNull(true, i);
     else
       CopyIntoRecord(lschema.TypeOf(i), &record, left, i, i);
   }
@@ -167,7 +167,7 @@ void EquiJoinOperator::EmitRow(const Record &left, const Record &right,
       j--;
     }
     if (right.IsNull(i))
-      record.SetNull(j);
+      record.SetNull(true, j);
     else
       CopyIntoRecord(rschema.TypeOf(i), &record, right, j, i);
   }
