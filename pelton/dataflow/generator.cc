@@ -5,14 +5,17 @@
 #include "glog/logging.h"
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/operator.h"
+#include "pelton/dataflow/ops/aggregate.h"
 #include "pelton/dataflow/ops/equijoin.h"
 #include "pelton/dataflow/ops/filter.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/ops/matview.h"
+#include "pelton/dataflow/ops/project.h"
 #include "pelton/dataflow/ops/union.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/state.h"
+#include "pelton/dataflow/value.h"
 
 namespace pelton {
 namespace dataflow {
@@ -51,6 +54,27 @@ NodeIndex DataFlowGraphGenerator::AddUnionOperator(
 NodeIndex DataFlowGraphGenerator::AddFilterOperator(NodeIndex parent) {
   // Create filter operator.
   std::shared_ptr<FilterOperator> op = std::make_shared<FilterOperator>();
+  // Add the operator to the graph.
+  std::shared_ptr<Operator> parent_ptr = this->graph_->GetNode(parent);
+  CHECK(parent_ptr);
+  CHECK(this->graph_->AddNode(op, parent_ptr));
+  return op->index();
+}
+NodeIndex DataFlowGraphGenerator::AddProjectOperator(NodeIndex parent) {
+  // Create project operator.
+  std::shared_ptr<ProjectOperator> op = std::make_shared<ProjectOperator>();
+  // Add the operator to the graph.
+  std::shared_ptr<Operator> parent_ptr = this->graph_->GetNode(parent);
+  CHECK(parent_ptr);
+  CHECK(this->graph_->AddNode(op, parent_ptr));
+  return op->index();
+}
+NodeIndex DataFlowGraphGenerator::AddAggregateOperator(
+    NodeIndex parent, const std::vector<ColumnID> &group_cols,
+    AggregateFunctionEnum agg_func, ColumnID agg_col) {
+  // Create aggregate operator.
+  std::shared_ptr<AggregateOperator> op =
+      std::make_shared<AggregateOperator>(group_cols, agg_func, agg_col);
   // Add the operator to the graph.
   std::shared_ptr<Operator> parent_ptr = this->graph_->GetNode(parent);
   CHECK(parent_ptr);
@@ -100,6 +124,17 @@ NodeIndex DataFlowGraphGenerator::AddMatviewOperator(
 }
 
 // Setting properties on existing operators.
+void DataFlowGraphGenerator::AddFilterOperationNull(NodeIndex filter_operator,
+                                                    ColumnID column,
+                                                    FilterOperationEnum fop) {
+  // Get filter operator.
+  std::shared_ptr<Operator> op = this->graph_->GetNode(filter_operator);
+  CHECK(op->type() == Operator::Type::FILTER);
+  std::shared_ptr<FilterOperator> filter =
+      std::static_pointer_cast<FilterOperator>(op);
+  // Add the operation to filter.
+  filter->AddOperation(NullValue(), column, fop);
+}
 void DataFlowGraphGenerator::AddFilterOperation(NodeIndex filter_operator,
                                                 const std::string &value,
                                                 ColumnID column,
@@ -135,6 +170,65 @@ void DataFlowGraphGenerator::AddFilterOperationSigned(NodeIndex filter_operator,
   // Add the operation to filter.
   filter->AddOperation(value, column, fop);
 }
+void DataFlowGraphGenerator::AddProjectionColumn(NodeIndex project_operator,
+                                                 const std::string &column_name,
+                                                 ColumnID cid) {
+  // Get project operator.
+  std::shared_ptr<Operator> op = this->graph_->GetNode(project_operator);
+  CHECK(op->type() == Operator::Type::PROJECT);
+  std::shared_ptr<ProjectOperator> project =
+      std::static_pointer_cast<ProjectOperator>(op);
+  // Add projection to project
+  project->AddProjection(column_name, cid);
+}
+void DataFlowGraphGenerator::AddProjectionLiteralSigned(
+    NodeIndex project_operator, const std::string &column_name, int64_t value,
+    ProjectMetadataEnum metadata) {
+  // Get project operator.
+  std::shared_ptr<Operator> op = this->graph_->GetNode(project_operator);
+  CHECK(op->type() == Operator::Type::PROJECT);
+  std::shared_ptr<ProjectOperator> project =
+      std::static_pointer_cast<ProjectOperator>(op);
+  // Add projection to project
+  project->AddProjection(column_name, value, metadata);
+}
+void DataFlowGraphGenerator::AddProjectionLiteralUnsigned(
+    NodeIndex project_operator, const std::string &column_name, uint64_t value,
+    ProjectMetadataEnum metadata) {
+  // Get project operator.
+  std::shared_ptr<Operator> op = this->graph_->GetNode(project_operator);
+  CHECK(op->type() == Operator::Type::PROJECT);
+  std::shared_ptr<ProjectOperator> project =
+      std::static_pointer_cast<ProjectOperator>(op);
+  // Add projection to project
+  project->AddProjection(column_name, value, metadata);
+}
+void DataFlowGraphGenerator::AddProjectionArithmeticWithLiteralSigned(
+    NodeIndex project_operator, const std::string &column_name,
+    ColumnID left_operand, ProjectOperationEnum operation,
+    int64_t right_operand, ProjectMetadataEnum metadata) {
+  // Get project operator.
+  std::shared_ptr<Operator> op = this->graph_->GetNode(project_operator);
+  CHECK(op->type() == Operator::Type::PROJECT);
+  std::shared_ptr<ProjectOperator> project =
+      std::static_pointer_cast<ProjectOperator>(op);
+  // Add projection to project
+  project->AddProjection(column_name, left_operand, operation, right_operand,
+                         metadata);
+}
+void DataFlowGraphGenerator::AddProjectionArithmeticWithLiteralUnsignedOrColumn(
+    NodeIndex project_operator, const std::string &column_name,
+    ColumnID left_operand, ProjectOperationEnum operation,
+    uint64_t right_operand, ProjectMetadataEnum metadata) {
+  // Get project operator.
+  std::shared_ptr<Operator> op = this->graph_->GetNode(project_operator);
+  CHECK(op->type() == Operator::Type::PROJECT);
+  std::shared_ptr<ProjectOperator> project =
+      std::static_pointer_cast<ProjectOperator>(op);
+  // Add projection to project
+  project->AddProjection(column_name, left_operand, operation, right_operand,
+                         metadata);
+}
 
 // Reading schema.
 std::vector<std::string> DataFlowGraphGenerator::GetTables() const {
@@ -151,6 +245,11 @@ std::string DataFlowGraphGenerator::GetTableColumnName(
 sqlast::ColumnDefinitionTypeEnum DataFlowGraphGenerator::GetTableColumnType(
     const std::string &table_name, ColumnID column) const {
   return this->state_->GetTableSchema(table_name).TypeOf(column);
+}
+
+// Debugging string.
+std::string DataFlowGraphGenerator::DebugString() const {
+  return this->graph_->DebugString();
 }
 
 }  // namespace dataflow

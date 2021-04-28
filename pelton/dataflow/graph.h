@@ -59,10 +59,12 @@ class DataFlowGraph {
     return it == nodes_.end() ? nullptr : it->second;
   }
 
+  // Debugging.
+  std::string DebugString() const;
+
  private:
   bool AddEdge(std::shared_ptr<Operator> parent,
                std::shared_ptr<Operator> child);
-
   // Maps input name to associated input operator.
   std::unordered_map<std::string, std::shared_ptr<InputOperator>> inputs_;
   std::vector<std::shared_ptr<MatViewOperator>> outputs_;

@@ -7,6 +7,9 @@ cc_binary(
     ],
     deps = [
         "//pelton",
+        "//pelton/util:perf",
+        "@gflags",
+        "@glog",
     ],
 )
 
@@ -17,5 +20,23 @@ cc_binary(
     ],
     deps = [
         "//pelton",
+        "//pelton/util:perf",
+        "@gflags",
+        "@glog",
+    ],
+)
+
+cc_binary(
+    name = "mysql",
+    srcs = [
+        "mysql.cc",
+    ],
+    linkopts = [
+        "-lmysqlcppconn",
+    ],
+    deps = [
+        "//pelton/util:perf",
+        "@gflags",
+        "@glog",
     ],
 )

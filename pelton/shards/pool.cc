@@ -1,169 +1,156 @@
-// Manages sqlite3 connections to the different shard/mini-databases.
+// Manages mysql connections to the different shard/mini-databases.
 #include "pelton/shards/pool.h"
 
 #include <cstring>
+#include <utility>
 
-#include "absl/strings/str_cat.h"
 #include "glog/logging.h"
+#include "mysql-cppconn-8/jdbc/cppconn/resultset.h"
+#include "mysql-cppconn-8/jdbc/mysql_driver.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/util/perf.h"
 
 namespace pelton {
 namespace shards {
 
-namespace {
-
-char *CopyCString(const std::string &str) {
-  char *result = new char[str.size() + 1];
-  // NOLINTNEXTLINE
-  strcpy(result, str.c_str());
-  return result;
-}
-
-}  // namespace
-
-const Callback *ConnectionPool::CALLBACK_NO_CAPTURE = nullptr;
-size_t ConnectionPool::SHARD_BY_INDEX_NO_CAPTURE = 0;
-char *ConnectionPool::SHARD_BY_NO_CAPTURE = nullptr;
-char *ConnectionPool::USER_ID_NO_CAPTURE = nullptr;
-
-// Destructor: close connection to the default unsharded database.
-ConnectionPool::~ConnectionPool() {
-  if (this->default_noshard_connection_ != nullptr) {
-    ::sqlite3_close(this->default_noshard_connection_);
-  }
-  this->default_noshard_connection_ = nullptr;
-}
-
 // Initialization: open a connection to the default unsharded database.
-void ConnectionPool::Initialize(const std::string &dir_path) {
-  this->dir_path_ = dir_path;
-  std::string shard_path = absl::StrCat(dir_path, "default.sqlite3");
-  ::sqlite3_open(shard_path.c_str(), &this->default_noshard_connection_);
-}
+void ConnectionPool::Initialize(const std::string &username,
+                                const std::string &password) {
+  sql::ConnectOptionsMap connection_properties;
+  connection_properties["hostName"] = "localhost";
+  connection_properties["userName"] = username;
+  connection_properties["password"] = password;
+  connection_properties["CLIENT_MULTI_STATEMENTS"] = true;
 
-// Get conenction to default shard (always open).
-::sqlite3 *ConnectionPool::GetDefaultConnection() const {
-  LOG(INFO) << "Shard: default shard";
-  return this->default_noshard_connection_;
-}
-
-// Open a connection to a shard.
-::sqlite3 *ConnectionPool::GetConnection(const ShardKind &shard_kind,
-                                         const UserId &user_id) const {
-  // Find the shard path.
-  std::string shard_name = sqlengine::NameShard(shard_kind, user_id);
-  std::string shard_path = absl::StrCat(this->dir_path_, shard_name);
-  // Open and return connection.
-  LOG(INFO) << "Shard: " << shard_name;
-  ::sqlite3 *connection;
-  ::sqlite3_open(shard_path.c_str(), &connection);
-  return connection;
+  sql::Driver *driver = sql::mysql::get_driver_instance();
+  this->conn_ =
+      std::unique_ptr<sql::Connection>(driver->connect(connection_properties));
+  this->stmt_ = std::unique_ptr<sql::Statement>(this->conn_->createStatement());
 }
 
 // Execution of SQL statements.
 // Execute statement against the default un-sharded database.
-absl::Status ConnectionPool::ExecuteDefault(const std::string &sql,
-                                            const OutputChannel &output) {
-  ::sqlite3 *connection = this->GetDefaultConnection();
-  return this->ExecuteDefault(sql, connection, output);
+mysql::SqlResult ConnectionPool::ExecuteDefault(
+    Operation op, const std::string &sql, const dataflow::SchemaRef &schema) {
+  perf::Start("ExecuteDefault");
+
+  LOG(INFO) << "Shard: default shard";
+  LOG(INFO) << "Statement: " << sql;
+
+  mysql::SqlResult result = this->ExecuteMySQL(op, sql, schema);
+
+  perf::End("ExecuteDefault");
+  return result;
 }
 
 // Execute statement against given user shard(s).
-absl::Status ConnectionPool::ExecuteShard(const std::string &sql,
-                                          const ShardingInformation &info,
-                                          const UserId &user_id,
-                                          const OutputChannel &output) {
-  ::sqlite3 *connection = this->GetConnection(info.shard_kind, user_id);
-  return this->ExecuteShard(sql, connection, info, user_id, output);
+mysql::SqlResult ConnectionPool::ExecuteShard(
+    Operation op, const std::string &sql, const ShardingInformation &info,
+    const UserId &user_id, const dataflow::SchemaRef &schema) {
+  perf::Start("ExecuteShard");
+
+  std::string shard_name = sqlengine::NameShard(info.shard_kind, user_id);
+  LOG(INFO) << "Shard: " << shard_name << " (userid: " << user_id << ")";
+  LOG(INFO) << "Statement:" << sql;
+
+  mysql::SqlResult result = this->ExecuteMySQL(op, sql, schema, shard_name,
+                                               info.shard_by_index, user_id);
+
+  perf::End("ExecuteShard");
+  return result;
 }
 
-absl::Status ConnectionPool::ExecuteShard(
-    const std::string &sql, const ShardingInformation &info,
-    const std::unordered_set<UserId> &user_ids, const OutputChannel &output) {
+mysql::SqlResult ConnectionPool::ExecuteShards(
+    Operation op, const std::string &sql, const ShardingInformation &info,
+    const std::unordered_set<UserId> &user_ids,
+    const dataflow::SchemaRef &schema) {
+  if (user_ids.size() == 0) {
+    switch (op) {
+      case ConnectionPool::Operation::STATEMENT:
+        return mysql::SqlResult{std::make_unique<mysql::StatementResult>(true),
+                                {}};
+      case ConnectionPool::Operation::UPDATE:
+        return mysql::SqlResult{std::make_unique<mysql::UpdateResult>(0), {}};
+      case ConnectionPool::Operation::QUERY:
+        return mysql::SqlResult{std::make_unique<mysql::InlinedSqlResult>(),
+                                schema};
+    }
+  }
+
+  // This result set is a proxy that allows access to results from all shards.
+  mysql::SqlResult result;
   for (const UserId &user_id : user_ids) {
-    ::sqlite3 *connection = this->GetConnection(info.shard_kind, user_id);
-    auto result = this->ExecuteShard(sql, connection, info, user_id, output);
-    if (!result.ok()) {
-      return result;
-    }
+    result.MakeInline();
+    result.Append(this->ExecuteShard(op, sql, info, user_id, schema));
   }
-  return absl::OkStatus();
+
+  return result;
 }
 
-// Actually execute statements after their connection has been resolved.
-absl::Status ConnectionPool::ExecuteDefault(const std::string &sql,
-                                            ::sqlite3 *connection,
-                                            const OutputChannel &output) {
-  LOG(INFO) << "Statement: " << sql;
-  // Turn c++ style callback into a c-style function pointer.
-  CALLBACK_NO_CAPTURE = &output.callback;
-  auto cb = [](void *context, int colnum, char **colvals, char **colnames) {
-    return (*CALLBACK_NO_CAPTURE)(context, colnum, colvals, colnames);
-  };
-
-  // Execute using c-style function pointer.
-  const char *str = sql.c_str();
-  void *context = output.context;
-  char **errmsg = output.errmsg;
-  if (::sqlite3_exec(connection, str, cb, context, errmsg) == SQLITE_OK) {
-    return absl::OkStatus();
-  } else {
-    std::string error = "Sqlite3 statement failed";
-    if (*errmsg != nullptr) {
-      error = absl::StrCat(error, ": ", *errmsg);
-    }
-    return absl::AbortedError(error);
-  }
+// Removing a shard is equivalent to deleting its database.
+void ConnectionPool::RemoveShard(const std::string &shard_name) {
+  LOG(INFO) << "Remove Shard: " << shard_name;
+  this->ExecuteMySQL(ConnectionPool::Operation::STATEMENT,
+                     "DROP DATABASE " + shard_name, {});
 }
 
-absl::Status ConnectionPool::ExecuteShard(const std::string &sql,
-                                          ::sqlite3 *connection,
-                                          const ShardingInformation &info,
-                                          const UserId &user_id,
-                                          const OutputChannel &output) {
-  LOG(INFO) << "Statement: " << sql;
-  // Turn c++ style callback into a c-style function pointer.
-  CALLBACK_NO_CAPTURE = &output.callback;
-  SHARD_BY_INDEX_NO_CAPTURE = info.shard_by_index;
-  SHARD_BY_NO_CAPTURE = CopyCString(info.shard_by);
-  USER_ID_NO_CAPTURE = CopyCString(user_id);
-  // Augment the shard by column to the result.
-  auto cb = [](void *context, int _colnum, char **colvals, char **colnames) {
-    size_t colnum = static_cast<size_t>(_colnum);
-    // Append stored column name and value to result at the stored index.
-    char **vals = new char *[colnum + 1];
-    char **names = new char *[colnum + 1];
-    vals[SHARD_BY_INDEX_NO_CAPTURE] = USER_ID_NO_CAPTURE;
-    names[SHARD_BY_INDEX_NO_CAPTURE] = SHARD_BY_NO_CAPTURE;
-    for (size_t i = 0; i < SHARD_BY_INDEX_NO_CAPTURE; i++) {
-      vals[i] = colvals[i];
-      names[i] = colnames[i];
-    }
-    for (size_t i = SHARD_BY_INDEX_NO_CAPTURE; i < colnum; i++) {
-      vals[i + 1] = colvals[i];
-      names[i + 1] = colnames[i];
-    }
-    // Forward appended results to callback.
-    int result = (*CALLBACK_NO_CAPTURE)(context, colnum + 1, vals, names);
-    // Deallocate appended results.
-    delete[] vals;
-    delete[] names;
-    return result;
-  };
-
-  // Execute using c-style function pointer.
-  const char *str = sql.c_str();
-  void *context = output.context;
-  char **errmsg = output.errmsg;
-  if (::sqlite3_exec(connection, str, cb, context, errmsg) == SQLITE_OK) {
-    return absl::OkStatus();
-  } else {
-    std::string error = "Sqlite3 statement failed";
-    if (*errmsg != nullptr) {
-      error = absl::StrCat(error, ": ", *errmsg);
-    }
-    return absl::AbortedError(error);
+// Actual SQL statement execution.
+mysql::SqlResult ConnectionPool::ExecuteMySQL(ConnectionPool::Operation op,
+                                              const std::string &sql,
+                                              const dataflow::SchemaRef &schema,
+                                              const std::string &shard_name,
+                                              int aug_index,
+                                              const std::string &aug_value) {
+  if (this->databases_.count(shard_name) == 0) {
+    this->stmt_->execute("CREATE DATABASE IF NOT EXISTS " + shard_name);
+    this->databases_.insert(shard_name);
   }
+
+  std::string exec_str = "USE " + shard_name + "; " + sql;
+  mysql::SqlResult res;
+  switch (op) {
+    case ConnectionPool::Operation::STATEMENT: {
+      perf::Start("MySQL");
+      this->stmt_->execute(exec_str);
+      this->stmt_->getMoreResults();
+      this->stmt_->getMoreResults();
+      perf::End("MySQL");
+      res = mysql::SqlResult(std::make_unique<mysql::StatementResult>(true));
+      break;
+    }
+    case ConnectionPool::Operation::UPDATE: {
+      perf::Start("MySQL");
+      this->stmt_->execute(exec_str);
+      this->stmt_->getMoreResults();  // Skip all results.
+      int row_count = this->stmt_->getUpdateCount();
+      this->stmt_->getMoreResults();
+      perf::End("MySQL");
+      res = mysql::SqlResult(std::make_unique<mysql::UpdateResult>(row_count));
+      break;
+    }
+    case ConnectionPool::Operation::QUERY: {
+      perf::Start("MySQL");
+      sql::ResultSet *tmp;
+      this->stmt_->execute(exec_str);
+      this->stmt_->getMoreResults();  // Skip the USE <db>; result.
+      tmp = this->stmt_->getResultSet();
+      this->stmt_->getMoreResults();
+      perf::End("MySQL");
+      if (aug_index > -1) {
+        res = mysql::SqlResult(
+            std::make_unique<mysql::AugmentedSqlResult>(
+                std::unique_ptr<sql::ResultSet>(tmp), aug_index, aug_value),
+            schema);
+      } else {
+        res = mysql::SqlResult(std::make_unique<mysql::MySqlResult>(
+                                   std::unique_ptr<sql::ResultSet>(tmp)),
+                               schema);
+      }
+      break;
+    }
+  }
+
+  return res;
 }
 
 }  // namespace shards

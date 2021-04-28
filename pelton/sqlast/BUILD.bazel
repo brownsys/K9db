@@ -24,6 +24,7 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
+        "//pelton/util:perf",
         "@absl//absl/status:statusor",
         "@absl//absl/strings",
         "@glog",
@@ -41,7 +42,9 @@ cc_library(
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":ast",
+        ":hacky",
         ":transformer",
+        "//pelton/util:perf",
         "@absl//absl/status:statusor",
         "@antlr4_runtimes//:cpp",
         "@grammars-v4//:sqlparser",
@@ -62,5 +65,21 @@ cc_library(
         "@absl//absl/status:statusor",
         "@antlr4_runtimes//:cpp",
         "@grammars-v4//:sqlparser",
+    ],
+)
+
+cc_library(
+    name = "hacky",
+    srcs = [
+        "hacky.cc",
+        "hacky_util.h",
+    ],
+    hdrs = [
+        "hacky.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":ast",
+        "@absl//absl/status:statusor",
     ],
 )

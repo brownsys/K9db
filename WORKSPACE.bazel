@@ -1,6 +1,7 @@
 workspace(name = "pelton")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_repository")
 
 # Buildifier
 # buildifier is written in Go and hence needs rules_go to be built.
@@ -89,6 +90,12 @@ http_archive(
     urls = ["https://github.com/google/glog/archive/v0.4.0.tar.gz"],
 )
 
+git_repository(
+    name = "gflags",
+    remote = "https://github.com/gflags/gflags.git",
+    tag = "v2.2.2",
+)
+
 # Google Benchmark library for microbenchmarks
 http_archive(
     name = "gbenchmark",
@@ -104,10 +111,6 @@ http_archive(
     strip_prefix = "rules_cc-9e10b8a6db775b1ecd358d8ddd3dab379a2c29a5",
     urls = ["https://github.com/bazelbuild/rules_cc/archive/9e10b8a6db775b1ecd358d8ddd3dab379a2c29a5.zip"],
 )
-
-#
-# For the sharding system.
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "new_git_repository")
 
 # ANTLR Runtime and Parser generator from grammar files.
 http_archive(
@@ -154,8 +157,8 @@ cc_library(
     ],
 )
 """,
-    #commit = "9514c04a33a0cf157853334105f32fc914e4f1de",  # My Fix on Oct 27 2020
-    commit = "ead0c4b7ec6a41a602bf35c631bf398729268af1",  # My non-merged second fix from Nov 10 2020
+    # My non-merged change for create_view_stmt QUERY_LITERAL from Mar 25 2021.
+    commit = "d01851e98aafd7f111708d03d65d07d8466db20a",
     #remote = "https://github.com/antlr/grammars-v4",
     remote = "https://github.com/KinanBab/grammars-v4.git",
 )

@@ -10,6 +10,7 @@
 
 #include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"
+#include "pelton/dataflow/ops/project_enum.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
@@ -19,10 +20,36 @@ namespace dataflow {
 
 class ProjectOperator : public Operator {
  public:
-  explicit ProjectOperator(const std::vector<ColumnID> &cids)
-      : Operator(Operator::Type::PROJECT),
-        cids_(cids),
-        owned_output_schema_() {}
+  using Operation = ProjectOperationEnum;
+  using Metadata = ProjectMetadataEnum;
+
+  ProjectOperator() : Operator(Operator::Type::PROJECT), projections_() {}
+
+  void AddProjection(const std::string &column_name, ColumnID cid) {
+    this->projections_.push_back(std::make_tuple(
+        column_name, cid, Operation::NONE, uint64_t(-1), Metadata::COLUMN));
+  }
+  // For projecting literal, user needs to explicitly specify Metadata::LITERAL.
+  // This is done in order to make the APIs more usable, else explicit casting
+  // would be required
+  //  in order to distinguish between LITERAL and COLUMN.
+  void AddProjection(const std::string &column_name,
+                     Record::DataVariant literal, Metadata metadata) {
+    this->projections_.push_back(
+        std::make_tuple(column_name, 99, Operation::NONE, literal, metadata));
+  }
+  void AddProjection(std::string column_name, ColumnID left_operand,
+                     Operation operation, int64_t right_operand,
+                     Metadata metadata) {
+    this->projections_.push_back(std::make_tuple(
+        column_name, left_operand, operation, right_operand, metadata));
+  }
+  void AddProjection(std::string column_name, ColumnID left_operand,
+                     Operation operation, uint64_t right_operand,
+                     Metadata metadata) {
+    this->projections_.push_back(std::make_tuple(
+        column_name, left_operand, operation, right_operand, metadata));
+  }
 
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,
@@ -30,12 +57,18 @@ class ProjectOperator : public Operator {
   void ComputeOutputSchema() override;
 
  private:
-  const std::vector<ColumnID> cids_;
-  SchemaOwner owned_output_schema_;
+  std::vector<std::tuple<std::string, ColumnID, Operation, Record::DataVariant,
+                         Metadata>>
+      projections_;
+
   // Allow tests to use .Process(...) directly.
-  FRIEND_TEST(ProjectOperatorTest, BatchTest);
+  FRIEND_TEST(ProjectOperatorTest, BatchTestColumn);
+  FRIEND_TEST(ProjectOperatorTest, BatchTestLiteral);
+  FRIEND_TEST(ProjectOperatorTest, BatchTestOperationRightColumn);
+  FRIEND_TEST(ProjectOperatorTest, BatchTestOperationRightLiteral);
   FRIEND_TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest);
   FRIEND_TEST(ProjectOperatorTest, OutputSchemaCompositeKeyTest);
+  FRIEND_TEST(ProjectOperatorTest, NullValueTest);
 };
 
 }  // namespace dataflow

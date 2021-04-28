@@ -67,7 +67,10 @@ class Select : public AbstractStatement {
  public:
   explicit Select(const std::string &table_name)
       : AbstractStatement(AbstractStatement::Type::SELECT),
-        table_name_(table_name) {}
+        table_name_(table_name) {
+    this->offset_ = 0;
+    this->limit_ = -1;
+  }
 
   Select(const Select &sel)
       : AbstractStatement(AbstractStatement::Type::SELECT) {
@@ -82,6 +85,11 @@ class Select : public AbstractStatement {
   const std::string &table_name() const;
   std::string &table_name();
 
+  const size_t &offset() const { return this->offset_; }
+  size_t &offset() { return this->offset_; }
+  const int &limit() const { return this->limit_; }
+  int &limit() { return this->limit_; }
+
   void AddColumn(const std::string &column);
   const std::vector<std::string> &GetColumns() const;
   std::vector<std::string> &GetColumns();
@@ -92,6 +100,15 @@ class Select : public AbstractStatement {
   BinaryExpression *const GetWhereClause();
   void SetWhereClause(std::unique_ptr<BinaryExpression> &&where);
   void RemoveWhereClause();
+
+  // We use Select to represent queries selecting data from flows, as well
+  // as those selecting data from underlying sharded tables. Not all fetures
+  // all support when accessing underlying sharded tables. This function
+  // checks whether all of the contents of this query are supported for shard
+  // access.
+  bool SupportedByShards() const {
+    return this->offset_ == 0 && this->limit_ == -1;
+  }
 
   template <class T>
   T Visit(AbstractVisitor<T> *visitor) const {
@@ -122,6 +139,8 @@ class Select : public AbstractStatement {
   std::string table_name_;
   std::vector<std::string> columns_;
   std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
+  size_t offset_;
+  int limit_;
 };
 
 class Delete : public AbstractStatement {
@@ -248,6 +267,22 @@ class Update : public AbstractStatement {
   std::vector<std::string> columns_;
   std::vector<std::string> values_;
   std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
+};
+
+class CreateView : public AbstractStatement {
+ public:
+  CreateView(const std::string &view_name, const std::string &query)
+      : AbstractStatement(AbstractStatement::Type::CREATE_VIEW),
+        view_name_(view_name),
+        query_(query) {}
+
+  // Accessors.
+  const std::string &view_name() const { return this->view_name_; }
+  const std::string &query() const { return this->query_; }
+
+ private:
+  std::string view_name_;
+  std::string query_;
 };
 
 }  // namespace sqlast

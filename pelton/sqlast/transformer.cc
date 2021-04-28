@@ -47,6 +47,9 @@ antlrcpp::Any AstTransformer::visitSql_stmt(
   if (ctx->create_table_stmt() != nullptr) {
     return ctx->create_table_stmt()->accept(this);
   }
+  if (ctx->create_index_stmt() != nullptr) {
+    return ctx->create_index_stmt()->accept(this);
+  }
   if (ctx->insert_stmt() != nullptr) {
     return ctx->insert_stmt()->accept(this);
   }
@@ -59,7 +62,34 @@ antlrcpp::Any AstTransformer::visitSql_stmt(
   if (ctx->delete_stmt() != nullptr) {
     return ctx->delete_stmt()->accept(this);
   }
+  if (ctx->create_view_stmt() != nullptr) {
+    return ctx->create_view_stmt()->accept(this);
+  }
+
   return absl::InvalidArgumentError("Unsupported statement type");
+}
+
+// Create a view.
+antlrcpp::Any AstTransformer::visitCreate_view_stmt(
+    sqlparser::SQLiteParser::Create_view_stmtContext *ctx) {
+  if (ctx->TEMP() != nullptr || ctx->TEMPORARY() != nullptr ||
+      ctx->EXISTS() != nullptr || ctx->schema_name() != nullptr ||
+      ctx->column_name().size() != 0) {
+    return absl::InvalidArgumentError("Unsupported constructs in create view");
+  }
+
+  // Parse view name.
+  CAST_OR_RETURN(std::string view_name, ctx->view_name()->accept(this),
+                 std::string);
+
+  // Select statement is not parsed and treated as a literal, the planner
+  // will parse and handle it.
+  std::string query = ctx->QUERY_LITERAL()->getText();
+  query = query.substr(2);
+  query = query.substr(0, query.size() - 2);
+
+  return static_cast<std::unique_ptr<AbstractStatement>>(
+      std::make_unique<CreateView>(view_name, query));
 }
 
 // Create Table constructs.
@@ -88,7 +118,8 @@ antlrcpp::Any AstTransformer::visitCreate_table_stmt(
                    constraint->accept(this),
                    std::pair<std::string _COMMA ColumnConstraint>);
     if (!table->HasColumn(col_name)) {
-      return absl::InvalidArgumentError("Constraint over non-existing column");
+      return absl::InvalidArgumentError("Constraint over non-existing column " +
+                                        col_name);
     }
     table->MutableColumn(col_name).AddConstraint(ast_constraint);
   }
@@ -182,6 +213,27 @@ antlrcpp::Any AstTransformer::visitForeign_key_clause(
   return constrn;
 }
 
+// Create Index constructs.
+antlrcpp::Any AstTransformer::visitCreate_index_stmt(
+    sqlparser::SQLiteParser::Create_index_stmtContext *ctx) {
+  if (ctx->UNIQUE() != nullptr || ctx->EXISTS() != nullptr ||
+      ctx->WHERE() != nullptr || ctx->schema_name() != nullptr) {
+    return absl::InvalidArgumentError("Invalid Create Index statement");
+  }
+  if (ctx->indexed_column().size() > 1) {
+    return absl::InvalidArgumentError("Multi-column index are not supported!");
+  }
+
+  CAST_OR_RETURN(std::string index_name, ctx->index_name()->accept(this),
+                 std::string);
+  CAST_OR_RETURN(std::string table_name, ctx->table_name()->accept(this),
+                 std::string);
+  CAST_OR_RETURN(std::string column_name, ctx->indexed_column(0)->accept(this),
+                 std::string);
+  return static_cast<std::unique_ptr<AbstractStatement>>(
+      std::make_unique<CreateIndex>(index_name, table_name, column_name));
+}
+
 // Insert constructs.
 antlrcpp::Any AstTransformer::visitInsert_stmt(
     sqlparser::SQLiteParser::Insert_stmtContext *ctx) {
@@ -270,10 +322,26 @@ antlrcpp::Any AstTransformer::visitSelect_stmt(
     sqlparser::SQLiteParser::Select_stmtContext *ctx) {
   if (ctx->common_table_stmt() != nullptr ||
       ctx->compound_operator().size() != 0 || ctx->select_core().size() != 1 ||
-      ctx->order_by_stmt() != nullptr || ctx->limit_stmt() != nullptr) {
+      ctx->order_by_stmt() != nullptr) {
     return absl::InvalidArgumentError("Invalid select construct");
   }
-  return ctx->select_core(0)->accept(this);
+
+  // Parse select_core.
+  MCAST_OR_RETURN(std::unique_ptr<AbstractStatement> select_stmt,
+                  ctx->select_core(0)->accept(this),
+                  std::unique_ptr<AbstractStatement>);
+
+  // Parse OFFSET and LIMIT if they exist.
+  if (ctx->limit_stmt() != nullptr) {
+    CAST_OR_RETURN(auto [offset _COMMA limit], ctx->limit_stmt()->accept(this),
+                   std::pair<size_t _COMMA int>);
+
+    Select *select = static_cast<Select *>(select_stmt.get());
+    select->limit() = limit;
+    select->offset() = offset;
+  }
+
+  return std::move(select_stmt);
 }
 antlrcpp::Any AstTransformer::visitSelect_core(
     sqlparser::SQLiteParser::Select_coreContext *ctx) {
@@ -300,7 +368,8 @@ antlrcpp::Any AstTransformer::visitSelect_core(
     MCAST_OR_RETURN(std::unique_ptr<Expression> expr,
                     ctx->expr(0)->accept(this), std::unique_ptr<Expression>);
     if (expr->type() != Expression::Type::EQ &&
-        expr->type() != Expression::Type::AND) {
+        expr->type() != Expression::Type::AND &&
+        expr->type() != Expression::Type::GREATER_THAN) {
       return absl::InvalidArgumentError("Where clause must be boolean");
     }
 
@@ -325,6 +394,15 @@ antlrcpp::Any AstTransformer::visitTable_or_subquery(
     return absl::InvalidArgumentError("Invalid select domain");
   }
   return ctx->table_name()->accept(this);
+}
+antlrcpp::Any AstTransformer::visitLimit_stmt(
+    sqlparser::SQLiteParser::Limit_stmtContext *ctx) {
+  std::string limit = ctx->expr().at(0)->getText();
+  if (ctx->expr().size() > 1) {
+    std::string offset = ctx->expr().at(1)->getText();
+    return std::pair<size_t, int>(std::stoul(offset), std::stoi(limit));
+  }
+  return std::pair<size_t, int>(0, std::stoi(limit));
 }
 
 // Delete statement.
@@ -367,7 +445,8 @@ antlrcpp::Any AstTransformer::visitQualified_table_name(
 antlrcpp::Any AstTransformer::visitExpr(
     sqlparser::SQLiteParser::ExprContext *ctx) {
   if ((ctx->literal_value() == nullptr && ctx->ASSIGN() == nullptr &&
-       ctx->column_name() == nullptr && ctx->AND() == nullptr) ||
+       ctx->column_name() == nullptr && ctx->AND() == nullptr &&
+       ctx->GT() == nullptr) ||
       ctx->expr().size() > 2) {
     return absl::InvalidArgumentError("Unsupported expression");
   }
@@ -393,6 +472,9 @@ antlrcpp::Any AstTransformer::visitExpr(
   }
   if (ctx->AND() != nullptr) {
     result = std::make_unique<BinaryExpression>(Expression::Type::AND);
+  }
+  if (ctx->GT() != nullptr) {
+    result = std::make_unique<BinaryExpression>(Expression::Type::GREATER_THAN);
   }
 
   MCAST_OR_RETURN(std::unique_ptr<Expression> expr0, ctx->expr(0)->accept(this),
@@ -424,6 +506,14 @@ antlrcpp::Any AstTransformer::visitName(
 }
 antlrcpp::Any AstTransformer::visitTable_name(
     sqlparser::SQLiteParser::Table_nameContext *ctx) {
+  return ctx->any_name()->accept(this);
+}
+antlrcpp::Any AstTransformer::visitIndex_name(
+    sqlparser::SQLiteParser::Index_nameContext *ctx) {
+  return ctx->any_name()->accept(this);
+}
+antlrcpp::Any AstTransformer::visitView_name(
+    sqlparser::SQLiteParser::View_nameContext *ctx) {
   return ctx->any_name()->accept(this);
 }
 antlrcpp::Any AstTransformer::visitForeign_table(
@@ -491,10 +581,6 @@ antlrcpp::Any AstTransformer::visitRelease_stmt(
     sqlparser::SQLiteParser::Release_stmtContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
-antlrcpp::Any AstTransformer::visitCreate_index_stmt(
-    sqlparser::SQLiteParser::Create_index_stmtContext *ctx) {
-  return absl::InvalidArgumentError("Unsupported Syntax");
-}
 antlrcpp::Any AstTransformer::visitSigned_number(
     sqlparser::SQLiteParser::Signed_numberContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
@@ -505,10 +591,6 @@ antlrcpp::Any AstTransformer::visitConflict_clause(
 }
 antlrcpp::Any AstTransformer::visitCreate_trigger_stmt(
     sqlparser::SQLiteParser::Create_trigger_stmtContext *ctx) {
-  return absl::InvalidArgumentError("Unsupported Syntax");
-}
-antlrcpp::Any AstTransformer::visitCreate_view_stmt(
-    sqlparser::SQLiteParser::Create_view_stmtContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
 antlrcpp::Any AstTransformer::visitCreate_virtual_table_stmt(
@@ -643,10 +725,6 @@ antlrcpp::Any AstTransformer::visitOrder_by_stmt(
     sqlparser::SQLiteParser::Order_by_stmtContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
-antlrcpp::Any AstTransformer::visitLimit_stmt(
-    sqlparser::SQLiteParser::Limit_stmtContext *ctx) {
-  return absl::InvalidArgumentError("Unsupported Syntax");
-}
 antlrcpp::Any AstTransformer::visitOrdering_term(
     sqlparser::SQLiteParser::Ordering_termContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
@@ -743,16 +821,8 @@ antlrcpp::Any AstTransformer::visitCollation_name(
     sqlparser::SQLiteParser::Collation_nameContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
-antlrcpp::Any AstTransformer::visitIndex_name(
-    sqlparser::SQLiteParser::Index_nameContext *ctx) {
-  return absl::InvalidArgumentError("Unsupported Syntax");
-}
 antlrcpp::Any AstTransformer::visitTrigger_name(
     sqlparser::SQLiteParser::Trigger_nameContext *ctx) {
-  return absl::InvalidArgumentError("Unsupported Syntax");
-}
-antlrcpp::Any AstTransformer::visitView_name(
-    sqlparser::SQLiteParser::View_nameContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
 antlrcpp::Any AstTransformer::visitModule_name(

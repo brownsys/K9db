@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "glog/logging.h"
+#include "pelton/util/perf.h"
 // NOLINTNEXTLINE
 #include "jni.h"
 
@@ -68,6 +69,7 @@ std::pair<JavaVM *, JNIEnv *> StartJVM(bool run = true) {
 // a DataFlowGraph with all the operators from that plan.
 dataflow::DataFlowGraph PlanGraph(dataflow::DataFlowState *state,
                                   const std::string &query) {
+  perf::Start("planner");
   // Start a JVM.
   auto [jvm, env] = StartJVM();
 
@@ -95,6 +97,7 @@ dataflow::DataFlowGraph PlanGraph(dataflow::DataFlowState *state,
 
   // Free up the created jstring.
   env->DeleteLocalRef(query_jstr);
+  perf::End("planner");
 
   // Return the graph.
   return graph;

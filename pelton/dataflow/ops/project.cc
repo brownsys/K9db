@@ -9,72 +9,223 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/sqlast/ast.h"
 
+#define ARITHMETIC_WITH_LITERAL_MACRO(OP)                                      \
+  {                                                                            \
+    switch (this->output_schema_.TypeOf(i)) {                                  \
+      case sqlast::ColumnDefinition::Type::UINT:                               \
+        out_record.SetUInt(                                                    \
+            record.GetUInt(left_operand) OP std::get<uint64_t>(right_operand), \
+            i);                                                                \
+        break;                                                                 \
+      case sqlast::ColumnDefinition::Type::INT:                                \
+        switch (record.schema().TypeOf(left_operand)) {                        \
+          case sqlast::ColumnDefinition::Type::UINT:                           \
+            out_record.SetInt(record.GetUInt(left_operand)                     \
+                                  OP std::get<uint64_t>(right_operand),        \
+                              i);                                              \
+            break;                                                             \
+          case sqlast::ColumnDefinition::Type::INT:                            \
+            out_record.SetInt(record.GetInt(left_operand)                      \
+                                  OP std::get<int64_t>(right_operand),         \
+                              i);                                              \
+            break;                                                             \
+          default:                                                             \
+            LOG(FATAL) << "Unsupported column type for operation in project";  \
+        }                                                                      \
+        break;                                                                 \
+      default:                                                                 \
+        LOG(FATAL) << "Unsupported arithmetic operation in project";           \
+    }                                                                          \
+  }
+// In above macro an edge case is being handled for (uint MINUS uint)
+// ARITHMETIC_WITH_LITERAL_MACRO
+
+#define ARITHMETIC_WITH_COLUMN_MACRO(OP)                                      \
+  {                                                                           \
+    switch (this->output_schema_.TypeOf(i)) {                                 \
+      case sqlast::ColumnDefinition::Type::UINT:                              \
+        out_record.SetUInt(record.GetUInt(left_operand) OP record.GetUInt(    \
+                               std::get<uint64_t>(right_operand)),            \
+                           i);                                                \
+        break;                                                                \
+      case sqlast::ColumnDefinition::Type::INT:                               \
+        switch (record.schema().TypeOf(left_operand)) {                       \
+          case sqlast::ColumnDefinition::Type::UINT:                          \
+            out_record.SetInt(record.GetUInt(left_operand) OP record.GetUInt( \
+                                  std::get<uint64_t>(right_operand)),         \
+                              i);                                             \
+            break;                                                            \
+          case sqlast::ColumnDefinition::Type::INT:                           \
+            out_record.SetInt(record.GetInt(left_operand) OP record.GetInt(   \
+                                  std::get<uint64_t>(right_operand)),         \
+                              i);                                             \
+            break;                                                            \
+          default:                                                            \
+            LOG(FATAL) << "Unsupported column type for operation in project"; \
+        }                                                                     \
+        break;                                                                \
+      default:                                                                \
+        LOG(FATAL) << "Unsupported arithmetic operation in project";          \
+    }                                                                         \
+  }
+// In above macro an edge case is being handled for (uint MINUS uint)
+// ARITHMETIC_WITH_COLUMN_MACRO
+
 namespace pelton {
 namespace dataflow {
 
-bool EnclosedKeyCols(const std::vector<ColumnID> &input_keycols,
-                     const std::vector<ColumnID> &cids) {
-  for (const auto &keycol : input_keycols) {
-    bool is_present = false;
-    for (const auto &cid : cids)
-      if (keycol == cid) is_present = true;
+namespace {
 
-    // at least one key column of the composite key is not being projected
-    if (!is_present) return false;
+inline sqlast::ColumnDefinition::Type GetLiteralType(
+    const Record::DataVariant &literal) {
+  switch (literal.index()) {
+    case 1:
+      return sqlast::ColumnDefinition::Type::UINT;
+    case 2:
+      return sqlast::ColumnDefinition::Type::INT;
+    default:
+      LOG(FATAL) << "Unsupported literal type in project";
   }
-  // all input key columns are present in the projected schema
-  return true;
 }
 
-void ProjectOperator::ComputeOutputSchema() {
-  std::vector<std::string> output_column_names = {};
-  std::vector<sqlast::ColumnDefinition::Type> output_column_types = {};
-  std::vector<ColumnID> input_keys = this->input_schemas_.at(0).keys();
-  std::vector<ColumnID> output_keys = {};
+}  // namespace
 
-  // If the input key set is a subset of the projected columns only then form an
-  // output keyset. Else do not assign keys for the output schema. Because the
-  // subset of input keycols can no longer uniqely identify records. This is
-  // only for semantic purposes as, as of now, this does not have an effect on
-  // the materialized view.
-  if (EnclosedKeyCols(input_keys, cids_)) {
-    for (auto ik : input_keys) {
-      auto it = std::find(cids_.begin(), cids_.end(), ik);
-      if (it != cids_.end()) {
-        output_keys.push_back(std::distance(cids_.begin(), it));
+void ProjectOperator::ComputeOutputSchema() {
+  // If keys are not provided, we can compute them ourselves by checking
+  // if the primary key survives the projection.
+  std::vector<ColumnID> out_keys = {};
+  for (ColumnID key : this->input_schemas_.at(0).keys()) {
+    bool found_key = false;
+    for (size_t i = 0; i < this->projections_.size(); i++) {
+      const auto &[column_name, left_operand, op, right_operand, metadata] =
+          this->projections_.at(i);
+      if (metadata == Metadata::COLUMN && left_operand == key) {
+        out_keys.push_back(i);
+        found_key = true;
+        break;
       }
+    }
+    if (!found_key) {
+      out_keys.clear();
+      break;
     }
   }
 
-  // obtain column names and types
-  for (const auto &cid : cids_) {
-    output_column_names.push_back(this->input_schemas_.at(0).NameOf(cid));
-    output_column_types.push_back(this->input_schemas_.at(0).TypeOf(cid));
+  // Obtain column name and types
+  std::vector<std::string> out_column_names = {};
+  std::vector<sqlast::ColumnDefinition::Type> out_column_types = {};
+  for (const auto &[column_name, left_operand, op, right_operand, metadata] :
+       this->projections_) {
+    // Obtain types and simultaneously sanity check for type compatibility
+    // in case of airthmetic operations
+    switch (metadata) {
+      case Metadata::COLUMN:
+        out_column_types.push_back(
+            this->input_schemas_.at(0).TypeOf(left_operand));
+        break;
+      case Metadata::LITERAL:
+        out_column_types.push_back(GetLiteralType(right_operand));
+        break;
+      case Metadata::ARITHMETIC_WITH_LITERAL:
+        if (this->input_schemas_.at(0).TypeOf(left_operand) !=
+            GetLiteralType(right_operand))
+          LOG(FATAL) << "Column and literal do not have same types for "
+                        "arithmetic operation in projection";
+        if (op == Operation::MINUS) {
+          // uint MINUS uint would result in an int
+          out_column_types.push_back(sqlast::ColumnDefinition::Type::INT);
+        } else {
+          out_column_types.push_back(
+              this->input_schemas_.at(0).TypeOf(left_operand));
+        }
+        break;
+      case Metadata::ARITHMETIC_WITH_COLUMN:
+        if (this->input_schemas_.at(0).TypeOf(left_operand) !=
+            this->input_schemas_.at(0).TypeOf(
+                std::get<uint64_t>(right_operand)))
+          LOG(FATAL) << "Columns do not have same types for arithmetic "
+                        "operation in projection";
+        if (op == Operation::MINUS) {
+          // uint MINUS uint would result in an int
+          out_column_types.push_back(sqlast::ColumnDefinition::Type::INT);
+        } else {
+          out_column_types.push_back(
+              this->input_schemas_.at(0).TypeOf(left_operand));
+        }
+    }
+    out_column_names.push_back(column_name);
   }
-  owned_output_schema_ =
-      SchemaOwner(output_column_names, output_column_types, output_keys);
-  this->output_schema_ = SchemaRef(owned_output_schema_);
+
+  this->output_schema_ =
+      SchemaFactory::Create(out_column_names, out_column_types, out_keys);
 }
 
 bool ProjectOperator::Process(NodeIndex source,
                               const std::vector<Record> &records,
                               std::vector<Record> *output) {
   for (const Record &record : records) {
-    Record out_record{this->output_schema_};
-    for (size_t i = 0; i < cids_.size(); i++) {
-      switch (this->output_schema_.TypeOf(i)) {
-        case sqlast::ColumnDefinition::Type::UINT:
-          out_record.SetUInt(record.GetUInt(cids_.at(i)), i);
+    Record out_record{this->output_schema_, record.IsPositive()};
+    for (size_t i = 0; i < this->projections_.size(); i++) {
+      if (record.IsNull(i)) {
+        out_record.SetNull(true, i);
+        continue;
+      }
+      const auto &[column_name, left_operand, op, right_operand, metadata] =
+          this->projections_.at(i);
+      switch (metadata) {
+        case Metadata::COLUMN:
+          switch (this->output_schema_.TypeOf(i)) {
+            case sqlast::ColumnDefinition::Type::UINT:
+              out_record.SetUInt(record.GetUInt(left_operand), i);
+              break;
+            case sqlast::ColumnDefinition::Type::INT:
+              out_record.SetInt(record.GetInt(left_operand), i);
+              break;
+            case sqlast::ColumnDefinition::Type::TEXT:
+              out_record.SetString(
+                  std::make_unique<std::string>(record.GetString(left_operand)),
+                  i);
+              break;
+            default:
+              LOG(FATAL) << "Unsupported type in project";
+          }
           break;
-        case sqlast::ColumnDefinition::Type::INT:
-          out_record.SetInt(record.GetInt(cids_.at(i)), i);
+        case Metadata::LITERAL:
+          switch (right_operand.index()) {
+            case 1:
+              out_record.SetUInt(std::get<uint64_t>(right_operand), i);
+              break;
+            case 2:
+              out_record.SetInt(std::get<int64_t>(right_operand), i);
+              break;
+            default:
+              LOG(FATAL) << "Unsupported literal type";
+          }
           break;
-        case sqlast::ColumnDefinition::Type::TEXT:
-          out_record.SetString(
-              std::make_unique<std::string>(record.GetString(cids_.at(i))), i);
+        case Metadata::ARITHMETIC_WITH_LITERAL:
+          switch (op) {
+            case Operation::MINUS:
+              ARITHMETIC_WITH_LITERAL_MACRO(-)
+              break;
+            case Operation::PLUS:
+              ARITHMETIC_WITH_LITERAL_MACRO(+)
+              break;
+            default:
+              LOG(FATAL) << "Unsupported arithmetic operation in project";
+          }
           break;
-        default:
-          LOG(FATAL) << "Unsupported type in project";
+        case Metadata::ARITHMETIC_WITH_COLUMN:
+          switch (op) {
+            case Operation::MINUS:
+              ARITHMETIC_WITH_COLUMN_MACRO(-)
+              break;
+            case Operation::PLUS:
+              ARITHMETIC_WITH_COLUMN_MACRO(+)
+              break;
+            default:
+              LOG(FATAL) << "Unsupported arithmetic operation in project";
+          }
+          break;
       }
     }
     output->push_back(std::move(out_record));

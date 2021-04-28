@@ -2,6 +2,7 @@
 #define PELTON_DATAFLOW_OPERATOR_H_
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "benchmark/benchmark.h"
@@ -16,7 +17,10 @@ namespace dataflow {
 class Edge;
 class DataFlowGraph;
 
+#ifdef PELTON_BENCHMARK  // shuts up compiler warnings
+// NOLINTNEXTLINE
 static void JoinOneToOne(benchmark::State &state);
+#endif
 
 class Operator {
  public:
@@ -27,7 +31,8 @@ class Operator {
     FILTER,
     UNION,
     EQUIJOIN,
-    PROJECT
+    PROJECT,
+    AGGREGATE,
   };
 
   // Cannot copy an operator.
@@ -59,6 +64,9 @@ class Operator {
 
   // Constructs a vector of parent operators from parents_ edge vector.
   std::vector<std::shared_ptr<Operator>> GetParents() const;
+
+  // For debugging.
+  virtual std::string DebugString() const;
 
  protected:
   explicit Operator(Type type)
@@ -105,7 +113,11 @@ class Operator {
 
   // Allow DataFlowGraph to use SetGraph, SetIndex, and AddParent functions.
   friend class DataFlowGraph;
+
+#ifdef PELTON_BENCHMARK  // shuts up compiler warnings
+  // NOLINTNEXTLINE
   friend void JoinOneToOne(benchmark::State &state);
+#endif
 };
 
 }  // namespace dataflow

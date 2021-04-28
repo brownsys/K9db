@@ -7,11 +7,14 @@
 #include <utility>
 #include <vector>
 
+#include "pelton/util/perf.h"
+
 namespace pelton {
 namespace sqlast {
 
 // Stringifier.
 std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
+  perf::Start("Stringify (create)");
   std::string result = "CREATE TABLE " + ast.table_name() + " (";
   bool first = true;
   for (const std::string &col : ast.VisitChildren(this)) {
@@ -21,7 +24,9 @@ std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
     first = false;
     result += col;
   }
-  result += ");";
+  result += ")";
+  result += " ENGINE MEMORY";
+  perf::End("Stringify (create)");
   return result;
 }
 std::string Stringifier::VisitColumnDefinition(const ColumnDefinition &ast) {
@@ -46,7 +51,16 @@ std::string Stringifier::VisitColumnConstraint(const ColumnConstraint &ast) {
   }
 }
 
+std::string Stringifier::VisitCreateIndex(const CreateIndex &ast) {
+  perf::Start("Stringify (create index)");
+  std::string result = "CREATE INDEX " + ast.index_name() + " ON " +
+                       ast.table_name() + "(" + ast.column_name() + ")";
+  perf::End("Stringify (create index)");
+  return result;
+}
+
 std::string Stringifier::VisitInsert(const Insert &ast) {
+  perf::Start("Stringify (insert)");
   std::string result = "INSERT INTO " + ast.table_name();
   // Columns if explicitly specified.
   if (ast.GetColumns().size() > 0) {
@@ -71,10 +85,12 @@ std::string Stringifier::VisitInsert(const Insert &ast) {
     first = false;
     result += val;
   }
-  result += ");";
+  result += ")";
+  perf::End("Stringify (insert)");
   return result;
 }
 std::string Stringifier::VisitUpdate(const Update &ast) {
+  perf::Start("Stringify (update)");
   std::string result = "UPDATE " + ast.table_name() + " SET ";
   // Columns and values.
   const std::vector<std::string> &cols = ast.GetColumns();
@@ -88,10 +104,11 @@ std::string Stringifier::VisitUpdate(const Update &ast) {
   if (ast.HasWhereClause()) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
-  result += ";";
+  perf::End("Stringify (update)");
   return result;
 }
 std::string Stringifier::VisitSelect(const Select &ast) {
+  perf::Start("Stringify (select)");
   std::string result = "SELECT ";
   bool first = true;
   for (const std::string &col : ast.GetColumns()) {
@@ -105,15 +122,16 @@ std::string Stringifier::VisitSelect(const Select &ast) {
   if (ast.HasWhereClause()) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
-  result += ";";
+  perf::End("Stringify (select)");
   return result;
 }
 std::string Stringifier::VisitDelete(const Delete &ast) {
+  perf::Start("Stringify (delete)");
   std::string result = "DELETE FROM " + ast.table_name();
   if (ast.HasWhereClause()) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
-  result += ";";
+  perf::End("Stringify (delete)");
   return result;
 }
 
@@ -150,6 +168,10 @@ std::pair<bool, std::string> ValueFinder::VisitColumnDefinition(
 }
 std::pair<bool, std::string> ValueFinder::VisitColumnConstraint(
     const ColumnConstraint &ast) {
+  assert(false);
+}
+std::pair<bool, std::string> ValueFinder::VisitCreateIndex(
+    const CreateIndex &ast) {
   assert(false);
 }
 std::pair<bool, std::string> ValueFinder::VisitInsert(const Insert &ast) {
@@ -223,6 +245,10 @@ std::unique_ptr<Expression> ExpressionRemover::VisitColumnDefinition(
 }
 std::unique_ptr<Expression> ExpressionRemover::VisitColumnConstraint(
     ColumnConstraint *ast) {
+  assert(false);
+}
+std::unique_ptr<Expression> ExpressionRemover::VisitCreateIndex(
+    CreateIndex *ast) {
   assert(false);
 }
 std::unique_ptr<Expression> ExpressionRemover::VisitInsert(Insert *ast) {

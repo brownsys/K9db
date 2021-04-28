@@ -10,7 +10,7 @@ namespace dataflow {
 
 using CType = pelton::sqlast::ColumnDefinition::Type;
 
-SchemaOwner MakeSchema(bool use_strings);
+SchemaRef MakeSchema(bool use_strings);
 
 }  // namespace dataflow
 }  // namespace pelton

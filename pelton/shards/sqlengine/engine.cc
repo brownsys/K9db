@@ -7,59 +7,79 @@
 
 #include "pelton/shards/sqlengine/create.h"
 #include "pelton/shards/sqlengine/delete.h"
+#include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/insert.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/update.h"
+#include "pelton/shards/sqlengine/view.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/sqlast/parser.h"
+#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
 namespace shards {
 namespace sqlengine {
 
-absl::Status Shard(const std::string &sql, SharderState *state,
-                   dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output) {
+absl::StatusOr<mysql::SqlResult> Shard(
+    const std::string &sql, SharderState *state,
+    dataflow::DataFlowState *dataflow_state) {
   // Parse with ANTLR into our AST.
+  perf::Start("parsing");
   sqlast::SQLParser parser;
   MOVE_OR_RETURN(std::unique_ptr<sqlast::AbstractStatement> statement,
                  parser.Parse(sql));
+  perf::End("parsing");
 
   // Compute result.
   switch (statement->type()) {
     // Case 1: CREATE TABLE statement.
     case sqlast::AbstractStatement::Type::CREATE_TABLE: {
       auto *stmt = static_cast<sqlast::CreateTable *>(statement.get());
-      auto result = create::Shard(*stmt, state, dataflow_state, output);
-      if (result.ok()) {
-        dataflow_state->AddTableSchema(*stmt);
-      }
-      return result;
+      return create::Shard(*stmt, state, dataflow_state);
     }
 
     // Case 2: Insert statement.
     case sqlast::AbstractStatement::Type::INSERT: {
       auto *stmt = static_cast<sqlast::Insert *>(statement.get());
-      return insert::Shard(*stmt, state, dataflow_state, output);
+      return insert::Shard(*stmt, state, dataflow_state);
     }
 
     // Case 3: Update statement.
     case sqlast::AbstractStatement::Type::UPDATE: {
       auto *stmt = static_cast<sqlast::Update *>(statement.get());
-      return update::Shard(*stmt, state, dataflow_state, output);
+      return update::Shard(*stmt, state, dataflow_state);
     }
 
     // Case 4: Select statement.
+    // Might be a select from a matview or a table.
     case sqlast::AbstractStatement::Type::SELECT: {
       auto *stmt = static_cast<sqlast::Select *>(statement.get());
-      return select::Shard(*stmt, state, dataflow_state, output);
+      if (dataflow_state->HasFlow(stmt->table_name())) {
+        return view::SelectView(*stmt, state, dataflow_state);
+      } else {
+        return select::Shard(*stmt, state, dataflow_state);
+      }
     }
 
     // Case 5: Delete statement.
     case sqlast::AbstractStatement::Type::DELETE: {
       auto *stmt = static_cast<sqlast::Delete *>(statement.get());
-      return delete_::Shard(*stmt, state, dataflow_state, output);
+      return delete_::Shard(*stmt, state, dataflow_state);
+    }
+
+    // Case 6: CREATE VIEW statement (e.g. dataflow).
+    case sqlast::AbstractStatement::Type::CREATE_VIEW: {
+      auto *stmt = static_cast<sqlast::CreateView *>(statement.get());
+      CHECK_STATUS(view::CreateView(*stmt, state, dataflow_state));
+      return mysql::SqlResult();
+    }
+
+    // Case 7: CREATE INEDX statement.
+    case sqlast::AbstractStatement::Type::CREATE_INDEX: {
+      auto *stmt = static_cast<sqlast::CreateIndex *>(statement.get());
+      CHECK_STATUS(index::CreateIndex(*stmt, state, dataflow_state));
+      return mysql::SqlResult();
     }
 
     // Unsupported (this should not be reachable).

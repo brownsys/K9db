@@ -1,280 +1,234 @@
 package com.brownsys.pelton;
 
 import com.brownsys.pelton.nativelib.DataFlowGraphLibrary;
+import com.brownsys.pelton.operators.AggregateOperatorFactory;
+import com.brownsys.pelton.operators.FilterOperatorFactory;
+import com.brownsys.pelton.operators.InputOperatorFactory;
+import com.brownsys.pelton.operators.JoinOperatorFactory;
+import com.brownsys.pelton.operators.MatViewOperatorFactory;
+import com.brownsys.pelton.operators.ProjectOperatorFactory;
+import com.brownsys.pelton.operators.UnionOperatorFactory;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Hashtable;
-import java.util.List;
 import java.util.Stack;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.core.TableScan;
+import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
+import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalUnion;
-import org.apache.calcite.rex.RexCall;
-import org.apache.calcite.rex.RexDynamicParam;
-import org.apache.calcite.rex.RexInputRef;
-import org.apache.calcite.rex.RexLiteral;
-import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.util.Pair;
 
 public class PhysicalPlanVisitor extends RelShuttleImpl {
-  private static final List<SqlKind> FILTER_OPERATIONS =
-      Arrays.asList(
-          SqlKind.EQUALS,
-          SqlKind.NOT_EQUALS,
-          SqlKind.LESS_THAN,
-          SqlKind.LESS_THAN_OR_EQUAL,
-          SqlKind.GREATER_THAN,
-          SqlKind.GREATER_THAN_OR_EQUAL);
-
-  private final DataFlowGraphLibrary.DataFlowGraphGenerator generator;
   private final Stack<ArrayList<Integer>> childrenOperators;
-  private final Hashtable<String, Integer> tableToInputOperator;
+  private final Stack<ArrayList<PlanningContext>> childrenContexts;
 
   public PhysicalPlanVisitor(DataFlowGraphLibrary.DataFlowGraphGenerator generator) {
-    this.generator = generator;
+    PlanningContext.useGenerator(generator);
     this.childrenOperators = new Stack<ArrayList<Integer>>();
-    this.tableToInputOperator = new Hashtable<String, Integer>();
+    this.childrenContexts = new Stack<ArrayList<PlanningContext>>();
   }
 
+  /*
+   * Main entry point. This is called by QueryPlanner.java to transform Calcite's query
+   * plan to a pelton data flow.
+   */
   public void populateGraph(RelNode plan) {
     this.childrenOperators.push(new ArrayList<Integer>());
+    this.childrenContexts.push(new ArrayList<PlanningContext>());
 
-    // Start visting.
+    // Start visiting.
     plan.accept(this);
 
     // Check if a mat view operator was already created, otherwise create one.
     ArrayList<Integer> children = this.childrenOperators.pop();
+    ArrayList<PlanningContext> contexts = this.childrenContexts.pop();
     if (children.size() > 0) {
-      // Add a materialized view linked to the last node in the graph.
       assert children.size() == 1;
+      assert contexts.size() == 1;
 
-      // The key of this matview is automatically determine by the input schema to it.
-      int[] keyCols = new int[0]; // TODO(babman): figure out key from query.
-      this.generator.AddMatviewOperator(children.get(0), keyCols);
+      MatViewOperatorFactory matviewFactory = new MatViewOperatorFactory(contexts.get(0));
+      matviewFactory.createOperator(children);
+
       assert this.childrenOperators.isEmpty();
     }
   }
 
-  // Created for queries that have an explicit order by, as well as unordered queries
-  // that have a limit.
-  @Override
-  public RelNode visit(LogicalSort sort) {
-    this.childrenOperators.push(new ArrayList<Integer>());
+  /*
+   * Actual planning code.
+   */
 
-    // Start visting.
-    visitChildren(sort);
-
-    // Add a materialized view linked to the last node in the graph.
-    ArrayList<Integer> children = this.childrenOperators.pop();
-    assert children.size() == 1;
-
-    // Find the sorting parameters.
-    List<RexNode> exps = sort.getChildExps();
-    int[] keyCols = new int[0]; // TODO(babman): figure out key from query.
-    int[] sortingCols = new int[exps.size()];
-    int limit = -1;
-    int offset = 0;
-    for (int i = 0; i < exps.size(); i++) {
-      RexNode exp = exps.get(i);
-      assert exp instanceof RexInputRef;
-      sortingCols[i] = ((RexInputRef) exp).getIndex();
-    }
-
-    // If offset or fetch (e.g. limit) is null, it means the query does not contain a LIMIT (, )
-    // expression. If they are not null, they may also be "?", in which case we keep the default
-    // unspecified -1 values for them.
-    if (sort.offset != null && !(sort.offset instanceof RexDynamicParam)) {
-      assert sort.offset instanceof RexLiteral;
-      offset = RexLiteral.intValue(sort.offset);
-    }
-    if (sort.fetch != null && !(sort.fetch instanceof RexDynamicParam)) {
-      assert sort.fetch instanceof RexLiteral;
-      limit = RexLiteral.intValue(sort.fetch);
-    }
-
-    // We do not add this to children, a matview cannot be a parent for other operators.
-    this.generator.AddMatviewOperator(children.get(0), keyCols, sortingCols, limit, offset);
-    return sort;
+  private Pair<Integer, PlanningContext> analyzeTableScan(TableScan scan) {
+    PlanningContext context = new PlanningContext();
+    InputOperatorFactory inputFactory = new InputOperatorFactory(context);
+    return new Pair<>(inputFactory.createOperator(scan), context);
   }
 
+  private Pair<Integer, PlanningContext> analyzeLogicalUnion(LogicalUnion union) {
+    Pair<ArrayList<Integer>, PlanningContext> pair =
+        this.constructChildrenOperators(union, PlanningContext.MergeOperation.UNION);
+    ArrayList<Integer> children = pair.left;
+    PlanningContext context = pair.right;
+
+    UnionOperatorFactory unionFactory = new UnionOperatorFactory(context);
+    return new Pair<>(unionFactory.createOperator(union, children), context);
+  }
+
+  private Pair<Integer, PlanningContext> analyzeLogicalFilter(LogicalFilter filter) {
+    Pair<ArrayList<Integer>, PlanningContext> pair =
+        this.constructChildrenOperators(filter, PlanningContext.MergeOperation.OTHER);
+    ArrayList<Integer> children = pair.left;
+    PlanningContext context = pair.right;
+
+    FilterOperatorFactory filterFactory = new FilterOperatorFactory(context);
+    return new Pair<>(filterFactory.createOperator(filter, children), context);
+  }
+
+  private Pair<Integer, PlanningContext> analyzeLogicalJoin(LogicalJoin join) {
+    Pair<ArrayList<Integer>, PlanningContext> pair =
+        this.constructChildrenOperators(join, PlanningContext.MergeOperation.JOIN);
+    ArrayList<Integer> children = pair.left;
+    PlanningContext context = pair.right;
+
+    JoinOperatorFactory joinFactory = new JoinOperatorFactory(context);
+    return new Pair<>(joinFactory.createOperator(join, children), context);
+  }
+
+  private Pair<ArrayList<Integer>, PlanningContext> analyzeLogicalProject(LogicalProject project) {
+    Pair<ArrayList<Integer>, PlanningContext> pair =
+        this.constructChildrenOperators(project, PlanningContext.MergeOperation.OTHER);
+    ArrayList<Integer> children = pair.left;
+    PlanningContext context = pair.right;
+
+    ProjectOperatorFactory projectFactory = new ProjectOperatorFactory(context);
+    if (projectFactory.isIdentity(project)) {
+      return new Pair<>(children, context);
+    } else {
+      ArrayList<Integer> result = new ArrayList<Integer>();
+      result.add(projectFactory.createOperator(project, children));
+      return new Pair<>(result, context);
+    }
+  }
+
+  private Pair<Integer, PlanningContext> analyzeLogicalAggregate(LogicalAggregate aggregate) {
+    Pair<ArrayList<Integer>, PlanningContext> pair =
+        this.constructChildrenOperators(aggregate, PlanningContext.MergeOperation.OTHER);
+    ArrayList<Integer> children = pair.left;
+    PlanningContext context = pair.right;
+
+    AggregateOperatorFactory aggregateFactory = new AggregateOperatorFactory(context);
+    return new Pair<>(aggregateFactory.createOperator(aggregate, children), context);
+  }
+
+  // LogicalSort applies to queries that have an explicit order by, as well as unordered queries
+  // that have a limit / offset clause.
+  private void analyzeLogicalSort(LogicalSort sort) {
+    Pair<ArrayList<Integer>, PlanningContext> pair =
+        this.constructChildrenOperators(sort, PlanningContext.MergeOperation.OTHER);
+    ArrayList<Integer> children = pair.left;
+    PlanningContext context = pair.right;
+
+    MatViewOperatorFactory matviewFactory = new MatViewOperatorFactory(context);
+    matviewFactory.createOperator(sort, children);
+  }
+
+  /*
+   * Plumbing so that our planning looks like simple recursion.
+   */
+  public Pair<ArrayList<Integer>, PlanningContext> constructChildrenOperators(
+      RelNode operator, PlanningContext.MergeOperation op) {
+    // Add a new stack frame in which children can store their results.
+    this.childrenOperators.push(new ArrayList<Integer>());
+    this.childrenContexts.push(new ArrayList<PlanningContext>());
+
+    // Actually visit children.
+    visitChildren(operator);
+
+    // Pop the stack frame and return it.
+    ArrayList<PlanningContext> contexts = this.childrenContexts.pop();
+    PlanningContext context = contexts.get(0);
+    for (int i = 1; i < contexts.size(); i++) {
+      context.merge(op, contexts.get(i));
+    }
+
+    return new Pair<>(this.childrenOperators.pop(), context);
+  }
+
+  /*
+   * Visitor pattern inherited from calcite
+   * accept(...) and visitChildren(...) end up invoking these functions.
+   */
   @Override
   public RelNode visit(TableScan scan) {
-    String tableName = scan.getTable().getQualifiedName().get(0);
-    Integer inputOperator = this.tableToInputOperator.get(tableName);
-    if (inputOperator == null) {
-      inputOperator = this.generator.AddInputOperator(tableName);
-      this.tableToInputOperator.put(tableName, inputOperator);
-    }
-    this.childrenOperators.peek().add(inputOperator);
+    Pair<Integer, PlanningContext> pair = this.analyzeTableScan(scan);
+    int operator = pair.left;
+    PlanningContext context = pair.right;
+
+    this.childrenOperators.peek().add(operator);
+    this.childrenContexts.peek().add(context);
     return scan;
   }
 
   @Override
   public RelNode visit(LogicalUnion union) {
-    // Add a new level in the stack to store ids of the direct children operators.
-    this.childrenOperators.push(new ArrayList<Integer>());
+    Pair<Integer, PlanningContext> pair = this.analyzeLogicalUnion(union);
+    int operator = pair.left;
+    PlanningContext context = pair.right;
 
-    // Visit children.
-    visitChildren(union);
-
-    // Get IDs of generated children.
-    ArrayList<Integer> children = this.childrenOperators.pop();
-    int[] ids = new int[children.size()];
-    for (int i = 0; i < children.size(); i++) {
-      ids[i] = children.get(i);
-    }
-
-    // Add a union operator.
-    int unionOperator = this.generator.AddUnionOperator(ids);
-    this.childrenOperators.peek().add(unionOperator);
-
+    this.childrenOperators.peek().add(operator);
+    this.childrenContexts.peek().add(context);
     return union;
-  }
-
-  private void visitFilterOperands(int filterOperator, RexNode condition, List<RexNode> operands) {
-    // Must be a binary condition with one side being a column and the other being a literal.
-    assert operands.size() == 2;
-    assert operands.get(0) instanceof RexInputRef || operands.get(1) instanceof RexInputRef;
-    assert operands.get(0) instanceof RexLiteral || operands.get(1) instanceof RexLiteral;
-
-    // Get the input and the value expressions.
-    int inputIndex = operands.get(0) instanceof RexInputRef ? 0 : 1;
-    int valueIndex = (inputIndex + 1) % 2;
-    RexInputRef input = (RexInputRef) operands.get(inputIndex);
-    RexLiteral value = (RexLiteral) operands.get(valueIndex);
-
-    // Determine the condition operation.
-    int operationEnum = -1;
-    switch (condition.getKind()) {
-      case EQUALS:
-        operationEnum = DataFlowGraphLibrary.EQUAL;
-        break;
-      case NOT_EQUALS:
-        operationEnum = DataFlowGraphLibrary.NOT_EQUAL;
-        break;
-      case LESS_THAN:
-        operationEnum = DataFlowGraphLibrary.LESS_THAN;
-        break;
-      case LESS_THAN_OR_EQUAL:
-        operationEnum = DataFlowGraphLibrary.LESS_THAN_OR_EQUAL;
-        break;
-      case GREATER_THAN:
-        operationEnum = DataFlowGraphLibrary.GREATER_THAN;
-        break;
-      case GREATER_THAN_OR_EQUAL:
-        operationEnum = DataFlowGraphLibrary.GREATER_THAN_OR_EQUAL;
-        break;
-      default:
-        assert false;
-    }
-
-    // Determine the value type.
-    int columnId = input.getIndex();
-    switch (value.getTypeName()) {
-      case DECIMAL:
-      case INTEGER:
-        this.generator.AddFilterOperationSigned(
-            filterOperator, RexLiteral.intValue(value), columnId, operationEnum);
-        break;
-      case VARCHAR:
-      case CHAR:
-        this.generator.AddFilterOperation(
-            filterOperator, RexLiteral.stringValue(value), columnId, operationEnum);
-        break;
-      default:
-        throw new IllegalArgumentException("Invalid literal type in filter");
-    }
   }
 
   @Override
   public RelNode visit(LogicalFilter filter) {
-    RexNode condition = filter.getCondition();
-    assert condition instanceof RexCall;
-    assert condition.isA(SqlKind.AND) || condition.isA(FILTER_OPERATIONS);
+    Pair<Integer, PlanningContext> pair = this.analyzeLogicalFilter(filter);
+    int operator = pair.left;
+    PlanningContext context = pair.right;
 
-    // Add a new level in the stack to store ids of the direct children operators.
-    this.childrenOperators.push(new ArrayList<Integer>());
-
-    // Visit children.
-    visitChildren(filter);
-
-    // Get IDs of generated children.
-    ArrayList<Integer> children = this.childrenOperators.pop();
-    assert children.size() == 1;
-
-    // Add a filter operator.
-    int filterOperator = this.generator.AddFilterOperator(children.get(0));
-    this.childrenOperators.peek().add(filterOperator);
-
-    // Fill the filter operator with the appropriate condition(s).
-    if (condition.isA(FILTER_OPERATIONS)) {
-      List<RexNode> operands = ((RexCall) condition).getOperands();
-      this.visitFilterOperands(filterOperator, condition, operands);
-    }
-
-    if (condition.isA(SqlKind.AND)) {
-      for (RexNode operand : ((RexCall) condition).getOperands()) {
-        List<RexNode> operands = ((RexCall) operand).getOperands();
-        this.visitFilterOperands(filterOperator, operand, operands);
-      }
-    }
+    this.childrenOperators.peek().add(operator);
+    this.childrenContexts.peek().add(context);
     return filter;
   }
 
   @Override
   public RelNode visit(LogicalJoin join) {
-    // Add a new level in the stack to store ids of the direct children operators.
-    this.childrenOperators.push(new ArrayList<Integer>());
+    Pair<Integer, PlanningContext> pair = this.analyzeLogicalJoin(join);
+    int operator = pair.left;
+    PlanningContext context = pair.right;
 
-    // Visit children.
-    visitChildren(join);
-
-    // Find the size of the schema of the left relation.
-    int leftCount = join.getLeft().getRowType().getFieldCount();
-
-    // Visit the join condition, extract the column ids for the left and right relation.
-    RexNode condition = join.getCondition();
-
-    // Only support == for now.
-    assert condition.isA(SqlKind.EQUALS);
-    List<RexNode> operands = ((RexCall) condition).getOperands();
-    assert operands.size() == 2;
-
-    // Join condition must be over a column per input relation.
-    RexNode leftCondition = operands.get(0);
-    RexNode rightCondition = operands.get(1);
-    assert leftCondition instanceof RexInputRef;
-    assert rightCondition instanceof RexInputRef;
-    int leftColIndex = ((RexInputRef) leftCondition).getIndex();
-    int rightColIndex = ((RexInputRef) rightCondition).getIndex();
-    rightColIndex -= leftCount;
-
-    // Set up all join operator parameters.
-    ArrayList<Integer> children = this.childrenOperators.pop();
-    int leftInput = children.get(0);
-    int rightInput = children.get(1);
-
-    // Find the right join operator per join type.
-    int joinOperator = -1;
-    switch (join.getJoinType()) {
-      case INNER:
-        joinOperator =
-            this.generator.AddEquiJoinOperator(leftInput, rightInput, leftColIndex, rightColIndex);
-        break;
-      case ANTI:
-      case FULL:
-      case LEFT:
-      case RIGHT:
-      case SEMI:
-        throw new IllegalArgumentException("Unsupported join type " + join.getJoinType());
-    }
-
-    // Propagate up to parents.
-    this.childrenOperators.peek().add(joinOperator);
+    this.childrenOperators.peek().add(operator);
+    this.childrenContexts.peek().add(context);
     return join;
+  }
+
+  @Override
+  public RelNode visit(LogicalProject project) {
+    Pair<ArrayList<Integer>, PlanningContext> pair = this.analyzeLogicalProject(project);
+    ArrayList<Integer> operators = pair.left;
+    PlanningContext context = pair.right;
+
+    this.childrenOperators.peek().addAll(operators);
+    this.childrenContexts.peek().add(context);
+    return project;
+  }
+
+  @Override
+  public RelNode visit(LogicalAggregate aggregate) {
+    Pair<Integer, PlanningContext> pair = this.analyzeLogicalAggregate(aggregate);
+    int operator = pair.left;
+    PlanningContext context = pair.right;
+
+    this.childrenOperators.peek().add(operator);
+    this.childrenContexts.peek().add(context);
+    return aggregate;
+  }
+
+  @Override
+  public RelNode visit(LogicalSort sort) {
+    this.analyzeLogicalSort(sort);
+    return sort;
   }
 }

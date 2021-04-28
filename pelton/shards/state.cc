@@ -15,12 +15,9 @@ namespace pelton {
 namespace shards {
 
 // Initialization.
-void SharderState::Initialize(const std::string &dir_path) {
-  this->dir_path_ = dir_path;
-  if (dir_path.back() != '/') {
-    this->dir_path_ += "/";
-  }
-  this->connection_pool_.Initialize(this->dir_path_);
+void SharderState::Initialize(const std::string &db_username,
+                              const std::string &db_password) {
+  this->connection_pool_.Initialize(db_username, db_password);
 }
 
 // Schema manipulations.
@@ -62,6 +59,11 @@ std::list<CreateStatement> SharderState::CreateShard(
   std::list<CreateStatement> result;
   for (const ShardedTableName &table : this->kind_to_tables_.at(shard_kind)) {
     result.push_back(this->sharded_schema_.at(table));
+  }
+  if (this->create_index_.count(shard_kind) > 0) {
+    for (const std::string &create_index : this->create_index_.at(shard_kind)) {
+      result.push_back(create_index);
+    }
   }
   return result;
 }
@@ -107,6 +109,45 @@ bool SharderState::ShardExists(const ShardKind &shard_kind,
 const std::unordered_set<UserId> &SharderState::UsersOfShard(
     const ShardKind &kind) const {
   return this->shards_.at(kind);
+}
+
+// Manage secondary indices.
+bool SharderState::HasIndexFor(const UnshardedTableName &table_name,
+                               const ColumnName &column_name,
+                               const ColumnName &shard_by) const {
+  if (this->index_to_flow_.count(table_name) == 0) {
+    return false;
+  }
+
+  auto &tbl = this->index_to_flow_.at(table_name);
+  if (this->index_to_flow_.at(table_name).count(column_name) == 0) {
+    return false;
+  }
+
+  auto &col = tbl.at(column_name);
+  return col.count(shard_by) > 0;
+}
+
+const std::unordered_set<ColumnName> &SharderState::IndicesFor(
+    const UnshardedTableName &table_name) {
+  return this->indices_[table_name];
+}
+
+const FlowName &SharderState::IndexFlow(const UnshardedTableName &table_name,
+                                        const ColumnName &column_name,
+                                        const ColumnName &shard_by) const {
+  return this->index_to_flow_.at(table_name).at(column_name).at(shard_by);
+}
+
+void SharderState::CreateIndex(const ShardKind &shard_kind,
+                               const UnshardedTableName &table_name,
+                               const ColumnName &column_name,
+                               const ColumnName &shard_by,
+                               const FlowName &flow_name,
+                               const std::string &create_index_stmt) {
+  this->indices_[table_name].insert(column_name);
+  this->index_to_flow_[table_name][column_name][shard_by] = flow_name;
+  this->create_index_[shard_kind].push_back(create_index_stmt);
 }
 
 }  // namespace shards

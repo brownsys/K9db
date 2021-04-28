@@ -8,16 +8,17 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/ints.h"
 
 namespace pelton {
 namespace dataflow {
 
+// NOLINTNEXTLINE
 static void UnorderedMatViewInsert2UInts(benchmark::State& state) {
-  SchemaOwner schema = MakeSchema(false);
+  SchemaRef schema = MakeSchema(false);
   auto op = new UnorderedMatViewOperator(schema.keys());
 
-  Record r(SchemaRef(schema), true, static_cast<uint64_t>(4),
-           static_cast<uint64_t>(5));
+  Record r{schema, true, 4_u, 5_u};
   std::vector<Record> rs;
   rs.emplace_back(std::move(r));
 
@@ -31,12 +32,12 @@ static void UnorderedMatViewInsert2UInts(benchmark::State& state) {
   delete op;
 }
 
+// NOLINTNEXTLINE
 static void UnorderedMatViewInsertUIntString(benchmark::State& state) {
-  SchemaOwner schema = MakeSchema(true);
+  SchemaRef schema = MakeSchema(true);
   auto op = new UnorderedMatViewOperator(schema.keys());
 
-  std::unique_ptr<std::string> s = std::make_unique<std::string>("world");
-  Record r(SchemaRef(schema), true, static_cast<uint64_t>(4), std::move(s));
+  Record r{schema, true, 4_u, std::make_unique<std::string>("world")};
   std::vector<Record> rs;
   rs.emplace_back(std::move(r));
 
@@ -50,15 +51,15 @@ static void UnorderedMatViewInsertUIntString(benchmark::State& state) {
   delete op;
 }
 
+// NOLINTNEXTLINE
 static void UnorderedMatViewBatchInsert(benchmark::State& state) {
-  SchemaOwner schema = MakeSchema(false);
+  SchemaRef schema = MakeSchema(false);
   auto op = new UnorderedMatViewOperator(schema.keys());
 
   std::vector<Record> rs = {};
   for (int i = 0; i < state.range(0); ++i) {
-    Record r(SchemaRef(schema), true, static_cast<uint64_t>(i),
-             static_cast<uint64_t>(i + 1));
-    rs.emplace_back(std::move(r));
+    uint64_t v = i;
+    rs.emplace_back(schema, true, v, v + 1);
   }
 
   size_t processed = 0;

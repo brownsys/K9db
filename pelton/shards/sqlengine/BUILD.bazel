@@ -12,14 +12,18 @@ cc_library(
     deps = [
         ":create",
         ":delete",
+        ":index",
         ":insert",
         ":select",
         ":update",
+        ":view",
         "//pelton/dataflow:state",
+        "//pelton/mysql:result",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sqlast:ast",
         "//pelton/sqlast:parser",
+        "//pelton/util:perf",
         "//pelton/util:status",
         "@absl//absl/status",
         "@antlr4_runtimes//:cpp",
@@ -37,13 +41,38 @@ cc_library(
     ],
     deps = [
         "//pelton/dataflow:state",
+        "//pelton/mysql:result",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/shards/sqlengine:util",
         "//pelton/sqlast:ast",
+        "//pelton/util:perf",
         "//pelton/util:status",
         "@absl//absl/status",
         "@absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "index",
+    srcs = [
+        "index.cc",
+    ],
+    hdrs = [
+        "index.h",
+    ],
+    deps = [
+        ":view",
+        "//pelton/dataflow:graph",
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:state",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/sqlast:ast",
+        "//pelton/util:perf",
+        "//pelton/util:status",
+        "@absl//absl/status",
     ],
 )
 
@@ -57,9 +86,11 @@ cc_library(
     ],
     deps = [
         "//pelton/dataflow:state",
+        "//pelton/mysql:result",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sqlast:ast",
+        "//pelton/util:perf",
         "//pelton/util:status",
         "@absl//absl/status",
     ],
@@ -74,10 +105,13 @@ cc_library(
         "select.h",
     ],
     deps = [
+        ":index",
         "//pelton/dataflow:state",
+        "//pelton/mysql:result",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sqlast:ast",
+        "//pelton/util:perf",
         "//pelton/util:status",
         "@absl//absl/status",
     ],
@@ -92,12 +126,15 @@ cc_library(
         "delete.h",
     ],
     deps = [
+        ":index",
         ":select",
         "//pelton/dataflow:state",
+        "//pelton/mysql:result",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/shards/sqlengine:util",
         "//pelton/sqlast:ast",
+        "//pelton/util:perf",
         "//pelton/util:status",
         "@absl//absl/status",
         "@absl//absl/strings",
@@ -114,12 +151,15 @@ cc_library(
     ],
     deps = [
         ":delete",
+        ":index",
         ":insert",
         ":select",
         "//pelton/dataflow:state",
+        "//pelton/mysql:result",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sqlast:ast",
+        "//pelton/util:perf",
         "//pelton/util:status",
         "@absl//absl/status",
     ],
@@ -133,9 +173,34 @@ cc_library(
     hdrs = [
         "util.h",
     ],
+    linkopts = [
+        "-lssl",
+        "-lcrypto",
+    ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
         "//pelton/shards:types",
         "@absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "view",
+    srcs = [
+        "view.cc",
+    ],
+    hdrs = [
+        "view.h",
+    ],
+    deps = [
+        "//pelton/dataflow:state",
+        "//pelton/mysql:result",
+        "//pelton/planner",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/sqlast:ast",
+        "//pelton/util:perf",
+        "//pelton/util:status",
+        "@absl//absl/status",
     ],
 )

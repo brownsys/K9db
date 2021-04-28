@@ -1,7 +1,17 @@
 #include "pelton/dataflow/record.h"
 
+#include <algorithm>
+#include <string>
+
 namespace pelton {
 namespace dataflow {
+
+std::string Record::Dequote(const std::string &st) {
+  std::string s(st);
+  s.erase(remove(s.begin(), s.end(), '\"'), s.end());
+  s.erase(remove(s.begin(), s.end(), '\''), s.end());
+  return s;
+}
 
 // Helper for Record::DataVariant.
 sqlast::ColumnDefinition::Type Record::TypeOfVariant(const DataVariant &v) {
@@ -12,6 +22,8 @@ sqlast::ColumnDefinition::Type Record::TypeOfVariant(const DataVariant &v) {
       return sqlast::ColumnDefinition::Type::UINT;
     case 2:
       return sqlast::ColumnDefinition::Type::INT;
+    case 3:
+      LOG(FATAL) << "NULL value variant can't be converted to a type!";
     default:
       LOG(FATAL) << "Unsupported variant type!";
   }
@@ -129,6 +141,20 @@ Value Record::GetValue(ColumnID col) const {
   }
 }
 
+std::string Record::GetValueString(ColumnID col) const {
+  CHECK_NE(this->data_, nullptr) << "Cannot get value for moved record";
+  switch (this->schema_.TypeOf(col)) {
+    case sqlast::ColumnDefinition::Type::UINT:
+      return std::to_string(this->data_[col].uint);
+    case sqlast::ColumnDefinition::Type::INT:
+      return std::to_string(this->data_[col].sint);
+    case sqlast::ColumnDefinition::Type::TEXT:
+      return *this->data_[col].str;
+    default:
+      LOG(FATAL) << "Unsupported data type in value extraction!";
+  }
+}
+
 // Data type transformation.
 void Record::SetValue(const std::string &value, size_t i) {
   CHECK_NOTNULL(this->data_);
@@ -140,11 +166,18 @@ void Record::SetValue(const std::string &value, size_t i) {
     case sqlast::ColumnDefinition::Type::INT:
       this->data_[i].sint = std::stoll(value);
       break;
-    case sqlast::ColumnDefinition::Type::TEXT:
+    case sqlast::ColumnDefinition::Type::TEXT: {
+      this->data_[i].str = std::make_unique<std::string>(Dequote(value));
+      break;
+    }
+    case sqlast::ColumnDefinition::Type::DATETIME:
+      // TODO(malte): DATETIME shouldn't be stored as a string, but as
+      // a timestamp since the epoch
       this->data_[i].str = std::make_unique<std::string>(value);
       break;
     default:
-      LOG(FATAL) << "Unsupported data type in setvalue";
+      LOG(FATAL) << "Unsupported data type in setvalue: "
+                 << this->schema_.TypeOf(i);
   }
 }
 
@@ -234,6 +267,11 @@ std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Record &r) {
         LOG(FATAL) << "Unsupported data type in record << operator";
     }
   }
+
+  if (!r.IsPositive()) {
+    os << " -- negative";
+  }
+
   return os;
 }
 

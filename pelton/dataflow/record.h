@@ -26,8 +26,9 @@ class Record {
  public:
   // Variant with the same type options as the record data type, can be used
   // by external code to ensure same types are supported.
-  using DataVariant = std::variant<std::string, uint64_t, int64_t>;
+  using DataVariant = std::variant<std::string, uint64_t, int64_t, NullValue>;
   static sqlast::ColumnDefinition::Type TypeOfVariant(const DataVariant &v);
+  static std::string Dequote(const std::string &st);
 
   // No default constructor.
   Record() = delete;
@@ -154,11 +155,13 @@ class Record {
   Key GetKey() const;
   Key GetValues(const std::vector<ColumnID> &cols) const;
   Value GetValue(ColumnID col) const;
+  std::string GetValueString(ColumnID col) const;
 
   // Data type transformation.
   void SetValue(const std::string &value, size_t i);
 
   // Accessors.
+  void SetPositive(bool positive) { this->positive_ = positive; }
   const SchemaRef &schema() const { return this->schema_; }
   bool IsPositive() const { return this->positive_; }
   int GetTimestamp() const { return this->timestamp_; }
@@ -192,40 +195,45 @@ class Record {
     if (index >= this->schema_.size()) {
       LOG(FATAL) << "Record data received too many arguments";
     }
-    // Make sure Arg is of the correct type.
-    switch (this->schema_.TypeOf(index)) {
-      case sqlast::ColumnDefinition::Type::UINT:
-        if constexpr (std::is_same<std::remove_reference_t<Arg>,
-                                   uint64_t>::value) {
-          this->data_[index].uint = t;
-        } else {
-          LOG(FATAL) << "Type mismatch in SetData at index " << index
-                     << ", expected " << this->schema_.TypeOf(index) << ", got "
-                     << TypeNameFor(t);
-        }
-        break;
-      case sqlast::ColumnDefinition::Type::INT:
-        if constexpr (std::is_same<std::remove_reference_t<Arg>,
-                                   int64_t>::value) {
-          this->data_[index].sint = t;
-        } else {
-          LOG(FATAL) << "Type mismatch in SetData at index " << index
-                     << ", expected " << this->schema_.TypeOf(index) << ", got "
-                     << TypeNameFor(t);
-        }
-        break;
-      case sqlast::ColumnDefinition::Type::TEXT:
-        if constexpr (std::is_same<std::remove_reference_t<Arg>,
-                                   std::unique_ptr<std::string>>::value) {
-          this->data_[index].str = std::move(t);
-        } else {
-          LOG(FATAL) << "Type mismatch in SetData at index " << index
-                     << ", expected " << this->schema_.TypeOf(index) << ", got "
-                     << TypeNameFor(t);
-        }
-        break;
-      default:
-        LOG(FATAL) << "Unsupported data type in SetData";
+    if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                               NullValue>::value) {
+      this->SetNull(true, index);
+    } else {
+      // Make sure Arg is of the correct type.
+      switch (this->schema_.TypeOf(index)) {
+        case sqlast::ColumnDefinition::Type::UINT:
+          if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                     uint64_t>::value) {
+            this->data_[index].uint = t;
+          } else {
+            LOG(FATAL) << "Type mismatch in SetData at index " << index
+                       << ", expected " << this->schema_.TypeOf(index)
+                       << ", got " << TypeNameFor(t);
+          }
+          break;
+        case sqlast::ColumnDefinition::Type::INT:
+          if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                     int64_t>::value) {
+            this->data_[index].sint = t;
+          } else {
+            LOG(FATAL) << "Type mismatch in SetData at index " << index
+                       << ", expected " << this->schema_.TypeOf(index)
+                       << ", got " << TypeNameFor(t);
+          }
+          break;
+        case sqlast::ColumnDefinition::Type::TEXT:
+          if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                     std::unique_ptr<std::string>>::value) {
+            this->data_[index].str = std::move(t);
+          } else {
+            LOG(FATAL) << "Type mismatch in SetData at index " << index
+                       << ", expected " << this->schema_.TypeOf(index)
+                       << ", got " << TypeNameFor(t);
+          }
+          break;
+        default:
+          LOG(FATAL) << "Unsupported data type in SetData";
+      }
     }
     // Handle the remaining ts.
     if constexpr (sizeof...(ts) > 0) {
@@ -248,10 +256,10 @@ class Record {
     ~RecordData() {}
   };
 
-  // 29 bytes but with alignment it is really 32 bytes.
+  // 37 bytes but with alignment it is really 40 bytes.
   RecordData *data_;  // [8 B]
-  uint64_t *bitmap_;
-  SchemaRef schema_;  // [16 B]
+  uint64_t *bitmap_;  // [8 B]
+  SchemaRef schema_;  // [8 B]
   int timestamp_;     // [4 B]
   bool positive_;     // [1 B]
 

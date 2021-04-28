@@ -2,11 +2,16 @@
 #include "pelton/shards/sqlengine/update.h"
 
 #include <string>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "pelton/shards/sqlengine/delete.h"
+#include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/insert.h"
 #include "pelton/shards/sqlengine/select.h"
+#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -29,28 +34,27 @@ int IndexOfColumn(const std::string &col_name,
 
 // Apply the update statement to every record in records, using table_schema
 // to resolve order of columns.
-absl::Status UpdateRawRecords(std::vector<RawRecord> *records,
-                              const sqlast::Update &stmt,
-                              const sqlast::CreateTable &table_schema) {
+absl::Status UpdateRecords(std::vector<dataflow::Record> *records,
+                           const sqlast::Update &stmt,
+                           const sqlast::CreateTable &table_schema) {
   // What is being updated.
-  const std::string &table_name = stmt.table_name();
   const std::vector<std::string> &updated_cols = stmt.GetColumns();
   const std::vector<std::string> &updated_vals = stmt.GetValues();
 
   // Loop over records and apply update.
   size_t size = records->size();
   for (size_t i = 0; i < size; i++) {
-    const RawRecord &record = records->at(i);
-    std::vector<std::string> updated_record = record.values;
+    dataflow::Record record = records->at(i).Copy();
+    record.SetPositive(true);
     for (size_t c = 0; c < updated_cols.size(); c++) {
       const std::string &col_name = updated_cols.at(c);
       int val_index = IndexOfColumn(col_name, table_schema);
       if (val_index < 0) {
         return absl::InvalidArgumentError("Unrecognized column " + col_name);
       }
-      updated_record.at(val_index) = updated_vals.at(c);
+      record.SetValue(updated_vals.at(c), val_index);
     }
-    records->emplace_back(table_name, updated_record, record.columns, true);
+    records->push_back(std::move(record));
   }
 
   return absl::OkStatus();
@@ -69,20 +73,28 @@ bool ModifiesShardBy(const sqlast::Update &stmt, SharderState *state) {
 
 // Creates a corresponding Insert statement for the given record, using given
 // table_schema to resolve types of values.
-sqlast::Insert InsertRaw(const RawRecord &record,
-                         const sqlast::CreateTable &table_schema) {
-  sqlast::Insert stmt{record.table_name};
-  for (size_t i = 0; i < record.values.size(); i++) {
+sqlast::Insert InsertRecord(const dataflow::Record &record,
+                            const sqlast::CreateTable &table_schema) {
+  sqlast::Insert stmt{table_schema.table_name()};
+  for (size_t i = 0; i < table_schema.GetColumns().size(); i++) {
     sqlast::ColumnDefinition::Type type =
         table_schema.GetColumns().at(i).column_type();
     switch (type) {
       case sqlast::ColumnDefinition::Type::UINT:
       case sqlast::ColumnDefinition::Type::INT:
-        stmt.AddValue(record.values.at(i));
+        stmt.AddValue(record.GetValueString(i));
         break;
       case sqlast::ColumnDefinition::Type::TEXT:
       case sqlast::ColumnDefinition::Type::DATETIME:
-        stmt.AddValue("\'" + record.values.at(i) + "\'");
+        // TODO(babman): This can be improved later.
+        // Values acquired from selecting from the database do not have an
+        // enclosing ', while those we get from the ANTLR-parsed queries do
+        // (e.g. the value set by an UPDATE statement).
+        if (record.GetString(i)[0] != '\'') {
+          stmt.AddValue("\'" + record.GetString(i) + "\'");
+        } else {
+          stmt.AddValue(record.GetString(i));
+        }
         break;
     }
   }
@@ -91,26 +103,35 @@ sqlast::Insert InsertRaw(const RawRecord &record,
 
 }  // namespace
 
-absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
-                   dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output) {
+absl::StatusOr<mysql::SqlResult> Shard(
+    const sqlast::Update &stmt, SharderState *state,
+    dataflow::DataFlowState *dataflow_state) {
+  perf::Start("Update");
+
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
+  bool update_flows = dataflow_state->HasFlowsFor(table_name);
 
   // Get the rows that are going to be deleted prior to deletion to use them
   // to update the dataflows.
-  std::vector<RawRecord> records;
-  CHECK_STATUS(select::Query(&records, stmt.SelectDomain(), state,
-                             dataflow_state, false));
-  size_t old_records_size = records.size();
-  CHECK_STATUS(UpdateRawRecords(&records, stmt, state->GetSchema(table_name)));
+  std::vector<dataflow::Record> records;
+  size_t old_records_size = 0;
+  if (update_flows) {
+    MOVE_OR_RETURN(mysql::SqlResult domain_result,
+                   select::Shard(stmt.SelectDomain(), state, dataflow_state));
+    records = domain_result.Vectorize();
+    old_records_size = records.size();
+    CHECK_STATUS(UpdateRecords(&records, stmt, state->GetSchema(table_name)));
+  }
 
   sqlast::Stringifier stringifier;
+  mysql::SqlResult result;
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
     std::string update_str = stmt.Visit(&stringifier);
-    CHECK_STATUS(state->connection_pool().ExecuteDefault(update_str, output));
+    result = state->connection_pool().ExecuteDefault(
+        ConnectionPool::Operation::UPDATE, update_str);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded.
@@ -118,15 +139,18 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
       // The update statement might move the rows from one shard to another.
       // We can only perform this update by splitting it into a DELETE-INSERT
       // pair.
-      CHECK_STATUS(delete_::Shard(stmt.DeleteDomain(), state, dataflow_state,
-                                  output, false));
+      MOVE_OR_RETURN(
+          mysql::SqlResult tmp,
+          delete_::Shard(stmt.DeleteDomain(), state, dataflow_state, false));
+      result.Append(std::move(tmp));
 
       // Insert updated records.
       for (size_t i = old_records_size; i < records.size(); i++) {
         sqlast::Insert insert_stmt =
-            InsertRaw(records.at(i), state->GetSchema(table_name));
-        CHECK_STATUS(
-            insert::Shard(insert_stmt, state, dataflow_state, output, false));
+            InsertRecord(records.at(i), state->GetSchema(table_name));
+        MOVE_OR_RETURN(
+            tmp, insert::Shard(insert_stmt, state, dataflow_state, false));
+        result.Append(std::move(tmp));
       }
 
     } else {
@@ -143,30 +167,62 @@ absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
         auto [found, user_id] = cloned.Visit(&value_finder);
         if (found) {
           if (state->ShardExists(info.shard_kind, user_id)) {
-            // Remove where condition on the shard by column, since it does not
-            // exist in the sharded table.
+            // Remove where condition on the shard by column, since it does
+            // not exist in the sharded table.
             sqlast::ExpressionRemover expression_remover(info.shard_by);
             cloned.Visit(&expression_remover);
 
             // Execute statement directly against shard.
             std::string update_str = cloned.Visit(&stringifier);
-            CHECK_STATUS(state->connection_pool().ExecuteShard(
-                update_str, info, user_id, output));
+            result.Append(state->connection_pool().ExecuteShard(
+                ConnectionPool::Operation::UPDATE, update_str, info, user_id));
           }
-        } else {
-          // Update against the relevant shards.
+
+        } else if (update_flows) {
+          // We already have the data we need to delete, we can use it to get an
+          // accurate enumeration of shards to execute this one.
+          std::unordered_set<UserId> shards;
+          for (const dataflow::Record &record : records) {
+            shards.insert(record.GetValueString(info.shard_by_index));
+          }
+
           std::string update_str = cloned.Visit(&stringifier);
-          CHECK_STATUS(state->connection_pool().ExecuteShard(
-              update_str, info, state->UsersOfShard(info.shard_kind), output));
+          result.Append(state->connection_pool().ExecuteShards(
+              ConnectionPool::Operation::UPDATE, update_str, info, shards));
+
+        } else {
+          // The update statement by itself does not obviously constraint a
+          // shard. Try finding the shard(s) via secondary indices.
+          ASSIGN_OR_RETURN(
+              const auto &pair,
+              index::LookupIndex(table_name, info.shard_by,
+                                 stmt.GetWhereClause(), state, dataflow_state));
+          if (pair.first) {
+            // Secondary index available for some constrainted column in stmt.
+            std::string update_str = cloned.Visit(&stringifier);
+            result.MakeInline();
+            result.AppendDeduplicate(state->connection_pool().ExecuteShards(
+                ConnectionPool::Operation::UPDATE, update_str, info,
+                pair.second));
+          } else {
+            // Update against all shards.
+            std::string update_str = cloned.Visit(&stringifier);
+            result.Append(state->connection_pool().ExecuteShards(
+                ConnectionPool::Operation::UPDATE, update_str, info,
+                state->UsersOfShard(info.shard_kind)));
+          }
         }
       }
     }
   }
 
   // Delete was successful, time to update dataflows.
-  dataflow_state->ProcessRawRecords(records);
+  if (update_flows) {
+    dataflow_state->ProcessRecords(table_name, records);
+  }
 
-  return absl::OkStatus();
+  perf::End("Update");
+  return result;
 }
 
 }  // namespace update

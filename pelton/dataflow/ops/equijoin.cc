@@ -53,7 +53,7 @@ bool EquiJoinOperator::Process(NodeIndex source,
     if (source == this->left()->index()) {
       // Match each record in the right table with this record.
       Key left_value = record.GetValues({this->left_id_});
-      for (const auto &right : this->right_table_.Lookup(left_value)) {
+      for (const Record &right : this->right_table_.Lookup(left_value)) {
         this->EmitRow(record, right, output, record.IsPositive());
       }
 
@@ -69,7 +69,7 @@ bool EquiJoinOperator::Process(NodeIndex source,
     } else if (source == this->right()->index()) {
       // Match each record in the left table with this record.
       Key right_value = record.GetValues({this->right_id_});
-      for (const auto &left : this->left_table_.Lookup(right_value)) {
+      for (const Record &left : this->left_table_.Lookup(right_value)) {
         this->EmitRow(left, record, output, record.IsPositive());
       }
 
@@ -142,8 +142,7 @@ void EquiJoinOperator::ComputeOutputSchema() {
   }
 
   // We own the joined schema.
-  this->joined_schema_ = SchemaOwner(names, types, keys);
-  this->output_schema_ = SchemaRef(this->joined_schema_);  // Inherited.
+  this->output_schema_ = SchemaFactory::Create(names, types, keys);
 }
 
 void EquiJoinOperator::EmitRow(const Record &left, const Record &right,

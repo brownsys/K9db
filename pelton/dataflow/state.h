@@ -11,7 +11,6 @@
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
-#include "pelton/shards/state.h"
 #include "pelton/sqlast/ast.h"
 
 #ifndef PELTON_DATAFLOW_STATE_H_
@@ -30,7 +29,7 @@ class DataFlowState {
 
   // Manage schemas.
   void AddTableSchema(const sqlast::CreateTable &create);
-  void AddTableSchema(const std::string &table_name, SchemaOwner &&schema);
+  void AddTableSchema(const std::string &table_name, SchemaRef schema);
 
   std::vector<std::string> GetTables() const;
   SchemaRef GetTableSchema(const TableName &table_name) const;
@@ -40,6 +39,8 @@ class DataFlowState {
 
   const DataFlowGraph &GetFlow(const FlowName &name) const;
 
+  bool HasFlow(const FlowName &name) const;
+
   bool HasFlowsFor(const TableName &table_name) const;
 
   // Save state to durable file.
@@ -48,21 +49,18 @@ class DataFlowState {
   // Load state from its durable file (if exists).
   void Load(const std::string &dir_path);
 
-  // Process raw records from sharder into flows.
-  bool ProcessRawRecords(const std::vector<shards::RawRecord> &raw_records);
+  Record CreateRecord(const sqlast::Insert &insert_stmt) const;
 
- private:
+  // Process raw data from sharder and use it to update flows.
   bool ProcessRecords(const TableName &table_name,
                       const std::vector<Record> &records);
 
-  // Creating and processing records from raw data.
-  Record CreateRecord(const shards::RawRecord &raw_record) const;
-
+ private:
   // Maps every table to its logical schema.
   // The logical schema is the contract between client code and our DB.
   // The stored schema may not matched the concrete/physical one due to sharding
   // or other transformations.
-  std::unordered_map<TableName, SchemaOwner> schema_;
+  std::unordered_map<TableName, SchemaRef> schema_;
 
   // DataFlow graphs and views.
   std::unordered_map<FlowName, DataFlowGraph> flows_;

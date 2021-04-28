@@ -42,6 +42,8 @@ public class PeltonSchemaFactory {
         return SqlTypeName.INTEGER;
       case DataFlowGraphLibrary.TEXT:
         return SqlTypeName.VARCHAR;
+      case DataFlowGraphLibrary.DATETIME:
+        return SqlTypeName.TIMESTAMP;
       default:
         throw new IllegalArgumentException("Unsupported column type");
     }

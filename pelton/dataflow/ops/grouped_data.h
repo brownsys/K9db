@@ -73,9 +73,11 @@ class UntemplatedGroupedData {
 // to Impl, and defers all operations to it.
 // Most of the code here is templates + inheritance to get this to work in a
 // type-safe way.
-template <typename T>
+template <typename T, typename C = std::true_type>
 class GenericIterator {
  private:
+  using vcit = typename std::vector<T>::const_iterator;
+  using vit = typename std::vector<T>::iterator;
   // Abstract concept of an iterator wrapper, we store and interact with
   // pointers to this class to hid the genericity of Impl<I>.
   class AbsImpl {
@@ -83,16 +85,17 @@ class GenericIterator {
     virtual std::unique_ptr<AbsImpl> Clone() const = 0;
     virtual void Increment() = 0;
     virtual bool Equals(const std::unique_ptr<AbsImpl> &o) const = 0;
-    virtual const T &Access() const = 0;
+    virtual typename GenericIterator<T, C>::reference Access() const = 0;
+    virtual ~AbsImpl() = default;
   };  // AbsImpl.
 
  public:
   // Iterator traits.
   using difference_type = int64_t;
   using value_type = T;
-  using pointer = const T *;
-  using reference = const T &;
   using iterator_category = std::input_iterator_tag;
+  using pointer = typename std::conditional<C::value, const T *, T *>::type;
+  using reference = typename std::conditional<C::value, const T &, T &>::type;
 
   // This is our wrapper around generic underlying iterators.
   template <typename I>  // I is an iterator for some container.
@@ -108,7 +111,7 @@ class GenericIterator {
       // concrete class derived from it.
       return this->it_ == static_cast<Impl<I> *>(o.get())->it_;
     }
-    const T &Access() const {
+    typename GenericIterator<T, C>::reference Access() const {
       if constexpr (std::is_same<T, Key>::value) {
         return this->it_->first;
       } else {
@@ -121,31 +124,32 @@ class GenericIterator {
   };  // Impl.
 
   // Empty impl for an empty iterator.
-  using EmptyImpl = Impl<typename std::vector<T>::const_iterator>;
+  using EmptyIterType = typename std::conditional<C::value, vcit, vit>::type;
+  using EmptyImpl = Impl<EmptyIterType>;
 
   // Construct the generic iterator by providing a concrete implemenation.
   explicit GenericIterator(std::unique_ptr<AbsImpl> impl)
       : impl_(std::move(impl)) {}
 
   // All operations translate to operation on the underlying implementation.
-  GenericIterator<T> &operator++() {
+  GenericIterator<T, C> &operator++() {
     // Increment in place.
     this->impl_->Increment();
     return *this;
   }
-  GenericIterator<T> operator++(int n) {
+  GenericIterator<T, C> operator++(int n) {
     // Increment copy, leave this unchanged.
     GenericIterator copy(this->impl_->Clone());
     ++this;
     return copy;
   }
-  bool operator==(const GenericIterator<T> &o) const {
+  bool operator==(const GenericIterator<T, C> &o) const {
     return this->impl_->Equals(o.impl_);
   }
-  bool operator!=(const GenericIterator<T> &o) const {
+  bool operator!=(const GenericIterator<T, C> &o) const {
     return !this->impl_->Equals(o.impl_);
   }
-  const T &operator*() const { return this->impl_->Access(); }
+  reference operator*() const { return this->impl_->Access(); }
 
  private:
   std::unique_ptr<AbsImpl> impl_;
@@ -154,8 +158,10 @@ class GenericIterator {
 // Host code only sees two types of (semi-concrete) iterators: one that produces
 // records and another that produces keys. The source of the iterators are still
 // generic (could be a vector or map, etc).
-using KeyIterator = GenericIterator<Key>;
-using RecordIterator = GenericIterator<Record>;
+using const_KeyIterator = GenericIterator<Key>;
+using const_RecordIterator = GenericIterator<Record>;
+using KeyIterator = GenericIterator<Key, std::false_type>;
+using RecordIterator = GenericIterator<Record, std::false_type>;
 
 // Represents an abstract container that can be iterated over in some generic
 // way. We return instances of this class instead of the underlying iterator
@@ -164,32 +170,43 @@ using RecordIterator = GenericIterator<Record>;
 // Note: an instance of this class can only be used once, using it (e.g. in a
 // for-each loop) consumes it because of moves. Further usage of such instance
 // will cause a failure.
-template <typename T>
+template <typename T, typename C = std::true_type>
 class GenericIterable {
  public:
-  GenericIterable(GenericIterator<T> &&begin, GenericIterator<T> &&end)
+  GenericIterable(GenericIterator<T, C> &&begin, GenericIterator<T, C> &&end)
       : begin_(std::move(begin)), end_(std::move(end)) {}
 
-  GenericIterator<T> begin() { return std::move(this->begin_); }
-  GenericIterator<T> end() { return std::move(this->end_); }
+  GenericIterator<T, C> begin() { return std::move(this->begin_); }
+  GenericIterator<T, C> end() { return std::move(this->end_); }
   bool IsEmpty() const { return this->begin_ == this->end_; }
   // Create an empty iterable.
-  static GenericIterable<T> CreateEmpty() {
+  static GenericIterable<T, C> CreateEmpty() {
     static std::vector<T> empty = {};
+    EIterType begin;
+    EIterType end;
+    if constexpr (C::value) {
+      begin = empty.cbegin();
+      end = empty.cend();
+    } else {
+      begin = empty.begin();
+      end = empty.end();
+    }
     return GenericIterable{
-        GenericIterator<T>{std::make_unique<EImpl>(empty.cbegin())},
-        GenericIterator<T>{std::make_unique<EImpl>(empty.cend())}};
+        GenericIterator<T, C>{std::make_unique<EImpl>(begin)},
+        GenericIterator<T, C>{std::make_unique<EImpl>(end)}};
   }
 
  private:
-  GenericIterator<T> begin_;
-  GenericIterator<T> end_;
-  using EImpl = typename GenericIterator<T>::template Impl<
-      typename std::vector<T>::const_iterator>;
+  GenericIterator<T, C> begin_;
+  GenericIterator<T, C> end_;
+  using EIterType = typename GenericIterator<T, C>::EmptyIterType;
+  using EImpl = typename GenericIterator<T, C>::EmptyImpl;
 };
 
-using KeyIterable = GenericIterable<Key>;
-using RecordIterable = GenericIterable<Record>;
+using const_KeyIterable = GenericIterable<Key>;
+using const_RecordIterable = GenericIterable<Record>;
+using KeyIterable = GenericIterable<Key, std::false_type>;
+using RecordIterable = GenericIterable<Record, std::false_type>;
 
 // This class stores a set of records, this set is divided into groups,
 // each mapped by a key. This class is used as the underlying storage for
@@ -268,10 +285,15 @@ using RecordIterable = GenericIterable<Record>;
 template <typename M, typename V, typename RecordCompare = nullptr_t>
 class GroupedDataT : public UntemplatedGroupedData {
  private:
+  using M_iterator = typename M::iterator;
+  using V_iterator = typename V::iterator;
   using M_citerator = typename M::const_iterator;
   using V_citerator = typename V::const_iterator;
-  using K_impl = typename KeyIterator::template Impl<M_citerator>;
-  using R_impl = typename RecordIterator::template Impl<V_citerator>;
+
+  using K_impl = typename KeyIterator::template Impl<M_iterator>;
+  using R_impl = typename RecordIterator::template Impl<V_iterator>;
+  using K_cimpl = typename const_KeyIterator::template Impl<M_citerator>;
+  using R_cimpl = typename const_RecordIterator::template Impl<V_citerator>;
 
  public:
   // If this is not ordered, we do not need to provide anything.
@@ -289,8 +311,29 @@ class GroupedDataT : public UntemplatedGroupedData {
 
   // Return an Iterable set of records corresponding to the given key, in the
   // underlying order (specified by V).
-  RecordIterable Lookup(const Key &key, int limit = -1,
-                        size_t offset = 0) const {
+  const_RecordIterable Lookup(const Key &key, int limit = -1,
+                              size_t offset = 0) const {
+    auto it = this->contents_.find(key);
+    if (it == this->contents_.end() ||
+        static_cast<size_t>(it->second.size()) <= offset) {
+      return const_RecordIterable::CreateEmpty();
+    }
+
+    // Key exists and its associated records count is > offset.
+    auto begin = it->second.cbegin();
+    auto end = it->second.cend();
+    size_t size = it->second.size();
+    if (offset > 0) {
+      begin = std::next(begin, offset);
+    }
+    if (limit > -1 && static_cast<size_t>(limit) + offset < size) {
+      end = std::next(begin, limit);
+    }
+    return const_RecordIterable{
+        const_RecordIterator{std::make_unique<R_cimpl>(begin)},
+        const_RecordIterator{std::make_unique<R_cimpl>(end)}};
+  }
+  RecordIterable Lookup(const Key &key, int limit = -1, size_t offset = 0) {
     auto it = this->contents_.find(key);
     if (it == this->contents_.end() ||
         static_cast<size_t>(it->second.size()) <= offset) {
@@ -298,8 +341,8 @@ class GroupedDataT : public UntemplatedGroupedData {
     }
 
     // Key exists and its associated records count is > offset.
-    auto begin = it->second.cbegin();
-    auto end = it->second.cend();
+    auto begin = it->second.begin();
+    auto end = it->second.end();
     size_t size = it->second.size();
     if (offset > 0) {
       begin = std::next(begin, offset);
@@ -317,13 +360,48 @@ class GroupedDataT : public UntemplatedGroupedData {
     if (it == this->contents_.end()) return 0;
     return it->second.size();
   }
+  // Return an Iterable set of records from the given key that are larger than
+  // a given record. Should only be used on record ordered containers.
+  const_RecordIterable LookupGreater(const Key &key, const Record &cmp,
+                                     int limit = -1, size_t offset = 0) const {
+    if constexpr (!std::is_null_pointer<RecordCompare>::value) {
+      auto it = this->contents_.find(key);
+      if (it == this->contents_.end() ||
+          static_cast<size_t>(it->second.size()) <= offset) {
+        return const_RecordIterable::CreateEmpty();
+      }
+
+      // Key exists and its associated records count is > offset.
+      auto cbeg = it->second.cbegin();
+      auto end = it->second.cend();
+      auto begin = std::upper_bound(cbeg, end, cmp, this->compare_);
+      size_t size = std::distance(begin, end);
+      if (offset > 0) {
+        begin = std::next(begin, offset);
+      }
+      if (limit > -1 && static_cast<size_t>(limit) + offset < size) {
+        end = std::next(begin, limit);
+      }
+
+      return const_RecordIterable{
+          const_RecordIterator{std::make_unique<R_cimpl>(begin)},
+          const_RecordIterator{std::make_unique<R_cimpl>(end)}};
+    }
+
+    return const_RecordIterable::CreateEmpty();
+  }
 
   // Return an Iterable set of keys contained by this group, in the underlying
   // order (specified by M).
-  KeyIterable Keys() const {
+  const_KeyIterable Keys() const {
+    return const_KeyIterable{
+        const_KeyIterator{std::make_unique<K_cimpl>(this->contents_.cbegin())},
+        const_KeyIterator{std::make_unique<K_cimpl>(this->contents_.cend())}};
+  }
+  KeyIterable Keys() {
     return KeyIterable{
-        KeyIterator{std::make_unique<K_impl>(this->contents_.cbegin())},
-        KeyIterator{std::make_unique<K_impl>(this->contents_.cend())}};
+        KeyIterator{std::make_unique<K_impl>(this->contents_.begin())},
+        KeyIterator{std::make_unique<K_impl>(this->contents_.end())}};
   }
 
   // Checks if we have any records mapped to the given key.
@@ -369,6 +447,12 @@ class GroupedDataT : public UntemplatedGroupedData {
         }
       }
     }
+    return true;
+  }
+
+  // Erase entry keyed on @param k
+  bool Erase(const Key &k) {
+    this->contents_.erase(k);
     return true;
   }
 

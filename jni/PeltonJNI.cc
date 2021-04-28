@@ -26,12 +26,14 @@ inline std::string GetString(JNIEnv *env, jstring string) {
 }  // namespace
 
 void Java_edu_brown_pelton_PeltonJNI_Open(JNIEnv *env, jobject this_,
-                                          jstring directory) {
+                                          jstring directory, jstring username,
+                                          jstring password) {
   LOG(INFO) << "Open pelton connection";
   int64_t ptr = env->GetLongField(this_, GetConnectionFieldID(env, this_));
   if (ptr == 0) {
     pelton::Connection *connection = new pelton::Connection();
-    pelton::open(GetString(env, directory), connection);
+    pelton::open(GetString(env, directory), GetString(env, username),
+                 GetString(env, password), connection);
     env->SetLongField(this_, GetConnectionFieldID(env, this_),
                       reinterpret_cast<int64_t>(connection));
   }
@@ -39,17 +41,14 @@ void Java_edu_brown_pelton_PeltonJNI_Open(JNIEnv *env, jobject this_,
 
 jboolean Java_edu_brown_pelton_PeltonJNI_ExecuteDDL(JNIEnv *env, jobject this_,
                                                     jstring sql) {
-  bool context = true;
   std::string str = GetString(env, sql);
   int64_t ptr = env->GetLongField(this_, GetConnectionFieldID(env, this_));
   if (ptr != 0) {
     pelton::Connection *connection =
         reinterpret_cast<pelton::Connection *>(ptr);
-    // Execute query.
-    auto callback = [&](void *context, int col_count, char **col_data,
-                        char **col_name) { return 0; };
-    if (pelton::exec(connection, str, callback,
-                     reinterpret_cast<void *>(&context), nullptr)) {
+    absl::StatusOr<pelton::SqlResult> result = pelton::exec(connection, str);
+    if (result.ok() && result.value().IsStatement() &&
+        result.value().Success()) {
       return JNI_TRUE;
     }
   }
@@ -58,67 +57,60 @@ jboolean Java_edu_brown_pelton_PeltonJNI_ExecuteDDL(JNIEnv *env, jobject this_,
 
 jint Java_edu_brown_pelton_PeltonJNI_ExecuteUpdate(JNIEnv *env, jobject this_,
                                                    jstring sql) {
-  bool context = true;
   std::string str = GetString(env, sql);
   int64_t ptr = env->GetLongField(this_, GetConnectionFieldID(env, this_));
   if (ptr != 0) {
     pelton::Connection *connection =
         reinterpret_cast<pelton::Connection *>(ptr);
-    // Execute query.
-    auto callback = [&](void *context, int col_count, char **col_data,
-                        char **col_name) { return 0; };
-    if (pelton::exec(connection, str, callback,
-                     reinterpret_cast<void *>(&context), nullptr)) {
-      return 1;
+    absl::StatusOr<pelton::SqlResult> result = pelton::exec(connection, str);
+    if (result.ok() && result.value().IsUpdate()) {
+      return result.value().UpdateCount();
     }
   }
-  return 0;
+  return -1;
 }
 
 jobject Java_edu_brown_pelton_PeltonJNI_ExecuteQuery(JNIEnv *env, jobject this_,
                                                      jstring sql) {
-  bool context = true;
   std::string str = GetString(env, sql);
   int64_t ptr = env->GetLongField(this_, GetConnectionFieldID(env, this_));
   if (ptr != 0) {
     pelton::Connection *connection =
         reinterpret_cast<pelton::Connection *>(ptr);
     // Create an ArrayList to return.
+    jclass string_class = env->FindClass("java/lang/String");
     jclass array_class = env->FindClass("java/util/ArrayList");
+    jmethodID add_id =
+        env->GetMethodID(array_class, "add", "(Ljava/lang/Object;)Z");
     jmethodID constructor_id = env->GetMethodID(array_class, "<init>", "()V");
     jobject array_list_obj = env->NewObject(array_class, constructor_id);
-    // Execute query and fill in ArrayList in the callback.
-    auto callback = [&](void *context, int col_count, char **col_data,
-                        char **col_name) {
-      jclass string_class = env->FindClass("java/lang/String");
-      jclass array_class = env->FindClass("java/util/ArrayList");
-      jmethodID add_id =
-          env->GetMethodID(array_class, "add", "(Ljava/lang/Object;)Z");
-
-      bool *first_time = reinterpret_cast<bool *>(context);
-      // Add the column names as the first row in the result array list.
-      if (*first_time) {
-        *first_time = false;
-        jobjectArray column_names =
-            env->NewObjectArray(col_count, string_class, NULL);
-        for (int i = 0; i < col_count; i++) {
-          jstring column_name = env->NewStringUTF(col_name[i]);
-          env->SetObjectArrayElement(column_names, i, column_name);
-        }
-        env->CallBooleanMethod(array_list_obj, add_id, column_names);
-      }
-      jobjectArray row_data =
+    // Execute query with pelton.
+    absl::StatusOr<pelton::SqlResult> result = pelton::exec(connection, str);
+    if (result.ok() && result.value().IsQuery()) {
+      pelton::SqlResult &sqlresult = result.value();
+      size_t col_count = sqlresult.GetSchema().size();
+      // First element in result contains column names / headers.
+      jobjectArray column_names =
           env->NewObjectArray(col_count, string_class, NULL);
-      for (int i = 0; i < col_count; i++) {
-        jstring data = env->NewStringUTF(col_data[i]);
-        env->SetObjectArrayElement(row_data, i, data);
+      for (size_t i = 0; i < col_count; i++) {
+        jstring column_name =
+            env->NewStringUTF(sqlresult.GetSchema().NameOf(i).c_str());
+        env->SetObjectArrayElement(column_names, i, column_name);
       }
+      env->CallBooleanMethod(array_list_obj, add_id, column_names);
 
-      env->CallBooleanMethod(array_list_obj, add_id, row_data);
-      return 0;
-    };
-    if (pelton::exec(connection, str, callback,
-                     reinterpret_cast<void *>(&context), nullptr)) {
+      // Remaining elements contain actual rows.
+      while (sqlresult.HasNext()) {
+        pelton::Record row = sqlresult.FetchOne();
+        jobjectArray row_data =
+            env->NewObjectArray(col_count, string_class, NULL);
+        for (size_t i = 0; i < col_count; i++) {
+          jstring data = env->NewStringUTF(row.GetValueString(i).c_str());
+          env->SetObjectArrayElement(row_data, i, data);
+        }
+        env->CallBooleanMethod(array_list_obj, add_id, row_data);
+      }
+      // All data added.
       return array_list_obj;
     }
   }

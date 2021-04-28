@@ -3,8 +3,9 @@
 #ifndef PELTON_SHARDS_SQLENGINE_UPDATE_H_
 #define PELTON_SHARDS_SQLENGINE_UPDATE_H_
 
-#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "pelton/dataflow/state.h"
+#include "pelton/mysql/result.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
 #include "pelton/sqlast/ast.h"
@@ -14,9 +15,9 @@ namespace shards {
 namespace sqlengine {
 namespace update {
 
-absl::Status Shard(const sqlast::Update &stmt, SharderState *state,
-                   dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output);
+absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Update &stmt,
+                                       SharderState *state,
+                                       dataflow::DataFlowState *dataflow_state);
 
 }  // namespace update
 }  // namespace sqlengine

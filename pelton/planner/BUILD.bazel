@@ -18,6 +18,7 @@ cc_library(
     deps = [
         "//pelton/dataflow:graph",
         "//pelton/dataflow:state",
+        "//pelton/util:perf",
         "@bazel_tools//tools/jdk:jni",
         "@glog",
     ],
@@ -43,7 +44,10 @@ cc_test(
         "//pelton/dataflow:schema",
         "//pelton/dataflow:state",
         "//pelton/dataflow:types",
+        "//pelton/dataflow/ops:aggregate",
+        "//pelton/dataflow/ops:filter",
         "//pelton/dataflow/ops:input",
+        "//pelton/dataflow/ops:project",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
         "@glog",

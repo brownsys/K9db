@@ -99,9 +99,15 @@ std::vector<std::string> &Update::GetValues() { return this->values_; }
 
 bool Update::HasWhereClause() const { return this->where_clause_.has_value(); }
 const BinaryExpression *const Update::GetWhereClause() const {
+  if (!this->where_clause_.has_value()) {
+    return nullptr;
+  }
   return this->where_clause_->get();
 }
 BinaryExpression *const Update::GetWhereClause() {
+  if (!this->where_clause_.has_value()) {
+    return nullptr;
+  }
   return this->where_clause_->get();
 }
 void Update::SetWhereClause(std::unique_ptr<BinaryExpression> &&where) {
@@ -148,9 +154,15 @@ void Select::RemoveColumn(const std::string &column) {
 
 bool Select::HasWhereClause() const { return this->where_clause_.has_value(); }
 const BinaryExpression *const Select::GetWhereClause() const {
+  if (!this->where_clause_.has_value()) {
+    return nullptr;
+  }
   return this->where_clause_->get();
 }
 BinaryExpression *const Select::GetWhereClause() {
+  if (!this->where_clause_.has_value()) {
+    return nullptr;
+  }
   return this->where_clause_->get();
 }
 void Select::SetWhereClause(std::unique_ptr<BinaryExpression> &&where) {
@@ -166,9 +178,15 @@ std::string &Delete::table_name() { return this->table_name_; }
 
 bool Delete::HasWhereClause() const { return this->where_clause_.has_value(); }
 const BinaryExpression *const Delete::GetWhereClause() const {
+  if (!this->where_clause_.has_value()) {
+    return nullptr;
+  }
   return this->where_clause_->get();
 }
 BinaryExpression *const Delete::GetWhereClause() {
+  if (!this->where_clause_.has_value()) {
+    return nullptr;
+  }
   return this->where_clause_->get();
 }
 void Delete::SetWhereClause(std::unique_ptr<BinaryExpression> &&where) {

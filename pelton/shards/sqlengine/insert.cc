@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -12,11 +13,16 @@ namespace shards {
 namespace sqlengine {
 namespace insert {
 
-absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
-                   dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output, bool update_flows) {
+absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Insert &stmt,
+                                       SharderState *state,
+                                       dataflow::DataFlowState *dataflow_state,
+                                       bool update_flows) {
+  perf::Start("Insert");
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
+  if (!dataflow_state->HasFlowsFor(table_name)) {
+    update_flows = false;
+  }
   if (!state->Exists(table_name)) {
     return absl::InvalidArgumentError("Table does not exist!");
   }
@@ -24,13 +30,15 @@ absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
   // Shard the insert statement so it is executable against the physical
   // sharded database.
   sqlast::Stringifier stringifier;
+  mysql::SqlResult result;
 
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
     // The insertion statement is unmodified.
     std::string insert_str = stmt.Visit(&stringifier);
-    CHECK_STATUS(state->connection_pool().ExecuteDefault(insert_str, output));
+    result = state->connection_pool().ExecuteDefault(
+        ConnectionPool::Operation::UPDATE, insert_str);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded!
@@ -51,27 +59,32 @@ absl::Status Shard(const sqlast::Insert &stmt, SharderState *state,
       //               insert.
       if (!state->ShardExists(info.shard_kind, user_id)) {
         for (auto create_stmt : state->CreateShard(info.shard_kind, user_id)) {
-          CHECK_STATUS(state->connection_pool().ExecuteShard(create_stmt, info,
-                                                             user_id, output));
+          mysql::SqlResult tmp = state->connection_pool().ExecuteShard(
+              ConnectionPool::Operation::STATEMENT, create_stmt, info, user_id);
+          if (!tmp.IsStatement() || !tmp.Success()) {
+            return absl::InternalError("Could not created sharded table " +
+                                       create_stmt);
+          }
         }
       }
 
       // Add the modified insert statement.
       std::string insert_str = cloned.Visit(&stringifier);
-      CHECK_STATUS(state->connection_pool().ExecuteShard(insert_str, info,
-                                                         user_id, output));
+      result.Append(state->connection_pool().ExecuteShard(
+          ConnectionPool::Operation::UPDATE, insert_str, info, user_id));
     }
   }
 
   // Insert was successful, time to update dataflows.
   // Turn inserted values into a record and process it via corresponding flows.
   if (update_flows) {
-    std::vector<RawRecord> records;
-    records.emplace_back(table_name, stmt.GetValues(), stmt.GetColumns(), true);
-    dataflow_state->ProcessRawRecords(records);
+    std::vector<dataflow::Record> records;
+    records.push_back(dataflow_state->CreateRecord(stmt));
+    dataflow_state->ProcessRecords(stmt.table_name(), records);
   }
 
-  return absl::OkStatus();
+  perf::End("Insert");
+  return result;
 }
 
 }  // namespace insert

@@ -48,24 +48,28 @@ std::string &ColumnConstraint::foreign_column() {
 // ColumnDefinition
 ColumnDefinition::Type ColumnDefinition::StringToType(
     const std::string &column_type) {
-  if (absl::EqualsIgnoreCase(column_type, "int")) {
+  if (absl::EqualsIgnoreCase(column_type, "INT")) {
     return Type::INT;
-  } else if (absl::StartsWithIgnoreCase(column_type, "varchar") ||
-             absl::EqualsIgnoreCase(column_type, "string")) {
+  } else if (absl::StartsWithIgnoreCase(column_type, "VARCHAR") ||
+             absl::EqualsIgnoreCase(column_type, "TEXT")) {
     return Type::TEXT;
+  } else if (absl::StartsWithIgnoreCase(column_type, "DATETIME")) {
+    return Type::DATETIME;
   } else {
-    LOG(FATAL) << "Unsupported column type!";
+    LOG(FATAL) << "Unsupported column type: " << column_type;
   }
 }
 
 std::string ColumnDefinition::TypeToString(ColumnDefinition::Type type) {
   switch (type) {
     case Type::INT:
-      return "int";
+      return "INT";
+    case Type::DATETIME:
+      return "DATETIME";
     case Type::TEXT:
-      return "varchar";
+      return "VARCHAR(100)";
     default:
-      LOG(FATAL) << "Unsupported column type!";
+      LOG(FATAL) << "Unsupported column type: " << type;
   }
 }
 
@@ -173,8 +177,11 @@ std::ostream &operator<<(std::ostream &os, const ColumnDefinition::Type &r) {
     case ColumnDefinition::Type::UINT:
       os << "UINT";
       break;
+    case ColumnDefinition::Type::DATETIME:
+      os << "DATETIME";
+      break;
     default:
-      LOG(FATAL) << "Unsupported column type!";
+      LOG(FATAL) << "Unsupported column type: " << r;
   }
   return os;
 }

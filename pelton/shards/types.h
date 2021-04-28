@@ -8,18 +8,8 @@
 namespace pelton {
 namespace shards {
 
-// (context, col_count, col_data, col_name)
-// https://www.sqlite.org/c3ref/exec.html
-using Callback = std::function<int(void *, int, char **, char **)>;
-
-// Stores output and error reporting channels passed from host code.
-// E.g. the callback is how a row in the query result set is reported back to
-// the host code.
-struct OutputChannel {
-  Callback callback;
-  void *context;
-  char **errmsg;
-};
+// The name of a dataflow.
+using FlowName = std::string;
 
 // The name of the table representing users that own shards of this kind.
 using ShardKind = std::string;
@@ -59,18 +49,6 @@ struct ShardingInformation {
   ColumnName shard_by;
   // The index of the sharding column in the table definition.
   ColumnIndex shard_by_index;
-};
-
-// Describes a raw record (a sequence of untyped values for columns of a row).
-struct RawRecord {
-  std::string table_name;
-  std::vector<std::string> values;
-  // If empty, this is the default order.
-  std::vector<std::string> columns;
-  bool positive;
-  RawRecord(const std::string &tn, const std::vector<std::string> &vs,
-            const std::vector<std::string> &ns, bool p)
-      : table_name(tn), values(vs), columns(ns), positive(p) {}
 };
 
 }  // namespace shards

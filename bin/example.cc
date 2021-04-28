@@ -1,21 +1,28 @@
-#include <cassert>
 #include <iostream>
 #include <utility>
 
+#include "gflags/gflags.h"
+#include "glog/logging.h"
 #include "pelton/pelton.h"
+#include "pelton/util/perf.h"
+
+DEFINE_string(db_username, "root", "MYSQL username to connect with");
+DEFINE_string(db_password, "password", "MYSQL pwd to connect with");
+
+namespace {
 
 // CREATE TABLE queries.
 std::vector<std::string> CREATES{
     // Students.
     "CREATE TABLE students ("
     "ID int,"
-    "PII_Name varchar(100),"
+    "PII_Name text,"
     "PRIMARY KEY(ID)"
     ");",
     // Assignments.
     "CREATE TABLE assignments ("
     "ID int,"
-    "Name varchar(100),"
+    "Name text,"
     "PRIMARY KEY(ID)"
     ");",
     // Submissions.
@@ -27,7 +34,9 @@ std::vector<std::string> CREATES{
     "PRIMARY KEY(ID),"
     "FOREIGN KEY (student_id) REFERENCES students(ID),"
     "FOREIGN KEY (assignment_id) REFERENCES assignments(ID)"
-    ");"};
+    ");",
+    // Submissions index.
+    "CREATE INDEX submissions_ass_id_index ON submissions(assignment_id);"};
 
 // Inserts.
 std::vector<std::string> INSERTS{
@@ -58,21 +67,44 @@ std::vector<std::string> DELETES{
 
 // Flows.
 std::vector<std::pair<std::string, std::string>> FLOWS{
-    std::make_pair("FILTER FLOW", "SELECT * FROM submissions WHERE ts >= 100"),
-    std::make_pair("FILTER_FLOW2", "SELECT * FROM submissions WHERE ts < 100"),
-    std::make_pair("FILTER FLOW3",
-                   "SELECT * FROM submissions WHERE ts >= 100 AND "
-                   "assignment_id = 2 AND ID > 5"),
-    std::make_pair("UNION_FLOW",
-                   "(SELECT * FROM submissions WHERE ts >= 100) UNION (SELECT "
-                   "* FROM submissions WHERE ts < 100)"),
-    std::make_pair("JOIN_FLOW",
-                   "SELECT * from submissions INNER JOIN students ON "
-                   "submissions.student_id = students.ID WHERE ts >= 100"),
-    std::make_pair("LIMIT_CONSTANT",
-                   "SELECT * from submissions ORDER BY ts LIMIT 2 OFFSET 5"),
-    std::make_pair("LIMIT_VARIABLE",
-                   "SELECT * from submissions ORDER BY ts LIMIT ?")};
+    std::make_pair("all_rows",
+                   "CREATE VIEW all_rows AS '\"SELECT * FROM submissions\"'"),
+    std::make_pair("filter_row",
+                   "CREATE VIEW filter_row AS "
+                   "'\"SELECT * FROM submissions WHERE ts >= 100\"'"),
+    std::make_pair("filter_row2",
+                   "CREATE VIEW filter_row2 AS "
+                   "'\"SELECT * FROM submissions WHERE ts < 100\"'"),
+    std::make_pair("filter_row3",
+                   "CREATE VIEW filter_row3 AS "
+                   "'\"SELECT * FROM submissions WHERE ts >= 100 AND "
+                   "assignment_id = 2 AND ID > 5\"'"),
+    std::make_pair(
+        "union_flow",
+        "CREATE VIEW union_flow AS "
+        "'\"(SELECT * FROM submissions WHERE ts >= 100) UNION (SELECT "
+        "* FROM submissions WHERE ts < 100)\"'"),
+    std::make_pair("join_flow",
+                   "CREATE VIEW join_flow AS "
+                   "'\"SELECT * from submissions INNER JOIN students ON "
+                   "submissions.student_id = students.ID WHERE ts >= 100\"'"),
+    std::make_pair(
+        "limit_constant",
+        "CREATE VIEW limit_constant AS "
+        "'\"SELECT * from submissions ORDER BY ts LIMIT 2 OFFSET 5\"'"),
+    std::make_pair("limit_variable",
+                   "CREATE VIEW limit_variable AS "
+                   "'\"SELECT * from submissions ORDER BY ts LIMIT ?\"'")};
+
+std::vector<std::string> FLOW_READS{
+    "SELECT * FROM all_rows;",
+    "SELECT * FROM filter_row;",
+    "SELECT * FROM filter_row2;",
+    "SELECT * FROM filter_row3;",
+    "SELECT * FROM union_flow;",
+    "SELECT * FROM join_flow;",
+    "SELECT * FROM limit_constant;",
+    "SELECT * FROM limit_variable WHERE ts > 100 LIMIT 2 OFFSET 1;"};
 
 // Selects.
 std::vector<std::string> QUERIES{
@@ -80,53 +112,45 @@ std::vector<std::string> QUERIES{
     "SELECT * FROM submissions WHERE student_id = 1;",
     "SELECT * FROM submissions WHERE assignment_id = 2;"};
 
-// Print query results!
-int Callback(void *context, int col_count, char **col_data, char **col_name) {
-  bool *first_time = reinterpret_cast<bool *>(context);
-
-  // Print header the first time!
-  if (*first_time) {
-    std::cout << std::endl;
-    *first_time = false;
-    for (int i = 0; i < col_count; i++) {
-      std::cout << "| " << col_name[i] << " ";
+// Printing query results.
+void Print(pelton::SqlResult &&result) {
+  if (result.IsStatement()) {
+    std::cout << "Success: " << result.Success() << std::endl;
+  } else if (result.IsUpdate()) {
+    std::cout << "Affected rows: " << result.UpdateCount() << std::endl;
+  } else if (result.IsQuery()) {
+    std::cout << result.GetSchema() << std::endl;
+    for (const pelton::Record &record : result) {
+      std::cout << record << std::endl;
     }
-    std::cout << "|" << std::endl;
-    for (int i = 0; i < col_count * 10; i++) {
-      std::cout << "-";
-    }
-    std::cout << std::endl;
   }
-
-  // Print row data.
-  for (int i = 0; i < col_count; i++) {
-    std::cout << "| " << col_data[i] << " ";
-  }
-  std::cout << "|" << std::endl;
-
-  return 0;
 }
 
+}  // namespace
+
 int main(int argc, char **argv) {
-  // Read command line arguments.
-  if (argc < 2) {
-    std::cout << "Please provide the database directory as a command line "
-                 "argument!"
-              << std::endl;
-    return 1;
-  }
-  std::string dir(argv[1]);
+  // Command line arugments and help message.
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+  // Initialize Google’s logging library.
+  google::InitGoogleLogging("example");
+
+  // Read MySql configurations.
+  const std::string &db_username = FLAGS_db_username;
+  const std::string &db_password = FLAGS_db_password;
+
+  pelton::perf::Start("all");
 
   // Open connection to sharder.
   pelton::Connection connection;
-  pelton::open(dir, &connection);
-  assert(pelton::exec(&connection, "SET echo;", &Callback, nullptr, nullptr));
+  pelton::open("", db_username, db_password, &connection);
+  CHECK(pelton::exec(&connection, "SET echo;").ok());
 
   // Create all the tables.
   std::cout << "Create the tables ... " << std::endl;
   for (std::string &create : CREATES) {
     std::cout << std::endl;
-    assert(pelton::exec(&connection, create, &Callback, nullptr, nullptr));
+    CHECK(pelton::exec(&connection, create).ok());
   }
   std::cout << std::endl;
 
@@ -134,7 +158,7 @@ int main(int argc, char **argv) {
   std::cout << "Installing flows ... " << std::endl;
   for (const auto &[name, query] : FLOWS) {
     std::cout << name << std::endl;
-    pelton::make_view(&connection, name, query);
+    CHECK(pelton::exec(&connection, query).ok());
   }
   pelton::shutdown_planner();
   std::cout << std::endl;
@@ -143,15 +167,17 @@ int main(int argc, char **argv) {
   std::cout << "Insert data into tables ... " << std::endl;
   for (std::string &insert : INSERTS) {
     std::cout << std::endl;
-    assert(pelton::exec(&connection, insert, &Callback, nullptr, nullptr));
+    CHECK(pelton::exec(&connection, insert).ok());
   }
   std::cout << std::endl;
 
   // Read flow.
   std::cout << "Read flows ... " << std::endl;
-  for (const auto &[name, _] : FLOWS) {
+  for (const auto &query : FLOW_READS) {
     std::cout << std::endl;
-    pelton::print_view(&connection, name);
+    auto status = pelton::exec(&connection, query);
+    CHECK(status.ok());
+    Print(std::move(status.value()));
   }
   std::cout << std::endl;
 
@@ -159,15 +185,17 @@ int main(int argc, char **argv) {
   std::cout << "Update data in tables ... " << std::endl;
   for (std::string &update : UPDATES) {
     std::cout << std::endl;
-    assert(pelton::exec(&connection, update, &Callback, nullptr, nullptr));
+    CHECK(pelton::exec(&connection, update).ok());
   }
   std::cout << std::endl;
 
   // Read flow.
   std::cout << "Read flows ... " << std::endl;
-  for (const auto &[name, _] : FLOWS) {
+  for (const auto &query : FLOW_READS) {
     std::cout << std::endl;
-    pelton::print_view(&connection, name);
+    auto status = pelton::exec(&connection, query);
+    CHECK(status.ok());
+    Print(std::move(status.value()));
   }
   std::cout << std::endl;
 
@@ -175,7 +203,7 @@ int main(int argc, char **argv) {
   std::cout << "Delete data from tables ... " << std::endl;
   for (std::string &del : DELETES) {
     std::cout << std::endl;
-    assert(pelton::exec(&connection, del, &Callback, nullptr, nullptr));
+    CHECK(pelton::exec(&connection, del).ok());
   }
   std::cout << std::endl;
 
@@ -183,22 +211,28 @@ int main(int argc, char **argv) {
   std::cout << "Run queries ... " << std::endl;
   for (std::string &select : QUERIES) {
     std::cout << std::endl;
-    bool context = true;
-    assert(pelton::exec(&connection, select, &Callback,
-                        reinterpret_cast<void *>(&context), nullptr));
+    CHECK(pelton::exec(&connection, select).ok());
   }
   std::cout << std::endl;
 
   // Read flow.
   std::cout << "Read flows ... " << std::endl;
-  for (const auto &[name, _] : FLOWS) {
+  for (const auto &query : FLOW_READS) {
     std::cout << std::endl;
-    pelton::print_view(&connection, name);
+    auto status = pelton::exec(&connection, query);
+    CHECK(status.ok());
+    Print(std::move(status.value()));
   }
   std::cout << std::endl;
 
   // Close connection.
   pelton::close(&connection);
+
+  // Print performance profile.
+  pelton::perf::End("all");
+  pelton::perf::PrintAll();
+
+  // Done.
   std::cout << "exit" << std::endl;
   return 0;
 }

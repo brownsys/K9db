@@ -1,7 +1,11 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 exports_files(
-    ["filter_enum.h"],
+    [
+        "filter_enum.h",
+        "aggregate_enum.h",
+        "project_enum.h",
+    ],
     ["//pelton/dataflow:__subpackages__"],
 )
 
@@ -147,9 +151,31 @@ cc_library(
     ],
     hdrs = [
         "project.h",
+        "project_enum.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "@glog",
+        "@gtest//:gtest_prod",
+    ],
+)
+
+cc_library(
+    name = "aggregate",
+    srcs = [
+        "aggregate.cc",
+    ],
+    hdrs = [
+        "aggregate.h",
+        "aggregate_enum.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":grouped_data",
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
@@ -241,6 +267,26 @@ cc_test(
 )
 
 cc_test(
+    name = "aggregate-test",
+    srcs = [
+        "aggregate_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":aggregate",
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "//pelton/util:ints",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "benchmarks",
     srcs = [
         "benchmark-utils.cc",
@@ -260,6 +306,7 @@ cc_test(
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
+        "//pelton/util:ints",
         "@gbenchmark//:benchmark_main",
     ],
 )

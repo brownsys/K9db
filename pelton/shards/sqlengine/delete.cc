@@ -2,12 +2,17 @@
 
 #include "pelton/shards/sqlengine/delete.h"
 
+#include <memory>
 #include <string>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "absl/strings/str_cat.h"
+#include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -15,23 +20,34 @@ namespace shards {
 namespace sqlengine {
 namespace delete_ {
 
-absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
-                   dataflow::DataFlowState *dataflow_state,
-                   const OutputChannel &output, bool update_flows) {
+absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
+                                       SharderState *state,
+                                       dataflow::DataFlowState *dataflow_state,
+                                       bool update_flows) {
+  perf::Start("Delete");
+  const std::string &table_name = stmt.table_name();
+
+  // If no flows read from this table, we do not need to do anything
+  // to update them.
+  if (!dataflow_state->HasFlowsFor(table_name)) {
+    update_flows = false;
+  }
+
   // Get the rows that are going to be deleted prior to deletion to use them
   // to update the dataflows.
-  std::vector<RawRecord> records;
+  std::vector<dataflow::Record> records;
   if (update_flows) {
-    CHECK_STATUS(select::Query(&records, stmt.SelectDomain(), state,
-                               dataflow_state, false));
+    MOVE_OR_RETURN(mysql::SqlResult result,
+                   select::Shard(stmt.SelectDomain(), state, dataflow_state));
+    records = result.Vectorize();
   }
 
   // Must transform the delete statement into one that is compatible with
   // the sharded schema.
-  const std::string &table_name = stmt.table_name();
   bool is_sharded = state->IsSharded(table_name);
   bool is_pii = state->IsPII(table_name);
   sqlast::Stringifier stringifier;
+  mysql::SqlResult result;
 
   // Sharding scenarios.
   if (is_pii) {
@@ -47,22 +63,24 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
 
     // Remove user shard.
     std::string shard = sqlengine::NameShard(table_name, user_id);
-    std::string path = absl::StrCat(state->dir_path(), shard);
-    remove(path.c_str());
+    state->connection_pool().RemoveShard(shard);
     state->RemoveUserFromShard(table_name, user_id);
 
     // Turn the delete statement back to a string, to delete relevant row in
     // PII table.
     std::string delete_str = stmt.Visit(&stringifier);
-    CHECK_STATUS(state->connection_pool().ExecuteDefault(delete_str, output));
+    result = state->connection_pool().ExecuteDefault(
+        ConnectionPool::Operation::UPDATE, delete_str);
 
     // TODO(babman): Update dataflow after user has been deleted.
-    return absl::UnimplementedError("Dataflow not updated after a user delete");
+    // return absl::UnimplementedError("Dataflow not updated after a user
+    // delete");
 
   } else if (!is_sharded && !is_pii) {
     // Case 2: Table does not have PII and is not sharded!
     std::string delete_str = stmt.Visit(&stringifier);
-    return state->connection_pool().ExecuteDefault(delete_str, output);
+    result = state->connection_pool().ExecuteDefault(
+        ConnectionPool::Operation::UPDATE, delete_str);
 
   } else {  // is_shared == true
     // Case 3: Table is sharded!
@@ -86,24 +104,58 @@ absl::Status Shard(const sqlast::Delete &stmt, SharderState *state,
 
           // Execute statement directly against shard.
           std::string delete_str = cloned.Visit(&stringifier);
-          CHECK_STATUS(state->connection_pool().ExecuteShard(delete_str, info,
-                                                             user_id, output));
+          result.Append(state->connection_pool().ExecuteShard(
+              ConnectionPool::Operation::UPDATE, delete_str, info, user_id));
         }
-      } else {
-        // Execute statement against all shards of this kind.
+
+      } else if (update_flows) {
+        // We already have the data we need to delete, we can use it to get an
+        // accurate enumeration of shards to execute this one.
+        std::unordered_set<UserId> shards;
+        for (const dataflow::Record &record : records) {
+          shards.insert(record.GetValueString(info.shard_by_index));
+        }
+
         std::string delete_str = cloned.Visit(&stringifier);
-        CHECK_STATUS(state->connection_pool().ExecuteShard(
-            delete_str, info, state->UsersOfShard(info.shard_kind), output));
+        result.Append(state->connection_pool().ExecuteShards(
+            ConnectionPool::Operation::UPDATE, delete_str, info, shards));
+
+      } else {
+        // The delete statement by itself does not obviously constraint a
+        // shard. Try finding the shard(s) via secondary indices.
+        ASSIGN_OR_RETURN(
+            const auto &pair,
+            index::LookupIndex(table_name, info.shard_by, stmt.GetWhereClause(),
+                               state, dataflow_state));
+        if (pair.first) {
+          // Secondary index available for some constrainted column in stmt.
+          std::string delete_str = cloned.Visit(&stringifier);
+          result.MakeInline();
+          result.AppendDeduplicate(state->connection_pool().ExecuteShards(
+              ConnectionPool::Operation::UPDATE, delete_str, info,
+              pair.second));
+        } else {
+          // Secondary index unhelpful.
+          // Execute statement against all shards of this kind.
+          std::string delete_str = cloned.Visit(&stringifier);
+          result.Append(state->connection_pool().ExecuteShards(
+              ConnectionPool::Operation::UPDATE, delete_str, info,
+              state->UsersOfShard(info.shard_kind)));
+        }
       }
     }
   }
 
   // Delete was successful, time to update dataflows.
   if (update_flows) {
-    dataflow_state->ProcessRawRecords(records);
+    dataflow_state->ProcessRecords(table_name, records);
+  }
+  if (!result.IsUpdate()) {
+    result = mysql::SqlResult{std::make_unique<mysql::UpdateResult>(0)};
   }
 
-  return absl::OkStatus();
+  perf::End("Delete");
+  return result;
 }
 
 }  // namespace delete_

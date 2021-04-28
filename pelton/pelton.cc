@@ -2,15 +2,12 @@
 #include "pelton/pelton.h"
 
 #include <iostream>
-#include <memory>
-#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
-#include "pelton/dataflow/graph.h"
 #include "pelton/planner/planner.h"
 #include "pelton/shards/sqlengine/engine.h"
 #include "pelton/shards/sqlengine/util.h"
@@ -45,8 +42,7 @@ bool SpecialStatements(const std::string &sql, Connection *connection) {
     std::vector<std::string> v = absl::StrSplit(sql, ' ');
     v.at(2).pop_back();
     std::string shard_name = shards::sqlengine::NameShard(v.at(1), v.at(2));
-    const std::string &dir_path = connection->GetSharderState()->dir_path();
-    std::cout << absl::StrCat(dir_path, shard_name) << std::endl;
+    std::cout << shard_name << std::endl;
     return true;
   }
   return false;
@@ -54,14 +50,15 @@ bool SpecialStatements(const std::string &sql, Connection *connection) {
 
 }  // namespace
 
-bool open(const std::string &directory, Connection *connection) {
-  connection->GetSharderState()->Initialize(directory);
+bool open(const std::string &directory, const std::string &db_username,
+          const std::string &db_password, Connection *connection) {
+  connection->Initialize(directory);
+  connection->GetSharderState()->Initialize(db_username, db_password);
   connection->Load();
   return true;
 }
 
-bool exec(Connection *connection, std::string sql,
-          const shards::Callback &callback, void *context, char **errmsg) {
+absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
   // Trim statement.
   Trim(sql);
   if (echo) {
@@ -70,29 +67,13 @@ bool exec(Connection *connection, std::string sql,
 
   // If special statement, handle it separately.
   if (SpecialStatements(sql, connection)) {
-    return true;
+    return SqlResult();
   }
 
   // Parse and rewrite statement.
   shards::SharderState *sstate = connection->GetSharderState();
   dataflow::DataFlowState *dstate = connection->GetDataFlowState();
-  shards::OutputChannel output = {callback, context, errmsg};
-  absl::Status status = shards::sqlengine::Shard(sql, sstate, dstate, output);
-  if (!status.ok()) {
-    std::cout << status << std::endl;
-    return false;
-  }
-
-  return true;
-}
-
-void make_view(Connection *connection, const std::string &name,
-               const std::string &query) {
-  // Plan the query using calcite and generate a concrete graph for it.
-  dataflow::DataFlowGraph graph =
-      planner::PlanGraph(connection->GetDataFlowState(), query);
-  // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
-  connection->GetDataFlowState()->AddFlow(name, graph);
+  return shards::sqlengine::Shard(sql, sstate, dstate);
 }
 
 void shutdown_planner() { planner::ShutdownPlanner(); }
@@ -102,8 +83,5 @@ bool close(Connection *connection) {
   planner::ShutdownPlanner();
   return true;
 }
-
-// Materialized views.
-#include "pelton/todo.inc"
 
 }  // namespace pelton
