@@ -40,24 +40,6 @@ INSERT INTO submissions VALUES (5, 1, 2, 5);
 INSERT INTO submissions VALUES (6, 2, 2, 6);
 INSERT INTO submissions VALUES (7, 3, 2, 7);
 
-SELECT * FROM pk_index_student_id;
-SELECT * FROM ass_index_student_id;
-
-SELECT * FROM submissions WHERE student_id = 1;
-SELECT * FROM submissions WHERE timestamp = 6;
-SELECT * FROM submissions WHERE id = 4;
-SELECT * FROM submissions WHERE assignment_id = 1;
-
-SELECT * FROM submissions WHERE student_id = 100;
-SELECT * FROM submissions WHERE timestamp = 100;
-SELECT * FROM submissions WHERE id = 100;
-SELECT * FROM submissions WHERE assignment_id = 100;
-
-DELETE FROM submissions WHERE id = 5;
-DELETE FROM submissions WHERE id = 100;
-DELETE FROM submissions WHERE assignment_id = 2;
-SELECT * FROM submissions;
-
-DELETE FROM submissions;
+UPDATE submissions SET student_id = 3 WHERE student_id = 2;
 
 SELECT * FROM submissions;
