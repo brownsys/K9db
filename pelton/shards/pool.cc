@@ -121,8 +121,8 @@ mysql::SqlResult ConnectionPool::ExecuteMySQL(ConnectionPool::Operation op,
     case ConnectionPool::Operation::UPDATE: {
       perf::Start("MySQL");
       this->stmt_->execute(exec_str);
-      int row_count = this->stmt_->getUpdateCount();
       this->stmt_->getMoreResults();  // Skip all results.
+      int row_count = this->stmt_->getUpdateCount();
       this->stmt_->getMoreResults();
       perf::End("MySQL");
       res = mysql::SqlResult(std::make_unique<mysql::UpdateResult>(row_count));
