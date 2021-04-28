@@ -60,8 +60,7 @@ class ProjectOperator : public Operator {
   std::vector<std::tuple<std::string, ColumnID, Operation, Record::DataVariant,
                          Metadata>>
       projections_;
-  bool EnclosedKeyCols(const std::vector<ColumnID> &input_keycols,
-                       const std::vector<ColumnID> &cids) const;
+
   // Allow tests to use .Process(...) directly.
   FRIEND_TEST(ProjectOperatorTest, BatchTestColumn);
   FRIEND_TEST(ProjectOperatorTest, BatchTestLiteral);

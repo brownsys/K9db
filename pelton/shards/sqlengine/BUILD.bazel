@@ -12,6 +12,7 @@ cc_library(
     deps = [
         ":create",
         ":delete",
+        ":index",
         ":insert",
         ":select",
         ":update",
@@ -53,6 +54,29 @@ cc_library(
 )
 
 cc_library(
+    name = "index",
+    srcs = [
+        "index.cc",
+    ],
+    hdrs = [
+        "index.h",
+    ],
+    deps = [
+        ":view",
+        "//pelton/dataflow:graph",
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:state",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/sqlast:ast",
+        "//pelton/util:perf",
+        "//pelton/util:status",
+        "@absl//absl/status",
+    ],
+)
+
+cc_library(
     name = "insert",
     srcs = [
         "insert.cc",
@@ -81,12 +105,14 @@ cc_library(
         "select.h",
     ],
     deps = [
+        ":index",
         "//pelton/dataflow:state",
         "//pelton/mysql:result",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
+        "//pelton/util:status",
         "@absl//absl/status",
     ],
 )
@@ -100,6 +126,7 @@ cc_library(
         "delete.h",
     ],
     deps = [
+        ":index",
         ":select",
         "//pelton/dataflow:state",
         "//pelton/mysql:result",
@@ -124,6 +151,7 @@ cc_library(
     ],
     deps = [
         ":delete",
+        ":index",
         ":insert",
         ":select",
         "//pelton/dataflow:state",

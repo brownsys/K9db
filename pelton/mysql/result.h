@@ -203,6 +203,8 @@ class AugmentedSqlResult : public SqlResult::SqlResultImpl {
 // A result set with inlined values.
 class InlinedSqlResult : public SqlResult::SqlResultImpl {
  public:
+  InlinedSqlResult() : records_(), index_(0) {}
+
   explicit InlinedSqlResult(std::vector<dataflow::Record> &&records)
       : records_(std::move(records)), index_(0) {}
 

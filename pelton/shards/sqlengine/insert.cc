@@ -20,6 +20,9 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Insert &stmt,
   perf::Start("Insert");
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
+  if (!dataflow_state->HasFlowsFor(table_name)) {
+    update_flows = false;
+  }
   if (!state->Exists(table_name)) {
     return absl::InvalidArgumentError("Table does not exist!");
   }

@@ -34,7 +34,9 @@ std::vector<std::string> CREATES{
     "PRIMARY KEY(ID),"
     "FOREIGN KEY (student_id) REFERENCES students(ID),"
     "FOREIGN KEY (assignment_id) REFERENCES assignments(ID)"
-    ");"};
+    ");",
+    // Submissions index.
+    "CREATE INDEX submissions_ass_id_index ON submissions(assignment_id);"};
 
 // Inserts.
 std::vector<std::string> INSERTS{

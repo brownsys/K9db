@@ -36,9 +36,10 @@ public class QueryPlanner {
         Frameworks.newConfigBuilder()
             // MySQL dialect.
             .parserConfig(
-                SqlParser.configBuilder().setLex(Lex.MYSQL)
-                                         .setConformance(SqlConformanceEnum.MYSQL_5)
-                                         .build())
+                SqlParser.configBuilder()
+                    .setLex(Lex.MYSQL)
+                    .setConformance(SqlConformanceEnum.MYSQL_5)
+                    .build())
             // Sets the schema to use by the planner
             .defaultSchema(this.schema)
             // Context provides a way to store data within the planner session that can be

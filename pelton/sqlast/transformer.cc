@@ -47,6 +47,9 @@ antlrcpp::Any AstTransformer::visitSql_stmt(
   if (ctx->create_table_stmt() != nullptr) {
     return ctx->create_table_stmt()->accept(this);
   }
+  if (ctx->create_index_stmt() != nullptr) {
+    return ctx->create_index_stmt()->accept(this);
+  }
   if (ctx->insert_stmt() != nullptr) {
     return ctx->insert_stmt()->accept(this);
   }
@@ -208,6 +211,27 @@ antlrcpp::Any AstTransformer::visitForeign_key_clause(
   CAST_OR_RETURN(constrn.foreign_column(), ctx->column_name(0)->accept(this),
                  std::string);
   return constrn;
+}
+
+// Create Index constructs.
+antlrcpp::Any AstTransformer::visitCreate_index_stmt(
+    sqlparser::SQLiteParser::Create_index_stmtContext *ctx) {
+  if (ctx->UNIQUE() != nullptr || ctx->EXISTS() != nullptr ||
+      ctx->WHERE() != nullptr || ctx->schema_name() != nullptr) {
+    return absl::InvalidArgumentError("Invalid Create Index statement");
+  }
+  if (ctx->indexed_column().size() > 1) {
+    return absl::InvalidArgumentError("Multi-column index are not supported!");
+  }
+
+  CAST_OR_RETURN(std::string index_name, ctx->index_name()->accept(this),
+                 std::string);
+  CAST_OR_RETURN(std::string table_name, ctx->table_name()->accept(this),
+                 std::string);
+  CAST_OR_RETURN(std::string column_name, ctx->indexed_column(0)->accept(this),
+                 std::string);
+  return static_cast<std::unique_ptr<AbstractStatement>>(
+      std::make_unique<CreateIndex>(index_name, table_name, column_name));
 }
 
 // Insert constructs.
@@ -484,6 +508,10 @@ antlrcpp::Any AstTransformer::visitTable_name(
     sqlparser::SQLiteParser::Table_nameContext *ctx) {
   return ctx->any_name()->accept(this);
 }
+antlrcpp::Any AstTransformer::visitIndex_name(
+    sqlparser::SQLiteParser::Index_nameContext *ctx) {
+  return ctx->any_name()->accept(this);
+}
 antlrcpp::Any AstTransformer::visitView_name(
     sqlparser::SQLiteParser::View_nameContext *ctx) {
   return ctx->any_name()->accept(this);
@@ -551,10 +579,6 @@ antlrcpp::Any AstTransformer::visitSavepoint_stmt(
 }
 antlrcpp::Any AstTransformer::visitRelease_stmt(
     sqlparser::SQLiteParser::Release_stmtContext *ctx) {
-  return absl::InvalidArgumentError("Unsupported Syntax");
-}
-antlrcpp::Any AstTransformer::visitCreate_index_stmt(
-    sqlparser::SQLiteParser::Create_index_stmtContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
 antlrcpp::Any AstTransformer::visitSigned_number(
@@ -795,10 +819,6 @@ antlrcpp::Any AstTransformer::visitNew_table_name(
 }
 antlrcpp::Any AstTransformer::visitCollation_name(
     sqlparser::SQLiteParser::Collation_nameContext *ctx) {
-  return absl::InvalidArgumentError("Unsupported Syntax");
-}
-antlrcpp::Any AstTransformer::visitIndex_name(
-    sqlparser::SQLiteParser::Index_nameContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
 antlrcpp::Any AstTransformer::visitTrigger_name(

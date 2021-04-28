@@ -74,20 +74,7 @@
 namespace pelton {
 namespace dataflow {
 
-bool ProjectOperator::EnclosedKeyCols(
-    const std::vector<ColumnID> &input_keycols,
-    const std::vector<ColumnID> &cids) const {
-  for (const auto &keycol : input_keycols) {
-    bool is_present = false;
-    for (const auto &cid : cids)
-      if (keycol == cid) is_present = true;
-
-    // at least one key column of the composite key is not being projected
-    if (!is_present) return false;
-  }
-  // all input key columns are present in the projected schema
-  return true;
-}
+namespace {
 
 inline sqlast::ColumnDefinition::Type GetLiteralType(
     const Record::DataVariant &literal) {
@@ -101,39 +88,32 @@ inline sqlast::ColumnDefinition::Type GetLiteralType(
   }
 }
 
-void ProjectOperator::ComputeOutputSchema() {
-  std::vector<std::string> out_column_names = {};
-  std::vector<sqlast::ColumnDefinition::Type> out_column_types = {};
-  std::vector<ColumnID> input_keys = this->input_schemas_.at(0).keys();
-  std::vector<ColumnID> out_keys = {};
+}  // namespace
 
-  // Get cids for determining whether input keys are being projected or not.
-  std::vector<ColumnID> cids;
-  for (const auto &[column_name, left_operand, op, right_operand, metadata] :
-       this->projections_) {
-    switch (metadata) {
-      case Metadata::COLUMN:
-        cids.push_back(left_operand);
+void ProjectOperator::ComputeOutputSchema() {
+  // If keys are not provided, we can compute them ourselves by checking
+  // if the primary key survives the projection.
+  std::vector<ColumnID> out_keys = {};
+  for (ColumnID key : this->input_schemas_.at(0).keys()) {
+    bool found_key = false;
+    for (size_t i = 0; i < this->projections_.size(); i++) {
+      const auto &[column_name, left_operand, op, right_operand, metadata] =
+          this->projections_.at(i);
+      if (metadata == Metadata::COLUMN && left_operand == key) {
+        out_keys.push_back(i);
+        found_key = true;
         break;
-      default:
-        continue;
-    }
-  }
-  // If the input key set is a subset of the projected columns only then form an
-  // output keyset. Else do not assign keys for the output schema. Because the
-  // subset of input keycols can no longer uniqely identify records. This is
-  // only for semantic purposes as, as of now, this does not have an effect on
-  // the materialized view.
-  if (EnclosedKeyCols(input_keys, cids)) {
-    for (auto ik : input_keys) {
-      auto it = std::find(cids.begin(), cids.end(), ik);
-      if (it != cids.end()) {
-        out_keys.push_back(std::distance(cids.begin(), it));
       }
+    }
+    if (!found_key) {
+      out_keys.clear();
+      break;
     }
   }
 
   // Obtain column name and types
+  std::vector<std::string> out_column_names = {};
+  std::vector<sqlast::ColumnDefinition::Type> out_column_types = {};
   for (const auto &[column_name, left_operand, op, right_operand, metadata] :
        this->projections_) {
     // Obtain types and simultaneously sanity check for type compatibility
@@ -175,6 +155,7 @@ void ProjectOperator::ComputeOutputSchema() {
     }
     out_column_names.push_back(column_name);
   }
+
   this->output_schema_ =
       SchemaFactory::Create(out_column_names, out_column_types, out_keys);
 }
@@ -183,7 +164,7 @@ bool ProjectOperator::Process(NodeIndex source,
                               const std::vector<Record> &records,
                               std::vector<Record> *output) {
   for (const Record &record : records) {
-    Record out_record{this->output_schema_};
+    Record out_record{this->output_schema_, record.IsPositive()};
     for (size_t i = 0; i < this->projections_.size(); i++) {
       if (record.IsNull(i)) {
         out_record.SetNull(true, i);

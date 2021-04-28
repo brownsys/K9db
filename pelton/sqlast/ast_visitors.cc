@@ -51,6 +51,14 @@ std::string Stringifier::VisitColumnConstraint(const ColumnConstraint &ast) {
   }
 }
 
+std::string Stringifier::VisitCreateIndex(const CreateIndex &ast) {
+  perf::Start("Stringify (create index)");
+  std::string result = "CREATE INDEX " + ast.index_name() + " ON " +
+                       ast.table_name() + "(" + ast.column_name() + ")";
+  perf::End("Stringify (create index)");
+  return result;
+}
+
 std::string Stringifier::VisitInsert(const Insert &ast) {
   perf::Start("Stringify (insert)");
   std::string result = "INSERT INTO " + ast.table_name();
@@ -162,6 +170,10 @@ std::pair<bool, std::string> ValueFinder::VisitColumnConstraint(
     const ColumnConstraint &ast) {
   assert(false);
 }
+std::pair<bool, std::string> ValueFinder::VisitCreateIndex(
+    const CreateIndex &ast) {
+  assert(false);
+}
 std::pair<bool, std::string> ValueFinder::VisitInsert(const Insert &ast) {
   assert(false);
 }
@@ -233,6 +245,10 @@ std::unique_ptr<Expression> ExpressionRemover::VisitColumnDefinition(
 }
 std::unique_ptr<Expression> ExpressionRemover::VisitColumnConstraint(
     ColumnConstraint *ast) {
+  assert(false);
+}
+std::unique_ptr<Expression> ExpressionRemover::VisitCreateIndex(
+    CreateIndex *ast) {
   assert(false);
 }
 std::unique_ptr<Expression> ExpressionRemover::VisitInsert(Insert *ast) {
