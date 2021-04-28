@@ -71,8 +71,12 @@ absl::Status CreateIndex(const sqlast::CreateIndex &stmt, SharderState *state,
 
 absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
     const std::string &table_name, const std::string &shard_by,
-    const sqlast::BinaryExpression &where_clause, SharderState *state,
+    const sqlast::BinaryExpression *where_clause, SharderState *state,
     dataflow::DataFlowState *dataflow_state) {
+  if (where_clause == nullptr) {
+    return std::make_pair(false, std::unordered_set<UserId>{});
+  }
+
   // Get all the columns that have a secondary index.
   const std::unordered_set<ColumnName> &indexed_cols =
       state->IndicesFor(table_name);
@@ -80,7 +84,7 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
   // See if the where clause conditions on a value for one of these columns.
   for (const ColumnName &column_name : indexed_cols) {
     sqlast::ValueFinder value_finder(column_name);
-    auto [found, column_value] = where_clause.Visit(&value_finder);
+    auto [found, column_value] = where_clause->Visit(&value_finder);
     if (!found) {
       continue;
     }

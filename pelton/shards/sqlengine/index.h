@@ -24,7 +24,7 @@ absl::Status CreateIndex(const sqlast::CreateIndex &stmt, SharderState *state,
 
 absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
     const std::string &table_name, const std::string &shard_by,
-    const sqlast::BinaryExpression &where_clause, SharderState *state,
+    const sqlast::BinaryExpression *where_clause, SharderState *state,
     dataflow::DataFlowState *dataflow_state);
 
 absl::StatusOr<std::unordered_set<UserId>> LookupIndex(

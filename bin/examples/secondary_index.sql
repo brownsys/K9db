@@ -22,6 +22,8 @@ CREATE TABLE submissions ( \
   FOREIGN KEY (assignment_id) REFERENCES assignments(ID) \
 );
 
+SELECT * FROM submissions;
+
 CREATE INDEX pk_index ON submissions (id);
 CREATE INDEX ass_index ON submissions (assignment_id);
 
@@ -51,3 +53,11 @@ SELECT * FROM submissions WHERE timestamp = 100;
 SELECT * FROM submissions WHERE id = 100;
 SELECT * FROM submissions WHERE assignment_id = 100;
 
+DELETE FROM submissions WHERE id = 5;
+DELETE FROM submissions WHERE id = 100;
+DELETE FROM submissions WHERE assignment_id = 2;
+SELECT * FROM submissions;
+
+DELETE FROM submissions;
+
+SELECT * FROM submissions;

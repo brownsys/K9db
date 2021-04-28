@@ -2,11 +2,14 @@
 
 #include "pelton/shards/sqlengine/delete.h"
 
+#include <memory>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include "absl/strings/str_cat.h"
+#include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/perf.h"
@@ -23,6 +26,12 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
                                        bool update_flows) {
   perf::Start("Delete");
   const std::string &table_name = stmt.table_name();
+
+  // If no flows read from this table, we do not need to do anything
+  // to update them.
+  if (!dataflow_state->HasFlowsFor(table_name)) {
+    update_flows = false;
+  }
 
   // Get the rows that are going to be deleted prior to deletion to use them
   // to update the dataflows.
@@ -82,28 +91,59 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
       sqlast::Delete cloned = stmt;
       cloned.table_name() = info.sharded_table_name;
 
-      // Find the value assigned to shard_by column in the where clause, and
-      // remove it from the where clause.
-      sqlast::ValueFinder value_finder(info.shard_by);
-      auto [found, user_id] = cloned.Visit(&value_finder);
-      if (found) {
-        if (state->ShardExists(info.shard_kind, user_id)) {
-          // Remove where condition on the shard by column, since it does not
-          // exist in the sharded table.
-          sqlast::ExpressionRemover expression_remover(info.shard_by);
-          cloned.Visit(&expression_remover);
-
-          // Execute statement directly against shard.
-          std::string delete_str = cloned.Visit(&stringifier);
-          result.Append(state->connection_pool().ExecuteShard(
-              ConnectionPool::Operation::UPDATE, delete_str, info, user_id));
+      if (update_flows) {
+        // We already have the data we need to delete, we can use it to get an
+        // accurate enumeration of shards to execute this one.
+        std::unordered_set<UserId> shards;
+        for (const dataflow::Record &record : records) {
+          shards.insert(record.GetValueString(info.shard_by_index));
         }
-      } else {
-        // Execute statement against all shards of this kind.
+
         std::string delete_str = cloned.Visit(&stringifier);
         result.Append(state->connection_pool().ExecuteShards(
-            ConnectionPool::Operation::UPDATE, delete_str, info,
-            state->UsersOfShard(info.shard_kind)));
+            ConnectionPool::Operation::UPDATE, delete_str, info, shards));
+
+      } else {
+        // Find the value assigned to shard_by column in the where clause, and
+        // remove it from the where clause.
+        sqlast::ValueFinder value_finder(info.shard_by);
+        auto [found, user_id] = cloned.Visit(&value_finder);
+        if (found) {
+          if (state->ShardExists(info.shard_kind, user_id)) {
+            // Remove where condition on the shard by column, since it does not
+            // exist in the sharded table.
+            sqlast::ExpressionRemover expression_remover(info.shard_by);
+            cloned.Visit(&expression_remover);
+
+            // Execute statement directly against shard.
+            std::string delete_str = cloned.Visit(&stringifier);
+            result.Append(state->connection_pool().ExecuteShard(
+                ConnectionPool::Operation::UPDATE, delete_str, info, user_id));
+          }
+
+        } else {
+          // The delete statement by itself does not obviously constraint a
+          // shard. Try finding the shard(s) via secondary indices.
+          ASSIGN_OR_RETURN(
+              const auto &pair,
+              index::LookupIndex(table_name, info.shard_by,
+                                 stmt.GetWhereClause(), state, dataflow_state));
+          if (pair.first) {
+            // Secondary index available for some constrainted column in stmt.
+            std::string delete_str = cloned.Visit(&stringifier);
+            result.MakeInline();
+            result.AppendDeduplicate(state->connection_pool().ExecuteShards(
+                ConnectionPool::Operation::UPDATE, delete_str, info,
+                pair.second));
+          } else {
+            // Secondary index unhelpful.
+            // Execute statement against all shards of this kind.
+            std::string delete_str = cloned.Visit(&stringifier);
+            result.Append(state->connection_pool().ExecuteShards(
+                ConnectionPool::Operation::UPDATE, delete_str, info,
+                state->UsersOfShard(info.shard_kind)));
+          }
+        }
       }
     }
   }
@@ -111,6 +151,9 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
   // Delete was successful, time to update dataflows.
   if (update_flows) {
     dataflow_state->ProcessRecords(table_name, records);
+  }
+  if (!result.IsUpdate()) {
+    result = mysql::SqlResult{std::make_unique<mysql::UpdateResult>(0)};
   }
 
   perf::End("Delete");

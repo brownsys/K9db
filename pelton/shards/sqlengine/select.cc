@@ -67,17 +67,14 @@ absl::StatusOr<mysql::SqlResult> Shard(
           result.AppendDeduplicate(state->connection_pool().ExecuteShard(
               ConnectionPool::Operation::QUERY, select_str, info, user_id,
               schema));
-        } else {
-          result.Append(mysql::SqlResult{
-              std::make_unique<mysql::InlinedSqlResult>(), schema});
         }
       } else {
         // The select statement by itself does not obviously constraint a shard.
         // Try finding the shard(s) via secondary indices.
         ASSIGN_OR_RETURN(
             const auto &pair,
-            index::LookupIndex(table_name, info.shard_by,
-                               *stmt.GetWhereClause(), state, dataflow_state));
+            index::LookupIndex(table_name, info.shard_by, stmt.GetWhereClause(),
+                               state, dataflow_state));
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
           std::string select_str = cloned.Visit(&stringifier);
@@ -96,6 +93,11 @@ absl::StatusOr<mysql::SqlResult> Shard(
         }
       }
     }
+  }
+
+  if (!result.IsQuery()) {
+    result =
+        mysql::SqlResult{std::make_unique<mysql::InlinedSqlResult>(), schema};
   }
 
   perf::End("Select");
