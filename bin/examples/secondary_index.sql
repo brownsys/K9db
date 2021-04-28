@@ -25,7 +25,6 @@ CREATE TABLE submissions ( \
 CREATE INDEX pk_index ON submissions (id);
 CREATE INDEX ass_index ON submissions (assignment_id);
 
-
 INSERT INTO assignments VALUES (1, 'assignment 1');
 INSERT INTO assignments VALUES (2, 'assignment 2');
 INSERT INTO students VALUES (1, 'Jerry');
@@ -41,3 +40,14 @@ INSERT INTO submissions VALUES (7, 3, 2, 7);
 
 SELECT * FROM pk_index_student_id;
 SELECT * FROM ass_index_student_id;
+
+SELECT * FROM submissions WHERE student_id = 1;
+SELECT * FROM submissions WHERE timestamp = 6;
+SELECT * FROM submissions WHERE id = 4;
+SELECT * FROM submissions WHERE assignment_id = 1;
+
+SELECT * FROM submissions WHERE student_id = 100;
+SELECT * FROM submissions WHERE timestamp = 100;
+SELECT * FROM submissions WHERE id = 100;
+SELECT * FROM submissions WHERE assignment_id = 100;
+

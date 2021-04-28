@@ -64,6 +64,19 @@ mysql::SqlResult ConnectionPool::ExecuteShards(
     Operation op, const std::string &sql, const ShardingInformation &info,
     const std::unordered_set<UserId> &user_ids,
     const dataflow::SchemaRef &schema) {
+  if (user_ids.size() == 0) {
+    switch (op) {
+      case ConnectionPool::Operation::STATEMENT:
+        return mysql::SqlResult{std::make_unique<mysql::StatementResult>(true),
+                                {}};
+      case ConnectionPool::Operation::UPDATE:
+        return mysql::SqlResult{std::make_unique<mysql::UpdateResult>(0), {}};
+      case ConnectionPool::Operation::QUERY:
+        return mysql::SqlResult{std::make_unique<mysql::InlinedSqlResult>(),
+                                schema};
+    }
+  }
+
   // This result set is a proxy that allows access to results from all shards.
   mysql::SqlResult result;
   for (const UserId &user_id : user_ids) {

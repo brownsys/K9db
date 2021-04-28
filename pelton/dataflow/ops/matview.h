@@ -19,6 +19,7 @@ namespace dataflow {
 class MatViewOperator : public Operator {
  public:
   virtual size_t count() const = 0;
+  virtual const std::vector<ColumnID> &key_cols() const = 0;
   virtual bool Contains(const Key &key) const = 0;
   virtual const_RecordIterable Lookup(const Key &key, int limit = -1,
                                       size_t offset = 0) const = 0;
@@ -70,9 +71,11 @@ class MatViewOperatorT : public MatViewOperator {
         limit_(limit),
         offset_(offset) {}
 
-  const std::vector<ColumnID> &key_cols() const { return this->key_cols_; }
-
   size_t count() const override { return this->contents_.count(); }
+
+  const std::vector<ColumnID> &key_cols() const override {
+    return this->key_cols_;
+  }
 
   bool Contains(const Key &key) const override {
     return this->contents_.Contains(key);

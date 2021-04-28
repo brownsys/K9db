@@ -105,12 +105,14 @@ cc_library(
         "select.h",
     ],
     deps = [
+        ":index",
         "//pelton/dataflow:state",
         "//pelton/mysql:result",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
+        "//pelton/util:status",
         "@absl//absl/status",
     ],
 )
@@ -124,6 +126,7 @@ cc_library(
         "delete.h",
     ],
     deps = [
+        ":index",
         ":select",
         "//pelton/dataflow:state",
         "//pelton/mysql:result",
@@ -148,6 +151,7 @@ cc_library(
     ],
     deps = [
         ":delete",
+        ":index",
         ":insert",
         ":select",
         "//pelton/dataflow:state",

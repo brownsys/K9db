@@ -48,11 +48,11 @@ absl::Status CreateIndex(const sqlast::CreateIndex &stmt, SharderState *state,
       std::string query;
       if (unique) {
         query = "SELECT " + column_name + ", " + info.shard_by + " FROM " +
-                table_name;
+                table_name + " WHERE " + column_name + " = ?";
       } else {
         query = "SELECT " + column_name + ", " + info.shard_by +
                 ", COUNT(*) FROM " + table_name + " GROUP BY " + column_name +
-                ", " + info.shard_by;
+                ", " + info.shard_by + " HAVING " + column_name + " = ?";
       }
       sqlast::CreateView create_view{index_name, query};
 
@@ -67,6 +67,35 @@ absl::Status CreateIndex(const sqlast::CreateIndex &stmt, SharderState *state,
 
   perf::End("Create Index");
   return absl::OkStatus();
+}
+
+absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
+    const std::string &table_name, const std::string &shard_by,
+    const sqlast::BinaryExpression &where_clause, SharderState *state,
+    dataflow::DataFlowState *dataflow_state) {
+  // Get all the columns that have a secondary index.
+  const std::unordered_set<ColumnName> &indexed_cols =
+      state->IndicesFor(table_name);
+
+  // See if the where clause conditions on a value for one of these columns.
+  for (const ColumnName &column_name : indexed_cols) {
+    sqlast::ValueFinder value_finder(column_name);
+    auto [found, column_value] = where_clause.Visit(&value_finder);
+    if (!found) {
+      continue;
+    }
+
+    // The where clause gives us a value for "column_name", we can translate
+    // it to some value(s) for shard_by column by looking at the index.
+    const FlowName &index_flow =
+        state->IndexFlow(table_name, column_name, shard_by);
+    MOVE_OR_RETURN(std::unordered_set<UserId> shards,
+                   LookupIndex(index_flow, column_value, dataflow_state));
+
+    return std::make_pair(true, std::move(shards));
+  }
+
+  return std::make_pair(false, std::unordered_set<UserId>{});
 }
 
 absl::StatusOr<std::unordered_set<UserId>> LookupIndex(

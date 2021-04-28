@@ -1,9 +1,12 @@
 // SELECT statements sharding and rewriting.
 #include "pelton/shards/sqlengine/select.h"
 
+#include <memory>
 #include <string>
 
+#include "pelton/shards/sqlengine/index.h"
 #include "pelton/util/perf.h"
+#include "pelton/util/status.h"
 
 namespace pelton {
 namespace shards {
@@ -64,14 +67,33 @@ absl::StatusOr<mysql::SqlResult> Shard(
           result.AppendDeduplicate(state->connection_pool().ExecuteShard(
               ConnectionPool::Operation::QUERY, select_str, info, user_id,
               schema));
+        } else {
+          result.Append(mysql::SqlResult{
+              std::make_unique<mysql::InlinedSqlResult>(), schema});
         }
       } else {
-        // Select from all the relevant shards.
-        std::string select_str = cloned.Visit(&stringifier);
-        result.MakeInline();
-        result.AppendDeduplicate(state->connection_pool().ExecuteShards(
-            ConnectionPool::Operation::QUERY, select_str, info,
-            state->UsersOfShard(info.shard_kind), schema));
+        // The select statement by itself does not obviously constraint a shard.
+        // Try finding the shard(s) via secondary indices.
+        ASSIGN_OR_RETURN(
+            const auto &pair,
+            index::LookupIndex(table_name, info.shard_by,
+                               *stmt.GetWhereClause(), state, dataflow_state));
+        if (pair.first) {
+          // Secondary index available for some constrainted column in stmt.
+          std::string select_str = cloned.Visit(&stringifier);
+          result.MakeInline();
+          result.AppendDeduplicate(state->connection_pool().ExecuteShards(
+              ConnectionPool::Operation::QUERY, select_str, info, pair.second,
+              schema));
+        } else {
+          // Secondary index unhelpful.
+          // Select from all the relevant shards.
+          std::string select_str = cloned.Visit(&stringifier);
+          result.MakeInline();
+          result.AppendDeduplicate(state->connection_pool().ExecuteShards(
+              ConnectionPool::Operation::QUERY, select_str, info,
+              state->UsersOfShard(info.shard_kind), schema));
+        }
       }
     }
   }
