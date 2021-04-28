@@ -15,7 +15,7 @@ public class PlanningContext {
   }
 
   // This context object is shared between all sibling planning contexts.
-  private class SharedContext {
+  private static class SharedContext {
     public final DataFlowGraphLibrary.DataFlowGraphGenerator generator;
     public final Hashtable<String, Integer> inputOperators;
 
@@ -23,6 +23,13 @@ public class PlanningContext {
       this.generator = generator;
       this.inputOperators = new Hashtable<String, Integer>();
     }
+  }
+
+  // SharedContext is a singleton.
+  private static SharedContext SINGLETON = null;
+
+  public static void useGenerator(DataFlowGraphLibrary.DataFlowGraphGenerator generator) {
+    PlanningContext.SINGLETON = new SharedContext(generator);
   }
 
   // Calcite's view of the schema within an operator and Pelton's view of that
@@ -36,8 +43,8 @@ public class PlanningContext {
   private final SharedContext shared;
 
   // The initial context we start from!
-  public PlanningContext(DataFlowGraphLibrary.DataFlowGraphGenerator generator) {
-    this.shared = new SharedContext(generator);
+  public PlanningContext() {
+    this.shared = PlanningContext.SINGLETON;
     this.keyColumns = new ArrayList<Integer>();
     this.columnTranslation = new HashMap<Integer, Integer>();
   }

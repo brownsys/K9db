@@ -22,12 +22,11 @@ import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.util.Pair;
 
 public class PhysicalPlanVisitor extends RelShuttleImpl {
-  private final DataFlowGraphLibrary.DataFlowGraphGenerator generator;
   private final Stack<ArrayList<Integer>> childrenOperators;
   private final Stack<ArrayList<PlanningContext>> childrenContexts;
 
   public PhysicalPlanVisitor(DataFlowGraphLibrary.DataFlowGraphGenerator generator) {
-    this.generator = generator;
+    PlanningContext.useGenerator(generator);
     this.childrenOperators = new Stack<ArrayList<Integer>>();
     this.childrenContexts = new Stack<ArrayList<PlanningContext>>();
   }
@@ -62,7 +61,7 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
    */
 
   private Pair<Integer, PlanningContext> analyzeTableScan(TableScan scan) {
-    PlanningContext context = new PlanningContext(this.generator);
+    PlanningContext context = new PlanningContext();
     InputOperatorFactory inputFactory = new InputOperatorFactory(context);
     return new Pair<>(inputFactory.createOperator(scan), context);
   }
