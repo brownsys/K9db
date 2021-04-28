@@ -38,6 +38,7 @@ class FilterOperator : public Operator {
     if (this->input_schemas_.size() > 0 &&
         this->input_schemas_.at(0).TypeOf(column) ==
             sqlast::ColumnDefinition::Type::UINT) {
+      CHECK_GE(value, 0);
       this->AddOperation(static_cast<uint64_t>(value), column, op);
     } else {
       this->ops_.push_back(std::make_tuple(value, column, op));
