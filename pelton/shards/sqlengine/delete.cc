@@ -91,7 +91,24 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
       sqlast::Delete cloned = stmt;
       cloned.table_name() = info.sharded_table_name;
 
-      if (update_flows) {
+      // Find the value assigned to shard_by column in the where clause, and
+      // remove it from the where clause.
+      sqlast::ValueFinder value_finder(info.shard_by);
+      auto [found, user_id] = cloned.Visit(&value_finder);
+      if (found) {
+        if (state->ShardExists(info.shard_kind, user_id)) {
+          // Remove where condition on the shard by column, since it does not
+          // exist in the sharded table.
+          sqlast::ExpressionRemover expression_remover(info.shard_by);
+          cloned.Visit(&expression_remover);
+
+          // Execute statement directly against shard.
+          std::string delete_str = cloned.Visit(&stringifier);
+          result.Append(state->connection_pool().ExecuteShard(
+              ConnectionPool::Operation::UPDATE, delete_str, info, user_id));
+        }
+
+      } else if (update_flows) {
         // We already have the data we need to delete, we can use it to get an
         // accurate enumeration of shards to execute this one.
         std::unordered_set<UserId> shards;
@@ -104,45 +121,26 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
             ConnectionPool::Operation::UPDATE, delete_str, info, shards));
 
       } else {
-        // Find the value assigned to shard_by column in the where clause, and
-        // remove it from the where clause.
-        sqlast::ValueFinder value_finder(info.shard_by);
-        auto [found, user_id] = cloned.Visit(&value_finder);
-        if (found) {
-          if (state->ShardExists(info.shard_kind, user_id)) {
-            // Remove where condition on the shard by column, since it does not
-            // exist in the sharded table.
-            sqlast::ExpressionRemover expression_remover(info.shard_by);
-            cloned.Visit(&expression_remover);
-
-            // Execute statement directly against shard.
-            std::string delete_str = cloned.Visit(&stringifier);
-            result.Append(state->connection_pool().ExecuteShard(
-                ConnectionPool::Operation::UPDATE, delete_str, info, user_id));
-          }
-
+        // The delete statement by itself does not obviously constraint a
+        // shard. Try finding the shard(s) via secondary indices.
+        ASSIGN_OR_RETURN(
+            const auto &pair,
+            index::LookupIndex(table_name, info.shard_by, stmt.GetWhereClause(),
+                               state, dataflow_state));
+        if (pair.first) {
+          // Secondary index available for some constrainted column in stmt.
+          std::string delete_str = cloned.Visit(&stringifier);
+          result.MakeInline();
+          result.AppendDeduplicate(state->connection_pool().ExecuteShards(
+              ConnectionPool::Operation::UPDATE, delete_str, info,
+              pair.second));
         } else {
-          // The delete statement by itself does not obviously constraint a
-          // shard. Try finding the shard(s) via secondary indices.
-          ASSIGN_OR_RETURN(
-              const auto &pair,
-              index::LookupIndex(table_name, info.shard_by,
-                                 stmt.GetWhereClause(), state, dataflow_state));
-          if (pair.first) {
-            // Secondary index available for some constrainted column in stmt.
-            std::string delete_str = cloned.Visit(&stringifier);
-            result.MakeInline();
-            result.AppendDeduplicate(state->connection_pool().ExecuteShards(
-                ConnectionPool::Operation::UPDATE, delete_str, info,
-                pair.second));
-          } else {
-            // Secondary index unhelpful.
-            // Execute statement against all shards of this kind.
-            std::string delete_str = cloned.Visit(&stringifier);
-            result.Append(state->connection_pool().ExecuteShards(
-                ConnectionPool::Operation::UPDATE, delete_str, info,
-                state->UsersOfShard(info.shard_kind)));
-          }
+          // Secondary index unhelpful.
+          // Execute statement against all shards of this kind.
+          std::string delete_str = cloned.Visit(&stringifier);
+          result.Append(state->connection_pool().ExecuteShards(
+              ConnectionPool::Operation::UPDATE, delete_str, info,
+              state->UsersOfShard(info.shard_kind)));
         }
       }
     }
