@@ -465,14 +465,6 @@ TEST(EquiJoinOperatorTest, LeftJoinTest) {
   std::unique_ptr<std::string> sd1 = std::make_unique<std::string>("descrp0");
   std::unique_ptr<std::string> sd2 = std::make_unique<std::string>("descrp1");
   std::unique_ptr<std::string> sd3 = std::make_unique<std::string>("descrp2");
-  std::unique_ptr<std::string> ji1 = std::make_unique<std::string>("item0");
-  std::unique_ptr<std::string> ji2 = std::make_unique<std::string>("item1");
-  std::unique_ptr<std::string> ji4 = std::make_unique<std::string>("item3");
-  std::unique_ptr<std::string> ji5 = std::make_unique<std::string>("item4");
-  std::unique_ptr<std::string> jd1 = std::make_unique<std::string>("descrp0");
-  std::unique_ptr<std::string> jd1_ = std::make_unique<std::string>("descrp0");
-  std::unique_ptr<std::string> jd3 = std::make_unique<std::string>("descrp2");
-  std::unique_ptr<std::string> jd3_ = std::make_unique<std::string>("descrp2");
 
   SchemaRef lschema = Schema1();
   SchemaRef rschema = Schema2();
