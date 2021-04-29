@@ -13,6 +13,17 @@ namespace shards {
 namespace sqlengine {
 namespace insert {
 
+namespace {
+
+std::string Dequote(const std::string &st) {
+  std::string s(st);
+  s.erase(remove(s.begin(), s.end(), '\"'), s.end());
+  s.erase(remove(s.begin(), s.end(), '\''), s.end());
+  return s;
+}
+
+}  // namespace
+
 absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Insert &stmt,
                                        SharderState *state,
                                        dataflow::DataFlowState *dataflow_state,
@@ -54,6 +65,7 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Insert &stmt,
       } else {
         user_id = cloned.RemoveValue(info.shard_by_index);
       }
+      user_id = Dequote(user_id);
 
       // TODO(babman): better to do this after user insert rather than user data
       //               insert.
