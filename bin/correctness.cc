@@ -1,9 +1,5 @@
 #include "pelton/planner/planner.h"
 #include <iostream>
-#include <limits>
-#include <string>
-#include <utility>
-#include <vector>
 #include <fstream>
 
 #include "gtest/gtest.h"
@@ -11,7 +7,6 @@
 #include "glog/logging.h"
 #include "pelton/pelton.h"
 #include "pelton/util/perf.h"
-#include <sstream>
 
 DEFINE_string(db_username, "pelton", "MYSQL username to connect with");
 DEFINE_string(db_password, "pelton", "MYSQL pwd to connect with");
@@ -57,7 +52,7 @@ namespace
 
     // Expected query results
     std::vector<std::vector<std::string>> EXPECTED = {};
-    
+
 }; // namespace
 
 int main(int argc, char **argv)
@@ -73,7 +68,6 @@ int main(int argc, char **argv)
     const std::string &db_password = FLAGS_db_password;
 
     // * process schema (input file 1)
-    // std::ifstream schema("bin/data/trivial-schema.sql");
     std::ifstream schema(argv[1]);
     std::string line;
     if (schema.is_open())
@@ -106,7 +100,6 @@ int main(int argc, char **argv)
     }
 
     // * process queries (input file 2)
-    // std::ifstream queries("bin/data/trivial-queries.sql");
     std::ifstream queries(argv[2]);
     if (queries.is_open())
     {
@@ -117,7 +110,12 @@ int main(int argc, char **argv)
                 continue;
             if (line.find("VIEW") != std::string::npos)
             {
-                FLOWS.push_back(std::make_pair("", line));
+                std::vector<std::string> split_on_space;
+                std::istringstream iss(line);
+                for (std::string s; iss >> s;)
+                    split_on_space.push_back(s);
+                // key of pair is the name of the view at index 2
+                FLOWS.push_back(std::make_pair(split_on_space[2], line));
             }
             else if (line.find("INSERT") != std::string::npos)
             {
@@ -144,6 +142,7 @@ int main(int argc, char **argv)
     }
 
     // * process expected results
+
     std::ifstream expected(argv[3]);
     if (expected.is_open())
     {
@@ -190,15 +189,6 @@ int main(int argc, char **argv)
     }
     std::cout << std::endl;
 
-    // Insert data into the tables.
-    std::cout << "Insert data into tables ... " << std::endl;
-    for (std::string &insert : INSERTS)
-    {
-        std::cout << std::endl;
-        CHECK(pelton::exec(&connection, insert).ok());
-    }
-    std::cout << std::endl;
-
     // Add flows.
     std::cout << "Installing flows ... " << std::endl;
     for (const auto &[name, query] : FLOWS)
@@ -209,6 +199,14 @@ int main(int argc, char **argv)
     pelton::shutdown_planner();
     std::cout << std::endl;
 
+    // Insert data into the tables.
+    std::cout << "Insert data into tables ... " << std::endl;
+    for (std::string &insert : INSERTS)
+    {
+        std::cout << std::endl;
+        CHECK(pelton::exec(&connection, insert).ok());
+    }
+    std::cout << std::endl;
 
     // Updates
     std::cout << "Update data in tables ... " << std::endl;
@@ -255,7 +253,8 @@ int main(int argc, char **argv)
             query_actual.push_back(tostring(record));
         }
 
-        if (i >= EXPECTED.size()) {
+        if (i >= EXPECTED.size())
+        {
             break;
         }
         // orderless comparison via google test
