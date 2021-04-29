@@ -11,11 +11,11 @@
 #include "benchmark/benchmark.h"
 #include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"
+#include "pelton/dataflow/ops/equijoin_enum.h"
 #include "pelton/dataflow/ops/grouped_data.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
-#include "pelton/dataflow/ops/equijoin_enum.h"
 
 namespace pelton {
 namespace dataflow {
@@ -25,8 +25,7 @@ class EquiJoinOperator : public Operator {
   using Mode = JoinModeEnum;
   EquiJoinOperator() = delete;
 
-  EquiJoinOperator(ColumnID left_id, ColumnID right_id,
-                   Mode mode = Mode::INNER)
+  EquiJoinOperator(ColumnID left_id, ColumnID right_id, Mode mode = Mode::INNER)
       : Operator(Operator::Type::EQUIJOIN),
         left_id_(left_id),
         right_id_(right_id),
@@ -62,6 +61,9 @@ class EquiJoinOperator : public Operator {
   Mode mode_;
   UnorderedGroupedData left_table_;
   UnorderedGroupedData right_table_;
+  // Keeps track of left records + NULL columns that have been emitted. This is
+  // later used to generate corresponding negative records
+  UnorderedGroupedData emitted_nulls_;
 
   // Join left and right and store it in output.
   void EmitRow(const Record &left, const Record &right,
@@ -71,6 +73,8 @@ class EquiJoinOperator : public Operator {
   FRIEND_TEST(EquiJoinOperatorTest, BasicJoinTest);
   FRIEND_TEST(EquiJoinOperatorTest, BasicUnjoinableTest);
   FRIEND_TEST(EquiJoinOperatorTest, FullJoinTest);
+  FRIEND_TEST(EquiJoinOperatorTest, BasicLeftJoinTest);
+  FRIEND_TEST(EquiJoinOperatorTest, BasicRightJoinTest);
   FRIEND_TEST(EquiJoinOperatorTest, LeftJoinTest);
 
 #ifdef PELTON_BENCHMARK  // shuts up compiler warnings
