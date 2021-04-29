@@ -10,15 +10,22 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.util.Pair;
 import org.apache.calcite.util.Permutation;
 
 public class ProjectOperatorFactory {
   private final PlanningContext context;
+  private final HashMap<Integer, Integer> peltonSourceToTarget;
+  private final HashMap<Integer, Integer> calciteToPeltonTarget;
+  private int projectionsCount;
+  private int targetCalciteIndex;
 
   public ProjectOperatorFactory(PlanningContext context) {
     this.context = context;
+    this.peltonSourceToTarget = new HashMap<Integer, Integer>();
+    this.calciteToPeltonTarget = new HashMap<Integer, Integer>();
+    this.projectionsCount = 0;
+    this.targetCalciteIndex = -1;
   }
 
   public boolean isIdentity(LogicalProject project) {
@@ -50,126 +57,169 @@ public class ProjectOperatorFactory {
     int projectOperator = this.context.getGenerator().AddProjectOperator(children.get(0));
 
     // Stores all column indices that were already projected!
-    HashMap<Integer, Integer> peltonSourceToTarget = new HashMap<Integer, Integer>();
-    HashMap<Integer, Integer> calciteToPeltonTarget = new HashMap<Integer, Integer>();
-    int targetPeltonIndex = 0;
-
     List<Pair<RexNode, String>> namedProjections = project.getNamedProjects();
-    for (int targetCalciteIndex = 0;
-        targetCalciteIndex < namedProjections.size();
-        targetCalciteIndex++) {
-
-      Pair<RexNode, String> item = namedProjections.get(targetCalciteIndex);
+    int count = namedProjections.size();
+    for (int i = 0; i < count; i++) {
+      Pair<RexNode, String> item = namedProjections.get(i);
       RexNode projectedNode = item.getKey();
       String projectedName = item.getValue();
 
+      this.targetCalciteIndex = i;
       switch (projectedNode.getKind()) {
         case INPUT_REF:
-          {
-            int sourceCalciteIndex = ((RexInputRef) projectedNode).getIndex();
-            int sourcePeltonIndex = this.context.getPeltonIndex(sourceCalciteIndex);
-            if (peltonSourceToTarget.containsKey(sourcePeltonIndex)) {
-              calciteToPeltonTarget.put(
-                  targetCalciteIndex, peltonSourceToTarget.get(sourcePeltonIndex));
-            } else {
-              peltonSourceToTarget.put(sourcePeltonIndex, targetPeltonIndex);
-              calciteToPeltonTarget.put(targetCalciteIndex, targetPeltonIndex);
-              targetPeltonIndex++;
-              this.context
-                  .getGenerator()
-                  .AddProjectionColumn(projectOperator, projectedName, sourcePeltonIndex);
-            }
-            break;
-          }
+          this.addColumnProjection(projectedName, (RexInputRef) projectedNode, projectOperator);
+          break;
         case LITERAL:
-          {
-            RexLiteral value = (RexLiteral) projectedNode;
-            switch (value.getTypeName()) {
-              case DECIMAL:
-              case INTEGER:
-                calciteToPeltonTarget.put(targetCalciteIndex, targetPeltonIndex);
-                targetPeltonIndex++;
-                this.context
-                    .getGenerator()
-                    .AddProjectionLiteralSigned(
-                        projectOperator,
-                        projectedName,
-                        RexLiteral.intValue(value),
-                        DataFlowGraphLibrary.LITERAL);
-                break;
-              default:
-                throw new IllegalArgumentException("Unsupported value type in literal projection");
-            }
-            break;
-          }
+          this.addLiteralProjection(projectedName, (RexLiteral) projectedNode, projectOperator);
+          break;
         case PLUS:
+          this.addArithmeticProjection(
+              projectedName,
+              ((RexCall) projectedNode).getOperands(),
+              DataFlowGraphLibrary.PLUS,
+              projectOperator);
+          break;
         case MINUS:
-          {
-            int arithmeticEnum =
-                projectedNode.getKind() == SqlKind.PLUS
-                    ? DataFlowGraphLibrary.PLUS
-                    : DataFlowGraphLibrary.MINUS;
-
-            RexCall operation = (RexCall) projectedNode;
-            List<RexNode> operands = operation.getOperands();
-
-            // Must be binary.
-            assert operands.size() == 2;
-            // Left side must be a column.
-            assert operands.get(0) instanceof RexInputRef;
-            // Right side must be a column or literal.
-            assert operands.get(1) instanceof RexInputRef || operands.get(1) instanceof RexLiteral;
-
-            // Update column index in case of de-duplication
-            int leftSourceCalciteId = ((RexInputRef) operands.get(0)).getIndex();
-            int leftSourcePeltonId = this.context.getPeltonIndex(leftSourceCalciteId);
-
-            if (operands.get(1) instanceof RexInputRef) {
-              int rightSourceCalciteId = ((RexInputRef) operands.get(1)).getIndex();
-              int rightSourcePeltonId = this.context.getPeltonIndex(rightSourceCalciteId);
-              calciteToPeltonTarget.put(targetCalciteIndex, targetPeltonIndex);
-              targetPeltonIndex++;
-              this.context
-                  .getGenerator()
-                  .AddProjectionArithmeticWithLiteralUnsignedOrColumn(
-                      projectOperator,
-                      projectedName,
-                      leftSourcePeltonId,
-                      arithmeticEnum,
-                      rightSourcePeltonId,
-                      DataFlowGraphLibrary.ARITHMETIC_WITH_COLUMN);
-            } else {
-              RexLiteral rightValue = (RexLiteral) operands.get(1);
-              switch (rightValue.getTypeName()) {
-                case DECIMAL:
-                case INTEGER:
-                  calciteToPeltonTarget.put(targetCalciteIndex, targetPeltonIndex);
-                  targetPeltonIndex++;
-                  this.context
-                      .getGenerator()
-                      .AddProjectionArithmeticWithLiteralSigned(
-                          projectOperator,
-                          projectedName,
-                          leftSourcePeltonId,
-                          arithmeticEnum,
-                          RexLiteral.intValue(rightValue),
-                          DataFlowGraphLibrary.ARITHMETIC_WITH_LITERAL);
-                  break;
-                default:
-                  throw new IllegalArgumentException(
-                      "Unsupported value type in literal projection");
-              }
-            }
-            break;
-          }
+          this.addArithmeticProjection(
+              projectedName,
+              ((RexCall) projectedNode).getOperands(),
+              DataFlowGraphLibrary.MINUS,
+              projectOperator);
+          break;
         default:
           throw new IllegalArgumentException(
               "Unsupported projection type " + projectedNode.getKind());
       }
     }
 
-    this.context.setColumnTranslation(calciteToPeltonTarget, peltonSourceToTarget);
+    this.context.setColumnTranslation(this.calciteToPeltonTarget, this.peltonSourceToTarget);
 
     return projectOperator;
+  }
+
+  // Direct column projection.
+  private void addColumnProjection(String name, RexInputRef column, int projectOperator) {
+    int sourceCalciteIndex = column.getIndex();
+    int sourcePeltonIndex = this.context.getPeltonIndex(sourceCalciteIndex);
+    if (this.peltonSourceToTarget.containsKey(sourcePeltonIndex)) {
+      this.calciteToPeltonTarget.put(
+          this.targetCalciteIndex, this.peltonSourceToTarget.get(sourcePeltonIndex));
+    } else {
+      int targetPeltonIndex = this.projectionsCount;
+      this.peltonSourceToTarget.put(sourcePeltonIndex, targetPeltonIndex);
+      this.calciteToPeltonTarget.put(this.targetCalciteIndex, targetPeltonIndex);
+      this.projectionsCount++;
+      this.addColumnProjection(name, sourcePeltonIndex, projectOperator);
+    }
+  }
+
+  public void addColumnProjection(String name, int sourcePeltonIndex, int projectOperator) {
+    this.context.getGenerator().AddProjectionColumn(projectOperator, name, sourcePeltonIndex);
+  }
+
+  // Literal projection.
+  public void addLiteralProjection(String name, RexLiteral literal, int projectOperator) {
+    int targetPeltonIndex = this.projectionsCount;
+    this.projectionsCount++;
+
+    switch (literal.getTypeName()) {
+      case DECIMAL:
+      case INTEGER:
+        this.calciteToPeltonTarget.put(this.targetCalciteIndex, targetPeltonIndex);
+        this.context
+            .getGenerator()
+            .AddProjectionLiteralInt(projectOperator, name, RexLiteral.intValue(literal));
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported value type in literal projection");
+    }
+  }
+
+  // Arithmetic projection.
+  private void addArithmeticProjection(
+      String name, List<RexNode> operands, int arithmeticEnum, int projectOperator) {
+    // Must be binary.
+    assert operands.size() == 2;
+
+    // Both operands must be a column or literal.
+    assert operands.get(0) instanceof RexInputRef || operands.get(0) instanceof RexLiteral;
+    assert operands.get(1) instanceof RexInputRef || operands.get(1) instanceof RexLiteral;
+
+    if (operands.get(0) instanceof RexInputRef && operands.get(1) instanceof RexInputRef) {
+      RexInputRef left = (RexInputRef) operands.get(0);
+      RexInputRef right = (RexInputRef) operands.get(1);
+      this.addArithmeticProjectionColumns(name, left, right, arithmeticEnum, projectOperator);
+    } else if (operands.get(0) instanceof RexInputRef) {
+      RexInputRef left = (RexInputRef) operands.get(0);
+      RexLiteral right = (RexLiteral) operands.get(1);
+      this.addArithmeticProjectionLiteral(name, left, right, arithmeticEnum, projectOperator);
+    } else if (operands.get(1) instanceof RexInputRef) {
+      RexLiteral left = (RexLiteral) operands.get(0);
+      RexInputRef right = (RexInputRef) operands.get(1);
+      this.addArithmeticProjectionLiteral(name, left, right, arithmeticEnum, projectOperator);
+    } else {
+      throw new IllegalArgumentException(
+          "Projection arithmetic expression cannot be just literal!");
+    }
+  }
+
+  private void addArithmeticProjectionColumns(
+      String name, RexInputRef left, RexInputRef right, int arithmeticEnum, int projectOperator) {
+    int leftSourcePeltonId = this.context.getPeltonIndex(left.getIndex());
+    int rightSourcePeltonId = this.context.getPeltonIndex(right.getIndex());
+
+    int targetPeltonIndex = this.projectionsCount;
+    this.projectionsCount++;
+    this.calciteToPeltonTarget.put(this.targetCalciteIndex, targetPeltonIndex);
+    this.context
+        .getGenerator()
+        .AddProjectionArithmeticColumns(
+            projectOperator, name, leftSourcePeltonId, rightSourcePeltonId, arithmeticEnum);
+  }
+
+  private void addArithmeticProjectionLiteral(
+      String name, RexInputRef left, RexLiteral right, int arithmeticEnum, int projectOperator) {
+    int leftSourcePeltonId = this.context.getPeltonIndex(left.getIndex());
+    switch (right.getTypeName()) {
+      case DECIMAL:
+      case INTEGER:
+        int targetPeltonIndex = this.projectionsCount;
+        this.projectionsCount++;
+        this.calciteToPeltonTarget.put(this.targetCalciteIndex, targetPeltonIndex);
+        this.context
+            .getGenerator()
+            .AddProjectionArithmeticLiteralLeft(
+                projectOperator,
+                name,
+                leftSourcePeltonId,
+                RexLiteral.intValue(right),
+                arithmeticEnum);
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported value type in literal projection");
+    }
+  }
+
+  private void addArithmeticProjectionLiteral(
+      String name, RexLiteral left, RexInputRef right, int arithmeticEnum, int projectOperator) {
+    int rightSourcePeltonId = this.context.getPeltonIndex(right.getIndex());
+    switch (left.getTypeName()) {
+      case DECIMAL:
+      case INTEGER:
+        int targetPeltonIndex = this.projectionsCount;
+        this.projectionsCount++;
+        this.calciteToPeltonTarget.put(this.targetCalciteIndex, targetPeltonIndex);
+        this.context
+            .getGenerator()
+            .AddProjectionArithmeticLiteralLeft(
+                projectOperator,
+                name,
+                RexLiteral.intValue(left),
+                rightSourcePeltonId,
+                arithmeticEnum);
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported value type in literal projection");
+    }
   }
 }

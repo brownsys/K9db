@@ -2,7 +2,7 @@ package com.brownsys.pelton.operators;
 
 import com.brownsys.pelton.PlanningContext;
 import com.brownsys.pelton.nativelib.DataFlowGraphLibrary;
-import com.brownsys.pelton.operators.util.FilterShapeVisitor;
+import com.brownsys.pelton.operators.util.FilterArithmeticVisitor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -44,9 +44,13 @@ public class FilterOperatorFactory {
     RexNode condition = filter.getCondition();
     assert condition instanceof RexCall;
 
-    Boolean goodShape = condition.accept(new FilterShapeVisitor());
-    if (goodShape == null || !goodShape) {
-      throw new IllegalArgumentException("Bad filter shape: unknown construct!");
+    FilterArithmeticVisitor arithmeticVisitor = new FilterArithmeticVisitor();
+    boolean hasArithmetic = condition.accept(arithmeticVisitor);
+    if (hasArithmetic) {
+      List<RexCall> arithmetics = arithmeticVisitor.getArithmeticNodes();
+      for (RexCall r : arithmetics) {
+        System.out.println(r.toStringRaw());
+      }
     }
 
     // Visit the operands of the filter operator
@@ -163,19 +167,36 @@ public class FilterOperatorFactory {
     if (operands.size() == 1) {
       this.addUnaryCondition(operands, operationEnum, filterOperator);
     } else if (operands.size() == 2) {
-      if (operands.get(0) instanceof RexInputRef && operands.get(1) instanceof RexInputRef) {
+      // Expressions with a ? parameter.
+      if (operands.get(0) instanceof RexDynamicParam) {
+        this.addQuestionMarkCondition(operands.get(1), operationEnum);
+      } else if (operands.get(1) instanceof RexDynamicParam) {
+        this.addQuestionMarkCondition(operands.get(0), operationEnum);
+      }
+      // Expression on two columns.
+      else if (operands.get(0) instanceof RexInputRef && operands.get(1) instanceof RexInputRef) {
         this.addColumnBinaryCondition(
             (RexInputRef) operands.get(0),
             (RexInputRef) operands.get(1),
             operationEnum,
             filterOperator);
-      } else if (operands.get(0) instanceof RexInputRef) {
-        this.addLeftValueBinaryCondition(
-            (RexInputRef) operands.get(0), operands.get(1), operationEnum, filterOperator);
-      } else if (operands.get(1) instanceof RexInputRef) {
-        this.addRightValueBinaryCondition(
-            operands.get(0), (RexInputRef) operands.get(1), operationEnum, filterOperator);
-      } else {
+      }
+      // Expression on a column and literal
+      else if (operands.get(0) instanceof RexInputRef && operands.get(1) instanceof RexLiteral) {
+        this.addValueBinaryCondition(
+            (RexInputRef) operands.get(0),
+            (RexLiteral) operands.get(1),
+            operationEnum,
+            filterOperator);
+      } else if (operands.get(1) instanceof RexInputRef && operands.get(0) instanceof RexLiteral) {
+        this.addValueBinaryCondition(
+            (RexLiteral) operands.get(0),
+            (RexInputRef) operands.get(1),
+            operationEnum,
+            filterOperator);
+      }
+      // Something else: not supported!
+      else {
         throw new IllegalArgumentException("Filter condition must be over at least one column");
       }
     } else {
@@ -194,6 +215,17 @@ public class FilterOperatorFactory {
     this.context.getGenerator().AddFilterOperationNull(filterOperator, columnId, operationEnum);
   }
 
+  private void addQuestionMarkCondition(RexNode otherOperand, int operationEnum) {
+    if (operationEnum != DataFlowGraphLibrary.EQUAL) {
+      throw new IllegalArgumentException("Can only use ? in an equality condition");
+    }
+    if (!(otherOperand instanceof RexInputRef)) {
+      throw new IllegalArgumentException("Cannot compare ? to a non-column expression");
+    }
+    int columnId = this.context.getPeltonIndex(((RexInputRef) otherOperand).getIndex());
+    this.context.addMatViewKey(columnId);
+  }
+
   private void addColumnBinaryCondition(
       RexInputRef left, RexInputRef right, int operationEnum, int filterOperator) {
     int leftId = this.context.getPeltonIndex(left.getIndex());
@@ -203,27 +235,19 @@ public class FilterOperatorFactory {
         .AddFilterOperationColumn(filterOperator, leftId, rightId, operationEnum);
   }
 
-  private void addLeftValueBinaryCondition(
-      RexInputRef left, RexNode right, int operationEnum, int filterOperator) {
-    assert right instanceof RexLiteral || right instanceof RexDynamicParam;
-    ;
+  private void addValueBinaryCondition(
+      RexInputRef left, RexLiteral right, int operationEnum, int filterOperator) {
+    assert right instanceof RexLiteral;
     int columnId = this.context.getPeltonIndex(left.getIndex());
 
-    // Handle parameters (`?` in query)
-    if (right instanceof RexDynamicParam) {
-      this.context.addMatViewKey(columnId);
-      return;
-    }
-
     // Determine the value type.
-    RexLiteral value = (RexLiteral) right;
-    switch (value.getTypeName()) {
+    switch (right.getTypeName()) {
       case DECIMAL:
       case INTEGER:
         this.context
             .getGenerator()
-            .AddFilterOperationSigned(
-                filterOperator, RexLiteral.intValue(value), columnId, operationEnum);
+            .AddFilterOperationInt(
+                filterOperator, RexLiteral.intValue(right), columnId, operationEnum);
         break;
 
       case VARCHAR:
@@ -231,7 +255,7 @@ public class FilterOperatorFactory {
         this.context
             .getGenerator()
             .AddFilterOperationString(
-                filterOperator, RexLiteral.stringValue(value), columnId, operationEnum);
+                filterOperator, RexLiteral.stringValue(right), columnId, operationEnum);
         break;
 
       case NULL:
@@ -250,34 +274,33 @@ public class FilterOperatorFactory {
 
       default:
         throw new IllegalArgumentException(
-            "Invalid literal type in filter: " + value.getTypeName());
+            "Invalid literal type in filter: " + right.getTypeName());
     }
   }
 
-  private void addRightValueBinaryCondition(
-      RexNode left, RexInputRef right, int operationEnum, int filterOperator) {
+  private void addValueBinaryCondition(
+      RexLiteral left, RexInputRef right, int operationEnum, int filterOperator) {
     switch (operationEnum) {
         // Invert left and right.
       case DataFlowGraphLibrary.LESS_THAN:
-        this.addLeftValueBinaryCondition(
+        this.addValueBinaryCondition(
             right, left, DataFlowGraphLibrary.GREATER_THAN_OR_EQUAL, filterOperator);
         break;
       case DataFlowGraphLibrary.LESS_THAN_OR_EQUAL:
-        this.addLeftValueBinaryCondition(
+        this.addValueBinaryCondition(
             right, left, DataFlowGraphLibrary.GREATER_THAN, filterOperator);
         break;
       case DataFlowGraphLibrary.GREATER_THAN:
-        this.addLeftValueBinaryCondition(
+        this.addValueBinaryCondition(
             right, left, DataFlowGraphLibrary.LESS_THAN_OR_EQUAL, filterOperator);
         break;
       case DataFlowGraphLibrary.GREATER_THAN_OR_EQUAL:
-        this.addLeftValueBinaryCondition(
-            right, left, DataFlowGraphLibrary.LESS_THAN, filterOperator);
+        this.addValueBinaryCondition(right, left, DataFlowGraphLibrary.LESS_THAN, filterOperator);
         break;
         // Symmetric operations.
       case DataFlowGraphLibrary.EQUAL:
       case DataFlowGraphLibrary.NOT_EQUAL:
-        this.addLeftValueBinaryCondition(right, left, operationEnum, filterOperator);
+        this.addValueBinaryCondition(right, left, operationEnum, filterOperator);
         break;
         // Unreachable.
       default:
