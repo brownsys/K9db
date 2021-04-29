@@ -110,6 +110,11 @@ public class PlanningContext {
   }
 
   // Duplicated columns (because of a join).
+  public int getPeltonColumnCount() {
+    HashSet<Integer> peltonIndices = new HashSet<Integer>(this.columnTranslation.values());
+    return peltonIndices.size();
+  }
+
   public int getPeltonIndex(int calciteIndex) {
     return this.columnTranslation.get(calciteIndex);
   }

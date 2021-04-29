@@ -3,7 +3,6 @@
 
 #include <cstdint>
 #include <string>
-#include <tuple>
 // NOLINTNEXTLINE
 #include <variant>
 #include <vector>
@@ -29,10 +28,10 @@ class FilterOperator : public Operator {
 
   // Add filter conditions/operations.
   void AddOperation(const std::string &value, ColumnID column, Operation op) {
-    this->ops_.push_back(std::make_tuple(value, column, op));
+    this->ops_.emplace_back(column, value, op);
   }
   void AddOperation(uint64_t value, ColumnID column, Operation op) {
-    this->ops_.push_back(std::make_tuple(value, column, op));
+    this->ops_.emplace_back(column, value, op);
   }
   void AddOperation(int64_t value, ColumnID column, Operation op) {
     if (this->input_schemas_.size() > 0 &&
@@ -41,15 +40,14 @@ class FilterOperator : public Operator {
       CHECK_GE(value, 0);
       this->AddOperation(static_cast<uint64_t>(value), column, op);
     } else {
-      this->ops_.push_back(std::make_tuple(value, column, op));
+      this->ops_.emplace_back(column, value, op);
     }
   }
-  void AddOperation(NullValue value, ColumnID column, Operation op) {
-    CHECK(op == Operation::IS_NULL || op == Operation::IS_NOT_NULL);
-    this->ops_.push_back(std::make_tuple(value, column, op));
-  }
   void AddOperation(ColumnID column, Operation op) {
-    return AddOperation(NullValue(), column, op);
+    this->ops_.emplace_back(column, op);
+  }
+  void AddOperation(ColumnID left_column, Operation op, ColumnID right_column) {
+    this->ops_.emplace_back(left_column, op, right_column);
   }
 
   bool Process(NodeIndex source, const std::vector<Record> &records,
@@ -61,7 +59,47 @@ class FilterOperator : public Operator {
   void ComputeOutputSchema() override;
 
  private:
-  std::vector<std::tuple<Record::DataVariant, ColumnID, Operation>> ops_;
+  class FilterOperation {
+   public:
+    // Use this for unary operation with null.
+    FilterOperation(ColumnID col, Operation op)
+        : left_(col), right_(NullValue()), op_(op), col_(false) {
+      CHECK(op == Operation::IS_NULL || op == Operation::IS_NOT_NULL);
+    }
+
+    // Use this for filter column with literal (excluding null).
+    FilterOperation(ColumnID l, Record::DataVariant r, Operation op)
+        : left_(l), right_(r), op_(op), col_(false) {}
+
+    // Use this for filter column with another column.
+    FilterOperation(ColumnID l, Operation op, ColumnID r)
+        : left_(l), right_(static_cast<uint64_t>(r)), op_(op), col_(true) {}
+
+    // Accessors.
+    ColumnID left() const { return this->left_; }
+    ColumnID right_column() const {
+      uint64_t col_id = std::get<uint64_t>(this->right_);
+      return static_cast<ColumnID>(col_id);
+    }
+    const Record::DataVariant &right() const { return this->right_; }
+    Operation op() const { return this->op_; }
+    bool is_column() const { return this->col_; }
+
+   private:
+    // Without loss of generality, column always on the left (planner inverts
+    // the operator when column appears on the right).
+    ColumnID left_;
+    // The right operand, might be a literal (including null), or another
+    // column.
+    Record::DataVariant right_;
+    // Filter operation (e.g. <, ==, etc).
+    Operation op_;
+    // Whether the right operand is a column or not.
+    bool col_;
+  };
+
+  std::vector<FilterOperation> ops_;
+
   // Allow tests to use .Process(...) directly.
   FRIEND_TEST(FilterOperatorTest, SingleAccept);
   FRIEND_TEST(FilterOperatorTest, AndAccept);

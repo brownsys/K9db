@@ -282,8 +282,8 @@ DataFlowGraph MakeProjectGraph(ColumnID keycol, const SchemaRef &schema) {
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto project = std::make_shared<ProjectOperator>();
-  project->AddProjection(schema.NameOf(0), 0);
-  project->AddProjection(schema.NameOf(2), 2);
+  project->AddColumnProjection(schema.NameOf(0), 0);
+  project->AddColumnProjection(schema.NameOf(2), 2);
   auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
@@ -305,8 +305,8 @@ DataFlowGraph MakeProjectOnFilterGraph(ColumnID keycol,
   auto filter = std::make_shared<FilterOperator>();
   filter->AddOperation(5_u, 0, FilterOperator::Operation::GREATER_THAN);
   auto project = std::make_shared<ProjectOperator>();
-  project->AddProjection(schema.NameOf(0), 0);
-  project->AddProjection(schema.NameOf(2), 2);
+  project->AddColumnProjection(schema.NameOf(0), 0);
+  project->AddColumnProjection(schema.NameOf(2), 2);
   auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
@@ -330,8 +330,8 @@ DataFlowGraph MakeProjectOnEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
   auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
   auto join = std::make_shared<EquiJoinOperator>(lk, rk);
   auto project = std::make_shared<ProjectOperator>();
-  project->AddProjection(lschema.NameOf(0), 0);
-  project->AddProjection(rschema.NameOf(0), 3);
+  project->AddColumnProjection(lschema.NameOf(0), 0);
+  project->AddColumnProjection(rschema.NameOf(0), 3);
   auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in1));
@@ -412,7 +412,7 @@ inline void MatViewContentsEqualsIndexed(
     std::shared_ptr<MatViewOperator> matview,
     const std::vector<Record> &records, size_t index) {
   EXPECT_EQ(matview->count(), records.size());
-  std::vector<ColumnID> indexed_keys{index};
+  std::vector<ColumnID> indexed_keys = {static_cast<ColumnID>(index)};
   for (const Record &record : records) {
     EXPECT_EQ(record, *matview->Lookup(record.GetValues(indexed_keys)).begin());
   }
