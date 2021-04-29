@@ -6,7 +6,6 @@
 #include <vector>
 #include <fstream>
 
-#include "glog/logging.h"
 #include "gtest/gtest.h"
 #include "gflags/gflags.h"
 #include "glog/logging.h"
@@ -137,16 +136,6 @@ int main(int argc, char **argv)
             {
                 UPDATES.push_back(line);
             }
-            // std::string token = strtok(queries, " ");
-            // while (token != NULL)
-            // {
-            //     std::string view = "VIEW";
-            //     if (token == view)
-            //     {
-            //         token = strtok(NULL, " ");
-            //         FLOWS.push_back(std::make_pair(token, queries));
-            //     }
-            //     token = strtok(NULL, " ");
         }
         queries.close();
     }
