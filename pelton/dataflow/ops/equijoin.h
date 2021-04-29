@@ -11,8 +11,8 @@
 #include "benchmark/benchmark.h"
 #include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"
-#include "pelton/dataflow/ops/join_enum.h"
 #include "pelton/dataflow/ops/grouped_data.h"
+#include "pelton/dataflow/ops/join_enum.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
@@ -61,8 +61,9 @@ class EquiJoinOperator : public Operator {
   Mode mode_;
   UnorderedGroupedData left_table_;
   UnorderedGroupedData right_table_;
-  // Keeps track of left records + NULL columns that have been emitted. This is
-  // later used to generate corresponding negative records
+  // Keeps track of (left records + NULL) or (NULL + right records) columns that
+  // have been emitted. This is later used to generate corresponding
+  // negative records
   UnorderedGroupedData emitted_nulls_;
 
   // Join left and right and store it in output.

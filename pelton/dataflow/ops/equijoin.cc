@@ -55,12 +55,11 @@ bool EquiJoinOperator::Process(NodeIndex source,
       Key left_value = record.GetValues({this->left_id_});
       for (const Record &right : this->right_table_.Lookup(left_value)) {
         if (this->mode_ == Mode::RIGHT) {
-          // Negate any previously emitted left + NULL records.
-          for (const Record &left_null :
+          // Negate any previously emitted NULL + right records.
+          for (const Record &right_null :
                this->emitted_nulls_.Lookup(left_value)) {
-            this->EmitRow(left_null,
-                          Record::NULLRecord(this->input_schemas_.at(1)),
-                          output, false);
+            this->EmitRow(Record::NULLRecord(this->input_schemas_.at(0)),
+                          right_null, output, false);
           }
           this->emitted_nulls_.Erase(left_value);
         }
@@ -81,7 +80,7 @@ bool EquiJoinOperator::Process(NodeIndex source,
       Key right_value = record.GetValues({this->right_id_});
       for (const Record &left : this->left_table_.Lookup(right_value)) {
         if (this->mode_ == Mode::LEFT) {
-          // Negate any previously emitted left + NULL records.
+          // Negate any previously emitted Left + NULL records.
           for (const Record &left_null :
                this->emitted_nulls_.Lookup(right_value)) {
             this->EmitRow(left_null,
@@ -95,7 +94,7 @@ bool EquiJoinOperator::Process(NodeIndex source,
 
       // additional check for right join
       if (mode_ == Mode::RIGHT && 0 == this->left_table_.Count(right_value)) {
-        this->EmitRow(record, Record::NULLRecord(this->left()->output_schema()),
+        this->EmitRow(Record::NULLRecord(this->input_schemas_.at(0)), record,
                       output, record.IsPositive());
         this->emitted_nulls_.Insert(right_value, record);
       }
