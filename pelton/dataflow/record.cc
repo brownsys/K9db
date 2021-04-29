@@ -53,6 +53,9 @@ Record Record::Copy() const {
         record.data_[i].sint = this->data_[i].sint;
         break;
       case sqlast::ColumnDefinition::Type::TEXT:
+      // TODO(malte): DATETIME should not be stored as a string,
+      // see below
+      case sqlast::ColumnDefinition::Type::DATETIME:
         if (this->data_[i].str) {
           record.data_[i].str =
               std::make_unique<std::string>(*this->data_[i].str);
