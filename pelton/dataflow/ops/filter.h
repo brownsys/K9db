@@ -3,7 +3,6 @@
 
 #include <cstdint>
 #include <string>
-#include <tuple>
 // NOLINTNEXTLINE
 #include <variant>
 #include <vector>
@@ -64,38 +63,39 @@ class FilterOperator : public Operator {
    public:
     // Use this for unary operation with null.
     FilterOperation(ColumnID col, Operation op)
-        : data_(std::make_tuple(col, NullValue(), op, false)) {
+        : left_(col), right_(NullValue()), op_(op), col_(false) {
       CHECK(op == Operation::IS_NULL || op == Operation::IS_NOT_NULL);
     }
 
     // Use this for filter column with literal (excluding null).
     FilterOperation(ColumnID l, Record::DataVariant r, Operation op)
-        : data_(std::make_tuple(l, r, op, false)) {}
+        : left_(l), right_(r), op_(op), col_(false) {}
 
     // Use this for filter column with another column.
     FilterOperation(ColumnID l, Operation op, ColumnID r)
-        : data_(std::make_tuple(l, static_cast<uint64_t>(r), op, true)) {}
+        : left_(l), right_(static_cast<uint64_t>(r)), op_(op), col_(true) {}
 
     // Accessors.
-    ColumnID left() const { return std::get<0>(this->data_); }
+    ColumnID left() const { return this->left_; }
     ColumnID right_column() const {
-      uint64_t col_id = std::get<uint64_t>(std::get<1>(this->data_));
+      uint64_t col_id = std::get<uint64_t>(this->right_);
       return static_cast<ColumnID>(col_id);
     }
-    const Record::DataVariant &right() const {
-      return std::get<1>(this->data_);
-    }
-    Operation op() const { return std::get<2>(this->data_); }
-    bool is_column() const { return std::get<3>(this->data_); }
+    const Record::DataVariant &right() const { return this->right_; }
+    Operation op() const { return this->op_; }
+    bool is_column() const { return this->col_; }
 
    private:
-    // [
-    //   LeftExpression (always a column),
-    //   RightExpression (May be column id, or literal including null),
-    //   Operation (enum),
-    //   whether right expression is a column or not (bool)
-    // ]
-    std::tuple<ColumnID, Record::DataVariant, Operation, bool> data_;
+    // Without loss of generality, column always on the left (planner inverts
+    // the operator when column appears on the right).
+    ColumnID left_;
+    // The right operand, might be a literal (including null), or another
+    // column.
+    Record::DataVariant right_;
+    // Filter operation (e.g. <, ==, etc).
+    Operation op_;
+    // Whether the right operand is a column or not.
+    bool col_;
   };
 
   std::vector<FilterOperation> ops_;

@@ -3,7 +3,6 @@
 
 #include <cstdint>
 #include <string>
-#include <tuple>
 // NOLINTNEXTLINE
 #include <variant>
 #include <vector>
@@ -78,80 +77,96 @@ class ProjectOperator : public Operator {
    public:
     // Project column.
     ProjectionOperation(const std::string &name, ColumnID cid)
-        : data_(std::make_tuple(name, static_cast<uint64_t>(cid), NullValue(),
-                                Metadata::COLUMN, Operation::NONE)) {}
+        : name_(name),
+          left_(static_cast<uint64_t>(cid)),
+          right_(NullValue()),
+          meta_(Metadata::COLUMN),
+          op_(Operation::NONE) {}
 
     // Project literal (bool _ is for distinguishing from other constructors).
     ProjectionOperation(const std::string &name, Record::DataVariant literal,
                         bool _)
-        : data_(std::make_tuple(name, literal, NullValue(), Metadata::LITERAL,
-                                Operation::NONE)) {}
+        : name_(name),
+          left_(literal),
+          right_(NullValue()),
+          meta_(Metadata::LITERAL),
+          op_(Operation::NONE) {}
 
     // Project arithmetic operation
     ProjectionOperation(const std::string &name, Operation op, ColumnID left,
                         ColumnID right)
-        : data_(std::make_tuple(name, static_cast<uint64_t>(left),
-                                static_cast<uint64_t>(right),
-                                Metadata::ARITHMETIC_WITH_COLUMN, op)) {
+        : name_(name),
+          left_(static_cast<uint64_t>(left)),
+          right_(static_cast<uint64_t>(right)),
+          meta_(Metadata::ARITHMETIC_WITH_COLUMN),
+          op_(op) {
       CHECK_NE(op, Operation::NONE);
     }
     ProjectionOperation(const std::string &name, ColumnID left, Operation op,
                         Record::DataVariant literal)
-        : data_(std::make_tuple(name, static_cast<uint64_t>(left), literal,
-                                Metadata::ARITHMETIC_WITH_LITERAL_LEFT, op)) {
+        : name_(name),
+          left_(static_cast<uint64_t>(left)),
+          right_(literal),
+          meta_(Metadata::ARITHMETIC_WITH_LITERAL_LEFT),
+          op_(op) {
       CHECK_NE(op, Operation::NONE);
     }
     ProjectionOperation(const std::string &name, Record::DataVariant literal,
                         ColumnID right, Operation op)
-        : data_(std::make_tuple(name, literal, static_cast<uint64_t>(right),
-                                Metadata::ARITHMETIC_WITH_LITERAL_RIGHT, op)) {
+        : name_(name),
+          left_(literal),
+          right_(static_cast<uint64_t>(right)),
+          meta_(Metadata::ARITHMETIC_WITH_LITERAL_RIGHT),
+          op_(op) {
       CHECK_NE(op, Operation::NONE);
     }
 
     // Checks.
-    bool column() const { return std::get<3>(this->data_) == Metadata::COLUMN; }
-    bool literal() const {
-      return std::get<3>(this->data_) == Metadata::LITERAL;
-    }
-    bool arithemtic() const {
-      return std::get<4>(this->data_) != Operation::NONE;
-    }
+    bool column() const { return this->meta_ == Metadata::COLUMN; }
+    bool literal() const { return this->meta_ == Metadata::LITERAL; }
+    bool arithemtic() const { return this->meta_ != Operation::NONE; }
     bool left_column() const {
-      return std::get<3>(this->data_) == Metadata::ARITHMETIC_WITH_COLUMN ||
-             std::get<3>(this->data_) == Metadata::ARITHMETIC_WITH_LITERAL_LEFT;
+      return this->meta_ == Metadata::ARITHMETIC_WITH_COLUMN ||
+             this->meta_ == Metadata::ARITHMETIC_WITH_LITERAL_LEFT;
     }
     bool right_column() const {
-      return std::get<3>(this->data_) == Metadata::ARITHMETIC_WITH_COLUMN ||
-             std::get<3>(this->data_) ==
-                 Metadata::ARITHMETIC_WITH_LITERAL_RIGHT;
+      return this->meta_ == Metadata::ARITHMETIC_WITH_COLUMN ||
+             this->meta_ == Metadata::ARITHMETIC_WITH_LITERAL_RIGHT;
     }
 
     // Accessors.
-    const std::string &getName() const { return std::get<0>(this->data_); }
+    const std::string &getName() const { return this->name_; }
     ColumnID getColumn() const {
-      uint64_t col = std::get<uint64_t>(std::get<1>(this->data_));
+      uint64_t col = std::get<uint64_t>(this->left_);
       return static_cast<ColumnID>(col);
     }
-    const Record::DataVariant &getLiteral() const {
-      return std::get<1>(this->data_);
-    }
+    const Record::DataVariant &getLiteral() const { return this->left_; }
     ColumnID getLeftColumn() const { return this->getColumn(); }
     const Record::DataVariant &getLeftLiteral() const {
       return this->getLiteral();
     }
     ColumnID getRightColumn() const {
-      uint64_t col = std::get<uint64_t>(std::get<2>(this->data_));
+      uint64_t col = std::get<uint64_t>(this->right_);
       return static_cast<ColumnID>(col);
     }
-    const Record::DataVariant &getRightLiteral() const {
-      return std::get<2>(this->data_);
-    }
-    Operation getOperation() const { return std::get<4>(this->data_); }
+    const Record::DataVariant &getRightLiteral() const { return this->right_; }
+    Operation getOperation() const { return this->op_; }
 
    private:
-    std::tuple<std::string, Record::DataVariant, Record::DataVariant, Metadata,
-               Operation>
-        data_;
+    // The name of the target projected column.
+    std::string name_;
+    // The left (or only if unary) operand in the projection.
+    // May be a literal or column.
+    Record::DataVariant left_;
+    // The right operand (only exists when binary projection).
+    // May be a literal or a column.
+    Record::DataVariant right_;
+    // Specifes the type of projection (e.g. column, literal, or arithmetic)
+    // this including whether left_ and right_ are literals or columns.
+    Metadata meta_;
+    // Arithmetic operation (+ or -) if applicable or NONE if no arithmetic
+    // operation is required.
+    Operation op_;
   };
 
   std::vector<ProjectionOperation> projections_;
