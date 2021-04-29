@@ -13,6 +13,7 @@ java_binary(
         "operators/MatViewOperatorFactory.java",
         "operators/ProjectOperatorFactory.java",
         "operators/UnionOperatorFactory.java",
+        "operators/util/FilterArithmeticVisitor.java",
         "schema/PeltonSchemaFactory.java",
         "schema/PeltonTable.java",
         "//pelton/planner/calcite/src/com/brownsys/pelton/nativelib:DataDataFlowGraphLibrary_java",

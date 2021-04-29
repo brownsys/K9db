@@ -159,6 +159,34 @@ TEST(FilterOperatorTest, BatchTest) {
   EXPECT_EQ(outputs.at(1), records.at(2));
 }
 
+TEST(FilterOperatorTest, ColOps) {
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
+  std::vector<ColumnID> keys = {0};
+  SchemaRef schema = SchemaFactory::Create(names, types, keys);
+
+  // Create some filter operator.
+  FilterOperator filter;
+  filter.AddOperation(0_u, FilterOperator::Operation::GREATER_THAN, 2_u);
+
+  // Create some records.
+  std::vector<Record> records;
+  records.emplace_back(schema, true, 0_s,
+                       std::make_unique<std::string>("Hello!"), 7_s);
+  records.emplace_back(schema, true, 4_s,
+                       std::make_unique<std::string>("Hello!"), 7_s);
+  records.emplace_back(schema, true, 6_s, std::make_unique<std::string>("Bye!"),
+                       9_s);
+  records.emplace_back(schema, true, 20_s,
+                       std::make_unique<std::string>("Bye!"), 15_s);
+
+  // Test filtering out records.
+  std::vector<Record> outputs;
+  EXPECT_TRUE(filter.Process(UNDEFINED_NODE_INDEX, records, &outputs));
+  EXPECT_EQ(outputs.size(), 1);
+  EXPECT_EQ(outputs.at(0), records.at(3));
+}
+
 #ifndef PELTON_VALGRIND_MODE
 TEST(FilterOperatorTest, TypeMistmatch) {
   SchemaRef schema = CreateSchema();
