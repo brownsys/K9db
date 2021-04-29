@@ -1,67 +1,97 @@
-1
+one(INT)|
+1|
 ;
-1
+one(INT)|
+1|
 ;
+id(INT,KEY)|tag(TEXT)|description(TEXT)|privileged(INT)|is_media(INT)|inactive(INT)|hotness_mod(INT)|
 0|mytag|description|0|0|0|0
 ;
+id(INT,KEY)|user_id(INT)|story_id(INT)|comment_id(INT)|vote(INT)|reason(TEXT)|
 3|0|0|\N|1|r
 ;
+id(INT,KEY)|created_at(DATETIME)|user_id(INT)|url(TEXT)|title(TEXT)|description(TEXT)|short_id(TEXT)|is_expired(INT)|upvotes(INT)|downvotes(INT)|is_moderated(INT)|hotness(INT)|markeddown_description(TEXT)|story_cache(TEXT)|comments_count(INT)|merged_story_id(INT)|unavailable_at(DATETIME)|twitter_id(TEXT)|user_is_author(INT)|
 0|2021-04-21 01:00:00|0|url|title|description|joe|0|50|20|0|1|markeddown|cache|0|0|2021-04-21 01:00:00|twitter|1
 ;
+id(INT,KEY)|PII_username(TEXT)|email(TEXT)|password_digest(TEXT)|created_at(DATETIME)|is_admin(INT)|password_reset_token(TEXT)|session_token(TEXT)|about(TEXT)|invited_by_user_id(INT)|is_moderator(INT)|pushover_mentions(INT)|rss_token(TEXT)|mailing_list_token(TEXT)|mailing_list_mode(INT)|karma(INT)|banned_at(DATETIME)|banned_by_user_id(INT)|banned_reason(TEXT)|deleted_at(DATETIME)|disabled_invite_at(DATETIME)|disabled_invite_by_user_id(INT)|disabled_invite_reason(TEXT)|settings(TEXT)|
 0|joe|joe@gmail.com|super_secure_password|2021-04-21 01:00:00|0|token|token2|aboutme|0|0|0|token|token|0|0|2021-04-21 01:00:00|250|reason|2021-04-21 01:00:00|2021-04-21 01:00:00|250|reason|settings
 ;
-1
+|one(INT)|
+1|
 ;
+id(INT,KEY)|user_id(INT)|story_id(INT)|comment_id(INT)|vote(INT)|reason(TEXT)|
 0|0|0|0|1|r
 ;
-0
-1
-2
+id(INT,KEY)|
+0|
+1|
+2|
 ;
+id(INT,KEY)|created_at(DATETIME)|updated_at(DATETIME)|short_id(TEXT)|story_id(INT)|user_id(INT)|parent_comment_id(INT)|thread_id(INT)|comment(TEXT)|upvotes(INT)|downvotes(INT)|confidence(INT)|markeddown_comment(TEXT)|is_deleted(INT)|is_moderated(INT)|is_from_email(INT)|hat_id(INT)|saldo(INT)|
 2|2021-04-21 01:00:00|2021-04-21 01:00:00|comment2|2|2|0|0|comment|0|0|0|markeddown|0|0|0|0|0
 ;
+id(INT)|tag(TEXT)|description(TEXT)|privileged(INT)|is_media(INT)|inactive(INT)|hotness_mod(INT)|
 2|mytag3|description3|0|0|0|0
 ;
-0|2021-04-21 01:00:00|2021-04-21 01:00:00|comment0|0|0|0|0|comment|0|0|0|markeddown|0|0|0|0
-;
+
+
+id(INT,KEY)|user_id(INT)|story_id(INT)|comment_id(INT)|vote(INT)|reason(TEXT)|
 0|0|2021-04-21 01:00:00|2021-04-21 01:00:00|0|0
 ;
+id(INT,KEY)|user_id(INT)|story_id(INT)|comment_id(INT)|vote(INT)|reason(TEXT)|
 0|0|0|0|1|r
 ;
-0
+story_id(INT)|
+0|
 ;
+id(INT,KEY)|PII_username(TEXT)|email(TEXT)|password_digest(TEXT)|created_at(DATETIME)|is_admin(INT)|password_reset_token(TEXT)|session_token(TEXT)|about(TEXT)|invited_by_user_id(INT)|is_moderator(INT)|pushover_mentions(INT)|rss_token(TEXT)|mailing_list_token(TEXT)|mailing_list_mode(INT)|karma(INT)|banned_at(DATETIME)|banned_by_user_id(INT)|banned_reason(TEXT)|deleted_at(DATETIME)|disabled_invite_at(DATETIME)|disabled_invite_by_user_id(INT)|disabled_invite_reason(TEXT)|settings(TEXT)
 0|joe|joe@gmail.com|super_secure_password|2021-04-21 01:00:00|0|token|token2|aboutme|0|0|0|token|token|0|0|2021-04-21 01:00:00|250|reason|2021-04-21 01:00:00|2021-04-21 01:00:00|250|reason|settings
 ;
+id(INT,KEY)|user_id(INT)|story_id(INT)|
 0|0|0
 ;
+id(INT,KEY)|created_at(DATETIME)|updated_at(DATETIME)|user_id(INT)|tag_id(INT)|
 0|2021-04-21 01:00:00|2021-04-21 01:00:00|0|0
 ;
+id(INT,KEY)|Count(UINT)|
 0|1
 ;
-0
+story_id(INT)|
+0|
 ;
+id(INT,KEY)|created_at(DATETIME)|updated_at(DATETIME)|user_id(INT)|story_id(INT)|
 0|2021-04-21 01:00:00|2021-04-21 01:00:00|0|0
 ;
+id(INT,KEY)|story_id(INT)|user_id(INT)|title(TEXT)|
 0|0|0|title
 ;
+id(INT,KEY)|story_id(INT)|tag_id(INT)|
 0|0|0
 ;
+one(INT)|
 1
 ;
+id(INT,KEY)|tag(TEXT)|description(TEXT)|privileged(INT)|is_media(INT)|inactive(INT)|hotness_mod(INT)|
 0|mytag|description|0|0|0|0
 ;
+id(INT,KEY)|created_at(DATETIME)|updated_at(DATETIME)|short_id(TEXT)|story_id(INT)|user_id(INT)|parent_comment_id(INT)|thread_id(INT)|comment(TEXT)|upvotes(INT)|downvotes(INT)|confidence(INT)|markeddown_comment(TEXT)|is_deleted(INT)|is_moderated(INT)|is_from_email(INT)|hat_id(INT)|
 2|2021-04-21 01:00:00|2021-04-21 01:00:00|comment2|2|2|0|0|comment|0|0|0|markeddown|0|0|0|0
 1|2021-04-21 01:00:00|2021-04-21 01:00:00|comment1|1|1|0|0|comment|0|0|0|markeddown|0|0|0|0
 0|2021-04-21 01:00:00|2021-04-21 01:00:00|comment0|0|0|0|0|comment|0|0|0|markeddown|0|0|0|0
 ;
-1
+EXPR$0(INT)|
+1|
 ;
+id(INT,KEY)|created_at(DATETIME)|user_id(INT)|url(TEXT)|title(TEXT)|description(TEXT)|short_id(TEXT)|is_expired(INT)|upvotes(INT)|downvotes(INT)|is_moderated(INT)|hotness(INT)|markeddown_description(TEXT)|story_cache(TEXT)|comments_count(INT)|merged_story_id(INT)|unavailable_at(DATETIME)|twitter_id(TEXT)|user_is_author(INT)|
 0|2021-04-21 01:00:00|0|url|title|description|joe|0|50|20|0|1|markeddown|cache|0|0|2021-04-21 01:00:00|twitter|1
 ;
+id(INT,KEY)|user_id(INT)|story_id(INT)|comment_id(INT)|vote(INT)|reason(TEXT)|
 0|0|0|0|1|r
 ;
+id(INT,KEY)|created_at(DATETIME)|user_id(INT)|url(TEXT)|title(TEXT)|description(TEXT)|short_id(TEXT)|is_expired(INT)|upvotes(INT)|downvotes(INT)|is_moderated(INT)|hotness(INT)|markeddown_description(TEXT)|story_cache(TEXT)|comments_count(INT)|merged_story_id(INT)|unavailable_at(DATETIME)|twitter_id(TEXT)|user_is_author(INT)|saldo(INT)|
 0|2021-04-21 01:00:00|2021-04-21 01:00:00|comment0|0|0|0|0|comment|0|0|0|markeddown|0|0|0|0
 1|2021-04-21 01:00:00|2021-04-21 01:00:00|comment1|1|1|0|0|comment|0|0|0|markeddown|0|0|0|0
 2|2021-04-21 01:00:00|2021-04-21 01:00:00|comment2|2|2|0|0|comment|0|0|0|markeddown|0|0|0|0
 ;
+removed test:
 3|2021-04-21 01:00:00|2|url2|title3|description2|james|0|50|20|0|1|markeddown|cache|0|\N|2021-04-21 01:00:00|twitter|1|30
