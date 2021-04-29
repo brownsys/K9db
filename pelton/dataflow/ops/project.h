@@ -25,41 +25,136 @@ class ProjectOperator : public Operator {
 
   ProjectOperator() : Operator(Operator::Type::PROJECT), projections_() {}
 
-  void AddProjection(const std::string &column_name, ColumnID cid) {
-    this->projections_.push_back(std::make_tuple(
-        column_name, cid, Operation::NONE, uint64_t(-1), Metadata::COLUMN));
+  void AddColumnProjection(const std::string &column_name, ColumnID cid) {
+    this->projections_.emplace_back(column_name, cid);
   }
-  // For projecting literal, user needs to explicitly specify Metadata::LITERAL.
-  // This is done in order to make the APIs more usable, else explicit casting
-  // would be required
-  //  in order to distinguish between LITERAL and COLUMN.
-  void AddProjection(const std::string &column_name,
-                     Record::DataVariant literal, Metadata metadata) {
-    this->projections_.push_back(
-        std::make_tuple(column_name, 99, Operation::NONE, literal, metadata));
+
+  void AddLiteralProjection(const std::string &column_name,
+                            Record::DataVariant literal) {
+    this->projections_.emplace_back(column_name, literal, true);
   }
-  void AddProjection(std::string column_name, ColumnID left_operand,
-                     Operation operation, int64_t right_operand,
-                     Metadata metadata) {
-    this->projections_.push_back(std::make_tuple(
-        column_name, left_operand, operation, right_operand, metadata));
+
+  void AddArithmeticColumnsProjection(const std::string &column_name,
+                                      ColumnID left_col, ColumnID right_col,
+                                      Operation op) {
+    this->projections_.emplace_back(column_name, op, left_col, right_col);
   }
-  void AddProjection(std::string column_name, ColumnID left_operand,
-                     Operation operation, uint64_t right_operand,
-                     Metadata metadata) {
-    this->projections_.push_back(std::make_tuple(
-        column_name, left_operand, operation, right_operand, metadata));
+  void AddArithmeticLeftProjection(std::string column_name, ColumnID left_col,
+                                   Record::DataVariant literal, Operation op) {
+    if (literal.index() == 2 && this->input_schemas_.size() > 0 &&
+        this->input_schemas_.at(0).TypeOf(left_col) ==
+            sqlast::ColumnDefinition::Type::UINT) {
+      int64_t v = std::get<2>(literal);
+      CHECK_GE(v, 0);
+      this->AddArithmeticLeftProjection(column_name, left_col,
+                                        static_cast<uint64_t>(v), op);
+    } else {
+      this->projections_.emplace_back(column_name, left_col, op, literal);
+    }
+  }
+  void AddArithmeticRightProjection(std::string column_name,
+                                    Record::DataVariant literal,
+                                    ColumnID right_col, Operation op) {
+    if (literal.index() == 2 && this->input_schemas_.size() > 0 &&
+        this->input_schemas_.at(0).TypeOf(right_col) ==
+            sqlast::ColumnDefinition::Type::UINT) {
+      int64_t v = std::get<2>(literal);
+      CHECK_GE(v, 0);
+      this->AddArithmeticRightProjection(column_name, static_cast<uint64_t>(v),
+                                         right_col, op);
+    } else {
+      this->projections_.emplace_back(column_name, literal, right_col, op);
+    }
   }
 
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,
                std::vector<Record> *output) override;
+
   void ComputeOutputSchema() override;
 
  private:
-  std::vector<std::tuple<std::string, ColumnID, Operation, Record::DataVariant,
-                         Metadata>>
-      projections_;
+  class ProjectionOperation {
+   public:
+    // Project column.
+    ProjectionOperation(const std::string &name, ColumnID cid)
+        : data_(std::make_tuple(name, static_cast<uint64_t>(cid), NullValue(),
+                                Metadata::COLUMN, Operation::NONE)) {}
+
+    // Project literal (bool _ is for distinguishing from other constructors).
+    ProjectionOperation(const std::string &name, Record::DataVariant literal,
+                        bool _)
+        : data_(std::make_tuple(name, literal, NullValue(), Metadata::LITERAL,
+                                Operation::NONE)) {}
+
+    // Project arithmetic operation
+    ProjectionOperation(const std::string &name, Operation op, ColumnID left,
+                        ColumnID right)
+        : data_(std::make_tuple(name, static_cast<uint64_t>(left),
+                                static_cast<uint64_t>(right),
+                                Metadata::ARITHMETIC_WITH_COLUMN, op)) {
+      CHECK_NE(op, Operation::NONE);
+    }
+    ProjectionOperation(const std::string &name, ColumnID left, Operation op,
+                        Record::DataVariant literal)
+        : data_(std::make_tuple(name, static_cast<uint64_t>(left), literal,
+                                Metadata::ARITHMETIC_WITH_LITERAL_LEFT, op)) {
+      CHECK_NE(op, Operation::NONE);
+    }
+    ProjectionOperation(const std::string &name, Record::DataVariant literal,
+                        ColumnID right, Operation op)
+        : data_(std::make_tuple(name, literal, static_cast<uint64_t>(right),
+                                Metadata::ARITHMETIC_WITH_LITERAL_RIGHT, op)) {
+      CHECK_NE(op, Operation::NONE);
+    }
+
+    // Checks.
+    bool column() const { return std::get<3>(this->data_) == Metadata::COLUMN; }
+    bool literal() const {
+      return std::get<3>(this->data_) == Metadata::LITERAL;
+    }
+    bool arithemtic() const {
+      return std::get<4>(this->data_) != Operation::NONE;
+    }
+    bool left_column() const {
+      return std::get<3>(this->data_) == Metadata::ARITHMETIC_WITH_COLUMN ||
+             std::get<3>(this->data_) == Metadata::ARITHMETIC_WITH_LITERAL_LEFT;
+    }
+    bool right_column() const {
+      return std::get<3>(this->data_) == Metadata::ARITHMETIC_WITH_COLUMN ||
+             std::get<3>(this->data_) ==
+                 Metadata::ARITHMETIC_WITH_LITERAL_RIGHT;
+    }
+
+    // Accessors.
+    const std::string &getName() const { return std::get<0>(this->data_); }
+    ColumnID getColumn() const {
+      uint64_t col = std::get<uint64_t>(std::get<1>(this->data_));
+      return static_cast<ColumnID>(col);
+    }
+    const Record::DataVariant &getLiteral() const {
+      return std::get<1>(this->data_);
+    }
+    ColumnID getLeftColumn() const { return this->getColumn(); }
+    const Record::DataVariant &getLeftLiteral() const {
+      return this->getLiteral();
+    }
+    ColumnID getRightColumn() const {
+      uint64_t col = std::get<uint64_t>(std::get<2>(this->data_));
+      return static_cast<ColumnID>(col);
+    }
+    const Record::DataVariant &getRightLiteral() const {
+      return std::get<2>(this->data_);
+    }
+    Operation getOperation() const { return std::get<4>(this->data_); }
+
+   private:
+    std::tuple<std::string, Record::DataVariant, Record::DataVariant, Metadata,
+               Operation>
+        data_;
+  };
+
+  std::vector<ProjectionOperation> projections_;
 
   // Allow tests to use .Process(...) directly.
   FRIEND_TEST(ProjectOperatorTest, BatchTestColumn);
@@ -69,6 +164,7 @@ class ProjectOperator : public Operator {
   FRIEND_TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest);
   FRIEND_TEST(ProjectOperatorTest, OutputSchemaCompositeKeyTest);
   FRIEND_TEST(ProjectOperatorTest, NullValueTest);
+  FRIEND_TEST(ProjectOperatorTest, ArithmeticAndNullValueTest);
 };
 
 }  // namespace dataflow

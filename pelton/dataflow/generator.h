@@ -59,10 +59,8 @@ class DataFlowGraphGenerator {
   void AddFilterOperationString(NodeIndex filter_operator,
                                 const std::string &value, ColumnID column,
                                 FilterOperationEnum fop);
-  void AddFilterOperationUnsigned(NodeIndex filter_operator, uint64_t value,
-                                  ColumnID column, FilterOperationEnum fop);
-  void AddFilterOperationSigned(NodeIndex filter_operator, int64_t value,
-                                ColumnID column, FilterOperationEnum fop);
+  void AddFilterOperationInt(NodeIndex filter_operator, int64_t value,
+                             ColumnID column, FilterOperationEnum fop);
   void AddFilterOperationNull(NodeIndex filter_operator, ColumnID column,
                               FilterOperationEnum fop);
   void AddFilterOperationColumn(NodeIndex filter_operator, ColumnID left_column,
@@ -70,23 +68,23 @@ class DataFlowGraphGenerator {
   // Projection.
   void AddProjectionColumn(NodeIndex project_operator,
                            const std::string &column_name, ColumnID cid);
-  void AddProjectionLiteralSigned(NodeIndex project_operator,
-                                  const std::string &column_name, int64_t value,
-                                  ProjectMetadataEnum metadata);
-  void AddProjectionLiteralUnsigned(NodeIndex project_operator,
-                                    const std::string &column_name,
-                                    uint64_t value,
-                                    ProjectMetadataEnum metadata);
-  void AddProjectionArithmeticWithLiteralSigned(NodeIndex project_operator,
-                                                const std::string &column_name,
-                                                ColumnID left_operand,
-                                                ProjectOperationEnum operation,
-                                                int64_t right_operand,
-                                                ProjectMetadataEnum metadata);
-  void AddProjectionArithmeticWithLiteralUnsignedOrColumn(
-      NodeIndex project_operator, const std::string &column_name,
-      ColumnID left_operand, ProjectOperationEnum operation,
-      uint64_t right_operand, ProjectMetadataEnum metadata);
+  void AddProjectionLiteralInt(NodeIndex project_operator,
+                               const std::string &column_name, int64_t value);
+
+  void AddProjectionArithmeticLiteralLeft(NodeIndex project_operator,
+                                          const std::string &column_name,
+                                          ColumnID left_column,
+                                          int64_t right_literal,
+                                          ProjectOperationEnum operation);
+  void AddProjectionArithmeticLiteralRight(NodeIndex project_operator,
+                                           const std::string &column_name,
+                                           int64_t left_literal,
+                                           ColumnID right_column,
+                                           ProjectOperationEnum operation);
+  void AddProjectionArithmeticColumns(NodeIndex project_operator,
+                                      const std::string &column_name,
+                                      ColumnID left, ColumnID right,
+                                      ProjectOperationEnum operation);
 
   // Reading schema.
   std::vector<std::string> GetTables() const;
