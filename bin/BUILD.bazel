@@ -1,6 +1,25 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary")
 
 cc_binary(
+    name = "correctness",
+    srcs = [
+        "correctness.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        "//pelton",
+        "//pelton/util:perf",
+        "@gflags",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+    data = ["//bin/data:trivial-schema.sql", "//bin/data:trivial-queries.sql", 
+            "//bin/data:medical_chat_schema.sql", "//bin/data:medical_chat_queries.sql",
+            "//bin/data:medical_chat_expected.txt"],
+)
+
+cc_binary(
     name = "example",
     srcs = [
         "example.cc",

@@ -1,6 +1,10 @@
 #!/bin/bash
 mysql -u $1 -p$2 --execute="DROP DATABASE default_db;"
 
+# medical_chat
+mysql -u $1 -p$2 --execute="DROP DATABASE doctors_c81e728d9d4c2f636f067f89cc14862c;"
+mysql -u $1 -p$2 --execute="DROP DATABASE patients_d3d9446802a44259755d38e6d163e820"
+
 # example.cc and examples/simple-websubmit.sql
 mysql -u $1 -p$2 --execute="DROP DATABASE students_c4ca4238a0b923820dcc509a6f75849b;"
 mysql -u $1 -p$2 --execute="DROP DATABASE students_c81e728d9d4c2f636f067f89cc14862c;"
