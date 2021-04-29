@@ -161,6 +161,7 @@ int main(int argc, char **argv)
                 EXPECTED.push_back(query_results);
                 // clear vector
                 query_results.clear();
+                continue;
             }
             query_results.push_back(line.insert(0, 1, '|'));
         }
