@@ -11,7 +11,7 @@
 #include "benchmark/benchmark.h"
 #include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"
-#include "pelton/dataflow/ops/equijoin_enum.h"
+#include "pelton/dataflow/ops/join_enum.h"
 #include "pelton/dataflow/ops/grouped_data.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
