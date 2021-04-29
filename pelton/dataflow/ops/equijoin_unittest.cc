@@ -457,10 +457,6 @@ TEST(EquiJoinOperatorTest, BasicRightJoinTest) {
   EXPECT_EQ(op->left_table_.count(), 1);
   EXPECT_IT_EQ(op->left_table_.Lookup(lrecords.at(0).GetValues({2})), lrecords);
   EXPECT_EQ(op->right_table_.count(), 1);
-
-  for (const Record &record : output) {
-    LOG(INFO) << record;
-  }
   EXPECT_EQ(output, expected_records);
 }
 

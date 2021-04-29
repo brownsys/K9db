@@ -65,6 +65,9 @@ class EquiJoinOperator : public Operator {
   // have been emitted. This is later used to generate corresponding
   // negative records
   UnorderedGroupedData emitted_nulls_;
+  // Records consisting entirely of NULL values. at index 0 is meant to be for
+  // left schema and at index 1 is meant to be for right schema.
+  std::vector<Record> null_records_;
 
   // Join left and right and store it in output.
   void EmitRow(const Record &left, const Record &right,

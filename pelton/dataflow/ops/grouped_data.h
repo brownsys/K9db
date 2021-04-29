@@ -357,7 +357,9 @@ class GroupedDataT : public UntemplatedGroupedData {
   // Count of records corresponding to a given key
   size_t Count(const Key &key) const {
     auto it = this->contents_.find(key);
-    if (it == this->contents_.end()) return 0;
+    if (it == this->contents_.end()) {
+      return 0;
+    }
     return it->second.size();
   }
   // Return an Iterable set of records from the given key that are larger than

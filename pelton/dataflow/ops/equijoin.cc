@@ -58,8 +58,7 @@ bool EquiJoinOperator::Process(NodeIndex source,
           // Negate any previously emitted NULL + right records.
           for (const Record &right_null :
                this->emitted_nulls_.Lookup(left_value)) {
-            this->EmitRow(Record::NULLRecord(this->input_schemas_.at(0)),
-                          right_null, output, false);
+            this->EmitRow(this->null_records_.at(0), right_null, output, false);
           }
           this->emitted_nulls_.Erase(left_value);
         }
@@ -68,8 +67,8 @@ bool EquiJoinOperator::Process(NodeIndex source,
 
       // additional check for left join
       if (mode_ == Mode::LEFT && 0 == this->right_table_.Count(left_value)) {
-        this->EmitRow(record, Record::NULLRecord(this->input_schemas_.at(1)),
-                      output, record.IsPositive());
+        this->EmitRow(record, this->null_records_.at(1), output,
+                      record.IsPositive());
         this->emitted_nulls_.Insert(left_value, record);
       }
 
@@ -83,9 +82,7 @@ bool EquiJoinOperator::Process(NodeIndex source,
           // Negate any previously emitted Left + NULL records.
           for (const Record &left_null :
                this->emitted_nulls_.Lookup(right_value)) {
-            this->EmitRow(left_null,
-                          Record::NULLRecord(this->input_schemas_.at(1)),
-                          output, false);
+            this->EmitRow(left_null, this->null_records_.at(1), output, false);
           }
           this->emitted_nulls_.Erase(right_value);
         }
@@ -94,8 +91,8 @@ bool EquiJoinOperator::Process(NodeIndex source,
 
       // additional check for right join
       if (mode_ == Mode::RIGHT && 0 == this->left_table_.Count(right_value)) {
-        this->EmitRow(Record::NULLRecord(this->input_schemas_.at(0)), record,
-                      output, record.IsPositive());
+        this->EmitRow(this->null_records_.at(0), record, output,
+                      record.IsPositive());
         this->emitted_nulls_.Insert(right_value, record);
       }
 
@@ -162,6 +159,12 @@ void EquiJoinOperator::ComputeOutputSchema() {
 
   // We own the joined schema.
   this->output_schema_ = SchemaFactory::Create(names, types, keys);
+
+  // Initialize left and right null records
+  this->null_records_.push_back(
+      std::move(Record::NULLRecord(this->input_schemas_.at(0))));
+  this->null_records_.push_back(
+      std::move(Record::NULLRecord(this->input_schemas_.at(1))));
 }
 
 void EquiJoinOperator::EmitRow(const Record &left, const Record &right,
