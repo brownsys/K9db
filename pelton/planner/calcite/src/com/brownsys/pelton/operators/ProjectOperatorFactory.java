@@ -118,7 +118,7 @@ public class ProjectOperatorFactory {
   }
 
   // Literal projection.
-  public void addLiteralProjection(String name, RexLiteral literal, int projectOperator) {
+  private void addLiteralProjection(String name, RexLiteral literal, int projectOperator) {
     int targetPeltonIndex = this.projectionsCount;
     this.projectionsCount++;
 
@@ -136,7 +136,7 @@ public class ProjectOperatorFactory {
   }
 
   // Arithmetic projection.
-  private void addArithmeticProjection(
+  public void addArithmeticProjection(
       String name, List<RexNode> operands, int arithmeticEnum, int projectOperator) {
     // Must be binary.
     assert operands.size() == 2;
@@ -211,7 +211,7 @@ public class ProjectOperatorFactory {
         this.calciteToPeltonTarget.put(this.targetCalciteIndex, targetPeltonIndex);
         this.context
             .getGenerator()
-            .AddProjectionArithmeticLiteralLeft(
+            .AddProjectionArithmeticLiteralRight(
                 projectOperator,
                 name,
                 RexLiteral.intValue(left),

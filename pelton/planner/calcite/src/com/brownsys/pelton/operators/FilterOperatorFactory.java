@@ -5,6 +5,7 @@ import com.brownsys.pelton.nativelib.DataFlowGraphLibrary;
 import com.brownsys.pelton.operators.util.FilterArithmeticVisitor;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rex.RexCall;
@@ -29,9 +30,13 @@ public class FilterOperatorFactory {
 
   // The context we use to access the native graph generation API.
   private final PlanningContext context;
+  private final ProjectOperatorFactory projectFactory;
+  private final HashMap<RexNode, Integer> arithmeticExpressionToProjectedColumn;
 
   public FilterOperatorFactory(PlanningContext context) {
     this.context = context;
+    this.projectFactory = new ProjectOperatorFactory(context);
+    this.arithmeticExpressionToProjectedColumn = new HashMap<RexNode, Integer>();
   }
 
   // Create operator(s) that are equivalent to the given filter.
@@ -40,23 +45,51 @@ public class FilterOperatorFactory {
   // result in a similarly nested tree of union and filter operators.
   public int createOperator(LogicalFilter filter, ArrayList<Integer> children) {
     assert children.size() == 1;
+    int inputOperator = children.get(0);
 
     RexNode condition = filter.getCondition();
     assert condition instanceof RexCall;
 
+    // If the filter has arithmetic expressions (e.g. col + 10 < something)
+    // or (col - col == something), we support these expressions by first
+    // introducing them as projections with tmp column names, then using these
+    // columns in their place during filtering. Finally, after the filter a new
+    // projection is carried out to remove these tmp columns.
     FilterArithmeticVisitor arithmeticVisitor = new FilterArithmeticVisitor();
     boolean hasArithmetic = condition.accept(arithmeticVisitor);
+    int tmpColumnCount = 0;
+    int originalColumnCount = this.context.getPeltonColumnCount();
     if (hasArithmetic) {
+      inputOperator = this.context.getGenerator().AddProjectOperator(inputOperator);
+      for (int i = 0; i < originalColumnCount; i++) {
+        // "" --> keep column name.
+        this.projectFactory.addColumnProjection("", i, inputOperator);
+      }
       List<RexCall> arithmetics = arithmeticVisitor.getArithmeticNodes();
       for (RexCall r : arithmetics) {
-        System.out.println(r.toStringRaw());
+        int projectedColumnIndex = originalColumnCount + tmpColumnCount++;
+        this.projectArithmeticExpression(r, projectedColumnIndex, inputOperator);
+        this.arithmeticExpressionToProjectedColumn.put(r, projectedColumnIndex);
       }
     }
 
     // Visit the operands of the filter operator
-    return this.analyzeCondition((RexCall) condition, children.get(0));
+    int outputOperator = this.analyzeCondition((RexCall) condition, inputOperator);
+
+    // Remove tmp columns.
+    if (hasArithmetic) {
+      outputOperator = this.context.getGenerator().AddProjectOperator(outputOperator);
+      for (int i = 0; i < originalColumnCount; i++) {
+        this.projectFactory.addColumnProjection("", i, outputOperator);
+      }
+    }
+
+    return outputOperator;
   }
 
+  /*
+   * Section for recursively traversing AND/OR filter tree.
+   */
   // Analyze a generic clause: could be a simple condition (e.g. x == y) or a tree
   // of expressions (e.g. (x == y OR y == z) AND ...).
   private int analyzeCondition(RexCall condition, int inputOperator) {
@@ -117,6 +150,10 @@ public class FilterOperatorFactory {
     }
   }
 
+  /*
+   * Section for parsing and creating a filter operator for a single level of
+   * the filter tree.
+   */
   // Generate a filter operator that filters according to the given (simple expression) operands.
   // Operands cannot have ANDs, ORs, or complex nesting. They must each match an option from
   // FILTER_OPERATIONS.
@@ -167,33 +204,57 @@ public class FilterOperatorFactory {
     if (operands.size() == 1) {
       this.addUnaryCondition(operands, operationEnum, filterOperator);
     } else if (operands.size() == 2) {
+      boolean leftArith = this.arithmeticExpressionToProjectedColumn.containsKey(operands.get(0));
+      boolean rightArith = this.arithmeticExpressionToProjectedColumn.containsKey(operands.get(1));
+
       // Expressions with a ? parameter.
       if (operands.get(0) instanceof RexDynamicParam) {
         this.addQuestionMarkCondition(operands.get(1), operationEnum);
       } else if (operands.get(1) instanceof RexDynamicParam) {
         this.addQuestionMarkCondition(operands.get(0), operationEnum);
       }
+      // Expression involving some arithmetic expressions.
+      else if (leftArith && rightArith) {
+        // Both arithmetic.
+        int leftId = this.arithmeticExpressionToProjectedColumn.get(operands.get(0));
+        int rightId = this.arithmeticExpressionToProjectedColumn.get(operands.get(1));
+        this.addColumnBinaryCondition(leftId, rightId, operationEnum, filterOperator);
+      } else if (leftArith && operands.get(1) instanceof RexInputRef) {
+        // Arithmetic, Column.
+        int leftId = this.arithmeticExpressionToProjectedColumn.get(operands.get(0));
+        int rightId = this.context.getPeltonIndex(((RexInputRef) operands.get(1)).getIndex());
+        this.addColumnBinaryCondition(leftId, rightId, operationEnum, filterOperator);
+      } else if (leftArith && operands.get(1) instanceof RexLiteral) {
+        // Arithmetic, Literal.
+        int leftId = this.arithmeticExpressionToProjectedColumn.get(operands.get(0));
+        this.addLiteralBinaryCondition(
+            leftId, (RexLiteral) operands.get(1), operationEnum, filterOperator);
+      } else if (rightArith && operands.get(0) instanceof RexInputRef) {
+        // Column, Arithmetic.
+        int leftId = this.context.getPeltonIndex(((RexInputRef) operands.get(0)).getIndex());
+        int rightId = this.arithmeticExpressionToProjectedColumn.get(operands.get(1));
+        this.addColumnBinaryCondition(leftId, rightId, operationEnum, filterOperator);
+      } else if (rightArith && operands.get(0) instanceof RexLiteral) {
+        // Literal, Arithmetic.
+        int rightId = this.arithmeticExpressionToProjectedColumn.get(operands.get(1));
+        this.addLiteralBinaryCondition(
+            (RexLiteral) operands.get(0), rightId, operationEnum, filterOperator);
+      }
       // Expression on two columns.
       else if (operands.get(0) instanceof RexInputRef && operands.get(1) instanceof RexInputRef) {
-        this.addColumnBinaryCondition(
-            (RexInputRef) operands.get(0),
-            (RexInputRef) operands.get(1),
-            operationEnum,
-            filterOperator);
+        int leftId = this.context.getPeltonIndex(((RexInputRef) operands.get(0)).getIndex());
+        int rightId = this.context.getPeltonIndex(((RexInputRef) operands.get(1)).getIndex());
+        this.addColumnBinaryCondition(leftId, rightId, operationEnum, filterOperator);
       }
       // Expression on a column and literal
       else if (operands.get(0) instanceof RexInputRef && operands.get(1) instanceof RexLiteral) {
-        this.addValueBinaryCondition(
-            (RexInputRef) operands.get(0),
-            (RexLiteral) operands.get(1),
-            operationEnum,
-            filterOperator);
+        int leftId = this.context.getPeltonIndex(((RexInputRef) operands.get(0)).getIndex());
+        this.addLiteralBinaryCondition(
+            leftId, (RexLiteral) operands.get(1), operationEnum, filterOperator);
       } else if (operands.get(1) instanceof RexInputRef && operands.get(0) instanceof RexLiteral) {
-        this.addValueBinaryCondition(
-            (RexLiteral) operands.get(0),
-            (RexInputRef) operands.get(1),
-            operationEnum,
-            filterOperator);
+        int rightId = this.context.getPeltonIndex(((RexInputRef) operands.get(1)).getIndex());
+        this.addLiteralBinaryCondition(
+            (RexLiteral) operands.get(0), rightId, operationEnum, filterOperator);
       }
       // Something else: not supported!
       else {
@@ -227,19 +288,14 @@ public class FilterOperatorFactory {
   }
 
   private void addColumnBinaryCondition(
-      RexInputRef left, RexInputRef right, int operationEnum, int filterOperator) {
-    int leftId = this.context.getPeltonIndex(left.getIndex());
-    int rightId = this.context.getPeltonIndex(right.getIndex());
+      int leftId, int rightId, int operationEnum, int filterOperator) {
     this.context
         .getGenerator()
         .AddFilterOperationColumn(filterOperator, leftId, rightId, operationEnum);
   }
 
-  private void addValueBinaryCondition(
-      RexInputRef left, RexLiteral right, int operationEnum, int filterOperator) {
-    assert right instanceof RexLiteral;
-    int columnId = this.context.getPeltonIndex(left.getIndex());
-
+  private void addLiteralBinaryCondition(
+      int leftColumnId, RexLiteral right, int operationEnum, int filterOperator) {
     // Determine the value type.
     switch (right.getTypeName()) {
       case DECIMAL:
@@ -247,7 +303,7 @@ public class FilterOperatorFactory {
         this.context
             .getGenerator()
             .AddFilterOperationInt(
-                filterOperator, RexLiteral.intValue(right), columnId, operationEnum);
+                filterOperator, RexLiteral.intValue(right), leftColumnId, operationEnum);
         break;
 
       case VARCHAR:
@@ -255,7 +311,7 @@ public class FilterOperatorFactory {
         this.context
             .getGenerator()
             .AddFilterOperationString(
-                filterOperator, RexLiteral.stringValue(right), columnId, operationEnum);
+                filterOperator, RexLiteral.stringValue(right), leftColumnId, operationEnum);
         break;
 
       case NULL:
@@ -269,7 +325,9 @@ public class FilterOperatorFactory {
           default:
             throw new IllegalArgumentException("Illegal operation on null");
         }
-        this.context.getGenerator().AddFilterOperationNull(filterOperator, columnId, operationEnum);
+        this.context
+            .getGenerator()
+            .AddFilterOperationNull(filterOperator, leftColumnId, operationEnum);
         break;
 
       default:
@@ -278,33 +336,55 @@ public class FilterOperatorFactory {
     }
   }
 
-  private void addValueBinaryCondition(
-      RexLiteral left, RexInputRef right, int operationEnum, int filterOperator) {
+  private void addLiteralBinaryCondition(
+      RexLiteral left, int right, int operationEnum, int filterOperator) {
     switch (operationEnum) {
         // Invert left and right.
       case DataFlowGraphLibrary.LESS_THAN:
-        this.addValueBinaryCondition(
-            right, left, DataFlowGraphLibrary.GREATER_THAN_OR_EQUAL, filterOperator);
-        break;
-      case DataFlowGraphLibrary.LESS_THAN_OR_EQUAL:
-        this.addValueBinaryCondition(
+        this.addLiteralBinaryCondition(
             right, left, DataFlowGraphLibrary.GREATER_THAN, filterOperator);
         break;
+      case DataFlowGraphLibrary.LESS_THAN_OR_EQUAL:
+        this.addLiteralBinaryCondition(
+            right, left, DataFlowGraphLibrary.GREATER_THAN_OR_EQUAL, filterOperator);
+        break;
       case DataFlowGraphLibrary.GREATER_THAN:
-        this.addValueBinaryCondition(
-            right, left, DataFlowGraphLibrary.LESS_THAN_OR_EQUAL, filterOperator);
+        this.addLiteralBinaryCondition(right, left, DataFlowGraphLibrary.LESS_THAN, filterOperator);
         break;
       case DataFlowGraphLibrary.GREATER_THAN_OR_EQUAL:
-        this.addValueBinaryCondition(right, left, DataFlowGraphLibrary.LESS_THAN, filterOperator);
+        this.addLiteralBinaryCondition(
+            right, left, DataFlowGraphLibrary.LESS_THAN_OR_EQUAL, filterOperator);
         break;
         // Symmetric operations.
       case DataFlowGraphLibrary.EQUAL:
       case DataFlowGraphLibrary.NOT_EQUAL:
-        this.addValueBinaryCondition(right, left, operationEnum, filterOperator);
+        this.addLiteralBinaryCondition(right, left, operationEnum, filterOperator);
         break;
         // Unreachable.
       default:
         throw new IllegalArgumentException("Illegal binary value operation " + operationEnum);
     }
+  }
+
+  /*
+   * Section for adding appropriate projections to compute arithmetic expressions ahead of
+   * the filter.
+   */
+  private void projectArithmeticExpression(
+      RexCall expression, int peltonIndex, int projectOperator) {
+    String name = "_PELTON_TMP_" + (peltonIndex + 1);
+    int arithmeticEnum = -1;
+    switch (expression.getKind()) {
+      case PLUS:
+        arithmeticEnum = DataFlowGraphLibrary.PLUS;
+        break;
+      case MINUS:
+        arithmeticEnum = DataFlowGraphLibrary.MINUS;
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported arithmetic expression in filter");
+    }
+    this.projectFactory.addArithmeticProjection(
+        name, expression.getOperands(), arithmeticEnum, projectOperator);
   }
 }
