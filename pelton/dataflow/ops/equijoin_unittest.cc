@@ -434,24 +434,33 @@ TEST(EquiJoinOperatorTest, BasicRightJoinTest) {
   op->ComputeOutputSchema();
 
   std::vector<Record> expected_records;
+  expected_records.emplace_back(op->output_schema(), true, NullValue(),
+                                NullValue(), NullValue(), 100_u,
+                                std::make_unique<std::string>("descrp0"));
+  expected_records.emplace_back(op->output_schema(), false, NullValue(),
+                                NullValue(), NullValue(), 100_u,
+                                std::make_unique<std::string>("descrp0"));
   expected_records.emplace_back(
       op->output_schema(), true, 0_u, std::make_unique<std::string>("item0"),
       -5_s, 100_u, std::make_unique<std::string>("descrp0"));
 
   // Process records.
   std::vector<Record> output;
-  EXPECT_TRUE(op->Process(0, lrecords, &output));
-  EXPECT_EQ(output.size(), 0);
-  EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_IT_EQ(op->left_table_.Lookup(lrecords.at(0).GetValues({2})), lrecords);
-  EXPECT_EQ(op->right_table_.count(), 0);
   EXPECT_TRUE(op->Process(1, rrecords, &output));
-  EXPECT_EQ(op->left_table_.count(), 1);
-  EXPECT_IT_EQ(op->left_table_.Lookup(lrecords.at(0).GetValues({2})), lrecords);
+  EXPECT_EQ(op->left_table_.count(), 0);
   EXPECT_EQ(op->right_table_.count(), 1);
   EXPECT_IT_EQ(op->right_table_.Lookup(rrecords.at(0).GetValues({1})),
                rrecords);
   EXPECT_EQ(output.size(), 1);
+  EXPECT_TRUE(op->Process(0, lrecords, &output));
+  EXPECT_EQ(output.size(), 3);
+  EXPECT_EQ(op->left_table_.count(), 1);
+  EXPECT_IT_EQ(op->left_table_.Lookup(lrecords.at(0).GetValues({2})), lrecords);
+  EXPECT_EQ(op->right_table_.count(), 1);
+
+  for (const Record &record : output) {
+    LOG(INFO) << record;
+  }
   EXPECT_EQ(output, expected_records);
 }
 
