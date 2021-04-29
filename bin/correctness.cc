@@ -189,6 +189,15 @@ int main(int argc, char **argv)
     }
     std::cout << std::endl;
 
+    // Insert data into the tables.
+    std::cout << "Insert data into tables ... " << std::endl;
+    for (std::string &insert : INSERTS)
+    {
+        std::cout << std::endl;
+        CHECK(pelton::exec(&connection, insert).ok());
+    }
+    std::cout << std::endl;
+
     // Add flows.
     std::cout << "Installing flows ... " << std::endl;
     for (const auto &[name, query] : FLOWS)
@@ -199,14 +208,6 @@ int main(int argc, char **argv)
     pelton::shutdown_planner();
     std::cout << std::endl;
 
-    // Insert data into the tables.
-    std::cout << "Insert data into tables ... " << std::endl;
-    for (std::string &insert : INSERTS)
-    {
-        std::cout << std::endl;
-        CHECK(pelton::exec(&connection, insert).ok());
-    }
-    std::cout << std::endl;
 
     // Updates
     std::cout << "Update data in tables ... " << std::endl;
