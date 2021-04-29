@@ -57,7 +57,6 @@ namespace
 
     // Expected query results
     std::vector<std::vector<std::string>> EXPECTED = {};
-
     
 }; // namespace
 

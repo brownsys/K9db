@@ -16,7 +16,8 @@ cc_binary(
     ],
     data = ["//bin/data:trivial-schema.sql", "//bin/data:trivial-queries.sql", 
             "//bin/data:medical_chat_schema.sql", "//bin/data:medical_chat_queries.sql",
-            "//bin/data:medical_chat_expected.txt"],
+            "//bin/data:medical_chat_expected.txt", "//bin/data:lobster_queries.sql",
+            "//bin/data:lobster_schema_simplified.sql", "//bin/data:lobster_expected.txt"],
 )
 
 cc_binary(
