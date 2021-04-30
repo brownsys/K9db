@@ -190,8 +190,9 @@ void EquiJoinOperator::EmitRow(const Record &left, const Record &right,
     }
     if (right.IsNull(i)) {
       record.SetNull(true, j);
-    } else
+    } else {
       CopyIntoRecord(rschema.TypeOf(i), &record, right, j, i);
+    }
   }
 
   // add result record to output

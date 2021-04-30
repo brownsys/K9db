@@ -82,9 +82,10 @@ NodeIndex DataFlowGraphGenerator::AddAggregateOperator(
   return op->index();
 }
 NodeIndex DataFlowGraphGenerator::AddJoinOperator(NodeIndex left_parent,
-                                                      NodeIndex right_parent,
-                                                      ColumnID left_column,
-                                                      ColumnID right_column, JoinModeEnum mode) {
+                                                  NodeIndex right_parent,
+                                                  ColumnID left_column,
+                                                  ColumnID right_column,
+                                                  JoinModeEnum mode) {
   // Create equijoin operator.
   std::shared_ptr<EquiJoinOperator> op =
       std::make_shared<EquiJoinOperator>(left_column, right_column, mode);
