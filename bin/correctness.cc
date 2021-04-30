@@ -76,16 +76,14 @@ int main(int argc, char **argv)
         std::string table = "";
         while (std::getline(schema, line))
         {
-            // if empty line or commented, skip
+            // if line is empty or commented out, skip it
             if (line == "" || line.find("--skip--") != std::string::npos)
                 continue;
 
-            // if not empty line, process SQL
-            // append to string until find ; indicating end of
-            // CREATE TABLE statement (done to separate element in vector)
+            // append to string until ';' marking the end of a CREATE statement
             table.append(line);
 
-            // if end of create statement, push back to vector
+            // if we've reached the end of a CREATE statement, add to CREATES
             if (line.find(";") != std::string::npos)
             {
                 CREATES.push_back(table);
@@ -100,6 +98,7 @@ int main(int argc, char **argv)
     }
 
     // * process queries (input file 2)
+
     std::ifstream queries(argv[2]);
     if (queries.is_open())
     {
@@ -114,7 +113,7 @@ int main(int argc, char **argv)
                 std::istringstream iss(line);
                 for (std::string s; iss >> s;)
                     split_on_space.push_back(s);
-                // key of pair is the name of the view at index 2
+                // key of this pair is the name of the view at index 2
                 FLOWS.push_back(std::make_pair(split_on_space[2], line));
             }
             else if (line.find("INSERT") != std::string::npos)
@@ -147,22 +146,22 @@ int main(int argc, char **argv)
     if (expected.is_open())
     {
         std::cout << "expected results file open" << std::endl;
-        // vector containing results for one query
-        std::vector<std::string> query_results;
+        // vector containing result for one query
+        std::vector<std::string> expected_result;
         while (std::getline(expected, line))
         {
             if (line == "" || line.find("--skip--") != std::string::npos)
                 continue;
-            // if ; found, end of query results
+            // if ';' is found, we've reached the end of a single query's results
             if (line.find(";") != std::string::npos)
             {
-                // push_back the vector of query results (prepend | for string formatting)
-                EXPECTED.push_back(query_results);
+                // add to the 2D vector of all query results
+                EXPECTED.push_back(expected_result);
                 // clear vector
-                query_results.clear();
+                expected_result.clear();
                 continue;
             }
-            query_results.push_back(line.insert(0, 1, '|'));
+            expected_result.push_back(line);
         }
         expected.close();
     }
@@ -171,7 +170,7 @@ int main(int argc, char **argv)
         std::cout << "expected results file closed" << std::endl;
     }
 
-    // * run schema and queries in pelton
+    // * run schema and queries using pelton
 
     pelton::perf::Start("all");
 
@@ -226,7 +225,7 @@ int main(int argc, char **argv)
     }
     std::cout << std::endl;
 
-    // * check flows from pelton to expected results
+    // * compare pelton to expected results
 
     std::cout << "Check flows and queries... " << std::endl;
     // run each query
@@ -248,11 +247,9 @@ int main(int argc, char **argv)
         // vector to hold query results.
         std::vector<std::string> query_actual;
 
-
         // add records to query_results
         for (const pelton::Record &record : result)
         {
-            // reverses the order due to appending to the end?
             query_actual.push_back(tostring(record));
         }
 
@@ -262,7 +259,7 @@ int main(int argc, char **argv)
 
         if (query.find("ORDER BY") != std::string::npos)
         {
-            // order matters
+            // ordered comparison
             EXPECT_EQ(EXPECTED[i], query_actual) << "failed query was: " << query;
         }
         else
