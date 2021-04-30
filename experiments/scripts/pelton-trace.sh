@@ -1,5 +1,5 @@
 #!/bin/bash
-./experiments/bin/drop_all.sh
+./bin/drop_all.sh
 
 # Compile everything with -c opt
 bazel build -c opt ...
