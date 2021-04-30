@@ -96,8 +96,8 @@ CREATE TABLE invitations ( \
   FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE keystores ( \
-  `key` varchar(50) NOT NULL PRIMARY KEY, \
-  `value` int \
+  keyX varchar(50) NOT NULL PRIMARY KEY, \
+  valueX int \
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 CREATE TABLE messages ( \
   id int NOT NULL PRIMARY KEY, \
