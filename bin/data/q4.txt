@@ -1,0 +1,3 @@
+mykey|0
+mykey2|0
+;

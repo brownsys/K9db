@@ -67,6 +67,19 @@ int main(int argc, char **argv)
     const std::string &db_username = FLAGS_db_username;
     const std::string &db_password = FLAGS_db_password;
 
+    // set default arguments if no args provided
+    const int default_argc = 4;
+    const char *default_argv[] = {"bin/correctness.cc",
+                                  "bin/data/lobster_schema_simplified.sql",
+                                  "bin/data/lobster_queries.sql",
+                                  "bin/data/lobster_expected.txt",
+                                  "bin/data/lobster_inserts.sql"};
+    if (argc == 1)
+    {
+        argc = (int)default_argc;
+        argv = (char **)default_argv;
+    }
+
     // * process schema (input file 1)
     std::ifstream schema(argv[1]);
     std::string line;
@@ -94,10 +107,12 @@ int main(int argc, char **argv)
     }
     else
     {
-        std::cout << "schema file closed" << std::endl;
+        std::cout << "schema file is closed" << std::endl;
     }
 
     // * process queries (input file 2)
+    // int num_views = 5;
+    // int num_queries = 5;
 
     std::ifstream queries(argv[2]);
     if (queries.is_open())
@@ -109,12 +124,14 @@ int main(int argc, char **argv)
                 continue;
             if (line.find("VIEW") != std::string::npos)
             {
+                // if (num_views == 0) continue;
                 std::vector<std::string> split_on_space;
                 std::istringstream iss(line);
                 for (std::string s; iss >> s;)
                     split_on_space.push_back(s);
                 // key of this pair is the name of the view at index 2
                 FLOWS.push_back(std::make_pair(split_on_space[2], line));
+                // num_views--;
             }
             else if (line.find("INSERT") != std::string::npos)
             {
@@ -122,7 +139,9 @@ int main(int argc, char **argv)
             }
             else if (line.find("SELECT") != std::string::npos)
             {
+                // if (num_queries == 0) continue;
                 FLOW_READS_AND_QUERIES.push_back(line);
+                // num_queries--;
             }
             else if (line.find("DELETE") != std::string::npos)
             {
@@ -137,10 +156,10 @@ int main(int argc, char **argv)
     }
     else
     {
-        std::cout << "queries file closed" << std::endl;
+        std::cout << "queries file is closed" << std::endl;
     }
 
-    // * process expected results
+    // * process expected results (input file 3)
 
     std::ifstream expected(argv[3]);
     if (expected.is_open())
@@ -161,13 +180,39 @@ int main(int argc, char **argv)
                 expected_result.clear();
                 continue;
             }
+            // '|' pre- and appended to match string formatting of pelton
+            std::string format = "|";
+            line.append(format);
+            line.insert(0, 1, '|');
             expected_result.push_back(line);
         }
         expected.close();
     }
     else
     {
-        std::cout << "expected results file closed" << std::endl;
+        std::cout << "expected results file is closed" << std::endl;
+    }
+
+    // * process inserts (input file 4)
+
+    std::ifstream inserts(argv[4]);
+    if (inserts.is_open())
+    {
+        std::cout << "inserts file opened" << std::endl;
+        while (std::getline(inserts, line))
+        {
+            if (line == "" || line.find("--skip--") != std::string::npos)
+                continue;
+            if (line.find("INSERT") != std::string::npos)
+            {
+                INSERTS.push_back(line);
+            }
+        }
+        inserts.close();
+    }
+    else
+    {
+        std::cout << "inserts file is closed" << std::endl;
     }
 
     // * run schema and queries using pelton

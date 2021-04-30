@@ -280,6 +280,13 @@ std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Record &r) {
           os << "[nullptr]"
              << "|";
         }
+      case sqlast::ColumnDefinition::Type::DATETIME:
+        if (r.data_[i].str) {
+          os << *r.data_[i].str << "|";
+        } else {
+          os << "[nullptr]"
+             << "|";
+        }
         break;
       default:
         LOG(FATAL) << "Unsupported data type in record << operator";
