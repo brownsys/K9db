@@ -101,9 +101,11 @@ class Record {
   void SetUInt(uint64_t uint, size_t i);
   void SetInt(int64_t sint, size_t i);
   void SetString(std::unique_ptr<std::string> &&v, size_t i);
+  void SetDateTime(std::unique_ptr<std::string> &&v, size_t i);
   uint64_t GetUInt(size_t i) const;
   int64_t GetInt(size_t i) const;
   const std::string &GetString(size_t i) const;
+  const std::string &GetDateTime(size_t i) const;
 
   inline bool IsNull(size_t i) const {
     if (!bitmap_) return false;

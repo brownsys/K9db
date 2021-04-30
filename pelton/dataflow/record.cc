@@ -53,6 +53,10 @@ Record Record::Copy() const {
         record.data_[i].sint = this->data_[i].sint;
         break;
       case sqlast::ColumnDefinition::Type::TEXT:
+       if (this->data_[i].str) {
+          record.data_[i].str =
+              std::make_unique<std::string>(*this->data_[i].str);
+        }
       // TODO(malte): DATETIME should not be stored as a string,
       // see below
       case sqlast::ColumnDefinition::Type::DATETIME:
@@ -62,7 +66,7 @@ Record Record::Copy() const {
         }
         break;
       default:
-        LOG(FATAL) << "Unsupported data type in record copy!";
+        LOG(FATAL) << "Unsupported data type " << type << " in record copy!";
     }
   }
 
@@ -85,6 +89,11 @@ void Record::SetString(std::unique_ptr<std::string> &&v, size_t i) {
   CHECK(!IsNull(i));
   this->data_[i].str = std::move(v);
 }
+void Record::SetDateTime(std::unique_ptr<std::string> &&v, size_t i) {
+  CheckType(i, sqlast::ColumnDefinition::Type::DATETIME);
+  CHECK(!IsNull(i));
+  this->data_[i].str = std::move(v);
+}
 uint64_t Record::GetUInt(size_t i) const {
   CheckType(i, sqlast::ColumnDefinition::Type::UINT);
   CHECK(!IsNull(i));
@@ -97,6 +106,12 @@ int64_t Record::GetInt(size_t i) const {
 }
 const std::string &Record::GetString(size_t i) const {
   CheckType(i, sqlast::ColumnDefinition::Type::TEXT);
+  CHECK(!IsNull(i));
+  return *(this->data_[i].str);
+}
+
+const std::string &Record::GetDateTime(size_t i) const {
+  CheckType(i, sqlast::ColumnDefinition::Type::DATETIME);
   CHECK(!IsNull(i));
   return *(this->data_[i].str);
 }

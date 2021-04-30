@@ -76,8 +76,8 @@ int main(int argc, char **argv)
         std::string table = "";
         while (std::getline(schema, line))
         {
-            // if empty line, skip
-            if (line == "")
+            // if empty line or commented, skip
+            if (line == "" || line.find("--skip--") != std::string::npos)
                 continue;
 
             // if not empty line, process SQL
@@ -106,7 +106,7 @@ int main(int argc, char **argv)
         std::cout << "queries file opened" << std::endl;
         while (std::getline(queries, line))
         {
-            if (line == "")
+            if (line == "" || line.find("--skip--") != std::string::npos)
                 continue;
             if (line.find("VIEW") != std::string::npos)
             {
@@ -151,7 +151,7 @@ int main(int argc, char **argv)
         std::vector<std::string> query_results;
         while (std::getline(expected, line))
         {
-            if (line == "")
+            if (line == "" || line.find("--skip--") != std::string::npos)
                 continue;
             // if ; found, end of query results
             if (line.find(";") != std::string::npos)
@@ -233,6 +233,11 @@ int main(int argc, char **argv)
     long unsigned int i = 0;
     for (const auto &query : FLOW_READS_AND_QUERIES)
     {
+        // if we exceed the number of expected results
+        if (i >= EXPECTED.size())
+        {
+            break;
+        }
         std::cout << std::endl;
         auto status = pelton::exec(&connection, query);
         CHECK(status.ok());
@@ -243,8 +248,6 @@ int main(int argc, char **argv)
         // vector to hold query results.
         std::vector<std::string> query_actual;
 
-        // add schema e.g. |id(INT, KEY)|
-        query_actual.push_back(tostring(result.GetSchema()));
 
         // add records to query_results
         for (const pelton::Record &record : result)
@@ -253,12 +256,20 @@ int main(int argc, char **argv)
             query_actual.push_back(tostring(record));
         }
 
-        if (i >= EXPECTED.size())
+        // add schema e.g. |id(INT, KEY)| to actual & expected
+        query_actual.push_back(tostring(result.GetSchema()));
+        EXPECTED[i].push_back(tostring(result.GetSchema()));
+
+        if (query.find("ORDER BY") != std::string::npos)
         {
-            break;
+            // order matters
+            EXPECT_EQ(EXPECTED[i], query_actual) << "failed query was: " << query;
         }
-        // orderless comparison via google test
-        EXPECT_EQ_MSET(EXPECTED[i], query_actual, tostring(query));
+        else
+        {
+            // orderless comparison
+            EXPECT_EQ_MSET(EXPECTED[i], query_actual, tostring(query));
+        }
         i++;
     }
     std::cout << std::endl;
