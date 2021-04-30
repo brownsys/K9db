@@ -354,6 +354,14 @@ class GroupedDataT : public UntemplatedGroupedData {
                           RecordIterator{std::make_unique<R_impl>(end)}};
   }
 
+  // Count of records corresponding to a given key
+  size_t Count(const Key &key) const {
+    auto it = this->contents_.find(key);
+    if (it == this->contents_.end()) {
+      return 0;
+    }
+    return it->second.size();
+  }
   // Return an Iterable set of records from the given key that are larger than
   // a given record. Should only be used on record ordered containers.
   const_RecordIterable LookupGreater(const Key &key, const Record &cmp,

@@ -14,6 +14,7 @@ import org.bytedeco.javacpp.tools.InfoMapper;
               "pelton/dataflow/ops/filter_enum.h",
               "pelton/dataflow/ops/aggregate_enum.h",
               "pelton/dataflow/ops/project_enum.h",
+              "pelton/dataflow/ops/join_enum.h",
               "pelton/sqlast/ast_schema_enums.h",
               "pelton/dataflow/generator.h"
             },

@@ -22,15 +22,18 @@ inline void CopyIntoRecord(sqlast::ColumnDefinition::Type datatype,
   switch (datatype) {
     case sqlast::ColumnDefinition::Type::UINT:
       target->SetUInt(source.GetUInt(source_index), target_index);
+      target->SetNull(false, target_index);
       break;
     case sqlast::ColumnDefinition::Type::INT:
       target->SetInt(source.GetInt(source_index), target_index);
+      target->SetNull(false, target_index);
       break;
     case sqlast::ColumnDefinition::Type::TEXT:
       // Copies the string.
       target->SetString(
           std::make_unique<std::string>(source.GetString(source_index)),
           target_index);
+      target->SetNull(false, target_index);
       break;
     default:
       LOG(FATAL) << "Unsupported type in equijoin emit";
@@ -51,7 +54,22 @@ bool EquiJoinOperator::Process(NodeIndex source,
       // Match each record in the right table with this record.
       Key left_value = record.GetValues({this->left_id_});
       for (const Record &right : this->right_table_.Lookup(left_value)) {
+        if (this->mode_ == Mode::RIGHT) {
+          // Negate any previously emitted NULL + right records.
+          for (const Record &right_null :
+               this->emitted_nulls_.Lookup(left_value)) {
+            this->EmitRow(this->null_records_.at(0), right_null, output, false);
+          }
+          this->emitted_nulls_.Erase(left_value);
+        }
         this->EmitRow(record, right, output, record.IsPositive());
+      }
+
+      // additional check for left join
+      if (mode_ == Mode::LEFT && 0 == this->right_table_.Count(left_value)) {
+        this->EmitRow(record, this->null_records_.at(1), output,
+                      record.IsPositive());
+        this->emitted_nulls_.Insert(left_value, record);
       }
 
       // Save record in the appropriate table.
@@ -60,7 +78,22 @@ bool EquiJoinOperator::Process(NodeIndex source,
       // Match each record in the left table with this record.
       Key right_value = record.GetValues({this->right_id_});
       for (const Record &left : this->left_table_.Lookup(right_value)) {
+        if (this->mode_ == Mode::LEFT) {
+          // Negate any previously emitted Left + NULL records.
+          for (const Record &left_null :
+               this->emitted_nulls_.Lookup(right_value)) {
+            this->EmitRow(left_null, this->null_records_.at(1), output, false);
+          }
+          this->emitted_nulls_.Erase(right_value);
+        }
         this->EmitRow(left, record, output, record.IsPositive());
+      }
+
+      // additional check for right join
+      if (mode_ == Mode::RIGHT && 0 == this->left_table_.Count(right_value)) {
+        this->EmitRow(this->null_records_.at(0), record, output,
+                      record.IsPositive());
+        this->emitted_nulls_.Insert(right_value, record);
       }
 
       // save record hashed to right table
@@ -126,6 +159,12 @@ void EquiJoinOperator::ComputeOutputSchema() {
 
   // We own the joined schema.
   this->output_schema_ = SchemaFactory::Create(names, types, keys);
+
+  // Initialize left and right null records
+  this->null_records_.push_back(
+      std::move(Record::NULLRecord(this->input_schemas_.at(0))));
+  this->null_records_.push_back(
+      std::move(Record::NULLRecord(this->input_schemas_.at(1))));
 }
 
 void EquiJoinOperator::EmitRow(const Record &left, const Record &right,
@@ -136,7 +175,10 @@ void EquiJoinOperator::EmitRow(const Record &left, const Record &right,
   // Create a concatenated record, dropping key column from left side.
   Record record{this->output_schema_, positive};
   for (size_t i = 0; i < lschema.size(); i++) {
-    CopyIntoRecord(lschema.TypeOf(i), &record, left, i, i);
+    if (left.IsNull(i))
+      record.SetNull(true, i);
+    else
+      CopyIntoRecord(lschema.TypeOf(i), &record, left, i, i);
   }
   for (size_t i = 0; i < rschema.size(); i++) {
     if (i == this->right_id_) {
@@ -146,7 +188,10 @@ void EquiJoinOperator::EmitRow(const Record &left, const Record &right,
     if (i > this->right_id_) {
       j--;
     }
-    CopyIntoRecord(rschema.TypeOf(i), &record, right, j, i);
+    if (right.IsNull(i)) {
+      record.SetNull(true, j);
+    } else
+      CopyIntoRecord(rschema.TypeOf(i), &record, right, j, i);
   }
 
   // add result record to output

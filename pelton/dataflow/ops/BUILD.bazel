@@ -5,6 +5,7 @@ exports_files(
         "filter_enum.h",
         "aggregate_enum.h",
         "project_enum.h",
+        "join_enum.h",
     ],
     ["//pelton/dataflow:__subpackages__"],
 )
@@ -16,6 +17,7 @@ cc_library(
     ],
     hdrs = [
         "equijoin.h",
+        "join_enum.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [

@@ -18,6 +18,7 @@ namespace dataflow {
 
 using CType = sqlast::ColumnDefinition::Type;
 
+
 // NOLINTNEXTLINE
 void JoinOneToOne(benchmark::State& state) {
   SchemaRef leftSchema = MakeSchema(false);
