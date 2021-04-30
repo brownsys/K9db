@@ -299,8 +299,8 @@ int main(int argc, char **argv)
         }
 
         // add schema e.g. |id(INT, KEY)| to actual & expected
-        query_actual.push_back(tostring(result.GetSchema()));
-        EXPECTED[i].push_back(tostring(result.GetSchema()));
+        // query_actual.push_back(tostring(result.GetSchema()));
+        // EXPECTED[i].push_back(tostring(result.GetSchema()));
 
         if (query.find("ORDER BY") != std::string::npos)
         {
