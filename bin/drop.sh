@@ -11,4 +11,5 @@ do
   mysql -u $1 -p$2 --execute="DROP DATABASE $DATABASE;" 2>&1 | grep -v "Using a password on the command line"
 done
 
+echo "Dropped DBs!"
 exit 0

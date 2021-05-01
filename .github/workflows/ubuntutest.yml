@@ -64,6 +64,7 @@ jobs:
     - name: Run cli samples
       run: |
         ./bin/drop.sh root root
+        echo "HERE"
         bazel run bin:cli --config=valgrind -- \
             --db_username=root --db_password=root --logtostderr=1 \
             < bin/examples/simple-websubmit.sql

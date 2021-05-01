@@ -28,7 +28,7 @@ void ConnectionPool::Initialize(const std::string &username,
   this->stmt_ = std::unique_ptr<sql::Statement>(this->conn_->createStatement());
 
   // Create and use the DB.
-  this->stmt_->execute("CREATE DATABASE pelton");
+  this->stmt_->execute("CREATE DATABASE IF NOT EXISTS pelton");
   this->stmt_->execute("USE pelton");
 }
 
