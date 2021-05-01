@@ -10,6 +10,10 @@
 
 DEFINE_string(db_username, "pelton", "MYSQL username to connect with");
 DEFINE_string(db_password, "pelton", "MYSQL pwd to connect with");
+DEFINE_string(schema, "bin/data/lobster_schema_simplified.sql", "SQL schema input file");
+DEFINE_string(queries, "bin/data/lobster_queries.sql", "SQL queries input file");
+DEFINE_string(inserts, "bin/data/lobster_inserts.sql", "SQL insert statement input file");
+DEFINE_string(expected_output, "bin/data/lobster_expected.txt", "File containing expected output");
 
 namespace
 {
@@ -67,21 +71,8 @@ int main(int argc, char **argv)
     const std::string &db_username = FLAGS_db_username;
     const std::string &db_password = FLAGS_db_password;
 
-    // set default arguments if no args provided
-    const int default_argc = 4;
-    const char *default_argv[] = {"bin/correctness.cc",
-                                  "bin/data/lobster_schema_simplified.sql",
-                                  "bin/data/lobster_queries.sql",
-                                  "bin/data/lobster_expected.txt",
-                                  "bin/data/lobster_inserts.sql"};
-    if (argc == 1)
-    {
-        argc = (int)default_argc;
-        argv = (char **)default_argv;
-    }
-
     // * process schema (input file 1)
-    std::ifstream schema(argv[1]);
+    std::ifstream schema(FLAGS_schema);
     std::string line;
     if (schema.is_open())
     {
@@ -114,7 +105,7 @@ int main(int argc, char **argv)
     // int num_views = 5;
     // int num_queries = 5;
 
-    std::ifstream queries(argv[2]);
+    std::ifstream queries(FLAGS_queries);
     if (queries.is_open())
     {
         std::cout << "queries file opened" << std::endl;
@@ -161,7 +152,7 @@ int main(int argc, char **argv)
 
     // * process expected results (input file 3)
 
-    std::ifstream expected(argv[3]);
+    std::ifstream expected(FLAGS_expected_output);
     if (expected.is_open())
     {
         std::cout << "expected results file open" << std::endl;
@@ -195,7 +186,7 @@ int main(int argc, char **argv)
 
     // * process inserts (input file 4)
 
-    std::ifstream inserts(argv[4]);
+    std::ifstream inserts(FLAGS_inserts);
     if (inserts.is_open())
     {
         std::cout << "inserts file opened" << std::endl;
