@@ -26,6 +26,10 @@ void ConnectionPool::Initialize(const std::string &username,
   this->conn_ =
       std::unique_ptr<sql::Connection>(driver->connect(connection_properties));
   this->stmt_ = std::unique_ptr<sql::Statement>(this->conn_->createStatement());
+
+  // Create and use the DB.
+  this->stmt_->execute("CREATE DATABASE pelton");
+  this->stmt_->execute("USE pelton");
 }
 
 // Execution of SQL statements.
@@ -81,7 +85,8 @@ mysql::SqlResult ConnectionPool::ExecuteShards(
 // Removing a shard is equivalent to deleting its database.
 void ConnectionPool::RemoveShard(const std::string &shard_name) {
   LOG(INFO) << "Remove Shard: " << shard_name;
-  this->stmt_->execute("DROP DATABASE " + shard_name);
+  // TODO(babman): find a better way of dropping.
+  // this->stmt_->execute("DROP DATABASE " + shard_name);
 }
 
 // Actual SQL statement execution.
@@ -89,12 +94,6 @@ mysql::SqlResult ConnectionPool::ExecuteMySQL(
     const sqlast::AbstractStatement *stmt, const dataflow::SchemaRef &schema,
     const std::string &shard_name, int aug_index,
     const std::string &aug_value) {
-  // Create database if it does not exist.
-  if (this->databases_.count(shard_name) == 0) {
-    this->stmt_->execute("CREATE DATABASE " + shard_name);
-    this->databases_.insert(shard_name);
-  }
-
   std::string sql = sqlast::Stringifier(shard_name).Visit(stmt);
   LOG(INFO) << "Statement:" << sql;
 
@@ -102,15 +101,7 @@ mysql::SqlResult ConnectionPool::ExecuteMySQL(
     case sqlast::AbstractStatement::Type::CREATE_TABLE:
     case sqlast::AbstractStatement::Type::CREATE_INDEX: {
       perf::Start("MySQL");
-      if (this->shard_in_use_ == shard_name) {
-        this->stmt_->execute(sql);
-      } else {
-        LOG(INFO) << "USE DB";
-        this->shard_in_use_ = shard_name;
-        this->stmt_->execute("USE " + shard_name + "; " + sql);
-        this->stmt_->getMoreResults();
-        this->stmt_->getMoreResults();
-      }
+      this->stmt_->execute(sql);
       perf::End("MySQL");
       return mysql::SqlResult(std::make_unique<mysql::StatementResult>(true));
     }

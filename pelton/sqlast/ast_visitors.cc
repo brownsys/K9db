@@ -26,7 +26,8 @@ std::string Dequote(const std::string &st) {
 // Stringifier.
 std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
   perf::Start("Stringify (create)");
-  std::string result = "CREATE TABLE " + ast.table_name() + " (";
+  std::string result =
+      "CREATE TABLE " + this->shard_prefix_ + ast.table_name() + " (";
   bool first = true;
   for (const std::string &col : ast.VisitChildren(this)) {
     if (!first) {
@@ -64,7 +65,8 @@ std::string Stringifier::VisitColumnConstraint(const ColumnConstraint &ast) {
 
 std::string Stringifier::VisitCreateIndex(const CreateIndex &ast) {
   perf::Start("Stringify (create index)");
-  std::string result = "CREATE INDEX " + ast.index_name() + " ON " +
+  std::string result = "CREATE INDEX " + this->shard_prefix_ +
+                       ast.index_name() + " ON " + this->shard_prefix_ +
                        ast.table_name() + "(" + ast.column_name() + ")";
   perf::End("Stringify (create index)");
   return result;

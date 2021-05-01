@@ -36,7 +36,7 @@ std::vector<std::string> CREATES{
     "FOREIGN KEY (assignment_id) REFERENCES assignments(ID)"
     ");",
     // Submissions index.
-    "CREATE INDEX submissions_ass_id_index ON submissions(assignment_id);"};
+    "CREATE INDEX sind ON submissions(assignment_id);"};
 
 // Inserts.
 std::vector<std::string> INSERTS{

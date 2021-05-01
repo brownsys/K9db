@@ -57,8 +57,6 @@ class ConnectionPool {
   // Connection management.
   std::unique_ptr<sql::Connection> conn_;
   std::unique_ptr<sql::Statement> stmt_;
-  std::unordered_set<std::string> databases_;
-  std::string shard_in_use_;
 };
 
 }  // namespace shards
