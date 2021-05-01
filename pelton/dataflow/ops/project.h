@@ -124,7 +124,7 @@ class ProjectOperator : public Operator {
     // Checks.
     bool column() const { return this->meta_ == Metadata::COLUMN; }
     bool literal() const { return this->meta_ == Metadata::LITERAL; }
-    bool arithemtic() const { return this->meta_ != Operation::NONE; }
+    bool arithemtic() const { return this->op_ != Operation::NONE; }
     bool left_column() const {
       return this->meta_ == Metadata::ARITHMETIC_WITH_COLUMN ||
              this->meta_ == Metadata::ARITHMETIC_WITH_LITERAL_LEFT;
