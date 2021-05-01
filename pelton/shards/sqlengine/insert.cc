@@ -40,16 +40,13 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Insert &stmt,
 
   // Shard the insert statement so it is executable against the physical
   // sharded database.
-  sqlast::Stringifier stringifier;
   mysql::SqlResult result;
 
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
     // The insertion statement is unmodified.
-    std::string insert_str = stmt.Visit(&stringifier);
-    result = state->connection_pool().ExecuteDefault(
-        ConnectionPool::Operation::UPDATE, insert_str);
+    result = state->connection_pool().ExecuteDefault(&stmt);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded!
@@ -70,20 +67,18 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Insert &stmt,
       // TODO(babman): better to do this after user insert rather than user data
       //               insert.
       if (!state->ShardExists(info.shard_kind, user_id)) {
-        for (auto create_stmt : state->CreateShard(info.shard_kind, user_id)) {
-          mysql::SqlResult tmp = state->connection_pool().ExecuteShard(
-              ConnectionPool::Operation::STATEMENT, create_stmt, info, user_id);
+        for (auto *create_stmt : state->CreateShard(info.shard_kind, user_id)) {
+          mysql::SqlResult tmp =
+              state->connection_pool().ExecuteShard(create_stmt, info, user_id);
           if (!tmp.IsStatement() || !tmp.Success()) {
-            return absl::InternalError("Could not created sharded table " +
-                                       create_stmt);
+            return absl::InternalError("Could not created sharded table");
           }
         }
       }
 
       // Add the modified insert statement.
-      std::string insert_str = cloned.Visit(&stringifier);
-      result.Append(state->connection_pool().ExecuteShard(
-          ConnectionPool::Operation::UPDATE, insert_str, info, user_id));
+      result.Append(
+          state->connection_pool().ExecuteShard(&cloned, info, user_id));
     }
   }
 

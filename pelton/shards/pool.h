@@ -12,14 +12,13 @@
 #include "mysql-cppconn-8/jdbc/mysql_connection.h"
 #include "pelton/mysql/result.h"
 #include "pelton/shards/types.h"
+#include "pelton/sqlast/ast.h"
 
 namespace pelton {
 namespace shards {
 
 class ConnectionPool {
  public:
-  enum class Operation { STATEMENT, UPDATE, QUERY };
-
   ConnectionPool() = default;
 
   // Not copyable or movable.
@@ -32,16 +31,16 @@ class ConnectionPool {
   void Initialize(const std::string &username, const std::string &password);
 
   // Execute statement against the default un-sharded database.
-  mysql::SqlResult ExecuteDefault(Operation op, const std::string &sql,
+  mysql::SqlResult ExecuteDefault(const sqlast::AbstractStatement *sql,
                                   const dataflow::SchemaRef &schema = {});
 
   // Execute statement against given user shard(s).
-  mysql::SqlResult ExecuteShard(Operation op, const std::string &sql,
+  mysql::SqlResult ExecuteShard(const sqlast::AbstractStatement *sql,
                                 const ShardingInformation &info,
                                 const UserId &user_id,
                                 const dataflow::SchemaRef &schema = {});
 
-  mysql::SqlResult ExecuteShards(Operation op, const std::string &sql,
+  mysql::SqlResult ExecuteShards(const sqlast::AbstractStatement *sql,
                                  const ShardingInformation &info,
                                  const std::unordered_set<UserId> &user_ids,
                                  const dataflow::SchemaRef &schema = {});
@@ -49,8 +48,7 @@ class ConnectionPool {
   void RemoveShard(const std::string &shard_name);
 
  private:
-  mysql::SqlResult ExecuteMySQL(ConnectionPool::Operation op,
-                                const std::string &sql,
+  mysql::SqlResult ExecuteMySQL(const sqlast::AbstractStatement *sql,
                                 const dataflow::SchemaRef &schema,
                                 const std::string &shard_name = "default_db",
                                 int aug_index = -1,
@@ -60,6 +58,7 @@ class ConnectionPool {
   std::unique_ptr<sql::Connection> conn_;
   std::unique_ptr<sql::Statement> stmt_;
   std::unordered_set<std::string> databases_;
+  std::string shard_in_use_;
 };
 
 }  // namespace shards

@@ -57,14 +57,14 @@ class SharderState {
   void AddShardKind(const ShardKind &kind, const ColumnName &pk);
 
   void AddUnshardedTable(const UnshardedTableName &table,
-                         const CreateStatement &create_str);
+                         const sqlast::CreateTable &create);
 
   void AddShardedTable(const UnshardedTableName &table,
                        const ShardingInformation &sharding_information,
-                       const CreateStatement &sharded_create_statement);
+                       const sqlast::CreateTable &sharded_create_statement);
 
-  std::list<CreateStatement> CreateShard(const ShardKind &shard_kind,
-                                         const UserId &user);
+  std::list<const sqlast::AbstractStatement *> CreateShard(
+      const ShardKind &shard_kind, const UserId &user);
 
   void RemoveUserFromShard(const ShardKind &kind, const UserId &user_id);
 
@@ -103,7 +103,7 @@ class SharderState {
                    const UnshardedTableName &table_name,
                    const ColumnName &column_name, const ColumnName &shard_by,
                    const FlowName &flow_name,
-                   const std::string &create_index_stmt);
+                   const sqlast::CreateIndex &create_index_stmt);
 
   // Save state to durable file.
   void Save(const std::string &dir_path);
@@ -146,13 +146,13 @@ class SharderState {
   // This can be used to create that table in a new shard.
   // The schema matches what is stored physically in the DB after
   // sharding and other transformations.
-  std::unordered_map<ShardedTableName, CreateStatement> sharded_schema_;
+  std::unordered_map<ShardedTableName, sqlast::CreateTable> sharded_schema_;
 
   // Connection pool that manages the underlying sqlite3 databases.
   ConnectionPool connection_pool_;
 
   // Secondary indices.
-  std::unordered_map<ShardKind, std::vector<std::string>> create_index_;
+  std::unordered_map<ShardKind, std::vector<sqlast::CreateIndex>> create_index_;
 
   // All columns in a table that have an index.
   std::unordered_map<UnshardedTableName, std::unordered_set<ColumnName>>

@@ -33,14 +33,14 @@ void SharderState::AddShardKind(const ShardKind &kind, const ColumnName &pk) {
 }
 
 void SharderState::AddUnshardedTable(const UnshardedTableName &table,
-                                     const CreateStatement &create_str) {
-  this->sharded_schema_.insert({table, create_str});
+                                     const sqlast::CreateTable &create) {
+  this->sharded_schema_.insert({table, create});
 }
 
 void SharderState::AddShardedTable(
     const UnshardedTableName &table,
     const ShardingInformation &sharding_information,
-    const CreateStatement &sharded_create_statement) {
+    const sqlast::CreateTable &sharded_create_statement) {
   // Record that the shard kind contains this sharded table.
   this->kind_to_tables_.at(sharding_information.shard_kind)
       .push_back(sharding_information.sharded_table_name);
@@ -51,19 +51,18 @@ void SharderState::AddShardedTable(
       {sharding_information.sharded_table_name, sharded_create_statement});
 }
 
-std::list<CreateStatement> SharderState::CreateShard(
+std::list<const sqlast::AbstractStatement *> SharderState::CreateShard(
     const ShardKind &shard_kind, const UserId &user) {
   // Mark shard for this user as created!
   this->shards_.at(shard_kind).insert(user);
   // Return the create table statements.
-  std::list<CreateStatement> result;
+  std::list<const sqlast::AbstractStatement *> result;
   for (const ShardedTableName &table : this->kind_to_tables_.at(shard_kind)) {
-    result.push_back(this->sharded_schema_.at(table));
+    result.push_back(&this->sharded_schema_.at(table));
   }
-  if (this->create_index_.count(shard_kind) > 0) {
-    for (const std::string &create_index : this->create_index_.at(shard_kind)) {
-      result.push_back(create_index);
-    }
+  for (const sqlast::CreateIndex &create_index :
+       this->create_index_[shard_kind]) {
+    result.push_back(&create_index);
   }
   return result;
 }
@@ -144,7 +143,7 @@ void SharderState::CreateIndex(const ShardKind &shard_kind,
                                const ColumnName &column_name,
                                const ColumnName &shard_by,
                                const FlowName &flow_name,
-                               const std::string &create_index_stmt) {
+                               const sqlast::CreateIndex &create_index_stmt) {
   this->indices_[table_name].insert(column_name);
   this->index_to_flow_[table_name][column_name][shard_by] = flow_name;
   this->create_index_[shard_kind].push_back(create_index_stmt);
