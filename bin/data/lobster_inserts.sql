@@ -4,6 +4,7 @@ INSERT INTO users VALUES (2, 'james', 'james@gmail.com', 'super_secure_password3
 INSERT INTO comments VALUES (0, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 'comment0', 0, 0, 0, 0, 'comment', 0, 0, 0, 'markeddown', 0, 0, 0, 0);
 INSERT INTO comments VALUES (1, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 'comment1', 1, 1, 0, 0, 'comment', 0, 0, 0, 'markeddown', 0, 0, 0, 0);
 INSERT INTO comments VALUES (2, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 'comment2', 2, 2, 0, 0, 'comment', 0, 0, 0, 'markeddown', 0, 0, 0, 0);
+INSERT INTO comments VALUES (3, '2021-04-21 01:00:00', '2021-04-21 01:00:00', '', 0, 2, 5, 5, 'comment', 5, 5, 5, 'markeddown', 5, 5, 5, 5);
 INSERT INTO hat_requests VALUES (0, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 0, 'myhat', 'mylink', 'mycomment');
 INSERT INTO hat_requests VALUES (1, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 1, 'myhat', 'mylink', 'mycomment');
 INSERT INTO hats VALUES (0, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 0, 0, 'myhat', 'mylink', 0, '2021-04-21 01:00:00');
