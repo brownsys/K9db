@@ -2,15 +2,15 @@
 
 ## TLDR;
 
-`bazel run //bin:correctness` runs a bunch of tests!
+`bazel run //bin:correctness` runs ~35 lobster test queries!
 
 ## Run individual queries
 
-`bazel run //bin:correctness -- <schema.sql> <query.sql> <expected_result> <inserts.sql>`
+`bazel run //bin:correctness -- --schema=<schema.sql> --queries=<query.sql> expected_output=<expected_result> inserts=<inserts.sql>`
 
 - For example:
 
-`bazel run //bin:correctness -- bin/data/lobster_schema_simplified.sql bin/data/lobster_q1.sql bin/data/q1.txt bin/data/lobster_inserts.sql`
+`bazel run //bin:correctness -- --schema=bin/data/lobster_schema_simplified.sql queries=bin/data/lobster_q1.sql expected_output=bin/data/q1.txt inserts=bin/data/lobster_inserts.sql`
 
 ## Add custom tests
 
@@ -26,4 +26,4 @@
 3. Run `correctness.cc`, passing the files containing the schema, queries, and expected results as command line arguments. Running `drop.sh` may be helpful for removing databases from previous runs.
 
 - For example:  
-   `./bin/drop.sh pelton pelton && bazel run //bin:correctness -- bin/data/medical_chat_schema.sql bin/data/medical_chat_queries.sql bin/data/medical_chat_expected.txt`
+   `./bin/drop.sh pelton pelton && bazel run //bin:correctness -- --schema=bin/data/medical_chat_schema.sql --bin/data/medical_chat_queries.sql --bin/data/medical_chat_expected.txt`

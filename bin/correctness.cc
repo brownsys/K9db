@@ -102,9 +102,6 @@ int main(int argc, char **argv)
     }
 
     // * process queries (input file 2)
-    // int num_views = 5;
-    // int num_queries = 5;
-
     std::ifstream queries(FLAGS_queries);
     if (queries.is_open())
     {
@@ -115,14 +112,12 @@ int main(int argc, char **argv)
                 continue;
             if (line.find("VIEW") != std::string::npos)
             {
-                // if (num_views == 0) continue;
                 std::vector<std::string> split_on_space;
                 std::istringstream iss(line);
                 for (std::string s; iss >> s;)
                     split_on_space.push_back(s);
                 // key of this pair is the name of the view at index 2
                 FLOWS.push_back(std::make_pair(split_on_space[2], line));
-                // num_views--;
             }
             else if (line.find("INSERT") != std::string::npos)
             {
@@ -130,9 +125,7 @@ int main(int argc, char **argv)
             }
             else if (line.find("SELECT") != std::string::npos)
             {
-                // if (num_queries == 0) continue;
                 FLOW_READS_AND_QUERIES.push_back(line);
-                // num_queries--;
             }
             else if (line.find("DELETE") != std::string::npos)
             {
@@ -272,6 +265,9 @@ int main(int argc, char **argv)
         if (i >= EXPECTED.size())
         {
             break;
+        }
+        if (EXPECTED.size() == 0) {
+            std::cout << "No expected results provided!" << std::endl;
         }
         std::cout << std::endl;
         auto status = pelton::exec(&connection, query);
