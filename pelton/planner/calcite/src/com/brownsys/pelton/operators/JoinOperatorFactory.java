@@ -45,9 +45,9 @@ public class JoinOperatorFactory {
     assert rightCondition instanceof RexInputRef;
 
     int leftCalciteIndex = ((RexInputRef) leftCondition).getIndex();
-    int rightClaciteIndex = ((RexInputRef) rightCondition).getIndex();
+    int rightCalciteIndex = ((RexInputRef) rightCondition).getIndex();
     int leftPeltonIndex = this.context.getPeltonIndex(leftCalciteIndex);
-    int rightPeltonIndex = this.context.getPeltonIndex(rightClaciteIndex);
+    int rightPeltonIndex = this.context.getPeltonIndex(rightCalciteIndex);
     this.context.setDuplicate(rightPeltonIndex, leftPeltonIndex);
     rightPeltonIndex -= leftPeltonCount;
 
