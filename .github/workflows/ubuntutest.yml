@@ -57,4 +57,3 @@ jobs:
       run: |
         docker exec pelton-testing sh -c "cd /home/pelton && $CLEANUP"
         docker exec pelton-testing sh -c "cd /home/pelton && $SOCIAL"
-        docker exec pelton-testing sh -c "cd /home/pelton && $SOCIALCNTD"
