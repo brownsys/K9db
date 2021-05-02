@@ -99,7 +99,8 @@ class MutableVisitor {
 // Turns ASTs to strings.
 class Stringifier : public AbstractVisitor<std::string> {
  public:
-  explicit Stringifier(const std::string shard_name) : shard_prefix_() {
+  explicit Stringifier(const std::string shard_name)
+      : shard_prefix_(), supports_foreign_keys_(false) {
     if (shard_name.size() > 0) {
       shard_prefix_ = shard_name + "_";
     }
@@ -119,6 +120,7 @@ class Stringifier : public AbstractVisitor<std::string> {
 
  private:
   std::string shard_prefix_;
+  bool supports_foreign_keys_;
 };
 
 // Finds the value assigned to a specified column anywhere in this expression.

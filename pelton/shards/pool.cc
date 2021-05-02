@@ -5,8 +5,6 @@
 #include <utility>
 
 #include "glog/logging.h"
-#include "mysql-cppconn-8/jdbc/cppconn/resultset.h"
-#include "mysql-cppconn-8/jdbc/mysql_driver.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/perf.h"
 
@@ -20,9 +18,9 @@ void ConnectionPool::Initialize(const std::string &username,
   connection_properties["hostName"] = "localhost";
   connection_properties["userName"] = username;
   connection_properties["password"] = password;
-  connection_properties["CLIENT_MULTI_STATEMENTS"] = true;
+  // connection_properties["CLIENT_MULTI_STATEMENTS"] = true;
 
-  sql::Driver *driver = sql::mysql::get_driver_instance();
+  sql::Driver *driver = sql::mariadb::get_driver_instance();
   this->conn_ =
       std::unique_ptr<sql::Connection>(driver->connect(connection_properties));
   this->stmt_ = std::unique_ptr<sql::Statement>(this->conn_->createStatement());
@@ -30,6 +28,9 @@ void ConnectionPool::Initialize(const std::string &username,
   // Create and use the DB.
   this->stmt_->execute("CREATE DATABASE IF NOT EXISTS pelton");
   this->stmt_->execute("USE pelton");
+  // this->stmt_->execute("SET GLOBAL table_open_cache=50000");
+  // this->stmt_->execute("SET GLOBAL schema_definition_cache=10000");
+  // this->stmt_->execute("SET GLOBAL table_definition_cache=10000");
 }
 
 // Execution of SQL statements.

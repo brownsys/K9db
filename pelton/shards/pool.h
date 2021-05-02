@@ -8,8 +8,7 @@
 #include <unordered_set>
 
 #include "absl/status/status.h"
-#include "mysql-cppconn-8/jdbc/cppconn/statement.h"
-#include "mysql-cppconn-8/jdbc/mysql_connection.h"
+#include "mariadb/conncpp.hpp"
 #include "pelton/mysql/result.h"
 #include "pelton/shards/types.h"
 #include "pelton/sqlast/ast.h"

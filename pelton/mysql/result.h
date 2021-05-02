@@ -7,10 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include "mysql-cppconn-8/jdbc/cppconn/resultset.h"
-// TODO(babmen): fix this.
-#undef PRAGMA
-
+#include "mariadb/conncpp.hpp"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 

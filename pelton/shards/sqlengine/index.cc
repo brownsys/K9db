@@ -57,7 +57,7 @@ absl::Status CreateIndex(const sqlast::CreateIndex &stmt, SharderState *state,
 
       // Store the index metadata.
       state->CreateIndex(info.shard_kind, table_name, column_name,
-                         info.shard_by, index_name, create_index);
+                         info.shard_by, index_name, create_index, unique);
     }
   }
 

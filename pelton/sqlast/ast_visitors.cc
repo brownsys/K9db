@@ -37,7 +37,7 @@ std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
     result += col;
   }
   result += ")";
-  result += " ENGINE MEMORY";
+  result += " ENGINE ROCKSDB";
   perf::End("Stringify (create)");
   return result;
 }
@@ -57,9 +57,13 @@ std::string Stringifier::VisitColumnConstraint(const ColumnConstraint &ast) {
       return "UNIQUE";
     case ColumnConstraint::Type::NOT_NULL:
       return "NOT NULL";
-    default:
-      return "REFERENCES " + ast.foreign_table() + "(" + ast.foreign_column() +
-             ")";
+    case ColumnConstraint::Type::FOREIGN_KEY:
+      if (this->supports_foreign_keys_) {
+        return "REFERENCES " + ast.foreign_table() + "(" +
+               ast.foreign_column() + ")";
+      } else {
+        return "";
+      }
   }
 }
 

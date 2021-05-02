@@ -143,10 +143,13 @@ void SharderState::CreateIndex(const ShardKind &shard_kind,
                                const ColumnName &column_name,
                                const ColumnName &shard_by,
                                const FlowName &flow_name,
-                               const sqlast::CreateIndex &create_index_stmt) {
+                               const sqlast::CreateIndex &create_index_stmt,
+                               bool unique) {
   this->indices_[table_name].insert(column_name);
   this->index_to_flow_[table_name][column_name][shard_by] = flow_name;
-  this->create_index_[shard_kind].push_back(create_index_stmt);
+  if (!unique) {
+    this->create_index_[shard_kind].push_back(create_index_stmt);
+  }
 }
 
 }  // namespace shards

@@ -89,7 +89,7 @@ if [[ "$1" == "" ]]; then
   echo ""
 
 else
-  ./bin/drop.sh root password | grep -v "Using a password on the command line"
+  ./bin/drop.sh root password
 
   # Compile everything with -c opt
   bazel build -c opt ...
