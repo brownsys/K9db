@@ -9,8 +9,8 @@ namespace pelton {
 namespace mysql {
 
 // Checks the type of a value in a result set.
-bool IsStringType(sql::ResultSet *result, size_t col_index) {
-  int type = result->getMetaData()->getColumnType(col_index);
+bool IsStringType(sql::ResultSetMetaData *meta, size_t col_index) {
+  int type = meta->getColumnType(col_index);
   return type == sql::DataType::VARCHAR || type == sql::DataType::CHAR ||
          type == sql::DataType::LONGVARCHAR || type == sql::DataType::NCHAR ||
          type == sql::DataType::NVARCHAR || type == sql::DataType::LONGNVARCHAR;
@@ -19,6 +19,7 @@ bool IsStringType(sql::ResultSet *result, size_t col_index) {
 // Transform a mysql value to one compatible with our record format.
 void MySqlValueIntoRecord(sql::ResultSet *result, size_t col_index,
                           size_t target_index, dataflow::Record *record) {
+  std::unique_ptr<sql::ResultSetMetaData> meta{result->getMetaData()};
   switch (record->schema().TypeOf(target_index)) {
     case sqlast::ColumnDefinition::Type::TEXT: {
       sql::SQLString sql_val = result->getString(col_index);
@@ -27,7 +28,7 @@ void MySqlValueIntoRecord(sql::ResultSet *result, size_t col_index,
       break;
     }
     case sqlast::ColumnDefinition::Type::INT: {
-      if (IsStringType(result, col_index)) {
+      if (IsStringType(meta.get(), col_index)) {
         sql::SQLString sql_val = result->getString(col_index);
         std::string val{sql_val.begin(), sql_val.end()};
         record->SetValue(val, target_index);
@@ -37,7 +38,7 @@ void MySqlValueIntoRecord(sql::ResultSet *result, size_t col_index,
       break;
     }
     case sqlast::ColumnDefinition::Type::UINT: {
-      if (IsStringType(result, col_index)) {
+      if (IsStringType(meta.get(), col_index)) {
         sql::SQLString sql_val = result->getString(col_index);
         std::string val{sql_val.begin(), sql_val.end()};
         record->SetValue(val, target_index);

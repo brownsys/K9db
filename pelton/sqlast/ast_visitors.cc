@@ -64,6 +64,8 @@ std::string Stringifier::VisitColumnConstraint(const ColumnConstraint &ast) {
       } else {
         return "";
       }
+    default:
+      assert(false);
   }
 }
 

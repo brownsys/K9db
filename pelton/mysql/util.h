@@ -9,7 +9,7 @@ namespace pelton {
 namespace mysql {
 
 // Checks the type of a value in a result set.
-bool IsStringType(sql::ResultSet *result, size_t col_index);
+bool IsStringType(sql::ResultSetMetaData *meta, size_t col_index);
 
 // Transform a mysql value to one compatible with our record format.
 void MySqlValueIntoRecord(sql::ResultSet *result, size_t col_index,
