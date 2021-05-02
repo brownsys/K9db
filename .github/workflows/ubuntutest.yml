@@ -34,7 +34,7 @@ jobs:
 
     - name: Run end-2-end sample
       env:
-        TEST: bazel run bin:example -- --db_username=root --db_password=root --logtostderr=1
+        TEST: bazel run bin:example -- --logtostderr=1
       run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
 
 
