@@ -8,9 +8,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG C.UTF-8
 ENV PATH /usr/local/bin:$PATH
 
-# Copy pelton directory
-COPY . /home/pelton
-
 # Install dependencies
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     apt-utils libssl-dev lsb-release openssl vim git python3 python3-pip \
@@ -39,7 +36,25 @@ RUN apt-get remove -y --purge mysql*
 RUN apt-get install -y mariadb-server
 RUN apt-get install -y mariadb-plugin-rocksdb
 RUN echo "[mariadb]" >> /etc/mysql/mariadb.cnf \
-    && echo "plugin_load_add = ha_rocksdb" >> /etc/mysql/mariadb.cnf
+    && echo "plugin_load_add = ha_rocksdb" >> /etc/mysql/mariadb.cnf \
+    && echo "[mysqld]" >> /etc/mysql/mariadb.cnf \
+    && echo "table_open_cache_instances = 1" >> /etc/mysql/mariadb.cnf \
+    && echo "table_open_cache = 1000000" >> /etc/mysql/mariadb.cnf \
+    && echo "table_definition_cache = 1000000" >> /etc/mysql/mariadb.cnf \
+    && echo "open_files_limit = 1000000" >> /etc/mysql/mariadb.cnf
+
+RUN echo "* hard nofile 1024000" >> /etc/security/limits.conf \
+    && echo "* soft nofile 1024000" >> /etc/security/limits.conf \
+    && echo "mysql hard nofile 1024000" >> /etc/security/limits.conf \
+    && echo "mysql soft nofile 1024000" >> /etc/security/limits.conf \
+    && echo "root hard nofile 1024000" >> /etc/security/limits.conf \
+    && echo "root soft nofile 1024000" >> /etc/security/limits.conf
+
+RUN echo "* soft nofile 1024000" >> /etc/security/limits.d/90-nproc.conf \
+    && echo "* hard nofile 1024000" >> /etc/security/limits.d/90-nproc.conf \
+    && echo "* soft nproc 10240" >> /etc/security/limits.d/90-nproc.conf \
+    && echo "* hard nproc 10240" >> /etc/security/limits.d/90-nproc.conf \
+    && echo "root soft nproc unlimited" >> /etc/security/limits.d/90-nproc.conf
 
 # install mariadb connector
 RUN apt-get install -y libmariadb3 libmariadb-dev
@@ -75,4 +90,8 @@ RUN rm -rf /tmp/*
 RUN cp /home/pelton/docker/configure_db.sql /home/configure_db.sql
 RUN cp /home/pelton/docker/configure_db.sh /home/configure_db.sh
 RUN chmod 750 /home/configure_db.sh
+
+# Copy pelton directory
+COPY . /home/pelton
+
 ENTRYPOINT ["/bin/bash", "./home/configure_db.sh"]
