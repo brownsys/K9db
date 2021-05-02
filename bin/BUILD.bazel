@@ -32,7 +32,7 @@ cc_binary(
         "mysql.cc",
     ],
     linkopts = [
-        "-lmysqlcppconn",
+        "-lmariadbcpp",
     ],
     deps = [
         "//pelton/util:perf",

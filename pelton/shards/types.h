@@ -33,10 +33,6 @@ using ColumnName = std::string;
 
 using ColumnIndex = size_t;
 
-// Valid SQL CreateTable statement formatted and ready to use to create
-// some table.
-using CreateStatement = std::string;
-
 // Contains the details of how a given table is sharded.
 struct ShardingInformation {
   // Which shard does this belong to (e.g. User, Doctor, Patient, etc)

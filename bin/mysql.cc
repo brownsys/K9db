@@ -1,18 +1,10 @@
-#include <sqlite3.h>
-
 #include <iostream>
 #include <limits>
 #include <string>
 
 #include "gflags/gflags.h"
 #include "glog/logging.h"
-#include "mysql-cppconn-8/jdbc/cppconn/datatype.h"
-#include "mysql-cppconn-8/jdbc/cppconn/resultset.h"
-#include "mysql-cppconn-8/jdbc/cppconn/resultset_metadata.h"
-#include "mysql-cppconn-8/jdbc/cppconn/sqlstring.h"
-#include "mysql-cppconn-8/jdbc/cppconn/statement.h"
-#include "mysql-cppconn-8/jdbc/mysql_connection.h"
-#include "mysql-cppconn-8/jdbc/mysql_driver.h"
+#include "mariadb/conncpp.hpp"
 #include "pelton/util/perf.h"
 
 void PrintHeader(bool print, sql::ResultSet *result) {
@@ -34,15 +26,18 @@ void PrintData(bool print, sql::ResultSet *result) {
     for (size_t i = 1; i <= result->getMetaData()->getColumnCount(); i++) {
       switch (result->getMetaData()->getColumnType(i)) {
         case sql::DataType::VARCHAR:
+        case sql::DataType::NVARCHAR:
         case sql::DataType::CHAR:
+        case sql::DataType::NCHAR:
         case sql::DataType::LONGVARCHAR:
+        case sql::DataType::LONGNVARCHAR:
           if (print) {
             std::cout << "| " << result->getString(i) << " ";
           }
           break;
         case sql::DataType::TINYINT:
         case sql::DataType::SMALLINT:
-        case sql::DataType::MEDIUMINT:
+        case sql::DataType::BIGINT:
         case sql::DataType::INTEGER:
           if (print) {
             std::cout << "| " << result->getInt(i) << " ";
@@ -113,7 +108,7 @@ int main(int argc, char **argv) {
 
   // Initialize our sharded state/connection.
   try {
-    sql::Driver *driver = sql::mysql::get_driver_instance();
+    sql::Driver *driver = sql::mariadb::get_driver_instance();
     std::unique_ptr<sql::Connection> con{
         driver->connect("localhost", db_username, db_password)};
 

@@ -101,21 +101,27 @@ void SharderState::Load(const std::string &dir_path) {
   // Read sharded_schema_.
   getline(state_file, line);
   while (line != "") {
-    std::string create_statement;
-    getline(state_file, create_statement);
-    this->sharded_schema_.insert({line, create_statement});
+    std::string serialized_create_statement;
+    getline(state_file, serialized_create_statement);
+    sqlast::SQLParser parser;
+    auto ptr = std::move(parser.Parse(serialized_create_statement).value());
+    sqlast::CreateTable *stmt = static_cast<sqlast::CreateTable *>(ptr.get());
+    this->sharded_schema_.insert({line, *stmt});
     getline(state_file, line);
   }
 
   // Read all create index statements.
   getline(state_file, line);
   while (line != "") {
-    std::string create_index;
-    getline(state_file, create_index);
-    while (create_index != "") {
+    std::string serialized_create_index;
+    getline(state_file, serialized_create_index);
+    while (serialized_create_index != "") {
+      sqlast::SQLParser parser;
+      auto ptr = std::move(parser.Parse(serialized_create_index).value());
+      sqlast::CreateIndex *stmt = static_cast<sqlast::CreateIndex *>(ptr.get());
       // TODO(babman): put this back in when flows are also loaded at restart.
-      // this->create_index_[line].push_back(create_index);
-      getline(state_file, create_index);
+      // this->create_index_[line].push_back(*stmt);
+      getline(state_file, serialized_create_index);
     }
     getline(state_file, line);
   }
@@ -146,9 +152,8 @@ void SharderState::Save(const std::string &dir_path) {
 
   // Begin writing.
   for (const auto &[table, schema] : this->schema_) {
-    sqlast::Stringifier stringifier;
-    std::string serialized_schema = schema.Visit(&stringifier);
-    state_file << table << "\n" << serialized_schema << "\n";
+    sqlast::Stringifier stringifier{""};
+    state_file << table << "\n" << schema.Visit(&stringifier) << "\n";
   }
   state_file << "\n";
 
@@ -188,14 +193,17 @@ void SharderState::Save(const std::string &dir_path) {
   state_file << "\n";
 
   for (const auto &[table_name, create_statement] : this->sharded_schema_) {
-    state_file << table_name << "\n" << create_statement << "\n";
+    sqlast::Stringifier stringifier{""};
+    state_file << table_name << "\n"
+               << create_statement.Visit(&stringifier) << "\n";
   }
   state_file << "\n";
 
   for (const auto &[shard_kind, index_vec] : this->create_index_) {
     state_file << shard_kind << "\n";
     for (const auto &create_index : index_vec) {
-      state_file << create_index << "\n";
+      sqlast::Stringifier stringifier{""};
+      state_file << create_index.Visit(&stringifier) << "\n";
     }
     state_file << "\n";
   }

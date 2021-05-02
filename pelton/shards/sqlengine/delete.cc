@@ -46,7 +46,6 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
   // the sharded schema.
   bool is_sharded = state->IsSharded(table_name);
   bool is_pii = state->IsPII(table_name);
-  sqlast::Stringifier stringifier;
   mysql::SqlResult result;
 
   // Sharding scenarios.
@@ -68,9 +67,7 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
 
     // Turn the delete statement back to a string, to delete relevant row in
     // PII table.
-    std::string delete_str = stmt.Visit(&stringifier);
-    result = state->connection_pool().ExecuteDefault(
-        ConnectionPool::Operation::UPDATE, delete_str);
+    result = state->connection_pool().ExecuteDefault(&stmt);
 
     // TODO(babman): Update dataflow after user has been deleted.
     // return absl::UnimplementedError("Dataflow not updated after a user
@@ -78,9 +75,7 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
 
   } else if (!is_sharded && !is_pii) {
     // Case 2: Table does not have PII and is not sharded!
-    std::string delete_str = stmt.Visit(&stringifier);
-    result = state->connection_pool().ExecuteDefault(
-        ConnectionPool::Operation::UPDATE, delete_str);
+    result = state->connection_pool().ExecuteDefault(&stmt);
 
   } else {  // is_shared == true
     // Case 3: Table is sharded!
@@ -103,9 +98,8 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
           cloned.Visit(&expression_remover);
 
           // Execute statement directly against shard.
-          std::string delete_str = cloned.Visit(&stringifier);
-          result.Append(state->connection_pool().ExecuteShard(
-              ConnectionPool::Operation::UPDATE, delete_str, info, user_id));
+          result.Append(
+              state->connection_pool().ExecuteShard(&cloned, info, user_id));
         }
 
       } else if (update_flows) {
@@ -116,9 +110,8 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
           shards.insert(record.GetValueString(info.shard_by_index));
         }
 
-        std::string delete_str = cloned.Visit(&stringifier);
-        result.Append(state->connection_pool().ExecuteShards(
-            ConnectionPool::Operation::UPDATE, delete_str, info, shards));
+        result.Append(
+            state->connection_pool().ExecuteShards(&cloned, info, shards));
 
       } else {
         // The delete statement by itself does not obviously constraint a
@@ -129,18 +122,14 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
                                state, dataflow_state));
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
-          std::string delete_str = cloned.Visit(&stringifier);
           result.MakeInline();
           result.AppendDeduplicate(state->connection_pool().ExecuteShards(
-              ConnectionPool::Operation::UPDATE, delete_str, info,
-              pair.second));
+              &cloned, info, pair.second));
         } else {
           // Secondary index unhelpful.
           // Execute statement against all shards of this kind.
-          std::string delete_str = cloned.Visit(&stringifier);
           result.Append(state->connection_pool().ExecuteShards(
-              ConnectionPool::Operation::UPDATE, delete_str, info,
-              state->UsersOfShard(info.shard_kind)));
+              &cloned, info, state->UsersOfShard(info.shard_kind)));
         }
       }
     }

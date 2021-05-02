@@ -247,7 +247,6 @@ absl::StatusOr<mysql::SqlResult> Shard(
   ASSIGN_OR_RETURN(std::list<ShardingInformation> sharding_information,
                    ShardTable(stmt, *state));
 
-  sqlast::Stringifier stringifier;
   mysql::SqlResult result;
   // Sharding scenarios.
   if (has_pii && sharding_information.size() == 0) {
@@ -255,11 +254,9 @@ absl::StatusOr<mysql::SqlResult> Shard(
     // This means that this table define a type of user for which shards must be
     // created! Hence, it is a shard kind!
     ASSIGN_OR_RETURN(std::string pk, GetPK(stmt));
-    std::string create_table_str = stmt.Visit(&stringifier);
     state->AddShardKind(table_name, pk);
-    state->AddUnshardedTable(table_name, create_table_str);
-    result = state->connection_pool().ExecuteDefault(
-        ConnectionPool::Operation::STATEMENT, create_table_str);
+    state->AddUnshardedTable(table_name, stmt);
+    result = state->connection_pool().ExecuteDefault(&stmt);
 
   } else if (!has_pii && sharding_information.size() > 0) {
     // Case 2: no pii but is linked to shards.
@@ -273,18 +270,15 @@ absl::StatusOr<mysql::SqlResult> Shard(
       // Apply sharding and come up with new schema.
       sqlast::CreateTable sharded_stmt =
           UpdateTableSchema(stmt, fk_shards, info.sharded_table_name);
-      std::string create_table_str = sharded_stmt.Visit(&stringifier);
       // Add the sharding information to state.
-      state->AddShardedTable(table_name, info, create_table_str);
+      state->AddShardedTable(table_name, info, sharded_stmt);
     }
 
   } else if (!has_pii && sharding_information.size() == 0) {
     // Case 3: neither pii nor linked.
     // The table does not belong to a shard and needs no further modification!
-    std::string create_table_str = stmt.Visit(&stringifier);
-    state->AddUnshardedTable(table_name, create_table_str);
-    result = state->connection_pool().ExecuteDefault(
-        ConnectionPool::Operation::STATEMENT, create_table_str);
+    state->AddUnshardedTable(table_name, stmt);
+    result = state->connection_pool().ExecuteDefault(&stmt);
   } else {
     // Has pii and linked to a shard is a logical schema error.
     return absl::UnimplementedError("Sharded Table cannot have PII fields!");

@@ -23,7 +23,6 @@ absl::StatusOr<mysql::SqlResult> Shard(
   }
 
   mysql::SqlResult result;
-  sqlast::Stringifier stringifier;
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
   dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
@@ -31,9 +30,7 @@ absl::StatusOr<mysql::SqlResult> Shard(
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
-    std::string select_str = stmt.Visit(&stringifier);
-    result = state->connection_pool().ExecuteDefault(
-        ConnectionPool::Operation::QUERY, select_str, schema);
+    result = state->connection_pool().ExecuteDefault(&stmt, schema);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded.
@@ -62,11 +59,9 @@ absl::StatusOr<mysql::SqlResult> Shard(
           cloned.Visit(&expression_remover);
 
           // Execute statement directly against shard.
-          std::string select_str = cloned.Visit(&stringifier);
           result.MakeInline();
           result.AppendDeduplicate(state->connection_pool().ExecuteShard(
-              ConnectionPool::Operation::QUERY, select_str, info, user_id,
-              schema));
+              &cloned, info, user_id, schema));
         }
       } else {
         // The select statement by itself does not obviously constraint a shard.
@@ -77,19 +72,15 @@ absl::StatusOr<mysql::SqlResult> Shard(
                                state, dataflow_state));
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
-          std::string select_str = cloned.Visit(&stringifier);
           result.MakeInline();
           result.AppendDeduplicate(state->connection_pool().ExecuteShards(
-              ConnectionPool::Operation::QUERY, select_str, info, pair.second,
-              schema));
+              &cloned, info, pair.second, schema));
         } else {
           // Secondary index unhelpful.
           // Select from all the relevant shards.
-          std::string select_str = cloned.Visit(&stringifier);
           result.MakeInline();
           result.AppendDeduplicate(state->connection_pool().ExecuteShards(
-              ConnectionPool::Operation::QUERY, select_str, info,
-              state->UsersOfShard(info.shard_kind), schema));
+              &cloned, info, state->UsersOfShard(info.shard_kind), schema));
         }
       }
     }

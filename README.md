@@ -25,6 +25,27 @@ Check out [.github/workflows/ubuntutest.yml](.github/workflows/ubuntutest.yml),
 specifically the dependencies section, for a scripted way to install dependencies
 on ubuntu 20.
 
+# Docker container
+We provide a docker container with all the dependencies.
+
+To build the docker container, run
+```bash
+docker build -t pelton/latest .
+```
+
+The docker container runs mariadb as a daemon. You should run the docker container
+in the background and then attach your shell to it or execute commands in it
+using docker exec:
+```bash
+# Run the container and name it pelton-testing
+docker run --name pelton-testing -d -t pelton/latest 
+
+# Wait a few seconds for mysqld to run successfully inside the container
+
+# Run desired commands
+docker exec pelton-testing sh -c "cd /home/pelton && bazel test ..."
+```
+
 ## Building
 
 Run `bazel build ...`.
