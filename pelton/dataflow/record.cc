@@ -169,15 +169,13 @@ void Record::SetValue(const std::string &value, size_t i) {
     case sqlast::ColumnDefinition::Type::INT:
       this->data_[i].sint = std::stoll(value);
       break;
+    // TODO(malte): DATETIME shouldn't be stored as a string, but as
+    // a timestamp since the epoch
+    case sqlast::ColumnDefinition::Type::DATETIME:
     case sqlast::ColumnDefinition::Type::TEXT: {
       this->data_[i].str = std::make_unique<std::string>(Dequote(value));
       break;
     }
-    case sqlast::ColumnDefinition::Type::DATETIME:
-      // TODO(malte): DATETIME shouldn't be stored as a string, but as
-      // a timestamp since the epoch
-      this->data_[i].str = std::make_unique<std::string>(value);
-      break;
     default:
       LOG(FATAL) << "Unsupported data type in setvalue: "
                  << this->schema_.TypeOf(i);
