@@ -80,9 +80,6 @@ std::string Operator::DebugString() const {
       break;
   }
 
-  // log statements to the constructor
-  // find out which operators produce duplicates.
-
   std::string str = "{";
   str += "\"operator\": \"" + type_str + "\", ";
   str += "\"id\": " + std::to_string(this->index()) + ", ";
