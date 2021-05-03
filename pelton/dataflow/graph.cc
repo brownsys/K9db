@@ -58,5 +58,13 @@ std::string DataFlowGraph::DebugString() const {
   return str;
 }
 
+uint64_t DataFlowGraph::SizeInMemory() const {
+  uint64_t size = 0;
+  for (const auto &[_, node] : this->nodes_) {
+    size += node->SizeInMemory();
+  }
+  return size;
+}
+
 }  // namespace dataflow
 }  // namespace pelton

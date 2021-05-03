@@ -98,6 +98,9 @@ class Operator {
    */
   virtual void ComputeOutputSchema() = 0;
 
+  // Return the size of any stored state in memory.
+  virtual uint64_t SizeInMemory() const { return 0; }
+
   // Edges to children and parents.
   std::vector<std::weak_ptr<Edge>> children_;
   std::vector<std::shared_ptr<Edge>> parents_;

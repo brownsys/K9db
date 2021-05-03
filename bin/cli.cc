@@ -122,6 +122,11 @@ int main(int argc, char **argv) {
 
     // Close the connection
     end_time = std::chrono::high_resolution_clock::now();
+
+    // Find peak memory usage.
+    std::cout << "Memory: " << connection.SizeInMemory() << "bytes"
+              << std::endl;
+
     pelton::close(&connection);
   } catch (const char *err_msg) {
     LOG(FATAL) << "Error: " << err_msg;

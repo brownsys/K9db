@@ -129,6 +129,10 @@ class MatViewOperatorT : public MatViewOperator {
     this->output_schema_ = this->input_schemas_.at(0);
   }
 
+  uint64_t SizeInMemory() const override {
+    return this->contents_.SizeInMemory();
+  }
+
  private:
   std::vector<ColumnID> key_cols_;
   T contents_;

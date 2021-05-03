@@ -151,6 +151,9 @@ class Record {
     }
   }
 
+  // The size of the record in bytes.
+  size_t SizeInMemory() const;
+
   // Data access with generic type.
   Key GetKey() const;
   Key GetValues(const std::vector<ColumnID> &cols) const;
