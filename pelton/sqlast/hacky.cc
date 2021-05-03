@@ -2,6 +2,8 @@
 // which we want to parse quickly without ANTLR.
 #include "pelton/sqlast/hacky.h"
 
+#include <utility>
+
 #include "pelton/sqlast/hacky_util.h"
 
 namespace pelton {
@@ -62,6 +64,81 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
   return stmt;
 }
 
+absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
+                                                               size_t size) {
+  // SELECT * FROM <tablename> WHERE <colum_name> = <value>
+  // SELECT.
+  if (!StartsWith(&str, &size, "SELECT", 6)) {
+    return absl::InvalidArgumentError("Hacky select: SELECT");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // * FROM.
+  if (!StartsWith(&str, &size, "*", 1)) {
+    return absl::InvalidArgumentError("Hacky select: *");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  if (!StartsWith(&str, &size, "FROM", 4)) {
+    return absl::InvalidArgumentError("Hacky select: FROM");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // <tablename>.
+  std::string table_name = ExtractIdentifier(&str, &size);
+  if (table_name.size() == 0) {
+    return absl::InvalidArgumentError("Hacky select: table name");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // Create the select statement.
+  std::unique_ptr<Select> stmt = std::make_unique<Select>(table_name);
+  stmt->AddColumn("*");
+
+  // WHERE.
+  if (!StartsWith(&str, &size, "WHERE", 5)) {
+    return absl::InvalidArgumentError("Hacky select: WHERE");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // <column_name>
+  std::string column_name = ExtractIdentifier(&str, &size);
+  if (column_name.size() == 0) {
+    return absl::InvalidArgumentError("Hacky select: column name");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // =.
+  if (!StartsWith(&str, &size, "=", 1)) {
+    return absl::InvalidArgumentError("Hacky select: =");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // Value.
+  std::string value = ExtractValue(&str, &size);
+  if (value.size() == 0) {
+    return absl::InvalidArgumentError("Hacky select: value");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // End of statement.
+  if (!StartsWith(&str, &size, ";", 1)) {
+    return absl::InvalidArgumentError("Hacky select: ;");
+  }
+  if (size != 0) {
+    return absl::InvalidArgumentError("Hacky select: EOF");
+  }
+
+  // Create condition and add it to the select stmt.
+  std::unique_ptr<BinaryExpression> condition =
+      std::make_unique<BinaryExpression>(Expression::Type::EQ);
+  condition->SetLeft(std::make_unique<ColumnExpression>(column_name));
+  condition->SetRight(std::make_unique<LiteralExpression>(value));
+  stmt->SetWhereClause(std::move(condition));
+
+  return stmt;
+}
+
 absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyParse(
     const std::string &sql) {
   size_t size = sql.size();
@@ -69,6 +146,9 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyParse(
 
   if (str[0] == 'I' || str[0] == 'i') {
     return HackyInsert(str, size);
+  }
+  if (str[0] == 'S' || str[0] == 's') {
+    return HackySelect(str, size);
   }
 
   return absl::InvalidArgumentError("Cannot hacky parse");
