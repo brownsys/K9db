@@ -35,7 +35,7 @@ do
       && cd -
 
     # Run pelton trace file
-    bazel run -c opt //bin:cli -- --print=no --minloglevel=3 < $SFILENAME > .output 2>&1
+    bazel run --config=opt //bin:cli -- --print=no --minloglevel=3 < $SFILENAME > .output 2>&1
 
     # Get the database size.
     echo "" >> .output
@@ -50,7 +50,7 @@ do
     echo "" >> .output 2>&1
 
     # Run vanilla trace file
-    bazel run -c opt //bin:mysql -- --print=no --minloglevel=3 < $UFILENAME >> .output 2>&1
+    bazel run --config=opt //bin:mysql -- --print=no --minloglevel=3 < $UFILENAME >> .output 2>&1
 
     # Get the database size.
     echo "" >> .output
