@@ -111,24 +111,27 @@ namespace pelton
       str += "], ";
 
       // print input schema
+      str += "\"input_columns\": [";
       for (const SchemaRef schema : this->input_schemas_)
       {
-        str += "\"input column names\": [";
-        // str += tostring(schema);
+        str += "[";
         for (const std::string col : schema.column_names())
         {
-          str += col + ", ";
+          str += "\"" + col + "\", ";
         }
+        str.pop_back();
+        str.pop_back();
+        str += "], ";
       }
       str.pop_back();
       str.pop_back();
       str += "], ";
 
       // print output schema
-      str += "\"output column names\": [";
+      str += "\"output_columns\": [";
       for (const std::string col : this->output_schema_.column_names())
       {
-        str += col + ", ";
+        str += "\"" + col + "\", ";
       }
       str.pop_back();
       str.pop_back();
