@@ -277,7 +277,8 @@ bool ProjectOperator::Process(NodeIndex source,
                 std::make_unique<std::string>(record.GetString(column)), i);
             break;
           default:
-            LOG(FATAL) << "Unsupported column type " << this->output_schema_.TypeOf(i) << " in project";
+            LOG(FATAL) << "Unsupported column type "
+                       << this->output_schema_.TypeOf(i) << " in project";
         }
 
       } else if (projection.literal()) {
