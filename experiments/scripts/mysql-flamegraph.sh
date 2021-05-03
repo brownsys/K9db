@@ -2,11 +2,11 @@
 ./bin/drop_all.sh
 
 # Compile everything with -c opt
-sudo bazel build -c opt //bin:mysql
+sudo bazel build --config=opt //bin:mysql
 
 # Run cli with perf record.
 sudo perf record -g -- \
-  sudo bazel run -c opt //bin:mysql -- \
+  sudo bazel run --config=opt //bin:mysql -- \
     --print=no --minloglevel=3 < experiments/GDPRbench/src/traces/mysql.sql
 
 # Format perf output and create the flamegraph.

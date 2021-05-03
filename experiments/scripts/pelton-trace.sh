@@ -92,8 +92,8 @@ else
   ./bin/drop.sh root password
 
   # Compile everything with -c opt
-  bazel build -c opt ...
+  bazel build --config=opt ...
 
-  bazel run //bin:cli -c opt -- \
+  bazel run //bin:cli --config=opt -- \
     --print=no --minloglevel=3 < experiments/GDPRbench/src/traces/pelton_$1.sql
 fi

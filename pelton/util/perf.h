@@ -2,8 +2,6 @@
 #ifndef PELTON_UTIL_PERF_H_
 #define PELTON_UTIL_PERF_H_
 
-#define PELTON_USE_PERF
-
 // NOLINTNEXTLINE
 #include <chrono>
 #include <string>
@@ -35,24 +33,24 @@ class Perf {
 };
 
 inline void Start() {
-#ifdef PELTON_USE_PERF
+#ifndef PELTON_OPT
   Perf::INSTANCE().Start();
   Perf::INSTANCE().Start("all");
 #endif
 }
 
 inline void Start(const std::string &label) {
-#ifdef PELTON_USE_PERF
+#ifndef PELTON_OPT
   Perf::INSTANCE().Start(label);
 #endif
 }
 inline void End(const std::string &label) {
-#ifdef PELTON_USE_PERF
+#ifndef PELTON_OPT
   Perf::INSTANCE().End(label);
 #endif
 }
 inline void PrintAll() {
-#ifdef PELTON_USE_PERF
+#ifndef PELTON_OPT
   Perf::INSTANCE().End("all");
   Perf::INSTANCE().PrintAll();
 #endif

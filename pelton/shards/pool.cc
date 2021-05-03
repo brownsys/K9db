@@ -37,7 +37,9 @@ void ConnectionPool::Initialize(const std::string &username,
 // Execute statement against the default un-sharded database.
 mysql::SqlResult ConnectionPool::ExecuteDefault(
     const sqlast::AbstractStatement *sql, const dataflow::SchemaRef &schema) {
+#ifndef PELTON_OPT
   LOG(INFO) << "Shard: default";
+#endif
   return this->ExecuteMySQL(sql, schema);
 }
 
@@ -45,8 +47,12 @@ mysql::SqlResult ConnectionPool::ExecuteDefault(
 mysql::SqlResult ConnectionPool::ExecuteShard(
     const sqlast::AbstractStatement *sql, const ShardingInformation &info,
     const UserId &user_id, const dataflow::SchemaRef &schema) {
+  perf::Start("hashing");
   std::string shard_name = sqlengine::NameShard(info.shard_kind, user_id);
+  perf::End("hashing");
+#ifndef PELTON_OPT
   LOG(INFO) << "Shard: " << shard_name << " (userid: " << user_id << ")";
+#endif
   return this->ExecuteMySQL(sql, schema, shard_name, info.shard_by_index,
                             user_id);
 }
@@ -85,7 +91,9 @@ mysql::SqlResult ConnectionPool::ExecuteShards(
 
 // Removing a shard is equivalent to deleting its database.
 void ConnectionPool::RemoveShard(const std::string &shard_name) {
+#ifndef PELTON_OPT
   LOG(INFO) << "Remove Shard: " << shard_name;
+#endif
   // TODO(babman): find a better way of dropping.
   // this->stmt_->execute("DROP DATABASE " + shard_name);
 }
@@ -96,7 +104,9 @@ mysql::SqlResult ConnectionPool::ExecuteMySQL(
     const std::string &shard_name, int aug_index,
     const std::string &aug_value) {
   std::string sql = sqlast::Stringifier(shard_name).Visit(stmt);
+#ifndef PELTON_OPT
   LOG(INFO) << "Statement:" << sql;
+#endif
 
   switch (stmt->type()) {
     case sqlast::AbstractStatement::Type::CREATE_TABLE:

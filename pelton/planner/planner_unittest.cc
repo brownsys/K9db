@@ -1113,8 +1113,6 @@ TEST(PlannerTest, BasicLeftJoin) {
   EXPECT_EQ(graph.GetNode(2)->type(), dataflow::Operator::Type::EQUIJOIN);
   EXPECT_EQ(graph.GetNode(3).get(), graph.outputs().at(0).get());
 
-  LOG(INFO) << graph.outputs().at(0).get()->output_schema();
-
   // Materialized View.
   std::shared_ptr<dataflow::MatViewOperator> matview = graph.outputs().at(0);
   EXPECT_EQ(matview->output_schema().column_names(),

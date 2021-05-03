@@ -1,3 +1,5 @@
+// NOLINTNEXTLINE
+#include <chrono>
 #include <iostream>
 #include <limits>
 #include <string>
@@ -107,6 +109,8 @@ int main(int argc, char **argv) {
   const std::string &db_password = FLAGS_db_password;
 
   // Initialize our sharded state/connection.
+  std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
+  std::chrono::time_point<std::chrono::high_resolution_clock> end_time;
   try {
     sql::Driver *driver = sql::mariadb::get_driver_instance();
     std::unique_ptr<sql::Connection> con{
@@ -129,6 +133,7 @@ int main(int argc, char **argv) {
         if (command == "# perf start") {
           std::cout << "Perf start" << std::endl;
           pelton::perf::Start();
+          start_time = std::chrono::high_resolution_clock::now();
         }
         continue;
       }
@@ -159,11 +164,18 @@ int main(int argc, char **argv) {
         std::cout << std::endl << ">>> " << std::flush;
       }
     }
+
+    end_time = std::chrono::high_resolution_clock::now();
   } catch (const char *err_msg) {
     LOG(FATAL) << "Error: " << err_msg;
   }
 
   pelton::perf::PrintAll();
+  std::cout << "Time: "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
+                                                                     start_time)
+                   .count()
+            << "ms" << std::endl;
 
   // Exit!
   std::cout << "exit" << std::endl;

@@ -5,7 +5,7 @@ echo "Worker starting!"
 echo "Orchestrator ip $ORCHESTRATOR"
 
 # Compile our code
-bazel build -c opt ...
+bazel build --config=opt ...
 
 # compile GDPRBench
 cd experiments/GDPRbench/src/ && mvn package && cd -
