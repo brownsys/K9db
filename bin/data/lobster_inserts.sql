@@ -15,8 +15,7 @@ INSERT INTO invitation_requests VALUES (0, 'code', 0, 'email', 'name', 'memo', '
 INSERT INTO invitation_requests VALUES (1, 'code', 1, 'email', 'name', 'memo', 'ip', '2021-04-21 01:00:00', '2021-04-21 01:00:00');
 INSERT INTO invitations VALUES (0, 0, 'email', 'code', '2021-04-21 01:00:00', '2021-04-21 01:00:00', 'memo');
 INSERT INTO invitations VALUES (1, 1, 'email', 'code', '2021-04-21 01:00:00', '2021-04-21 01:00:00', 'memo');
-INSERT INTO keystores VALUES ('mykey', 0);
-INSERT INTO keystores VALUES ('mykey2', 0);
+INSERT INTO keystores VALUES ('', 0);
 INSERT INTO messages VALUES (0, '2021-04-21 01:00:00', 0, 1, 0, 'subject', 'body', '0', 0, 0);
 INSERT INTO messages VALUES (1, '2021-04-21 01:00:00', 1, 0, 0, 'subject', 'body', '0', 0, 0);
 INSERT INTO moderations VALUES (0, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 0, 0, 0, 1, 'action', 'reason', 0);
