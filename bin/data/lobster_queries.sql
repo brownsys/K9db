@@ -7,7 +7,7 @@ SELECT * FROM q2;
 CREATE VIEW q3 AS '"SELECT tags.id, tags.tag, tags.description, tags.privileged, tags.is_media, tags.inactive, tags.hotness_mod FROM tags WHERE tags.inactive = 0 AND tags.tag = 'mytag'"';
 SELECT * FROM q3;
 
-CREATE VIEW q4 AS '"SELECT keystores.`key`, keystores.`value` FROM keystores WHERE keystores.`key` = 0"';
+CREATE VIEW q4 AS '"SELECT keystores.keyX, keystores.valueX FROM keystores WHERE keystores.keyX = ''"';
 SELECT * FROM q4;
 
 CREATE VIEW q5 AS '"SELECT votes.id, votes.user_id, votes.story_id, votes.comment_id, votes.vote, votes.reason FROM votes WHERE votes.user_id = 0 AND votes.story_id = 0 AND votes.comment_id IS NULL"';
