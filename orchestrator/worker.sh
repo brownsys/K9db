@@ -28,8 +28,27 @@ cd /
 # install dependencies
 apt-get update
 apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+echo "Pelton Log: Installed dependencies"
 
-# install docker
+# Make sure the ssd drive is mounted properly.
+if [[ ! -f ".ssd.configured" ]]
+then
+  touch .ssd.configured
+  # docker uses SSD
+  mkdir -p /etc/docker
+  echo '{ "data-root": "/data/docker" }' > /etc/docker/daemon.json
+  # format SSD (once)
+  mkfs -t xfs /dev/nvme1n1
+  echo "Pelton Log: Formatted SSD"
+fi
+
+# Mount SSD.
+mkdir -p /data
+mount /dev/nvme1n1 /data
+mkdir -p /data/docker
+echo "Pelton Log: Mounted SSD"
+
+# Install and configure docker.
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 echo \
   "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
@@ -37,6 +56,7 @@ echo \
 
 apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io
+echo "Pelton Log: Installed Docker"
 
 # Setup ssh keys to access pelton.
 mkdir -p /root/.ssh
@@ -75,11 +95,13 @@ echo "HostName github.com" >> /root/.ssh/config
 echo "IdentityFile /root/.ssh/id_rsa" >> /root/.ssh/config
 echo "StrictHostKeyChecking no" >> /root/.ssh/config
 echo "User git" >> /root/.ssh/config
+echo "Pelton Log: Setup SSH"
 
 # clone repo once!
 if [[ ! -d "pelton" ]]
 then
   git clone --recurse-submodules -j4 git@github.com:brownsys/pelton.git
+  echo "Pelton Log: Cloned repo!"
 fi
 
 # update repo
@@ -87,17 +109,22 @@ cd pelton
 git fetch origin
 git checkout $BRANCH
 git pull origin $BRANCH
+echo "Pelton Log: Updated repo!"
 
 # build docker image
 docker build -t pelton/latest .
-if [ $(docker ps -a | grep pelton-worker | wc -l) -ne 0 ]; then
-  docker stop pelton-worker
-  docker rm pelton-worker
+
+if [ $(docker ps -a | grep pelton-worker | wc -l) -eq 0 ]; then
+  echo "Pelton Log: Running docker container for the first time!"
+  docker run --name pelton-worker -d -t pelton/latest
+else
+  echo "Pelton Log: Resuming docker container"
+  docker start pelton-worker
 fi
 
-docker run --name pelton-worker -d -t pelton/latest
 sleep 20
 
+echo "Pelton Log: Starting Worker..."
 docker exec pelton-worker sh -c "cd /home/pelton/ && ./orchestrator/worker/daemon.sh $ORCHESTRATOR_IP"
 
 --//

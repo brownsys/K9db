@@ -27,6 +27,7 @@ cd /
 # install dependencies
 apt-get update
 apt-get install -y git nodejs npm
+echo "Pelton Log: Installed dependencies!"
 
 # Setup ssh keys to access pelton.
 mkdir -p /root/.ssh
@@ -65,11 +66,13 @@ echo "HostName github.com" >> /root/.ssh/config
 echo "IdentityFile /root/.ssh/id_rsa" >> /root/.ssh/config
 echo "StrictHostKeyChecking no" >> /root/.ssh/config
 echo "User git" >> /root/.ssh/config
+echo "Pelton Log: Configured SSH!"
 
 # clone repo once!
 if [[ ! -d "pelton" ]]
 then
   git clone --recurse-submodules -j4 git@github.com:brownsys/pelton.git
+  echo "Pelton Log: Cloned Repo!"
 fi
 
 # update repo.
@@ -77,6 +80,9 @@ cd pelton
 git fetch origin
 git checkout $BRANCH
 git pull origin $BRANCH
+echo "Pelton Log: Update Repo!"
 
 cd orchestrator/server && npm install
+echo "Pelton Log: Installed npm Dependencies!"
+echo "Pelton Log: Done!"
 --//
