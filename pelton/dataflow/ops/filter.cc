@@ -6,7 +6,6 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/sqlast/ast.h"
 
-
 // The value in v must be of the same type as the corresponding one in the
 // record schema.
 #define COLUMN_VALUE_CMP_MACRO(col, v, OP)                        \

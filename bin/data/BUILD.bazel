@@ -1,7 +1,13 @@
 exports_files([
-    "trivial-queries.sql", "trivial-schema.sql", 
-    "medical_chat_schema.sql", "medical_chat_queries.sql", "medical_chat_expected.txt", 
-    "lobster_schema_simplified.sql", "lobster_queries.sql", "lobster_expected.txt", "lobster_inserts.sql",
+    "trivial-queries.sql",
+    "trivial-schema.sql",
+    "medical_chat_schema.sql",
+    "medical_chat_queries.sql",
+    "medical_chat_expected.txt",
+    "lobster_schema_simplified.sql",
+    "lobster_queries.sql",
+    "lobster_expected.txt",
+    "lobster_inserts.sql",
     "q1.txt",
     "q2.txt",
     "q3.txt",
@@ -71,5 +77,5 @@ exports_files([
     "lobster_q32.sql",
     "lobster_q33.sql",
     "lobster_q34.sql",
-    "lobster_q35.sql"
+    "lobster_q35.sql",
 ])
