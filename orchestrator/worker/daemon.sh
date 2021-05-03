@@ -37,6 +37,11 @@ do
     # Run pelton trace file
     bazel run -c opt //bin:cli -- --print=no --minloglevel=3 < $SFILENAME > .output 2>&1
 
+    # Get the database size.
+    echo "" >> .output
+    echo "DB size" >> .output
+    mariadb -u root -ppassword --execute="SELECT table_schema AS 'Database', SUM(data_length + index_length) / 1024 / 1024 AS 'Size (MB)' FROM information_schema.TABLES GROUP BY table_schema" >> .output
+
     # Drop all the databases
     ./bin/drop.sh root password
     sleep 5
@@ -46,6 +51,11 @@ do
 
     # Run vanilla trace file
     bazel run -c opt //bin:mysql -- --print=no --minloglevel=3 < $UFILENAME >> .output 2>&1
+
+    # Get the database size.
+    echo "" >> .output
+    echo "DB size" >> .output
+    mariadb -u root -ppassword --execute="SELECT table_schema AS 'Database', SUM(data_length + index_length) / 1024 / 1024 AS 'Size (MB)' FROM information_schema.TABLES GROUP BY table_schema" >> .output
     
     # Curl the output to orchestrator
     curl -H 'Content-Type: text/plain' -X POST --data-binary @.output $ORCHESTRATOR/done 
