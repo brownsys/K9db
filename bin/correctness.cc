@@ -222,9 +222,8 @@ int main(int argc, char **argv) {
       break;
     }
     if (EXPECTED.size() == 0) {
-      std::cout << "No expected results provided!" << std::endl;
+      LOG(FATAL) << "No expected results provided!";
     }
-    std::cout << std::endl;
     auto status = pelton::exec(&connection, query);
     CHECK(status.ok());
 
@@ -261,6 +260,5 @@ int main(int argc, char **argv) {
   pelton::perf::PrintAll();
 
   // Done.
-  std::cout << "exit" << std::endl;
   return 0;
 }
