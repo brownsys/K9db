@@ -270,11 +270,14 @@ bool ProjectOperator::Process(NodeIndex source,
             out_record.SetInt(record.GetInt(column), i);
             break;
           case sqlast::ColumnDefinition::Type::TEXT:
+            out_record.SetString(
+                std::make_unique<std::string>(record.GetString(column)), i);
+            break;
           // TODO(malte): DATETIME should not be stored as a string,
           // see below
           case sqlast::ColumnDefinition::Type::DATETIME:
-            out_record.SetString(
-                std::make_unique<std::string>(record.GetString(column)), i);
+            out_record.SetDateTime(
+                std::make_unique<std::string>(record.GetDateTime(column)), i);
             break;
           default:
             LOG(FATAL) << "Unsupported column type "
