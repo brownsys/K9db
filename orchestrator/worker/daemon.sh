@@ -17,7 +17,7 @@ rm -rf .output
 while true
 do
   curl -X GET $ORCHESTRATOR/ready -o orchestrator/worker/worker_load
-  if [ $(wc -w orchestrator/worker/worker_load | awk '{print $1}') -ne 0 ]; then
+  if [[ -f orchestrator/worker/worker_load ]] && [ $(wc -w orchestrator/worker/worker_load | awk '{print $1}') -ne 0 ]; then
     # We have a load.
     PREFIX="../../.."
     LOAD_CONF="../../../orchestrator/worker/worker_load"
