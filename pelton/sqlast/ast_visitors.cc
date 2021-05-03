@@ -12,6 +12,17 @@
 namespace pelton {
 namespace sqlast {
 
+namespace {
+
+std::string Dequote(const std::string &st) {
+  std::string s(st);
+  s.erase(remove(s.begin(), s.end(), '\"'), s.end());
+  s.erase(remove(s.begin(), s.end(), '\''), s.end());
+  return s;
+}
+
+}  // namespace
+
 // Stringifier.
 std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
   perf::Start("Stringify (create)");
@@ -206,7 +217,7 @@ std::pair<bool, std::string> ValueFinder::VisitColumnExpression(
 }
 std::pair<bool, std::string> ValueFinder::VisitLiteralExpression(
     const LiteralExpression &ast) {
-  return std::make_pair(false, ast.value());
+  return std::make_pair(false, Dequote(ast.value()));
 }
 std::pair<bool, std::string> ValueFinder::VisitBinaryExpression(
     const BinaryExpression &ast) {

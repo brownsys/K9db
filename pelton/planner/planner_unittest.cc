@@ -1084,5 +1084,94 @@ TEST(PlannerTest, ComplexQueryWithKeys) {
   }
 }
 
+TEST(PlannerTest, BasicLeftJoin) {
+  // Create a schema.
+  dataflow::SchemaRef schema1 = dataflow::SchemaFactory::Create(
+      {"ID", "NAME"}, {CType::INT, CType::TEXT}, {0});
+  dataflow::SchemaRef schema3 = dataflow::SchemaFactory::Create(
+      {"ID", "STUDENT_ID", "ASSIGNMENT_ID", "TS"},
+      {CType::INT, CType::INT, CType::INT, CType::INT}, {0});
+
+  // Make a dummy query.
+  std::string query =
+      "SELECT * FROM submissions LEFT JOIN students ON submissions.student_id "
+      "= students.ID";
+
+  // Create a dummy state.
+  dataflow::DataFlowState state;
+  state.AddTableSchema("students", schema1);
+  state.AddTableSchema("submissions", schema3);
+
+  // Plan the graph via calcite.
+  dataflow::DataFlowGraph graph = PlanGraph(&state, query);
+
+  // Check that the graph is what we expect!
+  EXPECT_EQ(graph.inputs().at("students")->input_name(), "students");
+  EXPECT_EQ(graph.inputs().at("submissions")->input_name(), "submissions");
+  EXPECT_EQ(graph.GetNode(0).get(), graph.inputs().at("submissions").get());
+  EXPECT_EQ(graph.GetNode(1).get(), graph.inputs().at("students").get());
+  EXPECT_EQ(graph.GetNode(2)->type(), dataflow::Operator::Type::EQUIJOIN);
+  EXPECT_EQ(graph.GetNode(3).get(), graph.outputs().at(0).get());
+
+  LOG(INFO) << graph.outputs().at(0).get()->output_schema();
+
+  // Materialized View.
+  std::shared_ptr<dataflow::MatViewOperator> matview = graph.outputs().at(0);
+  EXPECT_EQ(matview->output_schema().column_names(),
+            (std::vector<std::string>{"ID", "STUDENT_ID", "ASSIGNMENT_ID", "TS",
+                                      "NAME"}));
+  EXPECT_EQ(matview->output_schema().column_types(),
+            (std::vector<CType>{CType::INT, CType::INT, CType::INT, CType::INT,
+                                CType::TEXT}));
+
+  // Try to process some records through flow.
+  std::vector<dataflow::Record> records;
+  records.emplace_back(schema3, true, 0_s, 0_s, 10_s, 100_s);
+  records.emplace_back(schema3, true, 1_s, 0_s, 20_s, 200_s);
+  records.emplace_back(schema3, true, 3_s, 1_s, 10_s, 320_s);
+  records.emplace_back(schema3, true, 4_s, 1_s, 10_s, 440_s);
+  records.emplace_back(schema3, true, 5_s, 1_s, 10_s, 465_s);
+  records.emplace_back(schema3, true, 6_s, 0_s, 10_s, 721_s);
+  graph.Process("submissions", records);
+
+  // Check for appropriate records with null values for left join
+  std::vector<dataflow::Record> expected_records;
+  dataflow::SchemaRef schema4 = matview->output_schema();
+  expected_records.emplace_back(schema4, true, 0_s, 0_s, 10_s, 100_s,
+                                dataflow::NullValue());
+  expected_records.emplace_back(schema4, true, 1_s, 0_s, 20_s, 200_s,
+                                dataflow::NullValue());
+  expected_records.emplace_back(schema4, true, 3_s, 1_s, 10_s, 320_s,
+                                dataflow::NullValue());
+  expected_records.emplace_back(schema4, true, 4_s, 1_s, 10_s, 440_s,
+                                dataflow::NullValue());
+  expected_records.emplace_back(schema4, true, 5_s, 1_s, 10_s, 465_s,
+                                dataflow::NullValue());
+  expected_records.emplace_back(schema4, true, 6_s, 0_s, 10_s, 721_s,
+                                dataflow::NullValue());
+  EXPECT_EQ_MSET(matview, expected_records);
+
+  records.clear();
+  records.emplace_back(schema1, true, 0_s, std::make_unique<std::string>("s1"));
+  records.emplace_back(schema1, true, 1_s, std::make_unique<std::string>("s2"));
+  graph.Process("students", records);
+
+  // Check if matview gets updated as a consequence of negative records
+  expected_records.clear();
+  expected_records.emplace_back(schema4, true, 0_s, 0_s, 10_s, 100_s,
+                                std::make_unique<std::string>("s1"));
+  expected_records.emplace_back(schema4, true, 1_s, 0_s, 20_s, 200_s,
+                                std::make_unique<std::string>("s1"));
+  expected_records.emplace_back(schema4, true, 3_s, 1_s, 10_s, 320_s,
+                                std::make_unique<std::string>("s2"));
+  expected_records.emplace_back(schema4, true, 4_s, 1_s, 10_s, 440_s,
+                                std::make_unique<std::string>("s2"));
+  expected_records.emplace_back(schema4, true, 5_s, 1_s, 10_s, 465_s,
+                                std::make_unique<std::string>("s2"));
+  expected_records.emplace_back(schema4, true, 6_s, 0_s, 10_s, 721_s,
+                                std::make_unique<std::string>("s1"));
+  EXPECT_EQ_MSET(matview, expected_records);
+}
+
 }  // namespace planner
 }  // namespace pelton

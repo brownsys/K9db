@@ -4,7 +4,7 @@ A new dataflow processor.
 
 ## Requirements
 Pelton only supports Ubuntu 20.04+ currently. MacOS might work but is not natively supported.
-To build, you need a working [Bazel](https://docs.bazel.build/versions/3.5.0/install.html)
+To build, you need a working [Bazel 4.0](https://docs.bazel.build/versions/4.0.0/install.html)
 installation.
 
 Bazel will pull some dependencies automatically. If not or you get errors, you may need to

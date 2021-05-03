@@ -10,6 +10,7 @@
 
 #include "pelton/dataflow/ops/aggregate_enum.h"
 #include "pelton/dataflow/ops/filter_enum.h"
+#include "pelton/dataflow/ops/join_enum.h"
 #include "pelton/dataflow/ops/project_enum.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast_schema_enums.h"
@@ -41,8 +42,9 @@ class DataFlowGraphGenerator {
                                  const std::vector<ColumnID> &group_cols,
                                  AggregateFunctionEnum agg_func,
                                  ColumnID agg_col);
-  NodeIndex AddEquiJoinOperator(NodeIndex left_parent, NodeIndex right_parent,
-                                ColumnID left_column, ColumnID right_column);
+  NodeIndex AddJoinOperator(NodeIndex left_parent, NodeIndex right_parent,
+                            ColumnID left_column, ColumnID right_column,
+                            JoinModeEnum mode);
 
   // Adding output materialized views.
   // Unordered mat view.

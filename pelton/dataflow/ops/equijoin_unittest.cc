@@ -359,5 +359,210 @@ TEST(EquiJoinOperatorTest, FullJoinTest) {
   EXPECT_EQ(output, jrecords);
 }
 
+TEST(EquiJoinOperatorTest, BasicLeftJoinTest) {
+  // Make two joinable records.
+  std::unique_ptr<std::string> s1 = std::make_unique<std::string>("item0");
+  std::unique_ptr<std::string> s2 = std::make_unique<std::string>("descrp0");
+  SchemaRef lschema = Schema1();
+  SchemaRef rschema = Schema2();
+  std::vector<Record> lrecords;
+  std::vector<Record> rrecords;
+  lrecords.emplace_back(lschema, true, 0_u, std::move(s1), -5_s);
+  rrecords.emplace_back(rschema, true, 100_u, -5_s, std::move(s2));
+
+  // Setup join operator with two parents, left with id 0 and right with id 1.
+  std::shared_ptr<IdentityOperator> iop1 = std::make_shared<IdentityOperator>();
+  std::shared_ptr<IdentityOperator> iop2 = std::make_shared<IdentityOperator>();
+  std::shared_ptr<EquiJoinOperator> op =
+      std::make_shared<EquiJoinOperator>(2, 1, EquiJoinOperator::Mode::LEFT);
+  iop1->SetIndex(0);
+  iop2->SetIndex(1);
+  op->parents_ = {std::make_shared<Edge>(iop1, op),
+                  std::make_shared<Edge>(iop2, op)};
+  op->input_schemas_ = {lschema, rschema};
+  op->ComputeOutputSchema();
+
+  std::vector<Record> expected_records;
+  expected_records.emplace_back(op->output_schema(), true, 0_u,
+                                std::make_unique<std::string>("item0"), -5_s,
+                                NullValue(), NullValue());
+  expected_records.emplace_back(op->output_schema(), false, 0_u,
+                                std::make_unique<std::string>("item0"), -5_s,
+                                NullValue(), NullValue());
+  expected_records.emplace_back(
+      op->output_schema(), true, 0_u, std::make_unique<std::string>("item0"),
+      -5_s, 100_u, std::make_unique<std::string>("descrp0"));
+
+  // Process records.
+  std::vector<Record> output;
+  EXPECT_TRUE(op->Process(0, lrecords, &output));
+  EXPECT_EQ(output.size(), 1);
+  EXPECT_EQ(op->left_table_.count(), 1);
+  EXPECT_IT_EQ(op->left_table_.Lookup(lrecords.at(0).GetValues({2})), lrecords);
+  EXPECT_EQ(op->right_table_.count(), 0);
+  EXPECT_TRUE(op->Process(1, rrecords, &output));
+  EXPECT_EQ(op->left_table_.count(), 1);
+  EXPECT_IT_EQ(op->left_table_.Lookup(lrecords.at(0).GetValues({2})), lrecords);
+  EXPECT_EQ(op->right_table_.count(), 1);
+  EXPECT_IT_EQ(op->right_table_.Lookup(rrecords.at(0).GetValues({1})),
+               rrecords);
+  EXPECT_EQ(output.size(), 3);
+  EXPECT_EQ(output, expected_records);
+}
+
+TEST(EquiJoinOperatorTest, BasicRightJoinTest) {
+  // Make two joinable records.
+  std::unique_ptr<std::string> s1 = std::make_unique<std::string>("item0");
+  std::unique_ptr<std::string> s2 = std::make_unique<std::string>("descrp0");
+  SchemaRef lschema = Schema1();
+  SchemaRef rschema = Schema2();
+  std::vector<Record> lrecords;
+  std::vector<Record> rrecords;
+  lrecords.emplace_back(lschema, true, 0_u, std::move(s1), -5_s);
+  rrecords.emplace_back(rschema, true, 100_u, -5_s, std::move(s2));
+
+  // Setup join operator with two parents, left with id 0 and right with id 1.
+  std::shared_ptr<IdentityOperator> iop1 = std::make_shared<IdentityOperator>();
+  std::shared_ptr<IdentityOperator> iop2 = std::make_shared<IdentityOperator>();
+  std::shared_ptr<EquiJoinOperator> op =
+      std::make_shared<EquiJoinOperator>(2, 1, EquiJoinOperator::Mode::RIGHT);
+  iop1->SetIndex(0);
+  iop2->SetIndex(1);
+  op->parents_ = {std::make_shared<Edge>(iop1, op),
+                  std::make_shared<Edge>(iop2, op)};
+  op->input_schemas_ = {lschema, rschema};
+  op->ComputeOutputSchema();
+
+  std::vector<Record> expected_records;
+  expected_records.emplace_back(op->output_schema(), true, NullValue(),
+                                NullValue(), NullValue(), 100_u,
+                                std::make_unique<std::string>("descrp0"));
+  expected_records.emplace_back(op->output_schema(), false, NullValue(),
+                                NullValue(), NullValue(), 100_u,
+                                std::make_unique<std::string>("descrp0"));
+  expected_records.emplace_back(
+      op->output_schema(), true, 0_u, std::make_unique<std::string>("item0"),
+      -5_s, 100_u, std::make_unique<std::string>("descrp0"));
+
+  // Process records.
+  std::vector<Record> output;
+  EXPECT_TRUE(op->Process(1, rrecords, &output));
+  EXPECT_EQ(op->left_table_.count(), 0);
+  EXPECT_EQ(op->right_table_.count(), 1);
+  EXPECT_IT_EQ(op->right_table_.Lookup(rrecords.at(0).GetValues({1})),
+               rrecords);
+  EXPECT_EQ(output.size(), 1);
+  EXPECT_TRUE(op->Process(0, lrecords, &output));
+  EXPECT_EQ(output.size(), 3);
+  EXPECT_EQ(op->left_table_.count(), 1);
+  EXPECT_IT_EQ(op->left_table_.Lookup(lrecords.at(0).GetValues({2})), lrecords);
+  EXPECT_EQ(op->right_table_.count(), 1);
+  EXPECT_EQ(output, expected_records);
+}
+
+TEST(EquiJoinOperatorTest, LeftJoinTest) {
+  // Make several sets of joinable records.
+  std::unique_ptr<std::string> si1 = std::make_unique<std::string>("item0");
+  std::unique_ptr<std::string> si2 = std::make_unique<std::string>("item1");
+  std::unique_ptr<std::string> si3 = std::make_unique<std::string>("item2");
+  std::unique_ptr<std::string> si4 = std::make_unique<std::string>("item3");
+  std::unique_ptr<std::string> si5 = std::make_unique<std::string>("item4");
+  std::unique_ptr<std::string> sd1 = std::make_unique<std::string>("descrp0");
+  std::unique_ptr<std::string> sd2 = std::make_unique<std::string>("descrp1");
+  std::unique_ptr<std::string> sd3 = std::make_unique<std::string>("descrp2");
+
+  SchemaRef lschema = Schema1();
+  SchemaRef rschema = Schema2();
+  std::vector<Record> lrecords1;
+  std::vector<Record> lrecords2;
+  std::vector<Record> lrecords3;
+  std::vector<Record> rrecords1;
+  std::vector<Record> rrecords2;
+  lrecords1.emplace_back(lschema, true, 0_u, std::move(si1), 1_s);
+  lrecords1.emplace_back(lschema, true, 1_u, std::move(si2), 2_s);
+  lrecords2.emplace_back(lschema, true, 2_u, std::move(si3), 0_s);
+  lrecords2.emplace_back(lschema, true, 3_u, std::move(si4), 2_s);
+  lrecords3.emplace_back(lschema, true, 4_u, std::move(si5), 1_s);
+  rrecords1.emplace_back(rschema, true, 100_u, 1_s, std::move(sd1));
+  rrecords1.emplace_back(rschema, true, 100_u, -1_s, std::move(sd2));
+  rrecords2.emplace_back(rschema, true, 50_u, 2_s, std::move(sd3));
+
+  // Setup join operator with two parents, left with id 0 and right with id 1.
+  std::shared_ptr<IdentityOperator> iop1 = std::make_shared<IdentityOperator>();
+  std::shared_ptr<IdentityOperator> iop2 = std::make_shared<IdentityOperator>();
+  std::shared_ptr<EquiJoinOperator> op =
+      std::make_shared<EquiJoinOperator>(2, 1, EquiJoinOperator::Mode::LEFT);
+  iop1->SetIndex(0);
+  iop2->SetIndex(1);
+  op->parents_ = {std::make_shared<Edge>(iop1, op),
+                  std::make_shared<Edge>(iop2, op)};
+  op->input_schemas_ = {lschema, rschema};
+  op->ComputeOutputSchema();
+
+  // Process records.
+  std::vector<Record> output;
+  // Batch 1.
+  EXPECT_TRUE(op->Process(0, lrecords1, &output));
+  EXPECT_EQ(op->left_table_.count(), 2);
+  EXPECT_EQ(op->right_table_.count(), 0);
+  EXPECT_EQ(output.size(), 2);
+  // Batch 2.
+  EXPECT_TRUE(op->Process(1, rrecords1, &output));
+  EXPECT_EQ(op->left_table_.count(), 2);
+  EXPECT_EQ(op->right_table_.count(), 2);
+  EXPECT_EQ(output.size(), 4);
+  // Batch 3.
+  EXPECT_TRUE(op->Process(0, lrecords2, &output));
+  EXPECT_EQ(op->left_table_.count(), 4);
+  EXPECT_EQ(op->right_table_.count(), 2);
+  EXPECT_EQ(output.size(), 6);
+  // Batch 4.
+  EXPECT_TRUE(op->Process(0, lrecords3, &output));
+  EXPECT_EQ(op->left_table_.count(), 5);
+  EXPECT_EQ(op->right_table_.count(), 2);
+  EXPECT_EQ(output.size(), 7);
+  // Batch 5.
+  EXPECT_TRUE(op->Process(1, rrecords2, &output));
+  EXPECT_EQ(op->left_table_.count(), 5);
+  EXPECT_EQ(op->right_table_.count(), 3);
+  EXPECT_EQ(output.size(), 11);
+
+  std::vector<Record> expected_records;
+  expected_records.emplace_back(op->output_schema(), true, 0_u,
+                                std::make_unique<std::string>("item0"), 1_s,
+                                NullValue(), NullValue());
+  expected_records.emplace_back(op->output_schema(), true, 1_u,
+                                std::make_unique<std::string>("item1"), 2_s,
+                                NullValue(), NullValue());
+  expected_records.emplace_back(op->output_schema(), false, 0_u,
+                                std::make_unique<std::string>("item0"), 1_s,
+                                NullValue(), NullValue());
+  expected_records.emplace_back(
+      op->output_schema(), true, 0_u, std::make_unique<std::string>("item0"),
+      1_s, 100_u, std::make_unique<std::string>("descrp0"));
+  expected_records.emplace_back(op->output_schema(), true, 2_u,
+                                std::make_unique<std::string>("item2"), 0_s,
+                                NullValue(), NullValue());
+  expected_records.emplace_back(op->output_schema(), true, 3_u,
+                                std::make_unique<std::string>("item3"), 2_s,
+                                NullValue(), NullValue());
+  expected_records.emplace_back(
+      op->output_schema(), true, 4_u, std::make_unique<std::string>("item4"),
+      1_s, 100_u, std::make_unique<std::string>("descrp0"));
+  expected_records.emplace_back(op->output_schema(), false, 1_u,
+                                std::make_unique<std::string>("item1"), 2_s,
+                                NullValue(), NullValue());
+  expected_records.emplace_back(op->output_schema(), false, 3_u,
+                                std::make_unique<std::string>("item3"), 2_s,
+                                NullValue(), NullValue());
+  expected_records.emplace_back(op->output_schema(), true, 1_u,
+                                std::make_unique<std::string>("item1"), 2_s,
+                                50_u, std::make_unique<std::string>("descrp2"));
+  expected_records.emplace_back(op->output_schema(), true, 3_u,
+                                std::make_unique<std::string>("item3"), 2_s,
+                                50_u, std::make_unique<std::string>("descrp2"));
+  EXPECT_EQ(output, expected_records);
+}
+
 }  // namespace dataflow
 }  // namespace pelton

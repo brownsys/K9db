@@ -77,6 +77,7 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
     return std::make_pair(false, std::unordered_set<UserId>{});
   }
 
+  perf::Start("Lookup Index1");
   // Get all the columns that have a secondary index.
   const std::unordered_set<ColumnName> &indexed_cols =
       state->IndicesFor(table_name);
@@ -96,9 +97,11 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
     MOVE_OR_RETURN(std::unordered_set<UserId> shards,
                    LookupIndex(index_flow, column_value, dataflow_state));
 
+    perf::End("Lookup Index1");
     return std::make_pair(true, std::move(shards));
   }
 
+  perf::End("Lookup Index1");
   return std::make_pair(false, std::unordered_set<UserId>{});
 }
 

@@ -1,28 +1,12 @@
 #!/bin/bash
-mysql -u $1 -p$2 --execute="DROP DATABASE default_db;"
-
-# medical_chat
-mysql -u $1 -p$2 --execute="DROP DATABASE doctors_c81e728d9d4c2f636f067f89cc14862c;"
-mysql -u $1 -p$2 --execute="DROP DATABASE patients_d3d9446802a44259755d38e6d163e820"
-
-# example.cc and examples/simple-websubmit.sql
-mysql -u $1 -p$2 --execute="DROP DATABASE students_c4ca4238a0b923820dcc509a6f75849b;"
-mysql -u $1 -p$2 --execute="DROP DATABASE students_c81e728d9d4c2f636f067f89cc14862c;"
-mysql -u $1 -p$2 --execute="DROP DATABASE students_eccbc87e4b5ce2fe28308fd9f2a7baf3;"
-
-# examples/medical_chat.sql
-mysql -u $1 -p$2 --execute="DROP DATABASE doctors_c4ca4238a0b923820dcc509a6f75849b;"
-mysql -u $1 -p$2 --execute="DROP DATABASE patients_98f13708210194c475687be6106a3b84;"
-
-# examples/{social_chat.sql,social_chat.cntd.sql}
-mysql -u $1 -p$2 --execute="DROP DATABASE Users_c81e728d9d4c2f636f067f89cc14862c"
-mysql -u $1 -p$2 --execute="DROP DATABASE Users_c4ca4238a0b923820dcc509a6f75849b"
-mysql -u $1 -p$2 --execute="DROP DATABASE Users_eccbc87e4b5ce2fe28308fd9f2a7baf3"
-
-# Lobsters
-mysql -u $1 -p$2 --execute="DROP DATABASE users_c81e728d9d4c2f636f067f89cc14862c"
-mysql -u $1 -p$2 --execute="DROP DATABASE users_cfcd208495d565ef66e7dff9f98764da"
-mysql -u $1 -p$2 --execute="DROP DATABASE users_c4ca4238a0b923820dcc509a6f75849b"
-mysql -u $1 -p$2 --execute="DROP DATABASE default_db"
-
-exit 0
+for DATABASE in $(mysql -u $1 -p$2 <<-END_SQL
+-- Prevent truncation
+SET SESSION group_concat_max_len = 10000000;
+-- AS '' does not output the header of the query
+SELECT DISTINCT table_schema AS '' FROM information_schema.tables WHERE table_schema NOT IN ('mysql', 'information_schema', 'sys', 'performance_schema');
+END_SQL
+)
+do
+  echo "Dropping database: $DATABASE"
+  mysql -u $1 -p$2 --execute="DROP DATABASE $DATABASE;" 2>&1 | grep -v "Using a password on the command line"
+done

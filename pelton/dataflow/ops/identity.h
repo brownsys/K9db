@@ -27,6 +27,9 @@ class IdentityOperator : public Operator {
   FRIEND_TEST(EquiJoinOperatorTest, BasicJoinTest);
   FRIEND_TEST(EquiJoinOperatorTest, BasicUnjoinableTest);
   FRIEND_TEST(EquiJoinOperatorTest, FullJoinTest);
+  FRIEND_TEST(EquiJoinOperatorTest, BasicLeftJoinTest);
+  FRIEND_TEST(EquiJoinOperatorTest, BasicRightJoinTest);
+  FRIEND_TEST(EquiJoinOperatorTest, LeftJoinTest);
 };
 
 }  // namespace dataflow

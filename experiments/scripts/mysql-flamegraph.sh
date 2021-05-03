@@ -1,5 +1,5 @@
 #!/bin/bash
-./experiments/scripts/clear-db.sh
+./bin/drop_all.sh
 
 # Compile everything with -c opt
 sudo bazel build -c opt //bin:mysql

@@ -1,6 +1,7 @@
 package com.brownsys.pelton.operators;
 
 import com.brownsys.pelton.PlanningContext;
+import com.brownsys.pelton.nativelib.DataFlowGraphLibrary;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -62,12 +63,37 @@ public class JoinOperatorFactory {
         joinOperator =
             this.context
                 .getGenerator()
-                .AddEquiJoinOperator(leftInput, rightInput, leftPeltonIndex, rightPeltonIndex);
+                .AddJoinOperator(
+                    leftInput,
+                    rightInput,
+                    leftPeltonIndex,
+                    rightPeltonIndex,
+                    DataFlowGraphLibrary.INNER);
+        break;
+      case LEFT:
+        joinOperator =
+            this.context
+                .getGenerator()
+                .AddJoinOperator(
+                    leftInput,
+                    rightInput,
+                    leftPeltonIndex,
+                    rightPeltonIndex,
+                    DataFlowGraphLibrary.LEFT);
+        break;
+      case RIGHT:
+        joinOperator =
+            this.context
+                .getGenerator()
+                .AddJoinOperator(
+                    leftInput,
+                    rightInput,
+                    leftPeltonIndex,
+                    rightPeltonIndex,
+                    DataFlowGraphLibrary.RIGHT);
         break;
       case ANTI:
       case FULL:
-      case LEFT:
-      case RIGHT:
       case SEMI:
         throw new IllegalArgumentException("Unsupported join type " + join.getJoinType());
     }
