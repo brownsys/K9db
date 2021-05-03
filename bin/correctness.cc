@@ -98,7 +98,7 @@ int main(int argc, char **argv)
     }
     else
     {
-        std::cout << "schema file is closed" << std::endl;
+        LOG(FATAL) << "couldn't open schema file " << FLAGS_schema;
     }
 
     // * process queries (input file 2)
@@ -140,7 +140,7 @@ int main(int argc, char **argv)
     }
     else
     {
-        std::cout << "queries file is closed" << std::endl;
+        LOG(FATAL) << "couldn't open queries file " << FLAGS_queries;
     }
 
     // * process expected results (input file 3)
@@ -174,7 +174,8 @@ int main(int argc, char **argv)
     }
     else
     {
-        std::cout << "expected results file is closed" << std::endl;
+        LOG(FATAL) << "couldn't open expected results file "
+                   << FLAGS_expected_output;
     }
 
     // * process inserts (input file 4)
@@ -196,7 +197,7 @@ int main(int argc, char **argv)
     }
     else
     {
-        std::cout << "inserts file is closed" << std::endl;
+        LOG(FATAL) << "couldn't open inserts file " << FLAGS_inserts;
     }
 
     // * run schema and queries using pelton
