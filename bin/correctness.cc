@@ -76,7 +76,7 @@ int main(int argc, char **argv)
     std::string line;
     if (schema.is_open())
     {
-        std::cout << "schema file opened" << std::endl;
+        LOG(INFO) << "schema file opened";
         std::string table = "";
         while (std::getline(schema, line))
         {
@@ -105,7 +105,7 @@ int main(int argc, char **argv)
     std::ifstream queries(FLAGS_queries);
     if (queries.is_open())
     {
-        std::cout << "queries file opened" << std::endl;
+        LOG(INFO) << "queries file opened";
         while (std::getline(queries, line))
         {
             if (line == "" || line.find("--skip--") != std::string::npos)
@@ -148,7 +148,7 @@ int main(int argc, char **argv)
     std::ifstream expected(FLAGS_expected_output);
     if (expected.is_open())
     {
-        std::cout << "expected results file open" << std::endl;
+        LOG(INFO) << "expected results file open";
         // vector containing result for one query
         std::vector<std::string> expected_result;
         while (std::getline(expected, line))
@@ -183,7 +183,7 @@ int main(int argc, char **argv)
     std::ifstream inserts(FLAGS_inserts);
     if (inserts.is_open())
     {
-        std::cout << "inserts file opened" << std::endl;
+        LOG(INFO) << "inserts file opened";
         while (std::getline(inserts, line))
         {
             if (line == "" || line.find("--skip--") != std::string::npos)
@@ -210,54 +210,49 @@ int main(int argc, char **argv)
     CHECK(pelton::exec(&connection, "SET echo;").ok());
 
     // Create all the tables.
-    std::cout << "Create the tables ... " << std::endl;
+    LOG(INFO) << "Create the tables ... ";
     for (std::string &create : CREATES)
     {
         std::cout << std::endl;
         CHECK(pelton::exec(&connection, create).ok());
     }
-    std::cout << std::endl;
 
     // Add flows.
-    std::cout << "Installing flows ... " << std::endl;
+    LOG(INFO) << "Installing flows ... ";
     for (const auto &[name, query] : FLOWS)
     {
         std::cout << name << std::endl;
         CHECK(pelton::exec(&connection, query).ok());
     }
     pelton::shutdown_planner();
-    std::cout << std::endl;
 
     // Insert data into the tables.
-    std::cout << "Insert data into tables ... " << std::endl;
+    LOG(INFO) << "Insert data into tables ... ";
     for (std::string &insert : INSERTS)
     {
         std::cout << std::endl;
         CHECK(pelton::exec(&connection, insert).ok());
     }
-    std::cout << std::endl;
 
     // Updates
-    std::cout << "Update data in tables ... " << std::endl;
+    LOG(INFO) << "Update data in tables ... ";
     for (std::string &update : UPDATES)
     {
         std::cout << std::endl;
         CHECK(pelton::exec(&connection, update).ok());
     }
-    std::cout << std::endl;
 
     // Deletes
-    std::cout << "Delete data from tables ... " << std::endl;
+    LOG(INFO) << "Delete data from tables ... ";
     for (std::string &del : DELETES)
     {
         std::cout << std::endl;
         CHECK(pelton::exec(&connection, del).ok());
     }
-    std::cout << std::endl;
 
     // * compare pelton to expected results
 
-    std::cout << "Check flows and queries... " << std::endl;
+    LOG(INFO) << "Check flows and queries... ";
     // run each query
     long unsigned int i = 0;
     for (const auto &query : FLOW_READS_AND_QUERIES)
@@ -302,7 +297,6 @@ int main(int argc, char **argv)
         }
         i++;
     }
-    std::cout << std::endl;
 
     // Close connection.
     pelton::close(&connection);
