@@ -11,6 +11,10 @@
 
 #define HANDLE_NULL_MACRO_COLUMN(col, other_col, OP)            \
   if (record.IsNull(col)) {                                     \
+    if (record.IsNull(other_col)) {                             \
+      out_record.SetNull(true, i);                              \
+      continue;                                                 \
+    }                                                           \
     switch (this->output_schema_.TypeOf(i)) {                   \
       case sqlast::ColumnDefinition::Type::UINT:                \
         out_record.SetUInt(record.GetUInt(other_col), i);       \

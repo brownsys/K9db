@@ -142,6 +142,7 @@ Key Record::GetValues(const std::vector<ColumnID> &cols) const {
   // Construct key with given capacity, and fill it up with values.
   Key key{cols.size()};
   for (ColumnID col : cols) {
+    CHECK(!this->IsNull(col));
     switch (this->schema_.TypeOf(col)) {
       case sqlast::ColumnDefinition::Type::UINT:
         key.AddValue(this->data_[col].uint);
