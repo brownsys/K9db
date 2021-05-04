@@ -112,11 +112,13 @@ fi
 
 # update repo
 cd pelton
+git stash
 git fetch origin
 git checkout $BRANCH
 git pull origin $BRANCH
 git submodule init && git submodule update
 chmod 777 -R .
+git log -1
 echo "Pelton Log: Updated repo!"
 
 # build docker image

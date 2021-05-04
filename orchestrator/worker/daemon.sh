@@ -5,7 +5,7 @@ echo "Worker starting!"
 echo "Orchestrator ip $ORCHESTRATOR"
 
 # Compile our code
-bazel build -c opt ...
+bazel build --config=opt ...
 echo "Pelton Log: Bazel built!"
 
 # compile GDPRBench
@@ -46,7 +46,7 @@ do
     if [[ $(head -n 1 orchestrator/worker/worker_load) == "# Pelton" ]]; then
       # Run pelton trace file
       echo "Pelton Log: Running Pelton job!"
-      bazel run -c opt //bin:cli -- --print=no --minloglevel=3 < $SFILENAME > .output 2> .error
+      bazel run --config=opt //bin:cli -- --print=no --minloglevel=3 < $SFILENAME > .output 2> .error
       if [ $? -eq 0 ]; then
         echo "Pelton Log: Pelton job completed!"
 
@@ -63,7 +63,7 @@ do
     else
       # Run vanilla trace file
       echo "Pelton Log: Running Baseline job!"
-      bazel run -c opt //bin:mysql -- --print=no --minloglevel=3 < $UFILENAME > .output 2> .error
+      bazel run --config=opt //bin:mysql -- --print=no --minloglevel=3 < $UFILENAME > .output 2> .error
       if [ $? -eq 0 ]; then
         echo "Pelton Log: Baseline job completed!"
 

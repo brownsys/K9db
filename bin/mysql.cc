@@ -24,9 +24,10 @@ void PrintHeader(bool print, sql::ResultSet *result) {
 }
 
 void PrintData(bool print, sql::ResultSet *result) {
+  std::unique_ptr<sql::ResultSetMetaData> meta{result->getMetaData()};
   while (result->next()) {
-    for (size_t i = 1; i <= result->getMetaData()->getColumnCount(); i++) {
-      switch (result->getMetaData()->getColumnType(i)) {
+    for (size_t i = 1; i <= meta->getColumnCount(); i++) {
+      switch (meta->getColumnType(i)) {
         case sql::DataType::VARCHAR:
         case sql::DataType::NVARCHAR:
         case sql::DataType::CHAR:
@@ -48,7 +49,7 @@ void PrintData(bool print, sql::ResultSet *result) {
         default:
           std::cout << std::endl;
           std::cout << "Unknown column type: "
-                    << result->getMetaData()->getColumnTypeName(i) << std::endl;
+                    << meta->getColumnTypeName(i) << std::endl;
       }
     }
     if (print) {
