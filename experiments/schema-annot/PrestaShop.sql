@@ -547,7 +547,7 @@ CREATE TABLE `PREFIX_connections_source` (
 /* Store technical contact informations */
 CREATE TABLE `PREFIX_contact` (
   `id_contact` int(10) unsigned NOT NULL auto_increment,
-  `email` varchar(255) NOT NULL,
+  `PII_email` varchar(255) NOT NULL,
   `customer_service` tinyint(1) NOT NULL DEFAULT '0',
   `position` tinyint(2) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`id_contact`)
@@ -628,7 +628,7 @@ CREATE TABLE `PREFIX_customer` (
   `ape` varchar(5),
   `firstname` varchar(255) NOT NULL,
   `lastname` varchar(255) NOT NULL,
-  `email` varchar(255) NOT NULL,
+  `PII_email` varchar(255) NOT NULL,
   `passwd` varchar(255) NOT NULL,
   `last_passwd_gen` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `birthday` date DEFAULT NULL,
@@ -809,7 +809,7 @@ CREATE TABLE `PREFIX_employee` (
   `id_lang` int(10) unsigned NOT NULL DEFAULT '0',
   `lastname` varchar(255) NOT NULL,
   `firstname` varchar(255) NOT NULL,
-  `email` varchar(255) NOT NULL,
+  `PII_email` varchar(255) NOT NULL,
   `passwd` varchar(255) NOT NULL,
   `last_passwd_gen` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `stats_date_from` date DEFAULT NULL,
