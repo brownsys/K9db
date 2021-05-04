@@ -19,7 +19,7 @@ Content-Disposition: attachment; filename="userdata.txt"
 
 #!/bin/bash
 # this script is run as root whenever the EC2 instance is launched/restarted.
-ORCHESTRATOR_IP="18.216.101.249"  # replace with actual IP for experiment.
+ORCHESTRATOR_IP="18.220.88.68"  # replace with actual IP for experiment.
 BRANCH="optimization"
 
 # start from root directory
