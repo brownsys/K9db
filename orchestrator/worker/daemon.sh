@@ -13,8 +13,11 @@ cd experiments/GDPRbench/src/ && mvn package && cd -
 echo "Pelton Log: mvn built!"
 
 # Poll the orchestrator for loads to run.
+echo "Pelton Log: find worker directory"
+find orchestrator/worker/
+
 rm -rf orchestrator/worker/worker_load
-rm -rf .output
+rm -rf .output .error
 
 while true
 do
@@ -59,7 +62,7 @@ do
     else
       # Run vanilla trace file
       echo "Pelton Log: Running Baseline job!"
-      bazel run -c opt //bin:mysql -- --print=no --minloglevel=3 < $UFILENAME >> .output 2>&1
+      bazel run -c opt //bin:mysql -- --print=no --minloglevel=3 < $UFILENAME >> .output 2> .error
       if [ $? -eq 0 ]; then
         echo "Pelton Log: Baseline job completed!"
 

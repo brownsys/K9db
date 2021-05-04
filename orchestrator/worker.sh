@@ -25,26 +25,28 @@ BRANCH="optimization"
 # start from root directory
 cd /
 
+# stop docker to ensure SSD is mounted first.
+service docker stop || true
+
 # install dependencies
 apt-get update
 apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
 echo "Pelton Log: Installed dependencies"
 
 # Make sure the ssd drive is mounted properly.
-if [[ ! -f ".ssd.configured" ]]
+if [[ $(parted -l | grep ext4 | wc -l) -eq 1 ]]
 then
-  touch .ssd.configured
   # docker uses SSD
   mkdir -p /etc/docker
   echo '{ "data-root": "/data/docker" }' > /etc/docker/daemon.json
   # format SSD (once)
-  mkfs -t xfs /dev/nvme1n1
+  mkfs -t ext4 /dev/nvme1n1
   echo "Pelton Log: Formatted SSD"
 fi
 
 # Mount SSD.
 mkdir -p /data
-mount /dev/nvme1n1 /data
+mount -t ext4 /dev/nvme1n1 /data
 mkdir -p /data/docker
 echo "Pelton Log: Mounted SSD"
 
@@ -57,6 +59,10 @@ echo \
 apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io
 echo "Pelton Log: Installed Docker"
+
+# Run docker on SSD.
+service docker start
+echo "Pelton Log: Docker started"
 
 # Setup ssh keys to access pelton.
 mkdir -p /root/.ssh
@@ -110,6 +116,7 @@ git fetch origin
 git checkout $BRANCH
 git pull origin $BRANCH
 git submodule init && git submodule update
+chmod 777 -R .
 echo "Pelton Log: Updated repo!"
 
 # build docker image
