@@ -151,6 +151,7 @@ Experiment.prototype.finished = function (result) {
   this.status = STATUS_EXPERIMENT_DONE;
   this.result = result;
   resultQueue.push(this);
+  fs.writeFileSync("orchestrator/server/result" + this.id, this.result);
 };
 Experiment.prototype.toString = function () {
   let str = this.type + " Experiment " + this.id + " (" + this.name_ + ")";
@@ -196,7 +197,7 @@ app.listen(PORT, () => {
       console.log('- experiments');
       console.log('- result <experiment id>');
       console.log('- gdprbench <tag> <path/to/load/file>');
-      console.log('- load <path/to/dir/containing/loads>');
+      console.log('- load <path/to/dir/containing/loads> [baseline|pelton]');
     }
     if (line.startsWith('exit')) {
       process.exit(0);
@@ -244,14 +245,18 @@ app.listen(PORT, () => {
     if (line.startsWith('load')) {
       const split = line.split(" ");
       const directory = split[1];
+      const type = split[2];
       const sep = directory.endsWith("/") ? "" : "/";
       for (const file of fs.readdirSync(directory)) {
         const path = directory + sep + file;
         if (fs.lstatSync(path).isFile()) {
-          const experiment1 = new Experiment(file, path, "Baseline");
-          const experiment2 = new Experiment(file, path, "Pelton");
-          console.log(experiment1.toString());
-          console.log(experiment2.toString());
+          if (type.toLowerCase() == "baseline")  {
+            const experiment = new Experiment(file, path, "Baseline");
+            console.log(experiment.toString());
+          } else {
+            const experiment = new Experiment(file, path, "Pelton");
+            console.log(experiment.toString());
+          }
         }
       }
     }
