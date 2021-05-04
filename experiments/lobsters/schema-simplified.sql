@@ -46,6 +46,10 @@ CREATE TABLE comments ( \
   is_moderated int, \
   is_from_email int, \
   hat_id int, \
+  FOREIGN KEY (user_id) REFERENCES users(id), \
+  FOREIGN KEY (parent_comment_id) REFERENCES comments(id), \
+  FOREIGN KEY (hat_id) REFERENCES hats(id), \
+  FOREIGN KEY (story_id) REFERENCES stories(id), \
   FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE hat_requests ( \
@@ -75,6 +79,7 @@ CREATE TABLE hidden_stories ( \
   id int NOT NULL PRIMARY KEY, \
   user_id int, \
   story_id int, \
+  FOREIGN KEY (story_id) REFERENCES stories(id), \
   FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE TABLE invitation_requests ( \
@@ -127,6 +132,8 @@ CREATE TABLE moderations ( \
   `action` text, \
   reason text, \
   is_from_suggestions int, \
+  FOREIGN KEY (comment_id) REFERENCES comments(id), \
+  FOREIGN KEY (story_id) REFERENCES stories(id), \
   FOREIGN KEY (OWNER_user_id) REFERENCES users(id), \
   FOREIGN KEY (OWNER_moderator_user_id) REFERENCES users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
@@ -137,6 +144,7 @@ CREATE TABLE read_ribbons ( \
   updated_at datetime NOT NULL, \
   user_id int, \
   story_id int, \
+  FOREIGN KEY (story_id) REFERENCES stories(id), \
   FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE saved_stories ( \
@@ -145,6 +153,7 @@ CREATE TABLE saved_stories ( \
   updated_at datetime NOT NULL, \
   user_id int, \
   story_id int, \
+  FOREIGN KEY (story_id) REFERENCES stories(id) \
   FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE TABLE stories ( \
@@ -167,6 +176,7 @@ CREATE TABLE stories ( \
   unavailable_at datetime, \
   twitter_id varchar(20), \
   user_is_author int, \
+  FOREIGN KEY (merged_story_id) REFERENCES stories(id), \
   FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
 -- Need this index for transitive sharding.
@@ -185,6 +195,8 @@ CREATE TABLE suggested_taggings ( \
   story_id int, \
   tag_id int, \
   user_id int, \
+  FOREIGN KEY (story_id) REFERENCES stories(id), \
+  FOREIGN KEY (tag_id) REFERENCES tags(id), \
   FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE TABLE suggested_titles ( \
@@ -192,6 +204,7 @@ CREATE TABLE suggested_titles ( \
   story_id int, \
   user_id int, \
   title varchar(150) NOT NULL, \
+  FOREIGN KEY (story_id) REFERENCES stories(id), \
   FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE TABLE tag_filters ( \
@@ -200,6 +213,7 @@ CREATE TABLE tag_filters ( \
   updated_at datetime NOT NULL, \
   user_id int, \
   tag_id int, \
+  FOREIGN KEY (tag_id) REFERENCES tags(id), \
   FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE TABLE taggings ( \
