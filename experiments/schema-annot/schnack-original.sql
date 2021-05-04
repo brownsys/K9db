@@ -6,13 +6,12 @@ CREATE TABLE comment (
     created_at TEXT NOT NULL,
     comment CHAR(4000) NOT NULL,
     rejected BOOLEAN,
-    approved BOOLEAN,
-    FOREIGN KEY (user_id) REFERENCES user(id)
+    approved BOOLEAN
 );
 
 CREATE TABLE user (
     id INTEGER PRIMARY KEY NOT NULL,
-    PII_name CHAR(128),
+    name CHAR(128),
     display_name CHAR(128),
     provider CHAR(128),
     provider_id CHAR(128),
@@ -57,8 +56,7 @@ CREATE TABLE comment (
     created_at TEXT NOT NULL,
     comment CHAR(4000) NOT NULL,
     rejected BOOLEAN,
-    approved BOOLEAN,
-    FOREIGN KEY (user_id) REFERENCES user(id)
+    approved BOOLEAN
 );
 INSERT INTO comment SELECT id, user_id, slug, created_at, comment, rejected, approved FROM comment_old;
 DROP TABLE comment_old;
@@ -103,7 +101,7 @@ ALTER TABLE user ADD COLUMN url CHAR(255);
 ALTER TABLE user RENAME TO user_old;
 CREATE TABLE user (
     id INTEGER PRIMARY KEY NOT NULL,
-    PII_name CHAR(128),
+    name CHAR(128),
     display_name CHAR(128),
     provider CHAR(128),
     provider_id CHAR(128),
