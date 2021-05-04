@@ -63,7 +63,7 @@ do
     else
       # Run vanilla trace file
       echo "Pelton Log: Running Baseline job!"
-      bazel run -c opt //bin:mysql -- --print=no --minloglevel=3 < $UFILENAME >> .output 2> .error
+      bazel run -c opt //bin:mysql -- --print=no --minloglevel=3 < $UFILENAME > .output 2> .error
       if [ $? -eq 0 ]; then
         echo "Pelton Log: Baseline job completed!"
 
