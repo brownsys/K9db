@@ -30,8 +30,7 @@ CREATE TABLE `blocks` (
   `block_id` int(11) NOT NULL,
   `block_by` int(11) NOT NULL,
   `user` int(11) NOT NULL,
-  `block_time` varchar(100) NOT NULL,
-  FOREIGN KEY (`user`) REFERENCES users(id)
+  `block_time` varchar(100) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
@@ -55,7 +54,6 @@ CREATE TABLE `bookmarks` (
   `bkmrk_by` int(11) NOT NULL,
   `post_id` int(11) NOT NULL,
   `bkmrk_time` varchar(100) NOT NULL
-  FOREIGN KEY (`post_id`) REFERENCES posts(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
@@ -77,11 +75,9 @@ CREATE TABLE `comments` (
   `type` enum('text','image','sticker') COLLATE utf8mb4_bin NOT NULL,
   `text` mediumtext COLLATE utf8mb4_bin NOT NULL,
   `commentSrc` mediumtext COLLATE utf8mb4_bin NOT NULL,
-  `OWNER_comment_by` int(11) NOT NULL,
+  `comment_by` int(11) NOT NULL,
   `post_id` int(11) NOT NULL,
   `comment_time` varchar(100) COLLATE utf8mb4_bin NOT NULL
-  FOREIGN KEY (`post_id`) REFERENCES posts(id),
-  FOREIGN KEY (`OWNER_comment_by`) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 --
@@ -109,11 +105,9 @@ INSERT INTO `comments` (`comment_id`, `type`, `text`, `commentSrc`, `comment_by`
 
 CREATE TABLE `conversations` (
   `con_id` int(11) NOT NULL,
-  `OWNER_user_one` int(11) NOT NULL,
-  `OWNER_user_two` int(11) NOT NULL,
+  `user_one` int(11) NOT NULL,
+  `user_two` int(11) NOT NULL,
   `con_time` varchar(100) NOT NULL
-  FOREIGN KEY (OWNER_user_one) REFERENCES users(id),
-  FOREIGN KEY (OWNER_user_two) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
@@ -137,8 +131,7 @@ CREATE TABLE `favourites` (
   `fav_id` int(11) NOT NULL,
   `fav_by` int(11) NOT NULL,
   `user` int(11) NOT NULL,
-  `fav_time` varchar(100) NOT NULL,
-  FOREIGN KEY (`user`) REFERENCES users(id)
+  `fav_time` varchar(100) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
@@ -159,13 +152,11 @@ INSERT INTO `favourites` (`fav_id`, `fav_by`, `user`, `fav_time`) VALUES
 
 CREATE TABLE `follow_system` (
   `follow_id` int(11) NOT NULL,
-  `OWNER_follow_by` int(11) NOT NULL,
+  `follow_by` int(11) NOT NULL,
   `follow_by_username` varchar(32) NOT NULL,
-  `OWNER_follow_to` int(11) NOT NULL,
+  `follow_to` int(11) NOT NULL,
   `follow_to_username` varchar(32) NOT NULL,
-  `follow_time` varchar(100) NOT NULL,
-  FOREIGN KEY (`OWNER_follow_by`) REFERENCES users(id),
-  FOREIGN KEY (`OWNER_follow_to`) REFERENCES users(id)
+  `follow_time` varchar(100) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
@@ -219,8 +210,7 @@ CREATE TABLE `groups` (
   `bio` varchar(2000) NOT NULL,
   `admin` int(11) NOT NULL,
   `group_type` enum('public','private') NOT NULL DEFAULT 'public',
-  `created` varchar(100) NOT NULL,
-  FOREIGN KEY (`admin`) REFERENCES users(id)
+  `created` varchar(100) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
@@ -240,11 +230,9 @@ INSERT INTO `groups` (`group_id`, `name`, `bio`, `admin`, `group_type`, `created
 CREATE TABLE `group_members` (
   `grp_member_id` int(11) NOT NULL,
   `group_id` int(11) NOT NULL,
-  `OWNER_member` int(11) NOT NULL,
+  `member` int(11) NOT NULL,
   `added_by` int(11) NOT NULL,
-  `joined_group` varchar(100) NOT NULL,
-  FOREIGN KEY (`OWNER_member`) REFERENCES users(id),
-  FOREIGN KEY (`added_by`) REFERENCES users(id)
+  `joined_group` varchar(100) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
@@ -270,10 +258,8 @@ CREATE TABLE `hashtags` (
   `hashtag_id` int(11) NOT NULL,
   `hashtag` varchar(1000) NOT NULL,
   `post_id` int(11) NOT NULL,
-  `OWNER_user` int(11) NOT NULL,
+  `user` int(11) NOT NULL,
   `hashtag_time` varchar(100) NOT NULL
-  FOREIGN KEY (`OWNER_user`) REFERENCES users(id),
-  FOREIGN KEY (`post_id`) REFERENCES posts(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
@@ -298,10 +284,8 @@ INSERT INTO `hashtags` (`hashtag_id`, `hashtag`, `post_id`, `user`, `hashtag_tim
 CREATE TABLE `likes` (
   `like_id` int(11) NOT NULL,
   `post_id` int(11) NOT NULL,
-  `OWNER_like_by` int(11) NOT NULL,
-  `like_time` varchar(100) NOT NULL,
-  FOREIGN KEY (`OWNER_like_by`) REFERENCES users(id),
-  FOREIGN KEY (`post_id`) REFERENCES posts(id)
+  `like_by` int(11) NOT NULL,
+  `like_time` varchar(100) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
@@ -343,9 +327,7 @@ CREATE TABLE `messages` (
   `message` longtext COLLATE utf8mb4_bin NOT NULL,
   `type` enum('text','image','sticker') COLLATE utf8mb4_bin NOT NULL,
   `status` enum('read','unread') COLLATE utf8mb4_bin NOT NULL DEFAULT 'unread',
-  `message_time` varchar(100) COLLATE utf8mb4_bin NOT NULL,
-  FOREIGN KEY (`OWNER_mssg_by`) REFERENCES users(id),
-  FOREIGN KEY (`OWNER_mssg_to`) REFERENCES users(id)
+  `message_time` varchar(100) COLLATE utf8mb4_bin NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 --
@@ -374,18 +356,13 @@ INSERT INTO `messages` (`message_id`, `con_id`, `mssg_by`, `mssg_to`, `message`,
 CREATE TABLE `notifications` (
   `notify_id` int(11) NOT NULL,
   `notify_by` int(11) NOT NULL,
-  `OWNER_notify_to` int(11) NOT NULL,
+  `notify_to` int(11) NOT NULL,
   `post_id` int(11) NOT NULL,
   `group_id` int(11) NOT NULL,
   `type` enum('follow','tag','like','share','shared_your_post','comment','favourites','recommend','add_grp_member','invite','change_admin','new_con','mention_post','mention_comment') NOT NULL,
   `user` int(11) NOT NULL,
   `notify_time` varchar(100) NOT NULL,
-  `status` enum('read','unread') NOT NULL DEFAULT 'unread',
-  FOREIGN KEY (`post_id`) REFERENCES posts(id),
-  FOREIGN KEY (`group_id`) REFERENCES groups(id),
-  FOREIGN KEY (`notify_by`) REFERENCES users(id),
-  FOREIGN KEY (`OWNER_notify_to`) REFERENCES users(id),
-  FOREIGN KEY (`user`) REFERENCES users(id)
+  `status` enum('read','unread') NOT NULL DEFAULT 'unread'
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
@@ -536,10 +513,7 @@ CREATE TABLE `posts` (
   `location` mediumtext COLLATE utf8mb4_bin NOT NULL,
   `type` enum('user','group') COLLATE utf8mb4_bin NOT NULL DEFAULT 'user',
   `group_id` int(11) NOT NULL,
-  `post_time` varchar(100) COLLATE utf8mb4_bin NOT NULL,
-  FOREIGN KEY (`user`) REFERENCES users(id),
-  FOREIGN KEY (`group_id`) REFERENCES groups(id),
-  FOREIGN KEY (`post_id`) REFERENCES posts(id)
+  `post_time` varchar(100) COLLATE utf8mb4_bin NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 --
@@ -585,9 +559,7 @@ INSERT INTO `posts` (`post_id`, `user`, `description`, `imgSrc`, `filter`, `loca
 CREATE TABLE `post_tags` (
   `post_tag_id` int(11) NOT NULL,
   `post_id` int(11) NOT NULL,
-  `OWNER_user` int(11) NOT NULL,
-  FOREIGN KEY (`OWNER_user`) REFERENCES users(id),
-  FOREIGN KEY (`post_id`) REFERENCES posts(id)
+  `user` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
@@ -598,11 +570,9 @@ CREATE TABLE `post_tags` (
 
 CREATE TABLE `profile_views` (
   `view_id` int(11) NOT NULL,
-  `OWNER_view_by` int(11) NOT NULL,
+  `view_by` int(11) NOT NULL,
   `view_to` int(11) NOT NULL,
-  `view_time` varchar(100) NOT NULL,
-  FOREIGN KEY (`OWNER_view_by`) REFERENCES users(id),
-  FOREIGN KEY (`view_to`) REFERENCES users(id)
+  `view_time` varchar(100) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
@@ -873,13 +843,11 @@ INSERT INTO `profile_views` (`view_id`, `view_by`, `view_to`, `view_time`) VALUE
 --
 
 CREATE TABLE `recommendations` (
-  `OWNER_recommend_id` int(11) NOT NULL,
-  `OWNER_recommend_by` int(11) NOT NULL,
+  `recommend_id` int(11) NOT NULL,
+  `recommend_by` int(11) NOT NULL,
   `recommend_to` int(11) NOT NULL,
   `recommend_of` int(11) NOT NULL,
-  `recommend_time` varchar(100) NOT NULL,
-  FOREIGN KEY (`OWNER_recommend_by`) REFERENCES users(id),
-  FOREIGN KEY (`OWNER_recommend_to`) REFERENCES users(id)
+  `recommend_time` varchar(100) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
@@ -903,12 +871,10 @@ INSERT INTO `recommendations` (`recommend_id`, `recommend_by`, `recommend_to`, `
 
 CREATE TABLE `shares` (
   `share_id` int(11) NOT NULL,
-  `OWNER_share_by` int(11) NOT NULL,
+  `share_by` int(11) NOT NULL,
   `share_to` int(11) NOT NULL,
   `post_id` int(11) NOT NULL,
-  `share_time` varchar(100) NOT NULL,
-  FOREIGN KEY (`OWNER_shard_by`) REFERENCES users(id),
-  FOREIGN KEY (`share_to`) REFERENCES users(id)
+  `share_time` varchar(100) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
@@ -934,8 +900,7 @@ INSERT INTO `shares` (`share_id`, `share_by`, `share_to`, `post_id`, `share_time
 CREATE TABLE `tags` (
   `tag_id` int(11) NOT NULL,
   `user` int(11) NOT NULL,
-  `tag` varchar(255) NOT NULL,
-  FOREIGN KEY (`user`) REFERENCES users(id)
+  `tag` varchar(255) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
@@ -957,7 +922,7 @@ CREATE TABLE `users` (
   `username` varchar(32) COLLATE utf8mb4_bin NOT NULL,
   `firstname` varchar(32) COLLATE utf8mb4_bin NOT NULL,
   `surname` varchar(32) COLLATE utf8mb4_bin NOT NULL,
-  `PII_email` varchar(255) COLLATE utf8mb4_bin NOT NULL,
+  `email` varchar(255) COLLATE utf8mb4_bin NOT NULL,
   `password` varchar(255) COLLATE utf8mb4_bin NOT NULL,
   `bio` varchar(1000) COLLATE utf8mb4_bin NOT NULL,
   `joined` varchar(100) COLLATE utf8mb4_bin NOT NULL,
@@ -970,7 +935,7 @@ CREATE TABLE `users` (
   `website` varchar(500) COLLATE utf8mb4_bin NOT NULL,
   `phone` varchar(20) COLLATE utf8mb4_bin NOT NULL,
   `isOnline` enum('yes','no') COLLATE utf8mb4_bin NOT NULL DEFAULT 'no',
-  `lastOnline` varchar(100) COLLATE utf8mb4_bin NOT NULL,
+  `lastOnline` varchar(100) COLLATE utf8mb4_bin NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 --
