@@ -6,21 +6,29 @@
 #include <openssl/md5.h>
 
 #include <cstdio>
+#include <unordered_map>
 
 namespace pelton {
 namespace shards {
 namespace sqlengine {
 
+static std::unordered_map<std::string, std::string> HASHMAP;
+
 std::string NameShard(const ShardKind &shard_kind, const UserId &user_id) {
-  char hex_buffer[MD5_DIGEST_LENGTH * 2 + 1];
-  unsigned char md5_buffer[MD5_DIGEST_LENGTH];
-  MD5(reinterpret_cast<const unsigned char *>(user_id.c_str()), user_id.size(),
-      md5_buffer);
-  for (size_t i = 0; i < MD5_DIGEST_LENGTH; i++) {
-    // NOLINTNEXTLINE
-    snprintf(hex_buffer + (i * 2), 3, "%02x", md5_buffer[i]);
+  if (HASHMAP.count(user_id) == 0) {
+    char hex_buffer[MD5_DIGEST_LENGTH * 2 + 1];
+    unsigned char md5_buffer[MD5_DIGEST_LENGTH];
+    MD5(reinterpret_cast<const unsigned char *>(user_id.c_str()),
+        user_id.size(), md5_buffer);
+    for (size_t i = 0; i < MD5_DIGEST_LENGTH; i++) {
+      // NOLINTNEXTLINE
+      snprintf(hex_buffer + (i * 2), 3, "%02x", md5_buffer[i]);
+    }
+    HASHMAP.insert({user_id, std::string(hex_buffer)});
+    return absl::StrCat(shard_kind.substr(0, 1), hex_buffer);
+  } else {
+    return absl::StrCat(shard_kind.substr(0, 1), HASHMAP.at(user_id));
   }
-  return absl::StrCat(shard_kind.substr(0, 1), hex_buffer);
 }
 
 }  // namespace sqlengine

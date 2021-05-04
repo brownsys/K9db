@@ -54,6 +54,12 @@ class EquiJoinOperator : public Operator {
   // Computes joined_schema_.
   void ComputeOutputSchema() override;
 
+  uint64_t SizeInMemory() const override {
+    return this->left_table_.SizeInMemory() +
+           this->right_table_.SizeInMemory() +
+           this->emitted_nulls_.SizeInMemory();
+  }
+
  private:
   // Columns on which join is computed.
   ColumnID left_id_;

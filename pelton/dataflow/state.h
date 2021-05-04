@@ -55,6 +55,8 @@ class DataFlowState {
   bool ProcessRecords(const TableName &table_name,
                       const std::vector<Record> &records);
 
+  uint64_t SizeInMemory() const;
+
  private:
   // Maps every table to its logical schema.
   // The logical schema is the contract between client code and our DB.

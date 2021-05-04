@@ -452,6 +452,16 @@ class GroupedDataT : public UntemplatedGroupedData {
     return true;
   }
 
+  uint64_t SizeInMemory() const {
+    uint64_t size = 0;
+    for (const Key &key : this->Keys()) {
+      for (const Record &record : this->Lookup(key)) {
+        size += record.SizeInMemory();
+      }
+    }
+    return size;
+  }
+
   // Erase entry keyed on @param k
   bool Erase(const Key &k) {
     this->contents_.erase(k);

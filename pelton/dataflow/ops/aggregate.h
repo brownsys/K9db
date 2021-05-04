@@ -40,6 +40,8 @@ class AggregateOperator : public Operator {
                std::vector<Record> *output) override;
   void ComputeOutputSchema() override;
 
+  uint64_t SizeInMemory() const override { return this->state_.SizeInMemory(); }
+
  private:
   UnorderedGroupedData state_;
   std::vector<ColumnID> group_columns_;

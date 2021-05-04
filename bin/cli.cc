@@ -1,3 +1,5 @@
+// NOLINTNEXTLINE
+#include <chrono>
 #include <iostream>
 #include <limits>
 #include <string>
@@ -76,6 +78,8 @@ int main(int argc, char **argv) {
   const std::string &dir = FLAGS_db_path;
 
   // Initialize our sharded state/connection.
+  std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
+  std::chrono::time_point<std::chrono::high_resolution_clock> end_time;
   try {
     pelton::Connection connection;
     pelton::open(dir, db_username, db_password, &connection);
@@ -93,6 +97,7 @@ int main(int argc, char **argv) {
         if (command == "# perf start") {
           std::cout << "Perf start" << std::endl;
           pelton::perf::Start();
+          start_time = std::chrono::high_resolution_clock::now();
         }
         continue;
       }
@@ -116,6 +121,12 @@ int main(int argc, char **argv) {
     }
 
     // Close the connection
+    end_time = std::chrono::high_resolution_clock::now();
+
+    // Find peak memory usage.
+    std::cout << "Memory: " << connection.SizeInMemory() << "bytes"
+              << std::endl;
+
     pelton::close(&connection);
   } catch (const char *err_msg) {
     LOG(FATAL) << "Error: " << err_msg;
@@ -123,6 +134,11 @@ int main(int argc, char **argv) {
 
   // Print performance profile.
   pelton::perf::PrintAll();
+  std::cout << "Time: "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
+                                                                     start_time)
+                   .count()
+            << "ms" << std::endl;
 
   // Exit!
   std::cout << "exit" << std::endl;
