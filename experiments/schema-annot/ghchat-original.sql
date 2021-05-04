@@ -32,8 +32,7 @@ CREATE TABLE `group_info` (
   `group_notice` varchar(100) NOT NULL DEFAULT '',
   `creator_id` int(11) NOT NULL,
   `create_time` int(11) NOT NULL,
-  PRIMARY KEY (`id`),
-  FOREIGN KEY (`creator_id`) REFERENCES user_info(id)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -51,8 +50,7 @@ CREATE TABLE `group_msg` (
   `time` int(11) NOT NULL,
   `attachments` varchar(250) DEFAULT '''[]''',
   PRIMARY KEY (`id`),
-  KEY `to_group` (`to_group_id`),
-  FOREIGN KEY (`from_user`) REFERENCES user_info(id)
+  KEY `to_group` (`to_group_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -66,8 +64,7 @@ CREATE TABLE `group_user_relation` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `to_group_id` char(100) NOT NULL DEFAULT '',
   `user_id` int(11) NOT NULL,
-  PRIMARY KEY (`id`),
-  FOREIGN KEY (`user_id`) REFERENCES user_info(id)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -79,16 +76,14 @@ DROP TABLE IF EXISTS `private_msg`;
 
 CREATE TABLE `private_msg` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `OWNER_from_user` int(11) NOT NULL,
-  `OWNER_to_user` int(11) NOT NULL,
+  `from_user` int(11) NOT NULL,
+  `to_user` int(11) NOT NULL,
   `message` text,
   `time` int(11) NOT NULL,
   `attachments` varchar(250) DEFAULT '[]',
   PRIMARY KEY (`id`),
-  KEY `OWNER_from_user` (`OWNER_from_user`),
-  KEY `OWNER_to_user` (`OWNER_to_user`),
-  FOREIGN KEY (`OWNER_from_user`) REFERENCES user_info(id),
-  FOREIGN KEY (`OWNER_to_user`) REFERENCES user_info(id)
+  KEY `from_user` (`from_user`),
+  KEY `to_user` (`to_user`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -101,7 +96,7 @@ DROP TABLE IF EXISTS `user_info`;
 CREATE TABLE `user_info` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `github_id` int(11) DEFAULT NULL,
-  `PII_name` varchar(20) NOT NULL DEFAULT 'NOT NULL',
+  `name` varchar(20) NOT NULL DEFAULT 'NOT NULL',
   `password` varchar(40) DEFAULT NULL,
   `avatar` varchar(250) DEFAULT '',
   `location` varchar(50) DEFAULT NULL,
@@ -122,14 +117,12 @@ DROP TABLE IF EXISTS `user_user_relation`;
 
 CREATE TABLE `user_user_relation` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `OWNER_user_id` int(11) NOT NULL,
-  `OWNER_from_user` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `from_user` int(11) NOT NULL,
   `remark` varchar(10) DEFAULT '',
   `shield` tinyint(1) NOT NULL DEFAULT '0',
   `time` int(11) NOT NULL,
-  PRIMARY KEY (`id`),
-  FOREIGN KEY (`OWNER_user_id`) REFERENCES user_info(id),
-  FOREIGN KEY (`OWNER_from_user`) REFERENCES user_info(id)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
