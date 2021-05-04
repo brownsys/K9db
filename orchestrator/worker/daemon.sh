@@ -16,14 +16,15 @@ echo "Pelton Log: mvn built!"
 echo "Pelton Log: find worker directory"
 find orchestrator/worker/
 
-rm -rf orchestrator/worker/worker_load
-rm -rf .output .error
-
 while true
 do
+  rm -rf orchestrator/worker/worker_load
+  rm -rf .output .error
+
   curl -X GET $ORCHESTRATOR/ready -o orchestrator/worker/worker_load
   if [[ -f orchestrator/worker/worker_load ]] && [ $(wc -w orchestrator/worker/worker_load | awk '{print $1}') -ne 0 ]; then
     echo "Pelton Log: Load received!"
+    head orchestrator/worker/worker_load
 
     # We have a load.
     PREFIX="../../.."
