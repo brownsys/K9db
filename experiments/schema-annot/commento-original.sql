@@ -10,7 +10,7 @@ VALUES (true);
 
 CREATE TABLE IF NOT EXISTS owners (
   ownerHex                 TEXT          NOT NULL  UNIQUE  PRIMARY KEY      ,
-  PII_email                    TEXT          NOT NULL  UNIQUE                   ,
+  email                    TEXT          NOT NULL  UNIQUE                   ,
   name                     TEXT          NOT NULL                           ,
   passwordHash             TEXT          NOT NULL                           ,
   confirmedEmail           TEXT          NOT NULL  DEFAULT false            ,
@@ -20,22 +20,19 @@ CREATE TABLE IF NOT EXISTS owners (
 CREATE TABLE IF NOT EXISTS ownerSessions (
   session                  TEXT          NOT NULL  UNIQUE  PRIMARY KEY      ,
   ownerHex                 TEXT          NOT NULL                           ,
-  loginDate                TIMESTAMP     NOT NULL,
-  FOREIGN KEY (ownerHex) REFERENCES owners(ownerHex)
+  loginDate                TIMESTAMP     NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS ownerConfirmHexes (
   confirmHex               TEXT          NOT NULL  UNIQUE  PRIMARY KEY      ,
   ownerHex                 TEXT          NOT NULL                           ,
-  sendDate                 TEXT          NOT NULL,
-  FOREIGN KEY (ownerHex) REFERENCES owners(ownerHex)
+  sendDate                 TEXT          NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS ownerResetHexes (
   resetHex                 TEXT          NOT NULL  UNIQUE  PRIMARY KEY      ,
   ownerHex                 TEXT          NOT NULL                           ,
-  sendDate                 TEXT          NOT NULL,
-  FOREIGN KEY (ownerHex) REFERENCES owners(ownerHex)
+  sendDate                 TEXT          NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS domains (
@@ -48,21 +45,19 @@ CREATE TABLE IF NOT EXISTS domains (
   autoSpamFilter           BOOLEAN       NOT NULL  DEFAULT true             ,
   requireModeration        BOOLEAN       NOT NULL  DEFAULT false            ,
   requireIdentification    BOOLEAN       NOT NULL  DEFAULT true             ,
-  viewsThisMonth           INTEGER       NOT NULL  DEFAULT 0,
-  FOREIGN KEY (ownerHex) REFERENCES owners(ownerHex)
+  viewsThisMonth           INTEGER       NOT NULL  DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS moderators (
   domain                   TEXT          NOT NULL                           ,
-  PII_email                    TEXT          NOT NULL                           ,
+  email                    TEXT          NOT NULL                           ,
   addDate                  TIMESTAMP     NOT NULL                           ,
-  PRIMARY KEY (domain, email),
-  FOREIGN KEY (domain) REFERENCES domains(domain)
+  PRIMARY KEY (domain, email)
 );
 
 CREATE TABLE IF NOT EXISTS commenters (
   commenterHex             TEXT          NOT NULL  UNIQUE  PRIMARY KEY      ,
-  PII_email                    TEXT          NOT NULL                           ,
+  email                    TEXT          NOT NULL                           ,
   name                     TEXT          NOT NULL                           ,
   link                     TEXT          NOT NULL                           ,
   photo                    TEXT          NOT NULL                           ,
@@ -74,23 +69,20 @@ CREATE TABLE IF NOT EXISTS commenters (
 CREATE TABLE IF NOT EXISTS commenterSessions (
   session                  TEXT          NOT NULL  UNIQUE  PRIMARY KEY      ,
   commenterHex             TEXT          NOT NULL  DEFAULT 'none'           ,
-  creationDate             TIMESTAMP     NOT NULL,
-  FOREIGN KEY (commenterHex) REFERENCES commenters(commenterHex)
+  creationDate             TIMESTAMP     NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS comments (
   commentHex               TEXT          NOT NULL  UNIQUE  PRIMARY KEY      ,
   domain                   TEXT          NOT NULL                           ,
   path                     TEXT          NOT NULL                           ,
-  OWNER_commenterHex             TEXT          NOT NULL                           ,
+  commenterHex             TEXT          NOT NULL                           ,
   markdown                 TEXT          NOT NULL                           ,
   html                     TEXT          NOT NULL                           ,
   parentHex                TEXT          NOT NULL                           ,
   score                    INTEGER       NOT NULL  DEFAULT 0                ,
   state                    TEXT          NOT NULL  DEFAULT 'unapproved'     , -- not a BOOLEAN because I expect more states in the future
-  creationDate             TIMESTAMP     NOT NULL,
-  FOREIGN KEY (OWNER_commenterHex) REFERENCES commenters(commenterHex),
-  FOREIGN KEY (domain) REFERENCES domains(domain)
+  creationDate             TIMESTAMP     NOT NULL
 );
 
 -- DELETEing a comment should recursively delete all children
@@ -110,8 +102,7 @@ CREATE TABLE IF NOT EXISTS votes (
   commentHex               TEXT          NOT NULL                           ,
   commenterHex             TEXT          NOT NULL                           ,
   direction                INTEGER       NOT NULL                           ,
-  voteDate                 TIMESTAMP     NOT NULL,
-  FOREIGN KEY (commenterHex) REFERENCES commenters(commenterHex)
+  voteDate                 TIMESTAMP     NOT NULL
 );
 
 CREATE UNIQUE INDEX votesUniqueIndex ON votes(commentHex, commenterHex);
@@ -144,10 +135,8 @@ FOR EACH ROW EXECUTE PROCEDURE votesUpdateTriggerFunction();
 
 CREATE TABLE IF NOT EXISTS views (
   domain                   TEXT          NOT NULL                           ,
-  OWNER_commenterHex             TEXT          NOT NULL                           ,
-  viewDate                 TIMESTAMP     NOT NULL,
-  FOREIGN KEY (OWNER_commenterHex) REFERENCES commenters(commenterHex),
-  FOREIGN KEY (domain) REFERENCES domains(domain)
+  commenterHex             TEXT          NOT NULL                           ,
+  viewDate                 TIMESTAMP     NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS domainIndex ON views(domain);
