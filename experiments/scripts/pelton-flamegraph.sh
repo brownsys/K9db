@@ -2,11 +2,11 @@
 ./bin/drop_all.sh
 
 # Compile everything with -c opt
-sudo bazel build -c opt //bin:cli
+sudo bazel build --config=opt //bin:cli
 
 # Run cli with perf record.
 sudo perf record -g -- \
-  sudo bazel run -c opt //bin:cli -- \
+  sudo bazel run --config=opt //bin:cli -- \
     --print=no --minloglevel=3 < experiments/GDPRbench/src/traces/pelton.sql
 
 # Format perf output and create the flamegraph.

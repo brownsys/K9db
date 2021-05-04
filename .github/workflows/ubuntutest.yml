@@ -8,80 +8,52 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Dependencies
+    - name: Build docker container
       run: |
-        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 90 \
-                                 --slave /usr/bin/gcc-ar gcc-ar /usr/bin/gcc-ar-9 \
-                                 --slave /usr/bin/gcc-nm gcc-nm /usr/bin/gcc-nm-9 \
-                                 --slave /usr/bin/gcc-ranlib gcc-ranlib /usr/bin/gcc-ranlib-9 \
-                                 --slave /usr/bin/g++ g++ /usr/bin/g++-9
-        sudo update-alternatives --set gcc /usr/bin/gcc-9
-        sudo apt-get install -y valgrind
-        # my sql connectors
-        sudo debconf-set-selections <<< 'mysql-apt-config mysql-apt-config/repo-distro select ubuntu'
-        sudo debconf-set-selections <<< 'mysql-apt-config mysql-apt-config/select-product select Ok'
-        sudo debconf-set-selections <<< 'mysql-apt-config mysql-apt-config/preview-component string'
-        sudo debconf-set-selections <<< 'mysql-apt-config mysql-apt-config/repo-url string http://repo.mysql.com/apt'
-        sudo debconf-set-selections <<< 'mysql-apt-config mysql-apt-config/enable-repo select mysql-8.0'
-        sudo debconf-set-selections <<< 'mysql-apt-config mysql-apt-config/select-tools select Enabled'
-        sudo debconf-set-selections <<< 'mysql-apt-config mysql-apt-config/unsupported-platform select abort'
-        sudo debconf-set-selections <<< 'mysql-apt-config mysql-apt-config/repo-codename select focal'
-        sudo debconf-set-selections <<< 'mysql-apt-config mysql-apt-config/select-server select mysql-8.0'
-        sudo debconf-set-selections <<< 'mysql-apt-config mysql-apt-config/tools-component string mysql-tools'
-        sudo debconf-set-selections <<< 'mysql-apt-config mysql-apt-config/select-preview select Disabled'
-        wget https://dev.mysql.com/get/mysql-apt-config_0.8.16-1_all.deb
-        sudo DEBIAN_FRONTEND=noninteractive dpkg -i mysql-apt-config_0.8.16-1_all.deb
-        sudo apt-get update
-        sudo apt-get install -y libmysqlcppconn8-2 libmysqlcppconn-dev
-        # openssl headers
-        sudo apt-get install -y libssl-dev
-    - name: Information
+        docker build -t pelton/latest .
+
+    - name: Run docker container
       run: |
-        # Start mysql.
-        sudo systemctl start mysql.service
-        # Output versions.
-        bazel --version
-        g++ --version
-        valgrind --version
-        java -version
-        javac -version
-        sudo mysql --version
+        docker run --mount type=bind,source=$(pwd),target=/home/pelton --name pelton-testing -d -t pelton/latest
+        sleep 15
 
     - name: Test dataflow with valgrind
-      run: bazel test //pelton/dataflow/... --config=valgrind
+      env:
+        TEST: bazel test //pelton/dataflow/... --config=valgrind
+      run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
 
     - name: Build all
-      run: bazel build ...
+      env:
+        TEST: bazel build ...
+      run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
 
     - name: Test all
-      run: bazel test ...
+      env:
+        TEST: bazel test ...
+      run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
 
     - name: Run end-2-end sample
-      run: |
-        bazel run bin:example -- --db_username=root --db_password=root \
-                                 --logtostderr=1
+      env:
+        TEST: bazel run bin:example -- --logtostderr=1
+      run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
+
 
     - name: Run cli samples
+      env:
+        CLEANUP: ./bin/drop.sh root password
+        WEBSUBMIT: bazel run bin:cli --config=valgrind -- --logtostderr=1 < bin/examples/simple-websubmit.sql
+        MEDICAL: bazel run bin:cli --config=valgrind -- --logtostderr=1 < bin/examples/medical_chat.sql
       run: |
-        ./bin/drop.sh root root
-        bazel run bin:cli --config=valgrind -- \
-            --db_username=root --db_password=root --logtostderr=1 \
-            < bin/examples/simple-websubmit.sql
-
-        ./bin/drop.sh root root
-        bazel run bin:cli --config=valgrind -- \
-            --db_username=root --db_password=root --logtostderr=1 \
-            < bin/examples/medical_chat.sql
+        docker exec pelton-testing sh -c "cd /home/pelton && $CLEANUP"
+        docker exec pelton-testing sh -c "cd /home/pelton && $WEBSUBMIT"
+        docker exec pelton-testing sh -c "cd /home/pelton && $CLEANUP"
+        docker exec pelton-testing sh -c "cd /home/pelton && $MEDICAL"
 
     - name: Run social chat with restart/recovery
+      env:
+        CLEANUP: rm -rf /tmp/db && mkdir /tmp/db && ./bin/drop.sh root password
+        SOCIAL: bazel run bin:cli --config=valgrind -- --logtostderr=1 --db_path=/tmp/db < bin/examples/social_chat.sql
+        SOCIALCNTD: bazel run bin:cli --config=valgrind -- --logtostderr=1 --db_path=/tmp/db < bin/examples/social_chat.cntd.sql
       run: |
-        rm -rf /tmp/db && mkdir /tmp/db
-        ./bin/drop.sh root root
-
-        bazel run bin:cli --config=valgrind -- \
-            --db_username=root --db_password=root --logtostderr=1 \
-            --db_path=/tmp/db < bin/examples/social_chat.sql
-
-        bazel run bin:cli --config=valgrind -- \
-            --db_username=root --db_password=root --logtostderr=1 \
-            --db_path=/tmp/db < bin/examples/social_chat.cntd.sql
+        docker exec pelton-testing sh -c "cd /home/pelton && $CLEANUP"
+        docker exec pelton-testing sh -c "cd /home/pelton && $SOCIAL"

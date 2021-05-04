@@ -9,7 +9,7 @@ cc_library(
         "result.h",
     ],
     linkopts = [
-        "-lmysqlcppconn8",
+        "-lmariadbcpp",
     ],
     visibility = ["//:__subpackages__"],
     deps = [
@@ -28,7 +28,7 @@ cc_library(
         "util.h",
     ],
     linkopts = [
-        "-lmysqlcppconn",
+        "-lmariadbcpp",
     ],
     visibility = ["//:__subpackages__"],
     deps = [

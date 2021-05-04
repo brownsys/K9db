@@ -11,6 +11,12 @@
 #include "pelton/sqlast/ast_schema.h"
 #include "pelton/sqlast/ast_statements.h"
 
+#define PELTON_CONST_VISIT_CAST(stmt, type, visitor) \
+  static_cast<const type *>(stmt)->Visit(visitor)
+
+#define PELTON_VISIT_CAST(stmt, type, visitor) \
+  static_cast<type *>(stmt)->Visit(visitor)
+
 namespace pelton {
 namespace sqlast {
 
@@ -30,6 +36,26 @@ class AbstractVisitor {
   virtual T VisitLiteralExpression(const LiteralExpression &ast) = 0;
   virtual T VisitBinaryExpression(const BinaryExpression &ast) = 0;
   virtual T VisitDelete(const Delete &ast) = 0;
+
+  T Visit(const AbstractStatement *stmt) {
+    switch (stmt->type()) {
+      case sqlast::AbstractStatement::Type::CREATE_TABLE:
+        return PELTON_CONST_VISIT_CAST(stmt, CreateTable, this);
+      case sqlast::AbstractStatement::Type::CREATE_INDEX:
+        return PELTON_CONST_VISIT_CAST(stmt, CreateIndex, this);
+      case sqlast::AbstractStatement::Type::INSERT:
+        return PELTON_CONST_VISIT_CAST(stmt, Insert, this);
+      case sqlast::AbstractStatement::Type::UPDATE:
+        return PELTON_CONST_VISIT_CAST(stmt, Update, this);
+      case sqlast::AbstractStatement::Type::DELETE:
+        return PELTON_CONST_VISIT_CAST(stmt, Delete, this);
+      case sqlast::AbstractStatement::Type::SELECT:
+        return PELTON_CONST_VISIT_CAST(stmt, Select, this);
+      case sqlast::AbstractStatement::Type::CREATE_VIEW:
+      default:
+        assert(false);
+    }
+  }
 };
 
 // Visit and modify.
@@ -48,11 +74,38 @@ class MutableVisitor {
   virtual T VisitLiteralExpression(LiteralExpression *ast) = 0;
   virtual T VisitBinaryExpression(BinaryExpression *ast) = 0;
   virtual T VisitDelete(Delete *ast) = 0;
+
+  T Visit(AbstractStatement *stmt) {
+    switch (stmt->type()) {
+      case sqlast::AbstractStatement::Type::CREATE_TABLE:
+        return PELTON_VISIT_CAST(stmt, CreateTable, this);
+      case sqlast::AbstractStatement::Type::CREATE_INDEX:
+        return PELTON_VISIT_CAST(stmt, CreateIndex, this);
+      case sqlast::AbstractStatement::Type::INSERT:
+        return PELTON_VISIT_CAST(stmt, Insert, this);
+      case sqlast::AbstractStatement::Type::UPDATE:
+        return PELTON_VISIT_CAST(stmt, Update, this);
+      case sqlast::AbstractStatement::Type::DELETE:
+        return PELTON_VISIT_CAST(stmt, Delete, this);
+      case sqlast::AbstractStatement::Type::SELECT:
+        return PELTON_VISIT_CAST(stmt, Select, this);
+      case sqlast::AbstractStatement::Type::CREATE_VIEW:
+      default:
+        assert(false);
+    }
+  }
 };
 
 // Turns ASTs to strings.
 class Stringifier : public AbstractVisitor<std::string> {
  public:
+  explicit Stringifier(const std::string shard_name)
+      : shard_prefix_(), supports_foreign_keys_(false) {
+    if (shard_name.size() > 0) {
+      shard_prefix_ = shard_name + "_";
+    }
+  }
+
   std::string VisitCreateTable(const CreateTable &ast) override;
   std::string VisitColumnDefinition(const ColumnDefinition &ast) override;
   std::string VisitColumnConstraint(const ColumnConstraint &ast) override;
@@ -64,6 +117,10 @@ class Stringifier : public AbstractVisitor<std::string> {
   std::string VisitLiteralExpression(const LiteralExpression &ast) override;
   std::string VisitBinaryExpression(const BinaryExpression &ast) override;
   std::string VisitDelete(const Delete &ast) override;
+
+ private:
+  std::string shard_prefix_;
+  bool supports_foreign_keys_;
 };
 
 // Finds the value assigned to a specified column anywhere in this expression.

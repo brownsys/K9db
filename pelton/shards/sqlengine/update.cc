@@ -124,14 +124,11 @@ absl::StatusOr<mysql::SqlResult> Shard(
     CHECK_STATUS(UpdateRecords(&records, stmt, state->GetSchema(table_name)));
   }
 
-  sqlast::Stringifier stringifier;
   mysql::SqlResult result;
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
-    std::string update_str = stmt.Visit(&stringifier);
-    result = state->connection_pool().ExecuteDefault(
-        ConnectionPool::Operation::UPDATE, update_str);
+    result = state->connection_pool().ExecuteDefault(&stmt);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded.
@@ -173,9 +170,8 @@ absl::StatusOr<mysql::SqlResult> Shard(
             cloned.Visit(&expression_remover);
 
             // Execute statement directly against shard.
-            std::string update_str = cloned.Visit(&stringifier);
-            result.Append(state->connection_pool().ExecuteShard(
-                ConnectionPool::Operation::UPDATE, update_str, info, user_id));
+            result.Append(
+                state->connection_pool().ExecuteShard(&cloned, info, user_id));
           }
 
         } else if (update_flows) {
@@ -186,9 +182,8 @@ absl::StatusOr<mysql::SqlResult> Shard(
             shards.insert(record.GetValueString(info.shard_by_index));
           }
 
-          std::string update_str = cloned.Visit(&stringifier);
-          result.Append(state->connection_pool().ExecuteShards(
-              ConnectionPool::Operation::UPDATE, update_str, info, shards));
+          result.Append(
+              state->connection_pool().ExecuteShards(&cloned, info, shards));
 
         } else {
           // The update statement by itself does not obviously constraint a
@@ -199,17 +194,13 @@ absl::StatusOr<mysql::SqlResult> Shard(
                                  stmt.GetWhereClause(), state, dataflow_state));
           if (pair.first) {
             // Secondary index available for some constrainted column in stmt.
-            std::string update_str = cloned.Visit(&stringifier);
             result.MakeInline();
             result.AppendDeduplicate(state->connection_pool().ExecuteShards(
-                ConnectionPool::Operation::UPDATE, update_str, info,
-                pair.second));
+                &cloned, info, pair.second));
           } else {
             // Update against all shards.
-            std::string update_str = cloned.Visit(&stringifier);
             result.Append(state->connection_pool().ExecuteShards(
-                ConnectionPool::Operation::UPDATE, update_str, info,
-                state->UsersOfShard(info.shard_kind)));
+                &cloned, info, state->UsersOfShard(info.shard_kind)));
           }
         }
       }

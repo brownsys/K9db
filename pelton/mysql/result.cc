@@ -96,7 +96,7 @@ bool MySqlResult::IsQuery() const { return true; }
 bool MySqlResult::HasNext() { return this->result_->next(); }
 
 dataflow::Record MySqlResult::FetchOne(const dataflow::SchemaRef &schema) {
-  return MySqlRowToRecord(*this->result_, schema, false);
+  return MySqlRowToRecord(this->result_.get(), schema, false);
 }
 
 // AugmentedSqlResult.
@@ -106,8 +106,8 @@ bool AugmentedSqlResult::HasNext() { return this->result_->next(); }
 
 dataflow::Record AugmentedSqlResult::FetchOne(
     const dataflow::SchemaRef &schema) {
-  dataflow::Record record =
-      MySqlRowToRecordSkipping(*this->result_, schema, false, this->aug_index_);
+  dataflow::Record record = MySqlRowToRecordSkipping(
+      this->result_.get(), schema, false, this->aug_index_);
   record.SetValue(this->aug_value_, this->aug_index_);
   return record;
 }

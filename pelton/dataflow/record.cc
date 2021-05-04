@@ -69,6 +69,28 @@ Record Record::Copy() const {
   return record;
 }
 
+// Size in memory.
+size_t Record::SizeInMemory() const {
+  size_t size = sizeof(Record);
+  for (size_t i = 0; i < this->schema_.size(); i++) {
+    if (!this->IsNull(i)) {
+      switch (this->schema_.TypeOf(i)) {
+        case sqlast::ColumnDefinition::Type::TEXT:
+        case sqlast::ColumnDefinition::Type::DATETIME:
+          if (this->data_[i].str != nullptr) {
+            size += this->data_[i].str->size();
+          }
+          break;
+        case sqlast::ColumnDefinition::Type::UINT:
+        case sqlast::ColumnDefinition::Type::INT:
+          size += sizeof(uint64_t);
+          break;
+      }
+    }
+  }
+  return size;
+}
+
 // Data access.
 void Record::SetUInt(uint64_t uint, size_t i) {
   CheckType(i, sqlast::ColumnDefinition::Type::UINT);

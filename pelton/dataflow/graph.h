@@ -62,6 +62,8 @@ class DataFlowGraph {
   // Debugging.
   std::string DebugString() const;
 
+  uint64_t SizeInMemory() const;
+
  private:
   bool AddEdge(std::shared_ptr<Operator> parent,
                std::shared_ptr<Operator> child);

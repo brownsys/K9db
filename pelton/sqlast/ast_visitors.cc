@@ -26,7 +26,8 @@ std::string Dequote(const std::string &st) {
 // Stringifier.
 std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
   perf::Start("Stringify (create)");
-  std::string result = "CREATE TABLE " + ast.table_name() + " (";
+  std::string result =
+      "CREATE TABLE " + this->shard_prefix_ + ast.table_name() + " (";
   bool first = true;
   for (const std::string &col : ast.VisitChildren(this)) {
     if (!first) {
@@ -36,7 +37,7 @@ std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
     result += col;
   }
   result += ")";
-  result += " ENGINE MEMORY";
+  result += " ENGINE ROCKSDB";
   perf::End("Stringify (create)");
   return result;
 }
@@ -56,15 +57,22 @@ std::string Stringifier::VisitColumnConstraint(const ColumnConstraint &ast) {
       return "UNIQUE";
     case ColumnConstraint::Type::NOT_NULL:
       return "NOT NULL";
+    case ColumnConstraint::Type::FOREIGN_KEY:
+      if (this->supports_foreign_keys_) {
+        return "REFERENCES " + ast.foreign_table() + "(" +
+               ast.foreign_column() + ")";
+      } else {
+        return "";
+      }
     default:
-      return "REFERENCES " + ast.foreign_table() + "(" + ast.foreign_column() +
-             ")";
+      assert(false);
   }
 }
 
 std::string Stringifier::VisitCreateIndex(const CreateIndex &ast) {
   perf::Start("Stringify (create index)");
-  std::string result = "CREATE INDEX " + ast.index_name() + " ON " +
+  std::string result = "CREATE INDEX " + this->shard_prefix_ +
+                       ast.index_name() + " ON " + this->shard_prefix_ +
                        ast.table_name() + "(" + ast.column_name() + ")";
   perf::End("Stringify (create index)");
   return result;
@@ -72,7 +80,7 @@ std::string Stringifier::VisitCreateIndex(const CreateIndex &ast) {
 
 std::string Stringifier::VisitInsert(const Insert &ast) {
   perf::Start("Stringify (insert)");
-  std::string result = "INSERT INTO " + ast.table_name();
+  std::string result = "INSERT INTO " + this->shard_prefix_ + ast.table_name();
   // Columns if explicitly specified.
   if (ast.GetColumns().size() > 0) {
     result += "(";
@@ -102,7 +110,8 @@ std::string Stringifier::VisitInsert(const Insert &ast) {
 }
 std::string Stringifier::VisitUpdate(const Update &ast) {
   perf::Start("Stringify (update)");
-  std::string result = "UPDATE " + ast.table_name() + " SET ";
+  std::string result =
+      "UPDATE " + this->shard_prefix_ + ast.table_name() + " SET ";
   // Columns and values.
   const std::vector<std::string> &cols = ast.GetColumns();
   const std::vector<std::string> &vals = ast.GetValues();
@@ -129,7 +138,7 @@ std::string Stringifier::VisitSelect(const Select &ast) {
     first = false;
     result += col;
   }
-  result += " FROM " + ast.table_name();
+  result += " FROM " + this->shard_prefix_ + ast.table_name();
   if (ast.HasWhereClause()) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
@@ -138,7 +147,7 @@ std::string Stringifier::VisitSelect(const Select &ast) {
 }
 std::string Stringifier::VisitDelete(const Delete &ast) {
   perf::Start("Stringify (delete)");
-  std::string result = "DELETE FROM " + ast.table_name();
+  std::string result = "DELETE FROM " + this->shard_prefix_ + ast.table_name();
   if (ast.HasWhereClause()) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
@@ -322,7 +331,6 @@ std::unique_ptr<Expression> ExpressionRemover::VisitLiteralExpression(
 }
 std::unique_ptr<Expression> ExpressionRemover::VisitBinaryExpression(
     BinaryExpression *ast) {
-  Stringifier str;
   auto result = ast->VisitChildren(this);
   switch (ast->type()) {
     case Expression::Type::EQ:

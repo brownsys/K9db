@@ -18,12 +18,9 @@ absl::Status CreateIndex(const sqlast::CreateIndex &stmt, SharderState *state,
   perf::Start("Create Index");
   const std::string &table_name = stmt.table_name();
 
-  sqlast::Stringifier stringifier;
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
-    std::string create_str = stmt.Visit(&stringifier);
-    state->connection_pool().ExecuteDefault(
-        ConnectionPool::Operation::STATEMENT, create_str);
+    state->connection_pool().ExecuteDefault(&stmt);
 
   } else {  // is_sharded == true
     const std::string &column_name = stmt.column_name();
@@ -42,7 +39,6 @@ absl::Status CreateIndex(const sqlast::CreateIndex &stmt, SharderState *state,
       std::string index_name = base_index_name + "_" + info.shard_by;
       sqlast::CreateIndex create_index{index_name, info.sharded_table_name,
                                        column_name};
-      std::string create_str = create_index.Visit(&stringifier);
 
       // The global index over all the shards.
       std::string query;
@@ -61,7 +57,7 @@ absl::Status CreateIndex(const sqlast::CreateIndex &stmt, SharderState *state,
 
       // Store the index metadata.
       state->CreateIndex(info.shard_kind, table_name, column_name,
-                         info.shard_by, index_name, create_str);
+                         info.shard_by, index_name, create_index, unique);
     }
   }
 

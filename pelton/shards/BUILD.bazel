@@ -9,7 +9,7 @@ cc_library(
         "pool.h",
     ],
     linkopts = [
-        "-lmysqlcppconn",
+        "-lmariadbcpp",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
@@ -17,6 +17,7 @@ cc_library(
         "//pelton/dataflow:schema",
         "//pelton/mysql:result",
         "//pelton/shards/sqlengine:util",
+        "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "@absl//absl/status",
         "@glog",

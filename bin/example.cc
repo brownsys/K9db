@@ -36,7 +36,7 @@ std::vector<std::string> CREATES{
     "FOREIGN KEY (assignment_id) REFERENCES assignments(ID)"
     ");",
     // Submissions index.
-    "CREATE INDEX submissions_ass_id_index ON submissions(assignment_id);"};
+    "CREATE INDEX sind ON submissions(assignment_id);"};
 
 // Inserts.
 std::vector<std::string> INSERTS{
@@ -139,8 +139,6 @@ int main(int argc, char **argv) {
   const std::string &db_username = FLAGS_db_username;
   const std::string &db_password = FLAGS_db_password;
 
-  pelton::perf::Start("all");
-
   // Open connection to sharder.
   pelton::Connection connection;
   pelton::open("", db_username, db_password, &connection);
@@ -225,11 +223,13 @@ int main(int argc, char **argv) {
   }
   std::cout << std::endl;
 
+  // Find peak memory usage.
+  std::cout << "Memory: " << connection.SizeInMemory() << "bytes" << std::endl;
+
   // Close connection.
   pelton::close(&connection);
 
   // Print performance profile.
-  pelton::perf::End("all");
   pelton::perf::PrintAll();
 
   // Done.

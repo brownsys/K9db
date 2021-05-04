@@ -96,6 +96,15 @@ bool DataFlowState::ProcessRecords(const TableName &table_name,
   return true;
 }
 
+// Size in memory of all the dataflow graphs.
+uint64_t DataFlowState::SizeInMemory() const {
+  uint64_t size = 0;
+  for (const auto &[_, flow] : this->flows_) {
+    size += flow.SizeInMemory();
+  }
+  return size;
+}
+
 // Load state from its durable file (if exists).
 void DataFlowState::Load(const std::string &dir_path) {
   // State file does not exists: this is a fresh database that was not
