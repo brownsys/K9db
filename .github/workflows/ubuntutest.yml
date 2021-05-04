@@ -14,7 +14,7 @@ jobs:
 
     - name: Run docker container
       run: |
-        docker run --name pelton-testing -d -t pelton/latest
+        docker run --mount type=bind,source=$(pwd),target=/home/pelton --name pelton-testing -d -t pelton/latest
         sleep 15
 
     - name: Test dataflow with valgrind
