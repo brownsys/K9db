@@ -19,7 +19,7 @@ Content-Disposition: attachment; filename="userdata.txt"
 
 #!/bin/bash
 # this script is run as root whenever the EC2 instance is launched/restarted.
-ORCHESTRATOR_IP="127.0.0.1"  # replace with actual IP for experiment.
+ORCHESTRATOR_IP="18.216.101.249"  # replace with actual IP for experiment.
 BRANCH="optimization"
 
 # start from root directory
@@ -109,14 +109,16 @@ cd pelton
 git fetch origin
 git checkout $BRANCH
 git pull origin $BRANCH
+git submodule init && git submodule update
 echo "Pelton Log: Updated repo!"
 
 # build docker image
-docker build -t pelton/latest .
-
 if [ $(docker ps -a | grep pelton-worker | wc -l) -eq 0 ]; then
+  echo "Pelton Log: Building docker image"
+  docker build -t pelton/latest .
+
   echo "Pelton Log: Running docker container for the first time!"
-  docker run --name pelton-worker -d -t pelton/latest
+  docker run --mount type=bind,source=/pelton,target=/home/pelton --name pelton-worker -d -t pelton/latest
 else
   echo "Pelton Log: Resuming docker container"
   docker start pelton-worker

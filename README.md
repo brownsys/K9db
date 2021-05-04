@@ -33,17 +33,18 @@ To build the docker container, run
 docker build -t pelton/latest .
 ```
 
-The docker container runs mariadb as a daemon. You should run the docker container
-in the background and then attach your shell to it or execute commands in it
-using docker exec:
+The docker container runs mariadb as a daemon. You should run the docker
+container in the background and then attach your shell to it or execute commands
+in it using docker exec:
 ```bash
 # Run the container and name it pelton-testing
-docker run --name pelton-testing -d -t pelton/latest 
+# Mount pelton into the container.
+docker run --mount type=bind,source=$(pwd),target=/home/pelton --name pelton-testing -d -t pelton/latest
 
 # Wait a few seconds for mysqld to run successfully inside the container
 
 # Run desired commands
-docker exec pelton-testing sh -c "cd /home/pelton && bazel test ..."
+docker exec -it pelton-testing /bin/bash
 ```
 
 ## Building

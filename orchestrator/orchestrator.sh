@@ -80,6 +80,7 @@ cd pelton
 git fetch origin
 git checkout $BRANCH
 git pull origin $BRANCH
+git submodule init && git submodule update
 echo "Pelton Log: Update Repo!"
 
 cd orchestrator/server && npm install
