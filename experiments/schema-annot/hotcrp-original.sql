@@ -5,7 +5,7 @@
 DROP TABLE IF EXISTS `ActionLog`;
 CREATE TABLE `ActionLog` (
   `logId` int(11) NOT NULL AUTO_INCREMENT,
-  `OWNER_contactId` int(11) NOT NULL,
+  `contactId` int(11) NOT NULL,
   `destContactId` int(11) DEFAULT NULL,
   `trueContactId` int(11) DEFAULT NULL,
   `paperId` int(11) DEFAULT NULL,
@@ -13,11 +13,7 @@ CREATE TABLE `ActionLog` (
   `ipaddr` varbinary(39) DEFAULT NULL,
   `action` varbinary(4096) NOT NULL,
   `data` varbinary(8192) DEFAULT NULL,
-  PRIMARY KEY (`logId`),
-  FOREIGN KEY (OWNER_contactId) REFERENCES ContactInfo(contactID),
-  FOREIGN KEY (destContactId) REFERENCES ContactInfo(contactId),
-  FOREIGN KEY (trueContactId) REFERENCES ContactInfo(contactId),
-  FOREIGN KEY (paperId) REFERENCES Paper(paperId)
+  PRIMARY KEY (`logId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -29,14 +25,12 @@ CREATE TABLE `ActionLog` (
 DROP TABLE IF EXISTS `Capability`;
 CREATE TABLE `Capability` (
   `capabilityType` int(11) NOT NULL,
-  `OWNER_contactId` int(11) NOT NULL,
+  `contactId` int(11) NOT NULL,
   `paperId` int(11) NOT NULL,
   `timeExpires` bigint(11) NOT NULL,
   `salt` varbinary(255) NOT NULL,
   `data` varbinary(4096) DEFAULT NULL,
-  PRIMARY KEY (`salt`),
-  FOREIGN KEY (OWNER_contactId) REFERENCES ContactInfo(contactId),
-  FOREIGN KEY (paperId) REFERENCES Paper(paperId)
+  PRIMARY KEY (`salt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -51,7 +45,7 @@ CREATE TABLE `ContactInfo` (
   `firstName` varbinary(120) NOT NULL DEFAULT '',
   `lastName` varbinary(120) NOT NULL DEFAULT '',
   `unaccentedName` varbinary(240) NOT NULL DEFAULT '',
-  `PII_email` varchar(120) NOT NULL,
+  `email` varchar(120) NOT NULL,
   `preferredEmail` varchar(120) DEFAULT NULL,
   `affiliation` varbinary(2048) NOT NULL DEFAULT '',
   `phone` varbinary(64) DEFAULT NULL,
@@ -87,8 +81,7 @@ CREATE TABLE `DeletedContactInfo` (
   `firstName` varbinary(120) NOT NULL,
   `lastName` varbinary(120) NOT NULL,
   `unaccentedName` varbinary(240) NOT NULL,
-  `email` varchar(120) NOT NULL,
-  FOREIGN KEY (contactId) REFERENCES ContactInfo(contactId)
+  `email` varchar(120) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -103,8 +96,7 @@ CREATE TABLE `DocumentLink` (
   `linkId` int(11) NOT NULL,
   `linkType` int(11) NOT NULL,
   `documentId` int(11) NOT NULL,
-  PRIMARY KEY (`paperId`,`linkId`,`linkType`),
-  FOREIGN KEY (paperId) REFERENCES Paper(paperId)
+  PRIMARY KEY (`paperId`,`linkId`,`linkType`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -115,13 +107,11 @@ CREATE TABLE `DocumentLink` (
 
 DROP TABLE IF EXISTS `FilteredDocument`;
 CREATE TABLE `FilteredDocument` (
-  `OWNER_inDocId` int(11) NOT NULL,
+  `inDocId` int(11) NOT NULL,
   `filterType` int(11) NOT NULL,
   `outDocId` int(11) NOT NULL,
   `createdAt` bigint(11) NOT NULL,
-  PRIMARY KEY (`inDocId`,`filterType`),
-  FOREIGN KEY (OWNER_inDocId) REFERENCES DocumentLink(documentId),
-  FOREIGN KEY (outDocId) REFERENCES DocumentLink(documentId)
+  PRIMARY KEY (`inDocId`,`filterType`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -137,8 +127,7 @@ CREATE TABLE `Formula` (
   `expression` varbinary(4096) NOT NULL,
   `createdBy` int(11) NOT NULL DEFAULT '0',
   `timeModified` bigint(11) NOT NULL DEFAULT '0',
-  PRIMARY KEY (`formulaId`),
-  FOREIGN KEY (createdBy) REFERENCES ContactInfo(contactId)
+  PRIMARY KEY (`formulaId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -160,8 +149,7 @@ CREATE TABLE `MailLog` (
   `emailBody` blob,
   `fromNonChair` tinyint(1) NOT NULL DEFAULT '0',
   `status` tinyint(1) NOT NULL DEFAULT '0',
-  PRIMARY KEY (`mailId`),
-  FOREIGN KEY (paperIDs) REFERENCES Paper(paperId) -- sort of
+  PRIMARY KEY (`mailId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -187,8 +175,8 @@ CREATE TABLE `Paper` (
   `finalPaperStorageId` int(11) NOT NULL DEFAULT '0',
   `blind` tinyint(1) NOT NULL DEFAULT '1',
   `outcome` tinyint(1) NOT NULL DEFAULT '0',
-  `OWNER_leadContactId` int(11) NOT NULL DEFAULT '0',
-  `OWNER_shepherdContactId` int(11) NOT NULL DEFAULT '0',
+  `leadContactId` int(11) NOT NULL DEFAULT '0',
+  `shepherdContactId` int(11) NOT NULL DEFAULT '0',
   `managerContactId` int(11) NOT NULL DEFAULT '0',
   `capVersion` int(1) NOT NULL DEFAULT '0',
   # next 3 fields copied from PaperStorage to reduce joins
@@ -202,12 +190,7 @@ CREATE TABLE `Paper` (
   PRIMARY KEY (`paperId`),
   KEY `timeSubmitted` (`timeSubmitted`),
   KEY `leadContactId` (`leadContactId`),
-  KEY `shepherdContactId` (`shepherdContactId`),
-  FOREIGN KEY (paperStorageId) REFERENCES PaperStorage(paperStorageId),
-  FOREIGN KEY (finalPaperStorageId) REFERENCES PaperStorage(paperStorageId),
-  FOREIGN KEY (OWNER_leadContactId) REFERENCES ContactInfo(contactId),
-  FOREIGN KEY (OWNER_shepherdContactId) REFERENCES ContactInfo(contactId),
-  FOREIGN KEY (managerContactId) REFERENCES ContactInfo(contactId),
+  KEY `shepherdContactId` (`shepherdContactId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -218,9 +201,9 @@ CREATE TABLE `Paper` (
 
 DROP TABLE IF EXISTS `PaperComment`;
 CREATE TABLE `PaperComment` (
-  `paperId` int(11) NOT NULL, -- should be OWNER if we could filter on comment type
+  `paperId` int(11) NOT NULL,
   `commentId` int(11) NOT NULL AUTO_INCREMENT,
-  `OWNER_contactId` int(11) NOT NULL,
+  `contactId` int(11) NOT NULL,
   `timeModified` bigint(11) NOT NULL,
   `timeNotified` bigint(11) NOT NULL DEFAULT '0',
   `timeDisplayed` bigint(11) NOT NULL DEFAULT '0',
@@ -236,9 +219,7 @@ CREATE TABLE `PaperComment` (
   PRIMARY KEY (`paperId`,`commentId`),
   UNIQUE KEY `commentId` (`commentId`),
   KEY `contactId` (`contactId`),
-  KEY `timeModifiedContact` (`timeModified`,`contactId`),
-  FOREIGN KEY (paperId) REFERENCES Paper(paperId),
-  FOREIGN KEY (OWNER_contactId) REFERENCES ContactInfo(contactId)
+  KEY `timeModifiedContact` (`timeModified`,`contactId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -250,12 +231,10 @@ CREATE TABLE `PaperComment` (
 DROP TABLE IF EXISTS `PaperConflict`;
 CREATE TABLE `PaperConflict` (
   `paperId` int(11) NOT NULL,
-  `OWNER_contactId` int(11) NOT NULL,
+  `contactId` int(11) NOT NULL,
   `conflictType` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`contactId`,`paperId`),
-  KEY `paperId` (`paperId`),
-  FOREIGN KEY (paperId) REFERENCES Paper(paperID),
-  FOREIGN KEY (OWNER_contactId) REFERENCES ContactInfo(contactId)
+  KEY `paperId` (`paperId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -271,8 +250,7 @@ CREATE TABLE `PaperOption` (
   `value` bigint(11) NOT NULL DEFAULT '0',
   `data` varbinary(32767) DEFAULT NULL,
   `dataOverflow` longblob,
-  PRIMARY KEY (`paperId`,`optionId`,`value`),
-  FOREIGN KEY (paperId) REFERENCES Paper(paperId)
+  PRIMARY KEY (`paperId`,`optionId`,`value`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -285,7 +263,7 @@ DROP TABLE IF EXISTS `PaperReview`;
 CREATE TABLE `PaperReview` (
   `paperId` int(11) NOT NULL,
   `reviewId` int(11) NOT NULL AUTO_INCREMENT,
-  `OWNER_contactId` int(11) NOT NULL,
+  `contactId` int(11) NOT NULL,
   `reviewToken` int(11) NOT NULL DEFAULT '0',
   `reviewType` tinyint(1) NOT NULL DEFAULT '0',
   `reviewRound` int(1) NOT NULL DEFAULT '0',
@@ -329,10 +307,7 @@ CREATE TABLE `PaperReview` (
   KEY `contactId` (`contactId`),
   KEY `reviewType` (`reviewType`),
   KEY `reviewRound` (`reviewRound`),
-  KEY `requestedBy` (`requestedBy`),
-  FOREIGN KEY (paperId) REFERENCES Paper(paperId),
-  FOREIGN KEY (OWNER_contactId) REFERENCES ContactInfo(contactId),
-  FOREIGN KEY (requestedBy) REFERENCES ContactInfo(contactId)
+  KEY `requestedBy` (`requestedBy`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -344,12 +319,10 @@ CREATE TABLE `PaperReview` (
 DROP TABLE IF EXISTS `PaperReviewPreference`;
 CREATE TABLE `PaperReviewPreference` (
   `paperId` int(11) NOT NULL,
-  `OWNER_contactId` int(11) NOT NULL,
+  `contactId` int(11) NOT NULL,
   `preference` int(4) NOT NULL DEFAULT '0',
   `expertise` int(4) DEFAULT NULL,
-  PRIMARY KEY (`paperId`,`contactId`),
-  FOREIGN KEY (paperId) REFERENCES Paper(paperId),
-  FOREIGN KEY (OWNER_contactId) REFERENCES ContactInfo(contactId)
+  PRIMARY KEY (`paperId`,`contactId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -361,24 +334,20 @@ CREATE TABLE `PaperReviewPreference` (
 DROP TABLE IF EXISTS `PaperReviewRefused`;
 CREATE TABLE `PaperReviewRefused` (
   `paperId` int(11) NOT NULL,
-  `PII_email` varchar(120) NOT NULL,
+  `email` varchar(120) NOT NULL,
   `firstName` varbinary(120) DEFAULT NULL,
   `lastName` varbinary(120) DEFAULT NULL,
   `affiliation` varbinary(2048) DEFAULT NULL,
-  `OWNER_contactId` int(11) NOT NULL,
-  `OWNER_requestedBy` int(11) NOT NULL,
+  `contactId` int(11) NOT NULL,
+  `requestedBy` int(11) NOT NULL,
   `timeRequested` bigint(11) DEFAULT NULL,
-  `OWNER_refusedBy` int(11) DEFAULT NULL,
+  `refusedBy` int(11) DEFAULT NULL,
   `timeRefused` bigint(11) DEFAULT NULL,
   `reviewType` tinyint(1) NOT NULL DEFAULT '0',
   `reviewRound` int(1) DEFAULT NULL,
   `data` varbinary(8192) DEFAULT NULL,
   `reason` varbinary(32767) DEFAULT NULL,
-  PRIMARY KEY (`paperId`,`email`),
-  FOREIGN KEY (paperId) REFERENCES Paper(paperId),
-  FOREIGN KEY (OWNER_contactId) REFERENCES ContactInfo(contactId),
-  FOREIGN KEY (OWNER_requestedBy) REFERENCES ContactInfo(contactId),
-  FOREIGN KEY (OWNER_refusedBy) REFERENCES ContactInfo(contactId)
+  PRIMARY KEY (`paperId`,`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -405,8 +374,7 @@ CREATE TABLE `PaperStorage` (
   `originalStorageId` int(11) DEFAULT NULL,
   `inactive` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`paperId`,`paperStorageId`),
-  UNIQUE KEY `paperStorageId` (`paperStorageId`),
-  FOREIGN KEY (paperId) REFERENCES Paper(paperId)
+  UNIQUE KEY `paperStorageId` (`paperStorageId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -420,8 +388,7 @@ CREATE TABLE `PaperTag` (
   `paperId` int(11) NOT NULL,
   `tag` varchar(80) NOT NULL,		# case-insensitive; see TAG_MAXLEN in init.php
   `tagIndex` float NOT NULL DEFAULT '0',
-  PRIMARY KEY (`paperId`,`tag`),
-  FOREIGN KEY (paperId) REFERENCES Paper(paperId)
+  PRIMARY KEY (`paperId`,`tag`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -449,11 +416,9 @@ CREATE TABLE `PaperTagAnno` (
 
 DROP TABLE IF EXISTS `PaperTopic`;
 CREATE TABLE `PaperTopic` (
-  `OWNER_paperId` int(11) NOT NULL,
-  `OWNER_topicId` int(11) NOT NULL,
-  PRIMARY KEY (`paperId`,`topicId`),
-  FOREIGN KEY (OWNER_paperId) REFERENCES Paper(paperId),
-  FOREIGN KEY (OWNER_topicId) REFERENCES TopicArea(topicId),
+  `paperId` int(11) NOT NULL,
+  `topicId` int(11) NOT NULL,
+  PRIMARY KEY (`paperId`,`topicId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -465,11 +430,9 @@ CREATE TABLE `PaperTopic` (
 DROP TABLE IF EXISTS `PaperWatch`;
 CREATE TABLE `PaperWatch` (
   `paperId` int(11) NOT NULL,
-  `OWNER_contactId` int(11) NOT NULL,
+  `contactId` int(11) NOT NULL,
   `watch` int(11) NOT NULL DEFAULT '0',
-  PRIMARY KEY (`paperId`,`contactId`),
-  FOREIGN KEY (OWNER_contactId) REFERENCES Paper(contactId),
-  FOREIGN KEY (paperId) REFERENCES Paper(paperId)
+  PRIMARY KEY (`paperId`,`contactId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -482,12 +445,9 @@ DROP TABLE IF EXISTS `ReviewRating`;
 CREATE TABLE `ReviewRating` (
   `paperId` int(11) NOT NULL,
   `reviewId` int(11) NOT NULL,
-  `OWNER_contactId` int(11) NOT NULL,
+  `contactId` int(11) NOT NULL,
   `rating` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`paperId`,`reviewId`,`contactId`)
-  FOREIGN KEY (OWNER_contactId) REFERENCES Paper(contactId),
-  FOREIGN KEY (paperId) REFERENCES Paper(paperId),
-  FOREIGN KEY (reviewId) REFERENCES PaperReview(reviewId),
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -499,17 +459,15 @@ CREATE TABLE `ReviewRating` (
 DROP TABLE IF EXISTS `ReviewRequest`;
 CREATE TABLE `ReviewRequest` (
   `paperId` int(11) NOT NULL,
-  `PII_email` varchar(120) NOT NULL,
+  `email` varchar(120) NOT NULL,
   `firstName` varbinary(120) DEFAULT NULL,
   `lastName` varbinary(120) DEFAULT NULL,
   `affiliation` varbinary(2048) DEFAULT NULL,
   `reason` varbinary(32767) DEFAULT NULL,
-  `OWNER_requestedBy` int(11) NOT NULL,
+  `requestedBy` int(11) NOT NULL,
   `timeRequested` bigint(11) NOT NULL,
   `reviewRound` int(1) DEFAULT NULL,
-  PRIMARY KEY (`paperId`,`email`),
-  FOREIGN KEY (paperId) REFERENCES Paper(paperId),
-  FOREIGN KEY (OWNER_requestedBy) REFERENCES ContactInfo(contactId)
+  PRIMARY KEY (`paperId`,`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -550,9 +508,7 @@ CREATE TABLE `TopicInterest` (
   `contactId` int(11) NOT NULL,
   `topicId` int(11) NOT NULL,
   `interest` int(1) NOT NULL,
-  PRIMARY KEY (`contactId`,`topicId`),
-  FOREIGN KEY (contactId) REFERENCES ContactInfo(contactId),
-  FOREIGN KEY (topicId) REFERENCES TopicArea(topicId)
+  PRIMARY KEY (`contactId`,`topicId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
