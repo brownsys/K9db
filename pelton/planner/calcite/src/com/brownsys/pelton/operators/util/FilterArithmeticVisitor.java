@@ -26,11 +26,9 @@ import org.apache.calcite.sql.SqlKind;
 // 3. throws IllegalArgumentException: if the condition has some unsupported shape
 //    or constructs. Importantly, an OR inside an AND.
 public class FilterArithmeticVisitor implements RexVisitor<Boolean> {
-  private boolean insideAnd;
   private LinkedList<RexCall> arithmeticNodes;
 
   public FilterArithmeticVisitor() {
-    this.insideAnd = false;
     this.arithmeticNodes = new LinkedList<RexCall>();
   }
 
@@ -40,18 +38,13 @@ public class FilterArithmeticVisitor implements RexVisitor<Boolean> {
 
   @Override
   public Boolean visitCall(RexCall arg0) {
-    boolean tmp = this.insideAnd;
     boolean hasArithmetic = false;
-    if (arg0.isA(SqlKind.AND)) {
-      this.insideAnd = true;
-    } else if (arg0.isA(SqlKind.OR)) {
-      if (this.insideAnd) {
-        throw new IllegalArgumentException("Cannot have an OR inside an AND in filter!");
-      }
-    } else if (arg0.isA(SqlKind.PLUS) || arg0.isA(SqlKind.MINUS)) {
+    if (arg0.isA(SqlKind.PLUS) || arg0.isA(SqlKind.MINUS)) {
       hasArithmetic = true;
       this.arithmeticNodes.addFirst(arg0);
-    } else if (!arg0.isA(FilterOperatorFactory.FILTER_OPERATIONS)) {
+    } else if (!arg0.isA(FilterOperatorFactory.FILTER_OPERATIONS)
+        && !arg0.isA(SqlKind.AND)
+        && !arg0.isA(SqlKind.OR)) {
       throw new IllegalArgumentException("Unsupported expression in filter!");
     }
 
@@ -60,7 +53,6 @@ public class FilterArithmeticVisitor implements RexVisitor<Boolean> {
       hasArithmetic = hasArithmetic || b;
     }
 
-    this.insideAnd = tmp;
     return hasArithmetic;
   }
 

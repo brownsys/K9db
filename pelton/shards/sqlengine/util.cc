@@ -24,6 +24,9 @@ std::string NameShard(const ShardKind &shard_kind, const UserId &user_id) {
       // NOLINTNEXTLINE
       snprintf(hex_buffer + (i * 2), 3, "%02x", md5_buffer[i]);
     }
+    // Drop some byes of the hash so that the name fit.
+    // TODO(babman): handle this better.
+    hex_buffer[24] = '\0';
     HASHMAP.insert({user_id, std::string(hex_buffer)});
     return absl::StrCat(shard_kind.substr(0, 1), hex_buffer);
   } else {

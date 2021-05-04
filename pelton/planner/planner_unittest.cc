@@ -503,7 +503,6 @@ TEST(PlannerTest, FilterSingleANDCondition) {
   EXPECT_EQ_MSET(graph.outputs().at(0), expected_records);
 }
 
-/*
 TEST(PlannerTest, FilterNestedORCondition) {
   // Create a schema.
   std::vector<std::string> names = {"Col1", "Col2", "Col3"};
@@ -514,7 +513,8 @@ TEST(PlannerTest, FilterNestedORCondition) {
 
   // Make a dummy query.
   std::string query =
-      "SELECT * FROM test_table WHERE Col3=20 AND (Col1<12 OR Col1>=20)";
+      "SELECT * FROM test_table WHERE Col3=20 AND (Col1 < 12 OR Col1 >= 20) "
+      " AND (Col1 + 2 < 16 OR Col1 = 20)";
 
   // Create a dummy state.
   dataflow::DataFlowState state;
@@ -526,31 +526,44 @@ TEST(PlannerTest, FilterNestedORCondition) {
   // Check that the graph is what we expect!
   EXPECT_EQ(graph.inputs().at("test_table")->input_name(), "test_table");
   EXPECT_EQ(graph.GetNode(0).get(), graph.inputs().at("test_table").get());
-  EXPECT_EQ(graph.GetNode(1)->type(), dataflow::Operator::Type::FILTER);
+  EXPECT_EQ(graph.GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
   EXPECT_EQ(graph.GetNode(2)->type(), dataflow::Operator::Type::FILTER);
-  EXPECT_EQ(graph.GetNode(3)->type(), dataflow::Operator::Type::UNION);
-  EXPECT_EQ(graph.GetNode(4)->type(), dataflow::Operator::Type::FILTER);
-  EXPECT_EQ(graph.GetNode(5)->type(), dataflow::Operator::Type::MAT_VIEW);
+  EXPECT_EQ(graph.GetNode(3)->type(), dataflow::Operator::Type::FILTER);
+  EXPECT_EQ(graph.GetNode(4)->type(), dataflow::Operator::Type::UNION);
+  EXPECT_EQ(graph.GetNode(5)->type(), dataflow::Operator::Type::FILTER);
+  EXPECT_EQ(graph.GetNode(6)->type(), dataflow::Operator::Type::FILTER);
+  EXPECT_EQ(graph.GetNode(7)->type(), dataflow::Operator::Type::UNION);
+  EXPECT_EQ(graph.GetNode(8)->type(), dataflow::Operator::Type::FILTER);
+  EXPECT_EQ(graph.GetNode(9)->type(), dataflow::Operator::Type::PROJECT);
+  EXPECT_EQ(graph.GetNode(10)->type(), dataflow::Operator::Type::MAT_VIEW);
 
   // Try to process some records through flow.
+  std::unique_ptr<std::string> str0 = std::make_unique<std::string>("notin!");
   std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
   std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
   std::unique_ptr<std::string> str3 = std::make_unique<std::string>("nope");
+  std::unique_ptr<std::string> str4 = std::make_unique<std::string>("nono");
+  std::unique_ptr<std::string> str5 = std::make_unique<std::string>("bad");
   std::vector<dataflow::Record> records;
+  records.emplace_back(schema, true, 12_s, std::move(str0), 20_s);
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
-  records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
+  records.emplace_back(schema, true, 21_s, std::move(str3), 20_s);
+  records.emplace_back(schema, true, 14_s, std::move(str4), 30_s);
+  records.emplace_back(schema, true, 10_s, std::move(str5), 30_s);
   graph.Process("test_table", records);
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
-  expected_records.push_back(records.at(0).Copy());
-  expected_records.push_back(records.at(1).Copy());
+  dataflow::SchemaRef output_schema = graph.outputs().at(0)->output_schema();
+  expected_records.emplace_back(output_schema, true, 10_s,
+                                std::make_unique<std::string>("hello!"), 20_s);
+  expected_records.emplace_back(output_schema, true, 20_s,
+                                std::make_unique<std::string>("bye!"), 20_s);
 
   // Look at flow output.
   EXPECT_EQ_MSET(graph.outputs().at(0), expected_records);
 }
-*/
 
 TEST(PlannerTest, FilterNestedANDCondition) {
   // Create a schema.

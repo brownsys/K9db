@@ -119,35 +119,27 @@ public class FilterOperatorFactory {
     return this.context.getGenerator().AddUnionOperator(childrenOperators);
   }
 
-  // Ideally would generate an intersection operator connected to all AND clauses.
-  // We do not support intersection, instead we assume this can only contain simple
-  // directly expressions as clauses, and can thus be represented as a single filter.
+  // Generate a filter for this AND condition. Nested ORs are supported.
   private int analyzeAnd(RexCall condition, int inputOperator) {
-    // And can only contain either other ands or direct expressions.
-    boolean allDirectExpression = true;
-    List<RexNode> operands = condition.getOperands();
-    for (RexNode operand : operands) {
-      if (!operand.isA(FILTER_OPERATIONS)) {
-        allDirectExpression = false;
+    // And can only contain either direct expressions or exactly a single OR.
+    ArrayList<RexNode> directExpressions = new ArrayList<RexNode>();
+    for (RexNode operand : condition.getOperands()) {
+      if (operand.isA(FILTER_OPERATIONS)) {
+        directExpressions.add(operand);
+      } else if (operand.isA(SqlKind.OR)) {
+        // If we have an OR: we process the OR first and generate its operators.
+        // The OR's output union operator becomes the input to our Filter.
+        // If this And condition contains other ORs, they are chained after this OR.
+        inputOperator = this.analyzeCondition((RexCall) operand, inputOperator);
+      } else {
+        throw new IllegalArgumentException("Found illegal " + operand.getKind() + " in AND");
       }
     }
 
-    if (allDirectExpression) {
-      return this.analyzeDirectFilter(operands, inputOperator);
-    } else {
-      // GoodShapeVisitor guarantees we will never get here.
-      assert false;
-
-      int[] childrenOperators = new int[operands.size()];
-      for (int i = 0; i < operands.size(); i++) {
-        RexNode operand = operands.get(i);
-        assert operand instanceof RexCall;
-        childrenOperators[i] = this.analyzeCondition((RexCall) operand, inputOperator);
-      }
-
-      // TODO(babman): Replace this with intersection if we need to support this.
-      return this.context.getGenerator().AddUnionOperator(childrenOperators);
+    if (directExpressions.size() > 0) {
+      return this.analyzeDirectFilter(directExpressions, inputOperator);
     }
+    return inputOperator;
   }
 
   /*
@@ -161,7 +153,9 @@ public class FilterOperatorFactory {
   private int analyzeDirectFilter(List<RexNode> operands, int inputOperator) {
     int filterOperator = this.context.getGenerator().AddFilterOperator(inputOperator);
     for (RexNode operand : operands) {
-      this.addFilterOperation((RexCall) operand, filterOperator);
+      if (operand.isA(FILTER_OPERATIONS)) {
+        this.addFilterOperation((RexCall) operand, filterOperator);
+      }
     }
     return filterOperator;
   }
