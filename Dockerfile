@@ -14,7 +14,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     python-is-python3 build-essential libssl-dev zlib1g-dev libncurses5-dev \
     libncursesw5-dev libreadline-dev libgdbm-dev libdb5.3-dev libbz2-dev \
     libexpat1-dev liblzma-dev tk-dev libffi-dev wget gcc-9 g++-9 unzip \
-    openjdk-11-jdk maven python2 valgrind
+    openjdk-11-jdk maven python2 valgrind curl
 
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 90 \
                                  --slave /usr/bin/gcc-ar gcc-ar /usr/bin/gcc-ar-9 \
@@ -80,18 +80,18 @@ RUN chown -R mysql:root /var/lib/mysql
 RUN mkdir -p /run/mysqld
 RUN chown -R mysql:root /run/mysqld/
 
-# for GDPRBench, replace python with python2
-RUN sed -i 's|#!/usr/bin/env python|#!/usr/bin/env python2|' /home/pelton/experiments/GDPRbench/src/bin/ycsb
-
 # clear tmp folder
 RUN rm -rf /tmp/*
+
+# Copy pelton directory
+COPY . /home/pelton
+
+# for GDPRBench, replace python with python2
+RUN sed -i 's|#!/usr/bin/env python|#!/usr/bin/env python2|' /home/pelton/experiments/GDPRbench/src/bin/ycsb
 
 # configure mariadb on startup and run mysqld in the background
 RUN cp /home/pelton/docker/configure_db.sql /home/configure_db.sql
 RUN cp /home/pelton/docker/configure_db.sh /home/configure_db.sh
 RUN chmod 750 /home/configure_db.sh
-
-# Copy pelton directory
-COPY . /home/pelton
 
 ENTRYPOINT ["/bin/bash", "./home/configure_db.sh"]
