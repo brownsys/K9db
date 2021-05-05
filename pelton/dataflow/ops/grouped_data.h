@@ -18,6 +18,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/record.h"
+#include "pelton/util/perf.h"
 
 namespace pelton {
 namespace dataflow {
@@ -129,30 +130,40 @@ class GenericIterator {
 
   // Construct the generic iterator by providing a concrete implemenation.
   explicit GenericIterator(std::unique_ptr<AbsImpl> impl)
-      : impl_(std::move(impl)) {}
+      : impl_(std::move(impl)), size_(-1) {}
+
+  GenericIterator(std::unique_ptr<AbsImpl> impl, int size)
+      : impl_(std::move(impl)), size_(size) {}
 
   // All operations translate to operation on the underlying implementation.
   GenericIterator<T, C> &operator++() {
     // Increment in place.
     this->impl_->Increment();
+    if (this->size_ > 0) {
+      this->size_--;
+    }
     return *this;
   }
   GenericIterator<T, C> operator++(int n) {
     // Increment copy, leave this unchanged.
-    GenericIterator copy(this->impl_->Clone());
+    GenericIterator copy(this->impl_->Clone(), this->size_);
     ++this;
     return copy;
   }
   bool operator==(const GenericIterator<T, C> &o) const {
+    if (this->size_ == 0 && o.size_ == 0) {
+      return true;
+    }
     return this->impl_->Equals(o.impl_);
   }
   bool operator!=(const GenericIterator<T, C> &o) const {
-    return !this->impl_->Equals(o.impl_);
+    return !(*this == o);
   }
   reference operator*() const { return this->impl_->Access(); }
 
  private:
   std::unique_ptr<AbsImpl> impl_;
+  int size_;
 };
 
 // Host code only sees two types of (semi-concrete) iterators: one that produces
@@ -322,16 +333,12 @@ class GroupedDataT : public UntemplatedGroupedData {
     // Key exists and its associated records count is > offset.
     auto begin = it->second.cbegin();
     auto end = it->second.cend();
-    size_t size = it->second.size();
     if (offset > 0) {
       begin = std::next(begin, offset);
     }
-    if (limit > -1 && static_cast<size_t>(limit) + offset < size) {
-      end = std::next(begin, limit);
-    }
     return const_RecordIterable{
-        const_RecordIterator{std::make_unique<R_cimpl>(begin)},
-        const_RecordIterator{std::make_unique<R_cimpl>(end)}};
+        const_RecordIterator{std::make_unique<R_cimpl>(begin), limit},
+        const_RecordIterator{std::make_unique<R_cimpl>(end), 0}};
   }
   RecordIterable Lookup(const Key &key, int limit = -1, size_t offset = 0) {
     auto it = this->contents_.find(key);
@@ -343,15 +350,12 @@ class GroupedDataT : public UntemplatedGroupedData {
     // Key exists and its associated records count is > offset.
     auto begin = it->second.begin();
     auto end = it->second.end();
-    size_t size = it->second.size();
     if (offset > 0) {
       begin = std::next(begin, offset);
     }
-    if (limit > -1 && static_cast<size_t>(limit) + offset < size) {
-      end = std::next(begin, limit);
-    }
-    return RecordIterable{RecordIterator{std::make_unique<R_impl>(begin)},
-                          RecordIterator{std::make_unique<R_impl>(end)}};
+    return RecordIterable{
+        RecordIterator{std::make_unique<R_impl>(begin), limit},
+        RecordIterator{std::make_unique<R_impl>(end), 0}};
   }
 
   // Count of records corresponding to a given key
@@ -362,6 +366,7 @@ class GroupedDataT : public UntemplatedGroupedData {
     }
     return it->second.size();
   }
+
   // Return an Iterable set of records from the given key that are larger than
   // a given record. Should only be used on record ordered containers.
   const_RecordIterable LookupGreater(const Key &key, const Record &cmp,
@@ -374,20 +379,17 @@ class GroupedDataT : public UntemplatedGroupedData {
       }
 
       // Key exists and its associated records count is > offset.
-      auto cbeg = it->second.cbegin();
+      auto begin = it->second.upper_bound(cmp);
       auto end = it->second.cend();
-      auto begin = std::upper_bound(cbeg, end, cmp, this->compare_);
-      size_t size = std::distance(begin, end);
       if (offset > 0) {
         begin = std::next(begin, offset);
       }
-      if (limit > -1 && static_cast<size_t>(limit) + offset < size) {
-        end = std::next(begin, limit);
-      }
 
-      return const_RecordIterable{
-          const_RecordIterator{std::make_unique<R_cimpl>(begin)},
-          const_RecordIterator{std::make_unique<R_cimpl>(end)}};
+      const_RecordIterable it22 = const_RecordIterable{
+          const_RecordIterator{std::make_unique<R_cimpl>(begin), limit},
+          const_RecordIterator{std::make_unique<R_cimpl>(end), 0}};
+
+      return it22;
     }
 
     return const_RecordIterable::CreateEmpty();
