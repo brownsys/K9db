@@ -1,6 +1,7 @@
 // UPDATE statements sharding and rewriting.
 #include "pelton/shards/sqlengine/update.h"
 
+#include <memory>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -170,16 +171,15 @@ absl::StatusOr<mysql::SqlResult> Shard(
                                                 dataflow_state));
             if (lookup.size() == 1) {
               user_id = std::move(*lookup.cbegin());
-            } else {
-              found = false;
+              // Execute statement directly against shard.
+              result.Append(state->connection_pool().ExecuteShard(&cloned, info,
+                                                                  user_id));
             }
           } else if (state->ShardExists(info.shard_kind, user_id)) {
             // Remove where condition on the shard by column, since it does
             // not exist in the sharded table.
             sqlast::ExpressionRemover expression_remover(info.shard_by);
             cloned.Visit(&expression_remover);
-          }
-          if (found) {
             // Execute statement directly against shard.
             result.Append(
                 state->connection_pool().ExecuteShard(&cloned, info, user_id));
@@ -232,6 +232,9 @@ absl::StatusOr<mysql::SqlResult> Shard(
   // Delete was successful, time to update dataflows.
   if (update_flows) {
     dataflow_state->ProcessRecords(table_name, records);
+  }
+  if (!result.IsUpdate()) {
+    result = mysql::SqlResult{std::make_unique<mysql::UpdateResult>(0)};
   }
 
   perf::End("Update");
