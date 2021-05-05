@@ -13,6 +13,7 @@ Value::Value(const Value &o) : type_(o.type_), str_() {
       this->sint_ = o.sint_;
       break;
     case sqlast::ColumnDefinition::Type::TEXT:
+    case sqlast::ColumnDefinition::Type::DATETIME:
       this->str_ = o.str_;
       break;
     default:
@@ -30,6 +31,7 @@ Value &Value::operator=(const Value &o) {
       this->sint_ = o.sint_;
       break;
     case sqlast::ColumnDefinition::Type::TEXT:
+    case sqlast::ColumnDefinition::Type::DATETIME:
       this->str_ = o.str_;  // Frees existing string and copies target.
       break;
     default:
@@ -48,6 +50,7 @@ Value::Value(Value &&o) : type_(o.type_), str_() {
       this->sint_ = o.sint_;
       break;
     case sqlast::ColumnDefinition::Type::TEXT:
+    case sqlast::ColumnDefinition::Type::DATETIME:
       this->str_ = std::move(o.str_);
       break;
     default:
@@ -65,6 +68,7 @@ Value &Value::operator=(Value &&o) {
       this->sint_ = o.sint_;
       break;
     case sqlast::ColumnDefinition::Type::TEXT:
+    case sqlast::ColumnDefinition::Type::DATETIME:
       // Frees current string and moves traget.
       this->str_ = std::move(o.str_);
       break;
@@ -83,6 +87,7 @@ bool Value::operator==(const Value &other) const {
     case sqlast::ColumnDefinition::Type::INT:
       return this->sint_ == other.sint_;
     case sqlast::ColumnDefinition::Type::TEXT:
+    case sqlast::ColumnDefinition::Type::DATETIME:
       return this->str_ == other.str_;
     default:
       LOG(FATAL) << "Unsupported data type in value comparison!";
@@ -96,6 +101,7 @@ bool Value::operator<(const Value &other) const {
     case sqlast::ColumnDefinition::Type::INT:
       return this->sint_ < other.sint_;
     case sqlast::ColumnDefinition::Type::TEXT:
+    case sqlast::ColumnDefinition::Type::DATETIME:
       return this->str_ < other.str_;
     default:
       LOG(FATAL) << "Unsupported data type in value comparison!";
@@ -126,6 +132,7 @@ std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Value &v) {
       os << v.sint_;
       break;
     case sqlast::ColumnDefinition::Type::TEXT:
+    case sqlast::ColumnDefinition::Type::DATETIME:
       os << v.str_;
       break;
     default:

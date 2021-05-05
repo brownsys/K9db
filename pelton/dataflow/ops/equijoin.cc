@@ -28,6 +28,12 @@ inline void CopyIntoRecord(sqlast::ColumnDefinition::Type datatype,
       target->SetInt(source.GetInt(source_index), target_index);
       target->SetNull(false, target_index);
       break;
+    case sqlast::ColumnDefinition::Type::DATETIME:
+      // Copies the string.
+      target->SetDateTime(
+          std::make_unique<std::string>(source.GetDateTime(source_index)),
+          target_index);
+      break;
     case sqlast::ColumnDefinition::Type::TEXT:
       // Copies the string.
       target->SetString(

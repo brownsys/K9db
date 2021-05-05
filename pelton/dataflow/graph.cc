@@ -54,6 +54,7 @@ std::string DataFlowGraph::DebugString() const {
   for (const auto &[_, node] : this->nodes_) {
     str += "\n\t" + node->DebugString() + ",";
   }
+  str.pop_back();
   str += "\n]";
   return str;
 }

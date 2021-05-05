@@ -78,8 +78,12 @@ void SharderState::Load(const std::string &dir_path) {
       getline(state_file, info.sharded_table_name);
       getline(state_file, info.shard_by);
       state_file >> info.shard_by_index;
-      this->sharded_by_.at(line).push_back(info);
       getline(state_file, shard_kind);
+      state_file >> info.distance_from_shard;
+      getline(state_file, shard_kind);
+      getline(state_file, info.next_table);
+      getline(state_file, info.next_column);
+      this->sharded_by_.at(line).push_back(info);
       getline(state_file, shard_kind);
     }
     getline(state_file, line);
@@ -178,6 +182,9 @@ void SharderState::Save(const std::string &dir_path) {
       state_file << info.sharded_table_name << "\n";
       state_file << info.shard_by << "\n";
       state_file << info.shard_by_index << "\n";
+      state_file << info.distance_from_shard << "\n";
+      state_file << info.next_table << "\n";
+      state_file << info.next_column << "\n";
     }
     state_file << "\n";
   }

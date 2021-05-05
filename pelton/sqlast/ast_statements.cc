@@ -61,6 +61,23 @@ std::string Insert::RemoveValue(size_t index) {
   return result;
 }
 
+absl::StatusOr<std::string> Insert::GetValue(const std::string &colname) {
+  if (this->columns_.size() > 0) {
+    auto it = std::find(this->columns_.begin(), this->columns_.end(), colname);
+    if (it == this->columns_.end()) {
+      return absl::InvalidArgumentError(
+          "Insert statement does not contain column \"" + colname + "\"");
+    }
+    size_t index = std::distance(this->columns_.begin(), it);
+    return this->values_.at(index);
+  }
+  return absl::InvalidArgumentError(
+      "Insert statement does not have column names set explicitly");
+}
+const std::string &Insert::GetValue(size_t index) {
+  return this->values_.at(index);
+}
+
 // Update.
 const std::string &Update::table_name() const { return this->table_name_; }
 std::string &Update::table_name() { return this->table_name_; }

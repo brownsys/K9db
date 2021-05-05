@@ -53,8 +53,12 @@ mysql::SqlResult ConnectionPool::ExecuteShard(
 #ifndef PELTON_OPT
   LOG(INFO) << "Shard: " << shard_name << " (userid: " << user_id << ")";
 #endif
-  return this->ExecuteMySQL(sql, schema, shard_name, info.shard_by_index,
-                            user_id);
+  if (info.IsTransitive()) {
+    return this->ExecuteMySQL(sql, schema, shard_name);
+  } else {
+    return this->ExecuteMySQL(sql, schema, shard_name, info.shard_by_index,
+                              user_id);
+  }
 }
 
 mysql::SqlResult ConnectionPool::ExecuteShards(

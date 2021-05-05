@@ -90,8 +90,33 @@ std::string Operator::DebugString() const {
   if (this->children_.size() > 0) {
     str.pop_back();
   }
+  str += "], ";
+
+  // print input schema
+  str += "\"input_columns\": [";
+  for (const SchemaRef schema : this->input_schemas_) {
+    str += "[";
+    for (const std::string col : schema.column_names()) {
+      str += "\"" + col + "\", ";
+    }
+    str.pop_back();
+    str.pop_back();
+    str += "], ";
+  }
+  str.pop_back();
+  str.pop_back();
+  str += "], ";
+
+  // print output schema
+  str += "\"output_columns\": [";
+  for (const std::string col : this->output_schema_.column_names()) {
+    str += "\"" + col + "\", ";
+  }
+  str.pop_back();
+  str.pop_back();
   str += "]";
-  str += "}";
+
+  str += "}\n";
   return str;
 }
 

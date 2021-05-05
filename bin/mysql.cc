@@ -34,6 +34,7 @@ void PrintData(bool print, sql::ResultSet *result) {
         case sql::DataType::NCHAR:
         case sql::DataType::LONGVARCHAR:
         case sql::DataType::LONGNVARCHAR:
+        case sql::DataType::TIMESTAMP:  // Print date as string.
           if (print) {
             std::cout << "| " << result->getString(i) << " ";
           }
@@ -48,8 +49,8 @@ void PrintData(bool print, sql::ResultSet *result) {
           break;
         default:
           std::cout << std::endl;
-          std::cout << "Unknown column type: "
-                    << meta->getColumnTypeName(i) << std::endl;
+          std::cout << "Unknown column type: " << meta->getColumnTypeName(i)
+                    << " #" << meta->getColumnType(i) << std::endl;
       }
     }
     if (print) {

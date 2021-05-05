@@ -62,7 +62,7 @@ Record Record::Copy() const {
         }
         break;
       default:
-        LOG(FATAL) << "Unsupported data type in record copy!";
+        LOG(FATAL) << "Unsupported data type " << type << " in record copy!";
     }
   }
 
@@ -107,6 +107,11 @@ void Record::SetString(std::unique_ptr<std::string> &&v, size_t i) {
   CHECK(!IsNull(i));
   this->data_[i].str = std::move(v);
 }
+void Record::SetDateTime(std::unique_ptr<std::string> &&v, size_t i) {
+  CheckType(i, sqlast::ColumnDefinition::Type::DATETIME);
+  CHECK(!IsNull(i));
+  this->data_[i].str = std::move(v);
+}
 uint64_t Record::GetUInt(size_t i) const {
   CheckType(i, sqlast::ColumnDefinition::Type::UINT);
   CHECK(!IsNull(i));
@@ -122,6 +127,11 @@ const std::string &Record::GetString(size_t i) const {
   CHECK(!IsNull(i));
   return *(this->data_[i].str);
 }
+const std::string &Record::GetDateTime(size_t i) const {
+  CheckType(i, sqlast::ColumnDefinition::Type::DATETIME);
+  CHECK(!IsNull(i));
+  return *(this->data_[i].str);
+}
 
 // Data access with generic type.
 Key Record::GetKey() const {
@@ -132,6 +142,7 @@ Key Record::GetValues(const std::vector<ColumnID> &cols) const {
   // Construct key with given capacity, and fill it up with values.
   Key key{cols.size()};
   for (ColumnID col : cols) {
+    CHECK(!this->IsNull(col));
     switch (this->schema_.TypeOf(col)) {
       case sqlast::ColumnDefinition::Type::UINT:
         key.AddValue(this->data_[col].uint);
@@ -140,6 +151,7 @@ Key Record::GetValues(const std::vector<ColumnID> &cols) const {
         key.AddValue(this->data_[col].sint);
         break;
       case sqlast::ColumnDefinition::Type::TEXT:
+      case sqlast::ColumnDefinition::Type::DATETIME:
         if (this->data_[col].str) {
           key.AddValue(*(this->data_[col].str));
         } else {
@@ -160,6 +172,7 @@ Value Record::GetValue(ColumnID col) const {
     case sqlast::ColumnDefinition::Type::INT:
       return Value(this->data_[col].sint);
     case sqlast::ColumnDefinition::Type::TEXT:
+    case sqlast::ColumnDefinition::Type::DATETIME:
       return Value(*this->data_[col].str);
     default:
       LOG(FATAL) << "Unsupported data type in value extraction!";
@@ -174,6 +187,7 @@ std::string Record::GetValueString(ColumnID col) const {
     case sqlast::ColumnDefinition::Type::INT:
       return std::to_string(this->data_[col].sint);
     case sqlast::ColumnDefinition::Type::TEXT:
+    case sqlast::ColumnDefinition::Type::DATETIME:
       return *this->data_[col].str;
     default:
       LOG(FATAL) << "Unsupported data type in value extraction!";
@@ -191,15 +205,13 @@ void Record::SetValue(const std::string &value, size_t i) {
     case sqlast::ColumnDefinition::Type::INT:
       this->data_[i].sint = std::stoll(value);
       break;
+    // TODO(malte): DATETIME shouldn't be stored as a string, but as
+    // a timestamp since the epoch
+    case sqlast::ColumnDefinition::Type::DATETIME:
     case sqlast::ColumnDefinition::Type::TEXT: {
       this->data_[i].str = std::make_unique<std::string>(Dequote(value));
       break;
     }
-    case sqlast::ColumnDefinition::Type::DATETIME:
-      // TODO(malte): DATETIME shouldn't be stored as a string, but as
-      // a timestamp since the epoch
-      this->data_[i].str = std::make_unique<std::string>(value);
-      break;
     default:
       LOG(FATAL) << "Unsupported data type in setvalue: "
                  << this->schema_.TypeOf(i);
@@ -242,6 +254,7 @@ bool Record::operator==(const Record &other) const {
         }
         break;
       case sqlast::ColumnDefinition::Type::TEXT:
+      case sqlast::ColumnDefinition::Type::DATETIME:
         // If the pointers are not literally identical pointers.
         if (this->data_[i].str != other.data_[i].str) {
           // Either is null but not both.
@@ -280,6 +293,7 @@ std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Record &r) {
       case sqlast::ColumnDefinition::Type::INT:
         os << r.data_[i].sint << "|";
         break;
+      case sqlast::ColumnDefinition::Type::DATETIME:
       case sqlast::ColumnDefinition::Type::TEXT:
         if (r.data_[i].str) {
           os << *r.data_[i].str << "|";

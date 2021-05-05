@@ -59,6 +59,7 @@ class Value {
       case sqlast::ColumnDefinition::Type::INT:
         return H::combine(std::move(h), k.sint_);
       case sqlast::ColumnDefinition::Type::TEXT:
+      case sqlast::ColumnDefinition::Type::DATETIME:
         return H::combine_contiguous(std::move(h), k.str_.c_str(),
                                      k.str_.size());
       default:

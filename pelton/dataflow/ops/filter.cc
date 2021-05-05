@@ -12,6 +12,9 @@
   if (record.schema().TypeOf(col) != Record::TypeOfVariant(v)) {  \
     LOG(FATAL) << "Type mistmatch in filter value";               \
   }                                                               \
+  if (record.IsNull(col)) {                                       \
+    return false;                                                 \
+  }                                                               \
   switch (record.schema().TypeOf(col)) {                          \
     case sqlast::ColumnDefinition::Type::INT:                     \
       if (!(record.GetInt(col) OP std::get<int64_t>(v))) {        \
@@ -36,6 +39,11 @@
 #define COLUMN_COLUMN_CMP_MACRO(col1, col2, OP)                       \
   if (record.schema().TypeOf(col1) != record.schema().TypeOf(col2)) { \
     LOG(FATAL) << "Type mistmatch in filter column";                  \
+  }                                                                   \
+  if (record.IsNull(col1) && record.IsNull(col2)) {                   \
+    return true;                                                      \
+  } else if (record.IsNull(col1) || record.IsNull(col2)) {            \
+    return false;                                                     \
   }                                                                   \
   switch (record.schema().TypeOf(col1)) {                             \
     case sqlast::ColumnDefinition::Type::INT:                         \

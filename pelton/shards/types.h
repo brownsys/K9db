@@ -42,9 +42,50 @@ struct ShardingInformation {
   // The column the table is sharded by. This is a column from the unsharded
   // schema that is removed post-sharding, it can be deduced from the shard
   // name.
+  // Note: in case of transitive sharding, this column is not removed, but its
+  // value is used to look up the transitive sharding value via an index.
   ColumnName shard_by;
   // The index of the sharding column in the table definition.
   ColumnIndex shard_by_index;
+  // 0 means direct sharding, 1 and above means a transitive shard.
+  // if this value is i, it means that there are i foreign key hops between
+  // this table and the initial shard_by column leading to a PII.
+  int distance_from_shard;
+  // In case of transitive sharding (distance_from_shard > 0), these fields
+  // store the name of the next intermediate table and column.
+  UnshardedTableName next_table;
+  ColumnName next_column;
+  FlowName next_index_name;
+
+  // Constructors.
+  ShardingInformation() = default;
+
+  // Create a non transitive sharding information.
+  ShardingInformation(const ShardKind &sk, const ShardedTableName &stn,
+                      const ColumnName &sb, ColumnIndex sbi,
+                      const ColumnName &nc)
+      : shard_kind(sk),
+        sharded_table_name(stn),
+        shard_by(sb),
+        shard_by_index(sbi),
+        distance_from_shard(0),
+        next_table(""),
+        next_column(nc),
+        next_index_name("") {}
+
+  // A transitive sharding information can only be created given the previous
+  // sharding information in the transitivity chain.
+  bool MakeTransitive(const ShardingInformation &next, const FlowName &index) {
+    distance_from_shard = next.distance_from_shard + 1;
+    next_table = shard_kind;
+    shard_kind = next.shard_kind;
+    next_index_name = index;
+    // Cannot support deeply transitive things yet.
+    return distance_from_shard == 1;
+  }
+
+  // Helpers.
+  bool IsTransitive() const { return this->distance_from_shard > 0; }
 };
 
 }  // namespace shards

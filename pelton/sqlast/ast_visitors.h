@@ -100,7 +100,7 @@ class MutableVisitor {
 class Stringifier : public AbstractVisitor<std::string> {
  public:
   explicit Stringifier(const std::string shard_name)
-      : shard_prefix_(), supports_foreign_keys_(false) {
+      : shard_prefix_(), supports_foreign_keys_(true) {
     if (shard_name.size() > 0) {
       shard_prefix_ = shard_name + "_";
     }
