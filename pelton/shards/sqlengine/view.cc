@@ -131,35 +131,35 @@ absl::StatusOr<mysql::SqlResult> SelectView(
       }
       // Reading by equality: the query provides us with a key that we read with
       // directly from the matview.
-      case sqlast::Expression::Type::EQ: {
-        // Key must be of the right type.
-        dataflow::Key key{1};
-        CHECK_EQ(values.size(), 1);
-        switch (schema.TypeOf(column_index)) {
-          case sqlast::ColumnDefinition::Type::UINT:
-            key.AddValue(static_cast<uint64_t>(std::stoull(values.at(0))));
-            break;
-          case sqlast::ColumnDefinition::Type::INT:
-            key.AddValue(static_cast<int64_t>(std::stoll(values.at(0))));
-            break;
-          case sqlast::ColumnDefinition::Type::TEXT:
-            key.AddValue(values.at(0));
-            break;
-          case sqlast::ColumnDefinition::Type::DATETIME:
-            key.AddValue(values.at(0));
-            break;
-          default:
-            return absl::InvalidArgumentError("Unsupported type in view read");
-        }
+      case sqlast::Expression::Type::EQ:
+      case sqlast::Expression::Type::IN: {
+        for (auto &k : values) {
+          dataflow::Key key{1};
+          // Key must be of the right type.
+          switch (schema.TypeOf(column_index)) {
+            case sqlast::ColumnDefinition::Type::UINT:
+              key.AddValue(static_cast<uint64_t>(std::stoull(k)));
+              break;
+            case sqlast::ColumnDefinition::Type::INT:
+              key.AddValue(static_cast<int64_t>(std::stoll(k)));
+              break;
+            case sqlast::ColumnDefinition::Type::TEXT:
+              key.AddValue(k);
+              break;
+            case sqlast::ColumnDefinition::Type::DATETIME:
+              key.AddValue(k);
+              break;
+            default:
+              return absl::InvalidArgumentError(
+                  "Unsupported type in view read");
+          }
 
-        // Read records attached to key.
-        for (const auto &record : matview->Lookup(key, limit, offset)) {
-          records.push_back(record.Copy());
+          // Read records attached to key.
+          for (const auto &record : matview->Lookup(key, limit, offset)) {
+            records.push_back(record.Copy());
+          }
         }
         break;
-      }
-      case sqlast::Expression::Type::IN: {
-        return absl::InvalidArgumentError("don't support IN yet");
       }
       default: {
         return absl::InvalidArgumentError("Unsupported read from view query");
