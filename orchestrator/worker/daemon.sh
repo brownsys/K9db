@@ -57,6 +57,11 @@ do
       cp .error .output
     fi
 
+    # Drop all the databases
+    echo "Pelton Log: Cleaning up!"
+    ./bin/drop.sh root password
+    sleep 5
+
     # Run vanilla trace file
     echo "Pelton Log: Running Baseline job!"
     bazel run --config=opt //bin:mysql -- --print=no --minloglevel=3 < $UFILENAME >> .output 2>> .error
