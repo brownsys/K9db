@@ -85,6 +85,7 @@ cc_library(
         "insert.h",
     ],
     deps = [
+        ":index",
         "//pelton/dataflow:state",
         "//pelton/mysql:result",
         "//pelton/shards:state",

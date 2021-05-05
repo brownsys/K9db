@@ -55,6 +55,7 @@ struct ShardingInformation {
   // store the name of the next intermediate table and column.
   UnshardedTableName next_table;
   ColumnName next_column;
+  FlowName next_index_name;
 
   // Constructors.
   ShardingInformation() = default;
@@ -65,14 +66,15 @@ struct ShardingInformation {
                       const ColumnName &nc)
       : shard_kind(sk), sharded_table_name(stn), shard_by(sb),
         shard_by_index(sbi), distance_from_shard(0), next_table(""),
-        next_column(nc) {}
+        next_column(nc), next_index_name("") {}
 
   // A transitive sharding information can only be created given the previous
   // sharding information in the transitivity chain.
-  bool MakeTransitive(const ShardingInformation &next) {
+  bool MakeTransitive(const ShardingInformation &next, const FlowName &index) {
     distance_from_shard = next.distance_from_shard + 1;
     next_table = shard_kind;    
     shard_kind = next.shard_kind;
+    next_index_name = index;
     // Cannot support deeply transitive things yet.
     return distance_from_shard == 1;
   }

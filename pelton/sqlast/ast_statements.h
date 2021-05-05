@@ -38,6 +38,8 @@ class Insert : public AbstractStatement {
 
   absl::StatusOr<std::string> RemoveValue(const std::string &colname);
   std::string RemoveValue(size_t index);
+  absl::StatusOr<std::string> GetValue(const std::string &colname);
+  const std::string &GetValue(size_t index);
 
   // Visitor pattern.
   template <class T>

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "pelton/shards/sqlengine/index.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
@@ -58,11 +59,32 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Insert &stmt,
       // Find the value corresponding to the shard by column.
       std::string user_id;
       if (cloned.HasColumns()) {
-        ASSIGN_OR_RETURN(user_id, cloned.RemoveValue(info.shard_by));
+        if (info.IsTransitive()) {
+          ASSIGN_OR_RETURN(user_id, cloned.GetValue(info.shard_by));
+        } else {
+          ASSIGN_OR_RETURN(user_id, cloned.RemoveValue(info.shard_by));
+        }
       } else {
-        user_id = cloned.RemoveValue(info.shard_by_index);
+        if (info.IsTransitive()) {
+          user_id = cloned.GetValue(info.shard_by_index);
+        } else {
+          user_id = cloned.RemoveValue(info.shard_by_index);
+        }
       }
       user_id = Dequote(user_id);
+
+      // If the sharding is transitive, the user id should be resolved via the
+      // secondary index of the target table.
+      if (info.IsTransitive()) {
+        ASSIGN_OR_RETURN(
+            const auto &lookup,
+            index::LookupIndex(info.next_index_name, user_id, dataflow_state));
+        if (lookup.size() == 1) {
+          user_id = *lookup.cbegin();
+        } else {
+          return absl::InvalidArgumentError("Foreign Key Value does not exist");
+        }
+      }
 
       // TODO(babman): better to do this after user insert rather than user data
       //               insert.

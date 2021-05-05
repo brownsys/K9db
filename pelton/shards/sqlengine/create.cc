@@ -114,7 +114,10 @@ absl::Status IsShardingBySupported(ShardingInformation *info,
       return absl::InvalidArgumentError(
           "Cannot have a transitive FK pointing to non-index column");
     }
-    if (!info->MakeTransitive(other)) {
+
+    const FlowName &index =
+        state.IndexFlow(foreign_table, info->next_column, other.shard_by);
+    if (!info->MakeTransitive(other, index)) {
       return absl::InvalidArgumentError("Transitive FK is too deep");
     }
     return absl::OkStatus();
