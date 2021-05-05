@@ -59,7 +59,7 @@ std::string Stringifier::VisitColumnConstraint(const ColumnConstraint &ast) {
       return "NOT NULL";
     case ColumnConstraint::Type::FOREIGN_KEY:
       if (this->supports_foreign_keys_) {
-        return "REFERENCES " + ast.foreign_table() + "(" +
+        return "REFERENCES " + this->shard_prefix_ + ast.foreign_table() + "(" +
                ast.foreign_column() + ")";
       } else {
         return "";

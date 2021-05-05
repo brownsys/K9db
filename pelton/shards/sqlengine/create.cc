@@ -81,14 +81,8 @@ absl::StatusOr<std::optional<ShardKind>> ShouldShardBy(
   bool foreign_sharded = state.IsSharded(foreign_table);
   bool foreign_pii = state.IsPII(foreign_table);
 
-  // Our insert rewriting logic does not support this case yet!
-  // Transitive fk sharding.
-  if (foreign_sharded) {
-    return absl::InvalidArgumentError("Transitive sharding is not supported!");
-  }
-
   // FK links to a shard, add it as either an explicit or implicit owner.
-  if (foreign_pii) {
+  if (foreign_pii || foreign_sharded) {
     return foreign_table;
   }
   return std::optional<ShardKind>{};
@@ -159,24 +153,29 @@ absl::StatusOr<std::list<ShardingInformation>> ShardTable(
 // Determine what should be done about a single foreign key in some
 // sharded table.
 absl::StatusOr<ForeignKeyType> ShardForeignKey(
+    const std::string &foreign_key_column_name,
     const sqlast::ColumnConstraint &foreign_key,
     const ShardingInformation &sharding_information,
     const SharderState &state) {
   const std::string &foreign_table = foreign_key.foreign_table();
 
-  // Figure out the type of this foreign key.
-  if (state.IsSharded(foreign_table)) {
-    const std::list<ShardingInformation> &list =
-        state.GetShardingInformation(foreign_table);
-    if (list.size() > 0) {
-      return absl::InvalidArgumentError(
-          "Unsupported: transitive foreign key into multi-owned table!");
-    }
-    const ShardKind &target = list.front().shard_kind;
-    if (target == sharding_information.shard_kind) {
+  // Options:
+  // 1. Foreign key is what we are sharding by:
+  //    FK is removed if the sharding is direct (points to a PII table).
+  //    FK is internal if the sharding is indirect.
+  if (foreign_key_column_name == sharding_information.shard_by) {
+    if (state.IsSharded(foreign_table)) {
       return FK_INTERNAL;
+    } else {
+      return FK_REMOVED;
     }
   }
+  // 2. Foreign key is to an unsharded table.
+  //    FK is external, column is kept but constraint dropped.
+  // 3. Foreign key is to a sharded table.
+  //    We have no guarantees if this table belongs to the same shard,
+  //    or a different shard but is non-owning. We have no choice but to
+  //    consider the FK external. Column is kept but constraint is dropped.
   return FK_EXTERNAL;
 }
 
@@ -191,15 +190,15 @@ absl::StatusOr<ForeignKeyShards> ShardForeignKeys(
   for (const auto &column : stmt.GetColumns()) {
     for (const auto &constraint : column.GetConstraints()) {
       if (constraint.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
+        const std::string &colname = column.column_name();
         ASSIGN_OR_RETURN(
             ForeignKeyType fk_type,
-            ShardForeignKey(constraint, sharding_information, state));
-        result.emplace(column.column_name(), fk_type);
+            ShardForeignKey(colname, constraint, sharding_information, state));
+        result.emplace(colname, fk_type);
       }
     }
   }
   // Remove shard_by column and its constraints.
-  result[sharding_information.shard_by] = FK_REMOVED;
   return result;
 }
 
@@ -246,6 +245,12 @@ absl::StatusOr<mysql::SqlResult> Shard(
   bool has_pii = HasPII(stmt);
   ASSIGN_OR_RETURN(std::list<ShardingInformation> sharding_information,
                    ShardTable(stmt, *state));
+  for (const auto &info : sharding_information) {
+    if (state->IsSharded(info.shard_kind)) {
+      return absl::InvalidArgumentError(
+          "Transitive sharding is not supported!");
+    }
+  }
 
   mysql::SqlResult result;
   // Sharding scenarios.

@@ -169,6 +169,15 @@ CREATE TABLE stories ( \
   user_is_author int, \
   FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE tags ( \
+  id int NOT NULL PRIMARY KEY, \
+  tag varchar(25) NOT NULL, \
+  description varchar(100), \
+  privileged int, \
+  is_media int, \
+  inactive int, \
+  hotness_mod int \
+) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE TABLE suggested_taggings ( \
   id int NOT NULL PRIMARY KEY, \
   story_id int, \
@@ -191,30 +200,21 @@ CREATE TABLE tag_filters ( \
   tag_id int, \
   FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
-CREATE TABLE taggings ( \
-  id int NOT NULL PRIMARY KEY, \
-  story_id int NOT NULL, \
-  tag_id int NOT NULL \
-  FOREIGN KEY (tag_id) REFERENCES tags(id), \
-  FOREIGN KEY (story_id) REFERENCES stories(id) \
-) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
-CREATE TABLE tags ( \
-  id int NOT NULL PRIMARY KEY, \
-  tag varchar(25) NOT NULL, \
-  description varchar(100), \
-  privileged int, \
-  is_media int, \
-  inactive int, \
-  hotness_mod int \
-) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
+#CREATE TABLE taggings ( \
+#  id int NOT NULL PRIMARY KEY, \
+#  story_id int NOT NULL, \
+#  tag_id int NOT NULL \
+#  FOREIGN KEY (tag_id) REFERENCES tags(id), \
+#  FOREIGN KEY (story_id) REFERENCES stories(id) \
+#) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE TABLE votes ( \
   id int NOT NULL PRIMARY KEY, \
-  user_id int NOT NULL, \
+  OWNER_user_id int NOT NULL, \
   story_id int NOT NULL, \
   comment_id int, \
   vote int NOT NULL, \
   reason varchar(1), \
-  FOREIGN KEY (user_id) REFERENCES users(id), \
+  FOREIGN KEY (OWNER_user_id) REFERENCES users(id), \
   FOREIGN KEY (story_id) REFERENCES stories(id), \
   FOREIGN KEY (comment_id) REFERENCES comments(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;

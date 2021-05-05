@@ -48,8 +48,8 @@ void PrintData(bool print, sql::ResultSet *result) {
           break;
         default:
           std::cout << std::endl;
-          std::cout << "Unknown column type: "
-                    << meta->getColumnTypeName(i) << std::endl;
+          std::cout << "Unknown column type: " << meta->getColumnTypeName(i)
+                    << std::endl;
       }
     }
     if (print) {
