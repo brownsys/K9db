@@ -81,7 +81,7 @@ CREATE TABLE invitation_requests ( \
   id int NOT NULL PRIMARY KEY, \
   code varchar(255), \
   is_verified int, \
-  email varchar(255), \
+  PII_email varchar(255), \
   name varchar(255), \
   memo text, \
   ip_address varchar(255), \
@@ -90,13 +90,13 @@ CREATE TABLE invitation_requests ( \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE invitations ( \
   id int NOT NULL PRIMARY KEY, \
-  user_id int, \
-  email varchar(255), \
+  OWNER_user_id int, \
+  OWNER_email varchar(255), \
   code varchar(255), \
   created_at datetime NOT NULL, \
   updated_at datetime NOT NULL, \
   memo text, \
-  FOREIGN KEY (user_id) REFERENCES users(id) \
+  FOREIGN KEY (OWNER_user_id) REFERENCES users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE keystores ( \
   keyX varchar(50) NOT NULL PRIMARY KEY, \

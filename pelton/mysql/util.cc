@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "glog/logging.h"
 
@@ -24,7 +25,8 @@ void MySqlValueIntoRecord(sql::ResultSet *result, size_t col_index,
     case sqlast::ColumnDefinition::Type::TEXT: {
       sql::SQLString sql_val = result->getString(col_index);
       std::string val{sql_val.begin(), sql_val.end()};
-      record->SetString(std::make_unique<std::string>(val), target_index);
+      record->SetString(std::make_unique<std::string>(std::move(val)),
+                        target_index);
       break;
     }
     case sqlast::ColumnDefinition::Type::INT: {
@@ -44,6 +46,23 @@ void MySqlValueIntoRecord(sql::ResultSet *result, size_t col_index,
         record->SetValue(val, target_index);
       } else {
         record->SetUInt(result->getUInt64(col_index), target_index);
+      }
+      break;
+    }
+    case sqlast::ColumnDefinition::Type::DATETIME: {
+      switch (meta->getColumnType(col_index)) {
+        case sql::DataType::TIMESTAMP: {
+          sql::SQLString sql_val = result->getString(col_index);
+          std::string val{sql_val.begin(), sql_val.end()};
+          record->SetDateTime(std::make_unique<std::string>(std::move(val)),
+                              target_index);
+          break;
+        }
+        default:
+          LOG(FATAL) << "Incompatible SQLType "
+                     << meta->getColumnTypeName(col_index) << " #"
+                     << meta->getColumnType(col_index)
+                     << " with Pelton's DATETIME";
       }
       break;
     }

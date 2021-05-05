@@ -151,6 +151,7 @@ Key Record::GetValues(const std::vector<ColumnID> &cols) const {
         key.AddValue(this->data_[col].sint);
         break;
       case sqlast::ColumnDefinition::Type::TEXT:
+      case sqlast::ColumnDefinition::Type::DATETIME:
         if (this->data_[col].str) {
           key.AddValue(*(this->data_[col].str));
         } else {
@@ -171,6 +172,7 @@ Value Record::GetValue(ColumnID col) const {
     case sqlast::ColumnDefinition::Type::INT:
       return Value(this->data_[col].sint);
     case sqlast::ColumnDefinition::Type::TEXT:
+    case sqlast::ColumnDefinition::Type::DATETIME:
       return Value(*this->data_[col].str);
     default:
       LOG(FATAL) << "Unsupported data type in value extraction!";
@@ -185,6 +187,7 @@ std::string Record::GetValueString(ColumnID col) const {
     case sqlast::ColumnDefinition::Type::INT:
       return std::to_string(this->data_[col].sint);
     case sqlast::ColumnDefinition::Type::TEXT:
+    case sqlast::ColumnDefinition::Type::DATETIME:
       return *this->data_[col].str;
     default:
       LOG(FATAL) << "Unsupported data type in value extraction!";
@@ -251,6 +254,7 @@ bool Record::operator==(const Record &other) const {
         }
         break;
       case sqlast::ColumnDefinition::Type::TEXT:
+      case sqlast::ColumnDefinition::Type::DATETIME:
         // If the pointers are not literally identical pointers.
         if (this->data_[i].str != other.data_[i].str) {
           // Either is null but not both.
