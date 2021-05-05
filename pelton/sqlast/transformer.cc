@@ -470,8 +470,14 @@ antlrcpp::Any AstTransformer::visitExpr(
   if (ctx->IN() != nullptr) {
     std::unique_ptr<BinaryExpression> result =
         std::make_unique<BinaryExpression>(Expression::Type::IN);
-    MCAST_OR_RETURN(std::unique_ptr<Expression> expr0,
-                    ctx->expr(0)->accept(this), std::unique_ptr<Expression>);
+    if (ctx->expr(0)->column_name() == nullptr) {
+      return absl::InvalidArgumentError(
+          "only support WHERE IN with column on left");
+    }
+    CAST_OR_RETURN(std::string column,
+                   ctx->expr(0)->column_name()->accept(this), std::string);
+    std::unique_ptr<Expression> expr0 =
+        std::make_unique<ColumnExpression>(column);
     std::vector<std::string> values;
     for (auto &v : ctx->expr(1)->expr()) {
       CAST_OR_RETURN(std::string value, v->literal_value()->accept(this),
@@ -481,7 +487,7 @@ antlrcpp::Any AstTransformer::visitExpr(
     result->SetLeft(std::move(expr0));
     result->SetRight(
         std::move(std::make_unique<LiteralListExpression>(values)));
-    return result;
+    return static_cast<std::unique_ptr<Expression>>(std::move(result));
   }
 
   std::unique_ptr<BinaryExpression> result;
