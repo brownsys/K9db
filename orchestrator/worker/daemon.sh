@@ -43,40 +43,35 @@ do
       && cd -
     echo "Pelton Log: Trace files generated!"
 
-    if [[ $(head -n 1 orchestrator/worker/worker_load) == "# Pelton" ]]; then
-      # Run pelton trace file
-      echo "Pelton Log: Running Pelton job!"
-      bazel run --config=opt //bin:cli -- --print=no --minloglevel=3 < $SFILENAME > .output 2> .error
-      if [ $? -eq 0 ]; then
-        echo "Pelton Log: Pelton job completed!"
+    # Run pelton trace file
+    echo "Pelton Log: Running Pelton job!"
+    bazel run --config=opt //bin:cli -- --print=no --minloglevel=3 < $SFILENAME > .output 2> .error
+    if [ $? -eq 0 ]; then
+      echo "Pelton Log: Pelton job completed!"
 
-        # Get the database size
-        echo "DB size" >> .output
-        mariadb -u root -ppassword --execute="SELECT table_schema AS 'Database', CAST(SUM(data_length + index_length) AS decimal) / 1449616.0 AS 'Size (MB)' FROM information_schema.TABLES GROUP BY table_schema" >> .output
-
-        # Post the results to orchestrator
-        curl -H 'Content-Type: text/plain' -X POST --data-binary @.output $ORCHESTRATOR/done
-      else
-        echo "Pelton Log: Pelton job errored out!"
-        curl -H 'Content-Type: text/plain' -X POST --data-binary @.error $ORCHESTRATOR/done
-      fi
+      # Get the database size
+      echo "DB size" >> .output
+      mariadb -u root -ppassword --execute="SELECT table_schema AS 'Database', CAST(SUM(data_length + index_length) AS decimal) / 1449616.0 AS 'Size (MB)' FROM information_schema.TABLES GROUP BY table_schema" >> .output
     else
-      # Run vanilla trace file
-      echo "Pelton Log: Running Baseline job!"
-      bazel run --config=opt //bin:mysql -- --print=no --minloglevel=3 < $UFILENAME > .output 2> .error
-      if [ $? -eq 0 ]; then
-        echo "Pelton Log: Baseline job completed!"
+      echo "Pelton Log: Pelton job errored out!"
+      cp .error .output
+    fi
 
-        # Get the database size
-        echo "DB size" >> .output
-        mariadb -u root -ppassword --execute="SELECT table_schema AS 'Database', CAST(SUM(data_length + index_length) AS decimal) / 1449616.0 AS 'Size (MB)' FROM information_schema.TABLES GROUP BY table_schema" >> .output
+    # Run vanilla trace file
+    echo "Pelton Log: Running Baseline job!"
+    bazel run --config=opt //bin:mysql -- --print=no --minloglevel=3 < $UFILENAME >> .output 2>> .error
+    if [ $? -eq 0 ]; then
+      echo "Pelton Log: Baseline job completed!"
 
-        # Post the results to orchestrator
-        curl -H 'Content-Type: text/plain' -X POST --data-binary @.output $ORCHESTRATOR/done
-      else
-        echo "Pelton Log: Baseline job errored out!"
-        curl -H 'Content-Type: text/plain' -X POST --data-binary @.error $ORCHESTRATOR/done
-      fi
+      # Get the database size
+      echo "DB size" >> .output
+      mariadb -u root -ppassword --execute="SELECT table_schema AS 'Database', CAST(SUM(data_length + index_length) AS decimal) / 1449616.0 AS 'Size (MB)' FROM information_schema.TABLES GROUP BY table_schema" >> .output
+
+      # Post the results to orchestrator
+      curl -H 'Content-Type: text/plain' -X POST --data-binary @.output $ORCHESTRATOR/done
+    else
+      echo "Pelton Log: Baseline job errored out!"
+      curl -H 'Content-Type: text/plain' -X POST --data-binary @.error $ORCHESTRATOR/done
     fi
 
     # Drop all the databases

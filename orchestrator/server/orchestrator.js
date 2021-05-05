@@ -122,7 +122,7 @@ Machine.findMachine = function (ip) {
 };
 
 // Experiment class.
-function Experiment(name, loadFile, type) {
+function Experiment(name, loadFile) {
   this.id = allExperiments.length;
   this.name_ = name;
   this.content = fs.readFileSync(loadFile, 'utf8');;
@@ -130,7 +130,6 @@ function Experiment(name, loadFile, type) {
   this.startTime = null;
   this.machine = null;
   this.result = null;
-  this.type = type;
   allExperiments.push(this);
   jobQueue.push(this);
 }
@@ -154,7 +153,7 @@ Experiment.prototype.finished = function (result) {
   fs.writeFileSync("orchestrator/server/result" + this.id, this.result);
 };
 Experiment.prototype.toString = function () {
-  let str = this.type + " Experiment " + this.id + " (" + this.name_ + ")";
+  let str = "Experiment " + this.id + " (" + this.name_ + ")";
   str += ", status: " + this.timeElapsed();
   if (this.machine != null) {
     str += ", machine: " + this.machine.id;
@@ -169,7 +168,7 @@ app.get('/ready', (req, res) => {
   const experiment = machine.assignJob();
   if (experiment) {
     res.type("text/plain");
-    res.send("# " + experiment.type + "\n" + experiment.content);
+    res.send(experiment.content);
   } else {
     res.type("text/plain");
     res.send("");
@@ -197,7 +196,7 @@ app.listen(PORT, () => {
       console.log('- experiments');
       console.log('- result <experiment id>');
       console.log('- gdprbench <tag> <path/to/load/file>');
-      console.log('- load <path/to/dir/containing/loads> [baseline|pelton]');
+      console.log('- load <path/to/dir/containing/loads>');
     }
     if (line.startsWith('exit')) {
       process.exit(0);
@@ -237,26 +236,18 @@ app.listen(PORT, () => {
       const split = line.split(" ");
       const name = split[1];
       const loadFile = split[2];
-      const experiment1 = new Experiment(name, loadFile, "Baseline");
-      const experiment2 = new Experiment(name, loadFile, "Pelton");
-      console.log(experiment1.toString());
-      console.log(experiment2.toString());
+      const experiment = new Experiment(name, loadFile);
+      console.log(experiment.toString());
     }
     if (line.startsWith('load')) {
       const split = line.split(" ");
       const directory = split[1];
-      const type = split[2];
       const sep = directory.endsWith("/") ? "" : "/";
       for (const file of fs.readdirSync(directory)) {
         const path = directory + sep + file;
         if (fs.lstatSync(path).isFile()) {
-          if (type.toLowerCase() == "baseline")  {
-            const experiment = new Experiment(file, path, "Baseline");
-            console.log(experiment.toString());
-          } else {
-            const experiment = new Experiment(file, path, "Pelton");
-            console.log(experiment.toString());
-          }
+          const experiment = new Experiment(file, path);
+          console.log(experiment.toString());
         }
       }
     }
