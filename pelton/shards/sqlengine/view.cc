@@ -38,16 +38,12 @@ absl::StatusOr<std::vector<std::string>> GetCondValues(
   const sqlast::Expression *left = exp->GetLeft();
   const sqlast::Expression *right = exp->GetRight();
   if (left->type() == sqlast::Expression::Type::LITERAL) {
-    std::string v =
-        static_cast<const sqlast::LiteralExpression *>(left)->value();
-    std::vector<std::string> vals{v};
-    return vals;
+    return std::vector<std::string>{
+        static_cast<const sqlast::LiteralExpression *>(left)->value()};
   }
   if (right->type() == sqlast::Expression::Type::LITERAL) {
-    std::string v =
-        static_cast<const sqlast::LiteralExpression *>(right)->value();
-    std::vector<std::string> vals{v};
-    return vals;
+    return std::vector<std::string>{
+        static_cast<const sqlast::LiteralExpression *>(right)->value()};
   }
   if (right->type() == sqlast::Expression::Type::LIST) {
     return static_cast<const sqlast::LiteralListExpression *>(right)->values();

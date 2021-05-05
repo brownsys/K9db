@@ -480,6 +480,10 @@ antlrcpp::Any AstTransformer::visitExpr(
         std::make_unique<ColumnExpression>(column);
     std::vector<std::string> values;
     for (auto &v : ctx->expr(1)->expr()) {
+      if (v->literal_value() == nullptr) {
+        return absl::InvalidArgumentError(
+            "only support literal list value with IN on right");
+      }
       CAST_OR_RETURN(std::string value, v->literal_value()->accept(this),
                      std::string);
       values.push_back(value);
