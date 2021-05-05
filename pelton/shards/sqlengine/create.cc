@@ -87,7 +87,7 @@ absl::StatusOr<std::optional<ShardKind>> ShouldShardBy(
   if (foreign_pii || foreign_sharded) {
     return foreign_table;
   }
-  
+
   return std::optional<ShardKind>{};
 }
 
@@ -108,7 +108,7 @@ absl::Status IsShardingBySupported(ShardingInformation *info,
     if (info_list.size() > 1) {
       return absl::InvalidArgumentError("Owning FK into mutli owned table");
     }
-    
+
     const ShardingInformation &other = info_list.front();
     if (!state.HasIndexFor(foreign_table, info->next_column, other.shard_by)) {
       return absl::InvalidArgumentError(
@@ -122,7 +122,7 @@ absl::Status IsShardingBySupported(ShardingInformation *info,
     }
     return absl::OkStatus();
   }
-  
+
   return absl::InvalidArgumentError("Pelton confused with non-existing shard");
 }
 
@@ -161,14 +161,16 @@ absl::StatusOr<std::list<ShardingInformation>> ShardTable(
       ASSIGN_OR_RETURN(std::optional<ShardKind> shard_kind,
                        ShouldShardBy(constraint, state));
       if (shard_kind.has_value()) {
-        const std::string & foreign_column = constraint.foreign_column();
+        const std::string &foreign_column = constraint.foreign_column();
         std::string sharded_table_name =
             NameShardedTable(table_name, column_name);
         // FK links to a shard, add it as either an explicit or implicit owner.
         if (explicit_owner) {
-          explicit_owners.emplace_back(shard_kind.value(), sharded_table_name, column_name, index, foreign_column);
+          explicit_owners.emplace_back(shard_kind.value(), sharded_table_name,
+                                       column_name, index, foreign_column);
         } else {
-          implicit_owners.emplace_back(shard_kind.value(), sharded_table_name, column_name, index, foreign_column);
+          implicit_owners.emplace_back(shard_kind.value(), sharded_table_name,
+                                       column_name, index, foreign_column);
         }
       }
     }

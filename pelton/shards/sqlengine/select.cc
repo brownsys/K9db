@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/util/perf.h"
@@ -54,9 +55,9 @@ absl::StatusOr<mysql::SqlResult> Shard(
       if (found) {
         if (info.IsTransitive()) {
           // Transitive sharding: look up via index.
-          ASSIGN_OR_RETURN(
-            auto &lookup,
-            index::LookupIndex(info.next_index_name, user_id, dataflow_state));
+          ASSIGN_OR_RETURN(auto &lookup,
+                           index::LookupIndex(info.next_index_name, user_id,
+                                              dataflow_state));
           if (lookup.size() == 1) {
             user_id = std::move(*lookup.cbegin());
           } else {

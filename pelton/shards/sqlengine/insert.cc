@@ -3,6 +3,7 @@
 #include "pelton/shards/sqlengine/insert.h"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "pelton/shards/sqlengine/index.h"

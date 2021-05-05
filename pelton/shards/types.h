@@ -64,15 +64,20 @@ struct ShardingInformation {
   ShardingInformation(const ShardKind &sk, const ShardedTableName &stn,
                       const ColumnName &sb, ColumnIndex sbi,
                       const ColumnName &nc)
-      : shard_kind(sk), sharded_table_name(stn), shard_by(sb),
-        shard_by_index(sbi), distance_from_shard(0), next_table(""),
-        next_column(nc), next_index_name("") {}
+      : shard_kind(sk),
+        sharded_table_name(stn),
+        shard_by(sb),
+        shard_by_index(sbi),
+        distance_from_shard(0),
+        next_table(""),
+        next_column(nc),
+        next_index_name("") {}
 
   // A transitive sharding information can only be created given the previous
   // sharding information in the transitivity chain.
   bool MakeTransitive(const ShardingInformation &next, const FlowName &index) {
     distance_from_shard = next.distance_from_shard + 1;
-    next_table = shard_kind;    
+    next_table = shard_kind;
     shard_kind = next.shard_kind;
     next_index_name = index;
     // Cannot support deeply transitive things yet.
