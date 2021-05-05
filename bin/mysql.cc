@@ -173,7 +173,7 @@ int main(int argc, char **argv) {
   }
 
   pelton::perf::PrintAll();
-  std::cout << "Time: "
+  std::cout << "Time MYSQL: "
             << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
                                                                      start_time)
                    .count()

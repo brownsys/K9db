@@ -134,7 +134,7 @@ int main(int argc, char **argv) {
 
   // Print performance profile.
   pelton::perf::PrintAll();
-  std::cout << "Time: "
+  std::cout << "Time PELTON: "
             << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
                                                                      start_time)
                    .count()
