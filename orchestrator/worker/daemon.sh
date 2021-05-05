@@ -4,6 +4,9 @@ ORCHESTRATOR="http://$1:8000"
 echo "Worker starting!"
 echo "Orchestrator ip $ORCHESTRATOR"
 
+./bin/drop.sh root password
+echo "Pelton Log: Cleaned DB!"
+
 # Compile our code
 bazel build --config=opt ...
 echo "Pelton Log: Bazel built!"
