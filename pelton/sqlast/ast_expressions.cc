@@ -17,6 +17,14 @@ std::string &ColumnExpression::column() { return this->column_; }
 const std::string &LiteralExpression::value() const { return this->value_; }
 std::string &LiteralExpression::value() { return this->value_; }
 
+// LiteralListExpression.
+const std::vector<std::string> &LiteralListExpression::values() const {
+  return this->values_;
+}
+std::vector<std::string> &LiteralListExpression::values() {
+  return this->values_;
+}
+
 // BinaryExpression.
 const Expression *const BinaryExpression::GetLeft() const {
   return this->left_.get();

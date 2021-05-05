@@ -161,6 +161,10 @@ std::string Stringifier::VisitColumnExpression(const ColumnExpression &ast) {
 std::string Stringifier::VisitLiteralExpression(const LiteralExpression &ast) {
   return ast.value();
 }
+std::string Stringifier::VisitLiteralListExpression(
+    const LiteralListExpression &ast) {
+  assert(false);
+}
 std::string Stringifier::VisitBinaryExpression(const BinaryExpression &ast) {
   std::string op = "";
   switch (ast.type()) {
@@ -227,6 +231,10 @@ std::pair<bool, std::string> ValueFinder::VisitColumnExpression(
 std::pair<bool, std::string> ValueFinder::VisitLiteralExpression(
     const LiteralExpression &ast) {
   return std::make_pair(false, Dequote(ast.value()));
+}
+std::pair<bool, std::string> ValueFinder::VisitLiteralListExpression(
+    const LiteralListExpression &ast) {
+  assert(false);
 }
 std::pair<bool, std::string> ValueFinder::VisitBinaryExpression(
     const BinaryExpression &ast) {
@@ -328,6 +336,10 @@ std::unique_ptr<Expression> ExpressionRemover::VisitColumnExpression(
 std::unique_ptr<Expression> ExpressionRemover::VisitLiteralExpression(
     LiteralExpression *ast) {
   return ast->Clone();
+}
+std::unique_ptr<Expression> ExpressionRemover::VisitLiteralListExpression(
+    LiteralListExpression *ast) {
+  assert(false);
 }
 std::unique_ptr<Expression> ExpressionRemover::VisitBinaryExpression(
     BinaryExpression *ast) {

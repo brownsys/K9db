@@ -33,14 +33,20 @@ absl::StatusOr<std::string> GetColumnName(const sqlast::BinaryExpression *exp) {
   return absl::InvalidArgumentError("Invalid view where clause: no column!");
 }
 
-absl::StatusOr<std::string> GetCondValue(const sqlast::BinaryExpression *exp) {
+absl::StatusOr<std::vector<std::string>> GetCondValues(
+    const sqlast::BinaryExpression *exp) {
   const sqlast::Expression *left = exp->GetLeft();
   const sqlast::Expression *right = exp->GetRight();
   if (left->type() == sqlast::Expression::Type::LITERAL) {
-    return static_cast<const sqlast::LiteralExpression *>(left)->value();
+    return std::vector<std::string>{
+        static_cast<const sqlast::LiteralExpression *>(left)->value()};
   }
   if (right->type() == sqlast::Expression::Type::LITERAL) {
-    return static_cast<const sqlast::LiteralExpression *>(right)->value();
+    return std::vector<std::string>{
+        static_cast<const sqlast::LiteralExpression *>(right)->value()};
+  }
+  if (right->type() == sqlast::Expression::Type::LIST) {
+    return static_cast<const sqlast::LiteralListExpression *>(right)->values();
   }
   return absl::InvalidArgumentError("Invalid view where clause: no literal!");
 }
@@ -88,18 +94,21 @@ absl::StatusOr<mysql::SqlResult> SelectView(
   if (stmt.HasWhereClause()) {
     const sqlast::BinaryExpression *where = stmt.GetWhereClause();
     ASSIGN_OR_RETURN(std::string column, GetColumnName(where));
-    ASSIGN_OR_RETURN(std::string value, GetCondValue(where));
+    ASSIGN_OR_RETURN(std::vector<std::string> values, GetCondValues(where));
     size_t column_index = schema.IndexOf(column);
 
     // If value is a string, trim surrounding quotes.
-    if (schema.TypeOf(column_index) == sqlast::ColumnDefinition::Type::TEXT) {
-      value = value.substr(1, value.size() - 2);
+    for (auto &value : values) {
+      if (schema.TypeOf(column_index) == sqlast::ColumnDefinition::Type::TEXT) {
+        value = value.substr(1, value.size() - 2);
+      }
     }
 
     switch (where->type()) {
       // Reading by greater than: the query provides us with a base record and
       // we read queries greater than that record.
       case sqlast::Expression::Type::GREATER_THAN: {
+        CHECK_EQ(values.size(), 1);
         if (!matview->RecordOrdered()) {
           return absl::InvalidArgumentError(
               "Record ordered read into unordered view");
@@ -107,7 +116,7 @@ absl::StatusOr<mysql::SqlResult> SelectView(
 
         // Read records > cmp.
         dataflow::Record cmp{schema};
-        cmp.SetValue(value, column_index);
+        cmp.SetValue(values.at(0), column_index);
         for (const auto &key : matview->Keys()) {
           for (const auto &record :
                matview->LookupGreater(key, cmp, limit, offset)) {
@@ -118,29 +127,33 @@ absl::StatusOr<mysql::SqlResult> SelectView(
       }
       // Reading by equality: the query provides us with a key that we read with
       // directly from the matview.
-      case sqlast::Expression::Type::EQ: {
-        // Key must be of the right type.
-        dataflow::Key key{1};
-        switch (schema.TypeOf(column_index)) {
-          case sqlast::ColumnDefinition::Type::UINT:
-            key.AddValue(static_cast<uint64_t>(std::stoull(value)));
-            break;
-          case sqlast::ColumnDefinition::Type::INT:
-            key.AddValue(static_cast<int64_t>(std::stoll(value)));
-            break;
-          case sqlast::ColumnDefinition::Type::TEXT:
-            key.AddValue(value);
-            break;
-          case sqlast::ColumnDefinition::Type::DATETIME:
-            key.AddValue(value);
-            break;
-          default:
-            return absl::InvalidArgumentError("Unsupported type in view read");
-        }
+      case sqlast::Expression::Type::EQ:
+      case sqlast::Expression::Type::IN: {
+        for (auto &k : values) {
+          dataflow::Key key{1};
+          // Key must be of the right type.
+          switch (schema.TypeOf(column_index)) {
+            case sqlast::ColumnDefinition::Type::UINT:
+              key.AddValue(static_cast<uint64_t>(std::stoull(k)));
+              break;
+            case sqlast::ColumnDefinition::Type::INT:
+              key.AddValue(static_cast<int64_t>(std::stoll(k)));
+              break;
+            case sqlast::ColumnDefinition::Type::TEXT:
+              key.AddValue(k);
+              break;
+            case sqlast::ColumnDefinition::Type::DATETIME:
+              key.AddValue(k);
+              break;
+            default:
+              return absl::InvalidArgumentError(
+                  "Unsupported type in view read");
+          }
 
-        // Read records attached to key.
-        for (const auto &record : matview->Lookup(key, limit, offset)) {
-          records.push_back(record.Copy());
+          // Read records attached to key.
+          for (const auto &record : matview->Lookup(key, limit, offset)) {
+            records.push_back(record.Copy());
+          }
         }
         break;
       }
