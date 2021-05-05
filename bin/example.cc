@@ -94,7 +94,10 @@ std::vector<std::pair<std::string, std::string>> FLOWS{
         "'\"SELECT * from submissions ORDER BY ts LIMIT 2 OFFSET 5\"'"),
     std::make_pair("limit_variable",
                    "CREATE VIEW limit_variable AS "
-                   "'\"SELECT * from submissions ORDER BY ts LIMIT ?\"'")};
+                   "'\"SELECT * from submissions ORDER BY ts LIMIT ?\"'"),
+    std::make_pair("sub_by_pk",
+                   "CREATE VIEW sub_by_pk AS "
+                   "'\"SELECT * from submissions WHERE ID = ?\"'")};
 
 std::vector<std::string> FLOW_READS{
     "SELECT * FROM all_rows;",
@@ -104,7 +107,9 @@ std::vector<std::string> FLOW_READS{
     "SELECT * FROM union_flow;",
     "SELECT * FROM join_flow;",
     "SELECT * FROM limit_constant;",
-    "SELECT * FROM limit_variable WHERE ts > 100 LIMIT 2 OFFSET 1;"};
+    "SELECT * FROM limit_variable WHERE ts > 100 LIMIT 2 OFFSET 1;",
+    "SELECT * FROM sub_by_pk WHERE ID in (1, 4, 8, 100);",
+    "SELECT * FROM sub_by_pk;"};
 
 // Selects.
 std::vector<std::string> QUERIES{
