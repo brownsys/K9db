@@ -111,7 +111,7 @@ absl::StatusOr<mysql::SqlResult> Shard(
 
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
-  bool update_flows = dataflow_state->HasFlowsFor(table_name);
+  bool update_flows = false; // dataflow_state->HasFlowsFor(table_name);
 
   // Get the rows that are going to be deleted prior to deletion to use them
   // to update the dataflows.

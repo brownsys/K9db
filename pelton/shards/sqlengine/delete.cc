@@ -24,6 +24,7 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
                                        SharderState *state,
                                        dataflow::DataFlowState *dataflow_state,
                                        bool update_flows) {
+  update_flows = false;
   perf::Start("Delete");
   const std::string &table_name = stmt.table_name();
 
