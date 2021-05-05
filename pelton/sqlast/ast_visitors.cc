@@ -163,11 +163,7 @@ std::string Stringifier::VisitLiteralExpression(const LiteralExpression &ast) {
 }
 std::string Stringifier::VisitLiteralListExpression(
     const LiteralListExpression &ast) {
-  std::string str;
-  for (auto &v : ast.values()) {
-    str += v;
-  }
-  return str;
+  assert(false);
 }
 std::string Stringifier::VisitBinaryExpression(const BinaryExpression &ast) {
   std::string op = "";
@@ -238,7 +234,7 @@ std::pair<bool, std::string> ValueFinder::VisitLiteralExpression(
 }
 std::pair<bool, std::string> ValueFinder::VisitLiteralListExpression(
     const LiteralListExpression &ast) {
-  return std::make_pair(false, "");
+  assert(false);
 }
 std::pair<bool, std::string> ValueFinder::VisitBinaryExpression(
     const BinaryExpression &ast) {
@@ -343,7 +339,7 @@ std::unique_ptr<Expression> ExpressionRemover::VisitLiteralExpression(
 }
 std::unique_ptr<Expression> ExpressionRemover::VisitLiteralListExpression(
     LiteralListExpression *ast) {
-  return ast->Clone();
+  assert(false);
 }
 std::unique_ptr<Expression> ExpressionRemover::VisitBinaryExpression(
     BinaryExpression *ast) {
