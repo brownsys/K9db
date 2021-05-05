@@ -77,10 +77,10 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Insert &stmt,
       // secondary index of the target table.
       if (info.IsTransitive()) {
         ASSIGN_OR_RETURN(
-            const auto &lookup,
+            auto &lookup,
             index::LookupIndex(info.next_index_name, user_id, dataflow_state));
         if (lookup.size() == 1) {
-          user_id = *lookup.cbegin();
+          user_id = std::move(*lookup.cbegin());
         } else {
           return absl::InvalidArgumentError("Foreign Key Value does not exist");
         }

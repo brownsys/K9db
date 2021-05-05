@@ -169,6 +169,8 @@ CREATE TABLE stories ( \
   user_is_author int, \
   FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
+-- Need this index for transitive sharding.
+CREATE INDEX storiespk ON stories(id);
 CREATE TABLE tags ( \
   id int NOT NULL PRIMARY KEY, \
   tag varchar(25) NOT NULL, \
@@ -200,13 +202,13 @@ CREATE TABLE tag_filters ( \
   tag_id int, \
   FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
-#CREATE TABLE taggings ( \
-#  id int NOT NULL PRIMARY KEY, \
-#  story_id int NOT NULL, \
-#  tag_id int NOT NULL \
-#  FOREIGN KEY (tag_id) REFERENCES tags(id), \
-#  FOREIGN KEY (story_id) REFERENCES stories(id) \
-#) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
+CREATE TABLE taggings ( \
+  id int NOT NULL PRIMARY KEY, \
+  story_id int NOT NULL, \
+  tag_id int NOT NULL, \
+  FOREIGN KEY (tag_id) REFERENCES tags(id), \
+  FOREIGN KEY (story_id) REFERENCES stories(id) \
+) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE TABLE votes ( \
   id int NOT NULL PRIMARY KEY, \
   OWNER_user_id int NOT NULL, \

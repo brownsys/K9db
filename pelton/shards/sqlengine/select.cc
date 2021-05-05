@@ -52,12 +52,23 @@ absl::StatusOr<mysql::SqlResult> Shard(
       sqlast::ValueFinder value_finder(info.shard_by);
       auto [found, user_id] = cloned.Visit(&value_finder);
       if (found) {
-        if (state->ShardExists(info.shard_kind, user_id)) {
+        if (info.IsTransitive()) {
+          // Transitive sharding: look up via index.
+          ASSIGN_OR_RETURN(
+            auto &lookup,
+            index::LookupIndex(info.next_index_name, user_id, dataflow_state));
+          if (lookup.size() == 1) {
+            user_id = std::move(*lookup.cbegin());
+          } else {
+            found = false;
+          }
+        } else if (state->ShardExists(info.shard_kind, user_id)) {
           // Remove where condition on the shard by column, since it does not
           // exist in the sharded table.
           sqlast::ExpressionRemover expression_remover(info.shard_by);
           cloned.Visit(&expression_remover);
-
+        }
+        if (found) {
           // Execute statement directly against shard.
           result.MakeInline();
           result.AppendDeduplicate(state->connection_pool().ExecuteShard(
