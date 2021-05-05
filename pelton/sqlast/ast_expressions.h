@@ -15,7 +15,7 @@ namespace sqlast {
 // Select and delete statements.
 class Expression {
  public:
-  enum class Type { LITERAL, COLUMN, EQ, AND, GREATER_THAN };
+  enum class Type { LITERAL, COLUMN, EQ, AND, GREATER_THAN, IN, LIST };
 
   explicit Expression(Type type) : type_(type) {}
 
@@ -105,6 +105,44 @@ class LiteralExpression : public Expression {
   std::string value_;
 };
 
+class LiteralListExpression : public Expression {
+ public:
+  explicit LiteralListExpression(const std::vector<std::string> &values)
+      : Expression(Expression::Type::LIST), values_(values) {}
+
+  LiteralListExpression(const LiteralListExpression &expr)
+      : Expression(Expression::Type::LIST) {
+    this->values_ = expr.values_;
+  }
+
+  std::unique_ptr<Expression> Clone() const override {
+    return std::make_unique<LiteralListExpression>(*this);
+  }
+
+  const std::vector<std::string> &values() const;
+  std::vector<std::string> &values();
+
+  template <class T>
+  T Visit(AbstractVisitor<T> *visitor) const {
+    return visitor->VisitLiteralListExpression(*this);
+  }
+  template <class T>
+  T Visit(MutableVisitor<T> *visitor) {
+    return visitor->VisitLiteralListExpression(this);
+  }
+  template <class T>
+  std::vector<T> VisitChildren(AbstractVisitor<T> *visitor) const {
+    return {};
+  }
+  template <class T>
+  std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
+    return {};
+  }
+
+ private:
+  std::vector<std::string> values_;
+};
+
 class BinaryExpression : public Expression {
  public:
   explicit BinaryExpression(Expression::Type type) : Expression(type) {}
@@ -188,6 +226,11 @@ class BinaryExpression : public Expression {
             std::move(static_cast<LiteralExpression *>(this->left_.get())
                           ->Visit(visitor)));
         break;
+      case Expression::Type::LIST:
+        result.push_back(
+            std::move(static_cast<LiteralListExpression *>(this->left_.get())
+                          ->Visit(visitor)));
+        break;
       default:
         result.push_back(
             std::move(static_cast<BinaryExpression *>(this->left_.get())
@@ -202,6 +245,11 @@ class BinaryExpression : public Expression {
       case Expression::Type::LITERAL:
         result.push_back(
             std::move(static_cast<LiteralExpression *>(this->right_.get())
+                          ->Visit(visitor)));
+        break;
+      case Expression::Type::LIST:
+        result.push_back(
+            std::move(static_cast<LiteralListExpression *>(this->right_.get())
                           ->Visit(visitor)));
         break;
       default:

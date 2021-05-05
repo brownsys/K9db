@@ -34,6 +34,7 @@ class AbstractVisitor {
   virtual T VisitSelect(const Select &ast) = 0;
   virtual T VisitColumnExpression(const ColumnExpression &ast) = 0;
   virtual T VisitLiteralExpression(const LiteralExpression &ast) = 0;
+  virtual T VisitLiteralListExpression(const LiteralListExpression &ast) = 0;
   virtual T VisitBinaryExpression(const BinaryExpression &ast) = 0;
   virtual T VisitDelete(const Delete &ast) = 0;
 
@@ -72,6 +73,7 @@ class MutableVisitor {
   virtual T VisitSelect(Select *ast) = 0;
   virtual T VisitColumnExpression(ColumnExpression *ast) = 0;
   virtual T VisitLiteralExpression(LiteralExpression *ast) = 0;
+  virtual T VisitLiteralListExpression(LiteralListExpression *ast) = 0;
   virtual T VisitBinaryExpression(BinaryExpression *ast) = 0;
   virtual T VisitDelete(Delete *ast) = 0;
 
@@ -115,6 +117,8 @@ class Stringifier : public AbstractVisitor<std::string> {
   std::string VisitSelect(const Select &ast) override;
   std::string VisitColumnExpression(const ColumnExpression &ast) override;
   std::string VisitLiteralExpression(const LiteralExpression &ast) override;
+  std::string VisitLiteralListExpression(
+      const LiteralListExpression &ast) override;
   std::string VisitBinaryExpression(const BinaryExpression &ast) override;
   std::string VisitDelete(const Delete &ast) override;
 
@@ -145,6 +149,8 @@ class ValueFinder : public AbstractVisitor<std::pair<bool, std::string>> {
       const ColumnExpression &ast) override;
   std::pair<bool, std::string> VisitLiteralExpression(
       const LiteralExpression &ast) override;
+  std::pair<bool, std::string> VisitLiteralListExpression(
+      const LiteralListExpression &ast) override;
   std::pair<bool, std::string> VisitBinaryExpression(
       const BinaryExpression &ast) override;
 
@@ -173,6 +179,8 @@ class ExpressionRemover : public MutableVisitor<std::unique_ptr<Expression>> {
       ColumnExpression *ast) override;
   std::unique_ptr<Expression> VisitLiteralExpression(
       LiteralExpression *ast) override;
+  std::unique_ptr<Expression> VisitLiteralListExpression(
+      LiteralListExpression *ast) override;
   std::unique_ptr<Expression> VisitBinaryExpression(
       BinaryExpression *ast) override;
 

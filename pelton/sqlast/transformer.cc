@@ -369,7 +369,8 @@ antlrcpp::Any AstTransformer::visitSelect_core(
                     ctx->expr(0)->accept(this), std::unique_ptr<Expression>);
     if (expr->type() != Expression::Type::EQ &&
         expr->type() != Expression::Type::AND &&
-        expr->type() != Expression::Type::GREATER_THAN) {
+        expr->type() != Expression::Type::GREATER_THAN &&
+        expr->type() != Expression::Type::IN) {
       return absl::InvalidArgumentError("Where clause must be boolean");
     }
 
@@ -446,7 +447,7 @@ antlrcpp::Any AstTransformer::visitExpr(
     sqlparser::SQLiteParser::ExprContext *ctx) {
   if ((ctx->literal_value() == nullptr && ctx->ASSIGN() == nullptr &&
        ctx->column_name() == nullptr && ctx->AND() == nullptr &&
-       ctx->GT() == nullptr) ||
+       ctx->GT() == nullptr && ctx->IN() == nullptr) ||
       ctx->expr().size() > 2) {
     return absl::InvalidArgumentError("Unsupported expression");
   }
@@ -463,6 +464,23 @@ antlrcpp::Any AstTransformer::visitExpr(
                    std::string);
     std::unique_ptr<Expression> result =
         std::make_unique<ColumnExpression>(column);
+    return result;
+  }
+
+  if (ctx->IN() != nullptr) {
+    std::unique_ptr<BinaryExpression> result =
+        std::make_unique<BinaryExpression>(Expression::Type::IN);
+    MCAST_OR_RETURN(std::unique_ptr<Expression> expr0,
+                    ctx->expr(0)->accept(this), std::unique_ptr<Expression>);
+    std::vector<std::string> values;
+    for (auto &v : ctx->expr(1)->expr()) {
+      CAST_OR_RETURN(std::string value, v->literal_value()->accept(this),
+                     std::string);
+      values.push_back(value);
+    }
+    result->SetLeft(std::move(expr0));
+    result->SetRight(
+        std::move(std::make_unique<LiteralListExpression>(values)));
     return result;
   }
 
