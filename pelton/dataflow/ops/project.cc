@@ -255,7 +255,8 @@ bool ProjectOperator::Process(NodeIndex source,
                               const std::vector<Record> &records,
                               std::vector<Record> *output) {
   for (const Record &record : records) {
-    Record out_record{this->output_schema_, record.IsPositive()};
+    output->emplace_back(this->output_schema_, record.IsPositive());
+    Record &out_record = output->back();
     for (size_t i = 0; i < this->projections_.size(); i++) {
       const auto &projection = this->projections_.at(i);
 
@@ -273,10 +274,11 @@ bool ProjectOperator::Process(NodeIndex source,
           case sqlast::ColumnDefinition::Type::INT:
             out_record.SetInt(record.GetInt(column), i);
             break;
-          case sqlast::ColumnDefinition::Type::TEXT:
+          case sqlast::ColumnDefinition::Type::TEXT: {
             out_record.SetString(
                 std::make_unique<std::string>(record.GetString(column)), i);
             break;
+          }
           // TODO(malte): DATETIME should not be stored as a string,
           // see below
           case sqlast::ColumnDefinition::Type::DATETIME:
@@ -353,8 +355,6 @@ bool ProjectOperator::Process(NodeIndex source,
         }
       }
     }
-
-    output->push_back(std::move(out_record));
   }
 
   return true;
