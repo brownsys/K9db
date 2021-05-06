@@ -78,7 +78,10 @@ void AggregateOperator::ComputeOutputSchema() {
   // grouped by on. The combined value of these columns are unique, as all rows
   // that had that value are aggregated into a single one. This is only for
   // semantic purposes as, as of now, this does not have an effect on
-  std::vector<ColumnID> out_keys = group_columns_;
+  std::vector<ColumnID> out_keys;
+  for (size_t i = 0; i < group_columns_.size(); i++) {
+    out_keys.push_back(i);
+  }
 
   this->output_schema_ =
       SchemaFactory::Create(out_column_names, out_column_types, out_keys);
