@@ -20,7 +20,7 @@ Content-Disposition: attachment; filename="userdata.txt"
 #!/bin/bash
 # this script is run as root whenever the EC2 instance is launched/restarted.
 ORCHESTRATOR_IP="18.220.88.68"  # replace with actual IP for experiment.
-BRANCH="optimization"
+BRANCH="experiment"
 
 # start from root directory
 cd /
@@ -112,6 +112,7 @@ fi
 
 # update repo
 cd pelton
+cd experiments/GDPRbench && git stash && cd -
 git stash
 git fetch origin
 git checkout $BRANCH

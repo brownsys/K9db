@@ -9,9 +9,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
+#include <list>
 #include <memory>
+#include <unordered_map>
 #include <utility>
-#include <vector>
 
 #include "absl/container/btree_map.h"
 #include "absl/container/btree_set.h"
@@ -62,7 +63,7 @@ struct HasFunction {
 // contain that static member.
 class UntemplatedGroupedData {
  protected:
-  static const std::vector<Record> EMPTY_VEC;
+  static const std::list<Record> EMPTY_VEC;
 };
 
 // A generic iterator that can iterate over any container producing the
@@ -77,8 +78,8 @@ class UntemplatedGroupedData {
 template <typename T, typename C = std::true_type>
 class GenericIterator {
  private:
-  using vcit = typename std::vector<T>::const_iterator;
-  using vit = typename std::vector<T>::iterator;
+  using vcit = typename std::list<T>::const_iterator;
+  using vit = typename std::list<T>::iterator;
   // Abstract concept of an iterator wrapper, we store and interact with
   // pointers to this class to hid the genericity of Impl<I>.
   class AbsImpl {
@@ -192,7 +193,7 @@ class GenericIterable {
   bool IsEmpty() const { return this->begin_ == this->end_; }
   // Create an empty iterable.
   static GenericIterable<T, C> CreateEmpty() {
-    static std::vector<T> empty = {};
+    static std::list<T> empty = {};
     EIterType begin;
     EIterType end;
     if constexpr (C::value) {
@@ -259,7 +260,7 @@ using RecordIterable = GenericIterable<Record, std::false_type>;
 // We provide three concrete instantiations of this generic type at the end of
 // this file:
 //
-// 1. GroupedDataT<absl::flat_hash_map, std::vector>:
+// 1. GroupedDataT<absl::flat_hash_map, std::list>:
 //    A completely unsorted set, used for storing views of completely unordered
 //    queries. For example: SELECT * FROM <table> WHERE <col> = ?.
 //    A key in such a case is a value from <col>, and the associated vector
@@ -284,7 +285,7 @@ using RecordIterable = GenericIterable<Record, std::false_type>;
 //          then the underlying map only contains a single record set (for the
 //          empty key), giving us a global order over all records.
 //
-// 3. GroupedDataT<absl::btree_map, std::vector>:
+// 3. GroupedDataT<absl::btree_map, std::list>:
 //    This is a set of unsorted records grouped by sorted keys. This is used
 //    when the key column set and sorting column set are identical.
 //    For example: SELECT * FROM <table> WHERE <col> = ? ORDER BY <col>.
@@ -414,7 +415,7 @@ class GroupedDataT : public UntemplatedGroupedData {
   }
 
   // Insert a record mapped by given key.
-  bool Insert(const Key &k, const Record &r) {
+  bool Insert(const Key &k, const Record &r, bool by_pk = false) {
     // Insert an empty vector for k if k does not exist in the map.
     V *v;
     if constexpr (std::is_null_pointer<RecordCompare>::value) {
@@ -423,32 +424,65 @@ class GroupedDataT : public UntemplatedGroupedData {
       v = &this->contents_.emplace(k, compare_).first->second;
     }
 
-    // Add or remove r from the vector of k in the map.
     if (r.IsPositive()) {
+      // Add the new record to the approprite bin.
       if constexpr (HasFunction<V>::Insert()) {
+        // Sorted container.
         v->insert(r.Copy());
       } else {
+        // Unsorted container.
         v->push_back(r.Copy());
+        if (!by_pk) {
+          const auto &keys = r.schema().keys();
+          if (keys.size() == 1) {
+            // Keep a quick lookup index by pk.
+            std::string pk = r.GetValueString(keys.at(0));
+            this->pk_index_.insert({pk, --v->cend()});
+          }
+        }
       }
       this->count_++;
     } else {
+      // Must delete the record.
+      // We can delete by key = pk quickly!
+      if (by_pk) {
+        M_iterator it = this->contents_.find(k);
+        it->second.clear();
+        return true;
+      }
+
       // We need to find r in v in the most efficient way possible.
       // If V supports .find() we use it (e.g. sorted containers).
-      // Otherwise, we use a linear scan.
-      V_citerator it;
+      // Otherwise, we use a lookup index on pk (if it exists) or a linear scan.
+      V_citerator it = v->end();
       if constexpr (HasFunction<V>::Find()) {
         it = v->find(r);
       } else {
-        it = std::find(std::begin(*v), std::end(*v), r);
+        const auto &keys = r.schema().keys();
+        if (keys.size() == 1) {
+          // V is a linked list. Slow too find r in it.
+          // Instead we use the pk_index_ map.
+          std::string pk = r.GetValueString(keys.at(0));
+          auto pk_it = this->pk_index_.find(pk);
+          if (pk_it != this->pk_index_.end()) {
+            it = pk_it->second;
+            this->pk_index_.erase(pk_it);
+          }
+        } else {
+          // We cannot use pk_index_ map, have to do a slow
+          // linear scan.
+          it = std::find(std::begin(*v), std::end(*v), r);
+        }
       }
+
       // If we found the record, we erase it, and remove all of v from
       // the map if it becomes empty.
       if (it != std::end(*v)) {
         v->erase(it);
         this->count_--;
-        if (v->empty()) {
+        /*if (v->empty()) {
           this->contents_.erase(k);
-        }
+        }*/
       }
     }
     return true;
@@ -474,14 +508,14 @@ class GroupedDataT : public UntemplatedGroupedData {
   RecordCompare compare_;
   size_t count_ = 0;
   M contents_;
+  std::unordered_map<std::string, V_citerator> pk_index_;
 };
 
 using UnorderedGroupedData =
-    GroupedDataT<absl::flat_hash_map<Key, std::vector<Record>>,
-                 std::vector<Record>>;
+    GroupedDataT<absl::flat_hash_map<Key, std::list<Record>>,
+                 std::list<Record>>;
 using KeyOrderedGroupedData =
-    GroupedDataT<absl::btree_map<Key, std::vector<Record>>,
-                 std::vector<Record>>;
+    GroupedDataT<absl::btree_map<Key, std::list<Record>>, std::list<Record>>;
 using RecordOrderedGroupedData = GroupedDataT<
     absl::flat_hash_map<Key, absl::btree_multiset<Record, Record::Compare>>,
     absl::btree_multiset<Record, Record::Compare>, Record::Compare>;
