@@ -111,6 +111,14 @@ class SharderState {
   // Load state from its durable file (if exists).
   void Load(const std::string &dir_path);
 
+  size_t NumShards() {
+    size_t count = 0;
+    for (auto &s : shards_) {
+      count += s.second.size();
+    }
+    return count;
+  }
+
  private:
   // The logical (unsharded) schema of every table.
   std::unordered_map<UnshardedTableName, sqlast::CreateTable> schema_;
