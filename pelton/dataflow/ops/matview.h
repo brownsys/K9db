@@ -116,8 +116,14 @@ class MatViewOperatorT : public MatViewOperator {
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,
                std::vector<Record> *output) override {
+    bool by_pk = false;
+    if (records.size() > 0) {
+      const std::vector<ColumnID> &keys = records.at(0).schema().keys();
+      by_pk = keys.size() > 0 && keys == this->key_cols_;
+    }
+
     for (const Record &r : records) {
-      if (!this->contents_.Insert(r.GetValues(this->key_cols_), r)) {
+      if (!this->contents_.Insert(r.GetValues(this->key_cols_), r, by_pk)) {
         return false;
       }
     }

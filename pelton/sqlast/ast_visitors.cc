@@ -151,6 +151,9 @@ std::string Stringifier::VisitDelete(const Delete &ast) {
   if (ast.HasWhereClause()) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
+  if (ast.returning()) {
+    result += " RETURNING *";
+  }
   perf::End("Stringify (delete)");
   return result;
 }

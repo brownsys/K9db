@@ -85,7 +85,7 @@ Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
 
 bool DataFlowState::ProcessRecords(const TableName &table_name,
                                    const std::vector<Record> &records) {
-  if (this->HasFlowsFor(table_name)) {
+  if (records.size() > 0 && this->HasFlowsFor(table_name)) {
     for (const FlowName &name : this->flows_per_input_table_.at(table_name)) {
       DataFlowGraph &graph = this->flows_.at(name);
       if (!graph.Process(table_name, records)) {

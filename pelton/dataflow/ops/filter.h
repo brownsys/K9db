@@ -2,6 +2,7 @@
 #define PELTON_DATAFLOW_OPS_FILTER_H_
 
 #include <cstdint>
+#include <memory>
 #include <string>
 // NOLINTNEXTLINE
 #include <variant>
@@ -52,6 +53,21 @@ class FilterOperator : public Operator {
 
   bool Process(NodeIndex source, const std::vector<Record> &records,
                std::vector<Record> *output) override;
+
+  bool ProcessAndForward(NodeIndex source, const std::vector<Record> &records) {
+    if (this->ops_.size() == 0) {
+      for (std::weak_ptr<Edge> edge_ptr : this->children_) {
+        std::shared_ptr<Edge> edge = edge_ptr.lock();
+        std::shared_ptr<Operator> child = edge->to().lock();
+        if (!child->ProcessAndForward(this->index(), records)) {
+          return false;
+        }
+      }
+      return true;
+    } else {
+      return Operator::ProcessAndForward(source, records);
+    }
+  }
 
  protected:
   bool Accept(const Record &record) const;
