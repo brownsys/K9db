@@ -24,7 +24,6 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
                                        SharderState *state,
                                        dataflow::DataFlowState *dataflow_state,
                                        bool update_flows) {
-  update_flows = false;
   perf::Start("Delete");
   const std::string &table_name = stmt.table_name();
 
@@ -36,12 +35,7 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
 
   // Get the rows that are going to be deleted prior to deletion to use them
   // to update the dataflows.
-  std::vector<dataflow::Record> records;
-  if (update_flows) {
-    MOVE_OR_RETURN(mysql::SqlResult result,
-                   select::Shard(stmt.SelectDomain(), state, dataflow_state));
-    records = result.Vectorize();
-  }
+  dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
 
   // Must transform the delete statement into one that is compatible with
   // the sharded schema.
@@ -62,21 +56,27 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
     }
 
     // Remove user shard.
-    std::string shard = sqlengine::NameShard(table_name, user_id);
-    state->connection_pool().RemoveShard(shard);
     state->RemoveUserFromShard(table_name, user_id);
 
     // Turn the delete statement back to a string, to delete relevant row in
     // PII table.
-    result = state->connection_pool().ExecuteDefault(&stmt);
-
-    // TODO(babman): Update dataflow after user has been deleted.
-    // return absl::UnimplementedError("Dataflow not updated after a user
-    // delete");
+    if (update_flows) {
+      sqlast::Delete cloned = stmt.MakeReturning();
+      result = state->connection_pool().ExecuteDefault(&cloned, schema);
+    } else {
+      result = state->connection_pool().ExecuteDefault(&stmt);
+    }
 
   } else if (!is_sharded && !is_pii) {
     // Case 2: Table does not have PII and is not sharded!
-    result = state->connection_pool().ExecuteDefault(&stmt);
+    if (update_flows) {
+      sqlast::Delete cloned = stmt.MakeReturning();
+      result = state->connection_pool().ExecuteDefault(&cloned, schema);
+      // result =
+      // mysql::SqlResult{std::make_unique<mysql::UpdateResult>(records.size())};
+    } else {
+      result = state->connection_pool().ExecuteDefault(&stmt);
+    }
 
   } else {  // is_shared == true
     // Case 3: Table is sharded!
@@ -84,7 +84,7 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
     // We must delete from all these different duplicates.
     for (const auto &info : state->GetShardingInformation(table_name)) {
       // Rename the table to match the sharded name.
-      sqlast::Delete cloned = stmt;
+      sqlast::Delete cloned = update_flows ? stmt.MakeReturning() : stmt;
       cloned.table_name() = info.sharded_table_name;
 
       // Find the value assigned to shard_by column in the where clause, and
@@ -100,8 +100,8 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
           if (lookup.size() == 1) {
             user_id = std::move(*lookup.cbegin());
             // Execute statement directly against shard.
-            result.Append(
-                state->connection_pool().ExecuteShard(&cloned, info, user_id));
+            result.Append(state->connection_pool().ExecuteShard(
+                &cloned, info, user_id, schema));
           }
         } else if (state->ShardExists(info.shard_kind, user_id)) {
           // Remove where condition on the shard by column, since it does not
@@ -109,31 +109,9 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
           sqlast::ExpressionRemover expression_remover(info.shard_by);
           cloned.Visit(&expression_remover);
           // Execute statement directly against shard.
-          result.Append(
-              state->connection_pool().ExecuteShard(&cloned, info, user_id));
+          result.Append(state->connection_pool().ExecuteShard(&cloned, info,
+                                                              user_id, schema));
         }
-
-      } else if (update_flows) {
-        // We already have the data we need to delete, we can use it to get an
-        // accurate enumeration of shards to execute this one.
-        std::unordered_set<UserId> shards;
-        for (const dataflow::Record &record : records) {
-          std::string val = record.GetValueString(info.shard_by_index);
-          if (info.IsTransitive()) {
-            // Transitive sharding: look up via index.
-            ASSIGN_OR_RETURN(auto &lookup,
-                             index::LookupIndex(info.next_index_name, user_id,
-                                                dataflow_state));
-            if (lookup.size() == 1) {
-              shards.insert(std::move(*lookup.begin()));
-            }
-          } else {
-            shards.insert(std::move(val));
-          }
-        }
-
-        result.Append(
-            state->connection_pool().ExecuteShards(&cloned, info, shards));
 
       } else {
         // The delete statement by itself does not obviously constraint a
@@ -146,12 +124,12 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
           // Secondary index available for some constrainted column in stmt.
           result.MakeInline();
           result.AppendDeduplicate(state->connection_pool().ExecuteShards(
-              &cloned, info, pair.second));
+              &cloned, info, pair.second, schema));
         } else {
           // Secondary index unhelpful.
           // Execute statement against all shards of this kind.
           result.Append(state->connection_pool().ExecuteShards(
-              &cloned, info, state->UsersOfShard(info.shard_kind)));
+              &cloned, info, state->UsersOfShard(info.shard_kind), schema));
         }
       }
     }
@@ -159,6 +137,15 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
 
   // Delete was successful, time to update dataflows.
   if (update_flows) {
+    std::vector<dataflow::Record> records;
+    if (result.IsQuery()) {
+      records = result.Vectorize();
+    }
+    for (const auto &r : records) {
+      std::cout << r << std::endl;
+    }
+    result =
+        mysql::SqlResult{std::make_unique<mysql::UpdateResult>(records.size())};
     dataflow_state->ProcessRecords(table_name, records);
   }
   if (!result.IsUpdate()) {
