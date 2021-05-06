@@ -26,6 +26,8 @@ ActiveRecord::Schema.define(version: 20170613183247) do
     t.index ["owner_id", "owner_type"], name: "index_activities_on_owner_id_and_owner_type"
     t.index ["recipient_id", "recipient_type"], name: "index_activities_on_recipient_id_and_recipient_type"
     t.index ["trackable_id", "trackable_type"], name: "index_activities_on_trackable_id_and_trackable_type"
+    # foreign key: owner_id references users.id (?)
+    # foreign key: recipient_id references users.id (?)
   end
 
   create_table "attachments", force: :cascade do |t|
@@ -35,6 +37,7 @@ ActiveRecord::Schema.define(version: 20170613183247) do
     t.datetime "created_at"
     t.datetime "updated_at"
     t.index ["attachable_type", "attachable_id"], name: "index_attachments_on_attachable_type_and_attachable_id"
+    # foreign key: attachable_id references ???
   end
 
   create_table "authentications", force: :cascade do |t|
@@ -45,6 +48,7 @@ ActiveRecord::Schema.define(version: 20170613183247) do
     t.datetime "created_at"
     t.datetime "updated_at"
     t.index ["user_id"], name: "index_authentications_on_user_id"
+    # foreign key: user_id references users.id
   end
 
   create_table "badges_sashes", force: :cascade do |t|
@@ -55,6 +59,7 @@ ActiveRecord::Schema.define(version: 20170613183247) do
     t.index ["badge_id", "sash_id"], name: "index_badges_sashes_on_badge_id_and_sash_id"
     t.index ["badge_id"], name: "index_badges_sashes_on_badge_id"
     t.index ["sash_id"], name: "index_badges_sashes_on_sash_id"
+    # foreign key: sash_id references sashes.id
   end
 
   create_table "comments", force: :cascade do |t|
@@ -62,7 +67,7 @@ ActiveRecord::Schema.define(version: 20170613183247) do
     t.text     "comment"
     t.string   "commentable_type"
     t.integer  "commentable_id"
-    t.integer  "user_id"
+    t.integer  "OWNER_user_id"
     t.string   "role",                        default: "comments"
     t.datetime "created_at"
     t.datetime "updated_at"
@@ -70,16 +75,20 @@ ActiveRecord::Schema.define(version: 20170613183247) do
     t.index ["commentable_id"], name: "index_comments_on_commentable_id"
     t.index ["commentable_type"], name: "index_comments_on_commentable_type"
     t.index ["user_id"], name: "index_comments_on_user_id"
+    # foreign key: user_id references users.id
+    # foreign key: commentable_id references ???
   end
 
   create_table "event_attendees", force: :cascade do |t|
     t.integer  "event_id",                 null: false
-    t.integer  "user_id",                  null: false
+    t.integer  "OWNER_user_id",                  null: false
     t.datetime "created_at"
     t.datetime "updated_at"
     t.         "status",     default: "0", null: false
     t.index ["event_id"], name: "index_event_attendees_on_event_id"
     t.index ["user_id"], name: "index_event_attendees_on_user_id"
+    # foreign key: user_id references users.id
+    # foreign key: event_id references events.id
   end
 
   create_table "events", force: :cascade do |t|
@@ -95,18 +104,21 @@ ActiveRecord::Schema.define(version: 20170613183247) do
     t.index ["cached_votes_up"], name: "index_events_on_cached_votes_up"
     t.index ["comments_count"], name: "index_events_on_comments_count"
     t.index ["user_id"], name: "index_events_on_user_id"
+    # foreign key: user_id references users.id
   end
 
   create_table "follows", force: :cascade do |t|
     t.string   "followable_type",                 null: false
     t.integer  "followable_id",                   null: false
     t.string   "follower_type",                   null: false
-    t.integer  "follower_id",                     null: false
+    t.integer  "OWNER_follower_id",                     null: false
     t.boolean  "blocked",         default: false, null: false
     t.datetime "created_at"
     t.datetime "updated_at"
     t.index ["followable_id", "followable_type"], name: "fk_followables"
     t.index ["follower_id", "follower_type"], name: "fk_follows"
+    # foreign key: followable_id references users.id (?)
+    # foreign key: follower_id references users.id (?)
   end
 
   create_table "friendly_id_slugs", force: :cascade do |t|
@@ -119,10 +131,11 @@ ActiveRecord::Schema.define(version: 20170613183247) do
     t.index ["slug", "sluggable_type"], name: "index_friendly_id_slugs_on_slug_and_sluggable_type"
     t.index ["sluggable_id"], name: "index_friendly_id_slugs_on_sluggable_id"
     t.index ["sluggable_type"], name: "index_friendly_id_slugs_on_sluggable_type"
+    # foreign key: sluggable_id references ???
   end
 
   create_table "merit_actions", force: :cascade do |t|
-    t.integer  "user_id"
+    t.integer  "OWNER_user_id"
     t.string   "action_method"
     t.integer  "action_value"
     t.boolean  "had_errors",    default: false
@@ -132,14 +145,18 @@ ActiveRecord::Schema.define(version: 20170613183247) do
     t.boolean  "processed",     default: false
     t.datetime "created_at"
     t.datetime "updated_at"
+    # foreign key: user_id references users.id
+    # foreign key: target_id references ???
   end
 
   create_table "merit_activity_logs", force: :cascade do |t|
-    t.integer  "action_id"
+    t.integer  "OWNER_action_id"
     t.string   "related_change_type"
     t.integer  "related_change_id"
     t.string   "description"
     t.datetime "created_at"
+    # foreign key: action_id references merit_actions.id
+    # foreign key: related_change_id references merit_activity_logs.id (?)
   end
 
   create_table "merit_score_points", force: :cascade do |t|
@@ -147,11 +164,13 @@ ActiveRecord::Schema.define(version: 20170613183247) do
     t.integer  "num_points", default: 0
     t.string   "log"
     t.datetime "created_at"
+    # foreign key: score_id references merit_scores.id
   end
 
   create_table "merit_scores", force: :cascade do |t|
     t.integer "sash_id"
     t.string  "category", default: "default"
+    # foreign key: sash_id references sashes.id
   end
 
   create_table "photo_albums", force: :cascade do |t|
@@ -166,6 +185,7 @@ ActiveRecord::Schema.define(version: 20170613183247) do
     t.integer  "comments_count",  default: 0
     t.index ["slug"], name: "index_photo_albums_on_slug", unique: true
     t.index ["user_id"], name: "index_photo_albums_on_user_id"
+    # foreign key: user_id references users.id
   end
 
   create_table "photos", force: :cascade do |t|
@@ -175,6 +195,7 @@ ActiveRecord::Schema.define(version: 20170613183247) do
     t.datetime "created_at"
     t.datetime "updated_at"
     t.index ["photo_album_id"], name: "index_photos_on_photo_album_id"
+    # foreign key: photo_album_id references photo_albums.id
   end
 
   create_table "posts", force: :cascade do |t|
@@ -189,6 +210,7 @@ ActiveRecord::Schema.define(version: 20170613183247) do
     t.index ["cached_votes_up"], name: "index_posts_on_cached_votes_up"
     t.index ["comments_count"], name: "index_posts_on_comments_count"
     t.index ["user_id"], name: "index_posts_on_user_id"
+    # foreign key: users_id references users.id
   end
 
   create_table "sashes", force: :cascade do |t|
@@ -198,7 +220,7 @@ ActiveRecord::Schema.define(version: 20170613183247) do
 
   create_table "users", force: :cascade do |t|
     t.string   "name",                   default: "",     null: false
-    t.string   "email",                  default: "",     null: false
+    t.string   "PII_email",                  default: "",     null: false
     t.string   "encrypted_password",     default: "",     null: false
     t.string   "bio"
     t.string   "avatar"
@@ -234,6 +256,7 @@ ActiveRecord::Schema.define(version: 20170613183247) do
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["slug"], name: "index_users_on_slug", unique: true
+    # foreign key: sash_id references sashes.id
   end
 
   create_table "votes", force: :cascade do |t|
@@ -248,6 +271,8 @@ ActiveRecord::Schema.define(version: 20170613183247) do
     t.datetime "updated_at"
     t.index ["votable_id", "votable_type", "vote_scope"], name: "index_votes_on_votable_id_and_votable_type_and_vote_scope"
     t.index ["voter_id", "voter_type", "vote_scope"], name: "index_votes_on_voter_id_and_voter_type_and_vote_scope"
+    # foreign key: votable_id references ???
+    # foreign key: voter_id references users.id
   end
 
 end
