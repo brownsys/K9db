@@ -141,9 +141,6 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
     if (result.IsQuery()) {
       records = result.Vectorize();
     }
-    for (const auto &r : records) {
-      std::cout << r << std::endl;
-    }
     result =
         mysql::SqlResult{std::make_unique<mysql::UpdateResult>(records.size())};
     dataflow_state->ProcessRecords(table_name, records);
