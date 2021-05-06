@@ -7,3 +7,5 @@ sudo chmod 0700 /var/lib/mysql
 sudo mysql_install_db
 sudo chown -R mysql.mysql /var/lib/mysql
 sudo service mariadb start
+mariadb -u root --execute="SET PASSWORD FOR 'root'@'localhost' = PASSWORD('password');"
+mariadb -u root --execute="INSTALL SONAME 'ha_rocksdb';"
