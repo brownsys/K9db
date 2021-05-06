@@ -1,7 +1,3 @@
-//
-// Created by Leonhard Spiegelberg on 11/6/20.
-//
-
 #ifndef PELTON_DATAFLOW_OPS_EQUIJOIN_H_
 #define PELTON_DATAFLOW_OPS_EQUIJOIN_H_
 
@@ -20,6 +16,9 @@
 namespace pelton {
 namespace dataflow {
 
+// protect against underflow bugs
+#define MAX_JOIN_COLUMNS (((uint32_t)-1) - 1000)
+
 class EquiJoinOperator : public Operator {
  public:
   using Mode = JoinModeEnum;
@@ -29,7 +28,15 @@ class EquiJoinOperator : public Operator {
       : Operator(Operator::Type::EQUIJOIN),
         left_id_(left_id),
         right_id_(right_id),
-        mode_(mode) {}
+        mode_(mode) {
+    if (left_id > MAX_JOIN_COLUMNS) {
+      LOG(FATAL) << "implausible column ID " << left_id << " in join operator!";
+    }
+    if (right_id > MAX_JOIN_COLUMNS) {
+      LOG(FATAL) << "implausible column ID " << right_id
+                 << " in join operator!";
+    }
+  }
 
   std::shared_ptr<Operator> left() const {
     return this->parents_.at(0)->from();
