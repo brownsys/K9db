@@ -145,7 +145,6 @@ CREATE TABLE saved_stories ( \
   updated_at datetime NOT NULL, \
   user_id int, \
   story_id int, \
-  FOREIGN KEY (story_id) REFERENCES stories(id) \
   FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE TABLE stories ( \
