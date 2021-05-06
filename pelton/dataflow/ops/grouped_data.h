@@ -11,11 +11,12 @@
 #include <iterator>
 #include <list>
 #include <memory>
+#include <set>
+#include <string>
 #include <unordered_map>
 #include <utility>
 
 #include "absl/container/btree_map.h"
-#include "absl/container/btree_set.h"
 #include "absl/container/flat_hash_map.h"
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/record.h"
@@ -426,19 +427,21 @@ class GroupedDataT : public UntemplatedGroupedData {
 
     if (r.IsPositive()) {
       // Add the new record to the approprite bin.
+      V_citerator insert_it;
       if constexpr (HasFunction<V>::Insert()) {
         // Sorted container.
-        v->insert(r.Copy());
+        insert_it = v->insert(r.Copy());
       } else {
         // Unsorted container.
         v->push_back(r.Copy());
-        if (!by_pk) {
-          const auto &keys = r.schema().keys();
-          if (keys.size() == 1) {
-            // Keep a quick lookup index by pk.
-            std::string pk = r.GetValueString(keys.at(0));
-            this->pk_index_.insert({pk, --v->cend()});
-          }
+        insert_it = --(v->cend());
+      }
+      if (!by_pk) {
+        const auto &keys = r.schema().keys();
+        if (keys.size() == 1) {
+          // Keep a quick lookup index by pk.
+          std::string pk = r.GetValueString(keys.at(0));
+          this->pk_index_.insert({pk, insert_it});
         }
       }
       this->count_++;
@@ -452,25 +455,24 @@ class GroupedDataT : public UntemplatedGroupedData {
       }
 
       // We need to find r in v in the most efficient way possible.
-      // If V supports .find() we use it (e.g. sorted containers).
-      // Otherwise, we use a lookup index on pk (if it exists) or a linear scan.
       V_citerator it = v->end();
-      if constexpr (HasFunction<V>::Find()) {
-        it = v->find(r);
+
+      const auto &keys = r.schema().keys();
+      if (keys.size() == 1) {
+        // It is too slow to search in V (linear for linkedlist,
+        // log for multiset). Instead we use the pk_index_ map.
+        std::string pk = r.GetValueString(keys.at(0));
+        auto pk_it = this->pk_index_.find(pk);
+        if (pk_it != this->pk_index_.end()) {
+          it = pk_it->second;
+          this->pk_index_.erase(pk_it);
+        }
       } else {
-        const auto &keys = r.schema().keys();
-        if (keys.size() == 1) {
-          // V is a linked list. Slow too find r in it.
-          // Instead we use the pk_index_ map.
-          std::string pk = r.GetValueString(keys.at(0));
-          auto pk_it = this->pk_index_.find(pk);
-          if (pk_it != this->pk_index_.end()) {
-            it = pk_it->second;
-            this->pk_index_.erase(pk_it);
-          }
+        if constexpr (HasFunction<V>::Find()) {
+          // Sorted container, log(n) search.
+          it = v->find(r);
         } else {
-          // We cannot use pk_index_ map, have to do a slow
-          // linear scan.
+          // Linked list, slow linear scan.
           it = std::find(std::begin(*v), std::end(*v), r);
         }
       }
@@ -517,8 +519,8 @@ using UnorderedGroupedData =
 using KeyOrderedGroupedData =
     GroupedDataT<absl::btree_map<Key, std::list<Record>>, std::list<Record>>;
 using RecordOrderedGroupedData = GroupedDataT<
-    absl::flat_hash_map<Key, absl::btree_multiset<Record, Record::Compare>>,
-    absl::btree_multiset<Record, Record::Compare>, Record::Compare>;
+    absl::flat_hash_map<Key, std::multiset<Record, Record::Compare>>,
+    std::multiset<Record, Record::Compare>, Record::Compare>;
 
 }  // namespace dataflow
 }  // namespace pelton
