@@ -73,8 +73,11 @@ mysql::SqlResult ConnectionPool::ExecuteShards(
                                 {}};
       case sqlast::AbstractStatement::Type::INSERT:
       case sqlast::AbstractStatement::Type::UPDATE:
-      case sqlast::AbstractStatement::Type::DELETE:
         return mysql::SqlResult{std::make_unique<mysql::UpdateResult>(0), {}};
+      case sqlast::AbstractStatement::Type::DELETE:
+        if (!static_cast<const sqlast::Delete *>(sql)->returning()) {
+          return mysql::SqlResult{std::make_unique<mysql::UpdateResult>(0), {}};
+        }
       case sqlast::AbstractStatement::Type::SELECT:
         return mysql::SqlResult{std::make_unique<mysql::InlinedSqlResult>(),
                                 schema};
@@ -121,15 +124,23 @@ mysql::SqlResult ConnectionPool::ExecuteMySQL(
       return mysql::SqlResult(std::make_unique<mysql::StatementResult>(true));
     }
 
-    case sqlast::AbstractStatement::Type::INSERT:
     case sqlast::AbstractStatement::Type::UPDATE:
-    case sqlast::AbstractStatement::Type::DELETE: {
+    case sqlast::AbstractStatement::Type::INSERT: {
       perf::Start("MySQL");
       int count = this->stmt_->executeUpdate(sql);
       perf::End("MySQL");
       return mysql::SqlResult(std::make_unique<mysql::UpdateResult>(count));
     }
-
+    // A returning delete is a query, a non returning delete is an update.
+    case sqlast::AbstractStatement::Type::DELETE: {
+      if (!static_cast<const sqlast::Delete *>(stmt)->returning()) {
+        perf::Start("MySQL");
+        int count = this->stmt_->executeUpdate(sql);
+        perf::End("MySQL");
+        return mysql::SqlResult(std::make_unique<mysql::UpdateResult>(count));
+      }
+      // No break, next case is executed.
+    }
     case sqlast::AbstractStatement::Type::SELECT: {
       perf::Start("MySQL");
       std::unique_ptr<sql::ResultSet> tmp{this->stmt_->executeQuery(sql)};
