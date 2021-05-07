@@ -20,6 +20,9 @@ cat experiments/lobsters/traces/mini-populate.sql >> trace.sql
 echo "" >> trace.sql
 echo "" >> trace.sql
 
+# Load pre endpoint free selects.
+cat experiments/lobsters/traces/minis/free.sql >> trace.sql
+
 # Put in some endpoint.
 echo "# perf start" >> trace.sql
 cat experiments/lobsters/traces/minis/$1.sql >> trace.sql
