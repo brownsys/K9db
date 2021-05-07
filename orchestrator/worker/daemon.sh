@@ -30,6 +30,7 @@ do
     WITH_ORDER="yes"
     if [[ $(head orchestrator/worker/worker_load -n 1) == "# PELTON NO ORDER" ]]; then
       WITH_ORDER="no"
+      echo "Pelton Log: No Order!"
     fi
 
     # We have a load.
