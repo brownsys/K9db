@@ -44,7 +44,7 @@ CREATE VIEW q15 AS '"SELECT read_ribbons.* FROM read_ribbons WHERE read_ribbons.
 --rewrote net_votes as arith expr in the WHERE clause
 CREATE VIEW q16 AS '"SELECT stories.* FROM stories WHERE stories.merged_story_id IS NULL AND stories.is_expired = 0 AND stories.upvotes - stories.downvotes >= 0 ORDER BY hotness ASC LIMIT 51"';
 CREATE VIEW q17 AS '"SELECT votes.* FROM votes WHERE votes.comment_id = ?"';
-CREATE VIEW q18 AS '"SELECT hidden_stories.story_id, hidden_stories.user_id FROM hidden_stories WHERE hidden_stories.user_id = ? AND hidden_stories.story_id = ?"';
+CREATE VIEW q18 AS '"SELECT hidden_stories.story_id, hidden_stories.user_id FROM hidden_stories WHERE hidden_stories.user_id = ?"';
 CREATE VIEW q19 AS '"SELECT users.* FROM users WHERE users.PII_username = ?"';
 CREATE VIEW q20 AS '"SELECT hidden_stories.* FROM hidden_stories WHERE hidden_stories.user_id = ? AND hidden_stories.story_id = ?"';
 CREATE VIEW q21 AS '"SELECT tag_filters.* FROM tag_filters WHERE tag_filters.user_id = ?"';
