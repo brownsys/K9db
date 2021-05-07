@@ -100,6 +100,7 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
           if (lookup.size() == 1) {
             user_id = std::move(*lookup.cbegin());
             // Execute statement directly against shard.
+            result.MakeInline();
             result.Append(state->connection_pool().ExecuteShard(
                 &cloned, info, user_id, schema));
           }
@@ -109,6 +110,7 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
           sqlast::ExpressionRemover expression_remover(info.shard_by);
           cloned.Visit(&expression_remover);
           // Execute statement directly against shard.
+          result.MakeInline();
           result.Append(state->connection_pool().ExecuteShard(&cloned, info,
                                                               user_id, schema));
         }
@@ -128,6 +130,7 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
         } else {
           // Secondary index unhelpful.
           // Execute statement against all shards of this kind.
+          result.MakeInline();
           result.Append(state->connection_pool().ExecuteShards(
               &cloned, info, state->UsersOfShard(info.shard_kind), schema));
         }

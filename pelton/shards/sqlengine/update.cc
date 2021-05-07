@@ -140,6 +140,7 @@ absl::StatusOr<mysql::SqlResult> Shard(
       MOVE_OR_RETURN(
           mysql::SqlResult tmp,
           delete_::Shard(stmt.DeleteDomain(), state, dataflow_state, false));
+      result.MakeInline();
       result.Append(std::move(tmp));
 
       // Insert updated records.
@@ -148,6 +149,7 @@ absl::StatusOr<mysql::SqlResult> Shard(
             InsertRecord(records.at(i), state->GetSchema(table_name));
         MOVE_OR_RETURN(
             tmp, insert::Shard(insert_stmt, state, dataflow_state, false));
+        result.MakeInline();
         result.Append(std::move(tmp));
       }
 
@@ -172,6 +174,7 @@ absl::StatusOr<mysql::SqlResult> Shard(
             if (lookup.size() == 1) {
               user_id = std::move(*lookup.cbegin());
               // Execute statement directly against shard.
+              result.MakeInline();
               result.Append(state->connection_pool().ExecuteShard(&cloned, info,
                                                                   user_id));
             }
@@ -181,6 +184,7 @@ absl::StatusOr<mysql::SqlResult> Shard(
             sqlast::ExpressionRemover expression_remover(info.shard_by);
             cloned.Visit(&expression_remover);
             // Execute statement directly against shard.
+            result.MakeInline();
             result.Append(
                 state->connection_pool().ExecuteShard(&cloned, info, user_id));
           }
@@ -204,6 +208,7 @@ absl::StatusOr<mysql::SqlResult> Shard(
             }
           }
 
+          result.MakeInline();
           result.Append(
               state->connection_pool().ExecuteShards(&cloned, info, shards));
 
@@ -221,6 +226,7 @@ absl::StatusOr<mysql::SqlResult> Shard(
                 &cloned, info, pair.second));
           } else {
             // Update against all shards.
+            result.MakeInline();
             result.Append(state->connection_pool().ExecuteShards(
                 &cloned, info, state->UsersOfShard(info.shard_kind)));
           }

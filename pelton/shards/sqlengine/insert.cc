@@ -100,6 +100,7 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Insert &stmt,
       }
 
       // Add the modified insert statement.
+      result.MakeInline();
       result.Append(
           state->connection_pool().ExecuteShard(&cloned, info, user_id));
     }
