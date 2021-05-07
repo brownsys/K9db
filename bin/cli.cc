@@ -165,6 +165,12 @@ int main(int argc, char **argv) {
     // Find peak memory usage.
     std::cout << "Memory: " << connection.SizeInMemory() << "bytes"
               << std::endl;
+              
+    std::cout << "Time PELTON: "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
+                                                                     start_time)
+                   .count()
+            << "ms" << std::endl;
 
     pelton::close(&connection);
   } catch (const char *err_msg) {
@@ -173,11 +179,6 @@ int main(int argc, char **argv) {
 
   // Print performance profile.
   pelton::perf::PrintAll();
-  std::cout << "Time PELTON: "
-            << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
-                                                                     start_time)
-                   .count()
-            << "ms" << std::endl;
 
   // Exit!
   std::cout << "exit" << std::endl;
