@@ -94,6 +94,7 @@ bool ReadCommand(std::string *ptr) {
 DEFINE_bool(print, true, "Print results to the screen");
 DEFINE_string(db_username, "root", "MYSQL username to connect with");
 DEFINE_string(db_password, "password", "MYSQL pwd to connect with");
+DEFINE_string(skip, "skip", "Endpoints to skip");
 
 int main(int argc, char **argv) {
   // Command line arugments and help message.
@@ -111,6 +112,8 @@ int main(int argc, char **argv) {
   // Find database directory.
   const std::string &db_username = FLAGS_db_username;
   const std::string &db_password = FLAGS_db_password;
+  // Endpoints separated by ','
+  const std::string &skip_endpoints = FLAGS_skip;
 
   // Initialize our sharded state/connection.
   std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
@@ -135,6 +138,7 @@ int main(int argc, char **argv) {
 
     // Read SQL statements one at a time!
     std::string command;
+    bool should_execute = true;
     while (ReadCommand(&command)) {
       if (command[0] == '#') {
         if (command == "# perf start") {
@@ -144,7 +148,11 @@ int main(int argc, char **argv) {
         }
         continue;
       } else if (command[0] == '-' && command[1] == '-') {
-        profiler.Measure(command);
+        should_execute = profiler.Measure(command, skip_endpoints);
+        continue;
+      }
+
+      if (!should_execute) {
         continue;
       } else if (command.substr(0, 8) == "REPLACE ") {
         continue;
