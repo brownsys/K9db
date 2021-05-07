@@ -79,16 +79,14 @@ absl::Status ExtractConstraintsFromAnd(
     CHECK_STATUS(ExtractConstraintsFromAnd(left, schema, cnstrs));
   } else {
     ASSIGN_OR_RETURN(std::string lcolumn, GetColumnName(left));
-    MOVE_OR_RETURN(std::vector<std::string> lvalues,
-                   GetCondValues(left));
+    MOVE_OR_RETURN(std::vector<std::string> lvalues, GetCondValues(left));
     cnstrs->insert({schema.IndexOf(lcolumn), std::move(lvalues)});
   }
   if (right->type() == sqlast::Expression::Type::AND) {
     CHECK_STATUS(ExtractConstraintsFromAnd(right, schema, cnstrs));
   } else {
     ASSIGN_OR_RETURN(std::string rcolumn, GetColumnName(right));
-    MOVE_OR_RETURN(std::vector<std::string> rvalues,
-                   GetCondValues(right));
+    MOVE_OR_RETURN(std::vector<std::string> rvalues, GetCondValues(right));
     cnstrs->insert({schema.IndexOf(rcolumn), std::move(rvalues)});
   }
   return absl::OkStatus();

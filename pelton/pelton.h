@@ -4,6 +4,7 @@
 
 #include <functional>
 #include <string>
+#include <vector>
 
 #include "absl/status/statusor.h"
 #include "pelton/dataflow/record.h"
@@ -65,6 +66,9 @@ class Connection {
 
 bool open(const std::string &directory, const std::string &db_username,
           const std::string &db_password, Connection *connection);
+
+absl::StatusOr<std::vector<SqlResult>> gdpr(Connection *connection,
+                                            std::string sql);
 
 absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql);
 

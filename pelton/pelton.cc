@@ -2,6 +2,7 @@
 #include "pelton/pelton.h"
 
 #include <iostream>
+#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -11,6 +12,7 @@
 #include "pelton/planner/planner.h"
 #include "pelton/shards/sqlengine/engine.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/util/status.h"
 
 namespace pelton {
 
@@ -38,17 +40,56 @@ bool SpecialStatements(const std::string &sql, Connection *connection) {
     std::cout << "SET echo;" << std::endl;
     return true;
   }
-  if (absl::StartsWith(sql, "GET ")) {
-    std::vector<std::string> v = absl::StrSplit(sql, ' ');
-    v.at(2).pop_back();
-    std::string shard_name = shards::sqlengine::NameShard(v.at(1), v.at(2));
-    std::cout << shard_name << std::endl;
-    return true;
-  }
   return false;
 }
 
 }  // namespace
+
+absl::StatusOr<std::vector<SqlResult>> gdpr(Connection *connection,
+                                            std::string sql) {
+  Trim(sql);
+  if (echo) {
+    std::cout << sql << std::endl;
+  }
+
+  shards::SharderState *state = connection->GetSharderState();
+  dataflow::DataFlowState *dstate = connection->GetDataFlowState();
+
+  std::vector<SqlResult> results;
+  if (absl::StartsWith(sql, "GET ")) {
+    std::vector<std::string> v = absl::StrSplit(sql, ' ');
+    std::string &shard_kind = v.at(1);
+    std::string &user_id = v.at(2);
+    if (user_id.back() == ';') {
+      user_id.pop_back();
+    }
+
+    for (const auto &[table, shard_by] : state->ShardTables(shard_kind)) {
+      std::string tsql = "SELECT * FROM " + table + " WHERE " + shard_by +
+                         " = " + user_id + ";";
+      MOVE_OR_RETURN(SqlResult res,
+                     shards::sqlengine::Shard(tsql, state, dstate));
+      results.push_back(std::move(res));
+    }
+  } else if (absl::StartsWith(sql, "FORGET ")) {
+    std::vector<std::string> v = absl::StrSplit(sql, ' ');
+    std::string &shard_kind = v.at(1);
+    std::string &user_id = v.at(2);
+    if (user_id.back() == ';') {
+      user_id.pop_back();
+    }
+
+    for (const auto &[table, shard_by] : state->ShardTables(shard_kind)) {
+      std::string tsql =
+          "DELETE FROM " + table + " WHERE " + shard_by + " = " + user_id + ";";
+      MOVE_OR_RETURN(SqlResult res,
+                     shards::sqlengine::Shard(tsql, state, dstate));
+      results.push_back(std::move(res));
+    }
+  }
+
+  return results;
+}
 
 bool open(const std::string &directory, const std::string &db_username,
           const std::string &db_password, Connection *connection) {

@@ -121,17 +121,33 @@ int main(int argc, char **argv) {
 
       // Command has been fully read, execute it!
       pelton::perf::Start("exec");
-      absl::StatusOr<pelton::SqlResult> status =
-          pelton::exec(&connection, command);
-      if (!status.ok()) {
-        std::cerr << "Fatal error" << std::endl;
-        std::cerr << status.status() << std::endl;
-        break;
+      if (command[0] == 'G' || command[0] == 'F') {
+        auto status = pelton::gdpr(&connection, command);
+        if (!status.ok()) {
+          std::cerr << "Fatal error" << std::endl;
+          std::cerr << status.status() << std::endl;
+          break;
+        }
+        if (print) {
+          for (pelton::SqlResult &result : status.value()) {
+            Print(std::move(result));
+          }
+        }
+      } else {
+        absl::StatusOr<pelton::SqlResult> status =
+            pelton::exec(&connection, command);
+        if (!status.ok()) {
+          std::cerr << "Fatal error" << std::endl;
+          std::cerr << status.status() << std::endl;
+          break;
+        }
+        if (print) {
+          Print(std::move(status.value()));
+        }
       }
 
       // Print result.
       if (print) {
-        Print(std::move(status.value()));
         std::cout << std::endl << ">>> " << std::flush;
       }
       pelton::perf::End("exec");
