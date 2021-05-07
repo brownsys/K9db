@@ -149,11 +149,13 @@ class Delete : public AbstractStatement {
  public:
   explicit Delete(const std::string &table_name)
       : AbstractStatement(AbstractStatement::Type::DELETE),
-        table_name_(table_name) {}
+        table_name_(table_name),
+        returning_(false) {}
 
   Delete(const Delete &del)
       : AbstractStatement(AbstractStatement::Type::DELETE) {
     this->table_name_ = del.table_name_;
+    this->returning_ = del.returning_;
     if (del.where_clause_.has_value()) {
       this->where_clause_ = std::optional(
           std::make_unique<BinaryExpression>(*del.where_clause_->get()));
@@ -170,6 +172,14 @@ class Delete : public AbstractStatement {
   void RemoveWhereClause();
 
   Select SelectDomain() const;
+
+  // Whether the delete statement is also a returning query.
+  bool returning() const { return this->returning_; }
+  Delete MakeReturning() const {
+    Delete stmt = *this;
+    stmt.returning_ = true;
+    return stmt;
+  }
 
   template <class T>
   T Visit(AbstractVisitor<T> *visitor) const {
@@ -199,6 +209,7 @@ class Delete : public AbstractStatement {
  private:
   std::string table_name_;
   std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
+  bool returning_;
 };
 
 class Update : public AbstractStatement {

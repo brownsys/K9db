@@ -376,7 +376,7 @@ TEST(AggregateOperatorTest, OutputSchemaPrimaryKeyTest) {
   // test schema data
   EXPECT_EQ(aggregate1.output_schema_.column_names(), expected_names);
   EXPECT_EQ(aggregate1.output_schema_.column_types(), expected_types);
-  EXPECT_EQ(aggregate1.output_schema_.keys(), group_columns);
+  EXPECT_EQ(aggregate1.output_schema_.keys(), (std::vector<ColumnID>{0}));
 
   // TEST 2: Primary keyed schema's keycolumn not included in projected schema
   group_columns = {1};
@@ -389,7 +389,7 @@ TEST(AggregateOperatorTest, OutputSchemaPrimaryKeyTest) {
   expected_types = {CType::INT, CType::INT};
   EXPECT_EQ(aggregate2.output_schema_.column_names(), expected_names);
   EXPECT_EQ(aggregate2.output_schema_.column_types(), expected_types);
-  EXPECT_EQ(aggregate2.output_schema_.keys(), group_columns);
+  EXPECT_EQ(aggregate2.output_schema_.keys(), (std::vector<ColumnID>{0}));
 }
 
 TEST(AggregateOperatorTest, OutputSchemaCompositeKeyTest) {
@@ -408,7 +408,7 @@ TEST(AggregateOperatorTest, OutputSchemaCompositeKeyTest) {
   // test schema data
   EXPECT_EQ(aggregate1.output_schema_.column_names(), expected_names);
   EXPECT_EQ(aggregate1.output_schema_.column_types(), expected_types);
-  EXPECT_EQ(aggregate1.output_schema_.keys(), group_columns);
+  EXPECT_EQ(aggregate1.output_schema_.keys(), (std::vector<ColumnID>{0, 1, 2}));
 
   // TEST 2: Primary keyed schema's keycolumn not included in projected schema
   group_columns = {0, 1};
@@ -421,7 +421,7 @@ TEST(AggregateOperatorTest, OutputSchemaCompositeKeyTest) {
   expected_types = {CType::UINT, CType::TEXT, CType::INT};
   EXPECT_EQ(aggregate2.output_schema_.column_names(), expected_names);
   EXPECT_EQ(aggregate2.output_schema_.column_types(), expected_types);
-  EXPECT_EQ(aggregate2.output_schema_.keys(), group_columns);
+  EXPECT_EQ(aggregate2.output_schema_.keys(), (std::vector<ColumnID>{0, 1}));
 }
 
 }  // namespace dataflow

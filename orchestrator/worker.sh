@@ -112,6 +112,7 @@ fi
 
 # update repo
 cd pelton
+cd experiments/GDPRbench && git stash && cd -
 git stash
 git fetch origin
 git checkout $BRANCH

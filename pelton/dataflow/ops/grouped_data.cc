@@ -6,7 +6,7 @@ namespace dataflow {
 /*
  * UntemplatedGroupedData.
  */
-const std::vector<Record> UntemplatedGroupedData::EMPTY_VEC = {};
+const std::list<Record> UntemplatedGroupedData::EMPTY_VEC = {};
 
 }  // namespace dataflow
 }  // namespace pelton
