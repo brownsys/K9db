@@ -82,45 +82,7 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewUnconstrained(
   return records;
 }
 
-// Ordered view.
-absl::StatusOr<std::vector<dataflow::Record>> SelectViewOrdered(
-    std::shared_ptr<dataflow::MatViewOperator> matview,
-    const sqlast::BinaryExpression *where, int limit, size_t offset) {
-  switch (where->type()) {
-    case sqlast::Expression::Type::GREATER_THAN: {
-      std::vector<dataflow::Record> records;
-      const dataflow::SchemaRef &schema = matview->output_schema();
-
-      ASSIGN_OR_RETURN(std::string column, GetColumnName(where));
-      MOVE_OR_RETURN(std::vector<std::string> values, GetCondValues(where));
-      size_t column_index = schema.IndexOf(column);
-
-      // If value is a string, trim surrounding quotes.
-      for (auto &value : values) {
-        if (schema.TypeOf(column_index) ==
-            sqlast::ColumnDefinition::Type::TEXT) {
-          value = dataflow::Record::Dequote(value);
-        }
-      }
-      CHECK_EQ(values.size(), 1);
-
-      // Read records > cmp.
-      dataflow::Record cmp{schema};
-      cmp.SetValue(values.at(0), column_index);
-      for (const auto &k : matview->Keys()) {
-        for (const auto &r : matview->LookupGreater(k, cmp, limit, offset)) {
-          records.push_back(r.Copy());
-        }
-      }
-
-      return records;
-    }
-    default:
-      return absl::InvalidArgumentError(
-          "Illegal WHERE condition for sorted view");
-  }
-}
-
+// Constrained with equality or related operations.
 absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
     std::shared_ptr<dataflow::MatViewOperator> matview,
     const sqlast::BinaryExpression *where, int limit, size_t offset) {
@@ -194,6 +156,48 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
   }
 
   return records;
+}
+
+// Ordered view.
+absl::StatusOr<std::vector<dataflow::Record>> SelectViewOrdered(
+    std::shared_ptr<dataflow::MatViewOperator> matview,
+    const sqlast::BinaryExpression *where, int limit, size_t offset) {
+  switch (where->type()) {
+    case sqlast::Expression::Type::GREATER_THAN: {
+      std::vector<dataflow::Record> records;
+      const dataflow::SchemaRef &schema = matview->output_schema();
+
+      ASSIGN_OR_RETURN(std::string column, GetColumnName(where));
+      MOVE_OR_RETURN(std::vector<std::string> values, GetCondValues(where));
+      size_t column_index = schema.IndexOf(column);
+
+      // If value is a string, trim surrounding quotes.
+      for (auto &value : values) {
+        if (schema.TypeOf(column_index) ==
+            sqlast::ColumnDefinition::Type::TEXT) {
+          value = dataflow::Record::Dequote(value);
+        }
+      }
+      CHECK_EQ(values.size(), 1);
+
+      // Read records > cmp.
+      dataflow::Record cmp{schema};
+      cmp.SetValue(values.at(0), column_index);
+      for (const auto &k : matview->Keys()) {
+        for (const auto &r : matview->LookupGreater(k, cmp, limit, offset)) {
+          records.push_back(r.Copy());
+        }
+      }
+
+      return records;
+    }
+    case sqlast::Expression::Type::EQ:
+      return SelectViewConstrained(matview, where, limit, offset);
+
+    default:
+      return absl::InvalidArgumentError(
+          "Illegal WHERE condition for sorted view");
+  }
 }
 
 }  // namespace
