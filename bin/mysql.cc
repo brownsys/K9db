@@ -42,6 +42,7 @@ void PrintData(bool print, sql::ResultSet *result) {
         case sql::DataType::TINYINT:
         case sql::DataType::SMALLINT:
         case sql::DataType::BIGINT:
+        case sql::DataType::BIT:
         case sql::DataType::INTEGER:
           if (print) {
             std::cout << "| " << result->getInt(i) << " ";
