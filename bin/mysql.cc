@@ -11,9 +11,7 @@
 #include "pelton/util/latency.h"
 #include "pelton/util/perf.h"
 
-std::vector<std::string> TO_SKIP = {"user",    "submit",   "recent",
-                                    "comment", "comments", "frontpage",
-                                    "recent",  "story",    "story_vote"};
+std::vector<std::string> TO_SKIP = {"submit"};
 
 void PrintHeader(bool print, sql::ResultSet *result) {
   if (print) {

@@ -13,7 +13,7 @@ namespace sqlast {
 
 class AstTransformer : public sqlparser::SQLiteParserBaseVisitor {
  public:
-  AstTransformer() = default;
+  AstTransformer() : in_update_(false) {}
 
   // Entry point for cst to ast transformation / building.
   absl::StatusOr<std::unique_ptr<sqlast::AbstractStatement>> TransformStatement(
@@ -252,8 +252,10 @@ class AstTransformer : public sqlparser::SQLiteParserBaseVisitor {
       sqlparser::SQLiteParser::Table_function_nameContext *context) override;
   antlrcpp::Any visitAny_name(
       sqlparser::SQLiteParser::Any_nameContext *context) override;
-};
 
+ private:
+  bool in_update_;
+};
 }  // namespace sqlast
 }  // namespace pelton
 

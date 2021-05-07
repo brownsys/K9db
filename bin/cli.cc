@@ -11,9 +11,7 @@
 #include "pelton/util/latency.h"
 #include "pelton/util/perf.h"
 
-std::vector<std::string> TO_SKIP = {"user",    "submit",   "recent",
-                                    "comment", "comments", "frontpage",
-                                    "recent",  "story",    "story_vote"};
+std::vector<std::string> TO_SKIP = {"submit"};
 
 // Printing query results.
 void Print(pelton::SqlResult &&result) {
@@ -112,9 +110,7 @@ int main(int argc, char **argv) {
         }
         continue;
       } else if (command[0] == '-' && command[1] == '-') {
-        std::cout << "at " << command << std::endl;
         current_endpoint = profiler.Measure(command);
-        std::cout << "back " << command << std::endl;
         continue;
       } else if (command.substr(0, 8) == "REPLACE ") {
         continue;

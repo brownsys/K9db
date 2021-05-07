@@ -280,6 +280,7 @@ antlrcpp::Any AstTransformer::visitExpr_list(
 // Update constructs.
 antlrcpp::Any AstTransformer::visitUpdate_stmt(
     sqlparser::SQLiteParser::Update_stmtContext *ctx) {
+  this->in_update_ = true;
   if (ctx->with_clause() != nullptr || ctx->OR() != nullptr ||
       ctx->column_name_list().size() > 0) {
     return absl::InvalidArgumentError("Invalid update constructs");
@@ -314,6 +315,8 @@ antlrcpp::Any AstTransformer::visitUpdate_stmt(
         static_cast<BinaryExpression *>(expr.release()));
     update->SetWhereClause(std::move(bexpr));
   }
+
+  this->in_update_ = false;
   return static_cast<std::unique_ptr<AbstractStatement>>(std::move(update));
 }
 
@@ -445,6 +448,16 @@ antlrcpp::Any AstTransformer::visitQualified_table_name(
 // Expressions.
 antlrcpp::Any AstTransformer::visitExpr(
     sqlparser::SQLiteParser::ExprContext *ctx) {
+  // Hack.
+  if ((ctx->PLUS() != nullptr || ctx->MINUS() != nullptr) && this->in_update_) {
+    if (ctx->expr(0)->literal_value() != nullptr) {
+      return ctx->expr(0)->accept(this);
+    }
+    if (ctx->expr(1)->literal_value() != nullptr) {
+      return ctx->expr(1)->accept(this);
+    }
+  }
+
   if ((ctx->literal_value() == nullptr && ctx->ASSIGN() == nullptr &&
        ctx->column_name() == nullptr && ctx->AND() == nullptr &&
        ctx->GT() == nullptr && ctx->IN() == nullptr) ||

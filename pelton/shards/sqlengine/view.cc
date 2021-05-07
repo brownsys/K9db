@@ -68,6 +68,32 @@ absl::StatusOr<std::vector<std::string>> GetCondValues(
   return absl::InvalidArgumentError("Invalid view where clause: no literal!");
 }
 
+absl::Status ExtractConstraintsFromAnd(
+    const sqlast::Expression *exp, dataflow::SchemaRef schema,
+    std::unordered_map<dataflow::ColumnID, std::vector<std::string>> *cnstrs) {
+  const sqlast::BinaryExpression *bin =
+      static_cast<const sqlast::BinaryExpression *>(exp);
+  const sqlast::Expression *left = bin->GetLeft();
+  const sqlast::Expression *right = bin->GetRight();
+  if (left->type() == sqlast::Expression::Type::AND) {
+    CHECK_STATUS(ExtractConstraintsFromAnd(left, schema, cnstrs));
+  } else {
+    ASSIGN_OR_RETURN(std::string lcolumn, GetColumnName(left));
+    MOVE_OR_RETURN(std::vector<std::string> lvalues,
+                   GetCondValues(left));
+    cnstrs->insert({schema.IndexOf(lcolumn), std::move(lvalues)});
+  }
+  if (right->type() == sqlast::Expression::Type::AND) {
+    CHECK_STATUS(ExtractConstraintsFromAnd(right, schema, cnstrs));
+  } else {
+    ASSIGN_OR_RETURN(std::string rcolumn, GetColumnName(right));
+    MOVE_OR_RETURN(std::vector<std::string> rvalues,
+                   GetCondValues(right));
+    cnstrs->insert({schema.IndexOf(rcolumn), std::move(rvalues)});
+  }
+  return absl::OkStatus();
+}
+
 // Unconstrained select (no where).
 absl::StatusOr<std::vector<dataflow::Record>> SelectViewUnconstrained(
     std::shared_ptr<dataflow::MatViewOperator> matview, int limit,
@@ -99,14 +125,7 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
       break;
     }
     case sqlast::Expression::Type::AND: {
-      ASSIGN_OR_RETURN(std::string lcolumn, GetColumnName(where->GetLeft()));
-      MOVE_OR_RETURN(std::vector<std::string> lvalues,
-                     GetCondValues(where->GetLeft()));
-      ASSIGN_OR_RETURN(std::string rcolumn, GetColumnName(where->GetRight()));
-      MOVE_OR_RETURN(std::vector<std::string> rvalues,
-                     GetCondValues(where->GetRight()));
-      constraints.insert({schema.IndexOf(lcolumn), std::move(lvalues)});
-      constraints.insert({schema.IndexOf(rcolumn), std::move(rvalues)});
+      ExtractConstraintsFromAnd(where, schema, &constraints);
       break;
     }
     default:

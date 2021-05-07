@@ -9,5 +9,5 @@ SELECT * FROM q26 WHERE story_id IN (1, 2, 4)
 SELECT * FROM q29 WHERE id IN (1) 
 SELECT * FROM q5 WHERE OWNER_user_id = 2 AND story_id IN (1, 2)
 SELECT * FROM q20 WHERE story_id IN (1, 2, 4) AND user_id = 2
-SELECT * FROM q24 WHERE WHERE story_id IN (1, 2, 4)) AND user_id = 2
+SELECT * FROM q24 WHERE story_id IN (1, 2, 4) AND user_id = 2
 --end: recent
