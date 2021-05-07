@@ -2,6 +2,7 @@
 #include "pelton/util/latency.h"
 
 #include <algorithm>
+#include <cassert>
 #include <iostream>
 #include <utility>
 #include <vector>
@@ -11,7 +12,11 @@
 namespace pelton {
 namespace latency {
 
-void Latency::TurnOn() { this->begin_ = true; }
+std::string Latency::TurnOn() {
+  this->begin_ = true;
+  this->Start("free");
+  return "free";
+}
 
 // Timing.
 void Latency::Start(const std::string &label) {
@@ -34,36 +39,40 @@ void Latency::End(const std::string &label) {
   }
 }
 
-bool Latency::Measure(const std::string &comment,
-                      const std::string &skip_endpoints) {
+std::string Latency::Measure(const std::string &comment) {
+  if (!this->begin_) {
+    return "";
+  }
+
+  if (comment == "free") {
+    this->Start("free");
+    return "free";
+  }
+  if (comment == "free") {
+    this->End("free");
+    return "free";
+  }
+
   if (absl::StartsWithIgnoreCase(comment, "--start: ")) {
-    if (absl::StrContains(skip_endpoints, comment.substr(10))) {
-      return false;
-    }
+    this->End("free");
     this->Start(comment.substr(9));
-    return true;
+    return comment.substr(9);
   } else if (absl::StartsWithIgnoreCase(comment, "--start ")) {
-    if (absl::StrContains(skip_endpoints, comment.substr(9))) {
-      return false;
-    }
+    this->End("free");
     this->Start(comment.substr(8));
-    return true;
+    return comment.substr(8);
   }
   if (absl::StartsWithIgnoreCase(comment, "--end: ")) {
-    if (absl::StrContains(skip_endpoints, comment.substr(8))) {
-      return false;
-    }
     this->End(comment.substr(7));
-    return true;
+    this->Start("free");
+    return "free";
   } else if (absl::StartsWithIgnoreCase(comment, "--end ")) {
-    if (absl::StrContains(skip_endpoints, comment.substr(7))) {
-      return false;
-    }
     this->End(comment.substr(6));
-    return true;
-  } else {
-    return true;
+    this->Start("free");
+    return "free";
   }
+
+  assert(false);
 }
 
 // Display results of timing.

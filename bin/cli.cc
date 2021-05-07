@@ -3,12 +3,17 @@
 #include <iostream>
 #include <limits>
 #include <string>
+#include <vector>
 
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "pelton/pelton.h"
 #include "pelton/util/latency.h"
 #include "pelton/util/perf.h"
+
+std::vector<std::string> TO_SKIP = {
+    "user",      "submit", "recent", "comment",    "comments",
+    "frontpage", "recent", "story",  "story_vote", "free"};
 
 // Printing query results.
 void Print(pelton::SqlResult &&result) {
@@ -59,7 +64,6 @@ DEFINE_bool(print, true, "Print results to the screen");
 DEFINE_string(db_path, "", "Path to database directory (required)");
 DEFINE_string(db_username, "root", "MYSQL username to connect with");
 DEFINE_string(db_password, "password", "MYSQL pwd to connect with");
-DEFINE_string(skip, "skip", "Endpoints to skip");
 
 int main(int argc, char **argv) {
   // Command line arugments and help message.
@@ -78,8 +82,6 @@ int main(int argc, char **argv) {
   const std::string &db_username = FLAGS_db_username;
   const std::string &db_password = FLAGS_db_password;
   const std::string &dir = FLAGS_db_path;
-  // Endpoints separated by ','
-  const std::string &skip_endpoints = FLAGS_skip;
 
   // Initialize our sharded state/connection.
   std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
@@ -99,25 +101,28 @@ int main(int argc, char **argv) {
 
     // Read SQL statements one at a time!
     std::string command;
-    bool should_execute = true;
+    std::string current_endpoint = "";
     while (ReadCommand(&command)) {
       if (command[0] == '#') {
         if (command == "# perf start") {
           std::cout << "Perf start" << std::endl;
           pelton::perf::Start();
+          current_endpoint = profiler.TurnOn();
           start_time = std::chrono::high_resolution_clock::now();
         }
         continue;
       } else if (command[0] == '-' && command[1] == '-') {
-        should_execute = profiler.Measure(command, skip_endpoints);
+        std::cout << "at " << command << std::endl;
+        current_endpoint = profiler.Measure(command);
+        std::cout << "back " << command << std::endl;
         continue;
       } else if (command.substr(0, 8) == "REPLACE ") {
         continue;
-      }
-
-      if (!should_execute) {
+      } else if (std::find(TO_SKIP.begin(), TO_SKIP.end(), current_endpoint) !=
+                 TO_SKIP.end()) {
         continue;
       }
+
       // Command has been fully read, execute it!
       pelton::perf::Start("exec");
       absl::StatusOr<pelton::SqlResult> status =

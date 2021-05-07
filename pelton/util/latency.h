@@ -12,12 +12,12 @@ namespace latency {
 
 class Latency {
  public:
-  Latency() = default;
+  Latency() : begin_(false) {}
 
-  void TurnOn();
+  std::string TurnOn();
   void Start(const std::string &label);
   void End(const std::string &label);
-  bool Measure(const std::string &comment, const std::string &skip_perf);
+  std::string Measure(const std::string &comment);
   void PrintAll();
 
  private:

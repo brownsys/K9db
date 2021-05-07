@@ -3,12 +3,17 @@
 #include <iostream>
 #include <limits>
 #include <string>
+#include <vector>
 
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "mariadb/conncpp.hpp"
 #include "pelton/util/latency.h"
 #include "pelton/util/perf.h"
+
+std::vector<std::string> TO_SKIP = {
+    "user",      "submit", "recent", "comment",    "comments",
+    "frontpage", "recent", "story",  "story_vote", "free"};
 
 void PrintHeader(bool print, sql::ResultSet *result) {
   if (print) {
@@ -94,7 +99,6 @@ bool ReadCommand(std::string *ptr) {
 DEFINE_bool(print, true, "Print results to the screen");
 DEFINE_string(db_username, "root", "MYSQL username to connect with");
 DEFINE_string(db_password, "password", "MYSQL pwd to connect with");
-DEFINE_string(skip, "skip", "Endpoints to skip");
 
 int main(int argc, char **argv) {
   // Command line arugments and help message.
@@ -112,8 +116,6 @@ int main(int argc, char **argv) {
   // Find database directory.
   const std::string &db_username = FLAGS_db_username;
   const std::string &db_password = FLAGS_db_password;
-  // Endpoints separated by ','
-  const std::string &skip_endpoints = FLAGS_skip;
 
   // Initialize our sharded state/connection.
   std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
@@ -138,23 +140,23 @@ int main(int argc, char **argv) {
 
     // Read SQL statements one at a time!
     std::string command;
-    bool should_execute = true;
+    std::string current_endpoint = "";
     while (ReadCommand(&command)) {
       if (command[0] == '#') {
         if (command == "# perf start") {
           std::cout << "Perf start" << std::endl;
           pelton::perf::Start();
+          current_endpoint = profiler.TurnOn();
           start_time = std::chrono::high_resolution_clock::now();
         }
         continue;
       } else if (command[0] == '-' && command[1] == '-') {
-        should_execute = profiler.Measure(command, skip_endpoints);
+        current_endpoint = profiler.Measure(command);
         continue;
       } else if (command.substr(0, 8) == "REPLACE ") {
         continue;
-      }
-
-      if (!should_execute) {
+      } else if (std::find(TO_SKIP.begin(), TO_SKIP.end(), current_endpoint) !=
+                 TO_SKIP.end()) {
         continue;
       }
 
