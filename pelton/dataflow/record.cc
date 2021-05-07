@@ -125,11 +125,13 @@ int64_t Record::GetInt(size_t i) const {
 const std::string &Record::GetString(size_t i) const {
   CheckType(i, sqlast::ColumnDefinition::Type::TEXT);
   CHECK(!IsNull(i));
+  CHECK_NOTNULL(this->data_[i].str);
   return *(this->data_[i].str);
 }
 const std::string &Record::GetDateTime(size_t i) const {
   CheckType(i, sqlast::ColumnDefinition::Type::DATETIME);
   CHECK(!IsNull(i));
+  CHECK_NOTNULL(this->data_[i].str);
   return *(this->data_[i].str);
 }
 
