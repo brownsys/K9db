@@ -1,5 +1,5 @@
-CREATE VIEW replying_comments_for_count AS \
-	'"SELECT read_ribbons.user_id, read_ribbons.story_id, comments.id \
+CREATE VIEW q36 AS \
+	'"SELECT read_ribbons.user_id, COUNT(*) \
 	FROM read_ribbons \
 	JOIN stories ON (read_ribbons.story_id = stories.id) \
 	JOIN comments ON (read_ribbons.story_id = comments.story_id) \
@@ -23,7 +23,7 @@ CREATE VIEW replying_comments_for_count AS \
             AND \
             stories.user_id = read_ribbons.user_id \
      ) \
-     )"';
+     ) GROUP BY read_ribbons.user_id"';
 CREATE VIEW q1 AS '"SELECT 1 AS `one`, PII_username FROM users WHERE users.PII_username = ?"';
 CREATE VIEW q2 AS '"SELECT 1 AS `one`, short_id FROM stories WHERE stories.short_id = ?"';
 CREATE VIEW q3 AS '"SELECT tags.* FROM tags WHERE tags.inactive = 0 AND tags.tag = ?"';
