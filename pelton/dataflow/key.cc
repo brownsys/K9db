@@ -60,6 +60,10 @@ void Key::AddValue(std::string &&v) {
   this->CheckSize();
   this->values_.emplace_back(std::move(v));
 }
+void Key::AddNull(sqlast::ColumnDefinition::Type type) {
+  this->CheckSize();
+  this->values_.emplace_back(type);
+}
 
 // Printing a record to an output stream (e.g. std::cout).
 std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Key &k) {

@@ -128,6 +128,10 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
       for (const auto &key : keys) {
         // Copy key and put val in it
         dataflow::Key copy = key;
+        if (val == "NULL") {
+          copy.AddNull(schema.TypeOf(col));
+          continue;
+        }
         switch (schema.TypeOf(col)) {
           case sqlast::ColumnDefinition::Type::UINT:
             copy.AddValue(static_cast<uint64_t>(std::stoull(val)));
@@ -170,14 +174,6 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewOrdered(
       ASSIGN_OR_RETURN(std::string column, GetColumnName(where));
       MOVE_OR_RETURN(std::vector<std::string> values, GetCondValues(where));
       size_t column_index = schema.IndexOf(column);
-
-      // If value is a string, trim surrounding quotes.
-      for (auto &value : values) {
-        if (schema.TypeOf(column_index) ==
-            sqlast::ColumnDefinition::Type::TEXT) {
-          value = dataflow::Record::Dequote(value);
-        }
-      }
       CHECK_EQ(values.size(), 1);
 
       // Read records > cmp.
