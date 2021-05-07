@@ -146,6 +146,8 @@ int main(int argc, char **argv) {
       } else if (command[0] == '-' && command[1] == '-') {
         profiler.Measure(command);
         continue;
+      } else if (command.substr(0, 8) == "REPLACE ") {
+        continue;
       }
 
       if (print) {
