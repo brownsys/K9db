@@ -117,6 +117,7 @@ cc_binary(
     ],
     deps = [
         "//pelton",
+        "//pelton/util:latency",
         "//pelton/util:perf",
         "@gflags",
         "@glog",
@@ -132,6 +133,7 @@ cc_binary(
         "-lmariadbcpp",
     ],
     deps = [
+        "//pelton/util:latency",
         "//pelton/util:perf",
         "@gflags",
         "@glog",

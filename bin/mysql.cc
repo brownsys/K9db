@@ -7,6 +7,7 @@
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "mariadb/conncpp.hpp"
+#include "pelton/util/latency.h"
 #include "pelton/util/perf.h"
 
 void PrintHeader(bool print, sql::ResultSet *result) {
@@ -69,7 +70,7 @@ bool ReadCommand(std::string *ptr) {
         line.find_first_not_of(" \t\n") == std::string::npos) {
       continue;
     }
-    if (line.front() == '#') {
+    if (line.front() == '#' || (line[0] == '-' && line[1] == '-')) {
       *ptr = line;
       pelton::perf::End("Read std::cin");
       return true;
@@ -129,6 +130,9 @@ int main(int argc, char **argv) {
       std::cout << ">>> " << std::flush;
     }
 
+    // For Measuring Latency of composie endpoints.
+    pelton::latency::Latency profiler;
+
     // Read SQL statements one at a time!
     std::string command;
     while (ReadCommand(&command)) {
@@ -138,6 +142,9 @@ int main(int argc, char **argv) {
           pelton::perf::Start();
           start_time = std::chrono::high_resolution_clock::now();
         }
+        continue;
+      } else if (command[0] == '-' && command[1] == '-') {
+        profiler.Measure(command);
         continue;
       }
 
@@ -161,6 +168,7 @@ int main(int argc, char **argv) {
       }
 
       pelton::perf::End("exec");
+      profiler.PrintAll();
 
       // Ready for next command.
       if (print) {
