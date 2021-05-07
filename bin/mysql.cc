@@ -150,11 +150,11 @@ int main(int argc, char **argv) {
       } else if (command[0] == '-' && command[1] == '-') {
         should_execute = profiler.Measure(command, skip_endpoints);
         continue;
+      } else if (command.substr(0, 8) == "REPLACE ") {
+        continue;
       }
 
       if (!should_execute) {
-        continue;
-      } else if (command.substr(0, 8) == "REPLACE ") {
         continue;
       }
 
