@@ -27,7 +27,10 @@ do
   curl -X GET $ORCHESTRATOR/ready -o orchestrator/worker/worker_load
   if [[ -f orchestrator/worker/worker_load ]] && [ $(wc -w orchestrator/worker/worker_load | awk '{print $1}') -ne 0 ]; then
     echo "Pelton Log: Load received!"
-    head orchestrator/worker/worker_load
+    WITH_ORDER="yes"
+    if [[ $(head orchestrator/worker/worker_load -n 1) == "# PELTON NO ORDER" ]]; then
+      WITH_ORDER="no"
+    fi
 
     # We have a load.
     PREFIX="../../.."
@@ -40,9 +43,11 @@ do
       && ./bin/ycsb load tracefile -s -P $LOAD_CONF \
           -p sharded.path=$PREFIX/$SFILENAME \
           -p unsharded.path=$PREFIX/$UFILENAME -p file.append=no \
+          -p sharded.order=$WITH_ORDER \
       && ./bin/ycsb run tracefile -s -P $LOAD_CONF \
           -p sharded.path=$PREFIX/$SFILENAME \
           -p unsharded.path=$PREFIX/$UFILENAME -p file.append=yes \
+          -p sharded.order=$WITH_ORDER \
       && cd -
     echo "Pelton Log: Trace files generated!"
 
