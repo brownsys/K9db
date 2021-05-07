@@ -72,7 +72,7 @@ std::string Latency::Measure(const std::string &comment) {
     return "free";
   }
 
-  assert(false);
+  return "";
 }
 
 // Display results of timing.
