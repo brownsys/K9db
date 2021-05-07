@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
   bool print = FLAGS_print;
 
   // Initialize Google’s logging library.
-  google::InitGoogleLogging("argc");
+  google::InitGoogleLogging("cli");
 
   // Find database directory.
   const std::string &db_username = FLAGS_db_username;
