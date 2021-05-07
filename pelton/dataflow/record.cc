@@ -144,7 +144,23 @@ Key Record::GetValues(const std::vector<ColumnID> &cols) const {
   // Construct key with given capacity, and fill it up with values.
   Key key{cols.size()};
   for (ColumnID col : cols) {
-    CHECK(!this->IsNull(col));
+    if (this->IsNull(col)) {
+      switch (this->schema_.TypeOf(col)) {
+        case sqlast::ColumnDefinition::Type::UINT:
+          key.AddValue(UINT64_MAX);
+          continue;
+        case sqlast::ColumnDefinition::Type::INT:
+          key.AddValue(INT64_MAX);
+          continue;
+        case sqlast::ColumnDefinition::Type::TEXT:
+        case sqlast::ColumnDefinition::Type::DATETIME:
+          key.AddValue("NULL");
+          continue;
+        default:
+          LOG(FATAL) << "NULL value in key unhandled for type "
+                     << this->schema_.TypeOf(col);
+      }
+    }
     switch (this->schema_.TypeOf(col)) {
       case sqlast::ColumnDefinition::Type::UINT:
         key.AddValue(this->data_[col].uint);
