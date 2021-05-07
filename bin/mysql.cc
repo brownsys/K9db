@@ -178,7 +178,6 @@ int main(int argc, char **argv) {
       }
 
       pelton::perf::End("exec");
-      profiler.PrintAll();
 
       // Ready for next command.
       if (print) {
@@ -187,6 +186,7 @@ int main(int argc, char **argv) {
     }
 
     end_time = std::chrono::high_resolution_clock::now();
+    profiler.PrintAll();
   } catch (const char *err_msg) {
     LOG(FATAL) << "Error: " << err_msg;
   }
