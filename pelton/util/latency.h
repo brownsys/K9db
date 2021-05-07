@@ -17,7 +17,7 @@ class Latency {
   void TurnOn();
   void Start(const std::string &label);
   void End(const std::string &label);
-  void Measure(const std::string &comment);
+  bool Measure(const std::string &comment, const std::string &skip_perf);
   void PrintAll();
 
  private:

@@ -34,18 +34,35 @@ void Latency::End(const std::string &label) {
   }
 }
 
-void Latency::Measure(const std::string &comment) {
+bool Latency::Measure(const std::string &comment,
+                      const std::string &skip_endpoints) {
   if (absl::StartsWithIgnoreCase(comment, "--start: ")) {
+    if (absl::StrContains(skip_endpoints, comment.substr(10))) {
+      return false;
+    }
     this->Start(comment.substr(9));
+    return true;
   } else if (absl::StartsWithIgnoreCase(comment, "--start ")) {
+    if (absl::StrContains(skip_endpoints, comment.substr(9))) {
+      return false;
+    }
     this->Start(comment.substr(8));
+    return true;
   }
   if (absl::StartsWithIgnoreCase(comment, "--end: ")) {
+    if (absl::StrContains(skip_endpoints, comment.substr(8))) {
+      return false;
+    }
     this->End(comment.substr(7));
+    return true;
   } else if (absl::StartsWithIgnoreCase(comment, "--end ")) {
+    if (absl::StrContains(skip_endpoints, comment.substr(7))) {
+      return false;
+    }
     this->End(comment.substr(6));
+    return true;
   } else {
-    return;
+    return true;
   }
 }
 
