@@ -83,7 +83,9 @@ void Latency::PrintAll() {
   std::sort(vec.begin(), vec.end());  // Sort by endpoint name.
   for (const auto &[label, duration] : vec) {
     uint64_t ms = duration / 1000000;
-    double avg = ms / this->count_.at(label);
+    uint64_t c = this->count_.at(label);
+    std::cout << label << ": Ran " << c << " times" << std::endl;
+    double avg = ms / c;
     std::cout << label << ": " << avg << "ms" << std::endl;
   }
   std::cout << "----------------------" << std::endl;
