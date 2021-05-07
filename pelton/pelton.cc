@@ -68,7 +68,7 @@ absl::StatusOr<std::vector<SqlResult>> gdpr(Connection *connection,
       std::string tsql = "SELECT * FROM " + table + " WHERE " + shard_by +
                          " = " + user_id + ";";
       MOVE_OR_RETURN(SqlResult res,
-                     shards::sqlengine::Shard(tsql, state, dstate));
+                     shards::sqlengine::Shard(tsql, state, dstate, &shard_kind, &user_id));
       results.push_back(std::move(res));
     }
   } else if (absl::StartsWith(sql, "FORGET ")) {
@@ -83,7 +83,7 @@ absl::StatusOr<std::vector<SqlResult>> gdpr(Connection *connection,
       std::string tsql =
           "DELETE FROM " + table + " WHERE " + shard_by + " = " + user_id + ";";
       MOVE_OR_RETURN(SqlResult res,
-                     shards::sqlengine::Shard(tsql, state, dstate));
+                     shards::sqlengine::Shard(tsql, state, dstate, &shard_kind, &user_id));
       results.push_back(std::move(res));
     }
   }

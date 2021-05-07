@@ -18,7 +18,8 @@ namespace delete_ {
 absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
                                        SharderState *state,
                                        dataflow::DataFlowState *dataflow_state,
-                                       bool update_flows = true);
+                                       bool update_flows = true,
+                                       std::string *shard_kind = nullptr, std::string *user_id = nullptr);
 
 }  // namespace delete_
 }  // namespace sqlengine

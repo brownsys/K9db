@@ -16,7 +16,8 @@ namespace select {
 
 absl::StatusOr<mysql::SqlResult> Shard(
     const sqlast::Select &stmt, SharderState *state,
-    dataflow::DataFlowState *dataflow_state) {
+    dataflow::DataFlowState *dataflow_state,
+    std::string *shard_kind, std::string *user_id) {
   perf::Start("Select");
   // Disqualifiy LIMIT and OFFSET queries.
   if (!stmt.SupportedByShards()) {
@@ -52,6 +53,9 @@ absl::StatusOr<mysql::SqlResult> Shard(
       // remove it from the where clause.
       sqlast::ValueFinder value_finder(info.shard_by);
       auto [found, user_id] = cloned.Visit(&value_finder);
+      if (!found && shard_kind != nullptr) {
+        continue;
+      }
       if (found) {
         if (info.IsTransitive()) {
           // Transitive sharding: look up via index.

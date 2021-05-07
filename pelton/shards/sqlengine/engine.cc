@@ -23,7 +23,8 @@ namespace sqlengine {
 
 absl::StatusOr<mysql::SqlResult> Shard(
     const std::string &sql, SharderState *state,
-    dataflow::DataFlowState *dataflow_state) {
+    dataflow::DataFlowState *dataflow_state,
+    std::string *shard_kind, std::string *user_id) {
   // Parse with ANTLR into our AST.
   perf::Start("parsing");
   sqlast::SQLParser parser;
@@ -58,14 +59,14 @@ absl::StatusOr<mysql::SqlResult> Shard(
       if (dataflow_state->HasFlow(stmt->table_name())) {
         return view::SelectView(*stmt, state, dataflow_state);
       } else {
-        return select::Shard(*stmt, state, dataflow_state);
+        return select::Shard(*stmt, state, dataflow_state, shard_kind, user_id);
       }
     }
 
     // Case 5: Delete statement.
     case sqlast::AbstractStatement::Type::DELETE: {
       auto *stmt = static_cast<sqlast::Delete *>(statement.get());
-      return delete_::Shard(*stmt, state, dataflow_state);
+      return delete_::Shard(*stmt, state, dataflow_state, true, shard_kind, user_id);
     }
 
     // Case 6: CREATE VIEW statement (e.g. dataflow).

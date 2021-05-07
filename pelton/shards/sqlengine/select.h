@@ -17,7 +17,8 @@ namespace select {
 
 absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Select &stmt,
                                        SharderState *state,
-                                       dataflow::DataFlowState *dataflow_state);
+                                       dataflow::DataFlowState *dataflow_state,
+                                       std::string *shard_kind = nullptr, std::string *user_id = nullptr);
 
 }  // namespace select
 }  // namespace sqlengine

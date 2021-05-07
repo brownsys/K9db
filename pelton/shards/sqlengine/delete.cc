@@ -23,7 +23,8 @@ namespace delete_ {
 absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
                                        SharderState *state,
                                        dataflow::DataFlowState *dataflow_state,
-                                       bool update_flows) {
+                                       bool update_flows,
+                                       std::string *shard_kind_g, std::string *user_id_g) {
   perf::Start("Delete");
   const std::string &table_name = stmt.table_name();
 
@@ -57,6 +58,11 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
       // remove it from the where clause.
       sqlast::ValueFinder value_finder(info.shard_by);
       auto [found, user_id] = cloned.Visit(&value_finder);
+      if (!found && shard_kind_g != nullptr) {
+        found = true;
+        user_id = *user_id_g;
+      }
+      
       if (found) {
         if (info.IsTransitive()) {
           // Transitive sharding: look up via index.
@@ -67,6 +73,7 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
             user_id = std::move(*lookup.cbegin());
             // Execute statement directly against shard.
             result.MakeInline();
+            if (shard_kind_g == nullptr || (*shard_kind_g == info.shard_kind && *user_id_g == user_id)) 
             result.Append(state->connection_pool().ExecuteShard(
                 &cloned, info, user_id, schema));
           }
@@ -77,6 +84,7 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
           cloned.Visit(&expression_remover);
           // Execute statement directly against shard.
           result.MakeInline();
+          if (shard_kind_g == nullptr || (*shard_kind_g == info.shard_kind && *user_id_g == user_id))
           result.Append(state->connection_pool().ExecuteShard(&cloned, info,
                                                               user_id, schema));
         }
@@ -91,18 +99,20 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
           result.MakeInline();
+          if (shard_kind_g == nullptr)
           result.AppendDeduplicate(state->connection_pool().ExecuteShards(
               &cloned, info, pair.second, schema));
         } else {
           // Secondary index unhelpful.
           // Execute statement against all shards of this kind.
           result.MakeInline();
+          if (shard_kind_g == nullptr)
           result.Append(state->connection_pool().ExecuteShards(
               &cloned, info, state->UsersOfShard(info.shard_kind), schema));
         }
       }
     }
-  } else if (is_pii) {
+  } else if (is_pii && shard_kind_g != nullptr) {
     // Case 1: Table has PII.
     sqlast::ValueFinder value_finder(state->PkOfPII(table_name));
 
@@ -125,7 +135,7 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
       result = state->connection_pool().ExecuteDefault(&stmt);
     }
 
-  } else if (!is_sharded && !is_pii) {
+  } else if (!is_sharded && !is_pii && shard_kind_g != nullptr) {
     // Case 2: Table does not have PII and is not sharded!
     if (update_flows) {
       sqlast::Delete cloned = stmt.MakeReturning();
