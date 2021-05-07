@@ -44,41 +44,7 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
   mysql::SqlResult result;
 
   // Sharding scenarios.
-  if (is_pii) {
-    // Case 1: Table has PII.
-    sqlast::ValueFinder value_finder(state->PkOfPII(table_name));
-
-    // We are deleting a user, we should also delete their shard!
-    auto [found, user_id] = stmt.Visit(&value_finder);
-    if (!found) {
-      return absl::InvalidArgumentError(
-          "DELETE PII statement does not specify an exact user to delete!");
-    }
-
-    // Remove user shard.
-    state->RemoveUserFromShard(table_name, user_id);
-
-    // Turn the delete statement back to a string, to delete relevant row in
-    // PII table.
-    if (update_flows) {
-      sqlast::Delete cloned = stmt.MakeReturning();
-      result = state->connection_pool().ExecuteDefault(&cloned, schema);
-    } else {
-      result = state->connection_pool().ExecuteDefault(&stmt);
-    }
-
-  } else if (!is_sharded && !is_pii) {
-    // Case 2: Table does not have PII and is not sharded!
-    if (update_flows) {
-      sqlast::Delete cloned = stmt.MakeReturning();
-      result = state->connection_pool().ExecuteDefault(&cloned, schema);
-      // result =
-      // mysql::SqlResult{std::make_unique<mysql::UpdateResult>(records.size())};
-    } else {
-      result = state->connection_pool().ExecuteDefault(&stmt);
-    }
-
-  } else {  // is_shared == true
+  if (is_sharded) {  // is_shared == true
     // Case 3: Table is sharded!
     // The table might be sharded according to different column/owners.
     // We must delete from all these different duplicates.
@@ -136,6 +102,40 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Delete &stmt,
         }
       }
     }
+  } else if (is_pii) {
+    // Case 1: Table has PII.
+    sqlast::ValueFinder value_finder(state->PkOfPII(table_name));
+
+    // We are deleting a user, we should also delete their shard!
+    auto [found, user_id] = stmt.Visit(&value_finder);
+    if (!found) {
+      return absl::InvalidArgumentError(
+          "DELETE PII statement does not specify an exact user to delete!");
+    }
+
+    // Remove user shard.
+    state->RemoveUserFromShard(table_name, user_id);
+
+    // Turn the delete statement back to a string, to delete relevant row in
+    // PII table.
+    if (update_flows) {
+      sqlast::Delete cloned = stmt.MakeReturning();
+      result = state->connection_pool().ExecuteDefault(&cloned, schema);
+    } else {
+      result = state->connection_pool().ExecuteDefault(&stmt);
+    }
+
+  } else if (!is_sharded && !is_pii) {
+    // Case 2: Table does not have PII and is not sharded!
+    if (update_flows) {
+      sqlast::Delete cloned = stmt.MakeReturning();
+      result = state->connection_pool().ExecuteDefault(&cloned, schema);
+      // result =
+      // mysql::SqlResult{std::make_unique<mysql::UpdateResult>(records.size())};
+    } else {
+      result = state->connection_pool().ExecuteDefault(&stmt);
+    }
+
   }
 
   // Delete was successful, time to update dataflows.

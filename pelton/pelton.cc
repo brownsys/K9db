@@ -82,7 +82,6 @@ absl::StatusOr<std::vector<SqlResult>> gdpr(Connection *connection,
     for (const auto &[table, shard_by] : state->ShardTables(shard_kind)) {
       std::string tsql =
           "DELETE FROM " + table + " WHERE " + shard_by + " = " + user_id + ";";
-      std::cout << tsql << std::endl;
       MOVE_OR_RETURN(SqlResult res,
                      shards::sqlengine::Shard(tsql, state, dstate));
       results.push_back(std::move(res));
