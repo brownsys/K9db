@@ -87,6 +87,7 @@ cc_test(
         "//tests/data:trivial-queries.sql",
         "//tests/data:trivial-schema.sql",
     ],
+    linkstatic = 1,
     deps = [
         "//pelton",
         "//pelton/util:perf",
