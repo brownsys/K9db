@@ -1,23 +1,12 @@
 #include <fstream>
 #include <iostream>
+#include <string>
 
-#include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 #include "pelton/pelton.h"
 #include "pelton/planner/planner.h"
 #include "pelton/util/perf.h"
-
-DEFINE_string(db_username, "pelton", "MYSQL username to connect with");
-DEFINE_string(db_password, "pelton", "MYSQL pwd to connect with");
-DEFINE_string(schema, "bin/data/lobster_schema_simplified.sql",
-              "SQL schema input file");
-DEFINE_string(queries, "bin/data/lobster_queries.sql",
-              "SQL queries input file");
-DEFINE_string(inserts, "bin/data/lobster_inserts.sql",
-              "SQL insert statement input file");
-DEFINE_string(expected_output, "bin/data/lobster_expected.txt",
-              "File containing expected output");
 
 namespace {
 // Expects that two vectors are equal regardless of order
@@ -36,45 +25,25 @@ std::string tostring(const T &x) {
   return os.str();
 }
 
-// CREATE TABLE queries.
-std::vector<std::string> CREATES{};
-
-// Inserts
-std::vector<std::string> INSERTS{};
-
-// Updates
-std::vector<std::string> UPDATES{};
-
-// Deletes
-std::vector<std::string> DELETES{};
-
-// Flows.
-std::vector<std::pair<std::string, std::string>> FLOWS{};
-
-// Flow reads (and queries)
-std::vector<std::string> FLOW_READS_AND_QUERIES{};
-
-// Expected query results
-std::vector<std::vector<std::string>> EXPECTED = {};
+struct TestInputs {
+  std::vector<std::string> creates;
+  std::vector<std::string> inserts;
+  std::vector<std::string> updates;
+  std::vector<std::string> deletes;
+  std::vector<std::pair<std::string, std::string>> flows;
+  std::vector<std::string> queries;
+  std::vector<std::vector<std::string>> expected_outputs;
+};
 
 };  // namespace
 
-int main(int argc, char **argv) {
-  // Command line arguments and help message
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
-
-  // Initialize Google’s logging library.
-  google::InitGoogleLogging("correctness");
-
-  // Read MySql configurations.
-  const std::string &db_username = FLAGS_db_username;
-  const std::string &db_password = FLAGS_db_password;
-
+void ReadInputs(const std::string &schema_file, const std::string &queries_file,
+                const std::string &inserts_file,
+                const std::string &expected_output_file, TestInputs *inputs) {
   // * process schema (input file 1)
-  std::ifstream schema(FLAGS_schema);
+  std::ifstream schema(schema_file);
   std::string line;
   if (schema.is_open()) {
-    LOG(INFO) << "schema file opened";
     std::string table = "";
     while (std::getline(schema, line)) {
       // if line is empty or commented out, skip it
@@ -85,19 +54,18 @@ int main(int argc, char **argv) {
 
       // if we've reached the end of a CREATE statement, add to CREATES
       if (line.find(";") != std::string::npos) {
-        CREATES.push_back(table);
+        inputs->creates.push_back(table);
         table = "";
       }
     }
     schema.close();
   } else {
-    LOG(FATAL) << "couldn't open schema file " << FLAGS_schema;
+    LOG(FATAL) << "couldn't open schema file " << schema_file;
   }
 
   // * process queries (input file 2)
-  std::ifstream queries(FLAGS_queries);
+  std::ifstream queries(queries_file);
   if (queries.is_open()) {
-    LOG(INFO) << "queries file opened";
     while (std::getline(queries, line)) {
       if (line == "" || line.find("--skip--") != std::string::npos) continue;
       if (line.find("VIEW") != std::string::npos) {
@@ -105,25 +73,39 @@ int main(int argc, char **argv) {
         std::istringstream iss(line);
         for (std::string s; iss >> s;) split_on_space.push_back(s);
         // key of this pair is the name of the view at index 2
-        FLOWS.push_back(std::make_pair(split_on_space[2], line));
+        inputs->flows.push_back(std::make_pair(split_on_space[2], line));
       } else if (line.find("INSERT") != std::string::npos) {
-        INSERTS.push_back(line);
+        inputs->inserts.push_back(line);
       } else if (line.find("SELECT") != std::string::npos) {
-        FLOW_READS_AND_QUERIES.push_back(line);
+        inputs->queries.push_back(line);
       } else if (line.find("DELETE") != std::string::npos) {
-        DELETES.push_back(line);
+        inputs->deletes.push_back(line);
       } else if (line.find("UPDATE") != std::string::npos) {
-        UPDATES.push_back(line);
+        inputs->updates.push_back(line);
       }
     }
     queries.close();
   } else {
-    LOG(FATAL) << "couldn't open queries file " << FLAGS_queries;
+    LOG(FATAL) << "couldn't open queries file " << queries_file;
+  }
+
+  // * process inserts (input file 4)
+  std::ifstream inserts(inserts_file);
+  if (inserts.is_open()) {
+    LOG(INFO) << "inserts file opened";
+    while (std::getline(inserts, line)) {
+      if (line == "" || line.find("--skip--") != std::string::npos) continue;
+      if (line.find("INSERT") != std::string::npos) {
+        inputs->inserts.push_back(line);
+      }
+    }
+    inserts.close();
+  } else {
+    LOG(FATAL) << "couldn't open inserts file " << inserts_file;
   }
 
   // * process expected results (input file 3)
-
-  std::ifstream expected(FLAGS_expected_output);
+  std::ifstream expected(expected_output_file);
   if (expected.is_open()) {
     LOG(INFO) << "expected results file open";
     // vector containing result for one query
@@ -133,7 +115,7 @@ int main(int argc, char **argv) {
       // if ';' is found, we've reached the end of a single query's results
       if (line.find(";") != std::string::npos) {
         // add to the 2D vector of all query results
-        EXPECTED.push_back(expected_result);
+        inputs->expected_outputs.push_back(expected_result);
         // clear vector
         expected_result.clear();
         continue;
@@ -147,24 +129,23 @@ int main(int argc, char **argv) {
     expected.close();
   } else {
     LOG(FATAL) << "couldn't open expected results file "
-               << FLAGS_expected_output;
+               << expected_output_file;
   }
+}
 
-  // * process inserts (input file 4)
+void RunTest(const std::string &schema_file, const std::string &query_file,
+             const std::string &inserts_file,
+             const std::string &expected_outputs_file) {
+  // Initialize Google’s logging library.
+  google::InitGoogleLogging("correctness");
 
-  std::ifstream inserts(FLAGS_inserts);
-  if (inserts.is_open()) {
-    LOG(INFO) << "inserts file opened";
-    while (std::getline(inserts, line)) {
-      if (line == "" || line.find("--skip--") != std::string::npos) continue;
-      if (line.find("INSERT") != std::string::npos) {
-        INSERTS.push_back(line);
-      }
-    }
-    inserts.close();
-  } else {
-    LOG(FATAL) << "couldn't open inserts file " << FLAGS_inserts;
-  }
+  // Read MySql configurations.
+  const std::string &db_username = "pelton";
+  const std::string &db_password = "pelton";
+
+  TestInputs inputs;
+  ReadInputs(schema_file, query_file, inserts_file, expected_outputs_file,
+             &inputs);
 
   // * run schema and queries using pelton
 
@@ -177,14 +158,14 @@ int main(int argc, char **argv) {
 
   // Create all the tables.
   LOG(INFO) << "Create the tables ... ";
-  for (std::string &create : CREATES) {
+  for (std::string &create : inputs.creates) {
     std::cout << std::endl;
     CHECK(pelton::exec(&connection, create).ok());
   }
 
   // Add flows.
   LOG(INFO) << "Installing flows ... ";
-  for (const auto &[name, query] : FLOWS) {
+  for (const auto &[name, query] : inputs.flows) {
     std::cout << name << std::endl;
     CHECK(pelton::exec(&connection, query).ok());
   }
@@ -192,21 +173,21 @@ int main(int argc, char **argv) {
 
   // Insert data into the tables.
   LOG(INFO) << "Insert data into tables ... ";
-  for (std::string &insert : INSERTS) {
+  for (std::string &insert : inputs.inserts) {
     std::cout << std::endl;
     CHECK(pelton::exec(&connection, insert).ok());
   }
 
   // Updates
   LOG(INFO) << "Update data in tables ... ";
-  for (std::string &update : UPDATES) {
+  for (std::string &update : inputs.updates) {
     std::cout << std::endl;
     CHECK(pelton::exec(&connection, update).ok());
   }
 
   // Deletes
   LOG(INFO) << "Delete data from tables ... ";
-  for (std::string &del : DELETES) {
+  for (std::string &del : inputs.deletes) {
     std::cout << std::endl;
     CHECK(pelton::exec(&connection, del).ok());
   }
@@ -216,12 +197,12 @@ int main(int argc, char **argv) {
   LOG(INFO) << "Check flows and queries... ";
   // run each query
   long unsigned int i = 0;
-  for (const auto &query : FLOW_READS_AND_QUERIES) {
+  for (const auto &query : inputs.queries) {
     // if we exceed the number of expected results
-    if (i >= EXPECTED.size()) {
+    if (i >= inputs.expected_outputs.size()) {
       break;
     }
-    if (EXPECTED.size() == 0) {
+    if (inputs.expected_outputs.size() == 0) {
       LOG(FATAL) << "No expected results provided!";
     }
     auto status = pelton::exec(&connection, query);
@@ -244,10 +225,11 @@ int main(int argc, char **argv) {
 
     if (query.find("ORDER BY") != std::string::npos) {
       // ordered comparison
-      EXPECT_EQ(EXPECTED[i], query_actual) << "failed query was: " << query;
+      EXPECT_EQ(inputs.expected_outputs[i], query_actual)
+          << "failed query was: " << query;
     } else {
       // orderless comparison
-      EXPECT_EQ_MSET(EXPECTED[i], query_actual, tostring(query));
+      EXPECT_EQ_MSET(inputs.expected_outputs[i], query_actual, tostring(query));
     }
     i++;
   }
@@ -258,7 +240,10 @@ int main(int argc, char **argv) {
   // Print performance profile.
   pelton::perf::End("all");
   pelton::perf::PrintAll();
+}
 
-  // Done.
-  return 0;
+TEST(E2ECorrectnessTest, MedicalChat) {
+  RunTest(std::string("tests/data/medical_chat_schema.sql"),
+          std::string("tests/data/medical_chat_queries.sql"), std::string(""),
+          std::string("tests/data/medical_chat_expected.txt"));
 }

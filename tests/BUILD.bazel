@@ -90,7 +90,6 @@ cc_test(
     deps = [
         "//pelton",
         "//pelton/util:perf",
-        "@gflags",
         "@glog",
         "@gtest",
         "@gtest//:gtest_main",
