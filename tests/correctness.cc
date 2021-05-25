@@ -256,6 +256,40 @@ TEST(E2ECorrectnessTest, MedicalChat) {
 }
 
 TEST(E2ECorrectnessTest, LobstersQ1) { RunLobstersTest(1); }
+TEST(E2ECorrectnessTest, LobstersQ2) { RunLobstersTest(2); }
+TEST(E2ECorrectnessTest, LobstersQ3) { RunLobstersTest(3); }
+TEST(E2ECorrectnessTest, LobstersQ4) { RunLobstersTest(4); }
+TEST(E2ECorrectnessTest, LobstersQ5) { RunLobstersTest(5); }
+TEST(E2ECorrectnessTest, LobstersQ6) { RunLobstersTest(6); }
+TEST(E2ECorrectnessTest, LobstersQ7) { RunLobstersTest(7); }
+TEST(E2ECorrectnessTest, LobstersQ8) { RunLobstersTest(8); }
+TEST(E2ECorrectnessTest, LobstersQ9) { RunLobstersTest(9); }
+TEST(E2ECorrectnessTest, LobstersQ10) { RunLobstersTest(10); }
+TEST(E2ECorrectnessTest, LobstersQ11) { RunLobstersTest(11); }
+TEST(E2ECorrectnessTest, LobstersQ12) { RunLobstersTest(12); }
+TEST(E2ECorrectnessTest, LobstersQ13) { RunLobstersTest(13); }
+TEST(E2ECorrectnessTest, LobstersQ14) { RunLobstersTest(14); }
+TEST(E2ECorrectnessTest, LobstersQ15) { RunLobstersTest(15); }
+TEST(E2ECorrectnessTest, LobstersQ16) { RunLobstersTest(16); }
+TEST(E2ECorrectnessTest, LobstersQ17) { RunLobstersTest(17); }
+TEST(E2ECorrectnessTest, LobstersQ18) { RunLobstersTest(18); }
+TEST(E2ECorrectnessTest, LobstersQ19) { RunLobstersTest(19); }
+TEST(E2ECorrectnessTest, LobstersQ20) { RunLobstersTest(20); }
+TEST(E2ECorrectnessTest, LobstersQ21) { RunLobstersTest(21); }
+TEST(E2ECorrectnessTest, LobstersQ22) { RunLobstersTest(22); }
+TEST(E2ECorrectnessTest, LobstersQ23) { RunLobstersTest(23); }
+TEST(E2ECorrectnessTest, LobstersQ24) { RunLobstersTest(24); }
+TEST(E2ECorrectnessTest, LobstersQ25) { RunLobstersTest(25); }
+TEST(E2ECorrectnessTest, LobstersQ26) { RunLobstersTest(26); }
+TEST(E2ECorrectnessTest, LobstersQ27) { RunLobstersTest(27); }
+TEST(E2ECorrectnessTest, LobstersQ28) { RunLobstersTest(28); }
+TEST(E2ECorrectnessTest, LobstersQ29) { RunLobstersTest(29); }
+TEST(E2ECorrectnessTest, LobstersQ30) { RunLobstersTest(30); }
+TEST(E2ECorrectnessTest, LobstersQ31) { RunLobstersTest(31); }
+TEST(E2ECorrectnessTest, LobstersQ32) { RunLobstersTest(32); }
+TEST(E2ECorrectnessTest, LobstersQ33) { RunLobstersTest(33); }
+TEST(E2ECorrectnessTest, LobstersQ34) { RunLobstersTest(34); }
+TEST(E2ECorrectnessTest, LobstersQ35) { RunLobstersTest(35); }
 
 int main(int argc, char **argv) {
   // Initialize Google’s logging library.
