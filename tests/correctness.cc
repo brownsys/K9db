@@ -135,9 +135,6 @@ void ReadInputs(const std::string &schema_file, const std::string &queries_file,
 void RunTest(const std::string &schema_file, const std::string &query_file,
              const std::string &inserts_file,
              const std::string &expected_outputs_file) {
-  // Initialize Google’s logging library.
-  google::InitGoogleLogging("correctness");
-
   // Read MySql configurations.
   const std::string &db_username = "root";
   const std::string &db_password = "password";
@@ -242,11 +239,13 @@ void RunTest(const std::string &schema_file, const std::string &query_file,
 }
 
 void RunLobstersTest(size_t query_id) {
+  char e_str[100];
   char q_str[100];
   snprintf(q_str, 100, "tests/data/lobsters_q%lu.sql", query_id);
+  snprintf(e_str, 100, "tests/data/q%lu.txt", query_id);
   RunTest(std::string("tests/data/lobsters_schema_simplified.sql"),
           std::string(q_str), std::string("tests/data/lobsters_inserts.sql"),
-          std::string("tests/data/lobsters_expected.txt"));
+          std::string(e_str));
 }
 
 TEST(E2ECorrectnessTest, MedicalChat) {
@@ -257,3 +256,12 @@ TEST(E2ECorrectnessTest, MedicalChat) {
 }
 
 TEST(E2ECorrectnessTest, LobstersQ1) { RunLobstersTest(1); }
+
+int main(int argc, char **argv) {
+  // Initialize Google’s logging library.
+  google::InitGoogleLogging("correctness");
+
+  ::testing::InitGoogleTest(&argc, argv);
+
+  return RUN_ALL_TESTS();
+}
