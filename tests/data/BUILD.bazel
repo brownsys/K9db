@@ -2,6 +2,7 @@ exports_files([
     "trivial-queries.sql",
     "trivial-schema.sql",
     "medical_chat_schema.sql",
+    "medical_chat_inserts.sql",
     "medical_chat_queries.sql",
     "medical_chat_expected.txt",
     "lobster_schema_simplified.sql",

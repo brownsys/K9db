@@ -47,6 +47,7 @@ cc_test(
         "//tests/data:lobster_queries.sql",
         "//tests/data:lobster_schema_simplified.sql",
         "//tests/data:medical_chat_expected.txt",
+        "//tests/data:medical_chat_inserts.sql",
         "//tests/data:medical_chat_queries.sql",
         "//tests/data:medical_chat_schema.sql",
         "//tests/data:q1.txt",

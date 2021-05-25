@@ -5,7 +5,6 @@
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 #include "pelton/pelton.h"
-#include "pelton/planner/planner.h"
 #include "pelton/util/perf.h"
 
 namespace {
@@ -140,8 +139,8 @@ void RunTest(const std::string &schema_file, const std::string &query_file,
   google::InitGoogleLogging("correctness");
 
   // Read MySql configurations.
-  const std::string &db_username = "pelton";
-  const std::string &db_password = "pelton";
+  const std::string &db_username = "root";
+  const std::string &db_password = "password";
 
   TestInputs inputs;
   ReadInputs(schema_file, query_file, inserts_file, expected_outputs_file,
@@ -242,8 +241,19 @@ void RunTest(const std::string &schema_file, const std::string &query_file,
   pelton::perf::PrintAll();
 }
 
+void RunLobstersTest(size_t query_id) {
+  char q_str[100];
+  snprintf(q_str, 100, "tests/data/lobsters_q%lu.sql", query_id);
+  RunTest(std::string("tests/data/lobsters_schema_simplified.sql"),
+          std::string(q_str), std::string("tests/data/lobsters_inserts.sql"),
+          std::string("tests/data/lobsters_expected.txt"));
+}
+
 TEST(E2ECorrectnessTest, MedicalChat) {
   RunTest(std::string("tests/data/medical_chat_schema.sql"),
-          std::string("tests/data/medical_chat_queries.sql"), std::string(""),
+          std::string("tests/data/medical_chat_queries.sql"),
+          std::string("tests/data/medical_chat_inserts.sql"),
           std::string("tests/data/medical_chat_expected.txt"));
 }
+
+TEST(E2ECorrectnessTest, LobstersQ1) { RunLobstersTest(1); }
