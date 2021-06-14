@@ -5,7 +5,6 @@
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 #include "pelton/pelton.h"
-#include "pelton/util/perf.h"
 
 namespace {
 // Expects that two vectors are equal regardless of order
@@ -35,6 +34,25 @@ struct TestInputs {
 };
 
 };  // namespace
+
+// Read MySql configurations.
+static const std::string &db_username = "root";
+static const std::string &db_password = "password";
+
+void DropDatabase() {
+  sql::ConnectOptionsMap connection_properties;
+  connection_properties["hostName"] = "localhost";
+  connection_properties["userName"] = db_username;
+  connection_properties["password"] = db_password;
+
+  sql::Driver *driver = sql::mariadb::get_driver_instance();
+  std::unique_ptr<sql::Connection> conn =
+      std::unique_ptr<sql::Connection>(driver->connect(connection_properties));
+  std::unique_ptr<sql::Statement> stmt =
+      std::unique_ptr<sql::Statement>(conn->createStatement());
+
+  stmt->execute("DROP DATABASE pelton");
+}
 
 void ReadInputs(const std::string &schema_file, const std::string &queries_file,
                 const std::string &inserts_file,
@@ -135,17 +153,13 @@ void ReadInputs(const std::string &schema_file, const std::string &queries_file,
 void RunTest(const std::string &schema_file, const std::string &query_file,
              const std::string &inserts_file,
              const std::string &expected_outputs_file) {
-  // Read MySql configurations.
-  const std::string &db_username = "root";
-  const std::string &db_password = "password";
-
   TestInputs inputs;
   ReadInputs(schema_file, query_file, inserts_file, expected_outputs_file,
              &inputs);
 
-  // * run schema and queries using pelton
-
-  pelton::perf::Start("all");
+  // Drop existing databases
+  LOG(INFO) << "Dropping DB...";
+  DropDatabase();
 
   // Open connection to sharder.
   pelton::Connection connection;
@@ -232,10 +246,6 @@ void RunTest(const std::string &schema_file, const std::string &query_file,
 
   // Close connection.
   pelton::close(&connection);
-
-  // Print performance profile.
-  pelton::perf::End("all");
-  pelton::perf::PrintAll();
 }
 
 void RunLobstersTest(size_t query_id) {
