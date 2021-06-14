@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 
+#include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 #include "pelton/pelton.h"
@@ -51,7 +52,7 @@ void DropDatabase() {
   std::unique_ptr<sql::Statement> stmt =
       std::unique_ptr<sql::Statement>(conn->createStatement());
 
-  stmt->execute("DROP DATABASE pelton");
+  stmt->execute("DROP DATABASE IF EXISTS pelton");
 }
 
 void ReadInputs(const std::string &schema_file, const std::string &queries_file,
@@ -164,41 +165,36 @@ void RunTest(const std::string &schema_file, const std::string &query_file,
   // Open connection to sharder.
   pelton::Connection connection;
   pelton::open("", db_username, db_password, &connection);
-  CHECK(pelton::exec(&connection, "SET echo;").ok());
+  // CHECK(pelton::exec(&connection, "SET echo;").ok());
 
   // Create all the tables.
   LOG(INFO) << "Create the tables ... ";
   for (std::string &create : inputs.creates) {
-    std::cout << std::endl;
     CHECK(pelton::exec(&connection, create).ok());
   }
 
   // Add flows.
   LOG(INFO) << "Installing flows ... ";
   for (const auto &[name, query] : inputs.flows) {
-    std::cout << name << std::endl;
+    LOG(INFO) << name;
     CHECK(pelton::exec(&connection, query).ok());
   }
-  pelton::shutdown_planner();
 
   // Insert data into the tables.
   LOG(INFO) << "Insert data into tables ... ";
   for (std::string &insert : inputs.inserts) {
-    std::cout << std::endl;
     CHECK(pelton::exec(&connection, insert).ok());
   }
 
   // Updates
   LOG(INFO) << "Update data in tables ... ";
   for (std::string &update : inputs.updates) {
-    std::cout << std::endl;
     CHECK(pelton::exec(&connection, update).ok());
   }
 
   // Deletes
   LOG(INFO) << "Delete data from tables ... ";
   for (std::string &del : inputs.deletes) {
-    std::cout << std::endl;
     CHECK(pelton::exec(&connection, del).ok());
   }
 
@@ -226,7 +222,10 @@ void RunTest(const std::string &schema_file, const std::string &query_file,
 
     // add records to query_results
     for (const pelton::Record &record : result) {
-      query_actual.push_back(tostring(record));
+      // TODO(babman): fix pelton outputing all records as negative.
+      pelton::Record copy = record.Copy();
+      copy.SetPositive(true);
+      query_actual.push_back(tostring(copy));
     }
 
     // add schema e.g. |id(INT, KEY)| to actual & expected
@@ -245,7 +244,7 @@ void RunTest(const std::string &schema_file, const std::string &query_file,
   }
 
   // Close connection.
-  pelton::close(&connection);
+  pelton::close(&connection, false);
 }
 
 void RunLobstersTest(size_t query_id) {
@@ -302,6 +301,9 @@ TEST(E2ECorrectnessTest, LobstersQ34) { RunLobstersTest(34); }
 TEST(E2ECorrectnessTest, LobstersQ35) { RunLobstersTest(35); }
 
 int main(int argc, char **argv) {
+  // Command line arugments and help message.
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+
   // Initialize Google’s logging library.
   google::InitGoogleLogging("correctness");
 

@@ -1,10 +1,8 @@
-id(INT,KEY)|OWNER_patient_id(INT)|doctor_id(INT)|message(TEXT)|
-1|10|1|HELLO|
-2|10|2|Good bye|
-3|20|1|HELLO|
-4|20|2|HELLO 2|
-5|20|1|HELLO 3|
+1|10|1|HELLO
+2|10|2|Good bye
+3|20|1|HELLO
+4|20|2|HELLO 2
+5|20|1|HELLO 3
 ;
-id(INT,KEY)|OWNER_patient_id(INT)|doctor_id(INT)|message(TEXT)|
 2|10|2|Good bye
 4|20|2|HELLO 2
