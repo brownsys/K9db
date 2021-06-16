@@ -133,6 +133,31 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "batch-message",
+    srcs = [],
+    hdrs = [
+        "batch_message.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":record",
+        ":types",
+    ],
+)
+
+cc_library(
+    name = "channel",
+    srcs = [],
+    hdrs = [
+        "channel.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":batch-message",
+    ],
+)
+
 cc_test(
     name = "value-test",
     srcs = [
@@ -217,6 +242,23 @@ cc_test(
         "//pelton/dataflow/ops:matview",
         "//pelton/dataflow/ops:project",
         "//pelton/dataflow/ops:union",
+        "//pelton/util:ints",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "channel-test",
+    srcs = [
+        "channel_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":channel",
+        ":batch-message",
+        "//pelton/sqlast:ast",
         "//pelton/util:ints",
         "@glog",
         "@gtest",
