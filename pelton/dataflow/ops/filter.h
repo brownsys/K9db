@@ -54,19 +54,7 @@ class FilterOperator : public Operator {
   bool Process(NodeIndex source, const std::vector<Record> &records,
                std::vector<Record> *output) override;
 
-  bool ProcessAndForward(NodeIndex source, const std::vector<Record> &records) {
-    if (this->ops_.size() == 0) {
-      for (NodeIndex childIndex: this->children_) {
-        std::shared_ptr<Operator> child = this->graph()->GetNode(childIndex);
-        if (!child->ProcessAndForward(this->index(), records)) {
-          return false;
-        }
-      }
-      return true;
-    } else {
-      return Operator::ProcessAndForward(source, records);
-    }
-  }
+  bool ProcessAndForward(NodeIndex source, const std::vector<Record> &records);
 
  protected:
   bool Accept(const Record &record) const;

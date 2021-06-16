@@ -38,12 +38,8 @@ class EquiJoinOperator : public Operator {
     }
   }
 
-  std::shared_ptr<Operator> left() const {
-    return this->parents_.at(0)->from();
-  }
-  std::shared_ptr<Operator> right() const {
-    return this->parents_.at(1)->from();
-  }
+  std::shared_ptr<Operator> left() const;
+  std::shared_ptr<Operator> right() const;
 
   /*!
    * processes a batch of input rows and writes output to output.

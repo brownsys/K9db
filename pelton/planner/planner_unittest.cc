@@ -14,6 +14,7 @@
 #include "pelton/dataflow/ops/aggregate.h"
 #include "pelton/dataflow/ops/filter.h"
 #include "pelton/dataflow/ops/input.h"
+#include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/ops/project.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"

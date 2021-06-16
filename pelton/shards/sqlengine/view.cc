@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/value.h"
 #include "pelton/planner/planner.h"

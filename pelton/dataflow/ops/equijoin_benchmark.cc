@@ -3,10 +3,11 @@
 #include <vector>
 
 #include "benchmark/benchmark.h"
+#include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/ops/benchmark-utils.h"
 #include "pelton/dataflow/ops/equijoin.h"
-#include "pelton/dataflow/ops/identity.h"
+#include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
@@ -23,15 +24,13 @@ void JoinOneToOne(benchmark::State& state) {
   SchemaRef leftSchema = MakeSchema(false);
   SchemaRef rightSchema = MakeSchema(false);
 
-  std::shared_ptr<IdentityOperator> iop1 = std::make_shared<IdentityOperator>();
-  std::shared_ptr<IdentityOperator> iop2 = std::make_shared<IdentityOperator>();
-  std::shared_ptr<EquiJoinOperator> op =
-      std::make_shared<EquiJoinOperator>(0, 0);
-  iop1->SetIndex(0);
-  iop2->SetIndex(1);
-  op->parents_ = {0,1};
-  op->input_schemas_ = {leftSchema, rightSchema};
-  op->ComputeOutputSchema();
+  DataFlowGraph g;
+  auto iop1 = std::make_shared<InputOperator>("test-table1", leftSchema);
+  auto iop2 = std::make_shared<InputOperator>("test-table2", rightSchema);
+  auto op = std::make_shared<EquiJoinOperator>(0, 0);
+  g.AddInputNode(iop1);
+  g.AddInputNode(iop2);
+  g.AddNode(op, {iop1, iop2});
 
   Record lr1{leftSchema, true, 4_u, 5_u};
   Record rr1{rightSchema, true, 4_u, 5_u};

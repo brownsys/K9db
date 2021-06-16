@@ -3,6 +3,7 @@
 
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/key.h"
+#include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/shards/sqlengine/view.h"
 #include "pelton/util/perf.h"

@@ -6,13 +6,14 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "pelton/dataflow/edge.h"
+#include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/key.h"
-#include "pelton/dataflow/ops/identity.h"
+#include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/util/ints.h"
+// #include "pelton/dataflow/operator.h"
 
 namespace pelton {
 namespace dataflow {
@@ -140,15 +141,13 @@ TEST(EquiJoinOperatorTest, BasicJoinTest) {
   rrecords.at(0).SetString(std::move(s2), 2);
 
   // Setup join operator with two parents, left with id 0 and right with id 1.
-  std::shared_ptr<IdentityOperator> iop1 = std::make_shared<IdentityOperator>();
-  std::shared_ptr<IdentityOperator> iop2 = std::make_shared<IdentityOperator>();
-  std::shared_ptr<EquiJoinOperator> op =
-      std::make_shared<EquiJoinOperator>(2, 1);
-  iop1->SetIndex(0);
-  iop2->SetIndex(1);
-  op->parents_ = {0,1};
-  op->input_schemas_ = {lschema, rschema};
-  op->ComputeOutputSchema();
+  DataFlowGraph g;
+  auto iop1 = std::make_shared<InputOperator>("test-table1", lschema);
+  auto iop2 = std::make_shared<InputOperator>("test-table2", rschema);
+  auto op = std::make_shared<EquiJoinOperator>(2, 1);
+  EXPECT_TRUE(g.AddInputNode(iop1));
+  EXPECT_TRUE(g.AddInputNode(iop2));
+  EXPECT_TRUE(g.AddNode(op, {iop1, iop2}));
 
   // Process records.
   std::vector<Record> output;
@@ -189,15 +188,13 @@ TEST(EquiJoinOperatorTest, BasicUnjoinableTest) {
   rrecords.at(0).SetString(std::move(s2), 2);
 
   // Setup join operator with two parents, left with id 0 and right with id 1.
-  std::shared_ptr<IdentityOperator> iop1 = std::make_shared<IdentityOperator>();
-  std::shared_ptr<IdentityOperator> iop2 = std::make_shared<IdentityOperator>();
-  std::shared_ptr<EquiJoinOperator> op =
-      std::make_shared<EquiJoinOperator>(2, 1);
-  iop1->SetIndex(0);
-  iop2->SetIndex(1);
-  op->parents_ = {0,1};
-  op->input_schemas_ = {lschema, rschema};
-  op->ComputeOutputSchema();
+  DataFlowGraph g;
+  auto iop1 = std::make_shared<InputOperator>("test-table1", lschema);
+  auto iop2 = std::make_shared<InputOperator>("test-table2", rschema);
+  auto op = std::make_shared<EquiJoinOperator>(2, 1);
+  EXPECT_TRUE(g.AddInputNode(iop1));
+  EXPECT_TRUE(g.AddInputNode(iop2));
+  EXPECT_TRUE(g.AddNode(op, {iop1, iop2}));
 
   // Process records.
   std::vector<Record> output;
@@ -283,15 +280,13 @@ TEST(EquiJoinOperatorTest, FullJoinTest) {
   rrecords2.at(0).SetString(std::move(sd3), 2);
 
   // Setup join operator with two parents, left with id 0 and right with id 1.
-  std::shared_ptr<IdentityOperator> iop1 = std::make_shared<IdentityOperator>();
-  std::shared_ptr<IdentityOperator> iop2 = std::make_shared<IdentityOperator>();
-  std::shared_ptr<EquiJoinOperator> op =
-      std::make_shared<EquiJoinOperator>(2, 1);
-  iop1->SetIndex(0);
-  iop2->SetIndex(1);
-  op->parents_ = {0,1};
-  op->input_schemas_ = {lschema, rschema};
-  op->ComputeOutputSchema();
+  DataFlowGraph g;
+  auto iop1 = std::make_shared<InputOperator>("test-table1", lschema);
+  auto iop2 = std::make_shared<InputOperator>("test-table2", rschema);
+  auto op = std::make_shared<EquiJoinOperator>(2, 1);
+  EXPECT_TRUE(g.AddInputNode(iop1));
+  EXPECT_TRUE(g.AddInputNode(iop2));
+  EXPECT_TRUE(g.AddNode(op, {iop1, iop2}));
 
   // Process records.
   std::vector<Record> output;
@@ -368,15 +363,14 @@ TEST(EquiJoinOperatorTest, BasicLeftJoinTest) {
   rrecords.emplace_back(rschema, true, 100_u, -5_s, std::move(s2));
 
   // Setup join operator with two parents, left with id 0 and right with id 1.
-  std::shared_ptr<IdentityOperator> iop1 = std::make_shared<IdentityOperator>();
-  std::shared_ptr<IdentityOperator> iop2 = std::make_shared<IdentityOperator>();
-  std::shared_ptr<EquiJoinOperator> op =
+  DataFlowGraph g;
+  auto iop1 = std::make_shared<InputOperator>("test-table1", lschema);
+  auto iop2 = std::make_shared<InputOperator>("test-table2", rschema);
+  auto op =
       std::make_shared<EquiJoinOperator>(2, 1, EquiJoinOperator::Mode::LEFT);
-  iop1->SetIndex(0);
-  iop2->SetIndex(1);
-  op->parents_ = {0,1};
-  op->input_schemas_ = {lschema, rschema};
-  op->ComputeOutputSchema();
+  EXPECT_TRUE(g.AddInputNode(iop1));
+  EXPECT_TRUE(g.AddInputNode(iop2));
+  EXPECT_TRUE(g.AddNode(op, {iop1, iop2}));
 
   std::vector<Record> expected_records;
   expected_records.emplace_back(op->output_schema(), true, 0_u,
@@ -418,15 +412,14 @@ TEST(EquiJoinOperatorTest, BasicRightJoinTest) {
   rrecords.emplace_back(rschema, true, 100_u, -5_s, std::move(s2));
 
   // Setup join operator with two parents, left with id 0 and right with id 1.
-  std::shared_ptr<IdentityOperator> iop1 = std::make_shared<IdentityOperator>();
-  std::shared_ptr<IdentityOperator> iop2 = std::make_shared<IdentityOperator>();
-  std::shared_ptr<EquiJoinOperator> op =
+  DataFlowGraph g;
+  auto iop1 = std::make_shared<InputOperator>("test-table1", lschema);
+  auto iop2 = std::make_shared<InputOperator>("test-table2", rschema);
+  auto op =
       std::make_shared<EquiJoinOperator>(2, 1, EquiJoinOperator::Mode::RIGHT);
-  iop1->SetIndex(0);
-  iop2->SetIndex(1);
-  op->parents_ = {0,1};
-  op->input_schemas_ = {lschema, rschema};
-  op->ComputeOutputSchema();
+  EXPECT_TRUE(g.AddInputNode(iop1));
+  EXPECT_TRUE(g.AddInputNode(iop2));
+  EXPECT_TRUE(g.AddNode(op, {iop1, iop2}));
 
   std::vector<Record> expected_records;
   expected_records.emplace_back(op->output_schema(), true, NullValue(),
@@ -483,15 +476,14 @@ TEST(EquiJoinOperatorTest, LeftJoinTest) {
   rrecords2.emplace_back(rschema, true, 50_u, 2_s, std::move(sd3));
 
   // Setup join operator with two parents, left with id 0 and right with id 1.
-  std::shared_ptr<IdentityOperator> iop1 = std::make_shared<IdentityOperator>();
-  std::shared_ptr<IdentityOperator> iop2 = std::make_shared<IdentityOperator>();
-  std::shared_ptr<EquiJoinOperator> op =
+  DataFlowGraph g;
+  auto iop1 = std::make_shared<InputOperator>("test-table1", lschema);
+  auto iop2 = std::make_shared<InputOperator>("test-table2", rschema);
+  auto op =
       std::make_shared<EquiJoinOperator>(2, 1, EquiJoinOperator::Mode::LEFT);
-  iop1->SetIndex(0);
-  iop2->SetIndex(1);
-  op->parents_ = {0,1};
-  op->input_schemas_ = {lschema, rschema};
-  op->ComputeOutputSchema();
+  EXPECT_TRUE(g.AddInputNode(iop1));
+  EXPECT_TRUE(g.AddInputNode(iop2));
+  EXPECT_TRUE(g.AddNode(op, {iop1, iop2}));
 
   // Process records.
   std::vector<Record> output;

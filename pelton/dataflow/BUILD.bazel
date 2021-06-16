@@ -1,5 +1,12 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 
+exports_files(
+    [
+        "graph.h",
+    ],
+    ["//pelton/dataflow:__subpackages__"],
+)
+
 cc_library(
     name = "state",
     srcs = [
@@ -93,8 +100,8 @@ cc_library(
         "operator.cc",
     ],
     hdrs = [
-        "edge.h",
         "operator.h",
+        "graph.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [

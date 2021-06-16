@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "glog/logging.h"
+#include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/record.h"
 
 namespace pelton {

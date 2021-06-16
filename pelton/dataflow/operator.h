@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "benchmark/benchmark.h"
-#include "pelton/dataflow/edge.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
@@ -73,7 +72,8 @@ class Operator {
 
   void SetGraph(DataFlowGraph *graph) { this->graph_ = graph; }
   void SetIndex(NodeIndex index) { this->index_ = index; }
-  void AddParent(std::shared_ptr<Operator> parent, std::tuple<NodeIndex, NodeIndex> edge);
+  void AddParent(std::shared_ptr<Operator> parent,
+                 std::tuple<NodeIndex, NodeIndex> edge);
 
   /*!
    * Push a batch of records through the dataflow graph. Order within this batch

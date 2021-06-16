@@ -3,6 +3,7 @@
 #include <tuple>
 
 #include "glog/logging.h"
+#include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/sqlast/ast.h"
 
@@ -131,6 +132,21 @@ bool FilterOperator::Accept(const Record &record) const {
     }
   }
   return true;
+}
+
+bool FilterOperator::ProcessAndForward(NodeIndex source,
+                                       const std::vector<Record> &records) {
+  if (this->ops_.size() == 0) {
+    for (NodeIndex childIndex : this->children_) {
+      std::shared_ptr<Operator> child = this->graph()->GetNode(childIndex);
+      if (!child->ProcessAndForward(this->index(), records)) {
+        return false;
+      }
+    }
+    return true;
+  } else {
+    return Operator::ProcessAndForward(source, records);
+  }
 }
 
 }  // namespace dataflow

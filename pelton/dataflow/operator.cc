@@ -1,7 +1,7 @@
 #include "pelton/dataflow/operator.h"
-// #include "pelton/dataflow/graph.h"
 
 #include "glog/logging.h"
+#include "pelton/dataflow/graph.h"
 
 namespace pelton {
 namespace dataflow {

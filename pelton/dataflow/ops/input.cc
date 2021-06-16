@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "glog/logging.h"
+#include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/record.h"
 
 namespace pelton {
@@ -26,7 +27,7 @@ bool InputOperator::ProcessAndForward(NodeIndex source,
 
   // Forward input records to children.
   for (NodeIndex childIndex : this->children_) {
-    std::shared_ptr<Operator> child = this->graph_()->GetNode(childIndex);
+    std::shared_ptr<Operator> child = this->graph()->GetNode(childIndex);
     if (!child->ProcessAndForward(this->index(), records)) {
       return false;
     }

@@ -3,10 +3,25 @@
 #include <memory>
 
 #include "glog/logging.h"
-#include "pelton/dataflow/edge.h"
+#include "pelton/dataflow/operator.h"
+#include "pelton/dataflow/ops/input.h"
+#include "pelton/dataflow/ops/matview.h"
 
 namespace pelton {
 namespace dataflow {
+
+bool DataFlowGraph::AddInputNode(std::shared_ptr<InputOperator> op) {
+  CHECK(this->inputs_.count(op->input_name()) == 0)
+      << "An operator for this input already exists";
+  this->inputs_.emplace(op->input_name(), op);
+  return AddNode(op, std::vector<std::shared_ptr<Operator>>{});
+}
+
+bool DataFlowGraph::AddOutputOperator(std::shared_ptr<MatViewOperator> op,
+                                      std::shared_ptr<Operator> parent) {
+  this->outputs_.emplace_back(op);
+  return AddNode(op, parent);
+}
 
 bool DataFlowGraph::AddNode(std::shared_ptr<Operator> op,
                             std::vector<std::shared_ptr<Operator>> parents) {
@@ -27,7 +42,8 @@ bool DataFlowGraph::AddNode(std::shared_ptr<Operator> op,
 
 bool DataFlowGraph::AddEdge(std::shared_ptr<Operator> parent,
                             std::shared_ptr<Operator> child) {
-  std::tuple<NodeIndex, NodeIndex> edge = std::make_tuple(parent.index(), child.index());
+  std::tuple<NodeIndex, NodeIndex> edge =
+      std::make_tuple(parent->index(), child->index());
   this->edges_.push_back(edge);
   // Also implicitly adds op1 as child of op2.
   child->AddParent(parent, edge);

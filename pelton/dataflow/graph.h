@@ -6,14 +6,15 @@
 #include <unordered_map>
 #include <vector>
 
-#include "pelton/dataflow/edge.h"
-#include "pelton/dataflow/operator.h"
-#include "pelton/dataflow/ops/input.h"
-#include "pelton/dataflow/ops/matview.h"
+#include "pelton/dataflow/record.h"
 #include "pelton/dataflow/types.h"
 
 namespace pelton {
 namespace dataflow {
+
+class Operator;
+class InputOperator;
+class MatViewOperator;
 
 class DataFlowGraph {
  public:
@@ -23,23 +24,16 @@ class DataFlowGraph {
                std::vector<std::shared_ptr<Operator>> parents);
 
   // Special case: input node has no parents.
-  inline bool AddInputNode(std::shared_ptr<InputOperator> op) {
-    CHECK(this->inputs_.count(op->input_name()) == 0)
-        << "An operator for this input already exists";
-    this->inputs_.emplace(op->input_name(), op);
-    return AddNode(op, std::vector<std::shared_ptr<Operator>>{});
-  }
+  bool AddInputNode(std::shared_ptr<InputOperator> op);
+
   // Special case: node with single parent.
   inline bool AddNode(std::shared_ptr<Operator> op,
                       std::shared_ptr<Operator> parent) {
     return AddNode(op, std::vector<std::shared_ptr<Operator>>{parent});
   }
   // Special case: output operator is added to outputs_.
-  inline bool AddOutputOperator(std::shared_ptr<MatViewOperator> op,
-                                std::shared_ptr<Operator> parent) {
-    this->outputs_.emplace_back(op);
-    return AddNode(op, parent);
-  }
+  bool AddOutputOperator(std::shared_ptr<MatViewOperator> op,
+                         std::shared_ptr<Operator> parent);
 
   bool Process(const std::string &input_name,
                const std::vector<Record> &records);
