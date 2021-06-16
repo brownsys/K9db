@@ -14,7 +14,6 @@
 namespace pelton {
 namespace dataflow {
 
-class Edge;
 class DataFlowGraph;
 
 #ifdef PELTON_BENCHMARK  // shuts up compiler warnings
@@ -74,7 +73,7 @@ class Operator {
 
   void SetGraph(DataFlowGraph *graph) { this->graph_ = graph; }
   void SetIndex(NodeIndex index) { this->index_ = index; }
-  void AddParent(std::shared_ptr<Operator> parent, std::shared_ptr<Edge> edge);
+  void AddParent(std::shared_ptr<Operator> parent, std::tuple<NodeIndex, NodeIndex> edge);
 
   /*!
    * Push a batch of records through the dataflow graph. Order within this batch
@@ -102,8 +101,8 @@ class Operator {
   virtual uint64_t SizeInMemory() const { return 0; }
 
   // Edges to children and parents.
-  std::vector<std::weak_ptr<Edge>> children_;
-  std::vector<std::shared_ptr<Edge>> parents_;
+  std::vector<NodeIndex> children_;
+  std::vector<NodeIndex> parents_;
 
   // Input and output schemas.
   std::vector<SchemaRef> input_schemas_;

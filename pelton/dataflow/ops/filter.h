@@ -56,9 +56,8 @@ class FilterOperator : public Operator {
 
   bool ProcessAndForward(NodeIndex source, const std::vector<Record> &records) {
     if (this->ops_.size() == 0) {
-      for (std::weak_ptr<Edge> edge_ptr : this->children_) {
-        std::shared_ptr<Edge> edge = edge_ptr.lock();
-        std::shared_ptr<Operator> child = edge->to().lock();
+      for (NodeIndex childIndex: this->children_) {
+        std::shared_ptr<Operator> child = this->graph()->GetNode(childIndex);
         if (!child->ProcessAndForward(this->index(), records)) {
           return false;
         }

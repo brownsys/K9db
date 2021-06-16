@@ -72,9 +72,9 @@ class DataFlowGraph {
   std::vector<std::shared_ptr<MatViewOperator>> outputs_;
 
   std::unordered_map<NodeIndex, std::shared_ptr<Operator>> nodes_;
-  std::unordered_map<EdgeIndex, std::shared_ptr<Edge>> edges_;
+  // 0th item of the tuple is source and 1st item is destination
+  std::vector<std::tuple<NodeIndex, NodeIndex>> edges_;
 
-  inline EdgeIndex MintEdgeIndex() { return this->edges_.size(); }
   inline NodeIndex MintNodeIndex() { return this->nodes_.size(); }
 };
 

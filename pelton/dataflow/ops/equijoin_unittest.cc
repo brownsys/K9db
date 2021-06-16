@@ -146,8 +146,7 @@ TEST(EquiJoinOperatorTest, BasicJoinTest) {
       std::make_shared<EquiJoinOperator>(2, 1);
   iop1->SetIndex(0);
   iop2->SetIndex(1);
-  op->parents_ = {std::make_shared<Edge>(iop1, op),
-                  std::make_shared<Edge>(iop2, op)};
+  op->parents_ = {0,1};
   op->input_schemas_ = {lschema, rschema};
   op->ComputeOutputSchema();
 
@@ -196,8 +195,7 @@ TEST(EquiJoinOperatorTest, BasicUnjoinableTest) {
       std::make_shared<EquiJoinOperator>(2, 1);
   iop1->SetIndex(0);
   iop2->SetIndex(1);
-  op->parents_ = {std::make_shared<Edge>(iop1, op),
-                  std::make_shared<Edge>(iop2, op)};
+  op->parents_ = {0,1};
   op->input_schemas_ = {lschema, rschema};
   op->ComputeOutputSchema();
 
@@ -291,8 +289,7 @@ TEST(EquiJoinOperatorTest, FullJoinTest) {
       std::make_shared<EquiJoinOperator>(2, 1);
   iop1->SetIndex(0);
   iop2->SetIndex(1);
-  op->parents_ = {std::make_shared<Edge>(iop1, op),
-                  std::make_shared<Edge>(iop2, op)};
+  op->parents_ = {0,1};
   op->input_schemas_ = {lschema, rschema};
   op->ComputeOutputSchema();
 
@@ -377,8 +374,7 @@ TEST(EquiJoinOperatorTest, BasicLeftJoinTest) {
       std::make_shared<EquiJoinOperator>(2, 1, EquiJoinOperator::Mode::LEFT);
   iop1->SetIndex(0);
   iop2->SetIndex(1);
-  op->parents_ = {std::make_shared<Edge>(iop1, op),
-                  std::make_shared<Edge>(iop2, op)};
+  op->parents_ = {0,1};
   op->input_schemas_ = {lschema, rschema};
   op->ComputeOutputSchema();
 
@@ -428,8 +424,7 @@ TEST(EquiJoinOperatorTest, BasicRightJoinTest) {
       std::make_shared<EquiJoinOperator>(2, 1, EquiJoinOperator::Mode::RIGHT);
   iop1->SetIndex(0);
   iop2->SetIndex(1);
-  op->parents_ = {std::make_shared<Edge>(iop1, op),
-                  std::make_shared<Edge>(iop2, op)};
+  op->parents_ = {0,1};
   op->input_schemas_ = {lschema, rschema};
   op->ComputeOutputSchema();
 
@@ -494,8 +489,7 @@ TEST(EquiJoinOperatorTest, LeftJoinTest) {
       std::make_shared<EquiJoinOperator>(2, 1, EquiJoinOperator::Mode::LEFT);
   iop1->SetIndex(0);
   iop2->SetIndex(1);
-  op->parents_ = {std::make_shared<Edge>(iop1, op),
-                  std::make_shared<Edge>(iop2, op)};
+  op->parents_ = {0,1};
   op->input_schemas_ = {lschema, rschema};
   op->ComputeOutputSchema();
 

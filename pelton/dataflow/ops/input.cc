@@ -25,9 +25,8 @@ bool InputOperator::ProcessAndForward(NodeIndex source,
   }
 
   // Forward input records to children.
-  for (std::weak_ptr<Edge> edge_ptr : this->children_) {
-    std::shared_ptr<Edge> edge = edge_ptr.lock();
-    std::shared_ptr<Operator> child = edge->to().lock();
+  for (NodeIndex childIndex : this->children_) {
+    std::shared_ptr<Operator> child = this->graph_()->GetNode(childIndex);
     if (!child->ProcessAndForward(this->index(), records)) {
       return false;
     }

@@ -29,8 +29,7 @@ void JoinOneToOne(benchmark::State& state) {
       std::make_shared<EquiJoinOperator>(0, 0);
   iop1->SetIndex(0);
   iop2->SetIndex(1);
-  op->parents_ = {std::make_shared<Edge>(iop1, op),
-                  std::make_shared<Edge>(iop2, op)};
+  op->parents_ = {0,1};
   op->input_schemas_ = {leftSchema, rightSchema};
   op->ComputeOutputSchema();
 
