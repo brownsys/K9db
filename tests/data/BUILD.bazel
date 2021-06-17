@@ -44,6 +44,7 @@ exports_files([
     "q33.txt",
     "q34.txt",
     "q35.txt",
+    "q36.txt",
     "lobsters_q1.sql",
     "lobsters_q2.sql",
     "lobsters_q3.sql",
@@ -79,4 +80,5 @@ exports_files([
     "lobsters_q33.sql",
     "lobsters_q34.sql",
     "lobsters_q35.sql",
+    "lobsters_q36.sql",
 ])
