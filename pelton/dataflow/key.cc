@@ -8,12 +8,12 @@ Key::Key(size_t capacity) : values_() { this->values_.reserve(capacity); }
 
 // Must be copyable to be used as a key for absl maps.
 Key::Key(const Key &o) {
-  this->values_.reserve(o.values_.capacity());
   this->values_ = o.values_;
+  this->values_.reserve(o.values_.capacity());
 }
 Key &Key::operator=(const Key &o) {
-  this->values_.reserve(o.values_.capacity());
   this->values_ = o.values_;
+  this->values_.reserve(o.values_.capacity());
   return *this;
 }
 

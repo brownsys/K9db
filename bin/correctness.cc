@@ -215,7 +215,7 @@ int main(int argc, char **argv) {
 
   LOG(INFO) << "Check flows and queries... ";
   // run each query
-  long unsigned int i = 0;
+  size_t i = 0;
   for (const auto &query : FLOW_READS_AND_QUERIES) {
     // if we exceed the number of expected results
     if (i >= EXPECTED.size()) {
