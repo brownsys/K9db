@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 #include <mutex>
+#include <condition_variable>
 
 #include "pelton/dataflow/batch_message.h"
 
@@ -17,19 +18,22 @@ class Channel {
     mtx_.lock();
     queue_.push_back(message);
     mtx_.unlock();
+    not_empty_.notify_all();
     return true;
   }
 
   // The queue gets flushed since we are following a multiple producer-single
   // consumer pattern
   std::vector<std::shared_ptr<BatchMessage>> Recv() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    while(queue_.size()==0){
+      not_empty_.wait(lock);
+    }
     std::vector<std::shared_ptr<BatchMessage>> messages;
-    mtx_.lock();
     while (!queue_.empty()) {
       messages.push_back(queue_.front());
       queue_.pop_front();
     }
-    mtx_.unlock();
     return messages;
   }
 
@@ -44,6 +48,8 @@ class Channel {
   // May consider using generics, do not need it as of now.
   std::deque<std::shared_ptr<BatchMessage>> queue_;
   std::mutex mtx_;
+  std::condition_variable not_empty_;
+
 };
 
 } // namespace dataflow
