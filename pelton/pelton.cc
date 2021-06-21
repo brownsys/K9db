@@ -3,7 +3,6 @@
 
 #include <iostream>
 #include <utility>
-#include <vector>
 
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
@@ -45,6 +44,7 @@ bool SpecialStatements(const std::string &sql, Connection *connection) {
 
 }  // namespace
 
+/*
 absl::StatusOr<std::vector<SqlResult>> gdpr(Connection *connection,
                                             std::string sql) {
   Trim(sql);
@@ -67,8 +67,9 @@ absl::StatusOr<std::vector<SqlResult>> gdpr(Connection *connection,
     for (const auto &[table, shard_by] : state->ShardTables(shard_kind)) {
       std::string tsql = "SELECT * FROM " + table + " WHERE " + shard_by +
                          " = " + user_id + ";";
-      MOVE_OR_RETURN(SqlResult res,
-                     shards::sqlengine::Shard(tsql, state, dstate, &shard_kind, &user_id));
+      MOVE_OR_RETURN(
+          SqlResult res,
+          shards::sqlengine::Shard(tsql, state, dstate, &shard_kind, &user_id));
       results.push_back(std::move(res));
     }
   } else if (absl::StartsWith(sql, "FORGET ")) {
@@ -82,14 +83,16 @@ absl::StatusOr<std::vector<SqlResult>> gdpr(Connection *connection,
     for (const auto &[table, shard_by] : state->ShardTables(shard_kind)) {
       std::string tsql =
           "DELETE FROM " + table + " WHERE " + shard_by + " = " + user_id + ";";
-      MOVE_OR_RETURN(SqlResult res,
-                     shards::sqlengine::Shard(tsql, state, dstate, &shard_kind, &user_id));
+      MOVE_OR_RETURN(
+          SqlResult res,
+          shards::sqlengine::Shard(tsql, state, dstate, &shard_kind, &user_id));
       results.push_back(std::move(res));
     }
   }
 
   return results;
 }
+*/
 
 bool open(const std::string &directory, const std::string &db_username,
           const std::string &db_password, Connection *connection) {

@@ -298,6 +298,28 @@ class CreateView : public AbstractStatement {
   std::string query_;
 };
 
+class GDPRStatement : public AbstractStatement {
+ public:
+  enum class Operation { GET, FORGET };
+
+  GDPRStatement(Operation operation, const std::string &shard_kind,
+                const std::string &user_id)
+      : AbstractStatement(AbstractStatement::Type::GDPR),
+        operation_(operation),
+        shard_kind_(shard_kind),
+        user_id_(user_id) {}
+
+  // Accessors.
+  const Operation &operation() const { return this->operation_; }
+  const std::string &shard_kind() const { return this->shard_kind_; }
+  const std::string &user_id() const { return this->user_id_; }
+
+ private:
+  Operation operation_;
+  std::string shard_kind_;
+  std::string user_id_;
+};
+
 }  // namespace sqlast
 }  // namespace pelton
 

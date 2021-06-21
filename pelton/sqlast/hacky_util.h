@@ -80,8 +80,8 @@ inline std::string ExtractValue(const char **ptr, size_t *size) {
       i++;
       break;
     } else if (dquote && str[i] == '"') {
-      break;
       i++;
+      break;
     } else if (!squote && !dquote && (str[i] < '0' || str[i] > '9')) {
       break;
     }
@@ -95,6 +95,18 @@ inline std::string ExtractValue(const char **ptr, size_t *size) {
   *ptr += i;
   *size -= i;
   return idn;
+}
+
+inline bool EqualIgnoreCase(const std::string &str1, const std::string &upper) {
+  if (str1.size() != upper.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < str1.size(); i++) {
+    if (str1[i] != upper[i] && str1[i] != (upper[i] + 32)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 }  // namespace sqlast

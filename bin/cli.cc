@@ -121,29 +121,16 @@ int main(int argc, char **argv) {
 
       // Command has been fully read, execute it!
       pelton::perf::Start("exec");
-      if (command[0] == 'G' || command[0] == 'F') {
-        auto status = pelton::gdpr(&connection, command);
-        if (!status.ok()) {
-          std::cerr << "Fatal error" << std::endl;
-          std::cerr << status.status() << std::endl;
-          break;
-        }
-        if (print) {
-          for (pelton::SqlResult &result : status.value()) {
-            Print(std::move(result));
-          }
-        }
-      } else {
-        absl::StatusOr<pelton::SqlResult> status =
-            pelton::exec(&connection, command);
-        if (!status.ok()) {
-          std::cerr << "Fatal error" << std::endl;
-          std::cerr << status.status() << std::endl;
-          break;
-        }
-        if (print) {
-          Print(std::move(status.value()));
-        }
+
+      absl::StatusOr<pelton::SqlResult> status =
+          pelton::exec(&connection, command);
+      if (!status.ok()) {
+        std::cerr << "Fatal error" << std::endl;
+        std::cerr << status.status() << std::endl;
+        break;
+      }
+      if (print) {
+        Print(std::move(status.value()));
       }
 
       // Print result.
@@ -166,11 +153,9 @@ int main(int argc, char **argv) {
     std::cout << "Memory: " << connection.SizeInMemory() << "bytes"
               << std::endl;
 
-    std::cout << "Time PELTON: "
-              << std::chrono::duration_cast<std::chrono::nanoseconds>(
-                     end_time - start_time)
-                     .count()
-              << "ms" << std::endl;
+    auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        end_time - start_time);
+    std::cout << "Time PELTON: " << diff.count() << "ns" << std::endl;
 
     pelton::close(&connection);
   } catch (const char *err_msg) {

@@ -1,7 +1,7 @@
-// SELECT statements sharding and rewriting.
+// GDPR statements handling (FORGET and GET).
 
-#ifndef PELTON_SHARDS_SQLENGINE_SELECT_H_
-#define PELTON_SHARDS_SQLENGINE_SELECT_H_
+#ifndef PELTON_SHARDS_SQLENGINE_GDPR_H_
+#define PELTON_SHARDS_SQLENGINE_GDPR_H_
 
 #include "absl/status/statusor.h"
 #include "pelton/dataflow/state.h"
@@ -13,15 +13,15 @@
 namespace pelton {
 namespace shards {
 namespace sqlengine {
-namespace select {
+namespace gdpr {
 
-absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Select &stmt,
+absl::StatusOr<mysql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
                                        SharderState *state,
                                        dataflow::DataFlowState *dataflow_state);
 
-}  // namespace select
+}  // namespace gdpr
 }  // namespace sqlengine
 }  // namespace shards
 }  // namespace pelton
 
-#endif  // PELTON_SHARDS_SQLENGINE_SELECT_H_
+#endif  // PELTON_SHARDS_SQLENGINE_GDPR_H_
