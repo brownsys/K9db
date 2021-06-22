@@ -45,8 +45,7 @@ void SharderState::AddShardedTable(
   // Record that the shard kind contains this sharded table.
   this->kind_to_tables_.at(sharding_information.shard_kind)
       .push_back(sharding_information.sharded_table_name);
-  this->kind_to_names_.at(sharding_information.shard_kind)
-      .emplace_back(table, sharding_information.shard_by);
+  this->kind_to_names_.at(sharding_information.shard_kind).insert(table);
   // Map the unsharded name to its sharding information.
   this->sharded_by_[table].push_back(sharding_information);
   // Store the sharded schema.
@@ -113,8 +112,8 @@ const std::unordered_set<UserId> &SharderState::UsersOfShard(
   return this->shards_.at(kind);
 }
 
-const std::list<std::pair<UnshardedTableName, ColumnName>>
-    &SharderState::ShardTables(const ShardKind &kind) const {
+const std::unordered_set<UnshardedTableName> &SharderState::TablesInShard(
+    const ShardKind &kind) const {
   return this->kind_to_names_.at(kind);
 }
 

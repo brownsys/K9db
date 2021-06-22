@@ -53,7 +53,7 @@ void SharderState::Load(const std::string &dir_path) {
     getline(state_file, line);
   }
 
-  // Read kind_to_tables.
+  // Read kind_to_tables_.
   getline(state_file, line);
   while (line != "") {
     this->kind_to_tables_.insert({line, {}});
@@ -61,6 +61,19 @@ void SharderState::Load(const std::string &dir_path) {
     getline(state_file, table_name);
     while (table_name != "") {
       this->kind_to_tables_.at(line).push_back(table_name);
+      getline(state_file, table_name);
+    }
+    getline(state_file, line);
+  }
+
+  // Read kind_to_names_.
+  getline(state_file, line);
+  while (line != "") {
+    this->kind_to_names_.insert({line, {}});
+    std::string table_name;
+    getline(state_file, table_name);
+    while (table_name != "") {
+      this->kind_to_names_.at(line).insert(table_name);
       getline(state_file, table_name);
     }
     getline(state_file, line);
@@ -167,6 +180,15 @@ void SharderState::Save(const std::string &dir_path) {
   state_file << "\n";
 
   for (const auto &[kind, table_names] : this->kind_to_tables_) {
+    state_file << kind << "\n";
+    for (const auto &table_name : table_names) {
+      state_file << table_name << "\n";
+    }
+    state_file << "\n";
+  }
+  state_file << "\n";
+
+  for (const auto &[kind, table_names] : this->kind_to_names_) {
     state_file << kind << "\n";
     for (const auto &table_name : table_names) {
       state_file << table_name << "\n";

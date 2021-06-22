@@ -88,7 +88,7 @@ class SharderState {
 
   const std::unordered_set<UserId> &UsersOfShard(const ShardKind &kind) const;
 
-  const std::list<std::pair<UnshardedTableName, ColumnName>> &ShardTables(
+  const std::unordered_set<UnshardedTableName> &TablesInShard(
       const ShardKind &kind) const;
 
   // Manage secondary indices.
@@ -135,8 +135,7 @@ class SharderState {
   // Maps a shard kind into the names of all contained tables.
   // Invariant: a table can at most belong to one shard kind.
   std::unordered_map<ShardKind, std::list<ShardedTableName>> kind_to_tables_;
-  std::unordered_map<ShardKind,
-                     std::list<std::pair<UnshardedTableName, ColumnName>>>
+  std::unordered_map<ShardKind, std::unordered_set<UnshardedTableName>>
       kind_to_names_;
 
   // Maps a table to the its sharding information.

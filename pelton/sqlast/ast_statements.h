@@ -147,10 +147,10 @@ class Select : public AbstractStatement {
 
 class Delete : public AbstractStatement {
  public:
-  explicit Delete(const std::string &table_name)
+  explicit Delete(const std::string &table_name, bool returning = false)
       : AbstractStatement(AbstractStatement::Type::DELETE),
         table_name_(table_name),
-        returning_(false) {}
+        returning_(returning) {}
 
   Delete(const Delete &del)
       : AbstractStatement(AbstractStatement::Type::DELETE) {
