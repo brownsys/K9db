@@ -23,14 +23,4 @@ fn main() {
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
-
-    // Tell Cargo that if the given file changes, to rerun this build script.
-    // println!("cargo:rerun-if-changed=src/cpp_wrapper/simple.h");
-    // Use the `cc` crate to build a C file and statically link it.
-    // cc::Build::new()
-    //     .file("src/cpp_wrapper/simple.h")
-    //     .compile("simple");
 }
-
-// from rust, call C-function which calls C++ function
-// from C++, call wrapper to convert types to C, then call C-function which calls rust
