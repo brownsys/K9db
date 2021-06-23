@@ -1,0 +1,17 @@
+[package]
+name = "mysql_proxy"
+version = "0.1.0"
+authors = ["vagrant"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+msql-srv = "0.8.7"
+#main = { version = "0.1.0", path = "/vagrant/ritual_workspace/out/main" }
+#libc = "0.2.97"
+cty = "0.2.1"
+
+[build-dependencies]
+cc = "1.0"
+bindgen = "0.53.1"
