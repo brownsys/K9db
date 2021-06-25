@@ -1,4 +1,6 @@
 #include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
 #include "../../../pelton/pelton.h"
 #include "open.h"
 

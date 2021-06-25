@@ -1,5 +1,6 @@
 #ifndef __OPEN_H__
 #define __OPEN_H__
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C"
