@@ -4,9 +4,9 @@ g++ -std=c++17 -o mysql_proxy/src/cpp_wrapper/libopen.so \
   mysql_proxy/src/cpp_wrapper/open.cpp \
   -shared \
   -fPIC \
-	-Wl,-rpath,../../../bazel-out/k8-fastbuild/bin/_solib_k8/_U_S_Spelton_Splanner_Cplanner___Ulib_Sjli \
-	-Wl,-rpath,../../../bazel-out/k8-fastbuild/bin/_solib_k8/_U_S_Spelton_Splanner_Cplanner___Ulib \
-	-Wl,-rpath,../../../bazel-out/k8-fastbuild/bin/_solib_k8/_U_S_Spelton_Splanner_Cplanner___Ulib_Sserver \
+	-Wl,-rpath,$(pwd)/bazel-out/k8-fastbuild/bin/_solib_k8/_U_S_Spelton_Splanner_Cplanner___Ulib_Sjli \
+	-Wl,-rpath,$(pwd)/bazel-out/k8-fastbuild/bin/_solib_k8/_U_S_Spelton_Splanner_Cplanner___Ulib \
+	-Wl,-rpath,$(pwd)/bazel-out/k8-fastbuild/bin/_solib_k8/_U_S_Spelton_Splanner_Cplanner___Ulib_Sserver \
 	-Lbazel-out/k8-fastbuild/bin/_solib_k8/_U_S_Spelton_Splanner_Cplanner___Ulib_Sjli \
 	-Lbazel-out/k8-fastbuild/bin/_solib_k8/_U_S_Spelton_Splanner_Cplanner___Ulib \
 	-Lbazel-out/k8-fastbuild/bin/_solib_k8/_U_S_Spelton_Splanner_Cplanner___Ulib_Sserver \

@@ -84,7 +84,9 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 }
 
 fn main() {
-    let listener = net::TcpListener::bind("127.0.0.1:3306").unwrap();
+    println!("Calling pelton open via ffi {}", open());
+
+    let listener = net::TcpListener::bind("127.0.0.1:10001").unwrap();
     // let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
     // let port = listener.local_addr().unwrap().port();
     println!("Listening at: {:?}", listener);

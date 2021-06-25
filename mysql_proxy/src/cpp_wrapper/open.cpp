@@ -9,6 +9,7 @@
 ConnectionC create()
 {
     ConnectionC c_conn = {new pelton::Connection()};
+    std::cout << c_conn.cpp_conn << std::endl;
     return c_conn;
 }
 
@@ -21,6 +22,10 @@ void destroy(ConnectionC c_conn)
 bool open_c(char *db_dir, char *db_username, char *db_password, ConnectionC c_conn)
 {
     std::cout << "hello?" << std::endl;
+    std::cout << std::string(db_dir) << std::endl;
+    std::cout << std::string(db_username) << std::endl;
+    std::cout << std::string(db_password) << std::endl;
+    std::cout << c_conn.cpp_conn << std::endl;
     // convert void pointer of ConnectionC struct into c++ class instance Connection 
     pelton::Connection *cpp_conn =
         reinterpret_cast<pelton::Connection *>(c_conn.cpp_conn);
