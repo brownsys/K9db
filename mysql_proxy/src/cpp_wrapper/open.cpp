@@ -1,7 +1,9 @@
-#include "mysql_proxy/src/cpp_wrapper/open.h"
+#include "open.h"
 
 #include <iostream>
-
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
 #include "../../../pelton/pelton.h"
 
 ConnectionC create()
