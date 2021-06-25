@@ -1,4 +1,3 @@
-#include "string.h"
 #include "simple_string.h"
 
 int main(int argc, char **argv)
