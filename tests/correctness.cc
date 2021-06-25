@@ -107,7 +107,7 @@ void ReadInputs(const std::string &schema_file, const std::string &queries_file,
     LOG(FATAL) << "couldn't open queries file " << queries_file;
   }
 
-  // * process inserts (input file 4)
+  // * process inserts (input file 3)
   std::ifstream inserts(inserts_file);
   if (inserts.is_open()) {
     LOG(INFO) << "inserts file opened";
@@ -122,7 +122,7 @@ void ReadInputs(const std::string &schema_file, const std::string &queries_file,
     LOG(FATAL) << "couldn't open inserts file " << inserts_file;
   }
 
-  // * process expected results (input file 3)
+  // * process expected results (input file 4)
   std::ifstream expected(expected_output_file);
   if (expected.is_open()) {
     LOG(INFO) << "expected results file open";
