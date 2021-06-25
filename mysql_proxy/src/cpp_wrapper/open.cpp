@@ -1,51 +1,37 @@
-#include <stdlib.h>
+#include "mysql_proxy/src/cpp_wrapper/open.h"
+
+#include <iostream>
+
 #include "../../../pelton/pelton.h"
-#include "open.h"
 
-// struct to hold C++ class object
-struct ConnectionC
+ConnectionC create()
 {
-    void *cpp_conn;
-};
-
-ConnectionC_t *create()
-{
-    ConnectionC_t *c_conn;
-    Connection *cpp_conn;
-
-    c_conn = (typeof(c_conn))malloc(sizeof(*c_conn));
-    cpp_conn = new Connection();
-    // ? call Initialize() or other method here?
-
-    c_conn->cpp_conn = cpp_conn;
+    ConnectionC c_conn = {new pelton::Connection()};
     return c_conn;
 }
 
-void destroy(ConnectionC_t *c_conn)
+void destroy(ConnectionC c_conn)
 {
-    if (c_conn == NULL)
-        return;
-    delete static_cast<Connection *>(c_conn->cpp_conn);
-    free(c_conn);
+    delete reinterpret_cast<pelton::Connection *>(c_conn.cpp_conn);
 }
 
 // wrapper that calls c++ from c
-bool open_c(char *query, char *db_username, char *db_password, ConnectionC_t *connection)
+bool open_c(char *db_dir, char *db_username, char *db_password, ConnectionC c_conn)
 {
-    // convert C parameters to c++ types (make instance of c++ class)
-    Connection *cpp_conn;
-    if (connection == NULL)
-        return 0;
+    std::cout << "hello?" << std::endl;
     // convert void pointer of ConnectionC struct into c++ class instance Connection 
-    cpp_conn = static_cast<Connection *>(connection->cpp_conn);
+    pelton::Connection *cpp_conn =
+        reinterpret_cast<pelton::Connection *>(c_conn.cpp_conn);
 
     // convert char* to const std::string
-    const std::string c_query(query);
+    const std::string c_db_dir(db_dir);
     const std::string c_db_username(db_username);
     const std::string c_db_password(db_password);
 
     // call c++ function from C with converted types
-    bool response = open_c(query, db_username, db_password, cpp_conn);
+    bool response = pelton::open(db_dir, db_username, db_password, cpp_conn);
+    
+    std::cout << "hello again!" << response << std::endl;
 
     return response;
 }
