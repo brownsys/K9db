@@ -6,9 +6,14 @@
 extern "C"
 {
 #endif
-    struct ConnectionC;
-    typedef struct ConnectionC ConnectionC_t;
-    bool open_c(char *query, char *db_username, char *db_password, ConnectionC_t *connection);
+    struct ConnectionC {
+      void *cpp_conn;
+    };
+
+    bool open_c(char *directory, char *db_username, char *db_password, ConnectionC connection);
+
+    ConnectionC create();
+    void destroy(ConnectionC c_conn);
 
 #ifdef __cplusplus
 }
