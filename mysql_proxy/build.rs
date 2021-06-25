@@ -8,7 +8,7 @@ fn main() {
     println!("cargo:include=src/cpp_wrapper/simple.h");
 
     // point to dir of compiled C libraries
-    println!("cargo:rustc-link-search=src/cpp_wrapper/");
+    println!("cargo:rustc-link-search=src/cpp_wrapper");
 
     // tell cargo to invalidate built crate when C wrapper changes
     // println!("cargo:rerun-if-changed=simple.h");

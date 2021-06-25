@@ -3,6 +3,7 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 
 include!("string_ffi.rs");
+include!("open_ffi.rs");
 
 // convert rust string to C, call C-wrapper, convert C++ response to rust string
 fn send_string(s: &str) -> &str {
@@ -17,4 +18,21 @@ fn send_string(s: &str) -> &str {
     let query_response : &str = query_response.to_str().unwrap();
 
     return query_response; // => ownership moved to function calling this one
+}
+
+fn open() -> bool {
+  // Convert to *mut i8 to send to C-function
+  let d = CString::new("").unwrap();
+  let d: *mut c_char = d.as_ptr() as *mut i8;
+  // Convert to *mut i8 to send to C-function
+  let u = CString::new("root").unwrap();
+  let u: *mut c_char = u.as_ptr() as *mut i8;
+  // Convert to *mut i8 to send to C-function
+  let p = CString::new("password").unwrap();
+  let p: *mut c_char = p.as_ptr() as *mut i8;
+
+  let conn = unsafe {create()};
+  let result = unsafe {open_c(d, u, p, conn)};
+  unsafe {destroy(conn)};
+  return result;
 }

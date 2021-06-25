@@ -6,14 +6,46 @@ pub const __bool_true_false_are_defined: u32 = 1;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct ConnectionC {
-    _unused: [u8; 0],
+    pub cpp_conn: *mut ::std::os::raw::c_void,
 }
-pub type ConnectionC_t = ConnectionC;
+#[test]
+fn bindgen_test_layout_ConnectionC() {
+    assert_eq!(
+        ::std::mem::size_of::<ConnectionC>(),
+        8usize,
+        concat!("Size of: ", stringify!(ConnectionC))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<ConnectionC>(),
+        8usize,
+        concat!("Alignment of ", stringify!(ConnectionC))
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<ConnectionC>())).cpp_conn as *const _ as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ConnectionC),
+            "::",
+            stringify!(cpp_conn)
+        )
+    );
+}
+
+#[link(name = "open")]
 extern "C" {
     pub fn open_c(
-        query: *mut ::std::os::raw::c_char,
+        directory: *mut ::std::os::raw::c_char,
         db_username: *mut ::std::os::raw::c_char,
         db_password: *mut ::std::os::raw::c_char,
-        connection: *mut ConnectionC_t,
+        connection: ConnectionC,
     ) -> bool;
+}
+#[link(name = "open")]
+extern "C" {
+    pub fn create() -> ConnectionC;
+}
+#[link(name = "open")]
+extern "C" {
+    pub fn destroy(c_conn: ConnectionC);
 }

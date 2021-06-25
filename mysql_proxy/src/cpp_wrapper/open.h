@@ -10,10 +10,10 @@ extern "C"
       void *cpp_conn;
     };
 
-    bool open_c(char *directory, char *db_username, char *db_password, ConnectionC connection);
+    bool open_c(char *directory, char *db_username, char *db_password, struct ConnectionC connection);
 
-    ConnectionC create();
-    void destroy(ConnectionC c_conn);
+    struct ConnectionC create();
+    void destroy(struct ConnectionC c_conn);
 
 #ifdef __cplusplus
 }
