@@ -47,9 +47,13 @@ impl<W: io::Write> MysqlShim<W> for Backend {
     fn on_query(&mut self, q_string: &str, results: QueryResultWriter<W>) -> io::Result<()> {
         println!("Rust proxy: starting on_query");
         println!("Rust Proxy: query received from HotCRP is: {:?}", q_string);
-        let query_response : &str = send_string(q_string); 
-        println!("Rust Proxy: query response from C-wrapper is: {:?}\n", query_response);
+        // let query_response : &str = send_string(q_string); 
+        // println!("Rust Proxy: query response from C-wrapper is: {:?}\n", query_response);
 
+        println!("Rust Proxy: calling c-wrapper for pelton::open()...\n");
+        let response = open();
+        println!("Rust Proxy: query response from C-wrapper is: {:?}\n", response);
+        
         if q_string.contains("SET") {
             return results.completed(0, 0);
         }
@@ -84,7 +88,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 }
 
 fn main() {
-    println!("Calling pelton open via ffi {}", open());
+    // println!("Calling pelton open via ffi {}", open());
 
     let listener = net::TcpListener::bind("127.0.0.1:10001").unwrap();
     // let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();

@@ -22,17 +22,17 @@ fn send_string(s: &str) -> &str {
 
 fn open() -> bool {
   // Convert to *mut i8 to send to C-function
-  let d = CString::new("").unwrap();
-  let d: *mut c_char = d.as_ptr() as *mut i8;
+  let dir = CString::new("").unwrap();
+  let dir: *mut c_char = dir.as_ptr() as *mut i8;
   // Convert to *mut i8 to send to C-function
-  let u = CString::new("root").unwrap();
-  let u: *mut c_char = u.as_ptr() as *mut i8;
+  let user = CString::new("root").unwrap();
+  let user: *mut c_char = user.as_ptr() as *mut i8;
   // Convert to *mut i8 to send to C-function
-  let p = CString::new("password").unwrap();
-  let p: *mut c_char = p.as_ptr() as *mut i8;
+  let pass = CString::new("password").unwrap();
+  let pass: *mut c_char = pass.as_ptr() as *mut i8;
 
-  let conn = unsafe {create()};
-  let result = unsafe {open_c(d, u, p, conn)};
+  // let conn = unsafe {create()};
+  let conn = unsafe {open_c(dir, user, pass)};
   unsafe {destroy(conn)};
-  return result;
+  return conn.connected;
 }
