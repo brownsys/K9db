@@ -39,14 +39,16 @@ SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
 }
 
 // Manage flows.
-void DataFlowState::AddFlow(const FlowName &name, const DataFlowGraph &flow) {
+void DataFlowState::AddFlow(const FlowName &name,
+                            const std::shared_ptr<DataFlowGraph> flow) {
   this->flows_.insert({name, flow});
-  for (const auto &[input_name, input] : flow.inputs()) {
+  for (const auto &[input_name, input] : flow->inputs()) {
     this->flows_per_input_table_[input_name].push_back(name);
   }
 }
 
-const DataFlowGraph &DataFlowState::GetFlow(const FlowName &name) const {
+const std::shared_ptr<DataFlowGraph> DataFlowState::GetFlow(
+    const FlowName &name) const {
   return this->flows_.at(name);
 }
 
@@ -87,8 +89,8 @@ bool DataFlowState::ProcessRecords(const TableName &table_name,
                                    const std::vector<Record> &records) {
   if (records.size() > 0 && this->HasFlowsFor(table_name)) {
     for (const FlowName &name : this->flows_per_input_table_.at(table_name)) {
-      DataFlowGraph &graph = this->flows_.at(name);
-      if (!graph.Process(table_name, records)) {
+      std::shared_ptr<DataFlowGraph> graph = this->flows_.at(name);
+      if (!graph->Process(table_name, records)) {
         return false;
       }
     }
@@ -100,7 +102,7 @@ bool DataFlowState::ProcessRecords(const TableName &table_name,
 uint64_t DataFlowState::SizeInMemory() const {
   uint64_t size = 0;
   for (const auto &[_, flow] : this->flows_) {
-    size += flow.SizeInMemory();
+    size += flow->SizeInMemory();
   }
   return size;
 }

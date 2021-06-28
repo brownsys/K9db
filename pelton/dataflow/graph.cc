@@ -14,13 +14,13 @@ bool DataFlowGraph::AddInputNode(std::shared_ptr<InputOperator> op) {
   CHECK(this->inputs_.count(op->input_name()) == 0)
       << "An operator for this input already exists";
   this->inputs_.emplace(op->input_name(), op);
-  return AddNode(op, std::vector<std::shared_ptr<Operator>>{});
+  return this->AddNode(op, std::vector<std::shared_ptr<Operator>>{});
 }
 
 bool DataFlowGraph::AddOutputOperator(std::shared_ptr<MatViewOperator> op,
                                       std::shared_ptr<Operator> parent) {
   this->outputs_.emplace_back(op);
-  return AddNode(op, parent);
+  return this->AddNode(op, parent);
 }
 
 bool DataFlowGraph::AddNode(std::shared_ptr<Operator> op,

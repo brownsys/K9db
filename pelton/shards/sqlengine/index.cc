@@ -107,15 +107,16 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     dataflow::DataFlowState *dataflow_state) {
   perf::Start("Lookup Index");
   // Find flow.
-  const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(index_name);
-  if (flow.outputs().size() == 0) {
+  const std::shared_ptr<dataflow::DataFlowGraph> &flow =
+      dataflow_state->GetFlow(index_name);
+  if (flow->outputs().size() == 0) {
     return absl::InvalidArgumentError("Read from index with no matviews");
-  } else if (flow.outputs().size() > 1) {
+  } else if (flow->outputs().size() > 1) {
     return absl::InvalidArgumentError("Read from index with several matviews");
   }
 
   // Materialized view that we want to look up in.
-  auto matview = flow.outputs().at(0);
+  auto matview = flow->outputs().at(0);
 
   // Construct look up key.
   dataflow::Key lookup_key{1};
