@@ -13,7 +13,6 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/util/ints.h"
-// #include "pelton/dataflow/operator.h"
 
 namespace pelton {
 namespace dataflow {
