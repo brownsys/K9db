@@ -4,7 +4,7 @@ pub const true_: u32 = 1;
 pub const false_: u32 = 0;
 pub const __bool_true_false_are_defined: u32 = 1;
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct ConnectionC {
     pub cpp_conn: *mut ::std::os::raw::c_void,
     pub connected: bool,
@@ -42,6 +42,16 @@ fn bindgen_test_layout_ConnectionC() {
         )
     );
 }
+
+// custom destructor
+impl Drop for ConnectionC {
+    fn drop (&mut self) {
+        println!("Rust FFI: Calling destructor ConnectionC::drop()");
+        unsafe {destroy(self.cpp_conn)};
+        println!("Rust FFI: Dropped!");
+    }
+}
+
 #[link(name = "open")]
 extern "C" {
     pub fn open_c(
@@ -52,5 +62,5 @@ extern "C" {
 }
 #[link(name = "open")]
 extern "C" {
-    pub fn destroy(c_conn: ConnectionC);
+    pub fn destroy(c_conn: *mut ::std::os::raw::c_void);
 }

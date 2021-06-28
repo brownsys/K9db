@@ -50,7 +50,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         // let query_response : &str = send_string(q_string); 
         // println!("Rust Proxy: query response from C-wrapper is: {:?}\n", query_response);
 
-        println!("Rust Proxy: calling c-wrapper for pelton::open()...\n");
+        println!("Rust Proxy: calling c-wrapper for pelton::open()\n");
         let response = open();
         println!("Rust Proxy: query response from C-wrapper is: {:?}\n", response);
         

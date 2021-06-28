@@ -33,6 +33,6 @@ fn open() -> bool {
 
   // let conn = unsafe {create()};
   let conn = unsafe {open_c(dir, user, pass)};
-  unsafe {destroy(conn)};
+  // unsafe {destroy(conn)};
   return conn.connected;
 }
