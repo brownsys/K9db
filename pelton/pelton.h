@@ -68,7 +68,7 @@ bool open(const std::string &directory, const std::string &db_username,
 
 absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql);
 
-bool close(Connection *connection);
+bool close(Connection *connection, bool shutdown_planner = true);
 
 // Call this if you are certain you are not going to make more calls to
 // make_view to shutdown the JVM.

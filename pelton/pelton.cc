@@ -78,9 +78,11 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
 
 void shutdown_planner() { planner::ShutdownPlanner(); }
 
-bool close(Connection *connection) {
+bool close(Connection *connection, bool shutdown_planner) {
   connection->Save();
-  planner::ShutdownPlanner();
+  if (shutdown_planner) {
+    planner::ShutdownPlanner();
+  }
   return true;
 }
 

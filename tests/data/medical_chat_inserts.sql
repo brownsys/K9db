@@ -16,6 +16,3 @@ INSERT INTO chat VALUES (2, 10, 2, 'Good bye');
 INSERT INTO chat VALUES (3, 20, 1, 'HELLO');
 INSERT INTO chat VALUES (4, 20, 2, 'HELLO 2');
 INSERT INTO chat VALUES (5, 20, 1, 'HELLO 3');
-
-SELECT * FROM chat;
-SELECT * FROM chat WHERE doctor_id = 2;

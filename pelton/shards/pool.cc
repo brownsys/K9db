@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "glog/logging.h"
+#include "mariadb/conncpp.hpp"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/perf.h"
 
