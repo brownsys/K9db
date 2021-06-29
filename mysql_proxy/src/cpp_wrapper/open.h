@@ -13,6 +13,7 @@ extern "C"
     };
     struct ConnectionC open_c(const char *query,const char *db_username,const char *db_password);
     void destroy(void* c_conn);
+    bool close_c(struct ConnectionC c_conn);
 
 #ifdef __cplusplus
 }

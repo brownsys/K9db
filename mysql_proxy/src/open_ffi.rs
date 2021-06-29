@@ -59,8 +59,6 @@ extern "C" {
         db_username: *mut ::std::os::raw::c_char,
         db_password: *mut ::std::os::raw::c_char,
     ) -> ConnectionC;
-}
-#[link(name = "open")]
-extern "C" {
     pub fn destroy(c_conn: *mut ::std::os::raw::c_void);
+    pub fn close_c(c_conn: ConnectionC) -> bool;
 }

@@ -15,12 +15,12 @@ ConnectionC create()
     return c_conn;
 }
 
-void destroy(void* cpp_conn)
+void destroy(void *cpp_conn)
 {
     delete reinterpret_cast<pelton::Connection *>(cpp_conn);
 }
 
-ConnectionC open_c(const char *db_dir,const char *db_username,const char *db_password)
+ConnectionC open_c(const char *db_dir, const char *db_username, const char *db_password)
 {
     std::cout << "C-Wrapper: starting open_c()" << std::endl;
     std::cout << "C-Wrapper: db_dir is: " << std::string(db_dir) << std::endl;
@@ -41,10 +41,21 @@ ConnectionC open_c(const char *db_dir,const char *db_username,const char *db_pas
     // call c++ function from C with converted types
     std::cout << "C-Wrapper: running pelton::open" << std::endl;
     bool response = pelton::open(c_db_dir, c_db_username, c_db_password, cpp_conn);
-    std::cout << "C-Wrapper: C++ response from pelton is: " << response << std::endl;
+    std::cout << "C-Wrapper: open response from pelton is: " << response << std::endl;
 
     // set boolean for C++ response (connected or not)
     c_conn.connected = response;
 
     return c_conn;
+}
+
+bool close_c(ConnectionC c_conn)
+{
+    std::cout << "C-Wrapper: starting close_c" << std::endl;
+    pelton::Connection *cpp_conn =
+        reinterpret_cast<pelton::Connection *>(c_conn.cpp_conn);
+
+    bool response = pelton::close(cpp_conn);
+    std::cout << "C-Wrapper: close response is: " << response << std::endl;
+    return response;
 }

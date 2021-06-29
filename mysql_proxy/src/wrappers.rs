@@ -20,19 +20,22 @@ fn send_string(s: &str) -> &str {
     return query_response; // => ownership moved to function calling this one
 }
 
-fn open() -> bool {
+fn open(dir: &str, user: &str, pass: &str) -> ConnectionC {
   // Convert to *mut i8 to send to C-function
-  let dir = CString::new("").unwrap();
+  let dir = CString::new(dir).unwrap();
   let dir: *mut c_char = dir.as_ptr() as *mut i8;
   // Convert to *mut i8 to send to C-function
-  let user = CString::new("root").unwrap();
+  let user = CString::new(user).unwrap();
   let user: *mut c_char = user.as_ptr() as *mut i8;
   // Convert to *mut i8 to send to C-function
-  let pass = CString::new("password").unwrap();
+  let pass = CString::new(pass).unwrap();
   let pass: *mut c_char = pass.as_ptr() as *mut i8;
 
-  // let conn = unsafe {create()};
   let conn = unsafe {open_c(dir, user, pass)};
-  // unsafe {destroy(conn)};
-  return conn.connected;
+  return conn;
+}
+
+fn close(rust_conn : ConnectionC) -> bool {
+  let response = unsafe {close_c(rust_conn)};
+  return response;
 }
