@@ -35,7 +35,7 @@ fn open(dir: &str, user: &str, pass: &str) -> ConnectionC {
   return conn;
 }
 
-fn close(rust_conn : ConnectionC) -> bool {
+fn close(rust_conn : ConnectionC) -> ConnectionC {
   let response = unsafe {close_c(rust_conn)};
   return response;
 }

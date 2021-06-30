@@ -63,5 +63,5 @@ extern "C" {
         db_password: *mut ::std::os::raw::c_char,
     ) -> ConnectionC;
     pub fn destroy(c_conn: *mut ::std::os::raw::c_void);
-    pub fn close_c(c_conn: ConnectionC) -> bool;
+    pub fn close_c(c_conn: ConnectionC) -> ConnectionC;
 }

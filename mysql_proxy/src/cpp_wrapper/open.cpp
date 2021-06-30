@@ -50,7 +50,7 @@ ConnectionC open_c(const char *db_dir, const char *db_username, const char *db_p
     return c_conn;
 }
 
-bool close_c(ConnectionC c_conn)
+ConnectionC close_c(ConnectionC c_conn)
 {
     std::cout << "C-Wrapper: starting close_c" << std::endl;
     pelton::Connection *cpp_conn =
@@ -58,8 +58,8 @@ bool close_c(ConnectionC c_conn)
 
     bool response = pelton::close(cpp_conn);
     std::cout << "C-Wrapper: close response is: " << response << std::endl;
+    c_conn.connected = false;
 
-    // ? ownership of c_conn transferred here, so rust won't trigger destructor, so no double free
-    destroy(cpp_conn);
-    return response;
+    // destroy(cpp_conn);
+    return c_conn;
 }
