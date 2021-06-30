@@ -6,6 +6,6 @@ int main(int argc, char **argv)
 	// outside
 	ConnectionC c_conn = open_c("", "root", "password");
 	ConnectionC close = close_c(c_conn);
-	// destroy(c_conn.cpp_conn);
+	destroy(c_conn.cpp_conn);
 	return 0;
 }

@@ -52,9 +52,9 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 
         println!("Rust Proxy: calling c-wrapper for pelton::open()\n");
         let rust_conn : ConnectionC = open("", "root", "password");
-        println!("Rust Proxy: open response from C-wrapper (connected field of ConnectionC struct) is: {:?}\n", rust_conn.connected);
+        println!("Rust Proxy: open response from C-wrapper is: {:?}\n", rust_conn.connected);
         let rust_conn : ConnectionC = close(rust_conn);
-        println!("Rust Proxy: close() response from C-wrapper is: {:?}\n", rust_conn.connected);
+        println!("Rust Proxy: close response from C-wrapper is: {:?}\n", rust_conn.connected);
         
         if q_string.contains("SET") {
             return results.completed(0, 0);
