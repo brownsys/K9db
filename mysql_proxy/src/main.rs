@@ -50,11 +50,12 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         // let query_response : &str = send_string(q_string); 
         // println!("Rust Proxy: query response from C-wrapper is: {:?}\n", query_response);
 
-        println!("Rust Proxy: calling c-wrapper for pelton::open()\n");
+        println!("Rust Proxy: calling c-wrapper for pelton::open\n");
         let rust_conn : ConnectionC = open("", "root", "password");
-        println!("Rust Proxy: open response from C-wrapper is: {:?}\n", rust_conn.connected);
+        println!("Rust Proxy: connection status is: {:?}", rust_conn.connected);
+        println!("Rust Proxy: calling c-wrapper for pelton::close\n");
         let rust_conn : ConnectionC = close(rust_conn);
-        println!("Rust Proxy: close response from C-wrapper is: {:?}\n", rust_conn.connected);
+        println!("Rust Proxy: connection status is: {:?}", rust_conn.connected);
         
         if q_string.contains("SET") {
             return results.completed(0, 0);
@@ -104,7 +105,7 @@ fn main() {
         // the next line reads: "if `let` destructures `listener.accept()` into `Ok((stream, addr))`then evaluate the block {}" 
         // i.e. if connection established, call mysql_intermediary's run_on_tcp. (_ in front of a variable name indicates to compiler that this is unused)
         if let Ok((stream, _addr)) = listener.accept() {  // -> .accept returns Result<(TcpStream, SocketAddr)> and blocks thread until a TCP connection is established
-            println!("Successfully connected to HotCRP's mysql server\nStream and address are: {:?}", stream);
+            println!("Successfully connected to HotCRP's mysql server\nStream and address are: {:?}\n", stream);
             let inter = MysqlIntermediary::run_on_tcp(Backend, stream).unwrap();
             // it's not reaching past here because at this point it's already started a new TCP server - it's processing client commands until client disconnects or an error occurs
         }
