@@ -47,6 +47,9 @@ fn bindgen_test_layout_ConnectionC() {
 impl Drop for ConnectionC {
     fn drop (&mut self) {
         println!("Rust FFI: Calling destructor ConnectionC::drop()");
+        // the struct itself is destructed by rust automatically. Only
+        // the C++ struct in the field of the rust struct is not and requires
+        // manually deallocation
         unsafe {destroy(self.cpp_conn)};
         println!("Rust FFI: Dropped!");
     }

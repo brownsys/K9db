@@ -17,6 +17,7 @@ ConnectionC create()
 
 void destroy(void *cpp_conn)
 {
+    std::cout << "C-Wrapper: destroy" << std::endl;
     delete reinterpret_cast<pelton::Connection *>(cpp_conn);
 }
 
@@ -57,5 +58,8 @@ bool close_c(ConnectionC c_conn)
 
     bool response = pelton::close(cpp_conn);
     std::cout << "C-Wrapper: close response is: " << response << std::endl;
+
+    // ? ownership of c_conn transferred here, so rust won't trigger destructor, so no double free
+    destroy(cpp_conn);
     return response;
 }
