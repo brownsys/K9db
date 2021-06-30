@@ -236,6 +236,28 @@ void Record::SetValue(const std::string &value, size_t i) {
   }
 }
 
+// Compute an integer hash based on specified columns.
+int64_t Record::Hash(std::vector<ColumnID> cols) {
+  int64_t hash_value = 0;
+  for (auto col : cols) {
+    switch (this->schema_.TypeOf(col)) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        hash_value += this->data_[col].uint;
+        break;
+      case sqlast::ColumnDefinition::Type::INT:
+        hash_value += this->data_[col].sint;
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+      case sqlast::ColumnDefinition::Type::DATETIME:
+        hash_value += (int64_t)std::hash<std::string>{}(*this->data_[col].str);
+        break;
+      default:
+        LOG(FATAL) << "Unsupported data type when computing hash!";
+    }
+  }
+  return hash_value;
+}
+
 // Equality: schema must be identical (pointer wise) and all values must be
 // equal.
 bool Record::operator==(const Record &other) const {

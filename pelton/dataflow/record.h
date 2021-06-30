@@ -165,6 +165,9 @@ class Record {
   // Data type transformation.
   void SetValue(const std::string &value, size_t i);
 
+  // Compute an integer hash based on specified columns.
+  int64_t Hash(std::vector<ColumnID> cols = std::vector<ColumnID>{});
+
   // Accessors.
   void SetPositive(bool positive) { this->positive_ = positive; }
   const SchemaRef &schema() const { return this->schema_; }
