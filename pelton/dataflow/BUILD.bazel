@@ -115,6 +115,22 @@ cc_library(
 )
 
 cc_library(
+    name = "partition",
+    srcs = [
+        "partition.cc",
+    ],
+    hdrs = [
+        "partition.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":record",
+        ":types",
+        "@absl//absl/container:flat_hash_map",
+    ],
+)
+
+cc_library(
     name = "graph",
     srcs = [
         "graph.cc",
@@ -193,6 +209,23 @@ cc_test(
         ":schema",
         ":types",
         "//pelton/sqlast:ast",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "partition-test",
+    srcs = [
+        "partition_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":partition",
+        ":schema",
+        "//pelton/sqlast:ast",
+        "//pelton/util:ints",
         "@glog",
         "@gtest",
         "@gtest//:gtest_main",
