@@ -77,6 +77,9 @@ std::string Operator::DebugString() const {
     case Operator::Type::AGGREGATE:
       type_str = "AGGREGATE";
       break;
+    case Operator::Type::EXCHANGE:
+      type_str = "EXCHANGE";
+      break;
   }
 
   std::string str = "{";

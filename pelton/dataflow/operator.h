@@ -31,6 +31,7 @@ class Operator {
     EQUIJOIN,
     PROJECT,
     AGGREGATE,
+    EXCHANGE,
   };
 
   // Cannot copy an operator.

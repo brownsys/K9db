@@ -192,6 +192,29 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "exchange",
+    srcs = [
+        "exchange.cc",
+    ],
+    hdrs = [
+        "exchange.h",
+        "//pelton/dataflow:graph.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/dataflow:channel",
+        "//pelton/dataflow:partition",
+        "@absl//absl/container:flat_hash_map",
+        "@glog",
+        "@gtest//:gtest_prod",
+    ],
+)
+
 cc_test(
     name = "equijoin-test",
     srcs = [
