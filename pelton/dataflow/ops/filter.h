@@ -56,6 +56,8 @@ class FilterOperator : public Operator {
 
   bool ProcessAndForward(NodeIndex source, const std::vector<Record> &records);
 
+  std::shared_ptr<Operator> Clone() const override;
+
  protected:
   bool Accept(const Record &record) const;
 

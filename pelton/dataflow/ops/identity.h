@@ -17,6 +17,7 @@ class IdentityOperator : public Operator {
 
   bool ProcessAndForward(NodeIndex source,
                          const std::vector<Record> &records) override;
+  std::shared_ptr<Operator> Clone() const override;
 
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,

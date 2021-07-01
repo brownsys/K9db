@@ -9,13 +9,14 @@
 
 namespace pelton {
 namespace dataflow {
-
 class UnionOperator : public Operator {
  public:
   UnionOperator() : Operator(Operator::Type::UNION) {}
 
   bool ProcessAndForward(NodeIndex source,
                          const std::vector<Record> &records) override;
+
+  std::shared_ptr<Operator> Clone() const override;
 
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,

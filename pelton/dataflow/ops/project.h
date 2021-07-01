@@ -66,6 +66,8 @@ class ProjectOperator : public Operator {
     }
   }
 
+  std::shared_ptr<Operator> Clone() const override;
+
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,
                std::vector<Record> *output) override;

@@ -88,6 +88,7 @@ bool FilterOperator::Process(NodeIndex source,
                              std::vector<Record> *output) {
   for (const Record &record : records) {
     if (this->Accept(record)) {
+      LOG(INFO) << "[FILTER] Out " << record;
       output->push_back(record.Copy());
     }
   }
@@ -147,6 +148,16 @@ bool FilterOperator::ProcessAndForward(NodeIndex source,
   } else {
     return Operator::ProcessAndForward(source, records);
   }
+}
+
+std::shared_ptr<Operator> FilterOperator::Clone() const {
+  auto clone = std::make_shared<FilterOperator>();
+  clone->children_ = this->children_;
+  clone->parents_ = this->parents_;
+  clone->input_schemas_ = this->input_schemas_;
+  clone->output_schema_ = this->output_schema_;
+  clone->ops_ = this->ops_;
+  return clone;
 }
 
 }  // namespace dataflow
