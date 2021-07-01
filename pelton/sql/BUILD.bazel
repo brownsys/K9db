@@ -1,0 +1,43 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "executor",
+    srcs = [
+        "executor.cc",
+    ],
+    hdrs = [
+        "executor.h",
+    ],
+    linkopts = [
+        "-lmariadbcpp",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":result",
+        "//pelton/dataflow:schema",
+        "//pelton/shards:types",
+        "//pelton/shards/sqlengine:util",
+        "//pelton/sqlast:ast",
+        "//pelton/util:perf",
+        "@absl//absl/status",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "result",
+    srcs = [
+        "result.cc",
+    ],
+    hdrs = [
+        "result.h",
+    ],
+    linkopts = [
+        "-lmariadbcpp",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//pelton/sql/result:abstract_result",
+        "//pelton/sql/result:resultset",
+    ],
+)
