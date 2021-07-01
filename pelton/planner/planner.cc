@@ -67,8 +67,8 @@ std::pair<JavaVM *, JNIEnv *> StartJVM(bool run = true) {
 
 // Given a query, use calcite to plan its execution, and generate
 // a DataFlowGraph with all the operators from that plan.
-dataflow::DataFlowGraph PlanGraph(dataflow::DataFlowState *state,
-                                  const std::string &query) {
+std::shared_ptr<dataflow::DataFlowGraph> PlanGraph(
+    dataflow::DataFlowState *state, const std::string &query) {
   perf::Start("planner");
   // Start a JVM.
   auto [jvm, env] = StartJVM();
@@ -81,8 +81,8 @@ dataflow::DataFlowGraph PlanGraph(dataflow::DataFlowState *state,
   jmethodID planMethod = env->GetStaticMethodID(QueryPlannerClass, "plan", sig);
 
   // Create the required shared state to pass to the java code.
-  dataflow::DataFlowGraph graph;
-  jlong graph_jptr = reinterpret_cast<jlong>(&graph);
+  auto graph = std::make_shared<dataflow::DataFlowGraph>();
+  jlong graph_jptr = reinterpret_cast<jlong>(graph.get());
   jlong state_jptr = reinterpret_cast<jlong>(state);
   jstring query_jstr = env->NewStringUTF(query.c_str());
 

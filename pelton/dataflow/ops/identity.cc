@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "glog/logging.h"
+#include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/record.h"
 
 namespace pelton {
@@ -22,9 +23,8 @@ bool IdentityOperator::Process(NodeIndex source,
 
 bool IdentityOperator::ProcessAndForward(NodeIndex source,
                                          const std::vector<Record> &records) {
-  for (std::weak_ptr<Edge> edge_ptr : this->children_) {
-    std::shared_ptr<Edge> edge = edge_ptr.lock();
-    std::shared_ptr<Operator> child = edge->to().lock();
+  for (NodeIndex childIndex : this->children_) {
+    std::shared_ptr<Operator> child = this->graph()->GetNode(childIndex);
     if (!child->ProcessAndForward(this->index(), records)) {
       return false;
     }

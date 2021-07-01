@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/value.h"
 #include "pelton/planner/planner.h"
@@ -57,7 +58,7 @@ absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
                         dataflow::DataFlowState *dataflow_state) {
   perf::Start("CreateView");
   // Plan the query using calcite and generate a concrete graph for it.
-  dataflow::DataFlowGraph graph =
+  std::shared_ptr<dataflow::DataFlowGraph> graph =
       planner::PlanGraph(dataflow_state, stmt.query());
 
   // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
@@ -75,15 +76,16 @@ absl::StatusOr<mysql::SqlResult> SelectView(
 
   // Get the corresponding flow.
   const std::string &view_name = stmt.table_name();
-  const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(view_name);
+  const std::shared_ptr<dataflow::DataFlowGraph> flow =
+      dataflow_state->GetFlow(view_name);
 
   // Only support flow ending with a single output matview for now.
-  if (flow.outputs().size() == 0) {
+  if (flow->outputs().size() == 0) {
     return absl::InvalidArgumentError("Read from flow with no matviews");
-  } else if (flow.outputs().size() > 1) {
+  } else if (flow->outputs().size() > 1) {
     return absl::InvalidArgumentError("Read from flow with several matviews");
   }
-  auto matview = flow.outputs().at(0);
+  auto matview = flow->outputs().at(0);
   const dataflow::SchemaRef &schema = matview->output_schema();
 
   std::vector<dataflow::Record> records;
