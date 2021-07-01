@@ -2,6 +2,11 @@
 
 #include "pelton/shards/sqlengine/gdpr.h"
 
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "pelton/shards/sqlengine/delete.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/util.h"
