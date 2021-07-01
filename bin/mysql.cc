@@ -193,8 +193,8 @@ int main(int argc, char **argv) {
 
   pelton::perf::PrintAll();
 
-  auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(
-      end_time - start_time);
+  auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time -
+                                                                   start_time);
   std::cout << "Time MYSQL: " << diff.count() << "ns" << std::endl;
 
   // Exit!
