@@ -1,13 +1,16 @@
 #ifndef PELTON_SQL_RESULT_RESULTSET_H_
 #define PELTON_SQL_RESULT_RESULTSET_H_
 
+#include <list>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "mariadb/conncpp.hpp"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
+#include "pelton/sql/eager_executor.h"
 
 namespace pelton {
 namespace sql {
@@ -71,7 +74,8 @@ class SqlResultSet {
   };
 
   // Constructors.
-  explicit SqlResultSet(const dataflow::SchemaRef &schema);
+  SqlResultSet(const dataflow::SchemaRef &schema,
+               SqlEagerExecutor *eager_executor);
 
   // Adding additional results to this set.
   void AddShardResult(LazyResultSet &&lazy_result_set);
@@ -91,14 +95,26 @@ class SqlResultSet {
   }
 
  private:
-  // index marks the current LazyResultSet.
-  size_t index_;
-  std::vector<LazyResultSet> lazy_data_;
+  std::list<LazyResultSet> lazy_data_;
+  std::vector<AugmentingInformation> current_augment_info_;
   std::unique_ptr<::sql::ResultSet> current_result_;
+  dataflow::Record current_record_;
+  bool current_record_ready_;
   dataflow::SchemaRef schema_;
+  // Online deduplication as rows are read in from underlying results.
+  bool deduplicate_;
+  std::unordered_set<std::string> duplicates_;
+  // Allows us to actually execute SQL commands when their data is being read.
+  SqlEagerExecutor *eager_executor_;
 
+  // Get the next record, from current_result_ or from the next result(s)
+  // found by executing the next LazyResultSet(s). Store record in
+  // current_record_.
+  // Returns true if a record was found, and false if the resultsets are totally
+  // consumed. Perform deduplication when needed.
+  bool GetNext();
   // Actually execute SQL statement in LazyResultSet against the shards.
-  void ExecuteLazy();
+  void Execute();
 };
 
 }  // namespace _result

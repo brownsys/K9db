@@ -1,22 +1,42 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
 cc_library(
-    name = "executor",
+    name = "eager_executor",
     srcs = [
-        "executor.cc",
+        "eager_executor.cc",
     ],
     hdrs = [
-        "executor.h",
+        "eager_executor.h",
     ],
     linkopts = [
         "-lmariadbcpp",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
+        "//pelton/util:perf",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "lazy_executor",
+    srcs = [
+        "lazy_executor.cc",
+    ],
+    hdrs = [
+        "lazy_executor.h",
+    ],
+    linkopts = [
+        "-lmariadbcpp",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":eager_executor",
         ":result",
         "//pelton/dataflow:schema",
         "//pelton/shards:types",
         "//pelton/shards/sqlengine:util",
+        "//pelton/sql/result:resultset",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "@absl//absl/status",

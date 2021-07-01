@@ -30,6 +30,7 @@ cc_library(
     deps = [
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
+        "//pelton/sql:eager_executor",
         "@glog",
     ],
 )

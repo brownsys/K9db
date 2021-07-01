@@ -10,6 +10,16 @@ namespace _result {
 
 namespace {
 
+// Turn record into a concatenated string.
+std::string StringifyRecord(const dataflow::Record &record) {
+  std::string delim("\0", 1);
+  std::string str = "";
+  for (size_t i = 0; i < record.schema().size(); i++) {
+    str += record.GetValueString(i) + delim;
+  }
+  return str;
+}
+
 // Checks the type of a value in a result set.
 bool IsStringType(::sql::ResultSetMetaData *meta, size_t col_index) {
   int type = meta->getColumnType(col_index);
@@ -107,8 +117,17 @@ dataflow::Record SqlRowToRecord(
 }  // namespace
 
 // Constructor.
-SqlResultSet::SqlResultSet(const dataflow::SchemaRef &schema)
-    : index_(0), lazy_data_(), current_result_(), schema_(schema) {}
+SqlResultSet::SqlResultSet(const dataflow::SchemaRef &schema,
+                           SqlEagerExecutor *eager_executor)
+    : lazy_data_(),
+      current_augment_info_(),
+      current_result_(),
+      current_record_(schema),
+      current_record_ready_(false),
+      schema_(schema),
+      deduplicate_(false),
+      duplicates_(),
+      eager_executor_(eager_executor) {}
 
 // Adding additional results to this set.
 void SqlResultSet::AddShardResult(LazyResultSet &&lazy_result_set) {
@@ -120,37 +139,63 @@ void SqlResultSet::Append(SqlResultSet &&other, bool deduplicate) {
   CHECK(this->schema_ == other.schema_) << "Appending unequal schemas";
   // Perform the appending by putting the lazy shard results from other at the
   // end of the current data.
-  for (LazyResultSet &lazy : other.lazy_data_) {
-    this->lazy_data_.push_back(std::move(lazy));
-  }
+  this->lazy_data_.splice(this->lazy_data_.end(), other.lazy_data_);
+  this->deduplicate_ = this->deduplicate_ || deduplicate;
 }
 
 // Query API.
 bool SqlResultSet::HasNext() {
-  if (this->current_result_ != nullptr && this->current_result_->next()) {
+  if (current_record_ready_) {
     return true;
   }
-  while (this->index_ < this->lazy_data_.size()) {
-    this->ExecuteLazy();
-    if (this->current_result_->next()) {
-      return true;
+  return this->GetNext();
+}
+dataflow::Record SqlResultSet::FetchOne() {
+  if (!this->current_record_ready_) {
+    if (!this->GetNext()) {
+      LOG(FATAL) << ".FetchOne() called on empty SqlResultSet";
     }
+  }
+  this->current_record_ready_ = false;
+  return std::move(this->current_record_);
+}
+
+// Get the next record, from current_result_ or from the next result(s)
+// found by executing the next LazyResultSet(s). Store record in
+// current_record_.
+bool SqlResultSet::GetNext() {
+  while (!this->lazy_data_.empty() || this->current_result_ != nullptr) {
+    while (this->current_result_ != nullptr && this->current_result_->next()) {
+      this->current_record_ =
+          SqlRowToRecord(this->current_result_.get(),
+                         this->current_augment_info_, this->schema_);
+      // Deduplicate if configured.
+      std::string record_str = StringifyRecord(this->current_record_);
+      if (this->duplicates_.count(record_str) == 0) {
+        if (this->deduplicate_) {
+          this->duplicates_.insert(std::move(record_str));
+        }
+        this->current_record_ready_ = true;
+        return true;
+      }
+    }
+    this->Execute();
   }
   return false;
 }
 
-dataflow::Record SqlResultSet::FetchOne() {
-  return SqlRowToRecord(this->current_result_.get(),
-                        this->lazy_data_.at(this->index_ - 1).augment_info,
-                        this->schema_);
-}
-
-// Actually execute the lazy sql command against the shards.
+// Actually execute SQL statement in LazyResultSet against the shards.
 // TODO(babman): actually call the executor from here etc.
-void SqlResultSet::ExecuteLazy() {
-  LazyResultSet lazy_info = this->lazy_data_.at(this->index_);
-  this->index_++;
-  // this->current_result_ = execute(lazy_info.sql);
+void SqlResultSet::Execute() {
+  this->current_result_ = std::unique_ptr<::sql::ResultSet>(nullptr);
+  this->current_record_ready_ = false;
+  this->current_augment_info_.clear();
+  if (!this->lazy_data_.empty()) {
+    LazyResultSet &lazy_info = this->lazy_data_.front();
+    this->current_augment_info_ = std::move(lazy_info.augment_info);
+    this->current_result_ = this->eager_executor_->ExecuteQuery(lazy_info.sql);
+    this->lazy_data_.pop_front();
+  }
 }
 
 }  // namespace _result
