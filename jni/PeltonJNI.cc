@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <memory>
 #include <string>
 
 // Automatically generated via bazel dependencies from jni/PeltonJNI.java.
@@ -88,20 +89,22 @@ jobject Java_edu_brown_pelton_PeltonJNI_ExecuteQuery(JNIEnv *env, jobject this_,
     absl::StatusOr<pelton::SqlResult> result = pelton::exec(connection, str);
     if (result.ok() && result.value().IsQuery()) {
       pelton::SqlResult &sqlresult = result.value();
-      size_t col_count = sqlresult.GetSchema().size();
+      std::unique_ptr<pelton::SqlResultSet> resultset =
+          sqlresult.NextResultSet();
+      size_t col_count = resultset->GetSchema().size();
       // First element in result contains column names / headers.
       jobjectArray column_names =
           env->NewObjectArray(col_count, string_class, NULL);
       for (size_t i = 0; i < col_count; i++) {
         jstring column_name =
-            env->NewStringUTF(sqlresult.GetSchema().NameOf(i).c_str());
+            env->NewStringUTF(resultset->GetSchema().NameOf(i).c_str());
         env->SetObjectArrayElement(column_names, i, column_name);
       }
       env->CallBooleanMethod(array_list_obj, add_id, column_names);
 
       // Remaining elements contain actual rows.
-      while (sqlresult.HasNext()) {
-        pelton::Record row = sqlresult.FetchOne();
+      while (resultset->HasNext()) {
+        pelton::Record row = resultset->FetchOne();
         jobjectArray row_data =
             env->NewObjectArray(col_count, string_class, NULL);
         for (size_t i = 0; i < col_count; i++) {

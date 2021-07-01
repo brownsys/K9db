@@ -70,6 +70,7 @@ cc_library(
         "//pelton/dataflow:state",
         "//pelton/shards:state",
         "//pelton/shards:types",
+        "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",

@@ -5,9 +5,9 @@
 
 #include "absl/status/statusor.h"
 #include "pelton/dataflow/state.h"
-#include "pelton/mysql/result.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
+#include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -15,9 +15,9 @@ namespace shards {
 namespace sqlengine {
 namespace gdpr {
 
-absl::StatusOr<mysql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
-                                       SharderState *state,
-                                       dataflow::DataFlowState *dataflow_state);
+absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
+                                     SharderState *state,
+                                     dataflow::DataFlowState *dataflow_state);
 
 }  // namespace gdpr
 }  // namespace sqlengine

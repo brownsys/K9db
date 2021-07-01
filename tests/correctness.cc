@@ -221,7 +221,7 @@ void RunTest(const std::string &schema_file, const std::string &query_file,
     std::vector<std::string> query_actual;
 
     // add records to query_results
-    for (const pelton::Record &record : result) {
+    for (const pelton::Record &record : *result.NextResultSet()) {
       // TODO(babman): fix pelton outputing all records as negative.
       pelton::Record copy = record.Copy();
       copy.SetPositive(true);

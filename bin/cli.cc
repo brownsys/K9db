@@ -2,6 +2,7 @@
 #include <chrono>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -20,9 +21,12 @@ void Print(pelton::SqlResult &&result) {
   } else if (result.IsUpdate()) {
     std::cout << "Affected rows: " << result.UpdateCount() << std::endl;
   } else if (result.IsQuery()) {
-    std::cout << result.GetSchema() << std::endl;
-    for (const pelton::Record &record : result) {
-      std::cout << record << std::endl;
+    while (result.HasResultSet()) {
+      std::unique_ptr<pelton::SqlResultSet> resultset = result.NextResultSet();
+      std::cout << resultset->GetSchema() << std::endl;
+      for (const pelton::Record &record : *resultset) {
+        std::cout << record << std::endl;
+      }
     }
   }
 }
