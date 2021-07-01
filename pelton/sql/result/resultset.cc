@@ -1,5 +1,6 @@
 #include "pelton/sql/result/resultset.h"
 
+#include <iterator>
 #include <utility>
 
 #include "glog/logging.h"
@@ -8,6 +9,7 @@ namespace pelton {
 namespace sql {
 namespace _result {
 
+// Helpers for SqlLazyResultSet.
 namespace {
 
 // Turn record into a concatenated string.
@@ -116,41 +118,43 @@ dataflow::Record SqlRowToRecord(
 
 }  // namespace
 
+// SqlLazyResultSet.
 // Constructor.
-SqlResultSet::SqlResultSet(const dataflow::SchemaRef &schema,
-                           SqlEagerExecutor *eager_executor)
-    : lazy_data_(),
+SqlLazyResultSet::SqlLazyResultSet(const dataflow::SchemaRef &schema,
+                                   SqlEagerExecutor *eager_executor)
+    : SqlResultSet(schema),
+      lazy_data_(),
       current_augment_info_(),
       current_result_(),
       current_record_(schema),
       current_record_ready_(false),
-      schema_(schema),
       deduplicate_(false),
       duplicates_(),
       eager_executor_(eager_executor) {}
 
 // Adding additional results to this set.
-void SqlResultSet::AddShardResult(LazyResultSet &&lazy_result_set) {
-  this->lazy_data_.push_back(std::move(lazy_result_set));
+void SqlLazyResultSet::AddShardResult(LazyState &&lazy_state) {
+  this->lazy_data_.push_back(std::move(lazy_state));
 }
-void SqlResultSet::Append(SqlResultSet &&other, bool deduplicate) {
-  // TODO(babman): mark that results should be deduplicated and perform
-  // deduplication online.
-  CHECK(this->schema_ == other.schema_) << "Appending unequal schemas";
+void SqlLazyResultSet::Append(std::unique_ptr<SqlResultSet> &&other,
+                              bool deduplicate) {
+  CHECK(this->schema_ == other->GetSchema()) << "Appending unequal schemas";
+  CHECK(!other->IsInline()) << "Appending inline resutlset to lazy";
   // Perform the appending by putting the lazy shard results from other at the
   // end of the current data.
-  this->lazy_data_.splice(this->lazy_data_.end(), other.lazy_data_);
+  SqlLazyResultSet *o = static_cast<SqlLazyResultSet *>(other.get());
+  this->lazy_data_.splice(this->lazy_data_.end(), o->lazy_data_);
   this->deduplicate_ = this->deduplicate_ || deduplicate;
 }
 
 // Query API.
-bool SqlResultSet::HasNext() {
+bool SqlLazyResultSet::HasNext() {
   if (current_record_ready_) {
     return true;
   }
   return this->GetNext();
 }
-dataflow::Record SqlResultSet::FetchOne() {
+dataflow::Record SqlLazyResultSet::FetchOne() {
   if (!this->current_record_ready_) {
     if (!this->GetNext()) {
       LOG(FATAL) << ".FetchOne() called on empty SqlResultSet";
@@ -160,10 +164,18 @@ dataflow::Record SqlResultSet::FetchOne() {
   return std::move(this->current_record_);
 }
 
+std::vector<dataflow::Record> SqlLazyResultSet::Vectorize() {
+  std::vector<dataflow::Record> vec;
+  for (dataflow::Record &record : *this) {
+    vec.push_back(std::move(record));
+  }
+  return vec;
+}
+
 // Get the next record, from current_result_ or from the next result(s)
 // found by executing the next LazyResultSet(s). Store record in
 // current_record_.
-bool SqlResultSet::GetNext() {
+bool SqlLazyResultSet::GetNext() {
   while (!this->lazy_data_.empty() || this->current_result_ != nullptr) {
     while (this->current_result_ != nullptr && this->current_result_->next()) {
       this->current_record_ =
@@ -184,17 +196,64 @@ bool SqlResultSet::GetNext() {
   return false;
 }
 
-// Actually execute SQL statement in LazyResultSet against the shards.
-// TODO(babman): actually call the executor from here etc.
-void SqlResultSet::Execute() {
+// Actually execute SQL statement in head LazyState against the shards.
+void SqlLazyResultSet::Execute() {
   this->current_result_ = std::unique_ptr<::sql::ResultSet>(nullptr);
   this->current_record_ready_ = false;
   this->current_augment_info_.clear();
   if (!this->lazy_data_.empty()) {
-    LazyResultSet &lazy_info = this->lazy_data_.front();
+    LazyState &lazy_info = this->lazy_data_.front();
     this->current_augment_info_ = std::move(lazy_info.augment_info);
     this->current_result_ = this->eager_executor_->ExecuteQuery(lazy_info.sql);
     this->lazy_data_.pop_front();
+  }
+}
+
+// SqlInlineResultSet.
+// Constructor.
+SqlInlineResultSet::SqlInlineResultSet(const dataflow::SchemaRef &schema,
+                                       std::vector<dataflow::Record> &&records)
+    : SqlResultSet(schema), index_(0), records_(std::move(records)) {}
+
+// Adding additional results to this set.
+void SqlInlineResultSet::Append(std::unique_ptr<SqlResultSet> &&other,
+                                bool deduplicate) {
+  if (deduplicate) {
+    std::unordered_set<std::string> dups;
+    for (const dataflow::Record &record : this->records_) {
+      dups.insert(StringifyRecord(record));
+    }
+    for (dataflow::Record &record : *other) {
+      if (dups.count(StringifyRecord(record)) == 0) {
+        this->records_.push_back(std::move(record));
+      }
+    }
+  } else {
+    for (dataflow::Record &record : *other) {
+      this->records_.push_back(std::move(record));
+    }
+  }
+}
+
+// Query API.
+bool SqlInlineResultSet::HasNext() {
+  return this->index_ < this->records_.size();
+}
+dataflow::Record SqlInlineResultSet::FetchOne() {
+  return std::move(this->records_.at(this->index_++));
+}
+
+std::vector<dataflow::Record> SqlInlineResultSet::Vectorize() {
+  if (this->index_ == 0) {
+    this->index_ = this->records_.size();
+    return std::move(this->records_);
+  } else {
+    std::vector<dataflow::Record> vec;
+    vec.reserve(this->records_.size() - this->index_);
+    for (; this->index_ < this->records_.size(); this->index_++) {
+      vec.push_back(std::move(this->records_.at(this->index_)));
+    }
+    return vec;
   }
 }
 

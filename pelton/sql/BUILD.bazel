@@ -26,9 +26,6 @@ cc_library(
     hdrs = [
         "lazy_executor.h",
     ],
-    linkopts = [
-        "-lmariadbcpp",
-    ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":eager_executor",
@@ -52,12 +49,11 @@ cc_library(
     hdrs = [
         "result.h",
     ],
-    linkopts = [
-        "-lmariadbcpp",
-    ],
     visibility = ["//:__subpackages__"],
     deps = [
+        "//pelton/dataflow:schema",
         "//pelton/sql/result:abstract_result",
+        "//pelton/sql/result:impls",
         "//pelton/sql/result:resultset",
     ],
 )

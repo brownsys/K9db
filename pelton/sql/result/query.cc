@@ -16,11 +16,11 @@ bool QuerySqlResult::HasResultSet() {
   return this->index_ < this->results_.size();
 }
 
-SqlResultSet QuerySqlResult::NextResultSet() {
+std::unique_ptr<SqlResultSet> QuerySqlResult::NextResultSet() {
   return std::move(this->results_.at(this->index_++));
 }
 
-void QuerySqlResult::AddResultSet(SqlResultSet &&result_set) {
+void QuerySqlResult::AddResultSet(std::unique_ptr<SqlResultSet> &&result_set) {
   this->results_.push_back(std::move(result_set));
 }
 
@@ -36,7 +36,7 @@ void QuerySqlResult::Append(std::unique_ptr<AbstractSqlResultImpl> &&other,
   CHECK(o->results_.size() == 1) << "Can only append by 1 resultset";
 
   // Append consuming other.
-  this->results_.at(0).Append(std::move(o->results_.at(0)), deduplicate);
+  this->results_.at(0)->Append(std::move(o->results_.at(0)), deduplicate);
 }
 
 }  // namespace _result

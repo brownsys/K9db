@@ -4,6 +4,7 @@
 #include <memory>
 #include <utility>
 
+#include "pelton/dataflow/schema.h"
 #include "pelton/sql/result/abstract_result.h"
 #include "pelton/sql/result/resultset.h"
 
@@ -29,7 +30,8 @@ class SqlResult {
   // For results of SELECT, the result_set object is actually a lazy wrapper
   // around plain SQL commands and some schema and other metadata. The actual
   // records/rows are produced as they are retrieved from this wrapper.
-  explicit SqlResult(SqlResultSet &&result_set);
+  explicit SqlResult(std::unique_ptr<SqlResultSet> &&result_set);
+  explicit SqlResult(const dataflow::SchemaRef &schema);  // For empty SELECTs.
 
   // API for accessing the result.
   inline bool IsStatement() const { return this->impl_->IsStatement(); }
@@ -44,7 +46,9 @@ class SqlResult {
 
   // Only safe to use if IsQuery() returns true.
   inline bool HasResultSet() { return this->impl_->HasResultSet(); }
-  inline SqlResultSet NextResultSet() { return this->impl_->NextResultSet(); }
+  inline std::unique_ptr<SqlResultSet> NextResultSet() {
+    return this->impl_->NextResultSet();
+  }
 
   // Internal API: do not use outside of pelton code.
   // Appends the provided SqlResult to this SqlResult, appeneded
@@ -56,7 +60,7 @@ class SqlResult {
       this->impl_->Append(std::move(other.impl_), deduplicate);
     }
   }
-  inline void AddResultSet(SqlResultSet &&result_set) {
+  inline void AddResultSet(std::unique_ptr<SqlResultSet> &&result_set) {
     if (this->impl_ == nullptr) {
       this->Append(SqlResult(std::move(result_set)));
     } else {

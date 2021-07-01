@@ -1,6 +1,7 @@
 // Manages mysql connections to the different shard/mini-databases.
 #include "pelton/sql/lazy_executor.h"
 
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -28,7 +29,8 @@ SqlResult SqlLazyExecutor::EmptyResultByType(
         return SqlResult(0);
       }
     case sqlast::AbstractStatement::Type::SELECT:
-      return SqlResult(SqlResultSet(schema, &this->eager_executor_));
+      return SqlResult(std::make_unique<_result::SqlLazyResultSet>(
+          schema, &this->eager_executor_));
     default:
       LOG(FATAL) << "Unsupported SQL statement in SqlLazyExecutor";
   }
@@ -140,8 +142,10 @@ SqlResult SqlLazyExecutor::Execute(const sqlast::AbstractStatement *stmt,
         aug_info.push_back({static_cast<size_t>(aug_index), aug_value});
       }
       // Create a lazy result set.
-      SqlResultSet result_set{schema, &this->eager_executor_};
-      result_set.AddShardResult({sql, std::move(aug_info)});
+      std::unique_ptr<_result::SqlLazyResultSet> result_set =
+          std::make_unique<_result::SqlLazyResultSet>(schema,
+                                                      &this->eager_executor_);
+      result_set->AddShardResult({sql, std::move(aug_info)});
       return SqlResult(std::move(result_set));
     }
 

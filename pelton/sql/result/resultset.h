@@ -21,13 +21,7 @@ struct AugmentingInformation {
   std::string value;
 };
 
-// ResultSet consists of potentially many (lazy) portions, each coming in from
-// some shard.
-struct LazyResultSet {
-  std::string sql;  // Statement to execute to get this shard's result.
-  std::vector<AugmentingInformation> augment_info;
-};
-
+// Abstract class.
 class SqlResultSet {
  public:
   // Iterator that goes over all records in this result set.
@@ -73,18 +67,19 @@ class SqlResultSet {
     dataflow::Record record_;
   };
 
-  // Constructors.
-  SqlResultSet(const dataflow::SchemaRef &schema,
-               SqlEagerExecutor *eager_executor);
+  // Constructor.
+  explicit SqlResultSet(const dataflow::SchemaRef &schema) : schema_(schema) {}
+  virtual ~SqlResultSet() = default;
 
-  // Adding additional results to this set.
-  void AddShardResult(LazyResultSet &&lazy_result_set);
-  void Append(SqlResultSet &&other, bool deduplicate);
-
-  // Query API.
+  // SqlResultSet API.
+  virtual bool IsInline() const = 0;
   dataflow::SchemaRef GetSchema() { return this->schema_; }
-  bool HasNext();
-  dataflow::Record FetchOne();
+  virtual bool HasNext() = 0;
+  virtual dataflow::Record FetchOne() = 0;
+
+  // Appending other SqlResultSets.
+  virtual void Append(std::unique_ptr<SqlResultSet> &&other,
+                      bool deduplicate) = 0;
 
   // Iterator API.
   SqlResultSet::Iterator begin() {
@@ -94,13 +89,43 @@ class SqlResultSet {
     return SqlResultSet::Iterator{nullptr, this->schema_};
   }
 
+  // Consume the ResultSet returning all remaining records as a vector.
+  virtual std::vector<dataflow::Record> Vectorize() = 0;
+
+ protected:
+  dataflow::SchemaRef schema_;
+};
+
+// SqlLazyResultSet consists of potentially many (lazy) portions, each coming
+// in from some shard.
+class SqlLazyResultSet : public SqlResultSet {
+ public:
+  struct LazyState {
+    std::string sql;  // Statement to execute to get this shard's result.
+    std::vector<AugmentingInformation> augment_info;
+  };
+
+  // Constructor.
+  SqlLazyResultSet(const dataflow::SchemaRef &schema,
+                   SqlEagerExecutor *eager_executor);
+
+  // Adding additional results to this set.
+  void AddShardResult(LazyState &&lazy_state);
+  void Append(std::unique_ptr<SqlResultSet> &&other, bool deduplicate) override;
+
+  // Query API.
+  bool IsInline() const override { return false; }
+  bool HasNext() override;
+  dataflow::Record FetchOne() override;
+
+  std::vector<dataflow::Record> Vectorize() override;
+
  private:
-  std::list<LazyResultSet> lazy_data_;
+  std::list<LazyState> lazy_data_;
   std::vector<AugmentingInformation> current_augment_info_;
   std::unique_ptr<::sql::ResultSet> current_result_;
   dataflow::Record current_record_;
   bool current_record_ready_;
-  dataflow::SchemaRef schema_;
   // Online deduplication as rows are read in from underlying results.
   bool deduplicate_;
   std::unordered_set<std::string> duplicates_;
@@ -108,13 +133,35 @@ class SqlResultSet {
   SqlEagerExecutor *eager_executor_;
 
   // Get the next record, from current_result_ or from the next result(s)
-  // found by executing the next LazyResultSet(s). Store record in
+  // found by executing the next LazyState(s). Store record in
   // current_record_.
   // Returns true if a record was found, and false if the resultsets are totally
   // consumed. Perform deduplication when needed.
   bool GetNext();
-  // Actually execute SQL statement in LazyResultSet against the shards.
+  // Actually execute SQL statement in LazyState against the shards.
   void Execute();
+};
+
+// SqlInlineResultSet consists of an inlined vector of records.
+class SqlInlineResultSet : public SqlResultSet {
+ public:
+  // Constructor.
+  explicit SqlInlineResultSet(const dataflow::SchemaRef &schema,
+                              std::vector<dataflow::Record> &&records = {});
+
+  // Adding additional results to this set.
+  void Append(std::unique_ptr<SqlResultSet> &&other, bool deduplicate) override;
+
+  // Query API.
+  bool IsInline() const override { return true; }
+  bool HasNext() override;
+  dataflow::Record FetchOne() override;
+
+  std::vector<dataflow::Record> Vectorize() override;
+
+ private:
+  size_t index_;
+  std::vector<dataflow::Record> records_;
 };
 
 }  // namespace _result

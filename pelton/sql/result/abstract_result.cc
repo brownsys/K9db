@@ -27,10 +27,11 @@ int AbstractSqlResultImpl::UpdateCount() const {
 bool AbstractSqlResultImpl::HasResultSet() {
   LOG(FATAL) << ".HasResultSet() called on non-query SqlResult";
 }
-SqlResultSet AbstractSqlResultImpl::NextResultSet() {
+std::unique_ptr<SqlResultSet> AbstractSqlResultImpl::NextResultSet() {
   LOG(FATAL) << ".NextResultSet() called on non-query SqlResult";
 }
-void AbstractSqlResultImpl::AddResultSet(SqlResultSet &&result_set) {
+void AbstractSqlResultImpl::AddResultSet(
+    std::unique_ptr<SqlResultSet> &&result_set) {
   LOG(FATAL) << ".AddResultSet() called on non-query SqlResult";
 }
 

@@ -20,8 +20,8 @@ class QuerySqlResult : public AbstractSqlResultImpl {
 
   // Query API.
   bool HasResultSet() override;
-  SqlResultSet NextResultSet() override;
-  void AddResultSet(SqlResultSet &&result_set) override;
+  std::unique_ptr<SqlResultSet> NextResultSet() override;
+  void AddResultSet(std::unique_ptr<SqlResultSet> &&result_set) override;
 
   // Appending.
   void Append(std::unique_ptr<AbstractSqlResultImpl> &&other,
@@ -29,7 +29,7 @@ class QuerySqlResult : public AbstractSqlResultImpl {
 
  private:
   size_t index_;
-  std::vector<SqlResultSet> results_;
+  std::vector<std::unique_ptr<SqlResultSet>> results_;
 };
 
 }  // namespace _result

@@ -27,8 +27,8 @@ class AbstractSqlResultImpl {
 
   // Query API.
   virtual bool HasResultSet();
-  virtual SqlResultSet NextResultSet();
-  virtual void AddResultSet(SqlResultSet &&result_set);
+  virtual std::unique_ptr<SqlResultSet> NextResultSet();
+  virtual void AddResultSet(std::unique_ptr<SqlResultSet> &&result_set);
 
   // Appending API.
   virtual void Append(std::unique_ptr<AbstractSqlResultImpl> &&other,

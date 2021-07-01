@@ -11,8 +11,8 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
-        ":pool",
         ":types",
+        "//pelton/sql:lazy_executor",
         "//pelton/sqlast:ast",
         "//pelton/sqlast:parser",
         "//pelton/util:fs",
