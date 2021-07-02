@@ -53,6 +53,14 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         println!("Rust Proxy: calling c-wrapper for pelton::open\n");
         let rust_conn : ConnectionC = open("", "root", "password");
         println!("Rust Proxy: connection status is: {:?}", rust_conn.connected);
+        
+        println!("Rust Proxy: calling c-wrapper for pelton::exec\n");
+        let rust_conn : ConnectionC = exec(rust_conn, q_string);
+        println!("Rust Proxy: query_response is: {:?}", rust_conn.query_response);
+        let response_type : &CStr = unsafe {CStr::from_ptr(rust_conn.query_response.response_type)};
+        let response_type : &str = response_type.to_str().unwrap();
+        println!("Rust Proxy: return type is: {:?}", response_type);
+
         println!("Rust Proxy: calling c-wrapper for pelton::close\n");
         let rust_conn : ConnectionC = close(rust_conn);
         println!("Rust Proxy: connection status is: {:?}", rust_conn.connected);

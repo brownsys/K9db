@@ -39,3 +39,11 @@ fn close(rust_conn : ConnectionC) -> ConnectionC {
   let response = unsafe {close_c(rust_conn)};
   return response;
 }
+
+fn exec(rust_conn : ConnectionC, query : &str) -> ConnectionC {
+  let c_query = CString::new(query).unwrap();
+  let c_query: *mut c_char = c_query.as_ptr() as *mut i8;
+
+  let response = unsafe {exec_c(rust_conn, c_query)};
+  return response;
+}
