@@ -61,32 +61,32 @@ ConnectionC open_c(const char *db_dir, const char *db_username, const char *db_p
     return c_conn;
 }
 
-ConnectionC close_c(ConnectionC c_conn)
+bool close_c(ConnectionC *c_conn)
 {
     std::cout << "C-Wrapper: starting close_c" << std::endl;
     pelton::Connection *cpp_conn =
-        reinterpret_cast<pelton::Connection *>(c_conn.cpp_conn);
+        reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
 
     bool response = pelton::close(cpp_conn);
     if (response)
     {
-        c_conn.connected = false;
+        c_conn->connected = false;
         std::cout << "C-Wrapper: connection closed\n"
                   << std::endl;
+        return true;
     }
     else
     {
         std::cout << "C-Wrapper: failed to close connection\n"
                   << std::endl;
+        return false;
     }
-
-    return c_conn;
 }
 
-bool exec_ddl(ConnectionC c_conn, std::string query)
+bool exec_ddl(ConnectionC *c_conn, std::string query)
 {
     pelton::Connection *cpp_conn =
-        reinterpret_cast<pelton::Connection *>(c_conn.cpp_conn);
+        reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
     absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
     if (result.ok() && result.value().IsStatement() && result.value().Success())
     {
@@ -98,10 +98,10 @@ bool exec_ddl(ConnectionC c_conn, std::string query)
     }
 }
 
-int exec_update(ConnectionC c_conn, std::string query)
+int exec_update(ConnectionC *c_conn, std::string query)
 {
     pelton::Connection *cpp_conn =
-        reinterpret_cast<pelton::Connection *>(c_conn.cpp_conn);
+        reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
     absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
 
     if (result.ok() && result.value().IsUpdate())
@@ -114,7 +114,7 @@ int exec_update(ConnectionC c_conn, std::string query)
     }
 }
 
-ConnectionC exec_c(ConnectionC c_conn, const char *query)
+QueryResponse exec_c(ConnectionC *c_conn, const char *query)
 {
     std::cout << "C-Wrapper: starting exec" << std::endl;
     const std::string query_string(query);
@@ -172,7 +172,5 @@ ConnectionC exec_c(ConnectionC c_conn, const char *query)
     {
         std::cout << "C-Wrapper: invalid response_type" << std::endl;
     }
-
-    c_conn.query_response = q_response;
-    return c_conn;
+    return q_response;
 }

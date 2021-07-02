@@ -60,7 +60,6 @@ fn bindgen_test_layout_QueryResponse() {
 pub struct ConnectionC {
     pub cpp_conn: *mut ::std::os::raw::c_void,
     pub connected: bool,
-    pub query_response: QueryResponse,
 }
 #[test]
 fn bindgen_test_layout_ConnectionC() {
@@ -94,27 +93,17 @@ fn bindgen_test_layout_ConnectionC() {
             stringify!(connected)
         )
     );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<ConnectionC>())).query_response as *const _ as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(ConnectionC),
-            "::",
-            stringify!(query_response)
-        )
-    );
 }
 
 // custom destructor
 impl Drop for ConnectionC {
     fn drop (&mut self) {
-        println!("Rust FFI: Calling destructor ConnectionC::drop()");
+        println!("Rust FFI: Calling destructor for ConnectionC");
         // the struct itself is destructed by rust automatically. Only
         // the C++ struct in the field of the rust struct is not and requires
         // manually deallocation
         unsafe {destroy(self.cpp_conn)};
-        println!("Rust FFI: Dropped!");
+        println!("Rust FFI: ConnectionC destroyed");
     }
 }
 
@@ -125,8 +114,8 @@ extern "C" {
         db_username: *mut ::std::os::raw::c_char,
         db_password: *mut ::std::os::raw::c_char,
     ) -> ConnectionC;
-    pub fn exec_c(c_conn: ConnectionC, query: *const ::std::os::raw::c_char) -> ConnectionC;
-    pub fn close_c(c_conn: ConnectionC) -> ConnectionC;
+    pub fn exec_c(c_conn: *mut ConnectionC, query: *const ::std::os::raw::c_char) -> QueryResponse;
+    pub fn close_c(c_conn: *mut ConnectionC) -> bool;
     pub fn destroy(c_conn: *mut ::std::os::raw::c_void);
 }
 

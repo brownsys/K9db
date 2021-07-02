@@ -15,11 +15,10 @@ extern "C"
     {
         void *cpp_conn;
         bool connected;
-        struct QueryResponse query_response;
     };
     struct ConnectionC open_c(const char* db_dir,const char* db_username, const char* db_password);
-    struct ConnectionC close_c(struct ConnectionC c_conn);
-    struct ConnectionC exec_c(struct ConnectionC c_conn, const char* query);
+    bool close_c(struct ConnectionC *c_conn);
+    struct QueryResponse exec_c(struct ConnectionC *c_conn, const char* query);
     void destroy(void* c_conn);
 
 #ifdef __cplusplus

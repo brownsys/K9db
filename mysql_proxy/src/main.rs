@@ -4,7 +4,9 @@ use msql_srv::*;
 include!("wrappers.rs");
 
 #[derive(Debug)]
-struct Backend;
+struct Backend {
+    rust_conn: ConnectionC,
+}
 impl<W: io::Write> MysqlShim<W> for Backend {
     type Error = io::Error;
 
@@ -47,24 +49,14 @@ impl<W: io::Write> MysqlShim<W> for Backend {
     fn on_query(&mut self, q_string: &str, results: QueryResultWriter<W>) -> io::Result<()> {
         println!("Rust proxy: starting on_query");
         println!("Rust Proxy: query received from HotCRP is: {:?}", q_string);
-        // let query_response : &str = send_string(q_string); 
-        // println!("Rust Proxy: query response from C-wrapper is: {:?}\n", query_response);
 
-        println!("Rust Proxy: calling c-wrapper for pelton::open\n");
-        let rust_conn : ConnectionC = open("", "root", "password");
-        println!("Rust Proxy: connection status is: {:?}", rust_conn.connected);
-        
         println!("Rust Proxy: calling c-wrapper for pelton::exec\n");
-        let rust_conn : ConnectionC = exec(rust_conn, q_string);
-        println!("Rust Proxy: query_response is: {:?}", rust_conn.query_response);
-        let response_type : &CStr = unsafe {CStr::from_ptr(rust_conn.query_response.response_type)};
+        let exec_response : QueryResponse = exec(&mut self.rust_conn, q_string);
+        println!("Rust Proxy: query_response is: {:?}", exec_response);
+        let response_type : &CStr = unsafe {CStr::from_ptr(exec_response.response_type)};
         let response_type : &str = response_type.to_str().unwrap();
-        println!("Rust Proxy: return type is: {:?}", response_type);
+        println!("Rust Proxy: return type is: {:?}\n", response_type);
 
-        println!("Rust Proxy: calling c-wrapper for pelton::close\n");
-        let rust_conn : ConnectionC = close(rust_conn);
-        println!("Rust Proxy: connection status is: {:?}", rust_conn.connected);
-        
         if q_string.contains("SET") {
             return results.completed(0, 0);
         }
@@ -98,12 +90,23 @@ impl<W: io::Write> MysqlShim<W> for Backend {
     }
 }
 
-fn main() {
-    // println!("Calling pelton open via ffi {}", open());
+// custom destructor to close connection once Backend goes out of scope 
+impl Drop for Backend {
+    fn drop (&mut self) {
+        println!("Rust FFI: Calling destructor for Backend");
+        println!("Rust Proxy: calling c-wrapper for pelton::close\n");
+        let close_response : bool = close(&mut self.rust_conn);
+        if (close_response) {
+            println!("Rust Proxy: successfully closed connection");
+        } else {
+            println!("Rust Proxy: failed to close connection");
+        }
+    }
+}
 
+fn main() {
     let listener = net::TcpListener::bind("127.0.0.1:10001").unwrap();
     // let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
-    // let port = listener.local_addr().unwrap().port();
     println!("Listening at: {:?}", listener);
 
     // thread::spawn creates a new thread with the first function it should run
@@ -114,7 +117,11 @@ fn main() {
         // i.e. if connection established, call mysql_intermediary's run_on_tcp. (_ in front of a variable name indicates to compiler that this is unused)
         if let Ok((stream, _addr)) = listener.accept() {  // -> .accept returns Result<(TcpStream, SocketAddr)> and blocks thread until a TCP connection is established
             println!("Successfully connected to HotCRP's mysql server\nStream and address are: {:?}\n", stream);
-            let inter = MysqlIntermediary::run_on_tcp(Backend, stream).unwrap();
+            println!("Rust Proxy: calling c-wrapper for pelton::open\n");
+            let rust_conn = open("", "root", "password");
+            println!("Rust Proxy: connection status is: {:?}", rust_conn.connected);
+            let backend = Backend{rust_conn};
+            let inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
             // it's not reaching past here because at this point it's already started a new TCP server - it's processing client commands until client disconnects or an error occurs
         }
     });

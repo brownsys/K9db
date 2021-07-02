@@ -35,12 +35,12 @@ fn open(dir: &str, user: &str, pass: &str) -> ConnectionC {
   return conn;
 }
 
-fn close(rust_conn : ConnectionC) -> ConnectionC {
+fn close(rust_conn : *mut ConnectionC) -> bool {
   let response = unsafe {close_c(rust_conn)};
   return response;
 }
 
-fn exec(rust_conn : ConnectionC, query : &str) -> ConnectionC {
+fn exec(rust_conn : *mut ConnectionC, query : &str) -> QueryResponse {
   let c_query = CString::new(query).unwrap();
   let c_query: *mut c_char = c_query.as_ptr() as *mut i8;
 
