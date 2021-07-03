@@ -73,10 +73,12 @@ std::shared_ptr<DataFlowGraph> DataFlowGraph::Clone() {
         std::static_pointer_cast<MatViewOperator>(matview->Clone());
     matview_clone->graph_ = clone.get();
     clone->outputs_.push_back(matview_clone);
+    clone->nodes_.emplace(matview_clone->index_, matview_clone);
   }
-  // Nodes must be added in order so that they have same indices.
+  // The cloned nodes have their indices set during the operator cloning itself
   for (size_t i = 0; i < this->nodes_.size(); i++) {
     auto node_clone = this->nodes_.at(i)->Clone();
+    assert(node_clone->index_ == i);
     node_clone->graph_ = clone.get();
     clone->nodes_.emplace(i, node_clone);
   }

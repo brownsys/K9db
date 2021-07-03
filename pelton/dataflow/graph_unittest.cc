@@ -220,7 +220,7 @@ DataFlowGraph MakeFilterGraph(ColumnID keycol, const SchemaRef &schema) {
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto filter = std::make_shared<FilterOperator>();
   filter->AddOperation(5UL, 0, FilterOperator::Operation::GREATER_THAN);
-  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
+  auto matview = std::make_shared<KeyOrderedMatViewOperator>(keys);
 
   EXPECT_TRUE(g.AddInputNode(in));
   EXPECT_TRUE(g.AddNode(filter, in));
@@ -574,6 +574,29 @@ TEST(DataFlowGraphTest, TestAggregateOnEquiJoinGraph) {
       MakeAggregateOnEquiJoinRecords(op->output_schema());
   // Outputs must be equal.
   MatViewContentsEqualsIndexed(g.outputs().at(0), result, 0);
+}
+
+// Similar to TestAggregateOnEquiJoinGraph
+TEST(DataFlowGraphTest, CloneTest) {
+  // Schema must survive records.
+  SchemaRef lschema = MakeLeftSchema();
+  SchemaRef rschema = MakeRightSchema();
+  // Make graph.
+  DataFlowGraph g = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
+  auto g_clone = g.Clone();
+
+  // Make records.
+  std::vector<Record> left = MakeLeftRecords(lschema);
+  std::vector<Record> right = MakeRightRecords(rschema);
+  // Process records.
+  EXPECT_TRUE(g_clone->Process("test-table1", left));
+  EXPECT_TRUE(g_clone->Process("test-table2", right));
+  // Compute expected result.
+  auto op = std::dynamic_pointer_cast<AggregateOperator>(g_clone->GetNode(3));
+  std::vector<Record> result =
+      MakeAggregateOnEquiJoinRecords(op->output_schema());
+  // Outputs must be equal.
+  MatViewContentsEqualsIndexed(g_clone->outputs().at(0), result, 0);
 }
 
 #ifndef PELTON_VALGRIND_MODE
