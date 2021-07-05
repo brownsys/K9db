@@ -308,7 +308,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     CHECK_STATUS(IsShardingBySupported(&info, *state));
   }
 
-  sql::SqlResult result;
+  sql::SqlResult result = sql::SqlResult(false);
   // Sharding scenarios.
   if (has_pii && sharding_information.size() == 0) {
     // Case 1: has pii but not linked to shards.

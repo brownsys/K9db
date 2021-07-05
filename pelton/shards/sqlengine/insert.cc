@@ -42,7 +42,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
 
   // Shard the insert statement so it is executable against the physical
   // sharded database.
-  sql::SqlResult result;
+  sql::SqlResult result = sql::SqlResult(0);
 
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {

@@ -125,7 +125,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
     CHECK_STATUS(UpdateRecords(&records, stmt, state->GetSchema(table_name)));
   }
 
-  sql::SqlResult result;
+  sql::SqlResult result = sql::SqlResult(0);
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
@@ -229,9 +229,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
   // Delete was successful, time to update dataflows.
   if (update_flows) {
     dataflow_state->ProcessRecords(table_name, records);
-  }
-  if (!result.IsUpdate()) {
-    result = sql::SqlResult(0);
   }
 
   perf::End("Update");

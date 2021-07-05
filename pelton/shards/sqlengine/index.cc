@@ -20,7 +20,7 @@ absl::StatusOr<sql::SqlResult> CreateIndex(
   perf::Start("Create Index");
   const std::string &table_name = stmt.table_name();
 
-  sql::SqlResult result;
+  sql::SqlResult result = sql::SqlResult(false);
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     result = state->executor().ExecuteDefault(&stmt);
