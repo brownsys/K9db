@@ -112,7 +112,7 @@ SqlResult SqlLazyExecutor::Execute(const sqlast::AbstractStatement *stmt,
                                    const std::string &aug_value) {
   std::string sql = sqlast::Stringifier(shard_name).Visit(stmt);
 #ifndef PELTON_OPT
-  LOG(INFO) << "Statement:" << sql;
+  LOG(INFO) << "Statement: " << sql;
 #endif
 
   switch (stmt->type()) {
@@ -122,8 +122,8 @@ SqlResult SqlLazyExecutor::Execute(const sqlast::AbstractStatement *stmt,
       return SqlResult(this->eager_executor_.ExecuteStatement(sql));
 
     // Updates: return a count of rows affected.
-    case sqlast::AbstractStatement::Type::UPDATE:
     case sqlast::AbstractStatement::Type::INSERT:
+    case sqlast::AbstractStatement::Type::UPDATE:
       return SqlResult(this->eager_executor_.ExecuteUpdate(sql));
 
     // A returning delete is a query, a non returning delete is an update.

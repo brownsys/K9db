@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 cc_library(
     name = "eager_executor",
@@ -38,6 +38,7 @@ cc_library(
         "//pelton/util:perf",
         "@absl//absl/status",
         "@glog",
+        "@gtest//:gtest_prod",
     ],
 )
 
@@ -55,5 +56,45 @@ cc_library(
         "//pelton/sql/result:abstract_result",
         "//pelton/sql/result:impls",
         "//pelton/sql/result:resultset",
+    ],
+)
+
+cc_test(
+    name = "eager_executor-test",
+    srcs = [
+        "eager_executor_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    linkopts = [
+        "-lmariadbcpp",
+    ],
+    deps = [
+        ":eager_executor",
+        "@glog",
+        "@gtest",
+    ],
+)
+
+cc_test(
+    name = "lazy_executor-test",
+    srcs = [
+        "lazy_executor_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    linkopts = [
+        "-lmariadbcpp",
+    ],
+    deps = [
+        ":lazy_executor",
+        ":result",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/shards:types",
+        "//pelton/shards/sqlengine:util",
+        "//pelton/sqlast:ast",
+        "//pelton/util:ints",
+        "@glog",
+        "@gtest",
     ],
 )

@@ -11,6 +11,7 @@
 #include <string>
 #include <unordered_set>
 
+#include "gtest/gtest_prod.h"
 #include "pelton/shards/types.h"
 #include "pelton/sql/eager_executor.h"
 #include "pelton/sql/result.h"
@@ -62,6 +63,14 @@ class SqlLazyExecutor {
   // Eager executor is responsible for executing the SQL commands against
   // the backend database.
   SqlEagerExecutor eager_executor_;
+
+  FRIEND_TEST(LazyExecutorTest, TestCreateTableDefault);
+  FRIEND_TEST(LazyExecutorTest, TestCreateTableShard);
+  FRIEND_TEST(LazyExecutorTest, TestUpdatesDefault);
+  FRIEND_TEST(LazyExecutorTest, TestUpdatesShard);
+  FRIEND_TEST(LazyExecutorTest, TestSelectDefault);
+  FRIEND_TEST(LazyExecutorTest, TestSelectShard);
+  FRIEND_TEST(LazyExecutorTest, TestSelectShardSet);
 };
 
 }  // namespace sql

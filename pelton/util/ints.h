@@ -2,6 +2,8 @@
 #define PELTON_UTIL_INTS_H_
 
 #include <cstdint>
+#include <memory>
+#include <string>
 
 namespace pelton {
 
@@ -15,6 +17,8 @@ namespace pelton {
 uint64_t operator"" _u(unsigned long long x);
 // NOLINTNEXTLINE
 int64_t operator"" _s(unsigned long long x);
+
+std::unique_ptr<std::string> operator"" _Uptr(const char *x, size_t len);
 
 }  // namespace pelton
 

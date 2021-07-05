@@ -64,8 +64,8 @@ bool ReadCommand(std::string *ptr) {
 
 DEFINE_bool(print, true, "Print results to the screen");
 DEFINE_string(db_path, "", "Path to database directory (required)");
-DEFINE_string(db_username, "root", "MYSQL username to connect with");
-DEFINE_string(db_password, "password", "MYSQL pwd to connect with");
+DEFINE_string(db_username, "root", "MariaDB username to connect with");
+DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
 
 int main(int argc, char **argv) {
   // Command line arugments and help message.

@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 cc_library(
     name = "abstract_result",
@@ -50,5 +50,26 @@ cc_library(
         ":abstract_result",
         ":resultset",
         "@glog",
+    ],
+)
+
+cc_test(
+    name = "resultset-test",
+    srcs = [
+        "resultset_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    linkopts = [
+        "-lmariadbcpp",
+    ],
+    deps = [
+        ":resultset",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sql:eager_executor",
+        "//pelton/util:ints",
+        "@glog",
+        "@gtest",
     ],
 )

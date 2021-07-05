@@ -26,5 +26,9 @@ int64_t operator"" _s(unsigned long long x) {
   // NOLINTNEXTLINE
   return static_cast<int64_t>(static_cast<long long>(x));
 }
+// NOLINTNEXTLINE
+std::unique_ptr<std::string> operator"" _Uptr(const char *x, size_t len) {
+  return std::make_unique<std::string>(x, len);
+}
 
 }  // namespace pelton
