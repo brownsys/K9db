@@ -133,7 +133,7 @@ int main(int argc, char **argv) {
       std::cout << ">>> " << std::flush;
     }
 
-    // For Measuring Latency of composie endpoints.
+    // For Measuring Latency of composite endpoints.
     pelton::latency::Latency profiler;
 
     // Read SQL statements one at a time!
@@ -193,8 +193,8 @@ int main(int argc, char **argv) {
 
   pelton::perf::PrintAll();
   std::cout << "Time MYSQL: "
-            << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
-                                                                     start_time)
+            << std::chrono::duration_cast<std::chrono::nanoseconds>(end_time -
+                                                                    start_time)
                    .count()
             << "ms" << std::endl;
 

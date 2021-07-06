@@ -167,7 +167,7 @@ int main(int argc, char **argv) {
               << std::endl;
 
     std::cout << "Time PELTON: "
-              << std::chrono::duration_cast<std::chrono::milliseconds>(
+              << std::chrono::duration_cast<std::chrono::nanoseconds>(
                      end_time - start_time)
                      .count()
               << "ms" << std::endl;
