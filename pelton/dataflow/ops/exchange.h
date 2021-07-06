@@ -2,6 +2,7 @@
 #define PELTON_DATAFLOW_OPS_EXCHANGE_H_
 
 #include <memory>
+#include <thread>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
@@ -30,7 +31,9 @@ class ExchangeOperator : public Operator {
         peers_(peers),
         partition_key_(partition_key),
         current_partition_(current_partition),
-        total_partitions_(total_partitions) {}
+        total_partitions_(total_partitions),
+        listen_thread_(
+            std::move(std::thread(&ExchangeOperator::ListenFromPeers, this))) {}
 
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,
@@ -38,7 +41,8 @@ class ExchangeOperator : public Operator {
 
   void ComputeOutputSchema() override;
 
-  // FRIEND_TEST(ExchangeOperatorTest, BasicJoinTest);
+  FRIEND_TEST(ExchangeOperatorTest, BasicTest);
+
  private:
   // Used by peers of this operator to send messages to this operator
   std::shared_ptr<Channel> incoming_chan_;
@@ -50,8 +54,13 @@ class ExchangeOperator : public Operator {
   std::vector<ColumnID> partition_key_;
   uint16_t current_partition_;
   uint16_t total_partitions_;
+  std::thread listen_thread_;
 
   void ListenFromPeers() {
+    // NOTE: This thread does not process records via recursive function
+    // calls because that would require locks on operators' state (if any).
+    // Instead this thread forwards sends the records for processing to the
+    // "main"(w.r.t the partition) thread via graph_chan_.
     while (true) {
       std::vector<std::shared_ptr<BatchMessage>> messages =
           this->incoming_chan_->Recv();

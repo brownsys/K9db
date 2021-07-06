@@ -343,3 +343,22 @@ cc_test(
         "@gbenchmark//:benchmark_main",
     ],
 )
+
+cc_test(
+    name = "exchange-test",
+    srcs = [
+        "exchange_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":exchange",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "//pelton/util:ints",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
