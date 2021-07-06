@@ -44,56 +44,6 @@ bool SpecialStatements(const std::string &sql, Connection *connection) {
 
 }  // namespace
 
-/*
-absl::StatusOr<std::vector<SqlResult>> gdpr(Connection *connection,
-                                            std::string sql) {
-  Trim(sql);
-  if (echo) {
-    std::cout << sql << std::endl;
-  }
-
-  shards::SharderState *state = connection->GetSharderState();
-  dataflow::DataFlowState *dstate = connection->GetDataFlowState();
-
-  std::vector<SqlResult> results;
-  if (absl::StartsWith(sql, "GET ")) {
-    std::vector<std::string> v = absl::StrSplit(sql, ' ');
-    std::string &shard_kind = v.at(1);
-    std::string &user_id = v.at(2);
-    if (user_id.back() == ';') {
-      user_id.pop_back();
-    }
-
-    for (const auto &[table, shard_by] : state->ShardTables(shard_kind)) {
-      std::string tsql = "SELECT * FROM " + table + " WHERE " + shard_by +
-                         " = " + user_id + ";";
-      MOVE_OR_RETURN(
-          SqlResult res,
-          shards::sqlengine::Shard(tsql, state, dstate, &shard_kind, &user_id));
-      results.push_back(std::move(res));
-    }
-  } else if (absl::StartsWith(sql, "FORGET ")) {
-    std::vector<std::string> v = absl::StrSplit(sql, ' ');
-    std::string &shard_kind = v.at(1);
-    std::string &user_id = v.at(2);
-    if (user_id.back() == ';') {
-      user_id.pop_back();
-    }
-
-    for (const auto &[table, shard_by] : state->ShardTables(shard_kind)) {
-      std::string tsql =
-          "DELETE FROM " + table + " WHERE " + shard_by + " = " + user_id + ";";
-      MOVE_OR_RETURN(
-          SqlResult res,
-          shards::sqlengine::Shard(tsql, state, dstate, &shard_kind, &user_id));
-      results.push_back(std::move(res));
-    }
-  }
-
-  return results;
-}
-*/
-
 bool open(const std::string &directory, const std::string &db_username,
           const std::string &db_password, Connection *connection) {
   connection->Initialize(directory);
