@@ -221,11 +221,11 @@ void RunTest(const std::string &schema_file, const std::string &query_file,
     std::vector<std::string> query_actual;
 
     // add records to query_results
-    for (const pelton::Record &record : *result.NextResultSet()) {
+    std::unique_ptr<pelton::SqlResultSet> resultset = result.NextResultSet();
+    for (pelton::Record &record : *resultset) {
       // TODO(babman): fix pelton outputing all records as negative.
-      pelton::Record copy = record.Copy();
-      copy.SetPositive(true);
-      query_actual.push_back(tostring(copy));
+      record.SetPositive(true);
+      query_actual.push_back(tostring(record));
     }
 
     // add schema e.g. |id(INT, KEY)| to actual & expected

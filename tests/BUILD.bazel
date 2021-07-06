@@ -97,6 +97,5 @@ cc_test(
         "@gflags",
         "@glog",
         "@gtest",
-        "@gtest//:gtest_main",
     ],
 )
