@@ -3,11 +3,15 @@
 #include <iostream>
 #include <limits>
 #include <string>
+#include <vector>
 
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "pelton/pelton.h"
+#include "pelton/util/latency.h"
 #include "pelton/util/perf.h"
+
+std::vector<std::string> TO_SKIP = {"submit"};
 
 // Printing query results.
 void Print(pelton::SqlResult &&result) {
@@ -33,7 +37,7 @@ bool ReadCommand(std::string *ptr) {
         line.find_first_not_of(" \t\n") == std::string::npos) {
       continue;
     }
-    if (line.front() == '#') {
+    if (line.front() == '#' || (line[0] == '-' && line[1] == '-')) {
       *ptr = line;
       pelton::perf::End("Read std::cin");
       return true;
@@ -70,7 +74,7 @@ int main(int argc, char **argv) {
   bool print = FLAGS_print;
 
   // Initialize Google’s logging library.
-  google::InitGoogleLogging("argc");
+  google::InitGoogleLogging("cli");
 
   // Find database directory.
   const std::string &db_username = FLAGS_db_username;
@@ -90,35 +94,66 @@ int main(int argc, char **argv) {
       std::cout << ">>> " << std::flush;
     }
 
+    // For Measuring Latency of composie endpoints.
+    pelton::latency::Latency profiler;
+
     // Read SQL statements one at a time!
     std::string command;
+    std::string current_endpoint = "";
     while (ReadCommand(&command)) {
-      if (command[0] == '#' || (command[0] == '-' && command[1] == '-')) {
+      if (command[0] == '#') {
         if (command == "# perf start") {
           std::cout << "Perf start" << std::endl;
           pelton::perf::Start();
+          current_endpoint = profiler.TurnOn();
           start_time = std::chrono::high_resolution_clock::now();
         }
+        continue;
+      } else if (command[0] == '-' && command[1] == '-') {
+        current_endpoint = profiler.Measure(command);
+        continue;
+      } else if (command.substr(0, 8) == "REPLACE ") {
+        continue;
+      } else if (std::find(TO_SKIP.begin(), TO_SKIP.end(), current_endpoint) !=
+                 TO_SKIP.end()) {
         continue;
       }
 
       // Command has been fully read, execute it!
       pelton::perf::Start("exec");
-      absl::StatusOr<pelton::SqlResult> status =
-          pelton::exec(&connection, command);
-      if (!status.ok()) {
-        std::cerr << "Fatal error" << std::endl;
-        std::cerr << status.status() << std::endl;
-        break;
+      if (command[0] == 'G' || command[0] == 'F') {
+        auto status = pelton::gdpr(&connection, command);
+        if (!status.ok()) {
+          std::cerr << "Fatal error" << std::endl;
+          std::cerr << status.status() << std::endl;
+          break;
+        }
+        if (print) {
+          for (pelton::SqlResult &result : status.value()) {
+            Print(std::move(result));
+          }
+        }
+      } else {
+        absl::StatusOr<pelton::SqlResult> status =
+            pelton::exec(&connection, command);
+        if (!status.ok()) {
+          std::cerr << "Fatal error" << std::endl;
+          std::cerr << status.status() << std::endl;
+          break;
+        }
+        if (print) {
+          Print(std::move(status.value()));
+        }
       }
 
       // Print result.
       if (print) {
-        Print(std::move(status.value()));
         std::cout << std::endl << ">>> " << std::flush;
       }
       pelton::perf::End("exec");
     }
+
+    profiler.PrintAll();
 
     // Close the connection
     end_time = std::chrono::high_resolution_clock::now();
@@ -131,6 +166,12 @@ int main(int argc, char **argv) {
     std::cout << "Memory: " << connection.SizeInMemory() << "bytes"
               << std::endl;
 
+    std::cout << "Time PELTON: "
+              << std::chrono::duration_cast<std::chrono::nanoseconds>(
+                     end_time - start_time)
+                     .count()
+              << "ms" << std::endl;
+
     pelton::close(&connection);
   } catch (const char *err_msg) {
     LOG(FATAL) << "Error: " << err_msg;
@@ -138,11 +179,6 @@ int main(int argc, char **argv) {
 
   // Print performance profile.
   pelton::perf::PrintAll();
-  std::cout << "Time PELTON: "
-            << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
-                                                                     start_time)
-                   .count()
-            << "ms" << std::endl;
 
   // Exit!
   std::cout << "exit" << std::endl;

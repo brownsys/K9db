@@ -20,6 +20,12 @@ CREATE TABLE submissions ( \
   FOREIGN KEY (assignment_id) REFERENCES assignments(ID) \
 );
 
+CREATE TABLE grades ( \
+  ID int, \
+  student_id int, \
+  grade int, \
+  FOREIGN KEY (student_id) REFERENCES students(ID) \
+);
 
 INSERT INTO assignments VALUES (1, 'assignment 1');
 INSERT INTO assignments VALUES (2, 'assignment 2');
@@ -33,6 +39,9 @@ INSERT INTO submissions VALUES (1, 1, 4);
 INSERT INTO submissions VALUES (1, 2, 5);
 INSERT INTO submissions VALUES (2, 2, 6);
 INSERT INTO submissions VALUES (3, 2, 7);
+INSERT INTO grades VALUES (1, 1, 100);
+INSERT INTO grades VALUES (2, 1, 50);
+INSERT INTO grades VALUES (3, 2, 77);
 
 SELECT * FROM assignments;
 SELECT * FROM students;
@@ -40,8 +49,12 @@ SELECT * FROM submissions;
 SELECT * FROM submissions WHERE assignment_id = 1;
 SELECT * FROM submissions WHERE student_id = 1;
 SELECT * FROM submissions WHERE student_id = 1 AND assignment_id = 2;
+SELECT * FROM grades;
+SELECT * FROM grades WHERE student_id = 1;
 
-DELETE FROM students WHERE ID = 1;
+GET students 1;
+FORGET students 1;
+
 SELECT * FROM submissions;
 
 UPDATE submissions SET timestamp = 20 WHERE student_id = 2 AND assignment_id = 1;

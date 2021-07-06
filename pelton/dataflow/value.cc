@@ -5,6 +5,10 @@ namespace dataflow {
 
 // Copy underlying string.
 Value::Value(const Value &o) : type_(o.type_), str_() {
+  if (o.is_null_) {
+    this->is_null_ = true;
+    return;
+  }
   switch (this->type_) {
     case sqlast::ColumnDefinition::Type::UINT:
       this->uint_ = o.uint_;
@@ -22,6 +26,10 @@ Value::Value(const Value &o) : type_(o.type_), str_() {
 }
 Value &Value::operator=(const Value &o) {
   CHECK(this->type_ == o.type_) << "Bad copy assign value type";
+  if (o.is_null_) {
+    this->is_null_ = true;
+    return *this;
+  }
   // Copy stuff.
   switch (this->type_) {
     case sqlast::ColumnDefinition::Type::UINT:
@@ -42,6 +50,10 @@ Value &Value::operator=(const Value &o) {
 
 // Move moves the string.
 Value::Value(Value &&o) : type_(o.type_), str_() {
+  if (o.is_null_) {
+    this->is_null_ = true;
+    return;
+  }
   switch (this->type_) {
     case sqlast::ColumnDefinition::Type::UINT:
       this->uint_ = o.uint_;
@@ -59,6 +71,10 @@ Value::Value(Value &&o) : type_(o.type_), str_() {
 }
 Value &Value::operator=(Value &&o) {
   CHECK(this->type_ == o.type_) << "Bad move assign value type";
+  if (o.is_null_) {
+    this->is_null_ = true;
+    return *this;
+  }
   // Copy stuff (but move string if o is a string).
   switch (this->type_) {
     case sqlast::ColumnDefinition::Type::UINT:
@@ -81,6 +97,11 @@ Value &Value::operator=(Value &&o) {
 // Comparisons.
 bool Value::operator==(const Value &other) const {
   CheckType(other.type_);
+  if (this->is_null_ && other.is_null_) {
+    return true;
+  } else if (this->is_null_ || other.is_null_) {
+    return false;
+  }
   switch (this->type_) {
     case sqlast::ColumnDefinition::Type::UINT:
       return this->uint_ == other.uint_;
@@ -95,6 +116,13 @@ bool Value::operator==(const Value &other) const {
 }
 bool Value::operator<(const Value &other) const {
   CheckType(other.type_);
+  if (this->is_null_ && other.is_null_) {
+    return false;
+  } else if (this->is_null_) {
+    return true;
+  } else if (other.is_null_) {
+    return false;
+  }
   switch (this->type_) {
     case sqlast::ColumnDefinition::Type::UINT:
       return this->uint_ < other.uint_;
@@ -111,19 +139,26 @@ bool Value::operator<(const Value &other) const {
 // Data access.
 uint64_t Value::GetUInt() const {
   CheckType(sqlast::ColumnDefinition::Type::UINT);
+  CHECK(!this->is_null_);
   return this->uint_;
 }
 int64_t Value::GetInt() const {
   CheckType(sqlast::ColumnDefinition::Type::INT);
+  CHECK(!this->is_null_);
   return this->sint_;
 }
 const std::string &Value::GetString() const {
   CheckType(sqlast::ColumnDefinition::Type::TEXT);
+  CHECK(!this->is_null_);
   return this->str_;
 }
 
 // Printing a record to an output stream (e.g. std::cout).
 std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Value &v) {
+  if (v.is_null_) {
+    os << "[NULL]";
+    return os;
+  }
   switch (v.type_) {
     case sqlast::ColumnDefinition::Type::UINT:
       os << v.uint_;

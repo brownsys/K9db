@@ -3,11 +3,15 @@
 #include <iostream>
 #include <limits>
 #include <string>
+#include <vector>
 
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "mariadb/conncpp.hpp"
+#include "pelton/util/latency.h"
 #include "pelton/util/perf.h"
+
+std::vector<std::string> TO_SKIP = {"submit"};
 
 void PrintHeader(bool print, sql::ResultSet *result) {
   if (print) {
@@ -42,6 +46,7 @@ void PrintData(bool print, sql::ResultSet *result) {
         case sql::DataType::TINYINT:
         case sql::DataType::SMALLINT:
         case sql::DataType::BIGINT:
+        case sql::DataType::BIT:
         case sql::DataType::INTEGER:
           if (print) {
             std::cout << "| " << result->getInt(i) << " ";
@@ -68,7 +73,7 @@ bool ReadCommand(std::string *ptr) {
         line.find_first_not_of(" \t\n") == std::string::npos) {
       continue;
     }
-    if (line.front() == '#') {
+    if (line.front() == '#' || (line[0] == '-' && line[1] == '-')) {
       *ptr = line;
       pelton::perf::End("Read std::cin");
       return true;
@@ -128,15 +133,28 @@ int main(int argc, char **argv) {
       std::cout << ">>> " << std::flush;
     }
 
+    // For Measuring Latency of composite endpoints.
+    pelton::latency::Latency profiler;
+
     // Read SQL statements one at a time!
     std::string command;
+    std::string current_endpoint = "";
     while (ReadCommand(&command)) {
       if (command[0] == '#') {
         if (command == "# perf start") {
           std::cout << "Perf start" << std::endl;
           pelton::perf::Start();
+          current_endpoint = profiler.TurnOn();
           start_time = std::chrono::high_resolution_clock::now();
         }
+        continue;
+      } else if (command[0] == '-' && command[1] == '-') {
+        current_endpoint = profiler.Measure(command);
+        continue;
+      } else if (command.substr(0, 8) == "REPLACE ") {
+        continue;
+      } else if (std::find(TO_SKIP.begin(), TO_SKIP.end(), current_endpoint) !=
+                 TO_SKIP.end()) {
         continue;
       }
 
@@ -168,14 +186,15 @@ int main(int argc, char **argv) {
     }
 
     end_time = std::chrono::high_resolution_clock::now();
+    profiler.PrintAll();
   } catch (const char *err_msg) {
     LOG(FATAL) << "Error: " << err_msg;
   }
 
   pelton::perf::PrintAll();
   std::cout << "Time MYSQL: "
-            << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
-                                                                     start_time)
+            << std::chrono::duration_cast<std::chrono::nanoseconds>(end_time -
+                                                                    start_time)
                    .count()
             << "ms" << std::endl;
 

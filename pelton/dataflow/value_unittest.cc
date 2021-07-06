@@ -18,8 +18,8 @@ using CType = sqlast::ColumnDefinition::Type;
 
 // Test value size.
 TEST(ValueTest, Size) {
-  // should be 40 bytes, unless std::string has a different size on the machine.
-  if (sizeof(Value) != 40) {
+  // should be 48 bytes, unless std::string has a different size on the machine.
+  if (sizeof(Value) != 48) {
     size_t max = sizeof(std::string) > 8 ? sizeof(std::string) : 8;
     size_t machine_size = sizeof(CType) + max;
     // Align with 8 bytes for x64.
