@@ -37,14 +37,18 @@ struct TestInputs {
 };  // namespace
 
 // Read MySql configurations.
-static const std::string &db_username = "root";
-static const std::string &db_password = "password";
+// Command line flags.
+DEFINE_string(db_username, "root", "MariaDB username to connect with");
+DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
+
+static std::string *db_username;
+static std::string *db_password;
 
 void DropDatabase() {
   sql::ConnectOptionsMap connection_properties;
   connection_properties["hostName"] = "localhost";
-  connection_properties["userName"] = db_username;
-  connection_properties["password"] = db_password;
+  connection_properties["userName"] = *db_username;
+  connection_properties["password"] = *db_password;
 
   sql::Driver *driver = sql::mariadb::get_driver_instance();
   std::unique_ptr<sql::Connection> conn =
@@ -164,7 +168,7 @@ void RunTest(const std::string &schema_file, const std::string &query_file,
 
   // Open connection to sharder.
   pelton::Connection connection;
-  pelton::open("", db_username, db_password, &connection);
+  pelton::open("", *db_username, *db_password, &connection);
   // CHECK(pelton::exec(&connection, "SET echo;").ok());
 
   // Create all the tables.
@@ -306,6 +310,8 @@ TEST(E2ECorrectnessTest, LobstersQ36) { RunLobstersTest(36); }
 int main(int argc, char **argv) {
   // Command line arugments and help message.
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+  db_username = new std::string(FLAGS_db_username);
+  db_password = new std::string(FLAGS_db_password);
 
   // Initialize Google’s logging library.
   google::InitGoogleLogging("correctness");
