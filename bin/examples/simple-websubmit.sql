@@ -52,8 +52,8 @@ SELECT * FROM submissions WHERE student_id = 1 AND assignment_id = 2;
 SELECT * FROM grades;
 SELECT * FROM grades WHERE student_id = 1;
 
-GET students 1;
-FORGET students 1;
+GDPR GET students 1;
+GDPR FORGET students 1;
 
 SELECT * FROM submissions;
 

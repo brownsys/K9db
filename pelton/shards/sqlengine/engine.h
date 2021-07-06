@@ -27,7 +27,9 @@ namespace sqlengine {
 
 absl::StatusOr<mysql::SqlResult> Shard(const std::string &sql,
                                        SharderState *sharder_state,
-                                       dataflow::DataFlowState *dataflow_state);
+                                       dataflow::DataFlowState *dataflow_state,
+                                       std::string *shard_kind = nullptr,
+                                       std::string *user_id = nullptr);
 
 }  // namespace sqlengine
 }  // namespace shards

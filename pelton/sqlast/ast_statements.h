@@ -147,10 +147,10 @@ class Select : public AbstractStatement {
 
 class Delete : public AbstractStatement {
  public:
-  explicit Delete(const std::string &table_name)
+  explicit Delete(const std::string &table_name, bool returning = false)
       : AbstractStatement(AbstractStatement::Type::DELETE),
         table_name_(table_name),
-        returning_(false) {}
+        returning_(returning) {}
 
   Delete(const Delete &del)
       : AbstractStatement(AbstractStatement::Type::DELETE) {
@@ -296,6 +296,28 @@ class CreateView : public AbstractStatement {
  private:
   std::string view_name_;
   std::string query_;
+};
+
+class GDPRStatement : public AbstractStatement {
+ public:
+  enum class Operation { GET, FORGET };
+
+  GDPRStatement(Operation operation, const std::string &shard_kind,
+                const std::string &user_id)
+      : AbstractStatement(AbstractStatement::Type::GDPR),
+        operation_(operation),
+        shard_kind_(shard_kind),
+        user_id_(user_id) {}
+
+  // Accessors.
+  const Operation &operation() const { return this->operation_; }
+  const std::string &shard_kind() const { return this->shard_kind_; }
+  const std::string &user_id() const { return this->user_id_; }
+
+ private:
+  Operation operation_;
+  std::string shard_kind_;
+  std::string user_id_;
 };
 
 }  // namespace sqlast
