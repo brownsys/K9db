@@ -1,20 +1,20 @@
 #ifndef PELTON_DATAFLOW_CHANNEL_H_
 #define PELTON_DATAFLOW_CHANNEL_H_
 
+#include <condition_variable>
 #include <deque>
 #include <memory>
-#include <vector>
 #include <mutex>
-#include <condition_variable>
+#include <vector>
 
-#include "pelton/dataflow/batch_message.h"
+#include "pelton/dataflow/message.h"
 
-namespace pelton{
-namespace dataflow{
+namespace pelton {
+namespace dataflow {
 
 class Channel {
  public:
-  bool Send(std::shared_ptr<BatchMessage> message) {
+  bool Send(std::shared_ptr<Message> message) {
     mtx_.lock();
     queue_.push_back(message);
     mtx_.unlock();
@@ -24,12 +24,12 @@ class Channel {
 
   // The queue gets flushed since we are following a multiple producer-single
   // consumer pattern
-  std::vector<std::shared_ptr<BatchMessage>> Recv() {
+  std::vector<std::shared_ptr<Message>> Recv() {
     std::unique_lock<std::mutex> lock(mtx_);
-    while(queue_.size()==0){
+    while (queue_.size() == 0) {
       not_empty_.wait(lock);
     }
-    std::vector<std::shared_ptr<BatchMessage>> messages;
+    std::vector<std::shared_ptr<Message>> messages;
     while (!queue_.empty()) {
       messages.push_back(queue_.front());
       queue_.pop_front();
@@ -37,7 +37,7 @@ class Channel {
     return messages;
   }
 
-  size_t size(){
+  size_t size() {
     mtx_.lock();
     size_t size = queue_.size();
     mtx_.unlock();
@@ -46,13 +46,12 @@ class Channel {
 
  private:
   // May consider using generics, do not need it as of now.
-  std::deque<std::shared_ptr<BatchMessage>> queue_;
+  std::deque<std::shared_ptr<Message>> queue_;
   std::mutex mtx_;
   std::condition_variable not_empty_;
-
 };
 
-} // namespace dataflow
-} // namespace pelton
+}  // namespace dataflow
+}  // namespace pelton
 
 #endif  // PELTON_DATAFLOW_CHANNEL_H_

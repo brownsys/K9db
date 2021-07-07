@@ -157,6 +157,15 @@ cc_library(
 )
 
 cc_library(
+    name = "message",
+    srcs = [],
+    hdrs = [
+        "message.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+)
+
+cc_library(
     name = "batch-message",
     srcs = [],
     hdrs = [
@@ -164,8 +173,21 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
+        ":message",
         ":record",
         ":types",
+    ],
+)
+
+cc_library(
+    name = "stop-message",
+    srcs = [],
+    hdrs = [
+        "stop_message.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":message",
     ],
 )
 
@@ -177,7 +199,7 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
-        ":batch-message",
+        ":message",
     ],
 )
 

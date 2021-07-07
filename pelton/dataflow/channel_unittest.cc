@@ -1,20 +1,18 @@
+#include "pelton/dataflow/channel.h"
+
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "pelton/dataflow/channel.h"
+#include "gtest/gtest.h"
 #include "pelton/dataflow/batch_message.h"
+#include "pelton/dataflow/message.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/ints.h"
 
-
-#include "gtest/gtest.h"
-
-
 namespace pelton {
 namespace dataflow {
-  using CType = sqlast::ColumnDefinition::Type;
-
+using CType = sqlast::ColumnDefinition::Type;
 
 inline SchemaRef CreateSchema() {
   // Create a schema.
@@ -36,12 +34,16 @@ TEST(ChannelTest, BasicTest) {
   expected_records.emplace_back(records.at(0).Copy());
   expected_records.emplace_back(records.at(1).Copy());
 
-  std::shared_ptr<BatchMessage> msg = std::make_shared<BatchMessage>("", 0 ,0 , std::move(records));
+  std::shared_ptr<BatchMessage> msg =
+      std::make_shared<BatchMessage>("", 0, 0, std::move(records));
   EXPECT_EQ(records.size(), 0);
   EXPECT_TRUE(channel->Send(msg));
   EXPECT_EQ(channel->size(), 1);
-  std::vector<std::shared_ptr<BatchMessage>> data = channel->Recv();
-  EXPECT_EQ(data.at(0)->records, expected_records);
+  std::vector<std::shared_ptr<Message>> data = channel->Recv();
+  EXPECT_EQ(data.size(), 1);
+  EXPECT_EQ(data.at(0)->type(), Message::Type::BATCH);
+  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(data.at(0))->records,
+            expected_records);
   EXPECT_EQ(channel->size(), 0);
 }
 

@@ -7,6 +7,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "gtest/gtest_prod.h"
+#include "pelton/dataflow/batch_message.h"
 #include "pelton/dataflow/channel.h"
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/operator.h"
@@ -34,6 +35,10 @@ class ExchangeOperator : public Operator {
         total_partitions_(total_partitions),
         listen_thread_(
             std::move(std::thread(&ExchangeOperator::ListenFromPeers, this))) {}
+  ~ExchangeOperator() {
+    // Ensure that the thread exits gracefully
+    this->listen_thread_.join();
+  }
 
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,
@@ -62,17 +67,28 @@ class ExchangeOperator : public Operator {
     // Instead this thread forwards sends the records for processing to the
     // "main"(w.r.t the partition) thread via graph_chan_.
     while (true) {
-      std::vector<std::shared_ptr<BatchMessage>> messages =
+      std::vector<std::shared_ptr<Message>> messages =
           this->incoming_chan_->Recv();
       // Forward each message to the graph channel
       for (auto const msg : messages) {
-        // Set the "entry" node for the message as the child of this exchange
-        // operator.
-        msg->entry_index =
-            this->graph()->GetNode(this->children_.at(0))->index();
-        // Set the source as the current node's index.
-        msg->source_index = this->index();
-        this->graph_chan_->Send(msg);
+        switch (msg->type()) {
+          case Message::Type::BATCH: {
+            auto batch_msg = std::dynamic_pointer_cast<BatchMessage>(msg);
+            // Set the "entry" node for the message as the child of this
+            // exchange operator.
+            batch_msg->entry_index =
+                this->graph()->GetNode(this->children_.at(0))->index();
+            // Set the source as the current node's index.
+            batch_msg->source_index = this->index();
+            this->graph_chan_->Send(batch_msg);
+          } break;
+          case Message::Type::STOP:
+            // Stop execution of this thread so that it can exit gracefully and
+            // the test suite deems the test as a success.
+            return;
+          default:
+            LOG(FATAL) << "Invalid message type";
+        }
       }
     }
   }
