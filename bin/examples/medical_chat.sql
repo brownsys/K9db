@@ -58,8 +58,8 @@ INSERT INTO chat VALUES (5, 20, 1, 'HELLO 3');
 SELECT * FROM chat;
 SELECT * FROM chat WHERE doctor_id = 2;
 SELECT * FROM chat WHERE OWNER_patient_id = 10;
-GET patients 10;
-GET doctors 2;
+GDPR GET patients 10;
+GDPR GET doctors 2;
 
 DELETE FROM doctors WHERE id = 2;
 SELECT * FROM chat;

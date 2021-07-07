@@ -1,6 +1,7 @@
 #ifndef PELTON_DATAFLOW_OPS_MATVIEW_H_
 #define PELTON_DATAFLOW_OPS_MATVIEW_H_
 
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -134,6 +135,16 @@ class MatViewOperatorT : public MatViewOperator {
     clone->output_schema_ = this->output_schema_;
     clone->index_ = this->index_;
     return clone;
+  }
+  // Debugging information
+  std::string DebugString() const override {
+    std::string result = "\t{\n\t\t\"base\": " + Operator::DebugString() + ",";
+    result += "\n\t\t\"keyed_by\": [";
+    for (ColumnID key : this->key_cols_) {
+      result += std::to_string(key) + ",";
+    }
+    result += "],\n\t}";
+    return result;
   }
 
  protected:

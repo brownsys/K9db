@@ -12,6 +12,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "pelton/shards/pool.h"
@@ -87,6 +88,9 @@ class SharderState {
 
   const std::unordered_set<UserId> &UsersOfShard(const ShardKind &kind) const;
 
+  const std::unordered_set<UnshardedTableName> &TablesInShard(
+      const ShardKind &kind) const;
+
   // Manage secondary indices.
   bool HasIndexFor(const UnshardedTableName &table_name,
                    const ColumnName &column_name,
@@ -131,6 +135,8 @@ class SharderState {
   // Maps a shard kind into the names of all contained tables.
   // Invariant: a table can at most belong to one shard kind.
   std::unordered_map<ShardKind, std::list<ShardedTableName>> kind_to_tables_;
+  std::unordered_map<ShardKind, std::unordered_set<UnshardedTableName>>
+      kind_to_names_;
 
   // Maps a table to the its sharding information.
   // If a table is unmapped by this map, then it is not sharded.
