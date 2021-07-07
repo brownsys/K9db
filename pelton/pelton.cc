@@ -2,7 +2,7 @@
 #include "pelton/pelton.h"
 
 #include <iostream>
-#include <vector>
+#include <utility>
 
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
@@ -11,6 +11,7 @@
 #include "pelton/planner/planner.h"
 #include "pelton/shards/sqlengine/engine.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/util/status.h"
 
 namespace pelton {
 
@@ -36,13 +37,6 @@ bool SpecialStatements(const std::string &sql, Connection *connection) {
   if (sql == "SET echo;") {
     echo = true;
     std::cout << "SET echo;" << std::endl;
-    return true;
-  }
-  if (absl::StartsWith(sql, "GET ")) {
-    std::vector<std::string> v = absl::StrSplit(sql, ' ');
-    v.at(2).pop_back();
-    std::string shard_name = shards::sqlengine::NameShard(v.at(1), v.at(2));
-    std::cout << shard_name << std::endl;
     return true;
   }
   return false;
