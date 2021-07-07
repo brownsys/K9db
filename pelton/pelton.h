@@ -2,7 +2,6 @@
 #ifndef PELTON_PELTON_H_
 #define PELTON_PELTON_H_
 
-#include <functional>
 #include <string>
 
 #include "absl/status/statusor.h"

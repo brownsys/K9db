@@ -26,7 +26,7 @@ INSERT INTO chat VALUES (3, 3, 1, 'HELLO from carl');
 INSERT INTO chat VALUES (4, 3, 2, 'HELLO from carl 2');
 
 SELECT * FROM chat;
-GET Users 1;
+GDPR GET Users 1;
 
 UPDATE chat SET message = 'Hello 2' WHERE message = 'HELLO from carl 2';
 UPDATE chat SET message = 'From Alice' WHERE OWNER_sender_id = 1;

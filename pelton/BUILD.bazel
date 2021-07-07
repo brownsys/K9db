@@ -20,6 +20,7 @@ cc_library(
         "//pelton/shards:types",
         "//pelton/shards/sqlengine:engine",
         "//pelton/shards/sqlengine:util",
+        "//pelton/util:status",
         "@absl//absl/status",
         "@absl//absl/strings",
     ],

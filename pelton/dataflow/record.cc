@@ -145,21 +145,8 @@ Key Record::GetValues(const std::vector<ColumnID> &cols) const {
   Key key{cols.size()};
   for (ColumnID col : cols) {
     if (this->IsNull(col)) {
-      switch (this->schema_.TypeOf(col)) {
-        case sqlast::ColumnDefinition::Type::UINT:
-          key.AddValue(UINT64_MAX);
-          continue;
-        case sqlast::ColumnDefinition::Type::INT:
-          key.AddValue(INT64_MAX);
-          continue;
-        case sqlast::ColumnDefinition::Type::TEXT:
-        case sqlast::ColumnDefinition::Type::DATETIME:
-          key.AddValue("NULL");
-          continue;
-        default:
-          LOG(FATAL) << "NULL value in key unhandled for type "
-                     << this->schema_.TypeOf(col);
-      }
+      key.AddNull(this->schema_.TypeOf(col));
+      continue;
     }
     switch (this->schema_.TypeOf(col)) {
       case sqlast::ColumnDefinition::Type::UINT:
@@ -184,6 +171,9 @@ Key Record::GetValues(const std::vector<ColumnID> &cols) const {
 }
 Value Record::GetValue(ColumnID col) const {
   CHECK_NE(this->data_, nullptr) << "Cannot get value for moved record";
+  if (this->IsNull(col)) {
+    return Value(this->schema_.TypeOf(col));
+  }
   switch (this->schema_.TypeOf(col)) {
     case sqlast::ColumnDefinition::Type::UINT:
       return Value(this->data_[col].uint);
@@ -199,6 +189,9 @@ Value Record::GetValue(ColumnID col) const {
 
 std::string Record::GetValueString(ColumnID col) const {
   CHECK_NE(this->data_, nullptr) << "Cannot get value for moved record";
+  if (this->IsNull(col)) {
+    return "NULL";
+  }
   switch (this->schema_.TypeOf(col)) {
     case sqlast::ColumnDefinition::Type::UINT:
       return std::to_string(this->data_[col].uint);
@@ -216,6 +209,10 @@ std::string Record::GetValueString(ColumnID col) const {
 void Record::SetValue(const std::string &value, size_t i) {
   CHECK_NOTNULL(this->data_);
   CHECK(!IsNull(i));
+  if (value == "NULL") {
+    this->SetNull(true, i);
+    return;
+  }
   switch (this->schema_.TypeOf(i)) {
     case sqlast::ColumnDefinition::Type::UINT:
       this->data_[i].uint = std::stoull(value);
