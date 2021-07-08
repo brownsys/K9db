@@ -12,6 +12,7 @@ cc_library(
     deps = [
         ":create",
         ":delete",
+        ":gdpr",
         ":index",
         ":insert",
         ":select",
@@ -203,5 +204,29 @@ cc_library(
         "//pelton/util:perf",
         "//pelton/util:status",
         "@absl//absl/status",
+    ],
+)
+
+cc_library(
+    name = "gdpr",
+    srcs = [
+        "gdpr.cc",
+    ],
+    hdrs = [
+        "gdpr.h",
+    ],
+    deps = [
+        ":delete",
+        ":select",
+        "//pelton/dataflow:state",
+        "//pelton/mysql:result",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/shards/sqlengine:util",
+        "//pelton/sqlast:ast",
+        "//pelton/util:perf",
+        "//pelton/util:status",
+        "@absl//absl/status",
+        "@absl//absl/strings",
     ],
 )

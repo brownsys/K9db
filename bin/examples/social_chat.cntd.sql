@@ -8,7 +8,7 @@ SELECT * FROM chat;
 INSERT INTO chat VALUES (1, 1, 2, 'HELLO from alice');
 
 SELECT * FROM chat;
-GET Users 1;
+GDPR GET Users 1;
 
 DELETE FROM Users WHERE id = 1;
 SELECT * FROM chat;

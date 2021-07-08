@@ -21,7 +21,8 @@ class AbstractStatement {
     UPDATE,
     SELECT,
     DELETE,
-    CREATE_VIEW
+    CREATE_VIEW,
+    GDPR
   };
 
   // Constructor.

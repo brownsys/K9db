@@ -9,62 +9,72 @@
 
 // The value in v must be of the same type as the corresponding one in the
 // record schema.
-#define COLUMN_VALUE_CMP_MACRO(col, v, OP)                        \
-  if (record.schema().TypeOf(col) != Record::TypeOfVariant(v)) {  \
-    LOG(FATAL) << "Type mistmatch in filter value";               \
-  }                                                               \
-  if (record.IsNull(col)) {                                       \
-    return false;                                                 \
-  }                                                               \
-  switch (record.schema().TypeOf(col)) {                          \
-    case sqlast::ColumnDefinition::Type::INT:                     \
-      if (!(record.GetInt(col) OP std::get<int64_t>(v))) {        \
-        return false;                                             \
-      }                                                           \
-      break;                                                      \
-    case sqlast::ColumnDefinition::Type::UINT:                    \
-      if (!(record.GetUInt(col) OP std::get<uint64_t>(v))) {      \
-        return false;                                             \
-      }                                                           \
-      break;                                                      \
-    case sqlast::ColumnDefinition::Type::TEXT:                    \
-      if (!(record.GetString(col) OP std::get<std::string>(v))) { \
-        return false;                                             \
-      }                                                           \
-      break;                                                      \
-    default:                                                      \
-      LOG(FATAL) << "Unsupported data type in filter operator";   \
-  }                                                               \
+#define COLUMN_VALUE_CMP_MACRO(col, v, OP)                          \
+  if (record.schema().TypeOf(col) != Record::TypeOfVariant(v)) {    \
+    LOG(FATAL) << "Type mistmatch in filter value";                 \
+  }                                                                 \
+  if (record.IsNull(col)) {                                         \
+    return false;                                                   \
+  }                                                                 \
+  switch (record.schema().TypeOf(col)) {                            \
+    case sqlast::ColumnDefinition::Type::INT:                       \
+      if (!(record.GetInt(col) OP std::get<int64_t>(v))) {          \
+        return false;                                               \
+      }                                                             \
+      break;                                                        \
+    case sqlast::ColumnDefinition::Type::UINT:                      \
+      if (!(record.GetUInt(col) OP std::get<uint64_t>(v))) {        \
+        return false;                                               \
+      }                                                             \
+      break;                                                        \
+    case sqlast::ColumnDefinition::Type::TEXT:                      \
+      if (!(record.GetString(col) OP std::get<std::string>(v))) {   \
+        return false;                                               \
+      }                                                             \
+      break;                                                        \
+    case sqlast::ColumnDefinition::Type::DATETIME:                  \
+      if (!(record.GetDateTime(col) OP std::get<std::string>(v))) { \
+        return false;                                               \
+      }                                                             \
+      break;                                                        \
+    default:                                                        \
+      LOG(FATAL) << "Unsupported data type in filter operator";     \
+  }                                                                 \
   // COLUMN_VALUE_COMPARE_MACRO
 
-#define COLUMN_COLUMN_CMP_MACRO(col1, col2, OP)                       \
-  if (record.schema().TypeOf(col1) != record.schema().TypeOf(col2)) { \
-    LOG(FATAL) << "Type mistmatch in filter column";                  \
-  }                                                                   \
-  if (record.IsNull(col1) && record.IsNull(col2)) {                   \
-    return true;                                                      \
-  } else if (record.IsNull(col1) || record.IsNull(col2)) {            \
-    return false;                                                     \
-  }                                                                   \
-  switch (record.schema().TypeOf(col1)) {                             \
-    case sqlast::ColumnDefinition::Type::INT:                         \
-      if (!(record.GetInt(col1) OP record.GetInt(col2))) {            \
-        return false;                                                 \
-      }                                                               \
-      break;                                                          \
-    case sqlast::ColumnDefinition::Type::UINT:                        \
-      if (!(record.GetUInt(col1) OP record.GetUInt(col2))) {          \
-        return false;                                                 \
-      }                                                               \
-      break;                                                          \
-    case sqlast::ColumnDefinition::Type::TEXT:                        \
-      if (!(record.GetString(col1) OP record.GetString(col2))) {      \
-        return false;                                                 \
-      }                                                               \
-      break;                                                          \
-    default:                                                          \
-      LOG(FATAL) << "Unsupported data type in filter operator";       \
-  }                                                                   \
+#define COLUMN_COLUMN_CMP_MACRO(col1, col2, OP)                            \
+  if (record.schema().TypeOf(col1) != record.schema().TypeOf(col2)) {      \
+    LOG(FATAL) << "Type mistmatch in filter column";                       \
+  }                                                                        \
+  if (record.IsNull(col1) && record.IsNull(col2)) {                        \
+    return true;                                                           \
+  } else if (record.IsNull(col1) || record.IsNull(col2)) {                 \
+    return false;                                                          \
+  }                                                                        \
+  switch (record.schema().TypeOf(col1)) {                                  \
+    case sqlast::ColumnDefinition::Type::INT:                              \
+      if (!(record.GetInt(col1) OP record.GetInt(col2))) {                 \
+        return false;                                                      \
+      }                                                                    \
+      break;                                                               \
+    case sqlast::ColumnDefinition::Type::UINT:                             \
+      if (!(record.GetUInt(col1) OP record.GetUInt(col2))) {               \
+        return false;                                                      \
+      }                                                                    \
+      break;                                                               \
+    case sqlast::ColumnDefinition::Type::TEXT:                             \
+      if (!(record.GetString(col1) OP record.GetString(col2))) {           \
+        return false;                                                      \
+      }                                                                    \
+      break;                                                               \
+    case sqlast::ColumnDefinition::Type::DATETIME                          \
+          : if (!(record.GetDateTime(col1) OP record.GetDateTime(col2))) { \
+        return false;                                                      \
+      }                                                                    \
+      break;                                                               \
+    default:                                                               \
+      LOG(FATAL) << "Unsupported data type in filter operator";            \
+  }                                                                        \
   // COLUMN_VALUE_COMPARE_MACRO
 
 #define GENERIC_CMP_MACRO(operation, OP)                                     \

@@ -52,6 +52,7 @@ class Key {
   void AddValue(int64_t v);
   void AddValue(const std::string &v);
   void AddValue(std::string &&v);
+  void AddNull(sqlast::ColumnDefinition::Type type);
 
   // For logging and printing...
   friend std::ostream &operator<<(std::ostream &os, const Key &k);
