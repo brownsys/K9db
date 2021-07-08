@@ -92,6 +92,10 @@ class ExchangeOperator : public Operator {
       }
     }
   }
+
+  virtual std::shared_ptr<Operator> Clone() const {
+    LOG(FATAL) << "Exchange operator does not support clone";
+  };
 };
 
 }  // namespace dataflow
