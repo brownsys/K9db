@@ -1,12 +1,16 @@
 use std::io;
 use std::net;
 use msql_srv::*;
+use std::slice;
+
 include!("wrappers.rs");
 
-#[derive(Debug)]
+// #[derive(Debug)]
 struct Backend {
     rust_conn: ConnectionC,
+    // exec_result: exec_type,
 }
+
 impl<W: io::Write> MysqlShim<W> for Backend {
     type Error = io::Error;
 
@@ -44,59 +48,74 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         // only way to send to client is via the writer InitWriter object. 
         // Ok(()) 
     }
-
+    
     // called when client issues query for immediate execution. Results returned via QueryResultWriter
     fn on_query(&mut self, q_string: &str, results: QueryResultWriter<W>) -> io::Result<()> {
         println!("Rust proxy: starting on_query");
         println!("Rust Proxy: query received from HotCRP is: {:?}", q_string);
-
-        println!("Rust Proxy: calling c-wrapper for pelton::exec\n");
-        let exec_response : QueryResponse = exec(&mut self.rust_conn, q_string);
-        println!("Rust Proxy: query_response is: {:?}", exec_response);
-        let response_type : &CStr = unsafe {CStr::from_ptr(exec_response.response_type)};
-        let response_type : &str = response_type.to_str().unwrap();
-        println!("Rust Proxy: return type is: {:?}\n", response_type);
-
-        if q_string.contains("SET") {
+        
+        if q_string.contains("SET") || q_string.contains("DROP") || q_string.contains("ALTER") {
+            println!("Rust Proxy: Unsupported query type")
             return results.completed(0, 0);
         }
         
-        let cols = [
-            Column {
-                table: "foo".to_string(),
-                column: "a".to_string(),
-                coltype: ColumnType::MYSQL_TYPE_LONGLONG,
-                colflags: ColumnFlags::empty(),
-            },
-            Column {
-                table: "foo".to_string(),
-                column: "b".to_string(),
-                coltype: ColumnType::MYSQL_TYPE_STRING,
-                colflags: ColumnFlags::empty(),
-            },
-            ];
+        println!("Rust Proxy: calling rust wrapper that calls c-wrapper for pelton::exec\n");
+        let exec_response : exec_type = exec(&mut self.rust_conn, q_string);
+        
+        if q_string.contains("CREATE") {
+            // ! TODO send boolean back to client. Do I need the row writer for this? No cols right?
             
-        // start a resultset response to the client with given columns. ==> replace this with wrapper response
-        // Returns a Result<RowWriter<'a,W>> a Struct for sending rows to client. a are the columns, 'a indicates this var has static lifetime equal to lifetime of the program. W is a writer to write data to
-        let mut rw = results.start(&cols)?;
-        // write a value to the next col of the current row (of this resultset). Here column "a"
-        rw.write_col(42)?; // written to results, writer object to communicate with client. Returning from function just sends to proxy framework (return of function is an emptyio Result)
-        // write a value to column "b"
-        rw.write_col("b's value")?;
-        // tell client no more rows coming. Returns an empty ok to the proxy
-        rw.finish()
-        // rw.finish(); // client
-        // Ok(()) // proxy
+        } else if q_string.contains("UPDATE") || q_string.contains("DELETE") || q_string.contains("INSERT") {
+            // ! TODO send int back to client. 
+            
+        } else if q_string.contains("SELECT") {
+            // ? destructor for CResult is not getting triggered for some reason
+            // ! TODO construct columns based on select response only. Done manually here
+            let cols = [
+                Column {
+                    table: "foo".to_string(),
+                    column: "a".to_string(),
+                    coltype: ColumnType::MYSQL_TYPE_LONGLONG,
+                    colflags: ColumnFlags::empty(),
+                },
+                Column {
+                    table: "foo".to_string(),
+                    column: "b".to_string(),
+                    coltype: ColumnType::MYSQL_TYPE_STRING,
+                    colflags: ColumnFlags::empty(),
+                },
+                ];
+                
+            // start a resultset response to the client with given columns. ==> replace this with wrapper response
+            // Returns a Result<RowWriter<'a,W>> a Struct for sending rows to client. a are the columns, 'a indicates this var has static lifetime equal to lifetime of the program. W is a writer to write data to
+            let mut rw = results.start(&cols)?;
+            // write a value to the next col of the current row (of this resultset). Here column "a"
+            // rw.write_col(42)?; // written to results, writer object to communicate with client. Returning from function just sends to proxy framework (return of function is an emptyio Result)
+            
+    
+            println!("Just before slice conversion");
+            let record_val = unsafe {(*exec_response.select).records.as_slice((*exec_response.select).num_records as usize)[0].record_data.UINT as u32};
+            println!("Just after slice conversion");
+            println!("{:?}", record_val);
+            unsafe{rw.write_col(record_val)?};
+            
+            // write a value to column "b"
+            rw.write_col("b's value")?;
+            // tell client no more rows coming. Returns an empty ok to the proxy
+            rw.finish()
+            // rw.finish(); // client
+            // Ok(()) // proxy
+        }
     }
 }
 
 // custom destructor to close connection once Backend goes out of scope 
 impl Drop for Backend {
     fn drop (&mut self) {
-        println!("Rust FFI: Calling destructor for Backend");
-        println!("Rust Proxy: calling c-wrapper for pelton::close\n");
+        println!("Rust Proxy: Starting destructor for Backend");
+        println!("Rust Proxy: Calling c-wrapper for pelton::close\n");
         let close_response : bool = close(&mut self.rust_conn);
-        if (close_response) {
+        if close_response {
             println!("Rust Proxy: successfully closed connection");
         } else {
             println!("Rust Proxy: failed to close connection");
@@ -121,7 +140,7 @@ fn main() {
             let rust_conn = open("", "root", "password");
             println!("Rust Proxy: connection status is: {:?}", rust_conn.connected);
             let backend = Backend{rust_conn};
-            let inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
+            let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
             // it's not reaching past here because at this point it's already started a new TCP server - it's processing client commands until client disconnects or an error occurs
         }
     });
