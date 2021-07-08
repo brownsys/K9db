@@ -210,7 +210,10 @@ void SqlLazyResultSet::Execute() {
 }
 
 // SqlInlineResultSet.
-// Constructor.
+// Constructors.
+SqlInlineResultSet::SqlInlineResultSet(const dataflow::SchemaRef &schema)
+    : SqlResultSet(schema), index_(0), records_() {}
+
 SqlInlineResultSet::SqlInlineResultSet(const dataflow::SchemaRef &schema,
                                        std::vector<dataflow::Record> &&records)
     : SqlResultSet(schema), index_(0), records_(std::move(records)) {}

@@ -145,9 +145,11 @@ class SqlLazyResultSet : public SqlResultSet {
 // SqlInlineResultSet consists of an inlined vector of records.
 class SqlInlineResultSet : public SqlResultSet {
  public:
-  // Constructor.
-  explicit SqlInlineResultSet(const dataflow::SchemaRef &schema,
-                              std::vector<dataflow::Record> &&records = {});
+  // Constructors.
+  explicit SqlInlineResultSet(const dataflow::SchemaRef &schema);
+
+  SqlInlineResultSet(const dataflow::SchemaRef &schema,
+                     std::vector<dataflow::Record> &&records);
 
   // Adding additional results to this set.
   void Append(std::unique_ptr<SqlResultSet> &&other, bool deduplicate) override;

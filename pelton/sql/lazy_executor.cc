@@ -91,9 +91,9 @@ SqlResult SqlLazyExecutor::ExecuteShards(
   if (user_ids.size() == 0) {
     bool returning = false;
     if (sql->type() == sqlast::AbstractStatement::Type::DELETE) {
-      returning = !static_cast<const sqlast::Delete *>(sql)->returning();
+      returning = static_cast<const sqlast::Delete *>(sql)->returning();
     }
-    EmptyResultByType(sql->type(), returning, schema);
+    return EmptyResultByType(sql->type(), returning, schema);
   }
 
   // This result set is a proxy that allows access to results from all shards.

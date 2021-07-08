@@ -34,9 +34,13 @@ class SqlResult {
   explicit SqlResult(const dataflow::SchemaRef &schema);  // For empty SELECTs.
 
   // API for accessing the result.
-  inline bool IsStatement() const { return this->impl_->IsStatement(); }
-  inline bool IsUpdate() const { return this->impl_->IsUpdate(); }
-  inline bool IsQuery() const { return this->impl_->IsQuery(); }
+  inline bool IsStatement() const {
+    return this->impl_ && this->impl_->IsStatement();
+  }
+  inline bool IsUpdate() const {
+    return this->impl_ && this->impl_->IsUpdate();
+  }
+  inline bool IsQuery() const { return this->impl_ && this->impl_->IsQuery(); }
 
   // Only safe to use if IsStatement() returns true.
   inline bool Success() const { return this->impl_->Success(); }
