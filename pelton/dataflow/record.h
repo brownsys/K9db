@@ -191,6 +191,10 @@ class Record {
     bool operator()(const Record &l, const Record &r) const {
       return l.GetValues(*cols) < r.GetValues(*cols);
     }
+    std::vector<ColumnID> Cols() const {
+      std::vector<ColumnID> compare_cols = *cols;
+      return compare_cols;
+    }
 
    private:
     std::shared_ptr<std::vector<ColumnID>> cols;

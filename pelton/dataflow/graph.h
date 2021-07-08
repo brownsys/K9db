@@ -53,6 +53,8 @@ class DataFlowGraph {
     return it == nodes_.end() ? nullptr : it->second;
   }
 
+  std::shared_ptr<DataFlowGraph> Clone();
+
   // Debugging.
   std::string DebugString() const;
 

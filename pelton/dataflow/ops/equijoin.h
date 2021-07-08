@@ -63,6 +63,8 @@ class EquiJoinOperator : public Operator {
            this->emitted_nulls_.SizeInMemory();
   }
 
+  std::shared_ptr<Operator> Clone() const override;
+
  private:
   // Columns on which join is computed.
   ColumnID left_id_;

@@ -215,5 +215,16 @@ void EquiJoinOperator::EmitRow(const Record &left, const Record &right,
   output->push_back(std::move(record));
 }
 
+std::shared_ptr<Operator> EquiJoinOperator::Clone() const {
+  auto clone = std::make_shared<EquiJoinOperator>(this->left_id_,
+                                                  this->right_id_, this->mode_);
+  clone->children_ = this->children_;
+  clone->parents_ = this->parents_;
+  clone->input_schemas_ = this->input_schemas_;
+  clone->output_schema_ = this->output_schema_;
+  clone->index_ = this->index_;
+  return clone;
+}
+
 }  // namespace dataflow
 }  // namespace pelton
