@@ -188,7 +188,6 @@ fn bindgen_test_layout_ConnectionC() {
 impl Drop for CResult {
     fn drop(&mut self) {
         println!("Rust FFI: Calling destructor for CResult");
-        // need to destruct entire struct since malloced it in C-Wrapper
         unsafe {destroy_select(self)};
         println!("Rust FFI: CResult destroyed");
     }

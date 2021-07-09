@@ -146,22 +146,15 @@ CResult *exec_select(ConnectionC *c_conn, const char *query)
 {
     std::cout << "C-Wrapper: creating dummy pelton record and vector" << std::endl;
 
-    // ! TODO support strings and datetime
-    // std::vector<std::string> names = {"Col1", "Col2", "Col3"};
-    // std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
-    // std::unique_ptr<std::string> s1 = std::make_unique<std::string>("Hello!");
-    // pelton::Record r1{schema, true, 0_u, std::move(s1), 10_s};
-    // std::vector<Record> pelton_records;
-    // records.push_back(r1.Copy());
-
-    std::vector<std::string> names2 = {"Col1", "Col2"};
-    std::vector<CType> types2 = {CType::INT, CType::INT};
+    std::vector<std::string> names2 = {"Col1", "Col2", "Col3", "Col4"};
+    std::vector<CType> types2 = {CType::UINT, CType::INT, CType::TEXT, CType::DATETIME};
     // set col to be primary key (here column at index 0 is the primary key):
     std::vector<pelton::dataflow::ColumnID> keys2 = {0};
     pelton::dataflow::SchemaRef schema2 = pelton::dataflow::SchemaFactory::Create(names2, types2, keys2);
+    std::unique_ptr<std::string> s = std::make_unique<std::string>("I'm a string");
+    std::unique_ptr<std::string> d = std::make_unique<std::string>("I'm a datetime");
     using namespace pelton::literals;
-    // pelton::Record r2{schema2, true, 66_u, -66_s};
-    pelton::Record r2{schema2, true, 66_s, 88_s};
+    pelton::Record r2{schema2, true, 66_u, -66_s, std::move(s), std::move(d)};
     std::vector<pelton::Record> pelton_records2;
     pelton_records2.push_back(r2.Copy());
 
@@ -169,6 +162,7 @@ CResult *exec_select(ConnectionC *c_conn, const char *query)
     // allocate memory for CResult struct and the flexible array of union Record pointers (# pointers = # rows/pelton records) according the the number of pelton records
     struct CResult *c_result = (CResult *)malloc(sizeof(*c_result) + sizeof(*(c_result->records)) * pelton_records2.size());
     //                                           |-- CResult* --|    | ----  RecordData[]  ---- |   | number of records (rows) |
+
     c_result->num_rows = pelton_records2.size();
     c_result->num_cols = names2.size();
     // then allocate memory for the underlying union RecordData that lies behind each RecordData[] pointer (# unions = # of cols)
@@ -196,12 +190,7 @@ CResult *exec_select(ConnectionC *c_conn, const char *query)
 
         // set column type
         CType col_type = schema2.TypeOf(i); // .GetSchema().TypeOf(i)
-        // ? TypeToString exception: unsupported column type UINT
-        std::string col_type_cpp = pelton::sqlast::ColumnDefinition::TypeToString(col_type);
-        const char *col_type_c = col_type_cpp.c_str();
-        // mysql only supports signed integers, hence TypeToString doesn't return UINT
-        // ? how to tell C/rust which union field to access if no case for UINT in TypeToString?
-        strcpy(c_result->col_types[i], col_type_c); // transfer ownership
+        c_result->col_types[i] = col_type;
         std::cout << "C-Wrapper: CResult col_type at index " << i << " is " << c_result->col_types[i] << std::endl;
     }
 
@@ -217,14 +206,40 @@ CResult *exec_select(ConnectionC *c_conn, const char *query)
         {
             std::cout << "C-Wrapper: col is : " << j << std::endl;
 
-            // if (c_result->col_types[i] == UINT_enum)... OR c_result->col_types[i].find("UINT")
             // [i] row, [j] col
-            c_result->records[i][j].UINT = pelton_records2[i].GetInt(j);
-            // else if (c_result->col_types[i].find("VARCHAR(100)")) {
-            // c_result->records[i].record_data[j].TEXT = pelton_records2[i].GetString(j);
-
-            std::cout << "C-Wrapper: row value for this column in std::vector<pelton::Record> pelton_records is: " << pelton_records2[i].GetInt(j) << std::endl;
-            std::cout << "C-Wrapper: row value for this column in CRecord c_result is: " << c_result->records[i][j].INT << std::endl;
+            if (c_result->col_types[j] == CType::UINT)
+            {
+                c_result->records[i][j].UINT = pelton_records2[i].GetUInt(j);
+                std::cout << "C-Wrapper: row value for this column in std::vector<pelton::Record> pelton_records is: " << pelton_records2[i].GetUInt(j) << std::endl;
+                std::cout << "C-Wrapper: row value for this column in CRecord c_result is: " << c_result->records[i][j].UINT << std::endl;
+            }
+            else if (c_result->col_types[j] == CType::INT)
+            {
+                c_result->records[i][j].INT = pelton_records2[i].GetInt(j);
+                std::cout << "C-Wrapper: row value for this column in std::vector<pelton::Record> pelton_records is: " << pelton_records2[i].GetInt(j) << std::endl;
+                std::cout << "C-Wrapper: row value for this column in CRecord c_result is: " << c_result->records[i][j].INT << std::endl;
+            }
+            else if (c_result->col_types[j] == CType::TEXT)
+            {
+                std::string cpp_val = pelton_records2[i].GetString(j);
+                char *val = (char *)malloc(cpp_val.size() + 1);
+                strcpy(val, cpp_val.c_str());
+                c_result->records[i][j].TEXT = val;
+                std::cout << "C-Wrapper: row value for this column in std::vector<pelton::Record> pelton_records is: " << pelton_records2[i].GetString(j) << std::endl;
+                std::cout << "C-Wrapper: row value for this column in CRecord c_result is: " << c_result->records[i][j].TEXT << std::endl;
+            }
+            else if (c_result->col_types[j] == CType::DATETIME)
+            {
+                std::string cpp_val = pelton_records2[i].GetDateTime(j);
+                char *val = (char *)malloc(cpp_val.size() + 1);
+                strcpy(val, cpp_val.c_str());
+                c_result->records[i][j].DATETIME = val;
+                std::cout << "C-Wrapper: row value for this column in std::vector<pelton::Record> pelton_records is: " << pelton_records2[i].GetDateTime(j) << std::endl;
+                std::cout << "C-Wrapper: row value for this column in CRecord c_result is: " << c_result->records[i][j].DATETIME << std::endl;
+            }
+            else {
+                std::cout << "C-Wrapper: Invalid col_type" << std::endl;
+            }
         }
     }
     return c_result;
@@ -233,8 +248,9 @@ CResult *exec_select(ConnectionC *c_conn, const char *query)
 void destroy_select(CResult *c_result)
 {
     std::cout << "C-Wrapper: destroy_select to delete CResult" << std::endl;
-    for (int r = 0; r < c_result->rows; r++) {
+    for (int r = 0; r < c_result->num_rows; r++)
+    {
         free(c_result->records[r]);
     }
-    free (c_result);
+    free(c_result);
 }

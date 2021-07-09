@@ -107,7 +107,27 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             // conversion from incomplete array field (flexible array) to rust slice
             // convert outermost arrays (every row) to a slice
             // convert every sub array (every col) to a slice
-            // let record_slice = unsafe{(*exec_response.select).records.as_slice((*exec_response.select).num_rows as usize)};
+            // * non-copy approach
+            let record_slice = unsafe{(*exec_response.select).records.as_mut_slice((*exec_response.select).num_rows as usize)};
+            // empty vec
+            // let record_slice2;
+            for col in 0..record_slice.len() {
+                // slice doesn't copy, converts ptr type to slice. Compile time construct (contiguous)
+                record_slice2[col] = std::slice::from_raw_parts_mut(record_slice[col], (*exec_response.select).num_rows as usize);
+            }
+            // std::vec::with_capacity to make an empty vector. 
+
+            // ! TODO call destructor for CResult manually. select is a mut*
+            // drop()
+
+            // *(record_slice[i])
+            // * copy approach
+            // vec! initializes 
+            // let mut record_slice_copy = vec![vec![CResult_RecordData; (*exec_response.select).num_cols as usize]; record_slice.len()];
+            // for col in 0..record_slice.len() {
+                // record_slice_copy[col] = std::slice::from_raw_parts_mut(record_slice[col], (*exec_response.select).num_rows as usize);
+            //     let row = std::slice::from_raw_parts_mut(record_slice[col], (*exec_response.select).num_rows as usize);
+            // }
             // ? array of pointers, so can't index twice. Need to convert the ptr to an array as well somehow 
             // let record_val = unsafe {record_slice[0][0].UINT as i32};
             // println!("Just after slice conversion");
