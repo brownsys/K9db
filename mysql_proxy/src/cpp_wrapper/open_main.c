@@ -11,7 +11,7 @@ int main(int argc, char **argv)
 	// int response_delete = exec_update(&c_conn, "DELETE FROM test3 WHERE my_column=2;");
 	CResult* response_select = exec_select(&c_conn, "SELECT * FROM test3;");
 	destroy_select(response_select);
-	bool close = close_c(&c_conn);
+	bool close = close_conn(&c_conn);
 	destroy_conn(c_conn.cpp_conn);
 	return 0;
 }

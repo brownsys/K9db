@@ -55,22 +55,32 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         println!("Rust Proxy: query received from HotCRP is: {:?}", q_string);
         
         if q_string.contains("SET") || q_string.contains("DROP") || q_string.contains("ALTER") {
-            println!("Rust Proxy: Unsupported query type")
-            return results.completed(0, 0);
+            println!("Rust Proxy: Unsupported query type");
+            return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
         }
         
         println!("Rust Proxy: calling rust wrapper that calls c-wrapper for pelton::exec\n");
         let exec_response : exec_type = exec(&mut self.rust_conn, q_string);
         
+        // determine query type and return appropriate response
         if q_string.contains("CREATE") {
-            // ! TODO send boolean back to client. Do I need the row writer for this? No cols right?
-            
+            if unsafe{exec_response.ddl} {
+                results.completed(0, 0)
+            } else {
+                println!("Rust Proxy: Failed to execute ddl");
+                results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
+            }
         } else if q_string.contains("UPDATE") || q_string.contains("DELETE") || q_string.contains("INSERT") {
-            // ! TODO send int back to client. 
-            
+            if unsafe{exec_response.update} != -1 {
+                unsafe {results.completed(exec_response.update as u64, 0)}
+            } else {
+                println!("Rust Proxy: Failed to execute update");
+                results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
+            }
         } else if q_string.contains("SELECT") {
             // ? destructor for CResult is not getting triggered for some reason
             // ! TODO construct columns based on select response only. Done manually here
+            // ! TODO return error on failed select (return -1 to indicate error in C wrapper?)
             let cols = [
                 Column {
                     table: "foo".to_string(),
@@ -94,10 +104,14 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             
     
             println!("Just before slice conversion");
-            let record_val = unsafe {(*exec_response.select).records.as_slice((*exec_response.select).num_records as usize)[0].record_data.UINT as u32};
-            println!("Just after slice conversion");
-            println!("{:?}", record_val);
-            unsafe{rw.write_col(record_val)?};
+            // conversion from incomplete array field (flexible array) to rust slice
+            // convert outermost arrays (every row) to a slice
+            // convert every sub array (every col) to a slice
+            // let record_slice = unsafe{(*exec_response.select).records.as_slice((*exec_response.select).num_rows as usize)};
+            // let record_val = unsafe {record_slice[0][0].UINT as i32};
+            // println!("Just after slice conversion");
+            // println!("{:?}", record_val);
+            // unsafe{rw.write_col(record_val)?};
             
             // write a value to column "b"
             rw.write_col("b's value")?;
@@ -105,6 +119,9 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             rw.finish()
             // rw.finish(); // client
             // Ok(()) // proxy
+        } else {
+            println!("Rust proxy: unsupported query type");
+            results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
         }
     }
 }

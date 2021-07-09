@@ -144,7 +144,7 @@ fn bindgen_test_layout_CResult() {
     );
 }
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct ConnectionC {
     pub cpp_conn: *mut ::std::os::raw::c_void,
     pub connected: bool,
@@ -182,47 +182,34 @@ fn bindgen_test_layout_ConnectionC() {
         )
     );
 }
-
-
-// custom destructors
-impl Drop for CResult {
-    fn drop(&mut self) {
-        println!("Rust FFI: Calling destructor for CResult");
-        // need to destruct entire struct since malloced it in C-Wrapper
-        unsafe {destroy_select(self)};
-        println!("Rust FFI: CResult destroyed");
-    }
-}
-
-impl Drop for ConnectionC {
-    fn drop (&mut self) {
-        println!("Rust FFI: Calling destructor for ConnectionC");
-        // the struct itself is destructed by rust automatically. Only
-        // the C++ struct in the field of the rust struct is not and requires
-        // manually deallocation
-        unsafe {destroy_conn(self.cpp_conn)};
-        println!("Rust FFI: ConnectionC destroyed");
-    }
-}
-
-#[link(name = "open")]
 extern "C" {
     pub fn open_c(
-        query: *mut ::std::os::raw::c_char,
-        db_username: *mut ::std::os::raw::c_char,
-        db_password: *mut ::std::os::raw::c_char,
+        db_dir: *const ::std::os::raw::c_char,
+        db_username: *const ::std::os::raw::c_char,
+        db_password: *const ::std::os::raw::c_char,
     ) -> ConnectionC;
+}
+extern "C" {
     pub fn exec_ddl(c_conn: *mut ConnectionC, query: *const ::std::os::raw::c_char) -> bool;
+}
+extern "C" {
     pub fn exec_update(
         c_conn: *mut ConnectionC,
         query: *const ::std::os::raw::c_char,
     ) -> ::std::os::raw::c_int;
+}
+extern "C" {
     pub fn exec_select(
         c_conn: *mut ConnectionC,
         query: *const ::std::os::raw::c_char,
     ) -> *mut CResult;
+}
+extern "C" {
     pub fn close_conn(c_conn: *mut ConnectionC) -> bool;
+}
+extern "C" {
     pub fn destroy_select(c_result: *mut CResult);
+}
+extern "C" {
     pub fn destroy_conn(c_conn: *mut ::std::os::raw::c_void);
 }
-

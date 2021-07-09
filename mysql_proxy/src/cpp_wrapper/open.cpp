@@ -12,6 +12,7 @@
 #include "../../../pelton/dataflow/types.h"
 #include "../../../pelton/sqlast/ast.h"
 #include "../../../pelton/util/ints.h"
+#include "../../../pelton/sqlast/ast_schema.h"
 
 namespace pelton
 {
@@ -20,6 +21,10 @@ namespace pelton
         uint64_t operator"" _u(unsigned long long x)
         {
             return static_cast<uint64_t>(x);
+        }
+        int64_t operator"" _s(unsigned long long x)
+        {
+            return static_cast<int64_t>(static_cast<long long>(x));
         }
     }
 }
@@ -84,7 +89,7 @@ ConnectionC open_c(const char *db_dir, const char *db_username, const char *db_p
     return c_conn;
 }
 
-bool close_c(ConnectionC *c_conn)
+bool close_conn(ConnectionC *c_conn)
 {
     std::cout << "C-Wrapper: starting close_c" << std::endl;
     pelton::Connection *cpp_conn =
@@ -139,37 +144,88 @@ int exec_update(ConnectionC *c_conn, const char *query)
 
 CResult *exec_select(ConnectionC *c_conn, const char *query)
 {
+    std::cout << "C-Wrapper: creating dummy pelton record and vector" << std::endl;
+
+    // ! TODO support strings and datetime
     // std::vector<std::string> names = {"Col1", "Col2", "Col3"};
     // std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
     // std::unique_ptr<std::string> s1 = std::make_unique<std::string>("Hello!");
     // pelton::Record r1{schema, true, 0_u, std::move(s1), 10_s};
-    // std::vector<Record> records;
+    // std::vector<Record> pelton_records;
     // records.push_back(r1.Copy());
 
-    std::cout << "C-Wrapper: creating dummy pelton record and vector" << std::endl;
-    std::vector<std::string> names2 = {"Col1"};
-    std::vector<CType> types2 = {CType::UINT};
+    std::vector<std::string> names2 = {"Col1", "Col2"};
+    std::vector<CType> types2 = {CType::INT, CType::INT};
     // set col to be primary key (here column at index 0 is the primary key):
     std::vector<pelton::dataflow::ColumnID> keys2 = {0};
-
     pelton::dataflow::SchemaRef schema2 = pelton::dataflow::SchemaFactory::Create(names2, types2, keys2);
-    // using pelton::operator""_u;
     using namespace pelton::literals;
-    pelton::Record r2{schema2, true, 66_u};
-    std::vector<pelton::Record> pelton_records;
-    pelton_records.push_back(r2.Copy());
+    // pelton::Record r2{schema2, true, 66_u, -66_s};
+    pelton::Record r2{schema2, true, 66_s, 88_s};
+    std::vector<pelton::Record> pelton_records2;
+    pelton_records2.push_back(r2.Copy());
 
     std::cout << "C-Wrapper: converting vector of pelton records to vector of CRecord" << std::endl;
-    // flexible array members only defined in C, not c++ so need malloc
-    struct CResult *c_result = (CResult *)malloc(sizeof(struct CResult) + sizeof(struct CRecord) * pelton_records.size());
-
-    for (int i = 0; i < pelton_records.size(); i++)
+    // allocate memory for CResult struct and the flexible array of union Record pointers (# pointers = # rows/pelton records) according the the number of pelton records
+    struct CResult *c_result = (CResult *)malloc(sizeof(*c_result) + sizeof(*(c_result->records)) * pelton_records2.size());
+    //                                           |-- CResult* --|    | ----  RecordData[]  ---- |   | number of records (rows) |
+    c_result->num_rows = pelton_records2.size();
+    c_result->num_cols = names2.size();
+    // then allocate memory for the underlying union RecordData that lies behind each RecordData[] pointer (# unions = # of cols)
+    for (int r = 0; r < c_result->num_rows; r++)
     {
-        // have to do this for every column, so should really be nested loop
-        c_result->records[i].record_data.UINT = pelton_records[i].GetUInt(i);
-        std::cout << "C-Wrapper: iteration is : " << i << std::endl;
-        std::cout << "C-Wrapper: value for this column in std::vector<pelton::Record> pelton_records is: " << pelton_records[i].GetUInt(0) << std::endl;
-        std::cout << "C-Wrapper: value for this column in CRecord c_result is: " << c_result->records[i].record_data.UINT << std::endl;
+        // allocate mem for all the cols of this row (# unions = # cols) | all the union arrays at each ptr
+        c_result->records[r] = (CResult::RecordData *)malloc(sizeof(*(c_result->records[r])) * c_result->num_cols);
+        //                                                  | ----     RecordData    ---- |   | number of columns |
+    }
+
+    // * Populate CResult schema
+
+    std::cout << "C-Wrapper: converting pelton schema to CResult" << std::endl;
+    // set number of columns
+    // c_result->num_cols = schema2.GetSchema().size();
+    c_result->num_cols = schema2.size();
+    std::cout << "C-Wrapper: CResult schema size is : " << c_result->num_cols << std::endl;
+    // for each column
+    for (int i = 0; i < schema2.size(); i++)
+    {
+        // set column name
+        const char *col_name = schema2.NameOf(i).c_str();
+        strcpy(c_result->col_names[i], col_name);
+        std::cout << "C-Wrapper: CResult col_name at index " << i << " is " << c_result->col_names[i] << std::endl;
+
+        // set column type
+        CType col_type = schema2.TypeOf(i); // .GetSchema().TypeOf(i)
+        // ? TypeToString exception: unsupported column type UINT
+        std::string col_type_cpp = pelton::sqlast::ColumnDefinition::TypeToString(col_type);
+        const char *col_type_c = col_type_cpp.c_str();
+        // mysql only supports signed integers, hence TypeToString doesn't return UINT
+        // ? how to tell C/rust which union field to access if no case for UINT in TypeToString?
+        strcpy(c_result->col_types[i], col_type_c); // transfer ownership
+        std::cout << "C-Wrapper: CResult col_type at index " << i << " is " << c_result->col_types[i] << std::endl;
+    }
+
+    // * Populate CResult *records[]
+    // for final version use while(sqlresult.HasNext() for outermost loop and the records_vector.size() as inner loop
+
+    // for every record (row)
+    for (int i = 0; i < pelton_records2.size(); i++)
+    {
+        std::cout << "C-Wrapper: row is : " << i << std::endl;
+        // for every RecordData (col)
+        for (int j = 0; j < names2.size(); j++)
+        {
+            std::cout << "C-Wrapper: col is : " << j << std::endl;
+
+            // if (c_result->col_types[i] == UINT_enum)... OR c_result->col_types[i].find("UINT")
+            // [i] row, [j] col
+            c_result->records[i][j].UINT = pelton_records2[i].GetInt(j);
+            // else if (c_result->col_types[i].find("VARCHAR(100)")) {
+            // c_result->records[i].record_data[j].TEXT = pelton_records2[i].GetString(j);
+
+            std::cout << "C-Wrapper: row value for this column in std::vector<pelton::Record> pelton_records is: " << pelton_records2[i].GetInt(j) << std::endl;
+            std::cout << "C-Wrapper: row value for this column in CRecord c_result is: " << c_result->records[i][j].INT << std::endl;
+        }
     }
     return c_result;
 }

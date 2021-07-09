@@ -36,7 +36,7 @@ fn open(dir: &str, user: &str, pass: &str) -> ConnectionC {
 }
 
 fn close(rust_conn : *mut ConnectionC) -> bool {
-  let response = unsafe {close_c(rust_conn)};
+  let response = unsafe {close_conn(rust_conn)};
   return response;
 }
 
