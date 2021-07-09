@@ -233,5 +233,8 @@ CResult *exec_select(ConnectionC *c_conn, const char *query)
 void destroy_select(CResult *c_result)
 {
     std::cout << "C-Wrapper: destroy_select to delete CResult" << std::endl;
-    delete c_result;
+    for (int r = 0; r < c_result->rows; r++) {
+        free(c_result->records[r]);
+    }
+    free (c_result);
 }

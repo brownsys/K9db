@@ -108,6 +108,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             // convert outermost arrays (every row) to a slice
             // convert every sub array (every col) to a slice
             // let record_slice = unsafe{(*exec_response.select).records.as_slice((*exec_response.select).num_rows as usize)};
+            // ? array of pointers, so can't index twice. Need to convert the ptr to an array as well somehow 
             // let record_val = unsafe {record_slice[0][0].UINT as i32};
             // println!("Just after slice conversion");
             // println!("{:?}", record_val);
