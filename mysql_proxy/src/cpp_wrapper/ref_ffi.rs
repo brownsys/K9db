@@ -33,12 +33,64 @@ impl<T> ::std::fmt::Debug for __IncompleteArrayField<T> {
 pub const true_: u32 = 1;
 pub const false_: u32 = 0;
 pub const __bool_true_false_are_defined: u32 = 1;
+pub type size_t = ::std::os::raw::c_ulong;
+pub type wchar_t = ::std::os::raw::c_int;
+#[repr(C)]
+#[repr(align(16))]
+#[derive(Debug, Copy, Clone)]
+pub struct max_align_t {
+    pub __clang_max_align_nonce1: ::std::os::raw::c_longlong,
+    pub __bindgen_padding_0: u64,
+    pub __clang_max_align_nonce2: u128,
+}
+#[test]
+fn bindgen_test_layout_max_align_t() {
+    assert_eq!(
+        ::std::mem::size_of::<max_align_t>(),
+        32usize,
+        concat!("Size of: ", stringify!(max_align_t))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<max_align_t>(),
+        16usize,
+        concat!("Alignment of ", stringify!(max_align_t))
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::std::ptr::null::<max_align_t>())).__clang_max_align_nonce1 as *const _ as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(max_align_t),
+            "::",
+            stringify!(__clang_max_align_nonce1)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::std::ptr::null::<max_align_t>())).__clang_max_align_nonce2 as *const _ as usize
+        },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(max_align_t),
+            "::",
+            stringify!(__clang_max_align_nonce2)
+        )
+    );
+}
+pub const ColumnDefinitionTypeEnum_UINT: ColumnDefinitionTypeEnum = 0;
+pub const ColumnDefinitionTypeEnum_INT: ColumnDefinitionTypeEnum = 1;
+pub const ColumnDefinitionTypeEnum_TEXT: ColumnDefinitionTypeEnum = 2;
+pub const ColumnDefinitionTypeEnum_DATETIME: ColumnDefinitionTypeEnum = 3;
+pub type ColumnDefinitionTypeEnum = ::std::os::raw::c_uint;
 #[repr(C)]
 pub struct CResult {
     pub col_names: [[::std::os::raw::c_char; 64usize]; 64usize],
-    pub col_types: [[::std::os::raw::c_char; 64usize]; 64usize],
-    pub num_rows: ::std::os::raw::c_ulong,
-    pub num_cols: ::std::os::raw::c_ulong,
+    pub col_types: [ColumnDefinitionTypeEnum; 64usize],
+    pub num_rows: size_t,
+    pub num_cols: size_t,
     pub records: __IncompleteArrayField<*mut CResult_RecordData>,
 }
 #[repr(C)]
@@ -46,6 +98,8 @@ pub struct CResult {
 pub union CResult_RecordData {
     pub UINT: ::std::os::raw::c_ulong,
     pub INT: ::std::os::raw::c_int,
+    pub TEXT: *mut ::std::os::raw::c_char,
+    pub DATETIME: *mut ::std::os::raw::c_char,
 }
 #[test]
 fn bindgen_test_layout_CResult_RecordData() {
@@ -79,12 +133,32 @@ fn bindgen_test_layout_CResult_RecordData() {
             stringify!(INT)
         )
     );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<CResult_RecordData>())).TEXT as *const _ as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CResult_RecordData),
+            "::",
+            stringify!(TEXT)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<CResult_RecordData>())).DATETIME as *const _ as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CResult_RecordData),
+            "::",
+            stringify!(DATETIME)
+        )
+    );
 }
 #[test]
 fn bindgen_test_layout_CResult() {
     assert_eq!(
         ::std::mem::size_of::<CResult>(),
-        8208usize,
+        4368usize,
         concat!("Size of: ", stringify!(CResult))
     );
     assert_eq!(
@@ -114,7 +188,7 @@ fn bindgen_test_layout_CResult() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<CResult>())).num_rows as *const _ as usize },
-        8192usize,
+        4352usize,
         concat!(
             "Offset of field: ",
             stringify!(CResult),
@@ -124,7 +198,7 @@ fn bindgen_test_layout_CResult() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<CResult>())).num_cols as *const _ as usize },
-        8200usize,
+        4360usize,
         concat!(
             "Offset of field: ",
             stringify!(CResult),
@@ -134,7 +208,7 @@ fn bindgen_test_layout_CResult() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<CResult>())).records as *const _ as usize },
-        8208usize,
+        4368usize,
         concat!(
             "Offset of field: ",
             stringify!(CResult),

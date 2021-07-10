@@ -104,17 +104,21 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             
     
             println!("Just before slice conversion");
+            // empty vec
+            // let mut vec = Vec::new();
+
             // conversion from incomplete array field (flexible array) to rust slice
             // convert outermost arrays (every row) to a slice
             // convert every sub array (every col) to a slice
             // * non-copy approach
-            let record_slice = unsafe{(*exec_response.select).records.as_mut_slice((*exec_response.select).num_rows as usize)};
-            // empty vec
-            // let record_slice2;
-            for col in 0..record_slice.len() {
-                // slice doesn't copy, converts ptr type to slice. Compile time construct (contiguous)
-                record_slice2[col] = std::slice::from_raw_parts_mut(record_slice[col], (*exec_response.select).num_rows as usize);
-            }
+            // let record_slice = unsafe{(*exec_response.select).records.as_mut_slice((*exec_response.select).num_rows as usize)};
+            // for col in 0..record_slice.len() {
+            //     // slice doesn't copy, converts ptr type to slice. Compile time construct (contiguous)
+            //     vec[col] = unsafe{std::slice::from_raw_parts_mut(record_slice[col], (*exec_response.select).num_rows as usize)};
+            // }
+            // println!("{:?}", vec[0]);
+            // println!("{:?}", vec[0][0]);
+
             // std::vec::with_capacity to make an empty vector. 
 
             // ! TODO call destructor for CResult manually. select is a mut*

@@ -34,6 +34,7 @@ pub const true_: u32 = 1;
 pub const false_: u32 = 0;
 pub const __bool_true_false_are_defined: u32 = 1;
 #[repr(C)]
+#[derive(Debug)]
 pub struct CResult {
     pub col_names: [[::std::os::raw::c_char; 64usize]; 64usize],
     pub col_types: [[::std::os::raw::c_char; 64usize]; 64usize],

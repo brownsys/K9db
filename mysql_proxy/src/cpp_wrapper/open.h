@@ -2,24 +2,32 @@
 #define __OPEN_H__
 #include <stdbool.h>
 #include "../../../pelton/sqlast/ast_schema_enums.h"
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
+    // enum ColumnDefinitionTypeEnum
+    // {
+    //     UINT,
+    //     INT,
+    //     TEXT,
+    //     DATETIME
+    // };
     struct CResult
     {
-        char col_names[64][64]; // => max 64 col names, each 64 chars in length
-        // char col_types[64][64]; // => specified here so rust knows which union field to access
+        char col_names[64][64]; // max 64 col names, each 64 chars in length
         pelton::sqlast::ColumnDefinitionTypeEnum col_types[64];
-        unsigned long num_rows; // number of records
-        unsigned long num_cols;
+        // enum ColumnDefinitionTypeEnum col_types[64];
+        size_t num_rows; // number of records
+        size_t num_cols;
         union RecordData
         {
             long unsigned int UINT;
             int INT;
-            char* TEXT;
-            char* DATETIME;
+            char *TEXT;
+            char *DATETIME;
         } * records[];
     };
 
