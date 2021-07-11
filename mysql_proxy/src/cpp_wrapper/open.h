@@ -17,7 +17,6 @@ extern "C"
     };
     struct CResult
     {
-        char* table_name;
         char* col_names[64]; // max 64 col names, each 64 chars in length
         // pelton::sqlast::ColumnDefinitionTypeEnum col_types[64];
         enum ColumnDefinitionTypeEnum col_types[64];

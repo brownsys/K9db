@@ -84,10 +84,6 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             println!("Rust Proxy: Populating mysql_srv response");
             // ! TODO return error on failed select (return NULL to indicate error in C wrapper?) Or how mimic rust's Result type?
 
-            // ? am I freeing the char* strings correctly in destroy_select in the C-Wrapper?
-            // add destructor for strings passed to rust? Or automatically destructed when take ownership via .to_owned?
-            // => might be cloned so still need to free the malloced memory. 
-
             let num_cols = unsafe { (*exec_response.select).num_cols as usize };
             let num_rows = unsafe { (*exec_response.select).num_rows as usize };
             let col_names = unsafe { (*exec_response.select).col_names };
@@ -98,9 +94,6 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             
             println!("Rust Proxy: creating columns");
             for c in 0..num_cols {
-                // convert table_name to rust string
-                let table_name = unsafe{(*exec_response.select).table_name};
-                let table_name_string : String = unsafe{CStr::from_ptr(table_name).to_str().unwrap().to_owned()};
                 // convert col_name at index c to rust string
                 let col_name_string: String =
                     unsafe { CStr::from_ptr(col_names[c]).to_str().unwrap().to_owned() };
@@ -115,8 +108,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                     _ => ColumnType::MYSQL_TYPE_NULL,
                 };
                 cols.push(Column {
-                    table: table_name_string,
-                    // table: "my_table".to_string(),
+                    table: "".to_string(),
                     column: col_name_string,
                     coltype: col_type,
                     colflags: ColumnFlags::empty(),
@@ -166,6 +158,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             }
             // calling destructor for CResult
             unsafe { std::ptr::drop_in_place(exec_response.select) };
+
             // tell client no more rows coming. Returns an empty ok to the proxy
             rw.finish()
             // rw.finish(); // client

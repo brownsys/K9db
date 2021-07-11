@@ -142,11 +142,6 @@ CResult *exec_select(ConnectionC *c_conn, const char *query)
 
         // * Populate CResult schema
 
-        // ! TODO access table name from pelton
-        char *table_name = (char *)malloc(10);
-        strcpy(table_name, "my_table");
-        c_result->table_name = table_name;
-
         // set number of columns
         c_result->num_cols = sql_result.GetSchema().size();
         c_result->num_rows = num_rows;
@@ -251,7 +246,6 @@ CResult *exec_select(ConnectionC *c_conn, const char *query)
 void destroy_select(CResult *c_result)
 {
     std::cout << "C-Wrapper: starting destroy_select to delete CResult" << std::endl;
-    free(c_result->table_name);
     for (int i = 0; c_result->col_names[i]; i++) {
         free(c_result->col_names[i]);
     }
