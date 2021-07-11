@@ -14,25 +14,6 @@
 #include "../../../pelton/util/ints.h"
 #include "../../../pelton/sqlast/ast_schema.h"
 
-namespace pelton
-{
-    inline namespace literals
-    {
-        uint64_t operator"" _u(unsigned long long x)
-        {
-            return static_cast<uint64_t>(x);
-        }
-        int64_t operator"" _s(unsigned long long x)
-        {
-            return static_cast<int64_t>(static_cast<long long>(x));
-        }
-    }
-}
-
-// namespace pelton
-// {
-//     namespace dataflow
-//     {
 using CType = pelton::sqlast::ColumnDefinition::Type;
 
 ConnectionC create()
@@ -161,22 +142,43 @@ CResult *exec_select(ConnectionC *c_conn, const char *query)
 
         // * Populate CResult schema
 
+        // ! TODO access table name from pelton
+        char *table_name = (char *)malloc(10);
+        strcpy(table_name, "my_table");
+        c_result->table_name = table_name;
+
         // set number of columns
         c_result->num_cols = sql_result.GetSchema().size();
         c_result->num_rows = num_rows;
         std::cout << "C-Wrapper: CResult number of columns is : " << c_result->num_cols << std::endl;
         std::cout << "C-Wrapper: CResult number of rows is : " << c_result->num_rows << std::endl;
+
         // for each column
         for (int i = 0; i < c_result->num_cols; i++)
         {
-            // set column name
-            const char *col_name = sql_result.GetSchema().NameOf(i).c_str();
-            strcpy(c_result->col_names[i], col_name);
-            std::cout << "C-Wrapper: CResult col_name at index " << i << " is " << c_result->col_names[i] << std::endl;
+            const std::string cpp_col_name = sql_result.GetSchema().NameOf(i);
+            char *col_name = (char*)malloc(cpp_col_name.size() + 1);
+            strcpy(col_name, cpp_col_name.c_str());
+            c_result->col_names[i] = col_name;
 
             // set column type
-            CType col_type = sql_result.GetSchema().TypeOf(i); // .GetSchema().TypeOf(i)
-            c_result->col_types[i] = col_type;
+            CType col_type = sql_result.GetSchema().TypeOf(i);
+            // c_result->col_types[i] = col_type;
+            switch (col_type)
+            {
+            case CType::INT:
+                c_result->col_types[i] = ColumnDefinitionTypeEnum::INT;
+                break;
+            case CType::UINT:
+                c_result->col_types[i] = ColumnDefinitionTypeEnum::UINT;
+                break;
+            case CType::TEXT:
+                c_result->col_types[i] = ColumnDefinitionTypeEnum::TEXT;
+                break;
+            case CType::DATETIME:
+                c_result->col_types[i] = ColumnDefinitionTypeEnum::DATETIME;
+                break;
+            }
             std::cout << "C-Wrapper: CResult col_type at index " << i << " is " << c_result->col_types[i] << std::endl;
         }
 
@@ -189,17 +191,12 @@ CResult *exec_select(ConnectionC *c_conn, const char *query)
             //                                                  | ----     RecordData    ---- |   | number of columns |
         }
 
-
         // * Populate CResult *records[]
         std::cout << "C-Wrapper: populating CResult *records[]" << std::endl;
 
         // for every record (row)
-        // while (sql_result.HasNext())
         for (int i = 0; i < num_rows; i++)
         {
-            // int i = 0;
-            // pelton::Record row = sql_result.FetchOne();
-
             std::cout << "C-Wrapper: row index is : " << i << std::endl;
             // for every col in this record (row)
             for (int j = 0; j < c_result->num_cols; j++)
@@ -207,19 +204,20 @@ CResult *exec_select(ConnectionC *c_conn, const char *query)
                 std::cout << "C-Wrapper: col index is : " << j << std::endl;
 
                 // [i] row, [j] col
-                if (c_result->col_types[j] == CType::UINT)
+                // if (c_result->col_types[j] == CType::UINT)
+                if (c_result->col_types[j] == ColumnDefinitionTypeEnum::UINT)
                 {
                     c_result->records[i][j].UINT = records[i].GetUInt(j);
                     std::cout << "C-Wrapper: row value for this column in std::vector<pelton::Record> pelton_records is: " << records[i].GetUInt(j) << std::endl;
                     std::cout << "C-Wrapper: row value for this column in CRecord c_result is: " << c_result->records[i][j].UINT << std::endl;
                 }
-                else if (c_result->col_types[j] == CType::INT)
+                else if (c_result->col_types[j] == ColumnDefinitionTypeEnum::INT)
                 {
                     c_result->records[i][j].INT = records[i].GetInt(j);
                     std::cout << "C-Wrapper: row value for this column in std::vector<pelton::Record> pelton_records is: " << records[i].GetInt(j) << std::endl;
                     std::cout << "C-Wrapper: row value for this column in CRecord c_result is: " << c_result->records[i][j].INT << std::endl;
                 }
-                else if (c_result->col_types[j] == CType::TEXT)
+                else if (c_result->col_types[j] == ColumnDefinitionTypeEnum::TEXT)
                 {
                     std::string cpp_val = records[i].GetString(j);
                     char *val = (char *)malloc(cpp_val.size() + 1);
@@ -228,7 +226,7 @@ CResult *exec_select(ConnectionC *c_conn, const char *query)
                     std::cout << "C-Wrapper: row value for this column in std::vector<pelton::Record> pelton_records is: " << records[i].GetString(j) << std::endl;
                     std::cout << "C-Wrapper: row value for this column in CRecord c_result is: " << c_result->records[i][j].TEXT << std::endl;
                 }
-                else if (c_result->col_types[j] == CType::DATETIME)
+                else if (c_result->col_types[j] == ColumnDefinitionTypeEnum::DATETIME)
                 {
                     std::string cpp_val = records[i].GetDateTime(j);
                     char *val = (char *)malloc(cpp_val.size() + 1);
@@ -242,17 +240,21 @@ CResult *exec_select(ConnectionC *c_conn, const char *query)
                     std::cout << "C-Wrapper: Invalid col_type" << std::endl;
                 }
             }
-            // i++;
         }
         return c_result;
     }
     std::cout << "C-Wrapper: Result.ok() or result.value().IsQuery() failed" << std::endl;
+    // ! TODO how to return error (can rust detect NULL?)
     return NULL;
 }
 
 void destroy_select(CResult *c_result)
 {
-    std::cout << "C-Wrapper: destroy_select to delete CResult" << std::endl;
+    std::cout << "C-Wrapper: starting destroy_select to delete CResult" << std::endl;
+    free(c_result->table_name);
+    for (int i = 0; c_result->col_names[i]; i++) {
+        free(c_result->col_names[i]);
+    }
     for (int r = 0; r < c_result->num_rows; r++)
     {
         free(c_result->records[r]);
