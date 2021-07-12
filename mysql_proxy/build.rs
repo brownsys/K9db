@@ -1,7 +1,6 @@
 extern crate bindgen;
-
-use std::env;
-use std::path::PathBuf;
+// use std::env;
+// use std::path::PathBuf;
 
 fn main() {
     // point to dir of compiled C libraries
