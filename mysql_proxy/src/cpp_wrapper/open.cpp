@@ -246,9 +246,10 @@ CResult *exec_select(ConnectionC *c_conn, const char *query)
 void destroy_select(CResult *c_result)
 {
     std::cout << "C-Wrapper: starting destroy_select to delete CResult" << std::endl;
-    for (int i = 0; c_result->col_names[i]; i++) {
-        free(c_result->col_names[i]);
-    }
+    // ? I think this results in double free:
+    // for (int i = 0; c_result->col_names[i]; i++) {
+    //     free(c_result->col_names[i]);
+    // }
     for (int r = 0; r < c_result->num_rows; r++)
     {
         free(c_result->records[r]);
