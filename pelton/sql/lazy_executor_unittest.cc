@@ -348,11 +348,11 @@ TEST(LazyExecutorTest, TestSelectDefault) {
   // Create Schema and expected records.
   dataflow::SchemaRef schema = UnshardedSchema();
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema, true, 1_s, "s1"_Uptr);
-  records.emplace_back(schema, true, 2_s, "s2"_Uptr);
-  records.emplace_back(schema, true, 3_s, "s1"_Uptr);
-  records.emplace_back(schema, true, 4_s, "s3"_Uptr);
-  records.emplace_back(schema, true, 5_s, "s2"_Uptr);
+  records.emplace_back(schema, true, 1_s, "s1"_uptr);
+  records.emplace_back(schema, true, 2_s, "s2"_uptr);
+  records.emplace_back(schema, true, 3_s, "s1"_uptr);
+  records.emplace_back(schema, true, 4_s, "s3"_uptr);
+  records.emplace_back(schema, true, 5_s, "s2"_uptr);
 
   // Query the database.
   sqlast::Select stmt2{"mytest"};
@@ -413,11 +413,11 @@ TEST(LazyExecutorTest, TestSelectShard) {
   // Create Schema and expected records.
   dataflow::SchemaRef schema = ShardedSchema();
   std::vector<dataflow::Record> records1, records2;
-  records1.emplace_back(schema, false, 1_s, 1_s, "s1"_Uptr);
-  records1.emplace_back(schema, false, 2_s, 1_s, "s2"_Uptr);
-  records2.emplace_back(schema, false, 3_s, 2_s, "s1"_Uptr);
-  records2.emplace_back(schema, false, 4_s, 2_s, "s3"_Uptr);
-  records1.emplace_back(schema, false, 5_s, 1_s, "s2"_Uptr);
+  records1.emplace_back(schema, false, 1_s, 1_s, "s1"_uptr);
+  records1.emplace_back(schema, false, 2_s, 1_s, "s2"_uptr);
+  records2.emplace_back(schema, false, 3_s, 2_s, "s1"_uptr);
+  records2.emplace_back(schema, false, 4_s, 2_s, "s3"_uptr);
+  records1.emplace_back(schema, false, 5_s, 1_s, "s2"_uptr);
 
   // Query the database for the first shard.
   sqlast::Select stmt2{"mytest"};
@@ -490,11 +490,11 @@ TEST(LazyExecutorTest, TestSelectShardSet) {
   // Create Schema and expected records.
   dataflow::SchemaRef schema = ShardedSchema();
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema, false, 1_s, 1_s, "s1"_Uptr);
-  records.emplace_back(schema, false, 2_s, 1_s, "s2"_Uptr);
-  records.emplace_back(schema, false, 5_s, 1_s, "s2"_Uptr);
-  records.emplace_back(schema, false, 3_s, 2_s, "s1"_Uptr);
-  records.emplace_back(schema, false, 4_s, 2_s, "s3"_Uptr);
+  records.emplace_back(schema, false, 1_s, 1_s, "s1"_uptr);
+  records.emplace_back(schema, false, 2_s, 1_s, "s2"_uptr);
+  records.emplace_back(schema, false, 5_s, 1_s, "s2"_uptr);
+  records.emplace_back(schema, false, 3_s, 2_s, "s1"_uptr);
+  records.emplace_back(schema, false, 4_s, 2_s, "s3"_uptr);
 
   // Query the database for the first shard.
   sqlast::Select stmt2{"mytest"};

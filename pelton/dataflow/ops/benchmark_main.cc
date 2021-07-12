@@ -1,7 +1,7 @@
 #include "benchmark/benchmark.h"
 
-// We want a custom main instead of using BENCHMARK_MAIN micro.
-// The BENCHMARK_MAIN micro throw an error if any command line flags passed
+// We want a custom main instead of using BENCHMARK_MAIN macro.
+// The BENCHMARK_MAIN macro throw an error if any command line flags passed
 // are unrecognizable. This causes our CI script to throw an error, as we
 // pass db_username and db_password flags to all tests, even ones that don't
 // use it.

@@ -24,8 +24,10 @@ class SqlResult {
   // type. Gets filled later with actual data by calling .Append(...)
   SqlResult();
   // For results of DDL (e.g. CREATE TABLE).
-  explicit SqlResult(bool status);
+  // Success is true if and only if the DDL statement succeeded.
+  explicit SqlResult(bool success);
   // For results of DML (e.g. INSERT/UPDATE/DELETE).
+  // row_count specifies how many rows were affected.
   explicit SqlResult(int row_count);
   // For results of SELECT, the result_set object is actually a lazy wrapper
   // around plain SQL commands and some schema and other metadata. The actual

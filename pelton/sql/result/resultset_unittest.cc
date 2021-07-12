@@ -58,11 +58,11 @@ TEST(ResultSetTest, InlineResultSet) {
 
   // Create a bunch of records.
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema, true, 1_s, "s1"_Uptr);
-  records.emplace_back(schema, true, 2_s, "s2"_Uptr);
-  records.emplace_back(schema, true, 3_s, "s1"_Uptr);
-  records.emplace_back(schema, true, 4_s, "s3"_Uptr);
-  records.emplace_back(schema, true, 5_s, "s2"_Uptr);
+  records.emplace_back(schema, true, 1_s, "s1"_uptr);
+  records.emplace_back(schema, true, 2_s, "s2"_uptr);
+  records.emplace_back(schema, true, 3_s, "s1"_uptr);
+  records.emplace_back(schema, true, 4_s, "s3"_uptr);
+  records.emplace_back(schema, true, 5_s, "s2"_uptr);
 
   // Make a copy.
   std::vector<dataflow::Record> copies;
@@ -92,11 +92,11 @@ TEST(ResultSetTest, SimpleLazyResultSet) {
 
   // Create a bunch of records.
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema, true, 1_s, "s1"_Uptr);
-  records.emplace_back(schema, true, 2_s, "s2"_Uptr);
-  records.emplace_back(schema, true, 3_s, "s1"_Uptr);
-  records.emplace_back(schema, true, 4_s, "s3"_Uptr);
-  records.emplace_back(schema, true, 5_s, "s2"_Uptr);
+  records.emplace_back(schema, true, 1_s, "s1"_uptr);
+  records.emplace_back(schema, true, 2_s, "s2"_uptr);
+  records.emplace_back(schema, true, 3_s, "s1"_uptr);
+  records.emplace_back(schema, true, 4_s, "s3"_uptr);
+  records.emplace_back(schema, true, 5_s, "s2"_uptr);
 
   // Create resultset.
   std::string query = "SELECT * FROM mytest ORDER BY id";
@@ -122,11 +122,11 @@ TEST(ResultSetTest, MultiLazyResultSet) {
 
   // Create a bunch of records.
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema, true, 1_s, "s1"_Uptr);
-  records.emplace_back(schema, true, 2_s, "s2"_Uptr);
-  records.emplace_back(schema, true, 3_s, "s1"_Uptr);
-  records.emplace_back(schema, true, 4_s, "s3"_Uptr);
-  records.emplace_back(schema, true, 5_s, "s2"_Uptr);
+  records.emplace_back(schema, true, 1_s, "s1"_uptr);
+  records.emplace_back(schema, true, 2_s, "s2"_uptr);
+  records.emplace_back(schema, true, 3_s, "s1"_uptr);
+  records.emplace_back(schema, true, 4_s, "s3"_uptr);
+  records.emplace_back(schema, true, 5_s, "s2"_uptr);
 
   // Create resultset.
   std::string query1 = "SELECT * FROM mytest WHERE id < 3 ORDER BY id";
@@ -154,11 +154,11 @@ TEST(ResultSetTest, AugmentedLazyResultSet) {
 
   // Create a bunch of records.
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema, true, 1_u, "s1"_Uptr, 10_u);
-  records.emplace_back(schema, true, 2_u, "s2"_Uptr, 10_u);
-  records.emplace_back(schema, true, 3_u, "s1"_Uptr, 50_u);
-  records.emplace_back(schema, true, 4_u, "s3"_Uptr, 50_u);
-  records.emplace_back(schema, true, 5_u, "s2"_Uptr, 50_u);
+  records.emplace_back(schema, true, 1_u, "s1"_uptr, 10_u);
+  records.emplace_back(schema, true, 2_u, "s2"_uptr, 10_u);
+  records.emplace_back(schema, true, 3_u, "s1"_uptr, 50_u);
+  records.emplace_back(schema, true, 4_u, "s3"_uptr, 50_u);
+  records.emplace_back(schema, true, 5_u, "s2"_uptr, 50_u);
 
   // Create resultset.
   std::string query1 = "SELECT * FROM mytest WHERE id < 3 ORDER BY id";
@@ -186,13 +186,13 @@ TEST(ResultSetTest, DeduplicateLazyResultSet) {
 
   // Create a bunch of records.
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema, true, 1_u, "s1"_Uptr, 10_u);
-  records.emplace_back(schema, true, 2_u, "s2"_Uptr, 10_u);
-  records.emplace_back(schema, true, 3_u, "s1"_Uptr, 50_u);
-  records.emplace_back(schema, true, 4_u, "s3"_Uptr, 50_u);
-  records.emplace_back(schema, true, 5_u, "s2"_Uptr, 50_u);
-  records.emplace_back(schema, true, 1_u, "s1"_Uptr, 90_u);
-  records.emplace_back(schema, true, 2_u, "s2"_Uptr, 90_u);
+  records.emplace_back(schema, true, 1_u, "s1"_uptr, 10_u);
+  records.emplace_back(schema, true, 2_u, "s2"_uptr, 10_u);
+  records.emplace_back(schema, true, 3_u, "s1"_uptr, 50_u);
+  records.emplace_back(schema, true, 4_u, "s3"_uptr, 50_u);
+  records.emplace_back(schema, true, 5_u, "s2"_uptr, 50_u);
+  records.emplace_back(schema, true, 1_u, "s1"_uptr, 90_u);
+  records.emplace_back(schema, true, 2_u, "s2"_uptr, 90_u);
 
   std::string query1 = "SELECT * FROM mytest WHERE id < 3 ORDER BY id";
   std::string query2 = "SELECT * FROM mytest WHERE id >= 3 ORDER BY id";
@@ -229,16 +229,16 @@ TEST(ResultSetTest, AppendLazyResultSet) {
 
   // Create a bunch of records.
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema, true, 1_u, "s1"_Uptr, 10_u);
-  records.emplace_back(schema, true, 2_u, "s2"_Uptr, 10_u);
-  records.emplace_back(schema, true, 3_u, "s1"_Uptr, 50_u);
-  records.emplace_back(schema, true, 4_u, "s3"_Uptr, 50_u);
-  records.emplace_back(schema, true, 5_u, "s2"_Uptr, 50_u);
-  records.emplace_back(schema, true, 1_u, "s1"_Uptr, 90_u);
-  records.emplace_back(schema, true, 2_u, "s2"_Uptr, 90_u);
-  records.emplace_back(schema, true, 3_u, "s1"_Uptr, 50_u);
-  records.emplace_back(schema, true, 4_u, "s3"_Uptr, 50_u);
-  records.emplace_back(schema, true, 5_u, "s2"_Uptr, 50_u);
+  records.emplace_back(schema, true, 1_u, "s1"_uptr, 10_u);
+  records.emplace_back(schema, true, 2_u, "s2"_uptr, 10_u);
+  records.emplace_back(schema, true, 3_u, "s1"_uptr, 50_u);
+  records.emplace_back(schema, true, 4_u, "s3"_uptr, 50_u);
+  records.emplace_back(schema, true, 5_u, "s2"_uptr, 50_u);
+  records.emplace_back(schema, true, 1_u, "s1"_uptr, 90_u);
+  records.emplace_back(schema, true, 2_u, "s2"_uptr, 90_u);
+  records.emplace_back(schema, true, 3_u, "s1"_uptr, 50_u);
+  records.emplace_back(schema, true, 4_u, "s3"_uptr, 50_u);
+  records.emplace_back(schema, true, 5_u, "s2"_uptr, 50_u);
 
   std::string query1 = "SELECT * FROM mytest WHERE id < 3 ORDER BY id";
   std::string query2 = "SELECT * FROM mytest WHERE id >= 3 ORDER BY id";

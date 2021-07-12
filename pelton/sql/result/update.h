@@ -24,7 +24,7 @@ class UpdateSqlResult : public AbstractSqlResultImpl {
     int other_count = static_cast<UpdateSqlResult *>(o)->row_count_;
     if (other_count < 0) {
       this->row_count_ = other_count;  // Error code.
-    } else if (this->row_count_ > -1) {
+    } else {
       this->row_count_ += other_count;  // Both results were successful.
     }
   }
