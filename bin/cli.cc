@@ -2,6 +2,7 @@
 #include <chrono>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -14,15 +15,22 @@
 std::vector<std::string> TO_SKIP = {"submit"};
 
 // Printing query results.
-void Print(pelton::SqlResult &&result) {
-  if (result.IsStatement()) {
+void Print(pelton::SqlResult &&result, bool print) {
+  if (result.IsStatement() && print) {
     std::cout << "Success: " << result.Success() << std::endl;
-  } else if (result.IsUpdate()) {
+  } else if (result.IsUpdate() && print) {
     std::cout << "Affected rows: " << result.UpdateCount() << std::endl;
   } else if (result.IsQuery()) {
-    std::cout << result.GetSchema() << std::endl;
-    for (const pelton::Record &record : result) {
-      std::cout << record << std::endl;
+    while (result.HasResultSet()) {
+      std::unique_ptr<pelton::SqlResultSet> resultset = result.NextResultSet();
+      if (print) {
+        std::cout << resultset->GetSchema() << std::endl;
+      }
+      for (const pelton::Record &record : *resultset) {
+        if (print) {
+          std::cout << record << std::endl;
+        }
+      }
     }
   }
 }
@@ -60,8 +68,8 @@ bool ReadCommand(std::string *ptr) {
 
 DEFINE_bool(print, true, "Print results to the screen");
 DEFINE_string(db_path, "", "Path to database directory (required)");
-DEFINE_string(db_username, "root", "MYSQL username to connect with");
-DEFINE_string(db_password, "password", "MYSQL pwd to connect with");
+DEFINE_string(db_username, "root", "MariaDB username to connect with");
+DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
 
 int main(int argc, char **argv) {
   // Command line arugments and help message.
@@ -129,9 +137,7 @@ int main(int argc, char **argv) {
         std::cerr << status.status() << std::endl;
         break;
       }
-      if (print) {
-        Print(std::move(status.value()));
-      }
+      Print(std::move(status.value()), print);
 
       // Print result.
       if (print) {

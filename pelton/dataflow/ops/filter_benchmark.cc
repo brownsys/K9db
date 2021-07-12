@@ -2,7 +2,7 @@
 
 #include "benchmark/benchmark.h"
 #include "pelton/dataflow/key.h"
-#include "pelton/dataflow/ops/benchmark-utils.h"
+#include "pelton/dataflow/ops/benchmark_utils.h"
 #include "pelton/dataflow/ops/filter.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"

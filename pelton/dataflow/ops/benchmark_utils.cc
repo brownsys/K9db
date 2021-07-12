@@ -1,4 +1,4 @@
-#include "pelton/dataflow/ops/benchmark-utils.h"
+#include "pelton/dataflow/ops/benchmark_utils.h"
 
 #include <string>
 #include <vector>

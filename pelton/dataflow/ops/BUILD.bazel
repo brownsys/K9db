@@ -291,8 +291,9 @@ cc_test(
 cc_test(
     name = "benchmarks",
     srcs = [
-        "benchmark-utils.cc",
-        "benchmark-utils.h",
+        "benchmark_main.cc",
+        "benchmark_utils.cc",
+        "benchmark_utils.h",
         "equijoin_benchmark.cc",
         "filter_benchmark.cc",
         "identity_benchmark.cc",
@@ -309,6 +310,6 @@ cc_test(
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
-        "@gbenchmark//:benchmark_main",
+        "@gbenchmark//:benchmark",
     ],
 )

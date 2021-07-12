@@ -61,7 +61,7 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
 
   // If special statement, handle it separately.
   if (SpecialStatements(sql, connection)) {
-    return SqlResult();
+    return SqlResult(true);
   }
 
   // Parse and rewrite statement.

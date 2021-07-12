@@ -17,7 +17,7 @@ namespace shards {
 // Initialization.
 void SharderState::Initialize(const std::string &db_username,
                               const std::string &db_password) {
-  this->connection_pool_.Initialize(db_username, db_password);
+  this->executor_.Initialize(db_username, db_password);
 }
 
 // Schema manipulations.
