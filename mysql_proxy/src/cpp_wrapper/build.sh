@@ -1,6 +1,6 @@
 cd ../../../
 pwd
-g++ -std=c++17 -o mysql_proxy/src/cpp_wrapper/libopen.so \
+g++ -g -std=c++17 -o mysql_proxy/src/cpp_wrapper/libopen.so \
   mysql_proxy/src/cpp_wrapper/open.cpp \
   -shared \
   -fPIC \

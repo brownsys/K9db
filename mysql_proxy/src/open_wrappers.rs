@@ -39,29 +39,28 @@ fn exec(rust_conn: *mut ConnectionC, query: &str) -> exec_type {
     let response = if query.contains("CREATE") {
         println!("Rust Wrapper: query type is: ddl");
         unsafe {
-          exec_type {
-            ddl: exec_ddl(rust_conn, c_query),
-          }
+            exec_type {
+                ddl: exec_ddl(rust_conn, c_query),
+            }
         }
-      } else if query.contains("DELETE") || query.contains("INSERT") || query.contains("UPDATE") {
+    } else if query.contains("DELETE") || query.contains("INSERT") || query.contains("UPDATE") {
         println!("Rust Wrapper: query type is: update");
         unsafe {
-          exec_type {
-            update: exec_update(rust_conn, c_query),
-          }
+            exec_type {
+                update: exec_update(rust_conn, c_query),
+            }
         }
-      } else if query.contains("SELECT") {
+    } else if query.contains("SELECT") {
         println!("Rust Wrapper: query type is: select");
         unsafe {
-          exec_type {
-            select: exec_select(rust_conn, c_query),
-          }
+            exec_type {
+                select: exec_select(rust_conn, c_query),
+            }
         }
-      } else {
+    } else {
         println!("Rust Wrapper: query type is: INVALID");
         exec_type { update: 1 }
-      };
-      println!("Rust Wrapper: about to return response to Rust Proxy main.rs");
-      return response;
-    }
-    
+    };
+    println!("Rust Wrapper: about to return response to Rust Proxy main.rs");
+    return response;
+}

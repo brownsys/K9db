@@ -1,10 +1,8 @@
 use msql_srv::*;
 use std::io;
 use std::net;
-use std::ptr;
-use std::slice;
 
-include!("wrappers.rs");
+include!("open_wrappers.rs");
 
 #[derive(Debug)]
 struct Backend {
@@ -82,7 +80,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             }
         } else if q_string.contains("SELECT") {
             println!("Rust Proxy: Populating mysql_srv response");
-            // ! TODO return error on failed select (return NULL to indicate error in C wrapper?) Or how mimic rust's Result type?
+            // ! TODO detect error on failed select. exec_select returns NULL on error
 
             let num_cols = unsafe { (*exec_response.select).num_cols as usize };
             let num_rows = unsafe { (*exec_response.select).num_rows as usize };
@@ -91,13 +89,12 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 
             let mut cols = Vec::with_capacity(num_cols);
 
-            
             println!("Rust Proxy: creating columns");
             for c in 0..num_cols {
                 // convert col_name at index c to rust string
                 let col_name_string: String =
                     unsafe { CStr::from_ptr(col_names[c]).to_str().unwrap().to_owned() };
-                
+
                 // convert C column type enum to MYSQL type
                 let col_type_c = col_types[c];
                 let col_type = match col_type_c {
@@ -120,9 +117,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             let mut rw = results.start(&cols)?;
 
             println!("Rust Proxy: writing select response using RowWriter");
-            // conversion from incomplete array field (flexible array) to rust slice
-            let mut rows_vector: Vec<&[*mut CResult_RecordData]> = Vec::with_capacity(num_rows);
-            // converting outer array of rows to slice
+            // conversion from incomplete array field (flexible array) to rust slice, starting with the outer array
             let rows_slice = unsafe { (*exec_response.select).records.as_slice(num_rows) };
 
             for r in 0..num_rows {
@@ -156,13 +151,14 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 }
                 rw.end_row()?;
             }
-            // calling destructor for CResult
+
+            // calling destructor for CResult (after results are written/copied via row writer)
             unsafe { std::ptr::drop_in_place(exec_response.select) };
 
             // tell client no more rows coming. Returns an empty ok to the proxy
-            rw.finish()
-            // rw.finish(); // client
-            // Ok(()) // proxy
+            rw.finish() // client & proxy
+                        // rw.finish(); // client
+                        // Ok(()) // proxy
         } else {
             println!("Rust proxy: unsupported query type");
             results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
@@ -209,7 +205,7 @@ fn main() {
             );
             let backend = Backend { rust_conn };
             let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
-            // it's not reaching past here because at this point it's already started a new TCP server - it's processing client commands until client disconnects or an error occurs
+            // it's not reaching past here because it's started a new TCP server and is processing client commands until client disconnects or an error occurs
         }
     });
 
