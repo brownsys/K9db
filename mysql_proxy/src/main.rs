@@ -52,11 +52,6 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         println!("Rust proxy: starting on_query");
         println!("Rust Proxy: query received from HotCRP is: {:?}", q_string);
 
-        if q_string.contains("SET") || q_string.contains("DROP") || q_string.contains("ALTER") {
-            println!("Rust Proxy: Unsupported query type");
-            return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
-        }
-
         println!("Rust Proxy: calling rust wrapper that calls c-wrapper for pelton::exec\n");
         let exec_response: exec_type = exec(&mut self.rust_conn, q_string);
 
