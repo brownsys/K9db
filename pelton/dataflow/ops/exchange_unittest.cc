@@ -40,13 +40,12 @@ TEST(ExchangeOperatorTest, BasicTest) {
   partition_chans.emplace(2, std::make_shared<Channel>());
   partition_chans.emplace(3, std::make_shared<Channel>());
 
-  auto incoming_chan = partition_chans.at(3);
   // A basic dataflow graph needs to be setup because the exchange operator
   // makes use of it's graph pointer
   DataFlowGraph g;
   auto input = std::make_shared<InputOperator>("test-table1", schema);
   auto exchange = std::make_shared<ExchangeOperator>(
-      incoming_chan, partition_chans, std::vector<ColumnID>{0}, 0, 3);
+      partition_chans, std::vector<ColumnID>{0}, 0, 3);
   auto identity = std::make_shared<IdentityOperator>();
   EXPECT_TRUE(g.AddInputNode(input));
   EXPECT_TRUE(g.AddNode(exchange, input));
