@@ -3,6 +3,8 @@
 #include <memory>
 
 #include "glog/logging.h"
+#include "pelton/dataflow/batch_message.h"
+#include "pelton/dataflow/channel.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/ops/matview.h"
@@ -40,10 +42,31 @@ bool DataFlowGraph::AddNode(std::shared_ptr<Operator> op,
   return inserted;
 }
 
+bool DataFlowGraph::InsertNodeAfter(std::shared_ptr<Operator> op,
+                                    std::shared_ptr<Operator> parent) {
+  // Clear children for @parent
+  std::vector<NodeIndex> old_children = parent->children_;
+  parent->children_ = std::vector<NodeIndex>{};
+  // Add new node to the graph
+  this->AddNode(op, parent);
+
+  // Add children for @op
+  op->children_ = old_children;
+  // Update stale edges
+  for (auto &edge : this->edges_) {
+    for (auto child_index : old_children) {
+      if (edge.first == parent->index() && edge.second == child_index) {
+        edge.first = op->index();
+      }
+    }
+  }
+
+  return true;
+}
+
 bool DataFlowGraph::AddEdge(std::shared_ptr<Operator> parent,
                             std::shared_ptr<Operator> child) {
-  std::tuple<NodeIndex, NodeIndex> edge =
-      std::make_tuple(parent->index(), child->index());
+  std::pair<NodeIndex, NodeIndex> edge{parent->index(), child->index()};
   this->edges_.push_back(edge);
   // Also implicitly adds op1 as child of op2.
   child->AddParent(parent, edge);
@@ -85,6 +108,22 @@ std::shared_ptr<DataFlowGraph> DataFlowGraph::Clone() {
   // Edges can be trivially copied
   clone->edges_ = this->edges_;
   return clone;
+}
+
+void DataFlowGraph::Start(std::shared_ptr<Channel> incoming_chan) const {
+  while (true) {
+    std::vector<std::shared_ptr<Message>> messages = incoming_chan->Recv();
+    for (auto msg : messages) {
+      switch (msg->type()) {
+        case Message::Type::BATCH:
+          LOG(INFO) << "Recieved batch with";
+          break;
+        case Message::Type::STOP:
+          LOG(INFO) << "Recieved stop signal";
+          return;
+      }
+    }
+  }
 }
 
 std::string DataFlowGraph::DebugString() const {

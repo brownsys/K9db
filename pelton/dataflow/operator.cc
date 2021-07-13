@@ -50,6 +50,15 @@ std::vector<std::shared_ptr<Operator>> Operator::GetParents() const {
   return nodes;
 }
 
+std::vector<std::shared_ptr<Operator>> Operator::GetChildren() const {
+  std::vector<std::shared_ptr<Operator>> nodes;
+  for (NodeIndex parentIndex : this->children_) {
+    nodes.emplace_back(this->graph()->GetNode(parentIndex));
+  }
+
+  return nodes;
+}
+
 std::string Operator::DebugString() const {
   std::string type_str = "";
   switch (this->type()) {

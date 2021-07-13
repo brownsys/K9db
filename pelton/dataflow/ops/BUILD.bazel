@@ -210,6 +210,7 @@ cc_library(
         "//pelton/dataflow:channel",
         "//pelton/dataflow:partition",
         "//pelton/dataflow:batch-message",
+        "//pelton/dataflow:stop-message",
         "@absl//absl/container:flat_hash_map",
         "@glog",
         "@gtest//:gtest_prod",

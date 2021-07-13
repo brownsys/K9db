@@ -15,6 +15,7 @@ namespace dataflow {
 class Operator;
 class InputOperator;
 class MatViewOperator;
+class Channel;
 
 class DataFlowGraph {
  public:
@@ -31,6 +32,10 @@ class DataFlowGraph {
                       std::shared_ptr<Operator> parent) {
     return AddNode(op, std::vector<std::shared_ptr<Operator>>{parent});
   }
+  // Insert a new node after initial construction of graph. This will be
+  // primarily used to insert exchange operators.
+  bool InsertNodeAfter(std::shared_ptr<Operator> op,
+                       std::shared_ptr<Operator> parent);
   // Special case: output operator is added to outputs_.
   bool AddOutputOperator(std::shared_ptr<MatViewOperator> op,
                          std::shared_ptr<Operator> parent);
@@ -55,6 +60,9 @@ class DataFlowGraph {
 
   std::shared_ptr<DataFlowGraph> Clone();
 
+  // Suppposed to be an entry point for deploying a graph partiton in a thread
+  void Start(std::shared_ptr<Channel> incoming_chan) const;
+
   // Debugging.
   std::string DebugString() const;
 
@@ -69,7 +77,7 @@ class DataFlowGraph {
 
   std::unordered_map<NodeIndex, std::shared_ptr<Operator>> nodes_;
   // 0th item of the tuple is source and 1st item is destination
-  std::vector<std::tuple<NodeIndex, NodeIndex>> edges_;
+  std::vector<std::pair<NodeIndex, NodeIndex>> edges_;
 
   inline NodeIndex MintNodeIndex() { return this->nodes_.size(); }
 };

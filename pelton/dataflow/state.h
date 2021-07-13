@@ -4,9 +4,11 @@
 // and state.
 
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/record.h"
@@ -57,6 +59,8 @@ class DataFlowState {
 
   uint64_t SizeInMemory() const;
 
+  ~DataFlowState();
+
  private:
   // Maps every table to its logical schema.
   // The logical schema is the contract between client code and our DB.
@@ -64,9 +68,35 @@ class DataFlowState {
   // or other transformations.
   std::unordered_map<TableName, SchemaRef> schema_;
 
+  // Base graphs supplied to the engine
+  std::unordered_map<FlowName, std::shared_ptr<DataFlowGraph>> base_graphs_;
   // DataFlow graphs and views.
   std::unordered_map<FlowName, std::shared_ptr<DataFlowGraph>> flows_;
   std::unordered_map<TableName, std::vector<FlowName>> flows_per_input_table_;
+
+  absl::flat_hash_map<
+      FlowName, absl::flat_hash_map<uint16_t, std::shared_ptr<DataFlowGraph>>>
+      partitioned_graphs_;
+  absl::flat_hash_map<FlowName,
+                      absl::flat_hash_map<uint16_t, std::shared_ptr<Channel>>>
+      partition_chans_;
+  absl::flat_hash_map<FlowName,
+                      absl::flat_hash_map<TableName, std::vector<ColumnID>>>
+      input_partitioned_by_;
+  uint16_t partition_count_ = 3;
+  // Just an object to store threads, will probably only use them to join and
+  // terminate the threads gracefully.
+  std::vector<std::thread> threads_;
+
+  void TraverseBaseGraph(FlowName name);
+  void VisitNode(std::shared_ptr<Operator> node, FlowName name);
+  std::pair<bool, std::vector<ColumnID>> GetRecentPartionBoundary(
+      std::shared_ptr<Operator> node, bool check_self, FlowName name);
+  void AddExchangeAfter(std::shared_ptr<Operator> node,
+                        std::vector<ColumnID> partition_key, FlowName name);
+  // Get input operators for the subgraph whose root is @node
+  std::vector<std::shared_ptr<InputOperator>> GetSubgraphInputs(
+      std::shared_ptr<Operator> node) const;
 };
 
 }  // namespace dataflow

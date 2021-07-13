@@ -64,6 +64,9 @@ class Operator {
   // Constructs a vector of parent operators from parents_ edge vector.
   std::vector<std::shared_ptr<Operator>> GetParents() const;
 
+  // Constructs a vector of parent operators from children_ edge vector.
+  std::vector<std::shared_ptr<Operator>> GetChildren() const;
+
   // Meant to generate a clone with same operator specific information, edges,
   // and input/output schemas.
   virtual std::shared_ptr<Operator> Clone() const = 0;
@@ -71,9 +74,15 @@ class Operator {
   // For debugging.
   virtual std::string DebugString() const;
 
+  // Used by the DataFlowEngine for graph traversal
+  bool visited_;
+
  protected:
   explicit Operator(Type type)
-      : index_(UNDEFINED_NODE_INDEX), type_(type), graph_(nullptr) {}
+      : visited_(false),
+        index_(UNDEFINED_NODE_INDEX),
+        type_(type),
+        graph_(nullptr) {}
 
   void SetGraph(DataFlowGraph *graph) { this->graph_ = graph; }
   void SetIndex(NodeIndex index) { this->index_ = index; }

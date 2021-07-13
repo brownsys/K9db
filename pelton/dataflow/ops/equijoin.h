@@ -64,6 +64,13 @@ class EquiJoinOperator : public Operator {
   }
 
   std::shared_ptr<Operator> Clone() const override;
+  // Accessors
+  // Returns the "joined" column id of the output schema. In a multithreaded
+  // environment the join operator will emit records partitioned by default on
+  // this column.
+  ColumnID join_column() const { return this->left_id_; }
+  ColumnID left_id() const { return this->left_id_; }
+  ColumnID right_id() const { return this->right_id_; }
 
  private:
   // Columns on which join is computed.

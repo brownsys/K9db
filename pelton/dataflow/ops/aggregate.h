@@ -32,6 +32,7 @@ class AggregateOperator : public Operator {
         aggregate_schema_() {}
 
   std::shared_ptr<Operator> Clone() const override;
+  std::vector<ColumnID> group_columns() const { return this->group_columns_; }
 
   ~AggregateOperator() {
     // Ensure that schemas are not destructed first
