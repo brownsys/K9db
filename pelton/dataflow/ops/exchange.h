@@ -21,12 +21,10 @@ namespace dataflow {
 class ExchangeOperator : public Operator {
  public:
   ExchangeOperator(
-      std::shared_ptr<Channel> incoming_chan,
       absl::flat_hash_map<uint16_t, std::shared_ptr<Channel>> partition_chans,
       std::vector<ColumnID> partition_key, uint16_t current_partition,
       uint16_t total_partitions)
       : Operator(Operator::Type::EXCHANGE),
-        incoming_chan_(incoming_chan),
         partition_chans_(partition_chans),
         partition_key_(partition_key),
         current_partition_(current_partition),
@@ -45,8 +43,6 @@ class ExchangeOperator : public Operator {
   FRIEND_TEST(ExchangeOperatorTest, BasicTest);
 
  private:
-  // Used by other partitions to send messages to this operator
-  std::shared_ptr<Channel> incoming_chan_;
   // Used for sending messages to other partitions
   absl::flat_hash_map<uint16_t, std::shared_ptr<Channel>> partition_chans_;
   // Key cols that this exchange operator is supposed to partition records by
