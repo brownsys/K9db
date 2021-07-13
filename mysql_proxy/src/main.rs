@@ -113,7 +113,8 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             }
 
             // start a resultset response to the client with given columns. ==> replace this with wrapper response
-            // Returns a Result<RowWriter<'a,W>> a Struct for sending rows to client. a are the columns, 'a indicates this var has static lifetime equal to lifetime of the program. W is a writer to write data to
+            // Returns a Result<RowWriter<'a,W>> a Struct for sending rows to client. a are the columns, 
+            // 'a indicates this var has static lifetime equal to lifetime of the program. W is a writer to write data to
             let mut rw = results.start(&cols)?;
 
             println!("Rust Proxy: writing select response using RowWriter");
@@ -188,9 +189,11 @@ fn main() {
     // thread::spawn creates a new thread with the first function it should run
     // move keyword means new thread takes ownership of vars it uses (in this case listener)
     let join_handle = std::thread::spawn(move || {
-        // Ok wraps around another value --> Result type exists in one of two states: Ok or Err, both of which wrap around another type, indicating if it represents an success or an error
-        // the next line reads: "if `let` destructures `listener.accept()` into `Ok((stream, addr))`then evaluate the block {}"
-        // i.e. if connection established, call mysql_intermediary's run_on_tcp. (_ in front of a variable name indicates to compiler that this is unused)
+        // Ok wraps around another value --> Result type exists in one of two states: Ok or Err, 
+        // both of which wrap around another type, indicating if it represents an success or an error
+        // next line reads: "if `let` destructures `listener.accept()` into `Ok((stream, addr))`then evaluate the block {}"
+        // i.e. if connection established, call mysql_intermediary's run_on_tcp. 
+        // (_ in front of a variable name indicates to compiler that it is unused)
         if let Ok((stream, _addr)) = listener.accept() {
             // -> .accept returns Result<(TcpStream, SocketAddr)> and blocks thread until a TCP connection is established
             println!(
@@ -205,10 +208,12 @@ fn main() {
             );
             let backend = Backend { rust_conn };
             let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
-            // it's not reaching past here because it's started a new TCP server and is processing client commands until client disconnects or an error occurs
+            // it's not reaching past here because it's started a new TCP server 
+            // and is processing client commands until client disconnects or an error occurs
         }
     });
 
-    // wait for listener thread before stopping main. MysqlIntermediary TCP server must terminate before we reach this line
+    // wait for listener thread before stopping main. 
+    // MysqlIntermediary TCP server must terminate before we reach this line
     join_handle.join().unwrap();
 }
