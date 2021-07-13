@@ -33,12 +33,12 @@ inline SchemaRef CreateSchema() {
 TEST(ExchangeOperatorTest, BasicTest) {
   SchemaRef schema = CreateSchema();
 
-  // Create an exchange opertor that belongs to 3rd partition and that is
+  // Create an exchange opertor that belongs to 0th partition and that is
   // supposed to shard records into three partitions.
   absl::flat_hash_map<uint16_t, std::shared_ptr<Channel>> partition_chans;
+  partition_chans.emplace(0, std::make_shared<Channel>());
   partition_chans.emplace(1, std::make_shared<Channel>());
   partition_chans.emplace(2, std::make_shared<Channel>());
-  partition_chans.emplace(3, std::make_shared<Channel>());
 
   // A basic dataflow graph needs to be setup because the exchange operator
   // makes use of it's graph pointer
@@ -91,7 +91,7 @@ TEST(ExchangeOperatorTest, BasicTest) {
       std::dynamic_pointer_cast<BatchMessage>(partition2.at(0))->records.at(1),
       records.at(3));
 
-  // Check for current partition (i.e. 3rd partition).
+  // Check for current partition (i.e. 0th partition).
   EXPECT_EQ(outputs.size(), 1);
   EXPECT_EQ(outputs.at(0), records.at(2));
 }
