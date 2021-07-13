@@ -32,6 +32,10 @@ class ExchangeOperator : public Operator {
         current_partition_(current_partition),
         total_partitions_(total_partitions) {}
 
+  std::shared_ptr<Operator> Clone() const {
+    LOG(FATAL) << "Exchange does not support clone";
+  }
+
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,
                std::vector<Record> *output) override;
