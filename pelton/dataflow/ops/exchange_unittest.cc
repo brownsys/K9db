@@ -7,6 +7,9 @@
 #include <vector>
 
 #include "gtest/gtest.h"
+#include "pelton/dataflow/graph.h"
+#include "pelton/dataflow/ops/identity.h"
+#include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/stop_message.h"
@@ -28,18 +31,28 @@ inline SchemaRef CreateSchema() {
 }
 
 TEST(ExchangeOperatorTest, BasicTest) {
-  // Create an exchange opertor that is supposed to shard records into
-  // three partitions.
-  absl::flat_hash_map<uint16_t, std::shared_ptr<Channel>> peer_chans;
-  peer_chans.emplace(1, std::make_shared<Channel>());
-  peer_chans.emplace(2, std::make_shared<Channel>());
-  peer_chans.emplace(3, std::make_shared<Channel>());
-
-  auto incoming_chan = std::make_shared<Channel>();
-  auto exchange = ExchangeOperator(incoming_chan, std::make_shared<Channel>(),
-                                   peer_chans, std::vector<ColumnID>{0}, 0, 3);
-
   SchemaRef schema = CreateSchema();
+
+  // Create an exchange opertor that belongs to 3rd partition and that is
+  // supposed to shard records into three partitions.
+  absl::flat_hash_map<uint16_t, std::shared_ptr<Channel>> partition_chans;
+  partition_chans.emplace(1, std::make_shared<Channel>());
+  partition_chans.emplace(2, std::make_shared<Channel>());
+  partition_chans.emplace(3, std::make_shared<Channel>());
+
+  auto incoming_chan = partition_chans.at(3);
+  // A basic dataflow graph needs to be setup because the exchange operator
+  // makes use of it's graph pointer
+  DataFlowGraph g;
+  auto input = std::make_shared<InputOperator>("test-table1", schema);
+  auto exchange = std::make_shared<ExchangeOperator>(
+      incoming_chan, partition_chans, std::vector<ColumnID>{0}, 0, 3);
+  auto identity = std::make_shared<IdentityOperator>();
+  EXPECT_TRUE(g.AddInputNode(input));
+  EXPECT_TRUE(g.AddNode(exchange, input));
+  // Add a dummy child operator so that the exchange op can make use of its
+  // index internally.
+  EXPECT_TRUE(g.AddNode(identity, exchange));
   // Create records
   std::vector<Record> records;
   records.emplace_back(schema, true, 1_u, std::make_unique<std::string>("CS"),
@@ -52,30 +65,34 @@ TEST(ExchangeOperatorTest, BasicTest) {
                        7_s);
 
   std::vector<Record> outputs;
-  EXPECT_TRUE(exchange.Process(UNDEFINED_NODE_INDEX, records, &outputs));
-  // Sleep for a while before sending stop message.
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  auto stop_msg = std::make_shared<StopMessage>();
-  incoming_chan->Send(stop_msg);
+  EXPECT_TRUE(exchange->Process(UNDEFINED_NODE_INDEX, records, &outputs));
 
-  // Collect records that are meant for peers and check if they are as expected.
-  std::vector<std::shared_ptr<Message>> peer1 = peer_chans.at(1)->Recv();
-  EXPECT_EQ(peer1.size(), 1);
+  // Collect records that are meant for other partitions and check if they are
+  // as expected.
+  std::vector<std::shared_ptr<Message>> partition1 =
+      partition_chans.at(1)->Recv();
+  EXPECT_EQ(partition1.size(), 1);
   EXPECT_EQ(
-      std::dynamic_pointer_cast<BatchMessage>(peer1.at(0))->records.size(), 1);
-  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(peer1.at(0))->records.at(0),
-            records.at(0));
-
-  std::vector<std::shared_ptr<Message>> peer2 = peer_chans.at(2)->Recv();
-  EXPECT_EQ(peer2.size(), 1);
+      std::dynamic_pointer_cast<BatchMessage>(partition1.at(0))->records.size(),
+      1);
   EXPECT_EQ(
-      std::dynamic_pointer_cast<BatchMessage>(peer2.at(0))->records.size(), 2);
-  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(peer2.at(0))->records.at(0),
-            records.at(1));
-  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(peer2.at(0))->records.at(1),
-            records.at(3));
+      std::dynamic_pointer_cast<BatchMessage>(partition1.at(0))->records.at(0),
+      records.at(0));
 
-  // Check for current partition.
+  std::vector<std::shared_ptr<Message>> partition2 =
+      partition_chans.at(2)->Recv();
+  EXPECT_EQ(partition2.size(), 1);
+  EXPECT_EQ(
+      std::dynamic_pointer_cast<BatchMessage>(partition2.at(0))->records.size(),
+      2);
+  EXPECT_EQ(
+      std::dynamic_pointer_cast<BatchMessage>(partition2.at(0))->records.at(0),
+      records.at(1));
+  EXPECT_EQ(
+      std::dynamic_pointer_cast<BatchMessage>(partition2.at(0))->records.at(1),
+      records.at(3));
+
+  // Check for current partition (i.e. 3rd partition).
   EXPECT_EQ(outputs.size(), 1);
   EXPECT_EQ(outputs.at(0), records.at(2));
 }

@@ -353,8 +353,11 @@ cc_test(
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":exchange",
+        ":input",
+        ":identity",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
+        "//pelton/dataflow:graph",
         "//pelton/dataflow:types",
         "//pelton/dataflow:stop-message",
         "//pelton/sqlast:ast",
