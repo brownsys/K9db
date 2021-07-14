@@ -114,21 +114,19 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 
             println!("Rust Proxy: writing select response using RowWriter");
             // conversion from incomplete array field (flexible array) to rust slice, starting with the outer array
-            let rows_slice = unsafe { (*exec_response.select).records.as_slice(num_rows) };
+            let rows_slice = unsafe { (*exec_response.select).records.as_slice(num_rows * num_cols) };
 
             for r in 0..num_rows {
-                // converting inner array of columns (for this row) to slice
-                let col_slice = unsafe { std::slice::from_raw_parts(rows_slice[r], num_cols) };
                 for c in 0..num_cols {
                     match col_types[c] {
                         // write a value to the next col of the current row (of this resultset)
                         ColumnDefinitionTypeEnum_UINT => unsafe {
-                            rw.write_col(col_slice[c].UINT)?
+                            rw.write_col(rows_slice[r * num_cols + c].UINT)?
                         },
-                        ColumnDefinitionTypeEnum_INT => unsafe { rw.write_col(col_slice[c].INT)? },
+                        ColumnDefinitionTypeEnum_INT => unsafe { rw.write_col(rows_slice[r * num_cols + c].INT)? },
                         ColumnDefinitionTypeEnum_TEXT => unsafe {
                             rw.write_col(
-                                CStr::from_ptr(col_slice[c].TEXT)
+                                CStr::from_ptr(rows_slice[r * num_cols + c].TEXT)
                                     .to_str()
                                     .unwrap()
                                     .to_owned(),
@@ -136,7 +134,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                         },
                         ColumnDefinitionTypeEnum_DATETIME => unsafe {
                             rw.write_col(
-                                CStr::from_ptr(col_slice[c].DATETIME)
+                                CStr::from_ptr(rows_slice[r * num_cols + c].DATETIME)
                                     .to_str()
                                     .unwrap()
                                     .to_owned(),

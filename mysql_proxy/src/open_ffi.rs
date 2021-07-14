@@ -91,7 +91,7 @@ pub struct CResult {
     pub col_types: [ColumnDefinitionTypeEnum; 64usize],
     pub num_rows: size_t,
     pub num_cols: size_t,
-    pub records: __IncompleteArrayField<*mut CResult_RecordData>,
+    pub records: __IncompleteArrayField<CResult_RecordData>,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]

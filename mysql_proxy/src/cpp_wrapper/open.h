@@ -19,7 +19,7 @@ struct CResult {
     int INT;
     char *TEXT;
     char *DATETIME;
-  } * records[];
+  } records[];
 };
 
 struct ConnectionC {
