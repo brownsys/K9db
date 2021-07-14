@@ -278,7 +278,7 @@ impl Drop for ConnectionC {
     }
 }
 
-#[link(name = "open")]
+#[link(name = "proxy")]
 extern "C" {
     pub fn open_c(
         query: *mut ::std::os::raw::c_char,

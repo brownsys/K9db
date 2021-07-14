@@ -8,8 +8,6 @@ edition = "2018"
 
 [dependencies]
 msql-srv = "0.8.7"
-#main = { version = "0.1.0", path = "/vagrant/ritual_workspace/out/main" }
-#libc = "0.2.97"
 cty = "0.2.1"
 
 [build-dependencies]

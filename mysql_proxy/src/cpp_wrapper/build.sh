@@ -1,7 +1,7 @@
 cd ../../../
 pwd
-g++ -g -std=c++17 -o mysql_proxy/src/cpp_wrapper/libopen.so \
-  mysql_proxy/src/cpp_wrapper/open.cpp \
+g++ -g -std=c++17 -o mysql_proxy/src/cpp_wrapper/libproxy.so \
+  mysql_proxy/src/cpp_wrapper/proxy.cpp \
   -shared \
   -fPIC \
 	-Wl,-rpath,$(pwd)/bazel-out/k8-fastbuild/bin/_solib_k8/_U_S_Spelton_Splanner_Cplanner___Ulib_Sjli \

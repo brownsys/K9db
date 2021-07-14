@@ -1,18 +1,18 @@
-#ifndef __OPEN_H__
-#define __OPEN_H__
+#ifndef __PROXY_H__
+#define __PROXY_H__
 #include <stdbool.h>
-// #include "../../../pelton/sqlast/ast_schema_enums.h"
 #include <stddef.h>
+// #include "../../../pelton/sqlast/ast_schema_enums.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 enum ColumnDefinitionTypeEnum { UINT, INT, TEXT, DATETIME };
 struct CResult {
-  char *col_names[64]; // max 64 col names, each 64 chars in length
   // pelton::sqlast::ColumnDefinitionTypeEnum col_types[64];
   enum ColumnDefinitionTypeEnum col_types[64];
-  size_t num_rows; // number of records
+  char *col_names[64]; 
+  size_t num_rows; // records
   size_t num_cols;
   union RecordData {
     long unsigned int UINT;
@@ -40,4 +40,4 @@ void destroy_conn(void *c_conn);
 }
 #endif
 
-#endif // __OPEN_H__
+#endif // __PROXY_H__

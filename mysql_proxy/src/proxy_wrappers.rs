@@ -2,7 +2,7 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::os::raw::c_char;
 
-include!("open_ffi.rs");
+include!("proxy_ffi.rs");
 
 fn open(dir: &str, user: &str, pass: &str) -> ConnectionC {
     // Convert to *mut i8 to send to C-function

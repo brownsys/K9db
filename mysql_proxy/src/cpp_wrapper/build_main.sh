@@ -1,1 +1,1 @@
-g++ -g -std=c++17 -o main open_main.c -L. -lopen -Wl,-rpath,.
+g++ -g -std=c++17 -o main proxy_main.c -L. -lproxy -Wl,-rpath,.

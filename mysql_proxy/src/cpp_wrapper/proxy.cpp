@@ -1,18 +1,5 @@
-#include "open.h"
-
-#include "../../../pelton/dataflow/key.h"
-#include "../../../pelton/dataflow/record.h"
-#include "../../../pelton/dataflow/schema.h"
-#include "../../../pelton/dataflow/types.h"
+#include "proxy.h"
 #include "../../../pelton/pelton.h"
-#include "../../../pelton/sqlast/ast.h"
-#include "../../../pelton/sqlast/ast_schema.h"
-#include "../../../pelton/util/ints.h"
-#include <iostream>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <string.h>
-#include <variant>
 
 using CType = pelton::sqlast::ColumnDefinition::Type;
 
@@ -139,7 +126,6 @@ CResult *exec_select(ConnectionC *c_conn, const char *query) {
 
       // set column type
       CType col_type = sql_result.GetSchema().TypeOf(i);
-      // c_result->col_types[i] = col_type;
       switch (col_type) {
       case CType::INT:
         c_result->col_types[i] = ColumnDefinitionTypeEnum::INT;

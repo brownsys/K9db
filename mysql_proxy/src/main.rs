@@ -2,7 +2,7 @@ use msql_srv::*;
 use std::io;
 use std::net;
 
-include!("open_wrappers.rs");
+include!("proxy_wrappers.rs");
 
 #[derive(Debug)]
 struct Backend {
@@ -42,9 +42,6 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         println!("on_init");
         // Tell client that database context has been changed
         writer.ok()
-        // not returned to client, but to a component inside the proxy mysql_srv that does erorr checking
-        // only way to send to client is via the writer InitWriter object.
-        // Ok(())
     }
 
     // called when client issues query for immediate execution. Results returned via QueryResultWriter
@@ -75,7 +72,6 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             }
         } else if q_string.contains("SELECT") {
             println!("Rust Proxy: Populating mysql_srv response");
-            // ! TODO detect error on failed select. exec_select returns NULL on error
 
             let num_cols = unsafe { (*exec_response.select).num_cols as usize };
             let num_rows = unsafe { (*exec_response.select).num_rows as usize };
@@ -107,9 +103,6 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 });
             }
 
-            // start a resultset response to the client with given columns. ==> replace this with wrapper response
-            // Returns a Result<RowWriter<'a,W>> a Struct for sending rows to client. a are the columns, 
-            // 'a indicates this var has static lifetime equal to lifetime of the program. W is a writer to write data to
             let mut rw = results.start(&cols)?;
 
             println!("Rust Proxy: writing select response using RowWriter");
@@ -176,19 +169,10 @@ impl Drop for Backend {
 
 fn main() {
     let listener = net::TcpListener::bind("127.0.0.1:10001").unwrap();
-    // let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
     println!("Listening at: {:?}", listener);
 
-    // thread::spawn creates a new thread with the first function it should run
-    // move keyword means new thread takes ownership of vars it uses (in this case listener)
     let join_handle = std::thread::spawn(move || {
-        // Ok wraps around another value --> Result type exists in one of two states: Ok or Err, 
-        // both of which wrap around another type, indicating if it represents an success or an error
-        // next line reads: "if `let` destructures `listener.accept()` into `Ok((stream, addr))`then evaluate the block {}"
-        // i.e. if connection established, call mysql_intermediary's run_on_tcp. 
-        // (_ in front of a variable name indicates to compiler that it is unused)
         if let Ok((stream, _addr)) = listener.accept() {
-            // -> .accept returns Result<(TcpStream, SocketAddr)> and blocks thread until a TCP connection is established
             println!(
                 "Successfully connected to HotCRP's mysql server\nStream and address are: {:?}\n",
                 stream
@@ -201,12 +185,7 @@ fn main() {
             );
             let backend = Backend { rust_conn };
             let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
-            // it's not reaching past here because it's started a new TCP server 
-            // and is processing client commands until client disconnects or an error occurs
         }
     });
-
-    // wait for listener thread before stopping main. 
-    // MysqlIntermediary TCP server must terminate before we reach this line
     join_handle.join().unwrap();
 }
