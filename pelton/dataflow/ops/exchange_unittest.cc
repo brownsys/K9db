@@ -71,25 +71,30 @@ TEST(ExchangeOperatorTest, BasicTest) {
   std::vector<std::shared_ptr<Message>> partition1 =
       partition_chans.at(1)->Recv();
   EXPECT_EQ(partition1.size(), 1);
-  EXPECT_EQ(
-      std::dynamic_pointer_cast<BatchMessage>(partition1.at(0))->records.size(),
-      1);
-  EXPECT_EQ(
-      std::dynamic_pointer_cast<BatchMessage>(partition1.at(0))->records.at(0),
-      records.at(0));
+  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(partition1.at(0))
+                ->records()
+                .size(),
+            1);
+  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(partition1.at(0))
+                ->records()
+                .at(0),
+            records.at(0));
 
   std::vector<std::shared_ptr<Message>> partition2 =
       partition_chans.at(2)->Recv();
   EXPECT_EQ(partition2.size(), 1);
-  EXPECT_EQ(
-      std::dynamic_pointer_cast<BatchMessage>(partition2.at(0))->records.size(),
-      2);
-  EXPECT_EQ(
-      std::dynamic_pointer_cast<BatchMessage>(partition2.at(0))->records.at(0),
-      records.at(1));
-  EXPECT_EQ(
-      std::dynamic_pointer_cast<BatchMessage>(partition2.at(0))->records.at(1),
-      records.at(3));
+  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(partition2.at(0))
+                ->records()
+                .size(),
+            2);
+  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(partition2.at(0))
+                ->records()
+                .at(0),
+            records.at(1));
+  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(partition2.at(0))
+                ->records()
+                .at(1),
+            records.at(3));
 
   // Check for current partition (i.e. 0th partition).
   EXPECT_EQ(outputs.size(), 1);

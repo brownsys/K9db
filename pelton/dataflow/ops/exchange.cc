@@ -49,7 +49,7 @@ bool ExchangeOperator::Process(NodeIndex source,
         this->graph()->GetNode(this->children_.at(0))->index();
     // Set the source as the current node's index.
     NodeIndex source_index = this->index();
-    auto msg = std::make_shared<BatchMessage>("", entry_index, source_index,
+    auto msg = std::make_shared<BatchMessage>(entry_index, source_index,
                                               std::move(item.second));
     this->partition_chans_.at(item.first)->Send(msg);
   }
