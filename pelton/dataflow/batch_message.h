@@ -29,6 +29,8 @@ class BatchMessage : public Message {
         records_(std::move(records)) {}
 
   std::vector<Record> ConsumeRecords() { return std::move(this->records_); }
+  bool ContainsInput() { return this->input_name_; }
+  
   // Accessors
   const std::string &input_name() {
     assert(this->input_name_);
