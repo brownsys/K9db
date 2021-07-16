@@ -49,12 +49,10 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         println!("Rust proxy: starting on_query");
         println!("Rust Proxy: query received is: {:?}", q_string);
 
-        println!("Rust Proxy: calling rust wrapper that calls c-wrapper for pelton::exec\n");
-        let exec_response: exec_type = exec(&mut self.rust_conn, q_string);
-
         // determine query type and return appropriate response
-        if q_string.contains("CREATE") {
-            if unsafe { exec_response.ddl } {
+        if q_string.contains("CREATE TABLE") || q_string.contains("CREATE INDEX") {
+            let ddl_response = unsafe { exec_ddl_rust(&mut self.rust_conn, q_string) };
+            if ddl_response {
                 results.completed(0, 0)
             } else {
                 println!("Rust Proxy: Failed to execute CREATE");
@@ -64,19 +62,21 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             || q_string.contains("DELETE")
             || q_string.contains("INSERT")
         {
-            if unsafe { exec_response.update } != -1 {
-                unsafe { results.completed(exec_response.update as u64, 0) }
+            let update_response = unsafe { exec_update_rust(&mut self.rust_conn, q_string) };
+            if update_response != -1 {
+                unsafe { results.completed(update_response as u64, 0) }
             } else {
                 println!("Rust Proxy: Failed to execute UPDATE");
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
-        } else if q_string.contains("SELECT") {
+        } else if q_string.contains("SELECT") || q_string.contains("VIEW") {
             println!("Rust Proxy: Populating SELECT response");
+            let select_response = unsafe { exec_select_rust(&mut self.rust_conn, q_string) };
 
-            let num_cols = unsafe { (*exec_response.select).num_cols as usize };
-            let num_rows = unsafe { (*exec_response.select).num_rows as usize };
-            let col_names = unsafe { (*exec_response.select).col_names };
-            let col_types = unsafe { (*exec_response.select).col_types };
+            let num_cols = unsafe { (*select_response).num_cols as usize };
+            let num_rows = unsafe { (*select_response).num_rows as usize };
+            let col_names = unsafe { (*select_response).col_names };
+            let col_types = unsafe { (*select_response).col_types };
             let mut cols = Vec::with_capacity(num_cols);
 
             println!("Rust Proxy: creating columns for rust reponse");
@@ -106,7 +106,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 
             println!("Rust Proxy: writing SELECT response using RowWriter");
             // convert incomplete array field (flexible array) to rust slice, starting with the outer array
-            let rows_slice = unsafe { (*exec_response.select).records.as_slice(num_rows * num_cols) };
+            let rows_slice = unsafe { (*select_response).records.as_slice(num_rows * num_cols) };
 
             for r in 0..num_rows {
                 for c in 0..num_cols {
@@ -115,7 +115,9 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                         ColumnDefinitionTypeEnum_UINT => unsafe {
                             rw.write_col(rows_slice[r * num_cols + c].UINT)?
                         },
-                        ColumnDefinitionTypeEnum_INT => unsafe { rw.write_col(rows_slice[r * num_cols + c].INT)? },
+                        ColumnDefinitionTypeEnum_INT => unsafe {
+                            rw.write_col(rows_slice[r * num_cols + c].INT)?
+                        },
                         ColumnDefinitionTypeEnum_TEXT => unsafe {
                             rw.write_col(
                                 CStr::from_ptr(rows_slice[r * num_cols + c].TEXT)
@@ -139,7 +141,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             }
 
             // call destructor for CResult (after results are written/copied via row writer)
-            unsafe { std::ptr::drop_in_place(exec_response.select) };
+            unsafe { std::ptr::drop_in_place(select_response) };
 
             // tell client no more rows coming. Returns an empty Ok to the proxy
             rw.finish() // client & proxy
