@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "gtest/gtest_prod.h"
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/record.h"
@@ -61,6 +62,13 @@ class DataFlowState {
 
   ~DataFlowState();
 
+ protected:
+  // Accessors. Mainly used for testing
+  const auto &partitioned_graphs() const { return this->partitioned_graphs_; };
+  const auto &input_partitioned_by() const {
+    return this->input_partitioned_by_;
+  }
+
  private:
   // Maps every table to its logical schema.
   // The logical schema is the contract between client code and our DB.
@@ -68,8 +76,6 @@ class DataFlowState {
   // or other transformations.
   std::unordered_map<TableName, SchemaRef> schema_;
 
-  // Base graphs supplied to the engine
-  std::unordered_map<FlowName, std::shared_ptr<DataFlowGraph>> base_graphs_;
   // DataFlow graphs and views.
   std::unordered_map<FlowName, std::shared_ptr<DataFlowGraph>> flows_;
   std::unordered_map<TableName, std::vector<FlowName>> flows_per_input_table_;
@@ -88,15 +94,23 @@ class DataFlowState {
   // terminate the threads gracefully.
   std::vector<std::thread> threads_;
 
-  void TraverseBaseGraph(FlowName name);
-  void VisitNode(std::shared_ptr<Operator> node, FlowName name);
+  void TraverseBaseGraph(const FlowName &name);
+  void VisitNode(std::shared_ptr<Operator> node, const FlowName &name);
   std::pair<bool, std::vector<ColumnID>> GetRecentPartionBoundary(
-      std::shared_ptr<Operator> node, bool check_self, FlowName name);
-  void AddExchangeAfter(std::shared_ptr<Operator> node,
-                        std::vector<ColumnID> partition_key, FlowName name);
+      std::shared_ptr<Operator> node, bool check_self,
+      const FlowName &name) const;
+  void AddExchangeAfter(NodeIndex parent_index,
+                        std::vector<ColumnID> partition_key,
+                        const FlowName &name);
   // Get input operators for the subgraph whose root is @node
   std::vector<std::shared_ptr<InputOperator>> GetSubgraphInputs(
       std::shared_ptr<Operator> node) const;
+
+  // Allow tests to use protected functions directly
+  FRIEND_TEST(DataFlowEngineTest, TestTrivialGraph);
+  FRIEND_TEST(DataFlowEngineTest, TestEquiJoinGraph);
+  FRIEND_TEST(DataFlowEngineTest, TestAggregateOnEquiJoinGraph);
+  FRIEND_TEST(DataFlowEngineTest, TestUnionGraph);
 };
 
 }  // namespace dataflow

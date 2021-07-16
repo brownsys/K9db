@@ -87,6 +87,17 @@ void AggregateOperator::ComputeOutputSchema() {
       SchemaFactory::Create(out_column_names, out_column_types, out_keys);
 }
 
+std::vector<ColumnID> AggregateOperator::OutPartitionCols() const {
+  std::vector<ColumnID> cols;
+  // Output records of the aggregate will be partitioned by the group by
+  // columns(w.r.t the output schema).
+  // Records are not partitioned by the last column i.e. the aggregate column
+  for (size_t i = 0; i < this->output_schema_.size() - 1; i++) {
+    cols.push_back(i);
+  }
+  return cols;
+}
+
 void AggregateOperator::EmitRecord(const Key &key,
                                    const Record &aggregate_record,
                                    bool positive,

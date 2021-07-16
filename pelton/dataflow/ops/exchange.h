@@ -34,6 +34,9 @@ class ExchangeOperator : public Operator {
     LOG(FATAL) << "Exchange does not support clone";
   }
 
+  // Accessors
+  const std::vector<ColumnID> &partition_key() { return this->partition_key_; }
+
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,
                std::vector<Record> *output) override;

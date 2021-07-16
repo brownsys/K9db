@@ -25,7 +25,7 @@
 namespace pelton {
 namespace dataflow {
 
-void DataFlowState::TraverseBaseGraph(FlowName name) {
+void DataFlowState::TraverseBaseGraph(const FlowName &name) {
   // Traverse depth first starting from the matview
   // TODO(Ishan): Instances where the following assertion will fail?
   assert(this->flows_.at(name)->outputs().size() == 1);
@@ -37,7 +37,8 @@ void DataFlowState::TraverseBaseGraph(FlowName name) {
   }
 }
 
-void DataFlowState::VisitNode(std::shared_ptr<Operator> node, FlowName name) {
+void DataFlowState::VisitNode(std::shared_ptr<Operator> node,
+                              const FlowName &name) {
   if (node->visited_) {
     return;
   }
@@ -48,9 +49,6 @@ void DataFlowState::VisitNode(std::shared_ptr<Operator> node, FlowName name) {
       // These operators have no partioning requirements, hence continue
       // visiting.
       return VisitNode(node->GetParents()[0], name);
-    case Operator::Type::UNION:
-      // TODO(Ishan): Think about edge cases for union.
-      LOG(FATAL) << "Not supported yet";
     case Operator::Type::INPUT:
       // By default the input operators will partition records by the record
       // key. But this can be changed later based on the requirement of an
@@ -65,15 +63,13 @@ void DataFlowState::VisitNode(std::shared_ptr<Operator> node, FlowName name) {
         // Simply specify partitioning at the inputs of the dataflow graph
         // TODO(Ishan): Check on this again, Following is based on the
         // assumption that one flow will have a single matview op.
-        this->input_partitioned_by_.emplace(
-            name, absl::flat_hash_map<TableName, std::vector<ColumnID>>{});
         for (auto const &item : this->flows_.at(name)->inputs()) {
-          this->input_partitioned_by_.at(name).emplace(item.first,
-                                                       matview_op->key_cols());
+          this->input_partitioned_by_.at(name).at(item.first) =
+              matview_op->key_cols();
         }
       } else if (boundary.second != matview_op->key_cols()) {
-        AddExchangeAfter(matview_op->GetParents()[0], matview_op->key_cols(),
-                         name);
+        AddExchangeAfter(matview_op->GetParents()[0]->index(),
+                         matview_op->key_cols(), name);
       }
     }
       return VisitNode(node->GetParents()[0], name);
@@ -82,11 +78,11 @@ void DataFlowState::VisitNode(std::shared_ptr<Operator> node, FlowName name) {
       auto boundary = GetRecentPartionBoundary(node, false, name);
       if (!boundary.first) {
         for (auto input_op : GetSubgraphInputs(node)) {
-          this->input_partitioned_by_.at(name).emplace(
-              input_op->input_name(), aggregate_op->group_columns());
+          this->input_partitioned_by_.at(name).at(input_op->input_name()) =
+              aggregate_op->group_columns();
         }
       } else if (boundary.second != aggregate_op->group_columns()) {
-        AddExchangeAfter(aggregate_op->GetParents()[0],
+        AddExchangeAfter(aggregate_op->GetParents()[0]->index(),
                          aggregate_op->group_columns(), name);
       }
     }
@@ -98,28 +94,59 @@ void DataFlowState::VisitNode(std::shared_ptr<Operator> node, FlowName name) {
       auto right_boundary = GetRecentPartionBoundary(right_op, true, name);
       auto equijoin_op = std::dynamic_pointer_cast<EquiJoinOperator>(node);
       auto left_partition_cols = std::vector<ColumnID>{equijoin_op->left_id()};
-      auto right_partition_cols = std::vector<ColumnID>{equijoin_op->left_id()};
+      auto right_partition_cols =
+          std::vector<ColumnID>{equijoin_op->right_id()};
 
       if (!left_boundary.first) {
         // Partition at left op's inputs
         for (auto input_op : GetSubgraphInputs(left_op)) {
-          this->input_partitioned_by_.at(name).emplace(input_op->input_name(),
-                                                       left_partition_cols);
+          this->input_partitioned_by_.at(name).at(input_op->input_name()) =
+              left_partition_cols;
         }
       } else {
-        AddExchangeAfter(left_op, left_partition_cols, name);
+        AddExchangeAfter(left_op->index(), left_partition_cols, name);
       }
 
       if (!right_boundary.first) {
         // Partition at right op's inputs
         for (auto input_op : GetSubgraphInputs(right_op)) {
-          this->input_partitioned_by_.at(name).emplace(input_op->input_name(),
-                                                       right_partition_cols);
+          this->input_partitioned_by_.at(name).at(input_op->input_name()) =
+              right_partition_cols;
         }
       } else {
-        AddExchangeAfter(right_op, right_partition_cols, name);
+        AddExchangeAfter(right_op->index(), right_partition_cols, name);
       }
+      // Visit both children of the join
+      VisitNode(left_op, name);
+      VisitNode(right_op, name);
     } break;
+    case Operator::Type::UNION:
+      // For Union, both the children must be partitioned by the same keyset.
+      // And that keyset is unkown at this point of time. Hence, if one input
+      // is partitioned and the other isn't, then insert an exchange operator
+      // for the after the other input.
+      // If both are partitioned on different keys, then throw an error. (TODO
+      // (Ishan): potential edge cases for this?)
+      {
+        auto left_op = node->GetParents()[0];
+        auto right_op = node->GetParents()[1];
+        auto left_boundary = GetRecentPartionBoundary(left_op, true, name);
+        auto right_boundary = GetRecentPartionBoundary(right_op, true, name);
+        if (left_boundary.first && !right_boundary.first) {
+          AddExchangeAfter(right_op->index(), left_boundary.second, name);
+        } else if (!left_boundary.first && right_boundary.first) {
+          AddExchangeAfter(left_op->index(), right_boundary.second, name);
+        } else if (left_boundary.first && right_boundary.first) {
+          // TODO(Ishan): Possibility of this assertion failing?
+          assert(left_boundary.second == right_boundary.second);
+        }  // else: if both inputs have not been partitioned yet, don't do
+           // anything
+
+        // Visit both children of union
+        VisitNode(left_op, name);
+        VisitNode(right_op, name);
+      }
+      break;
     case Operator::Type::EXCHANGE:
       LOG(FATAL)
           << "Not expected here, exchange should be inserted after traversal.";
@@ -129,7 +156,8 @@ void DataFlowState::VisitNode(std::shared_ptr<Operator> node, FlowName name) {
 }
 
 std::pair<bool, std::vector<ColumnID>> DataFlowState::GetRecentPartionBoundary(
-    std::shared_ptr<Operator> node, bool check_self, FlowName name) {
+    std::shared_ptr<Operator> node, bool check_self,
+    const FlowName &name) const {
   if (check_self) {
     // Start from one level up. This flag is primarily used when obtaining
     // the partition boundary for inputs of a join.
@@ -142,16 +170,34 @@ std::pair<bool, std::vector<ColumnID>> DataFlowState::GetRecentPartionBoundary(
     case Operator::Type::FILTER:
     case Operator::Type::PROJECT:
       return this->GetRecentPartionBoundary(parent, false, name);
-    case Operator::Type::UNION:
-      // TODO(Ishan): Any restrictions on the partitioning for the children of
-      // union? should they be the same?
+    case Operator::Type::UNION: {
+      // Similar logic as what is being done in VisitNode, but will not be
+      // inserting any exchange operators in this section of code based on the
+      // assumption that this union will eventually be visited and the visiting
+      // code will insert any necessary exchange operators.
+      auto left_op = parent->GetParents()[0];
+      auto right_op = parent->GetParents()[1];
+      auto left_boundary = GetRecentPartionBoundary(left_op, true, name);
+      auto right_boundary = GetRecentPartionBoundary(right_op, true, name);
+      if (left_boundary.first && !right_boundary.first) {
+        response = {true, left_boundary.second};
+      } else if (!left_boundary.first && right_boundary.first) {
+        response = {true, right_boundary.second};
+      } else if (left_boundary.first && right_boundary.first) {
+        assert(left_boundary.second == right_boundary.second);
+        response = {true, left_boundary.second};
+      } else {
+        response = {false, std::vector<ColumnID>{}};
+      }
+    }
       return response;
     case Operator::Type::INPUT: {
-      auto input_op = std::dynamic_pointer_cast<InputOperator>(node);
-      if (!this->input_partitioned_by_.contains(name) ||
-          !this->input_partitioned_by_.at(name).contains(
-              input_op->input_name())) {
+      auto input_op = std::dynamic_pointer_cast<InputOperator>(parent);
+      if (this->input_partitioned_by_.at(name)
+              .at(input_op->input_name())
+              .size() == 0) {
         // A decision has not been made on the paritioning key for this input
+        response = {false, std::vector<ColumnID>{}};
         return response;
       }
       response = {true, this->input_partitioned_by_.at(name).at(
@@ -159,18 +205,19 @@ std::pair<bool, std::vector<ColumnID>> DataFlowState::GetRecentPartionBoundary(
       return response;
     }
     case Operator::Type::MAT_VIEW: {
-      auto matview_op = std::dynamic_pointer_cast<MatViewOperator>(node);
+      auto matview_op = std::dynamic_pointer_cast<MatViewOperator>(parent);
       response = {true, matview_op->key_cols()};
     }
       return response;
     case Operator::Type::EQUIJOIN: {
-      auto equijoin_op = std::dynamic_pointer_cast<EquiJoinOperator>(node);
-      response = {true, std::vector<ColumnID>{equijoin_op->join_column()}};
+      auto equijoin_op = std::dynamic_pointer_cast<EquiJoinOperator>(parent);
+      auto join_column = equijoin_op->join_column();
+      response = {true, std::vector<ColumnID>{join_column}};
     }
       return response;
     case Operator::Type::AGGREGATE: {
-      auto agg_op = std::dynamic_pointer_cast<AggregateOperator>(node);
-      response = {true, agg_op->group_columns()};
+      auto agg_op = std::dynamic_pointer_cast<AggregateOperator>(parent);
+      response = {true, agg_op->OutPartitionCols()};
     }
       return response;
     case Operator::Type::EXCHANGE:
@@ -181,16 +228,17 @@ std::pair<bool, std::vector<ColumnID>> DataFlowState::GetRecentPartionBoundary(
   }
 }
 
-void DataFlowState::AddExchangeAfter(std::shared_ptr<Operator> node,
+void DataFlowState::AddExchangeAfter(NodeIndex parent_index,
                                      std::vector<ColumnID> partition_key,
-                                     FlowName name) {
+                                     const FlowName &name) {
   for (uint16_t partition = 0; partition < this->partition_count_;
        partition++) {
+    auto partitioned_graph = this->partitioned_graphs_.at(name).at(partition);
     auto exchange_op = std::make_shared<ExchangeOperator>(
         this->partition_chans_.at(name), partition_key, partition,
         this->partition_count_);
-    this->partitioned_graphs_.at(name).at(partition)->InsertNodeAfter(
-        exchange_op, node);
+    partitioned_graph->InsertNodeAfter(
+        exchange_op, partitioned_graph->GetNode(parent_index));
   }
 }
 
@@ -255,6 +303,18 @@ void DataFlowState::AddFlow(const FlowName &name,
     // this->threads_.push_back(std::thread(&DataFlowGraph::Start, partition,
     // comm_chan));
   }
+  // Initialize data structures for input partitions
+  // NOTE: Since every flow at least has a matview, each input is expected to be
+  // partitioned on some key. Hence, no default partitioning key will be
+  // specified for the inputs.
+  this->input_partitioned_by_.emplace(
+      name, absl::flat_hash_map<TableName, std::vector<ColumnID>>{});
+  for (auto item : flow->inputs()) {
+    this->input_partitioned_by_.at(name).emplace(item.first,
+                                                 std::vector<ColumnID>{});
+  }
+
+  this->TraverseBaseGraph(name);
 }
 
 const std::shared_ptr<DataFlowGraph> DataFlowState::GetFlow(

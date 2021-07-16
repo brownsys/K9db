@@ -52,6 +52,15 @@ bool DataFlowGraph::InsertNodeAfter(std::shared_ptr<Operator> op,
 
   // Add children for @op
   op->children_ = old_children;
+  // Replace @parent with @op as parent for the above children
+  for (auto child_index : op->children_) {
+    auto child_op = this->GetNode(child_index);
+    for (size_t i = 0; i < child_op->parents_.size(); i++) {
+      if (child_op->parents_.at(i) == parent->index()) {
+        child_op->parents_.at(i) = op->index();
+      }
+    }
+  }
   // Update stale edges
   for (auto &edge : this->edges_) {
     for (auto child_index : old_children) {
@@ -119,7 +128,7 @@ void DataFlowGraph::Start(std::shared_ptr<Channel> incoming_chan) const {
           LOG(INFO) << "Recieved batch with";
           break;
         case Message::Type::STOP:
-          LOG(INFO) << "Recieved stop signal";
+          // Terminate this thread
           return;
       }
     }
@@ -128,8 +137,8 @@ void DataFlowGraph::Start(std::shared_ptr<Channel> incoming_chan) const {
 
 std::string DataFlowGraph::DebugString() const {
   std::string str = "[";
-  for (const auto &[_, node] : this->nodes_) {
-    str += "\n\t" + node->DebugString() + ",";
+  for (int i = (this->nodes_.size() - 1); i >= 0; i--) {
+    str += "\n\t" + this->nodes_.at(i)->DebugString() + ",";
   }
   str.pop_back();
   str += "\n]";

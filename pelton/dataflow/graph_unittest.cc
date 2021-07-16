@@ -11,6 +11,7 @@
 #include "pelton/dataflow/ops/aggregate.h"
 #include "pelton/dataflow/ops/equijoin.h"
 #include "pelton/dataflow/ops/filter.h"
+#include "pelton/dataflow/ops/identity.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/ops/project.h"
@@ -597,6 +598,43 @@ TEST(DataFlowGraphTest, CloneTest) {
       MakeAggregateOnEquiJoinRecords(op->output_schema());
   // Outputs must be equal.
   MatViewContentsEqualsIndexed(g_clone->outputs().at(0), result, 0);
+}
+
+TEST(DataFlowGraphTest, InsertTest) {
+  // Schema must survive records.
+  SchemaRef schema = MakeLeftSchema();
+  // Make graph.
+  DataFlowGraph g = MakeProjectOnFilterGraph(0, schema);
+  LOG(INFO) << g.DebugString();
+  // Insert an identity operator after the filter operator
+  auto identity_op = std::make_shared<IdentityOperator>();
+  g.InsertNodeAfter(identity_op, g.GetNode(1));
+  LOG(INFO) << g.DebugString();
+  EXPECT_EQ(g.GetNode(0)->type(), Operator::Type::INPUT);
+  EXPECT_EQ(g.GetNode(1)->type(), Operator::Type::FILTER);
+  EXPECT_EQ(g.GetNode(2)->type(), Operator::Type::PROJECT);
+  EXPECT_EQ(g.GetNode(3)->type(), Operator::Type::MAT_VIEW);
+  EXPECT_EQ(g.GetNode(4)->type(), Operator::Type::IDENTITY);
+  // Check children
+  EXPECT_EQ(g.GetNode(0)->GetChildren()[0], g.GetNode(1));
+  EXPECT_EQ(g.GetNode(1)->GetChildren()[0], g.GetNode(4));
+  EXPECT_EQ(g.GetNode(4)->GetChildren()[0], g.GetNode(2));
+  EXPECT_EQ(g.GetNode(2)->GetChildren()[0], g.GetNode(3));
+  // Check parents
+  EXPECT_EQ(g.GetNode(3)->GetParents()[0], g.GetNode(2));
+  EXPECT_EQ(g.GetNode(2)->GetParents()[0], g.GetNode(4));
+  EXPECT_EQ(g.GetNode(4)->GetParents()[0], g.GetNode(1));
+  EXPECT_EQ(g.GetNode(1)->GetParents()[0], g.GetNode(0));
+
+  // Make records.
+  std::vector<Record> records = MakeLeftRecords(schema);
+  // Process records.
+  EXPECT_TRUE(g.Process("test-table", records));
+  // Compute expected result.
+  auto op = std::dynamic_pointer_cast<ProjectOperator>(g.GetNode(2));
+  std::vector<Record> result = MakeProjectOnFilterRecords(op->output_schema());
+  // Outputs must be equal.
+  MatViewContentsEquals(g.outputs().at(0), result);
 }
 
 #ifndef PELTON_VALGRIND_MODE
