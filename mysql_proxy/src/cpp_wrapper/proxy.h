@@ -11,7 +11,7 @@ enum ColumnDefinitionTypeEnum { UINT, INT, TEXT, DATETIME };
 struct CResult {
   // pelton::sqlast::ColumnDefinitionTypeEnum col_types[64];
   enum ColumnDefinitionTypeEnum col_types[64];
-  char *col_names[64]; 
+  char *col_names[128]; 
   size_t num_rows; // records
   size_t num_cols;
   union RecordData {

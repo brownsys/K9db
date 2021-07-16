@@ -47,7 +47,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
     // called when client issues query for immediate execution. Results returned via QueryResultWriter
     fn on_query(&mut self, q_string: &str, results: QueryResultWriter<W>) -> io::Result<()> {
         println!("Rust proxy: starting on_query");
-        println!("Rust Proxy: query received from HotCRP is: {:?}", q_string);
+        println!("Rust Proxy: query received is: {:?}", q_string);
 
         println!("Rust Proxy: calling rust wrapper that calls c-wrapper for pelton::exec\n");
         let exec_response: exec_type = exec(&mut self.rust_conn, q_string);
@@ -57,7 +57,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             if unsafe { exec_response.ddl } {
                 results.completed(0, 0)
             } else {
-                println!("Rust Proxy: Failed to execute ddl");
+                println!("Rust Proxy: Failed to execute CREATE");
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
         } else if q_string.contains("UPDATE")
@@ -67,20 +67,19 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             if unsafe { exec_response.update } != -1 {
                 unsafe { results.completed(exec_response.update as u64, 0) }
             } else {
-                println!("Rust Proxy: Failed to execute update");
+                println!("Rust Proxy: Failed to execute UPDATE");
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
         } else if q_string.contains("SELECT") {
-            println!("Rust Proxy: Populating mysql_srv response");
+            println!("Rust Proxy: Populating SELECT response");
 
             let num_cols = unsafe { (*exec_response.select).num_cols as usize };
             let num_rows = unsafe { (*exec_response.select).num_rows as usize };
             let col_names = unsafe { (*exec_response.select).col_names };
             let col_types = unsafe { (*exec_response.select).col_types };
-
             let mut cols = Vec::with_capacity(num_cols);
 
-            println!("Rust Proxy: creating columns");
+            println!("Rust Proxy: creating columns for rust reponse");
             for c in 0..num_cols {
                 // convert col_name at index c to rust string
                 let col_name_string: String =
@@ -91,8 +90,8 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 let col_type = match col_type_c {
                     ColumnDefinitionTypeEnum_UINT => ColumnType::MYSQL_TYPE_LONGLONG,
                     ColumnDefinitionTypeEnum_INT => ColumnType::MYSQL_TYPE_LONGLONG,
-                    ColumnDefinitionTypeEnum_TEXT => ColumnType::MYSQL_TYPE_STRING,
-                    ColumnDefinitionTypeEnum_DATETIME => ColumnType::MYSQL_TYPE_STRING,
+                    ColumnDefinitionTypeEnum_TEXT => ColumnType::MYSQL_TYPE_VAR_STRING,
+                    ColumnDefinitionTypeEnum_DATETIME => ColumnType::MYSQL_TYPE_VAR_STRING,
                     _ => ColumnType::MYSQL_TYPE_NULL,
                 };
                 cols.push(Column {
@@ -105,8 +104,8 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 
             let mut rw = results.start(&cols)?;
 
-            println!("Rust Proxy: writing select response using RowWriter");
-            // conversion from incomplete array field (flexible array) to rust slice, starting with the outer array
+            println!("Rust Proxy: writing SELECT response using RowWriter");
+            // convert incomplete array field (flexible array) to rust slice, starting with the outer array
             let rows_slice = unsafe { (*exec_response.select).records.as_slice(num_rows * num_cols) };
 
             for r in 0..num_rows {
@@ -139,10 +138,10 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 rw.end_row()?;
             }
 
-            // calling destructor for CResult (after results are written/copied via row writer)
+            // call destructor for CResult (after results are written/copied via row writer)
             unsafe { std::ptr::drop_in_place(exec_response.select) };
 
-            // tell client no more rows coming. Returns an empty ok to the proxy
+            // tell client no more rows coming. Returns an empty Ok to the proxy
             rw.finish() // client & proxy
                         // rw.finish(); // client
                         // Ok(()) // proxy
@@ -153,7 +152,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
     }
 }
 
-// custom destructor to close connection once Backend goes out of scope
+// destructor to close connection when Backend goes out of scope
 impl Drop for Backend {
     fn drop(&mut self) {
         println!("Rust Proxy: Starting destructor for Backend");
@@ -174,7 +173,7 @@ fn main() {
     let join_handle = std::thread::spawn(move || {
         if let Ok((stream, _addr)) = listener.accept() {
             println!(
-                "Successfully connected to HotCRP's mysql server\nStream and address are: {:?}\n",
+                "Successfully connected to mysql proxy\nStream and address are: {:?}\n",
                 stream
             );
             println!("Rust Proxy: calling c-wrapper for pelton::open\n");

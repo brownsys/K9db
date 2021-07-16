@@ -87,8 +87,8 @@ pub const ColumnDefinitionTypeEnum_DATETIME: ColumnDefinitionTypeEnum = 3;
 pub type ColumnDefinitionTypeEnum = ::std::os::raw::c_uint;
 #[repr(C)]
 pub struct CResult {
-    pub col_names: [*mut ::std::os::raw::c_char; 64usize],
     pub col_types: [ColumnDefinitionTypeEnum; 64usize],
+    pub col_names: [*mut ::std::os::raw::c_char; 128usize],
     pub num_rows: size_t,
     pub num_cols: size_t,
     pub records: __IncompleteArrayField<CResult_RecordData>,
@@ -158,7 +158,7 @@ fn bindgen_test_layout_CResult_RecordData() {
 fn bindgen_test_layout_CResult() {
     assert_eq!(
         ::std::mem::size_of::<CResult>(),
-        784usize,
+        1296usize,
         concat!("Size of: ", stringify!(CResult))
     );
     assert_eq!(
@@ -167,18 +167,8 @@ fn bindgen_test_layout_CResult() {
         concat!("Alignment of ", stringify!(CResult))
     );
     assert_eq!(
-        unsafe { &(*(::std::ptr::null::<CResult>())).col_names as *const _ as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CResult),
-            "::",
-            stringify!(col_names)
-        )
-    );
-    assert_eq!(
         unsafe { &(*(::std::ptr::null::<CResult>())).col_types as *const _ as usize },
-        512usize,
+        0usize,
         concat!(
             "Offset of field: ",
             stringify!(CResult),
@@ -187,8 +177,18 @@ fn bindgen_test_layout_CResult() {
         )
     );
     assert_eq!(
+        unsafe { &(*(::std::ptr::null::<CResult>())).col_names as *const _ as usize },
+        256usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CResult),
+            "::",
+            stringify!(col_names)
+        )
+    );
+    assert_eq!(
         unsafe { &(*(::std::ptr::null::<CResult>())).num_rows as *const _ as usize },
-        768usize,
+        1280usize,
         concat!(
             "Offset of field: ",
             stringify!(CResult),
@@ -198,7 +198,7 @@ fn bindgen_test_layout_CResult() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<CResult>())).num_cols as *const _ as usize },
-        776usize,
+        1288usize,
         concat!(
             "Offset of field: ",
             stringify!(CResult),
@@ -208,7 +208,7 @@ fn bindgen_test_layout_CResult() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<CResult>())).records as *const _ as usize },
-        784usize,
+        1296usize,
         concat!(
             "Offset of field: ",
             stringify!(CResult),
