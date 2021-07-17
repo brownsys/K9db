@@ -116,8 +116,6 @@ void populate_column_types(CResult *c_result, pelton::SqlResult &sql_result) {
       c_result->col_types[i] = ColumnDefinitionTypeEnum::DATETIME;
       break;
     }
-    std::cout << "C-Wrapper: CResult col_type at index " << i << " is "
-              << c_result->col_types[i] << std::endl;
   }
 }
 
@@ -127,10 +125,8 @@ void populate_records(CResult *c_result,
   size_t num_cols = c_result->num_cols;
   // for every record (row)
   for (int i = 0; i < num_rows; i++) {
-    std::cout << "C-Wrapper: row index is : " << i << std::endl;
     // for every col in this row
     for (int j = 0; j < num_cols; j++) {
-      std::cout << "C-Wrapper: col index is : " << j << std::endl;
       if (c_result->col_types[j] == ColumnDefinitionTypeEnum::UINT) {
         // current row index * num cols per row + current col index
         c_result->records[i * num_cols + j].UINT = records[i].GetUInt(j);
@@ -156,7 +152,9 @@ void populate_records(CResult *c_result,
 CResult *exec_select(ConnectionC *c_conn, const char *query) {
   pelton::Connection *cpp_conn =
       reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
+  std::cout << "Just before exec, query is: " << query << std::endl;
   absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
+  std::cout << "Just after exec" << std::endl;
 
   if (result.ok() && result.value().IsQuery()) {
     pelton::SqlResult &sql_result = result.value();
