@@ -51,7 +51,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 
         // determine query type and return appropriate response
         if q_string.contains("CREATE TABLE") || q_string.contains("CREATE INDEX") {
-            let ddl_response = unsafe { exec_ddl_rust(&mut self.rust_conn, q_string) };
+            let ddl_response = exec_ddl_rust(&mut self.rust_conn, q_string);
             if ddl_response {
                 results.completed(0, 0)
             } else {
@@ -62,52 +62,27 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             || q_string.contains("DELETE")
             || q_string.contains("INSERT")
         {
-            let update_response = unsafe { exec_update_rust(&mut self.rust_conn, q_string) };
+            let update_response = exec_update_rust(&mut self.rust_conn, q_string);
             if update_response != -1 {
-                unsafe { results.completed(update_response as u64, 0) }
+                results.completed(update_response as u64, 0)
             } else {
                 println!("Rust Proxy: Failed to execute UPDATE");
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
         } else if q_string.contains("SELECT") || q_string.contains("VIEW") {
-            println!("Rust Proxy: Populating SELECT response");
-            let select_response = unsafe { exec_select_rust(&mut self.rust_conn, q_string) };
-
+            let select_response = exec_select_rust(&mut self.rust_conn, q_string);
             let num_cols = unsafe { (*select_response).num_cols as usize };
             let num_rows = unsafe { (*select_response).num_rows as usize };
             let col_names = unsafe { (*select_response).col_names };
             let col_types = unsafe { (*select_response).col_types };
-            let mut cols = Vec::with_capacity(num_cols);
 
-            println!("Rust Proxy: creating columns for rust reponse");
-            for c in 0..num_cols {
-                // convert col_name at index c to rust string
-                let col_name_string: String =
-                    unsafe { CStr::from_ptr(col_names[c]).to_str().unwrap().to_owned() };
-
-                // convert C column type enum to MYSQL type
-                let col_type_c = col_types[c];
-                let col_type = match col_type_c {
-                    ColumnDefinitionTypeEnum_UINT => ColumnType::MYSQL_TYPE_LONGLONG,
-                    ColumnDefinitionTypeEnum_INT => ColumnType::MYSQL_TYPE_LONGLONG,
-                    ColumnDefinitionTypeEnum_TEXT => ColumnType::MYSQL_TYPE_VAR_STRING,
-                    ColumnDefinitionTypeEnum_DATETIME => ColumnType::MYSQL_TYPE_VAR_STRING,
-                    _ => ColumnType::MYSQL_TYPE_NULL,
-                };
-                cols.push(Column {
-                    table: "".to_string(),
-                    column: col_name_string,
-                    coltype: col_type,
-                    colflags: ColumnFlags::empty(),
-                });
-            }
-
+            println!("Rust Proxy: converting response schema to rust compatible types");
+            let cols = convert_columns(num_cols, col_types, col_names);
             let mut rw = results.start(&cols)?;
 
-            println!("Rust Proxy: writing SELECT response using RowWriter");
+            println!("Rust Proxy: writing query response using RowWriter");
             // convert incomplete array field (flexible array) to rust slice, starting with the outer array
             let rows_slice = unsafe { (*select_response).records.as_slice(num_rows * num_cols) };
-
             for r in 0..num_rows {
                 for c in 0..num_cols {
                     match col_types[c] {
@@ -139,14 +114,11 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 }
                 rw.end_row()?;
             }
-
             // call destructor for CResult (after results are written/copied via row writer)
             unsafe { std::ptr::drop_in_place(select_response) };
 
             // tell client no more rows coming. Returns an empty Ok to the proxy
-            rw.finish() // client & proxy
-                        // rw.finish(); // client
-                        // Ok(()) // proxy
+            rw.finish()
         } else {
             println!("Rust proxy: unsupported query type");
             results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
