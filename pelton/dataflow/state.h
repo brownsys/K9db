@@ -42,6 +42,9 @@ class DataFlowState {
 
   const std::shared_ptr<DataFlowGraph> GetFlow(const FlowName &name) const;
 
+  const std::shared_ptr<DataFlowGraph> GetPartition(
+      const FlowName &name, uint16_t partition_id) const;
+
   bool HasFlow(const FlowName &name) const;
 
   bool HasFlowsFor(const TableName &table_name) const;

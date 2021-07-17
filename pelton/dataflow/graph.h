@@ -40,8 +40,12 @@ class DataFlowGraph {
   bool AddOutputOperator(std::shared_ptr<MatViewOperator> op,
                          std::shared_ptr<Operator> parent);
 
+  // Process records that are meant for an input operator
   bool Process(const std::string &input_name,
-               const std::vector<Record> &records);
+               const std::vector<Record> &records) const;
+  // Process records that are meant for a node specified by @entry_index
+  bool Process(const NodeIndex source_index, const NodeIndex entry_index,
+               const std::vector<Record> &records) const;
 
   // Accessors.
   const std::unordered_map<std::string, std::shared_ptr<InputOperator>>
@@ -51,6 +55,7 @@ class DataFlowGraph {
   const std::vector<std::shared_ptr<MatViewOperator>> &outputs() const {
     return this->outputs_;
   }
+  const NodeIndex &index() { return this->index_; };
 
   // Get node by its index.
   inline std::shared_ptr<Operator> GetNode(NodeIndex node_index) const {
@@ -58,6 +63,7 @@ class DataFlowGraph {
     return it == nodes_.end() ? nullptr : it->second;
   }
 
+  void SetIndex(NodeIndex graph_index) { this->index_ = graph_index; }
   std::shared_ptr<DataFlowGraph> Clone();
 
   // Suppposed to be an entry point for deploying a graph partiton in a thread
@@ -69,6 +75,7 @@ class DataFlowGraph {
   uint64_t SizeInMemory() const;
 
  private:
+  NodeIndex index_;
   bool AddEdge(std::shared_ptr<Operator> parent,
                std::shared_ptr<Operator> child);
   // Maps input name to associated input operator.

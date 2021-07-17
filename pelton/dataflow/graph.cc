@@ -83,9 +83,20 @@ bool DataFlowGraph::AddEdge(std::shared_ptr<Operator> parent,
 }
 
 bool DataFlowGraph::Process(const std::string &input_name,
-                            const std::vector<Record> &records) {
+                            const std::vector<Record> &records) const {
   std::shared_ptr<InputOperator> node = this->inputs_.at(input_name);
   if (!node->ProcessAndForward(UNDEFINED_NODE_INDEX, records)) {
+    return false;
+  }
+
+  return true;
+}
+
+bool DataFlowGraph::Process(const NodeIndex source_index,
+                            const NodeIndex entry_index,
+                            const std::vector<Record> &records) const {
+  std::shared_ptr<Operator> node = this->nodes_.at(entry_index);
+  if (!node->ProcessAndForward(source_index, records)) {
     return false;
   }
 
@@ -124,9 +135,21 @@ void DataFlowGraph::Start(std::shared_ptr<Channel> incoming_chan) const {
     std::vector<std::shared_ptr<Message>> messages = incoming_chan->Recv();
     for (auto msg : messages) {
       switch (msg->type()) {
-        case Message::Type::BATCH:
-          LOG(INFO) << "Recieved batch with";
-          break;
+        case Message::Type::BATCH: {
+          auto batch_msg = std::dynamic_pointer_cast<BatchMessage>(msg);
+          for (const auto &record : batch_msg->records()) {
+          }
+          if (batch_msg->ContainsInput()) {
+            // Records are passed by const reference. The records will no longer
+            // be available after all the references to that batch message are
+            // destroyed. Which should be fine since there will be at least one
+            // reference that will be present till the end of this case's scope.
+            this->Process(batch_msg->input_name(), batch_msg->records());
+          } else {
+            this->Process(batch_msg->source_index(), batch_msg->entry_index(),
+                          batch_msg->ConsumeRecords());
+          }
+        } break;
         case Message::Type::STOP:
           // Terminate this thread
           return;

@@ -17,6 +17,7 @@
 #include "pelton/dataflow/ops/equijoin.h"
 #include "pelton/dataflow/ops/exchange.h"
 #include "pelton/dataflow/ops/matview.h"
+#include "pelton/dataflow/partition.h"
 #include "pelton/dataflow/stop_message.h"
 #include "pelton/util/fs.h"
 
@@ -299,6 +300,7 @@ void DataFlowState::AddFlow(const FlowName &name,
     std::shared_ptr<Channel> comm_chan = std::make_shared<Channel>();
     this->partition_chans_.at(name).emplace(i, comm_chan);
     std::shared_ptr<DataFlowGraph> partition = flow->Clone();
+    partition->SetIndex(i);
     this->partitioned_graphs_.at(name).emplace(i, partition);
     // this->threads_.push_back(std::thread(&DataFlowGraph::Start, partition,
     // comm_chan));
@@ -315,11 +317,22 @@ void DataFlowState::AddFlow(const FlowName &name,
   }
 
   this->TraverseBaseGraph(name);
+  // Deploy one partition per thread
+  for (uint16_t i = 0; i < this->partition_count_; i++) {
+    this->threads_.push_back(std::thread(
+        &DataFlowGraph::Start, this->partitioned_graphs_.at(name).at(i),
+        this->partition_chans_.at(name).at(i)));
+  }
 }
 
 const std::shared_ptr<DataFlowGraph> DataFlowState::GetFlow(
     const FlowName &name) const {
   return this->flows_.at(name);
+}
+
+const std::shared_ptr<DataFlowGraph> DataFlowState::GetPartition(
+    const FlowName &name, uint16_t partition_id) const {
+  return this->partitioned_graphs_.at(name).at(partition_id);
 }
 
 bool DataFlowState::HasFlow(const FlowName &name) const {
@@ -359,9 +372,24 @@ bool DataFlowState::ProcessRecords(const TableName &table_name,
                                    const std::vector<Record> &records) {
   if (records.size() > 0 && this->HasFlowsFor(table_name)) {
     for (const FlowName &name : this->flows_per_input_table_.at(table_name)) {
-      std::shared_ptr<DataFlowGraph> graph = this->flows_.at(name);
-      if (!graph->Process(table_name, records)) {
-        return false;
+      // TODO(Ishan): Consider consuming @records over here instead of being
+      // passed as const reference.
+      // For now just copy the records.
+      std::vector<Record> records_copy;
+      for (const auto &record : records) {
+        records_copy.push_back(record.Copy());
+      }
+      // Partition records based on key specified by the input operator
+      auto input_partition_key =
+          this->input_partitioned_by_.at(name).at(table_name);
+      absl::flat_hash_map<uint16_t, std::vector<Record>> partitioned_records =
+          PartitionTrivial(std::move(records_copy), input_partition_key,
+                           this->partition_count_);
+      // Send batch messages to appropriate partitions
+      for (auto &item : partitioned_records) {
+        auto batch_msg =
+            std::make_shared<BatchMessage>(table_name, std::move(item.second));
+        this->partition_chans_.at(name).at(item.first)->Send(batch_msg);
       }
     }
   }
