@@ -214,6 +214,31 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "graph-test-utils",
+    srcs = [
+    ],
+    hdrs = [
+            "graph_test_utils.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":graph",
+        ":record",
+        ":schema",
+        ":types",
+        "//pelton/dataflow/ops:aggregate",
+        "//pelton/dataflow/ops:equijoin",
+        "//pelton/dataflow/ops:filter",
+        "//pelton/dataflow/ops:input",
+        "//pelton/dataflow/ops:identity",
+        "//pelton/dataflow/ops:matview",
+        "//pelton/dataflow/ops:project",
+        "//pelton/dataflow/ops:union",
+        "//pelton/util:ints",
+    ],
+)
+
 cc_test(
     name = "value-test",
     srcs = [
@@ -304,19 +329,7 @@ cc_test(
     ],
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
-        ":graph",
-        ":record",
-        ":schema",
-        ":types",
-        "//pelton/dataflow/ops:aggregate",
-        "//pelton/dataflow/ops:equijoin",
-        "//pelton/dataflow/ops:filter",
-        "//pelton/dataflow/ops:input",
-        "//pelton/dataflow/ops:identity",
-        "//pelton/dataflow/ops:matview",
-        "//pelton/dataflow/ops:project",
-        "//pelton/dataflow/ops:union",
-        "//pelton/util:ints",
+        ":graph-test-utils",
         "@glog",
         "@gtest",
         "@gtest//:gtest_main",
@@ -348,19 +361,7 @@ cc_test(
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":state",
-        ":graph",
-        ":record",
-        ":schema",
-        ":types",
-        "//pelton/dataflow/ops:aggregate",
-        "//pelton/dataflow/ops:equijoin",
-        "//pelton/dataflow/ops:exchange",
-        "//pelton/dataflow/ops:filter",
-        "//pelton/dataflow/ops:input",
-        "//pelton/dataflow/ops:matview",
-        "//pelton/dataflow/ops:project",
-        "//pelton/dataflow/ops:union",
-        "//pelton/util:ints",
+        ":graph-test-utils",
         "@glog",
         "@gtest",
         "@gtest//:gtest_main",

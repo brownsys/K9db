@@ -137,8 +137,6 @@ void DataFlowGraph::Start(std::shared_ptr<Channel> incoming_chan) const {
       switch (msg->type()) {
         case Message::Type::BATCH: {
           auto batch_msg = std::dynamic_pointer_cast<BatchMessage>(msg);
-          for (const auto &record : batch_msg->records()) {
-          }
           if (batch_msg->ContainsInput()) {
             // Records are passed by const reference. The records will no longer
             // be available after all the references to that batch message are

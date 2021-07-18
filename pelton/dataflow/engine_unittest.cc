@@ -5,6 +5,7 @@
 #include "gtest/gtest.h"
 #include "pelton/dataflow/batch_message.h"
 #include "pelton/dataflow/channel.h"
+#include "pelton/dataflow/graph_test_utils.h"
 #include "pelton/dataflow/message.h"
 #include "pelton/dataflow/ops/aggregate.h"
 #include "pelton/dataflow/ops/equijoin.h"
@@ -14,6 +15,7 @@
 #include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/ops/project.h"
 #include "pelton/dataflow/ops/union.h"
+#include "pelton/dataflow/partition.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/state.h"
@@ -23,112 +25,6 @@
 
 namespace pelton {
 namespace dataflow {
-using CType = sqlast::ColumnDefinition::Type;
-
-// Make schemas.
-SchemaRef MakeLeftSchema() {
-  std::vector<std::string> names = {"ID", "Item", "Category"};
-  std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
-  std::vector<ColumnID> keys = {0};
-  return SchemaFactory::Create(names, types, keys);
-}
-
-SchemaRef MakeRightSchema() {
-  std::vector<std::string> names = {"Category", "Description"};
-  std::vector<CType> types = {CType::INT, CType::TEXT};
-  std::vector<ColumnID> keys;
-  return SchemaFactory::Create(names, types, keys);
-}
-
-std::shared_ptr<DataFlowGraph> MakeTrivialGraph(ColumnID keycol,
-                                                const SchemaRef &schema) {
-  std::vector<ColumnID> keys = {keycol};
-  auto g = std::make_shared<DataFlowGraph>();
-
-  auto in = std::make_shared<InputOperator>("test-table", schema);
-  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
-
-  EXPECT_TRUE(g->AddInputNode(in));
-  EXPECT_TRUE(g->AddOutputOperator(matview, in));
-  EXPECT_EQ(g->inputs().size(), 1);
-  EXPECT_EQ(g->outputs().size(), 1);
-  EXPECT_EQ(g->inputs().at("test-table").get(), in.get());
-  EXPECT_EQ(g->outputs().at(0).get(), matview.get());
-  return g;
-}
-
-std::shared_ptr<DataFlowGraph> MakeEquiJoinGraph(ColumnID ok, ColumnID lk,
-                                                 ColumnID rk,
-                                                 const SchemaRef &lschema,
-                                                 const SchemaRef &rschema) {
-  std::vector<ColumnID> keys = {ok};
-  auto g = std::make_shared<DataFlowGraph>();
-
-  auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
-  auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
-  auto join = std::make_shared<EquiJoinOperator>(lk, rk);
-  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
-
-  EXPECT_TRUE(g->AddInputNode(in1));
-  EXPECT_TRUE(g->AddInputNode(in2));
-  EXPECT_TRUE(g->AddNode(join, {in1, in2}));
-  EXPECT_TRUE(g->AddOutputOperator(matview, join));
-  EXPECT_EQ(g->inputs().size(), 2);
-  EXPECT_EQ(g->outputs().size(), 1);
-  EXPECT_EQ(g->inputs().at("test-table1").get(), in1.get());
-  EXPECT_EQ(g->inputs().at("test-table2").get(), in2.get());
-  EXPECT_EQ(g->outputs().at(0).get(), matview.get());
-  return g;
-}
-
-std::shared_ptr<DataFlowGraph> MakeAggregateOnEquiJoinGraph(
-    ColumnID ok, ColumnID lk, ColumnID rk, const SchemaRef &lschema,
-    const SchemaRef &rschema) {
-  std::vector<ColumnID> keys = {ok};
-  std::vector<ColumnID> group_columns = {2};
-  auto g = std::make_shared<DataFlowGraph>();
-
-  auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
-  auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
-  auto join = std::make_shared<EquiJoinOperator>(lk, rk);
-  auto aggregate = std::make_shared<AggregateOperator>(
-      group_columns, AggregateOperator::Function::COUNT, -1);
-  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
-
-  EXPECT_TRUE(g->AddInputNode(in1));
-  EXPECT_TRUE(g->AddInputNode(in2));
-  EXPECT_TRUE(g->AddNode(join, {in1, in2}));
-  EXPECT_TRUE(g->AddNode(aggregate, join));
-  EXPECT_TRUE(g->AddOutputOperator(matview, aggregate));
-  EXPECT_EQ(g->inputs().size(), 2);
-  EXPECT_EQ(g->outputs().size(), 1);
-  EXPECT_EQ(g->inputs().at("test-table1").get(), in1.get());
-  EXPECT_EQ(g->inputs().at("test-table2").get(), in2.get());
-  EXPECT_EQ(g->outputs().at(0).get(), matview.get());
-  return g;
-}
-
-std::shared_ptr<DataFlowGraph> MakeUnionGraph(ColumnID keycol,
-                                              const SchemaRef &schema) {
-  std::vector<ColumnID> keys = {keycol};
-  auto g = std::make_shared<DataFlowGraph>();
-
-  auto in1 = std::make_shared<InputOperator>("test-table1", schema);
-  auto in2 = std::make_shared<InputOperator>("test-table2", schema);
-  auto union_ = std::make_shared<UnionOperator>();
-  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
-
-  EXPECT_TRUE(g->AddInputNode(in1));
-  EXPECT_TRUE(g->AddInputNode(in2));
-  EXPECT_TRUE(g->AddNode(union_, {in1, in2}));
-  EXPECT_TRUE(g->AddOutputOperator(matview, union_));
-  EXPECT_EQ(g->inputs().size(), 2);
-  EXPECT_EQ(g->outputs().size(), 1);
-  EXPECT_EQ(g->inputs().at("test-table1").get(), in1.get());
-  EXPECT_EQ(g->inputs().at("test-table2").get(), in2.get());
-  EXPECT_EQ(g->outputs().at(0).get(), matview.get());
-  return g;
-}
 
 TEST(DataFlowEngineTest, TestTrivialGraph) {
   DataFlowState state;
@@ -137,18 +33,34 @@ TEST(DataFlowEngineTest, TestTrivialGraph) {
   state.AddTableSchema("test-table", schema);
   // Make graph
   auto graph = MakeTrivialGraph(2, schema);
-  state.AddFlow("trivial", graph);
+  std::string flow_name = "trivial";
+  state.AddFlow(flow_name, graph);
 
   auto partitions = state.partitioned_graphs();
   auto input_partitions = state.input_partitioned_by();
   // Check if partitions are as expected.
-  for (auto item : partitions.at("trivial")) {
+  for (auto item : partitions.at(flow_name)) {
     EXPECT_EQ(item.second->GetNode(0)->type(), Operator::Type::INPUT);
     EXPECT_EQ(item.second->GetNode(1)->type(), Operator::Type::MAT_VIEW);
   }
+  auto matview_key_cols = std::vector<ColumnID>{2};
   // Check if input op's partitioning citeria is correct
-  EXPECT_EQ(input_partitions.at("trivial").at("test-table"),
-            std::vector<ColumnID>{2});
+  EXPECT_EQ(input_partitions.at(flow_name).at("test-table"), matview_key_cols);
+
+  // Process records through the sharded dataflow
+  std::vector<Record> records = MakeLeftRecords(schema);
+  state.ProcessRecords("test-table", records);
+  // Wait for a while for records to get processed
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  // Partition the input records so that equality checks are easier to perform
+  auto partitioned_records =
+      PartitionTrivial(std::move(records), matview_key_cols, 3);
+  // Check if records have reached appropriate partition's matviews
+  for (const auto &item : partitioned_records) {
+    auto partition_matview =
+        state.GetPartition(flow_name, item.first)->outputs().at(0);
+    EXPECT_EQ_MSET(partition_matview, item.second);
+  }
 }
 
 TEST(DataFlowEngineTest, TestEquiJoinGraph) {
@@ -160,12 +72,13 @@ TEST(DataFlowEngineTest, TestEquiJoinGraph) {
   state.AddTableSchema("test-table2", rschema);
   // Make graph
   auto graph = MakeEquiJoinGraph(0, 2, 0, lschema, rschema);
-  state.AddFlow("equijoin", graph);
+  std::string flow_name = "equijion";
+  state.AddFlow(flow_name, graph);
 
   auto partitions = state.partitioned_graphs();
   auto input_partitions = state.input_partitioned_by();
   // Check if partitions are as expected.
-  for (auto item : partitions.at("equijoin")) {
+  for (auto item : partitions.at(flow_name)) {
     EXPECT_EQ(item.second->GetNode(0)->type(), Operator::Type::INPUT);
     EXPECT_EQ(item.second->GetNode(1)->type(), Operator::Type::INPUT);
     EXPECT_EQ(item.second->GetNode(2)->type(), Operator::Type::EQUIJOIN);
@@ -179,10 +92,32 @@ TEST(DataFlowEngineTest, TestEquiJoinGraph) {
     EXPECT_EQ(exchange_op->partition_key(), matview_op->key_cols());
   }
   // Check if input op's partitioning citeria is correct
-  EXPECT_EQ(input_partitions.at("equijoin").at("test-table1"),
+  EXPECT_EQ(input_partitions.at(flow_name).at("test-table1"),
             std::vector<ColumnID>{2});
-  EXPECT_EQ(input_partitions.at("equijoin").at("test-table2"),
+  EXPECT_EQ(input_partitions.at(flow_name).at("test-table2"),
             std::vector<ColumnID>{0});
+
+  // Process records through the sharded dataflow
+  // Make records.
+  std::vector<Record> left = MakeLeftRecords(lschema);
+  std::vector<Record> right = MakeRightRecords(rschema);
+  state.ProcessRecords("test-table1", left);
+  state.ProcessRecords("test-table2", right);
+  auto join_op = std::dynamic_pointer_cast<EquiJoinOperator>(graph->GetNode(2));
+  std::vector<Record> result = MakeJoinRecords(join_op->output_schema());
+  // Wait for a while for records to get processed
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  // Partition the input records so that equality checks are easier to perform
+  auto matview_op =
+      std::dynamic_pointer_cast<MatViewOperator>(graph->GetNode(3));
+  auto partitioned_records =
+      PartitionTrivial(std::move(result), matview_op->key_cols(), 3);
+  // Check if records have reached appropriate partition's matviews
+  for (const auto &item : partitioned_records) {
+    auto partition_matview =
+        state.GetPartition(flow_name, item.first)->outputs().at(0);
+    EXPECT_EQ_MSET(partition_matview, item.second);
+  }
 }
 
 TEST(DataFlowEngineTest, TestAggregateOnEquiJoinGraph) {
@@ -194,13 +129,13 @@ TEST(DataFlowEngineTest, TestAggregateOnEquiJoinGraph) {
   state.AddTableSchema("test-table2", rschema);
   // Make graph
   auto graph = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
-  state.AddFlow("aggregateOnEquijoin", graph);
+  std::string flow_name = "aggregateOnEquijoin";
+  state.AddFlow(flow_name, graph);
 
   auto partitions = state.partitioned_graphs();
   auto input_partitions = state.input_partitioned_by();
   // Check if partitions are as expected.
-  for (auto item : partitions.at("aggregateOnEquijoin")) {
-    // LOG(INFO) << item.second->DebugString();
+  for (auto item : partitions.at(flow_name)) {
     // Based on the graph that is supplied to the engine, it does not require
     // any exchange operators
     EXPECT_EQ(item.second->GetNode(0)->type(), Operator::Type::INPUT);
@@ -210,10 +145,34 @@ TEST(DataFlowEngineTest, TestAggregateOnEquiJoinGraph) {
     EXPECT_EQ(item.second->GetNode(4)->type(), Operator::Type::MAT_VIEW);
   }
   // Check if input op's partitioning citeria is correct
-  EXPECT_EQ(input_partitions.at("aggregateOnEquijoin").at("test-table1"),
+  EXPECT_EQ(input_partitions.at(flow_name).at("test-table1"),
             std::vector<ColumnID>{2});
-  EXPECT_EQ(input_partitions.at("aggregateOnEquijoin").at("test-table2"),
+  EXPECT_EQ(input_partitions.at(flow_name).at("test-table2"),
             std::vector<ColumnID>{0});
+
+  // Process records through the sharded dataflow
+  // Make records.
+  std::vector<Record> left = MakeLeftRecords(lschema);
+  std::vector<Record> right = MakeRightRecords(rschema);
+  state.ProcessRecords("test-table1", left);
+  state.ProcessRecords("test-table2", right);
+  auto aggregate_op =
+      std::dynamic_pointer_cast<AggregateOperator>(graph->GetNode(3));
+  std::vector<Record> result =
+      MakeAggregateOnEquiJoinRecords(aggregate_op->output_schema());
+  // Wait for a while for records to get processed
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  // Partition the input records so that equality checks are easier to perform
+  auto matview_op =
+      std::dynamic_pointer_cast<MatViewOperator>(graph->GetNode(4));
+  auto partitioned_records =
+      PartitionTrivial(std::move(result), matview_op->key_cols(), 3);
+  // Check if records have reached appropriate partition's matviews
+  for (const auto &item : partitioned_records) {
+    auto partition_matview =
+        state.GetPartition(flow_name, item.first)->outputs().at(0);
+    EXPECT_EQ_MSET(partition_matview, item.second);
+  }
 }
 
 TEST(DataFlowEngineTest, TestUnionGraph) {
@@ -224,6 +183,7 @@ TEST(DataFlowEngineTest, TestUnionGraph) {
   state.AddTableSchema("test-table2", schema);
   // Make graph
   auto graph = MakeUnionGraph(0, schema);
+  std::string flow_name = "union";
   state.AddFlow("union", graph);
 
   auto partitions = state.partitioned_graphs();
@@ -240,6 +200,32 @@ TEST(DataFlowEngineTest, TestUnionGraph) {
             std::vector<ColumnID>{0});
   EXPECT_EQ(input_partitions.at("union").at("test-table2"),
             std::vector<ColumnID>{0});
+
+  // Process records through the sharded dataflow
+  // Make records.
+  std::vector<Record> records = MakeLeftRecords(schema);
+  std::vector<Record> first_half;
+  first_half.push_back(records.at(0).Copy());
+  first_half.push_back(records.at(1).Copy());
+  std::vector<Record> second_half;
+  second_half.push_back(records.at(2).Copy());
+  second_half.push_back(records.at(3).Copy());
+  second_half.push_back(records.at(4).Copy());
+  state.ProcessRecords("test-table1", first_half);
+  state.ProcessRecords("test-table2", second_half);
+  // Wait for a while for records to get processed
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  // Partition the input records so that equality checks are easier to perform
+  auto matview_op =
+      std::dynamic_pointer_cast<MatViewOperator>(graph->GetNode(3));
+  auto partitioned_records =
+      PartitionTrivial(std::move(records), matview_op->key_cols(), 3);
+  // Check if records have reached appropriate partition's matviews
+  for (const auto &item : partitioned_records) {
+    auto partition_matview =
+        state.GetPartition(flow_name, item.first)->outputs().at(0);
+    EXPECT_EQ_MSET(partition_matview, item.second);
+  }
 }
 
 }  // namespace dataflow
