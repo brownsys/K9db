@@ -50,7 +50,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         println!("Rust Proxy: query received is: {:?}", q_string);
 
         // determine query type and return appropriate response
-        if q_string.contains("CREATE TABLE") || q_string.contains("CREATE INDEX") {
+        if q_string.contains("CREATE TABLE") || q_string.contains("CREATE INDEX") || q_string.contains("CREATE VIEW") {
             let ddl_response = exec_ddl_rust(&mut self.rust_conn, q_string);
             if ddl_response {
                 results.completed(0, 0)
@@ -69,7 +69,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 println!("Rust Proxy: Failed to execute UPDATE");
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
-        } else if q_string.contains("SELECT") || q_string.contains("VIEW") {
+        } else if q_string.contains("SELECT") {
             let select_response = exec_select_rust(&mut self.rust_conn, q_string);
             let num_cols = unsafe { (*select_response).num_cols as usize };
             let num_rows = unsafe { (*select_response).num_rows as usize };

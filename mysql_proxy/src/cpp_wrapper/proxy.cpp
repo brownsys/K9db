@@ -74,7 +74,9 @@ bool close_conn(ConnectionC *c_conn) {
 bool exec_ddl(ConnectionC *c_conn, const char *query) {
   pelton::Connection *cpp_conn =
       reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
+  std::cout << "Just before exec, query is: " << query << std::endl;
   absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
+  std::cout << "Just after exec" << std::endl;
   return result.ok() && result.value().IsStatement() &&
          result.value().Success();
 }
@@ -152,9 +154,7 @@ void populate_records(CResult *c_result,
 CResult *exec_select(ConnectionC *c_conn, const char *query) {
   pelton::Connection *cpp_conn =
       reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
-  std::cout << "Just before exec, query is: " << query << std::endl;
   absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
-  std::cout << "Just after exec" << std::endl;
 
   if (result.ok() && result.value().IsQuery()) {
     pelton::SqlResult &sql_result = result.value();
