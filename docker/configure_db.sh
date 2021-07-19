@@ -1,4 +1,9 @@
 #!/bin/bash
+echo "Running cargo-raze"
+cd /home/pelton/mysql_proxy/
+rm -rf cargo && /root/.cargo/bin/cargo raze
+cd -
+
 echo "Running mysqld ..."
 mysqld &
 MYSQLID=$!
@@ -7,9 +12,6 @@ MYSQLID=$!
 sleep 10
 
 if [[ -f "/home/configure_db.sql" ]]; then
-  echo "Running cargo-raze" > /home/log.log
-  cd /home/pelton/mysql_proxy/ && rm -rf cargo && cargo raze && cd -
-
   echo "Configuring mariadb ..."
   mariadb -u root < /home/configure_db.sql
   if [ $? -eq 0 ]; then
