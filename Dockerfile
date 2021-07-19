@@ -31,6 +31,9 @@ RUN cd /tmp \
     && echo "source /usr/local/lib/bazel/bin/bazel-complete.bash" >> ~/.bashrc \
     && rm bazel-4.0.0-installer-linux-x86_64.sh
 
+# install rust
+RUN curl https://sh.rustup.rs | sh -s -- -y
+
 # install mariadb
 RUN apt-get remove -y --purge mysql*
 RUN apt-get install -y mariadb-server

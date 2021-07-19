@@ -13,6 +13,9 @@ if [[ -f "/home/configure_db.sql" ]]; then
     echo "Configured successfully"
     rm /home/configure_db.sql
   fi
+  echo "Running cargo-raze"
+  cargo install cargo-raze
+  cd /home/pelton/mysql_proxy/ && rm -rf cargo && cargo raze && cd -
 fi
 
 wait $MYSQLID
