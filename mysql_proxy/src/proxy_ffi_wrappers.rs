@@ -1,9 +1,25 @@
-use std::ffi::CStr;
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
+
+extern crate msql_srv;
+
+use msql_srv::{ColumnType, Column, ColumnFlags};
 use std::ffi::CString;
 use std::os::raw::c_char;
-include!("proxy_ffi.rs");
 
-fn open(dir: &str, user: &str, pass: &str) -> ConnectionC {
+include!("proxy_ffi_bindgen.rs");
+
+// Custom destructor
+impl Drop for FFIResult {
+    fn drop(&mut self) {
+        println!("Rust FFI: Calling destructor for CResult");
+        unsafe {FFIDestroySelect(self)};
+        println!("Rust FFI: CResult destroyed");
+    }
+}
+
+pub fn open(dir: &str, user: &str, pass: &str) -> FFIConnection {
     // convert &str to char* to pass query to C-wrapper
     let dir = CString::new(dir).unwrap();
     let dir: *mut c_char = dir.as_ptr() as *mut i8;
@@ -12,54 +28,54 @@ fn open(dir: &str, user: &str, pass: &str) -> ConnectionC {
     let pass = CString::new(pass).unwrap();
     let pass: *mut c_char = pass.as_ptr() as *mut i8;
 
-    let conn = unsafe { open_c(dir, user, pass) };
+    let conn = unsafe { FFIOpen(dir, user, pass) };
     return conn;
 }
 
-fn close(rust_conn: *mut ConnectionC) -> bool {
-    let response = unsafe { close_conn(rust_conn) };
+pub fn close(rust_conn: *mut FFIConnection) -> bool {
+    let response = unsafe { FFIClose(rust_conn) };
     return response;
 }
 
-fn exec_ddl_rust(rust_conn: *mut ConnectionC, query: &str) -> bool {
+pub fn exec_ddl(rust_conn: *mut FFIConnection, query: &str) -> bool {
     println!("Rust Proxy: ddl query received is: {:?}", query);
     let c_query = CString::new(query).unwrap();
     let char_query = c_query.as_ptr() as *mut i8;
-    return unsafe { exec_ddl(rust_conn, char_query) };
+    return unsafe { FFIExecDDL(rust_conn, char_query) };
 }
 
-fn exec_update_rust(rust_conn: *mut ConnectionC, query: &str) -> i32 {
+pub fn exec_update(rust_conn: *mut FFIConnection, query: &str) -> i32 {
     println!("Rust Proxy: update query received is: {:?}", query);
     let c_query = CString::new(query).unwrap();
     let char_query = c_query.as_ptr() as *mut i8;
-    return unsafe { exec_update(rust_conn, char_query) };
+    return unsafe { FFIExecUpdate(rust_conn, char_query) };
 }
 
-fn exec_select_rust(rust_conn: *mut ConnectionC, query: &str) -> *mut CResult {
+pub fn exec_select(rust_conn: *mut FFIConnection, query: &str) -> *mut FFIResult {
     println!("Rust Proxy: select query received is: {:?}", query);
     let c_query = CString::new(query).unwrap();
     let char_query = c_query.as_ptr() as *mut i8;
-    return unsafe { exec_select(rust_conn, char_query) };
+    return unsafe { FFIExecSelect(rust_conn, char_query) };
 }
 
-fn convert_columns(
+pub fn convert_columns(
     num_cols: usize,
-    col_types: [ColumnDefinitionTypeEnum; 64usize],
+    col_types: [FFIColumnType; 64usize],
     col_names: [*mut ::std::os::raw::c_char; 128usize],
 ) -> Vec<Column> {
     let mut cols = Vec::with_capacity(num_cols);
     for c in 0..num_cols {
         // convert col_name at index c to rust string
         let col_name_string: String =
-            unsafe { CStr::from_ptr(col_names[c]).to_str().unwrap().to_owned() };
+            unsafe { CString::from_raw(col_names[c]).into_string().unwrap() };
 
         // convert C column type enum to MYSQL type
         let col_type_c = col_types[c];
         let col_type = match col_type_c {
-            ColumnDefinitionTypeEnum_UINT => ColumnType::MYSQL_TYPE_LONGLONG,
-            ColumnDefinitionTypeEnum_INT => ColumnType::MYSQL_TYPE_LONGLONG,
-            ColumnDefinitionTypeEnum_TEXT => ColumnType::MYSQL_TYPE_VAR_STRING,
-            ColumnDefinitionTypeEnum_DATETIME => ColumnType::MYSQL_TYPE_VAR_STRING,
+            FFIColumnType_UINT => ColumnType::MYSQL_TYPE_LONGLONG,
+            FFIColumnType_INT => ColumnType::MYSQL_TYPE_LONGLONG,
+            FFIColumnType_TEXT => ColumnType::MYSQL_TYPE_VAR_STRING,
+            FFIColumnType_DATETIME => ColumnType::MYSQL_TYPE_VAR_STRING,
             _ => ColumnType::MYSQL_TYPE_NULL,
         };
         cols.push(Column {

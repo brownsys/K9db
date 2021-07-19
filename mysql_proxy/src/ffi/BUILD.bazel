@@ -1,0 +1,34 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+
+exports_files(
+    ["ffi.h"],
+    visibility = ["//mysql_proxy:__subpackages__"],
+)
+
+cc_library(
+    name = "ffi",
+    srcs = [
+        "ffi.cc",
+    ],
+    hdrs = [
+        "ffi.h",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//pelton",
+        "@glog",
+    ],
+)
+
+# TODO: need to make this a cc_test, blocked on JVM fix.
+cc_binary(
+    name = "ffi-test",
+    srcs = [
+        "ffi_unittest.cc",
+    ],
+    deps = [
+        ":ffi",
+        "@gflags",
+        "@gtest",
+    ],
+)

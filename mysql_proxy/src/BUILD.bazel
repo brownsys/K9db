@@ -1,0 +1,66 @@
+load("@rules_rust//rust:rust.bzl", "rust_binary", "rust_library")
+
+rust_binary(
+    name = "mysql_proxy",
+    srcs = [
+        "main.rs",
+    ],
+    rustc_flags = [
+        "-Clink-args=-lssl",
+        "-Clink-args=-lcrypto",
+        "-Clink-args=-lmariadbcpp",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":proxy_ffi",
+        "@raze__msql_srv__0_8_8//:msql_srv",
+    ],
+)
+
+# Includes both the bindgen generated ffi definitions and our wrappers.
+# Also, depends on the ffi .so library so that it gets linked
+# with our rust code.
+rust_library(
+    name = "proxy_ffi",
+    srcs = [
+        ":proxy_ffi_bindgen",
+        ":proxy_ffi_wrappers",
+    ],
+    deps = [
+        "//mysql_proxy/src/ffi",
+        "@raze__msql_srv__0_8_8//:msql_srv",
+    ],
+)
+
+# Invoke bindgen to generate rust definitions for the ffi library.
+genrule(
+    name = "proxy_ffi_bindgen",
+    srcs = [
+        "//mysql_proxy/src/ffi:ffi.h",
+    ],
+    outs = [
+        "proxy_ffi_bindgen.rs",
+    ],
+    cmd = """
+        ./$(location @raze__bindgen__0_32_3//:cargo_bin_bindgen) $< -o $@
+    """,
+    tools = [
+        "@raze__bindgen__0_32_3//:cargo_bin_bindgen",
+    ],
+)
+
+# Copy proxy_wrappers to bazel out / working directory
+# This way, it becomes located in the exact same directory that
+# contains proxy_ffi_bindgen.rs, and can thus include! it.
+genrule(
+    name = "proxy_ffi_wrappers",
+    srcs = [
+        "proxy_ffi_wrappers.rs",
+    ],
+    outs = [
+        "proxy_ffi.rs",
+    ],
+    cmd = """
+        cp $< $@
+    """,
+)

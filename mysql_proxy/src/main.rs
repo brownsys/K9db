@@ -1,12 +1,19 @@
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
+
+extern crate msql_srv;
+extern crate proxy_ffi;
+
 use msql_srv::*;
+use proxy_ffi::*;
 use std::io;
 use std::net;
-
-include!("proxy_wrappers.rs");
+use std::ffi::CString;
 
 #[derive(Debug)]
 struct Backend {
-    rust_conn: ConnectionC,
+    rust_conn: FFIConnection,
 }
 
 impl<W: io::Write> MysqlShim<W> for Backend {
@@ -51,7 +58,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 
         // determine query type and return appropriate response
         if q_string.contains("CREATE TABLE") || q_string.contains("CREATE INDEX") || q_string.contains("CREATE VIEW") {
-            let ddl_response = exec_ddl_rust(&mut self.rust_conn, q_string);
+            let ddl_response = exec_ddl(&mut self.rust_conn, q_string);
             if ddl_response {
                 results.completed(0, 0)
             } else {
@@ -62,7 +69,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             || q_string.contains("DELETE")
             || q_string.contains("INSERT")
         {
-            let update_response = exec_update_rust(&mut self.rust_conn, q_string);
+            let update_response = exec_update(&mut self.rust_conn, q_string);
             if update_response != -1 {
                 results.completed(update_response as u64, 0)
             } else {
@@ -70,7 +77,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
         } else if q_string.contains("SELECT") {
-            let select_response = exec_select_rust(&mut self.rust_conn, q_string);
+            let select_response = exec_select(&mut self.rust_conn, q_string);
             let num_cols = unsafe { (*select_response).num_cols as usize };
             let num_rows = unsafe { (*select_response).num_rows as usize };
             let col_names = unsafe { (*select_response).col_names };
@@ -82,31 +89,29 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 
             println!("Rust Proxy: writing query response using RowWriter");
             // convert incomplete array field (flexible array) to rust slice, starting with the outer array
-            let rows_slice = unsafe { (*select_response).records.as_slice(num_rows * num_cols) };
+            let rows_slice = unsafe { (*select_response).values.as_slice(num_rows * num_cols) };
             for r in 0..num_rows {
                 for c in 0..num_cols {
                     match col_types[c] {
                         // write a value to the next col of the current row (of this resultset)
-                        ColumnDefinitionTypeEnum_UINT => unsafe {
+                        FFIColumnType_UINT => unsafe {
                             rw.write_col(rows_slice[r * num_cols + c].UINT)?
                         },
-                        ColumnDefinitionTypeEnum_INT => unsafe {
+                        FFIColumnType_INT => unsafe {
                             rw.write_col(rows_slice[r * num_cols + c].INT)?
                         },
-                        ColumnDefinitionTypeEnum_TEXT => unsafe {
+                        FFIColumnType_TEXT => unsafe {
                             rw.write_col(
-                                CStr::from_ptr(rows_slice[r * num_cols + c].TEXT)
-                                    .to_str()
-                                    .unwrap()
-                                    .to_owned(),
+                                CString::from_raw(rows_slice[r * num_cols + c].TEXT)
+                                    .into_string()
+                                    .unwrap(),
                             )?
                         },
-                        ColumnDefinitionTypeEnum_DATETIME => unsafe {
+                        FFIColumnType_DATETIME => unsafe {
                             rw.write_col(
-                                CStr::from_ptr(rows_slice[r * num_cols + c].DATETIME)
-                                    .to_str()
-                                    .unwrap()
-                                    .to_owned(),
+                                CString::from_raw(rows_slice[r * num_cols + c].DATETIME)
+                                    .into_string()
+                                    .unwrap(),
                             )?
                         },
                         _ => println!("Rust Proxy: Invalid column type"),
@@ -157,7 +162,7 @@ fn main() {
                 rust_conn.connected
             );
             let backend = Backend { rust_conn };
-            let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
+            let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();            
         }
     });
     join_handle.join().unwrap();

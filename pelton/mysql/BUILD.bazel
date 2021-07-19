@@ -13,14 +13,14 @@ cc_library(
     ],
     visibility = ["//:__subpackages__"],
     deps = [
-        ":util",
+        ":result_util",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
     ],
 )
 
 cc_library(
-    name = "util",
+    name = "result_util",
     srcs = [
         "util.cc",
     ],

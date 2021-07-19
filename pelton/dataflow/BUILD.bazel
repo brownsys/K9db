@@ -1,7 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 
 cc_library(
-    name = "state",
+    name = "dstate",
     srcs = [
         "state.cc",
     ],
@@ -248,11 +248,11 @@ cc_binary(
     linkshared = 1,
     visibility = ["//pelton:__subpackages__"],
     deps = [
+        ":dstate",
         ":graph",
         ":key",
         ":operator",
         ":schema",
-        ":state",
         ":types",
         "//pelton/dataflow/ops:aggregate",
         "//pelton/dataflow/ops:equijoin",
