@@ -1,4 +1,6 @@
 // Creation and management of secondary indices.
+
+#include <memory>
 #include "pelton/shards/sqlengine/index.h"
 
 #include "pelton/dataflow/graph.h"

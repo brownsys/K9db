@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <utility>
 
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/types.h"
@@ -69,7 +70,7 @@ class DataFlowGraph {
 
   std::unordered_map<NodeIndex, std::shared_ptr<Operator>> nodes_;
   // 0th item of the tuple is source and 1st item is destination
-  std::vector<std::tuple<NodeIndex, NodeIndex>> edges_;
+  std::vector<std::pair<NodeIndex, NodeIndex>> edges_;
 
   inline NodeIndex MintNodeIndex() { return this->nodes_.size(); }
 };

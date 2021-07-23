@@ -42,8 +42,7 @@ bool DataFlowGraph::AddNode(std::shared_ptr<Operator> op,
 
 bool DataFlowGraph::AddEdge(std::shared_ptr<Operator> parent,
                             std::shared_ptr<Operator> child) {
-  std::tuple<NodeIndex, NodeIndex> edge =
-      std::make_tuple(parent->index(), child->index());
+  std::pair<NodeIndex, NodeIndex> edge{parent->index(), child->index()};
   this->edges_.push_back(edge);
   // Also implicitly adds op1 as child of op2.
   child->AddParent(parent, edge);

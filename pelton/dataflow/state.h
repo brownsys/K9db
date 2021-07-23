@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <memory>
 
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/ops/input.h"
