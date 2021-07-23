@@ -8,6 +8,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <memory>
 
 #include "absl/container/flat_hash_map.h"
 #include "gtest/gtest_prod.h"

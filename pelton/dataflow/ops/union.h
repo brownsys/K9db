@@ -2,6 +2,7 @@
 #define PELTON_DATAFLOW_OPS_UNION_H_
 
 #include <vector>
+#include <memory>
 
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/record.h"

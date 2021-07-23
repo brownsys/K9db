@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <tuple>
 
 #include "benchmark/benchmark.h"
 #include "pelton/dataflow/record.h"

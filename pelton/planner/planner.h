@@ -3,6 +3,7 @@
 #define PELTON_PLANNER_PLANNER_H_
 
 #include <string>
+#include <memory>
 
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/state.h"
