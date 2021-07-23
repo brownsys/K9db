@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -187,31 +188,35 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
     LOG(INFO) << "C-Wrapper: " << result.status();
   }
 
-  if (result.ok() && result.value().IsQuery()) {
+  if (result.ok()) {
     pelton::SqlResult &sql_result = result.value();
-    std::vector<pelton::dataflow::Record> records = sql_result.Vectorize();
-    size_t num_rows = records.size();
-    size_t num_cols = sql_result.GetSchema().size();
+    if (sql_result.IsQuery() && sql_result.HasResultSet()) {
+      std::unique_ptr<pelton::SqlResultSet> resultset =
+          sql_result.NextResultSet();
+      std::vector<pelton::dataflow::Record> records = resultset->Vectorize();
+      size_t num_rows = records.size();
+      size_t num_cols = resultset->GetSchema().size();
 
-    LOG(INFO) << "C-Wrapper: malloc FFIResult";
-    // allocate memory for CResult struct and the flexible array of RecordData
-    // unions
-    // we have to use malloc here to account for the flexible array.
-    FFIResult *c_result = static_cast<FFIResult *>(
-        malloc(sizeof(FFIResult) +
-               sizeof(FFIResult::RecordData) * num_rows * num_cols));
-    //  |- FFIResult*-|   |union RecordData| |num of records (rows) and cols |
+      LOG(INFO) << "C-Wrapper: malloc FFIResult";
+      // allocate memory for CResult struct and the flexible array of RecordData
+      // unions
+      // we have to use malloc here to account for the flexible array.
+      FFIResult *c_result = static_cast<FFIResult *>(
+          malloc(sizeof(FFIResult) +
+                 sizeof(FFIResult::RecordData) * num_rows * num_cols));
+      //  |- FFIResult*-|   |union RecordData| |num of records (rows) and cols |
 
-    // set number of columns
-    c_result->num_cols = num_cols;
-    c_result->num_rows = num_rows;
-    PopulateSchema(c_result, sql_result.GetSchema());
-    PopulateRecords(c_result, records);
-    return c_result;
-  } else {
-    LOG(INFO) << "C-Wrapper: Result.ok() or result.value().IsQuery() failed";
-    return nullptr;
+      // set number of columns
+      c_result->num_cols = num_cols;
+      c_result->num_rows = num_rows;
+      PopulateSchema(c_result, resultset->GetSchema());
+      PopulateRecords(c_result, records);
+      return c_result;
+    }
   }
+
+  LOG(INFO) << "C-Wrapper: Result.ok() or result.value().IsQuery() failed";
+  return nullptr;
 }
 
 // Clean up the memory allocated by an FFIResult.

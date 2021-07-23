@@ -7,9 +7,13 @@ namespace dataflow {
 Key::Key(size_t capacity) : values_() { this->values_.reserve(capacity); }
 
 // Must be copyable to be used as a key for absl maps.
-Key::Key(const Key &o) { this->values_ = o.values_; }
+Key::Key(const Key &o) {
+  this->values_ = o.values_;
+  this->values_.reserve(o.values_.capacity());
+}
 Key &Key::operator=(const Key &o) {
   this->values_ = o.values_;
+  this->values_.reserve(o.values_.capacity());
   return *this;
 }
 
@@ -17,6 +21,7 @@ Key &Key::operator=(const Key &o) {
 Key::Key(Key &&o) { this->values_ = std::move(o.values_); }
 Key &Key::operator=(Key &&o) {
   this->values_ = std::move(o.values_);
+  this->values_.reserve(o.values_.capacity());
   return *this;
 }
 
@@ -54,6 +59,10 @@ void Key::AddValue(const std::string &v) {
 void Key::AddValue(std::string &&v) {
   this->CheckSize();
   this->values_.emplace_back(std::move(v));
+}
+void Key::AddNull(sqlast::ColumnDefinition::Type type) {
+  this->CheckSize();
+  this->values_.emplace_back(type);
 }
 
 // Printing a record to an output stream (e.g. std::cout).

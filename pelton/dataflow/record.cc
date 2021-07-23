@@ -125,11 +125,13 @@ int64_t Record::GetInt(size_t i) const {
 const std::string &Record::GetString(size_t i) const {
   CheckType(i, sqlast::ColumnDefinition::Type::TEXT);
   CHECK(!IsNull(i));
+  CHECK_NOTNULL(this->data_[i].str);
   return *(this->data_[i].str);
 }
 const std::string &Record::GetDateTime(size_t i) const {
   CheckType(i, sqlast::ColumnDefinition::Type::DATETIME);
   CHECK(!IsNull(i));
+  CHECK_NOTNULL(this->data_[i].str);
   return *(this->data_[i].str);
 }
 
@@ -142,7 +144,10 @@ Key Record::GetValues(const std::vector<ColumnID> &cols) const {
   // Construct key with given capacity, and fill it up with values.
   Key key{cols.size()};
   for (ColumnID col : cols) {
-    CHECK(!this->IsNull(col));
+    if (this->IsNull(col)) {
+      key.AddNull(this->schema_.TypeOf(col));
+      continue;
+    }
     switch (this->schema_.TypeOf(col)) {
       case sqlast::ColumnDefinition::Type::UINT:
         key.AddValue(this->data_[col].uint);
@@ -166,6 +171,9 @@ Key Record::GetValues(const std::vector<ColumnID> &cols) const {
 }
 Value Record::GetValue(ColumnID col) const {
   CHECK_NE(this->data_, nullptr) << "Cannot get value for moved record";
+  if (this->IsNull(col)) {
+    return Value(this->schema_.TypeOf(col));
+  }
   switch (this->schema_.TypeOf(col)) {
     case sqlast::ColumnDefinition::Type::UINT:
       return Value(this->data_[col].uint);
@@ -181,6 +189,9 @@ Value Record::GetValue(ColumnID col) const {
 
 std::string Record::GetValueString(ColumnID col) const {
   CHECK_NE(this->data_, nullptr) << "Cannot get value for moved record";
+  if (this->IsNull(col)) {
+    return "NULL";
+  }
   switch (this->schema_.TypeOf(col)) {
     case sqlast::ColumnDefinition::Type::UINT:
       return std::to_string(this->data_[col].uint);
@@ -198,6 +209,10 @@ std::string Record::GetValueString(ColumnID col) const {
 void Record::SetValue(const std::string &value, size_t i) {
   CHECK_NOTNULL(this->data_);
   CHECK(!IsNull(i));
+  if (value == "NULL") {
+    this->SetNull(true, i);
+    return;
+  }
   switch (this->schema_.TypeOf(i)) {
     case sqlast::ColumnDefinition::Type::UINT:
       this->data_[i].uint = std::stoull(value);

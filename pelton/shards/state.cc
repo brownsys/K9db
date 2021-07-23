@@ -17,7 +17,7 @@ namespace shards {
 // Initialization.
 void SharderState::Initialize(const std::string &db_username,
                               const std::string &db_password) {
-  this->connection_pool_.Initialize(db_username, db_password);
+  this->executor_.Initialize(db_username, db_password);
 }
 
 // Schema manipulations.
@@ -29,6 +29,7 @@ void SharderState::AddSchema(const UnshardedTableName &table_name,
 void SharderState::AddShardKind(const ShardKind &kind, const ColumnName &pk) {
   this->kinds_.insert({kind, pk});
   this->kind_to_tables_.insert({kind, {}});
+  this->kind_to_names_.insert({kind, {}});
   this->shards_.insert({kind, {}});
 }
 
@@ -44,6 +45,7 @@ void SharderState::AddShardedTable(
   // Record that the shard kind contains this sharded table.
   this->kind_to_tables_.at(sharding_information.shard_kind)
       .push_back(sharding_information.sharded_table_name);
+  this->kind_to_names_.at(sharding_information.shard_kind).insert(table);
   // Map the unsharded name to its sharding information.
   this->sharded_by_[table].push_back(sharding_information);
   // Store the sharded schema.
@@ -108,6 +110,11 @@ bool SharderState::ShardExists(const ShardKind &shard_kind,
 const std::unordered_set<UserId> &SharderState::UsersOfShard(
     const ShardKind &kind) const {
   return this->shards_.at(kind);
+}
+
+const std::unordered_set<UnshardedTableName> &SharderState::TablesInShard(
+    const ShardKind &kind) const {
+  return this->kind_to_names_.at(kind);
 }
 
 // Manage secondary indices.

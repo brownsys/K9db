@@ -35,7 +35,11 @@ std::vector<std::string> DataFlowState::GetTables() const {
   return result;
 }
 SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
-  return this->schema_.at(table_name);
+  if (this->schema_.count(table_name) > 0) {
+    return this->schema_.at(table_name);
+  } else {
+    LOG(FATAL) << "Tried to get schema for non-existent table " << table_name;
+  }
 }
 
 // Manage flows.

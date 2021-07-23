@@ -7,6 +7,7 @@
 
 #include "pelton/shards/sqlengine/create.h"
 #include "pelton/shards/sqlengine/delete.h"
+#include "pelton/shards/sqlengine/gdpr.h"
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/insert.h"
 #include "pelton/shards/sqlengine/select.h"
@@ -21,9 +22,11 @@ namespace pelton {
 namespace shards {
 namespace sqlengine {
 
-absl::StatusOr<mysql::SqlResult> Shard(
-    const std::string &sql, SharderState *state,
-    dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
+                                     SharderState *state,
+                                     dataflow::DataFlowState *dataflow_state,
+                                     std::string *shard_kind,
+                                     std::string *user_id) {
   // Parse with ANTLR into our AST.
   perf::Start("parsing");
   sqlast::SQLParser parser;
@@ -65,21 +68,26 @@ absl::StatusOr<mysql::SqlResult> Shard(
     // Case 5: Delete statement.
     case sqlast::AbstractStatement::Type::DELETE: {
       auto *stmt = static_cast<sqlast::Delete *>(statement.get());
-      return delete_::Shard(*stmt, state, dataflow_state);
+      return delete_::Shard(*stmt, state, dataflow_state, true);
     }
 
     // Case 6: CREATE VIEW statement (e.g. dataflow).
     case sqlast::AbstractStatement::Type::CREATE_VIEW: {
       auto *stmt = static_cast<sqlast::CreateView *>(statement.get());
       CHECK_STATUS(view::CreateView(*stmt, state, dataflow_state));
-      return mysql::SqlResult();
+      return sql::SqlResult(true);
     }
 
     // Case 7: CREATE INEDX statement.
     case sqlast::AbstractStatement::Type::CREATE_INDEX: {
       auto *stmt = static_cast<sqlast::CreateIndex *>(statement.get());
-      CHECK_STATUS(index::CreateIndex(*stmt, state, dataflow_state));
-      return mysql::SqlResult();
+      return index::CreateIndex(*stmt, state, dataflow_state);
+    }
+
+    // Case 8: GDPR (GET | FORGET) statements.
+    case sqlast::AbstractStatement::Type::GDPR: {
+      auto *stmt = static_cast<sqlast::GDPRStatement *>(statement.get());
+      return gdpr::Shard(*stmt, state, dataflow_state);
     }
 
     // Unsupported (this should not be reachable).

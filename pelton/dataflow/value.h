@@ -30,6 +30,9 @@ class Value {
   explicit Value(std::string &&v)
       : type_(sqlast::ColumnDefinition::Type::TEXT), str_(std::move(v)) {}
 
+  explicit Value(sqlast::ColumnDefinition::Type type)
+      : type_(type), is_null_(true) {}
+
   // Copies the underlying string.
   Value(const Value &o);
   Value &operator=(const Value &o);
@@ -53,6 +56,9 @@ class Value {
   // Hash to use as a key in absl hash tables.
   template <typename H>
   friend H AbslHashValue(H h, const Value &k) {
+    if (k.is_null_) {
+      return H::combine(std::move(h), "[nullptr]");
+    }
     switch (k.type_) {
       case sqlast::ColumnDefinition::Type::UINT:
         return H::combine(std::move(h), k.uint_);
@@ -72,6 +78,7 @@ class Value {
   uint64_t GetUInt() const;
   int64_t GetInt() const;
   const std::string &GetString() const;
+  bool IsNull() const { return this->is_null_; }
 
   // Access the underlying type.
   sqlast::ColumnDefinition::Type type() const { return this->type_; }
@@ -87,6 +94,7 @@ class Value {
     int64_t sint_;
     std::string str_;
   };
+  bool is_null_ = false;
 
   inline void CheckType(sqlast::ColumnDefinition::Type t) const {
     if (this->type_ != t) {

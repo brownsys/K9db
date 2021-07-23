@@ -2,7 +2,7 @@
 #include "pelton/pelton.h"
 
 #include <iostream>
-#include <vector>
+#include <utility>
 
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
@@ -11,6 +11,7 @@
 #include "pelton/planner/planner.h"
 #include "pelton/shards/sqlengine/engine.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/util/status.h"
 
 namespace pelton {
 
@@ -38,13 +39,6 @@ bool SpecialStatements(const std::string &sql, Connection *connection) {
     std::cout << "SET echo;" << std::endl;
     return true;
   }
-  if (absl::StartsWith(sql, "GET ")) {
-    std::vector<std::string> v = absl::StrSplit(sql, ' ');
-    v.at(2).pop_back();
-    std::string shard_name = shards::sqlengine::NameShard(v.at(1), v.at(2));
-    std::cout << shard_name << std::endl;
-    return true;
-  }
   return false;
 }
 
@@ -67,7 +61,7 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
 
   // If special statement, handle it separately.
   if (SpecialStatements(sql, connection)) {
-    return SqlResult();
+    return SqlResult(true);
   }
 
   // Parse and rewrite statement.
@@ -78,9 +72,11 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
 
 void shutdown_planner() { planner::ShutdownPlanner(); }
 
-bool close(Connection *connection) {
+bool close(Connection *connection, bool shutdown_planner) {
   connection->Save();
-  planner::ShutdownPlanner();
+  if (shutdown_planner) {
+    planner::ShutdownPlanner();
+  }
   return true;
 }
 
