@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "pelton/dataflow/message.h"
 #include "pelton/dataflow/record.h"

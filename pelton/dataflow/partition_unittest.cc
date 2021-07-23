@@ -2,6 +2,8 @@
 
 #include <string>
 #include <vector>
+#include <memory>
+#include <utility>
 
 #include "gtest/gtest.h"
 #include "pelton/dataflow/record.h"
