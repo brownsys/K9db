@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <utility>
 
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/types.h"
