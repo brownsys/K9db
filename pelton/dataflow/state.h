@@ -3,6 +3,7 @@
 // The state includes the currently installed flows, including their operators
 // and state.
 
+#include <optional>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -97,17 +98,17 @@ class DataFlowState {
   // terminate the threads gracefully.
   std::vector<std::thread> threads_;
 
-  void TraverseBaseGraph(const FlowName &name);
-  void VisitNode(std::shared_ptr<Operator> node, const FlowName &name);
-  std::pair<bool, std::vector<ColumnID>> GetRecentPartionBoundary(
-      std::shared_ptr<Operator> node, bool check_self,
-      const FlowName &name) const;
   void AddExchangeAfter(NodeIndex parent_index,
                         std::vector<ColumnID> partition_key,
                         const FlowName &name);
-  // Get input operators for the subgraph whose root is @node
-  std::vector<std::shared_ptr<InputOperator>> GetSubgraphInputs(
-      std::shared_ptr<Operator> node) const;
+
+  // Annotate all the nodes in the base graph
+  void TraverseBaseGraph(const FlowName &name);
+  void AnnotateBaseGraph(std::shared_ptr<DataFlowGraph> graph);
+  void VisitNode(std::shared_ptr<Operator> node,
+                 std::vector<ColumnID> recent_partition,
+                 std::optional<std::shared_ptr<Operator>> &tracking_union,
+                 const FlowName &name);
 
   // Allow tests to use protected functions directly
   FRIEND_TEST(DataFlowEngineTest, TestTrivialGraph);

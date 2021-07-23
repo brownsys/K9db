@@ -2,6 +2,7 @@
 #define PELTON_DATAFLOW_OPERATOR_H_
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -76,6 +77,8 @@ class Operator {
 
   // Used by the DataFlowEngine for graph traversal
   bool visited_;
+  // Key the an operator's input must be partitioned by.
+  std::optional<std::vector<ColumnID>> partitioned_by_;
 
  protected:
   explicit Operator(Type type)
