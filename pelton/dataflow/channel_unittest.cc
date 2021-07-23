@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "gtest/gtest.h"
 #include "pelton/dataflow/batch_message.h"

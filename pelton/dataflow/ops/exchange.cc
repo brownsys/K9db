@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <vector>
+#include <utility>
 
 #include "glog/logging.h"
 #include "pelton/dataflow/record.h"
