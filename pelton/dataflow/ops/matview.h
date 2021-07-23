@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <memory>
 
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/operator.h"
@@ -30,7 +31,7 @@ class MatViewOperator : public Operator {
   virtual const_KeyIterable Keys() const = 0;
   virtual bool RecordOrdered() const = 0;
   virtual bool KeyOrdered() const = 0;
-  virtual std::shared_ptr<Operator> Clone() const override = 0;
+  std::shared_ptr<Operator> Clone() const override = 0;
 
  protected:
   // We do not know if we are ordered or unordered, this type is revealed

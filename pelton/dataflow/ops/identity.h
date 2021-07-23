@@ -2,6 +2,7 @@
 #define PELTON_DATAFLOW_OPS_IDENTITY_H_
 
 #include <vector>
+#include <memory>
 
 #include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"

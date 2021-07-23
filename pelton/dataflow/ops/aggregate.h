@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <tuple>
+#include <memory>
 // NOLINTNEXTLINE
 #include <variant>
 #include <vector>

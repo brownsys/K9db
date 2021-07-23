@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/record.h"

@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <string>
+#include <memory>
 // NOLINTNEXTLINE
 #include <variant>
 #include <vector>
