@@ -35,7 +35,7 @@ void DataFlowState::TraverseBaseGraph(const FlowName &name) {
   std::optional<std::shared_ptr<Operator>> tracking_union = std::nullopt;
   auto matview_op = this->flows_.at(name)->outputs().at(0);
   // Start a DFS traversal that inserts exchange operators where necessary.
-  this->VisitNode(matview_op, matview_op->key_cols(), tracking_union, name);
+  this->VisitNode(matview_op, matview_op->key_cols(), &tracking_union, name);
 }
 // TODO(Ishan): consider specifying partitioned_by_ during operator construction
 void DataFlowState::AnnotateBaseGraph(
@@ -73,12 +73,11 @@ void DataFlowState::AnnotateBaseGraph(
 
 void DataFlowState::VisitNode(
     std::shared_ptr<Operator> node, std::vector<ColumnID> recent_partition,
-    std::optional<std::shared_ptr<Operator>> &tracking_union,
+    std::optional<std::shared_ptr<Operator>> *tracking_union,
     const FlowName &name) {
   if (node->visited_) {
     return;
   }
-  LOG(INFO) << "Visiting: " << node->index();
   node->visited_ = true;
   switch (node->type()) {
     case Operator::Type::FILTER:
@@ -92,7 +91,7 @@ void DataFlowState::VisitNode(
       // down the line. Hence, start tracking this union until a partition
       // boundary is reached.
       {
-        tracking_union = node;
+        *tracking_union = node;
         this->VisitNode(node->GetParents().at(0), recent_partition,
                         tracking_union, name);
         this->VisitNode(node->GetParents().at(1), recent_partition,
@@ -105,17 +104,17 @@ void DataFlowState::VisitNode(
           this->input_partitioned_by_.at(name).at(input_op->input_name());
       if (partition_cols.size() == 0) {
         // A decision has not been made on the paritioning key for this input
-        if (tracking_union) {
-          tracking_union.value()->partitioned_by_ = recent_partition;
-          tracking_union = std::nullopt;
+        if (*tracking_union) {
+          tracking_union->value()->partitioned_by_ = recent_partition;
+          *tracking_union = std::nullopt;
         }
         this->input_partitioned_by_.at(name).at(input_op->input_name()) =
             recent_partition;
       } else if (partition_cols != recent_partition) {
-        if (tracking_union) {
-          this->AddExchangeAfter(tracking_union.value()->index(),
+        if (*tracking_union) {
+          this->AddExchangeAfter(tracking_union->value()->index(),
                                  partition_cols, name);
-          tracking_union = std::nullopt;
+          *tracking_union = std::nullopt;
         }
         this->AddExchangeAfter(input_op->index(), partition_cols, name);
       }
@@ -124,13 +123,13 @@ void DataFlowState::VisitNode(
     case Operator::Type::EQUIJOIN: {
       auto equijoin_op = std::dynamic_pointer_cast<EquiJoinOperator>(node);
       auto partition_cols = std::vector<ColumnID>{equijoin_op->join_column()};
-      if (tracking_union) {
-        tracking_union.value()->partitioned_by_ = partition_cols;
+      if (*tracking_union) {
+        tracking_union->value()->partitioned_by_ = partition_cols;
         if (recent_partition != partition_cols) {
-          this->AddExchangeAfter(tracking_union.value()->index(),
+          this->AddExchangeAfter(tracking_union->value()->index(),
                                  partition_cols, name);
         }
-        tracking_union = std::nullopt;
+        *tracking_union = std::nullopt;
       } else if (partition_cols != recent_partition) {
         this->AddExchangeAfter(node->index(), recent_partition, name);
       }
@@ -144,13 +143,13 @@ void DataFlowState::VisitNode(
     case Operator::Type::AGGREGATE: {
       auto agg_op = std::dynamic_pointer_cast<AggregateOperator>(node);
       auto partition_cols = agg_op->OutPartitionCols();
-      if (tracking_union) {
-        tracking_union.value()->partitioned_by_ = partition_cols;
+      if (*tracking_union) {
+        tracking_union->value()->partitioned_by_ = partition_cols;
         if (recent_partition != partition_cols) {
-          this->AddExchangeAfter(tracking_union.value()->index(),
+          this->AddExchangeAfter(tracking_union->value()->index(),
                                  partition_cols, name);
         }
-        tracking_union = std::nullopt;
+        *tracking_union = std::nullopt;
       } else if (partition_cols != recent_partition) {
         this->AddExchangeAfter(node->index(), recent_partition, name);
       }

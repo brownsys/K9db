@@ -1,3 +1,6 @@
+#ifndef PELTON_DATAFLOW_GRAPH_TEST_UTILS_H_
+#define PELTON_DATAFLOW_GRAPH_TEST_UTILS_H_
+
 #include <cstdint>
 #include <iostream>
 #include <memory>
@@ -200,7 +203,6 @@ std::shared_ptr<DataFlowGraph> MakeTrivialGraph(ColumnID keycol,
                                                 const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
   auto g = std::make_shared<DataFlowGraph>();
-  ;
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
@@ -218,7 +220,6 @@ std::shared_ptr<DataFlowGraph> MakeFilterGraph(ColumnID keycol,
                                                const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
   auto g = std::make_shared<DataFlowGraph>();
-  ;
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto filter = std::make_shared<FilterOperator>();
@@ -239,7 +240,6 @@ std::shared_ptr<DataFlowGraph> MakeUnionGraph(ColumnID keycol,
                                               const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
   auto g = std::make_shared<DataFlowGraph>();
-  ;
 
   auto in1 = std::make_shared<InputOperator>("test-table1", schema);
   auto in2 = std::make_shared<InputOperator>("test-table2", schema);
@@ -264,7 +264,6 @@ std::shared_ptr<DataFlowGraph> MakeEquiJoinGraph(ColumnID ok, ColumnID lk,
                                                  const SchemaRef &rschema) {
   std::vector<ColumnID> keys = {ok};
   auto g = std::make_shared<DataFlowGraph>();
-  ;
 
   auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
   auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
@@ -287,7 +286,6 @@ std::shared_ptr<DataFlowGraph> MakeProjectGraph(ColumnID keycol,
                                                 const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
   auto g = std::make_shared<DataFlowGraph>();
-  ;
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto project = std::make_shared<ProjectOperator>();
@@ -309,7 +307,6 @@ std::shared_ptr<DataFlowGraph> MakeProjectOnFilterGraph(
     ColumnID keycol, const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
   auto g = std::make_shared<DataFlowGraph>();
-  ;
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto filter = std::make_shared<FilterOperator>();
@@ -335,7 +332,6 @@ std::shared_ptr<DataFlowGraph> MakeProjectOnEquiJoinGraph(
     const SchemaRef &rschema) {
   std::vector<ColumnID> keys = {ok};
   auto g = std::make_shared<DataFlowGraph>();
-  ;
 
   auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
   auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
@@ -363,7 +359,6 @@ std::shared_ptr<DataFlowGraph> MakeAggregateGraph(ColumnID keycol,
   std::vector<ColumnID> keys = {keycol};
   std::vector<ColumnID> group_columns = {2};
   auto g = std::make_shared<DataFlowGraph>();
-  ;
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto aggregate = std::make_shared<AggregateOperator>(
@@ -386,7 +381,6 @@ std::shared_ptr<DataFlowGraph> MakeAggregateOnEquiJoinGraph(
   std::vector<ColumnID> keys = {ok};
   std::vector<ColumnID> group_columns = {2};
   auto g = std::make_shared<DataFlowGraph>();
-  ;
 
   auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
   auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
@@ -455,3 +449,5 @@ inline void EXPECT_EQ_MSET(std::shared_ptr<dataflow::MatViewOperator> output,
 
 }  // namespace dataflow
 }  // namespace pelton
+
+#endif  // PELTON_DATAFLOW_GRAPH_TEST_UTILS_H_

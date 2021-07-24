@@ -56,8 +56,8 @@ class DataFlowGraph {
   const std::vector<std::shared_ptr<MatViewOperator>> &outputs() const {
     return this->outputs_;
   }
-  const NodeIndex &index() { return this->index_; };
-  const size_t node_count() { return this->nodes_.size(); };
+  const NodeIndex &index() { return this->index_; }
+  const size_t node_count() { return this->nodes_.size(); }
 
   // Get node by its index.
   inline std::shared_ptr<Operator> GetNode(NodeIndex node_index) const {

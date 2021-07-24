@@ -69,7 +69,7 @@ class DataFlowState {
 
  protected:
   // Accessors. Mainly used for testing
-  const auto &partitioned_graphs() const { return this->partitioned_graphs_; };
+  const auto &partitioned_graphs() const { return this->partitioned_graphs_; }
   const auto &input_partitioned_by() const {
     return this->input_partitioned_by_;
   }
@@ -108,7 +108,7 @@ class DataFlowState {
   void AnnotateBaseGraph(std::shared_ptr<DataFlowGraph> graph);
   void VisitNode(std::shared_ptr<Operator> node,
                  std::vector<ColumnID> recent_partition,
-                 std::optional<std::shared_ptr<Operator>> &tracking_union,
+                 std::optional<std::shared_ptr<Operator>> *tracking_union,
                  const FlowName &name);
 
   // Allow tests to use protected functions directly
