@@ -27,6 +27,73 @@
 namespace pelton {
 namespace dataflow {
 
+// Manage schemas.
+void DataFlowState::AddTableSchema(const sqlast::CreateTable &create) {
+  this->schema_.emplace(create.table_name(), SchemaFactory::Create(create));
+}
+void DataFlowState::AddTableSchema(const std::string &table_name,
+                                   SchemaRef schema) {
+  this->schema_.emplace(table_name, schema);
+}
+
+std::vector<std::string> DataFlowState::GetTables() const {
+  std::vector<std::string> result;
+  result.reserve(this->schema_.size());
+  for (const auto &[table_name, _] : this->schema_) {
+    result.push_back(table_name);
+  }
+  return result;
+}
+SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
+  if (this->schema_.count(table_name) > 0) {
+    return this->schema_.at(table_name);
+  } else {
+    LOG(FATAL) << "Tried to get schema for non-existent table " << table_name;
+  }
+}
+
+// Manage flows.
+void DataFlowState::AddFlow(const FlowName &name,
+                            const std::shared_ptr<DataFlowGraph> flow) {
+  this->flows_.insert({name, flow});
+  for (const auto &[input_name, input] : flow->inputs()) {
+    this->flows_per_input_table_[input_name].push_back(name);
+  }
+
+  // Tasks related to the dataflow engine
+  this->partitioned_graphs_.emplace(
+      name, absl::flat_hash_map<uint16_t, std::shared_ptr<DataFlowGraph>>{});
+  this->partition_chans_.emplace(
+      name, absl::flat_hash_map<uint16_t, std::shared_ptr<Channel>>{});
+  for (uint16_t i = 0; i < this->partition_count_; i++) {
+    std::shared_ptr<Channel> comm_chan = std::make_shared<Channel>();
+    this->partition_chans_.at(name).emplace(i, comm_chan);
+    std::shared_ptr<DataFlowGraph> partition = flow->Clone();
+    partition->SetIndex(i);
+    this->partitioned_graphs_.at(name).emplace(i, partition);
+    // this->threads_.push_back(std::thread(&DataFlowGraph::Start, partition,
+    // comm_chan));
+  }
+  // Initialize data structures for input partitions
+  // NOTE: Since every flow at least has a matview, each input is expected to be
+  // partitioned on some key. Hence, no default partitioning key will be
+  // specified for the inputs.
+  this->input_partitioned_by_.emplace(
+      name, absl::flat_hash_map<TableName, std::vector<ColumnID>>{});
+  for (auto item : flow->inputs()) {
+    this->input_partitioned_by_.at(name).emplace(item.first,
+                                                 std::vector<ColumnID>{});
+  }
+
+  this->TraverseBaseGraph(name);
+  // Deploy one partition per thread
+  for (uint16_t i = 0; i < this->partition_count_; i++) {
+    this->threads_.push_back(std::thread(
+        &DataFlowGraph::Start, this->partitioned_graphs_.at(name).at(i),
+        this->partition_chans_.at(name).at(i)));
+  }
+}
+
 void DataFlowState::TraverseBaseGraph(const FlowName &name) {
   // Annotate base graph
   this->AnnotateBaseGraph(this->flows_.at(name));
@@ -175,73 +242,6 @@ void DataFlowState::AddExchangeAfter(NodeIndex parent_index,
         this->partition_count_);
     partitioned_graph->InsertNodeAfter(
         exchange_op, partitioned_graph->GetNode(parent_index));
-  }
-}
-
-// Manage schemas.
-void DataFlowState::AddTableSchema(const sqlast::CreateTable &create) {
-  this->schema_.emplace(create.table_name(), SchemaFactory::Create(create));
-}
-void DataFlowState::AddTableSchema(const std::string &table_name,
-                                   SchemaRef schema) {
-  this->schema_.emplace(table_name, schema);
-}
-
-std::vector<std::string> DataFlowState::GetTables() const {
-  std::vector<std::string> result;
-  result.reserve(this->schema_.size());
-  for (const auto &[table_name, _] : this->schema_) {
-    result.push_back(table_name);
-  }
-  return result;
-}
-SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
-  if (this->schema_.count(table_name) > 0) {
-    return this->schema_.at(table_name);
-  } else {
-    LOG(FATAL) << "Tried to get schema for non-existent table " << table_name;
-  }
-}
-
-// Manage flows.
-void DataFlowState::AddFlow(const FlowName &name,
-                            const std::shared_ptr<DataFlowGraph> flow) {
-  this->flows_.insert({name, flow});
-  for (const auto &[input_name, input] : flow->inputs()) {
-    this->flows_per_input_table_[input_name].push_back(name);
-  }
-
-  // Tasks related to the dataflow engine
-  this->partitioned_graphs_.emplace(
-      name, absl::flat_hash_map<uint16_t, std::shared_ptr<DataFlowGraph>>{});
-  this->partition_chans_.emplace(
-      name, absl::flat_hash_map<uint16_t, std::shared_ptr<Channel>>{});
-  for (uint16_t i = 0; i < this->partition_count_; i++) {
-    std::shared_ptr<Channel> comm_chan = std::make_shared<Channel>();
-    this->partition_chans_.at(name).emplace(i, comm_chan);
-    std::shared_ptr<DataFlowGraph> partition = flow->Clone();
-    partition->SetIndex(i);
-    this->partitioned_graphs_.at(name).emplace(i, partition);
-    // this->threads_.push_back(std::thread(&DataFlowGraph::Start, partition,
-    // comm_chan));
-  }
-  // Initialize data structures for input partitions
-  // NOTE: Since every flow at least has a matview, each input is expected to be
-  // partitioned on some key. Hence, no default partitioning key will be
-  // specified for the inputs.
-  this->input_partitioned_by_.emplace(
-      name, absl::flat_hash_map<TableName, std::vector<ColumnID>>{});
-  for (auto item : flow->inputs()) {
-    this->input_partitioned_by_.at(name).emplace(item.first,
-                                                 std::vector<ColumnID>{});
-  }
-
-  this->TraverseBaseGraph(name);
-  // Deploy one partition per thread
-  for (uint16_t i = 0; i < this->partition_count_; i++) {
-    this->threads_.push_back(std::thread(
-        &DataFlowGraph::Start, this->partitioned_graphs_.at(name).at(i),
-        this->partition_chans_.at(name).at(i)));
   }
 }
 
