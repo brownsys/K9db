@@ -31,7 +31,9 @@ class ExchangeOperator : public Operator {
         current_partition_(current_partition),
         total_partitions_(total_partitions) {}
 
-  std::shared_ptr<Operator> Clone() const override;
+  std::shared_ptr<Operator> Clone() const {
+    LOG(FATAL) << "Exchange operator does not support clone";
+  }
   // Accessors
   const std::vector<ColumnID> &partition_key() { return this->partition_key_; }
 
