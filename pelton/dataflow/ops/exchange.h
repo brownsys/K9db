@@ -20,6 +20,7 @@ namespace dataflow {
 
 class ExchangeOperator : public Operator {
  public:
+  ExchangeOperator() = delete;
   ExchangeOperator(
       absl::flat_hash_map<uint16_t, std::shared_ptr<Channel>> partition_chans,
       std::vector<ColumnID> partition_key, uint16_t current_partition,
@@ -30,10 +31,7 @@ class ExchangeOperator : public Operator {
         current_partition_(current_partition),
         total_partitions_(total_partitions) {}
 
-  std::shared_ptr<Operator> Clone() const {
-    LOG(FATAL) << "Exchange does not support clone";
-  }
-
+  std::shared_ptr<Operator> Clone() const override;
   // Accessors
   const std::vector<ColumnID> &partition_key() { return this->partition_key_; }
 
