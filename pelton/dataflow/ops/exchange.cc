@@ -57,17 +57,5 @@ bool ExchangeOperator::Process(NodeIndex source,
   return true;
 }
 
-std::shared_ptr<Operator> ExchangeOperator::Clone() const {
-  auto clone = std::make_shared<ExchangeOperator>(
-      this->partition_chans_, this->partition_key_, this->current_partition_,
-      this->total_partitions_);
-  clone->children_ = this->children_;
-  clone->parents_ = this->parents_;
-  clone->input_schemas_ = this->input_schemas_;
-  clone->output_schema_ = this->output_schema_;
-  clone->index_ = this->index_;
-  return clone;
-}
-
 }  // namespace dataflow
 }  // namespace pelton
