@@ -1,8 +1,8 @@
 #include "pelton/dataflow/ops/exchange.h"
 
 #include <memory>
-#include <vector>
 #include <utility>
+#include <vector>
 
 #include "glog/logging.h"
 #include "pelton/dataflow/record.h"
