@@ -116,6 +116,7 @@ class DataFlowState {
   FRIEND_TEST(DataFlowEngineTest, TestEquiJoinGraph);
   FRIEND_TEST(DataFlowEngineTest, TestAggregateOnEquiJoinGraph);
   FRIEND_TEST(DataFlowEngineTest, TestUnionGraph);
+  FRIEND_TEST(DataFlowEngineTest, TestDiamondGraph);
 };
 
 }  // namespace dataflow

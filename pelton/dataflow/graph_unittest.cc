@@ -174,6 +174,26 @@ TEST(DataFlowGraphTest, TestAggregateOnEquiJoinGraph) {
   MatViewContentsEqualsIndexed(g->outputs().at(0), result, 0);
 }
 
+TEST(DataFlowGraphTest, TestDiamondGraph) {
+  // Schema must survive records.
+  SchemaRef lschema = MakeLeftSchema();
+  SchemaRef rschema = MakeRightSchema();
+  // Make graph.
+  std::shared_ptr<DataFlowGraph> g =
+      MakeDiamondGraph(0, 2, 0, lschema, rschema);
+  // Make records.
+  std::vector<Record> left = MakeLeftRecords(lschema);
+  std::vector<Record> right = MakeRightRecords(rschema);
+  // Process records.
+  EXPECT_TRUE(g->Process("test-table1", left));
+  EXPECT_TRUE(g->Process("test-table2", right));
+  // Compute expected result.
+  auto op = std::dynamic_pointer_cast<AggregateOperator>(g->GetNode(3));
+  std::vector<Record> result = MakeDiamondRecords(op->output_schema());
+  // Outputs must be equal.
+  MatViewContentsEqualsIndexed(g->outputs().at(0), result, 0);
+}
+
 // Similar to TestAggregateOnEquiJoinGraph
 TEST(DataFlowGraphTest, CloneTest) {
   // Schema must survive records.

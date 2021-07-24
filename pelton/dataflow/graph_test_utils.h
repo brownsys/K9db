@@ -197,6 +197,13 @@ inline std::vector<Record> MakeAggregateOnEquiJoinRecords(
   records.emplace_back(schema, true, 5L, (uint64_t)1ULL);
   return records;
 }
+inline std::vector<Record> MakeDiamondRecords(const SchemaRef &schema) {
+  // Make records.
+  std::vector<Record> records;
+  records.emplace_back(schema, true, 1L, (uint64_t)3ULL);
+  records.emplace_back(schema, true, 5L, (uint64_t)1ULL);
+  return records;
+}
 
 // Make different types of flows/graphs.
 std::shared_ptr<DataFlowGraph> MakeTrivialGraph(ColumnID keycol,
@@ -394,6 +401,55 @@ std::shared_ptr<DataFlowGraph> MakeAggregateOnEquiJoinGraph(
   EXPECT_TRUE(g->AddNode(join, {in1, in2}));
   EXPECT_TRUE(g->AddNode(aggregate, join));
   EXPECT_TRUE(g->AddOutputOperator(matview, aggregate));
+  EXPECT_EQ(g->inputs().size(), 2);
+  EXPECT_EQ(g->outputs().size(), 1);
+  EXPECT_EQ(g->inputs().at("test-table1").get(), in1.get());
+  EXPECT_EQ(g->inputs().at("test-table2").get(), in2.get());
+  EXPECT_EQ(g->outputs().at(0).get(), matview.get());
+  return g;
+}
+
+// This graph produces output that is the same as that of
+// AggregateOnEquijoinGraph
+std::shared_ptr<DataFlowGraph> MakeDiamondGraph(ColumnID ok, ColumnID lk,
+                                                ColumnID rk,
+                                                const SchemaRef &lschema,
+                                                const SchemaRef &rschema) {
+  std::vector<ColumnID> keys = {ok};
+  std::vector<ColumnID> group_columns = {2};
+  auto g = std::make_shared<DataFlowGraph>();
+
+  auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
+  auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
+  auto join = std::make_shared<EquiJoinOperator>(lk, rk);
+  auto aggregate = std::make_shared<AggregateOperator>(
+      group_columns, AggregateOperator::Function::COUNT, -1);
+  // Project operators of the diamond simply project all the columns and the
+  // filter operators (along with the union) perfom a logical OR on the two
+  // filter conditions.
+  auto project_left = std::make_shared<ProjectOperator>();
+  project_left->AddColumnProjection("Category", 0);
+  project_left->AddColumnProjection("Count", 1);
+  auto project_right = std::make_shared<ProjectOperator>();
+  project_right->AddColumnProjection("Category", 0);
+  project_right->AddColumnProjection("Count", 1);
+  auto filter_left = std::make_shared<FilterOperator>();
+  filter_left->AddOperation(2_s, 0, FilterOperator::Operation::LESS_THAN);
+  auto filter_right = std::make_shared<FilterOperator>();
+  filter_right->AddOperation(4_s, 0, FilterOperator::Operation::GREATER_THAN);
+  auto union_ = std::make_shared<UnionOperator>();
+  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
+
+  EXPECT_TRUE(g->AddInputNode(in1));
+  EXPECT_TRUE(g->AddInputNode(in2));
+  EXPECT_TRUE(g->AddNode(join, {in1, in2}));
+  EXPECT_TRUE(g->AddNode(aggregate, join));
+  EXPECT_TRUE(g->AddNode(project_left, aggregate));
+  EXPECT_TRUE(g->AddNode(project_right, aggregate));
+  EXPECT_TRUE(g->AddNode(filter_left, project_left));
+  EXPECT_TRUE(g->AddNode(filter_right, project_right));
+  EXPECT_TRUE(g->AddNode(union_, {filter_left, filter_right}));
+  EXPECT_TRUE(g->AddOutputOperator(matview, union_));
   EXPECT_EQ(g->inputs().size(), 2);
   EXPECT_EQ(g->outputs().size(), 1);
   EXPECT_EQ(g->inputs().at("test-table1").get(), in1.get());
