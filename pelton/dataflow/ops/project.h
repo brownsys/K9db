@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <string>
+#include <memory>
 // NOLINTNEXTLINE
 #include <variant>
 #include <vector>
@@ -65,6 +66,8 @@ class ProjectOperator : public Operator {
       this->projections_.emplace_back(column_name, literal, right_col, op);
     }
   }
+
+  std::shared_ptr<Operator> Clone() const override;
 
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,

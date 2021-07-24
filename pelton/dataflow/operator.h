@@ -65,12 +65,16 @@ class Operator {
   // Constructs a vector of parent operators from parents_ edge vector.
   std::vector<std::shared_ptr<Operator>> GetParents() const;
 
+  // Meant to generate a clone with same operator specific information, edges,
+  // and input/output schemas.
+  virtual std::shared_ptr<Operator> Clone() const = 0;
+
   // For debugging.
   virtual std::string DebugString() const;
 
  protected:
   explicit Operator(Type type)
-      : type_(type), index_(UNDEFINED_NODE_INDEX), graph_(nullptr) {}
+      : index_(UNDEFINED_NODE_INDEX), type_(type), graph_(nullptr) {}
 
   void SetGraph(DataFlowGraph *graph) { this->graph_ = graph; }
   void SetIndex(NodeIndex index) { this->index_ = index; }
@@ -109,14 +113,17 @@ class Operator {
   // Input and output schemas.
   std::vector<SchemaRef> input_schemas_;
   SchemaRef output_schema_;
+  NodeIndex index_;
 
  private:
   Type type_;
-  NodeIndex index_;
   DataFlowGraph *graph_;  // The graph the operator belongs to.
 
   // Allow DataFlowGraph to use SetGraph, SetIndex, and AddParent functions.
   friend class DataFlowGraph;
+  // friend class MatViewOperator;
+  template <typename T>
+  friend class MatViewOperatorT;
 
 #ifdef PELTON_BENCHMARK  // shuts up compiler warnings
   // NOLINTNEXTLINE

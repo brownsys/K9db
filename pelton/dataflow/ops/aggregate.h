@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <tuple>
+#include <memory>
 // NOLINTNEXTLINE
 #include <variant>
 #include <vector>
@@ -22,6 +23,7 @@ namespace dataflow {
 class AggregateOperator : public Operator {
  public:
   using Function = AggregateFunctionEnum;
+  AggregateOperator() = delete;
   AggregateOperator(std::vector<ColumnID> group_columns,
                     Function aggregate_function, ColumnID aggregate_column)
       : Operator(Operator::Type::AGGREGATE),
@@ -30,8 +32,10 @@ class AggregateOperator : public Operator {
         aggregate_column_(aggregate_column),
         aggregate_schema_() {}
 
+  std::shared_ptr<Operator> Clone() const override;
+
   ~AggregateOperator() {
-    // ensure that schemas are not destructed first
+    // Ensure that schemas are not destructed first
     state_.~GroupedDataT();
   }
 

@@ -59,6 +59,33 @@ bool DataFlowGraph::Process(const std::string &input_name,
   return true;
 }
 
+std::shared_ptr<DataFlowGraph> DataFlowGraph::Clone() {
+  auto clone = std::make_shared<DataFlowGraph>();
+  for (auto const &item : this->inputs_) {
+    auto input_clone =
+        std::static_pointer_cast<InputOperator>(item.second->Clone());
+    input_clone->graph_ = clone.get();
+    clone->inputs_.emplace(item.first, input_clone);
+  }
+  for (std::shared_ptr<MatViewOperator> const &matview : this->outputs_) {
+    auto matview_clone =
+        std::static_pointer_cast<MatViewOperator>(matview->Clone());
+    matview_clone->graph_ = clone.get();
+    clone->outputs_.push_back(matview_clone);
+    clone->nodes_.emplace(matview_clone->index_, matview_clone);
+  }
+  // The cloned nodes have their indices set during the operator cloning itself
+  for (size_t i = 0; i < this->nodes_.size(); i++) {
+    auto node_clone = this->nodes_.at(i)->Clone();
+    assert(node_clone->index_ == i);
+    node_clone->graph_ = clone.get();
+    clone->nodes_.emplace(i, node_clone);
+  }
+  // Edges can be trivially copied
+  clone->edges_ = this->edges_;
+  return clone;
+}
+
 std::string DataFlowGraph::DebugString() const {
   std::string str = "[";
   for (const auto &[_, node] : this->nodes_) {

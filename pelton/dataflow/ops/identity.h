@@ -2,6 +2,7 @@
 #define PELTON_DATAFLOW_OPS_IDENTITY_H_
 
 #include <vector>
+#include <memory>
 
 #include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"
@@ -17,6 +18,7 @@ class IdentityOperator : public Operator {
 
   bool ProcessAndForward(NodeIndex source,
                          const std::vector<Record> &records) override;
+  std::shared_ptr<Operator> Clone() const override;
 
  protected:
   bool Process(NodeIndex source, const std::vector<Record> &records,

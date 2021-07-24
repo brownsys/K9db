@@ -360,5 +360,16 @@ bool ProjectOperator::Process(NodeIndex source,
   return true;
 }
 
+std::shared_ptr<Operator> ProjectOperator::Clone() const {
+  auto clone = std::make_shared<ProjectOperator>();
+  clone->children_ = this->children_;
+  clone->parents_ = this->parents_;
+  clone->input_schemas_ = this->input_schemas_;
+  clone->output_schema_ = this->output_schema_;
+  clone->projections_ = this->projections_;
+  clone->index_ = this->index_;
+  return clone;
+}
+
 }  // namespace dataflow
 }  // namespace pelton
