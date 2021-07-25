@@ -92,12 +92,20 @@ bool DataFlowGraph::Process(const std::string &input_name,
   return true;
 }
 
-bool DataFlowGraph::Process(const NodeIndex source_index,
-                            const NodeIndex entry_index,
+bool DataFlowGraph::Process(const NodeIndex destination_index,
+                            const std::optional<NodeIndex> source_index,
                             const std::vector<Record> &records) const {
-  std::shared_ptr<Operator> node = this->nodes_.at(entry_index);
-  if (!node->ProcessAndForward(source_index, records)) {
-    return false;
+  std::shared_ptr<Operator> node = this->nodes_.at(destination_index);
+  if (!source_index) {
+    // Implies that the records are meant for the input operator
+    node = std::dynamic_pointer_cast<InputOperator>(node);
+    if (!node->ProcessAndForward(UNDEFINED_NODE_INDEX, records)) {
+      return false;
+    }
+  } else {
+    if (!node->ProcessAndForward(source_index.value(), records)) {
+      return false;
+    }
   }
 
   return true;
@@ -137,16 +145,8 @@ void DataFlowGraph::Start(std::shared_ptr<Channel> incoming_chan) const {
       switch (msg->type()) {
         case Message::Type::BATCH: {
           auto batch_msg = std::dynamic_pointer_cast<BatchMessage>(msg);
-          if (batch_msg->ContainsInput()) {
-            // Records are passed by const reference. The records will no longer
-            // be available after all the references to that batch message are
-            // destroyed. Which should be fine since there will be at least one
-            // reference that will be present till the end of this case's scope.
-            this->Process(batch_msg->input_name(), batch_msg->records());
-          } else {
-            this->Process(batch_msg->source_index(), batch_msg->entry_index(),
-                          batch_msg->ConsumeRecords());
-          }
+          this->Process(batch_msg->destination_index(),
+                        batch_msg->source_index(), batch_msg->ConsumeRecords());
         } break;
         case Message::Type::STOP:
           // Terminate this thread

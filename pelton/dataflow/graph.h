@@ -2,10 +2,11 @@
 #define PELTON_DATAFLOW_GRAPH_H_
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
-#include <vector>
 #include <utility>
+#include <vector>
 
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/types.h"
@@ -44,8 +45,10 @@ class DataFlowGraph {
   // Process records that are meant for an input operator
   bool Process(const std::string &input_name,
                const std::vector<Record> &records) const;
-  // Process records that are meant for a node specified by @entry_index
-  bool Process(const NodeIndex source_index, const NodeIndex entry_index,
+  // Process records that are meant for a node specified by @destination_index
+  // and perceived as if they were sent by @source_index
+  bool Process(const NodeIndex destination_index,
+               const std::optional<NodeIndex> source_index,
                const std::vector<Record> &records) const;
 
   // Accessors.

@@ -306,9 +306,11 @@ bool DataFlowState::ProcessRecords(const TableName &table_name,
           PartitionTrivial(std::move(records_copy), input_partition_key,
                            this->partition_count_);
       // Send batch messages to appropriate partitions
+      auto flow = this->flows_.at(name);
       for (auto &item : partitioned_records) {
-        auto batch_msg =
-            std::make_shared<BatchMessage>(table_name, std::move(item.second));
+        auto input_op = flow->inputs().at(table_name);
+        auto batch_msg = std::make_shared<BatchMessage>(input_op->index(),
+                                                        std::move(item.second));
         this->partition_chans_.at(name).at(item.first)->Send(batch_msg);
       }
     }
