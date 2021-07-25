@@ -44,13 +44,13 @@ bool ExchangeOperator::Process(NodeIndex source,
     if (item.first == this->current_partition_) {
       continue;
     }
-    // Set the "entry" node for the message as the child of this
+    // Set the "destination" node for the message as the child of this
     // exchange operator.
-    NodeIndex entry_index =
+    NodeIndex destination_index =
         this->graph()->GetNode(this->children_.at(0))->index();
     // Set the source as the current node's index.
     NodeIndex source_index = this->index();
-    auto msg = std::make_shared<BatchMessage>(entry_index, source_index,
+    auto msg = std::make_shared<BatchMessage>(destination_index, source_index,
                                               std::move(item.second));
     this->partition_chans_.at(item.first)->Send(msg);
   }

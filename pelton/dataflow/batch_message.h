@@ -3,8 +3,8 @@
 
 #include <optional>
 #include <string>
-#include <vector>
 #include <utility>
+#include <vector>
 
 #include "pelton/dataflow/message.h"
 #include "pelton/dataflow/record.h"
@@ -15,41 +15,30 @@ namespace dataflow {
 
 class BatchMessage : public Message {
  public:
-  BatchMessage(std::string input_name, std::vector<Record> records)
+  BatchMessage(NodeIndex destination_index, std::vector<Record> records)
       : Message(Message::Type::BATCH),
-        input_name_(input_name),
-        entry_index_(std::nullopt),
+        destination_index_(destination_index),
         source_index_(std::nullopt),
         records_(std::move(records)) {}
-  BatchMessage(NodeIndex entry_index, NodeIndex source_index,
+  BatchMessage(NodeIndex destination_index, NodeIndex source_index,
                std::vector<Record> records)
       : Message(Message::Type::BATCH),
-        input_name_(std::nullopt),
-        entry_index_(entry_index),
+        destination_index_(destination_index),
         source_index_(source_index),
         records_(std::move(records)) {}
 
   std::vector<Record> ConsumeRecords() { return std::move(this->records_); }
-  bool ContainsInput() { return this->input_name_.has_value(); }
 
   // Accessors
-  const std::string &input_name() {
-    assert(this->input_name_);
-    return this->input_name_.value();
-  }
-  const NodeIndex &entry_index() {
-    assert(this->entry_index_);
-    return this->entry_index_.value();
-  }
-  const NodeIndex &source_index() {
-    assert(this->source_index_);
-    return this->source_index_.value();
-  }
+  const NodeIndex &destination_index() { return this->destination_index_; }
+  const std::optional<NodeIndex> &source_index() { return this->source_index_; }
   const std::vector<Record> &records() { return this->records_; }
 
  private:
-  std::optional<std::string> input_name_;
-  std::optional<NodeIndex> entry_index_;
+  NodeIndex destination_index_;
+  // If @source_index_ is null it implies that the records are meant for an
+  // input operator and are being sent by the dataflow engine. Else they are
+  // being sent by an exchange operator.
   std::optional<NodeIndex> source_index_;
   std::vector<Record> records_;
 };
