@@ -21,7 +21,7 @@ genrule(
   # Remember where we should have been executing from within the bazel fs.
   EXEC_PATH=$$(pwd)
 
-  # Get the location of javacpp.jar, libgenerator.so, and include path.
+  # Get the location of javacpp.jar and include path.
   JAVACPP_JAR=$$(pwd)/$(location @maven//:org_bytedeco_javacpp)
   INCLUDE_PATH=$$(pwd)
 
@@ -52,7 +52,6 @@ genrule(
     name = "libjniDataFlowGraphLibrary_so",
     srcs = [
         ":DataDataFlowGraphLibrary_java",
-        "//pelton/dataflow:generator",
         "//pelton/dataflow:generator_h",
         "DataFlowGraphLibraryConfig.java",
     ],
@@ -69,11 +68,10 @@ genrule(
     READ_PATH=$$(dirname $${READ_PATH})
   done
   READ_PATH=$$(dirname $${READ_PATH})/execroot/pelton
-  # Get the location of javacpp.jar, libgenerator.so, and include path.
-  JAVACPP_JAR=$$(pwd)/$(location @maven//:org_bytedeco_javacpp)
-  LINK_PATH=$${READ_PATH}/$$(dirname $(location //pelton/dataflow:generator))
-  echo $${LINK_PATH}
+  # Find the include path (for headers).
   INCLUDE_PATH=$$(pwd)
+  # Get the location of javacpp.jar.
+  JAVACPP_JAR=$$(pwd)/$(location @maven//:org_bytedeco_javacpp)
 
   # Create a clean tmp directory and copy input files to it.
   TMP_DIR="/tmp/__libjniDataFlowGraphLibrary_so_tmp"
@@ -88,7 +86,6 @@ genrule(
   java -jar "$${JAVACPP_JAR}"                 \
       -nodelete                               \
       -Dplatform.includepath=$${INCLUDE_PATH} \
-      -Dplatform.linkpath=$${LINK_PATH}       \
       -Dplatform.compiler=gcc                 \
       com/brownsys/pelton/nativelib/DataFlowGraphLibrary.java
 
