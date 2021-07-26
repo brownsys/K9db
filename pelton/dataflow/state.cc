@@ -156,9 +156,18 @@ void DataFlowState::VisitNode(
       // Union requires both inputs to be partitioned by the same key. But
       // that key is not known at this point, it could be a couple of operators
       // down the line. Hence, start tracking this union until a partition
-      // boundary is reached.
+      // boundary is reached. (At a later point in time) whenever a partitioning
+      // boundary is encountered, an exchange will be inserted after the union
+      // that is being tracked.
       {
-        *tracking_union = node;
+        // If a union is already being tracked it implies that there is no
+        // partitioning boundary present between the tracked union and this
+        // union. Hence, a single exchange operator (inserted after the
+        // tracked union) would be sufficient, and hence there is no need to
+        // track this union.
+        if (!*tracking_union) {
+          *tracking_union = node;
+        }
         this->VisitNode(node->GetParents().at(0), recent_partition,
                         tracking_union, name);
         this->VisitNode(node->GetParents().at(1), recent_partition,
