@@ -65,6 +65,27 @@ void Key::AddNull(sqlast::ColumnDefinition::Type type) {
   this->values_.emplace_back(type);
 }
 
+size_t Key::Hash() {
+  size_t hash_value = 0;
+  for (const auto &value : this->values_) {
+    switch (value.type()) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        hash_value += std::hash<std::uint64_t>{}(value.GetUInt());
+        break;
+      case sqlast::ColumnDefinition::Type::INT:
+        hash_value += std::hash<std::int64_t>{}(value.GetInt());
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+      case sqlast::ColumnDefinition::Type::DATETIME:
+        hash_value += std::hash<std::string>{}(value.GetString());
+        break;
+      default:
+        LOG(FATAL) << "Unsupported data type when computing hash of key!";
+    }
+  }
+  return hash_value;
+}
+
 // Printing a record to an output stream (e.g. std::cout).
 std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Key &k) {
   os << "Key = |";

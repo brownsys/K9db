@@ -1,6 +1,7 @@
 #include "pelton/dataflow/partition.h"
 
 #include <stdlib.h>
+
 #include <utility>
 
 namespace pelton {
@@ -11,8 +12,8 @@ absl::flat_hash_map<uint16_t, std::vector<Record>> PartitionTrivial(
     uint16_t nthreads) {
   absl::flat_hash_map<uint16_t, std::vector<Record>> partitions;
   for (auto &record : records) {
-    uint64_t hash = std::abs(record.Hash(cols));
-    uint64_t partition = (uint16_t)hash % nthreads;
+    size_t hash = record.Hash(cols);
+    uint16_t partition = (uint16_t)(hash % (size_t)nthreads);
     if (partitions.contains(partition)) {
       partitions.at(partition).push_back(std::move(record));
     } else {

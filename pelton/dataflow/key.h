@@ -54,6 +54,13 @@ class Key {
   void AddValue(std::string &&v);
   void AddNull(sqlast::ColumnDefinition::Type type);
 
+  // AbslHashValue is implemented for Key so that it can be used as a key in
+  // absl::flat_hash_map. However, AbslHashValue does not produce deterministic
+  // hash values(across different runs). The hash value generataed by Hash()
+  // is deterministic and is used to make decisions when it comes to
+  // partitioning.
+  size_t Hash();
+
   // For logging and printing...
   friend std::ostream &operator<<(std::ostream &os, const Key &k);
 
