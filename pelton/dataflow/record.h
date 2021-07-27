@@ -166,7 +166,7 @@ class Record {
   void SetValue(const std::string &value, size_t i);
 
   // Compute an integer hash based on specified columns.
-  int64_t Hash(std::vector<ColumnID> cols = std::vector<ColumnID>{});
+  size_t Hash(std::vector<ColumnID> cols = std::vector<ColumnID>{});
 
   // Accessors.
   void SetPositive(bool positive) { this->positive_ = positive; }
