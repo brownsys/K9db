@@ -8,6 +8,8 @@ edition = "2018"
 
 [dependencies]
 msql-srv = "0.8.7"
+slog = "2.7.0"
+slog-term = "2.8.0"
 
 [build-dependencies]
 bindgen = "0.32.2"

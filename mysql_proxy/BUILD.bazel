@@ -21,6 +21,24 @@ alias(
     ],
 )
 
+alias(
+    name = "slog",
+    actual = "@raze__slog__2_7_0//:slog",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)
+
+alias(
+    name = "slog_term",
+    actual = "@raze__slog_term__2_8_0//:slog_term",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)
+
 # Export file for Stardoc support
 exports_files(
     [

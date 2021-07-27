@@ -13,9 +13,7 @@ include!("proxy_ffi_bindgen.rs");
 // Custom destructor
 impl Drop for FFIResult {
     fn drop(&mut self) {
-        println!("Rust FFI: Calling destructor for CResult");
         unsafe {FFIDestroySelect(self)};
-        println!("Rust FFI: CResult destroyed");
     }
 }
 
@@ -38,21 +36,18 @@ pub fn close(rust_conn: *mut FFIConnection) -> bool {
 }
 
 pub fn exec_ddl(rust_conn: *mut FFIConnection, query: &str) -> bool {
-    println!("Rust Proxy: ddl query received is: {:?}", query);
     let c_query = CString::new(query).unwrap();
     let char_query = c_query.as_ptr() as *mut i8;
     return unsafe { FFIExecDDL(rust_conn, char_query) };
 }
 
 pub fn exec_update(rust_conn: *mut FFIConnection, query: &str) -> i32 {
-    println!("Rust Proxy: update query received is: {:?}", query);
     let c_query = CString::new(query).unwrap();
     let char_query = c_query.as_ptr() as *mut i8;
     return unsafe { FFIExecUpdate(rust_conn, char_query) };
 }
 
 pub fn exec_select(rust_conn: *mut FFIConnection, query: &str) -> *mut FFIResult {
-    println!("Rust Proxy: select query received is: {:?}", query);
     let c_query = CString::new(query).unwrap();
     let char_query = c_query.as_ptr() as *mut i8;
     return unsafe { FFIExecSelect(rust_conn, char_query) };

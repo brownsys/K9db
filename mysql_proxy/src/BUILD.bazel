@@ -14,6 +14,8 @@ rust_binary(
     deps = [
         ":proxy_ffi",
         "@raze__msql_srv__0_8_8//:msql_srv",
+        "@raze__slog__2_7_0//:slog",
+        "@raze__slog_term__2_8_0//:slog_term",
     ],
 )
 
@@ -29,6 +31,8 @@ rust_library(
     deps = [
         "//mysql_proxy/src/ffi",
         "@raze__msql_srv__0_8_8//:msql_srv",
+        "@raze__slog__2_7_0//:slog",
+        "@raze__slog_term__2_8_0//:slog_term",
     ],
 )
 
