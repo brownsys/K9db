@@ -9,10 +9,13 @@ rust_binary(
         "-Clink-args=-lssl",
         "-Clink-args=-lcrypto",
         "-Clink-args=-lmariadbcpp",
+        "-Clink-args=-rdynamic",
+        "-Clink-args=-Wl,-export-dynamic",
     ],
     visibility = ["//visibility:public"],
     deps = [
         ":proxy_ffi",
+        "//mysql_proxy/src/ffi:ffi",
         "//mysql_proxy:msql_srv",
         "//mysql_proxy:slog",
         "//mysql_proxy:slog_term",
@@ -29,7 +32,6 @@ rust_library(
         ":proxy_ffi_wrappers",
     ],
     deps = [
-        "//mysql_proxy/src/ffi",
         "//mysql_proxy:msql_srv",
     ],
 )

@@ -18,17 +18,18 @@ cc_library(
         "//pelton",
         "@glog",
     ],
+    linkstatic = 1,
+    linkopts = [ "-rdynamic" ],
 )
 
-# TODO: need to make this a cc_test, blocked on JVM fix.
-cc_binary(
+cc_test(
     name = "ffi-test",
     srcs = [
         "ffi_unittest.cc",
     ],
     deps = [
         ":ffi",
-        "@gflags",
+        "@com_github_gflags_gflags//:gflags",
         "@gtest",
     ],
 )
