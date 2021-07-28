@@ -22,7 +22,7 @@ bazel run //mysql_proxy/src:mysql_proxy
 
 - Run with FFI debug info printed on-screen
 ```bash
-clear && bazel run //mysql_proxy/src:mysql_proxy -- -print=true
+bazel run //mysql_proxy/src:mysql_proxy -- -alsologtostderr=true
 ```
 
 3. Connect to the proxy using a mariadb client (from another terminal).
