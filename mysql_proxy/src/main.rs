@@ -67,9 +67,10 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         debug!(self.log, "Rust proxy: starting on_query");
         debug!(self.log, "Rust Proxy: query received is: {:?}", q_string);
 
-        // determine query type and return appropriate response
-        if q_string.contains("CREATE TABLE") || q_string.contains("CREATE INDEX")
-            || q_string.contains("CREATE VIEW") || q_string.contains("SET")
+        if q_string.contains("CREATE TABLE") 
+            || q_string.contains("CREATE INDEX")
+            || q_string.contains("CREATE VIEW") 
+            || q_string.contains("SET") && !q_string.contains("UPDATE")
         {
             let ddl_response = exec_ddl(&mut self.rust_conn, q_string);
             debug!(self.log, "ddl_response is {:?}", ddl_response);
@@ -83,7 +84,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 error!(self.log, "Rust Proxy: Failed to execute CREATE");
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
-        } else if q_string.contains("UPDATE")
+        } else if q_string.contains("UPDATE") && q_string.contains("SET")
             || q_string.contains("DELETE")
             || q_string.contains("INSERT")
             || q_string.contains("GDPR FORGET")
