@@ -8,24 +8,17 @@
 #include <string>
 #include <vector>
 
+#include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "pelton/pelton.h"
 
-DEFINE_bool(print, false, "Print results to the screen");
-
 // process command line arguments with gflags
 void FFIGflags(int argc, char **argv) {
-    // Command line arguments and help message.
-    gflags::ParseCommandLineFlags(&argc, &argv, true);
+  // Command line arguments and help message.
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-    // Initialize Google’s logging library.
-    google::InitGoogleLogging("proxy");
-
-    // redirect LOG(INFO) to screen output
-    bool print = FLAGS_print;
-    if (print) {
-      FLAGS_alsologtostderr = 1;
-    }
+  // Initialize Google’s logging library.
+  google::InitGoogleLogging("proxy");
 }
 
 // Open a connection. The returned struct has connected = true if successful.

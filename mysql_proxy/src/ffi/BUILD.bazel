@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 exports_files(
     ["ffi.h"],
@@ -13,13 +13,14 @@ cc_library(
     hdrs = [
         "ffi.h",
     ],
+    linkopts = ["-rdynamic"],
+    linkstatic = 1,
     visibility = ["//:__subpackages__"],
     deps = [
         "//pelton",
+        "@com_github_gflags_gflags//:gflags",
         "@glog",
     ],
-    linkstatic = 1,
-    linkopts = [ "-rdynamic" ],
 )
 
 cc_test(
