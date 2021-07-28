@@ -18,6 +18,7 @@ cc_library(
     deps = [
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:graph",
+        "//pelton/dataflow:generator",
         "//pelton/util:perf",
         "@bazel_tools//tools/jdk:jni",
         "@glog",
@@ -31,7 +32,6 @@ cc_test(
         "planner_unittest.cc",
     ],
     copts = ["-Iexternal/gtest/googletest/include"],
-    linkstatic = 1,
     target_compatible_with = [
         "@platforms//os:linux",
     ],
