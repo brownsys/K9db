@@ -71,8 +71,6 @@ void DataFlowState::AddFlow(const FlowName &name,
     std::shared_ptr<DataFlowGraph> partition = flow->Clone();
     partition->SetIndex(i);
     this->partitioned_graphs_.at(name).emplace(i, partition);
-    // this->threads_.push_back(std::thread(&DataFlowGraph::Start, partition,
-    // comm_chan));
   }
   // Initialize data structures for input partitions
   // NOTE: Since every flow at least has a matview, each input is expected to be
