@@ -10,17 +10,17 @@ cargo raze
 cd <pelton_root>
 ```
 
-2. Run the proxy:
-```bash
-bazel run //mysql_proxy/src:mysql_proxy
-```
-
-- Run with compiler optimizations
+2. Run with compiler optimizations
 ```bash
 bazel run //mysql_proxy/src:mysql_proxy --config=opt
 ```
 
-- Run with debug output printed to the screen
+- Run with rust debug info printed on-screen
+```bash
+bazel run //mysql_proxy/src:mysql_proxy
+```
+
+- Run with FFI debug info printed on-screen
 ```bash
 clear && bazel run //mysql_proxy/src:mysql_proxy -- -print=true
 ```
