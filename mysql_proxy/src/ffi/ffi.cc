@@ -37,7 +37,6 @@ FFIConnection FFIOpen(const char *db_dir, const char *db_username,
   LOG(INFO) << "C-Wrapper: db_dir is: " << std::string(db_dir);
   LOG(INFO) << "C-Wrapper: db_username is: " << std::string(db_username);
   LOG(INFO) << "C-Wrapper: db_passwored is: " << std::string(db_password);
-  // if (print) std::cout << ">>> " << std::flush;
 
   // Create a new connection.
   FFIConnection c_conn = {new pelton::Connection(), false};
