@@ -15,6 +15,7 @@ use std::io;
 use std::net;
 use std::ffi::CString;
 use std::time::{Duration, Instant};
+use std::os::raw::{c_char, c_int};
 
 #[derive(Debug)]
 struct Backend {
@@ -69,6 +70,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         // determine query type and return appropriate response
         if q_string.contains("CREATE TABLE") || q_string.contains("CREATE INDEX") || q_string.contains("CREATE VIEW") {
             let ddl_response = exec_ddl(&mut self.rust_conn, q_string);
+            debug!(self.log, "ddl_response is {:?}", ddl_response);
 
             // stop measuring runtime and add to total time for this connection
             // let query_time = start.elapsed();
@@ -77,7 +79,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             if ddl_response {
                 results.completed(0, 0)
             } else {
-                debug!(self.log, "Rust Proxy: Failed to execute CREATE");
+                error!(self.log, "Rust Proxy: Failed to execute CREATE");
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
         } else if q_string.contains("UPDATE")
@@ -93,7 +95,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             if update_response != -1 {
                 results.completed(update_response as u64, 0)
             } else {
-                debug!(self.log, "Rust Proxy: Failed to execute UPDATE");
+                error!(self.log, "Rust Proxy: Failed to execute UPDATE");
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
         } else if q_string.contains("SELECT") {
@@ -139,7 +141,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                                     .unwrap(),
                             )?
                         },
-                        _ => debug!(self.log, "Rust Proxy: Invalid column type"),
+                        _ => error!(self.log, "Rust Proxy: Invalid column type"),
                     }
                 }
                 rw.end_row()?;
@@ -150,7 +152,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             // tell client no more rows coming. Returns an empty Ok to the proxy
             rw.finish()
         } else {
-            debug!(self.log, "Rust proxy: unsupported query type");
+            error!(self.log, "Rust proxy: unsupported query type");
             results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
         }
     }
@@ -172,18 +174,26 @@ impl Drop for Backend {
 }
 
 fn main() {
-    // initialize logging
+    // initialize rust logging
     let plain = slog_term::PlainSyncDecorator::new(std::io::stdout());
     let log : slog::Logger = slog::Logger::root( slog_term::FullFormat::new(plain).build().fuse(), o!());
+    
+    // process command line arguments with gflags via FFI
+    // create vector of zero terminated CStrings from command line arguments
+    let args = std::env::args().map(|arg| CString::new(arg).unwrap()).collect::<Vec<CString>>();
+    let c_argc = args.len() as c_int;
+    // convert CStrings to raw pointers
+    let mut c_argv = args.iter().map(|arg| arg.as_ptr() as *mut i8).collect::<Vec<*mut c_char>>();
+    unsafe{FFIGflags(c_argc, c_argv.as_mut_ptr())};
 
     let listener = net::TcpListener::bind("127.0.0.1:10001").unwrap();
-    info!(log, "Listening at: {:?}", listener);
+    info!(log, "Rust Proxy: Listening at: {:?}", listener);
 
     let join_handle = std::thread::spawn(move || {
         let log = log.clone();
         if let Ok((stream, _addr)) = listener.accept() {
             info!(log,
-                "Successfully connected to mysql proxy\nStream and address are: {:?}",
+                "Rust Proxy: Successfully connected to mysql proxy\nStream and address are: {:?}",
                 stream
             );
             debug!(log, "Rust Proxy: calling c-wrapper for pelton::open\n");

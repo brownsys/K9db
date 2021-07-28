@@ -15,6 +15,16 @@ cd <pelton_root>
 bazel run //mysql_proxy/src:mysql_proxy
 ```
 
+- Run with compiler optimizations
+```bash
+bazel run //mysql_proxy/src:mysql_proxy --config=opt
+```
+
+- Run with debug output printed to the screen
+```bash
+clear && bazel run //mysql_proxy/src:mysql_proxy -- -print=true
+```
+
 3. Connect to the proxy using a mariadb client (from another terminal).
 ```bash
 mariadb --port=10001 --host=127.0.0.1

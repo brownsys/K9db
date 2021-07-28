@@ -11,15 +11,33 @@
 #include "glog/logging.h"
 #include "pelton/pelton.h"
 
+DEFINE_bool(print, false, "Print results to the screen");
+
+// process command line arguments with gflags
+void FFIGflags(int argc, char **argv) {
+    // Command line arguments and help message.
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+    // Initialize Google’s logging library.
+    google::InitGoogleLogging("proxy");
+
+    // redirect LOG(INFO) to screen output
+    bool print = FLAGS_print;
+    if (print) {
+      FLAGS_alsologtostderr = 1;
+    }
+}
+
 // Open a connection. The returned struct has connected = true if successful.
 // Otherwise connected = false.
 FFIConnection FFIOpen(const char *db_dir, const char *db_username,
                       const char *db_password) {
-  // Log debuggin information.
+  // Log debugging information.
   LOG(INFO) << "C-Wrapper: starting open_c";
   LOG(INFO) << "C-Wrapper: db_dir is: " << std::string(db_dir);
   LOG(INFO) << "C-Wrapper: db_username is: " << std::string(db_username);
   LOG(INFO) << "C-Wrapper: db_passwored is: " << std::string(db_password);
+  // if (print) std::cout << ">>> " << std::flush;
 
   // Create a new connection.
   FFIConnection c_conn = {new pelton::Connection(), false};
