@@ -91,11 +91,10 @@ cc_test(
         "//tests/data:trivial-queries.sql",
         "//tests/data:trivial-schema.sql",
     ],
-    linkstatic = 1,
     deps = [
         "//pelton",
         "//pelton/util:perf",
-        "@gflags",
+        "@com_github_gflags_gflags//:gflags",
         "@glog",
         "@gtest",
     ],

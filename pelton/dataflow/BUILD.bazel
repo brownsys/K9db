@@ -239,13 +239,14 @@ filegroup(
     visibility = ["//pelton:__subpackages__"],
 )
 
-cc_binary(
+cc_library(
     name = "generator",
     srcs = [
         "generator.cc",
+    ],
+    hdrs = [
         "generator.h",
     ],
-    linkshared = 1,
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":graph",
