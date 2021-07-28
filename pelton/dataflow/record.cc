@@ -234,7 +234,7 @@ void Record::SetValue(const std::string &value, size_t i) {
 }
 
 // Compute an integer hash based on specified columns.
-size_t Record::Hash(std::vector<ColumnID> cols) {
+size_t Record::Hash(const std::vector<ColumnID> &cols) const {
   size_t hash_value = 0;
   for (auto col : cols) {
     switch (this->schema_.TypeOf(col)) {

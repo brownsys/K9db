@@ -65,7 +65,7 @@ void Key::AddNull(sqlast::ColumnDefinition::Type type) {
   this->values_.emplace_back(type);
 }
 
-size_t Key::Hash() {
+size_t Key::Hash() const {
   size_t hash_value = 0;
   for (const auto &value : this->values_) {
     switch (value.type()) {

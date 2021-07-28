@@ -1,9 +1,9 @@
 #include "pelton/dataflow/partition.h"
 
-#include <string>
-#include <vector>
 #include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "gtest/gtest.h"
 #include "pelton/dataflow/record.h"
