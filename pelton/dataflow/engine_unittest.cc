@@ -59,7 +59,7 @@ TEST(DataFlowEngineTest, TestTrivialGraph) {
   // Check if records have reached appropriate partition's matviews
   for (const auto &item : partitioned_records) {
     auto partition_matview =
-        state.GetPartition(flow_name, item.first)->outputs().at(0);
+        state.GetPartitionedFlow(flow_name, item.first)->outputs().at(0);
     EXPECT_EQ_MSET(partition_matview, item.second);
   }
 }
@@ -118,7 +118,7 @@ TEST(DataFlowEngineTest, TestEquiJoinGraph) {
   // Check if records have reached appropriate partition's matviews
   for (const auto &item : partitioned_records) {
     auto partition_matview =
-        state.GetPartition(flow_name, item.first)->outputs().at(0);
+        state.GetPartitionedFlow(flow_name, item.first)->outputs().at(0);
     EXPECT_EQ_MSET(partition_matview, item.second);
   }
 }
@@ -173,7 +173,7 @@ TEST(DataFlowEngineTest, TestAggregateOnEquiJoinGraph) {
   // Check if records have reached appropriate partition's matviews
   for (const auto &item : partitioned_records) {
     auto partition_matview =
-        state.GetPartition(flow_name, item.first)->outputs().at(0);
+        state.GetPartitionedFlow(flow_name, item.first)->outputs().at(0);
     EXPECT_EQ_MSET(partition_matview, item.second);
   }
 }
@@ -227,7 +227,7 @@ TEST(DataFlowEngineTest, TestUnionGraph) {
   // Check if records have reached appropriate partition's matviews
   for (const auto &item : partitioned_records) {
     auto partition_matview =
-        state.GetPartition(flow_name, item.first)->outputs().at(0);
+        state.GetPartitionedFlow(flow_name, item.first)->outputs().at(0);
     EXPECT_EQ_MSET(partition_matview, item.second);
   }
 }
@@ -287,7 +287,7 @@ TEST(DataFlowEngineTest, TestDiamondGraph) {
   // Check if records have reached appropriate partition's matviews
   for (const auto &item : partitioned_records) {
     auto partition_matview =
-        state.GetPartition(flow_name, item.first)->outputs().at(0);
+        state.GetPartitionedFlow(flow_name, item.first)->outputs().at(0);
     EXPECT_EQ_MSET(partition_matview, item.second);
   }
 }

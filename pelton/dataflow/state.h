@@ -3,12 +3,12 @@
 // The state includes the currently installed flows, including their operators
 // and state.
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
-#include <memory>
 
 #include "absl/container/flat_hash_map.h"
 #include "gtest/gtest_prod.h"
@@ -44,7 +44,7 @@ class DataFlowState {
 
   const std::shared_ptr<DataFlowGraph> GetFlow(const FlowName &name) const;
 
-  const std::shared_ptr<DataFlowGraph> GetPartition(
+  const std::shared_ptr<DataFlowGraph> GetPartitionedFlow(
       const FlowName &name, uint16_t partition_id) const;
 
   bool HasFlow(const FlowName &name) const;
@@ -62,6 +62,9 @@ class DataFlowState {
   // Process raw data from sharder and use it to update flows.
   bool ProcessRecords(const TableName &table_name,
                       const std::vector<Record> &records);
+
+  const std::shared_ptr<MatViewOperator> GetPartitionedMatView(
+      const FlowName &name, const Key &key) const;
 
   uint64_t SizeInMemory() const;
 

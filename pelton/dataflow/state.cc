@@ -259,9 +259,23 @@ const std::shared_ptr<DataFlowGraph> DataFlowState::GetFlow(
   return this->flows_.at(name);
 }
 
-const std::shared_ptr<DataFlowGraph> DataFlowState::GetPartition(
+const std::shared_ptr<DataFlowGraph> DataFlowState::GetPartitionedFlow(
     const FlowName &name, uint16_t partition_id) const {
   return this->partitioned_graphs_.at(name).at(partition_id);
+}
+
+const std::shared_ptr<MatViewOperator> DataFlowState::GetPartitionedMatView(
+    const FlowName &name, const Key &key) const {
+  uint64_t partition_index = GetPartition(key, this->partition_count_);
+  // Currently, only one matview is supported per flow.
+  assert(this->partitioned_graphs_.at(name)
+             .at(partition_index)
+             ->outputs()
+             .size() == 1);
+  return this->partitioned_graphs_.at(name)
+      .at(partition_index)
+      ->outputs()
+      .at(0);
 }
 
 bool DataFlowState::HasFlow(const FlowName &name) const {
