@@ -192,22 +192,27 @@ fn main() {
     let listener = net::TcpListener::bind("127.0.0.1:10001").unwrap();
     info!(log, "Rust Proxy: Listening at: {:?}", listener);
 
-    let join_handle = std::thread::spawn(move || {
-        let log = log.clone();
-        if let Ok((stream, _addr)) = listener.accept() {
-            info!(log,
+    let mut threads = Vec::new();
+
+    while let Ok((stream, _addr)) = listener.accept() {
+        let log_clone = log.clone();
+        threads.push(std::thread::spawn(move || {
+            info!(log_clone,
                 "Rust Proxy: Successfully connected to mysql proxy\nStream and address are: {:?}",
                 stream
             );
-            debug!(log, "Rust Proxy: calling c-wrapper for pelton::open");
-            let rust_conn = open("", "pelton", "root", "password");
-            info!(log,
+            debug!(log_clone, "Rust Proxy: calling c-wrapper for pelton::open");
+            let rust_conn = open("", "pelton" "root", "password"); 
+            info!(log_clone,
                 "Rust Proxy: connection status is: {:?}",
                 rust_conn.connected
             );
-            let backend = Backend { rust_conn : rust_conn, runtime : Duration::new(0, 0), log : log };
-            let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
-        }
-    });
-    join_handle.join().unwrap();
+            let backend = Backend { rust_conn : rust_conn, runtime : Duration::new(0, 0), log : log_clone };
+            let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();            
+        }));
+    }
+
+    for join_handle in threads {
+        join_handle.join().unwrap();
+    }
 }
