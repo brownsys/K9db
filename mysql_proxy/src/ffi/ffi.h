@@ -43,6 +43,10 @@ typedef struct {
 } FFIResult;
 
 // The FFI API.
+
+// Pass command line arguments to gflags
+void FFIGflags(int argc, char **argv);
+
 // Open a connection. The returned struct has connected = true if successful.
 // Otherwise connected = false.
 FFIConnection FFIOpen(const char *db_dir, const char *db_username,

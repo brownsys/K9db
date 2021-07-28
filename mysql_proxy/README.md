@@ -10,9 +10,19 @@ cargo raze
 cd <pelton_root>
 ```
 
-2. Run the proxy:
+2. Run with compiler optimizations
+```bash
+bazel run //mysql_proxy/src:mysql_proxy --config=opt
+```
+
+- Run with rust debug info printed on-screen
 ```bash
 bazel run //mysql_proxy/src:mysql_proxy
+```
+
+- Run with FFI debug info printed on-screen
+```bash
+clear && bazel run //mysql_proxy/src:mysql_proxy -- -print=true
 ```
 
 3. Connect to the proxy using a mariadb client (from another terminal).
