@@ -18,7 +18,7 @@ cc_library(
         ":select",
         ":update",
         ":view",
-        "//pelton/dataflow:state",
+        "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sql:result",
@@ -41,7 +41,7 @@ cc_library(
         "create.h",
     ],
     deps = [
-        "//pelton/dataflow:state",
+        "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/shards/sqlengine:util",
@@ -64,10 +64,10 @@ cc_library(
     ],
     deps = [
         ":view",
+        "//pelton/dataflow:dstate",
         "//pelton/dataflow:graph",
         "//pelton/dataflow:key",
         "//pelton/dataflow:record",
-        "//pelton/dataflow:state",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sql:result",
@@ -88,7 +88,7 @@ cc_library(
     ],
     deps = [
         ":index",
-        "//pelton/dataflow:state",
+        "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sql:result",
@@ -109,7 +109,7 @@ cc_library(
     ],
     deps = [
         ":index",
-        "//pelton/dataflow:state",
+        "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sql:result",
@@ -131,7 +131,7 @@ cc_library(
     deps = [
         ":index",
         ":select",
-        "//pelton/dataflow:state",
+        "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/shards/sqlengine:util",
@@ -157,7 +157,7 @@ cc_library(
         ":index",
         ":insert",
         ":select",
-        "//pelton/dataflow:state",
+        "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sql:result",
@@ -196,7 +196,7 @@ cc_library(
         "view.h",
     ],
     deps = [
-        "//pelton/dataflow:state",
+        "//pelton/dataflow:dstate",
         "//pelton/planner",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -219,7 +219,7 @@ cc_library(
     deps = [
         ":delete",
         ":select",
-        "//pelton/dataflow:state",
+        "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/shards/sqlengine:util",
