@@ -62,19 +62,20 @@ impl<W: io::Write> MysqlShim<W> for Backend {
     // called when client issues query for immediate execution. Results returned via QueryResultWriter
     fn on_query(&mut self, q_string: &str, results: QueryResultWriter<W>) -> io::Result<()> {
         // start measuring runtime
-        // let start = Instant::now();
+        let start = Instant::now();
 
         debug!(self.log, "Rust proxy: starting on_query");
         debug!(self.log, "Rust Proxy: query received is: {:?}", q_string);
 
         // determine query type and return appropriate response
-        if q_string.contains("CREATE TABLE") || q_string.contains("CREATE INDEX") || q_string.contains("CREATE VIEW") {
+        if q_string.contains("CREATE TABLE") || q_string.contains("CREATE INDEX")
+            || q_string.contains("CREATE VIEW") || q_string.contains("SET")
+        {
             let ddl_response = exec_ddl(&mut self.rust_conn, q_string);
             debug!(self.log, "ddl_response is {:?}", ddl_response);
 
             // stop measuring runtime and add to total time for this connection
-            // let query_time = start.elapsed();
-            // self.runtime = self.runtime + query_time;
+            self.runtime = self.runtime + start.elapsed();
 
             if ddl_response {
                 results.completed(0, 0)
@@ -85,12 +86,12 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         } else if q_string.contains("UPDATE")
             || q_string.contains("DELETE")
             || q_string.contains("INSERT")
+            || q_string.contains("GDPR FORGET")
         {
             let update_response = exec_update(&mut self.rust_conn, q_string);
 
             // stop measuring runtime and add to total time for this connection 
-            // let query_time = start.elapsed();
-            // self.runtime = self.runtime + query_time;
+            self.runtime = self.runtime + start.elapsed();
 
             if update_response != -1 {
                 results.completed(update_response as u64, 0)
@@ -98,12 +99,11 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 error!(self.log, "Rust Proxy: Failed to execute UPDATE");
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
-        } else if q_string.contains("SELECT") {
+        } else if q_string.contains("SELECT") || q_string.contains("GDPR GET") {
             let select_response = exec_select(&mut self.rust_conn, q_string);
 
             // stop measuring runtime and add to total time for this connection
-            // let query_time = start.elapsed();
-            // self.runtime = self.runtime + query_time;
+            self.runtime = self.runtime + start.elapsed();
 
             let num_cols = unsafe { (*select_response).num_cols as usize };
             let num_rows = unsafe { (*select_response).num_rows as usize };
@@ -162,7 +162,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 impl Drop for Backend {
     fn drop(&mut self) {
         debug!(self.log, "Rust Proxy: Starting destructor for Backend");
-        debug!(self.log, "Rust Proxy: Calling c-wrapper for pelton::close\n");
+        debug!(self.log, "Rust Proxy: Calling c-wrapper for pelton::close");
         debug!(self.log, "Total time elapsed for this connection is: {:?}", self.runtime);
         let close_response: bool = close(&mut self.rust_conn);
         if close_response {
@@ -196,7 +196,7 @@ fn main() {
                 "Rust Proxy: Successfully connected to mysql proxy\nStream and address are: {:?}",
                 stream
             );
-            debug!(log, "Rust Proxy: calling c-wrapper for pelton::open\n");
+            debug!(log, "Rust Proxy: calling c-wrapper for pelton::open");
             let rust_conn = open("", "root", "password"); 
             info!(log,
                 "Rust Proxy: connection status is: {:?}",

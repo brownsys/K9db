@@ -34,7 +34,7 @@ static inline void Trim(std::string &s) {
 bool echo = false;
 
 bool SpecialStatements(const std::string &sql, Connection *connection) {
-  if (sql == "SET echo;") {
+  if (sql == "SET echo;" || sql == "SET echo") {
     echo = true;
     std::cout << "SET echo;" << std::endl;
     return true;

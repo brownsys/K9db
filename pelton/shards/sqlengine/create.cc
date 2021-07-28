@@ -339,6 +339,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
       // Add the sharding information to state.
       state->AddShardedTable(table_name, info, sharded_stmt);
     }
+    result = sql::SqlResult(true);
 
   } else if (!has_pii && sharding_information.size() == 0) {
     // Case 3: neither pii nor linked.

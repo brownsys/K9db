@@ -64,6 +64,6 @@ GDPR GET doctors 2;
 DELETE FROM doctors WHERE id = 2;
 SELECT * FROM chat;
 
-DELETE FROM patients WHERE id = 10;
+GDPR FORGET patients 10;
 SELECT * FROM patients;
 SELECT * FROM chat;
