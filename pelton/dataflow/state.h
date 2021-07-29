@@ -66,6 +66,8 @@ class DataFlowState {
   const std::shared_ptr<MatViewOperator> GetPartitionedMatView(
       const FlowName &name, const Key &key) const;
 
+  const SchemaRef GetOutputSchema(const FlowName &name);
+
   uint64_t SizeInMemory() const;
 
   ~DataFlowState();

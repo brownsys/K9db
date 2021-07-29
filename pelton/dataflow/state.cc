@@ -276,6 +276,12 @@ const std::shared_ptr<MatViewOperator> DataFlowState::GetPartitionedMatView(
       .at(0);
 }
 
+const SchemaRef DataFlowState::GetOutputSchema(const FlowName &name) {
+  const auto flow = this->flows_.at(name);
+  assert(flow->outputs().size() == 1);
+  return flow->outputs().at(0)->output_schema();
+}
+
 bool DataFlowState::HasFlow(const FlowName &name) const {
   return this->flows_.count(name) == 1;
 }
