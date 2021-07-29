@@ -50,12 +50,12 @@ inline void CopyIntoRecord(sqlast::ColumnDefinition::Type datatype,
 }  // namespace
 
 std::shared_ptr<Operator> EquiJoinOperator::left() const {
-  NodeIndex parentIndex = this->parents_.at(0);
-  return this->graph()->GetNode(parentIndex);
+  NodeIndex parent_index = this->parents_.at(0);
+  return this->graph()->GetNode(parent_index);
 }
 std::shared_ptr<Operator> EquiJoinOperator::right() const {
-  NodeIndex parentIndex = this->parents_.at(1);
-  return this->graph()->GetNode(parentIndex);
+  NodeIndex parent_index = this->parents_.at(1);
+  return this->graph()->GetNode(parent_index);
 }
 
 bool EquiJoinOperator::Process(NodeIndex source,

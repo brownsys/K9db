@@ -31,8 +31,8 @@ bool Operator::ProcessAndForward(NodeIndex source,
   }
 
   // Pass output vector down to children to process.
-  for (NodeIndex childIndex : this->children_) {
-    std::shared_ptr childNode = this->graph()->GetNode(childIndex);
+  for (NodeIndex child_index : this->children_) {
+    std::shared_ptr childNode = this->graph()->GetNode(child_index);
     if (!childNode->ProcessAndForward(this->index_, output)) {
       return false;
     }
@@ -43,8 +43,8 @@ bool Operator::ProcessAndForward(NodeIndex source,
 
 std::vector<std::shared_ptr<Operator>> Operator::GetParents() const {
   std::vector<std::shared_ptr<Operator>> nodes;
-  for (NodeIndex parentIndex : this->parents_) {
-    nodes.emplace_back(this->graph()->GetNode(parentIndex));
+  for (NodeIndex parent_index : this->parents_) {
+    nodes.emplace_back(this->graph()->GetNode(parent_index));
   }
 
   return nodes;
@@ -83,8 +83,8 @@ std::string Operator::DebugString() const {
   str += "\"operator\": \"" + type_str + "\", ";
   str += "\"id\": " + std::to_string(this->index()) + ", ";
   str += "\"children\": [";
-  for (NodeIndex childIndex : this->children_) {
-    str += std::to_string(childIndex) + ",";
+  for (NodeIndex child_index : this->children_) {
+    str += std::to_string(child_index) + ",";
   }
   if (this->children_.size() > 0) {
     str.pop_back();
