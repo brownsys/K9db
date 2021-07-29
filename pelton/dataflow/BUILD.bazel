@@ -4,7 +4,7 @@ exports_files(
     [
         "graph.h",
     ],
-    ["//pelton/dataflow:__subpackages__"],
+    visibility = ["//pelton/dataflow:__subpackages__"],
 )
 
 cc_library(
