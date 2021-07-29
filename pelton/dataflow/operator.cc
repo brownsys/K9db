@@ -44,7 +44,7 @@ bool Operator::ProcessAndForward(NodeIndex source,
 std::vector<std::shared_ptr<Operator>> Operator::GetParents() const {
   std::vector<std::shared_ptr<Operator>> nodes;
   for (NodeIndex parent_index : this->parents_) {
-    nodes.emplace_back(this->graph()->GetNode(parent_index));
+    CHECK(nodes.emplace_back(this->graph()->GetNode(parent_index)));
   }
 
   return nodes;
