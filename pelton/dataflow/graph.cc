@@ -34,19 +34,18 @@ bool DataFlowGraph::AddNode(std::shared_ptr<Operator> op,
 
   for (const auto &parent : parents) {
     if (parent) {
-      CHECK(this->AddEdge(parent, op));
+      this->AddEdge(parent, op);
     }
   }
   return inserted;
 }
 
-bool DataFlowGraph::AddEdge(std::shared_ptr<Operator> parent,
+void DataFlowGraph::AddEdge(std::shared_ptr<Operator> parent,
                             std::shared_ptr<Operator> child) {
   std::pair<NodeIndex, NodeIndex> edge{parent->index(), child->index()};
   this->edges_.push_back(edge);
   // Also implicitly adds op1 as child of op2.
   child->AddParent(parent, edge);
-  return true;
 }
 
 bool DataFlowGraph::Process(const std::string &input_name,

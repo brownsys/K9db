@@ -4,8 +4,8 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
-#include <vector>
 #include <utility>
+#include <vector>
 
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/types.h"
@@ -60,7 +60,7 @@ class DataFlowGraph {
   uint64_t SizeInMemory() const;
 
  private:
-  bool AddEdge(std::shared_ptr<Operator> parent,
+  void AddEdge(std::shared_ptr<Operator> parent,
                std::shared_ptr<Operator> child);
   // Maps input name to associated input operator.
   std::unordered_map<std::string, std::shared_ptr<InputOperator>> inputs_;
