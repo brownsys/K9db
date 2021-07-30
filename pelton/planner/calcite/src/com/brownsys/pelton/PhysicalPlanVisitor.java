@@ -83,7 +83,17 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     PlanningContext context = pair.right;
 
     FilterOperatorFactory filterFactory = new FilterOperatorFactory(context);
-    return new Pair<>(filterFactory.createOperator(filter, children), context);
+    int filterOperator = filterFactory.createOperator(filter, children);
+    if (filterOperator == -1) {
+      // This filter is a no-op, hence it was not constructed. But the context
+      // still contains info about the matview keys.
+      // This filter would have originally had a single child.
+      assert children.size() == 0;
+      return new Pair<>(children.get(0), context);
+    } else {
+      return new Pair<>(filterOperator, context);
+    }
+    // return new Pair<>(filterFactory.createOperator(filter, children), context);
   }
 
   private Pair<Integer, PlanningContext> analyzeLogicalJoin(LogicalJoin join) {
