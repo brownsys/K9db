@@ -1025,11 +1025,9 @@ TEST(PlannerTest, ComplexQueryWithKeys) {
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::EQUIJOIN);
   EXPECT_EQ(graph->GetNode(3).get(), graph->inputs().at("assignments").get());
   EXPECT_EQ(graph->GetNode(4)->type(), dataflow::Operator::Type::EQUIJOIN);
-  EXPECT_EQ(graph->GetNode(5)->type(), dataflow::Operator::Type::FILTER);
-  EXPECT_EQ(graph->GetNode(6)->type(), dataflow::Operator::Type::PROJECT);
-  EXPECT_EQ(graph->GetNode(7)->type(), dataflow::Operator::Type::AGGREGATE);
-  EXPECT_EQ(graph->GetNode(8)->type(), dataflow::Operator::Type::FILTER);
-  EXPECT_EQ(graph->GetNode(9).get(), graph->outputs().at(0).get());
+  EXPECT_EQ(graph->GetNode(5)->type(), dataflow::Operator::Type::PROJECT);
+  EXPECT_EQ(graph->GetNode(6)->type(), dataflow::Operator::Type::AGGREGATE);
+  EXPECT_EQ(graph->GetNode(7).get(), graph->outputs().at(0).get());
 
   // Materialized View.
   std::shared_ptr<dataflow::MatViewOperator> matview = graph->outputs().at(0);
