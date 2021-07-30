@@ -2,6 +2,7 @@
 
 #include "pelton/shards/sqlengine/view.h"
 
+#include <algorithm>
 #include <cstring>
 #include <memory>
 #include <string>
