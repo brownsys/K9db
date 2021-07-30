@@ -93,7 +93,6 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     } else {
       return new Pair<>(filterOperator, context);
     }
-    // return new Pair<>(filterFactory.createOperator(filter, children), context);
   }
 
   private Pair<Integer, PlanningContext> analyzeLogicalJoin(LogicalJoin join) {
