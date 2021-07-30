@@ -276,10 +276,30 @@ const std::shared_ptr<MatViewOperator> DataFlowState::GetPartitionedMatView(
       .at(0);
 }
 
+const std::vector<std::shared_ptr<MatViewOperator>>
+DataFlowState::GetPartitionedMatViews(const FlowName &name) {
+  std::vector<std::shared_ptr<MatViewOperator>> matviews;
+  for (const auto item : this->partitioned_graphs_.at(name)) {
+    // Currently, only one matview is supported per flow.
+    assert(item.second->outputs().size() == 1);
+    matviews.push_back(item.second->outputs().at(0));
+  }
+  return matviews;
+}
+
 const SchemaRef DataFlowState::GetOutputSchema(const FlowName &name) {
   const auto flow = this->flows_.at(name);
+  // Currently, we only support a single matview per flow.
   assert(flow->outputs().size() == 1);
   return flow->outputs().at(0)->output_schema();
+}
+
+const std::vector<ColumnID> &DataFlowState::GetMatViewKeyCols(
+    const FlowName &name) {
+  const auto flow = this->flows_.at(name);
+  // Currently, we only support a single matview per flow.
+  assert(flow->outputs().size() == 1);
+  return flow->outputs().at(0)->key_cols();
 }
 
 bool DataFlowState::HasFlow(const FlowName &name) const {

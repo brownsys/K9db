@@ -95,13 +95,18 @@ absl::Status ExtractConstraintsFromAnd(
 
 // Unconstrained select (no where).
 absl::StatusOr<std::vector<dataflow::Record>> SelectViewUnconstrained(
-    std::shared_ptr<dataflow::MatViewOperator> matview, int limit,
-    size_t offset) {
+    dataflow::DataFlowState *dataflow_state, const std::string &view_name,
+    int limit, size_t offset) {
   // No where condition: we are reading everything (keys and records).
+  // Matviews need to be queried from all partitions
+  const auto matviews = dataflow_state->GetPartitionedMatViews(view_name);
   std::vector<dataflow::Record> records;
-  for (const auto &key : matview->Keys()) {
-    for (const auto &record : matview->Lookup(key, limit, offset)) {
-      records.push_back(record.Copy());
+  for (const auto matview : matviews) {
+    for (const auto &key : matview->Keys()) {
+      auto matview = dataflow_state->GetPartitionedMatView(view_name, key);
+      for (const auto &record : matview->Lookup(key, limit, offset)) {
+        records.push_back(record.Copy());
+      }
     }
   }
   return records;
@@ -109,9 +114,10 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewUnconstrained(
 
 // Constrained with equality or related operations.
 absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
-    std::shared_ptr<dataflow::MatViewOperator> matview,
+    dataflow::DataFlowState *dataflow_state, const std::string &view_name,
     const sqlast::BinaryExpression *where, int limit, size_t offset) {
-  const dataflow::SchemaRef &schema = matview->output_schema();
+  const dataflow::SchemaRef &schema =
+      dataflow_state->GetOutputSchema(view_name);
   std::unordered_map<dataflow::ColumnID, std::vector<std::string>> constraints;
   std::vector<dataflow::Record> records;
   switch (where->type()) {
@@ -133,8 +139,10 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
   }
 
   std::vector<dataflow::Key> keys;
-  keys.emplace_back(matview->key_cols().size());
-  for (dataflow::ColumnID col : matview->key_cols()) {
+  const std::vector<dataflow::ColumnID> matview_key_cols =
+      dataflow_state->GetMatViewKeyCols(view_name);
+  keys.emplace_back(matview_key_cols.size());
+  for (dataflow::ColumnID col : matview_key_cols) {
     if (constraints.count(col) == 0) {
       return absl::InvalidArgumentError(
           "Where condition does not constraint column " + schema.NameOf(col));
@@ -172,6 +180,7 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
 
   // Read records attached to key.
   for (const auto &key : keys) {
+    auto matview = dataflow_state->GetPartitionedMatView(view_name, key);
     for (const auto &record : matview->Lookup(key, limit, offset)) {
       records.push_back(record.Copy());
     }
@@ -182,22 +191,49 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
 
 // Ordered view.
 absl::StatusOr<std::vector<dataflow::Record>> SelectViewOrdered(
-    std::shared_ptr<dataflow::MatViewOperator> matview,
+    dataflow::DataFlowState *dataflow_state, const std::string &view_name,
     const sqlast::BinaryExpression *where, int limit, size_t offset) {
   switch (where->type()) {
     case sqlast::Expression::Type::GREATER_THAN: {
       std::vector<dataflow::Record> records;
-      const dataflow::SchemaRef &schema = matview->output_schema();
+      const dataflow::SchemaRef &schema =
+          dataflow_state->GetOutputSchema(view_name);
 
       ASSIGN_OR_RETURN(std::string column, GetColumnName(where));
       MOVE_OR_RETURN(std::vector<std::string> values, GetCondValues(where));
       size_t column_index = schema.IndexOf(column);
       CHECK_EQ(values.size(), 1);
 
+      // Need to query all the matviews since the keys that are '> value' could
+      // be present in any matview. We need to first fetch all the keys, sort
+      // them and then query the matviews(in the same order as the sorted keys)
+      // and accumulate records incrementally. This would guarantee that the
+      // final set of records would be sorted as well.
+      // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      // TODO(Optimization): Another strategy is to only get the keys from
+      // matviews that are '> value', then sort those keys and finally query the
+      // matvies. This would require the use of a B+Tree in the matview which
+      // would make anyways make such scan queries faster.
+      // TODO(optimization): Ref: Kinan. Potential for something equivalent
+      // to an external merge sort? In this case, it would be equivalent to just
+      // an 'intelligent merge' since the matviews would already contain sorted
+      // records.
+      // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      const auto matviews = dataflow_state->GetPartitionedMatViews(view_name);
+      // Accumulate all keys
+      std::vector<dataflow::Key> keys;
+      for (const auto matview : matviews) {
+        for (const auto &k : matview->Keys()) {
+          keys.emplace_back(k);
+        }
+      }
+      // Sort accumulated keys
+      std::sort(keys.begin(), keys.end());
       // Read records > cmp.
       dataflow::Record cmp{schema};
       cmp.SetValue(values.at(0), column_index);
-      for (const auto &k : matview->Keys()) {
+      for (const auto &k : keys) {
+        auto matview = dataflow_state->GetPartitionedMatView(view_name, k);
         for (const auto &r : matview->LookupGreater(k, cmp, limit, offset)) {
           records.push_back(r.Copy());
         }
@@ -206,7 +242,8 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewOrdered(
       return records;
     }
     case sqlast::Expression::Type::EQ:
-      return SelectViewConstrained(matview, where, limit, offset);
+      return SelectViewConstrained(dataflow_state, view_name, where, limit,
+                                   offset);
 
     default:
       return absl::InvalidArgumentError(
@@ -248,7 +285,8 @@ absl::StatusOr<mysql::SqlResult> SelectView(
     return absl::InvalidArgumentError("Read from flow with several matviews");
   }
   auto matview = flow->outputs().at(0);
-  const dataflow::SchemaRef &schema = matview->output_schema();
+  const dataflow::SchemaRef &schema =
+      dataflow_state->GetOutputSchema(view_name);
 
   std::vector<dataflow::Record> records;
 
@@ -259,13 +297,15 @@ absl::StatusOr<mysql::SqlResult> SelectView(
   if (stmt.HasWhereClause()) {
     const sqlast::BinaryExpression *where = stmt.GetWhereClause();
     if (matview->RecordOrdered()) {
-      MOVE_OR_RETURN(records, SelectViewOrdered(matview, where, limit, offset));
+      MOVE_OR_RETURN(records, SelectViewOrdered(dataflow_state, view_name,
+                                                where, limit, offset));
     } else {
-      MOVE_OR_RETURN(records,
-                     SelectViewConstrained(matview, where, limit, offset));
+      MOVE_OR_RETURN(records, SelectViewConstrained(dataflow_state, view_name,
+                                                    where, limit, offset));
     }
   } else {
-    MOVE_OR_RETURN(records, SelectViewUnconstrained(matview, limit, offset));
+    MOVE_OR_RETURN(records, SelectViewUnconstrained(dataflow_state, view_name,
+                                                    limit, offset));
   }
 
   perf::End("SelectView");
