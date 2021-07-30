@@ -16,7 +16,8 @@ using DBStatement = ::sql::Statement;
 using DBResultSet = ::sql::ResultSet;
 
 // Initialize: keep a connection open to the underlying DB.
-void SqlEagerExecutor::Initialize(const std::string &username,
+void SqlEagerExecutor::Initialize(const std::string &db_name,
+                                  const std::string &username,
                                   const std::string &password) {
   DBProperties props;
   props["hostName"] = "localhost";
@@ -29,8 +30,8 @@ void SqlEagerExecutor::Initialize(const std::string &username,
   this->stmt_ = std::unique_ptr<DBStatement>(this->conn_->createStatement());
 
   // Create and use the DB.
-  this->stmt_->execute("CREATE DATABASE IF NOT EXISTS pelton");
-  this->stmt_->execute("USE pelton");
+  this->stmt_->execute("CREATE DATABASE IF NOT EXISTS " + db_name);
+  this->stmt_->execute("USE " + db_name);
   // this->stmt_->execute("SET GLOBAL table_open_cache=50000");
   // this->stmt_->execute("SET GLOBAL schema_definition_cache=10000");
   // this->stmt_->execute("SET GLOBAL table_definition_cache=10000");

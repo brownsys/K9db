@@ -7,7 +7,10 @@
 #include "gtest/gtest.h"
 #include "pelton/pelton.h"
 
+#define DB_NAME "correctness_test"
+
 namespace {
+
 // Expects that two vectors are equal regardless of order
 inline void EXPECT_EQ_MSET(std::vector<std::string> expected,
                            std::vector<std::string> actual, std::string query) {
@@ -56,7 +59,7 @@ void DropDatabase() {
   std::unique_ptr<sql::Statement> stmt =
       std::unique_ptr<sql::Statement>(conn->createStatement());
 
-  stmt->execute("DROP DATABASE IF EXISTS pelton");
+  stmt->execute("DROP DATABASE IF EXISTS " DB_NAME);
 }
 
 void ReadInputs(const std::string &schema_file, const std::string &queries_file,
@@ -168,7 +171,7 @@ void RunTest(const std::string &schema_file, const std::string &query_file,
 
   // Open connection to sharder.
   pelton::Connection connection;
-  pelton::open("", *db_username, *db_password, &connection);
+  pelton::open("", DB_NAME, *db_username, *db_password, &connection);
   // CHECK(pelton::exec(&connection, "SET echo;").ok());
 
   // Create all the tables.

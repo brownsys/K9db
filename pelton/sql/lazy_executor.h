@@ -32,7 +32,8 @@ class SqlLazyExecutor {
 
   // Initialization: initialize the eager executor so that it maintains
   // an open connection to the underlying DB.
-  void Initialize(const std::string &username, const std::string &password);
+  void Initialize(const std::string &db_name, const std::string &username,
+                  const std::string &password);
 
   // Execute statement against the default un-sharded database.
   SqlResult ExecuteDefault(const sqlast::AbstractStatement *sql,

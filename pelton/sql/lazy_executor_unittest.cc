@@ -17,12 +17,15 @@
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/ints.h"
 
+#define DB_NAME "lazy_executor_test"
+
 // Command line flags.
 DEFINE_string(db_username, "root", "MariaDB username to connect with");
 DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
 
 // Executor is global and used by all tests.
 pelton::sql::SqlLazyExecutor executor;
+pelton::sql::SqlEagerExecutor *exec;
 
 namespace pelton {
 namespace sql {
@@ -32,7 +35,7 @@ using CType = sqlast::ColumnDefinition::Type;
 // Helpers.
 
 // Unsharded table.
-void CreateUnshardedTable(SqlEagerExecutor *exec) {
+void CreateUnshardedTable() {
   std::string drop = "DROP TABLE IF EXISTS default_db_mytest;";
   EXPECT_TRUE(exec->ExecuteStatement(drop));
 
@@ -44,13 +47,13 @@ void CreateUnshardedTable(SqlEagerExecutor *exec) {
   EXPECT_TRUE(result.IsStatement());
   EXPECT_TRUE(result.Success());
 }
-void CleanupUnshardedTable(SqlEagerExecutor *exec) {
+void CleanupUnshardedTable() {
   EXPECT_TRUE(exec->ExecuteStatement("DROP TABLE default_db_mytest;"));
 }
 
 // Sharded table.
 std::pair<std::string, shards::ShardingInformation> CreateShardedTable(
-    SqlEagerExecutor *exec, const std::string &user_id) {
+    const std::string &user_id) {
   // Sharding information.
   shards::ShardingInformation info = {"user", "mytest_user", "user", 1, ""};
   std::string shard_name =
@@ -72,7 +75,7 @@ std::pair<std::string, shards::ShardingInformation> CreateShardedTable(
 
   return std::make_pair(shard_name, info);
 }
-void CleanupShardedTable(SqlEagerExecutor *exec, const std::string &user_id) {
+void CleanupShardedTable(const std::string &user_id) {
   // Sharding information.
   shards::ShardingInformation info = {"user", "mytest_user", "user", 1, ""};
   std::string shard_name =
@@ -98,10 +101,10 @@ dataflow::SchemaRef ShardedSchema() {
 
 // TESTS
 TEST(LazyExecutorTest, TestCreateTableDefault) {
-  SqlEagerExecutor *exec = &executor.eager_executor_;
+  exec = &executor.eager_executor_;
 
   // Create table.
-  CreateUnshardedTable(exec);
+  CreateUnshardedTable();
 
   // Look for default_db_mytest table.
   std::unique_ptr<::sql::ResultSet> tables = exec->ExecuteQuery("SHOW TABLES;");
@@ -115,14 +118,14 @@ TEST(LazyExecutorTest, TestCreateTableDefault) {
   EXPECT_TRUE(found);
 
   // Drop mytest table.
-  CleanupUnshardedTable(exec);
+  CleanupUnshardedTable();
 }
 
 TEST(LazyExecutorTest, TestCreateTableShard) {
-  SqlEagerExecutor *exec = &executor.eager_executor_;
+  exec = &executor.eager_executor_;
 
   // Create sharded table.
-  auto [shard_name, _] = CreateShardedTable(exec, "1");
+  auto [shard_name, _] = CreateShardedTable("1");
 
   // Look for sharded table.
   std::unique_ptr<::sql::ResultSet> tables = exec->ExecuteQuery("SHOW TABLES;");
@@ -136,14 +139,14 @@ TEST(LazyExecutorTest, TestCreateTableShard) {
   EXPECT_TRUE(found);
 
   // Drop mytest table.
-  CleanupShardedTable(exec, "1");
+  CleanupShardedTable("1");
 }
 
 TEST(LazyExecutorTest, TestUpdatesDefault) {
-  SqlEagerExecutor *exec = &executor.eager_executor_;
+  exec = &executor.eager_executor_;
 
   // Create table.
-  CreateUnshardedTable(exec);
+  CreateUnshardedTable();
 
   // Insert values.
   sqlast::Insert stmt{"mytest"};
@@ -214,15 +217,15 @@ TEST(LazyExecutorTest, TestUpdatesDefault) {
   EXPECT_FALSE(rows->next());
 
   // Delete testing table.
-  CleanupUnshardedTable(exec);
+  CleanupUnshardedTable();
 }
 
 TEST(LazyExecutorTest, TestUpdatesShard) {
-  SqlEagerExecutor *exec = &executor.eager_executor_;
+  exec = &executor.eager_executor_;
 
   // Create table.
-  auto [shard1, info1] = CreateShardedTable(exec, "1");
-  auto [shard2, info2] = CreateShardedTable(exec, "2");
+  auto [shard1, info1] = CreateShardedTable("1");
+  auto [shard2, info2] = CreateShardedTable("2");
 
   // Insert values.
   sqlast::Insert stmt{"mytest"};
@@ -308,15 +311,15 @@ TEST(LazyExecutorTest, TestUpdatesShard) {
   EXPECT_EQ(result.UpdateCount(), 3);
 
   // Delete testing table.
-  CleanupShardedTable(exec, "1");
-  CleanupShardedTable(exec, "2");
+  CleanupShardedTable("1");
+  CleanupShardedTable("2");
 }
 
 TEST(LazyExecutorTest, TestSelectDefault) {
-  SqlEagerExecutor *exec = &executor.eager_executor_;
+  exec = &executor.eager_executor_;
 
   // Create table.
-  CreateUnshardedTable(exec);
+  CreateUnshardedTable();
 
   // Insert values.
   sqlast::Insert stmt{"mytest"};
@@ -373,15 +376,15 @@ TEST(LazyExecutorTest, TestSelectDefault) {
   EXPECT_FALSE(result.HasResultSet());
 
   // Clean up.
-  CleanupUnshardedTable(exec);
+  CleanupUnshardedTable();
 }
 
 TEST(LazyExecutorTest, TestSelectShard) {
-  SqlEagerExecutor *exec = &executor.eager_executor_;
+  exec = &executor.eager_executor_;
 
   // Create table.
-  auto [shard1, info1] = CreateShardedTable(exec, "1");
-  auto [shard2, info2] = CreateShardedTable(exec, "2");
+  auto [shard1, info1] = CreateShardedTable("1");
+  auto [shard2, info2] = CreateShardedTable("2");
 
   // Insert values.
   sqlast::Insert stmt{"mytest"};
@@ -449,16 +452,16 @@ TEST(LazyExecutorTest, TestSelectShard) {
   EXPECT_FALSE(result.HasResultSet());
 
   // Clean up.
-  CleanupShardedTable(exec, "1");
-  CleanupShardedTable(exec, "2");
+  CleanupShardedTable("1");
+  CleanupShardedTable("2");
 }
 
 TEST(LazyExecutorTest, TestSelectShardSet) {
-  SqlEagerExecutor *exec = &executor.eager_executor_;
+  exec = &executor.eager_executor_;
 
   // Create table.
-  auto [shard1, info1] = CreateShardedTable(exec, "1");
-  auto [shard2, info2] = CreateShardedTable(exec, "2");
+  auto [shard1, info1] = CreateShardedTable("1");
+  auto [shard2, info2] = CreateShardedTable("2");
 
   // Insert values.
   sqlast::Insert stmt{"mytest"};
@@ -516,8 +519,8 @@ TEST(LazyExecutorTest, TestSelectShardSet) {
   EXPECT_FALSE(result.HasResultSet());
 
   // Clean up.
-  CleanupShardedTable(exec, "1");
-  CleanupShardedTable(exec, "2");
+  CleanupShardedTable("1");
+  CleanupShardedTable("2");
 }
 
 }  // namespace sql
@@ -534,9 +537,14 @@ int main(int argc, char **argv) {
   const std::string &db_password = FLAGS_db_password;
 
   // Initialize the executor being tested.
-  executor.Initialize(db_username, db_password);
+  executor.Initialize(DB_NAME, db_username, db_password);
 
   // Run tests.
   // Connection is closed implicitly when executor is destructed.
-  return RUN_ALL_TESTS();
+  auto result = RUN_ALL_TESTS();
+
+  // DROP test DB.
+  exec->ExecuteStatement("DROP DATABASE " DB_NAME);
+
+  return result;
 }

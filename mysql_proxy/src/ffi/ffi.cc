@@ -23,11 +23,12 @@ void FFIGflags(int argc, char **argv) {
 
 // Open a connection. The returned struct has connected = true if successful.
 // Otherwise connected = false.
-FFIConnection FFIOpen(const char *db_dir, const char *db_username,
-                      const char *db_password) {
+FFIConnection FFIOpen(const char *db_dir, const char *db_name,
+                      const char *db_username, const char *db_password) {
   // Log debugging information.
   LOG(INFO) << "C-Wrapper: starting open_c";
   LOG(INFO) << "C-Wrapper: db_dir is: " << std::string(db_dir);
+  LOG(INFO) << "C-Wrapper: db_name is: " << std::string(db_name);
   LOG(INFO) << "C-Wrapper: db_username is: " << std::string(db_username);
   LOG(INFO) << "C-Wrapper: db_passwored is: " << std::string(db_password);
 
@@ -41,12 +42,13 @@ FFIConnection FFIOpen(const char *db_dir, const char *db_username,
 
   // convert char* to const std::string
   const std::string c_db_dir(db_dir);
+  const std::string c_db(db_name);
   const std::string c_db_username(db_username);
   const std::string c_db_password(db_password);
 
   // call c++ function from C with converted types
   LOG(INFO) << "C-Wrapper: running pelton::open";
-  if (pelton::open(c_db_dir, c_db_username, c_db_password, cpp_conn)) {
+  if (pelton::open(c_db_dir, c_db, c_db_username, c_db_password, cpp_conn)) {
     LOG(INFO) << "C-Wrapper: connection opened";
     c_conn.connected = true;
   } else {

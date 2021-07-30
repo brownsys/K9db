@@ -63,8 +63,9 @@ class Connection {
   std::string path_;
 };
 
-bool open(const std::string &directory, const std::string &db_username,
-          const std::string &db_password, Connection *connection);
+bool open(const std::string &directory, const std::string &db_name,
+          const std::string &db_username, const std::string &db_password,
+          Connection *connection);
 
 absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql);
 

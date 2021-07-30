@@ -13,6 +13,8 @@
 #include "pelton/sql/eager_executor.h"
 #include "pelton/util/ints.h"
 
+#define DB_NAME "resultset_test"
+
 // Command line flags.
 DEFINE_string(db_username, "root", "MariaDB username to connect with");
 DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
@@ -21,7 +23,7 @@ DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
 pelton::sql::SqlEagerExecutor executor;
 
 void SetupDB(const std::string &db_username, const std::string &db_password) {
-  executor.Initialize(db_username, db_password);
+  executor.Initialize(DB_NAME, db_username, db_password);
 
   std::string drop = "DROP TABLE IF EXISTS mytest";
   std::string create =
@@ -40,6 +42,7 @@ void SetupDB(const std::string &db_username, const std::string &db_password) {
 
 void CleanupDB() {
   EXPECT_TRUE(executor.ExecuteStatement("DROP TABLE mytest;"));
+  EXPECT_TRUE(executor.ExecuteStatement("DROP DATABASE " DB_NAME));
 }
 
 namespace pelton {

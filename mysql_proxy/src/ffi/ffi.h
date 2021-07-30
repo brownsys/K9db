@@ -49,8 +49,8 @@ void FFIGflags(int argc, char **argv);
 
 // Open a connection. The returned struct has connected = true if successful.
 // Otherwise connected = false.
-FFIConnection FFIOpen(const char *db_dir, const char *db_username,
-                      const char *db_password);
+FFIConnection FFIOpen(const char *db_name, const char *db_dir,
+                      const char *db_username, const char *db_password);
 
 // Execute a DDL statement (e.g. CREATE TABLE, CREATE VIEW, CREATE INDEX).
 bool FFIExecDDL(FFIConnection *c_conn, const char *query);

@@ -48,7 +48,7 @@ class SharderState {
   sql::SqlLazyExecutor &executor() { return this->executor_; }
 
   // Initialization.
-  void Initialize(const std::string &db_username,
+  void Initialize(const std::string &db_name, const std::string &db_username,
                   const std::string &db_password);
 
   // Schema manipulations.

@@ -56,6 +56,8 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         // first statement in sql would be `use db` => acknowledgement
         debug!(self.log, "Rust proxy: starting on_init");
         // Tell client that database context has been changed
+        // TODO(babman, benji): Figure out the DB name from the `use db`
+        // statement and pass that to pelton.
         writer.ok()
     }
 
@@ -67,10 +69,10 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         debug!(self.log, "Rust proxy: starting on_query");
         debug!(self.log, "Rust Proxy: query received is: {:?}", q_string);
 
-        if q_string.contains("CREATE TABLE") 
-            || q_string.contains("CREATE INDEX")
-            || q_string.contains("CREATE VIEW") 
-            || q_string.contains("SET") && !q_string.contains("UPDATE")
+        if q_string.starts_with("CREATE TABLE")
+            || q_string.starts_with("CREATE INDEX")
+            || q_string.starts_with("CREATE VIEW")
+            || q_string.starts_with("SET")
         {
             let ddl_response = exec_ddl(&mut self.rust_conn, q_string);
             debug!(self.log, "ddl_response is {:?}", ddl_response);
@@ -84,14 +86,14 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 error!(self.log, "Rust Proxy: Failed to execute CREATE");
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
-        } else if q_string.contains("UPDATE") && q_string.contains("SET")
-            || q_string.contains("DELETE")
-            || q_string.contains("INSERT")
-            || q_string.contains("GDPR FORGET")
+        } else if q_string.starts_with("UPDATE")
+            || q_string.starts_with("DELETE")
+            || q_string.starts_with("INSERT")
+            || q_string.starts_with("GDPR FORGET")
         {
             let update_response = exec_update(&mut self.rust_conn, q_string);
 
-            // stop measuring runtime and add to total time for this connection 
+            // stop measuring runtime and add to total time for this connection
             self.runtime = self.runtime + start.elapsed();
 
             if update_response != -1 {
@@ -100,7 +102,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 error!(self.log, "Rust Proxy: Failed to execute UPDATE");
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
-        } else if q_string.contains("SELECT") || q_string.contains("GDPR GET") {
+        } else if q_string.starts_with("SELECT") || q_string.starts_with("GDPR GET") {
             let select_response = exec_select(&mut self.rust_conn, q_string);
 
             // stop measuring runtime and add to total time for this connection
@@ -178,7 +180,7 @@ fn main() {
     // initialize rust logging
     let plain = slog_term::PlainSyncDecorator::new(std::io::stdout());
     let log : slog::Logger = slog::Logger::root( slog_term::FullFormat::new(plain).build().fuse(), o!());
-    
+
     // process command line arguments with gflags via FFI
     // create vector of zero terminated CStrings from command line arguments
     let args = std::env::args().map(|arg| CString::new(arg).unwrap()).collect::<Vec<CString>>();
@@ -198,13 +200,13 @@ fn main() {
                 stream
             );
             debug!(log, "Rust Proxy: calling c-wrapper for pelton::open");
-            let rust_conn = open("", "root", "password"); 
+            let rust_conn = open("", "pelton", "root", "password");
             info!(log,
                 "Rust Proxy: connection status is: {:?}",
                 rust_conn.connected
             );
             let backend = Backend { rust_conn : rust_conn, runtime : Duration::new(0, 0), log : log };
-            let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();            
+            let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
         }
     });
     join_handle.join().unwrap();

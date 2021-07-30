@@ -38,9 +38,10 @@ SqlResult SqlLazyExecutor::EmptyResultByType(
 
 // Initialization: initialize the eager executor so that it maintains
 // an open connection to the underlying DB.
-void SqlLazyExecutor::Initialize(const std::string &username,
+void SqlLazyExecutor::Initialize(const std::string &db_name,
+                                 const std::string &username,
                                  const std::string &password) {
-  this->eager_executor_.Initialize(username, password);
+  this->eager_executor_.Initialize(db_name, username, password);
 }
 
 // (lazy) Execution of SQL statements.

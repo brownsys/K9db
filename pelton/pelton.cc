@@ -44,10 +44,11 @@ bool SpecialStatements(const std::string &sql, Connection *connection) {
 
 }  // namespace
 
-bool open(const std::string &directory, const std::string &db_username,
-          const std::string &db_password, Connection *connection) {
+bool open(const std::string &directory, const std::string &db_name,
+          const std::string &db_username, const std::string &db_password,
+          Connection *connection) {
   connection->Initialize(directory);
-  connection->GetSharderState()->Initialize(db_username, db_password);
+  connection->GetSharderState()->Initialize(db_name, db_username, db_password);
   connection->Load();
   return true;
 }

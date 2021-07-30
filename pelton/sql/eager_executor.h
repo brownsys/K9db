@@ -22,7 +22,8 @@ class SqlEagerExecutor {
   SqlEagerExecutor &operator=(const SqlEagerExecutor &&) = delete;
 
   // Initialize: keep a connection open to the underlying DB.
-  void Initialize(const std::string &username, const std::string &password);
+  void Initialize(const std::string &db_name, const std::string &username,
+                  const std::string &password);
 
   // Execute statement against the underlying database.
   // Sharding information should already be baked in the SQL command.

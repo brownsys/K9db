@@ -8,6 +8,8 @@
 #include "gtest/gtest.h"
 #include "mariadb/conncpp.hpp"
 
+#define DB_NAME "ffi_test"
+
 // Read DB configurations.
 // Command line flags.
 DEFINE_string(db_username, "root", "MariaDB username to connect with");
@@ -34,11 +36,11 @@ void DropDatabase() {
   std::unique_ptr<sql::Statement> stmt =
       std::unique_ptr<sql::Statement>(conn->createStatement());
 
-  stmt->execute("DROP DATABASE IF EXISTS pelton");
+  stmt->execute("DROP DATABASE IF EXISTS " DB_NAME);
 }
 
 TEST(PROXY, OPEN_TEST) {
-  c_conn = FFIOpen("", db_username->c_str(), db_password->c_str());
+  c_conn = FFIOpen("", DB_NAME, db_username->c_str(), db_password->c_str());
   EXPECT_TRUE(c_conn.connected) << "Openning connection failed!";
 }
 

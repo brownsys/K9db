@@ -17,16 +17,18 @@ impl Drop for FFIResult {
     }
 }
 
-pub fn open(dir: &str, user: &str, pass: &str) -> FFIConnection {
+pub fn open(dir: &str, db: &str, user: &str, pass: &str) -> FFIConnection {
     // convert &str to char* to pass query to C-wrapper
     let dir = CString::new(dir).unwrap();
     let dir: *mut c_char = dir.as_ptr() as *mut i8;
+    let db = CString::new(db).unwrap();
+    let db: *mut c_char = db.as_ptr() as *mut i8;
     let user = CString::new(user).unwrap();
     let user: *mut c_char = user.as_ptr() as *mut i8;
     let pass = CString::new(pass).unwrap();
     let pass: *mut c_char = pass.as_ptr() as *mut i8;
 
-    let conn = unsafe { FFIOpen(dir, user, pass) };
+    let conn = unsafe { FFIOpen(dir, db, user, pass) };
     return conn;
 }
 

@@ -7,6 +7,8 @@
 #include "gtest/gtest.h"
 #include "mariadb/conncpp.hpp"
 
+#define DB_NAME "eager_executor_test"
+
 // Command line flags.
 DEFINE_string(db_username, "root", "MariaDB username to connect with");
 DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
@@ -123,9 +125,14 @@ int main(int argc, char **argv) {
   const std::string &db_password = FLAGS_db_password;
 
   // Initialize the executor being tested.
-  executor.Initialize(db_username, db_password);
+  executor.Initialize(DB_NAME, db_username, db_password);
 
   // Run tests.
   // Connection is closed implicitly when executor is destructed.
-  return RUN_ALL_TESTS();
+  auto result = RUN_ALL_TESTS();
+
+  // DROP test DB.
+  executor.ExecuteStatement("DROP DATABASE " DB_NAME);
+
+  return result;
 }
