@@ -69,6 +69,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         debug!(self.log, "Rust proxy: starting on_query");
         debug!(self.log, "Rust Proxy: query received is: {:?}", q_string);
 
+        // determine query type and return appropriate response
         if q_string.starts_with("CREATE TABLE")
             || q_string.starts_with("CREATE INDEX")
             || q_string.starts_with("CREATE VIEW")
@@ -202,13 +203,13 @@ fn main() {
                 stream
             );
             debug!(log_clone, "Rust Proxy: calling c-wrapper for pelton::open");
-            let rust_conn = open("", "pelton" "root", "password"); 
+            let rust_conn = open("", "pelton" "root", "password");
             info!(log_clone,
                 "Rust Proxy: connection status is: {:?}",
                 rust_conn.connected
             );
             let backend = Backend { rust_conn : rust_conn, runtime : Duration::new(0, 0), log : log_clone };
-            let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();            
+            let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
         }));
     }
 
