@@ -39,11 +39,10 @@ void JoinOneToOne(benchmark::State& state) {
   leftRecords.emplace_back(std::move(lr1));
   rightRecords.emplace_back(std::move(rr1));
 
-  std::vector<Record> out_rs;
-  op->Process(0, leftRecords, &out_rs);
+  op->Process(0, leftRecords);
   size_t processed = 0;
   for (auto _ : state) {
-    op->Process(1, rightRecords, &out_rs);
+    op->Process(1, rightRecords);
     processed++;
   }
   state.SetItemsProcessed(processed);

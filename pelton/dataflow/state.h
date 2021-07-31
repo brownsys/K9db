@@ -3,10 +3,10 @@
 // The state includes the currently installed flows, including their operators
 // and state.
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <memory>
 
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/ops/input.h"
@@ -53,7 +53,7 @@ class DataFlowState {
   Record CreateRecord(const sqlast::Insert &insert_stmt) const;
 
   // Process raw data from sharder and use it to update flows.
-  bool ProcessRecords(const TableName &table_name,
+  void ProcessRecords(const TableName &table_name,
                       const std::vector<Record> &records);
 
   uint64_t SizeInMemory() const;

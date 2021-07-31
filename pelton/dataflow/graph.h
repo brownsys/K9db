@@ -36,7 +36,7 @@ class DataFlowGraph {
   bool AddOutputOperator(std::shared_ptr<MatViewOperator> op,
                          std::shared_ptr<Operator> parent);
 
-  bool Process(const std::string &input_name,
+  void Process(const std::string &input_name,
                const std::vector<Record> &records);
 
   // Accessors.

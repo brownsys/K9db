@@ -36,8 +36,8 @@ class AggregateOperator : public Operator {
   }
 
  protected:
-  bool Process(NodeIndex source, const std::vector<Record> &records,
-               std::vector<Record> *output) override;
+  std::optional<std::vector<Record>> Process(
+      NodeIndex source, const std::vector<Record> &records) override;
   void ComputeOutputSchema() override;
 
   uint64_t SizeInMemory() const override { return this->state_.SizeInMemory(); }
