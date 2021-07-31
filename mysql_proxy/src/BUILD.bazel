@@ -19,6 +19,7 @@ rust_binary(
         "//mysql_proxy:slog",
         "//mysql_proxy:slog_term",
         "//mysql_proxy/src/ffi",
+        "//mysql_proxy:ctrlc",
     ],
 )
 

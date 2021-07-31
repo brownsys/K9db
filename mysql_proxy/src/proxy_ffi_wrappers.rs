@@ -17,7 +17,7 @@ impl Drop for FFIResult {
     }
 }
 
-pub fn open(dir: &str, db: &str, user: &str, pass: &str) -> FFIConnection {
+pub fn open_ffi(dir: &str, db: &str, user: &str, pass: &str) -> FFIConnection {
     // convert &str to char* to pass query to C-wrapper
     let dir = CString::new(dir).unwrap();
     let dir: *mut c_char = dir.as_ptr() as *mut i8;
@@ -32,24 +32,24 @@ pub fn open(dir: &str, db: &str, user: &str, pass: &str) -> FFIConnection {
     return conn;
 }
 
-pub fn close(rust_conn: *mut FFIConnection) -> bool {
+pub fn close_ffi(rust_conn: *mut FFIConnection) -> bool {
     let response = unsafe { FFIClose(rust_conn) };
     return response;
 }
 
-pub fn exec_ddl(rust_conn: *mut FFIConnection, query: &str) -> bool {
+pub fn exec_ddl_ffi(rust_conn: *mut FFIConnection, query: &str) -> bool {
     let c_query = CString::new(query).unwrap();
     let char_query = c_query.as_ptr() as *mut i8;
     return unsafe { FFIExecDDL(rust_conn, char_query) };
 }
 
-pub fn exec_update(rust_conn: *mut FFIConnection, query: &str) -> i32 {
+pub fn exec_update_ffi(rust_conn: *mut FFIConnection, query: &str) -> i32 {
     let c_query = CString::new(query).unwrap();
     let char_query = c_query.as_ptr() as *mut i8;
     return unsafe { FFIExecUpdate(rust_conn, char_query) };
 }
 
-pub fn exec_select(rust_conn: *mut FFIConnection, query: &str) -> *mut FFIResult {
+pub fn exec_select_ffi(rust_conn: *mut FFIConnection, query: &str) -> *mut FFIResult {
     let c_query = CString::new(query).unwrap();
     let char_query = c_query.as_ptr() as *mut i8;
     return unsafe { FFIExecSelect(rust_conn, char_query) };

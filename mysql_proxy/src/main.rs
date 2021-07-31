@@ -4,18 +4,21 @@
 
 #[macro_use]
 extern crate slog;
-extern crate slog_term;
+extern crate ctrlc;
 extern crate msql_srv;
 extern crate proxy_ffi;
+extern crate slog_term;
 
-use slog::Drain;
 use msql_srv::*;
 use proxy_ffi::*;
+use slog::Drain;
+use std::ffi::CString;
 use std::io;
 use std::net;
-use std::ffi::CString;
-use std::time::{Duration, Instant};
 use std::os::raw::{c_char, c_int};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 #[derive(Debug)]
 struct Backend {
@@ -75,7 +78,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             || q_string.starts_with("CREATE VIEW")
             || q_string.starts_with("SET")
         {
-            let ddl_response = exec_ddl(&mut self.rust_conn, q_string);
+            let ddl_response = exec_ddl_ffi(&mut self.rust_conn, q_string);
             debug!(self.log, "ddl_response is {:?}", ddl_response);
 
             // stop measuring runtime and add to total time for this connection
@@ -92,7 +95,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             || q_string.starts_with("INSERT")
             || q_string.starts_with("GDPR FORGET")
         {
-            let update_response = exec_update(&mut self.rust_conn, q_string);
+            let update_response = exec_update_ffi(&mut self.rust_conn, q_string);
 
             // stop measuring runtime and add to total time for this connection
             self.runtime = self.runtime + start.elapsed();
@@ -104,7 +107,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
         } else if q_string.starts_with("SELECT") || q_string.starts_with("GDPR GET") {
-            let select_response = exec_select(&mut self.rust_conn, q_string);
+            let select_response = exec_select_ffi(&mut self.rust_conn, q_string);
 
             // stop measuring runtime and add to total time for this connection
             self.runtime = self.runtime + start.elapsed();
@@ -114,11 +117,17 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             let col_names = unsafe { (*select_response).col_names };
             let col_types = unsafe { (*select_response).col_types };
 
-            debug!(self.log, "Rust Proxy: converting response schema to rust compatible types");
+            debug!(
+                self.log,
+                "Rust Proxy: converting response schema to rust compatible types"
+            );
             let cols = convert_columns(num_cols, col_types, col_names);
             let mut rw = results.start(&cols)?;
 
-            debug!(self.log, "Rust Proxy: writing query response using RowWriter");
+            debug!(
+                self.log,
+                "Rust Proxy: writing query response using RowWriter"
+            );
             // convert incomplete array field (flexible array) to rust slice, starting with the outer array
             let rows_slice = unsafe { (*select_response).values.as_slice(num_rows * num_cols) };
             for r in 0..num_rows {
@@ -167,8 +176,11 @@ impl Drop for Backend {
     fn drop(&mut self) {
         debug!(self.log, "Rust Proxy: Starting destructor for Backend");
         debug!(self.log, "Rust Proxy: Calling c-wrapper for pelton::close");
-        debug!(self.log, "Total time elapsed for this connection is: {:?}", self.runtime);
-        let close_response: bool = close(&mut self.rust_conn);
+        debug!(
+            self.log,
+            "Total time elapsed for this connection is: {:?}", self.runtime
+        );
+        let close_response: bool = close_ffi(&mut self.rust_conn);
         if close_response {
             debug!(self.log, "Rust Proxy: successfully closed connection");
         } else {
@@ -180,39 +192,81 @@ impl Drop for Backend {
 fn main() {
     // initialize rust logging
     let plain = slog_term::PlainSyncDecorator::new(std::io::stdout());
-    let log : slog::Logger = slog::Logger::root( slog_term::FullFormat::new(plain).build().fuse(), o!());
+    let log: slog::Logger =
+        slog::Logger::root(slog_term::FullFormat::new(plain).build().fuse(), o!());
 
     // process command line arguments with gflags via FFI
     // create vector of zero terminated CStrings from command line arguments
-    let args = std::env::args().map(|arg| CString::new(arg).unwrap()).collect::<Vec<CString>>();
+    let args = std::env::args()
+        .map(|arg| CString::new(arg).unwrap())
+        .collect::<Vec<CString>>();
     let c_argc = args.len() as c_int;
     // convert CStrings to raw pointers
-    let mut c_argv = args.iter().map(|arg| arg.as_ptr() as *mut i8).collect::<Vec<*mut c_char>>();
-    unsafe{FFIGflags(c_argc, c_argv.as_mut_ptr())};
+    let mut c_argv = args
+        .iter()
+        .map(|arg| arg.as_ptr() as *mut i8)
+        .collect::<Vec<*mut c_char>>();
+    // pass converted arguments to C-FFI
+    unsafe { FFIGflags(c_argc, c_argv.as_mut_ptr()) };
 
     let listener = net::TcpListener::bind("127.0.0.1:10001").unwrap();
     info!(log, "Rust Proxy: Listening at: {:?}", listener);
+    // set listener to non-blocking mode
+    listener
+        .set_nonblocking(true)
+        .expect("Cannot set non-blocking");
+    let listener_terminated = Arc::new(AtomicBool::new(false));
 
+    // store client thread handles
     let mut threads = Vec::new();
 
-    while let Ok((stream, _addr)) = listener.accept() {
-        let log_clone = log.clone();
-        threads.push(std::thread::spawn(move || {
-            info!(log_clone,
-                "Rust Proxy: Successfully connected to mysql proxy\nStream and address are: {:?}",
-                stream
-            );
-            debug!(log_clone, "Rust Proxy: calling c-wrapper for pelton::open");
-            let rust_conn = open("", "pelton" "root", "password");
-            info!(log_clone,
-                "Rust Proxy: connection status is: {:?}",
-                rust_conn.connected
-            );
-            let backend = Backend { rust_conn : rust_conn, runtime : Duration::new(0, 0), log : log_clone };
-            let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
-        }));
+    // detect listener status via shared boolean
+    let listener_terminated_clone = Arc::clone(&listener_terminated);
+    // detect SIGTERM to close listener
+    let log_ctrlc = log.clone();
+    ctrlc::set_handler(move || {
+        info!(
+            log_ctrlc,
+            "Rust Proxy: received SIGTERM! Terminating listener once all client connections have closed..."
+        );
+        listener_terminated_clone.store(true, Ordering::Relaxed);
+        debug!(
+            log_ctrlc,
+            "Rust Proxy: listener_terminated = {:?}",
+            listener_terminated_clone.load(Ordering::Relaxed)
+        );
+    })
+    .expect("Error setting Ctrl-C handler");
+
+    // run listener until terminated with SIGTERM
+    while !listener_terminated.load(Ordering::Relaxed) {
+        while let Ok((stream, _addr)) = listener.accept() {
+            // clone log so that each client thread has an owned copy
+            let log_client = log.clone();
+            threads.push(std::thread::spawn(move || {
+                info!(
+                    log_client,
+                    "Rust Proxy: Successfully connected to mysql proxy\nStream and address are: {:?}",
+                    stream
+                );
+                let rust_conn = open_ffi("", "pelton", "root", "password");
+                info!(
+                    log_client,
+                    "Rust Proxy: connection status is: {:?}", rust_conn.connected
+                );
+                let backend = Backend {
+                    rust_conn: rust_conn,
+                    runtime: Duration::new(0, 0),
+                    log: log_client,
+                };
+                let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
+            }));
+        }
+        // wait before checking listener status
+        std::thread::sleep(Duration::from_secs(1));
     }
 
+    // join all client threads
     for join_handle in threads {
         join_handle.join().unwrap();
     }
