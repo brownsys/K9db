@@ -5,10 +5,11 @@ cc_binary(
     srcs = [
         "example.cc",
     ],
+    linkstatic = 0,
     deps = [
         "//pelton",
         "//pelton/util:perf",
-        "@gflags",
+        "@com_github_gflags_gflags//:gflags",
         "@glog",
     ],
 )
@@ -18,11 +19,12 @@ cc_binary(
     srcs = [
         "cli.cc",
     ],
+    linkstatic = 0,
     deps = [
         "//pelton",
         "//pelton/util:latency",
         "//pelton/util:perf",
-        "@gflags",
+        "@com_github_gflags_gflags//:gflags",
         "@glog",
     ],
 )
@@ -38,7 +40,7 @@ cc_binary(
     deps = [
         "//pelton/util:latency",
         "//pelton/util:perf",
-        "@gflags",
+        "@com_github_gflags_gflags//:gflags",
         "@glog",
     ],
 )

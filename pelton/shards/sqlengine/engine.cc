@@ -22,11 +22,11 @@ namespace pelton {
 namespace shards {
 namespace sqlengine {
 
-absl::StatusOr<mysql::SqlResult> Shard(const std::string &sql,
-                                       SharderState *state,
-                                       dataflow::DataFlowState *dataflow_state,
-                                       std::string *shard_kind,
-                                       std::string *user_id) {
+absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
+                                     SharderState *state,
+                                     dataflow::DataFlowState *dataflow_state,
+                                     std::string *shard_kind,
+                                     std::string *user_id) {
   // Parse with ANTLR into our AST.
   perf::Start("parsing");
   sqlast::SQLParser parser;
@@ -75,14 +75,13 @@ absl::StatusOr<mysql::SqlResult> Shard(const std::string &sql,
     case sqlast::AbstractStatement::Type::CREATE_VIEW: {
       auto *stmt = static_cast<sqlast::CreateView *>(statement.get());
       CHECK_STATUS(view::CreateView(*stmt, state, dataflow_state));
-      return mysql::SqlResult();
+      return sql::SqlResult(true);
     }
 
     // Case 7: CREATE INEDX statement.
     case sqlast::AbstractStatement::Type::CREATE_INDEX: {
       auto *stmt = static_cast<sqlast::CreateIndex *>(statement.get());
-      CHECK_STATUS(index::CreateIndex(*stmt, state, dataflow_state));
-      return mysql::SqlResult();
+      return index::CreateIndex(*stmt, state, dataflow_state);
     }
 
     // Case 8: GDPR (GET | FORGET) statements.

@@ -34,7 +34,7 @@ static inline void Trim(std::string &s) {
 bool echo = false;
 
 bool SpecialStatements(const std::string &sql, Connection *connection) {
-  if (sql == "SET echo;") {
+  if (sql == "SET echo;" || sql == "SET echo") {
     echo = true;
     std::cout << "SET echo;" << std::endl;
     return true;
@@ -44,10 +44,11 @@ bool SpecialStatements(const std::string &sql, Connection *connection) {
 
 }  // namespace
 
-bool open(const std::string &directory, const std::string &db_username,
-          const std::string &db_password, Connection *connection) {
+bool open(const std::string &directory, const std::string &db_name,
+          const std::string &db_username, const std::string &db_password,
+          Connection *connection) {
   connection->Initialize(directory);
-  connection->GetSharderState()->Initialize(db_username, db_password);
+  connection->GetSharderState()->Initialize(db_name, db_username, db_password);
   connection->Load();
   return true;
 }
@@ -61,7 +62,7 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
 
   // If special statement, handle it separately.
   if (SpecialStatements(sql, connection)) {
-    return SqlResult();
+    return SqlResult(true);
   }
 
   // Parse and rewrite statement.
