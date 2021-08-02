@@ -7,11 +7,11 @@
 #include <unordered_set>
 #include <utility>
 
-#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
+#include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -19,8 +19,9 @@ namespace shards {
 namespace sqlengine {
 namespace index {
 
-absl::Status CreateIndex(const sqlast::CreateIndex &stmt, SharderState *state,
-                         dataflow::DataFlowState *dataflow_state);
+absl::StatusOr<sql::SqlResult> CreateIndex(
+    const sqlast::CreateIndex &stmt, SharderState *state,
+    dataflow::DataFlowState *dataflow_state);
 
 absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
     const std::string &table_name, const std::string &shard_by,

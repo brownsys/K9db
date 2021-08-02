@@ -5,7 +5,7 @@
 #include "benchmark/benchmark.h"
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/key.h"
-#include "pelton/dataflow/ops/benchmark-utils.h"
+#include "pelton/dataflow/ops/benchmark_utils.h"
 #include "pelton/dataflow/ops/equijoin.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/record.h"
