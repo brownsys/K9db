@@ -25,6 +25,7 @@ java_binary(
     main_class = "com.brownsys.pelton.QueryPlanner",
     visibility = ["//pelton/planner:__subpackages__"],
     deps = [
+        "@maven//:org_apache_calcite_avatica_avatica_core",
         "@maven//:org_apache_calcite_calcite_core",
         "@maven//:org_bytedeco_javacpp",
     ],
