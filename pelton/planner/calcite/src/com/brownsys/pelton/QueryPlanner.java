@@ -68,11 +68,74 @@ public class QueryPlanner {
             SqlStdOperatorTable.instance(), catalogReader, typeFactory, validatorConfig);
 
     // Configure the HepPlanner.
+    // The HepPlanner consists of multiple sub programs.
+    // The subprograms are executed in order.
+    // When a subprogram is executed, its rules are executed one at a time in order, a rule is repeated
+    // until its execution does not change the expression, before moving to the next rule.
+    // The execution of a subprogram is repeated until the subprogram as a whole no-longer
+    // changes the expression, before moving to the next subprogram.
+
+    // Performs constant folding.
+    HepProgram constantFolding =
+        HepProgram.builder()
+          .addRuleInstance(CoreRules.PROJECT_REDUCE_EXPRESSIONS)
+          .addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS)
+          .addRuleInstance(CoreRules.JOIN_REDUCE_EXPRESSIONS)
+          .build();
+    // Simplify the plan by merging consecutive matching operators
+    // or removing useless/empty operators.
+    HepProgram simplifier =
+        HepProgram.builder()
+          .addRuleInstance(CoreRules.PROJECT_MERGE)
+          .addRuleInstance(CoreRules.FILTER_MERGE)
+          .addRuleInstance(CoreRules.AGGREGATE_MERGE)
+          .addRuleInstance(CoreRules.UNION_MERGE)
+          .addRuleInstance(CoreRules.UNION_REMOVE)
+          .build();
+    // Pushes projects until they reach the closest possible point to input(s).
+    // Includes splitting the projection into multiple cascading ones.
+    HepProgram pushProject =
+        HepProgram.builder()
+          .addRuleInstance(CoreRules.PROJECT_JOIN_TRANSPOSE)
+          .addRuleInstance(CoreRules.PROJECT_FILTER_TRANSPOSE)
+          .addRuleInstance(CoreRules.PROJECT_MERGE)
+          .build();
+    // Pushes filters until they reach the closest possible point to input(s).
+    // This may end up splitting a filter consisting of multiple conditions into
+    // many filters, each of them getting pushed to a different level / branch.
+    HepProgram pushFilter =
+        HepProgram.builder()
+          .addRuleInstance(CoreRules.FILTER_AGGREGATE_TRANSPOSE)
+          .addRuleInstance(CoreRules.FILTER_PROJECT_TRANSPOSE)
+          .addRuleInstance(CoreRules.FILTER_MERGE)
+          // Extract conditions that are part of a join but only depend on
+          // a single input of the join, and puts them as filters on that input
+          // directly.
+          .addRuleInstance(CoreRules.JOIN_CONDITION_PUSH)
+          .addRuleInstance(CoreRules.JOIN_PUSH_TRANSITIVE_PREDICATES)
+          // TODO(babman): Need our own version of FILTER_ON_JOIN.
+          .build();
+    // The complete optimization program.
     HepProgram hepProgram =
         HepProgram.builder()
-            .addRuleInstance(CoreRules.AGGREGATE_JOIN_TRANSPOSE)
-            .addRuleInstance(CoreRules.FILTER_AGGREGATE_TRANSPOSE)
-            .addRuleInstance(CoreRules.FILTER_PROJECT_TRANSPOSE)
+            .addSubprogram(constantFolding)
+            .addSubprogram(simplifier)
+            // Get filters as deep as possible.
+            .addSubprogram(pushFilter)
+            .addSubprogram(simplifier)
+            // This gets the projects as deep as possible, past even filters.
+            .addSubprogram(pushProject)
+            .addSubprogram(simplifier)
+            // This gets filters as deep as possible.
+            // This really only pushes filters past projects.
+            // If they are push-able past any other operator, then that
+            // push would have already happened in the previous pushFilter
+            // application.
+            // Because of the order, projects are also deep,
+            // the only operators potentially in front of them
+            // are filters.
+            .addSubprogram(pushFilter)
+            .addSubprogram(simplifier)
             .build();
     this.planner = new HepPlanner(hepProgram);
 
