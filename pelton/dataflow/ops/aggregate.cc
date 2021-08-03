@@ -145,7 +145,7 @@ inline void AggregateOperator::InitAggregateValue(Record *aggregate_record,
 }
 
 std::optional<std::vector<Record>> AggregateOperator::Process(
-    NodeIndex source, const std::vector<Record> &records) {
+    NodeIndex, const std::vector<Record> &records) {
   std::vector<Record> output;
   absl::flat_hash_map<Key, StateChange> first_delta;
 

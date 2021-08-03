@@ -52,7 +52,7 @@ class FilterOperator : public Operator {
   }
 
   std::optional<std::vector<Record>> Process(
-      NodeIndex source, const std::vector<Record> &records) override;
+      NodeIndex, const std::vector<Record> &records) override;
 
  protected:
   bool Accept(const Record &record) const;

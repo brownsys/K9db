@@ -31,7 +31,7 @@ void UnionOperator::ComputeOutputSchema() {
 }
 
 std::optional<std::vector<Record>> UnionOperator::Process(
-    NodeIndex source, const std::vector<Record> &records) {
+    NodeIndex, const std::vector<Record> &records) {
   return std::nullopt;
 }
 

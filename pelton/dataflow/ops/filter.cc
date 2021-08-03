@@ -95,7 +95,7 @@ void FilterOperator::ComputeOutputSchema() {
 }
 
 std::optional<std::vector<Record>> FilterOperator::Process(
-    NodeIndex source, const std::vector<Record> &records) {
+    NodeIndex, const std::vector<Record> &records) {
   std::vector<Record> output;
   for (const Record &record : records) {
     if (this->Accept(record)) {
