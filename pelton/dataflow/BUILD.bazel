@@ -360,7 +360,7 @@ cc_test(
     ],
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
-        ":state",
+        ":dstate",
         ":graph-test-utils",
         "@glog",
         "@gtest",
