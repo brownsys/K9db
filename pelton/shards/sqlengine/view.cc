@@ -230,7 +230,7 @@ absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
   return absl::OkStatus();
 }
 
-absl::StatusOr<mysql::SqlResult> SelectView(
+absl::StatusOr<sql::SqlResult> SelectView(
     const sqlast::Select &stmt, SharderState *state,
     dataflow::DataFlowState *dataflow_state) {
   // TODO(babman): fix this.
@@ -269,8 +269,8 @@ absl::StatusOr<mysql::SqlResult> SelectView(
   }
 
   perf::End("SelectView");
-  return mysql::SqlResult(
-      std::make_unique<mysql::InlinedSqlResult>(std::move(records)), schema);
+  return sql::SqlResult(std::make_unique<sql::_result::SqlInlineResultSet>(
+      schema, std::move(records)));
 }
 
 }  // namespace view

@@ -26,10 +26,10 @@ std::string Dequote(const std::string &st) {
 
 }  // namespace
 
-absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Insert &stmt,
-                                       SharderState *state,
-                                       dataflow::DataFlowState *dataflow_state,
-                                       bool update_flows) {
+absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
+                                     SharderState *state,
+                                     dataflow::DataFlowState *dataflow_state,
+                                     bool update_flows) {
   perf::Start("Insert");
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
@@ -42,13 +42,13 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Insert &stmt,
 
   // Shard the insert statement so it is executable against the physical
   // sharded database.
-  mysql::SqlResult result;
+  sql::SqlResult result = sql::SqlResult(0);
 
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
     // The insertion statement is unmodified.
-    result = state->connection_pool().ExecuteDefault(&stmt);
+    result = state->executor().ExecuteDefault(&stmt);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded!
@@ -91,8 +91,8 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Insert &stmt,
       //               insert.
       if (!state->ShardExists(info.shard_kind, user_id)) {
         for (auto *create_stmt : state->CreateShard(info.shard_kind, user_id)) {
-          mysql::SqlResult tmp =
-              state->connection_pool().ExecuteShard(create_stmt, info, user_id);
+          sql::SqlResult tmp =
+              state->executor().ExecuteShard(create_stmt, info, user_id);
           if (!tmp.IsStatement() || !tmp.Success()) {
             return absl::InternalError("Could not created sharded table");
           }
@@ -100,9 +100,7 @@ absl::StatusOr<mysql::SqlResult> Shard(const sqlast::Insert &stmt,
       }
 
       // Add the modified insert statement.
-      result.MakeInline();
-      result.Append(
-          state->connection_pool().ExecuteShard(&cloned, info, user_id));
+      result.Append(state->executor().ExecuteShard(&cloned, info, user_id));
     }
   }
 

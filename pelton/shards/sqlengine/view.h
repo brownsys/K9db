@@ -5,9 +5,9 @@
 
 #include "absl/status/statusor.h"
 #include "pelton/dataflow/state.h"
-#include "pelton/mysql/result.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
+#include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -18,7 +18,7 @@ namespace view {
 absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
                         dataflow::DataFlowState *dataflow_state);
 
-absl::StatusOr<mysql::SqlResult> SelectView(
+absl::StatusOr<sql::SqlResult> SelectView(
     const sqlast::Select &stmt, SharderState *state,
     dataflow::DataFlowState *dataflow_state);
 

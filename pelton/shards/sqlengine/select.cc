@@ -14,16 +14,16 @@ namespace shards {
 namespace sqlengine {
 namespace select {
 
-absl::StatusOr<mysql::SqlResult> Shard(
-    const sqlast::Select &stmt, SharderState *state,
-    dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
+                                     SharderState *state,
+                                     dataflow::DataFlowState *dataflow_state) {
   perf::Start("Select");
   // Disqualifiy LIMIT and OFFSET queries.
   if (!stmt.SupportedByShards()) {
     return absl::InvalidArgumentError("Query contains unsupported features");
   }
 
-  mysql::SqlResult result;
+  sql::SqlResult result;
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
   dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
@@ -31,7 +31,7 @@ absl::StatusOr<mysql::SqlResult> Shard(
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
-    result = state->connection_pool().ExecuteDefault(&stmt, schema);
+    result = state->executor().ExecuteDefault(&stmt, schema);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded.
@@ -61,9 +61,9 @@ absl::StatusOr<mysql::SqlResult> Shard(
           if (lookup.size() == 1) {
             user_id = std::move(*lookup.cbegin());
             // Execute statement directly against shard.
-            result.MakeInline();
-            result.AppendDeduplicate(state->connection_pool().ExecuteShard(
-                &cloned, info, user_id, schema));
+            result.Append(
+                state->executor().ExecuteShard(&cloned, info, user_id, schema),
+                true);
           }
         } else if (state->ShardExists(info.shard_kind, user_id)) {
           // Remove where condition on the shard by column, since it does not
@@ -71,9 +71,9 @@ absl::StatusOr<mysql::SqlResult> Shard(
           sqlast::ExpressionRemover expression_remover(info.shard_by);
           cloned.Visit(&expression_remover);
           // Execute statement directly against shard.
-          result.MakeInline();
-          result.AppendDeduplicate(state->connection_pool().ExecuteShard(
-              &cloned, info, user_id, schema));
+          result.Append(
+              state->executor().ExecuteShard(&cloned, info, user_id, schema),
+              true);
         }
 
       } else {
@@ -85,23 +85,23 @@ absl::StatusOr<mysql::SqlResult> Shard(
                                state, dataflow_state));
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
-          result.MakeInline();
-          result.AppendDeduplicate(state->connection_pool().ExecuteShards(
-              &cloned, info, pair.second, schema));
+          result.Append(state->executor().ExecuteShards(&cloned, info,
+                                                        pair.second, schema),
+                        true);
         } else {
           // Secondary index unhelpful.
           // Select from all the relevant shards.
-          result.MakeInline();
-          result.AppendDeduplicate(state->connection_pool().ExecuteShards(
-              &cloned, info, state->UsersOfShard(info.shard_kind), schema));
+          result.Append(
+              state->executor().ExecuteShards(
+                  &cloned, info, state->UsersOfShard(info.shard_kind), schema),
+              true);
         }
       }
     }
   }
 
   if (!result.IsQuery()) {
-    result =
-        mysql::SqlResult{std::make_unique<mysql::InlinedSqlResult>(), schema};
+    result = sql::SqlResult(schema);
   }
 
   perf::End("Select");

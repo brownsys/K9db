@@ -104,9 +104,9 @@ sqlast::Insert InsertRecord(const dataflow::Record &record,
 
 }  // namespace
 
-absl::StatusOr<mysql::SqlResult> Shard(
-    const sqlast::Update &stmt, SharderState *state,
-    dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
+                                     SharderState *state,
+                                     dataflow::DataFlowState *dataflow_state) {
   perf::Start("Update");
 
   // Table name to select from.
@@ -118,18 +118,18 @@ absl::StatusOr<mysql::SqlResult> Shard(
   std::vector<dataflow::Record> records;
   size_t old_records_size = 0;
   if (update_flows) {
-    MOVE_OR_RETURN(mysql::SqlResult domain_result,
+    MOVE_OR_RETURN(sql::SqlResult domain_result,
                    select::Shard(stmt.SelectDomain(), state, dataflow_state));
-    records = domain_result.Vectorize();
+    records = domain_result.NextResultSet()->Vectorize();
     old_records_size = records.size();
     CHECK_STATUS(UpdateRecords(&records, stmt, state->GetSchema(table_name)));
   }
 
-  mysql::SqlResult result;
+  sql::SqlResult result = sql::SqlResult(0);
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
-    result = state->connection_pool().ExecuteDefault(&stmt);
+    result = state->executor().ExecuteDefault(&stmt);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded.
@@ -137,19 +137,16 @@ absl::StatusOr<mysql::SqlResult> Shard(
       // The update statement might move the rows from one shard to another.
       // We can only perform this update by splitting it into a DELETE-INSERT
       // pair.
-      MOVE_OR_RETURN(
-          mysql::SqlResult tmp,
-          delete_::Shard(stmt.DeleteDomain(), state, dataflow_state, false));
-      result.MakeInline();
-      result.Append(std::move(tmp));
+      MOVE_OR_RETURN(result, delete_::Shard(stmt.DeleteDomain(), state,
+                                            dataflow_state, false));
 
       // Insert updated records.
       for (size_t i = old_records_size; i < records.size(); i++) {
         sqlast::Insert insert_stmt =
             InsertRecord(records.at(i), state->GetSchema(table_name));
         MOVE_OR_RETURN(
-            tmp, insert::Shard(insert_stmt, state, dataflow_state, false));
-        result.MakeInline();
+            sql::SqlResult tmp,
+            insert::Shard(insert_stmt, state, dataflow_state, false));
         result.Append(std::move(tmp));
       }
 
@@ -174,9 +171,8 @@ absl::StatusOr<mysql::SqlResult> Shard(
             if (lookup.size() == 1) {
               user_id = std::move(*lookup.cbegin());
               // Execute statement directly against shard.
-              result.MakeInline();
-              result.Append(state->connection_pool().ExecuteShard(&cloned, info,
-                                                                  user_id));
+              result.Append(
+                  state->executor().ExecuteShard(&cloned, info, user_id));
             }
           } else if (state->ShardExists(info.shard_kind, user_id)) {
             // Remove where condition on the shard by column, since it does
@@ -184,9 +180,8 @@ absl::StatusOr<mysql::SqlResult> Shard(
             sqlast::ExpressionRemover expression_remover(info.shard_by);
             cloned.Visit(&expression_remover);
             // Execute statement directly against shard.
-            result.MakeInline();
             result.Append(
-                state->connection_pool().ExecuteShard(&cloned, info, user_id));
+                state->executor().ExecuteShard(&cloned, info, user_id));
           }
 
         } else if (update_flows) {
@@ -208,9 +203,7 @@ absl::StatusOr<mysql::SqlResult> Shard(
             }
           }
 
-          result.MakeInline();
-          result.Append(
-              state->connection_pool().ExecuteShards(&cloned, info, shards));
+          result.Append(state->executor().ExecuteShards(&cloned, info, shards));
 
         } else {
           // The update statement by itself does not obviously constraint a
@@ -221,13 +214,11 @@ absl::StatusOr<mysql::SqlResult> Shard(
                                  stmt.GetWhereClause(), state, dataflow_state));
           if (pair.first) {
             // Secondary index available for some constrainted column in stmt.
-            result.MakeInline();
-            result.AppendDeduplicate(state->connection_pool().ExecuteShards(
-                &cloned, info, pair.second));
+            result.Append(
+                state->executor().ExecuteShards(&cloned, info, pair.second));
           } else {
             // Update against all shards.
-            result.MakeInline();
-            result.Append(state->connection_pool().ExecuteShards(
+            result.Append(state->executor().ExecuteShards(
                 &cloned, info, state->UsersOfShard(info.shard_kind)));
           }
         }
@@ -238,9 +229,6 @@ absl::StatusOr<mysql::SqlResult> Shard(
   // Delete was successful, time to update dataflows.
   if (update_flows) {
     dataflow_state->ProcessRecords(table_name, records);
-  }
-  if (!result.IsUpdate()) {
-    result = mysql::SqlResult{std::make_unique<mysql::UpdateResult>(0)};
   }
 
   perf::End("Update");
