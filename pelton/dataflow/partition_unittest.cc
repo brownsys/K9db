@@ -41,7 +41,7 @@ TEST(PartitionTest, BasicTest) {
   std::vector<ColumnID> partition_cols = {0, 2};
 
   absl::flat_hash_map<uint16_t, std::vector<Record>> partitions =
-      PartitionTrivial(std::move(records), partition_cols, 2);
+      partition::HashPartition(std::move(records), partition_cols, 2);
   EXPECT_EQ(partitions.size(), 2);
   EXPECT_EQ(partitions.at(0).size(), 1);
   EXPECT_EQ(partitions.at(1).size(), 1);

@@ -31,8 +31,8 @@ std::optional<std::vector<Record>> ExchangeOperator::Process(
   }
 
   absl::flat_hash_map<uint16_t, std::vector<Record>> partitioned_records =
-      PartitionTrivial(std::move(to_partition), this->partition_key_,
-                       this->total_partitions_);
+      partition::HashPartition(std::move(to_partition), this->partition_key_,
+                               this->total_partitions_);
 
   // Forward records that are meant to be in the current partition
   if (partitioned_records.contains(this->current_partition_)) {

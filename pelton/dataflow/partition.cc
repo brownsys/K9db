@@ -7,11 +7,12 @@
 namespace pelton {
 namespace dataflow {
 
+namespace partition {
 uint16_t GetPartition(const Key &key, const uint16_t &total_partitions) {
   return (uint16_t)(key.Hash() % (size_t)total_partitions);
 }
 
-absl::flat_hash_map<uint16_t, std::vector<Record>> PartitionTrivial(
+absl::flat_hash_map<uint16_t, std::vector<Record>> HashPartition(
     std::vector<Record> records, const std::vector<ColumnID> &cols,
     const uint16_t &total_partitions) {
   absl::flat_hash_map<uint16_t, std::vector<Record>> partitions;
@@ -28,6 +29,7 @@ absl::flat_hash_map<uint16_t, std::vector<Record>> PartitionTrivial(
   }
   return partitions;
 }
+}  // namespace partition
 
 }  // namespace dataflow
 }  // namespace pelton
