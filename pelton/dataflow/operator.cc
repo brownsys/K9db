@@ -80,20 +80,19 @@ std::string Operator::DebugString() const {
       break;
   }
 
-  std::string str = "{";
-  str += "\"operator\": \"" + type_str + "\", ";
-  str += "\"id\": " + std::to_string(this->index()) + ", ";
-  str += "\"children\": [";
+  std::string str = "";
+  str += "  \"operator\": \"" + type_str + "\",\n";
+  str += "  \"id\": " + std::to_string(this->index()) + ",\n";
+  str += "  \"children\": [";
   for (const std::weak_ptr<Edge> &edge : this->children_) {
-    str += std::to_string(edge.lock()->to().lock()->index()) + ",";
+    str += std::to_string(edge.lock()->to().lock()->index()) + ", ";
   }
-  if (this->children_.size() > 0) {
-    str.pop_back();
-  }
-  str += "], ";
+  str.pop_back();
+  str.pop_back();
+  str += "],\n";
 
   // print input schema
-  str += "\"input_columns\": [";
+  str += "  \"input_columns\": [ ";
   for (const SchemaRef schema : this->input_schemas_) {
     str += "[";
     for (const std::string col : schema.column_names()) {
@@ -105,18 +104,16 @@ std::string Operator::DebugString() const {
   }
   str.pop_back();
   str.pop_back();
-  str += "], ";
+  str += " ],\n";
 
   // print output schema
-  str += "\"output_columns\": [";
+  str += "  \"output_columns\": [";
   for (const std::string col : this->output_schema_.column_names()) {
     str += "\"" + col + "\", ";
   }
   str.pop_back();
   str.pop_back();
-  str += "]";
-
-  str += "}\n";
+  str += "],\n";
   return str;
 }
 

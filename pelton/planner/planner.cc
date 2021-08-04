@@ -15,6 +15,13 @@
 #define CLASS_PATH_ARG "-Djava.class.path="
 #define LIBRARY_PATH_ARG "-Djava.library.path="
 
+// Configure java logging level according to compilation mode/config.
+#ifndef PELTON_OPT
+#define PELTON_JAVA_DEBUG true
+#else
+#define PELTON_JAVA_DEBUG false
+#endif  // PELTON_OPT
+
 namespace pelton {
 namespace planner {
 
@@ -77,7 +84,7 @@ dataflow::DataFlowGraph PlanGraph(dataflow::DataFlowState *state,
   jclass QueryPlannerClass = env->FindClass("com/brownsys/pelton/QueryPlanner");
 
   // Get the (static) entry method from that class.
-  const char *sig = "(JJLjava/lang/String;)V";
+  const char *sig = "(JJLjava/lang/String;Z)V";
   jmethodID planMethod = env->GetStaticMethodID(QueryPlannerClass, "plan", sig);
 
   // Create the required shared state to pass to the java code.
@@ -88,7 +95,7 @@ dataflow::DataFlowGraph PlanGraph(dataflow::DataFlowState *state,
 
   // Call the method on the object
   env->CallStaticVoidMethod(QueryPlannerClass, planMethod, graph_jptr,
-                            state_jptr, query_jstr);
+                            state_jptr, query_jstr, PELTON_JAVA_DEBUG);
   if (env->ExceptionCheck()) {  // Handle any exception.
     env->ExceptionDescribe();
     env->ExceptionClear();
