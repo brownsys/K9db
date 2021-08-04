@@ -97,5 +97,4 @@ public class RexInputRefOffsetter implements RexVisitor<RexNode> {
     throw new IllegalArgumentException(
         "Unsupported RexNode in filter node " + arg0.getClass().getName());
   }
-
 }

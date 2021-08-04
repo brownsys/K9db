@@ -92,5 +92,4 @@ public class RexInputRefCollector implements RexVisitor<HashSet<RexInputRef>> {
     throw new IllegalArgumentException(
         "Unsupported RexNode in filter node " + arg0.getClass().getName());
   }
-
 }

@@ -1,5 +1,7 @@
 package com.brownsys.pelton.rules;
 
+import com.brownsys.pelton.util.RexInputRefCollector;
+import com.brownsys.pelton.util.RexInputRefOffsetter;
 import java.util.HashSet;
 import java.util.Stack;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -11,8 +13,6 @@ import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.tools.RelBuilder;
-import com.brownsys.pelton.util.RexInputRefCollector;
-import com.brownsys.pelton.util.RexInputRefOffsetter;
 
 // https://calcite.apache.org/javadocAggregate/org/apache/calcite/plan/RelRule.html
 public class FilterPastJoin extends RelRule<FilterPastJoin.Config> {
@@ -39,7 +39,7 @@ public class FilterPastJoin extends RelRule<FilterPastJoin.Config> {
     // be shifted by the size of the left input schema.
     int leftCols = join.getLeft().getRowType().getFieldCount();
     RexInputRefOffsetter offsetter = new RexInputRefOffsetter(-1 * leftCols);
-    
+
     // Separate conditions that refer to a single input only from shared conditions.
     HashSet<RexNode> leftConditions = new HashSet<RexNode>();
     HashSet<RexNode> rightConditions = new HashSet<RexNode>();
@@ -65,12 +65,13 @@ public class FilterPastJoin extends RelRule<FilterPastJoin.Config> {
     // consists only if conditions that could not be pushed.
     // P.S.: .filter(<empty>) does nothin.
     final RelBuilder relBuilder = call.builder();
-    relBuilder.push(join.getLeft())
-              .filter(leftConditions)
-              .push(join.getRight())
-              .filter(rightConditions)
-              .join(join.getJoinType(), join.getCondition())
-              .filter(remainingConditions);
+    relBuilder
+        .push(join.getLeft())
+        .filter(leftConditions)
+        .push(join.getRight())
+        .filter(rightConditions)
+        .join(join.getJoinType(), join.getCondition())
+        .filter(remainingConditions);
 
     call.transformTo(relBuilder.build());
   }
@@ -114,27 +115,27 @@ public class FilterPastJoin extends RelRule<FilterPastJoin.Config> {
     boolean canPushLeft = false;
     boolean canPushRight = false;
     switch (join.getJoinType()) {
-      // Full outer join: cannot push filters on either side here without
-      // changing the semantics of the query.
       case FULL:
+        // Full outer join: cannot push filters on either side here without
+        // changing the semantics of the query.
         return 0;
-      // Equijoin: can push on both sides and the semantics are preserved.
       case INNER:
+        // Equijoin: can push on both sides and the semantics are preserved.
         canPushLeft = true;
         canPushRight = true;
         break;
-      // LEFT JOIN: can only push to the left.
       case LEFT:
+        // LEFT JOIN: can only push to the left.
         canPushLeft = true;
         break;
-      // RIGHT JOIN: can only push to the right.
       case RIGHT:
+        // RIGHT JOIN: can only push to the right.
         canPushRight = true;
         break;
-      // Semi and anti-semi join only return rows from the left input.
-      // A consequent filter cannot possible refer to columns from the right input.
       case ANTI:
       case SEMI:
+        // Semi and anti-semi join only return rows from the left input.
+        // A consequent filter cannot possible refer to columns from the right input.
         canPushLeft = true;
         break;
     }
@@ -155,8 +156,7 @@ public class FilterPastJoin extends RelRule<FilterPastJoin.Config> {
 
     if (refersLeft && !refersRight && canPushLeft) {
       return -1;
-    }
-    else if (!refersLeft && refersRight && canPushRight) {
+    } else if (!refersLeft && refersRight && canPushRight) {
       return 1;
     }
     return 0;
@@ -164,15 +164,18 @@ public class FilterPastJoin extends RelRule<FilterPastJoin.Config> {
 
   // Configuration for this rule.
   public interface Config extends RelRule.Config {
-    Config DEFAULT = RelRule.Config.EMPTY
-        .withOperandSupplier(
-            builder -> builder.operand(LogicalFilter.class).oneInput(
-                nestedBuilder -> nestedBuilder.operand(LogicalJoin.class).anyInputs()
-            )
-          )
-        .as(Config.class);
-    
-    @Override default FilterPastJoin toRule() {
+    Config DEFAULT =
+        RelRule.Config.EMPTY
+            .withOperandSupplier(
+                builder ->
+                    builder
+                        .operand(LogicalFilter.class)
+                        .oneInput(
+                            nestedBuilder -> nestedBuilder.operand(LogicalJoin.class).anyInputs()))
+            .as(Config.class);
+
+    @Override
+    default FilterPastJoin toRule() {
       return new FilterPastJoin(DEFAULT);
     }
   }
