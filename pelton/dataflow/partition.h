@@ -15,7 +15,7 @@ uint16_t GetPartition(const Key &key, const uint16_t &total_partitions);
 
 // Partition given records
 absl::flat_hash_map<uint16_t, std::vector<Record>> HashPartition(
-    std::vector<Record> records, const std::vector<ColumnID> &cols,
+    std::vector<Record> &&records, const std::vector<ColumnID> &cols,
     const uint16_t &total_partitions);
 }  // namespace partition
 
