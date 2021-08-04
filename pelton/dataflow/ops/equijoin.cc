@@ -83,7 +83,8 @@ std::optional<std::vector<Record>> EquiJoinOperator::Process(
       }
 
       // additional check for left join
-      if (mode_ == Mode::LEFT && 0 == this->right_table_.Count(left_value)) {
+      if (this->mode_ == Mode::LEFT &&
+          0 == this->right_table_.Count(left_value)) {
         this->EmitRow(record, this->null_records_.at(1), &output,
                       record.IsPositive());
         this->emitted_nulls_.Insert(left_value, record);
