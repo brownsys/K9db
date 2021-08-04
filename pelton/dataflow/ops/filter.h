@@ -51,10 +51,8 @@ class FilterOperator : public Operator {
     this->ops_.emplace_back(left_column, op, right_column);
   }
 
-  bool Process(NodeIndex source, const std::vector<Record> &records,
-               std::vector<Record> *output) override;
-
-  bool ProcessAndForward(NodeIndex source, const std::vector<Record> &records);
+  std::optional<std::vector<Record>> Process(
+      NodeIndex, const std::vector<Record> &records) override;
 
   std::shared_ptr<Operator> Clone() const override;
 

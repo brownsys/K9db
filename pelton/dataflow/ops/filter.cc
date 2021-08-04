@@ -1,6 +1,7 @@
 #include "pelton/dataflow/ops/filter.h"
 
 #include <tuple>
+#include <utility>
 
 #include "glog/logging.h"
 #include "pelton/dataflow/graph.h"
@@ -42,39 +43,39 @@
   }                                                                 \
   // COLUMN_VALUE_COMPARE_MACRO
 
-#define COLUMN_COLUMN_CMP_MACRO(col1, col2, OP)                            \
-  if (record.schema().TypeOf(col1) != record.schema().TypeOf(col2)) {      \
-    LOG(FATAL) << "Type mistmatch in filter column";                       \
-  }                                                                        \
-  if (record.IsNull(col1) && record.IsNull(col2)) {                        \
-    return true;                                                           \
-  } else if (record.IsNull(col1) || record.IsNull(col2)) {                 \
-    return false;                                                          \
-  }                                                                        \
-  switch (record.schema().TypeOf(col1)) {                                  \
-    case sqlast::ColumnDefinition::Type::INT:                              \
-      if (!(record.GetInt(col1) OP record.GetInt(col2))) {                 \
-        return false;                                                      \
-      }                                                                    \
-      break;                                                               \
-    case sqlast::ColumnDefinition::Type::UINT:                             \
-      if (!(record.GetUInt(col1) OP record.GetUInt(col2))) {               \
-        return false;                                                      \
-      }                                                                    \
-      break;                                                               \
-    case sqlast::ColumnDefinition::Type::TEXT:                             \
-      if (!(record.GetString(col1) OP record.GetString(col2))) {           \
-        return false;                                                      \
-      }                                                                    \
-      break;                                                               \
-    case sqlast::ColumnDefinition::Type::DATETIME                          \
-          : if (!(record.GetDateTime(col1) OP record.GetDateTime(col2))) { \
-        return false;                                                      \
-      }                                                                    \
-      break;                                                               \
-    default:                                                               \
-      LOG(FATAL) << "Unsupported data type in filter operator";            \
-  }                                                                        \
+#define COLUMN_COLUMN_CMP_MACRO(col1, col2, OP)                       \
+  if (record.schema().TypeOf(col1) != record.schema().TypeOf(col2)) { \
+    LOG(FATAL) << "Type mistmatch in filter column";                  \
+  }                                                                   \
+  if (record.IsNull(col1) && record.IsNull(col2)) {                   \
+    return true;                                                      \
+  } else if (record.IsNull(col1) || record.IsNull(col2)) {            \
+    return false;                                                     \
+  }                                                                   \
+  switch (record.schema().TypeOf(col1)) {                             \
+    case sqlast::ColumnDefinition::Type::INT:                         \
+      if (!(record.GetInt(col1) OP record.GetInt(col2))) {            \
+        return false;                                                 \
+      }                                                               \
+      break;                                                          \
+    case sqlast::ColumnDefinition::Type::UINT:                        \
+      if (!(record.GetUInt(col1) OP record.GetUInt(col2))) {          \
+        return false;                                                 \
+      }                                                               \
+      break;                                                          \
+    case sqlast::ColumnDefinition::Type::TEXT:                        \
+      if (!(record.GetString(col1) OP record.GetString(col2))) {      \
+        return false;                                                 \
+      }                                                               \
+      break;                                                          \
+    case sqlast::ColumnDefinition::Type::DATETIME:                    \
+      if (!(record.GetDateTime(col1) OP record.GetDateTime(col2))) {  \
+        return false;                                                 \
+      }                                                               \
+      break;                                                          \
+    default:                                                          \
+      LOG(FATAL) << "Unsupported data type in filter operator";       \
+  }                                                                   \
   // COLUMN_VALUE_COMPARE_MACRO
 
 #define GENERIC_CMP_MACRO(operation, OP)                                     \
@@ -93,15 +94,15 @@ void FilterOperator::ComputeOutputSchema() {
   this->output_schema_ = this->input_schemas_.at(0);
 }
 
-bool FilterOperator::Process(NodeIndex source,
-                             const std::vector<Record> &records,
-                             std::vector<Record> *output) {
+std::optional<std::vector<Record>> FilterOperator::Process(
+    NodeIndex, const std::vector<Record> &records) {
+  std::vector<Record> output;
   for (const Record &record : records) {
     if (this->Accept(record)) {
-      output->push_back(record.Copy());
+      output.push_back(record.Copy());
     }
   }
-  return true;
+  return std::move(output);
 }
 
 bool FilterOperator::Accept(const Record &record) const {
@@ -142,21 +143,6 @@ bool FilterOperator::Accept(const Record &record) const {
     }
   }
   return true;
-}
-
-bool FilterOperator::ProcessAndForward(NodeIndex source,
-                                       const std::vector<Record> &records) {
-  if (this->ops_.size() == 0) {
-    for (NodeIndex childIndex : this->children_) {
-      std::shared_ptr<Operator> child = this->graph()->GetNode(childIndex);
-      if (!child->ProcessAndForward(this->index(), records)) {
-        return false;
-      }
-    }
-    return true;
-  } else {
-    return Operator::ProcessAndForward(source, records);
-  }
 }
 
 std::shared_ptr<Operator> FilterOperator::Clone() const {

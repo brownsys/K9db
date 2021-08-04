@@ -15,8 +15,8 @@
 #include <utility>
 #include <vector>
 
-#include "pelton/shards/pool.h"
 #include "pelton/shards/types.h"
+#include "pelton/sql/lazy_executor.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -45,10 +45,10 @@ class SharderState {
   SharderState &operator=(const SharderState &&) = delete;
 
   // Accessors.
-  ConnectionPool &connection_pool() { return this->connection_pool_; }
+  sql::SqlLazyExecutor &executor() { return this->executor_; }
 
   // Initialization.
-  void Initialize(const std::string &db_username,
+  void Initialize(const std::string &db_name, const std::string &db_username,
                   const std::string &db_password);
 
   // Schema manipulations.
@@ -163,7 +163,7 @@ class SharderState {
   std::unordered_map<ShardedTableName, sqlast::CreateTable> sharded_schema_;
 
   // Connection pool that manages the underlying sqlite3 databases.
-  ConnectionPool connection_pool_;
+  sql::SqlLazyExecutor executor_;
 
   // Secondary indices.
   std::unordered_map<ShardKind, std::vector<sqlast::CreateIndex>> create_index_;

@@ -289,9 +289,9 @@ sqlast::CreateTable UpdateTableSchema(sqlast::CreateTable stmt,
 
 }  // namespace
 
-absl::StatusOr<mysql::SqlResult> Shard(
-    const sqlast::CreateTable &stmt, SharderState *state,
-    dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
+                                     SharderState *state,
+                                     dataflow::DataFlowState *dataflow_state) {
   perf::Start("Create");
 
   const std::string &table_name = stmt.table_name();
@@ -308,7 +308,7 @@ absl::StatusOr<mysql::SqlResult> Shard(
     CHECK_STATUS(IsShardingBySupported(&info, *state));
   }
 
-  mysql::SqlResult result;
+  sql::SqlResult result = sql::SqlResult(false);
   // Sharding scenarios.
   if (has_pii && sharding_information.size() == 0) {
     // Case 1: has pii but not linked to shards.
@@ -317,7 +317,7 @@ absl::StatusOr<mysql::SqlResult> Shard(
     ASSIGN_OR_RETURN(std::string pk, GetPK(stmt));
     state->AddShardKind(table_name, pk);
     state->AddUnshardedTable(table_name, stmt);
-    result = state->connection_pool().ExecuteDefault(&stmt);
+    result = state->executor().ExecuteDefault(&stmt);
 
   } else if (!has_pii && sharding_information.size() > 0) {
     // Case 2: no pii but is linked to shards.
@@ -339,12 +339,13 @@ absl::StatusOr<mysql::SqlResult> Shard(
       // Add the sharding information to state.
       state->AddShardedTable(table_name, info, sharded_stmt);
     }
+    result = sql::SqlResult(true);
 
   } else if (!has_pii && sharding_information.size() == 0) {
     // Case 3: neither pii nor linked.
     // The table does not belong to a shard and needs no further modification!
     state->AddUnshardedTable(table_name, stmt);
-    result = state->connection_pool().ExecuteDefault(&stmt);
+    result = state->executor().ExecuteDefault(&stmt);
   } else {
     // Has pii and linked to a shard is a logical schema error.
     return absl::UnimplementedError("Sharded Table cannot have PII fields!");

@@ -1,14 +1,7 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
-
-exports_files(
-    [
-        "graph.h",
-    ],
-    ["//pelton/dataflow:__subpackages__"],
-)
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 cc_library(
-    name = "state",
+    name = "dstate",
     srcs = [
         "state.cc",
     ],
@@ -246,20 +239,21 @@ filegroup(
     visibility = ["//pelton:__subpackages__"],
 )
 
-cc_binary(
+cc_library(
     name = "generator",
     srcs = [
         "generator.cc",
+    ],
+    hdrs = [
         "generator.h",
     ],
-    linkshared = 1,
     visibility = ["//pelton:__subpackages__"],
     deps = [
+        ":dstate",
         ":graph",
         ":key",
         ":operator",
         ":schema",
-        ":state",
         ":types",
         "//pelton/dataflow/ops:aggregate",
         "//pelton/dataflow/ops:equijoin",
