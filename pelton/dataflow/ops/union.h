@@ -15,7 +15,7 @@ class UnionOperator : public Operator {
   UnionOperator() : Operator(Operator::Type::UNION) {}
 
   std::optional<std::vector<Record>> Process(
-      NodeIndex, const std::vector<Record> &records) override;
+      NodeIndex /*source*/, const std::vector<Record>& /*records*/) override;
 
  protected:
   bool DeepCompareSchemas(const SchemaRef s1, const SchemaRef s2);

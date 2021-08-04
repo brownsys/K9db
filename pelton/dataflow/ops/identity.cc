@@ -15,7 +15,7 @@ void IdentityOperator::ComputeOutputSchema() {
 }
 
 std::optional<std::vector<Record>> IdentityOperator::Process(
-    NodeIndex source, const std::vector<Record> &records) {
+    NodeIndex /*source*/, const std::vector<Record>& /*records*/) {
   return std::nullopt;
 }
 

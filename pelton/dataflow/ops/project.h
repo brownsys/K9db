@@ -68,7 +68,7 @@ class ProjectOperator : public Operator {
 
  protected:
   std::optional<std::vector<Record>> Process(
-      NodeIndex, const std::vector<Record> &records) override;
+      NodeIndex /*source*/, const std::vector<Record> &records) override;
 
   void ComputeOutputSchema() override;
 
