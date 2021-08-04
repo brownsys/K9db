@@ -121,8 +121,10 @@ class MatViewOperatorT : public MatViewOperator {
     for (ColumnID key : this->key_cols_) {
       result += std::to_string(key) + ", ";
     }
-    result.pop_back();
-    result.pop_back();
+    if (this->key_cols_.size() > 0) {
+      result.pop_back();
+      result.pop_back();
+    }
     result += "],\n";
     return result;
   }

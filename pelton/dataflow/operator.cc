@@ -87,8 +87,10 @@ std::string Operator::DebugString() const {
   for (const std::weak_ptr<Edge> &edge : this->children_) {
     str += std::to_string(edge.lock()->to().lock()->index()) + ", ";
   }
-  str.pop_back();
-  str.pop_back();
+  if (this->children_.size() > 0) {
+    str.pop_back();
+    str.pop_back();
+  }
   str += "],\n";
 
   // print input schema
