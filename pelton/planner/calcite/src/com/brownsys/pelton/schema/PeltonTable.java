@@ -7,13 +7,19 @@ import org.apache.calcite.schema.impl.AbstractTable;
 import org.apache.calcite.sql.type.SqlTypeName;
 
 public class PeltonTable extends AbstractTable {
+  private String tableName;
   private ArrayList<String> columnNames;
   private ArrayList<SqlTypeName> columnTypes;
 
-  public PeltonTable() {
+  public PeltonTable(String tableName) {
     super();
+    this.tableName = tableName;
     this.columnNames = new ArrayList<String>();
     this.columnTypes = new ArrayList<SqlTypeName>();
+  }
+
+  public String getTableName() {
+    return tableName;
   }
 
   public void AddColumn(String columnName, SqlTypeName columnType) {

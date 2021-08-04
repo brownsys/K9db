@@ -33,8 +33,6 @@ import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
 
 public class QueryPlanner {
-  // JNI wrapper around our generator API (dataflow/generator.h).
-  private final DataFlowGraphLibrary.DataFlowGraphGenerator generator;
   // Calcite components required for planning.
   private final CalciteSchema schema;
   private final SqlParser.Config parserConfig;
@@ -42,16 +40,12 @@ public class QueryPlanner {
   private final SqlToRelConverter converter;
   private final HepPlanner planner;
 
-  // Construct a QueryPlanner given a C++ DataFlowGraphLibrary interface exposing
-  // Pelton state.
-  private QueryPlanner(DataFlowGraphLibrary.DataFlowGraphGenerator generator) {
-    // Store the c++ interface.
-    this.generator = generator;
-
-    // Create a calcite-understandable representation of the schema of the logical
-    // un-sharded database, as exposed from c++ via generator.
-    PeltonSchemaFactory schemaFactory = new PeltonSchemaFactory(generator);
-    this.schema = schemaFactory.createSchema();
+  // Constructs a QueryPlanner given the underlying DB schema.
+  // Essentially responsible for configuring calcite's parser, semantic validator,
+  // CST transformer, and planner with optimization rules.
+  public QueryPlanner(CalciteSchema schema) {
+    // Store the c++ interface and schema.
+    this.schema = schema;
 
     // Configure the calcite syntax parsing.
     this.parserConfig =
@@ -155,7 +149,7 @@ public class QueryPlanner {
   }
 
   // Parse query and plan it into a physical plan.
-  private RelNode getPhysicalPlan(String query)
+  public RelNode getPhysicalPlan(String query)
       throws SqlParseException, ValidationException, RelConversionException {
     // Parse query.
     SqlNode sqlNode = SqlParser.create(query, this.parserConfig).parseStmt();
@@ -165,17 +159,21 @@ public class QueryPlanner {
     RelRoot rawPlan = this.converter.convertQuery(validatedSqlNode, false, true);
     // Log unoptimized plan.
     Logger logger = Logger.getLogger(Logger.GLOBAL_LOGGER_NAME);
-    logger.log(Level.INFO, "Java: Unoptimized plan\n" + RelOptUtil.toString(rawPlan.project()));
+    logger.log(Level.INFO, "Unoptimized plan\n" + RelOptUtil.toString(rawPlan.project()));
     // Apply planner optimizations.
     this.planner.clear();
     this.planner.setRoot(rawPlan.project());
-    return this.planner.findBestExp();
+    RelNode optimizedPlan = this.planner.findBestExp();
+    // Log optimized plan.
+    logger.log(Level.INFO, "optimized plan\n" + RelOptUtil.toString(optimizedPlan));
+    return optimizedPlan;
   }
 
   // Traverse the logical plan and use it to populate the corresponding operators into the graph in
   // this.generator.
-  private void PopulateDataFlowGraph(RelNode physicalPlan) {
-    PhysicalPlanVisitor visitor = new PhysicalPlanVisitor(this.generator);
+  public void PopulateDataFlowGraph(
+      DataFlowGraphLibrary.DataFlowGraphGenerator generator, RelNode physicalPlan) {
+    PhysicalPlanVisitor visitor = new PhysicalPlanVisitor(generator);
     visitor.populateGraph(physicalPlan);
   }
 
@@ -191,21 +189,25 @@ public class QueryPlanner {
     // Logging.
     Logger logger = Logger.getLogger(Logger.GLOBAL_LOGGER_NAME);
     logger.setLevel(debugLogging ? Level.FINEST : Level.SEVERE);
-    logger.log(Level.INFO, "Java: planning query\n" + query);
+    logger.log(Level.INFO, "planning query\n" + query);
 
     // Create the generator interface using the pointers passed from c++.
+    // JNI wrapper around our generator API (dataflow/generator.h).
     DataFlowGraphLibrary.DataFlowGraphGenerator generator =
         new DataFlowGraphLibrary.DataFlowGraphGenerator(ptr1, ptr2);
 
+    // Create a calcite-understandable representation of the schema of the logical
+    // un-sharded database, as exposed from c++ via generator.
+    CalciteSchema schema = new PeltonSchemaFactory(generator).createSchema();
+
     // Create a planner.
-    QueryPlanner planner = new QueryPlanner(generator);
+    QueryPlanner planner = new QueryPlanner(schema);
 
     // Parse the query and turn it into an optimized physical plan.
     RelNode physicalPlan = planner.getPhysicalPlan(query);
-    logger.log(Level.INFO, "Java: optimized plan\n" + RelOptUtil.toString(physicalPlan));
 
     // Extract pelton operators from plan and populate them into the c++ DataFlowGraph.
-    planner.PopulateDataFlowGraph(physicalPlan);
-    logger.log(Level.INFO, "Java: Added all operators\n" + generator.DebugString().getString());
+    planner.PopulateDataFlowGraph(generator, physicalPlan);
+    logger.log(Level.INFO, "Added all operators\n" + generator.DebugString().getString());
   }
 }

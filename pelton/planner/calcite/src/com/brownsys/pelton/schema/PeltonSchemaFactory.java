@@ -17,15 +17,14 @@ public class PeltonSchemaFactory {
     DataFlowGraphLibrary.StringVector tables = generator.GetTables();
     for (int i = 0; i < tables.size(); i++) {
       BytePointer ccTableName = tables.get(i);
-      String tableName = ccTableName.getString();
       PeltonTable table = this.createTable(ccTableName);
-      schema.add(tableName, table);
+      schema.add(table.getTableName(), table);
     }
     return schema;
   }
 
   private PeltonTable createTable(BytePointer ccTableName) {
-    PeltonTable table = new PeltonTable();
+    PeltonTable table = new PeltonTable(ccTableName.getString());
     for (int j = 0; j < generator.GetTableColumnCount(ccTableName); j++) {
       String colName = generator.GetTableColumnName(ccTableName, j).getString();
       SqlTypeName type = this.enumToCalciteType(generator.GetTableColumnType(ccTableName, j));
