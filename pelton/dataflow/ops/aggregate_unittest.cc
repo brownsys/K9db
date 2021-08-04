@@ -164,9 +164,9 @@ TEST(AggregateOperatorTest, MultipleGroupColumnsCountPositive) {
                                 6_s, 2_u);
 
   // Feed records and test
-  std::vector<Record> outputs;
-  EXPECT_TRUE(aggregate.Process(UNDEFINED_NODE_INDEX, records, &outputs));
-  // compareRecordStreams(&expected_records, &outputs);
+  std::optional<std::vector<Record>> outputs =
+      aggregate.Process(UNDEFINED_NODE_INDEX, records);
+  // compareRecordStreams(&expected_records, &outputs.value());
 }
 
 TEST(AggregateOperatorTest, MultipleGroupColumnsSumPositive) {
@@ -201,9 +201,9 @@ TEST(AggregateOperatorTest, MultipleGroupColumnsSumPositive) {
                                 6_s, 12_s);
 
   // Feed records and test
-  std::vector<Record> outputs;
-  EXPECT_TRUE(aggregate.Process(UNDEFINED_NODE_INDEX, records, &outputs));
-  compareRecordStreams(&expected_records, &outputs);
+  std::optional<std::vector<Record>> outputs =
+      aggregate.Process(UNDEFINED_NODE_INDEX, records);
+  compareRecordStreams(&expected_records, &outputs.value());
 }
 
 TEST(AggregateOperatorTest, CountPositiveNegative) {
@@ -231,8 +231,8 @@ TEST(AggregateOperatorTest, CountPositiveNegative) {
   records1.emplace_back(schema, true, 4_s, 5_s, 6_s);
 
   // STAGE1
-  std::vector<Record> outputs1;
-  EXPECT_TRUE(aggregate.Process(UNDEFINED_NODE_INDEX, records1, &outputs1));
+  std::optional<std::vector<Record>> outputs1 =
+      aggregate.Process(UNDEFINED_NODE_INDEX, records1);
 
   // Records to be fed
   std::vector<Record> records2;
@@ -249,9 +249,9 @@ TEST(AggregateOperatorTest, CountPositiveNegative) {
   expected_records.emplace_back(aggregate.output_schema_, true, 7_s, 1_u);
 
   // STAGE2
-  std::vector<Record> outputs2;
-  EXPECT_TRUE(aggregate.Process(UNDEFINED_NODE_INDEX, records2, &outputs2));
-  compareRecordStreams(&expected_records, &outputs2);
+  std::optional<std::vector<Record>> outputs2 =
+      aggregate.Process(UNDEFINED_NODE_INDEX, records2);
+  compareRecordStreams(&expected_records, &outputs2.value());
 }
 
 TEST(AggregateOperatorTest, SumPositiveNegative) {
@@ -279,8 +279,8 @@ TEST(AggregateOperatorTest, SumPositiveNegative) {
   records1.emplace_back(schema, true, 4_s, 5_s, 6_s);
 
   // STAGE1
-  std::vector<Record> outputs1;
-  EXPECT_TRUE(aggregate.Process(UNDEFINED_NODE_INDEX, records1, &outputs1));
+  std::optional<std::vector<Record>> outputs1 =
+      aggregate.Process(UNDEFINED_NODE_INDEX, records1);
 
   // Records to be fed
   std::vector<Record> records2;
@@ -294,9 +294,9 @@ TEST(AggregateOperatorTest, SumPositiveNegative) {
   expected_records.emplace_back(aggregate.output_schema_, true, 7_s, 7_s);
 
   // STAGE2
-  std::vector<Record> outputs2;
-  EXPECT_TRUE(aggregate.Process(UNDEFINED_NODE_INDEX, records2, &outputs2));
-  compareRecordStreams(&expected_records, &outputs2);
+  std::optional<std::vector<Record>> outputs2 =
+      aggregate.Process(UNDEFINED_NODE_INDEX, records2);
+  compareRecordStreams(&expected_records, &outputs2.value());
 }
 
 TEST(AggregateOperatorTest, CountPositiveNegativeSingleBatch) {
@@ -325,9 +325,9 @@ TEST(AggregateOperatorTest, CountPositiveNegativeSingleBatch) {
   expected_records.emplace_back(aggregate.output_schema_, true, 2_s, 2_u);
   expected_records.emplace_back(aggregate.output_schema_, true, 5_s, 2_u);
 
-  std::vector<Record> outputs;
-  EXPECT_TRUE(aggregate.Process(UNDEFINED_NODE_INDEX, records, &outputs));
-  compareRecordStreams(&expected_records, &outputs);
+  std::optional<std::vector<Record>> outputs =
+      aggregate.Process(UNDEFINED_NODE_INDEX, records);
+  compareRecordStreams(&expected_records, &outputs.value());
 }
 
 TEST(AggregateOperatorTest, SumPositiveNegativeSingleBatch) {
@@ -356,9 +356,9 @@ TEST(AggregateOperatorTest, SumPositiveNegativeSingleBatch) {
   expected_records.emplace_back(aggregate.output_schema_, true, 2_s, 16_s);
   expected_records.emplace_back(aggregate.output_schema_, true, 5_s, 11_s);
 
-  std::vector<Record> outputs;
-  EXPECT_TRUE(aggregate.Process(UNDEFINED_NODE_INDEX, records, &outputs));
-  compareRecordStreams(&expected_records, &outputs);
+  std::optional<std::vector<Record>> outputs =
+      aggregate.Process(UNDEFINED_NODE_INDEX, records);
+  compareRecordStreams(&expected_records, &outputs.value());
 }
 
 TEST(AggregateOperatorTest, OutputSchemaPrimaryKeyTest) {

@@ -115,7 +115,7 @@ TEST(MatViewOperatorTest, SingleMatView) {
   // Test all views.
   for (std::unique_ptr<MatViewOperator> &matview : views) {
     // Process and check.
-    EXPECT_TRUE(matview->ProcessAndForward(UNDEFINED_NODE_INDEX, records));
+    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, records);
     EXPECT_EQ(matview->count(), 1);
 
     // Get record by key.
@@ -148,7 +148,7 @@ TEST(MatViewOperatorTest, SingleMatViewDifferentKey) {
   // Test all views.
   for (std::unique_ptr<MatViewOperator> &matview : views) {
     // Process and check.
-    EXPECT_TRUE(matview->ProcessAndForward(UNDEFINED_NODE_INDEX, records));
+    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, records);
     EXPECT_EQ(matview->count(), 1);
 
     // Get record by key.
@@ -201,7 +201,7 @@ TEST(MatViewOperatorTest, ProcessBatchTest) {
   // Test all views.
   for (std::unique_ptr<MatViewOperator> &matview : views) {
     // Process and check.
-    EXPECT_TRUE(matview->ProcessAndForward(UNDEFINED_NODE_INDEX, records));
+    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, records);
 
     EXPECT_EQ(matview->count(), records.size());
     EXPECT_TRUE(matview->Contains(r1.GetKey()));
@@ -250,7 +250,7 @@ TEST(MatViewOperatorTest, OrderedKeyTest) {
   KeyOrderedMatViewOperator matview{keys};
 
   // Process and check.
-  EXPECT_TRUE(matview.ProcessAndForward(UNDEFINED_NODE_INDEX, records));
+  matview.ProcessAndForward(UNDEFINED_NODE_INDEX, records);
 
   EXPECT_EQ(matview.count(), records.size());
   EXPECT_TRUE(matview.Contains(r1.GetKey()));
@@ -307,7 +307,7 @@ TEST(MatViewOperatorTest, OrderedRecordTest) {
   RecordOrderedMatViewOperator matview{keys, compare};
 
   // Process and check.
-  EXPECT_TRUE(matview.ProcessAndForward(UNDEFINED_NODE_INDEX, records));
+  matview.ProcessAndForward(UNDEFINED_NODE_INDEX, records);
 
   EXPECT_EQ(matview.count(), records.size());
   EXPECT_TRUE(matview.Contains(all_keys.at(0)));
@@ -359,7 +359,7 @@ TEST(MatViewOperatorTest, EmptyKeyTest) {
   // Test all views.
   for (std::unique_ptr<MatViewOperator> &matview : views) {
     // Process and check.
-    EXPECT_TRUE(matview->ProcessAndForward(UNDEFINED_NODE_INDEX, records));
+    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, records);
 
     EXPECT_EQ(matview->count(), records.size());
     EXPECT_TRUE(matview->Contains(Key(0)));
@@ -425,7 +425,7 @@ TEST(MatViewOperatorTest, LimitTest) {
   // Test all views.
   for (std::unique_ptr<MatViewOperator> &matview : views) {
     // Process and check.
-    EXPECT_TRUE(matview->ProcessAndForward(UNDEFINED_NODE_INDEX, records));
+    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, records);
 
     EXPECT_EQ(matview->count(), records.size());
     EXPECT_TRUE(matview->Contains(Key(0)));
@@ -490,7 +490,7 @@ TEST(MatViewOperatorTest, LookupGreater) {
   RecordOrderedMatViewOperator matview{{}, compare};
 
   // Process and check.
-  EXPECT_TRUE(matview.ProcessAndForward(UNDEFINED_NODE_INDEX, records));
+  matview.ProcessAndForward(UNDEFINED_NODE_INDEX, records);
 
   EXPECT_EQ(matview.count(), records.size());
   EXPECT_TRUE(matview.Contains(Key(0)));

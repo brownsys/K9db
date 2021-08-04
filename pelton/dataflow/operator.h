@@ -2,11 +2,12 @@
 #define PELTON_DATAFLOW_OPERATOR_H_
 
 #include <memory>
+#include <optional>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "benchmark/benchmark.h"
-#include "pelton/dataflow/edge.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
@@ -14,7 +15,6 @@
 namespace pelton {
 namespace dataflow {
 
-class Edge;
 class DataFlowGraph;
 
 #ifdef PELTON_BENCHMARK  // shuts up compiler warnings
@@ -50,7 +50,7 @@ class Operator {
    * @param records
    * @return
    */
-  virtual bool ProcessAndForward(NodeIndex source,
+  virtual void ProcessAndForward(NodeIndex source,
                                  const std::vector<Record> &records);
   // TODO(babman): we can have an optimized version for the case where this
   // operator is a single child of another operator. The records can then be
@@ -74,7 +74,8 @@ class Operator {
 
   void SetGraph(DataFlowGraph *graph) { this->graph_ = graph; }
   void SetIndex(NodeIndex index) { this->index_ = index; }
-  void AddParent(std::shared_ptr<Operator> parent, std::shared_ptr<Edge> edge);
+  void AddParent(std::shared_ptr<Operator> parent,
+                 std::tuple<NodeIndex, NodeIndex> edge);
 
   /*!
    * Push a batch of records through the dataflow graph. Order within this batch
@@ -87,8 +88,8 @@ class Operator {
    * @param output target vector where to write outputs to.
    * @return true when processing succeeded, false when an error occurred.
    */
-  virtual bool Process(NodeIndex source, const std::vector<Record> &records,
-                       std::vector<Record> *output) = 0;
+  virtual std::optional<std::vector<Record>> Process(
+      NodeIndex source, const std::vector<Record> &records) = 0;
 
   /*!
    * Compute the output_schema of the operator.
@@ -102,8 +103,8 @@ class Operator {
   virtual uint64_t SizeInMemory() const { return 0; }
 
   // Edges to children and parents.
-  std::vector<std::weak_ptr<Edge>> children_;
-  std::vector<std::shared_ptr<Edge>> parents_;
+  std::vector<NodeIndex> children_;
+  std::vector<NodeIndex> parents_;
 
   // Input and output schemas.
   std::vector<SchemaRef> input_schemas_;
@@ -113,6 +114,7 @@ class Operator {
   Type type_;
   NodeIndex index_;
   DataFlowGraph *graph_;  // The graph the operator belongs to.
+  void BroadcastToChildren(const std::vector<Record> &records);
 
   // Allow DataFlowGraph to use SetGraph, SetIndex, and AddParent functions.
   friend class DataFlowGraph;

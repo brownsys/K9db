@@ -51,23 +51,8 @@ class FilterOperator : public Operator {
     this->ops_.emplace_back(left_column, op, right_column);
   }
 
-  bool Process(NodeIndex source, const std::vector<Record> &records,
-               std::vector<Record> *output) override;
-
-  bool ProcessAndForward(NodeIndex source, const std::vector<Record> &records) {
-    if (this->ops_.size() == 0) {
-      for (std::weak_ptr<Edge> edge_ptr : this->children_) {
-        std::shared_ptr<Edge> edge = edge_ptr.lock();
-        std::shared_ptr<Operator> child = edge->to().lock();
-        if (!child->ProcessAndForward(this->index(), records)) {
-          return false;
-        }
-      }
-      return true;
-    } else {
-      return Operator::ProcessAndForward(source, records);
-    }
-  }
+  std::optional<std::vector<Record>> Process(
+      NodeIndex /*source*/, const std::vector<Record> &records) override;
 
  protected:
   bool Accept(const Record &record) const;

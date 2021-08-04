@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "glog/logging.h"
+#include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/value.h"
 #include "pelton/sqlast/ast.h"
 
@@ -48,9 +49,18 @@ inline void CopyIntoRecord(sqlast::ColumnDefinition::Type datatype,
 
 }  // namespace
 
-bool EquiJoinOperator::Process(NodeIndex source,
-                               const std::vector<Record> &records,
-                               std::vector<Record> *output) {
+std::shared_ptr<Operator> EquiJoinOperator::left() const {
+  NodeIndex parent_index = this->parents_.at(0);
+  return this->graph()->GetNode(parent_index);
+}
+std::shared_ptr<Operator> EquiJoinOperator::right() const {
+  NodeIndex parent_index = this->parents_.at(1);
+  return this->graph()->GetNode(parent_index);
+}
+
+std::optional<std::vector<Record>> EquiJoinOperator::Process(
+    NodeIndex source, const std::vector<Record> &records) {
+  std::vector<Record> output;
   for (const Record &record : records) {
     // In comparison to a normal HashJoin in a database, here
     // records flow from one operator in.
@@ -64,16 +74,17 @@ bool EquiJoinOperator::Process(NodeIndex source,
           // Negate any previously emitted NULL + right records.
           for (const Record &right_null :
                this->emitted_nulls_.Lookup(left_value)) {
-            this->EmitRow(this->null_records_.at(0), right_null, output, false);
+            this->EmitRow(this->null_records_.at(0), right_null, &output,
+                          false);
           }
           this->emitted_nulls_.Erase(left_value);
         }
-        this->EmitRow(record, right, output, record.IsPositive());
+        this->EmitRow(record, right, &output, record.IsPositive());
       }
 
       // additional check for left join
       if (mode_ == Mode::LEFT && 0 == this->right_table_.Count(left_value)) {
-        this->EmitRow(record, this->null_records_.at(1), output,
+        this->EmitRow(record, this->null_records_.at(1), &output,
                       record.IsPositive());
         this->emitted_nulls_.Insert(left_value, record);
       }
@@ -88,16 +99,16 @@ bool EquiJoinOperator::Process(NodeIndex source,
           // Negate any previously emitted Left + NULL records.
           for (const Record &left_null :
                this->emitted_nulls_.Lookup(right_value)) {
-            this->EmitRow(left_null, this->null_records_.at(1), output, false);
+            this->EmitRow(left_null, this->null_records_.at(1), &output, false);
           }
           this->emitted_nulls_.Erase(right_value);
         }
-        this->EmitRow(left, record, output, record.IsPositive());
+        this->EmitRow(left, record, &output, record.IsPositive());
       }
 
       // additional check for right join
       if (mode_ == Mode::RIGHT && 0 == this->left_table_.Count(right_value)) {
-        this->EmitRow(this->null_records_.at(0), record, output,
+        this->EmitRow(this->null_records_.at(0), record, &output,
                       record.IsPositive());
         this->emitted_nulls_.Insert(right_value, record);
       }
@@ -108,10 +119,9 @@ bool EquiJoinOperator::Process(NodeIndex source,
       LOG(FATAL) << "EquiJoinOperator got input from Node " << source
                  << " but has parents " << this->left()->index() << " and "
                  << this->right()->index();
-      return false;
     }
   }
-  return true;
+  return std::move(output);
 }
 
 void EquiJoinOperator::ComputeOutputSchema() {

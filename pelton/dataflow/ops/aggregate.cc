@@ -144,9 +144,9 @@ inline void AggregateOperator::InitAggregateValue(Record *aggregate_record,
   }
 }
 
-bool AggregateOperator::Process(NodeIndex source,
-                                const std::vector<Record> &records,
-                                std::vector<Record> *output) {
+std::optional<std::vector<Record>> AggregateOperator::Process(
+    NodeIndex /*source*/, const std::vector<Record> &records) {
+  std::vector<Record> output;
   absl::flat_hash_map<Key, StateChange> first_delta;
 
   for (const Record &record : records) {
@@ -268,20 +268,20 @@ bool AggregateOperator::Process(NodeIndex source,
           // The aggregate value does not support Type::TEXT
           LOG(FATAL) << "Unsupported type in aggregate";
       }
-      EmitRecord(item.first, *state_.Lookup(item.first).begin(), true, output);
+      EmitRecord(item.first, *state_.Lookup(item.first).begin(), true, &output);
     } else {
       switch (aggregate_schema_.TypeOf(0)) {
         case sqlast::ColumnDefinition::Type::UINT:
           if ((*state_.Lookup(item.first).begin()).GetUInt(0) == 0ULL) {
             state_.Erase(item.first);
-            EmitRecord(item.first, item.second.old_value_, false, output);
+            EmitRecord(item.first, item.second.old_value_, false, &output);
             continue;
           }
           break;
         case sqlast::ColumnDefinition::Type::INT:
           if ((*state_.Lookup(item.first).begin()).GetInt(0) == 0L) {
             state_.Erase(item.first);
-            EmitRecord(item.first, item.second.old_value_, false, output);
+            EmitRecord(item.first, item.second.old_value_, false, &output);
             continue;
           }
           break;
@@ -290,11 +290,11 @@ bool AggregateOperator::Process(NodeIndex source,
           LOG(FATAL) << "Unsupported type in aggregate";
       }
       // for a negative update push negative record followed by positive record
-      EmitRecord(item.first, item.second.old_value_, false, output);
-      EmitRecord(item.first, *state_.Lookup(item.first).begin(), true, output);
+      EmitRecord(item.first, item.second.old_value_, false, &output);
+      EmitRecord(item.first, *state_.Lookup(item.first).begin(), true, &output);
     }
   }
-  return true;
+  return std::move(output);
 }
 
 }  // namespace dataflow

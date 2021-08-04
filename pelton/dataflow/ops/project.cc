@@ -251,12 +251,12 @@ void ProjectOperator::ComputeOutputSchema() {
       SchemaFactory::Create(out_column_names, out_column_types, out_keys);
 }
 
-bool ProjectOperator::Process(NodeIndex source,
-                              const std::vector<Record> &records,
-                              std::vector<Record> *output) {
+std::optional<std::vector<Record>> ProjectOperator::Process(
+    NodeIndex /*source*/, const std::vector<Record> &records) {
+  std::vector<Record> output;
   for (const Record &record : records) {
-    output->emplace_back(this->output_schema_, record.IsPositive());
-    Record &out_record = output->back();
+    output.emplace_back(this->output_schema_, record.IsPositive());
+    Record &out_record = output.back();
     for (size_t i = 0; i < this->projections_.size(); i++) {
       const auto &projection = this->projections_.at(i);
 
@@ -357,7 +357,7 @@ bool ProjectOperator::Process(NodeIndex source,
     }
   }
 
-  return true;
+  return std::move(output);
 }
 
 }  // namespace dataflow

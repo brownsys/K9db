@@ -126,8 +126,8 @@ class MatViewOperatorT : public MatViewOperator {
   }
 
  protected:
-  bool Process(NodeIndex source, const std::vector<Record> &records,
-               std::vector<Record> *output) override {
+  std::optional<std::vector<Record>> Process(
+      NodeIndex /*source*/, const std::vector<Record> &records) {
     bool by_pk = false;
     if (records.size() > 0) {
       const std::vector<ColumnID> &keys = records.at(0).schema().keys();
@@ -136,11 +136,11 @@ class MatViewOperatorT : public MatViewOperator {
 
     for (const Record &r : records) {
       if (!this->contents_.Insert(r.GetValues(this->key_cols_), r, by_pk)) {
-        return false;
+        LOG(FATAL) << "Failed to insert record in matview";
       }
     }
 
-    return true;
+    return std::nullopt;
   }
 
   void ComputeOutputSchema() override {

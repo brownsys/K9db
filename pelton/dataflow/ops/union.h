@@ -14,13 +14,10 @@ class UnionOperator : public Operator {
  public:
   UnionOperator() : Operator(Operator::Type::UNION) {}
 
-  bool ProcessAndForward(NodeIndex source,
-                         const std::vector<Record> &records) override;
+  std::optional<std::vector<Record>> Process(
+      NodeIndex /*source*/, const std::vector<Record>& /*records*/) override;
 
  protected:
-  bool Process(NodeIndex source, const std::vector<Record> &records,
-               std::vector<Record> *output) override;
-
   bool DeepCompareSchemas(const SchemaRef s1, const SchemaRef s2);
   void ComputeOutputSchema() override;
 };
