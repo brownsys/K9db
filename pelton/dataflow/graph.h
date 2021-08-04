@@ -43,11 +43,11 @@ class DataFlowGraph {
                          std::shared_ptr<Operator> parent);
 
   // Process records that are meant for an input operator
-  bool Process(const std::string &input_name,
+  void Process(const std::string &input_name,
                const std::vector<Record> &records) const;
   // Process records that are meant for a node specified by @destination_index
   // and perceived as if they were sent by @source_index
-  bool Process(const NodeIndex destination_index,
+  void Process(const NodeIndex destination_index,
                const std::optional<NodeIndex> source_index,
                const std::vector<Record> &records) const;
 
@@ -81,7 +81,7 @@ class DataFlowGraph {
 
  private:
   NodeIndex index_;
-  bool AddEdge(std::shared_ptr<Operator> parent,
+  void AddEdge(std::shared_ptr<Operator> parent,
                std::shared_ptr<Operator> child);
   // Maps input name to associated input operator.
   std::unordered_map<std::string, std::shared_ptr<InputOperator>> inputs_;

@@ -18,13 +18,13 @@ cc_library(
     hdrs = [
         "equijoin.h",
         "join_enum.h",
-        "//pelton/dataflow:graph.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":grouped_data",
         "//pelton/dataflow:key",
         "//pelton/dataflow:operator",
+        "//pelton/dataflow:graph",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
@@ -43,7 +43,6 @@ cc_library(
     hdrs = [
         "filter.h",
         "filter_enum.h",
-        "//pelton/dataflow:graph.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
@@ -64,7 +63,6 @@ cc_library(
     ],
     hdrs = [
         "input.h",
-        "//pelton/dataflow:graph.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
@@ -80,7 +78,6 @@ cc_library(
     name = "identity",
     srcs = [
         "identity.cc",
-        "//pelton/dataflow:graph.h",
     ],
     hdrs = [
         "identity.h",
@@ -139,7 +136,6 @@ cc_library(
     ],
     hdrs = [
         "union.h",
-        "//pelton/dataflow:graph.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
@@ -199,11 +195,11 @@ cc_library(
     ],
     hdrs = [
         "exchange.h",
-        "//pelton/dataflow:graph.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
         "//pelton/dataflow:operator",
+        "//pelton/dataflow:graph",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",

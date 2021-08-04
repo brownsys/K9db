@@ -4,7 +4,6 @@
 // and state.
 
 #include <memory>
-#include <optional>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -60,7 +59,7 @@ class DataFlowState {
   Record CreateRecord(const sqlast::Insert &insert_stmt) const;
 
   // Process raw data from sharder and use it to update flows.
-  bool ProcessRecords(const TableName &table_name,
+  void ProcessRecords(const TableName &table_name,
                       const std::vector<Record> &records);
 
   const std::shared_ptr<MatViewOperator> GetPartitionedMatView(

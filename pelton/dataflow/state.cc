@@ -264,7 +264,8 @@ const std::shared_ptr<DataFlowGraph> DataFlowState::GetPartitionedFlow(
 
 const std::shared_ptr<MatViewOperator> DataFlowState::GetPartitionedMatView(
     const FlowName &name, const Key &key) const {
-  uint64_t partition_index = GetPartition(key, this->partition_count_);
+  uint64_t partition_index =
+      partition::GetPartition(key, this->partition_count_);
   // Currently, only one matview is supported per flow.
   assert(this->partitioned_graphs_.at(name)
              .at(partition_index)
@@ -335,7 +336,7 @@ Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
   return record;
 }
 
-bool DataFlowState::ProcessRecords(const TableName &table_name,
+void DataFlowState::ProcessRecords(const TableName &table_name,
                                    const std::vector<Record> &records) {
   if (records.size() > 0 && this->HasFlowsFor(table_name)) {
     for (const FlowName &name : this->flows_per_input_table_.at(table_name)) {
@@ -350,8 +351,8 @@ bool DataFlowState::ProcessRecords(const TableName &table_name,
       auto input_partition_key =
           this->input_partitioned_by_.at(name).at(table_name);
       absl::flat_hash_map<uint16_t, std::vector<Record>> partitioned_records =
-          PartitionTrivial(std::move(records_copy), input_partition_key,
-                           this->partition_count_);
+          partition::HashPartition(std::move(records_copy), input_partition_key,
+                                   this->partition_count_);
       // Send batch messages to appropriate partitions
       auto flow = this->flows_.at(name);
       for (auto &item : partitioned_records) {
@@ -362,7 +363,6 @@ bool DataFlowState::ProcessRecords(const TableName &table_name,
       }
     }
   }
-  return true;
 }
 
 // Size in memory of all the dataflow graphs.

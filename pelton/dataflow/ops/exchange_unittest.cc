@@ -63,8 +63,8 @@ TEST(ExchangeOperatorTest, BasicTest) {
   records.emplace_back(schema, true, 5_u, std::make_unique<std::string>("Mech"),
                        7_s);
 
-  std::vector<Record> outputs;
-  EXPECT_TRUE(exchange->Process(UNDEFINED_NODE_INDEX, records, &outputs));
+  std::optional<std::vector<Record>> outputs =
+      exchange->Process(UNDEFINED_NODE_INDEX, records);
 
   // Collect records that are meant for other partitions and check if they are
   // as expected.
@@ -97,8 +97,8 @@ TEST(ExchangeOperatorTest, BasicTest) {
             records.at(3));
 
   // Check for current partition (i.e. 0th partition).
-  EXPECT_EQ(outputs.size(), 1);
-  EXPECT_EQ(outputs.at(0), records.at(2));
+  EXPECT_EQ(outputs.value().size(), 1);
+  EXPECT_EQ(outputs.value().at(0), records.at(2));
 }
 
 }  // namespace dataflow

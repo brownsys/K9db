@@ -22,15 +22,12 @@ class InputOperator : public Operator {
 
   const std::string &input_name() const { return this->input_name_; }
 
-  bool ProcessAndForward(NodeIndex source,
-                         const std::vector<Record> &records) override;
+  std::optional<std::vector<Record>> Process(
+      NodeIndex, const std::vector<Record> &records) override;
 
   std::shared_ptr<Operator> Clone() const override;
 
  protected:
-  bool Process(NodeIndex source, const std::vector<Record> &records,
-               std::vector<Record> *output) override;
-
   void ComputeOutputSchema() override {}
 
  private:

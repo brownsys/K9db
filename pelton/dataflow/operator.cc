@@ -22,29 +22,30 @@ void Operator::AddParent(std::shared_ptr<Operator> parent,
   }
 }
 
-bool Operator::ProcessAndForward(NodeIndex source,
+void Operator::ProcessAndForward(NodeIndex source,
                                  const std::vector<Record> &records) {
   // Process the records generating the output vector.
-  std::vector<Record> output;
-  if (!this->Process(source, records, &output)) {
-    return false;
+  std::optional<std::vector<Record>> output = this->Process(source, records);
+  if (output) {
+    // Pass output vector down to children to process.
+    this->BroadcastToChildren(output.value());
+  } else {
+    // Directly forward records to children.
+    this->BroadcastToChildren(records);
   }
+}
 
-  // Pass output vector down to children to process.
-  for (NodeIndex childIndex : this->children_) {
-    std::shared_ptr childNode = this->graph()->GetNode(childIndex);
-    if (!childNode->ProcessAndForward(this->index_, output)) {
-      return false;
-    }
+void Operator::BroadcastToChildren(const std::vector<Record> &records) {
+  for (NodeIndex child_index : this->children_) {
+    std::shared_ptr child_node = this->graph()->GetNode(child_index);
+    child_node->ProcessAndForward(this->index_, records);
   }
-
-  return true;
 }
 
 std::vector<std::shared_ptr<Operator>> Operator::GetParents() const {
   std::vector<std::shared_ptr<Operator>> nodes;
-  for (NodeIndex parentIndex : this->parents_) {
-    nodes.emplace_back(this->graph()->GetNode(parentIndex));
+  for (NodeIndex parent_index : this->parents_) {
+    CHECK(nodes.emplace_back(this->graph()->GetNode(parent_index)));
   }
 
   return nodes;
@@ -95,8 +96,8 @@ std::string Operator::DebugString() const {
   str += "\"operator\": \"" + type_str + "\", ";
   str += "\"id\": " + std::to_string(this->index()) + ", ";
   str += "\"children\": [";
-  for (NodeIndex childIndex : this->children_) {
-    str += std::to_string(childIndex) + ",";
+  for (NodeIndex child_index : this->children_) {
+    str += std::to_string(child_index) + ",";
   }
   if (this->children_.size() > 0) {
     str.pop_back();

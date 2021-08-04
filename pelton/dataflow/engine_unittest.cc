@@ -55,7 +55,7 @@ TEST(DataFlowEngineTest, TestTrivialGraph) {
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
   // Partition the input records so that equality checks are easier to perform
   auto partitioned_records =
-      PartitionTrivial(std::move(records), matview_key_cols, 3);
+      partition::HashPartition(std::move(records), matview_key_cols, 3);
   // Check if records have reached appropriate partition's matviews
   for (const auto &item : partitioned_records) {
     auto partition_matview =
@@ -113,8 +113,8 @@ TEST(DataFlowEngineTest, TestEquiJoinGraph) {
   // Partition the input records so that equality checks are easier to perform
   auto matview_op =
       std::dynamic_pointer_cast<MatViewOperator>(graph->GetNode(3));
-  auto partitioned_records =
-      PartitionTrivial(std::move(expected_records), matview_op->key_cols(), 3);
+  auto partitioned_records = partition::HashPartition(
+      std::move(expected_records), matview_op->key_cols(), 3);
   // Check if records have reached appropriate partition's matviews
   for (const auto &item : partitioned_records) {
     auto partition_matview =
@@ -168,8 +168,8 @@ TEST(DataFlowEngineTest, TestAggregateOnEquiJoinGraph) {
   // Partition the input records so that equality checks are easier to perform
   auto matview_op =
       std::dynamic_pointer_cast<MatViewOperator>(graph->GetNode(4));
-  auto partitioned_records =
-      PartitionTrivial(std::move(expected_records), matview_op->key_cols(), 3);
+  auto partitioned_records = partition::HashPartition(
+      std::move(expected_records), matview_op->key_cols(), 3);
   // Check if records have reached appropriate partition's matviews
   for (const auto &item : partitioned_records) {
     auto partition_matview =
@@ -223,7 +223,7 @@ TEST(DataFlowEngineTest, TestUnionGraph) {
   auto matview_op =
       std::dynamic_pointer_cast<MatViewOperator>(graph->GetNode(3));
   auto partitioned_records =
-      PartitionTrivial(std::move(records), matview_op->key_cols(), 3);
+      partition::HashPartition(std::move(records), matview_op->key_cols(), 3);
   // Check if records have reached appropriate partition's matviews
   for (const auto &item : partitioned_records) {
     auto partition_matview =
@@ -282,8 +282,8 @@ TEST(DataFlowEngineTest, TestDiamondGraph) {
   // Partition the input records so that equality checks are easier to perform
   auto matview_op =
       std::dynamic_pointer_cast<MatViewOperator>(graph->GetNode(9));
-  auto partitioned_records =
-      PartitionTrivial(std::move(expected_records), matview_op->key_cols(), 3);
+  auto partitioned_records = partition::HashPartition(
+      std::move(expected_records), matview_op->key_cols(), 3);
   // Check if records have reached appropriate partition's matviews
   for (const auto &item : partitioned_records) {
     auto partition_matview =

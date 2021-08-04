@@ -1,12 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
-exports_files(
-    [
-        "graph.h",
-    ],
-    ["//pelton/dataflow:__subpackages__"],
-)
-
 cc_library(
     name = "dstate",
     srcs = [

@@ -16,14 +16,10 @@ class IdentityOperator : public Operator {
  public:
   IdentityOperator() : Operator(Operator::Type::IDENTITY) {}
 
-  bool ProcessAndForward(NodeIndex source,
-                         const std::vector<Record> &records) override;
+  std::optional<std::vector<Record>> Process(
+      NodeIndex source, const std::vector<Record> &records) override;
   std::shared_ptr<Operator> Clone() const override;
-
  protected:
-  bool Process(NodeIndex source, const std::vector<Record> &records,
-               std::vector<Record> *output) override;
-
   void ComputeOutputSchema() override;
 
   FRIEND_TEST(EquiJoinOperatorTest, BasicJoinTest);

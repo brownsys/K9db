@@ -9,9 +9,7 @@
 #include "gtest/gtest_prod.h"
 #include "pelton/dataflow/batch_message.h"
 #include "pelton/dataflow/channel.h"
-#include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/operator.h"
-#include "pelton/dataflow/partition.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/types.h"
 
@@ -38,8 +36,8 @@ class ExchangeOperator : public Operator {
   const std::vector<ColumnID> &partition_key() { return this->partition_key_; }
 
  protected:
-  bool Process(NodeIndex source, const std::vector<Record> &records,
-               std::vector<Record> *output) override;
+  std::optional<std::vector<Record>> Process(
+      NodeIndex, const std::vector<Record> &records) override;
 
   void ComputeOutputSchema() override;
 

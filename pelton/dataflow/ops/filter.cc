@@ -1,6 +1,7 @@
 #include "pelton/dataflow/ops/filter.h"
 
 #include <tuple>
+#include <utility>
 
 #include "glog/logging.h"
 #include "pelton/dataflow/graph.h"
@@ -93,15 +94,15 @@ void FilterOperator::ComputeOutputSchema() {
   this->output_schema_ = this->input_schemas_.at(0);
 }
 
-bool FilterOperator::Process(NodeIndex source,
-                             const std::vector<Record> &records,
-                             std::vector<Record> *output) {
+std::optional<std::vector<Record>> FilterOperator::Process(
+    NodeIndex, const std::vector<Record> &records) {
+  std::vector<Record> output;
   for (const Record &record : records) {
     if (this->Accept(record)) {
-      output->push_back(record.Copy());
+      output.push_back(record.Copy());
     }
   }
-  return true;
+  return std::move(output);
 }
 
 bool FilterOperator::Accept(const Record &record) const {
@@ -142,21 +143,6 @@ bool FilterOperator::Accept(const Record &record) const {
     }
   }
   return true;
-}
-
-bool FilterOperator::ProcessAndForward(NodeIndex source,
-                                       const std::vector<Record> &records) {
-  if (this->ops_.size() == 0) {
-    for (NodeIndex childIndex : this->children_) {
-      std::shared_ptr<Operator> child = this->graph()->GetNode(childIndex);
-      if (!child->ProcessAndForward(this->index(), records)) {
-        return false;
-      }
-    }
-    return true;
-  } else {
-    return Operator::ProcessAndForward(source, records);
-  }
 }
 
 std::shared_ptr<Operator> FilterOperator::Clone() const {

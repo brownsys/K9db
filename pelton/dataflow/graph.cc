@@ -36,7 +36,7 @@ bool DataFlowGraph::AddNode(std::shared_ptr<Operator> op,
 
   for (const auto &parent : parents) {
     if (parent) {
-      CHECK(this->AddEdge(parent, op));
+      this->AddEdge(parent, op);
     }
   }
   return inserted;
@@ -73,42 +73,31 @@ bool DataFlowGraph::InsertNodeAfter(std::shared_ptr<Operator> op,
   return true;
 }
 
-bool DataFlowGraph::AddEdge(std::shared_ptr<Operator> parent,
+void DataFlowGraph::AddEdge(std::shared_ptr<Operator> parent,
                             std::shared_ptr<Operator> child) {
   std::pair<NodeIndex, NodeIndex> edge{parent->index(), child->index()};
   this->edges_.push_back(edge);
   // Also implicitly adds op1 as child of op2.
   child->AddParent(parent, edge);
-  return true;
 }
 
-bool DataFlowGraph::Process(const std::string &input_name,
+void DataFlowGraph::Process(const std::string &input_name,
                             const std::vector<Record> &records) const {
   std::shared_ptr<InputOperator> node = this->inputs_.at(input_name);
-  if (!node->ProcessAndForward(UNDEFINED_NODE_INDEX, records)) {
-    return false;
-  }
-
-  return true;
+  node->ProcessAndForward(UNDEFINED_NODE_INDEX, records);
 }
 
-bool DataFlowGraph::Process(const NodeIndex destination_index,
+void DataFlowGraph::Process(const NodeIndex destination_index,
                             const std::optional<NodeIndex> source_index,
                             const std::vector<Record> &records) const {
   std::shared_ptr<Operator> node = this->nodes_.at(destination_index);
   if (!source_index) {
     // Implies that the records are meant for the input operator
     node = std::dynamic_pointer_cast<InputOperator>(node);
-    if (!node->ProcessAndForward(UNDEFINED_NODE_INDEX, records)) {
-      return false;
-    }
+    node->ProcessAndForward(UNDEFINED_NODE_INDEX, records);
   } else {
-    if (!node->ProcessAndForward(source_index.value(), records)) {
-      return false;
-    }
+    node->ProcessAndForward(source_index.value(), records);
   }
-
-  return true;
 }
 
 std::shared_ptr<DataFlowGraph> DataFlowGraph::Clone() {
