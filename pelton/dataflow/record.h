@@ -244,6 +244,16 @@ class Record {
                        << ", got " << TypeNameFor(t);
           }
           break;
+        case sqlast::ColumnDefinition::Type::DATETIME:
+          if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                     std::unique_ptr<std::string>>::value) {
+            this->data_[index].str = std::move(t);
+          } else {
+            LOG(FATAL) << "Type mismatch in SetData at index " << index
+                       << ", expected " << this->schema_.TypeOf(index)
+                       << ", got " << TypeNameFor(t);
+          }
+          break;
         default:
           LOG(FATAL) << "Unsupported data type in SetData";
       }

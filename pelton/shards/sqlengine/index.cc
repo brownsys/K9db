@@ -3,6 +3,7 @@
 #include <memory>
 #include "pelton/shards/sqlengine/index.h"
 
+#include "absl/status/status.h"
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/ops/matview.h"
@@ -16,14 +17,16 @@ namespace shards {
 namespace sqlengine {
 namespace index {
 
-absl::Status CreateIndex(const sqlast::CreateIndex &stmt, SharderState *state,
-                         dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<sql::SqlResult> CreateIndex(
+    const sqlast::CreateIndex &stmt, SharderState *state,
+    dataflow::DataFlowState *dataflow_state) {
   perf::Start("Create Index");
   const std::string &table_name = stmt.table_name();
 
+  sql::SqlResult result = sql::SqlResult(false);
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
-    state->connection_pool().ExecuteDefault(&stmt);
+    result = state->executor().ExecuteDefault(&stmt);
 
   } else {  // is_sharded == true
     const std::string &column_name = stmt.column_name();
@@ -62,10 +65,12 @@ absl::Status CreateIndex(const sqlast::CreateIndex &stmt, SharderState *state,
       state->CreateIndex(info.shard_kind, table_name, column_name,
                          info.shard_by, index_name, create_index, unique);
     }
+
+    result = sql::SqlResult(true);
   }
 
   perf::End("Create Index");
-  return absl::OkStatus();
+  return result;
 }
 
 absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(

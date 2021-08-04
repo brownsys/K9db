@@ -2,6 +2,7 @@ load("@rules_cc//cc:defs.bzl", "cc_test")
 
 cc_test(
     name = "correctness",
+    timeout = "long",
     srcs = [
         "correctness.cc",
     ],
@@ -90,13 +91,11 @@ cc_test(
         "//tests/data:trivial-queries.sql",
         "//tests/data:trivial-schema.sql",
     ],
-    linkstatic = 1,
     deps = [
         "//pelton",
         "//pelton/util:perf",
-        "@gflags",
+        "@com_github_gflags_gflags//:gflags",
         "@glog",
         "@gtest",
-        "@gtest//:gtest_main",
     ],
 )

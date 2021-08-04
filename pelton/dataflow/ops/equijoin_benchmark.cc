@@ -5,7 +5,7 @@
 #include "benchmark/benchmark.h"
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/key.h"
-#include "pelton/dataflow/ops/benchmark-utils.h"
+#include "pelton/dataflow/ops/benchmark_utils.h"
 #include "pelton/dataflow/ops/equijoin.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/record.h"
@@ -39,11 +39,10 @@ void JoinOneToOne(benchmark::State& state) {
   leftRecords.emplace_back(std::move(lr1));
   rightRecords.emplace_back(std::move(rr1));
 
-  std::vector<Record> out_rs;
-  op->Process(0, leftRecords, &out_rs);
+  op->Process(0, leftRecords);
   size_t processed = 0;
   for (auto _ : state) {
-    op->Process(1, rightRecords, &out_rs);
+    op->Process(1, rightRecords);
     processed++;
   }
   state.SetItemsProcessed(processed);

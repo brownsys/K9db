@@ -89,17 +89,14 @@ Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
   return record;
 }
 
-bool DataFlowState::ProcessRecords(const TableName &table_name,
+void DataFlowState::ProcessRecords(const TableName &table_name,
                                    const std::vector<Record> &records) {
   if (records.size() > 0 && this->HasFlowsFor(table_name)) {
     for (const FlowName &name : this->flows_per_input_table_.at(table_name)) {
       std::shared_ptr<DataFlowGraph> graph = this->flows_.at(name);
-      if (!graph->Process(table_name, records)) {
-        return false;
-      }
+      graph->Process(table_name, records);
     }
   }
-  return true;
 }
 
 // Size in memory of all the dataflow graphs.

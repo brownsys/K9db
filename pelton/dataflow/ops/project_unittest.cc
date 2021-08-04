@@ -62,9 +62,9 @@ TEST(ProjectOperatorTest, BatchTestColumn) {
                                 std::make_unique<std::string>("hello!"));
 
   // Feed records and test
-  std::vector<Record> outputs;
-  EXPECT_TRUE(project.Process(UNDEFINED_NODE_INDEX, records, &outputs));
-  EXPECT_EQ(outputs, expected_records);
+  std::optional<std::vector<Record>> outputs =
+      project.Process(UNDEFINED_NODE_INDEX, records);
+  EXPECT_EQ(outputs.value(), expected_records);
 }
 
 TEST(ProjectOperatorTest, BatchTestLiteral) {
@@ -92,9 +92,9 @@ TEST(ProjectOperatorTest, BatchTestLiteral) {
   expected_records.emplace_back(project.output_schema_, true, 6_u, 1_u);
 
   // Feed records and test
-  std::vector<Record> outputs;
-  EXPECT_TRUE(project.Process(UNDEFINED_NODE_INDEX, records, &outputs));
-  EXPECT_EQ(outputs, expected_records);
+  std::optional<std::vector<Record>> outputs =
+      project.Process(UNDEFINED_NODE_INDEX, records);
+  EXPECT_EQ(outputs.value(), expected_records);
 }
 
 TEST(ProjectOperatorTest, BatchTestOperationRightColumn) {
@@ -124,9 +124,9 @@ TEST(ProjectOperatorTest, BatchTestOperationRightColumn) {
   expected_records.emplace_back(project.output_schema_, true, 6_u, 2_s);
 
   // Feed records and test
-  std::vector<Record> outputs;
-  EXPECT_TRUE(project.Process(UNDEFINED_NODE_INDEX, records, &outputs));
-  EXPECT_EQ(outputs, expected_records);
+  std::optional<std::vector<Record>> outputs =
+      project.Process(UNDEFINED_NODE_INDEX, records);
+  EXPECT_EQ(outputs.value(), expected_records);
 }
 
 TEST(ProjectOperatorTest, BatchTestOperationRightLiteral) {
@@ -159,9 +159,9 @@ TEST(ProjectOperatorTest, BatchTestOperationRightLiteral) {
   expected_records.emplace_back(project.output_schema_, true, 6_u, 11_u);
 
   // Feed records and test
-  std::vector<Record> outputs;
-  EXPECT_TRUE(project.Process(UNDEFINED_NODE_INDEX, records, &outputs));
-  EXPECT_EQ(outputs, expected_records);
+  std::optional<std::vector<Record>> outputs =
+      project.Process(UNDEFINED_NODE_INDEX, records);
+  EXPECT_EQ(outputs.value(), expected_records);
 }
 
 TEST(ProjectOperatorTest, OutputSchemaPrimaryKeyTest) {
@@ -259,9 +259,9 @@ TEST(ProjectOperatorTest, NullValueTest) {
                                 std::make_unique<std::string>("hello!"));
 
   // Feed records and test
-  std::vector<Record> outputs;
-  EXPECT_TRUE(project.Process(UNDEFINED_NODE_INDEX, records, &outputs));
-  EXPECT_EQ(outputs, expected_records);
+  std::optional<std::vector<Record>> outputs =
+      project.Process(UNDEFINED_NODE_INDEX, records);
+  EXPECT_EQ(outputs.value(), expected_records);
 }
 
 TEST(ProjectOperatorTest, ArithmeticAndNullValueTest) {
@@ -301,9 +301,9 @@ TEST(ProjectOperatorTest, ArithmeticAndNullValueTest) {
                                 NullValue(), -10_s, -10_s);
 
   // Feed records and test
-  std::vector<Record> outputs;
-  EXPECT_TRUE(project.Process(UNDEFINED_NODE_INDEX, records, &outputs));
-  EXPECT_EQ(outputs, expected_records);
+  std::optional<std::vector<Record>> outputs =
+      project.Process(UNDEFINED_NODE_INDEX, records);
+  EXPECT_EQ(outputs.value(), expected_records);
 }
 
 }  // namespace dataflow

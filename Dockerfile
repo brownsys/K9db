@@ -14,7 +14,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     build-essential libssl-dev zlib1g-dev libncurses5-dev \
     libncursesw5-dev libreadline-dev libgdbm-dev libdb5.3-dev libbz2-dev \
     libexpat1-dev liblzma-dev tk-dev libffi-dev wget gcc-9 g++-9 unzip \
-    openjdk-11-jdk maven python2 valgrind curl
+    openjdk-11-jdk maven python2 valgrind curl libclang-dev
 
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 90 \
                                  --slave /usr/bin/gcc-ar gcc-ar /usr/bin/gcc-ar-9 \
@@ -30,6 +30,10 @@ RUN cd /tmp \
     && ./bazel-4.0.0-installer-linux-x86_64.sh \
     && echo "source /usr/local/lib/bazel/bin/bazel-complete.bash" >> ~/.bashrc \
     && rm bazel-4.0.0-installer-linux-x86_64.sh
+
+# install rust
+RUN curl https://sh.rustup.rs | sh -s -- -y
+RUN /root/.cargo/bin/cargo install cargo-raze
 
 # install mariadb
 RUN apt-get remove -y --purge mysql*

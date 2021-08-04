@@ -1,4 +1,9 @@
 #!/bin/bash
+echo "Running cargo-raze"
+cd /home/pelton/mysql_proxy/
+rm -rf cargo && /root/.cargo/bin/cargo raze
+cd -
+
 echo "Running mysqld ..."
 mysqld &
 MYSQLID=$!

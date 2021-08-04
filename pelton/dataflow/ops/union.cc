@@ -30,23 +30,9 @@ void UnionOperator::ComputeOutputSchema() {
   }
 }
 
-bool UnionOperator::Process(NodeIndex source,
-                            const std::vector<Record> &records,
-                            std::vector<Record> *output) {
-  LOG(FATAL) << "Process() called on UnionOperator";
-  return false;
-}
-
-bool UnionOperator::ProcessAndForward(NodeIndex source,
-                                      const std::vector<Record> &records) {
-  for (NodeIndex childIndex : this->children_) {
-    std::shared_ptr<Operator> child = this->graph()->GetNode(childIndex);
-    if (!child->ProcessAndForward(this->index(), records)) {
-      return false;
-    }
-  }
-
-  return true;
+std::optional<std::vector<Record>> UnionOperator::Process(
+    NodeIndex, const std::vector<Record> &records) {
+  return std::nullopt;
 }
 
 std::shared_ptr<Operator> UnionOperator::Clone() const {

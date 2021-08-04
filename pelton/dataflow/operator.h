@@ -2,9 +2,10 @@
 #define PELTON_DATAFLOW_OPERATOR_H_
 
 #include <memory>
+#include <optional>
 #include <string>
-#include <vector>
 #include <tuple>
+#include <vector>
 
 #include "benchmark/benchmark.h"
 #include "pelton/dataflow/record.h"
@@ -50,7 +51,7 @@ class Operator {
    * @param records
    * @return
    */
-  virtual bool ProcessAndForward(NodeIndex source,
+  virtual void ProcessAndForward(NodeIndex source,
                                  const std::vector<Record> &records);
   // TODO(babman): we can have an optimized version for the case where this
   // operator is a single child of another operator. The records can then be
@@ -92,8 +93,8 @@ class Operator {
    * @param output target vector where to write outputs to.
    * @return true when processing succeeded, false when an error occurred.
    */
-  virtual bool Process(NodeIndex source, const std::vector<Record> &records,
-                       std::vector<Record> *output) = 0;
+  virtual std::optional<std::vector<Record>> Process(
+      NodeIndex source, const std::vector<Record> &records) = 0;
 
   /*!
    * Compute the output_schema of the operator.
@@ -118,6 +119,7 @@ class Operator {
  private:
   Type type_;
   DataFlowGraph *graph_;  // The graph the operator belongs to.
+  void BroadcastToChildren(const std::vector<Record> &records);
 
   // Allow DataFlowGraph to use SetGraph, SetIndex, and AddParent functions.
   friend class DataFlowGraph;

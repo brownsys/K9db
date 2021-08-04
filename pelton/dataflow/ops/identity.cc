@@ -14,23 +14,9 @@ void IdentityOperator::ComputeOutputSchema() {
   this->output_schema_ = this->input_schemas_.at(0);
 }
 
-bool IdentityOperator::Process(NodeIndex source,
-                               const std::vector<Record> &records,
-                               std::vector<Record> *output) {
-  LOG(FATAL) << "Process() called on IdentityOperator";
-  return false;
-}
-
-bool IdentityOperator::ProcessAndForward(NodeIndex source,
-                                         const std::vector<Record> &records) {
-  for (NodeIndex childIndex : this->children_) {
-    std::shared_ptr<Operator> child = this->graph()->GetNode(childIndex);
-    if (!child->ProcessAndForward(this->index(), records)) {
-      return false;
-    }
-  }
-
-  return true;
+std::optional<std::vector<Record>> IdentityOperator::Process(
+    NodeIndex source, const std::vector<Record> &records) {
+  return std::nullopt;
 }
 
 std::shared_ptr<Operator> IdentityOperator::Clone() const {

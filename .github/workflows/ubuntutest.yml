@@ -15,11 +15,11 @@ jobs:
     - name: Run docker container
       run: |
         docker run --mount type=bind,source=$(pwd),target=/home/pelton --name pelton-testing -d -t pelton/latest
-        sleep 15
+        sleep 30
 
     - name: Test dataflow with valgrind
       env:
-        TEST: bazel test //pelton/dataflow/... --config=valgrind
+        TEST: bazel test //pelton/dataflow/... --config=valgrind --test_output=all
       run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
 
     - name: Build all
@@ -29,7 +29,7 @@ jobs:
 
     - name: Test all
       env:
-        TEST: bazel test ...
+        TEST: bazel test ... --test_output=all --test_arg=--db_username=root --test_arg=--db_password=password
       run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
 
     - name: Run end-2-end sample

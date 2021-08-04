@@ -2,7 +2,7 @@
 
 #include "benchmark/benchmark.h"
 #include "pelton/dataflow/key.h"
-#include "pelton/dataflow/ops/benchmark-utils.h"
+#include "pelton/dataflow/ops/benchmark_utils.h"
 #include "pelton/dataflow/ops/filter.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
@@ -23,10 +23,9 @@ static void FilterPasses(benchmark::State& state) {
   std::vector<Record> rs;
   rs.emplace_back(std::move(r));
 
-  std::vector<Record> out_rs;
   size_t processed = 0;
   for (auto _ : state) {
-    filter.Process(UNDEFINED_NODE_INDEX, rs, &out_rs);
+    filter.Process(UNDEFINED_NODE_INDEX, rs);
     processed++;
   }
   state.SetItemsProcessed(processed);
@@ -42,10 +41,9 @@ static void FilterDiscards(benchmark::State& state) {
   std::vector<Record> rs;
   rs.emplace_back(std::move(r));
 
-  std::vector<Record> out_rs;
   size_t processed = 0;
   for (auto _ : state) {
-    filter.Process(UNDEFINED_NODE_INDEX, rs, &out_rs);
+    filter.Process(UNDEFINED_NODE_INDEX, rs);
     processed++;
   }
   state.SetItemsProcessed(processed);
