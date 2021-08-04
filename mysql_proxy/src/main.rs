@@ -193,21 +193,24 @@ fn main() {
     // initialize rust logging
     let plain = slog_term::PlainSyncDecorator::new(std::io::stdout());
     let log: slog::Logger =
-        slog::Logger::root(slog_term::FullFormat::new(plain).build().fuse(), o!());
-
+    slog::Logger::root(slog_term::FullFormat::new(plain).build().fuse(), o!());
+    
     // process command line arguments with gflags via FFI
     // create vector of zero terminated CStrings from command line arguments
     let args = std::env::args()
-        .map(|arg| CString::new(arg).unwrap())
-        .collect::<Vec<CString>>();
+    .map(|arg| CString::new(arg).unwrap())
+    .collect::<Vec<CString>>();
     let c_argc = args.len() as c_int;
     // convert CStrings to raw pointers
     let mut c_argv = args
-        .iter()
-        .map(|arg| arg.as_ptr() as *mut i8)
-        .collect::<Vec<*mut c_char>>();
+    .iter()
+    .map(|arg| arg.as_ptr() as *mut i8)
+    .collect::<Vec<*mut c_char>>();
     // pass converted arguments to C-FFI
     unsafe { FFIGflags(c_argc, c_argv.as_mut_ptr()) };
+
+    let global_open = global_open_ffi("", "pelton", "root", "password");
+    info!(log, "Rust Proxy: opening connection globally: {:?}", global_open);
 
     let listener = net::TcpListener::bind("127.0.0.1:10001").unwrap();
     info!(log, "Rust Proxy: Listening at: {:?}", listener);
@@ -249,7 +252,7 @@ fn main() {
                     "Rust Proxy: Successfully connected to mysql proxy\nStream and address are: {:?}",
                     stream
                 );
-                let rust_conn = open_ffi("", "pelton", "root", "password");
+                let rust_conn = open_ffi();
                 info!(
                     log_client,
                     "Rust Proxy: connection status is: {:?}", rust_conn.connected
@@ -270,4 +273,6 @@ fn main() {
     for join_handle in threads {
         join_handle.join().unwrap();
     }
+    let global_close = global_close_ffi();
+    info!(log, "Rust Proxy: Closing connection globally: {:?}", global_close);
 }

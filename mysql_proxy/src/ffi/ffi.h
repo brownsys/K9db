@@ -11,7 +11,7 @@ extern "C" {
 
 // Connection is essentially a wrapper around pelton connection.
 typedef struct {
-  // cpp_conn is in reality of type pelton::Connection.
+  // cpp_conn is in reality of type pelton::ConnectionLocal.
   void *cpp_conn;
   // connected is used to report whether some error was encountered when opening
   // the connection.
@@ -47,10 +47,13 @@ typedef struct {
 // Pass command line arguments to gflags
 void FFIGflags(int argc, char **argv);
 
-// Open a connection. The returned struct has connected = true if successful.
-// Otherwise connected = false.
-FFIConnection FFIOpen(const char *db_name, const char *db_dir,
-                      const char *db_username, const char *db_password);
+// Open a global connection, initializing pelton_state in pelton.cc
+bool FFIGlobalOpen(const char *db_name, const char *db_dir,
+                   const char *db_username, const char *db_password);
+
+// Open a connection for a single client. The returned struct has connected =
+// true if successful. Otherwise connected = false.
+FFIConnection FFIOpen();
 
 // Execute a DDL statement (e.g. CREATE TABLE, CREATE VIEW, CREATE INDEX).
 bool FFIExecDDL(FFIConnection *c_conn, const char *query);
@@ -66,7 +69,10 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query);
 // Clean up the memory allocated by an FFIResult.
 void FFIDestroySelect(FFIResult *c_result);
 
-// Close the connection. Returns true if successful and false otherwise.
+// Close the global connection. Returns true if successful and false otherwise.
+bool FFIGlobalClose();
+
+// Close a client connection. Returns true if successful and false otherwise.
 bool FFIClose(FFIConnection *c_conn);
 
 #ifdef __cplusplus

@@ -30,6 +30,8 @@ class Connection {
   Connection(const Connection &&) = delete;
   Connection &operator=(const Connection &&) = delete;
 
+  // path to store state if want to store in folder (usually give it empty
+  // string)
   void Initialize(const std::string &path) {
     this->path_ = path;
     if (this->path_.size() > 0 && this->path_.back() != '/') {
@@ -41,6 +43,7 @@ class Connection {
   shards::SharderState *GetSharderState() { return &this->sharder_state_; }
   dataflow::DataFlowState *GetDataFlowState() { return &this->dataflow_state_; }
 
+  // Won't need save and load to save to files. Eventually will delete these::
   // State persistance.
   void Save() {
     if (this->path_.size() > 0) {
@@ -63,13 +66,26 @@ class Connection {
   std::string path_;
 };
 
-bool open(const std::string &directory, const std::string &db_name,
-          const std::string &db_username, const std::string &db_password,
-          Connection *connection);
+class ConnectionLocal {
+ public:
+  Connection *global_connection;
+};
 
-absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql);
+// open persistent connection, initialize pelton_state
+bool global_open(const std::string &directory, const std::string &db_name,
+                 const std::string &db_username,
+                 const std::string &db_password);
 
-bool close(Connection *connection, bool shutdown_planner = true);
+// close global connection, delete pelton_state
+bool global_close(bool shutdown_planner = true);
+
+// open local connection
+bool open(ConnectionLocal *connection);
+
+absl::StatusOr<SqlResult> exec(ConnectionLocal *connection, std::string sql);
+
+// close local connection
+bool close(ConnectionLocal *connection);
 
 // Call this if you are certain you are not going to make more calls to
 // make_view to shutdown the JVM.

@@ -40,8 +40,8 @@ void DropDatabase() {
 }
 
 TEST(PROXY, OPEN_TEST) {
-  c_conn = FFIOpen("", DB_NAME, db_username->c_str(), db_password->c_str());
-  EXPECT_TRUE(c_conn.connected) << "Openning connection failed!";
+  c_conn = FFIOpen();
+  EXPECT_TRUE(c_conn.connected) << "Opening connection failed!";
 }
 
 // Test creating tables and views.
@@ -137,9 +137,17 @@ int main(int argc, char **argv) {
   // Drop the database (in case it existed before because of some tests).
   DropDatabase();
 
+  // Open global connection
+  EXPECT_TRUE(
+      FFIGlobalOpen("", DB_NAME, db_username->c_str(), db_password->c_str()))
+      << "Opening global connection failed!";
+
   // Run tests.
   ::testing::InitGoogleTest(&argc, argv);
   auto result = RUN_ALL_TESTS();
+
+  // Close global connection
+  EXPECT_TRUE(FFIGlobalClose()) << "Closing global connection failed!";
 
   // Drop the database again.
   DropDatabase();

@@ -17,6 +17,9 @@ namespace pelton {
 
 namespace {
 
+// global state that persists between client connections
+Connection *pelton_state = nullptr;
+
 // String whitespace trimming.
 // https://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring/25385766
 // NOLINTNEXTLINE
@@ -44,16 +47,33 @@ bool SpecialStatements(const std::string &sql, Connection *connection) {
 
 }  // namespace
 
-bool open(const std::string &directory, const std::string &db_name,
-          const std::string &db_username, const std::string &db_password,
-          Connection *connection) {
-  connection->Initialize(directory);
-  connection->GetSharderState()->Initialize(db_name, db_username, db_password);
-  connection->Load();
+bool global_open(const std::string &directory, const std::string &db_name,
+                 const std::string &db_username,
+                 const std::string &db_password) {
+  // if already open
+  if (pelton_state != nullptr) {
+    // close without shutting down planner
+    global_close(false);
+  }
+  pelton_state = new Connection();
+  pelton_state->Initialize(directory);
+  pelton_state->GetSharderState()->Initialize(db_name, db_username,
+                                              db_password);
+  pelton_state->Load();
   return true;
 }
 
-absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
+bool open(ConnectionLocal *connection) {
+  connection->global_connection = pelton_state;
+  return true;
+}
+
+bool close(ConnectionLocal *connection) {
+  // empty for now
+  return true;
+}
+
+absl::StatusOr<SqlResult> exec(ConnectionLocal *connection, std::string sql) {
   // Trim statement.
   Trim(sql);
   if (echo) {
@@ -61,23 +81,30 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
   }
 
   // If special statement, handle it separately.
-  if (SpecialStatements(sql, connection)) {
+  if (SpecialStatements(sql, connection->global_connection)) {
     return SqlResult(true);
   }
 
   // Parse and rewrite statement.
-  shards::SharderState *sstate = connection->GetSharderState();
-  dataflow::DataFlowState *dstate = connection->GetDataFlowState();
+  shards::SharderState *sstate =
+      connection->global_connection->GetSharderState();  // access field?
+  dataflow::DataFlowState *dstate =
+      connection->global_connection->GetDataFlowState();
   return shards::sqlengine::Shard(sql, sstate, dstate);
 }
 
 void shutdown_planner() { planner::ShutdownPlanner(); }
 
-bool close(Connection *connection, bool shutdown_planner) {
-  connection->Save();
+bool global_close(bool shutdown_planner) {
+  if (pelton_state == nullptr) {
+    return true;
+  }
+  pelton_state->Save();
   if (shutdown_planner) {
     planner::ShutdownPlanner();
   }
+  delete pelton_state;
+  pelton_state = nullptr;
   return true;
 }
 
