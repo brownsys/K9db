@@ -2,7 +2,7 @@ package com.brownsys.pelton.operators;
 
 import com.brownsys.pelton.PlanningContext;
 import com.brownsys.pelton.nativelib.DataFlowGraphLibrary;
-import com.brownsys.pelton.operators.util.FilterArithmeticVisitor;
+import com.brownsys.pelton.util.RexArithmeticCollector;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -55,7 +55,7 @@ public class FilterOperatorFactory {
     // introducing them as projections with tmp column names, then using these
     // columns in their place during filtering. Finally, after the filter a new
     // projection is carried out to remove these tmp columns.
-    FilterArithmeticVisitor arithmeticVisitor = new FilterArithmeticVisitor();
+    RexArithmeticCollector arithmeticVisitor = new RexArithmeticCollector();
     boolean hasArithmetic = condition.accept(arithmeticVisitor);
     int tmpColumnCount = 0;
     int originalColumnCount = this.context.getPeltonColumnCount();

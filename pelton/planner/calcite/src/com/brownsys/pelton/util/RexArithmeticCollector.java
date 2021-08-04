@@ -1,4 +1,4 @@
-package com.brownsys.pelton.operators.util;
+package com.brownsys.pelton.util;
 
 import com.brownsys.pelton.operators.FilterOperatorFactory;
 import java.util.LinkedList;
@@ -19,16 +19,12 @@ import org.apache.calcite.rex.RexTableInputRef;
 import org.apache.calcite.rex.RexVisitor;
 import org.apache.calcite.sql.SqlKind;
 
-// Checks whether a given filter condition contains arithmetic expressions.
-// This visitor can return either:
-// 1. true: when the condition contains arithmetic (+ or -).
-// 2. false: if the condition does not contain any arithmetic.
-// 3. throws IllegalArgumentException: if the condition has some unsupported shape
-//    or constructs. Importantly, an OR inside an AND.
-public class FilterArithmeticVisitor implements RexVisitor<Boolean> {
+// Returns all arithmetic operators found inside the given RexNode tree.
+// throws IllegalArgumentException: if the condition has some unsupported constructs.
+public class RexArithmeticCollector implements RexVisitor<Boolean> {
   private LinkedList<RexCall> arithmeticNodes;
 
-  public FilterArithmeticVisitor() {
+  public RexArithmeticCollector() {
     this.arithmeticNodes = new LinkedList<RexCall>();
   }
 

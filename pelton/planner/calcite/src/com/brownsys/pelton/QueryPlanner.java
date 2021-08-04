@@ -1,6 +1,7 @@
 package com.brownsys.pelton;
 
 import com.brownsys.pelton.nativelib.DataFlowGraphLibrary;
+import com.brownsys.pelton.rules.FilterPastJoin;
 import com.brownsys.pelton.schema.PeltonSchemaFactory;
 import java.util.Collections;
 import org.apache.calcite.config.CalciteConnectionConfig;
@@ -113,7 +114,7 @@ public class QueryPlanner {
           // directly.
           .addRuleInstance(CoreRules.JOIN_CONDITION_PUSH)
           .addRuleInstance(CoreRules.JOIN_PUSH_TRANSITIVE_PREDICATES)
-          // TODO(babman): Need our own version of FILTER_ON_JOIN.
+          .addRuleInstance(FilterPastJoin.Config.DEFAULT.toRule())
           .build();
     // The complete optimization program.
     HepProgram hepProgram =
@@ -159,7 +160,7 @@ public class QueryPlanner {
     SqlNode validatedSqlNode = this.validator.validate(sqlNode);
     // Transform to a tree of calcite logical operators.
     RelRoot rawPlan = this.converter.convertQuery(validatedSqlNode, false, true);
-    System.out.println("Raw plan:");
+    System.out.println("Java: Unoptimized plan");
     System.out.println(RelOptUtil.toString(rawPlan.project()));
     // Apply planner optimizations.
     this.planner.clear();
@@ -194,7 +195,7 @@ public class QueryPlanner {
 
     // Parse the query and turn it into an optimized physical plan.
     RelNode physicalPlan = planner.getPhysicalPlan(query);
-    System.out.println("Java: Calcite plan");
+    System.out.println("Java: Optimized plan");
     System.out.println(RelOptUtil.toString(physicalPlan));
 
     // Extract pelton operators from plan and populate them into the c++ DataFlowGraph.
