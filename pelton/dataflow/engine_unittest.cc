@@ -50,12 +50,13 @@ TEST(DataFlowEngineTest, TestTrivialGraph) {
 
   // Process records through the sharded dataflow
   std::vector<Record> records = MakeLeftRecords(schema);
-  state.ProcessRecords("test-table", records);
+  std::vector<Record> records_copy = MakeLeftRecords(schema);
+  state.ProcessRecords("test-table", std::move(std::move(records)));
   // Wait for a while for records to get processed
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
   // Partition the input records so that equality checks are easier to perform
   auto partitioned_records =
-      partition::HashPartition(std::move(records), matview_key_cols, 3);
+      partition::HashPartition(std::move(records_copy), matview_key_cols, 3);
   // Check if records have reached appropriate partition's matviews
   for (const auto &item : partitioned_records) {
     auto partition_matview =
@@ -103,8 +104,8 @@ TEST(DataFlowEngineTest, TestEquiJoinGraph) {
   // Make records.
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
-  state.ProcessRecords("test-table1", left);
-  state.ProcessRecords("test-table2", right);
+  state.ProcessRecords("test-table1", std::move(left));
+  state.ProcessRecords("test-table2", std::move(right));
   auto join_op = std::dynamic_pointer_cast<EquiJoinOperator>(graph->GetNode(2));
   std::vector<Record> expected_records =
       MakeJoinRecords(join_op->output_schema());
@@ -157,8 +158,8 @@ TEST(DataFlowEngineTest, TestAggregateOnEquiJoinGraph) {
   // Make records.
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
-  state.ProcessRecords("test-table1", left);
-  state.ProcessRecords("test-table2", right);
+  state.ProcessRecords("test-table1", std::move(left));
+  state.ProcessRecords("test-table2", std::move(right));
   auto aggregate_op =
       std::dynamic_pointer_cast<AggregateOperator>(graph->GetNode(3));
   std::vector<Record> expected_records =
@@ -215,8 +216,8 @@ TEST(DataFlowEngineTest, TestUnionGraph) {
   second_half.push_back(records.at(2).Copy());
   second_half.push_back(records.at(3).Copy());
   second_half.push_back(records.at(4).Copy());
-  state.ProcessRecords("test-table1", first_half);
-  state.ProcessRecords("test-table2", second_half);
+  state.ProcessRecords("test-table1", std::move(first_half));
+  state.ProcessRecords("test-table2", std::move(second_half));
   // Wait for a while for records to get processed
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
   // Partition the input records so that equality checks are easier to perform
@@ -271,8 +272,8 @@ TEST(DataFlowEngineTest, TestDiamondGraph) {
   // Make records.
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
-  state.ProcessRecords("test-table1", left);
-  state.ProcessRecords("test-table2", right);
+  state.ProcessRecords("test-table1", std::move(left));
+  state.ProcessRecords("test-table2", std::move(right));
   auto aggregate_op =
       std::dynamic_pointer_cast<AggregateOperator>(graph->GetNode(3));
   std::vector<Record> expected_records =

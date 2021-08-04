@@ -114,7 +114,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
       std::vector<dataflow::Record> records =
           result.NextResultSet()->Vectorize();
       result = sql::SqlResult(static_cast<int>(records.size()));
-      dataflow_state->ProcessRecords(table_name, records);
+      dataflow_state->ProcessRecords(table_name, std::move(records));
     }
   }
   if (!result.IsUpdate()) {

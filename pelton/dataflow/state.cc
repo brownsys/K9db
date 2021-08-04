@@ -337,21 +337,14 @@ Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
 }
 
 void DataFlowState::ProcessRecords(const TableName &table_name,
-                                   const std::vector<Record> &records) {
+                                   std::vector<Record> &&records) {
   if (records.size() > 0 && this->HasFlowsFor(table_name)) {
     for (const FlowName &name : this->flows_per_input_table_.at(table_name)) {
-      // TODO(Ishan): Consider consuming @records over here instead of being
-      // passed as const reference.
-      // For now just copy the records.
-      std::vector<Record> records_copy;
-      for (const auto &record : records) {
-        records_copy.push_back(record.Copy());
-      }
       // Partition records based on key specified by the input operator
       auto input_partition_key =
           this->input_partitioned_by_.at(name).at(table_name);
       absl::flat_hash_map<uint16_t, std::vector<Record>> partitioned_records =
-          partition::HashPartition(std::move(records_copy), input_partition_key,
+          partition::HashPartition(std::move(records), input_partition_key,
                                    this->partition_count_);
       // Send batch messages to appropriate partitions
       auto flow = this->flows_.at(name);

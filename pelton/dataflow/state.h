@@ -60,7 +60,7 @@ class DataFlowState {
 
   // Process raw data from sharder and use it to update flows.
   void ProcessRecords(const TableName &table_name,
-                      const std::vector<Record> &records);
+                      std::vector<Record> &&records);
 
   const std::shared_ptr<MatViewOperator> GetPartitionedMatView(
       const FlowName &name, const Key &key) const;
