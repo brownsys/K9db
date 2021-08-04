@@ -223,6 +223,9 @@ std::shared_ptr<Operator> EquiJoinOperator::Clone() const {
   clone->input_schemas_ = this->input_schemas_;
   clone->output_schema_ = this->output_schema_;
   clone->index_ = this->index_;
+  for (const auto &null_record : this->null_records_) {
+    clone->null_records_.push_back(null_record.Copy());
+  }
   return clone;
 }
 
