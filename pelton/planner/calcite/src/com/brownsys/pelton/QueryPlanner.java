@@ -77,7 +77,7 @@ public class QueryPlanner {
     HepProgram constantFolding =
         HepProgram.builder()
             .addRuleInstance(CoreRules.PROJECT_REDUCE_EXPRESSIONS)
-            .addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS)
+            // .addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS)
             .addRuleInstance(CoreRules.JOIN_REDUCE_EXPRESSIONS)
             .build();
     // Simplify the plan by merging consecutive matching operators
