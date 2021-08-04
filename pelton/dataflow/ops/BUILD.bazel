@@ -195,11 +195,11 @@ cc_library(
     ],
     hdrs = [
         "exchange.h",
-        "//pelton/dataflow:graph.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
         "//pelton/dataflow:operator",
+        "//pelton/dataflow:graph",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",

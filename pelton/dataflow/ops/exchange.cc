@@ -5,6 +5,8 @@
 #include <vector>
 
 #include "glog/logging.h"
+#include "pelton/dataflow/graph.h"
+#include "pelton/dataflow/partition.h"
 #include "pelton/dataflow/record.h"
 
 namespace pelton {
@@ -14,12 +16,12 @@ void ExchangeOperator::ComputeOutputSchema() {
   this->output_schema_ = this->input_schemas_.at(0);
 }
 
-bool ExchangeOperator::Process(NodeIndex source,
-                               const std::vector<Record> &records,
-                               std::vector<Record> *output) {
+std::optional<std::vector<Record>> ExchangeOperator::Process(
+    NodeIndex, const std::vector<Record> &records) {
+  std::vector<Record> output;
   // Return if no records to process
   if (records.size() == 0) {
-    return true;
+    return std::move(output);
   }
   // Input records will have to be copied since it is a const reference.
   // TODO(Ishan): Benchmark this later with the slice representation
@@ -35,7 +37,7 @@ bool ExchangeOperator::Process(NodeIndex source,
   // Forward records that are meant to be in the current partition
   if (partitioned_records.contains(this->current_partition_)) {
     for (auto &record : partitioned_records.at(this->current_partition_)) {
-      output->push_back(std::move(record));
+      output.push_back(std::move(record));
     }
   }
 
@@ -54,7 +56,7 @@ bool ExchangeOperator::Process(NodeIndex source,
                                               std::move(item.second));
     this->partition_chans_.at(item.first)->Send(msg);
   }
-  return true;
+  return std::move(output);
 }
 
 }  // namespace dataflow
