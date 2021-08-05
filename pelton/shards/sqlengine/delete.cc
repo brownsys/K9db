@@ -22,20 +22,20 @@ namespace delete_ {
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
                                      SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state,
+                                     dataflow::DataFlowEngine *dataflow_engine,
                                      bool update_flows) {
   perf::Start("Delete");
   const std::string &table_name = stmt.table_name();
 
   // If no flows read from this table, we do not need to do anything
   // to update them.
-  if (!dataflow_state->HasFlowsFor(table_name)) {
+  if (!dataflow_engine->HasFlowsFor(table_name)) {
     update_flows = false;
   }
 
   // Get the rows that are going to be deleted prior to deletion to use them
   // to update the dataflows.
-  dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
+  dataflow::SchemaRef schema = dataflow_engine->GetTableSchema(table_name);
 
   // Must transform the delete statement into one that is compatible with
   // the sharded schema.
@@ -62,7 +62,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
           // Transitive sharding: look up via index.
           ASSIGN_OR_RETURN(auto &lookup,
                            index::LookupIndex(info.next_index_name, user_id,
-                                              dataflow_state));
+                                              dataflow_engine));
           if (lookup.size() == 1) {
             user_id = std::move(*lookup.cbegin());
             // Execute statement directly against shard.
@@ -85,7 +85,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
         ASSIGN_OR_RETURN(
             const auto &pair,
             index::LookupIndex(table_name, info.shard_by, stmt.GetWhereClause(),
-                               state, dataflow_state));
+                               state, dataflow_engine));
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
           result.Append(state->executor().ExecuteShards(&cloned, info,
@@ -114,7 +114,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
       std::vector<dataflow::Record> records =
           result.NextResultSet()->Vectorize();
       result = sql::SqlResult(static_cast<int>(records.size()));
-      dataflow_state->ProcessRecords(table_name, std::move(records));
+      dataflow_engine->ProcessRecords(table_name, std::move(records));
     }
   }
   if (!result.IsUpdate()) {

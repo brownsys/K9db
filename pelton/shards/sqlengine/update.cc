@@ -104,14 +104,14 @@ sqlast::Insert InsertRecord(const dataflow::Record &record,
 
 }  // namespace
 
-absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<sql::SqlResult> Shard(
+    const sqlast::Update &stmt, SharderState *state,
+    dataflow::DataFlowEngine *dataflow_engine) {
   perf::Start("Update");
 
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
-  bool update_flows = dataflow_state->HasFlowsFor(table_name);
+  bool update_flows = dataflow_engine->HasFlowsFor(table_name);
 
   // Get the rows that are going to be deleted prior to deletion to use them
   // to update the dataflows.
@@ -119,7 +119,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
   size_t old_records_size = 0;
   if (update_flows) {
     MOVE_OR_RETURN(sql::SqlResult domain_result,
-                   select::Shard(stmt.SelectDomain(), state, dataflow_state));
+                   select::Shard(stmt.SelectDomain(), state, dataflow_engine));
     records = domain_result.NextResultSet()->Vectorize();
     old_records_size = records.size();
     CHECK_STATUS(UpdateRecords(&records, stmt, state->GetSchema(table_name)));
@@ -138,7 +138,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
       // We can only perform this update by splitting it into a DELETE-INSERT
       // pair.
       MOVE_OR_RETURN(result, delete_::Shard(stmt.DeleteDomain(), state,
-                                            dataflow_state, false));
+                                            dataflow_engine, false));
 
       // Insert updated records.
       for (size_t i = old_records_size; i < records.size(); i++) {
@@ -146,7 +146,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
             InsertRecord(records.at(i), state->GetSchema(table_name));
         MOVE_OR_RETURN(
             sql::SqlResult tmp,
-            insert::Shard(insert_stmt, state, dataflow_state, false));
+            insert::Shard(insert_stmt, state, dataflow_engine, false));
         result.Append(std::move(tmp));
       }
 
@@ -167,7 +167,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
             // Transitive sharding: look up via index.
             ASSIGN_OR_RETURN(auto &lookup,
                              index::LookupIndex(info.next_index_name, user_id,
-                                                dataflow_state));
+                                                dataflow_engine));
             if (lookup.size() == 1) {
               user_id = std::move(*lookup.cbegin());
               // Execute statement directly against shard.
@@ -194,7 +194,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
               // Transitive sharding: look up via index.
               ASSIGN_OR_RETURN(auto &lookup,
                                index::LookupIndex(info.next_index_name, user_id,
-                                                  dataflow_state));
+                                                  dataflow_engine));
               if (lookup.size() == 1) {
                 shards.insert(std::move(*lookup.begin()));
               }
@@ -208,10 +208,10 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
         } else {
           // The update statement by itself does not obviously constraint a
           // shard. Try finding the shard(s) via secondary indices.
-          ASSIGN_OR_RETURN(
-              const auto &pair,
-              index::LookupIndex(table_name, info.shard_by,
-                                 stmt.GetWhereClause(), state, dataflow_state));
+          ASSIGN_OR_RETURN(const auto &pair,
+                           index::LookupIndex(table_name, info.shard_by,
+                                              stmt.GetWhereClause(), state,
+                                              dataflow_engine));
           if (pair.first) {
             // Secondary index available for some constrainted column in stmt.
             result.Append(
@@ -228,7 +228,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
 
   // Delete was successful, time to update dataflows.
   if (update_flows) {
-    dataflow_state->ProcessRecords(table_name, std::move(records));
+    dataflow_engine->ProcessRecords(table_name, std::move(records));
   }
 
   perf::End("Update");

@@ -1,4 +1,5 @@
-// Defines the state of the dataflow system.
+// Execution engine for the sharded dataflow. It also maintains the dataflow
+// state.
 //
 // The state includes the currently installed flows, including their operators
 // and state.
@@ -17,8 +18,8 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/sqlast/ast.h"
 
-#ifndef PELTON_DATAFLOW_STATE_H_
-#define PELTON_DATAFLOW_STATE_H_
+#ifndef PELTON_DATAFLOW_ENGINE_H_
+#define PELTON_DATAFLOW_ENGINE_H_
 
 namespace pelton {
 namespace dataflow {
@@ -27,9 +28,9 @@ namespace dataflow {
 using TableName = std::string;
 using FlowName = std::string;
 
-class DataFlowState {
+class DataFlowEngine {
  public:
-  DataFlowState() = default;
+  DataFlowEngine() = default;
 
   // Manage schemas.
   void AddTableSchema(const sqlast::CreateTable &create);
@@ -74,7 +75,7 @@ class DataFlowState {
 
   uint64_t SizeInMemory() const;
 
-  ~DataFlowState();
+  ~DataFlowEngine();
 
  protected:
   // Accessors. Mainly used for testing
@@ -131,4 +132,4 @@ class DataFlowState {
 }  // namespace dataflow
 }  // namespace pelton
 
-#endif  // PELTON_DATAFLOW_STATE_H_
+#endif  // PELTON_DATAFLOW_ENGINE_H_

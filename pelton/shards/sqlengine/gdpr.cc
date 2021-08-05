@@ -17,9 +17,9 @@ namespace shards {
 namespace sqlengine {
 namespace gdpr {
 
-absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<sql::SqlResult> Shard(
+    const sqlast::GDPRStatement &stmt, SharderState *state,
+    dataflow::DataFlowEngine *dataflow_engine) {
   perf::Start("GDPR");
   sql::SqlResult result;
 
@@ -29,8 +29,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
   bool is_forget = stmt.operation() == sqlast::GDPRStatement::Operation::FORGET;
   for (const auto &table_name : state->TablesInShard(shard_kind)) {
     sql::SqlResult table_result;
-    dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
-    bool update_flows = is_forget && dataflow_state->HasFlowsFor(table_name);
+    dataflow::SchemaRef schema = dataflow_engine->GetTableSchema(table_name);
+    bool update_flows = is_forget && dataflow_engine->HasFlowsFor(table_name);
     for (const auto &info : state->GetShardingInformation(table_name)) {
       if (info.shard_kind != shard_kind) {
         continue;
@@ -53,7 +53,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       std::vector<dataflow::Record> records =
           table_result.NextResultSet()->Vectorize();
       total_count += records.size();
-      dataflow_state->ProcessRecords(table_name, std::move(records));
+      dataflow_engine->ProcessRecords(table_name, std::move(records));
     } else if (is_forget) {
       total_count += table_result.UpdateCount();
     } else if (!is_forget) {

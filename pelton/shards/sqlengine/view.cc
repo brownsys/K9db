@@ -96,15 +96,15 @@ absl::Status ExtractConstraintsFromAnd(
 
 // Unconstrained select (no where).
 absl::StatusOr<std::vector<dataflow::Record>> SelectViewUnconstrained(
-    dataflow::DataFlowState *dataflow_state, const std::string &view_name,
+    dataflow::DataFlowEngine *dataflow_engine, const std::string &view_name,
     int limit, size_t offset) {
   // No where condition: we are reading everything (keys and records).
   // Matviews need to be queried from all partitions
-  const auto matviews = dataflow_state->GetPartitionedMatViews(view_name);
+  const auto matviews = dataflow_engine->GetPartitionedMatViews(view_name);
   std::vector<dataflow::Record> records;
   for (const auto matview : matviews) {
     for (const auto &key : matview->Keys()) {
-      auto matview = dataflow_state->GetPartitionedMatView(view_name, key);
+      auto matview = dataflow_engine->GetPartitionedMatView(view_name, key);
       for (const auto &record : matview->Lookup(key, limit, offset)) {
         records.push_back(record.Copy());
       }
@@ -115,10 +115,10 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewUnconstrained(
 
 // Constrained with equality or related operations.
 absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
-    dataflow::DataFlowState *dataflow_state, const std::string &view_name,
+    dataflow::DataFlowEngine *dataflow_engine, const std::string &view_name,
     const sqlast::BinaryExpression *where, int limit, size_t offset) {
   const dataflow::SchemaRef &schema =
-      dataflow_state->GetOutputSchema(view_name);
+      dataflow_engine->GetOutputSchema(view_name);
   std::unordered_map<dataflow::ColumnID, std::vector<std::string>> constraints;
   std::vector<dataflow::Record> records;
   switch (where->type()) {
@@ -141,7 +141,7 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
 
   std::vector<dataflow::Key> keys;
   const std::vector<dataflow::ColumnID> matview_key_cols =
-      dataflow_state->GetMatViewKeyCols(view_name);
+      dataflow_engine->GetMatViewKeyCols(view_name);
   keys.emplace_back(matview_key_cols.size());
   for (dataflow::ColumnID col : matview_key_cols) {
     if (constraints.count(col) == 0) {
@@ -181,7 +181,7 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
 
   // Read records attached to key.
   for (const auto &key : keys) {
-    auto matview = dataflow_state->GetPartitionedMatView(view_name, key);
+    auto matview = dataflow_engine->GetPartitionedMatView(view_name, key);
     for (const auto &record : matview->Lookup(key, limit, offset)) {
       records.push_back(record.Copy());
     }
@@ -192,13 +192,13 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
 
 // Ordered view.
 absl::StatusOr<std::vector<dataflow::Record>> SelectViewOrdered(
-    dataflow::DataFlowState *dataflow_state, const std::string &view_name,
+    dataflow::DataFlowEngine *dataflow_engine, const std::string &view_name,
     const sqlast::BinaryExpression *where, int limit, size_t offset) {
   switch (where->type()) {
     case sqlast::Expression::Type::GREATER_THAN: {
       std::vector<dataflow::Record> records;
       const dataflow::SchemaRef &schema =
-          dataflow_state->GetOutputSchema(view_name);
+          dataflow_engine->GetOutputSchema(view_name);
 
       ASSIGN_OR_RETURN(std::string column, GetColumnName(where));
       MOVE_OR_RETURN(std::vector<std::string> values, GetCondValues(where));
@@ -220,7 +220,7 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewOrdered(
       // an 'intelligent merge' since the matviews would already contain sorted
       // records.
       // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-      const auto matviews = dataflow_state->GetPartitionedMatViews(view_name);
+      const auto matviews = dataflow_engine->GetPartitionedMatViews(view_name);
       // Accumulate all keys
       std::vector<dataflow::Key> keys;
       for (const auto matview : matviews) {
@@ -234,7 +234,7 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewOrdered(
       dataflow::Record cmp{schema};
       cmp.SetValue(values.at(0), column_index);
       for (const auto &k : keys) {
-        auto matview = dataflow_state->GetPartitionedMatView(view_name, k);
+        auto matview = dataflow_engine->GetPartitionedMatView(view_name, k);
         for (const auto &r : matview->LookupGreater(k, cmp, limit, offset)) {
           records.push_back(r.Copy());
         }
@@ -243,7 +243,7 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewOrdered(
       return records;
     }
     case sqlast::Expression::Type::EQ:
-      return SelectViewConstrained(dataflow_state, view_name, where, limit,
+      return SelectViewConstrained(dataflow_engine, view_name, where, limit,
                                    offset);
 
     default:
@@ -255,14 +255,14 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewOrdered(
 }  // namespace
 
 absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
-                        dataflow::DataFlowState *dataflow_state) {
+                        dataflow::DataFlowEngine *dataflow_engine) {
   perf::Start("CreateView");
   // Plan the query using calcite and generate a concrete graph for it.
   std::shared_ptr<dataflow::DataFlowGraph> graph =
-      planner::PlanGraph(dataflow_state, stmt.query());
+      planner::PlanGraph(dataflow_engine, stmt.query());
 
   // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
-  dataflow_state->AddFlow(stmt.view_name(), graph);
+  dataflow_engine->AddFlow(stmt.view_name(), graph);
 
   perf::End("CreateView");
   return absl::OkStatus();
@@ -270,14 +270,14 @@ absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
 
 absl::StatusOr<sql::SqlResult> SelectView(
     const sqlast::Select &stmt, SharderState *state,
-    dataflow::DataFlowState *dataflow_state) {
+    dataflow::DataFlowEngine *dataflow_engine) {
   // TODO(babman): fix this.
   perf::Start("SelectView");
 
   // Get the corresponding flow.
   const std::string &view_name = stmt.table_name();
   const std::shared_ptr<dataflow::DataFlowGraph> flow =
-      dataflow_state->GetFlow(view_name);
+      dataflow_engine->GetFlow(view_name);
 
   // Only support flow ending with a single output matview for now.
   if (flow->outputs().size() == 0) {
@@ -287,7 +287,7 @@ absl::StatusOr<sql::SqlResult> SelectView(
   }
   auto matview = flow->outputs().at(0);
   const dataflow::SchemaRef &schema =
-      dataflow_state->GetOutputSchema(view_name);
+      dataflow_engine->GetOutputSchema(view_name);
 
   std::vector<dataflow::Record> records;
 
@@ -298,14 +298,14 @@ absl::StatusOr<sql::SqlResult> SelectView(
   if (stmt.HasWhereClause()) {
     const sqlast::BinaryExpression *where = stmt.GetWhereClause();
     if (matview->RecordOrdered()) {
-      MOVE_OR_RETURN(records, SelectViewOrdered(dataflow_state, view_name,
+      MOVE_OR_RETURN(records, SelectViewOrdered(dataflow_engine, view_name,
                                                 where, limit, offset));
     } else {
-      MOVE_OR_RETURN(records, SelectViewConstrained(dataflow_state, view_name,
+      MOVE_OR_RETURN(records, SelectViewConstrained(dataflow_engine, view_name,
                                                     where, limit, offset));
     }
   } else {
-    MOVE_OR_RETURN(records, SelectViewUnconstrained(dataflow_state, view_name,
+    MOVE_OR_RETURN(records, SelectViewUnconstrained(dataflow_engine, view_name,
                                                     limit, offset));
   }
 

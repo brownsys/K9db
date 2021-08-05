@@ -28,12 +28,12 @@ std::string Dequote(const std::string &st) {
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
                                      SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state,
+                                     dataflow::DataFlowEngine *dataflow_engine,
                                      bool update_flows) {
   perf::Start("Insert");
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
-  if (!dataflow_state->HasFlowsFor(table_name)) {
+  if (!dataflow_engine->HasFlowsFor(table_name)) {
     update_flows = false;
   }
   if (!state->Exists(table_name)) {
@@ -79,7 +79,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
       if (info.IsTransitive()) {
         ASSIGN_OR_RETURN(
             auto &lookup,
-            index::LookupIndex(info.next_index_name, user_id, dataflow_state));
+            index::LookupIndex(info.next_index_name, user_id, dataflow_engine));
         if (lookup.size() == 1) {
           user_id = std::move(*lookup.cbegin());
         } else {
@@ -108,8 +108,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
   // Turn inserted values into a record and process it via corresponding flows.
   if (update_flows) {
     std::vector<dataflow::Record> records;
-    records.push_back(dataflow_state->CreateRecord(stmt));
-    dataflow_state->ProcessRecords(stmt.table_name(), std::move(records));
+    records.push_back(dataflow_engine->CreateRecord(stmt));
+    dataflow_engine->ProcessRecords(stmt.table_name(), std::move(records));
   }
 
   perf::End("Insert");

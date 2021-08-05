@@ -14,9 +14,9 @@ namespace shards {
 namespace sqlengine {
 namespace select {
 
-absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<sql::SqlResult> Shard(
+    const sqlast::Select &stmt, SharderState *state,
+    dataflow::DataFlowEngine *dataflow_engine) {
   perf::Start("Select");
   // Disqualifiy LIMIT and OFFSET queries.
   if (!stmt.SupportedByShards()) {
@@ -26,7 +26,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
   sql::SqlResult result;
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
-  dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
+  dataflow::SchemaRef schema = dataflow_engine->GetTableSchema(table_name);
 
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
@@ -57,7 +57,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
           // Transitive sharding: look up via index.
           ASSIGN_OR_RETURN(auto &lookup,
                            index::LookupIndex(info.next_index_name, user_id,
-                                              dataflow_state));
+                                              dataflow_engine));
           if (lookup.size() == 1) {
             user_id = std::move(*lookup.cbegin());
             // Execute statement directly against shard.
@@ -82,7 +82,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
         ASSIGN_OR_RETURN(
             const auto &pair,
             index::LookupIndex(table_name, info.shard_by, stmt.GetWhereClause(),
-                               state, dataflow_state));
+                               state, dataflow_engine));
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
           result.Append(state->executor().ExecuteShards(&cloned, info,

@@ -289,9 +289,9 @@ sqlast::CreateTable UpdateTableSchema(sqlast::CreateTable stmt,
 
 }  // namespace
 
-absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<sql::SqlResult> Shard(
+    const sqlast::CreateTable &stmt, SharderState *state,
+    dataflow::DataFlowEngine *dataflow_engine) {
   perf::Start("Create");
 
   const std::string &table_name = stmt.table_name();
@@ -352,7 +352,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
   }
 
   state->AddSchema(table_name, stmt);
-  dataflow_state->AddTableSchema(stmt);
+  dataflow_engine->AddTableSchema(stmt);
 
   perf::End("Create");
   return result;

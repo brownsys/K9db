@@ -17,7 +17,7 @@
 #include <string>
 
 #include "absl/status/statusor.h"
-#include "pelton/dataflow/state.h"
+#include "pelton/dataflow/engine.h"
 #include "pelton/shards/state.h"
 #include "pelton/sql/result.h"
 
@@ -27,7 +27,7 @@ namespace sqlengine {
 
 absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
                                      SharderState *sharder_state,
-                                     dataflow::DataFlowState *dataflow_state,
+                                     dataflow::DataFlowEngine *dataflow_engine,
                                      std::string *shard_kind = nullptr,
                                      std::string *user_id = nullptr);
 

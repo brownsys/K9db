@@ -67,7 +67,7 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
 
   // Parse and rewrite statement.
   shards::SharderState *sstate = connection->GetSharderState();
-  dataflow::DataFlowState *dstate = connection->GetDataFlowState();
+  dataflow::DataFlowEngine *dstate = connection->GetDataFlowEngine();
   return shards::sqlengine::Shard(sql, sstate, dstate);
 }
 

@@ -1,9 +1,10 @@
-// Defines the state of the dataflow system.
+// Execution engine for the sharded dataflow. It also maintains the dataflow
+// state.
 //
 // The state includes the currently installed flows, including their operators
 // and state.
 
-#include "pelton/dataflow/state.h"
+#include "pelton/dataflow/engine.h"
 
 #include <chrono>
 #include <fstream>
@@ -28,15 +29,15 @@ namespace pelton {
 namespace dataflow {
 
 // Manage schemas.
-void DataFlowState::AddTableSchema(const sqlast::CreateTable &create) {
+void DataFlowEngine::AddTableSchema(const sqlast::CreateTable &create) {
   this->schema_.emplace(create.table_name(), SchemaFactory::Create(create));
 }
-void DataFlowState::AddTableSchema(const std::string &table_name,
-                                   SchemaRef schema) {
+void DataFlowEngine::AddTableSchema(const std::string &table_name,
+                                    SchemaRef schema) {
   this->schema_.emplace(table_name, schema);
 }
 
-std::vector<std::string> DataFlowState::GetTables() const {
+std::vector<std::string> DataFlowEngine::GetTables() const {
   std::vector<std::string> result;
   result.reserve(this->schema_.size());
   for (const auto &[table_name, _] : this->schema_) {
@@ -44,7 +45,7 @@ std::vector<std::string> DataFlowState::GetTables() const {
   }
   return result;
 }
-SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
+SchemaRef DataFlowEngine::GetTableSchema(const TableName &table_name) const {
   if (this->schema_.count(table_name) > 0) {
     return this->schema_.at(table_name);
   } else {
@@ -53,8 +54,8 @@ SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
 }
 
 // Manage flows.
-void DataFlowState::AddFlow(const FlowName &name,
-                            const std::shared_ptr<DataFlowGraph> flow) {
+void DataFlowEngine::AddFlow(const FlowName &name,
+                             const std::shared_ptr<DataFlowGraph> flow) {
   this->flows_.insert({name, flow});
   for (const auto &[input_name, input] : flow->inputs()) {
     this->flows_per_input_table_[input_name].push_back(name);
@@ -92,7 +93,7 @@ void DataFlowState::AddFlow(const FlowName &name,
   }
 }
 
-void DataFlowState::TraverseBaseGraph(const FlowName &name) {
+void DataFlowEngine::TraverseBaseGraph(const FlowName &name) {
   // Annotate base graph
   this->AnnotateBaseGraph(this->flows_.at(name));
 
@@ -103,7 +104,7 @@ void DataFlowState::TraverseBaseGraph(const FlowName &name) {
   this->VisitNode(matview_op, matview_op->key_cols(), &tracking_union, name);
 }
 // TODO(Ishan): consider specifying partitioned_by_ during operator construction
-void DataFlowState::AnnotateBaseGraph(
+void DataFlowEngine::AnnotateBaseGraph(
     const std::shared_ptr<DataFlowGraph> graph) {
   for (size_t i = 0; i < graph->node_count(); i++) {
     const auto node = graph->GetNode(i);
@@ -136,7 +137,7 @@ void DataFlowState::AnnotateBaseGraph(
   }
 }
 
-void DataFlowState::VisitNode(
+void DataFlowEngine::VisitNode(
     std::shared_ptr<Operator> node, std::vector<ColumnID> recent_partition,
     std::optional<std::shared_ptr<Operator>> *tracking_union,
     const FlowName &name) {
@@ -238,9 +239,9 @@ void DataFlowState::VisitNode(
   }
 }
 
-void DataFlowState::AddExchangeAfter(NodeIndex parent_index,
-                                     std::vector<ColumnID> partition_key,
-                                     const FlowName &name) {
+void DataFlowEngine::AddExchangeAfter(NodeIndex parent_index,
+                                      std::vector<ColumnID> partition_key,
+                                      const FlowName &name) {
   for (uint16_t partition = 0; partition < this->partition_count_;
        partition++) {
     auto partitioned_graph = this->partitioned_graphs_.at(name).at(partition);
@@ -252,17 +253,17 @@ void DataFlowState::AddExchangeAfter(NodeIndex parent_index,
   }
 }
 
-const std::shared_ptr<DataFlowGraph> DataFlowState::GetFlow(
+const std::shared_ptr<DataFlowGraph> DataFlowEngine::GetFlow(
     const FlowName &name) const {
   return this->flows_.at(name);
 }
 
-const std::shared_ptr<DataFlowGraph> DataFlowState::GetPartitionedFlow(
+const std::shared_ptr<DataFlowGraph> DataFlowEngine::GetPartitionedFlow(
     const FlowName &name, uint16_t partition_id) const {
   return this->partitioned_graphs_.at(name).at(partition_id);
 }
 
-const std::shared_ptr<MatViewOperator> DataFlowState::GetPartitionedMatView(
+const std::shared_ptr<MatViewOperator> DataFlowEngine::GetPartitionedMatView(
     const FlowName &name, const Key &key) const {
   uint64_t partition_index =
       partition::GetPartition(key, this->partition_count_);
@@ -278,7 +279,7 @@ const std::shared_ptr<MatViewOperator> DataFlowState::GetPartitionedMatView(
 }
 
 const std::vector<std::shared_ptr<MatViewOperator>>
-DataFlowState::GetPartitionedMatViews(const FlowName &name) {
+DataFlowEngine::GetPartitionedMatViews(const FlowName &name) {
   std::vector<std::shared_ptr<MatViewOperator>> matviews;
   for (const auto item : this->partitioned_graphs_.at(name)) {
     // Currently, only one matview is supported per flow.
@@ -288,14 +289,14 @@ DataFlowState::GetPartitionedMatViews(const FlowName &name) {
   return matviews;
 }
 
-const SchemaRef DataFlowState::GetOutputSchema(const FlowName &name) {
+const SchemaRef DataFlowEngine::GetOutputSchema(const FlowName &name) {
   const auto flow = this->flows_.at(name);
   // Currently, we only support a single matview per flow.
   assert(flow->outputs().size() == 1);
   return flow->outputs().at(0)->output_schema();
 }
 
-const std::vector<ColumnID> &DataFlowState::GetMatViewKeyCols(
+const std::vector<ColumnID> &DataFlowEngine::GetMatViewKeyCols(
     const FlowName &name) {
   const auto flow = this->flows_.at(name);
   // Currently, we only support a single matview per flow.
@@ -303,15 +304,15 @@ const std::vector<ColumnID> &DataFlowState::GetMatViewKeyCols(
   return flow->outputs().at(0)->key_cols();
 }
 
-bool DataFlowState::HasFlow(const FlowName &name) const {
+bool DataFlowEngine::HasFlow(const FlowName &name) const {
   return this->flows_.count(name) == 1;
 }
 
-bool DataFlowState::HasFlowsFor(const TableName &table_name) const {
+bool DataFlowEngine::HasFlowsFor(const TableName &table_name) const {
   return this->flows_per_input_table_.count(table_name) == 1;
 }
 
-Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
+Record DataFlowEngine::CreateRecord(const sqlast::Insert &insert_stmt) const {
   // Create an empty positive record with appropriate schema.
   const std::string &table_name = insert_stmt.table_name();
   SchemaRef schema = this->schema_.at(table_name);
@@ -336,8 +337,8 @@ Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
   return record;
 }
 
-void DataFlowState::ProcessRecords(const TableName &table_name,
-                                   std::vector<Record> &&records) {
+void DataFlowEngine::ProcessRecords(const TableName &table_name,
+                                    std::vector<Record> &&records) {
   if (records.size() > 0 && this->HasFlowsFor(table_name)) {
     // One copy of records is required per flow since the records are
     // dispatched as BatchMessages to the flows.
@@ -375,7 +376,7 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
 }
 
 // Size in memory of all the dataflow graphs.
-uint64_t DataFlowState::SizeInMemory() const {
+uint64_t DataFlowEngine::SizeInMemory() const {
   uint64_t size = 0;
   for (const auto &[_, flow] : this->flows_) {
     size += flow->SizeInMemory();
@@ -384,7 +385,7 @@ uint64_t DataFlowState::SizeInMemory() const {
 }
 
 // Load state from its durable file (if exists).
-void DataFlowState::Load(const std::string &dir_path) {
+void DataFlowEngine::Load(const std::string &dir_path) {
   // State file does not exists: this is a fresh database that was not
   // created previously!
   std::string state_file_path = dir_path + STATE_FILE_NAME;
@@ -438,7 +439,7 @@ void DataFlowState::Load(const std::string &dir_path) {
 }
 
 // Save state to durable file.
-void DataFlowState::Save(const std::string &dir_path) {
+void DataFlowEngine::Save(const std::string &dir_path) {
   // Open state file for writing.
   std::ofstream state_file;
   util::OpenWrite(&state_file, dir_path + STATE_FILE_NAME);
@@ -464,7 +465,7 @@ void DataFlowState::Save(const std::string &dir_path) {
   state_file.close();
 }
 
-DataFlowState::~DataFlowState() {
+DataFlowEngine::~DataFlowEngine() {
   // Give some time for the previously sent records to get processed
   std::this_thread::sleep_for(std::chrono::milliseconds(40));
   std::shared_ptr<StopMessage> stop_msg = std::make_shared<StopMessage>();

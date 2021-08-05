@@ -2,8 +2,8 @@
 #define PELTON_DATAFLOW_OPS_PROJECT_H_
 
 #include <cstdint>
-#include <string>
 #include <memory>
+#include <string>
 // NOLINTNEXTLINE
 #include <variant>
 #include <vector>

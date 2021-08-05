@@ -5,9 +5,9 @@
 #include <string>
 
 #include "absl/status/statusor.h"
+#include "pelton/dataflow/engine.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
-#include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
 #include "pelton/sql/result.h"
@@ -39,27 +39,31 @@ class Connection {
 
   // Getters.
   shards::SharderState *GetSharderState() { return &this->sharder_state_; }
-  dataflow::DataFlowState *GetDataFlowState() { return &this->dataflow_state_; }
+  dataflow::DataFlowEngine *GetDataFlowEngine() {
+    return &this->dataflow_engine_;
+  }
 
   // State persistance.
   void Save() {
     if (this->path_.size() > 0) {
       this->sharder_state_.Save(this->path_);
-      this->dataflow_state_.Save(this->path_);
+      this->dataflow_engine_.Save(this->path_);
     }
   }
   void Load() {
     if (this->path_.size() > 0) {
       this->sharder_state_.Load(this->path_);
-      this->dataflow_state_.Load(this->path_);
+      this->dataflow_engine_.Load(this->path_);
     }
   }
 
-  uint64_t SizeInMemory() const { return this->dataflow_state_.SizeInMemory(); }
+  uint64_t SizeInMemory() const {
+    return this->dataflow_engine_.SizeInMemory();
+  }
 
  private:
   shards::SharderState sharder_state_;
-  dataflow::DataFlowState dataflow_state_;
+  dataflow::DataFlowEngine dataflow_engine_;
   std::string path_;
 };
 

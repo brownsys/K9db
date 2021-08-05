@@ -8,7 +8,7 @@
 #include <utility>
 
 #include "absl/status/statusor.h"
-#include "pelton/dataflow/state.h"
+#include "pelton/dataflow/engine.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
 #include "pelton/sql/result.h"
@@ -21,16 +21,16 @@ namespace index {
 
 absl::StatusOr<sql::SqlResult> CreateIndex(
     const sqlast::CreateIndex &stmt, SharderState *state,
-    dataflow::DataFlowState *dataflow_state);
+    dataflow::DataFlowEngine *dataflow_engine);
 
 absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
     const std::string &table_name, const std::string &shard_by,
     const sqlast::BinaryExpression *where_clause, SharderState *state,
-    dataflow::DataFlowState *dataflow_state);
+    dataflow::DataFlowEngine *dataflow_engine);
 
 absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     const std::string &index_name, const std::string &value,
-    dataflow::DataFlowState *dataflow_state);
+    dataflow::DataFlowEngine *dataflow_engine);
 
 }  // namespace index
 }  // namespace sqlengine

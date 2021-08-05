@@ -20,7 +20,7 @@ namespace index {
 
 absl::StatusOr<sql::SqlResult> CreateIndex(
     const sqlast::CreateIndex &stmt, SharderState *state,
-    dataflow::DataFlowState *dataflow_state) {
+    dataflow::DataFlowEngine *dataflow_engine) {
   perf::Start("Create Index");
   const std::string &table_name = stmt.table_name();
 
@@ -60,7 +60,7 @@ absl::StatusOr<sql::SqlResult> CreateIndex(
       sqlast::CreateView create_view{index_name, query};
 
       // Install flow.
-      CHECK_STATUS(view::CreateView(create_view, state, dataflow_state));
+      CHECK_STATUS(view::CreateView(create_view, state, dataflow_engine));
 
       // Store the index metadata.
       state->CreateIndex(info.shard_kind, table_name, column_name,
@@ -77,7 +77,7 @@ absl::StatusOr<sql::SqlResult> CreateIndex(
 absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
     const std::string &table_name, const std::string &shard_by,
     const sqlast::BinaryExpression *where_clause, SharderState *state,
-    dataflow::DataFlowState *dataflow_state) {
+    dataflow::DataFlowEngine *dataflow_engine) {
   if (where_clause == nullptr) {
     return std::make_pair(false, std::unordered_set<UserId>{});
   }
@@ -100,7 +100,7 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
     const FlowName &index_flow =
         state->IndexFlow(table_name, column_name, shard_by);
     MOVE_OR_RETURN(std::unordered_set<UserId> shards,
-                   LookupIndex(index_flow, column_value, dataflow_state));
+                   LookupIndex(index_flow, column_value, dataflow_engine));
 
     perf::End("Lookup Index1");
     return std::make_pair(true, std::move(shards));
@@ -112,11 +112,11 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
 
 absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     const std::string &index_name, const std::string &value,
-    dataflow::DataFlowState *dataflow_state) {
+    dataflow::DataFlowEngine *dataflow_engine) {
   perf::Start("Lookup Index");
 
   // Construct look up key.
-  const auto output_schema = dataflow_state->GetOutputSchema(index_name);
+  const auto output_schema = dataflow_engine->GetOutputSchema(index_name);
   dataflow::Key lookup_key{1};
   switch (output_schema.TypeOf(0)) {
     case sqlast::ColumnDefinition::Type::UINT:
@@ -138,7 +138,7 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
   }
 
   // Materialized view that we want to look up in.
-  auto matview = dataflow_state->GetPartitionedMatView(index_name, lookup_key);
+  auto matview = dataflow_engine->GetPartitionedMatView(index_name, lookup_key);
 
   // Lookup.
   std::unordered_set<UserId> result;

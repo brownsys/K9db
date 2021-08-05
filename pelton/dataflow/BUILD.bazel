@@ -1,12 +1,12 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 cc_library(
-    name = "dstate",
+    name = "dengine",
     srcs = [
-        "state.cc",
+        "engine.cc",
     ],
     hdrs = [
-        "state.h",
+        "engine.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
@@ -353,7 +353,7 @@ cc_test(
     ],
     copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
-        ":dstate",
+        ":dengine",
         ":graph-test-utils",
         "@glog",
         "@gtest",
@@ -386,7 +386,7 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
-        ":dstate",
+        ":dengine",
         ":graph",
         ":key",
         ":operator",

@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "glog/logging.h"
+#include "pelton/dataflow/engine.h"
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/aggregate.h"
@@ -14,23 +15,22 @@
 #include "pelton/dataflow/ops/union.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
-#include "pelton/dataflow/state.h"
 #include "pelton/dataflow/value.h"
 
 namespace pelton {
 namespace dataflow {
 
-DataFlowGraphGenerator::DataFlowGraphGenerator(DataFlowGraphJavaPtr graph_ptr,
-                                               DataFlowStateJavaPtr state_ptr) {
+DataFlowGraphGenerator::DataFlowGraphGenerator(
+    DataFlowGraphJavaPtr graph_ptr, DataFlowEngineJavaPtr engine_ptr) {
   this->graph_ = reinterpret_cast<DataFlowGraph *>(graph_ptr);
-  this->state_ = reinterpret_cast<DataFlowState *>(state_ptr);
+  this->engine_ = reinterpret_cast<DataFlowEngine *>(engine_ptr);
 }
 
 // Adding operators.
 NodeIndex DataFlowGraphGenerator::AddInputOperator(
     const std::string &table_name) {
   // Create input operator
-  SchemaRef table_schema = this->state_->GetTableSchema(table_name);
+  SchemaRef table_schema = this->engine_->GetTableSchema(table_name);
   std::shared_ptr<InputOperator> input =
       std::make_shared<InputOperator>(table_name, table_schema);
   // Add the operator to the graph.
@@ -235,19 +235,19 @@ void DataFlowGraphGenerator::AddProjectionArithmeticColumns(
 
 // Reading schema.
 std::vector<std::string> DataFlowGraphGenerator::GetTables() const {
-  return this->state_->GetTables();
+  return this->engine_->GetTables();
 }
 size_t DataFlowGraphGenerator::GetTableColumnCount(
     const std::string &table_name) const {
-  return this->state_->GetTableSchema(table_name).size();
+  return this->engine_->GetTableSchema(table_name).size();
 }
 std::string DataFlowGraphGenerator::GetTableColumnName(
     const std::string &table_name, ColumnID column) const {
-  return this->state_->GetTableSchema(table_name).NameOf(column);
+  return this->engine_->GetTableSchema(table_name).NameOf(column);
 }
 sqlast::ColumnDefinitionTypeEnum DataFlowGraphGenerator::GetTableColumnType(
     const std::string &table_name, ColumnID column) const {
-  return this->state_->GetTableSchema(table_name).TypeOf(column);
+  return this->engine_->GetTableSchema(table_name).TypeOf(column);
 }
 
 // Debugging string.

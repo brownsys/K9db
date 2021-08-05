@@ -8,6 +8,7 @@
 
 #include "glog/logging.h"
 #include "gtest/gtest.h"
+#include "pelton/dataflow/engine.h"
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/operator.h"
@@ -18,7 +19,6 @@
 #include "pelton/dataflow/ops/project.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
-#include "pelton/dataflow/state.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/ints.h"
@@ -92,12 +92,12 @@ TEST(PlannerTest, SimpleProject) {
   // Make a dummy query.
   std::string query = "SELECT Col3 FROM test_table WHERE Col2 = 'hello!'";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("test_table", schema);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
@@ -135,12 +135,12 @@ TEST(PlannerTest, SimpleProjectLiteral) {
   // Make a dummy query.
   std::string query = "select 1 as `one` from  test_table";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("test_table", schema);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
@@ -184,12 +184,12 @@ TEST(PlannerTest, ProjectArithmeticRightLiteral) {
   // Make a dummy query.
   std::string query = "SELECT Col1, Col3 - 5 as Delta5 FROM test_table";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("test_table", schema);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
@@ -233,12 +233,12 @@ TEST(PlannerTest, ProjectArithmeticRightColumn) {
   // Make a dummy query.
   std::string query = "SELECT Col3 - Col1 as DeltaCol FROM test_table";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("test_table", schema);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
@@ -284,12 +284,12 @@ TEST(PlannerTest, SimpleAggregate) {
   std::string query =
       "SELECT Col3, COUNT(*) FROM test_table GROUP BY Col3 ORDER BY Col3";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("test_table", schema);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
@@ -338,12 +338,12 @@ TEST(PlannerTest, SimpleFilter) {
   // Make a dummy query.
   std::string query = "SELECT * FROM test_table WHERE 'hello!' = Col2";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("test_table", schema);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
@@ -381,12 +381,12 @@ TEST(PlannerTest, SingleConditionFilter) {
   // Make a dummy query.
   std::string query = "SELECT * FROM test_table WHERE Col3=20";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("test_table", schema);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
@@ -425,12 +425,12 @@ TEST(PlannerTest, FilterSingleORCondition) {
   std::string query =
       "SELECT * FROM test_table WHERE Col3=20 OR Col3=50 ORDER BY Col3";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("test_table", schema);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
@@ -472,12 +472,12 @@ TEST(PlannerTest, FilterSingleANDCondition) {
   // Make a dummy query.
   std::string query = "SELECT * FROM test_table WHERE Col3=20 AND 5<Col1";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("test_table", schema);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
@@ -517,12 +517,12 @@ TEST(PlannerTest, FilterNestedORCondition) {
       "SELECT * FROM test_table WHERE Col3=20 AND (Col1 < 12 OR Col1 >= 20) "
       " AND (Col1 + 2 < 16 OR Col1 = 20)";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("test_table", schema);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
@@ -578,12 +578,12 @@ TEST(PlannerTest, FilterNestedANDCondition) {
   std::string query =
       "SELECT * FROM test_table WHERE Col3=50 OR (Col3=20 AND Col1=20)";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("test_table", schema);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
@@ -623,12 +623,12 @@ TEST(PlannerTest, FilterColumnComparison) {
   // Make a dummy query.
   std::string query = "SELECT * FROM test_table WHERE Col1 >= Col3";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("test_table", schema);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
@@ -665,12 +665,12 @@ TEST(PlannerTest, FilterArithmeticCondition) {
   // Make a dummy query.
   std::string query = "SELECT * FROM test_table WHERE 100 > 30 + Col3";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("test_table", schema);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
@@ -742,12 +742,12 @@ TEST(PlannerTest, FilterArithmeticConditionTwoColumns) {
   std::string query =
       "SELECT * FROM test_table WHERE Col3 - Col1 < 10 ORDER BY Col1";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("test_table", schema);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
@@ -819,12 +819,12 @@ TEST(PlannerTest, UniqueSecondaryIndexFlow) {
   // Make a dummy query.
   std::string query = "SELECT IndexCol, ShardByCol FROM test_table";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("test_table", schema);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
@@ -896,12 +896,12 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
       "SELECT IndexCol as I, ShardByCol as S, COUNT(*) "
       "FROM test_table GROUP BY IndexCol, ShardByCol";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("test_table", schema);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
@@ -1007,14 +1007,14 @@ TEST(PlannerTest, ComplexQueryWithKeys) {
       "GROUP BY assignments.ID, students.NAME, students.ID "
       "HAVING assignments.ID = ?";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("students", schema1);
-  state.AddTableSchema("assignments", schema2);
-  state.AddTableSchema("submissions", schema3);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("students", schema1);
+  engine.AddTableSchema("assignments", schema2);
+  engine.AddTableSchema("submissions", schema3);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("students")->input_name(), "students");
@@ -1109,13 +1109,13 @@ TEST(PlannerTest, BasicLeftJoin) {
       "SELECT * FROM submissions LEFT JOIN students ON submissions.student_id "
       "= students.ID";
 
-  // Create a dummy state.
-  dataflow::DataFlowState state;
-  state.AddTableSchema("students", schema1);
-  state.AddTableSchema("submissions", schema3);
+  // Create a dummy engine.
+  dataflow::DataFlowEngine engine;
+  engine.AddTableSchema("students", schema1);
+  engine.AddTableSchema("submissions", schema3);
 
   // Plan the graph via calcite.
-  auto graph = PlanGraph(&state, query);
+  auto graph = PlanGraph(&engine, query);
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("students")->input_name(), "students");

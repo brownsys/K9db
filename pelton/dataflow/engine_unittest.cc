@@ -1,5 +1,8 @@
+#include "pelton/dataflow/engine.h"
+
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "gtest/gtest.h"
@@ -18,7 +21,6 @@
 #include "pelton/dataflow/partition.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
-#include "pelton/dataflow/state.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/ints.h"
@@ -27,17 +29,17 @@ namespace pelton {
 namespace dataflow {
 
 TEST(DataFlowEngineTest, TestTrivialGraph) {
-  DataFlowState state;
+  DataFlowEngine engine;
   // Make schema
   SchemaRef schema = MakeLeftSchema();
-  state.AddTableSchema("test-table", schema);
+  engine.AddTableSchema("test-table", schema);
   // Make graph
   auto graph = MakeTrivialGraph(2, schema);
   std::string flow_name = "trivial";
-  state.AddFlow(flow_name, graph);
+  engine.AddFlow(flow_name, graph);
 
-  auto partitions = state.partitioned_graphs();
-  auto input_partitions = state.input_partitioned_by();
+  auto partitions = engine.partitioned_graphs();
+  auto input_partitions = engine.input_partitioned_by();
   // Check if partitions are as expected.
   for (auto item : partitions.at(flow_name)) {
     EXPECT_EQ(item.second->node_count(), 2);
@@ -51,7 +53,7 @@ TEST(DataFlowEngineTest, TestTrivialGraph) {
   // Process records through the sharded dataflow
   std::vector<Record> records = MakeLeftRecords(schema);
   std::vector<Record> records_copy = MakeLeftRecords(schema);
-  state.ProcessRecords("test-table", std::move(std::move(records)));
+  engine.ProcessRecords("test-table", std::move(std::move(records)));
   // Wait for a while for records to get processed
   std::this_thread::sleep_for(std::chrono::milliseconds(200));
   // Partition the input records so that equality checks are easier to perform
@@ -60,25 +62,25 @@ TEST(DataFlowEngineTest, TestTrivialGraph) {
   // Check if records have reached appropriate partition's matviews
   for (const auto &item : partitioned_records) {
     auto partition_matview =
-        state.GetPartitionedFlow(flow_name, item.first)->outputs().at(0);
+        engine.GetPartitionedFlow(flow_name, item.first)->outputs().at(0);
     EXPECT_EQ_MSET(partition_matview, item.second);
   }
 }
 
 TEST(DataFlowEngineTest, TestEquiJoinGraph) {
-  DataFlowState state;
+  DataFlowEngine engine;
   // Make schemas
   SchemaRef lschema = MakeLeftSchema();
   SchemaRef rschema = MakeRightSchema();
-  state.AddTableSchema("test-table1", lschema);
-  state.AddTableSchema("test-table2", rschema);
+  engine.AddTableSchema("test-table1", lschema);
+  engine.AddTableSchema("test-table2", rschema);
   // Make graph
   auto graph = MakeEquiJoinGraph(0, 2, 0, lschema, rschema);
   std::string flow_name = "equijion";
-  state.AddFlow(flow_name, graph);
+  engine.AddFlow(flow_name, graph);
 
-  auto partitions = state.partitioned_graphs();
-  auto input_partitions = state.input_partitioned_by();
+  auto partitions = engine.partitioned_graphs();
+  auto input_partitions = engine.input_partitioned_by();
   // Check if partitions are as expected.
   for (auto item : partitions.at(flow_name)) {
     EXPECT_EQ(item.second->node_count(), 5);
@@ -104,8 +106,8 @@ TEST(DataFlowEngineTest, TestEquiJoinGraph) {
   // Make records.
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
-  state.ProcessRecords("test-table1", std::move(left));
-  state.ProcessRecords("test-table2", std::move(right));
+  engine.ProcessRecords("test-table1", std::move(left));
+  engine.ProcessRecords("test-table2", std::move(right));
   auto join_op = std::dynamic_pointer_cast<EquiJoinOperator>(graph->GetNode(2));
   std::vector<Record> expected_records =
       MakeJoinRecords(join_op->output_schema());
@@ -119,25 +121,25 @@ TEST(DataFlowEngineTest, TestEquiJoinGraph) {
   // Check if records have reached appropriate partition's matviews
   for (const auto &item : partitioned_records) {
     auto partition_matview =
-        state.GetPartitionedFlow(flow_name, item.first)->outputs().at(0);
+        engine.GetPartitionedFlow(flow_name, item.first)->outputs().at(0);
     EXPECT_EQ_MSET(partition_matview, item.second);
   }
 }
 
 TEST(DataFlowEngineTest, TestAggregateOnEquiJoinGraph) {
-  DataFlowState state;
+  DataFlowEngine engine;
   // Make schemas
   SchemaRef lschema = MakeLeftSchema();
   SchemaRef rschema = MakeRightSchema();
-  state.AddTableSchema("test-table1", lschema);
-  state.AddTableSchema("test-table2", rschema);
+  engine.AddTableSchema("test-table1", lschema);
+  engine.AddTableSchema("test-table2", rschema);
   // Make graph
   auto graph = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
   std::string flow_name = "aggregateOnEquijoin";
-  state.AddFlow(flow_name, graph);
+  engine.AddFlow(flow_name, graph);
 
-  auto partitions = state.partitioned_graphs();
-  auto input_partitions = state.input_partitioned_by();
+  auto partitions = engine.partitioned_graphs();
+  auto input_partitions = engine.input_partitioned_by();
   // Check if partitions are as expected.
   for (auto item : partitions.at(flow_name)) {
     // This graph should not require any exchange operators
@@ -158,8 +160,8 @@ TEST(DataFlowEngineTest, TestAggregateOnEquiJoinGraph) {
   // Make records.
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
-  state.ProcessRecords("test-table1", std::move(left));
-  state.ProcessRecords("test-table2", std::move(right));
+  engine.ProcessRecords("test-table1", std::move(left));
+  engine.ProcessRecords("test-table2", std::move(right));
   auto aggregate_op =
       std::dynamic_pointer_cast<AggregateOperator>(graph->GetNode(3));
   std::vector<Record> expected_records =
@@ -174,24 +176,24 @@ TEST(DataFlowEngineTest, TestAggregateOnEquiJoinGraph) {
   // Check if records have reached appropriate partition's matviews
   for (const auto &item : partitioned_records) {
     auto partition_matview =
-        state.GetPartitionedFlow(flow_name, item.first)->outputs().at(0);
+        engine.GetPartitionedFlow(flow_name, item.first)->outputs().at(0);
     EXPECT_EQ_MSET(partition_matview, item.second);
   }
 }
 
 TEST(DataFlowEngineTest, TestUnionGraph) {
-  DataFlowState state;
+  DataFlowEngine engine;
   // Make schemas
   SchemaRef schema = MakeLeftSchema();
-  state.AddTableSchema("test-table1", schema);
-  state.AddTableSchema("test-table2", schema);
+  engine.AddTableSchema("test-table1", schema);
+  engine.AddTableSchema("test-table2", schema);
   // Make graph
   auto graph = MakeUnionGraph(0, schema);
   std::string flow_name = "union";
-  state.AddFlow("union", graph);
+  engine.AddFlow("union", graph);
 
-  auto partitions = state.partitioned_graphs();
-  auto input_partitions = state.input_partitioned_by();
+  auto partitions = engine.partitioned_graphs();
+  auto input_partitions = engine.input_partitioned_by();
   // Check if partitions are as expected.
   for (auto item : partitions.at("union")) {
     EXPECT_EQ(item.second->node_count(), 4);
@@ -216,8 +218,8 @@ TEST(DataFlowEngineTest, TestUnionGraph) {
   second_half.push_back(records.at(2).Copy());
   second_half.push_back(records.at(3).Copy());
   second_half.push_back(records.at(4).Copy());
-  state.ProcessRecords("test-table1", std::move(first_half));
-  state.ProcessRecords("test-table2", std::move(second_half));
+  engine.ProcessRecords("test-table1", std::move(first_half));
+  engine.ProcessRecords("test-table2", std::move(second_half));
   // Wait for a while for records to get processed
   std::this_thread::sleep_for(std::chrono::milliseconds(200));
   // Partition the input records so that equality checks are easier to perform
@@ -228,25 +230,25 @@ TEST(DataFlowEngineTest, TestUnionGraph) {
   // Check if records have reached appropriate partition's matviews
   for (const auto &item : partitioned_records) {
     auto partition_matview =
-        state.GetPartitionedFlow(flow_name, item.first)->outputs().at(0);
+        engine.GetPartitionedFlow(flow_name, item.first)->outputs().at(0);
     EXPECT_EQ_MSET(partition_matview, item.second);
   }
 }
 
 TEST(DataFlowEngineTest, TestDiamondGraph) {
-  DataFlowState state;
+  DataFlowEngine engine;
   // Make schemas
   SchemaRef lschema = MakeLeftSchema();
   SchemaRef rschema = MakeRightSchema();
-  state.AddTableSchema("test-table1", lschema);
-  state.AddTableSchema("test-table2", rschema);
+  engine.AddTableSchema("test-table1", lschema);
+  engine.AddTableSchema("test-table2", rschema);
   // Make graph
   auto graph = MakeDiamondGraph(0, 2, 0, lschema, rschema);
   std::string flow_name = "diamond";
-  state.AddFlow(flow_name, graph);
+  engine.AddFlow(flow_name, graph);
 
-  auto partitions = state.partitioned_graphs();
-  auto input_partitions = state.input_partitioned_by();
+  auto partitions = engine.partitioned_graphs();
+  auto input_partitions = engine.input_partitioned_by();
   // Check if partitions are as expected.
   for (auto item : partitions.at(flow_name)) {
     // This graph should not require any exchange operators
@@ -272,8 +274,8 @@ TEST(DataFlowEngineTest, TestDiamondGraph) {
   // Make records.
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
-  state.ProcessRecords("test-table1", std::move(left));
-  state.ProcessRecords("test-table2", std::move(right));
+  engine.ProcessRecords("test-table1", std::move(left));
+  engine.ProcessRecords("test-table2", std::move(right));
   auto aggregate_op =
       std::dynamic_pointer_cast<AggregateOperator>(graph->GetNode(3));
   std::vector<Record> expected_records =
@@ -288,7 +290,7 @@ TEST(DataFlowEngineTest, TestDiamondGraph) {
   // Check if records have reached appropriate partition's matviews
   for (const auto &item : partitioned_records) {
     auto partition_matview =
-        state.GetPartitionedFlow(flow_name, item.first)->outputs().at(0);
+        engine.GetPartitionedFlow(flow_name, item.first)->outputs().at(0);
     EXPECT_EQ_MSET(partition_matview, item.second);
   }
 }

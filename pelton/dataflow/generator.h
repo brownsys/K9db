@@ -19,19 +19,19 @@ namespace pelton {
 namespace dataflow {
 
 // Forward decleration to avoid include pelton/dataflow/graph.h and
-// pelton/dataflow/state.h here.
+// pelton/dataflow/engine.h here.
 // Including these header files throws off javacpp, which is responsible for
 // generating the java native API and its shims.
 class DataFlowGraph;
-class DataFlowState;
+class DataFlowEngine;
 
 using DataFlowGraphJavaPtr = uint64_t;
-using DataFlowStateJavaPtr = uint64_t;
+using DataFlowEngineJavaPtr = uint64_t;
 
 class DataFlowGraphGenerator {
  public:
   DataFlowGraphGenerator(DataFlowGraphJavaPtr graph_ptr,
-                         DataFlowStateJavaPtr state_ptr);
+                         DataFlowEngineJavaPtr engine_ptr);
 
   // Adding operators.
   NodeIndex AddInputOperator(const std::string &table_name);
@@ -101,7 +101,7 @@ class DataFlowGraphGenerator {
 
  private:
   DataFlowGraph *graph_;
-  DataFlowState *state_;
+  DataFlowEngine *engine_;
 };
 
 }  // namespace dataflow
