@@ -19,10 +19,10 @@ namespace dataflow {
 class ExchangeOperator : public Operator {
  public:
   ExchangeOperator() = delete;
-  ExchangeOperator(
-      absl::flat_hash_map<uint16_t, std::shared_ptr<Channel>> partition_chans,
-      std::vector<ColumnID> partition_key, uint16_t current_partition,
-      uint16_t total_partitions)
+  ExchangeOperator(absl::flat_hash_map<PartitionID, std::shared_ptr<Channel>>
+                       partition_chans,
+                   std::vector<ColumnID> partition_key,
+                   PartitionID current_partition, PartitionID total_partitions)
       : Operator(Operator::Type::EXCHANGE),
         partition_chans_(partition_chans),
         partition_key_(partition_key),
@@ -43,11 +43,11 @@ class ExchangeOperator : public Operator {
 
  private:
   // Used for sending messages to other partitions
-  absl::flat_hash_map<uint16_t, std::shared_ptr<Channel>> partition_chans_;
+  absl::flat_hash_map<PartitionID, std::shared_ptr<Channel>> partition_chans_;
   // Key cols that this exchange operator is supposed to partition records by
   std::vector<ColumnID> partition_key_;
-  uint16_t current_partition_;
-  uint16_t total_partitions_;
+  PartitionID current_partition_;
+  PartitionID total_partitions_;
 };
 
 }  // namespace dataflow

@@ -30,7 +30,7 @@ std::optional<std::vector<Record>> ExchangeOperator::Process(
     to_partition.push_back(record.Copy());
   }
 
-  absl::flat_hash_map<uint16_t, std::vector<Record>> partitioned_records =
+  absl::flat_hash_map<PartitionID, std::vector<Record>> partitioned_records =
       partition::HashPartition(std::move(to_partition), this->partition_key_,
                                this->total_partitions_);
 
