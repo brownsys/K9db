@@ -45,7 +45,7 @@ class DataFlowEngine {
   const std::shared_ptr<DataFlowGraph> GetFlow(const FlowName &name) const;
 
   const std::shared_ptr<DataFlowGraph> GetPartitionedFlow(
-      const FlowName &name, uint16_t partition_id) const;
+      const FlowName &name, PartitionID partition_id) const;
 
   bool HasFlow(const FlowName &name) const;
 
@@ -96,15 +96,16 @@ class DataFlowEngine {
   std::unordered_map<TableName, std::vector<FlowName>> flows_per_input_table_;
 
   absl::flat_hash_map<
-      FlowName, absl::flat_hash_map<uint16_t, std::shared_ptr<DataFlowGraph>>>
+      FlowName,
+      absl::flat_hash_map<PartitionID, std::shared_ptr<DataFlowGraph>>>
       partitioned_graphs_;
-  absl::flat_hash_map<FlowName,
-                      absl::flat_hash_map<uint16_t, std::shared_ptr<Channel>>>
+  absl::flat_hash_map<
+      FlowName, absl::flat_hash_map<PartitionID, std::shared_ptr<Channel>>>
       partition_chans_;
   absl::flat_hash_map<FlowName,
                       absl::flat_hash_map<TableName, std::vector<ColumnID>>>
       input_partitioned_by_;
-  uint16_t partition_count_ = 3;
+  PartitionID partition_count_ = 3;
   // Just an object to store threads, will probably only use them to join and
   // terminate the threads gracefully.
   std::vector<std::thread> threads_;

@@ -63,10 +63,10 @@ void DataFlowEngine::AddFlow(const FlowName &name,
 
   // Tasks related to the dataflow engine
   this->partitioned_graphs_.emplace(
-      name, absl::flat_hash_map<uint16_t, std::shared_ptr<DataFlowGraph>>{});
+      name, absl::flat_hash_map<PartitionID, std::shared_ptr<DataFlowGraph>>{});
   this->partition_chans_.emplace(
-      name, absl::flat_hash_map<uint16_t, std::shared_ptr<Channel>>{});
-  for (uint16_t i = 0; i < this->partition_count_; i++) {
+      name, absl::flat_hash_map<PartitionID, std::shared_ptr<Channel>>{});
+  for (PartitionID i = 0; i < this->partition_count_; i++) {
     std::shared_ptr<Channel> comm_chan = std::make_shared<Channel>();
     this->partition_chans_.at(name).emplace(i, comm_chan);
     std::shared_ptr<DataFlowGraph> partition = flow->Clone();
@@ -86,7 +86,7 @@ void DataFlowEngine::AddFlow(const FlowName &name,
 
   this->TraverseBaseGraph(name);
   // Deploy one partition per thread
-  for (uint16_t i = 0; i < this->partition_count_; i++) {
+  for (PartitionID i = 0; i < this->partition_count_; i++) {
     this->threads_.push_back(std::thread(
         &DataFlowGraph::Start, this->partitioned_graphs_.at(name).at(i),
         this->partition_chans_.at(name).at(i)));
@@ -242,7 +242,7 @@ void DataFlowEngine::VisitNode(
 void DataFlowEngine::AddExchangeAfter(NodeIndex parent_index,
                                       std::vector<ColumnID> partition_key,
                                       const FlowName &name) {
-  for (uint16_t partition = 0; partition < this->partition_count_;
+  for (PartitionID partition = 0; partition < this->partition_count_;
        partition++) {
     auto partitioned_graph = this->partitioned_graphs_.at(name).at(partition);
     auto exchange_op = std::make_shared<ExchangeOperator>(
@@ -259,7 +259,7 @@ const std::shared_ptr<DataFlowGraph> DataFlowEngine::GetFlow(
 }
 
 const std::shared_ptr<DataFlowGraph> DataFlowEngine::GetPartitionedFlow(
-    const FlowName &name, uint16_t partition_id) const {
+    const FlowName &name, PartitionID partition_id) const {
   return this->partitioned_graphs_.at(name).at(partition_id);
 }
 
@@ -360,9 +360,10 @@ void DataFlowEngine::ProcessRecords(const TableName &table_name,
       // Partition records based on key specified by the input operator
       auto input_partition_key =
           this->input_partitioned_by_.at(name).at(table_name);
-      absl::flat_hash_map<uint16_t, std::vector<Record>> partitioned_records =
-          partition::HashPartition(std::move(records_per_flow.at(i)),
-                                   input_partition_key, this->partition_count_);
+      absl::flat_hash_map<PartitionID, std::vector<Record>>
+          partitioned_records = partition::HashPartition(
+              std::move(records_per_flow.at(i)), input_partition_key,
+              this->partition_count_);
       // Send batch messages to appropriate partitions
       auto flow = this->flows_.at(name);
       for (auto &item : partitioned_records) {
