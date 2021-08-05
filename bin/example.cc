@@ -1,5 +1,7 @@
 #include <iostream>
 #include <utility>
+#include <thread>
+#include <chrono>
 
 #include "gflags/gflags.h"
 #include "glog/logging.h"
@@ -177,6 +179,9 @@ int main(int argc, char **argv) {
   }
   std::cout << std::endl;
 
+  // Wait for a while for records to get processed
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
   // Read flow.
   std::cout << "Read flows ... " << std::endl;
   for (const auto &query : FLOW_READS) {
@@ -195,6 +200,9 @@ int main(int argc, char **argv) {
   }
   std::cout << std::endl;
 
+  // Wait for a while for records to get processed
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
   // Read flow.
   std::cout << "Read flows ... " << std::endl;
   for (const auto &query : FLOW_READS) {
@@ -212,6 +220,9 @@ int main(int argc, char **argv) {
     CHECK(pelton::exec(&connection, del).ok());
   }
   std::cout << std::endl;
+
+  // Wait for a while for records to get processed
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
   // Query data.
   std::cout << "Run queries ... " << std::endl;
