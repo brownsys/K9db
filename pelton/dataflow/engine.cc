@@ -103,7 +103,7 @@ void DataFlowEngine::TraverseBaseGraph(const FlowName &name) {
   // Start a DFS traversal that inserts exchange operators where necessary.
   this->VisitNode(matview_op, matview_op->key_cols(), &tracking_union, name);
 }
-// TODO(Ishan): consider specifying partitioned_by_ during operator construction
+
 void DataFlowEngine::AnnotateBaseGraph(
     const std::shared_ptr<DataFlowGraph> graph) {
   for (size_t i = 0; i < graph->node_count(); i++) {
