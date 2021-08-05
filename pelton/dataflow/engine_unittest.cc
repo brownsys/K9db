@@ -53,7 +53,7 @@ TEST(DataFlowEngineTest, TestTrivialGraph) {
   std::vector<Record> records_copy = MakeLeftRecords(schema);
   state.ProcessRecords("test-table", std::move(std::move(records)));
   // Wait for a while for records to get processed
-  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
   // Partition the input records so that equality checks are easier to perform
   auto partitioned_records =
       partition::HashPartition(std::move(records_copy), matview_key_cols, 3);
@@ -110,7 +110,7 @@ TEST(DataFlowEngineTest, TestEquiJoinGraph) {
   std::vector<Record> expected_records =
       MakeJoinRecords(join_op->output_schema());
   // Wait for a while for records to get processed
-  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
   // Partition the input records so that equality checks are easier to perform
   auto matview_op =
       std::dynamic_pointer_cast<MatViewOperator>(graph->GetNode(3));
@@ -165,7 +165,7 @@ TEST(DataFlowEngineTest, TestAggregateOnEquiJoinGraph) {
   std::vector<Record> expected_records =
       MakeAggregateOnEquiJoinRecords(aggregate_op->output_schema());
   // Wait for a while for records to get processed
-  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
   // Partition the input records so that equality checks are easier to perform
   auto matview_op =
       std::dynamic_pointer_cast<MatViewOperator>(graph->GetNode(4));
@@ -219,7 +219,7 @@ TEST(DataFlowEngineTest, TestUnionGraph) {
   state.ProcessRecords("test-table1", std::move(first_half));
   state.ProcessRecords("test-table2", std::move(second_half));
   // Wait for a while for records to get processed
-  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
   // Partition the input records so that equality checks are easier to perform
   auto matview_op =
       std::dynamic_pointer_cast<MatViewOperator>(graph->GetNode(3));
@@ -279,7 +279,7 @@ TEST(DataFlowEngineTest, TestDiamondGraph) {
   std::vector<Record> expected_records =
       MakeDiamondRecords(aggregate_op->output_schema());
   // Wait for a while for records to get processed
-  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
   // Partition the input records so that equality checks are easier to perform
   auto matview_op =
       std::dynamic_pointer_cast<MatViewOperator>(graph->GetNode(9));
