@@ -1,6 +1,8 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <thread>
+#include <chrono>
 
 #include "gflags/gflags.h"
 #include "glog/logging.h"
@@ -205,6 +207,8 @@ void RunTest(const std::string &schema_file, const std::string &query_file,
     CHECK(pelton::exec(&connection, del).ok());
   }
 
+  // Wait for a while for records to get processed
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
   // * compare pelton to expected results
 
   LOG(INFO) << "Check flows and queries... ";
