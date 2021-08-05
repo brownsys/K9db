@@ -10,6 +10,8 @@ typedef uint32_t NodeIndex;
 
 typedef uint32_t ColumnID;
 
+typedef uint16_t PartitionID;
+
 static const NodeIndex UNDEFINED_NODE_INDEX =
     std::numeric_limits<NodeIndex>::max();
 
