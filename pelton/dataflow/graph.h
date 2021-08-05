@@ -14,6 +14,9 @@
 namespace pelton {
 namespace dataflow {
 
+// Type aliases
+using GraphIndex = NodeIndex;
+
 class Operator;
 class InputOperator;
 class MatViewOperator;
@@ -59,7 +62,7 @@ class DataFlowGraph {
   const std::vector<std::shared_ptr<MatViewOperator>> &outputs() const {
     return this->outputs_;
   }
-  const NodeIndex &index() { return this->index_; }
+  const GraphIndex &index() { return this->index_; }
   const size_t node_count() { return this->nodes_.size(); }
 
   // Get node by its index.
@@ -68,7 +71,7 @@ class DataFlowGraph {
     return it == nodes_.end() ? nullptr : it->second;
   }
 
-  void SetIndex(NodeIndex graph_index) { this->index_ = graph_index; }
+  void SetIndex(GraphIndex graph_index) { this->index_ = graph_index; }
   std::shared_ptr<DataFlowGraph> Clone();
 
   // Suppposed to be an entry point for deploying a graph partiton in a thread
@@ -80,7 +83,7 @@ class DataFlowGraph {
   uint64_t SizeInMemory() const;
 
  private:
-  NodeIndex index_;
+  GraphIndex index_;
   void AddEdge(std::shared_ptr<Operator> parent,
                std::shared_ptr<Operator> child);
   // Maps input name to associated input operator.
