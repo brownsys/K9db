@@ -35,7 +35,7 @@ TEST(ExchangeOperatorTest, BasicTest) {
 
   // Create an exchange opertor that belongs to 0th partition and that is
   // supposed to shard records into three partitions.
-  absl::flat_hash_map<uint16_t, std::shared_ptr<Channel>> partition_chans;
+  absl::flat_hash_map<PartitionID, std::shared_ptr<Channel>> partition_chans;
   partition_chans.emplace(0, std::make_shared<Channel>());
   partition_chans.emplace(1, std::make_shared<Channel>());
   partition_chans.emplace(2, std::make_shared<Channel>());
