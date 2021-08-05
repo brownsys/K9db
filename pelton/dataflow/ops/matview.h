@@ -150,7 +150,7 @@ class MatViewOperatorT : public MatViewOperator {
 
  protected:
   std::optional<std::vector<Record>> Process(
-      NodeIndex, const std::vector<Record> &records) {
+      NodeIndex /*source*/, const std::vector<Record> &records) {
     bool by_pk = false;
     if (records.size() > 0) {
       const std::vector<ColumnID> &keys = records.at(0).schema().keys();
