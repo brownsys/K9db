@@ -84,7 +84,7 @@ void DataFlowGraph::AddEdge(std::shared_ptr<Operator> parent,
 void DataFlowGraph::Process(const std::string &input_name,
                             const std::vector<Record> &records) const {
   std::shared_ptr<InputOperator> node = this->inputs_.at(input_name);
-  node->ProcessAndForward(UNDEFINED_NODE_INDEX, records);
+  this->Process(node->index(), std::nullopt, records);
 }
 
 void DataFlowGraph::Process(const NodeIndex destination_index,

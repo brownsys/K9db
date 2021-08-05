@@ -78,7 +78,7 @@ class DataFlowEngine {
   ~DataFlowEngine();
 
  protected:
-  // Accessors. Mainly used for testing
+  // Accessors. Mainly used in tests to check for correctness.
   const auto &partitioned_graphs() const { return this->partitioned_graphs_; }
   const auto &input_partitioned_by() const {
     return this->input_partitioned_by_;
