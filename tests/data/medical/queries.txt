@@ -7,3 +7,18 @@
 2|10|2|Good bye
 4|20|2|HELLO 2
 ;
+1
+2
+;
+HELLO
+Good bye
+HELLO
+HELLO 2
+HELLO 3
+;
+HELLO|10
+Good bye|10
+HELLO|20
+HELLO 2|20
+HELLO 3|20
+;

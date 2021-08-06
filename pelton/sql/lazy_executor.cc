@@ -56,38 +56,28 @@ SqlResult SqlLazyExecutor::ExecuteDefault(const sqlast::AbstractStatement *sql,
 
 // Execute statement against given user shard.
 SqlResult SqlLazyExecutor::ExecuteShard(const sqlast::AbstractStatement *sql,
-                                        const shards::ShardingInformation &info,
+                                        const std::string &shard_kind,
                                         const shards::UserId &user_id,
-                                        const dataflow::SchemaRef &schema) {
+                                        const dataflow::SchemaRef &schema,
+                                        int aug_index) {
   // Find the physical shard name (prefix) by hashing the user id and user kind.
   perf::Start("hashing");
-  std::string shard_name =
-      shards::sqlengine::NameShard(info.shard_kind, user_id);
+  std::string shard_name = shards::sqlengine::NameShard(shard_kind, user_id);
   perf::End("hashing");
 
 #ifndef PELTON_OPT
   LOG(INFO) << "Shard: " << shard_name << " (userid: " << user_id << ")";
 #endif
 
-  // If the sharding is directly (e.g. the user_id appears in schema), then
-  // the logical schema (prior to sharding) and the physical schema in the DB
-  // (after sharding) differ by that user_id column, which is dropped in the DB.
-  // We must augment the user_id to the result set.
-  // If the sharding is indirect (e.g. transitive foreign keys), the schemas
-  // are identical, and there is no need to augment anything.
-  if (info.IsTransitive()) {
-    return this->Execute(sql, schema, shard_name);
-  } else {
-    return this->Execute(sql, schema, shard_name, info.shard_by_index, user_id);
-  }
+  // Execute against the underlying shard.
+  return this->Execute(sql, schema, shard_name, aug_index, user_id);
 }
 
 // Execute statement against given user shards.
 SqlResult SqlLazyExecutor::ExecuteShards(
-    const sqlast::AbstractStatement *sql,
-    const shards::ShardingInformation &info,
+    const sqlast::AbstractStatement *sql, const std::string &shard_kind,
     const std::unordered_set<shards::UserId> &user_ids,
-    const dataflow::SchemaRef &schema) {
+    const dataflow::SchemaRef &schema, int aug_index) {
   // If no user_ids are provided, we return an empty result.
   if (user_ids.size() == 0) {
     bool returning = false;
@@ -100,7 +90,8 @@ SqlResult SqlLazyExecutor::ExecuteShards(
   // This result set is a proxy that allows access to results from all shards.
   SqlResult result;
   for (const shards::UserId &user_id : user_ids) {
-    result.Append(this->ExecuteShard(sql, info, user_id, schema));
+    result.Append(
+        this->ExecuteShard(sql, shard_kind, user_id, schema, aug_index));
   }
 
   return result;

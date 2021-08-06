@@ -69,7 +69,7 @@ std::pair<std::string, shards::ShardingInformation> CreateShardedTable(
   stmt.AddColumn("name", sqlast::ColumnDefinition("name", CType::TEXT));
 
   // Execute the statement.
-  SqlResult result = executor.ExecuteShard(&stmt, info, user_id);
+  SqlResult result = executor.ExecuteShard(&stmt, info.shard_kind, user_id);
   EXPECT_TRUE(result.IsStatement());
   EXPECT_TRUE(result.Success());
 
@@ -230,27 +230,27 @@ TEST(LazyExecutorTest, TestUpdatesShard) {
   // Insert values.
   sqlast::Insert stmt{"mytest"};
   stmt.SetValues({"1", "\"s1\""});
-  SqlResult result = executor.ExecuteShard(&stmt, info1, "1");
+  SqlResult result = executor.ExecuteShard(&stmt, info1.shard_kind, "1");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 1);
 
   stmt.SetValues({"2", "\"s2\""});
-  result = executor.ExecuteShard(&stmt, info1, "1");
+  result = executor.ExecuteShard(&stmt, info1.shard_kind, "1");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 1);
 
   stmt.SetValues({"3", "\"s1\""});
-  result = executor.ExecuteShard(&stmt, info2, "2");
+  result = executor.ExecuteShard(&stmt, info2.shard_kind, "2");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 1);
 
   stmt.SetValues({"4", "\"s3\""});
-  result = executor.ExecuteShard(&stmt, info2, "2");
+  result = executor.ExecuteShard(&stmt, info2.shard_kind, "2");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 1);
 
   stmt.SetValues({"5", "\"s2\""});
-  result = executor.ExecuteShard(&stmt, info1, "1");
+  result = executor.ExecuteShard(&stmt, info1.shard_kind, "1");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 1);
 
@@ -264,10 +264,10 @@ TEST(LazyExecutorTest, TestUpdatesShard) {
   stmt2.AddColumnValue("name", "\"s5\"");
   stmt2.SetWhereClause(std::move(where));
 
-  result = executor.ExecuteShard(&stmt2, info1, "1");
+  result = executor.ExecuteShard(&stmt2, info1.shard_kind, "1");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 0);
-  result = executor.ExecuteShard(&stmt2, info2, "2");
+  result = executor.ExecuteShard(&stmt2, info2.shard_kind, "2");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 1);
 
@@ -280,10 +280,10 @@ TEST(LazyExecutorTest, TestUpdatesShard) {
   sqlast::Delete stmt3{"mytest"};
   stmt3.SetWhereClause(std::move(where));
 
-  result = executor.ExecuteShard(&stmt3, info1, "1");
+  result = executor.ExecuteShard(&stmt3, info1.shard_kind, "1");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 2);
-  result = executor.ExecuteShard(&stmt3, info2, "2");
+  result = executor.ExecuteShard(&stmt3, info2.shard_kind, "2");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 0);
 
@@ -306,7 +306,7 @@ TEST(LazyExecutorTest, TestUpdatesShard) {
 
   // Delete all data from all shards.
   sqlast::Delete stmt4{"mytest"};
-  result = executor.ExecuteShards(&stmt4, info1, {"1", "2"});
+  result = executor.ExecuteShards(&stmt4, info1.shard_kind, {"1", "2"});
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 3);
 
@@ -389,27 +389,27 @@ TEST(LazyExecutorTest, TestSelectShard) {
   // Insert values.
   sqlast::Insert stmt{"mytest"};
   stmt.SetValues({"1", "\"s1\""});
-  SqlResult result = executor.ExecuteShard(&stmt, info1, "1");
+  SqlResult result = executor.ExecuteShard(&stmt, info1.shard_kind, "1");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 1);
 
   stmt.SetValues({"2", "\"s2\""});
-  result = executor.ExecuteShard(&stmt, info1, "1");
+  result = executor.ExecuteShard(&stmt, info1.shard_kind, "1");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 1);
 
   stmt.SetValues({"3", "\"s1\""});
-  result = executor.ExecuteShard(&stmt, info2, "2");
+  result = executor.ExecuteShard(&stmt, info2.shard_kind, "2");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 1);
 
   stmt.SetValues({"4", "\"s3\""});
-  result = executor.ExecuteShard(&stmt, info2, "2");
+  result = executor.ExecuteShard(&stmt, info2.shard_kind, "2");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 1);
 
   stmt.SetValues({"5", "\"s2\""});
-  result = executor.ExecuteShard(&stmt, info1, "1");
+  result = executor.ExecuteShard(&stmt, info1.shard_kind, "1");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 1);
 
@@ -425,7 +425,8 @@ TEST(LazyExecutorTest, TestSelectShard) {
   // Query the database for the first shard.
   sqlast::Select stmt2{"mytest"};
   stmt2.AddColumn("*");
-  result = executor.ExecuteShard(&stmt2, info1, "1", schema);
+  result = executor.ExecuteShard(&stmt2, info1.shard_kind, "1", schema,
+                                 info1.shard_by_index);
 
   EXPECT_TRUE(result.IsQuery());
   EXPECT_TRUE(result.HasResultSet());
@@ -439,7 +440,8 @@ TEST(LazyExecutorTest, TestSelectShard) {
   EXPECT_FALSE(result.HasResultSet());
 
   // Query the database for the second shard.
-  result = executor.ExecuteShard(&stmt2, info2, "2", schema);
+  result = executor.ExecuteShard(&stmt2, info2.shard_kind, "2", schema,
+                                 info2.shard_by_index);
   EXPECT_TRUE(result.IsQuery());
   EXPECT_TRUE(result.HasResultSet());
   resultset = result.NextResultSet();
@@ -466,27 +468,27 @@ TEST(LazyExecutorTest, TestSelectShardSet) {
   // Insert values.
   sqlast::Insert stmt{"mytest"};
   stmt.SetValues({"1", "\"s1\""});
-  SqlResult result = executor.ExecuteShard(&stmt, info1, "1");
+  SqlResult result = executor.ExecuteShard(&stmt, info1.shard_kind, "1");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 1);
 
   stmt.SetValues({"2", "\"s2\""});
-  result = executor.ExecuteShard(&stmt, info1, "1");
+  result = executor.ExecuteShard(&stmt, info1.shard_kind, "1");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 1);
 
   stmt.SetValues({"3", "\"s1\""});
-  result = executor.ExecuteShard(&stmt, info2, "2");
+  result = executor.ExecuteShard(&stmt, info2.shard_kind, "2");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 1);
 
   stmt.SetValues({"4", "\"s3\""});
-  result = executor.ExecuteShard(&stmt, info2, "2");
+  result = executor.ExecuteShard(&stmt, info2.shard_kind, "2");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 1);
 
   stmt.SetValues({"5", "\"s2\""});
-  result = executor.ExecuteShard(&stmt, info1, "1");
+  result = executor.ExecuteShard(&stmt, info1.shard_kind, "1");
   EXPECT_TRUE(result.IsUpdate());
   EXPECT_EQ(result.UpdateCount(), 1);
 
@@ -502,7 +504,8 @@ TEST(LazyExecutorTest, TestSelectShardSet) {
   // Query the database for the first shard.
   sqlast::Select stmt2{"mytest"};
   stmt2.AddColumn("*");
-  result = executor.ExecuteShards(&stmt2, info1, {"1", "2"}, schema);
+  result = executor.ExecuteShards(&stmt2, info1.shard_kind, {"1", "2"}, schema,
+                                  info1.shard_by_index);
 
   EXPECT_TRUE(result.IsQuery());
   EXPECT_TRUE(result.HasResultSet());

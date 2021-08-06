@@ -44,11 +44,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
   // sharded database.
   sql::SqlResult result = sql::SqlResult(0);
 
+  auto &exec = state->executor();
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
     // The insertion statement is unmodified.
-    result = state->executor().ExecuteDefault(&stmt);
+    result = exec.ExecuteDefault(&stmt);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded!
@@ -92,7 +93,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
       if (!state->ShardExists(info.shard_kind, user_id)) {
         for (auto *create_stmt : state->CreateShard(info.shard_kind, user_id)) {
           sql::SqlResult tmp =
-              state->executor().ExecuteShard(create_stmt, info, user_id);
+              exec.ExecuteShard(create_stmt, info.shard_kind, user_id);
           if (!tmp.IsStatement() || !tmp.Success()) {
             return absl::InternalError("Could not created sharded table");
           }
@@ -100,7 +101,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
       }
 
       // Add the modified insert statement.
-      result.Append(state->executor().ExecuteShard(&cloned, info, user_id));
+      result.Append(exec.ExecuteShard(&cloned, info.shard_kind, user_id));
     }
   }
 
