@@ -177,6 +177,9 @@ std::string Stringifier::VisitBinaryExpression(const BinaryExpression &ast) {
     case Expression::Type::EQ:
       op = " = ";
       break;
+    case Expression::Type::IS:
+      op = " IS ";
+      break;
     default:
       assert(false);
   }
@@ -244,6 +247,7 @@ std::pair<bool, std::string> ValueFinder::VisitBinaryExpression(
   auto result = ast.VisitChildren(this);
   switch (ast.type()) {
     case Expression::Type::EQ:
+    case Expression::Type::IS:
       if (ast.GetLeft()->type() == Expression::Type::COLUMN) {
         return std::make_pair(result.at(0).first, result.at(1).second);
       }
@@ -349,6 +353,7 @@ std::unique_ptr<Expression> ExpressionRemover::VisitBinaryExpression(
   auto result = ast->VisitChildren(this);
   switch (ast->type()) {
     case Expression::Type::EQ:
+    case Expression::Type::IS:
       if (result.at(0).get() == nullptr || result.at(1).get() == nullptr) {
         return nullptr;
       }

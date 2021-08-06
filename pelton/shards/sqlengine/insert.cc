@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/strings/match.h"
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
@@ -72,6 +73,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
         } else {
           user_id = cloned.RemoveValue(info.shard_by_index);
         }
+      }
+      if (absl::EqualsIgnoreCase(user_id, "NULL")) {
+        return absl::InvalidArgumentError(info.shard_by + " cannot be NULL");
       }
       user_id = Dequote(user_id);
 

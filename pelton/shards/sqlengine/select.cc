@@ -17,6 +17,22 @@ namespace select {
 
 namespace {
 
+bool IsIntLiteral(const std::string &str) {
+  std::cout << str << std::endl;
+  for (char c : str) {
+    if (c < '0' || c > '9') {
+      return false;
+    }
+  }
+  std::cout << std::endl;
+  return true;
+}
+
+bool IsStringLiteral(const std::string &str) {
+  size_t e = str.size() - 1;
+  return (str[0] == '"' || str[0] == '\'') && (str[e] == '"' || str[e] == '\'');
+}
+
 dataflow::SchemaRef ResultSchema(const sqlast::Select &stmt,
                                  dataflow::SchemaRef table_schema) {
   const std::vector<std::string> &column_names = stmt.GetColumns();
@@ -27,7 +43,13 @@ dataflow::SchemaRef ResultSchema(const sqlast::Select &stmt,
   std::vector<sqlast::ColumnDefinition::Type> column_types;
   column_types.reserve(column_names.size());
   for (const std::string &col : column_names) {
-    column_types.push_back(table_schema.TypeOf(table_schema.IndexOf(col)));
+    if (IsIntLiteral(col)) {
+      column_types.push_back(sqlast::ColumnDefinition::Type::INT);
+    } else if (IsStringLiteral(col)) {
+      column_types.push_back(sqlast::ColumnDefinition::Type::TEXT);
+    } else {
+      column_types.push_back(table_schema.TypeOf(table_schema.IndexOf(col)));
+    }
   }
   return dataflow::SchemaFactory::Create(column_names, column_types, {});
 }

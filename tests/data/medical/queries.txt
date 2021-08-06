@@ -22,3 +22,6 @@ HELLO|20
 HELLO 2|20
 HELLO 3|20
 ;
+1|str
+1|str
+;

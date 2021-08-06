@@ -385,10 +385,13 @@ antlrcpp::Any AstTransformer::visitSelect_core(
 antlrcpp::Any AstTransformer::visitResult_column(
     sqlparser::SQLiteParser::Result_columnContext *ctx) {
   if (ctx->expr() != nullptr) {
-    if (ctx->expr()->column_name() == nullptr) {
-      return absl::InvalidArgumentError("Bad column expression in SELECT");
+    if (ctx->expr()->column_name() != nullptr) {
+      return ctx->expr()->column_name()->accept(this);
     }
-    return ctx->expr()->column_name()->accept(this);
+    if (ctx->expr()->literal_value() != nullptr) {
+      return ctx->expr()->literal_value()->accept(this);
+    }
+    return absl::InvalidArgumentError("Bad column expression in SELECT");
   }
   if (ctx->STAR() != nullptr) {
     return std::string("*");
@@ -465,7 +468,7 @@ antlrcpp::Any AstTransformer::visitExpr(
 
   if ((ctx->literal_value() == nullptr && ctx->ASSIGN() == nullptr &&
        ctx->column_name() == nullptr && ctx->AND() == nullptr &&
-       ctx->GT() == nullptr && ctx->IN() == nullptr) ||
+       ctx->GT() == nullptr && ctx->IN() == nullptr && ctx->IS() == nullptr) ||
       ctx->expr().size() > 2) {
     return absl::InvalidArgumentError("Unsupported expression");
   }
@@ -515,6 +518,9 @@ antlrcpp::Any AstTransformer::visitExpr(
   std::unique_ptr<BinaryExpression> result;
   if (ctx->ASSIGN() != nullptr) {
     result = std::make_unique<BinaryExpression>(Expression::Type::EQ);
+  }
+  if (ctx->IN() != nullptr) {
+    result = std::make_unique<BinaryExpression>(Expression::Type::IS);
   }
   if (ctx->AND() != nullptr) {
     result = std::make_unique<BinaryExpression>(Expression::Type::AND);
