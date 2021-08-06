@@ -47,8 +47,8 @@ typedef struct {
 // Pass command line arguments to gflags
 void FFIGflags(int argc, char **argv);
 
-// Open a global connection, initializing pelton_state in pelton.cc
-bool FFIGlobalOpen(const char *db_name, const char *db_dir,
+// Initialize pelton_state in pelton.cc. Returns true if successful and false otherwise.
+bool FFIInitialize(const char *db_name, const char *db_dir,
                    const char *db_username, const char *db_password);
 
 // Open a connection for a single client. The returned struct has connected =
@@ -69,8 +69,8 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query);
 // Clean up the memory allocated by an FFIResult.
 void FFIDestroySelect(FFIResult *c_result);
 
-// Close the global connection. Returns true if successful and false otherwise.
-bool FFIGlobalClose();
+// Delete pelton_state. Returns true if successful and false otherwise.
+bool FFIShutdown();
 
 // Close a client connection. Returns true if successful and false otherwise.
 bool FFIClose(FFIConnection *c_conn);

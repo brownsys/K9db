@@ -17,7 +17,7 @@ impl Drop for FFIResult {
     }
 }
 
-pub fn global_open_ffi(dir: &str, db: &str, user: &str, pass: &str) -> bool {
+pub fn initialize_ffi(dir: &str, db: &str, user: &str, pass: &str) -> bool {
     // convert &str to char* to pass query to C-wrapper
     let dir = CString::new(dir).unwrap();
     let dir: *mut c_char = dir.as_ptr() as *mut i8;
@@ -28,7 +28,7 @@ pub fn global_open_ffi(dir: &str, db: &str, user: &str, pass: &str) -> bool {
     let pass = CString::new(pass).unwrap();
     let pass: *mut c_char = pass.as_ptr() as *mut i8;
 
-    let conn = unsafe { FFIGlobalOpen(dir, db, user, pass) };
+    let conn = unsafe { FFIInitialize(dir, db, user, pass) };
     return conn;
 }
 
@@ -37,8 +37,8 @@ pub fn open_ffi() -> FFIConnection {
     return conn;
 }
 
-pub fn global_close_ffi() -> bool {
-    let response = unsafe { FFIGlobalClose() };
+pub fn shutdown_ffi() -> bool {
+    let response = unsafe { FFIShutdown() };
     return response;
 }
 

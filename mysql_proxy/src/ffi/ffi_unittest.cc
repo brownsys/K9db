@@ -137,9 +137,9 @@ int main(int argc, char **argv) {
   // Drop the database (in case it existed before because of some tests).
   DropDatabase();
 
-  // Open global connection
+  // Initialize Pelton State
   EXPECT_TRUE(
-      FFIGlobalOpen("", DB_NAME, db_username->c_str(), db_password->c_str()))
+      FFIInitialize("", DB_NAME, db_username->c_str(), db_password->c_str()))
       << "Opening global connection failed!";
 
   // Run tests.
@@ -147,7 +147,7 @@ int main(int argc, char **argv) {
   auto result = RUN_ALL_TESTS();
 
   // Close global connection
-  EXPECT_TRUE(FFIGlobalClose()) << "Closing global connection failed!";
+  EXPECT_TRUE(FFIShutdown()) << "Closing global connection failed!";
 
   // Drop the database again.
   DropDatabase();

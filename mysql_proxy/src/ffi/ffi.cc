@@ -21,8 +21,8 @@ void FFIGflags(int argc, char **argv) {
   google::InitGoogleLogging("proxy");
 }
 
-// Open a global connection, initializing pelton_state in pelton.cc
-bool FFIGlobalOpen(const char *db_dir, const char *db_name,
+// Initialize pelton_state in pelton.cc
+bool FFIInitialize(const char *db_dir, const char *db_name,
                    const char *db_username, const char *db_password) {
   // Log debugging information.
   LOG(INFO) << "C-Wrapper: starting open_c";
@@ -38,8 +38,8 @@ bool FFIGlobalOpen(const char *db_dir, const char *db_name,
   const std::string c_db_password(db_password);
 
   // call c++ function from C with converted types
-  LOG(INFO) << "C-Wrapper: running pelton::global_open";
-  if (pelton::global_open(c_db_dir, c_db, c_db_username, c_db_password)) {
+  LOG(INFO) << "C-Wrapper: running pelton::initialize";
+  if (pelton::initialize(c_db_dir, c_db, c_db_username, c_db_password)) {
     LOG(INFO) << "C-Wrapper: global connection opened";
   } else {
     LOG(INFO) << "C-Wrapper: failed to open global connection";
@@ -52,12 +52,12 @@ bool FFIGlobalOpen(const char *db_dir, const char *db_name,
 // true if successful. Otherwise connected = false
 FFIConnection FFIOpen() {
   // Create a new client connection.
-  FFIConnection c_conn = {new pelton::ConnectionLocal(), false};
+  FFIConnection c_conn = {new pelton::Connection(), false};
 
   // convert void pointer of ConnectionC struct into c++ class instance
-  // ConnectionLocal
-  pelton::ConnectionLocal *cpp_conn =
-      reinterpret_cast<pelton::ConnectionLocal *>(c_conn.cpp_conn);
+  // Connection
+  pelton::Connection *cpp_conn =
+      reinterpret_cast<pelton::Connection *>(c_conn.cpp_conn);
 
   // call c++ function from C with converted types
   LOG(INFO) << "C-Wrapper: running pelton::open";
@@ -71,10 +71,10 @@ FFIConnection FFIOpen() {
   return c_conn;
 }
 
-// Close the global connection. Returns true if successful and false otherwise._
-bool FFIGlobalClose() {
+// Delete pelton_state. Returns true if successful and false otherwise.
+bool FFIShutdown() {
   LOG(INFO) << "C-Wrapper: Closing global connection";
-  bool response = pelton::global_close(true);
+  bool response = pelton::shutdown(true);
   if (response) {
     LOG(INFO) << "C-Wrapper: global connection closed";
     return true;
@@ -85,14 +85,14 @@ bool FFIGlobalClose() {
 // Close the connection. Returns true if successful and false otherwise.
 bool FFIClose(FFIConnection *c_conn) {
   LOG(INFO) << "C-Wrapper: starting close_c";
-  pelton::ConnectionLocal *cpp_conn =
-      reinterpret_cast<pelton::ConnectionLocal *>(c_conn->cpp_conn);
+  pelton::Connection *cpp_conn =
+      reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
 
   if (cpp_conn != nullptr) {
     bool response = pelton::close(cpp_conn);
     if (response) {
       LOG(INFO) << "C-Wrapper: connection closed";
-      delete reinterpret_cast<pelton::ConnectionLocal *>(cpp_conn);
+      delete reinterpret_cast<pelton::Connection *>(cpp_conn);
       c_conn->connected = false;
       c_conn->cpp_conn = nullptr;
       return true;
@@ -107,8 +107,8 @@ bool FFIClose(FFIConnection *c_conn) {
 // Execute a DDL statement (e.g. CREATE TABLE, CREATE VIEW, CREATE INDEX).
 bool FFIExecDDL(FFIConnection *c_conn, const char *query) {
   LOG(INFO) << "C-Wrapper: executing ddl " << std::string(query);
-  pelton::ConnectionLocal *cpp_conn =
-      reinterpret_cast<pelton::ConnectionLocal *>(c_conn->cpp_conn);
+  pelton::Connection *cpp_conn =
+      reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
   absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
   if (!result.ok()) {
     LOG(INFO) << "C-Wrapper: " << result.status();
@@ -121,8 +121,8 @@ bool FFIExecDDL(FFIConnection *c_conn, const char *query) {
 // Returns -1 if error, otherwise returns the number of affected rows.
 int FFIExecUpdate(FFIConnection *c_conn, const char *query) {
   LOG(INFO) << "C-Wrapper: executing update " << std::string(query);
-  pelton::ConnectionLocal *cpp_conn =
-      reinterpret_cast<pelton::ConnectionLocal *>(c_conn->cpp_conn);
+  pelton::Connection *cpp_conn =
+      reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
   absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
   if (!result.ok()) {
     LOG(INFO) << "C-Wrapper: " << result.status();
@@ -216,8 +216,8 @@ void PopulateRecords(FFIResult *c_result,
 // Returns nullptr (0) on error.
 FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
   LOG(INFO) << "C-Wrapper: executing query " << std::string(query);
-  pelton::ConnectionLocal *cpp_conn =
-      reinterpret_cast<pelton::ConnectionLocal *>(c_conn->cpp_conn);
+  pelton::Connection *cpp_conn =
+      reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
   absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
   if (!result.ok()) {
     LOG(INFO) << "C-Wrapper: " << result.status();

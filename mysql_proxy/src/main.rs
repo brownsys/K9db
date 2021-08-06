@@ -209,7 +209,7 @@ fn main() {
     // pass converted arguments to C-FFI
     unsafe { FFIGflags(c_argc, c_argv.as_mut_ptr()) };
 
-    let global_open = global_open_ffi("", "pelton", "root", "password");
+    let global_open = initialize_ffi("", "pelton", "root", "password");
     info!(log, "Rust Proxy: opening connection globally: {:?}", global_open);
 
     let listener = net::TcpListener::bind("127.0.0.1:10001").unwrap();
@@ -273,6 +273,6 @@ fn main() {
     for join_handle in threads {
         join_handle.join().unwrap();
     }
-    let global_close = global_close_ffi();
-    info!(log, "Rust Proxy: Closing connection globally: {:?}", global_close);
+    let global_close = shutdown_ffi();
+    info!(log, "Rust Proxy: Shutting down pelton, clearing global state: {:?}", global_close);
 }

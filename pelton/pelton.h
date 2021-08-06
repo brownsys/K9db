@@ -20,15 +20,15 @@ using SqlResultSet = sql::SqlResultSet;
 using Schema = dataflow::SchemaRef;
 using Record = dataflow::Record;
 
-class Connection {
+class State {
  public:
-  Connection() = default;
+  State() = default;
 
   // Not copyable or movable.
-  Connection(const Connection &) = delete;
-  Connection &operator=(const Connection &) = delete;
-  Connection(const Connection &&) = delete;
-  Connection &operator=(const Connection &&) = delete;
+  State(const State &) = delete;
+  State &operator=(const State &) = delete;
+  State(const State &&) = delete;
+  State &operator=(const State &&) = delete;
 
   // path to store state if want to store in folder (usually give it empty
   // string)
@@ -43,8 +43,6 @@ class Connection {
   shards::SharderState *GetSharderState() { return &this->sharder_state_; }
   dataflow::DataFlowState *GetDataFlowState() { return &this->dataflow_state_; }
 
-  // Won't need save and load to save to files. Eventually will delete these::
-  // State persistance.
   void Save() {
     if (this->path_.size() > 0) {
       this->sharder_state_.Save(this->path_);
@@ -66,26 +64,26 @@ class Connection {
   std::string path_;
 };
 
-class ConnectionLocal {
+class Connection {
  public:
-  Connection *global_connection;
+  State *pelton_state;
 };
 
-// open persistent connection, initialize pelton_state
-bool global_open(const std::string &directory, const std::string &db_name,
+// initialize pelton_state
+bool initialize(const std::string &directory, const std::string &db_name,
                  const std::string &db_username,
                  const std::string &db_password);
 
-// close global connection, delete pelton_state
-bool global_close(bool shutdown_planner = true);
+// delete pelton_state
+bool shutdown(bool shutdown_planner = true);
 
-// open local connection
-bool open(ConnectionLocal *connection);
+// open connection
+bool open(Connection *connection);
 
-absl::StatusOr<SqlResult> exec(ConnectionLocal *connection, std::string sql);
+absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql);
 
-// close local connection
-bool close(ConnectionLocal *connection);
+// close connection
+bool close(Connection *connection);
 
 // Call this if you are certain you are not going to make more calls to
 // make_view to shutdown the JVM.

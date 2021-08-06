@@ -18,7 +18,7 @@ namespace pelton {
 namespace {
 
 // global state that persists between client connections
-Connection *pelton_state = nullptr;
+State *pelton_state = nullptr;
 
 // String whitespace trimming.
 // https://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring/25385766
@@ -36,7 +36,7 @@ static inline void Trim(std::string &s) {
 // Special statements we added to SQL.
 bool echo = false;
 
-bool SpecialStatements(const std::string &sql, Connection *connection) {
+bool SpecialStatements(const std::string &sql, State *connection) {
   if (sql == "SET echo;" || sql == "SET echo") {
     echo = true;
     std::cout << "SET echo;" << std::endl;
@@ -47,15 +47,15 @@ bool SpecialStatements(const std::string &sql, Connection *connection) {
 
 }  // namespace
 
-bool global_open(const std::string &directory, const std::string &db_name,
+bool initialize(const std::string &directory, const std::string &db_name,
                  const std::string &db_username,
                  const std::string &db_password) {
   // if already open
   if (pelton_state != nullptr) {
     // close without shutting down planner
-    global_close(false);
+    shutdown(false);
   }
-  pelton_state = new Connection();
+  pelton_state = new State();
   pelton_state->Initialize(directory);
   pelton_state->GetSharderState()->Initialize(db_name, db_username,
                                               db_password);
@@ -63,17 +63,17 @@ bool global_open(const std::string &directory, const std::string &db_name,
   return true;
 }
 
-bool open(ConnectionLocal *connection) {
-  connection->global_connection = pelton_state;
+bool open(Connection *connection) {
+  connection->pelton_state = pelton_state;
   return true;
 }
 
-bool close(ConnectionLocal *connection) {
+bool close(Connection *connection) {
   // empty for now
   return true;
 }
 
-absl::StatusOr<SqlResult> exec(ConnectionLocal *connection, std::string sql) {
+absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
   // Trim statement.
   Trim(sql);
   if (echo) {
@@ -81,21 +81,21 @@ absl::StatusOr<SqlResult> exec(ConnectionLocal *connection, std::string sql) {
   }
 
   // If special statement, handle it separately.
-  if (SpecialStatements(sql, connection->global_connection)) {
+  if (SpecialStatements(sql, connection->pelton_state)) {
     return SqlResult(true);
   }
 
   // Parse and rewrite statement.
   shards::SharderState *sstate =
-      connection->global_connection->GetSharderState();  // access field?
+      connection->pelton_state->GetSharderState();  // access field?
   dataflow::DataFlowState *dstate =
-      connection->global_connection->GetDataFlowState();
+      connection->pelton_state->GetDataFlowState();
   return shards::sqlengine::Shard(sql, sstate, dstate);
 }
 
 void shutdown_planner() { planner::ShutdownPlanner(); }
 
-bool global_close(bool shutdown_planner) {
+bool shutdown(bool shutdown_planner) {
   if (pelton_state == nullptr) {
     return true;
   }
