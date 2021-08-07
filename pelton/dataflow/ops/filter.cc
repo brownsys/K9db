@@ -145,5 +145,16 @@ bool FilterOperator::Accept(const Record &record) const {
   return true;
 }
 
+std::shared_ptr<Operator> FilterOperator::Clone() const {
+  auto clone = std::make_shared<FilterOperator>();
+  clone->children_ = this->children_;
+  clone->parents_ = this->parents_;
+  clone->input_schemas_ = this->input_schemas_;
+  clone->output_schema_ = this->output_schema_;
+  clone->index_ = this->index_;
+  clone->ops_ = this->ops_;
+  return clone;
+}
+
 }  // namespace dataflow
 }  // namespace pelton

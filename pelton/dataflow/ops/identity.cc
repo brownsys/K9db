@@ -19,5 +19,15 @@ std::optional<std::vector<Record>> IdentityOperator::Process(
   return std::nullopt;
 }
 
+std::shared_ptr<Operator> IdentityOperator::Clone() const {
+  auto clone = std::make_shared<IdentityOperator>();
+  clone->children_ = this->children_;
+  clone->parents_ = this->parents_;
+  clone->input_schemas_ = this->input_schemas_;
+  clone->output_schema_ = this->output_schema_;
+  clone->index_ = this->index_;
+  return clone;
+}
+
 }  // namespace dataflow
 }  // namespace pelton

@@ -83,7 +83,8 @@ std::optional<std::vector<Record>> EquiJoinOperator::Process(
       }
 
       // additional check for left join
-      if (mode_ == Mode::LEFT && 0 == this->right_table_.Count(left_value)) {
+      if (this->mode_ == Mode::LEFT &&
+          0 == this->right_table_.Count(left_value)) {
         this->EmitRow(record, this->null_records_.at(1), &output,
                       record.IsPositive());
         this->emitted_nulls_.Insert(left_value, record);
@@ -213,6 +214,20 @@ void EquiJoinOperator::EmitRow(const Record &left, const Record &right,
 
   // add result record to output
   output->push_back(std::move(record));
+}
+
+std::shared_ptr<Operator> EquiJoinOperator::Clone() const {
+  auto clone = std::make_shared<EquiJoinOperator>(this->left_id_,
+                                                  this->right_id_, this->mode_);
+  clone->children_ = this->children_;
+  clone->parents_ = this->parents_;
+  clone->input_schemas_ = this->input_schemas_;
+  clone->output_schema_ = this->output_schema_;
+  clone->index_ = this->index_;
+  for (const auto &null_record : this->null_records_) {
+    clone->null_records_.push_back(null_record.Copy());
+  }
+  return clone;
 }
 
 }  // namespace dataflow

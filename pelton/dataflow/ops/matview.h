@@ -1,6 +1,7 @@
 #ifndef PELTON_DATAFLOW_OPS_MATVIEW_H_
 #define PELTON_DATAFLOW_OPS_MATVIEW_H_
 
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -19,6 +20,9 @@ namespace dataflow {
 // the underlying storage layout and order.
 class MatViewOperator : public Operator {
  public:
+  // Cannot copy an operator.
+  MatViewOperator(const MatViewOperator &other) = delete;
+  MatViewOperator &operator=(const MatViewOperator &other) = delete;
   virtual size_t count() const = 0;
   virtual const std::vector<ColumnID> &key_cols() const = 0;
   virtual bool Contains(const Key &key) const = 0;
@@ -30,6 +34,7 @@ class MatViewOperator : public Operator {
   virtual const_KeyIterable Keys() const = 0;
   virtual bool RecordOrdered() const = 0;
   virtual bool KeyOrdered() const = 0;
+  std::shared_ptr<Operator> Clone() const override = 0;
 
  protected:
   // We do not know if we are ordered or unordered, this type is revealed
@@ -51,6 +56,9 @@ class MatViewOperator : public Operator {
 template <typename T>
 class MatViewOperatorT : public MatViewOperator {
  public:
+  MatViewOperatorT(const MatViewOperatorT &other) = delete;
+  MatViewOperatorT &operator=(const MatViewOperatorT &other) = delete;
+
   template <typename = typename std::enable_if<
                 !std::is_same<T, RecordOrderedGroupedData>::value>>
   explicit MatViewOperatorT(const std::vector<ColumnID> &key_cols,
@@ -58,6 +66,7 @@ class MatViewOperatorT : public MatViewOperator {
       : MatViewOperator(),
         key_cols_(key_cols),
         contents_(),
+        compare_(Record::Compare{{}}),
         limit_(limit),
         offset_(offset) {}
 
@@ -69,6 +78,7 @@ class MatViewOperatorT : public MatViewOperator {
       : MatViewOperator(),
         key_cols_(key_cols),
         contents_(compare),
+        compare_(Record::Compare{compare.Cols()}),
         limit_(limit),
         offset_(offset) {}
 
@@ -114,6 +124,25 @@ class MatViewOperatorT : public MatViewOperator {
     return this->contents_.LookupGreater(key, cmp, limit, offset);
   }
 
+  std::shared_ptr<Operator> Clone() const {
+    std::shared_ptr<MatViewOperator> clone;
+    if (std::is_same<T, UnorderedGroupedData>::value) {
+      clone = std::make_shared<MatViewOperatorT<UnorderedGroupedData>>(
+          this->key_cols_, this->limit_, this->offset_);
+    } else if (std::is_same<T, RecordOrderedGroupedData>::value) {
+      clone = std::make_shared<MatViewOperatorT<RecordOrderedGroupedData>>(
+          this->key_cols_, this->compare_, this->limit_, this->offset_);
+    } else if (std::is_same<T, KeyOrderedGroupedData>::value) {
+      clone = std::make_shared<MatViewOperatorT<KeyOrderedGroupedData>>(
+          this->key_cols_, this->limit_, this->offset_);
+    }
+    clone->children_ = this->children_;
+    clone->parents_ = this->parents_;
+    clone->input_schemas_ = this->input_schemas_;
+    clone->output_schema_ = this->output_schema_;
+    clone->index_ = this->index_;
+    return clone;
+  }
   // Debugging information
   std::string DebugString() const override {
     std::string result = "\t{\n\t\t\"base\": " + Operator::DebugString() + ",";
@@ -154,6 +183,7 @@ class MatViewOperatorT : public MatViewOperator {
  private:
   std::vector<ColumnID> key_cols_;
   T contents_;
+  Record::Compare compare_;
   int limit_;
   size_t offset_;
 };

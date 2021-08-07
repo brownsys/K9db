@@ -23,6 +23,9 @@ class EquiJoinOperator : public Operator {
  public:
   using Mode = JoinModeEnum;
   EquiJoinOperator() = delete;
+  // Cannot copy an operator.
+  EquiJoinOperator(const EquiJoinOperator &other) = delete;
+  EquiJoinOperator &operator=(const EquiJoinOperator &other) = delete;
 
   EquiJoinOperator(ColumnID left_id, ColumnID right_id, Mode mode = Mode::INNER)
       : Operator(Operator::Type::EQUIJOIN),
@@ -62,6 +65,8 @@ class EquiJoinOperator : public Operator {
            this->right_table_.SizeInMemory() +
            this->emitted_nulls_.SizeInMemory();
   }
+
+  std::shared_ptr<Operator> Clone() const override;
 
  private:
   // Columns on which join is computed.

@@ -20,5 +20,13 @@ std::optional<std::vector<Record>> InputOperator::Process(
   return std::nullopt;
 }
 
+std::shared_ptr<Operator> InputOperator::Clone() const {
+  auto clone = std::make_shared<InputOperator>(this->input_name_,
+                                               this->input_schemas_.at(0));
+  clone->children_ = this->children_;
+  clone->index_ = this->index_;
+  return clone;
+}
+
 }  // namespace dataflow
 }  // namespace pelton

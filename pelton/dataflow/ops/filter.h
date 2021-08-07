@@ -23,6 +23,9 @@ class FilterOperator : public Operator {
  public:
   // The operations we can use to filter (on a value in a record).
   using Operation = FilterOperationEnum;
+  // Cannot copy an operator.
+  FilterOperator(const FilterOperator &other) = delete;
+  FilterOperator &operator=(const FilterOperator &other) = delete;
 
   // Construct the filter operator by first providing the input schema.
   FilterOperator() : Operator(Operator::Type::FILTER) {}
@@ -53,6 +56,8 @@ class FilterOperator : public Operator {
 
   std::optional<std::vector<Record>> Process(
       NodeIndex /*source*/, const std::vector<Record> &records) override;
+
+  std::shared_ptr<Operator> Clone() const override;
 
  protected:
   bool Accept(const Record &record) const;

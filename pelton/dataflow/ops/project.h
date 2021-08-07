@@ -2,6 +2,7 @@
 #define PELTON_DATAFLOW_OPS_PROJECT_H_
 
 #include <cstdint>
+#include <memory>
 #include <string>
 // NOLINTNEXTLINE
 #include <variant>
@@ -21,6 +22,9 @@ class ProjectOperator : public Operator {
  public:
   using Operation = ProjectOperationEnum;
   using Metadata = ProjectMetadataEnum;
+  // Cannot copy an operator.
+  ProjectOperator(const ProjectOperator &other) = delete;
+  ProjectOperator &operator=(const ProjectOperator &other) = delete;
 
   ProjectOperator() : Operator(Operator::Type::PROJECT), projections_() {}
 
@@ -65,6 +69,8 @@ class ProjectOperator : public Operator {
       this->projections_.emplace_back(column_name, literal, right_col, op);
     }
   }
+
+  std::shared_ptr<Operator> Clone() const override;
 
  protected:
   std::optional<std::vector<Record>> Process(
