@@ -123,7 +123,6 @@ class Operator {
 
   // Allow DataFlowGraph to use SetGraph, SetIndex, and AddParent functions.
   friend class DataFlowGraph;
-  // friend class MatViewOperator;
   template <typename T>
   friend class MatViewOperatorT;
 
