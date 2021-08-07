@@ -17,11 +17,6 @@ jobs:
         docker run --mount type=bind,source=$(pwd),target=/home/pelton --name pelton-testing -d -t pelton/latest
         sleep 30
 
-    - name: Test dataflow with valgrind
-      env:
-        TEST: bazel test //pelton/dataflow/... --config=valgrind --test_output=all
-      run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
-
     - name: Build all
       env:
         TEST: bazel build ...
@@ -37,6 +32,10 @@ jobs:
         TEST: bazel run bin:example -- --logtostderr=1
       run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
 
+    - name: Test dataflow with valgrind
+      env:
+        TEST: bazel test //pelton/dataflow/... --config=valgrind --test_output=all
+      run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
 
     - name: Run cli samples
       env:
