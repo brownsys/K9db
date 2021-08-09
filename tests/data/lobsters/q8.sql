@@ -1,0 +1,1 @@
+SELECT * FROM q8 WHERE id = 0;

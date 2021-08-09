@@ -1001,8 +1001,8 @@ TEST(PlannerTest, ComplexQueryWithKeys) {
       "SELECT assignments.ID AS aid, students.NAME, students.ID AS sid, "
       "       COUNT(*) "
       "FROM submissions "
-      "  JOIN students ON submissions.student_id = students.ID "
-      "  JOIN assignments ON submissions.assignment_id = assignments.ID "
+      "  JOIN students ON submissions.STUDENT_ID = students.ID "
+      "  JOIN assignments ON submissions.ASSIGNMENT_ID = assignments.ID "
       "WHERE students.ID = ? "
       "GROUP BY assignments.ID, students.NAME, students.ID "
       "HAVING assignments.ID = ?";
@@ -1021,13 +1021,16 @@ TEST(PlannerTest, ComplexQueryWithKeys) {
   EXPECT_EQ(graph->inputs().at("assignments")->input_name(), "assignments");
   EXPECT_EQ(graph->inputs().at("submissions")->input_name(), "submissions");
   EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("submissions").get());
-  EXPECT_EQ(graph->GetNode(1).get(), graph->inputs().at("students").get());
-  EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::EQUIJOIN);
-  EXPECT_EQ(graph->GetNode(3).get(), graph->inputs().at("assignments").get());
-  EXPECT_EQ(graph->GetNode(4)->type(), dataflow::Operator::Type::EQUIJOIN);
-  EXPECT_EQ(graph->GetNode(5)->type(), dataflow::Operator::Type::PROJECT);
-  EXPECT_EQ(graph->GetNode(6)->type(), dataflow::Operator::Type::AGGREGATE);
-  EXPECT_EQ(graph->GetNode(7).get(), graph->outputs().at(0).get());
+  EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
+  EXPECT_EQ(graph->GetNode(2).get(), graph->inputs().at("students").get());
+  EXPECT_EQ(graph->GetNode(3)->type(), dataflow::Operator::Type::EQUIJOIN);
+  EXPECT_EQ(graph->GetNode(4)->type(), dataflow::Operator::Type::PROJECT);
+  EXPECT_EQ(graph->GetNode(5).get(), graph->inputs().at("assignments").get());
+  EXPECT_EQ(graph->GetNode(6)->type(), dataflow::Operator::Type::PROJECT);
+  EXPECT_EQ(graph->GetNode(7)->type(), dataflow::Operator::Type::EQUIJOIN);
+  EXPECT_EQ(graph->GetNode(8)->type(), dataflow::Operator::Type::PROJECT);
+  EXPECT_EQ(graph->GetNode(9)->type(), dataflow::Operator::Type::AGGREGATE);
+  EXPECT_EQ(graph->GetNode(10).get(), graph->outputs().at(0).get());
 
   // Materialized View.
   std::shared_ptr<dataflow::MatViewOperator> matview = graph->outputs().at(0);
@@ -1106,7 +1109,7 @@ TEST(PlannerTest, BasicLeftJoin) {
 
   // Make a dummy query.
   std::string query =
-      "SELECT * FROM submissions LEFT JOIN students ON submissions.student_id "
+      "SELECT * FROM submissions LEFT JOIN students ON submissions.STUDENT_ID "
       "= students.ID";
 
   // Create a dummy state.

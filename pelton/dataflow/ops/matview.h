@@ -145,12 +145,16 @@ class MatViewOperatorT : public MatViewOperator {
   }
   // Debugging information
   std::string DebugString() const override {
-    std::string result = "\t{\n\t\t\"base\": " + Operator::DebugString() + ",";
-    result += "\n\t\t\"keyed_by\": [";
+    std::string result = Operator::DebugString();
+    result += "  \"keyed_by\": [";
     for (ColumnID key : this->key_cols_) {
-      result += std::to_string(key) + ",";
+      result += std::to_string(key) + ", ";
     }
-    result += "],\n\t}";
+    if (this->key_cols_.size() > 0) {
+      result.pop_back();
+      result.pop_back();
+    }
+    result += "],\n";
     return result;
   }
 

@@ -89,11 +89,12 @@ std::string Operator::DebugString() const {
   }
   if (this->children_.size() > 0) {
     str.pop_back();
+    str.pop_back();
   }
-  str += "], ";
+  str += "],\n";
 
   // print input schema
-  str += "\"input_columns\": [";
+  str += "  \"input_columns\": [ ";
   for (const SchemaRef schema : this->input_schemas_) {
     str += "[";
     for (const std::string col : schema.column_names()) {
@@ -105,18 +106,16 @@ std::string Operator::DebugString() const {
   }
   str.pop_back();
   str.pop_back();
-  str += "], ";
+  str += " ],\n";
 
   // print output schema
-  str += "\"output_columns\": [";
+  str += "  \"output_columns\": [";
   for (const std::string col : this->output_schema_.column_names()) {
     str += "\"" + col + "\", ";
   }
   str.pop_back();
   str.pop_back();
-  str += "]";
-
-  str += "}\n";
+  str += "],\n";
   return str;
 }
 

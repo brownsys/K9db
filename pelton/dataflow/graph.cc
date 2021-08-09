@@ -91,12 +91,13 @@ std::shared_ptr<DataFlowGraph> DataFlowGraph::Clone() {
 }
 
 std::string DataFlowGraph::DebugString() const {
-  std::string str = "[";
+  std::string str = "[\n";
   for (const auto &[_, node] : this->nodes_) {
-    str += "\n\t" + node->DebugString() + ",";
+    str += " {\n";
+    str += node->DebugString();
+    str += " },\n";
   }
-  str.pop_back();
-  str += "\n]";
+  str += "]";
   return str;
 }
 

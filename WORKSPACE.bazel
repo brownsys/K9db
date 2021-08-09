@@ -178,7 +178,8 @@ maven_install(
     name = "maven",
     artifacts = [
         "com.google.googlejavaformat:google-java-format:1.9",
-        "org.apache.calcite:calcite-core:1.23.0",
+        "org.apache.calcite:calcite-core:1.27.0",
+        "org.apache.calcite.avatica:avatica-core:1.18.0",
         "org.bytedeco:javacpp:1.5.4",
     ],
     fetch_sources = True,
