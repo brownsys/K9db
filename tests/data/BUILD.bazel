@@ -6,6 +6,7 @@ filegroup(
     ]) + [
         "//experiments/lobsters:schema.sql",
         "//experiments/lobsters:views.sql",
+        "//experiments/lobsters:extra-views.sql",
     ],
     visibility = ["//tests:__subpackages__"],
 )

@@ -67,7 +67,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       result.AddResultSet(table_result.NextResultSet());
     }
   }
-  std::cout << stmt.shard_kind() << " :: " << stmt.user_id() << std::endl;
 
   perf::End("GDPR");
   if (is_forget) {

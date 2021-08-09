@@ -519,7 +519,7 @@ antlrcpp::Any AstTransformer::visitExpr(
   if (ctx->ASSIGN() != nullptr) {
     result = std::make_unique<BinaryExpression>(Expression::Type::EQ);
   }
-  if (ctx->IN() != nullptr) {
+  if (ctx->IS() != nullptr) {
     result = std::make_unique<BinaryExpression>(Expression::Type::IS);
   }
   if (ctx->AND() != nullptr) {

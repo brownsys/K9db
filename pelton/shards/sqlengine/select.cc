@@ -18,13 +18,11 @@ namespace select {
 namespace {
 
 bool IsIntLiteral(const std::string &str) {
-  std::cout << str << std::endl;
   for (char c : str) {
     if (c < '0' || c > '9') {
       return false;
     }
   }
-  std::cout << std::endl;
   return true;
 }
 
