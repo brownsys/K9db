@@ -107,7 +107,7 @@ void DataFlowState::SizeInMemory() const {
     uint64_t flow_size = flow.SizeInMemory();
     uint64_t flow_size_mb = flow_size / 1024 / 1024;
     std::cout << fname << ": " << flow_size_mb << "MB" << std::endl;
-    size += flow_size;
+    total_size += flow_size;
   }
   std::cout << "Total size: " << total_size << std::endl;
 }

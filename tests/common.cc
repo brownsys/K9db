@@ -111,7 +111,7 @@ std::vector<std::vector<std::string>> ReadExpected(const std::string &file) {
 }
 
 // Setup the database for testing. This includes its schema, views, and content.
-void InitializeDatabase(const std::string &db_name, int file_count,
+void InitializeDatabase(const std::string &db_name, size_t file_count,
                         va_list file_path_args) {
   const std::string &db_username = FLAGS_db_username;
   const std::string &db_password = FLAGS_db_password;
@@ -153,7 +153,7 @@ void TearDown(const std::string &db_name) {
 
 }  // namespace
 
-int TestingMain(int argc, char **argv, const std::string &testname, int file_count, ...) {
+int TestingMain(int argc, char **argv, const std::string &testname, size_t file_count, ...) {
   // Setup va list containing variadic file paths.
   va_list file_path_args;
   va_start(file_path_args, file_count);
@@ -167,7 +167,7 @@ int TestingMain(int argc, char **argv, const std::string &testname, int file_cou
   ::testing::InitGoogleTest(&argc, argv);
 
   // Setup the schema (once).
-  InitializeDatabase(db_name, file_path_args);
+  InitializeDatabase(db_name, file_count, file_path_args);
 
   // Run tests.
   auto result = RUN_ALL_TESTS();

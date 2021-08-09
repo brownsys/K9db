@@ -12,7 +12,7 @@ namespace tests {
 // This function takes in the argc and argv arguments passed to main from
 // the command line, as well as any number of file paths that contain
 // SQL commands to use to initialize the DB prior to testing.
-int TestingMain(int argc, char **argv, const std::string &testname, int file_count, ...);
+int TestingMain(int argc, char **argv, const std::string &testname, size_t file_count, ...);
 
 // Constitutes a test that checks that pelton produces a matching output
 // for the given queries.

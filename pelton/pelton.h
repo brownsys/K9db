@@ -55,7 +55,7 @@ class Connection {
     }
   }
 
-  uint64_t SizeInMemory() const { return this->dataflow_state_.SizeInMemory(); }
+  void SizeInMemory() const { this->dataflow_state_.SizeInMemory(); }
 
  private:
   shards::SharderState sharder_state_;
