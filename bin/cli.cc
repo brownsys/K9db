@@ -158,9 +158,8 @@ int main(int argc, char **argv) {
               << "Shards: " << connection.GetSharderState()->NumShards()
               << std::endl;
 
-    // Find peak memory usage.
-    std::cout << "Memory: " << connection.SizeInMemory() << "bytes"
-              << std::endl;
+    // Print flows memory usage.
+    connection.SizeInMemory();
 
     auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(
         end_time - start_time);
