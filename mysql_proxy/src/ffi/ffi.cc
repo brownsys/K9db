@@ -166,7 +166,7 @@ void PopulateSchema(FFIResult *c_result, const pelton::Schema &schema) {
         c_result->col_types[i] = FFIColumnType::DATETIME;
         break;
       default:
-        LOG(INFO) << "C-Wrapper: Unrecognizable column type " << col_type;
+        LOG(FATAL) << "C-Wrapper: Unrecognizable column type " << col_type;
     }
   }
 }
@@ -202,9 +202,11 @@ void PopulateRecords(FFIResult *c_result,
               static_cast<char *>(malloc(cpp_val.size() + 1));
           memcpy(c_result->values[index].DATETIME, cpp_val.c_str(),
                  cpp_val.size() + 1);
+          break;
         }
         default:
-          LOG(FATAL) << "C-Wrapper: Invalid col_type";
+          LOG(FATAL) << "C-Wrapper: Invalid col_type: "
+                     << c_result->col_types[j];
       }
     }
   }

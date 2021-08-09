@@ -2,6 +2,7 @@
 #ifndef PELTON_PELTON_H_
 #define PELTON_PELTON_H_
 
+#include <mutex>
 #include <string>
 
 #include "absl/status/statusor.h"
@@ -58,21 +59,25 @@ class State {
 
   uint64_t SizeInMemory() const { return this->dataflow_state_.SizeInMemory(); }
 
+  void LockMutex() { this->mtx.lock(); }
+  void UnlockMutex() { this->mtx.unlock(); }
+
  private:
   shards::SharderState sharder_state_;
   dataflow::DataFlowState dataflow_state_;
   std::string path_;
+  std::mutex mtx;
 };
 
-class Connection {
- public:
+struct Connection {
   State *pelton_state;
+  void lock_mtx() { this->pelton_state->LockMutex(); };
+  void unlock_mtx() { this->pelton_state->UnlockMutex(); };
 };
 
 // initialize pelton_state
 bool initialize(const std::string &directory, const std::string &db_name,
-                 const std::string &db_username,
-                 const std::string &db_password);
+                const std::string &db_username, const std::string &db_password);
 
 // delete pelton_state
 bool shutdown(bool shutdown_planner = true);

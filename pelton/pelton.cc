@@ -48,8 +48,8 @@ bool SpecialStatements(const std::string &sql, State *connection) {
 }  // namespace
 
 bool initialize(const std::string &directory, const std::string &db_name,
-                 const std::string &db_username,
-                 const std::string &db_password) {
+                const std::string &db_username,
+                const std::string &db_password) {
   // if already open
   if (pelton_state != nullptr) {
     // close without shutting down planner
@@ -74,6 +74,8 @@ bool close(Connection *connection) {
 }
 
 absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
+  connection->lock_mtx();
+
   // Trim statement.
   Trim(sql);
   if (echo) {
@@ -87,10 +89,14 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
 
   // Parse and rewrite statement.
   shards::SharderState *sstate =
-      connection->pelton_state->GetSharderState();  // access field?
+      connection->pelton_state->GetSharderState(); 
   dataflow::DataFlowState *dstate =
       connection->pelton_state->GetDataFlowState();
-  return shards::sqlengine::Shard(sql, sstate, dstate);
+  absl::lts_2020_09_23::StatusOr<pelton::sql::SqlResult> sql_result =
+      shards::sqlengine::Shard(sql, sstate, dstate);
+
+  connection->unlock_mtx();
+  return sql_result;
 }
 
 void shutdown_planner() { planner::ShutdownPlanner(); }

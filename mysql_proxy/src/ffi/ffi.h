@@ -47,7 +47,8 @@ typedef struct {
 // Pass command line arguments to gflags
 void FFIGflags(int argc, char **argv);
 
-// Initialize pelton_state in pelton.cc. Returns true if successful and false otherwise.
+// Initialize pelton_state in pelton.cc. Returns true if successful and false
+// otherwise.
 bool FFIInitialize(const char *db_name, const char *db_dir,
                    const char *db_username, const char *db_password);
 
