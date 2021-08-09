@@ -111,6 +111,7 @@ TEST(E2ECorrectnessTest, LobstersQ36) {
 
 int main(int argc, char **argv) {
   return tests::TestingMain(
-      argc, argv, "lobsters", "experiments/lobsters/schema.sql",
-      "experiments/lobsters/views.sql", "tests/data/lobsters/data.sql");
+      argc, argv, "lobsters", 4, "experiments/lobsters/schema.sql",
+      "experiments/lobsters/views.sql", "experiments/lobsters/extra-views.sql",
+      "tests/data/lobsters/data.sql");
 }
