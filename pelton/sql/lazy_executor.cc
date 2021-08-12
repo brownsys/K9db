@@ -14,10 +14,9 @@ namespace pelton {
 namespace sql {
 
 // Creates an empty SqlResult that corresponds to the given sql statement type.
-SqlResult SqlLazyExecutor::EmptyResultByType(
-    sqlast::AbstractStatement::Type type, bool returning,
-    const dataflow::SchemaRef &schema) {
-  switch (type) {
+SqlResult SqlLazyExecutor::EmptyResult(const sqlast::AbstractStatement *sql,
+                                       const dataflow::SchemaRef &schema) {
+  switch (sql->type()) {
     case sqlast::AbstractStatement::Type::CREATE_TABLE:
     case sqlast::AbstractStatement::Type::CREATE_INDEX:
       return SqlResult(true);
@@ -25,7 +24,7 @@ SqlResult SqlLazyExecutor::EmptyResultByType(
     case sqlast::AbstractStatement::Type::UPDATE:
       return SqlResult(0);
     case sqlast::AbstractStatement::Type::DELETE:
-      if (!returning) {
+      if (!static_cast<const sqlast::Delete *>(sql)->returning()) {
         return SqlResult(0);
       }
     case sqlast::AbstractStatement::Type::SELECT:
@@ -80,11 +79,7 @@ SqlResult SqlLazyExecutor::ExecuteShards(
     const dataflow::SchemaRef &schema, int aug_index) {
   // If no user_ids are provided, we return an empty result.
   if (user_ids.size() == 0) {
-    bool returning = false;
-    if (sql->type() == sqlast::AbstractStatement::Type::DELETE) {
-      returning = static_cast<const sqlast::Delete *>(sql)->returning();
-    }
-    return EmptyResultByType(sql->type(), returning, schema);
+    return EmptyResult(sql, schema);
   }
 
   // This result set is a proxy that allows access to results from all shards.

@@ -1,5 +1,7 @@
 #include "tests/common.h"
 
+#include <stdarg.h>
+
 #include <algorithm>
 #include <fstream>
 #include <iostream>
@@ -7,7 +9,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include <stdarg.h>
 
 #include "gflags/gflags.h"
 #include "glog/logging.h"
@@ -153,7 +154,8 @@ void TearDown(const std::string &db_name) {
 
 }  // namespace
 
-int TestingMain(int argc, char **argv, const std::string &testname, size_t file_count, ...) {
+int TestingMain(int argc, char **argv, const std::string &testname,
+                size_t file_count, ...) {
   // Setup va list containing variadic file paths.
   va_list file_path_args;
   va_start(file_path_args, file_count);

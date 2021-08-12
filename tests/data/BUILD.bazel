@@ -4,9 +4,9 @@ filegroup(
         "lobsters/*.sql",
         "lobsters/*.txt",
     ]) + [
-        "//experiments/lobsters:schema.sql",
-        "//experiments/lobsters:views.sql",
-        "//experiments/lobsters:extra-views.sql",
+        "//experiments/lobsters:schema/schema.sql",
+        "//experiments/lobsters:schema/views.sql",
+        "//experiments/lobsters:schema/extra-views.sql",
     ],
     visibility = ["//tests:__subpackages__"],
 )

@@ -109,7 +109,8 @@ void DataFlowState::SizeInMemory() const {
     std::cout << fname << ": " << flow_size_mb << "MB" << std::endl;
     total_size += flow_size;
   }
-  std::cout << "Total size: " << total_size << std::endl;
+  std::cout << "Total size: " << (total_size / 1204 / 1024) << "MB"
+            << std::endl;
 }
 
 // Load state from its durable file (if exists).

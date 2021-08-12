@@ -54,9 +54,8 @@ class SqlLazyExecutor {
                           int aug_index = -1);
 
  private:
-  SqlResult EmptyResultByType(sqlast::AbstractStatement::Type type,
-                              bool returning,
-                              const dataflow::SchemaRef &schema);
+  SqlResult EmptyResult(const sqlast::AbstractStatement *sql,
+                        const dataflow::SchemaRef &schema);
 
   SqlResult Execute(const sqlast::AbstractStatement *sql,
                     const dataflow::SchemaRef &schema,
