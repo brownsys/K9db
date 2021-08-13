@@ -171,7 +171,8 @@ void RunTest(const std::string &schema_file, const std::string &query_file,
 
   // Open connection to sharder.
   pelton::Connection connection;
-  pelton::open("", DB_NAME, *db_username, *db_password, &connection);
+  pelton::initialize("", DB_NAME, *db_username, *db_password);
+  pelton::open(&connection);
   // CHECK(pelton::exec(&connection, "SET echo;").ok());
 
   // Create all the tables.
@@ -251,7 +252,8 @@ void RunTest(const std::string &schema_file, const std::string &query_file,
   }
 
   // Close connection.
-  pelton::close(&connection, false);
+  pelton::close(&connection);
+  pelton::shutdown(false);
 }
 
 void RunLobstersTest(size_t query_id) {
