@@ -27,6 +27,7 @@ INSERT INTO saved_stories VALUES (1, '2021-04-21 01:00:00', '2021-04-21 01:00:00
 INSERT INTO stories VALUES (0,'2021-04-21 01:00:00', 0, 'url', 'title', 'description', 'joe', 0, 50, 20, 0, 1, 'markeddown', 'cache', 0, 0, '2021-04-21 01:00:00', 'twitter', 1);
 INSERT INTO stories VALUES (1,'2021-04-21 01:00:00', 1, 'url2', 'title2', 'description2', 'jeff', 0, 50, 20, 0, 1, 'markeddown', 'cache', 0, 0, '2021-04-21 01:00:00', 'twitter', 1);
 INSERT INTO stories VALUES (2,'2021-04-21 01:00:00', 2, 'url2', 'title2', 'description2', 'james', 0, 50, 20, 0, 1, 'markeddown', 'cache', 0, 0, '2021-04-21 01:00:00', 'twitter', 1);
+INSERT INTO stories VALUES (3,'2021-04-21 01:00:00', 2, 'url2', 'title3', 'description2', 'james', 0, 50, 20, 0, 1, 'markeddown', 'cache', 0, NULL, '2021-04-21 01:00:00', 'twitter', 1);
 INSERT INTO suggested_taggings VALUES (0, 0, 0, 0);
 INSERT INTO suggested_taggings VALUES (1, 1, 1, 1);
 INSERT INTO suggested_titles VALUES (0, 0, 0, 'title');
@@ -42,3 +43,4 @@ INSERT INTO tags VALUES (2, 'mytag3', 'description3', 0, 0, 0, 0);
 INSERT INTO votes VALUES (0, 0, 0, 0, 1, 'r');
 INSERT INTO votes VALUES (1, 1, 1, 1, 1, 'r');
 INSERT INTO votes VALUES (2, 2, 2, 2, 1, 'r');
+INSERT INTO votes VALUES (3, 0, 0, NULL, 1, NULL);
