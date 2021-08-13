@@ -37,18 +37,14 @@ jobs:
         TEST: bazel run bin:example -- --logtostderr=1
       run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
 
-    - name: Run mysql proxy
-      env:
-        PROXY: bazel run --run_under "valgrind --error-exitcode=1 --errors-for-leak-kinds=definite --leak-check=full --show-leak-kinds=definite" //mysql_proxy/src:mysql_proxy -- -logtostderr=1
-      run: docker exec pelton-testing sh -c "cd /home/pelton/mysql && $PROXY"
+    - name: Run cli and social chat via mysql proxy
+      run: docker exec pelton-testing sh -c "cd /home/pelton/ && ./bin/test_proxy.sh"
 
     - name: Run cli samples
       env:
         CLEANUP: ./bin/drop.sh root password
-        WEBSUBMIT: mariadb --port=10001 --host=127.0.0.1 < bin/examples/simple-websubmit.sql
-        # WEBSUBMIT: bazel run bin:cli --config=valgrind -- --logtostderr=1 < bin/examples/simple-websubmit.sql
-        MEDICAL: mariadb --port=10001 --host=127.0.0.1 < bin/examples/medical_chat.sql
-        # MEDICAL: bazel run bin:cli --config=valgrind -- --logtostderr=1 < bin/examples/medical_chat.sql
+        WEBSUBMIT: bazel run bin:cli --config=valgrind -- --logtostderr=1 < bin/examples/simple-websubmit.sql
+        MEDICAL: bazel run bin:cli --config=valgrind -- --logtostderr=1 < bin/examples/medical_chat.sql
       run: |
         docker exec pelton-testing sh -c "cd /home/pelton && $CLEANUP"
         docker exec pelton-testing sh -c "cd /home/pelton && $WEBSUBMIT"
@@ -58,10 +54,8 @@ jobs:
     - name: Run social chat with restart/recovery
       env:
         CLEANUP: rm -rf /tmp/db && mkdir /tmp/db && ./bin/drop.sh root password
-        # SOCIAL: bazel run bin:cli --config=valgrind -- --logtostderr=1 --db_path=/tmp/db < bin/examples/social_chat.sql
-        SOCIAL: mariadb --port=10001 --host=127.0.0.1 < bin/examples/social_chat.sql
-        # SOCIALCNTD: bazel run bin:cli --config=valgrind -- --logtostderr=1 --db_path=/tmp/db < bin/examples/social_chat.cntd.sql
-        SOCIALCNTD: mariadb --port=10001 --host=127.0.0.1 < bin/examples/social_chat.cntd.sql
+        SOCIAL: bazel run bin:cli --config=valgrind -- --logtostderr=1 --db_path=/tmp/db < bin/examples/social_chat.sql
+        SOCIALCNTD: bazel run bin:cli --config=valgrind -- --logtostderr=1 --db_path=/tmp/db < bin/examples/social_chat.cntd.sql
       run: |
         docker exec pelton-testing sh -c "cd /home/pelton && $CLEANUP"
         docker exec pelton-testing sh -c "cd /home/pelton && $SOCIAL"
