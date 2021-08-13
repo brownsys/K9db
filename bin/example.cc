@@ -151,7 +151,7 @@ int main(int argc, char **argv) {
   pelton::Connection connection;
   pelton::initialize("", "exampledb", db_username, db_password);
   pelton::open(&connection);
-  CHECK(pelton::exec(&connection, "SET echo;").ok());
+  // CHECK(pelton::exec(&connection, "SET echo;").ok());
 
   // Create all the tables.
   std::cout << "Create the tables ... " << std::endl;
