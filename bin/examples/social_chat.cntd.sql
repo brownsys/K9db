@@ -1,5 +1,3 @@
-SET echo;
-
 INSERT INTO Users VALUES (1, 'Alice');
 INSERT INTO Users VALUES (2, 'Bob');
 

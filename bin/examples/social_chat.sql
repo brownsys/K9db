@@ -1,5 +1,3 @@
-SET echo;
-
 CREATE TABLE Users ( \
   id int, \
   PII_name text, \
