@@ -87,9 +87,11 @@ TEST(PROXY, QUERY_TEST) {
   EXPECT_EQ(std::string(response_select->records[1].record.TEXT), "hello")
       << "Bad data";
   EXPECT_EQ(response_select->records[2].record.INT, 2) << "Bad data";
-  EXPECT_EQ(std::string(response_select->records[3].record.TEXT), "bye") << "Bad data";
+  EXPECT_EQ(std::string(response_select->records[3].record.TEXT), "bye")
+      << "Bad data";
   EXPECT_EQ(response_select->records[4].record.INT, 50) << "Bad data";
-  EXPECT_EQ(std::string(response_select->records[5].record.TEXT), "hi") << "Bad data";
+  EXPECT_EQ(std::string(response_select->records[5].record.TEXT), "hi")
+      << "Bad data";
   free(response_select->col_names[0]);
   free(response_select->col_names[1]);
   free(response_select->records[1].record.TEXT);
@@ -107,7 +109,8 @@ TEST(PROXY, QUERY_TEST) {
   EXPECT_EQ(response_select->col_types[0], CType::INT) << "Bad types";
   EXPECT_EQ(response_select->col_types[1], CType::TEXT) << "Bad types";
   EXPECT_EQ(response_select->records[0].record.INT, 50) << "Bad data";
-  EXPECT_EQ(std::string(response_select->records[1].record.TEXT), "hi") << "Bad data";
+  EXPECT_EQ(std::string(response_select->records[1].record.TEXT), "hi")
+      << "Bad data";
   EXPECT_EQ(response_select->records[2].record.INT, 10) << "Bad data";
   EXPECT_EQ(std::string(response_select->records[3].record.TEXT), "hello")
       << "Bad data";

@@ -156,12 +156,13 @@ int main(int argc, char **argv) {
     end_time = std::chrono::high_resolution_clock::now();
 
     std::cout << std::endl
-              << "Shards: " << connection.pelton_state->GetSharderState()->NumShards()
+              << "Shards: "
+              << connection.pelton_state->GetSharderState()->NumShards()
               << std::endl;
 
     // Find peak memory usage.
-    std::cout << "Memory: " << connection.pelton_state->SizeInMemory() << "bytes"
-              << std::endl;
+    std::cout << "Memory: " << connection.pelton_state->SizeInMemory()
+              << "bytes" << std::endl;
 
     auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(
         end_time - start_time);

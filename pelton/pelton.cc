@@ -88,8 +88,7 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
   }
 
   // Parse and rewrite statement.
-  shards::SharderState *sstate =
-      connection->pelton_state->GetSharderState(); 
+  shards::SharderState *sstate = connection->pelton_state->GetSharderState();
   dataflow::DataFlowState *dstate =
       connection->pelton_state->GetDataFlowState();
   absl::lts_2020_09_23::StatusOr<pelton::sql::SqlResult> sql_result =

@@ -69,6 +69,15 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         // start measuring runtime
         let start = Instant::now();
 
+        if q_string.starts_with("SET echo")
+            || q_string.starts_with("DROP")
+            || q_string.starts_with("ALTER")
+            || q_string.starts_with("GDPR")
+        {
+            debug!(self.log, "Rust Proxy: Unsupported query type");
+            return results.completed(0, 0);
+        }
+
         debug!(self.log, "Rust proxy: starting on_query");
         debug!(self.log, "Rust Proxy: query received is: {:?}", q_string);
 
@@ -93,7 +102,6 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         } else if q_string.starts_with("UPDATE")
             || q_string.starts_with("DELETE")
             || q_string.starts_with("INSERT")
-            || q_string.starts_with("GDPR FORGET")
         {
             let update_response = exec_update_ffi(&mut self.rust_conn, q_string);
 
@@ -129,32 +137,36 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 "Rust Proxy: writing query response using RowWriter"
             );
             // convert incomplete array field (flexible array) to rust slice, starting with the outer array
-            let rows_slice = unsafe { (*select_response).values.as_slice(num_rows * num_cols) };
+            let rows_slice = unsafe { (*select_response).records.as_slice(num_rows * num_cols) };
             for r in 0..num_rows {
                 for c in 0..num_cols {
-                    match col_types[c] {
-                        // write a value to the next col of the current row (of this resultset)
-                        FFIColumnType_UINT => unsafe {
-                            rw.write_col(rows_slice[r * num_cols + c].UINT)?
-                        },
-                        FFIColumnType_INT => unsafe {
-                            rw.write_col(rows_slice[r * num_cols + c].INT)?
-                        },
-                        FFIColumnType_TEXT => unsafe {
-                            rw.write_col(
-                                CString::from_raw(rows_slice[r * num_cols + c].TEXT)
-                                    .into_string()
-                                    .unwrap(),
-                            )?
-                        },
-                        FFIColumnType_DATETIME => unsafe {
-                            rw.write_col(
-                                CString::from_raw(rows_slice[r * num_cols + c].DATETIME)
-                                    .into_string()
-                                    .unwrap(),
-                            )?
-                        },
-                        _ => error!(self.log, "Rust Proxy: Invalid column type"),
+                    if rows_slice[r * num_cols + c].is_null {
+                        rw.write_col(None::<i32>)?
+                    } else {
+                        match col_types[c] {
+                            // write a value to the next col of the current row (of this resultset)
+                            FFIColumnType_UINT => unsafe {
+                                rw.write_col(rows_slice[r * num_cols + c].record.UINT)?
+                            },
+                            FFIColumnType_INT => unsafe {
+                                rw.write_col(rows_slice[r * num_cols + c].record.INT)?
+                            },
+                            FFIColumnType_TEXT => unsafe {
+                                rw.write_col(
+                                    CString::from_raw(rows_slice[r * num_cols + c].record.TEXT)
+                                        .into_string()
+                                        .unwrap(),
+                                )?
+                            },
+                            FFIColumnType_DATETIME => unsafe {
+                                rw.write_col(
+                                    CString::from_raw(rows_slice[r * num_cols + c].record.DATETIME)
+                                        .into_string()
+                                        .unwrap(),
+                                )?
+                            },
+                            _ => error!(self.log, "Rust Proxy: Invalid column type"),
+                        }
                     }
                 }
                 rw.end_row()?;
@@ -193,24 +205,27 @@ fn main() {
     // initialize rust logging
     let plain = slog_term::PlainSyncDecorator::new(std::io::stdout());
     let log: slog::Logger =
-    slog::Logger::root(slog_term::FullFormat::new(plain).build().fuse(), o!());
-    
+        slog::Logger::root(slog_term::FullFormat::new(plain).build().fuse(), o!());
+
     // process command line arguments with gflags via FFI
     // create vector of zero terminated CStrings from command line arguments
     let args = std::env::args()
-    .map(|arg| CString::new(arg).unwrap())
-    .collect::<Vec<CString>>();
+        .map(|arg| CString::new(arg).unwrap())
+        .collect::<Vec<CString>>();
     let c_argc = args.len() as c_int;
     // convert CStrings to raw pointers
     let mut c_argv = args
-    .iter()
-    .map(|arg| arg.as_ptr() as *mut i8)
-    .collect::<Vec<*mut c_char>>();
+        .iter()
+        .map(|arg| arg.as_ptr() as *mut i8)
+        .collect::<Vec<*mut c_char>>();
     // pass converted arguments to C-FFI
     unsafe { FFIGflags(c_argc, c_argv.as_mut_ptr()) };
 
     let global_open = initialize_ffi("", "pelton", "root", "password");
-    info!(log, "Rust Proxy: opening connection globally: {:?}", global_open);
+    info!(
+        log,
+        "Rust Proxy: opening connection globally: {:?}", global_open
+    );
 
     let listener = net::TcpListener::bind("127.0.0.1:10001").unwrap();
     info!(log, "Rust Proxy: Listening at: {:?}", listener);
@@ -274,5 +289,8 @@ fn main() {
         join_handle.join().unwrap();
     }
     let global_close = shutdown_ffi();
-    info!(log, "Rust Proxy: Shutting down pelton, clearing global state: {:?}", global_close);
+    info!(
+        log,
+        "Rust Proxy: Shutting down pelton, clearing global state: {:?}", global_close
+    );
 }

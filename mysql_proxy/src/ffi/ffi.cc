@@ -181,32 +181,37 @@ void PopulateRecords(FFIResult *c_result,
     for (size_t j = 0; j < num_cols; j++) {
       // current row index * num cols per row + current col index
       size_t index = i * num_cols + j;
-      switch (c_result->col_types[j]) {
-        case FFIColumnType::UINT:
-          c_result->values[index].UINT = records[i].GetUInt(j);
-          break;
-        case FFIColumnType::INT:
-          c_result->values[index].INT = records[i].GetInt(j);
-          break;
-        case FFIColumnType::TEXT: {
-          const std::string &cpp_val = records[i].GetString(j);
-          c_result->values[index].TEXT =
-              static_cast<char *>(malloc(cpp_val.size() + 1));
-          memcpy(c_result->values[index].TEXT, cpp_val.c_str(),
-                 cpp_val.size() + 1);
-          break;
+      if (records[i].IsNull(j)) {
+        c_result->records[index].is_null = true;
+      } else {
+        c_result->records[index].is_null = false;
+        switch (c_result->col_types[j]) {
+          case FFIColumnType::UINT:
+            c_result->records[index].record.UINT = records[i].GetUInt(j);
+            break;
+          case FFIColumnType::INT:
+            c_result->records[index].record.INT = records[i].GetInt(j);
+            break;
+          case FFIColumnType::TEXT: {
+            const std::string &cpp_val = records[i].GetString(j);
+            c_result->records[index].record.TEXT =
+                static_cast<char *>(malloc(cpp_val.size() + 1));
+            memcpy(c_result->records[index].record.TEXT, cpp_val.c_str(),
+                   cpp_val.size() + 1);
+            break;
+          }
+          case FFIColumnType::DATETIME: {
+            const std::string &cpp_val = records[i].GetDateTime(j);
+            c_result->records[index].record.DATETIME =
+                static_cast<char *>(malloc(cpp_val.size() + 1));
+            memcpy(c_result->records[index].record.DATETIME, cpp_val.c_str(),
+                   cpp_val.size() + 1);
+            break;
+          }
+          default:
+            LOG(FATAL) << "C-Wrapper: Invalid col_type: "
+                       << c_result->col_types[j];
         }
-        case FFIColumnType::DATETIME: {
-          const std::string &cpp_val = records[i].GetDateTime(j);
-          c_result->values[index].DATETIME =
-              static_cast<char *>(malloc(cpp_val.size() + 1));
-          memcpy(c_result->values[index].DATETIME, cpp_val.c_str(),
-                 cpp_val.size() + 1);
-          break;
-        }
-        default:
-          LOG(FATAL) << "C-Wrapper: Invalid col_type: "
-                     << c_result->col_types[j];
       }
     }
   }
@@ -239,9 +244,8 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
       // unions
       // we have to use malloc here to account for the flexible array.
       FFIResult *c_result = static_cast<FFIResult *>(
-          malloc(sizeof(FFIResult) +
-                 sizeof(FFIResult::RecordData) * num_rows * num_cols));
-      //  |- FFIResult*-|   |union RecordData| |num of records (rows) and cols |
+          malloc(sizeof(FFIResult) + sizeof(FFIRecord) * num_rows * num_cols));
+      //  |- FFIResult*-|   |struct FFIRecord| |num of records (rows) and cols |
 
       // set number of columns
       c_result->num_cols = num_cols;

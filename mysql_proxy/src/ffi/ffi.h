@@ -21,6 +21,17 @@ typedef struct {
 // Our version of pelton/sqlast/ast_schema_enums.h#ColumnDefinitionTypeEnum.
 typedef enum { UINT, INT, TEXT, DATETIME } FFIColumnType;
 
+// Our representation of a Query result record (row)
+typedef struct {
+  bool is_null;
+  union RecordData {
+    uint64_t UINT;
+    int64_t INT;
+    char *TEXT;
+    char *DATETIME;
+  } record;
+} FFIRecord;
+
 // Our representation of a Query result. Contains schema information as well
 // as the result data.
 // Data inside FFIResult is owned by the FFIResult and must be freed manually
@@ -34,12 +45,7 @@ typedef struct {
   size_t num_cols;
   // The actual size of this is num_rows * num_cols.
   // The value of col j and row i corresponds to values[i * num_cols + j].
-  union RecordData {
-    uint64_t UINT;
-    int64_t INT;
-    char *TEXT;
-    char *DATETIME;
-  } values[];
+  FFIRecord records[];
 } FFIResult;
 
 // The FFI API.
