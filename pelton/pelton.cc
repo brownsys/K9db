@@ -84,6 +84,7 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
 
   // If special statement, handle it separately.
   if (SpecialStatements(sql, connection->pelton_state)) {
+    connection->unlock_mtx();
     return SqlResult(true);
   }
 

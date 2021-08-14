@@ -1,3 +1,5 @@
+SET echo;
+
 CREATE TABLE students ( \
   ID int, \
   PII_Name text, \
