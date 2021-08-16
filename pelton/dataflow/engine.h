@@ -30,7 +30,8 @@ using FlowName = std::string;
 
 class DataFlowEngine {
  public:
-  DataFlowEngine() = default;
+  explicit DataFlowEngine(PartitionID partition_count = 3)
+      : partition_count_(partition_count) {}
 
   // Manage schemas.
   void AddTableSchema(const sqlast::CreateTable &create);
@@ -105,7 +106,7 @@ class DataFlowEngine {
   absl::flat_hash_map<FlowName,
                       absl::flat_hash_map<TableName, std::vector<ColumnID>>>
       input_partitioned_by_;
-  PartitionID partition_count_ = 3;
+  PartitionID partition_count_;
   // Just an object to store threads, will probably only use them to join and
   // terminate the threads gracefully.
   std::vector<std::thread> threads_;
