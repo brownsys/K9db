@@ -338,7 +338,7 @@ Record DataFlowEngine::CreateRecord(const sqlast::Insert &insert_stmt) const {
 }
 
 void DataFlowEngine::ProcessRecords(const TableName &table_name,
-                                    std::vector<Record> &&records) {
+                                    std::vector<Record> &&records) const {
   if (records.size() > 0 && this->HasFlowsFor(table_name)) {
     // One copy of records is required per flow since the records are
     // dispatched as BatchMessages to the flows.
