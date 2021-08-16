@@ -27,3 +27,16 @@
 
 - For example:  
    `./bin/drop.sh pelton pelton && bazel run //bin:correctness -- --schema=bin/data/medical_chat_schema.sql --bin/data/medical_chat_queries.sql --bin/data/medical_chat_expected.txt`
+
+# Dataflow benchmark
+The dataflow benchmark specifically benchmarks the compute performance of the sharded dataflow. It first constructs all the records in memory and then distributes them to the available workers. The workers then simultaneously dispatch record batches to the dataflow engine.
+
+The benchmark suite logs the time (from the recent epoch) in milliseconds before starting the workers. The benchmark sets appropriate markers in the partitioned matviews. Currently, if the number of records processed by the matview equals it's `marker_` value, then it logs the time in milliseconds. The time taken for the sharded dataflow to process all records would be the difference of the largest logged time by a partitioned matview and the start time logged by the benchmarking suite.
+
+- Ensure that #batches % #workers = 0, so that the records can be evenly distributed among the workers.
+- Graph types supported by the benchmark can be found in `pelton/dataflow/benchmark/utils.h`.
+
+To run the benchmark, execute:
+```
+bazel run bin:benchmark --config=opt --  --graph_type=0 --num_batches=300000 --batch_size=1 --num_workers=3 --num_partitions=3
+```
