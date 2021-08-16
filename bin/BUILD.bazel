@@ -44,3 +44,15 @@ cc_binary(
         "@glog",
     ],
 )
+
+cc_binary(
+    name = "benchmark",
+    srcs = [
+        "benchmark.cc",
+    ],
+    deps = [
+        "//pelton",
+        "@com_github_gflags_gflags//:gflags",
+        "@glog",
+    ],
+)

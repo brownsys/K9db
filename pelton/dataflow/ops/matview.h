@@ -1,11 +1,12 @@
 #ifndef PELTON_DATAFLOW_OPS_MATVIEW_H_
 #define PELTON_DATAFLOW_OPS_MATVIEW_H_
 
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-#include <memory>
 
+#include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/grouped_data.h"
@@ -32,11 +33,13 @@ class MatViewOperator : public Operator {
   virtual bool RecordOrdered() const = 0;
   virtual bool KeyOrdered() const = 0;
   std::shared_ptr<Operator> Clone() const override = 0;
+  void SetMarker(uint64_t marker) { this->marker_ = marker; }
 
  protected:
   // We do not know if we are ordered or unordered, this type is revealed
   // to us by the derived class as an argument.
   MatViewOperator() : Operator(Operator::Type::MAT_VIEW) {}
+  uint64_t marker_ = 0;
 };
 
 // Actual implementation is generic over T: the underlying GroupedDataT
@@ -161,6 +164,17 @@ class MatViewOperatorT : public MatViewOperator {
       if (!this->contents_.Insert(r.GetValues(this->key_cols_), r, by_pk)) {
         LOG(FATAL) << "Failed to insert record in matview";
       }
+    }
+
+    if (this->marker_ == this->count()) {
+      auto time_point = std::chrono::system_clock::now();
+      std::string time_milliseconds =
+          std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
+                             time_point.time_since_epoch())
+                             .count());
+      std::string log = "[matview" + std::to_string(this->graph()->index()) +
+                        "] " + time_milliseconds + "\n";
+      std::cout << log;
     }
 
     return std::nullopt;

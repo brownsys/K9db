@@ -1,0 +1,81 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+cc_library(
+    name = "utils",
+    srcs = [
+        "utils.cc",
+    ],
+    hdrs = [
+        "utils.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:graph",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:types",
+        "//pelton/dataflow/ops:aggregate",
+        "//pelton/dataflow/ops:equijoin",
+        "//pelton/dataflow/ops:filter",
+        "//pelton/dataflow/ops:input",
+        "//pelton/dataflow/ops:identity",
+        "//pelton/dataflow/ops:matview",
+        "//pelton/dataflow/ops:project",
+        "//pelton/dataflow/ops:union",
+        "//pelton/util:ints",
+        "@glog",
+    ],
+)
+
+
+cc_library(
+    name = "worker",
+    srcs = [
+        "worker.cc",
+    ],
+    hdrs = [
+        "worker.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":utils",
+        "//pelton/dataflow:dengine",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "//pelton/util:ints",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "driver",
+    srcs = [
+        "driver.cc",
+    ],
+    hdrs = [
+        "driver.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":utils",
+        ":worker",
+        "//pelton/dataflow:dengine",
+        "@absl//absl/container:flat_hash_map",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "driver-test",
+    srcs = [
+        "driver_unittest.cc",
+    ],
+    copts = ["-Iexternal/gtest/googletest/include"],
+    deps = [
+        ":driver",
+        "@glog",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)
