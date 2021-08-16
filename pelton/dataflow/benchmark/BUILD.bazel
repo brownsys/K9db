@@ -65,17 +65,3 @@ cc_library(
         "@glog",
     ],
 )
-
-cc_test(
-    name = "driver-test",
-    srcs = [
-        "driver_unittest.cc",
-    ],
-    copts = ["-Iexternal/gtest/googletest/include"],
-    deps = [
-        ":driver",
-        "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
-    ],
-)

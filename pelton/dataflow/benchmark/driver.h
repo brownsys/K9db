@@ -21,7 +21,6 @@ class Driver {
         batch_size_(batch_size),
         num_workers_(num_workers),
         num_partitions_(num_partitions) {
-    LOG(INFO) << "driver constructor";
     this->InitializeEngine();
   }
   void Execute();
@@ -38,7 +37,7 @@ class Driver {
   uint64_t batch_size_;
   uint64_t num_workers_;
   uint64_t num_partitions_;
-  // Just an object to store worker threads
+  // An object to store worker threads
   std::vector<std::thread> threads_;
 
   absl::flat_hash_map<uint64_t, std::vector<std::vector<Record>>>

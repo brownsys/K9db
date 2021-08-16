@@ -19,7 +19,7 @@ class Worker {
       : index_(index),
         dataflow_engine_(dataflow_engine),
         graph_type_(graph_type),
-        /*batches_(std::move(batches)),*/ input_names_(input_names) {}
+        input_names_(input_names) {}
   // Entry point for the thread that this worker is launched in.
   void Start(std::vector<std::vector<Record>> &&batches);
   void Start(std::vector<std::vector<Record>> &&left_batches,
