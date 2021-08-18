@@ -1,6 +1,7 @@
 #ifndef PELTON_DATAFLOW_OPS_MATVIEW_H_
 #define PELTON_DATAFLOW_OPS_MATVIEW_H_
 
+#include <shared_mutex>
 #include <memory>
 #include <string>
 #include <utility>
@@ -39,7 +40,7 @@ class MatViewOperator : public Operator {
   // We do not know if we are ordered or unordered, this type is revealed
   // to us by the derived class as an argument.
   MatViewOperator() : Operator(Operator::Type::MAT_VIEW) {}
-  uint64_t marker_ = 0;
+  std::optional<uint64_t> marker_ = std::nullopt;
 };
 
 // Actual implementation is generic over T: the underlying GroupedDataT
@@ -79,24 +80,32 @@ class MatViewOperatorT : public MatViewOperator {
         limit_(limit),
         offset_(offset) {}
 
-  size_t count() const override { return this->contents_.count(); }
+  size_t count() const override {
+    std::shared_lock<std::shared_mutex> lock(this->mtx_);
+    return this->contents_.count();
+  }
 
   const std::vector<ColumnID> &key_cols() const override {
     return this->key_cols_;
   }
 
   bool Contains(const Key &key) const override {
+    std::shared_lock<std::shared_mutex> lock(this->mtx_);
     return this->contents_.Contains(key);
   }
 
   const_RecordIterable Lookup(const Key &key, int limit = -1,
                               size_t offset = 0) const override {
+    std::shared_lock<std::shared_mutex> lock(this->mtx_);
     limit = limit == -1 ? this->limit_ : limit;
     offset = offset == 0 ? this->offset_ : offset;
     return this->contents_.Lookup(key, limit, offset);
   }
 
-  const_KeyIterable Keys() const override { return this->contents_.Keys(); }
+  const_KeyIterable Keys() const override {
+    std::shared_lock<std::shared_mutex> lock(this->mtx_);
+    return this->contents_.Keys();
+  }
 
   bool RecordOrdered() const override {
     if constexpr (std::is_same<T, RecordOrderedGroupedData>::value) {
@@ -116,6 +125,7 @@ class MatViewOperatorT : public MatViewOperator {
   const_RecordIterable LookupGreater(const Key &key, const Record &cmp,
                                      int limit = -1,
                                      size_t offset = 0) const override {
+    std::shared_lock<std::shared_mutex> lock(this->mtx_);
     limit = limit == -1 ? this->limit_ : limit;
     offset = offset == 0 ? this->offset_ : offset;
     return this->contents_.LookupGreater(key, cmp, limit, offset);
@@ -160,21 +170,29 @@ class MatViewOperatorT : public MatViewOperator {
       by_pk = keys.size() > 0 && keys == this->key_cols_;
     }
 
+    // In the non-benchmarked version of the dataflow, an RAII
+    // version of obtaning the lock would be used. Because of the subsequent
+    // code related ot logging time, the lock has to be freed before count()
+    // is called.
+    this->mtx_.lock();
     for (const Record &r : records) {
       if (!this->contents_.Insert(r.GetValues(this->key_cols_), r, by_pk)) {
         LOG(FATAL) << "Failed to insert record in matview";
       }
     }
+    this->mtx_.unlock();
 
-    if (this->marker_ == this->count()) {
-      auto time_point = std::chrono::system_clock::now();
-      std::string time_milliseconds =
-          std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
-                             time_point.time_since_epoch())
-                             .count());
-      std::string log = "[matview" + std::to_string(this->graph()->index()) +
-                        "] " + time_milliseconds + "\n";
-      std::cout << log;
+    if (this->marker_) {
+      if (this->count() >= this->marker_.value()) {
+        auto time_point = std::chrono::system_clock::now();
+        std::string time_milliseconds = std::to_string(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                time_point.time_since_epoch())
+                .count());
+        std::string log = "[matview" + std::to_string(this->graph()->index()) +
+                          "] " + time_milliseconds + "\n";
+        std::cout << log;
+      }
     }
 
     return std::nullopt;
@@ -194,6 +212,7 @@ class MatViewOperatorT : public MatViewOperator {
   Record::Compare compare_;
   int limit_;
   size_t offset_;
+  mutable std::shared_mutex mtx_;
 };
 
 using UnorderedMatViewOperator = MatViewOperatorT<UnorderedGroupedData>;
