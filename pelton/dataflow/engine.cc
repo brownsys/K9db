@@ -30,14 +30,17 @@ namespace dataflow {
 
 // Manage schemas.
 void DataFlowEngine::AddTableSchema(const sqlast::CreateTable &create) {
+  std::unique_lock<std::shared_mutex> lock(this->mtx_);
   this->schema_.emplace(create.table_name(), SchemaFactory::Create(create));
 }
 void DataFlowEngine::AddTableSchema(const std::string &table_name,
                                     SchemaRef schema) {
+  std::unique_lock<std::shared_mutex> lock(this->mtx_);
   this->schema_.emplace(table_name, schema);
 }
 
 std::vector<std::string> DataFlowEngine::GetTables() const {
+  std::shared_lock<std::shared_mutex> lock(this->mtx_);
   std::vector<std::string> result;
   result.reserve(this->schema_.size());
   for (const auto &[table_name, _] : this->schema_) {
@@ -46,6 +49,7 @@ std::vector<std::string> DataFlowEngine::GetTables() const {
   return result;
 }
 SchemaRef DataFlowEngine::GetTableSchema(const TableName &table_name) const {
+  std::shared_lock<std::shared_mutex> lock(this->mtx_);
   if (this->schema_.count(table_name) > 0) {
     return this->schema_.at(table_name);
   } else {
@@ -56,6 +60,7 @@ SchemaRef DataFlowEngine::GetTableSchema(const TableName &table_name) const {
 // Manage flows.
 void DataFlowEngine::AddFlow(const FlowName &name,
                              const std::shared_ptr<DataFlowGraph> flow) {
+  std::unique_lock<std::shared_mutex> lock(this->mtx_);
   this->flows_.insert({name, flow});
   for (const auto &[input_name, input] : flow->inputs()) {
     this->flows_per_input_table_[input_name].push_back(name);
@@ -255,16 +260,19 @@ void DataFlowEngine::AddExchangeAfter(NodeIndex parent_index,
 
 const std::shared_ptr<DataFlowGraph> DataFlowEngine::GetFlow(
     const FlowName &name) const {
+  std::shared_lock<std::shared_mutex> lock(this->mtx_);
   return this->flows_.at(name);
 }
 
 const std::shared_ptr<DataFlowGraph> DataFlowEngine::GetPartitionedFlow(
     const FlowName &name, PartitionID partition_id) const {
+  std::shared_lock<std::shared_mutex> lock(this->mtx_);
   return this->partitioned_graphs_.at(name).at(partition_id);
 }
 
 const std::shared_ptr<MatViewOperator> DataFlowEngine::GetPartitionedMatView(
     const FlowName &name, const Key &key) const {
+  std::shared_lock<std::shared_mutex> lock(this->mtx_);
   uint64_t partition_index =
       partition::GetPartition(key, this->partition_count_);
   // Currently, only one matview is supported per flow.
@@ -280,6 +288,7 @@ const std::shared_ptr<MatViewOperator> DataFlowEngine::GetPartitionedMatView(
 
 const std::vector<std::shared_ptr<MatViewOperator>>
 DataFlowEngine::GetPartitionedMatViews(const FlowName &name) {
+  std::shared_lock<std::shared_mutex> lock(this->mtx_);
   std::vector<std::shared_ptr<MatViewOperator>> matviews;
   for (const auto item : this->partitioned_graphs_.at(name)) {
     // Currently, only one matview is supported per flow.
@@ -290,6 +299,7 @@ DataFlowEngine::GetPartitionedMatViews(const FlowName &name) {
 }
 
 const SchemaRef DataFlowEngine::GetOutputSchema(const FlowName &name) {
+  std::shared_lock<std::shared_mutex> lock(this->mtx_);
   const auto flow = this->flows_.at(name);
   // Currently, we only support a single matview per flow.
   assert(flow->outputs().size() == 1);
@@ -298,6 +308,7 @@ const SchemaRef DataFlowEngine::GetOutputSchema(const FlowName &name) {
 
 const std::vector<ColumnID> &DataFlowEngine::GetMatViewKeyCols(
     const FlowName &name) {
+  std::shared_lock<std::shared_mutex> lock(this->mtx_);
   const auto flow = this->flows_.at(name);
   // Currently, we only support a single matview per flow.
   assert(flow->outputs().size() == 1);
@@ -305,17 +316,21 @@ const std::vector<ColumnID> &DataFlowEngine::GetMatViewKeyCols(
 }
 
 bool DataFlowEngine::HasFlow(const FlowName &name) const {
+  std::shared_lock<std::shared_mutex> lock(this->mtx_);
   return this->flows_.count(name) == 1;
 }
 
 bool DataFlowEngine::HasFlowsFor(const TableName &table_name) const {
+  std::shared_lock<std::shared_mutex> lock(this->mtx_);
   return this->flows_per_input_table_.count(table_name) == 1;
 }
 
 Record DataFlowEngine::CreateRecord(const sqlast::Insert &insert_stmt) const {
   // Create an empty positive record with appropriate schema.
   const std::string &table_name = insert_stmt.table_name();
+  this->mtx_.lock_shared();
   SchemaRef schema = this->schema_.at(table_name);
+  this->mtx_.unlock_shared();
   Record record{schema, true};
 
   // Fill in record with data.
@@ -340,6 +355,7 @@ Record DataFlowEngine::CreateRecord(const sqlast::Insert &insert_stmt) const {
 void DataFlowEngine::ProcessRecords(const TableName &table_name,
                                     std::vector<Record> &&records) const {
   if (records.size() > 0 && this->HasFlowsFor(table_name)) {
+    std::shared_lock<std::shared_mutex> lock(this->mtx_);
     // One copy of records is required per flow since the records are
     // dispatched as BatchMessages to the flows.
     std::vector<std::vector<Record>> records_per_flow;
@@ -378,6 +394,7 @@ void DataFlowEngine::ProcessRecords(const TableName &table_name,
 
 // Size in memory of all the dataflow graphs.
 uint64_t DataFlowEngine::SizeInMemory() const {
+  std::shared_lock<std::shared_mutex> lock(this->mtx_);
   uint64_t size = 0;
   for (const auto &[_, flow] : this->flows_) {
     size += flow->SizeInMemory();

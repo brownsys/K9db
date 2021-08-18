@@ -4,6 +4,7 @@
 // The state includes the currently installed flows, including their operators
 // and state.
 
+#include <shared_mutex>
 #include <memory>
 #include <string>
 #include <thread>
@@ -110,6 +111,7 @@ class DataFlowEngine {
   // Just an object to store threads, will probably only use them to join and
   // terminate the threads gracefully.
   std::vector<std::thread> threads_;
+  mutable std::shared_mutex mtx_;
 
   void AddExchangeAfter(NodeIndex parent_index,
                         std::vector<ColumnID> partition_key,
