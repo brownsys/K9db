@@ -32,6 +32,13 @@ Driver::PrepareWorkerBatches(std::vector<std::vector<Record>> &&all_batches) {
     worker_batches.emplace(i, std::move(temp));
     read_index += batches_per_worker;
   }
+  // Move any remaining batches as well. Batches may remain because
+  // #batches % #workers may not be zero.
+  worker_batches.at(this->num_workers_ - 1).insert(
+  worker_batches.at(this->num_workers_ - 1).end(),
+  std::make_move_iterator(all_batches.begin() + read_index),
+  std::make_move_iterator(all_batches.end()));
+
   return worker_batches;
 }
 
