@@ -1,5 +1,5 @@
-#ifndef PELTON_DATAFLOW_BENCHMARK_WORKER_H_
-#define PELTON_DATAFLOW_BENCHMARK_WORKER_H_
+#ifndef PELTON_DATAFLOW_BENCHMARK_CLIENT_H_
+#define PELTON_DATAFLOW_BENCHMARK_CLIENT_H_
 
 #include <memory>
 #include <random>
@@ -12,15 +12,15 @@
 namespace pelton {
 namespace dataflow {
 
-class Worker {
+class Client {
  public:
-  Worker(uint64_t index, std::shared_ptr<DataFlowEngine> dataflow_engine,
+  Client(uint64_t index, std::shared_ptr<DataFlowEngine> dataflow_engine,
          utils::GraphType graph_type, std::vector<TableName> input_names)
       : index_(index),
         dataflow_engine_(dataflow_engine),
         graph_type_(graph_type),
         input_names_(input_names) {}
-  // Entry point for the thread that this worker is launched in.
+  // Entry point for the thread that this client is launched in.
   void Start(std::vector<std::vector<Record>> &&batches);
   void Start(std::vector<std::vector<Record>> &&left_batches,
              std::vector<std::vector<Record>> &&right_batches);
@@ -38,4 +38,4 @@ class Worker {
 }  // namespace dataflow
 }  // namespace pelton
 
-#endif  // PELTON_DATAFLOW_BENCHMARK_WORKER_H_
+#endif  // PELTON_DATAFLOW_BENCHMARK_CLIENT_H_

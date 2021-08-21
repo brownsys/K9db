@@ -7,39 +7,39 @@
 #include <utility>
 
 #include "absl/container/flat_hash_map.h"
-#include "pelton/dataflow/benchmark/worker.h"
+#include "pelton/dataflow/benchmark/client.h"
 
 namespace pelton {
 namespace dataflow {
 
-// Evenly distributes all batches across the workers.
+// Evenly distributes all batches across the clients.
 absl::flat_hash_map<uint64_t, std::vector<std::vector<Record>>>
-Driver::PrepareWorkerBatches(std::vector<std::vector<Record>> &&all_batches) {
+Driver::PrepareClientBatches(std::vector<std::vector<Record>> &&all_batches) {
   // Shuffle batches
   std::random_shuffle(all_batches.begin(), all_batches.end());
-  // Evenly distribute batches across the workers
+  // Evenly distribute batches across the clients
   absl::flat_hash_map<uint64_t, std::vector<std::vector<Record>>>
-      worker_batches;
-  uint64_t batches_per_worker =
-      (uint64_t)floor(this->num_batches_ / this->num_workers_);
+      client_batches;
+  uint64_t batches_per_client =
+      (uint64_t)floor(this->num_batches_ / this->num_clients_);
   uint64_t read_index = 0;
-  for (uint64_t i = 0; i < this->num_workers_; i++) {
+  for (uint64_t i = 0; i < this->num_clients_; i++) {
     std::vector<std::vector<Record>> temp;
     temp.insert(temp.end(),
                 std::make_move_iterator(all_batches.begin() + read_index),
                 std::make_move_iterator(all_batches.begin() + read_index +
-                                        batches_per_worker));
-    worker_batches.emplace(i, std::move(temp));
-    read_index += batches_per_worker;
+                                        batches_per_client));
+    client_batches.emplace(i, std::move(temp));
+    read_index += batches_per_client;
   }
   // Move any remaining batches as well. Batches may remain because
-  // #batches % #workers may not be zero.
-  worker_batches.at(this->num_workers_ - 1).insert(
-  worker_batches.at(this->num_workers_ - 1).end(),
+  // #batches % #clients may not be zero.
+  client_batches.at(this->num_clients_ - 1).insert(
+  client_batches.at(this->num_clients_ - 1).end(),
   std::make_move_iterator(all_batches.begin() + read_index),
   std::make_move_iterator(all_batches.end()));
 
-  return worker_batches;
+  return client_batches;
 }
 
 void Driver::Execute() {
@@ -47,21 +47,21 @@ void Driver::Execute() {
     case utils::GraphType::FILTER_GRAPH: {
       std::vector<std::vector<Record>> batches =
           utils::MakeFilterBatches(this->num_batches_, this->batch_size_);
-      auto worker_batches = this->PrepareWorkerBatches(std::move(batches));
+      auto client_batches = this->PrepareClientBatches(std::move(batches));
       // Select appropriate overloaded function
-      void (Worker::*memfunc)(std::vector<std::vector<Record>> &&) =
-          &Worker::Start;
+      void (Client::*memfunc)(std::vector<std::vector<Record>> &&) =
+          &Client::Start;
       auto time_point = std::chrono::system_clock::now();
       std::cout << "Start: "
                 << std::chrono::duration_cast<std::chrono::milliseconds>(
                        time_point.time_since_epoch())
                        .count()
                 << std::endl;
-      for (uint64_t i = 0; i < this->num_workers_; i++) {
-        Worker worker(i, this->dataflow_engine_, this->graph_type_,
+      for (uint64_t i = 0; i < this->num_clients_; i++) {
+        Client client(i, this->dataflow_engine_, this->graph_type_,
                       this->input_names_);
         this->threads_.emplace_back(
-            std::thread(memfunc, worker, std::move(worker_batches.at(i))));
+            std::thread(memfunc, client, std::move(client_batches.at(i))));
       }
     } break;
     case utils::GraphType::EQUIJOIN_GRAPH_WITH_EXCHANGE:
@@ -71,26 +71,26 @@ void Driver::Execute() {
       std::vector<std::vector<Record>> right_batches =
           utils::MakeEquiJoinRightBatches(this->num_batches_,
                                           this->batch_size_);
-      auto worker_batches_left =
-          this->PrepareWorkerBatches(std::move(left_batches));
-      auto worker_batches_right =
-          this->PrepareWorkerBatches(std::move(right_batches));
+      auto client_batches_left =
+          this->PrepareClientBatches(std::move(left_batches));
+      auto client_batches_right =
+          this->PrepareClientBatches(std::move(right_batches));
       // Select appropriate overloaded function
-      void (Worker::*memfunc)(std::vector<std::vector<Record>> &&,
+      void (Client::*memfunc)(std::vector<std::vector<Record>> &&,
                               std::vector<std::vector<Record>> &&) =
-          &Worker::Start;
+          &Client::Start;
       auto time_point = std::chrono::system_clock::now();
       std::cout << "Start: "
                 << std::chrono::duration_cast<std::chrono::milliseconds>(
                        time_point.time_since_epoch())
                        .count()
                 << std::endl;
-      for (uint64_t i = 0; i < this->num_workers_; i++) {
-        Worker worker(i, this->dataflow_engine_, this->graph_type_,
+      for (uint64_t i = 0; i < this->num_clients_; i++) {
+        Client client(i, this->dataflow_engine_, this->graph_type_,
                       this->input_names_);
         this->threads_.emplace_back(
-            std::thread(memfunc, worker, std::move(worker_batches_left.at(i)),
-                        std::move(worker_batches_right.at(i))));
+            std::thread(memfunc, client, std::move(client_batches_left.at(i)),
+                        std::move(client_batches_right.at(i))));
       }
     } break;
     default:
@@ -156,7 +156,7 @@ void Driver::InitializeEngine() {
 }
 
 Driver::~Driver() {
-  // Wait for all worker threads to terminate
+  // Wait for all client threads to terminate
   for (auto &thread : this->threads_) {
     thread.join();
   }

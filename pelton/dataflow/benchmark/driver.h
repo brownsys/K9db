@@ -15,11 +15,11 @@ namespace dataflow {
 class Driver {
  public:
   Driver(utils::GraphType graph_type, uint64_t num_batches, uint64_t batch_size,
-         uint64_t num_workers, PartitionID num_partitions)
+         uint64_t num_clients, PartitionID num_partitions)
       : graph_type_(graph_type),
         num_batches_(num_batches),
         batch_size_(batch_size),
-        num_workers_(num_workers),
+        num_clients_(num_clients),
         num_partitions_(num_partitions) {
     this->InitializeEngine();
   }
@@ -35,13 +35,13 @@ class Driver {
   std::vector<TableName> input_names_;
   uint64_t num_batches_;
   uint64_t batch_size_;
-  uint64_t num_workers_;
+  uint64_t num_clients_;
   uint64_t num_partitions_;
-  // An object to store worker threads
+  // An object to store client threads
   std::vector<std::thread> threads_;
 
   absl::flat_hash_map<uint64_t, std::vector<std::vector<Record>>>
-  PrepareWorkerBatches(std::vector<std::vector<Record>> &&all_batches);
+  PrepareClientBatches(std::vector<std::vector<Record>> &&all_batches);
 };
 
 }  // namespace dataflow

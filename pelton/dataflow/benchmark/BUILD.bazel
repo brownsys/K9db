@@ -29,12 +29,12 @@ cc_library(
 
 
 cc_library(
-    name = "worker",
+    name = "client",
     srcs = [
-        "worker.cc",
+        "client.cc",
     ],
     hdrs = [
-        "worker.h",
+        "client.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
@@ -59,7 +59,7 @@ cc_library(
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":utils",
-        ":worker",
+        ":client",
         "//pelton/dataflow:dengine",
         "@absl//absl/container:flat_hash_map",
         "@glog",

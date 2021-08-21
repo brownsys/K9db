@@ -1,4 +1,4 @@
-#include "pelton/dataflow/benchmark/worker.h"
+#include "pelton/dataflow/benchmark/client.h"
 
 #include <utility>
 
@@ -10,7 +10,7 @@
 namespace pelton {
 namespace dataflow {
 
-void Worker::Start(std::vector<std::vector<Record>> &&batches) {
+void Client::Start(std::vector<std::vector<Record>> &&batches) {
   switch (this->graph_type_) {
     case utils::GraphType::FILTER_GRAPH:
       CHECK_EQ(this->input_names_.size(), (size_t)1);
@@ -20,11 +20,11 @@ void Worker::Start(std::vector<std::vector<Record>> &&batches) {
       }
       break;
     default:
-      LOG(FATAL) << "Graph not supported by worker";
+      LOG(FATAL) << "Graph not supported by benchmark client";
   }
 }
 
-void Worker::Start(std::vector<std::vector<Record>> &&left_batches,
+void Client::Start(std::vector<std::vector<Record>> &&left_batches,
                    std::vector<std::vector<Record>> &&right_batches) {
   switch (this->graph_type_) {
     case utils::GraphType::EQUIJOIN_GRAPH_WITH_EXCHANGE:
@@ -41,7 +41,7 @@ void Worker::Start(std::vector<std::vector<Record>> &&left_batches,
       }
     } break;
     default:
-      LOG(FATAL) << "Graph not supported by worker";
+      LOG(FATAL) << "Graph not supported by client";
   }
 }
 
