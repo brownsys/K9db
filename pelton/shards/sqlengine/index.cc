@@ -1,7 +1,8 @@
 // Creation and management of secondary indices.
 
-#include <memory>
 #include "pelton/shards/sqlengine/index.h"
+
+#include <memory>
 
 #include "absl/status/status.h"
 #include "pelton/dataflow/graph.h"

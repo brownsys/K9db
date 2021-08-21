@@ -45,7 +45,6 @@ class Channel {
   }
 
  private:
-  // May consider using generics, do not need it as of now.
   std::deque<std::shared_ptr<Message>> queue_;
   std::mutex mtx_;
   std::condition_variable not_empty_;

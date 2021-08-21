@@ -166,7 +166,7 @@ class Record {
   void SetValue(const std::string &value, size_t i);
 
   // Compute hash based on specified columns.
-  size_t Hash(
+  size_t DeterministicHash(
       const std::vector<ColumnID> &cols = std::vector<ColumnID>{}) const;
 
   // Accessors.
