@@ -14,10 +14,19 @@ namespace dataflow {
 
 class Channel {
  public:
+  explicit Channel(uint64_t capacity = 10000) : capacity_(capacity) {}
+  // Cannot copy a channel.
+  Channel(const Channel &other) = delete;
+  Channel &operator=(const Channel &other) = delete;
+
   bool Send(std::shared_ptr<Message> message) {
-    mtx_.lock();
+    std::unique_lock<std::mutex> lock(mtx_);
+    while (queue_.size() == capacity_) {
+      not_full_.wait(lock);
+    }
     queue_.push_back(message);
-    mtx_.unlock();
+    // Since we follow a multiple producer-single consumer model, only one
+    // thread ends up getting notified.
     not_empty_.notify_all();
     return true;
   }
@@ -34,6 +43,9 @@ class Channel {
       messages.push_back(queue_.front());
       queue_.pop_front();
     }
+    // Since the channel gets flushed upon each Recv, most likely the Send
+    // requests of all the threads that are sleeping could be accomodated.
+    not_full_.notify_all();
     return messages;
   }
 
@@ -48,6 +60,8 @@ class Channel {
   std::deque<std::shared_ptr<Message>> queue_;
   std::mutex mtx_;
   std::condition_variable not_empty_;
+  std::condition_variable not_full_;
+  uint64_t capacity_;
 };
 
 }  // namespace dataflow
