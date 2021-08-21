@@ -2,9 +2,9 @@
 #define PELTON_DATAFLOW_OPS_AGGREGATE_H_
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <tuple>
-#include <memory>
 // NOLINTNEXTLINE
 #include <variant>
 #include <vector>
@@ -24,6 +24,10 @@ class AggregateOperator : public Operator {
  public:
   using Function = AggregateFunctionEnum;
   AggregateOperator() = delete;
+  // Cannot copy an operator.
+  AggregateOperator(const AggregateOperator &other) = delete;
+  AggregateOperator &operator=(const AggregateOperator &other) = delete;
+
   AggregateOperator(std::vector<ColumnID> group_columns,
                     Function aggregate_function, ColumnID aggregate_column)
       : Operator(Operator::Type::AGGREGATE),

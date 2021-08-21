@@ -12,10 +12,14 @@ namespace pelton {
 namespace dataflow {
 class UnionOperator : public Operator {
  public:
+  // Cannot copy an operator.
+  UnionOperator(const UnionOperator &other) = delete;
+  UnionOperator &operator=(const UnionOperator &other) = delete;
+
   UnionOperator() : Operator(Operator::Type::UNION) {}
 
   std::optional<std::vector<Record>> Process(
-      NodeIndex /*source*/, const std::vector<Record>& /*records*/) override;
+      NodeIndex /*source*/, const std::vector<Record> & /*records*/) override;
 
   std::shared_ptr<Operator> Clone() const override;
 

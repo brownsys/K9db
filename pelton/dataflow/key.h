@@ -59,7 +59,7 @@ class Key {
   // hash values(across different runs). The hash value generataed by Hash()
   // is deterministic and is used to make decisions when it comes to
   // partitioning.
-  size_t Hash() const;
+  size_t DeterministicHash() const;
 
   // For logging and printing...
   friend std::ostream &operator<<(std::ostream &os, const Key &k);
