@@ -1,8 +1,8 @@
 #ifndef PELTON_DATAFLOW_OPS_IDENTITY_H_
 #define PELTON_DATAFLOW_OPS_IDENTITY_H_
 
-#include <vector>
 #include <memory>
+#include <vector>
 
 #include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"
@@ -14,11 +14,16 @@ namespace dataflow {
 
 class IdentityOperator : public Operator {
  public:
+  // Cannot copy an operator.
+  IdentityOperator(const IdentityOperator &other) = delete;
+  IdentityOperator &operator=(const IdentityOperator &other) = delete;
+
   IdentityOperator() : Operator(Operator::Type::IDENTITY) {}
 
   std::optional<std::vector<Record>> Process(
       NodeIndex source, const std::vector<Record> &records) override;
   std::shared_ptr<Operator> Clone() const override;
+
  protected:
   void ComputeOutputSchema() override;
 

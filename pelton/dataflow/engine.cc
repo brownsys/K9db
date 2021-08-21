@@ -276,10 +276,9 @@ const std::shared_ptr<MatViewOperator> DataFlowEngine::GetPartitionedMatView(
   uint64_t partition_index =
       partition::GetPartition(key, this->partition_count_);
   // Currently, only one matview is supported per flow.
-  assert(this->partitioned_graphs_.at(name)
-             .at(partition_index)
-             ->outputs()
-             .size() == 1);
+  CHECK_EQ(
+      this->partitioned_graphs_.at(name).at(partition_index)->outputs().size(),
+      static_cast<size_t>(1));
   return this->partitioned_graphs_.at(name)
       .at(partition_index)
       ->outputs()
@@ -292,7 +291,7 @@ DataFlowEngine::GetPartitionedMatViews(const FlowName &name) {
   std::vector<std::shared_ptr<MatViewOperator>> matviews;
   for (const auto item : this->partitioned_graphs_.at(name)) {
     // Currently, only one matview is supported per flow.
-    assert(item.second->outputs().size() == 1);
+    CHECK_EQ(item.second->outputs().size(), static_cast<size_t>(1));
     matviews.push_back(item.second->outputs().at(0));
   }
   return matviews;
@@ -302,7 +301,7 @@ const SchemaRef DataFlowEngine::GetOutputSchema(const FlowName &name) {
   std::shared_lock<std::shared_mutex> lock(this->mtx_);
   const auto flow = this->flows_.at(name);
   // Currently, we only support a single matview per flow.
-  assert(flow->outputs().size() == 1);
+  CHECK_EQ(flow->outputs().size(), static_cast<size_t>(1));
   return flow->outputs().at(0)->output_schema();
 }
 
@@ -311,7 +310,7 @@ const std::vector<ColumnID> &DataFlowEngine::GetMatViewKeyCols(
   std::shared_lock<std::shared_mutex> lock(this->mtx_);
   const auto flow = this->flows_.at(name);
   // Currently, we only support a single matview per flow.
-  assert(flow->outputs().size() == 1);
+  CHECK_EQ(flow->outputs().size(), static_cast<size_t>(1));
   return flow->outputs().at(0)->key_cols();
 }
 
@@ -492,9 +491,7 @@ DataFlowEngine::~DataFlowEngine() {
       item2.second->Send(stop_msg);
     }
   }
-  // Give some time for the stop message to propagate before joining partition
-  // threads.
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
   for (auto &thread : this->threads_) {
     thread.join();
   }

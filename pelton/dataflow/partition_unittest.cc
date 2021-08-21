@@ -34,19 +34,15 @@ TEST(PartitionTest, BasicTest) {
   records.emplace_back(schema, true, 2_u,
                        std::make_unique<std::string>("data2"), 8_s);
 
-  std::vector<Record> expected;
-  expected.emplace_back(records.at(0).Copy());
-  expected.emplace_back(records.at(1).Copy());
-
   std::vector<ColumnID> partition_cols = {0, 2};
 
   absl::flat_hash_map<uint16_t, std::vector<Record>> partitions =
-      partition::HashPartition(std::move(records), partition_cols, 2);
+      partition::HashPartition(records, partition_cols, 2);
   EXPECT_EQ(partitions.size(), 2);
   EXPECT_EQ(partitions.at(0).size(), 1);
   EXPECT_EQ(partitions.at(1).size(), 1);
-  EXPECT_EQ(partitions.at(0).at(0), expected.at(1));
-  EXPECT_EQ(partitions.at(1).at(0), expected.at(0));
+  EXPECT_EQ(partitions.at(0).at(0), records.at(1));
+  EXPECT_EQ(partitions.at(1).at(0), records.at(0));
 }
 
 }  // namespace dataflow

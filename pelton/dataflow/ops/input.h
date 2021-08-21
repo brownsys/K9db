@@ -1,9 +1,9 @@
 #ifndef PELTON_DATAFLOW_OPS_INPUT_H_
 #define PELTON_DATAFLOW_OPS_INPUT_H_
 
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
 
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/record.h"
@@ -14,6 +14,10 @@ namespace dataflow {
 
 class InputOperator : public Operator {
  public:
+  // Cannot copy an operator.
+  InputOperator(const InputOperator &other) = delete;
+  InputOperator &operator=(const InputOperator &other) = delete;
+
   InputOperator(const std::string &input_name, const SchemaRef &schema)
       : Operator(Operator::Type::INPUT), input_name_(input_name) {
     this->input_schemas_.push_back(schema);

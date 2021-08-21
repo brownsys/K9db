@@ -22,6 +22,9 @@ namespace dataflow {
 // the underlying storage layout and order.
 class MatViewOperator : public Operator {
  public:
+  // Cannot copy an operator.
+  MatViewOperator(const MatViewOperator &other) = delete;
+  MatViewOperator &operator=(const MatViewOperator &other) = delete;
   virtual size_t count() const = 0;
   virtual const std::vector<ColumnID> &key_cols() const = 0;
   virtual bool Contains(const Key &key) const = 0;
@@ -57,6 +60,9 @@ class MatViewOperator : public Operator {
 template <typename T>
 class MatViewOperatorT : public MatViewOperator {
  public:
+  MatViewOperatorT(const MatViewOperatorT &other) = delete;
+  MatViewOperatorT &operator=(const MatViewOperatorT &other) = delete;
+
   template <typename = typename std::enable_if<
                 !std::is_same<T, RecordOrderedGroupedData>::value>>
   explicit MatViewOperatorT(const std::vector<ColumnID> &key_cols,
