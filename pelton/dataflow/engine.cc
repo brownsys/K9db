@@ -339,20 +339,6 @@ Record DataFlowEngine::CreateRecord(const sqlast::Insert &insert_stmt) const {
 void DataFlowEngine::ProcessRecords(const TableName &table_name,
                                     std::vector<Record> &&records) const {
   if (records.size() > 0 && this->HasFlowsFor(table_name)) {
-    // One copy of records is required per flow since the records are
-    // dispatched as BatchMessages to the flows.
-    std::vector<std::vector<Record>> records_per_flow;
-    for (size_t i = 0;
-         i < this->flows_per_input_table_.at(table_name).size() - 1; i++) {
-      std::vector<Record> records_copy;
-      for (size_t j = 0; j < records.size(); j++) {
-        records_copy.push_back(records.at(j).Copy());
-      }
-      records_per_flow.push_back(std::move(records_copy));
-    }
-    // Move the original set at the end. This saves one round of copying.
-    records_per_flow.push_back(std::move(records));
-
     for (size_t i = 0; i < this->flows_per_input_table_.at(table_name).size();
          i++) {
       const FlowName &name = this->flows_per_input_table_.at(table_name).at(i);
@@ -361,8 +347,7 @@ void DataFlowEngine::ProcessRecords(const TableName &table_name,
           this->input_partitioned_by_.at(name).at(table_name);
       absl::flat_hash_map<PartitionID, std::vector<Record>>
           partitioned_records = partition::HashPartition(
-              std::move(records_per_flow.at(i)), input_partition_key,
-              this->partition_count_);
+              records, input_partition_key, this->partition_count_);
       // Send batch messages to appropriate partitions
       auto flow = this->flows_.at(name);
       for (auto &item : partitioned_records) {
