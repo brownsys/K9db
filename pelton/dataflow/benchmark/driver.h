@@ -24,7 +24,6 @@ class Driver {
     this->InitializeEngine();
   }
   void Execute();
-  void InitializeEngine();
   ~Driver();
 
  private:
@@ -39,7 +38,10 @@ class Driver {
   uint64_t num_partitions_;
   // An object to store client threads
   std::vector<std::thread> threads_;
+  // Currently, the benchmark is meant to be used for one flow at a time.
+  FlowName flow_name = "flowX";
 
+  void InitializeEngine();
   absl::flat_hash_map<uint64_t, std::vector<std::vector<Record>>>
   PrepareClientBatches(std::vector<std::vector<Record>> &&all_batches);
 };

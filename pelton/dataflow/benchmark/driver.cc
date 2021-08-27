@@ -99,33 +99,30 @@ void Driver::Execute() {
 }
 
 void Driver::InitializeEngine() {
+  this->dataflow_engine_ =
+      std::make_shared<DataFlowEngine>(this->num_partitions_);
   switch (this->graph_type_) {
     case utils::GraphType::FILTER_GRAPH: {
-      this->dataflow_engine_ =
-          std::make_shared<DataFlowEngine>(this->num_partitions_);
       // Make schema
       SchemaRef schema = utils::MakeFilterSchema();
       this->dataflow_engine_->AddTableSchema("test-table", schema);
       this->input_names_ = std::vector<TableName>{"test-table"};
       // Make graph
       auto graph = utils::MakeFilterGraph(0, schema);
-      std::string flow_name = "flowX";
-      this->dataflow_engine_->AddFlow(flow_name, graph);
+      this->dataflow_engine_->AddFlow(this->flow_name, graph);
       // Set markers in all matviews
       // For the filter graph, records are constructed such that, all records
       // will be distributed evenly across all partitions.
       uint64_t records_per_partition = (uint64_t)floor(
           (this->num_batches_ * this->batch_size_) / this->num_partitions_);
       for (auto matview :
-           this->dataflow_engine_->GetPartitionedMatViews(flow_name)) {
+           this->dataflow_engine_->GetPartitionedMatViews(this->flow_name)) {
         matview->SetMarker(records_per_partition);
       }
     }
       break;
     case utils::GraphType::EQUIJOIN_GRAPH_WITH_EXCHANGE:
     case utils::GraphType::EQUIJOIN_GRAPH_WITHOUT_EXCHANGE: {
-      this->dataflow_engine_ =
-          std::make_shared<DataFlowEngine>(this->num_partitions_);
       SchemaRef left_schema = utils::MakeEquiJoinLeftSchema();
       SchemaRef right_schema = utils::MakeEquiJoinRightSchema();
       this->dataflow_engine_->AddTableSchema("test-table1", left_schema);
@@ -138,15 +135,14 @@ void Driver::InitializeEngine() {
       } else {
         graph = utils::MakeEquiJoinGraph(1, 1, 1, left_schema, right_schema);
       }
-      std::string flow_name = "flowX";
-      this->dataflow_engine_->AddFlow(flow_name, graph);
+      this->dataflow_engine_->AddFlow(this->flow_name, graph);
       // Set markers in all matviews
       // For the filter graph, records are constructed such that, all records
       // will be distributed evenly across all partitions.
       uint64_t records_per_partition = (uint64_t)floor(
           (this->num_batches_ * this->batch_size_) / this->num_partitions_);
       for (auto matview :
-           this->dataflow_engine_->GetPartitionedMatViews(flow_name)) {
+           this->dataflow_engine_->GetPartitionedMatViews(this->flow_name)) {
         matview->SetMarker(records_per_partition);
       }
     } break;

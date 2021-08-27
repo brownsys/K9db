@@ -1,7 +1,6 @@
 #include "pelton/dataflow/benchmark/driver.h"
 #include "pelton/dataflow/benchmark/utils.h"
 
-// NOTE: Ensure that #batches % #clients = 0
 DEFINE_uint64(graph_type, 0, "GraphType as defined in benchmark_utils.h");
 DEFINE_uint64(num_batches, 300000, "Number of batches");
 DEFINE_uint64(batch_size, 1, "Number of records per batch");
