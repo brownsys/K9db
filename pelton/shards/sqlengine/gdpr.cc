@@ -27,6 +27,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
   const std::string &shard_kind = stmt.shard_kind();
   const std::string &user_id = stmt.user_id();
   bool is_forget = stmt.operation() == sqlast::GDPRStatement::Operation::FORGET;
+  auto &exec = state->executor();
   for (const auto &table_name : state->TablesInShard(shard_kind)) {
     sql::SqlResult table_result;
     dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
@@ -36,15 +37,21 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
         continue;
       }
 
+      // Augment returned results with the user_id.
+      int aug_index = -1;
+      if (!info.IsTransitive()) {
+        aug_index = info.shard_by_index;
+      }
+
       if (is_forget) {
         sqlast::Delete tbl_stmt{info.sharded_table_name, update_flows};
-        table_result.Append(
-            state->executor().ExecuteShard(&tbl_stmt, info, user_id, schema));
+        table_result.Append(exec.ExecuteShard(&tbl_stmt, shard_kind, user_id,
+                                              schema, aug_index));
       } else {  // sqlast::GDPRStatement::Operation::GET
         sqlast::Select tbl_stmt{info.sharded_table_name};
         tbl_stmt.AddColumn("*");
-        table_result.Append(
-            state->executor().ExecuteShard(&tbl_stmt, info, user_id, schema));
+        table_result.Append(exec.ExecuteShard(&tbl_stmt, shard_kind, user_id,
+                                              schema, aug_index));
       }
     }
 
@@ -60,7 +67,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       result.AddResultSet(table_result.NextResultSet());
     }
   }
-  std::cout << stmt.shard_kind() << " :: " << stmt.user_id() << std::endl;
 
   perf::End("GDPR");
   if (is_forget) {

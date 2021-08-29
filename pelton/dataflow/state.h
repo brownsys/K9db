@@ -56,7 +56,7 @@ class DataFlowState {
   void ProcessRecords(const TableName &table_name,
                       const std::vector<Record> &records);
 
-  uint64_t SizeInMemory() const;
+  void PrintSizeInMemory() const;
 
  private:
   // Maps every table to its logical schema.

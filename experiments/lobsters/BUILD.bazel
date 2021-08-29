@@ -1,1 +1,1 @@
-exports_files(glob(["*.sql"]))
+exports_files(glob(["schema/*.sql"]))

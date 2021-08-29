@@ -1,5 +1,7 @@
 #include "tests/common.h"
 
+#include <stdarg.h>
+
 #include <algorithm>
 #include <fstream>
 #include <iostream>
@@ -110,10 +112,8 @@ std::vector<std::vector<std::string>> ReadExpected(const std::string &file) {
 }
 
 // Setup the database for testing. This includes its schema, views, and content.
-void InitializeDatabase(const std::string &db_name,
-                        const std::string &schema_file,
-                        const std::string &views_file,
-                        const std::string &inserts_file) {
+void InitializeDatabase(const std::string &db_name, size_t file_count,
+                        va_list file_path_args) {
   const std::string &db_username = FLAGS_db_username;
   const std::string &db_password = FLAGS_db_password;
 
@@ -131,26 +131,13 @@ void InitializeDatabase(const std::string &db_name,
   }
 
   // Create all the tables.
-  LOG(INFO) << "Create the tables ... ";
-  auto schema = ReadSQL(schema_file);
-  for (const std::string &create : schema) {
-    CHECK(pelton::exec(connection, create).ok());
-  }
-
-  // Add flows.
-  if (views_file != "") {
-    LOG(INFO) << "Installing flows ... ";
-    auto flows = ReadSQL(views_file);
-    for (const auto &flow : flows) {
-      CHECK(pelton::exec(connection, flow).ok());
+  for (size_t i = 0; i < file_count; i++) {
+    const char *file_path = va_arg(file_path_args, const char *);
+    LOG(INFO) << "Executing file " << file_path;
+    auto commands = ReadSQL(file_path);
+    for (const std::string &command : commands) {
+      CHECK(pelton::exec(connection, command).ok());
     }
-  }
-
-  // Insert data into the tables.
-  LOG(INFO) << "Insert data into tables ... ";
-  auto inserts = ReadSQL(inserts_file);
-  for (const std::string &insert : inserts) {
-    CHECK(pelton::exec(connection, insert).ok());
   }
 }
 
@@ -168,8 +155,11 @@ void TearDown(const std::string &db_name) {
 }  // namespace
 
 int TestingMain(int argc, char **argv, const std::string &testname,
-                const std::string &schema_file, const std::string &views_file,
-                const std::string &inserts_file) {
+                size_t file_count, ...) {
+  // Setup va list containing variadic file paths.
+  va_list file_path_args;
+  va_start(file_path_args, file_count);
+
   // Command line arugments and help message.
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   const std::string &db_name = testname + "_test";
@@ -179,13 +169,16 @@ int TestingMain(int argc, char **argv, const std::string &testname,
   ::testing::InitGoogleTest(&argc, argv);
 
   // Setup the schema (once).
-  InitializeDatabase(db_name, schema_file, views_file, inserts_file);
+  InitializeDatabase(db_name, file_count, file_path_args);
 
   // Run tests.
   auto result = RUN_ALL_TESTS();
 
   // Tear down database.
   TearDown(db_name);
+
+  // Clean up the va list.
+  va_end(file_path_args);
 
   return result;
 }

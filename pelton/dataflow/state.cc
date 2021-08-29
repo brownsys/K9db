@@ -6,6 +6,7 @@
 #include "pelton/dataflow/state.h"
 
 #include <fstream>
+#include <iostream>
 #include <memory>
 #include <utility>
 
@@ -100,12 +101,16 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
 }
 
 // Size in memory of all the dataflow graphs.
-uint64_t DataFlowState::SizeInMemory() const {
-  uint64_t size = 0;
-  for (const auto &[_, flow] : this->flows_) {
-    size += flow->SizeInMemory();
+void DataFlowState::PrintSizeInMemory() const {
+  uint64_t total_size = 0;
+  for (const auto &[fname, flow] : this->flows_) {
+    uint64_t flow_size = flow.SizeInMemory();
+    uint64_t flow_size_mb = flow_size / 1024 / 1024;
+    std::cout << fname << ": " << flow_size_mb << "MB" << std::endl;
+    total_size += flow_size;
   }
-  return size;
+  std::cout << "Total size: " << (total_size / 1204 / 1024) << "MB"
+            << std::endl;
 }
 
 // Load state from its durable file (if exists).

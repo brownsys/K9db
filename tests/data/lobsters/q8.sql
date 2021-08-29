@@ -1,1 +1,2 @@
 SELECT * FROM q8 WHERE id = 0;
+SELECT * FROM users WHERE id = 0;
