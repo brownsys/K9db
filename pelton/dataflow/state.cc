@@ -101,7 +101,7 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
 }
 
 // Size in memory of all the dataflow graphs.
-void DataFlowState::SizeInMemory() const {
+void DataFlowState::PrintSizeInMemory() const {
   uint64_t total_size = 0;
   for (const auto &[fname, flow] : this->flows_) {
     uint64_t flow_size = flow.SizeInMemory();

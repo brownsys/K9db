@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
   std::cout << std::endl;
 
   // Print flows memory usage.
-  connection.SizeInMemory();
+  connection.PrintSizeInMemory();
 
   // Close connection.
   pelton::close(&connection);

@@ -168,7 +168,7 @@ int main(int argc, char **argv) {
               << std::endl;
 
     // Print flows memory usage.
-    connection.SizeInMemory();
+    connection.PrintSizeInMemory();
 
     auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(
         end_time - start_time);
