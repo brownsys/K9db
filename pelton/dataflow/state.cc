@@ -104,7 +104,7 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
 void DataFlowState::PrintSizeInMemory() const {
   uint64_t total_size = 0;
   for (const auto &[fname, flow] : this->flows_) {
-    uint64_t flow_size = flow.SizeInMemory();
+    uint64_t flow_size = flow->SizeInMemory();
     uint64_t flow_size_mb = flow_size / 1024 / 1024;
     std::cout << fname << ": " << flow_size_mb << "MB" << std::endl;
     total_size += flow_size;
