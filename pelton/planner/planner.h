@@ -2,8 +2,8 @@
 #ifndef PELTON_PLANNER_PLANNER_H_
 #define PELTON_PLANNER_PLANNER_H_
 
-#include <string>
 #include <memory>
+#include <string>
 
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/state.h"
