@@ -14,7 +14,9 @@ namespace dataflow {
 
 class Channel {
  public:
-  explicit Channel(uint64_t capacity = 10000) : capacity_(capacity) {}
+  explicit Channel(std::shared_ptr<std::condition_variable> not_empty,
+                   uint64_t capacity = 10000)
+      : not_empty_(not_empty), capacity_(capacity) {}
   // Cannot copy a channel.
   Channel(const Channel &other) = delete;
   Channel &operator=(const Channel &other) = delete;
@@ -25,18 +27,23 @@ class Channel {
       not_full_.wait(lock);
     }
     queue_.push_back(message);
-    // Since we follow a multiple producer-single consumer model, only one
-    // thread ends up getting notified.
-    not_empty_.notify_all();
+    // Only a single thread (that is responsible for nth partitions of all
+    // flows) is supposed to be waiting on this condition variable. Hence only
+    // one threads ends up getting notified.
+    not_empty_->notify_all();
     return true;
   }
 
   // The queue gets flushed since we are following a multiple producer-single
   // consumer pattern
-  std::vector<std::shared_ptr<Message>> Recv() {
+  std::optional<std::vector<std::shared_ptr<Message>>> Recv() {
     std::unique_lock<std::mutex> lock(mtx_);
-    while (queue_.size() == 0) {
-      not_empty_.wait(lock);
+    // TODO(Ishan): It may be a little unsafe but consider performing the queue
+    // empty check without grabbing the above lock.
+    if (queue_.size() == 0) {
+      // In order to support reading from multiple channels, reads from empty
+      // channels do not block.
+      return std::nullopt;
     }
     std::vector<std::shared_ptr<Message>> messages;
     while (!queue_.empty()) {
@@ -59,7 +66,7 @@ class Channel {
  private:
   std::deque<std::shared_ptr<Message>> queue_;
   std::mutex mtx_;
-  std::condition_variable not_empty_;
+  std::shared_ptr<std::condition_variable> not_empty_;
   std::condition_variable not_full_;
   uint64_t capacity_;
 };
