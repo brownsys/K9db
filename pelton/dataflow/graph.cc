@@ -132,6 +132,7 @@ std::shared_ptr<DataFlowGraph> DataFlowGraph::Clone() {
   }
   // Edges can be trivially copied
   clone->edges_ = this->edges_;
+  clone->index_ = this->index_;
   return clone;
 }
 
