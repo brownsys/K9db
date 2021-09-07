@@ -104,8 +104,12 @@ class DataFlowEngine {
   absl::flat_hash_map<PartitionID, std::shared_ptr<Worker>> workers_;
   // Channels reserved for facilitating communication between external entities
   // (mostly clients) and the partitions.
+  // For clients, since we are following a single producer single consumer
+  // pattern, one channel is reserved per partition per input operator.
   absl::flat_hash_map<
-      FlowName, absl::flat_hash_map<PartitionID, std::shared_ptr<Channel>>>
+      FlowName, absl::flat_hash_map<
+                    PartitionID,
+                    absl::flat_hash_map<NodeIndex, std::shared_ptr<Channel>>>>
       partition_chans_;
   absl::flat_hash_map<FlowName,
                       absl::flat_hash_map<TableName, std::vector<ColumnID>>>

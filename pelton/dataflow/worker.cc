@@ -51,8 +51,8 @@ void Worker::Start() {
             case Message::Type::BATCH: {
               auto batch_msg = std::dynamic_pointer_cast<BatchMessage>(msg);
               this->graphs_.at(channel->graph_index())
-                  ->Process(batch_msg->destination_index(),
-                            batch_msg->source_index(),
+                  ->Process(channel->destination_index(),
+                            channel->source_index(),
                             batch_msg->ConsumeRecords());
             } break;
             case Message::Type::STOP: {

@@ -71,16 +71,31 @@ void DataFlowEngine::AddFlow(const FlowName &name,
   for (const auto &[input_name, input] : flow->inputs()) {
     this->flows_per_input_table_[input_name].push_back(name);
   }
-  // Tasks related to the dataflow engine
+
+  // Core tasks of the parallel dataflow engine: cloning, traversal and
+  // deployment
   this->partitioned_graphs_.emplace(
       name, absl::flat_hash_map<PartitionID, std::shared_ptr<DataFlowGraph>>{});
   this->partition_chans_.emplace(
-      name, absl::flat_hash_map<PartitionID, std::shared_ptr<Channel>>{});
+      name, absl::flat_hash_map<
+                PartitionID,
+                absl::flat_hash_map<NodeIndex, std::shared_ptr<Channel>>>{});
+
   for (PartitionID i = 0; i < this->partition_count_; i++) {
-    std::shared_ptr<Channel> comm_chan = std::make_shared<Channel>(
-        this->workers_.at(i)->condition_variable(), this->workers_.at(i));
-    comm_chan->SetGraphIndex(flow->index());
-    this->partition_chans_.at(name).emplace(i, comm_chan);
+    // Setup channels for clients, reserve one channel per partition per input
+    // operator.
+    this->partition_chans_.at(name).emplace(
+        i, absl::flat_hash_map<NodeIndex, std::shared_ptr<Channel>>{});
+    for (const auto &[_, input_op] : flow->inputs()) {
+      std::shared_ptr<Channel> comm_chan = std::make_shared<Channel>(
+          this->workers_.at(i)->condition_variable(), this->workers_.at(i));
+      comm_chan->SetGraphIndex(flow->index());
+      comm_chan->SetDestinationIndex(input_op->index());
+      this->partition_chans_.at(name).at(i).emplace(input_op->index(),
+                                                    comm_chan);
+    }
+
+    // Clone the base graph.
     std::shared_ptr<DataFlowGraph> partition = flow->Clone();
     partition->SetPartitionID(i);
     this->partitioned_graphs_.at(name).emplace(i, partition);
@@ -105,7 +120,10 @@ void DataFlowEngine::AddFlow(const FlowName &name,
   // The workers must monitor channels that have been reserved for
   // clients as well.
   for (const auto &[partition, worker] : this->workers_) {
-    worker->MonitorChannel(this->partition_chans_.at(name).at(partition));
+    for (const auto &[_, chan] :
+         this->partition_chans_.at(name).at(partition)) {
+      worker->MonitorChannel(chan);
+    }
   }
   // Deploy one worker per thread
   for (const auto &[_, worker] : this->workers_) {
@@ -290,7 +308,7 @@ void DataFlowEngine::AddExchangeAfter(NodeIndex parent_index,
         exchange_chans, partition_key, partition, this->partition_count_);
     partitioned_graph->InsertNodeAfter(
         exchange_op, partitioned_graph->GetNode(parent_index));
-
+    exchange_op->InitChanIndices();
     // Workers should monitor appropriate channels
     for (const auto &[partition, chan] : exchange_chans) {
       this->workers_.at(partition)->MonitorChannel(chan);
@@ -395,11 +413,13 @@ void DataFlowEngine::ProcessRecords(const TableName &table_name,
               records, input_partition_key, this->partition_count_);
       // Send batch messages to appropriate partitions
       auto flow = this->flows_.at(name);
-      for (auto &item : partitioned_records) {
+      for (auto &[partition, r] : partitioned_records) {
         auto input_op = flow->inputs().at(table_name);
-        auto batch_msg = std::make_shared<BatchMessage>(input_op->index(),
-                                                        std::move(item.second));
-        this->partition_chans_.at(name).at(item.first)->Send(batch_msg);
+        auto batch_msg = std::make_shared<BatchMessage>(std::move(r));
+        this->partition_chans_.at(name)
+            .at(partition)
+            .at(input_op->index())
+            ->Send(batch_msg);
       }
     }
   }
@@ -504,7 +524,11 @@ DataFlowEngine::~DataFlowEngine() {
   // terminate.
   for (auto const &item1 : this->partition_chans_) {
     for (auto const &item2 : item1.second) {
-      item2.second->Send(stop_msg);
+      for (auto const &item3 : item2.second) {
+        item3.second->Send(stop_msg);
+        // Send stop message on any single input operator's channel.
+        break;
+      }
     }
     break;
   }
