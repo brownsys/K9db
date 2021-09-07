@@ -29,7 +29,7 @@ class Channel {
 
   bool Send(std::shared_ptr<Message> message);
 
-  // The queue gets flushed since we are following a multiple producer-single
+  // The queue gets flushed since we are following a single producer-single
   // consumer pattern
   std::optional<std::vector<std::shared_ptr<Message>>> Recv();
 
@@ -43,9 +43,16 @@ class Channel {
   void SetGraphIndex(GraphIndex graph_index) {
     this->graph_index_ = graph_index;
   }
-
+  void SetSourceIndex(NodeIndex source_index) {
+    this->source_index_ = source_index;
+  }
+  void SetDestinationIndex(NodeIndex destination_index) {
+    this->destination_index_ = destination_index;
+  }
   // Accessors
   const GraphIndex &graph_index() { return this->graph_index_; }
+  const std::optional<NodeIndex> source_index() { return this->source_index_; }
+  const NodeIndex destination_index() { return this->destination_index_; }
 
  private:
   std::deque<std::shared_ptr<Message>> queue_;
@@ -56,6 +63,11 @@ class Channel {
   GraphIndex graph_index_;
   std::weak_ptr<Worker> destination_worker_;
   uint64_t capacity_;
+  // If @source_index_ is null it implies that the records are meant for an
+  // input operator and are being sent by the dataflow engine. Else they are
+  // being sent by an exchange operator.
+  std::optional<NodeIndex> source_index_;
+  NodeIndex destination_index_;
 };
 
 }  // namespace dataflow
