@@ -14,6 +14,7 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/stop_message.h"
 #include "pelton/dataflow/types.h"
+#include "pelton/dataflow/worker.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/ints.h"
 
@@ -39,9 +40,11 @@ TEST(ExchangeOperatorTest, BasicTest) {
   // Make use of a single dummy condition variable for testing purposes.
   std::shared_ptr<std::condition_variable> cv =
       std::make_shared<std::condition_variable>();
-  partition_chans.emplace(0, std::make_shared<Channel>(cv));
-  partition_chans.emplace(1, std::make_shared<Channel>(cv));
-  partition_chans.emplace(2, std::make_shared<Channel>(cv));
+  // Make use of a dummy worker
+  std::shared_ptr<Worker> worker = std::make_shared<Worker>(0, cv);
+  partition_chans.emplace(0, std::make_shared<Channel>(cv, worker));
+  partition_chans.emplace(1, std::make_shared<Channel>(cv, worker));
+  partition_chans.emplace(2, std::make_shared<Channel>(cv, worker));
 
   // A basic dataflow graph needs to be setup because the exchange operator
   // makes use of it's graph pointer

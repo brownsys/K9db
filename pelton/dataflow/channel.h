@@ -12,49 +12,26 @@
 namespace pelton {
 namespace dataflow {
 
+// Forward declarations
+class Worker;
+
 class Channel {
  public:
   explicit Channel(std::shared_ptr<std::condition_variable> not_empty,
+                   std::weak_ptr<Worker> destination_worker,
                    uint64_t capacity = 10000)
-      : not_empty_(not_empty), capacity_(capacity) {}
+      : not_empty_(not_empty),
+        destination_worker_(destination_worker),
+        capacity_(capacity) {}
   // Cannot copy a channel.
   Channel(const Channel &other) = delete;
   Channel &operator=(const Channel &other) = delete;
 
-  bool Send(std::shared_ptr<Message> message) {
-    std::unique_lock<std::mutex> lock(mtx_);
-    while (queue_.size() == capacity_) {
-      not_full_.wait(lock);
-    }
-    queue_.push_back(message);
-    // Only a single thread (that is responsible for nth partitions of all
-    // flows) is supposed to be waiting on this condition variable. Hence only
-    // one threads ends up getting notified.
-    not_empty_->notify_all();
-    return true;
-  }
+  bool Send(std::shared_ptr<Message> message);
 
   // The queue gets flushed since we are following a multiple producer-single
   // consumer pattern
-  std::optional<std::vector<std::shared_ptr<Message>>> Recv() {
-    std::unique_lock<std::mutex> lock(mtx_);
-    // TODO(Ishan): It may be a little unsafe but consider performing the queue
-    // empty check without grabbing the above lock.
-    if (queue_.size() == 0) {
-      // In order to support reading from multiple channels, reads from empty
-      // channels do not block.
-      return std::nullopt;
-    }
-    std::vector<std::shared_ptr<Message>> messages;
-    while (!queue_.empty()) {
-      messages.push_back(queue_.front());
-      queue_.pop_front();
-    }
-    // Since the channel gets flushed upon each Recv, most likely the Send
-    // requests of all the threads that are sleeping could be accomodated.
-    not_full_.notify_all();
-    return messages;
-  }
+  std::optional<std::vector<std::shared_ptr<Message>>> Recv();
 
   size_t size() {
     mtx_.lock();
@@ -63,11 +40,21 @@ class Channel {
     return size;
   }
 
+  void SetGraphIndex(GraphIndex graph_index) {
+    this->graph_index_ = graph_index;
+  }
+
+  // Accessors
+  const GraphIndex &graph_index() { return this->graph_index_; }
+
  private:
   std::deque<std::shared_ptr<Message>> queue_;
   std::mutex mtx_;
   std::shared_ptr<std::condition_variable> not_empty_;
   std::condition_variable not_full_;
+  // Graph/flow that this channel belongs to.
+  GraphIndex graph_index_;
+  std::weak_ptr<Worker> destination_worker_;
   uint64_t capacity_;
 };
 

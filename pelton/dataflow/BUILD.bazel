@@ -16,6 +16,7 @@ cc_library(
         ":channel",
         ":batch-message",
         ":stop-message",
+        ":worker",
         "//pelton/dataflow/ops:input",
         "//pelton/dataflow/ops:matview",
         "//pelton/dataflow/ops:equijoin",
@@ -152,7 +153,6 @@ cc_library(
         ":operator",
         ":record",
         ":types",
-        ":channel",
         ":batch-message",
         "//pelton/dataflow/ops:input",
         "//pelton/dataflow/ops:matview",
@@ -167,6 +167,10 @@ cc_library(
         "message.h",
     ],
     visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":record",
+        ":types",
+    ]
 )
 
 cc_library(
@@ -197,13 +201,36 @@ cc_library(
 
 cc_library(
     name = "channel",
-    srcs = [],
+    srcs = [
+        "channel.cc",
+    ],
     hdrs = [
         "channel.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":message",
+        ":worker",
+    ],
+)
+
+cc_library(
+    name = "worker",
+    srcs = [
+        "worker.cc",
+    ],
+    hdrs = [
+        "worker.h",
+        # Required in order to avoid cyclic dependency of cc_librarys between
+        # "worker" and "channel"
+        "channel.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":batch-message",
+        ":graph",
+        "@glog",
+        "@absl//absl/container:flat_hash_map",
     ],
 )
 

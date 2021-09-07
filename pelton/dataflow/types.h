@@ -8,6 +8,8 @@ namespace dataflow {
 
 typedef uint32_t NodeIndex;
 
+typedef uint32_t GraphIndex;
+
 typedef uint32_t ColumnID;
 
 typedef uint16_t PartitionID;

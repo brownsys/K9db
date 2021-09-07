@@ -8,6 +8,7 @@
 #include "gtest/gtest.h"
 #include "pelton/dataflow/batch_message.h"
 #include "pelton/dataflow/message.h"
+#include "pelton/dataflow/worker.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/ints.h"
 
@@ -27,7 +28,9 @@ TEST(ChannelTest, BasicTest) {
   // Make use of a dummy condition variable only for testing purposes.
   std::shared_ptr<std::condition_variable> cv =
       std::make_shared<std::condition_variable>();
-  std::shared_ptr<Channel> channel = std::make_shared<Channel>(cv);
+  // Make use of a dummy worker
+  std::shared_ptr<Worker> worker = std::make_shared<Worker>(0, cv);
+  std::shared_ptr<Channel> channel = std::make_shared<Channel>(cv, worker);
   SchemaRef schema = CreateSchema();
   // Create records
   std::vector<Record> records;
@@ -57,9 +60,11 @@ TEST(ChannelTest, NonBlockingTest) {
   // Make use of a dummy condition variable only for testing purposes.
   std::shared_ptr<std::condition_variable> cv =
       std::make_shared<std::condition_variable>();
-  std::shared_ptr<Channel> chan1 = std::make_shared<Channel>(cv);
-  std::shared_ptr<Channel> chan2 = std::make_shared<Channel>(cv);
-  std::shared_ptr<Channel> chan3 = std::make_shared<Channel>(cv);
+  // Make use of a dummy worker
+  std::shared_ptr<Worker> worker = std::make_shared<Worker>(0, cv);
+  std::shared_ptr<Channel> chan1 = std::make_shared<Channel>(cv, worker);
+  std::shared_ptr<Channel> chan2 = std::make_shared<Channel>(cv, worker);
+  std::shared_ptr<Channel> chan3 = std::make_shared<Channel>(cv, worker);
   SchemaRef schema = CreateSchema();
   // Create records
   std::vector<Record> records;
