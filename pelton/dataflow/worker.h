@@ -37,8 +37,6 @@ class Worker {
     return this->condition_variable_;
   }
 
-  ~Worker() { LOG(INFO) << "Worker destructor called"; }
-
  private:
   // A worker is responsible for partition @partition_id_ of all flows
   // installed in the system.

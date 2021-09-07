@@ -32,7 +32,6 @@ DataFlowEngine::DataFlowEngine(PartitionID partition_count)
     : partition_count_(partition_count) {
   // Initialize worker objects
   for (PartitionID i = 0; i < this->partition_count_; i++) {
-    LOG(INFO) << "[engine] Creating worker: " << i;
     this->workers_.emplace(i,
                            std::make_shared<Worker>(
                                i, std::make_shared<std::condition_variable>()));
