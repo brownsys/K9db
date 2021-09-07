@@ -34,7 +34,7 @@ class Channel {
     return true;
   }
 
-  // The queue gets flushed since we are following a multiple producer-single
+  // The queue gets flushed since we are following a single producer-single
   // consumer pattern
   std::optional<std::vector<std::shared_ptr<Message>>> Recv() {
     std::unique_lock<std::mutex> lock(mtx_);
@@ -63,12 +63,28 @@ class Channel {
     return size;
   }
 
+  void SetSourceIndex(NodeIndex source_index) {
+    this->source_index_ = source_index;
+  }
+  void SetDestinationIndex(NodeIndex destination_index) {
+    this->destination_index_ = destination_index;
+  }
+
+  // Accessors
+  const std::optional<NodeIndex> source_index() { return this->source_index_; }
+  const NodeIndex destination_index() { return this->destination_index_; }
+
  private:
   std::deque<std::shared_ptr<Message>> queue_;
   std::mutex mtx_;
   std::shared_ptr<std::condition_variable> not_empty_;
   std::condition_variable not_full_;
   uint64_t capacity_;
+  // If @source_index_ is null it implies that the records are meant for an
+  // input operator and are being sent by the dataflow engine. Else they are
+  // being sent by an exchange operator.
+  std::optional<NodeIndex> source_index_;
+  NodeIndex destination_index_;
 };
 
 }  // namespace dataflow

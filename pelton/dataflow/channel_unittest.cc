@@ -39,7 +39,7 @@ TEST(ChannelTest, BasicTest) {
   expected_records.emplace_back(records.at(1).Copy());
 
   std::shared_ptr<BatchMessage> msg =
-      std::make_shared<BatchMessage>(0, 0, std::move(records));
+      std::make_shared<BatchMessage>(std::move(records));
   EXPECT_EQ(records.size(), 0);
   EXPECT_TRUE(channel->Send(msg));
   EXPECT_EQ(channel->size(), 1);
@@ -67,7 +67,7 @@ TEST(ChannelTest, NonBlockingTest) {
   records.emplace_back(schema, true, 2_s, 2_s, 7_s);
 
   std::shared_ptr<BatchMessage> msg =
-      std::make_shared<BatchMessage>(0, 0, std::move(records));
+      std::make_shared<BatchMessage>(std::move(records));
   EXPECT_EQ(records.size(), 0);
   EXPECT_TRUE(chan1->Send(msg));
   EXPECT_EQ(chan1->size(), 1);
