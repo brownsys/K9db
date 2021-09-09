@@ -25,3 +25,11 @@ run:valgrind --run_under "valgrind --error-exitcode=1 --errors-for-leak-kinds=de
 build:opt -c opt  # use bazel default opt config
 build:opt --copt -DPELTON_OPT
 build:opt --host_copt -DPELTON_OPT
+
+# For thread sanitizer
+build:tsan --strip=never
+build:tsan --copt -fsanitize=thread
+build:tsan --copt -g
+build:tsan --copt -O1
+build:tsan --copt -fno-omit-frame-pointer
+build:tsan --linkopt -fsanitize=thread
