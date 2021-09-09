@@ -32,9 +32,12 @@ DataFlowEngine::DataFlowEngine(PartitionID partition_count)
     : partition_count_(partition_count) {
   // Initialize worker objects
   for (PartitionID i = 0; i < this->partition_count_; i++) {
-    this->workers_.emplace(i,
-                           std::make_shared<Worker>(
-                               i, std::make_shared<std::condition_variable>()));
+    auto worker = std::make_shared<Worker>(
+        i, std::make_shared<std::condition_variable>());
+    this->workers_.emplace(i, worker);
+    this->stop_chans_.emplace(
+        i, std::make_shared<Channel>(worker->condition_variable(), worker));
+    worker->MonitorChannel(this->stop_chans_.at(i));
   }
   // Deploy one worker per thread
   for (const auto &[_, worker] : this->workers_) {
@@ -518,19 +521,10 @@ void DataFlowEngine::Save(const std::string &dir_path) {
 DataFlowEngine::~DataFlowEngine() {
   // Give some time for the previously sent records to get processed
   std::this_thread::sleep_for(std::chrono::milliseconds(40));
-  std::shared_ptr<StopMessage> stop_msg = std::make_shared<StopMessage>();
-  // Only send stop messages to all partitions of any flow. This will ensure
-  // that all workers get exactly one stop message which will cause them to
-  // terminate.
-  for (auto const &item1 : this->partition_chans_) {
-    for (auto const &item2 : item1.second) {
-      for (auto const &item3 : item2.second) {
-        item3.second->Send(stop_msg);
-        // Send stop message on any single input operator's channel.
-        break;
-      }
-    }
-    break;
+  // Send stop message to each worker.
+  for (auto const &[_, stop_chan] : this->stop_chans_) {
+    std::shared_ptr<StopMessage> stop_msg = std::make_shared<StopMessage>();
+    stop_chan->Send(stop_msg);
   }
 
   for (auto &thread : this->threads_) {

@@ -102,6 +102,8 @@ class DataFlowEngine {
       partitioned_graphs_;
   // Each worker is responsible for a particular partition of all flows.
   absl::flat_hash_map<PartitionID, std::shared_ptr<Worker>> workers_;
+  // One channel per worker to send stop messages on.
+  absl::flat_hash_map<PartitionID, std::shared_ptr<Channel>> stop_chans_;
   // Channels reserved for facilitating communication between external entities
   // (mostly clients) and the partitions.
   // For clients, since we are following a single producer single consumer
