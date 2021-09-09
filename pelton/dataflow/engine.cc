@@ -36,6 +36,10 @@ DataFlowEngine::DataFlowEngine(PartitionID partition_count)
                            std::make_shared<Worker>(
                                i, std::make_shared<std::condition_variable>()));
   }
+  // Deploy one worker per thread
+  for (const auto &[_, worker] : this->workers_) {
+    this->threads_.push_back(std::thread(&Worker::Start, worker));
+  }
 }
 
 // Manage schemas.
@@ -124,10 +128,6 @@ void DataFlowEngine::AddFlow(const FlowName &name,
          this->partition_chans_.at(name).at(partition)) {
       worker->MonitorChannel(chan);
     }
-  }
-  // Deploy one worker per thread
-  for (const auto &[_, worker] : this->workers_) {
-    this->threads_.push_back(std::thread(&Worker::Start, worker));
   }
 }
 
