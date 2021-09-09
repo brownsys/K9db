@@ -534,8 +534,7 @@ DataFlowEngine::~DataFlowEngine() {
   }
 
   for (auto &thread : this->threads_) {
-    // Since stop messages have been sent, the threads will terminate.
-    thread.detach();
+    thread.join();
   }
 }
 
