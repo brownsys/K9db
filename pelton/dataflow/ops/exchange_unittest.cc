@@ -14,6 +14,7 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/stop_message.h"
 #include "pelton/dataflow/types.h"
+#include "pelton/dataflow/worker.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/ints.h"
 
@@ -33,12 +34,17 @@ inline SchemaRef CreateSchema() {
 TEST(ExchangeOperatorTest, BasicTest) {
   SchemaRef schema = CreateSchema();
 
-  // Create an exchange opertor that belongs to 0th partition and that is
+  // Create an exchange operator that belongs to 0th partition and that is
   // supposed to shard records into three partitions.
   absl::flat_hash_map<PartitionID, std::shared_ptr<Channel>> partition_chans;
-  partition_chans.emplace(0, std::make_shared<Channel>());
-  partition_chans.emplace(1, std::make_shared<Channel>());
-  partition_chans.emplace(2, std::make_shared<Channel>());
+  // Make use of a single dummy condition variable for testing purposes.
+  std::shared_ptr<std::condition_variable> cv =
+      std::make_shared<std::condition_variable>();
+  // Make use of a dummy worker
+  std::shared_ptr<Worker> worker = std::make_shared<Worker>(0, cv);
+  partition_chans.emplace(0, std::make_shared<Channel>(cv, worker));
+  partition_chans.emplace(1, std::make_shared<Channel>(cv, worker));
+  partition_chans.emplace(2, std::make_shared<Channel>(cv, worker));
 
   // A basic dataflow graph needs to be setup because the exchange operator
   // makes use of it's graph pointer
@@ -68,35 +74,45 @@ TEST(ExchangeOperatorTest, BasicTest) {
 
   // Collect records that are meant for other partitions and check if they are
   // as expected.
-  std::vector<std::shared_ptr<Message>> partition1 =
+  std::optional<std::vector<std::shared_ptr<Message>>> partition1 =
       partition_chans.at(1)->Recv();
-  EXPECT_EQ(partition1.size(), 1);
-  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(partition1.at(0))
+  EXPECT_TRUE(partition1.has_value());
+  EXPECT_EQ(partition1.value().size(), 1);
+  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(partition1.value().at(0))
                 ->records()
                 .size(),
             1);
-  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(partition1.at(0))
+  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(partition1.value().at(0))
                 ->records()
                 .at(0),
             records.at(0));
 
-  std::vector<std::shared_ptr<Message>> partition2 =
+  std::optional<std::vector<std::shared_ptr<Message>>> partition2 =
       partition_chans.at(2)->Recv();
-  EXPECT_EQ(partition2.size(), 1);
-  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(partition2.at(0))
+  EXPECT_TRUE(partition2.has_value());
+  EXPECT_EQ(partition2.value().size(), 1);
+  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(partition2.value().at(0))
                 ->records()
                 .size(),
             2);
-  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(partition2.at(0))
+  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(partition2.value().at(0))
                 ->records()
                 .at(0),
             records.at(1));
-  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(partition2.at(0))
+  EXPECT_EQ(std::dynamic_pointer_cast<BatchMessage>(partition2.value().at(0))
                 ->records()
                 .at(1),
             records.at(3));
 
   // Check for current partition (i.e. 0th partition).
+  // Partition0's channel should be empty. Hence, a read from it should not
+  // contain any messages but more importantly should not block.
+  std::optional<std::vector<std::shared_ptr<Message>>> partition0 =
+      partition_chans.at(0)->Recv();
+  EXPECT_FALSE(partition0.has_value());
+  // Instead the output for current partition should be present in the output
+  // vector.
+  EXPECT_TRUE(outputs.has_value());
   EXPECT_EQ(outputs.value().size(), 1);
   EXPECT_EQ(outputs.value().at(0), records.at(2));
 }

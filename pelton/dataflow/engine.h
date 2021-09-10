@@ -17,6 +17,7 @@
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
+#include "pelton/dataflow/worker.h"
 #include "pelton/sqlast/ast.h"
 
 #ifndef PELTON_DATAFLOW_ENGINE_H_
@@ -31,8 +32,7 @@ using FlowName = std::string;
 
 class DataFlowEngine {
  public:
-  explicit DataFlowEngine(PartitionID partition_count = 3)
-      : partition_count_(partition_count) {}
+  explicit DataFlowEngine(PartitionID partition_count = 3);
 
   // Manage schemas.
   void AddTableSchema(const sqlast::CreateTable &create);
@@ -101,8 +101,18 @@ class DataFlowEngine {
       FlowName,
       absl::flat_hash_map<PartitionID, std::shared_ptr<DataFlowGraph>>>
       partitioned_graphs_;
+  // Each worker is responsible for a particular partition of all flows.
+  absl::flat_hash_map<PartitionID, std::shared_ptr<Worker>> workers_;
+  // One channel per worker to send stop messages on.
+  absl::flat_hash_map<PartitionID, std::shared_ptr<Channel>> stop_chans_;
+  // Channels reserved for facilitating communication between external entities
+  // (mostly clients) and the partitions.
+  // For clients, since we are following a single producer single consumer
+  // pattern, one channel is reserved per partition per input operator.
   absl::flat_hash_map<
-      FlowName, absl::flat_hash_map<PartitionID, std::shared_ptr<Channel>>>
+      FlowName, absl::flat_hash_map<
+                    PartitionID,
+                    absl::flat_hash_map<NodeIndex, std::shared_ptr<Channel>>>>
       partition_chans_;
   absl::flat_hash_map<FlowName,
                       absl::flat_hash_map<TableName, std::vector<ColumnID>>>
@@ -113,10 +123,6 @@ class DataFlowEngine {
   std::vector<std::thread> threads_;
   mutable std::shared_mutex mtx_;
 
-  void AddExchangeAfter(NodeIndex parent_index,
-                        std::vector<ColumnID> partition_key,
-                        const FlowName &name);
-
   // Annotate all the nodes in the base graph
   void TraverseBaseGraph(const FlowName &name);
   void AnnotateBaseGraph(std::shared_ptr<DataFlowGraph> graph);
@@ -124,6 +130,12 @@ class DataFlowEngine {
                  std::vector<ColumnID> recent_partition,
                  std::optional<std::shared_ptr<Operator>> *tracking_union,
                  const FlowName &name);
+  absl::flat_hash_map<PartitionID, std::shared_ptr<Channel>>
+  ConstructChansForExchange(PartitionID current_partition,
+                            const FlowName &name) const;
+  void AddExchangeAfter(NodeIndex parent_index,
+                        std::vector<ColumnID> partition_key,
+                        const FlowName &name);
 
   // Allow tests to use protected functions directly
   FRIEND_TEST(DataFlowEngineTest, TestTrivialGraph);

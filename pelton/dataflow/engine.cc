@@ -28,6 +28,23 @@
 namespace pelton {
 namespace dataflow {
 
+DataFlowEngine::DataFlowEngine(PartitionID partition_count)
+    : partition_count_(partition_count) {
+  // Initialize worker objects
+  for (PartitionID i = 0; i < this->partition_count_; i++) {
+    auto worker = std::make_shared<Worker>(
+        i, std::make_shared<std::condition_variable>());
+    this->workers_.emplace(i, worker);
+    this->stop_chans_.emplace(
+        i, std::make_shared<Channel>(worker->condition_variable(), worker));
+    worker->MonitorChannel(this->stop_chans_.at(i));
+  }
+  // Deploy one worker per thread
+  for (const auto &[_, worker] : this->workers_) {
+    this->threads_.push_back(std::thread(&Worker::Start, worker));
+  }
+}
+
 // Manage schemas.
 void DataFlowEngine::AddTableSchema(const sqlast::CreateTable &create) {
   std::unique_lock<std::shared_mutex> lock(this->mtx_);
@@ -61,21 +78,38 @@ SchemaRef DataFlowEngine::GetTableSchema(const TableName &table_name) const {
 void DataFlowEngine::AddFlow(const FlowName &name,
                              const std::shared_ptr<DataFlowGraph> flow) {
   std::unique_lock<std::shared_mutex> lock(this->mtx_);
+  flow->SetIndex(this->flows_.size());
   this->flows_.insert({name, flow});
   for (const auto &[input_name, input] : flow->inputs()) {
     this->flows_per_input_table_[input_name].push_back(name);
   }
 
-  // Tasks related to the dataflow engine
+  // Core tasks of the parallel dataflow engine: cloning, traversal and
+  // deployment
   this->partitioned_graphs_.emplace(
       name, absl::flat_hash_map<PartitionID, std::shared_ptr<DataFlowGraph>>{});
   this->partition_chans_.emplace(
-      name, absl::flat_hash_map<PartitionID, std::shared_ptr<Channel>>{});
+      name, absl::flat_hash_map<
+                PartitionID,
+                absl::flat_hash_map<NodeIndex, std::shared_ptr<Channel>>>{});
+
   for (PartitionID i = 0; i < this->partition_count_; i++) {
-    std::shared_ptr<Channel> comm_chan = std::make_shared<Channel>();
-    this->partition_chans_.at(name).emplace(i, comm_chan);
+    // Setup channels for clients, reserve one channel per partition per input
+    // operator.
+    this->partition_chans_.at(name).emplace(
+        i, absl::flat_hash_map<NodeIndex, std::shared_ptr<Channel>>{});
+    for (const auto &[_, input_op] : flow->inputs()) {
+      std::shared_ptr<Channel> comm_chan = std::make_shared<Channel>(
+          this->workers_.at(i)->condition_variable(), this->workers_.at(i));
+      comm_chan->SetGraphIndex(flow->index());
+      comm_chan->SetDestinationIndex(input_op->index());
+      this->partition_chans_.at(name).at(i).emplace(input_op->index(),
+                                                    comm_chan);
+    }
+
+    // Clone the base graph.
     std::shared_ptr<DataFlowGraph> partition = flow->Clone();
-    partition->SetIndex(i);
+    partition->SetPartitionID(i);
     this->partitioned_graphs_.at(name).emplace(i, partition);
   }
   // Initialize data structures for input partitions
@@ -90,11 +124,18 @@ void DataFlowEngine::AddFlow(const FlowName &name,
   }
 
   this->TraverseBaseGraph(name);
-  // Deploy one partition per thread
-  for (PartitionID i = 0; i < this->partition_count_; i++) {
-    this->threads_.push_back(std::thread(
-        &DataFlowGraph::Start, this->partitioned_graphs_.at(name).at(i),
-        this->partition_chans_.at(name).at(i)));
+
+  // Add partitioned graphs to appropriate workers
+  for (const auto &[partition, graph] : this->partitioned_graphs_.at(name)) {
+    this->workers_.at(partition)->AddPartitionedGraph(graph);
+  }
+  // The workers must monitor channels that have been reserved for
+  // clients as well.
+  for (const auto &[partition, worker] : this->workers_) {
+    for (const auto &[_, chan] :
+         this->partition_chans_.at(name).at(partition)) {
+      worker->MonitorChannel(chan);
+    }
   }
 }
 
@@ -244,17 +285,42 @@ void DataFlowEngine::VisitNode(
   }
 }
 
+// Each exchange operator has it's own set of dedicated channels to communicate
+// with other partitions.
+absl::flat_hash_map<PartitionID, std::shared_ptr<Channel>>
+DataFlowEngine::ConstructChansForExchange(PartitionID current_partition,
+                                          const FlowName &name) const {
+  absl::flat_hash_map<PartitionID, std::shared_ptr<Channel>> chans;
+  for (PartitionID i = 0; i < this->partition_count_; i++) {
+    if (i == current_partition) {
+      // The exchange operator does not need a channel to forward records in
+      // it's own partition. It simply uses the recursive process function call.
+      continue;
+    }
+    auto chan = std::make_shared<Channel>(
+        this->workers_.at(i)->condition_variable(), this->workers_.at(i));
+    chan->SetGraphIndex(this->flows_.at(name)->index());
+    chans.emplace(i, chan);
+  }
+  return chans;
+}
+
 void DataFlowEngine::AddExchangeAfter(NodeIndex parent_index,
                                       std::vector<ColumnID> partition_key,
                                       const FlowName &name) {
   for (PartitionID partition = 0; partition < this->partition_count_;
        partition++) {
     auto partitioned_graph = this->partitioned_graphs_.at(name).at(partition);
+    auto exchange_chans = this->ConstructChansForExchange(partition, name);
     auto exchange_op = std::make_shared<ExchangeOperator>(
-        this->partition_chans_.at(name), partition_key, partition,
-        this->partition_count_);
+        exchange_chans, partition_key, partition, this->partition_count_);
     partitioned_graph->InsertNodeAfter(
         exchange_op, partitioned_graph->GetNode(parent_index));
+    exchange_op->InitChanIndices();
+    // Workers should monitor appropriate channels
+    for (const auto &[partition, chan] : exchange_chans) {
+      this->workers_.at(partition)->MonitorChannel(chan);
+    }
   }
 }
 
@@ -366,11 +432,13 @@ void DataFlowEngine::ProcessRecords(const TableName &table_name,
               records, input_partition_key, this->partition_count_);
       // Send batch messages to appropriate partitions
       auto flow = this->flows_.at(name);
-      for (auto &item : partitioned_records) {
+      for (auto &[partition, r] : partitioned_records) {
         auto input_op = flow->inputs().at(table_name);
-        auto batch_msg = std::make_shared<BatchMessage>(input_op->index(),
-                                                        std::move(item.second));
-        this->partition_chans_.at(name).at(item.first)->Send(batch_msg);
+        auto batch_msg = std::make_shared<BatchMessage>(std::move(r));
+        this->partition_chans_.at(name)
+            .at(partition)
+            .at(input_op->index())
+            ->Send(batch_msg);
       }
     }
   }
@@ -470,11 +538,10 @@ void DataFlowEngine::Save(const std::string &dir_path) {
 DataFlowEngine::~DataFlowEngine() {
   // Give some time for the previously sent records to get processed
   std::this_thread::sleep_for(std::chrono::milliseconds(40));
-  std::shared_ptr<StopMessage> stop_msg = std::make_shared<StopMessage>();
-  for (auto const &item1 : this->partition_chans_) {
-    for (auto const &item2 : item1.second) {
-      item2.second->Send(stop_msg);
-    }
+  // Send stop message to each worker.
+  for (auto const &[_, stop_chan] : this->stop_chans_) {
+    std::shared_ptr<StopMessage> stop_msg = std::make_shared<StopMessage>();
+    stop_chan->Send(stop_msg);
   }
 
   for (auto &thread : this->threads_) {

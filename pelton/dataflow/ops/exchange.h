@@ -29,6 +29,10 @@ class ExchangeOperator : public Operator {
         current_partition_(current_partition),
         total_partitions_(total_partitions) {}
 
+  // A helper function to set the source and destination indices of the channels
+  // after the exchange operator is added to a flow.
+  void InitChanIndices();
+
   std::shared_ptr<Operator> Clone() const {
     LOG(FATAL) << "Exchange operator does not support clone";
   }

@@ -12,42 +12,26 @@
 namespace pelton {
 namespace dataflow {
 
+// Forward declarations
+class Worker;
+
 class Channel {
  public:
-  explicit Channel(uint64_t capacity = 10000) : capacity_(capacity) {}
+  explicit Channel(std::shared_ptr<std::condition_variable> not_empty,
+                   std::weak_ptr<Worker> destination_worker,
+                   uint64_t capacity = 10000)
+      : not_empty_(not_empty),
+        destination_worker_(destination_worker),
+        capacity_(capacity) {}
   // Cannot copy a channel.
   Channel(const Channel &other) = delete;
   Channel &operator=(const Channel &other) = delete;
 
-  bool Send(std::shared_ptr<Message> message) {
-    std::unique_lock<std::mutex> lock(mtx_);
-    while (queue_.size() == capacity_) {
-      not_full_.wait(lock);
-    }
-    queue_.push_back(message);
-    // Since we follow a multiple producer-single consumer model, only one
-    // thread ends up getting notified.
-    not_empty_.notify_all();
-    return true;
-  }
+  bool Send(std::shared_ptr<Message> message);
 
-  // The queue gets flushed since we are following a multiple producer-single
+  // The queue gets flushed since we are following a single producer-single
   // consumer pattern
-  std::vector<std::shared_ptr<Message>> Recv() {
-    std::unique_lock<std::mutex> lock(mtx_);
-    while (queue_.size() == 0) {
-      not_empty_.wait(lock);
-    }
-    std::vector<std::shared_ptr<Message>> messages;
-    while (!queue_.empty()) {
-      messages.push_back(queue_.front());
-      queue_.pop_front();
-    }
-    // Since the channel gets flushed upon each Recv, most likely the Send
-    // requests of all the threads that are sleeping could be accomodated.
-    not_full_.notify_all();
-    return messages;
-  }
+  std::optional<std::vector<std::shared_ptr<Message>>> Recv();
 
   size_t size() {
     mtx_.lock();
@@ -56,12 +40,34 @@ class Channel {
     return size;
   }
 
+  void SetGraphIndex(GraphIndex graph_index) {
+    this->graph_index_ = graph_index;
+  }
+  void SetSourceIndex(NodeIndex source_index) {
+    this->source_index_ = source_index;
+  }
+  void SetDestinationIndex(NodeIndex destination_index) {
+    this->destination_index_ = destination_index;
+  }
+  // Accessors
+  const GraphIndex &graph_index() { return this->graph_index_; }
+  const std::optional<NodeIndex> source_index() { return this->source_index_; }
+  const NodeIndex destination_index() { return this->destination_index_; }
+
  private:
   std::deque<std::shared_ptr<Message>> queue_;
   std::mutex mtx_;
-  std::condition_variable not_empty_;
+  std::shared_ptr<std::condition_variable> not_empty_;
   std::condition_variable not_full_;
+  // Graph/flow that this channel belongs to.
+  GraphIndex graph_index_;
+  std::weak_ptr<Worker> destination_worker_;
   uint64_t capacity_;
+  // If @source_index_ is null it implies that the records are meant for an
+  // input operator and are being sent by the dataflow engine. Else they are
+  // being sent by an exchange operator.
+  std::optional<NodeIndex> source_index_;
+  NodeIndex destination_index_;
 };
 
 }  // namespace dataflow

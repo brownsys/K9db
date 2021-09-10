@@ -4,7 +4,6 @@
 
 #include "glog/logging.h"
 #include "pelton/dataflow/batch_message.h"
-#include "pelton/dataflow/channel.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/ops/matview.h"
@@ -133,25 +132,8 @@ std::shared_ptr<DataFlowGraph> DataFlowGraph::Clone() {
   }
   // Edges can be trivially copied
   clone->edges_ = this->edges_;
+  clone->index_ = this->index_;
   return clone;
-}
-
-void DataFlowGraph::Start(std::shared_ptr<Channel> incoming_chan) const {
-  while (true) {
-    std::vector<std::shared_ptr<Message>> messages = incoming_chan->Recv();
-    for (auto msg : messages) {
-      switch (msg->type()) {
-        case Message::Type::BATCH: {
-          auto batch_msg = std::dynamic_pointer_cast<BatchMessage>(msg);
-          this->Process(batch_msg->destination_index(),
-                        batch_msg->source_index(), batch_msg->ConsumeRecords());
-        } break;
-        case Message::Type::STOP:
-          // Terminate this thread
-          return;
-      }
-    }
-  }
 }
 
 std::string DataFlowGraph::DebugString() const {

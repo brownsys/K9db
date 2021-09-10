@@ -12,6 +12,19 @@
 namespace pelton {
 namespace dataflow {
 
+void ExchangeOperator::InitChanIndices() {
+  // Set the source as the current exchange op's index
+  NodeIndex source_index = this->index();
+  // Set the "destination" node for the message as the child of this
+  // exchange operator.
+  CHECK_EQ(this->children_.size(), static_cast<size_t>(1));
+  NodeIndex destination_index = this->children_.at(0);
+  for (const auto &[_, chan] : this->partition_chans_) {
+    chan->SetSourceIndex(source_index);
+    chan->SetDestinationIndex(destination_index);
+  }
+}
+
 void ExchangeOperator::ComputeOutputSchema() {
   this->output_schema_ = this->input_schemas_.at(0);
 }
@@ -40,14 +53,7 @@ std::optional<std::vector<Record>> ExchangeOperator::Process(
     if (item.first == this->current_partition_) {
       continue;
     }
-    // Set the "destination" node for the message as the child of this
-    // exchange operator.
-    NodeIndex destination_index =
-        this->graph()->GetNode(this->children_.at(0))->index();
-    // Set the source as the current node's index.
-    NodeIndex source_index = this->index();
-    auto msg = std::make_shared<BatchMessage>(destination_index, source_index,
-                                              std::move(item.second));
+    auto msg = std::make_shared<BatchMessage>(std::move(item.second));
     this->partition_chans_.at(item.first)->Send(msg);
   }
   return std::move(output);
