@@ -195,8 +195,9 @@ class MatViewOperatorT : public MatViewOperator {
             std::chrono::duration_cast<std::chrono::milliseconds>(
                 time_point.time_since_epoch())
                 .count());
-        std::string log = "[matview" + std::to_string(this->graph()->index()) +
-                          "] " + time_milliseconds + "\n";
+        std::string log = "[matview" +
+                          std::to_string(this->graph()->partition_id()) + "] " +
+                          time_milliseconds + "\n";
         std::cout << log;
       }
     }
