@@ -43,11 +43,6 @@ class AggregateOperator : public Operator {
     return this->group_columns_;
   }
 
-  ~AggregateOperator() {
-    // Ensure that schemas are not destructed first
-    state_.~GroupedDataT();
-  }
-
  protected:
   std::optional<std::vector<Record>> Process(
       NodeIndex /*source*/, const std::vector<Record> &records) override;

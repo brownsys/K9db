@@ -28,6 +28,7 @@ enum class GraphType {
   FILTER_GRAPH,
   EQUIJOIN_GRAPH_WITH_EXCHANGE,
   EQUIJOIN_GRAPH_WITHOUT_EXCHANGE,
+  AGGREGATE_GRAPH_WITHOUT_EXCHANGE,
 };
 
 using CType = sqlast::ColumnDefinition::Type;
@@ -35,11 +36,14 @@ using CType = sqlast::ColumnDefinition::Type;
 extern SchemaRef MakeFilterSchema();
 extern SchemaRef MakeEquiJoinLeftSchema();
 extern SchemaRef MakeEquiJoinRightSchema();
+extern SchemaRef MakeAggregateSchema();
 extern std::vector<std::vector<Record>> MakeFilterBatches(uint64_t num_batches,
                                                           uint64_t batch_size);
 extern std::vector<std::vector<Record>> MakeEquiJoinLeftBatches(
     uint64_t num_batches, uint64_t batch_size);
 extern std::vector<std::vector<Record>> MakeEquiJoinRightBatches(
+    uint64_t num_batches, uint64_t batch_size);
+extern std::vector<std::vector<Record>> MakeAggregateBatches(
     uint64_t num_batches, uint64_t batch_size);
 extern std::shared_ptr<DataFlowGraph> MakeFilterGraph(ColumnID keycol,
                                                       const SchemaRef &schema);
@@ -47,6 +51,9 @@ extern std::shared_ptr<DataFlowGraph> MakeFilterGraph(ColumnID keycol,
 extern std::shared_ptr<DataFlowGraph> MakeEquiJoinGraph(
     ColumnID ok, ColumnID lk, ColumnID rk, const SchemaRef &lschema,
     const SchemaRef &rschema);
+
+extern std::shared_ptr<DataFlowGraph> MakeAggregateGraph(
+    ColumnID keycol, const SchemaRef &schema, std::vector<ColumnID> group_cols);
 
 }  // namespace utils
 }  // namespace dataflow

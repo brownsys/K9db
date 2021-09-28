@@ -94,6 +94,31 @@ void Driver::Execute() {
             memfunc, client, std::move(client_batches_right.at(i))));
       }
     } break;
+    case utils::GraphType::AGGREGATE_GRAPH_WITHOUT_EXCHANGE: {
+      std::vector<std::vector<Record>> batches =
+          utils::MakeAggregateBatches(this->num_batches_, this->batch_size_);
+      // Prime the partitions with left batches
+      // for (size_t i = 0; i < batches.size(); i++) {
+      //   this->dataflow_engine_->PrimeDataFlow(this->input_names_.at(0),
+      //                                          std::move(batches.at(i)));
+      // }
+      auto client_batches = this->PrepareClientBatches(std::move(batches));
+      // Select appropriate overloaded function
+      void (Client::*memfunc)(std::vector<std::vector<Record>> &&) =
+          &Client::Start;
+      auto time_point = std::chrono::system_clock::now();
+      std::cout << "Start: "
+                << std::chrono::duration_cast<std::chrono::milliseconds>(
+                       time_point.time_since_epoch())
+                       .count()
+                << std::endl;
+      for (uint64_t i = 0; i < this->num_clients_; i++) {
+        Client client(i, this->dataflow_engine_, this->graph_type_,
+                      this->input_names_);
+        this->threads_.emplace_back(
+            std::thread(memfunc, client, std::move(client_batches.at(i))));
+      }
+    } break;
     default:
       LOG(FATAL) << "Unsupported graph type";
   }
@@ -139,6 +164,27 @@ void Driver::InitializeEngine() {
       // Set markers in all matviews
       // For the filter graph, records are constructed such that, all records
       // will be distributed evenly across all partitions.
+      uint64_t records_per_partition = (uint64_t)floor(
+          (this->num_batches_ * this->batch_size_) / this->num_partitions_);
+      for (auto matview :
+           this->dataflow_engine_->GetPartitionedMatViews(this->flow_name)) {
+        matview->SetMarker(records_per_partition);
+      }
+    } break;
+    case utils::GraphType::AGGREGATE_GRAPH_WITHOUT_EXCHANGE: {
+      // Make schema
+      SchemaRef schema = utils::MakeAggregateSchema();
+      this->dataflow_engine_->AddTableSchema("test-table", schema);
+      this->input_names_ = std::vector<TableName>{"test-table"};
+      // Make graph
+      auto graph =
+          utils::MakeAggregateGraph(0, schema, std::vector<ColumnID>{1});
+      this->dataflow_engine_->AddFlow(this->flow_name, graph);
+      // Set markers in all matviews
+      // The aggregate operator is keyed on a column and uses an aggregate
+      // function such that it will emit, one output record per input record.
+      // And the output records will be distributed evenly across all
+      // partitions.
       uint64_t records_per_partition = (uint64_t)floor(
           (this->num_batches_ * this->batch_size_) / this->num_partitions_);
       for (auto matview :
