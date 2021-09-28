@@ -34,10 +34,10 @@ Driver::PrepareClientBatches(std::vector<std::vector<Record>> &&all_batches) {
   }
   // Move any remaining batches as well. Batches may remain because
   // #batches % #clients may not be zero.
-  client_batches.at(this->num_clients_ - 1).insert(
-  client_batches.at(this->num_clients_ - 1).end(),
-  std::make_move_iterator(all_batches.begin() + read_index),
-  std::make_move_iterator(all_batches.end()));
+  client_batches.at(this->num_clients_ - 1)
+      .insert(client_batches.at(this->num_clients_ - 1).end(),
+              std::make_move_iterator(all_batches.begin() + read_index),
+              std::make_move_iterator(all_batches.end()));
 
   return client_batches;
 }
@@ -71,13 +71,15 @@ void Driver::Execute() {
       std::vector<std::vector<Record>> right_batches =
           utils::MakeEquiJoinRightBatches(this->num_batches_,
                                           this->batch_size_);
-      auto client_batches_left =
-          this->PrepareClientBatches(std::move(left_batches));
       auto client_batches_right =
           this->PrepareClientBatches(std::move(right_batches));
+      // Prime the partitions with left batches
+      for (size_t i = 0; i < left_batches.size(); i++) {
+        this->dataflow_engine_->ProcessRecords(this->input_names_.at(0),
+                                               std::move(left_batches.at(i)));
+      }
       // Select appropriate overloaded function
-      void (Client::*memfunc)(std::vector<std::vector<Record>> &&,
-                              std::vector<std::vector<Record>> &&) =
+      void (Client::*memfunc)(std::vector<std::vector<Record>> &&) =
           &Client::Start;
       auto time_point = std::chrono::system_clock::now();
       std::cout << "Start: "
@@ -88,9 +90,8 @@ void Driver::Execute() {
       for (uint64_t i = 0; i < this->num_clients_; i++) {
         Client client(i, this->dataflow_engine_, this->graph_type_,
                       this->input_names_);
-        this->threads_.emplace_back(
-            std::thread(memfunc, client, std::move(client_batches_left.at(i)),
-                        std::move(client_batches_right.at(i))));
+        this->threads_.emplace_back(std::thread(
+            memfunc, client, std::move(client_batches_right.at(i))));
       }
     } break;
     default:
@@ -119,8 +120,7 @@ void Driver::InitializeEngine() {
            this->dataflow_engine_->GetPartitionedMatViews(this->flow_name)) {
         matview->SetMarker(records_per_partition);
       }
-    }
-      break;
+    } break;
     case utils::GraphType::EQUIJOIN_GRAPH_WITH_EXCHANGE:
     case utils::GraphType::EQUIJOIN_GRAPH_WITHOUT_EXCHANGE: {
       SchemaRef left_schema = utils::MakeEquiJoinLeftSchema();

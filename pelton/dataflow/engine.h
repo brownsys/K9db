@@ -65,6 +65,10 @@ class DataFlowEngine {
   void ProcessRecords(const TableName &table_name,
                       std::vector<Record> &&records) const;
 
+  // Process records in a synchronous manner, i.e. without the use of channels.
+  void PrimeDataFlow(const TableName &table_name,
+                     std::vector<Record> &&records);
+
   const std::shared_ptr<MatViewOperator> GetPartitionedMatView(
       const FlowName &name, const Key &key) const;
 

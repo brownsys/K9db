@@ -444,6 +444,33 @@ void DataFlowEngine::ProcessRecords(const TableName &table_name,
   }
 }
 
+void DataFlowEngine::PrimeDataFlow(const TableName &table_name,
+                                   std::vector<Record> &&records) {
+  if (records.size() > 0 && this->HasFlowsFor(table_name)) {
+    // Need to acquire a unique lock since this API is synchronous(no channels
+    // are being used) and hence will be modifying the state of dataflow
+    // operators.
+    std::unique_lock<std::shared_mutex> lock(this->mtx_);
+    for (size_t i = 0; i < this->flows_per_input_table_.at(table_name).size();
+         i++) {
+      const FlowName &name = this->flows_per_input_table_.at(table_name).at(i);
+      // Partition records based on key specified by the input operator
+      auto input_partition_key =
+          this->input_partitioned_by_.at(name).at(table_name);
+      absl::flat_hash_map<PartitionID, std::vector<Record>>
+          partitioned_records = partition::HashPartition(
+              records, input_partition_key, this->partition_count_);
+      // Send batch messages to appropriate partitions
+      auto flow = this->flows_.at(name);
+      for (auto &[partition, r] : partitioned_records) {
+        auto input_op = flow->inputs().at(table_name);
+        this->partitioned_graphs_.at(name).at(partition)->Process(
+            input_op->input_name(), r);
+      }
+    }
+  }
+}
+
 // Size in memory of all the dataflow graphs.
 uint64_t DataFlowEngine::SizeInMemory() const {
   std::shared_lock<std::shared_mutex> lock(this->mtx_);
