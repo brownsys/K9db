@@ -75,7 +75,7 @@ void Driver::Execute() {
           this->PrepareClientBatches(std::move(right_batches));
       // Prime the partitions with left batches
       for (size_t i = 0; i < left_batches.size(); i++) {
-        this->dataflow_engine_->ProcessRecords(this->input_names_.at(0),
+        this->dataflow_engine_->PrimeDataFlow(this->input_names_.at(0),
                                                std::move(left_batches.at(i)));
       }
       // Select appropriate overloaded function
@@ -97,11 +97,6 @@ void Driver::Execute() {
     case utils::GraphType::AGGREGATE_GRAPH_WITHOUT_EXCHANGE: {
       std::vector<std::vector<Record>> batches =
           utils::MakeAggregateBatches(this->num_batches_, this->batch_size_);
-      // Prime the partitions with left batches
-      // for (size_t i = 0; i < batches.size(); i++) {
-      //   this->dataflow_engine_->PrimeDataFlow(this->input_names_.at(0),
-      //                                          std::move(batches.at(i)));
-      // }
       auto client_batches = this->PrepareClientBatches(std::move(batches));
       // Select appropriate overloaded function
       void (Client::*memfunc)(std::vector<std::vector<Record>> &&) =
