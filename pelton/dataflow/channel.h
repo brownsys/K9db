@@ -27,6 +27,12 @@ class Channel {
   Channel(const Channel &other) = delete;
   Channel &operator=(const Channel &other) = delete;
 
+  ~Channel() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    // Ensure that all messages have been processed.
+    CHECK_EQ(this->queue_.size(), (size_t)0);
+  }
+
   bool Send(std::shared_ptr<Message> message);
 
   // The queue gets flushed since we are following a single producer-single
