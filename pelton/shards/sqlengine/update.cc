@@ -126,10 +126,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
   }
 
   sql::SqlResult result = sql::SqlResult(0);
+
+  auto &exec = state->executor();
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
-    result = state->executor().ExecuteDefault(&stmt);
+    result = exec.ExecuteDefault(&stmt);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded.
@@ -154,6 +156,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
       // The table might be sharded according to different column/owners.
       // We must update all these different duplicates.
       for (const auto &info : state->GetShardingInformation(table_name)) {
+        const std::string &shard_kind = info.shard_kind;
         // Rename the table to match the sharded name.
         sqlast::Update cloned = stmt;
         cloned.table_name() = info.sharded_table_name;
@@ -171,8 +174,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
             if (lookup.size() == 1) {
               user_id = std::move(*lookup.cbegin());
               // Execute statement directly against shard.
-              result.Append(
-                  state->executor().ExecuteShard(&cloned, info, user_id));
+              result.Append(exec.ExecuteShard(&cloned, shard_kind, user_id));
             }
           } else if (state->ShardExists(info.shard_kind, user_id)) {
             // Remove where condition on the shard by column, since it does
@@ -180,8 +182,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
             sqlast::ExpressionRemover expression_remover(info.shard_by);
             cloned.Visit(&expression_remover);
             // Execute statement directly against shard.
-            result.Append(
-                state->executor().ExecuteShard(&cloned, info, user_id));
+            result.Append(exec.ExecuteShard(&cloned, shard_kind, user_id));
           }
 
         } else if (update_flows) {
@@ -203,7 +204,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
             }
           }
 
-          result.Append(state->executor().ExecuteShards(&cloned, info, shards));
+          result.Append(exec.ExecuteShards(&cloned, shard_kind, shards));
 
         } else {
           // The update statement by itself does not obviously constraint a
@@ -214,12 +215,11 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
                                  stmt.GetWhereClause(), state, dataflow_state));
           if (pair.first) {
             // Secondary index available for some constrainted column in stmt.
-            result.Append(
-                state->executor().ExecuteShards(&cloned, info, pair.second));
+            result.Append(exec.ExecuteShards(&cloned, shard_kind, pair.second));
           } else {
             // Update against all shards.
-            result.Append(state->executor().ExecuteShards(
-                &cloned, info, state->UsersOfShard(info.shard_kind)));
+            const auto &user_ids = state->UsersOfShard(shard_kind);
+            result.Append(exec.ExecuteShards(&cloned, shard_kind, user_ids));
           }
         }
       }

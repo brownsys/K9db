@@ -6,6 +6,7 @@
 #include "pelton/dataflow/state.h"
 
 #include <fstream>
+#include <iostream>
 #include <memory>
 #include <utility>
 
@@ -43,14 +44,16 @@ SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
 }
 
 // Manage flows.
-void DataFlowState::AddFlow(const FlowName &name, const DataFlowGraph &flow) {
+void DataFlowState::AddFlow(const FlowName &name,
+                            const std::shared_ptr<DataFlowGraph> flow) {
   this->flows_.insert({name, flow});
-  for (const auto &[input_name, input] : flow.inputs()) {
+  for (const auto &[input_name, input] : flow->inputs()) {
     this->flows_per_input_table_[input_name].push_back(name);
   }
 }
 
-const DataFlowGraph &DataFlowState::GetFlow(const FlowName &name) const {
+const std::shared_ptr<DataFlowGraph> DataFlowState::GetFlow(
+    const FlowName &name) const {
   return this->flows_.at(name);
 }
 
@@ -87,26 +90,27 @@ Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
   return record;
 }
 
-bool DataFlowState::ProcessRecords(const TableName &table_name,
+void DataFlowState::ProcessRecords(const TableName &table_name,
                                    const std::vector<Record> &records) {
   if (records.size() > 0 && this->HasFlowsFor(table_name)) {
     for (const FlowName &name : this->flows_per_input_table_.at(table_name)) {
-      DataFlowGraph &graph = this->flows_.at(name);
-      if (!graph.Process(table_name, records)) {
-        return false;
-      }
+      std::shared_ptr<DataFlowGraph> graph = this->flows_.at(name);
+      graph->Process(table_name, records);
     }
   }
-  return true;
 }
 
 // Size in memory of all the dataflow graphs.
-uint64_t DataFlowState::SizeInMemory() const {
-  uint64_t size = 0;
-  for (const auto &[_, flow] : this->flows_) {
-    size += flow.SizeInMemory();
+void DataFlowState::PrintSizeInMemory() const {
+  uint64_t total_size = 0;
+  for (const auto &[fname, flow] : this->flows_) {
+    uint64_t flow_size = flow->SizeInMemory();
+    uint64_t flow_size_mb = flow_size / 1024 / 1024;
+    std::cout << fname << ": " << flow_size_mb << "MB" << std::endl;
+    total_size += flow_size;
   }
-  return size;
+  std::cout << "Total size: " << (total_size / 1204 / 1024) << "MB"
+            << std::endl;
 }
 
 // Load state from its durable file (if exists).

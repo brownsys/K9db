@@ -1,9 +1,13 @@
 // Creation and management of secondary indices.
+
 #include "pelton/shards/sqlengine/index.h"
+
+#include <memory>
 
 #include "absl/status/status.h"
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/key.h"
+#include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/shards/sqlengine/view.h"
 #include "pelton/util/perf.h"
@@ -111,15 +115,16 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     dataflow::DataFlowState *dataflow_state) {
   perf::Start("Lookup Index");
   // Find flow.
-  const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(index_name);
-  if (flow.outputs().size() == 0) {
+  const std::shared_ptr<dataflow::DataFlowGraph> &flow =
+      dataflow_state->GetFlow(index_name);
+  if (flow->outputs().size() == 0) {
     return absl::InvalidArgumentError("Read from index with no matviews");
-  } else if (flow.outputs().size() > 1) {
+  } else if (flow->outputs().size() > 1) {
     return absl::InvalidArgumentError("Read from index with several matviews");
   }
 
   // Materialized view that we want to look up in.
-  auto matview = flow.outputs().at(0);
+  auto matview = flow->outputs().at(0);
 
   // Construct look up key.
   dataflow::Key lookup_key{1};

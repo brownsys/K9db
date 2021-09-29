@@ -37,6 +37,10 @@ void SqlValueIntoRecord(::sql::ResultSet *result, size_t index_in_result,
                         size_t index_in_record, dataflow::Record *record) {
   std::unique_ptr<::sql::ResultSetMetaData> meta{result->getMetaData()};
 
+  if (result->isNull(index_in_result)) {
+    record->SetNull(true, index_in_record);
+    return;
+  }
   switch (record->schema().TypeOf(index_in_record)) {
     case sqlast::ColumnDefinition::Type::TEXT: {
       ::sql::SQLString sql_val = result->getString(index_in_result);

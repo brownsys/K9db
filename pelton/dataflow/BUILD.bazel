@@ -93,7 +93,7 @@ cc_library(
         "operator.cc",
     ],
     hdrs = [
-        "edge.h",
+        "graph.h",
         "operator.h",
     ],
     visibility = ["//pelton:__subpackages__"],

@@ -23,6 +23,9 @@ class EquiJoinOperator : public Operator {
  public:
   using Mode = JoinModeEnum;
   EquiJoinOperator() = delete;
+  // Cannot copy an operator.
+  EquiJoinOperator(const EquiJoinOperator &other) = delete;
+  EquiJoinOperator &operator=(const EquiJoinOperator &other) = delete;
 
   EquiJoinOperator(ColumnID left_id, ColumnID right_id, Mode mode = Mode::INNER)
       : Operator(Operator::Type::EQUIJOIN),
@@ -38,12 +41,8 @@ class EquiJoinOperator : public Operator {
     }
   }
 
-  std::shared_ptr<Operator> left() const {
-    return this->parents_.at(0)->from();
-  }
-  std::shared_ptr<Operator> right() const {
-    return this->parents_.at(1)->from();
-  }
+  std::shared_ptr<Operator> left() const;
+  std::shared_ptr<Operator> right() const;
 
   /*!
    * processes a batch of input rows and writes output to output.
@@ -55,8 +54,8 @@ class EquiJoinOperator : public Operator {
    * @param output
    * @return
    */
-  bool Process(NodeIndex source, const std::vector<Record> &records,
-               std::vector<Record> *output) override;
+  std::optional<std::vector<Record>> Process(
+      NodeIndex source, const std::vector<Record> &records) override;
 
   // Computes joined_schema_.
   void ComputeOutputSchema() override;
@@ -66,6 +65,8 @@ class EquiJoinOperator : public Operator {
            this->right_table_.SizeInMemory() +
            this->emitted_nulls_.SizeInMemory();
   }
+
+  std::shared_ptr<Operator> Clone() const override;
 
  private:
   // Columns on which join is computed.

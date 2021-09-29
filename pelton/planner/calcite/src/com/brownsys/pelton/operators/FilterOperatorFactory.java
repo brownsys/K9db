@@ -2,7 +2,7 @@ package com.brownsys.pelton.operators;
 
 import com.brownsys.pelton.PlanningContext;
 import com.brownsys.pelton.nativelib.DataFlowGraphLibrary;
-import com.brownsys.pelton.operators.util.FilterArithmeticVisitor;
+import com.brownsys.pelton.util.RexArithmeticCollector;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -55,7 +55,7 @@ public class FilterOperatorFactory {
     // introducing them as projections with tmp column names, then using these
     // columns in their place during filtering. Finally, after the filter a new
     // projection is carried out to remove these tmp columns.
-    FilterArithmeticVisitor arithmeticVisitor = new FilterArithmeticVisitor();
+    RexArithmeticCollector arithmeticVisitor = new RexArithmeticCollector();
     boolean hasArithmetic = condition.accept(arithmeticVisitor);
     int tmpColumnCount = 0;
     int originalColumnCount = this.context.getPeltonColumnCount();
@@ -151,6 +151,16 @@ public class FilterOperatorFactory {
   // FILTER_OPERATIONS.
   // Generated operator is equivalent to AND(operands).
   private int analyzeDirectFilter(List<RexNode> operands, int inputOperator) {
+    // Do not create a filter operator in pelton if this filter only contains
+    // conditions with RexDynamicParam. Else a query like "SELECT * from
+    // submissions WHERE ID = ?" would end up creating a no-op filter since
+    // the where condition is only used to key the matview.
+    boolean isNoop = analyzeNoop(operands);
+    if (isNoop) {
+      return -1;
+    }
+    // End of no-op check
+
     int filterOperator = this.context.getGenerator().AddFilterOperator(inputOperator);
     for (RexNode operand : operands) {
       if (operand.isA(FILTER_OPERATIONS)) {
@@ -160,12 +170,44 @@ public class FilterOperatorFactory {
     return filterOperator;
   }
 
-  // Add a single simple condition to an existing filter operator.
-  // Operand must match one of the options in FILTER_OPERATIONS.
-  private void addFilterOperation(RexCall condition, int filterOperator) {
+  private boolean analyzeNoop(List<RexNode> conditions) {
+    // This filter operator will result in a no-op if all the conditions are
+    // of type RexDynamicParam (i.e. contain a "?")
+    for (RexNode condition : conditions) {
+      List<RexNode> operands = ((RexCall) condition).getOperands();
+      if (operands.size() == 1) {
+        // Cannot contain a "?"
+        return false;
+      } else {
+        if (!(operands.get(0) instanceof RexDynamicParam)
+            && !(operands.get(1) instanceof RexDynamicParam)) {
+          return false;
+        }
+      }
+    }
+    // If reached here then it implies that all conditions are binary and each one
+    // contains at least one "?". Hence this filter will be a no-op.
+
+    // Do not create an exchange operator, simply specify keys that the matview
+    // should be keyed on.
+    for (RexNode condition : conditions) {
+      int operationEnum = getOperationEnum((RexCall) condition);
+      List<RexNode> operands = ((RexCall) condition).getOperands();
+      if (operands.get(0) instanceof RexDynamicParam) {
+        this.addQuestionMarkCondition(operands.get(1), operationEnum);
+      } else if (operands.get(1) instanceof RexDynamicParam) {
+        this.addQuestionMarkCondition(operands.get(0), operationEnum);
+      } else {
+        // Should not reach here
+        assert false;
+      }
+    }
+    return true;
+  }
+
+  private int getOperationEnum(RexCall condition) {
     // Determine the condition operation.
     int operationEnum = -1;
-    List<RexNode> operands = condition.getOperands();
     switch (condition.getKind()) {
       case EQUALS:
         operationEnum = DataFlowGraphLibrary.EQUAL;
@@ -194,7 +236,15 @@ public class FilterOperatorFactory {
       default:
         assert false;
     }
+    return operationEnum;
+  }
 
+  // Add a single simple condition to an existing filter operator.
+  // Operand must match one of the options in FILTER_OPERATIONS.
+  private void addFilterOperation(RexCall condition, int filterOperator) {
+    // Determine the condition operation.
+    int operationEnum = getOperationEnum(condition);
+    List<RexNode> operands = condition.getOperands();
     if (operands.size() == 1) {
       this.addUnaryCondition(operands, operationEnum, filterOperator);
     } else if (operands.size() == 2) {

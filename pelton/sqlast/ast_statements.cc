@@ -164,9 +164,14 @@ const std::vector<std::string> &Select::GetColumns() const {
   return this->columns_;
 }
 std::vector<std::string> &Select::GetColumns() { return this->columns_; }
-void Select::RemoveColumn(const std::string &column) {
-  this->columns_.erase(
-      std::find(this->columns_.begin(), this->columns_.end(), column));
+int Select::RemoveColumn(const std::string &column) {
+  auto it = std::find(this->columns_.begin(), this->columns_.end(), column);
+  if (it == this->columns_.end()) {
+    return -1;
+  }
+  int index = it - this->columns_.begin();
+  this->columns_.erase(it);
+  return index;
 }
 
 bool Select::HasWhereClause() const { return this->where_clause_.has_value(); }

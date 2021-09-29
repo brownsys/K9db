@@ -41,20 +41,21 @@ class SqlLazyExecutor {
 
   // Execute statement against given user shard.
   SqlResult ExecuteShard(const sqlast::AbstractStatement *sql,
-                         const shards::ShardingInformation &info,
+                         const std::string &shard_kind,
                          const shards::UserId &user_id,
-                         const dataflow::SchemaRef &schema = {});
+                         const dataflow::SchemaRef &schema = {},
+                         int aug_index = -1);
 
   // Execute statement against given user shards.
   SqlResult ExecuteShards(const sqlast::AbstractStatement *sql,
-                          const shards::ShardingInformation &info,
+                          const std::string &shard_kind,
                           const std::unordered_set<shards::UserId> &user_ids,
-                          const dataflow::SchemaRef &schema = {});
+                          const dataflow::SchemaRef &schema = {},
+                          int aug_index = -1);
 
  private:
-  SqlResult EmptyResultByType(sqlast::AbstractStatement::Type type,
-                              bool returning,
-                              const dataflow::SchemaRef &schema);
+  SqlResult EmptyResult(const sqlast::AbstractStatement *sql,
+                        const dataflow::SchemaRef &schema);
 
   SqlResult Execute(const sqlast::AbstractStatement *sql,
                     const dataflow::SchemaRef &schema,

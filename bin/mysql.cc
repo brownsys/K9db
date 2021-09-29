@@ -95,6 +95,7 @@ bool ReadCommand(std::string *ptr) {
 }
 
 DEFINE_bool(print, true, "Print results to the screen");
+DEFINE_bool(progress, true, "Show progress counter");
 DEFINE_string(db_username, "root", "MYSQL username to connect with");
 DEFINE_string(db_password, "password", "MYSQL pwd to connect with");
 
@@ -114,6 +115,7 @@ int main(int argc, char **argv) {
   // Find database directory.
   const std::string &db_username = FLAGS_db_username;
   const std::string &db_password = FLAGS_db_password;
+  size_t progress = 0;
 
   // Initialize our sharded state/connection.
   std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
@@ -158,6 +160,11 @@ int main(int argc, char **argv) {
         continue;
       }
 
+      if (FLAGS_progress) {
+        if (++progress % 1000 == 0) {
+          std::cout << progress << std::endl;
+        }
+      }
       if (print) {
         std::cout << command << std::endl;
       }

@@ -39,11 +39,11 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
 
   // Must transform the delete statement into one that is compatible with
   // the sharded schema.
-  bool is_sharded = state->IsSharded(table_name);
-  bool is_pii = state->IsPII(table_name);
   sql::SqlResult result;
 
   // Sharding scenarios.
+  auto &exec = state->executor();
+  bool is_sharded = state->IsSharded(table_name);
   if (is_sharded) {  // is_shared == true
     // Case 3: Table is sharded!
     // The table might be sharded according to different column/owners.
@@ -52,6 +52,14 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
       // Rename the table to match the sharded name.
       sqlast::Delete cloned = update_flows ? stmt.MakeReturning() : stmt;
       cloned.table_name() = info.sharded_table_name;
+
+      // Figure out if we need to augment the (returning) result set with the
+      // shard_by column.
+      const std::string &shard_kind = info.shard_kind;
+      int aug_index = -1;
+      if (!info.IsTransitive()) {
+        aug_index = info.shard_by_index;
+      }
 
       // Find the value assigned to shard_by column in the where clause, and
       // remove it from the where clause.
@@ -66,8 +74,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
           if (lookup.size() == 1) {
             user_id = std::move(*lookup.cbegin());
             // Execute statement directly against shard.
-            result.Append(
-                state->executor().ExecuteShard(&cloned, info, user_id, schema));
+            result.Append(exec.ExecuteShard(&cloned, shard_kind, user_id,
+                                            schema, aug_index));
           }
         } else if (state->ShardExists(info.shard_kind, user_id)) {
           // Remove where condition on the shard by column, since it does not
@@ -75,8 +83,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
           sqlast::ExpressionRemover expression_remover(info.shard_by);
           cloned.Visit(&expression_remover);
           // Execute statement directly against shard.
-          result.Append(
-              state->executor().ExecuteShard(&cloned, info, user_id, schema));
+          result.Append(exec.ExecuteShard(&cloned, shard_kind, user_id, schema,
+                                          aug_index));
         }
 
       } else {
@@ -88,13 +96,14 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
                                state, dataflow_state));
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
-          result.Append(state->executor().ExecuteShards(&cloned, info,
-                                                        pair.second, schema));
+          result.Append(exec.ExecuteShards(&cloned, shard_kind, pair.second,
+                                           schema, aug_index));
         } else {
           // Secondary index unhelpful.
           // Execute statement against all shards of this kind.
-          result.Append(state->executor().ExecuteShards(
-              &cloned, info, state->UsersOfShard(info.shard_kind), schema));
+          const auto &user_ids = state->UsersOfShard(shard_kind);
+          result.Append(exec.ExecuteShards(&cloned, shard_kind, user_ids,
+                                           schema, aug_index));
         }
       }
     }
@@ -102,9 +111,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
     // Case 2: Table is not sharded.
     if (update_flows) {
       sqlast::Delete cloned = stmt.MakeReturning();
-      result = state->executor().ExecuteDefault(&cloned, schema);
+      result = exec.ExecuteDefault(&cloned, schema);
     } else {
-      result = state->executor().ExecuteDefault(&stmt);
+      result = exec.ExecuteDefault(&stmt);
     }
   }
 

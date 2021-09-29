@@ -57,7 +57,7 @@ class State {
     }
   }
 
-  uint64_t SizeInMemory() const { return this->dataflow_state_.SizeInMemory(); }
+  void PrintSizeInMemory() const { this->dataflow_state_.PrintSizeInMemory(); }
 
   void LockMutex() { this->mtx.lock(); }
   void UnlockMutex() { this->mtx.unlock(); }

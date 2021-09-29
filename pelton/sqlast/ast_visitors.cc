@@ -166,7 +166,12 @@ std::string Stringifier::VisitLiteralExpression(const LiteralExpression &ast) {
 }
 std::string Stringifier::VisitLiteralListExpression(
     const LiteralListExpression &ast) {
-  assert(false);
+  std::string list = "(";
+  for (const std::string &val : ast.values()) {
+    list += list.size() == 1 ? val : (", " + val);
+  }
+  list += ")";
+  return list;
 }
 std::string Stringifier::VisitBinaryExpression(const BinaryExpression &ast) {
   std::string op = "";
@@ -176,6 +181,12 @@ std::string Stringifier::VisitBinaryExpression(const BinaryExpression &ast) {
       break;
     case Expression::Type::EQ:
       op = " = ";
+      break;
+    case Expression::Type::IS:
+      op = " IS ";
+      break;
+    case Expression::Type::IN:
+      op = " IN ";
       break;
     default:
       assert(false);
@@ -237,7 +248,10 @@ std::pair<bool, std::string> ValueFinder::VisitLiteralExpression(
 }
 std::pair<bool, std::string> ValueFinder::VisitLiteralListExpression(
     const LiteralListExpression &ast) {
-  assert(false);
+  if (ast.values().size() == 1) {
+    return std::make_pair(false, Dequote(ast.values().at(0)));
+  }
+  return std::make_pair(false, "");
 }
 std::pair<bool, std::string> ValueFinder::VisitBinaryExpression(
     const BinaryExpression &ast) {
@@ -252,6 +266,20 @@ std::pair<bool, std::string> ValueFinder::VisitBinaryExpression(
       }
       return std::make_pair(false, "");
 
+    case Expression::Type::IS:
+      // IS cannot be used on a shard by column since it is not nullable.
+      if (result.at(0).first) {
+        assert(false);
+      }
+      return std::make_pair(result.at(0).first, result.at(1).second);
+
+    case Expression::Type::IN:
+      // IN can be used on a shard by column when the value list is a singleton.
+      if (result.at(0).first && !result.at(1).first) {
+        assert(false);
+      }
+      return std::make_pair(result.at(0).first, result.at(1).second);
+
     case Expression::Type::AND:
       if (result.at(0).first) {
         return result.at(0);
@@ -260,6 +288,7 @@ std::pair<bool, std::string> ValueFinder::VisitBinaryExpression(
         return result.at(1);
       }
       return std::make_pair(false, "");
+
     default:
       assert(false);
   }
@@ -342,13 +371,15 @@ std::unique_ptr<Expression> ExpressionRemover::VisitLiteralExpression(
 }
 std::unique_ptr<Expression> ExpressionRemover::VisitLiteralListExpression(
     LiteralListExpression *ast) {
-  assert(false);
+  return ast->Clone();
 }
 std::unique_ptr<Expression> ExpressionRemover::VisitBinaryExpression(
     BinaryExpression *ast) {
   auto result = ast->VisitChildren(this);
   switch (ast->type()) {
     case Expression::Type::EQ:
+    case Expression::Type::IS:
+    case Expression::Type::IN:
       if (result.at(0).get() == nullptr || result.at(1).get() == nullptr) {
         return nullptr;
       }

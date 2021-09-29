@@ -60,7 +60,7 @@ do
 
       # Get the database size
       echo "DB size" >> .output
-      mariadb -u root -ppassword --execute="SELECT table_schema AS 'Database', CAST(SUM(data_length + index_length) AS decimal) / 1449616.0 AS 'Size (MB)' FROM information_schema.TABLES GROUP BY table_schema" >> .output
+      mariadb -u root -ppassword --execute="SELECT table_schema AS 'Database',  ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'Size (MB)' FROM information_schema.TABLES GROUP BY table_schema" >> .output
     else
       echo "Pelton Log: Pelton job errored out!"
       cp .error .output
@@ -79,7 +79,7 @@ do
 
       # Get the database size
       echo "DB size" >> .output
-      mariadb -u root -ppassword --execute="SELECT table_schema AS 'Database', CAST(SUM(data_length + index_length) AS decimal) / 1449616.0 AS 'Size (MB)' FROM information_schema.TABLES GROUP BY table_schema" >> .output
+      mariadb -u root -ppassword --execute="SELECT table_schema AS 'Database',  ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'Size (MB)' FROM information_schema.TABLES GROUP BY table_schema" >> .output
 
       # Post the results to orchestrator
       curl -H 'Content-Type: text/plain' -X POST --data-binary @.output $ORCHESTRATOR/done
