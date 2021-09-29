@@ -170,7 +170,7 @@ int main(int argc, char **argv) {
               << std::endl;
 
     // Print flows memory usage.
-    connection.PrintSizeInMemory();
+    connection.pelton_state->GetDataFlowState()->PrintSizeInMemory();
 
     auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(
         end_time - start_time);
