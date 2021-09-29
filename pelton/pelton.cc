@@ -74,7 +74,7 @@ bool close(Connection *connection) {
 }
 
 absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
-  connection->lock_mtx();
+  // ? connection->lock_mtx();
 
   // Trim statement.
   Trim(sql);
@@ -84,18 +84,21 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
 
   // If special statement, handle it separately.
   if (SpecialStatements(sql, connection->pelton_state)) {
-    connection->unlock_mtx();
+    // ? connection->unlock_mtx();
     return SqlResult(true);
   }
 
   // Parse and rewrite statement.
   shards::SharderState *sstate = connection->pelton_state->GetSharderState();
+  // dataflow locking handled by Ishan in his PRs. Here just use global lock
+  connection->lock_mtx(); // !
   dataflow::DataFlowState *dstate =
       connection->pelton_state->GetDataFlowState();
+  connection->unlock_mtx(); // !
   absl::lts_2020_09_23::StatusOr<pelton::sql::SqlResult> sql_result =
       shards::sqlengine::Shard(sql, sstate, dstate);
 
-  connection->unlock_mtx();
+  // ? connection->unlock_mtx();
   return sql_result;
 }
 
