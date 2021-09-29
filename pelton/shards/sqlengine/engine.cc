@@ -65,7 +65,7 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       if (dataflow_state->HasFlow(stmt->table_name())) {
         return view::SelectView(*stmt, connection);
       } else {
-        return select::Shard(*stmt, connection);
+        return select::Shard(*stmt, connection, true);
       }
     }
 

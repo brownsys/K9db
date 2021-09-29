@@ -56,11 +56,14 @@ dataflow::SchemaRef ResultSchema(const sqlast::Select &stmt,
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
-                                     Connection *connection) {
+                                     Connection *connection, bool synchronize) {
   perf::Start("Select");
   shards::SharderState *state = connection->state->sharder_state();
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
-  SharedLock lock = state->ReaderLock();
+  SharedLock lock;
+  if (synchronize) {
+    lock = state->ReaderLock();
+  }
 
   // Disqualifiy LIMIT and OFFSET queries.
   if (!stmt.SupportedByShards()) {

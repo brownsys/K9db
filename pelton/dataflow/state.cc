@@ -171,24 +171,24 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
       for (const Record &r : records) {
         copy.push_back(r.Copy());
       }
-      auto &flow = this->flows_.at(flow_name);
-      auto partitions = flow->PartitionInputs(table_name, std::move(copy));
-      for (auto &[partition, vec] : partitions) {
-        this->channels_.at(partition)->WriteInput(
-            {flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
-             flow->GetPartition(partition)->GetInputNode(table_name)->index()});
-      }
+      this->ProcessRecordsByFlowName(flow_name, table_name, std::move(copy));
     }
 
     // Move into last flow.
     const std::string &flow_name = flow_names.back();
-    auto &flow = this->flows_.at(flow_name);
-    auto partitions = flow->PartitionInputs(table_name, std::move(records));
-    for (auto &[partition, vec] : partitions) {
-      this->channels_.at(partition)->WriteInput(
-          {flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
-           flow->GetPartition(partition)->GetInputNode(table_name)->index()});
-    }
+    this->ProcessRecordsByFlowName(flow_name, table_name, std::move(records));
+  }
+}
+
+void DataFlowState::ProcessRecordsByFlowName(const FlowName &flow_name,
+                                             const TableName &table_name,
+                                             std::vector<Record> &&records) {
+  auto &flow = this->flows_.at(flow_name);
+  auto partitions = flow->PartitionInputs(table_name, std::move(records));
+  for (auto &[partition, vec] : partitions) {
+    this->channels_.at(partition)->WriteInput(
+        {flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
+         flow->GetPartition(partition)->GetInputNode(table_name)->index()});
   }
 }
 

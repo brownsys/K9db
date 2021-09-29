@@ -17,7 +17,7 @@ namespace sqlengine {
 namespace select {
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
-                                     Connection *connection);
+                                     Connection *connection, bool synchronize);
 
 }  // namespace select
 }  // namespace sqlengine
