@@ -28,7 +28,9 @@ void Operator::ProcessAndForward(NodeIndex source,
   std::optional<std::vector<Record>> output = this->Process(source, records);
   if (output) {
     // Pass output vector down to children to process.
-    this->BroadcastToChildren(output.value());
+    if (output.value().size() > 0) {
+      this->BroadcastToChildren(output.value());
+    }
   } else {
     // Directly forward records to children.
     this->BroadcastToChildren(records);
@@ -37,7 +39,7 @@ void Operator::ProcessAndForward(NodeIndex source,
 
 void Operator::BroadcastToChildren(const std::vector<Record> &records) {
   for (NodeIndex child_index : this->children_) {
-    std::shared_ptr child_node = this->graph()->GetNode(child_index);
+    std::shared_ptr<Operator> child_node = this->graph()->GetNode(child_index);
     child_node->ProcessAndForward(this->index_, records);
   }
 }

@@ -1,0 +1,36 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_binary")
+
+cc_library(
+    name = "client",
+    srcs = [
+        "client.cc",
+    ],
+    hdrs = [
+        "client.h",
+    ],
+    #visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:dstate",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/sqlast:ast",
+        "@glog",
+    ],
+)
+
+cc_binary(
+    name = "benchmark",
+    srcs = [
+        "benchmark.cc",
+    ],
+    linkstatic = 0,
+    deps = [
+        ":client",
+        "//pelton/dataflow:dstate",
+        "//pelton/dataflow:schema",
+        "//pelton/planner:planner",
+        "//pelton/sqlast:parser",
+        "//pelton/util:status",
+        "@glog",
+    ]
+)
