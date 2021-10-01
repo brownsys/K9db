@@ -18,8 +18,8 @@ class UnionOperator : public Operator {
 
   UnionOperator() : Operator(Operator::Type::UNION) {}
 
-  std::optional<std::vector<Record>> Process(
-      NodeIndex /*source*/, const std::vector<Record> & /*records*/) override;
+  std::vector<Record> Process(NodeIndex source,
+                              std::vector<Record> &&records) override;
 
   std::shared_ptr<Operator> Clone() const override;
 

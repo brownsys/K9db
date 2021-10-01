@@ -1,6 +1,7 @@
 #include "pelton/dataflow/ops/identity.h"
 
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "glog/logging.h"
@@ -14,9 +15,9 @@ void IdentityOperator::ComputeOutputSchema() {
   this->output_schema_ = this->input_schemas_.at(0);
 }
 
-std::optional<std::vector<Record>> IdentityOperator::Process(
-    NodeIndex /*source*/, const std::vector<Record>& /*records*/) {
-  return std::nullopt;
+std::vector<Record> IdentityOperator::Process(NodeIndex source,
+                                              std::vector<Record> &&records) {
+  return std::move(records);
 }
 
 std::shared_ptr<Operator> IdentityOperator::Clone() const {

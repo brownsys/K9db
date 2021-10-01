@@ -416,7 +416,7 @@ class GroupedDataT : public UntemplatedGroupedData {
   }
 
   // Insert a record mapped by given key.
-  bool Insert(const Key &k, const Record &r, bool by_pk = false) {
+  bool Insert(const Key &k, Record &&r, bool by_pk = false) {
     // Insert an empty vector for k if k does not exist in the map.
     V *v;
     if constexpr (std::is_null_pointer<RecordCompare>::value) {
@@ -426,21 +426,26 @@ class GroupedDataT : public UntemplatedGroupedData {
     }
 
     if (r.IsPositive()) {
+      // Access the key before record move.
+      const auto &keys = r.schema().keys();
+      std::string pk;
+      if (keys.size() == 1) {
+        // Keep a quick lookup index by pk.
+        pk = r.GetValueString(keys.at(0));
+      }
       // Add the new record to the approprite bin.
       V_citerator insert_it;
       if constexpr (HasFunction<V>::Insert()) {
         // Sorted container.
-        insert_it = v->insert(r.Copy());
+        insert_it = v->insert(std::move(r));
       } else {
         // Unsorted container.
-        v->push_back(r.Copy());
+        v->push_back(std::move(r));
         insert_it = --(v->cend());
       }
+      // Keep a quick lookup index by pk when the matview does not use the pk.
       if (!by_pk) {
-        const auto &keys = r.schema().keys();
         if (keys.size() == 1) {
-          // Keep a quick lookup index by pk.
-          std::string pk = r.GetValueString(keys.at(0));
           this->pk_index_.insert({pk, insert_it});
         }
       }

@@ -114,7 +114,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
   if (update_flows) {
     std::vector<dataflow::Record> records;
     records.push_back(dataflow_state->CreateRecord(stmt));
-    dataflow_state->ProcessRecords(stmt.table_name(), records);
+    dataflow_state->ProcessRecords(stmt.table_name(), std::move(records));
   }
 
   perf::End("Insert");

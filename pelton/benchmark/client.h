@@ -22,7 +22,7 @@ class Client {
 
   // Batch computation.
   uint64_t BenchmarkBatch(const std::string &table,
-                          const std::vector<dataflow::Record> &records);
+                          std::vector<dataflow::Record> &&records);
 
   // Entry Point.
   void Benchmark(size_t batch_size, size_t batch_count);
@@ -35,4 +35,4 @@ class Client {
 }  // namespace benchmark
 }  // namespace pelton
 
-#endif  // PELTON_DATAFLOW_BENCHMARK_CLIENT_H_
+#endif  // PELTON_BENCHMARK_CLIENT_H_

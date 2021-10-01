@@ -58,8 +58,8 @@ std::shared_ptr<Operator> EquiJoinOperator::right() const {
   return this->graph()->GetNode(parent_index);
 }
 
-std::optional<std::vector<Record>> EquiJoinOperator::Process(
-    NodeIndex source, const std::vector<Record> &records) {
+std::vector<Record> EquiJoinOperator::Process(NodeIndex source,
+                                              std::vector<Record> &&records) {
   std::vector<Record> output;
   for (const Record &record : records) {
     // In comparison to a normal HashJoin in a database, here
@@ -87,11 +87,11 @@ std::optional<std::vector<Record>> EquiJoinOperator::Process(
           0 == this->right_table_.Count(left_value)) {
         this->EmitRow(record, this->null_records_.at(1), &output,
                       record.IsPositive());
-        this->emitted_nulls_.Insert(left_value, record);
+        this->emitted_nulls_.Insert(left_value, record.Copy());
       }
 
       // Save record in the appropriate table.
-      this->left_table_.Insert(left_value, record);
+      this->left_table_.Insert(left_value, record.Copy());
     } else if (source == this->right()->index()) {
       // Match each record in the left table with this record.
       Key right_value = record.GetValues({this->right_id_});
@@ -111,18 +111,18 @@ std::optional<std::vector<Record>> EquiJoinOperator::Process(
       if (mode_ == Mode::RIGHT && 0 == this->left_table_.Count(right_value)) {
         this->EmitRow(this->null_records_.at(0), record, &output,
                       record.IsPositive());
-        this->emitted_nulls_.Insert(right_value, record);
+        this->emitted_nulls_.Insert(right_value, record.Copy());
       }
 
       // save record hashed to right table
-      this->right_table_.Insert(right_value, record);
+      this->right_table_.Insert(right_value, record.Copy());
     } else {
       LOG(FATAL) << "EquiJoinOperator got input from Node " << source
                  << " but has parents " << this->left()->index() << " and "
                  << this->right()->index();
     }
   }
-  return std::move(output);
+  return output;
 }
 
 void EquiJoinOperator::ComputeOutputSchema() {

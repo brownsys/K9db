@@ -13,7 +13,6 @@ cc_library(
         ":graph",
         ":record",
         ":schema",
-        "//pelton/dataflow/ops:input",
         "//pelton/sqlast:ast",
         "//pelton/util:fs",
         "@glog",

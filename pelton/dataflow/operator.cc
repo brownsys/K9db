@@ -1,5 +1,7 @@
 #include "pelton/dataflow/operator.h"
 
+#include <utility>
+
 #include "glog/logging.h"
 #include "pelton/dataflow/graph.h"
 
@@ -23,25 +25,35 @@ void Operator::AddParent(std::shared_ptr<Operator> parent,
 }
 
 void Operator::ProcessAndForward(NodeIndex source,
-                                 const std::vector<Record> &records) {
+                                 std::vector<Record> &&records) {
   // Process the records generating the output vector.
-  std::optional<std::vector<Record>> output = this->Process(source, records);
-  if (output) {
-    // Pass output vector down to children to process.
-    if (output.value().size() > 0) {
-      this->BroadcastToChildren(output.value());
-    }
-  } else {
-    // Directly forward records to children.
-    this->BroadcastToChildren(records);
+  std::vector<Record> output = this->Process(source, std::move(records));
+  // Pass output vector down to children to process.
+  if (output.size() > 0) {
+    this->BroadcastToChildren(std::move(output));
   }
 }
 
-void Operator::BroadcastToChildren(const std::vector<Record> &records) {
-  for (NodeIndex child_index : this->children_) {
-    std::shared_ptr<Operator> child_node = this->graph()->GetNode(child_index);
-    child_node->ProcessAndForward(this->index_, records);
+void Operator::BroadcastToChildren(std::vector<Record> &&records) {
+  if (this->children_.size() == 0) {
+    return;
   }
+  // We are at a fork in the graph with many children.
+  for (size_t i = 0; i < this->children_.size() - 1; i++) {
+    // We need to copy the records for each child (except the last one).
+    std::vector<Record> copy;
+    copy.reserve(records.size());
+    for (const Record &r : records) {
+      copy.push_back(r.Copy());
+    }
+    // Move the copy to child.
+    this->graph()
+        ->GetNode(this->children_.at(i))
+        ->ProcessAndForward(this->index_, std::move(copy));
+  }
+  this->graph()
+      ->GetNode(this->children_.back())
+      ->ProcessAndForward(this->index_, std::move(records));
 }
 
 std::vector<std::shared_ptr<Operator>> Operator::GetParents() const {

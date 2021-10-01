@@ -73,8 +73,8 @@ class ProjectOperator : public Operator {
   std::shared_ptr<Operator> Clone() const override;
 
  protected:
-  std::optional<std::vector<Record>> Process(
-      NodeIndex /*source*/, const std::vector<Record> &records) override;
+  std::vector<Record> Process(NodeIndex source,
+                              std::vector<Record> &&records) override;
 
   void ComputeOutputSchema() override;
 

@@ -20,8 +20,9 @@ class IdentityOperator : public Operator {
 
   IdentityOperator() : Operator(Operator::Type::IDENTITY) {}
 
-  std::optional<std::vector<Record>> Process(
-      NodeIndex source, const std::vector<Record> &records) override;
+  std::vector<Record> Process(NodeIndex source,
+                              std::vector<Record> &&records) override;
+
   std::shared_ptr<Operator> Clone() const override;
 
  protected:

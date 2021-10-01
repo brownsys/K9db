@@ -14,36 +14,32 @@ namespace pelton {
 namespace dataflow {
 
 // NOLINTNEXTLINE
-static void FilterPasses(benchmark::State& state) {
+static void FilterPasses(benchmark::State &state) {
   SchemaRef schema = MakeSchema(false);
   FilterOperator filter;
   filter.AddOperation(5_u, 0, FilterOperator::Operation::LESS_THAN);
 
-  Record r{schema, true, 4_u, 5_u};
-  std::vector<Record> rs;
-  rs.emplace_back(std::move(r));
-
   size_t processed = 0;
   for (auto _ : state) {
-    filter.Process(UNDEFINED_NODE_INDEX, rs);
+    std::vector<Record> rs;
+    rs.emplace_back(schema, true, 4_u, 5_u);
+    filter.Process(UNDEFINED_NODE_INDEX, std::move(rs));
     processed++;
   }
   state.SetItemsProcessed(processed);
 }
 
 // NOLINTNEXTLINE
-static void FilterDiscards(benchmark::State& state) {
+static void FilterDiscards(benchmark::State &state) {
   SchemaRef schema = MakeSchema(false);
   FilterOperator filter;
   filter.AddOperation(5_u, 0, FilterOperator::Operation::LESS_THAN);
 
-  Record r{schema, true, 6_u, 5_u};
-  std::vector<Record> rs;
-  rs.emplace_back(std::move(r));
-
   size_t processed = 0;
   for (auto _ : state) {
-    filter.Process(UNDEFINED_NODE_INDEX, rs);
+    std::vector<Record> rs;
+    rs.emplace_back(schema, true, 6_u, 5_u);
+    filter.Process(UNDEFINED_NODE_INDEX, std::move(rs));
     processed++;
   }
   state.SetItemsProcessed(processed);

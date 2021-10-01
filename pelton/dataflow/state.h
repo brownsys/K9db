@@ -54,7 +54,7 @@ class DataFlowState {
 
   // Process raw data from sharder and use it to update flows.
   void ProcessRecords(const TableName &table_name,
-                      const std::vector<Record> &records);
+                      std::vector<Record> &&records);
 
   void PrintSizeInMemory() const;
 

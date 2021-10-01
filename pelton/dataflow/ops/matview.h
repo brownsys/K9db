@@ -159,21 +159,21 @@ class MatViewOperatorT : public MatViewOperator {
   }
 
  protected:
-  std::optional<std::vector<Record>> Process(
-      NodeIndex /*source*/, const std::vector<Record> &records) {
+  std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records) {
     bool by_pk = false;
     if (records.size() > 0) {
       const std::vector<ColumnID> &keys = records.at(0).schema().keys();
       by_pk = keys.size() > 0 && keys == this->key_cols_;
     }
 
-    for (const Record &r : records) {
-      if (!this->contents_.Insert(r.GetValues(this->key_cols_), r, by_pk)) {
+    for (Record &r : records) {
+      if (!this->contents_.Insert(r.GetValues(this->key_cols_), std::move(r),
+                                  by_pk)) {
         LOG(FATAL) << "Failed to insert record in matview";
       }
     }
 
-    return std::nullopt;
+    return {};
   }
 
   void ComputeOutputSchema() override {

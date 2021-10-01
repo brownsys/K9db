@@ -49,9 +49,9 @@ void DataFlowGraph::AddEdge(std::shared_ptr<Operator> parent,
 }
 
 void DataFlowGraph::Process(const std::string &input_name,
-                            const std::vector<Record> &records) {
+                            std::vector<Record> &&records) {
   std::shared_ptr<InputOperator> node = this->inputs_.at(input_name);
-  node->ProcessAndForward(UNDEFINED_NODE_INDEX, records);
+  node->ProcessAndForward(UNDEFINED_NODE_INDEX, std::move(records));
 }
 
 std::shared_ptr<DataFlowGraph> DataFlowGraph::Clone() {

@@ -26,8 +26,8 @@ class InputOperator : public Operator {
 
   const std::string &input_name() const { return this->input_name_; }
 
-  std::optional<std::vector<Record>> Process(
-      NodeIndex /*source*/, const std::vector<Record> &records) override;
+  std::vector<Record> Process(NodeIndex source,
+                              std::vector<Record> &&records) override;
 
   std::shared_ptr<Operator> Clone() const override;
 

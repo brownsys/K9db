@@ -1,7 +1,9 @@
 #include "pelton/benchmark/client.h"
 
+// NOLINTNEXTLINE
 #include <chrono>
 #include <memory>
+#include <utility>
 
 #include "glog/logging.h"
 #include "pelton/sqlast/ast_schema.h"
@@ -40,10 +42,10 @@ std::vector<dataflow::Record> Client::GenerateBatch(dataflow::SchemaRef schema,
 
 // Batch computation.
 uint64_t Client::BenchmarkBatch(const std::string &table,
-                                const std::vector<dataflow::Record> &records) {
+                                std::vector<dataflow::Record> &&records) {
   // Process the records.
   auto start = std::chrono::high_resolution_clock::now();
-  this->state_->ProcessRecords(table, records);
+  this->state_->ProcessRecords(table, std::move(records));
 
   // Measure time.
   auto end = std::chrono::high_resolution_clock::now();
@@ -63,7 +65,7 @@ void Client::Benchmark(size_t batch_size, size_t batch_count) {
     TLOG << "Priming " << table << "...";
     for (size_t j = 0; j < batch_count; j++) {
       auto batch = this->GenerateBatch(schema, batch_size);
-      this->state_->ProcessRecords(table, batch);
+      this->state_->ProcessRecords(table, std::move(batch));
     }
   }
   TLOG << "Done Priming!";
@@ -75,7 +77,7 @@ void Client::Benchmark(size_t batch_size, size_t batch_count) {
   TLOG << "Benchmarking " << table << "...";
   for (size_t i = 0; i < batch_count; i++) {
     auto batch = this->GenerateBatch(schema, batch_size);
-    total_time += this->BenchmarkBatch(table, batch);
+    total_time += this->BenchmarkBatch(table, std::move(batch));
   }
 
   double throughput = total_time / 1000.0 / 1000 / 1000;

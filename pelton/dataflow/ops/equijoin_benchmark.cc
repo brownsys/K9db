@@ -20,7 +20,7 @@ namespace dataflow {
 using CType = sqlast::ColumnDefinition::Type;
 
 // NOLINTNEXTLINE
-void JoinOneToOne(benchmark::State& state) {
+void JoinOneToOne(benchmark::State &state) {
   SchemaRef leftSchema = MakeSchema(false);
   SchemaRef rightSchema = MakeSchema(false);
 
@@ -32,17 +32,15 @@ void JoinOneToOne(benchmark::State& state) {
   g.AddInputNode(iop2);
   g.AddNode(op, {iop1, iop2});
 
-  Record lr1{leftSchema, true, 4_u, 5_u};
-  Record rr1{rightSchema, true, 4_u, 5_u};
   std::vector<Record> leftRecords;
-  std::vector<Record> rightRecords;
-  leftRecords.emplace_back(std::move(lr1));
-  rightRecords.emplace_back(std::move(rr1));
+  leftRecords.emplace_back(leftSchema, true, 4_u, 5_u);
+  op->Process(0, std::move(leftRecords));
 
-  op->Process(0, leftRecords);
   size_t processed = 0;
   for (auto _ : state) {
-    op->Process(1, rightRecords);
+    std::vector<Record> rightRecords;
+    rightRecords.emplace_back(rightSchema, true, 4_u, 5_u);
+    op->Process(1, std::move(rightRecords));
     processed++;
   }
   state.SetItemsProcessed(processed);

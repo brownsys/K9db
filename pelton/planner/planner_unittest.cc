@@ -80,6 +80,16 @@ inline void EXPECT_EQ_MSET(const dataflow::Key &key,
   EXPECT_TRUE(tmp.empty());
 }
 
+std::vector<dataflow::Record> CopyVec(
+    const std::vector<dataflow::Record> &records) {
+  std::vector<dataflow::Record> copy;
+  copy.reserve(records.size());
+  for (const dataflow::Record &r : records) {
+    copy.push_back(r.Copy());
+  }
+  return copy;
+}
+
 // Project.
 TEST(PlannerTest, SimpleProject) {
   // Create a schema.
@@ -118,7 +128,7 @@ TEST(PlannerTest, SimpleProject) {
   std::vector<dataflow::Record> records;
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
-  graph->Process("test_table", records);
+  graph->Process("test_table", std::move(records));
 
   // Look at flow output.
   EXPECT_EQ_MSET(graph->outputs().at(0), expected_records);
@@ -158,7 +168,7 @@ TEST(PlannerTest, SimpleProjectLiteral) {
   std::vector<dataflow::Record> records;
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
-  graph->Process("test_table", records);
+  graph->Process("test_table", std::move(records));
 
   // Look at flow output.
   std::shared_ptr<dataflow::MatViewOperator> output = graph->outputs().at(0);
@@ -207,7 +217,7 @@ TEST(PlannerTest, ProjectArithmeticRightLiteral) {
   std::vector<dataflow::Record> records;
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
-  graph->Process("test_table", records);
+  graph->Process("test_table", std::move(records));
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
@@ -256,7 +266,7 @@ TEST(PlannerTest, ProjectArithmeticRightColumn) {
   std::vector<dataflow::Record> records;
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
-  graph->Process("test_table", records);
+  graph->Process("test_table", std::move(records));
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
@@ -310,7 +320,7 @@ TEST(PlannerTest, SimpleAggregate) {
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
   records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
-  graph->Process("test_table", records);
+  graph->Process("test_table", std::move(records));
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
@@ -357,7 +367,7 @@ TEST(PlannerTest, SimpleFilter) {
   std::vector<dataflow::Record> records;
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
-  graph->Process("test_table", records);
+  graph->Process("test_table", CopyVec(records));
 
   // Look at flow output.
   std::shared_ptr<dataflow::MatViewOperator> output = graph->outputs().at(0);
@@ -402,7 +412,7 @@ TEST(PlannerTest, SingleConditionFilter) {
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
   records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
-  graph->Process("test_table", records);
+  graph->Process("test_table", CopyVec(records));
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
@@ -448,7 +458,7 @@ TEST(PlannerTest, FilterSingleORCondition) {
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
   records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
-  graph->Process("test_table", records);
+  graph->Process("test_table", CopyVec(records));
 
   // Look at flow output.
   std::shared_ptr<dataflow::MatViewOperator> output = graph->outputs().at(0);
@@ -493,7 +503,7 @@ TEST(PlannerTest, FilterSingleANDCondition) {
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
   records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
-  graph->Process("test_table", records);
+  graph->Process("test_table", CopyVec(records));
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
@@ -552,7 +562,7 @@ TEST(PlannerTest, FilterNestedORCondition) {
   records.emplace_back(schema, true, 21_s, std::move(str3), 20_s);
   records.emplace_back(schema, true, 14_s, std::move(str4), 30_s);
   records.emplace_back(schema, true, 10_s, std::move(str5), 30_s);
-  graph->Process("test_table", records);
+  graph->Process("test_table", std::move(records));
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
@@ -601,7 +611,7 @@ TEST(PlannerTest, FilterNestedANDCondition) {
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
   records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
-  graph->Process("test_table", records);
+  graph->Process("test_table", CopyVec(records));
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
@@ -644,7 +654,7 @@ TEST(PlannerTest, FilterColumnComparison) {
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
   records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
-  graph->Process("test_table", records);
+  graph->Process("test_table", CopyVec(records));
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
@@ -716,7 +726,7 @@ TEST(PlannerTest, FilterArithmeticCondition) {
   records.emplace_back(schema, true, 10_s, std::move(str1), 50_u);
   records.emplace_back(schema, true, 20_s, std::move(str2), 70_u);
   records.emplace_back(schema, true, 30_s, std::move(str3), 30_u);
-  graph->Process("test_table", records);
+  graph->Process("test_table", std::move(records));
 
   // Expected records
   std::unique_ptr<std::string> str4 = std::make_unique<std::string>("hello!");
@@ -793,7 +803,7 @@ TEST(PlannerTest, FilterArithmeticConditionTwoColumns) {
   records.emplace_back(schema, true, 20_u, std::move(str2), 20_u);
   records.emplace_back(schema, true, 10_u, std::move(str1), 20_u);
   records.emplace_back(schema, true, 30_u, std::move(str3), 25_u);
-  graph->Process("test_table", records);
+  graph->Process("test_table", std::move(records));
 
   // Expected records
   std::unique_ptr<std::string> str4 = std::make_unique<std::string>("bye!");
@@ -850,7 +860,7 @@ TEST(PlannerTest, UniqueSecondaryIndexFlow) {
                        std::make_unique<std::string>("shard2"), 20_s);
   records.emplace_back(schema, true, 30_s,
                        std::make_unique<std::string>("shard3"), 50_s);
-  graph->Process("test_table", records);
+  graph->Process("test_table", std::move(records));
 
   // Expected records.
   std::vector<dataflow::Record> expected_records;
@@ -872,7 +882,7 @@ TEST(PlannerTest, UniqueSecondaryIndexFlow) {
                         std::make_unique<std::string>("shard2"), 20_s);
   records2.emplace_back(schema, true, 100_s,
                         std::make_unique<std::string>("shard5"), 50_s);
-  graph->Process("test_table", records2);
+  graph->Process("test_table", std::move(records2));
 
   // Expected records.
   std::vector<dataflow::Record> expected_records2;
@@ -926,7 +936,7 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
                        std::make_unique<std::string>("shard1"), 20_s);
   records.emplace_back(schema, true, 1_s, 10_s,
                        std::make_unique<std::string>("shard1"), 20_s);
-  graph->Process("test_table", records);
+  graph->Process("test_table", CopyVec(records));
 
   // Check that processing was correct.
   std::vector<dataflow::Record> expected_records;
@@ -941,7 +951,7 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
                        std::make_unique<std::string>("shard2"), 150_s);
   records.emplace_back(schema, true, 2_s, 30_s,
                        std::make_unique<std::string>("shard1"), 200_s);
-  graph->Process("test_table", records);
+  graph->Process("test_table", CopyVec(records));
 
   expected_records.clear();
   expected_records.emplace_back(matview->output_schema(), true, 10_s,
@@ -958,7 +968,7 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
                         std::make_unique<std::string>("shard1"), 20_s);
   records2.emplace_back(schema, false, 1_s, 10_s,
                         std::make_unique<std::string>("shard1"), 20_s);
-  graph->Process("test_table", records2);
+  graph->Process("test_table", CopyVec(records2));
 
   expected_records.clear();
   expected_records.emplace_back(matview->output_schema(), true, 10_s,
@@ -975,7 +985,7 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
                         std::make_unique<std::string>("shard1"), 50_s);
   records2.emplace_back(schema, false, 2_s, 30_s,
                         std::make_unique<std::string>("shard1"), 200_s);
-  graph->Process("test_table", records2);
+  graph->Process("test_table", CopyVec(records2));
 
   expected_records.clear();
   expected_records.emplace_back(matview->output_schema(), true, 10_s,
@@ -1047,14 +1057,14 @@ TEST(PlannerTest, ComplexQueryWithKeys) {
   std::vector<dataflow::Record> records;
   records.emplace_back(schema1, true, 0_s, std::make_unique<std::string>("s1"));
   records.emplace_back(schema1, true, 1_s, std::make_unique<std::string>("s2"));
-  graph->Process("students", records);
+  graph->Process("students", std::move(records));
 
   records.clear();
   records.emplace_back(schema2, true, 10_s,
                        std::make_unique<std::string>("a1"));
   records.emplace_back(schema2, true, 20_s,
                        std::make_unique<std::string>("a2"));
-  graph->Process("assignments", records);
+  graph->Process("assignments", std::move(records));
 
   records.clear();
   records.emplace_back(schema3, true, 0_s, 0_s, 10_s, 100_s);
@@ -1063,7 +1073,7 @@ TEST(PlannerTest, ComplexQueryWithKeys) {
   records.emplace_back(schema3, true, 4_s, 1_s, 10_s, 440_s);
   records.emplace_back(schema3, true, 5_s, 1_s, 10_s, 465_s);
   records.emplace_back(schema3, true, 6_s, 0_s, 10_s, 721_s);
-  graph->Process("submissions", records);
+  graph->Process("submissions", std::move(records));
 
   // Check that processing was correct.
   dataflow::SchemaRef schema4 = matview->output_schema();
@@ -1145,7 +1155,7 @@ TEST(PlannerTest, BasicLeftJoin) {
   records.emplace_back(schema3, true, 4_s, 1_s, 10_s, 440_s);
   records.emplace_back(schema3, true, 5_s, 1_s, 10_s, 465_s);
   records.emplace_back(schema3, true, 6_s, 0_s, 10_s, 721_s);
-  graph->Process("submissions", records);
+  graph->Process("submissions", std::move(records));
 
   // Check for appropriate records with null values for left join
   std::vector<dataflow::Record> expected_records;
@@ -1167,7 +1177,7 @@ TEST(PlannerTest, BasicLeftJoin) {
   records.clear();
   records.emplace_back(schema1, true, 0_s, std::make_unique<std::string>("s1"));
   records.emplace_back(schema1, true, 1_s, std::make_unique<std::string>("s2"));
-  graph->Process("students", records);
+  graph->Process("students", std::move(records));
 
   // Check if matview gets updated as a consequence of negative records
   expected_records.clear();

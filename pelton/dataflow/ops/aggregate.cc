@@ -144,8 +144,8 @@ inline void AggregateOperator::InitAggregateValue(Record *aggregate_record,
   }
 }
 
-std::optional<std::vector<Record>> AggregateOperator::Process(
-    NodeIndex /*source*/, const std::vector<Record> &records) {
+std::vector<Record> AggregateOperator::Process(NodeIndex source,
+                                               std::vector<Record> &&records) {
   std::vector<Record> output;
   absl::flat_hash_map<Key, StateChange> first_delta;
 
@@ -294,7 +294,7 @@ std::optional<std::vector<Record>> AggregateOperator::Process(
       EmitRecord(item.first, *state_.Lookup(item.first).begin(), true, &output);
     }
   }
-  return std::move(output);
+  return output;
 }
 
 std::shared_ptr<Operator> AggregateOperator::Clone() const {

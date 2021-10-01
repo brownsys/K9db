@@ -14,17 +14,15 @@ namespace pelton {
 namespace dataflow {
 
 // NOLINTNEXTLINE
-static void UnorderedMatViewInsert2UInts(benchmark::State& state) {
+static void UnorderedMatViewInsert2UInts(benchmark::State &state) {
   SchemaRef schema = MakeSchema(false);
   auto op = new UnorderedMatViewOperator(schema.keys());
 
-  Record r{schema, true, 4_u, 5_u};
-  std::vector<Record> rs;
-  rs.emplace_back(std::move(r));
-
   size_t processed = 0;
   for (auto _ : state) {
-    op->ProcessAndForward(UNDEFINED_NODE_INDEX, rs);
+    std::vector<Record> rs;
+    rs.emplace_back(schema, true, 4_u, 5_u);
+    op->ProcessAndForward(UNDEFINED_NODE_INDEX, std::move(rs));
     processed++;
   }
   state.SetItemsProcessed(processed);
@@ -33,17 +31,15 @@ static void UnorderedMatViewInsert2UInts(benchmark::State& state) {
 }
 
 // NOLINTNEXTLINE
-static void UnorderedMatViewInsertUIntString(benchmark::State& state) {
+static void UnorderedMatViewInsertUIntString(benchmark::State &state) {
   SchemaRef schema = MakeSchema(true);
   auto op = new UnorderedMatViewOperator(schema.keys());
 
-  Record r{schema, true, 4_u, std::make_unique<std::string>("world")};
-  std::vector<Record> rs;
-  rs.emplace_back(std::move(r));
-
   size_t processed = 0;
   for (auto _ : state) {
-    op->ProcessAndForward(UNDEFINED_NODE_INDEX, rs);
+    std::vector<Record> rs;
+    rs.emplace_back(schema, true, 4_u, std::make_unique<std::string>("world"));
+    op->ProcessAndForward(UNDEFINED_NODE_INDEX, std::move(rs));
     processed++;
   }
   state.SetItemsProcessed(processed);
@@ -52,20 +48,20 @@ static void UnorderedMatViewInsertUIntString(benchmark::State& state) {
 }
 
 // NOLINTNEXTLINE
-static void UnorderedMatViewBatchInsert(benchmark::State& state) {
+static void UnorderedMatViewBatchInsert(benchmark::State &state) {
   SchemaRef schema = MakeSchema(false);
   auto op = new UnorderedMatViewOperator(schema.keys());
 
-  std::vector<Record> rs = {};
-  for (int i = 0; i < state.range(0); ++i) {
-    uint64_t v = i;
-    rs.emplace_back(schema, true, v, v + 1);
-  }
-
   size_t processed = 0;
   for (auto _ : state) {
+    std::vector<Record> rs = {};
+    for (int i = 0; i < state.range(0); ++i) {
+      uint64_t v = i;
+      rs.emplace_back(schema, true, v, v + 1);
+    }
+
     processed += rs.size();
-    op->ProcessAndForward(UNDEFINED_NODE_INDEX, rs);
+    op->ProcessAndForward(UNDEFINED_NODE_INDEX, std::move(rs));
   }
   state.SetItemsProcessed(processed);
 

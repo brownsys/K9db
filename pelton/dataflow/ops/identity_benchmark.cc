@@ -14,18 +14,15 @@ namespace pelton {
 namespace dataflow {
 
 // NOLINTNEXTLINE
-static void IdentityForwards(benchmark::State& state) {
+static void IdentityForwards(benchmark::State &state) {
   SchemaRef schema = MakeSchema(false);
   IdentityOperator op;
 
-  Record r{schema, true, 4_u, 5_u};
-  std::vector<Record> rs;
-  rs.emplace_back(std::move(r));
-
-  std::vector<Record> out_rs;
   size_t processed = 0;
   for (auto _ : state) {
-    op.ProcessAndForward(UNDEFINED_NODE_INDEX, rs);
+    std::vector<Record> rs;
+    rs.emplace_back(schema, true, 4_u, 5_u);
+    op.ProcessAndForward(UNDEFINED_NODE_INDEX, std::move(rs));
     processed++;
   }
   state.SetItemsProcessed(processed);

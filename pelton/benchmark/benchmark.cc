@@ -1,4 +1,5 @@
 #include <iostream>
+// NOLINTNEXTLINE
 #include <thread>
 
 #include "glog/logging.h"

@@ -60,7 +60,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       std::vector<dataflow::Record> records =
           table_result.NextResultSet()->Vectorize();
       total_count += records.size();
-      dataflow_state->ProcessRecords(table_name, records);
+      dataflow_state->ProcessRecords(table_name, std::move(records));
     } else if (is_forget) {
       total_count += table_result.UpdateCount();
     } else if (!is_forget) {

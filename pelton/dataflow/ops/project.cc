@@ -251,8 +251,8 @@ void ProjectOperator::ComputeOutputSchema() {
       SchemaFactory::Create(out_column_names, out_column_types, out_keys);
 }
 
-std::optional<std::vector<Record>> ProjectOperator::Process(
-    NodeIndex /*source*/, const std::vector<Record> &records) {
+std::vector<Record> ProjectOperator::Process(NodeIndex source,
+                                             std::vector<Record> &&records) {
   std::vector<Record> output;
   for (const Record &record : records) {
     output.emplace_back(this->output_schema_, record.IsPositive());
@@ -357,7 +357,7 @@ std::optional<std::vector<Record>> ProjectOperator::Process(
     }
   }
 
-  return std::move(output);
+  return output;
 }
 
 std::shared_ptr<Operator> ProjectOperator::Clone() const {

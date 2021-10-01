@@ -1,6 +1,7 @@
 #include "pelton/dataflow/ops/union.h"
 
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "glog/logging.h"
@@ -23,16 +24,16 @@ bool UnionOperator::DeepCompareSchemas(const SchemaRef s1, const SchemaRef s2) {
 
 void UnionOperator::ComputeOutputSchema() {
   this->output_schema_ = this->input_schemas_.at(0);
-  for (const SchemaRef& input_schema : this->input_schemas_) {
+  for (const SchemaRef &input_schema : this->input_schemas_) {
     if (!DeepCompareSchemas(this->output_schema_, input_schema)) {
       LOG(FATAL) << "UnionOperator has inputs with different schemas";
     }
   }
 }
 
-std::optional<std::vector<Record>> UnionOperator::Process(
-    NodeIndex /*source*/, const std::vector<Record>& /*records*/) {
-  return std::nullopt;
+std::vector<Record> UnionOperator::Process(NodeIndex source,
+                                           std::vector<Record> &&records) {
+  return std::move(records);
 }
 
 std::shared_ptr<Operator> UnionOperator::Clone() const {

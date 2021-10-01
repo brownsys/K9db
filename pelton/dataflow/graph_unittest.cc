@@ -426,10 +426,11 @@ TEST(DataFlowGraphTest, TestTrivialGraph) {
   DataFlowGraph g = MakeTrivialGraph(0, schema);
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
+  std::vector<Record> results = MakeLeftRecords(schema);
   // Process records.
-  g.Process("test-table", records);
+  g.Process("test-table", std::move(records));
   // Outputs must be equal.
-  MatViewContentsEquals(g.outputs().at(0), records);
+  MatViewContentsEquals(g.outputs().at(0), results);
 }
 
 TEST(DataFlowGraphTest, TestFilterGraph) {
@@ -440,7 +441,7 @@ TEST(DataFlowGraphTest, TestFilterGraph) {
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
-  g.Process("test-table", records);
+  g.Process("test-table", std::move(records));
   // Filter records.
   auto op = std::dynamic_pointer_cast<FilterOperator>(g.GetNode(1));
   std::vector<Record> filtered = MakeFilterRecords(op->output_schema());
@@ -463,8 +464,8 @@ TEST(DataFlowGraphTest, TestUnionGraph) {
   second_half.push_back(records.at(3).Copy());
   second_half.push_back(records.at(4).Copy());
   // Process records.
-  g.Process("test-table1", first_half);
-  g.Process("test-table2", second_half);
+  g.Process("test-table1", std::move(first_half));
+  g.Process("test-table2", std::move(second_half));
   // Outputs must be equal.
   MatViewContentsEquals(g.outputs().at(0), records);
 }
@@ -479,8 +480,8 @@ TEST(DataFlowGraphTest, TestEquiJoinGraph) {
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
   // Process records.
-  g.Process("test-table1", left);
-  g.Process("test-table2", right);
+  g.Process("test-table1", std::move(left));
+  g.Process("test-table2", std::move(right));
   // Compute expected result.
   auto op = std::dynamic_pointer_cast<EquiJoinOperator>(g.GetNode(2));
   std::vector<Record> result = MakeJoinRecords(op->output_schema());
@@ -496,7 +497,7 @@ TEST(DataFlowGraphTest, TestProjectGraph) {
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
-  g.Process("test-table", records);
+  g.Process("test-table", std::move(records));
   // Compute expected result.
   auto op = std::dynamic_pointer_cast<ProjectOperator>(g.GetNode(1));
   std::vector<Record> result = MakeProjectRecords(op->output_schema());
@@ -512,7 +513,7 @@ TEST(DataFlowGraphTest, TestProjectOnFilterGraph) {
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
-  g.Process("test-table", records);
+  g.Process("test-table", std::move(records));
   // Compute expected result.
   auto op = std::dynamic_pointer_cast<ProjectOperator>(g.GetNode(2));
   std::vector<Record> result = MakeProjectOnFilterRecords(op->output_schema());
@@ -530,8 +531,8 @@ TEST(DataFlowGraphTest, TestProjectOnEquiJoinGraph) {
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
   // Process records.
-  g.Process("test-table1", left);
-  g.Process("test-table2", right);
+  g.Process("test-table1", std::move(left));
+  g.Process("test-table2", std::move(right));
   // Compute expected result.
   auto op = std::dynamic_pointer_cast<ProjectOperator>(g.GetNode(3));
   std::vector<Record> result =
@@ -548,7 +549,7 @@ TEST(DataFlowGraphTest, TestAggregateGraph) {
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
-  g.Process("test-table", records);
+  g.Process("test-table", std::move(records));
   // Compute expected result.
   auto op = std::dynamic_pointer_cast<AggregateOperator>(g.GetNode(1));
   std::vector<Record> result = MakeAggregateRecords(op->output_schema());
@@ -566,8 +567,8 @@ TEST(DataFlowGraphTest, TestAggregateOnEquiJoinGraph) {
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
   // Process records.
-  g.Process("test-table1", left);
-  g.Process("test-table2", right);
+  g.Process("test-table1", std::move(left));
+  g.Process("test-table2", std::move(right));
   // Compute expected result.
   auto op = std::dynamic_pointer_cast<AggregateOperator>(g.GetNode(3));
   std::vector<Record> result =
@@ -589,8 +590,8 @@ TEST(DataFlowGraphTest, CloneTest) {
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
   // Process records.
-  g_clone->Process("test-table1", left);
-  g_clone->Process("test-table2", right);
+  g_clone->Process("test-table1", std::move(left));
+  g_clone->Process("test-table2", std::move(right));
   // Compute expected result.
   auto op = std::dynamic_pointer_cast<AggregateOperator>(g_clone->GetNode(3));
   std::vector<Record> result =

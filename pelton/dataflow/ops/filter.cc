@@ -94,15 +94,16 @@ void FilterOperator::ComputeOutputSchema() {
   this->output_schema_ = this->input_schemas_.at(0);
 }
 
-std::optional<std::vector<Record>> FilterOperator::Process(
-    NodeIndex /*source*/, const std::vector<Record> &records) {
+std::vector<Record> FilterOperator::Process(NodeIndex source,
+                                            std::vector<Record> &&records) {
   std::vector<Record> output;
-  for (const Record &record : records) {
+  output.reserve(records.size());
+  for (Record &record : records) {
     if (this->Accept(record)) {
-      output.push_back(record.Copy());
+      output.push_back(std::move(record));
     }
   }
-  return std::move(output);
+  return output;
 }
 
 bool FilterOperator::Accept(const Record &record) const {
