@@ -6,6 +6,18 @@
 namespace pelton {
 namespace dataflow {
 
+bool Worker::MonitorStopChannel(std::shared_ptr<Channel> channel) {
+  std::unique_lock<std::mutex> lock(this->mtx_);
+  this->stop_chan_ = channel;
+  return true;
+}
+
+// The DataFlowEngine inserts channels such that the channels present towards
+// the end of chans_to_monitor_ vector are for the exchange operators and
+// channels present at the front are for the inputs. This is intended by design
+// so that by the time worker is done consuming channels for the inputs, It
+// will be more likely that channels reserved for the exchange ops will contain
+// messages.
 bool Worker::MonitorChannel(std::shared_ptr<Channel> channel) {
   std::unique_lock<std::mutex> lock(this->mtx_);
   this->chans_to_monitor_.push_back(channel);
@@ -42,6 +54,7 @@ void Worker::Start() {
       this->condition_variable_->wait(lock);
     }
 
+    // Check and process messages on channels.
     for (auto channel : this->chans_to_monitor_) {
       std::optional<std::vector<std::shared_ptr<Message>>> messages =
           channel->Recv();
@@ -55,16 +68,26 @@ void Worker::Start() {
                             channel->source_index(),
                             batch_msg->ConsumeRecords());
             } break;
-            case Message::Type::STOP: {
-              // Terminate this worker thread if a stop message is received
-              // by any flow.
-              return;
-            } break;
+            case Message::Type::STOP:
+              LOG(FATAL)
+                  << "Stop is message not expected to be sent on this channel";
             default:
               LOG(FATAL) << "Unsupported message type";
           }
         }
       }
+    }
+
+    // Consume messages from the stop channel at the end so that in case if a
+    // stop message is present, then messages from other channels have the
+    // opportunity to get consumed before the worker thread terminates.
+    std::optional<std::vector<std::shared_ptr<Message>>> messages =
+        this->stop_chan_->Recv();
+    if (messages.has_value()) {
+      CHECK_EQ(messages.value().size(), static_cast<size_t>(1));
+      auto stop_message = messages.value().at(0);
+      assert(stop_message->type() == Message::Type::STOP);
+      return;
     }
   }
 }

@@ -37,7 +37,7 @@ DataFlowEngine::DataFlowEngine(PartitionID partition_count)
     this->workers_.emplace(i, worker);
     this->stop_chans_.emplace(
         i, std::make_shared<Channel>(worker->condition_variable(), worker));
-    worker->MonitorChannel(this->stop_chans_.at(i));
+    worker->MonitorStopChannel(this->stop_chans_.at(i));
   }
   // Deploy one worker per thread
   for (const auto &[_, worker] : this->workers_) {
@@ -107,6 +107,15 @@ void DataFlowEngine::AddFlow(const FlowName &name,
     partition->SetPartitionID(i);
     this->partitioned_graphs_.at(name).emplace(i, partition);
   }
+  // The workers must monitor channels that have been reserved for
+  // inputs as well.
+  for (const auto &[partition, worker] : this->workers_) {
+    for (const auto &[_, chan] :
+         this->partition_chans_.at(name).at(partition)) {
+      worker->MonitorChannel(chan);
+    }
+  }
+
   // Initialize data structures for input partitions
   // NOTE: Since every flow at least has a matview, each input is expected to be
   // partitioned on some key. Hence, no default partitioning key will be
@@ -123,14 +132,6 @@ void DataFlowEngine::AddFlow(const FlowName &name,
   // Add partitioned graphs to appropriate workers
   for (const auto &[partition, graph] : this->partitioned_graphs_.at(name)) {
     this->workers_.at(partition)->AddPartitionedGraph(graph);
-  }
-  // The workers must monitor channels that have been reserved for
-  // clients as well.
-  for (const auto &[partition, worker] : this->workers_) {
-    for (const auto &[_, chan] :
-         this->partition_chans_.at(name).at(partition)) {
-      worker->MonitorChannel(chan);
-    }
   }
 }
 

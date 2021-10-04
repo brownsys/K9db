@@ -26,6 +26,7 @@ class Worker {
       : partition_id_(partition_id), condition_variable_(condition_variable) {}
 
   bool MonitorChannel(std::shared_ptr<Channel> channel);
+  bool MonitorStopChannel(std::shared_ptr<Channel> channel);
   bool AddPartitionedGraph(std::shared_ptr<DataFlowGraph> graph);
   void NotifyWorker();
 
@@ -45,6 +46,7 @@ class Worker {
   // is responsible for listening on, has input to read from.
   std::shared_ptr<std::condition_variable> condition_variable_;
   std::vector<std::shared_ptr<Channel>> chans_to_monitor_;
+  std::shared_ptr<Channel> stop_chan_;
   // Contains partitioned graph for @partition_id_.
   absl::flat_hash_map<GraphIndex, std::shared_ptr<DataFlowGraph>> graphs_;
   // Keeps track of how many flows have been marked as stopped.
