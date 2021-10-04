@@ -201,7 +201,7 @@ http_archive(
 
 load("@rules_rust//rust:repositories.bzl", "rust_repositories")
 
-rust_repositories()
+rust_repositories(version = "nightly", iso_date="2021-06-16")
 
 load("@rules_rust//bindgen:repositories.bzl", "rust_bindgen_repositories")
 
