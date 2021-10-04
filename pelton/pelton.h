@@ -59,20 +59,14 @@ class State {
 
   void PrintSizeInMemory() const { this->dataflow_state_.PrintSizeInMemory(); }
 
-  void LockMutex() { this->mtx.lock(); }
-  void UnlockMutex() { this->mtx.unlock(); }
-
  private:
   shards::SharderState sharder_state_;
   dataflow::DataFlowState dataflow_state_;
   std::string path_;
-  std::mutex mtx;
 };
 
 struct Connection {
   State *pelton_state;
-  void lock_mtx() { this->pelton_state->LockMutex(); };
-  void unlock_mtx() { this->pelton_state->UnlockMutex(); };
 };
 
 // initialize pelton_state

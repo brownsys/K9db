@@ -7,9 +7,9 @@
 #ifndef PELTON_SHARDS_STATE_H_
 #define PELTON_SHARDS_STATE_H_
 
-#include <shared_mutex>
 #include <list>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -180,7 +180,11 @@ class SharderState {
       std::unordered_map<ColumnName, std::unordered_map<ColumnName, FlowName>>>
       index_to_flow_;
 
-  mutable std::shared_mutex mtx_;
+  mutable std::shared_mutex mtx1_;
+  mutable std::shared_mutex mtx2_;
+  mutable std::shared_mutex mtx3_;
+  mutable std::shared_mutex mtx4_;
+  mutable std::shared_mutex mtx5_;
 };
 
 }  // namespace shards

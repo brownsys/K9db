@@ -30,7 +30,6 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
                                      dataflow::DataFlowState *dataflow_state,
                                      std::string *shard_kind = nullptr,
                                      std::string *user_id = nullptr);
-
 }  // namespace sqlengine
 }  // namespace shards
 }  // namespace pelton
