@@ -12,8 +12,11 @@
 namespace pelton {
 namespace sqlast {
 
+std::shared_mutex SQLParser::MTX = {};
 absl::StatusOr<std::unique_ptr<AbstractStatement>> SQLParser::Parse(
     const std::string &sql) {
+  std::unique_lock<std::shared_mutex> lock(MTX);
+
   auto hacky_result = HackyParse(sql);
   if (hacky_result.ok()) {
     return std::move(hacky_result.value());
@@ -46,6 +49,7 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> SQLParser::Parse(
   perf::Start("Transformer");
   auto result = AstTransformer().TransformStatement(statement);
   perf::End("Transformer");
+  // this->UnlockMutex();
   return result;
 }
 
