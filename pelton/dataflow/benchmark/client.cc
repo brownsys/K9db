@@ -14,6 +14,7 @@ void Client::Start(std::vector<std::vector<Record>> &&batches) {
   switch (this->graph_type_) {
     case utils::GraphType::FILTER_GRAPH:
     case utils::GraphType::AGGREGATE_GRAPH_WITHOUT_EXCHANGE:
+    case utils::GraphType::IDENTITY_GRAPH:
       CHECK_EQ(this->input_names_.size(), (size_t)1);
       for (size_t i = 0; i < batches.size(); i++) {
         this->dataflow_engine_->ProcessRecords(this->input_names_.at(0),

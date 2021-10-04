@@ -156,6 +156,7 @@ void DataFlowEngine::AnnotateBaseGraph(
   for (size_t i = 0; i < graph->node_count(); i++) {
     const auto node = graph->GetNode(i);
     switch (node->type()) {
+      case Operator::Type::IDENTITY:
       case Operator::Type::FILTER:
       case Operator::Type::PROJECT:
       case Operator::Type::UNION:
@@ -193,6 +194,7 @@ void DataFlowEngine::VisitNode(
   }
   node->visited_ = true;
   switch (node->type()) {
+    case Operator::Type::IDENTITY:
     case Operator::Type::FILTER:
     case Operator::Type::PROJECT:
     case Operator::Type::MAT_VIEW:

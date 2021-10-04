@@ -35,6 +35,8 @@ SchemaRef MakeAggregateSchema() {
   return SchemaFactory::Create(names, types, keys);
 }
 
+SchemaRef MakeIdentitySchema() { return MakeFilterSchema(); }
+
 std::vector<std::vector<Record>> MakeFilterBatches(uint64_t num_batches,
                                                    uint64_t batch_size) {
   uint64_t record_id = 0;
@@ -112,6 +114,11 @@ std::vector<std::vector<Record>> MakeAggregateBatches(uint64_t num_batches,
   return batches;
 }
 
+std::vector<std::vector<Record>> MakeIdentityBatches(uint64_t num_batches,
+                                                     uint64_t batch_size) {
+  return MakeFilterBatches(num_batches, batch_size);
+}
+
 std::shared_ptr<DataFlowGraph> MakeFilterGraph(ColumnID keycol,
                                                const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
@@ -162,6 +169,21 @@ std::shared_ptr<DataFlowGraph> MakeAggregateGraph(
   g->AddInputNode(in);
   g->AddNode(aggregate, in);
   g->AddOutputOperator(matview, aggregate);
+  return g;
+}
+
+std::shared_ptr<DataFlowGraph> MakeIdentityGraph(ColumnID keycol,
+                                                 const SchemaRef &schema) {
+  std::vector<ColumnID> keys = {keycol};
+  auto g = std::make_shared<DataFlowGraph>();
+
+  auto in = std::make_shared<InputOperator>("test-table", schema);
+  auto identity = std::make_shared<IdentityOperator>();
+  auto matview = std::make_shared<KeyOrderedMatViewOperator>(keys);
+
+  g->AddInputNode(in);
+  g->AddNode(identity, in);
+  g->AddOutputOperator(matview, identity);
   return g;
 }
 
