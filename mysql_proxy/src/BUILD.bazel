@@ -33,11 +33,11 @@ rust_library(
         ":proxy_ffi_bindgen",
         ":proxy_ffi_wrappers",
     ],
-    deps = [
-        "//mysql_proxy:msql_srv",
-    ],
     rustc_flags = [
         "-Zsanitizer=thread",
+    ],
+    deps = [
+        "//mysql_proxy:msql_srv",
     ],
 )
 

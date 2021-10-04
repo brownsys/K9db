@@ -38,10 +38,10 @@ class AggregateOperator : public Operator {
 
   std::shared_ptr<Operator> Clone() const override;
 
-  ~AggregateOperator() {
-    // Ensure that schemas are not destructed first
-    state_.~GroupedDataT();
-  }
+  // ~AggregateOperator() {
+  //   // Ensure that schemas are not destructed first
+  //   state_.~GroupedDataT();
+  // }
 
  protected:
   std::optional<std::vector<Record>> Process(
