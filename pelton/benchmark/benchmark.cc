@@ -77,6 +77,9 @@ void Benchmark(const std::vector<std::string> &tables, const std::string &query,
 }  // namespace pelton
 
 int main(int argc, char **argv) {
+  // Initialize Google’s logging library.
+  google::InitGoogleLogging("cli");
+
   pelton::benchmark::Benchmark(
       {"CREATE TABLE tbl(col1 INT PRIMARY KEY, col2 VARCHAR, col3 INT);"},
       "SELECT * FROM tbl WHERE col3 < 10", 1, 10000000, 1);

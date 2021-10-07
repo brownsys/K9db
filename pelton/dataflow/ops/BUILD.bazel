@@ -29,9 +29,9 @@ cc_library(
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
-        "@gbenchmark//:benchmark",
+        "@com_github_google_benchmark//:benchmark",
         "@glog",
-        "@gtest//:gtest_prod",
+        "@com_google_googletest//:gtest_prod",
     ],
 )
 
@@ -52,7 +52,7 @@ cc_library(
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
         "@glog",
-        "@gtest//:gtest_prod",
+        "@com_google_googletest//:gtest_prod",
     ],
 )
 
@@ -89,7 +89,7 @@ cc_library(
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "@glog",
-        "@gtest//:gtest_prod",
+        "@com_google_googletest//:gtest_prod",
     ],
 )
 
@@ -105,8 +105,8 @@ cc_library(
         "//pelton/dataflow:key",
         "//pelton/dataflow:record",
         "//pelton/dataflow:types",
-        "@absl//absl/container:btree",
-        "@absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:btree",
+        "@com_google_absl//absl/container:flat_hash_map",
     ],
 )
 
@@ -163,7 +163,7 @@ cc_library(
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "@glog",
-        "@gtest//:gtest_prod",
+        "@com_google_googletest//:gtest_prod",
     ],
 )
 
@@ -184,7 +184,7 @@ cc_library(
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "@glog",
-        "@gtest//:gtest_prod",
+        "@com_google_googletest//:gtest_prod",
     ],
 )
 
@@ -193,7 +193,6 @@ cc_test(
     srcs = [
         "equijoin_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":equijoin",
         ":identity",
@@ -206,8 +205,8 @@ cc_test(
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
         "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -216,7 +215,6 @@ cc_test(
     srcs = [
         "filter_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":filter",
         "//pelton/dataflow:record",
@@ -225,8 +223,8 @@ cc_test(
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
         "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -235,7 +233,6 @@ cc_test(
     srcs = [
         "matview_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":matview",
         "//pelton/dataflow:key",
@@ -245,8 +242,8 @@ cc_test(
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
         "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -255,7 +252,6 @@ cc_test(
     srcs = [
         "project_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":project",
         "//pelton/dataflow:key",
@@ -265,8 +261,8 @@ cc_test(
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
         "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -275,7 +271,6 @@ cc_test(
     srcs = [
         "aggregate_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":aggregate",
         "//pelton/dataflow:key",
@@ -285,8 +280,8 @@ cc_test(
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
         "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -314,6 +309,6 @@ cc_test(
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
-        "@gbenchmark//:benchmark",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )

@@ -56,6 +56,7 @@ uint64_t Client::BenchmarkBatch(const std::string &table,
 // Entry Point.
 void Client::Benchmark(size_t batch_size, size_t batch_count) {
   TLOG << "Starting...";
+  auto start = std::chrono::high_resolution_clock::now();
   std::vector<std::string> tables = this->state_->GetTables();
 
   // Prime all inputs except one.
@@ -80,10 +81,14 @@ void Client::Benchmark(size_t batch_size, size_t batch_count) {
     total_time += this->BenchmarkBatch(table, std::move(batch));
   }
 
+  auto end = std::chrono::high_resolution_clock::now();
+  auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+  TLOG << "Total time: " << (diff.count() / 1000.0 / 1000 / 1000);
+
   double throughput = total_time / 1000.0 / 1000 / 1000;
   throughput = (batch_size * batch_count) / throughput;
-  TLOG << total_time << "ns";
-  TLOG << throughput << " records per second";
+  TLOG << "Measured time: " << total_time << "ns";
+  TLOG << "Throughput: " << throughput << " records per second";
 }
 
 }  // namespace benchmark

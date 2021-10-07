@@ -32,5 +32,6 @@ cc_binary(
         "//pelton/sqlast:parser",
         "//pelton/util:status",
         "@glog",
-    ]
+    ],
+    malloc = "@com_google_tcmalloc//tcmalloc:tcmalloc",
 )

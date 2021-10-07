@@ -70,6 +70,6 @@ cc_test(
         "//pelton/sql:eager_executor",
         "//pelton/util:ints",
         "@glog",
-        "@gtest",
+        "@com_google_googletest//:gtest",
     ],
 )
