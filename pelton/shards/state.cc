@@ -15,7 +15,6 @@ namespace pelton {
 namespace shards {
 
 // Initialization.
-// writes to executor_ (w1)
 void SharderState::Initialize(const std::string &db_name,
                               const std::string &db_username,
                               const std::string &db_password) {
@@ -23,38 +22,39 @@ void SharderState::Initialize(const std::string &db_name,
 }
 
 // Schema manipulations.
-// writes to schema_ (w1)
 void SharderState::AddSchema(const UnshardedTableName &table_name,
                              const sqlast::CreateTable &table_schema) {
+  // writer lock for schema_
   std::unique_lock<std::shared_mutex> lock(this->mtx1_);
   this->schema_.insert({table_name, table_schema});
 }
 
-// writes to kinds_ (w1), kind_to_tables_ (w1), kind_to_names_ (w1), shards_
-// (w1)
 void SharderState::AddShardKind(const ShardKind &kind, const ColumnName &pk) {
+  // writer lock for kinds_, kind_to_tables, kind_to_names
   std::unique_lock<std::shared_mutex> lock(this->mtx2_);
+  // writer lock for shards_
+  std::unique_lock<std::shared_mutex> lock2(this->mtx3_);
   this->kinds_.insert({kind, pk});
-  // std::unique_lock<std::shared_mutex> unlock(this->mtx2_);
   this->kind_to_tables_.insert({kind, {}});
   this->kind_to_names_.insert({kind, {}});
   this->shards_.insert({kind, {}});
 }
 
-// writes to sharded_schema (w1)
 void SharderState::AddUnshardedTable(const UnshardedTableName &table,
                                      const sqlast::CreateTable &create) {
+  // writer lock for sharded_schema_
   std::unique_lock<std::shared_mutex> lock(this->mtx3_);
   this->sharded_schema_.insert({table, create});
 }
 
-// writes to kind_to_tables_ (w1), kind_to_names_ (w1), sharded_by_ (w1),
-// sharded_schema_ (w2)
 void SharderState::AddShardedTable(
     const UnshardedTableName &table,
     const ShardingInformation &sharding_information,
     const sqlast::CreateTable &sharded_create_statement) {
-  std::unique_lock<std::shared_mutex> lock(this->mtx2_);
+  // writer lock for kind_to_tables_, kind_to_names_
+  std::unique_lock<std::shared_mutex> lock1(this->mtx2_);
+  // writer lock for sharded_by_, sharded_schema_
+  std::unique_lock<std::shared_mutex> lock2(this->mtx3_);
 
   // Record that the shard kind contains this sharded table.
   this->kind_to_tables_.at(sharding_information.shard_kind)
@@ -67,10 +67,16 @@ void SharderState::AddShardedTable(
       {sharding_information.sharded_table_name, sharded_create_statement});
 }
 
-// writes to shards_ (w2), create_index_ (w1)
 std::list<const sqlast::AbstractStatement *> SharderState::CreateShard(
     const ShardKind &shard_kind, const UserId &user) {
-  std::unique_lock<std::shared_mutex> lock(this->mtx4_);
+  // reader lock for kind_to_tables_
+  std::shared_lock<std::shared_mutex> lock(this->mtx2_);
+  // writer lock for shards_
+  std::unique_lock<std::shared_mutex> lock2(this->mtx3_);
+  // reader lock for sharded_schema_
+  std::shared_lock<std::shared_mutex> lock3(this->mtx3_);
+  // reader lock for create_index_
+  std::shared_lock<std::shared_mutex> lock4(this->mtx4_);
 
   // Mark shard for this user as created!
   this->shards_.at(shard_kind).insert(user);
@@ -79,87 +85,91 @@ std::list<const sqlast::AbstractStatement *> SharderState::CreateShard(
   for (const ShardedTableName &table : this->kind_to_tables_.at(shard_kind)) {
     result.push_back(&this->sharded_schema_.at(table));
   }
-  for (const sqlast::CreateIndex &create_index :
-       this->create_index_[shard_kind]) {
-    result.push_back(&create_index);
+  // if shard_kind exists as key in create_index_, add to result
+  if (this->create_index_.find(shard_kind) != this->create_index_.end()) {
+    for (const sqlast::CreateIndex &create_index :
+         this->create_index_[shard_kind]) {
+      result.push_back(&create_index);
+    }
   }
   return result;
 }
 
-// writes to shards_ (w3)
 void SharderState::RemoveUserFromShard(const ShardKind &kind,
                                        const UserId &user_id) {
-  std::unique_lock<std::shared_mutex> lock(this->mtx4_);
+  // writer lock for shards_
+  std::unique_lock<std::shared_mutex> lock(this->mtx3_);
   this->shards_.at(kind).erase(user_id);
 }
 
 // Schema lookups.
-// reads from schema_ (r1)
 const sqlast::CreateTable &SharderState::GetSchema(
     const UnshardedTableName &table_name) const {
+  // reader lock for schema_
   std::shared_lock<std::shared_mutex> lock(this->mtx1_);
   return this->schema_.at(table_name);
 }
 
-// reads from sharded_schema_ (r1), sharded_by_ (r1)
 bool SharderState::Exists(const UnshardedTableName &table) const {
-  std::shared_lock<std::shared_mutex> lock(this->mtx2_);
+  // reader lock for sharded_schema_, sharded_by_
+  std::shared_lock<std::shared_mutex> lock(this->mtx3_);
   return this->sharded_schema_.count(table) > 0 ||
          this->sharded_by_.count(table) > 0;
 }
 
-// reads from sharded_by_ (r2)
 bool SharderState::IsSharded(const UnshardedTableName &table) const {
-  std::shared_lock<std::shared_mutex> lock(this->mtx2_);
+  // reader lock for sharded_by_
+  std::shared_lock<std::shared_mutex> lock(this->mtx3_);
   return this->sharded_by_.count(table) == 1;
 }
 
 // reads from sharded_by_ (r3)
 const std::list<ShardingInformation> &SharderState::GetShardingInformation(
     const UnshardedTableName &table) const {
-  std::shared_lock<std::shared_mutex> lock(this->mtx2_);
+  // reader lock for sharded_by_
+  std::shared_lock<std::shared_mutex> lock(this->mtx3_);
   return this->sharded_by_.at(table);
 }
 
-// reads from kinds_ (r1)
 bool SharderState::IsPII(const UnshardedTableName &table) const {
+  // reader lock for kinds_
   std::shared_lock<std::shared_mutex> lock(this->mtx2_);
   return this->kinds_.count(table) > 0;
 }
 
-// reads from kinds_ (r2)
 const ColumnName &SharderState::PkOfPII(const UnshardedTableName &table) const {
+  // reader lock for kinds_
   std::shared_lock<std::shared_mutex> lock(this->mtx2_);
   return this->kinds_.at(table);
 }
 
-// reads from shards_ (r1)
 bool SharderState::ShardExists(const ShardKind &shard_kind,
                                const UserId &user) const {
-  std::shared_lock<std::shared_mutex> lock(this->mtx2_);
+  // reader lock for shards_
+  std::shared_lock<std::shared_mutex> lock(this->mtx3_);
   return this->shards_.at(shard_kind).count(user) > 0;
 }
 
-// reads from shards_ (r2)
 const std::unordered_set<UserId> &SharderState::UsersOfShard(
     const ShardKind &kind) const {
-  std::shared_lock<std::shared_mutex> lock(this->mtx2_);
+  // reader lock for shards_
+  std::shared_lock<std::shared_mutex> lock(this->mtx3_);
   return this->shards_.at(kind);
 }
 
-// reads from kind_to_names_ (r1)
 const std::unordered_set<UnshardedTableName> &SharderState::TablesInShard(
     const ShardKind &kind) const {
+  // reader lock for kind_to_names_
   std::shared_lock<std::shared_mutex> lock(this->mtx2_);
   return this->kind_to_names_.at(kind);
 }
 
 // Manage secondary indices.
-// reads from index_to_flow_ (r1)
 bool SharderState::HasIndexFor(const UnshardedTableName &table_name,
                                const ColumnName &column_name,
                                const ColumnName &shard_by) const {
-  std::shared_lock<std::shared_mutex> lock(this->mtx5_);
+  // reader lock for index_to_flow_
+  std::shared_lock<std::shared_mutex> lock(this->mtx4_);
   if (this->index_to_flow_.count(table_name) == 0) {
     return false;
   }
@@ -173,23 +183,23 @@ bool SharderState::HasIndexFor(const UnshardedTableName &table_name,
   return col.count(shard_by) > 0;
 }
 
-// ? reads or writes to indices_ (w1 or r1). Not const, but seems like a reader
-// ! TODO: Change to const
 const std::unordered_set<ColumnName> &SharderState::IndicesFor(
-    const UnshardedTableName &table_name) {
-  std::unique_lock<std::shared_mutex> lock(this->mtx4_);
-  // if table_name is in indices .count == 1
-  return this->indices_.at(table_name);
-  // else
-  // return {};
-  // return this->indices_[table_name];
+    const UnshardedTableName &table_name) const {
+  // reader lock for indices_
+  std::shared_lock<std::shared_mutex> lock(this->mtx4_);
+  // if table_name does not exist, return empty unordered_set
+  if (this->indices_.find(table_name) == this->indices_.end()) {
+    return std::unordered_set<ColumnName>{};
+  } else {
+    return this->indices_.at(table_name);
+  }
 }
 
-// reads from index_to_flow_ (r2)
 const FlowName &SharderState::IndexFlow(const UnshardedTableName &table_name,
                                         const ColumnName &column_name,
                                         const ColumnName &shard_by) const {
-  std::shared_lock<std::shared_mutex> lock(this->mtx5_);
+  // reader lock for index_to_flow_
+  std::shared_lock<std::shared_mutex> lock(this->mtx4_);
   return this->index_to_flow_.at(table_name).at(column_name).at(shard_by);
 }
 
@@ -201,6 +211,7 @@ void SharderState::CreateIndex(const ShardKind &shard_kind,
                                const FlowName &flow_name,
                                const sqlast::CreateIndex &create_index_stmt,
                                bool unique) {
+  // writer lock for indices_, index_to_flow_, create_index_
   std::unique_lock<std::shared_mutex> lock(this->mtx4_);
   this->indices_[table_name].insert(column_name);
   this->index_to_flow_[table_name][column_name][shard_by] = flow_name;

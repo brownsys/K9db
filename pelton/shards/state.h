@@ -98,7 +98,7 @@ class SharderState {
                    const ColumnName &shard_by) const;
 
   const std::unordered_set<ColumnName> &IndicesFor(
-      const UnshardedTableName &table_name);
+      const UnshardedTableName &table_name) const;
 
   const FlowName &IndexFlow(const UnshardedTableName &table_name,
                             const ColumnName &column_name,
@@ -184,7 +184,6 @@ class SharderState {
   mutable std::shared_mutex mtx2_;
   mutable std::shared_mutex mtx3_;
   mutable std::shared_mutex mtx4_;
-  mutable std::shared_mutex mtx5_;
 };
 
 }  // namespace shards
