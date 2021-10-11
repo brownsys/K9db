@@ -43,6 +43,26 @@ def delete(table, **kwargs):
     sql.append(";\n")
     return "".join(sql)
 
+with open("creates_simple1.sql", "w") as f:
+        f.write(create("students" + str(0), "", ID="int", PII_Name="text", PRIMARY="KEY(ID)"))
+        f.write(create("assignments" + str(0), "", ID="int", Name="text", 
+                       PRIMARY="KEY(ID)"))
+        f.write(create("submissions" + str(0), 
+                       "FOREIGN KEY (student_id) REFERENCES students(ID), FOREIGN KEY (assignment_id) REFERENCES assignments(ID)",
+                       student_id="int", assignment_id="int", 
+                       timestamp="int"
+                       ))
+
+with open("creates_simple2.sql", "w") as f:
+        f.write(create("students" + str(1), "", ID="int", PII_Name="text", PRIMARY="KEY(ID)"))
+        f.write(create("assignments" + str(1), "", ID="int", Name="text", 
+                       PRIMARY="KEY(ID)"))
+        f.write(create("submissions" + str(1), 
+                       "FOREIGN KEY (student_id) REFERENCES students(ID), FOREIGN KEY (assignment_id) REFERENCES assignments(ID)",
+                       student_id="int", assignment_id="int", 
+                       timestamp="int"
+                       ))
+
 with open("creates_unique1.sql", "w") as f:
     for i in range(20):
         f.write(create("students" + str(i), "", ID="int", PII_Name="text", PRIMARY="KEY(ID)"))
@@ -96,6 +116,22 @@ with open("creates_duplicates2.sql", "w") as f:
                        timestamp="int"
                        ))
 
+with open("inserts_simple1.sql", "w") as f:
+    # INSERT INTO students VALUES (1, 'Jerry');
+    f.write(upsert("students" + str(0), ID=0, PII_Name=0))
+    # INSERT INTO assignments VALUES (1, 'assignment 1');
+    f.write(upsert("assignments" + str(0), ID=0, Name=0))
+    # INSERT INTO submissions VALUES (1, 1, 1);
+    f.write(upsert("submissions" + str(0), student_id=0, assignment_id=0, timestamp=0))
+
+with open("inserts_simple2.sql", "w") as f:
+    # INSERT INTO students VALUES (1, 'Jerry');
+    f.write(upsert("students" + str(1), ID=0, PII_Name=0))
+    # INSERT INTO assignments VALUES (1, 'assignment 1');
+    f.write(upsert("assignments" + str(1), ID=0, Name=0))
+    # INSERT INTO submissions VALUES (1, 1, 1);
+    f.write(upsert("submissions" + str(1), student_id=0, assignment_id=0, timestamp=0))
+            
 with open("inserts_unique1.sql", "w") as f:
     # INSERT INTO students VALUES (1, 'Jerry');
     for i in range(50):
@@ -124,5 +160,30 @@ with open("inserts_unique2.sql", "w") as f:
         for j in range(20):
             f.write(upsert("submissions" + str(j), student_id=i+j, assignment_id=i+j, timestamp=i+j))
 
-# f = open("inserts_duplicates.sql", "w")
-# ! TODO: generate sql file for duplicate inserts
+with open("inserts_duplicates1.sql", "w") as f:
+    # INSERT INTO students VALUES (1, 'Jerry');
+    for i in range(50):
+        for j in range(20):
+            f.write(upsert("students" + str(j), ID=i+j, PII_Name=i+j))
+    # INSERT INTO assignments VALUES (1, 'assignment 1');
+    for i in range(50):
+        for j in range(20):
+            f.write(upsert("assignments" + str(j), ID=i+j, Name=i+j))
+    # INSERT INTO submissions VALUES (1, 1, 1);
+    for i in range(50):
+        for j in range(20):
+            f.write(upsert("submissions" + str(j), student_id=i+j, assignment_id=i+j, timestamp=i+j))
+
+with open("inserts_duplicates2.sql", "w") as f:
+    # INSERT INTO students VALUES (1, 'Jerry');
+    for i in range(49, 100):
+        for j in range(20):
+            f.write(upsert("students" + str(j), ID=i+j, PII_Name=i+j))
+    # INSERT INTO assignments VALUES (1, 'assignment 1');
+    for i in range(49, 100):
+        for j in range(20):
+            f.write(upsert("assignments" + str(j), ID=i+j, Name=i+j))
+    # INSERT INTO submissions VALUES (1, 1, 1);
+    for i in range(49, 100):
+        for j in range(20):
+            f.write(upsert("submissions" + str(j), student_id=i+j, assignment_id=i+j, timestamp=i+j))
