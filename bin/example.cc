@@ -234,7 +234,6 @@ int main(int argc, char **argv) {
 
   // Print flows memory usage.
   connection.pelton_state->GetDataFlowState()->PrintSizeInMemory();
-  ;
 
   // Close connection.
   pelton::close(&connection);
