@@ -20,10 +20,12 @@ namespace dataflow {
 
 // Manage schemas.
 void DataFlowState::AddTableSchema(const sqlast::CreateTable &create) {
+  std::unique_lock<std::shared_mutex> lock(this->mtx1_);
   this->schema_.emplace(create.table_name(), SchemaFactory::Create(create));
 }
 void DataFlowState::AddTableSchema(const std::string &table_name,
                                    SchemaRef schema) {
+  std::unique_lock<std::shared_mutex> lock(this->mtx1_);
   this->schema_.emplace(table_name, schema);
 }
 

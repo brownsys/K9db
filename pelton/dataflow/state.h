@@ -3,6 +3,7 @@
 // The state includes the currently installed flows, including their operators
 // and state.
 
+#include <shared_mutex>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -68,6 +69,8 @@ class DataFlowState {
   // DataFlow graphs and views.
   std::unordered_map<FlowName, std::shared_ptr<DataFlowGraph>> flows_;
   std::unordered_map<TableName, std::vector<FlowName>> flows_per_input_table_;
+
+  mutable std::shared_mutex mtx1_;
 };
 
 }  // namespace dataflow
