@@ -17,16 +17,16 @@ namespace sqlast {
 
 #define __CAST_OR_RETURN_VAR_NAME(arg) __CAST_OR_RETURN_RESULT_##arg
 #define __CAST_OR_RETURN_VAL(arg) __CAST_OR_RETURN_VAR_NAME(arg)
-#define CAST_OR_RETURN(lexpr, rexpr, type)               \
-  antlrcpp::Any __CAST_OR_RETURN_VAL(__LINE__) = rexpr;  \
-  if (__CAST_OR_RETURN_VAL(__LINE__).is<absl::Status>()) \
-    return __CAST_OR_RETURN_VAL(__LINE__);               \
+#define CAST_OR_RETURN(lexpr, rexpr, type)                                     \
+  antlrcpp::Any __CAST_OR_RETURN_VAL(__LINE__) = rexpr;                        \
+  if (__CAST_OR_RETURN_VAL(__LINE__).is<absl::Status>())                       \
+    return __CAST_OR_RETURN_VAL(__LINE__);                                     \
   lexpr = __CAST_OR_RETURN_VAL(__LINE__).as<type>()
 
-#define MCAST_OR_RETURN(lexpr, rexpr, type)                        \
-  antlrcpp::Any __CAST_OR_RETURN_VAL(__LINE__) = std::move(rexpr); \
-  if (__CAST_OR_RETURN_VAL(__LINE__).is<absl::Status>())           \
-    return __CAST_OR_RETURN_VAL(__LINE__);                         \
+#define MCAST_OR_RETURN(lexpr, rexpr, type)                                    \
+  antlrcpp::Any __CAST_OR_RETURN_VAL(__LINE__) = std::move(rexpr);             \
+  if (__CAST_OR_RETURN_VAL(__LINE__).is<absl::Status>())                       \
+    return __CAST_OR_RETURN_VAL(__LINE__);                                     \
   lexpr = std::move(__CAST_OR_RETURN_VAL(__LINE__).as<type>())
 
 absl::StatusOr<std::unique_ptr<AbstractStatement>>
@@ -42,8 +42,8 @@ AstTransformer::TransformStatement(
 }
 
 // Valid Syntax.
-antlrcpp::Any AstTransformer::visitSql_stmt(
-    sqlparser::SQLiteParser::Sql_stmtContext *ctx) {
+antlrcpp::Any
+AstTransformer::visitSql_stmt(sqlparser::SQLiteParser::Sql_stmtContext *ctx) {
   if (ctx->create_table_stmt() != nullptr) {
     return ctx->create_table_stmt()->accept(this);
   }
@@ -82,6 +82,11 @@ antlrcpp::Any AstTransformer::visitCreate_view_stmt(
   CAST_OR_RETURN(std::string view_name, ctx->view_name()->accept(this),
                  std::string);
 
+  std::optional<std::string> purpose = std::nullopt;
+  if (ctx->purpose_name() != nullptr) {
+    CAST_OR_RETURN(purpose, ctx->purpose_name()->accept(this), std::string);
+  }
+
   // Select statement is not parsed and treated as a literal, the planner
   // will parse and handle it.
   std::string query = ctx->QUERY_LITERAL()->getText();
@@ -89,7 +94,7 @@ antlrcpp::Any AstTransformer::visitCreate_view_stmt(
   query = query.substr(0, query.size() - 2);
 
   return static_cast<std::unique_ptr<AbstractStatement>>(
-      std::make_unique<CreateView>(view_name, query));
+      std::make_unique<CreateView>(view_name, query, purpose));
 }
 
 // Create Table constructs.
@@ -263,8 +268,8 @@ antlrcpp::Any AstTransformer::visitInsert_stmt(
   insert->SetValues(std::move(values));
   return static_cast<std::unique_ptr<AbstractStatement>>(std::move(insert));
 }
-antlrcpp::Any AstTransformer::visitExpr_list(
-    sqlparser::SQLiteParser::Expr_listContext *ctx) {
+antlrcpp::Any
+AstTransformer::visitExpr_list(sqlparser::SQLiteParser::Expr_listContext *ctx) {
   std::vector<std::string> values;
   for (auto expr_ctx : ctx->expr()) {
     if (expr_ctx->literal_value() == nullptr) {
@@ -454,8 +459,8 @@ antlrcpp::Any AstTransformer::visitQualified_table_name(
 
 // Common constructs.
 // Expressions.
-antlrcpp::Any AstTransformer::visitExpr(
-    sqlparser::SQLiteParser::ExprContext *ctx) {
+antlrcpp::Any
+AstTransformer::visitExpr(sqlparser::SQLiteParser::ExprContext *ctx) {
   // Hack.
   if ((ctx->PLUS() != nullptr || ctx->MINUS() != nullptr) && this->in_update_) {
     if (ctx->expr(0)->literal_value() != nullptr) {
@@ -552,8 +557,8 @@ antlrcpp::Any AstTransformer::visitIndexed_column(
   }
   return ctx->column_name()->accept(this);
 }
-antlrcpp::Any AstTransformer::visitName(
-    sqlparser::SQLiteParser::NameContext *ctx) {
+antlrcpp::Any
+AstTransformer::visitName(sqlparser::SQLiteParser::NameContext *ctx) {
   return ctx->any_name()->accept(this);
 }
 antlrcpp::Any AstTransformer::visitTable_name(
@@ -564,8 +569,12 @@ antlrcpp::Any AstTransformer::visitIndex_name(
     sqlparser::SQLiteParser::Index_nameContext *ctx) {
   return ctx->any_name()->accept(this);
 }
-antlrcpp::Any AstTransformer::visitView_name(
-    sqlparser::SQLiteParser::View_nameContext *ctx) {
+antlrcpp::Any
+AstTransformer::visitView_name(sqlparser::SQLiteParser::View_nameContext *ctx) {
+  return ctx->any_name()->accept(this);
+}
+antlrcpp::Any AstTransformer::visitPurpose_name(
+    sqlparser::SQLiteParser::Purpose_nameContext *ctx) {
   return ctx->any_name()->accept(this);
 }
 antlrcpp::Any AstTransformer::visitForeign_table(
@@ -576,12 +585,12 @@ antlrcpp::Any AstTransformer::visitColumn_name(
     sqlparser::SQLiteParser::Column_nameContext *ctx) {
   return ctx->any_name()->accept(this);
 }
-antlrcpp::Any AstTransformer::visitType_name(
-    sqlparser::SQLiteParser::Type_nameContext *ctx) {
+antlrcpp::Any
+AstTransformer::visitType_name(sqlparser::SQLiteParser::Type_nameContext *ctx) {
   return ctx->getText();
 }
-antlrcpp::Any AstTransformer::visitAny_name(
-    sqlparser::SQLiteParser::Any_nameContext *ctx) {
+antlrcpp::Any
+AstTransformer::visitAny_name(sqlparser::SQLiteParser::Any_nameContext *ctx) {
   if (ctx->IDENTIFIER() == nullptr) {
     return absl::InvalidArgumentError("All names must be simple and unquoted");
   }
@@ -589,12 +598,12 @@ antlrcpp::Any AstTransformer::visitAny_name(
 }
 
 // Invalid Syntax!
-antlrcpp::Any AstTransformer::visitParse(
-    sqlparser::SQLiteParser::ParseContext *ctx) {
+antlrcpp::Any
+AstTransformer::visitParse(sqlparser::SQLiteParser::ParseContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
-antlrcpp::Any AstTransformer::visitError(
-    sqlparser::SQLiteParser::ErrorContext *ctx) {
+antlrcpp::Any
+AstTransformer::visitError(sqlparser::SQLiteParser::ErrorContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
 antlrcpp::Any AstTransformer::visitSql_stmt_list(
@@ -673,8 +682,8 @@ antlrcpp::Any AstTransformer::visitDetach_stmt(
     sqlparser::SQLiteParser::Detach_stmtContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
-antlrcpp::Any AstTransformer::visitDrop_stmt(
-    sqlparser::SQLiteParser::Drop_stmtContext *ctx) {
+antlrcpp::Any
+AstTransformer::visitDrop_stmt(sqlparser::SQLiteParser::Drop_stmtContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
 antlrcpp::Any AstTransformer::visitRaise_function(
@@ -781,8 +790,8 @@ antlrcpp::Any AstTransformer::visitOrdering_term(
     sqlparser::SQLiteParser::Ordering_termContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
-antlrcpp::Any AstTransformer::visitAsc_desc(
-    sqlparser::SQLiteParser::Asc_descContext *ctx) {
+antlrcpp::Any
+AstTransformer::visitAsc_desc(sqlparser::SQLiteParser::Asc_descContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
 antlrcpp::Any AstTransformer::visitFrame_left(
@@ -801,8 +810,8 @@ antlrcpp::Any AstTransformer::visitWindow_function(
     sqlparser::SQLiteParser::Window_functionContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
-antlrcpp::Any AstTransformer::visitOffset(
-    sqlparser::SQLiteParser::OffsetContext *ctx) {
+antlrcpp::Any
+AstTransformer::visitOffset(sqlparser::SQLiteParser::OffsetContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
 antlrcpp::Any AstTransformer::visitDefault_value(
@@ -849,8 +858,8 @@ antlrcpp::Any AstTransformer::visitColumn_alias(
     sqlparser::SQLiteParser::Column_aliasContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
-antlrcpp::Any AstTransformer::visitKeyword(
-    sqlparser::SQLiteParser::KeywordContext *ctx) {
+antlrcpp::Any
+AstTransformer::visitKeyword(sqlparser::SQLiteParser::KeywordContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
 antlrcpp::Any AstTransformer::visitSchema_name(
@@ -901,12 +910,12 @@ antlrcpp::Any AstTransformer::visitWindow_name(
     sqlparser::SQLiteParser::Window_nameContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
-antlrcpp::Any AstTransformer::visitAlias(
-    sqlparser::SQLiteParser::AliasContext *ctx) {
+antlrcpp::Any
+AstTransformer::visitAlias(sqlparser::SQLiteParser::AliasContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
-antlrcpp::Any AstTransformer::visitFilename(
-    sqlparser::SQLiteParser::FilenameContext *ctx) {
+antlrcpp::Any
+AstTransformer::visitFilename(sqlparser::SQLiteParser::FilenameContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
 antlrcpp::Any AstTransformer::visitBase_window_name(
@@ -926,5 +935,5 @@ antlrcpp::Any AstTransformer::visitTable_function_name(
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
 
-}  // namespace sqlast
-}  // namespace pelton
+} // namespace sqlast
+} // namespace pelton

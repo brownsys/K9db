@@ -57,7 +57,8 @@ absl::StatusOr<sql::SqlResult> CreateIndex(
                 ", COUNT(*) FROM " + table_name + " GROUP BY " + column_name +
                 ", " + info.shard_by + " HAVING " + column_name + " = ?";
       }
-      sqlast::CreateView create_view{index_name, query};
+      std::optional<std::string> purpose = std::nullopt;
+      sqlast::CreateView create_view{index_name, query, purpose};
 
       // Install flow.
       CHECK_STATUS(view::CreateView(create_view, state, dataflow_state));

@@ -284,18 +284,21 @@ class Update : public AbstractStatement {
 
 class CreateView : public AbstractStatement {
  public:
-  CreateView(const std::string &view_name, const std::string &query)
+  CreateView(const std::string &view_name, const std::string &query, const std::optional<std::string> &purpose)
       : AbstractStatement(AbstractStatement::Type::CREATE_VIEW),
         view_name_(view_name),
-        query_(query) {}
+        query_(query),
+        purpose_(purpose) {}
 
   // Accessors.
   const std::string &view_name() const { return this->view_name_; }
   const std::string &query() const { return this->query_; }
+  const std::optional<std::string> &purpose() const { return this->purpose_; }
 
  private:
   std::string view_name_;
   std::string query_;
+  std::optional<std::string> purpose_;
 };
 
 class GDPRStatement : public AbstractStatement {

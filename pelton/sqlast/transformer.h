@@ -12,31 +12,31 @@ namespace pelton {
 namespace sqlast {
 
 class AstTransformer : public sqlparser::SQLiteParserBaseVisitor {
- public:
+public:
   AstTransformer() : in_update_(false) {}
 
   // Entry point for cst to ast transformation / building.
-  absl::StatusOr<std::unique_ptr<sqlast::AbstractStatement>> TransformStatement(
-      sqlparser::SQLiteParser::Sql_stmtContext *context);
+  absl::StatusOr<std::unique_ptr<sqlast::AbstractStatement>>
+  TransformStatement(sqlparser::SQLiteParser::Sql_stmtContext *context);
 
   // Visitors for all possible parser rules from the sqlite3 grammar, including
   // supported (valid) and unsupported syntax.
-  antlrcpp::Any visitParse(
-      sqlparser::SQLiteParser::ParseContext *context) override;
-  antlrcpp::Any visitError(
-      sqlparser::SQLiteParser::ErrorContext *context) override;
+  antlrcpp::Any
+  visitParse(sqlparser::SQLiteParser::ParseContext *context) override;
+  antlrcpp::Any
+  visitError(sqlparser::SQLiteParser::ErrorContext *context) override;
   antlrcpp::Any visitSql_stmt_list(
       sqlparser::SQLiteParser::Sql_stmt_listContext *context) override;
-  antlrcpp::Any visitSql_stmt(
-      sqlparser::SQLiteParser::Sql_stmtContext *context) override;
+  antlrcpp::Any
+  visitSql_stmt(sqlparser::SQLiteParser::Sql_stmtContext *context) override;
   antlrcpp::Any visitAlter_table_stmt(
       sqlparser::SQLiteParser::Alter_table_stmtContext *context) override;
   antlrcpp::Any visitAnalyze_stmt(
       sqlparser::SQLiteParser::Analyze_stmtContext *context) override;
   antlrcpp::Any visitAttach_stmt(
       sqlparser::SQLiteParser::Attach_stmtContext *context) override;
-  antlrcpp::Any visitBegin_stmt(
-      sqlparser::SQLiteParser::Begin_stmtContext *context) override;
+  antlrcpp::Any
+  visitBegin_stmt(sqlparser::SQLiteParser::Begin_stmtContext *context) override;
   antlrcpp::Any visitCommit_stmt(
       sqlparser::SQLiteParser::Commit_stmtContext *context) override;
   antlrcpp::Any visitRollback_stmt(
@@ -51,10 +51,10 @@ class AstTransformer : public sqlparser::SQLiteParserBaseVisitor {
       sqlparser::SQLiteParser::Indexed_columnContext *context) override;
   antlrcpp::Any visitCreate_table_stmt(
       sqlparser::SQLiteParser::Create_table_stmtContext *context) override;
-  antlrcpp::Any visitColumn_def(
-      sqlparser::SQLiteParser::Column_defContext *context) override;
-  antlrcpp::Any visitType_name(
-      sqlparser::SQLiteParser::Type_nameContext *context) override;
+  antlrcpp::Any
+  visitColumn_def(sqlparser::SQLiteParser::Column_defContext *context) override;
+  antlrcpp::Any
+  visitType_name(sqlparser::SQLiteParser::Type_nameContext *context) override;
   antlrcpp::Any visitColumn_constraint(
       sqlparser::SQLiteParser::Column_constraintContext *context) override;
   antlrcpp::Any visitSigned_number(
@@ -87,12 +87,12 @@ class AstTransformer : public sqlparser::SQLiteParserBaseVisitor {
       sqlparser::SQLiteParser::Delete_stmt_limitedContext *context) override;
   antlrcpp::Any visitDetach_stmt(
       sqlparser::SQLiteParser::Detach_stmtContext *context) override;
-  antlrcpp::Any visitDrop_stmt(
-      sqlparser::SQLiteParser::Drop_stmtContext *context) override;
-  antlrcpp::Any visitExpr_list(
-      sqlparser::SQLiteParser::Expr_listContext *ctx) override;
-  antlrcpp::Any visitExpr(
-      sqlparser::SQLiteParser::ExprContext *context) override;
+  antlrcpp::Any
+  visitDrop_stmt(sqlparser::SQLiteParser::Drop_stmtContext *context) override;
+  antlrcpp::Any
+  visitExpr_list(sqlparser::SQLiteParser::Expr_listContext *ctx) override;
+  antlrcpp::Any
+  visitExpr(sqlparser::SQLiteParser::ExprContext *context) override;
   antlrcpp::Any visitRaise_function(
       sqlparser::SQLiteParser::Raise_functionContext *context) override;
   antlrcpp::Any visitLiteral_value(
@@ -145,8 +145,8 @@ class AstTransformer : public sqlparser::SQLiteParserBaseVisitor {
       sqlparser::SQLiteParser::Window_defnContext *context) override;
   antlrcpp::Any visitOver_clause(
       sqlparser::SQLiteParser::Over_clauseContext *context) override;
-  antlrcpp::Any visitFrame_spec(
-      sqlparser::SQLiteParser::Frame_specContext *context) override;
+  antlrcpp::Any
+  visitFrame_spec(sqlparser::SQLiteParser::Frame_specContext *context) override;
   antlrcpp::Any visitFrame_clause(
       sqlparser::SQLiteParser::Frame_clauseContext *context) override;
   antlrcpp::Any visitSimple_function_invocation(
@@ -162,22 +162,22 @@ class AstTransformer : public sqlparser::SQLiteParserBaseVisitor {
       sqlparser::SQLiteParser::Common_table_stmtContext *context) override;
   antlrcpp::Any visitOrder_by_stmt(
       sqlparser::SQLiteParser::Order_by_stmtContext *context) override;
-  antlrcpp::Any visitLimit_stmt(
-      sqlparser::SQLiteParser::Limit_stmtContext *context) override;
+  antlrcpp::Any
+  visitLimit_stmt(sqlparser::SQLiteParser::Limit_stmtContext *context) override;
   antlrcpp::Any visitOrdering_term(
       sqlparser::SQLiteParser::Ordering_termContext *context) override;
-  antlrcpp::Any visitAsc_desc(
-      sqlparser::SQLiteParser::Asc_descContext *context) override;
-  antlrcpp::Any visitFrame_left(
-      sqlparser::SQLiteParser::Frame_leftContext *context) override;
+  antlrcpp::Any
+  visitAsc_desc(sqlparser::SQLiteParser::Asc_descContext *context) override;
+  antlrcpp::Any
+  visitFrame_left(sqlparser::SQLiteParser::Frame_leftContext *context) override;
   antlrcpp::Any visitFrame_right(
       sqlparser::SQLiteParser::Frame_rightContext *context) override;
   antlrcpp::Any visitFrame_single(
       sqlparser::SQLiteParser::Frame_singleContext *context) override;
   antlrcpp::Any visitWindow_function(
       sqlparser::SQLiteParser::Window_functionContext *context) override;
-  antlrcpp::Any visitOffset(
-      sqlparser::SQLiteParser::OffsetContext *context) override;
+  antlrcpp::Any
+  visitOffset(sqlparser::SQLiteParser::OffsetContext *context) override;
   antlrcpp::Any visitDefault_value(
       sqlparser::SQLiteParser::Default_valueContext *context) override;
   antlrcpp::Any visitPartition_by(
@@ -200,16 +200,16 @@ class AstTransformer : public sqlparser::SQLiteParserBaseVisitor {
       sqlparser::SQLiteParser::Module_argumentContext *context) override;
   antlrcpp::Any visitColumn_alias(
       sqlparser::SQLiteParser::Column_aliasContext *context) override;
-  antlrcpp::Any visitKeyword(
-      sqlparser::SQLiteParser::KeywordContext *context) override;
-  antlrcpp::Any visitName(
-      sqlparser::SQLiteParser::NameContext *context) override;
+  antlrcpp::Any
+  visitKeyword(sqlparser::SQLiteParser::KeywordContext *context) override;
+  antlrcpp::Any
+  visitName(sqlparser::SQLiteParser::NameContext *context) override;
   antlrcpp::Any visitFunction_name(
       sqlparser::SQLiteParser::Function_nameContext *context) override;
   antlrcpp::Any visitSchema_name(
       sqlparser::SQLiteParser::Schema_nameContext *context) override;
-  antlrcpp::Any visitTable_name(
-      sqlparser::SQLiteParser::Table_nameContext *context) override;
+  antlrcpp::Any
+  visitTable_name(sqlparser::SQLiteParser::Table_nameContext *context) override;
   antlrcpp::Any visitTable_or_index_name(
       sqlparser::SQLiteParser::Table_or_index_nameContext *context) override;
   antlrcpp::Any visitNew_table_name(
@@ -220,12 +220,14 @@ class AstTransformer : public sqlparser::SQLiteParserBaseVisitor {
       sqlparser::SQLiteParser::Collation_nameContext *context) override;
   antlrcpp::Any visitForeign_table(
       sqlparser::SQLiteParser::Foreign_tableContext *context) override;
-  antlrcpp::Any visitIndex_name(
-      sqlparser::SQLiteParser::Index_nameContext *context) override;
+  antlrcpp::Any
+  visitIndex_name(sqlparser::SQLiteParser::Index_nameContext *context) override;
   antlrcpp::Any visitTrigger_name(
       sqlparser::SQLiteParser::Trigger_nameContext *context) override;
-  antlrcpp::Any visitView_name(
-      sqlparser::SQLiteParser::View_nameContext *context) override;
+  antlrcpp::Any
+  visitView_name(sqlparser::SQLiteParser::View_nameContext *context) override;
+  antlrcpp::Any visitPurpose_name(
+      sqlparser::SQLiteParser::Purpose_nameContext *context) override;
   antlrcpp::Any visitModule_name(
       sqlparser::SQLiteParser::Module_nameContext *context) override;
   antlrcpp::Any visitPragma_name(
@@ -238,10 +240,10 @@ class AstTransformer : public sqlparser::SQLiteParserBaseVisitor {
       sqlparser::SQLiteParser::Transaction_nameContext *context) override;
   antlrcpp::Any visitWindow_name(
       sqlparser::SQLiteParser::Window_nameContext *context) override;
-  antlrcpp::Any visitAlias(
-      sqlparser::SQLiteParser::AliasContext *context) override;
-  antlrcpp::Any visitFilename(
-      sqlparser::SQLiteParser::FilenameContext *context) override;
+  antlrcpp::Any
+  visitAlias(sqlparser::SQLiteParser::AliasContext *context) override;
+  antlrcpp::Any
+  visitFilename(sqlparser::SQLiteParser::FilenameContext *context) override;
   antlrcpp::Any visitBase_window_name(
       sqlparser::SQLiteParser::Base_window_nameContext *context) override;
   antlrcpp::Any visitSimple_func(
@@ -250,13 +252,13 @@ class AstTransformer : public sqlparser::SQLiteParserBaseVisitor {
       sqlparser::SQLiteParser::Aggregate_funcContext *context) override;
   antlrcpp::Any visitTable_function_name(
       sqlparser::SQLiteParser::Table_function_nameContext *context) override;
-  antlrcpp::Any visitAny_name(
-      sqlparser::SQLiteParser::Any_nameContext *context) override;
+  antlrcpp::Any
+  visitAny_name(sqlparser::SQLiteParser::Any_nameContext *context) override;
 
- private:
+private:
   bool in_update_;
 };
-}  // namespace sqlast
-}  // namespace pelton
+} // namespace sqlast
+} // namespace pelton
 
-#endif  // PELTON_SQLAST_TRANSFORMER_H_
+#endif // PELTON_SQLAST_TRANSFORMER_H_
