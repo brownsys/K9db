@@ -30,6 +30,8 @@ class Channel {
   ~Channel() {
     std::unique_lock<std::mutex> lock(mtx_);
     // Ensure that all messages have been processed.
+    // If this check fails then increase the sleep time in DataFlowEngine's
+    // destructor.
     CHECK_EQ(this->queue_.size(), (size_t)0);
   }
 

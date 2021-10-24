@@ -521,7 +521,7 @@ void DataFlowEngine::Save(const std::string &dir_path) {
 
 DataFlowEngine::~DataFlowEngine() {
   // Give some time for the previously sent records to get processed
-  std::this_thread::sleep_for(std::chrono::milliseconds(40));
+  std::this_thread::sleep_for(std::chrono::milliseconds(5000));
   // Send stop message to each worker.
   for (auto const &[_, stop_chan] : this->stop_chans_) {
     std::shared_ptr<StopMessage> stop_msg = std::make_shared<StopMessage>();
