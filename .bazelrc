@@ -5,6 +5,7 @@ build --cxxopt="-std=c++17"
 build --host_cxxopt="-std=c++17"
 build --copt -g
 build --host_copt -g
+build --strip=never
 
 build:asan --strip=never
 build:asan --copt -fsanitize=address
