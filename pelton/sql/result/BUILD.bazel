@@ -68,7 +68,7 @@ cc_test(
         "//pelton/dataflow:types",
         "//pelton/sql:eager_executor",
         "//pelton/util:ints",
-        "@glog",
         "@com_google_googletest//:gtest",
+        "@glog",
     ],
 )

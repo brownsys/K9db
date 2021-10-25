@@ -37,8 +37,8 @@ cc_library(
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "@com_google_absl//absl/status",
-        "@glog",
         "@com_google_googletest//:gtest_prod",
+        "@glog",
     ],
 )
 
@@ -69,8 +69,8 @@ cc_test(
     ],
     deps = [
         ":eager_executor",
-        "@glog",
         "@com_google_googletest//:gtest",
+        "@glog",
     ],
 )
 
@@ -92,7 +92,7 @@ cc_test(
         "//pelton/shards/sqlengine:util",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
-        "@glog",
         "@com_google_googletest//:gtest",
+        "@glog",
     ],
 )

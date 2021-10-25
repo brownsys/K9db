@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_binary")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 
 cc_library(
     name = "client",
@@ -24,14 +24,14 @@ cc_binary(
         "benchmark.cc",
     ],
     linkstatic = 0,
+    malloc = "@com_google_tcmalloc//tcmalloc",
     deps = [
         ":client",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:schema",
-        "//pelton/planner:planner",
+        "//pelton/planner",
         "//pelton/sqlast:parser",
         "//pelton/util:status",
         "@glog",
     ],
-    malloc = "@com_google_tcmalloc//tcmalloc:tcmalloc",
 )

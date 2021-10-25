@@ -141,9 +141,9 @@ cc_test(
         ":value",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
-        "@glog",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
+        "@glog",
     ],
 )
 
@@ -156,9 +156,9 @@ cc_test(
         ":key",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
-        "@glog",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
+        "@glog",
     ],
 )
 
@@ -173,9 +173,9 @@ cc_test(
         ":types",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
-        "@glog",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
+        "@glog",
     ],
 )
 
@@ -188,9 +188,9 @@ cc_test(
         ":schema",
         ":types",
         "//pelton/sqlast:ast",
-        "@glog",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
+        "@glog",
     ],
 )
 
@@ -212,9 +212,9 @@ cc_test(
         "//pelton/dataflow/ops:project",
         "//pelton/dataflow/ops:union",
         "//pelton/util:ints",
-        "@glog",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
+        "@glog",
     ],
 )
 

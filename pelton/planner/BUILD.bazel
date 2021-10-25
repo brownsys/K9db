@@ -49,8 +49,8 @@ cc_test(
         "//pelton/dataflow/ops:project",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
-        "@glog",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
+        "@glog",
     ],
 )

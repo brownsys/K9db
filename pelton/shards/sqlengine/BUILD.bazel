@@ -26,8 +26,8 @@ cc_library(
         "//pelton/sqlast:parser",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@com_google_absl//absl/status",
         "@antlr4_runtimes//:cpp",
+        "@com_google_absl//absl/status",
         "@grammars-v4//:sqlparser",
     ],
 )

@@ -11,8 +11,8 @@ cc_library(
     deps = [
         "//pelton",
         "@com_github_gflags_gflags//:gflags",
-        "@glog",
         "@com_google_googletest//:gtest",
+        "@glog",
     ],
 )
 

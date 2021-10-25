@@ -45,8 +45,8 @@ cc_library(
         ":hacky",
         ":transformer",
         "//pelton/util:perf",
-        "@com_google_absl//absl/status:statusor",
         "@antlr4_runtimes//:cpp",
+        "@com_google_absl//absl/status:statusor",
         "@grammars-v4//:sqlparser",
     ],
 )
@@ -61,9 +61,9 @@ cc_library(
     ],
     deps = [
         ":ast",
+        "@antlr4_runtimes//:cpp",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
-        "@antlr4_runtimes//:cpp",
         "@grammars-v4//:sqlparser",
     ],
 )

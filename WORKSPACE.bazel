@@ -8,8 +8,8 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_r
 # repo.
 http_archive(
     name = "rules_python",
-    url = "https://github.com/bazelbuild/rules_python/releases/download/0.4.0/rules_python-0.4.0.tar.gz",
     sha256 = "954aa89b491be4a083304a2cb838019c8b8c3720a7abb9c4cb81ac7a24230cea",
+    url = "https://github.com/bazelbuild/rules_python/releases/download/0.4.0/rules_python-0.4.0.tar.gz",
 )
 
 # Buildifier
@@ -64,17 +64,17 @@ http_archive(
 # Abseil C++ Libraries
 http_archive(
     name = "com_google_absl",  # 2021-05-20T02:59:16Z
-    urls = ["https://github.com/abseil/abseil-cpp/archive/7971fb358ae376e016d2d4fc9327aad95659b25e.zip"],
-    strip_prefix = "abseil-cpp-7971fb358ae376e016d2d4fc9327aad95659b25e",
     sha256 = "aeba534f7307e36fe084b452299e49b97420667a8d28102cf9a0daeed340b859",
+    strip_prefix = "abseil-cpp-7971fb358ae376e016d2d4fc9327aad95659b25e",
+    urls = ["https://github.com/abseil/abseil-cpp/archive/7971fb358ae376e016d2d4fc9327aad95659b25e.zip"],
 )
 
 # Google Test
 http_archive(
     name = "com_google_googletest",  # 2021-05-19T20:10:13Z
-    urls = ["https://github.com/google/googletest/archive/aa9b44a18678dfdf57089a5ac22c1edb69f35da5.zip"],
-    strip_prefix = "googletest-aa9b44a18678dfdf57089a5ac22c1edb69f35da5",
     sha256 = "8cf4eaab3a13b27a95b7e74c58fb4c0788ad94d1f7ec65b20665c4caf1d245e8",
+    strip_prefix = "googletest-aa9b44a18678dfdf57089a5ac22c1edb69f35da5",
+    urls = ["https://github.com/google/googletest/archive/aa9b44a18678dfdf57089a5ac22c1edb69f35da5.zip"],
 )
 
 # Google GFlags
@@ -102,9 +102,9 @@ http_archive(
 # Google Benchmark library for microbenchmarks
 http_archive(
     name = "com_github_google_benchmark",  # 2021-05-20T16:59:29Z
-    urls = ["https://github.com/google/benchmark/archive/a4bcd937b298fdc2b0c7da9961fa202a5aecd56b.zip"],
-    strip_prefix = "benchmark-a4bcd937b298fdc2b0c7da9961fa202a5aecd56b",
     sha256 = "a6abcbe9dec091cd570462bf712661d3944f73f964f82501456eaa5f89036b1a",
+    strip_prefix = "benchmark-a4bcd937b298fdc2b0c7da9961fa202a5aecd56b",
+    urls = ["https://github.com/google/benchmark/archive/a4bcd937b298fdc2b0c7da9961fa202a5aecd56b.zip"],
 )
 
 # C++ rules for Bazel.
@@ -220,7 +220,6 @@ load("//mysql_proxy/cargo:crates.bzl", "raze_fetch_remote_crates")
 
 raze_fetch_remote_crates()
 
-
 # TCMalloc dependencies: Fuzzing
 # Need to install python3-distutils or python3-dev
 # Also: sudo ln -s /usr/bin/python3 /usr/bin/python
@@ -242,8 +241,6 @@ rules_fuzzing_init()
 # TCMalloc
 git_repository(
     name = "com_google_tcmalloc",
-    remote = "https://github.com/google/tcmalloc.git",
     commit = "45c59ccbc062ac96d83710205033c656e490d376",
+    remote = "https://github.com/google/tcmalloc.git",
 )
-
-
