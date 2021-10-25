@@ -55,39 +55,29 @@ void DataFlowGraph::Process(const std::string &input_name,
 }
 
 std::shared_ptr<DataFlowGraph> DataFlowGraph::Clone() {
-  auto clone = std::make_shared<DataFlowGraph>();
-  for (auto const &item : this->inputs_) {
-    auto input_clone =
-        std::static_pointer_cast<InputOperator>(item.second->Clone());
-    input_clone->graph_ = clone.get();
-    clone->inputs_.emplace(item.first, input_clone);
-    clone->nodes_.emplace(input_clone->index_, input_clone);
-  }
-  for (std::shared_ptr<MatViewOperator> const &matview : this->outputs_) {
-    auto matview_clone =
-        std::static_pointer_cast<MatViewOperator>(matview->Clone());
-    matview_clone->graph_ = clone.get();
-    clone->outputs_.push_back(matview_clone);
-    clone->nodes_.emplace(matview_clone->index_, matview_clone);
-  }
-  // The cloned nodes have their indices set during the operator cloning itself
+  std::shared_ptr<DataFlowGraph> graph = std::make_shared<DataFlowGraph>();
+  // Clone each node.
   for (size_t i = 0; i < this->nodes_.size(); i++) {
+    std::shared_ptr<Operator> node = this->nodes_.at(i)->Clone();
+    assert(node->index_ == i);
+    node->graph_ = graph.get();
+    graph->nodes_.emplace(i, node);
+
+    // Must also store input and matview operators in special maps.
     switch (this->nodes_.at(i)->type()) {
       case Operator::Type::INPUT:
+        auto input = std::static_pointer_cast<InputOperator>(node);
+        graph->inputs_.emplace(input->input_name(), input);
+        break;
       case Operator::Type::MAT_VIEW:
-        // Inputs and matviews have already been cloned
-        continue;
-      default:
+        auto matview = std::static_pointer_cast<MatViewOperator>(node);
+        graph->outputs_.push_back(matview);
         break;
     }
-    auto node_clone = this->nodes_.at(i)->Clone();
-    assert(node_clone->index_ == i);
-    node_clone->graph_ = clone.get();
-    clone->nodes_.emplace(i, node_clone);
   }
-  // Edges can be trivially copied
-  clone->edges_ = this->edges_;
-  return clone;
+  // Edges can be trivially copied.
+  graph->edges_ = this->edges_;
+  return graph;
 }
 
 std::string DataFlowGraph::DebugString() const {

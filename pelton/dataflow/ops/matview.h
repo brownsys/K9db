@@ -124,7 +124,7 @@ class MatViewOperatorT : public MatViewOperator {
     return this->contents_.LookupGreater(key, cmp, limit, offset);
   }
 
-  std::shared_ptr<Operator> Clone() const {
+  std::shared_ptr<Operator> Clone() const override {
     std::shared_ptr<MatViewOperator> clone;
     if (std::is_same<T, UnorderedGroupedData>::value) {
       clone = std::make_shared<MatViewOperatorT<UnorderedGroupedData>>(

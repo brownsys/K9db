@@ -51,10 +51,6 @@ class Operator {
    * @return
    */
   void ProcessAndForward(NodeIndex source, std::vector<Record> &&records);
-  // TODO(babman): we can have an optimized version for the case where this
-  // operator is a single child of another operator. The records can then be
-  // moved into ProcessAndForward, modified in place, and then moved/passed
-  // by const ref to its child/children.
 
   Type type() const { return this->type_; }
   NodeIndex index() const { return this->index_; }
