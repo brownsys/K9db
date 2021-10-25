@@ -92,24 +92,22 @@ Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
 
 void DataFlowState::ProcessRecords(const TableName &table_name,
                                    std::vector<Record> &&records) {
-  if (records.size() == 0 || !this->HasFlowsFor(table_name)) {
-    return;
-  }
-
-  // Send copies per flow (except last flow).
-  const std::vector<FlowName> &flow_names =
-      this->flows_per_input_table_.at(table_name);
-  for (size_t i = 0; i < flow_names.size() - 1; i++) {
-    std::vector<Record> copy;
-    copy.reserve(records.size());
-    for (const Record &r : records) {
-      copy.push_back(r.Copy());
+  if (records.size() > 0 && this->HasFlowsFor(table_name)) {
+    // Send copies per flow (except last flow).
+    const std::vector<FlowName> &flow_names =
+        this->flows_per_input_table_.at(table_name);
+    for (size_t i = 0; i < flow_names.size() - 1; i++) {
+      std::vector<Record> copy;
+      copy.reserve(records.size());
+      for (const Record &r : records) {
+        copy.push_back(r.Copy());
+      }
+      this->flows_.at(flow_names.at(i))->Process(table_name, std::move(copy));
     }
-    this->flows_.at(flow_names.at(i))->Process(table_name, std::move(copy));
-  }
 
-  // Move into last flow.
-  this->flows_.at(flow_names.back())->Process(table_name, std::move(records));
+    // Move into last flow.
+    this->flows_.at(flow_names.back())->Process(table_name, std::move(records));
+  }
 }
 
 // Size in memory of all the dataflow graphs.
