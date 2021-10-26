@@ -220,7 +220,7 @@ absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
                         dataflow::DataFlowState *dataflow_state) {
   perf::Start("CreateView");
   // Plan the query using calcite and generate a concrete graph for it.
-  std::shared_ptr<dataflow::DataFlowGraph> graph =
+  std::shared_ptr<dataflow::DataFlowGraphPartition> graph =
       planner::PlanGraph(dataflow_state, stmt.query());
 
   // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
@@ -238,7 +238,7 @@ absl::StatusOr<sql::SqlResult> SelectView(
 
   // Get the corresponding flow.
   const std::string &view_name = stmt.table_name();
-  const std::shared_ptr<dataflow::DataFlowGraph> flow =
+  const std::shared_ptr<dataflow::DataFlowGraphPartition> flow =
       dataflow_state->GetFlow(view_name);
 
   // Only support flow ending with a single output matview for now.

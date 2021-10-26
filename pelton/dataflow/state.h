@@ -27,6 +27,7 @@ using FlowName = std::string;
 class DataFlowState {
  public:
   DataFlowState() = default;
+  explicit DataFlowState(size_t workers) : workers_(workers) {}
 
   // Manage schemas.
   void AddTableSchema(const sqlast::CreateTable &create);
@@ -36,9 +37,11 @@ class DataFlowState {
   SchemaRef GetTableSchema(const TableName &table_name) const;
 
   // Add and manage flows.
-  void AddFlow(const FlowName &name, const std::shared_ptr<DataFlowGraph> flow);
+  void AddFlow(const FlowName &name,
+               const std::shared_ptr<DataFlowGraphPartition> flow);
 
-  const std::shared_ptr<DataFlowGraph> GetFlow(const FlowName &name) const;
+  const std::shared_ptr<DataFlowGraphPartition> GetFlow(
+      const FlowName &name) const;
 
   bool HasFlow(const FlowName &name) const;
 
@@ -59,6 +62,9 @@ class DataFlowState {
   void PrintSizeInMemory() const;
 
  private:
+  // The number of worker threads.
+  size_t workers_;
+
   // Maps every table to its logical schema.
   // The logical schema is the contract between client code and our DB.
   // The stored schema may not matched the concrete/physical one due to sharding
@@ -66,7 +72,7 @@ class DataFlowState {
   std::unordered_map<TableName, SchemaRef> schema_;
 
   // DataFlow graphs and views.
-  std::unordered_map<FlowName, std::shared_ptr<DataFlowGraph>> flows_;
+  std::unordered_map<FlowName, std::shared_ptr<DataFlowGraphPartition>> flows_;
   std::unordered_map<TableName, std::vector<FlowName>> flows_per_input_table_;
 };
 

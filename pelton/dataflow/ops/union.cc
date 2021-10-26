@@ -42,7 +42,6 @@ std::shared_ptr<Operator> UnionOperator::Clone() const {
   clone->parents_ = this->parents_;
   clone->input_schemas_ = this->input_schemas_;
   clone->output_schema_ = this->output_schema_;
-  clone->index_ = this->index_;
   return clone;
 }
 

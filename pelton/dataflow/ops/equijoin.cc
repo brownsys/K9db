@@ -51,11 +51,11 @@ inline void CopyIntoRecord(sqlast::ColumnDefinition::Type datatype,
 
 std::shared_ptr<Operator> EquiJoinOperator::left() const {
   NodeIndex parent_index = this->parents_.at(0);
-  return this->graph()->GetNode(parent_index);
+  return this->partition()->GetNode(parent_index);
 }
 std::shared_ptr<Operator> EquiJoinOperator::right() const {
   NodeIndex parent_index = this->parents_.at(1);
-  return this->graph()->GetNode(parent_index);
+  return this->partition()->GetNode(parent_index);
 }
 
 std::vector<Record> EquiJoinOperator::Process(NodeIndex source,
@@ -223,7 +223,6 @@ std::shared_ptr<Operator> EquiJoinOperator::Clone() const {
   clone->parents_ = this->parents_;
   clone->input_schemas_ = this->input_schemas_;
   clone->output_schema_ = this->output_schema_;
-  clone->index_ = this->index_;
   for (const auto &null_record : this->null_records_) {
     clone->null_records_.push_back(null_record.Copy());
   }

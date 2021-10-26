@@ -8,17 +8,15 @@
 namespace pelton {
 namespace dataflow {
 
-void Operator::AddParent(std::shared_ptr<Operator> parent,
-                         std::tuple<NodeIndex, NodeIndex> edge) {
-  CHECK_EQ(this->index(), std::get<1>(edge));
-  this->parents_.push_back(std::get<0>(edge));
+void Operator::AddParent(std::shared_ptr<Operator> parent) {
+  this->parents_.push_back(parent->index());
   // Project operator's schema should be computed after operations have been
   // added.
   if (parent->type() == Operator::Type::PROJECT) {
     parent->ComputeOutputSchema();
   }
   this->input_schemas_.push_back(parent->output_schema());
-  parent->children_.emplace_back(std::get<1>(edge));
+  parent->children_.push_back(this->index());
   if (this->type() != Operator::Type::PROJECT) {
     this->ComputeOutputSchema();
   }
@@ -47,22 +45,11 @@ void Operator::BroadcastToChildren(std::vector<Record> &&records) {
       copy.push_back(r.Copy());
     }
     // Move the copy to child.
-    this->graph()
-        ->GetNode(this->children_.at(i))
+    this->partition_->GetNode(this->children_.at(i))
         ->ProcessAndForward(this->index_, std::move(copy));
   }
-  this->graph()
-      ->GetNode(this->children_.back())
+  this->partition_->GetNode(this->children_.back())
       ->ProcessAndForward(this->index_, std::move(records));
-}
-
-std::vector<std::shared_ptr<Operator>> Operator::GetParents() const {
-  std::vector<std::shared_ptr<Operator>> nodes;
-  for (NodeIndex parent_index : this->parents_) {
-    CHECK(nodes.emplace_back(this->graph()->GetNode(parent_index)));
-  }
-
-  return nodes;
 }
 
 std::string Operator::DebugString() const {
@@ -131,6 +118,13 @@ std::string Operator::DebugString() const {
   str.pop_back();
   str += "],\n";
   return str;
+}
+
+void Operator::CloneInto(std::shared_ptr<Operator> clone) const {
+  clone->children_ = this->children_;
+  clone->parents_ = this->parents_;
+  clone->input_schemas_ = this->input_schemas_;
+  clone->output_schema_ = this->output_schema_;
 }
 
 }  // namespace dataflow

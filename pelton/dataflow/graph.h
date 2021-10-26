@@ -17,9 +17,9 @@ class Operator;
 class InputOperator;
 class MatViewOperator;
 
-class DataFlowGraph {
+class DataFlowGraphPartition {
  public:
-  DataFlowGraph() = default;
+  DataFlowGraphPartition() = default;
 
   bool AddNode(std::shared_ptr<Operator> op,
                std::vector<std::shared_ptr<Operator>> parents);
@@ -53,7 +53,7 @@ class DataFlowGraph {
     return it == nodes_.end() ? nullptr : it->second;
   }
 
-  std::shared_ptr<DataFlowGraph> Clone();
+  std::shared_ptr<DataFlowGraphPartition> Clone();
 
   // Debugging.
   std::string DebugString() const;
@@ -61,17 +61,12 @@ class DataFlowGraph {
   uint64_t SizeInMemory() const;
 
  private:
-  void AddEdge(std::shared_ptr<Operator> parent,
-               std::shared_ptr<Operator> child);
   // Maps input name to associated input operator.
   std::unordered_map<std::string, std::shared_ptr<InputOperator>> inputs_;
   std::vector<std::shared_ptr<MatViewOperator>> outputs_;
 
+  // Nodes have doubly edges from parent to children and back stored inside.
   std::unordered_map<NodeIndex, std::shared_ptr<Operator>> nodes_;
-  // 0th item of the tuple is source and 1st item is destination
-  std::vector<std::pair<NodeIndex, NodeIndex>> edges_;
-
-  inline NodeIndex MintNodeIndex() { return this->nodes_.size(); }
 };
 
 }  // namespace dataflow

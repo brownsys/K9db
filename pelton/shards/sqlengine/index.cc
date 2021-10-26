@@ -115,7 +115,7 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     dataflow::DataFlowState *dataflow_state) {
   perf::Start("Lookup Index");
   // Find flow.
-  const std::shared_ptr<dataflow::DataFlowGraph> &flow =
+  const std::shared_ptr<dataflow::DataFlowGraphPartition> &flow =
       dataflow_state->GetFlow(index_name);
   if (flow->outputs().size() == 0) {
     return absl::InvalidArgumentError("Read from index with no matviews");

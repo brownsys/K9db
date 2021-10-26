@@ -44,15 +44,15 @@ SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
 }
 
 // Manage flows.
-void DataFlowState::AddFlow(const FlowName &name,
-                            const std::shared_ptr<DataFlowGraph> flow) {
+void DataFlowState::AddFlow(
+    const FlowName &name, const std::shared_ptr<DataFlowGraphPartition> flow) {
   this->flows_.insert({name, flow});
   for (const auto &[input_name, input] : flow->inputs()) {
     this->flows_per_input_table_[input_name].push_back(name);
   }
 }
 
-const std::shared_ptr<DataFlowGraph> DataFlowState::GetFlow(
+const std::shared_ptr<DataFlowGraphPartition> DataFlowState::GetFlow(
     const FlowName &name) const {
   return this->flows_.at(name);
 }

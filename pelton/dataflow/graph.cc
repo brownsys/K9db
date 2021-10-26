@@ -10,77 +10,69 @@
 namespace pelton {
 namespace dataflow {
 
-bool DataFlowGraph::AddInputNode(std::shared_ptr<InputOperator> op) {
+bool DataFlowGraphPartition::AddInputNode(std::shared_ptr<InputOperator> op) {
   CHECK(this->inputs_.count(op->input_name()) == 0)
       << "An operator for this input already exists";
   this->inputs_.emplace(op->input_name(), op);
   return this->AddNode(op, std::vector<std::shared_ptr<Operator>>{});
 }
 
-bool DataFlowGraph::AddOutputOperator(std::shared_ptr<MatViewOperator> op,
-                                      std::shared_ptr<Operator> parent) {
+bool DataFlowGraphPartition::AddOutputOperator(
+    std::shared_ptr<MatViewOperator> op, std::shared_ptr<Operator> parent) {
   this->outputs_.emplace_back(op);
   return this->AddNode(op, parent);
 }
 
-bool DataFlowGraph::AddNode(std::shared_ptr<Operator> op,
-                            std::vector<std::shared_ptr<Operator>> parents) {
-  NodeIndex idx = this->MintNodeIndex();
-  op->SetIndex(idx);
-  op->SetGraph(this);
+bool DataFlowGraphPartition::AddNode(
+    std::shared_ptr<Operator> op,
+    std::vector<std::shared_ptr<Operator>> parents) {
+  NodeIndex idx = this->nodes_.size();
+  op->AddToPartition(this, idx);
 
   const auto &[_, inserted] = this->nodes_.emplace(idx, op);
   CHECK(inserted);
 
   for (const auto &parent : parents) {
-    if (parent) {
-      this->AddEdge(parent, op);
-    }
+    op->AddParent(parent);
   }
+
   return inserted;
 }
 
-void DataFlowGraph::AddEdge(std::shared_ptr<Operator> parent,
-                            std::shared_ptr<Operator> child) {
-  std::pair<NodeIndex, NodeIndex> edge{parent->index(), child->index()};
-  this->edges_.push_back(edge);
-  // Also implicitly adds op1 as child of op2.
-  child->AddParent(parent, edge);
-}
-
-void DataFlowGraph::Process(const std::string &input_name,
-                            std::vector<Record> &&records) {
+void DataFlowGraphPartition::Process(const std::string &input_name,
+                                     std::vector<Record> &&records) {
   std::shared_ptr<InputOperator> node = this->inputs_.at(input_name);
   node->ProcessAndForward(UNDEFINED_NODE_INDEX, std::move(records));
 }
 
-std::shared_ptr<DataFlowGraph> DataFlowGraph::Clone() {
-  std::shared_ptr<DataFlowGraph> graph = std::make_shared<DataFlowGraph>();
+std::shared_ptr<DataFlowGraphPartition> DataFlowGraphPartition::Clone() {
+  auto partition = std::make_shared<DataFlowGraphPartition>();
   // Clone each node.
   for (size_t i = 0; i < this->nodes_.size(); i++) {
     std::shared_ptr<Operator> node = this->nodes_.at(i)->Clone();
-    assert(node->index_ == i);
-    node->graph_ = graph.get();
-    graph->nodes_.emplace(i, node);
+    node->AddToPartition(partition.get(), i);
+    partition->nodes_.emplace(i, node);
 
     // Must also store input and matview operators in special maps.
     switch (this->nodes_.at(i)->type()) {
-      case Operator::Type::INPUT:
+      case Operator::Type::INPUT: {
         auto input = std::static_pointer_cast<InputOperator>(node);
-        graph->inputs_.emplace(input->input_name(), input);
+        partition->inputs_.emplace(input->input_name(), input);
         break;
-      case Operator::Type::MAT_VIEW:
+      }
+      case Operator::Type::MAT_VIEW: {
         auto matview = std::static_pointer_cast<MatViewOperator>(node);
-        graph->outputs_.push_back(matview);
+        partition->outputs_.push_back(matview);
         break;
+      }
+      default: {
+      }
     }
   }
-  // Edges can be trivially copied.
-  graph->edges_ = this->edges_;
-  return graph;
+  return partition;
 }
 
-std::string DataFlowGraph::DebugString() const {
+std::string DataFlowGraphPartition::DebugString() const {
   std::string str = "[\n";
   for (const auto &[_, node] : this->nodes_) {
     str += " {\n";
@@ -91,7 +83,7 @@ std::string DataFlowGraph::DebugString() const {
   return str;
 }
 
-uint64_t DataFlowGraph::SizeInMemory() const {
+uint64_t DataFlowGraphPartition::SizeInMemory() const {
   uint64_t size = 0;
   for (const auto &[_, node] : this->nodes_) {
     size += node->SizeInMemory();

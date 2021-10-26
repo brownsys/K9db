@@ -20,9 +20,9 @@
 namespace pelton {
 namespace dataflow {
 
-DataFlowGraphGenerator::DataFlowGraphGenerator(DataFlowGraphJavaPtr graph_ptr,
-                                               DataFlowStateJavaPtr state_ptr) {
-  this->graph_ = reinterpret_cast<DataFlowGraph *>(graph_ptr);
+DataFlowGraphGenerator::DataFlowGraphGenerator(
+    DataFlowGraphPartitionJavaPtr graph_ptr, DataFlowStateJavaPtr state_ptr) {
+  this->graph_ = reinterpret_cast<DataFlowGraphPartition *>(graph_ptr);
   this->state_ = reinterpret_cast<DataFlowState *>(state_ptr);
 }
 

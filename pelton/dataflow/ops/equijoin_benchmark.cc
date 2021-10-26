@@ -24,7 +24,7 @@ void JoinOneToOne(benchmark::State &state) {
   SchemaRef leftSchema = MakeSchema(false);
   SchemaRef rightSchema = MakeSchema(false);
 
-  DataFlowGraph g;
+  DataFlowGraphPartition g;
   auto iop1 = std::make_shared<InputOperator>("test-table1", leftSchema);
   auto iop2 = std::make_shared<InputOperator>("test-table2", rightSchema);
   auto op = std::make_shared<EquiJoinOperator>(0, 0);

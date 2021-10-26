@@ -15,7 +15,7 @@
 namespace pelton {
 namespace dataflow {
 
-class DataFlowGraph;
+class DataFlowGraphPartition;
 
 #ifdef PELTON_BENCHMARK  // shuts up compiler warnings
 // NOLINTNEXTLINE
@@ -39,7 +39,7 @@ class Operator {
   Operator(const Operator &other) = delete;
   Operator &operator=(const Operator &other) = delete;
 
-  virtual ~Operator() { graph_ = nullptr; }
+  virtual ~Operator() { this->partition_ = nullptr; }
 
   /*!
    * Take a batch of records belonging to operator source and push it
@@ -52,13 +52,11 @@ class Operator {
    */
   void ProcessAndForward(NodeIndex source, std::vector<Record> &&records);
 
+  // Accessors (read only).
   Type type() const { return this->type_; }
   NodeIndex index() const { return this->index_; }
-  DataFlowGraph *graph() const { return graph_; }
+  DataFlowGraphPartition *partition() const { return partition_; }
   const SchemaRef &output_schema() const { return this->output_schema_; }
-
-  // Constructs a vector of parent operators from parents_ edge vector.
-  std::vector<std::shared_ptr<Operator>> GetParents() const;
 
   // Meant to generate a clone with same operator specific information, edges,
   // and input/output schemas.
@@ -67,14 +65,12 @@ class Operator {
   // For debugging.
   virtual std::string DebugString() const;
 
+  // Return the size of any stored state in memory.
+  virtual uint64_t SizeInMemory() const { return 0; }
+
  protected:
   explicit Operator(Type type)
-      : index_(UNDEFINED_NODE_INDEX), type_(type), graph_(nullptr) {}
-
-  void SetGraph(DataFlowGraph *graph) { this->graph_ = graph; }
-  void SetIndex(NodeIndex index) { this->index_ = index; }
-  void AddParent(std::shared_ptr<Operator> parent,
-                 std::tuple<NodeIndex, NodeIndex> edge);
+      : index_(UNDEFINED_NODE_INDEX), type_(type), partition_(nullptr) {}
 
   /*!
    * Push a batch of records through the dataflow graph. Order within this batch
@@ -98,8 +94,8 @@ class Operator {
    */
   virtual void ComputeOutputSchema() = 0;
 
-  // Return the size of any stored state in memory.
-  virtual uint64_t SizeInMemory() const { return 0; }
+  // Helper for clone: copies this node's configuration into the given clone.
+  void CloneInto(std::shared_ptr<Operator> clone) const;
 
   // Edges to children and parents.
   std::vector<NodeIndex> children_;
@@ -108,17 +104,22 @@ class Operator {
   // Input and output schemas.
   std::vector<SchemaRef> input_schemas_;
   SchemaRef output_schema_;
-  NodeIndex index_;
 
  private:
-  Type type_;
-  DataFlowGraph *graph_;  // The graph the operator belongs to.
+  // Called by DataFlowGraphPartition.
+  friend class DataFlowGraphPartition;
+  void AddToPartition(DataFlowGraphPartition *partition, NodeIndex index) {
+    this->partition_ = partition;
+    this->index_ = index;
+  }
+  void AddParent(std::shared_ptr<Operator> parent);
+
+  // Pass the given batch to the children operators (if any) for processing.
   void BroadcastToChildren(std::vector<Record> &&records);
 
-  // Allow DataFlowGraph to use SetGraph, SetIndex, and AddParent functions.
-  friend class DataFlowGraph;
-  template <typename T>
-  friend class MatViewOperatorT;
+  NodeIndex index_;
+  Type type_;
+  DataFlowGraphPartition *partition_;  // The graph the operator belongs to.
 
 #ifdef PELTON_BENCHMARK  // shuts up compiler warnings
   // NOLINTNEXTLINE

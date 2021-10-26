@@ -7,7 +7,7 @@ namespace pelton {
 namespace dataflow {
 
 typedef uint32_t NodeIndex;
-
+typedef uint32_t PartitionIndex;
 typedef uint32_t ColumnID;
 
 static const NodeIndex UNDEFINED_NODE_INDEX =

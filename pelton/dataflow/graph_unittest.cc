@@ -197,9 +197,10 @@ inline std::vector<Record> MakeAggregateOnEquiJoinRecords(
 }
 
 // Make different types of flows/graphs.
-DataFlowGraph MakeTrivialGraph(ColumnID keycol, const SchemaRef &schema) {
+DataFlowGraphPartition MakeTrivialGraph(ColumnID keycol,
+                                        const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  DataFlowGraph g;
+  DataFlowGraphPartition g;
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
@@ -213,9 +214,10 @@ DataFlowGraph MakeTrivialGraph(ColumnID keycol, const SchemaRef &schema) {
   return g;
 }
 
-DataFlowGraph MakeFilterGraph(ColumnID keycol, const SchemaRef &schema) {
+DataFlowGraphPartition MakeFilterGraph(ColumnID keycol,
+                                       const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  DataFlowGraph g;
+  DataFlowGraphPartition g;
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto filter = std::make_shared<FilterOperator>();
@@ -232,9 +234,10 @@ DataFlowGraph MakeFilterGraph(ColumnID keycol, const SchemaRef &schema) {
   return g;
 }
 
-DataFlowGraph MakeUnionGraph(ColumnID keycol, const SchemaRef &schema) {
+DataFlowGraphPartition MakeUnionGraph(ColumnID keycol,
+                                      const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  DataFlowGraph g;
+  DataFlowGraphPartition g;
 
   auto in1 = std::make_shared<InputOperator>("test-table1", schema);
   auto in2 = std::make_shared<InputOperator>("test-table2", schema);
@@ -253,11 +256,11 @@ DataFlowGraph MakeUnionGraph(ColumnID keycol, const SchemaRef &schema) {
   return g;
 }
 
-DataFlowGraph MakeEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
-                                const SchemaRef &lschema,
-                                const SchemaRef &rschema) {
+DataFlowGraphPartition MakeEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
+                                         const SchemaRef &lschema,
+                                         const SchemaRef &rschema) {
   std::vector<ColumnID> keys = {ok};
-  DataFlowGraph g;
+  DataFlowGraphPartition g;
 
   auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
   auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
@@ -276,9 +279,10 @@ DataFlowGraph MakeEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
   return g;
 }
 
-DataFlowGraph MakeProjectGraph(ColumnID keycol, const SchemaRef &schema) {
+DataFlowGraphPartition MakeProjectGraph(ColumnID keycol,
+                                        const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  DataFlowGraph g;
+  DataFlowGraphPartition g;
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto project = std::make_shared<ProjectOperator>();
@@ -296,10 +300,10 @@ DataFlowGraph MakeProjectGraph(ColumnID keycol, const SchemaRef &schema) {
   return g;
 }
 
-DataFlowGraph MakeProjectOnFilterGraph(ColumnID keycol,
-                                       const SchemaRef &schema) {
+DataFlowGraphPartition MakeProjectOnFilterGraph(ColumnID keycol,
+                                                const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  DataFlowGraph g;
+  DataFlowGraphPartition g;
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto filter = std::make_shared<FilterOperator>();
@@ -320,11 +324,12 @@ DataFlowGraph MakeProjectOnFilterGraph(ColumnID keycol,
   return g;
 }
 
-DataFlowGraph MakeProjectOnEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
-                                         const SchemaRef &lschema,
-                                         const SchemaRef &rschema) {
+DataFlowGraphPartition MakeProjectOnEquiJoinGraph(ColumnID ok, ColumnID lk,
+                                                  ColumnID rk,
+                                                  const SchemaRef &lschema,
+                                                  const SchemaRef &rschema) {
   std::vector<ColumnID> keys = {ok};
-  DataFlowGraph g;
+  DataFlowGraphPartition g;
 
   auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
   auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
@@ -347,10 +352,11 @@ DataFlowGraph MakeProjectOnEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
   return g;
 }
 
-DataFlowGraph MakeAggregateGraph(ColumnID keycol, const SchemaRef &schema) {
+DataFlowGraphPartition MakeAggregateGraph(ColumnID keycol,
+                                          const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
   std::vector<ColumnID> group_columns = {2};
-  DataFlowGraph g;
+  DataFlowGraphPartition g;
 
   auto in = std::make_shared<InputOperator>("test-table", schema);
   auto aggregate = std::make_shared<AggregateOperator>(
@@ -367,13 +373,13 @@ DataFlowGraph MakeAggregateGraph(ColumnID keycol, const SchemaRef &schema) {
   return g;
 }
 
-DataFlowGraph MakeAggregateOnEquiJoinGraph(ColumnID ok, ColumnID lk,
-                                           ColumnID rk,
-                                           const SchemaRef &lschema,
-                                           const SchemaRef &rschema) {
+DataFlowGraphPartition MakeAggregateOnEquiJoinGraph(ColumnID ok, ColumnID lk,
+                                                    ColumnID rk,
+                                                    const SchemaRef &lschema,
+                                                    const SchemaRef &rschema) {
   std::vector<ColumnID> keys = {ok};
   std::vector<ColumnID> group_columns = {2};
-  DataFlowGraph g;
+  DataFlowGraphPartition g;
 
   auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
   auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
@@ -419,11 +425,11 @@ inline void MatViewContentsEqualsIndexed(
 }
 
 // Tests!
-TEST(DataFlowGraphTest, TestTrivialGraph) {
+TEST(DataFlowGraphPartitionTest, TestTrivialGraph) {
   // Schema must survive records.
   SchemaRef schema = MakeLeftSchema();
   // Make graph.
-  DataFlowGraph g = MakeTrivialGraph(0, schema);
+  auto g = MakeTrivialGraph(0, schema);
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   std::vector<Record> results = MakeLeftRecords(schema);
@@ -433,11 +439,11 @@ TEST(DataFlowGraphTest, TestTrivialGraph) {
   MatViewContentsEquals(g.outputs().at(0), results);
 }
 
-TEST(DataFlowGraphTest, TestFilterGraph) {
+TEST(DataFlowGraphPartitionTest, TestFilterGraph) {
   // Schema must survive records.
   SchemaRef schema = MakeLeftSchema();
   // Make graph.
-  DataFlowGraph g = MakeFilterGraph(0, schema);
+  auto g = MakeFilterGraph(0, schema);
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
@@ -449,11 +455,11 @@ TEST(DataFlowGraphTest, TestFilterGraph) {
   MatViewContentsEquals(g.outputs().at(0), filtered);
 }
 
-TEST(DataFlowGraphTest, TestUnionGraph) {
+TEST(DataFlowGraphPartitionTest, TestUnionGraph) {
   // Schema must survive records.
   SchemaRef schema = MakeLeftSchema();
   // Make graph.
-  DataFlowGraph g = MakeUnionGraph(0, schema);
+  auto g = MakeUnionGraph(0, schema);
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   std::vector<Record> first_half;
@@ -470,12 +476,12 @@ TEST(DataFlowGraphTest, TestUnionGraph) {
   MatViewContentsEquals(g.outputs().at(0), records);
 }
 
-TEST(DataFlowGraphTest, TestEquiJoinGraph) {
+TEST(DataFlowGraphPartitionTest, TestEquiJoinGraph) {
   // Schema must survive records.
   SchemaRef lschema = MakeLeftSchema();
   SchemaRef rschema = MakeRightSchema();
   // Make graph.
-  DataFlowGraph g = MakeEquiJoinGraph(0, 2, 0, lschema, rschema);
+  auto g = MakeEquiJoinGraph(0, 2, 0, lschema, rschema);
   // Make records.
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
@@ -489,11 +495,11 @@ TEST(DataFlowGraphTest, TestEquiJoinGraph) {
   MatViewContentsEquals(g.outputs().at(0), result);
 }
 
-TEST(DataFlowGraphTest, TestProjectGraph) {
+TEST(DataFlowGraphPartitionTest, TestProjectGraph) {
   // Schema must survive records.
   SchemaRef schema = MakeLeftSchema();
   // Make graph.
-  DataFlowGraph g = MakeProjectGraph(0, schema);
+  auto g = MakeProjectGraph(0, schema);
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
@@ -505,11 +511,11 @@ TEST(DataFlowGraphTest, TestProjectGraph) {
   MatViewContentsEquals(g.outputs().at(0), result);
 }
 
-TEST(DataFlowGraphTest, TestProjectOnFilterGraph) {
+TEST(DataFlowGraphPartitionTest, TestProjectOnFilterGraph) {
   // Schema must survive records.
   SchemaRef schema = MakeLeftSchema();
   // Make graph.
-  DataFlowGraph g = MakeProjectOnFilterGraph(0, schema);
+  auto g = MakeProjectOnFilterGraph(0, schema);
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
@@ -521,12 +527,12 @@ TEST(DataFlowGraphTest, TestProjectOnFilterGraph) {
   MatViewContentsEquals(g.outputs().at(0), result);
 }
 
-TEST(DataFlowGraphTest, TestProjectOnEquiJoinGraph) {
+TEST(DataFlowGraphPartitionTest, TestProjectOnEquiJoinGraph) {
   // Schema must survive records.
   SchemaRef lschema = MakeLeftSchema();
   SchemaRef rschema = MakeRightSchema();
   // Make graph.
-  DataFlowGraph g = MakeProjectOnEquiJoinGraph(0, 2, 0, lschema, rschema);
+  auto g = MakeProjectOnEquiJoinGraph(0, 2, 0, lschema, rschema);
   // Make records.
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
@@ -541,11 +547,11 @@ TEST(DataFlowGraphTest, TestProjectOnEquiJoinGraph) {
   MatViewContentsEquals(g.outputs().at(0), result);
 }
 
-TEST(DataFlowGraphTest, TestAggregateGraph) {
+TEST(DataFlowGraphPartitionTest, TestAggregateGraph) {
   // Schema must survive records.
   SchemaRef schema = MakeLeftSchema();
   // Make graph.
-  DataFlowGraph g = MakeAggregateGraph(0, schema);
+  auto g = MakeAggregateGraph(0, schema);
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
@@ -557,12 +563,12 @@ TEST(DataFlowGraphTest, TestAggregateGraph) {
   MatViewContentsEqualsIndexed(g.outputs().at(0), result, 0);
 }
 
-TEST(DataFlowGraphTest, TestAggregateOnEquiJoinGraph) {
+TEST(DataFlowGraphPartitionTest, TestAggregateOnEquiJoinGraph) {
   // Schema must survive records.
   SchemaRef lschema = MakeLeftSchema();
   SchemaRef rschema = MakeRightSchema();
   // Make graph.
-  DataFlowGraph g = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
+  auto g = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
   // Make records.
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
@@ -578,12 +584,12 @@ TEST(DataFlowGraphTest, TestAggregateOnEquiJoinGraph) {
 }
 
 // Similar to TestAggregateOnEquiJoinGraph
-TEST(DataFlowGraphTest, CloneTest) {
+TEST(DataFlowGraphPartitionTest, CloneTest) {
   // Schema must survive records.
   SchemaRef lschema = MakeLeftSchema();
   SchemaRef rschema = MakeRightSchema();
   // Make graph.
-  DataFlowGraph g = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
+  auto g = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
   auto g_clone = g.Clone();
 
   // Make records.
@@ -600,13 +606,29 @@ TEST(DataFlowGraphTest, CloneTest) {
   MatViewContentsEqualsIndexed(g_clone->outputs().at(0), result, 0);
 }
 
+TEST(DataFlowGraphPartitionTest, CloneReprTest) {
+  // Schema must survive records.
+  SchemaRef lschema = MakeLeftSchema();
+  SchemaRef rschema = MakeRightSchema();
+
+  // Test with aggregate and equijoin.
+  auto g1 = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
+  auto g1_clone = g1.Clone();
+  ASSERT_EQ(g1.DebugString(), g1_clone->DebugString());
+
+  // Test with filter and project.
+  auto g2 = MakeProjectOnFilterGraph(0, lschema);
+  auto g2_clone = g2.Clone();
+  ASSERT_EQ(g2.DebugString(), g2_clone->DebugString());
+}
+
 #ifndef PELTON_VALGRIND_MODE
 TEST(RecordTest, TestDuplicateInputGraph) {
   // Create a schema.
   SchemaRef schema = MakeLeftSchema();
 
   // Make a graph.
-  DataFlowGraph g;
+  DataFlowGraphPartition g;
 
   // Add two input operators to the graph for the same table, expect an error.
   auto in1 = std::make_shared<InputOperator>("test-table", schema);
