@@ -126,6 +126,19 @@ absl::Status IsShardingBySupported(ShardingInformation *info,
   return absl::OkStatus();
 }
 
+struct OwningTable {
+  ColumnName column_name;
+  ColumnName foreign_column;
+  std::string foreign_table;
+
+  OwningTable(const &ColumnName col_name, const &ColumnName foreign_col, const std::string &ftab)
+    : column_name(col_name),
+      foreign_column(foreign_col),
+      foreign_table(ftab)
+      {}
+    
+};
+
 // Figures out which shard kind this table should belong to.
 // Currently, we expect one of two solutions:
 // 1) a foreign key column is explicitly specified to be the column to shard by
@@ -136,12 +149,13 @@ absl::Status IsShardingBySupported(ShardingInformation *info,
 //    to the shard defined by that PII table, or to the same shard that the
 //    target table is in. Having multiple such foreign keys results in a runtime
 //    error.
-absl::StatusOr<std::list<ShardingInformation>> ShardTable(
+absl::StatusOr<std::pair<std::list<ShardingInformation>, std::optional<OwningTable>>> ShardTable(
     const sqlast::CreateTable &stmt, const SharderState &state) {
   // Result is empty by default.
   std::list<ShardingInformation> explicit_owners;
   std::list<ShardingInformation> implicit_owners;
   std::unordered_map<ColumnName, ColumnIndex> index_map;
+  std::optional<OwningTable> owning_table;
 
   const std::string &table_name = stmt.table_name();
   // Check column definitions for inlined foreign key constraints.
@@ -187,12 +201,22 @@ absl::StatusOr<std::list<ShardingInformation>> ShardTable(
           NameShardedTable(table_name, column_name);
       explicit_owners.emplace_back(table_name, sharded_table_name, column_name,
                                    index, "");
+    } else if (absl::StartsWith(column_name, "OWNING_")) {
+      // This table also denotes a relationship to another (via explicit annotation)
+      if (fk_constraint != nullptr) {
+        if (owning_table) {
+          return absl::InvalidArgumentError("Duplicate 'OWNING' column");
+        }
+        owning_table.emplace(column_name, fk_constraint->foreign_column(), fk_constraint->foreign_table());
+      } else {
+        return absl::InvalidArgumentError("Non fk-column specified as 'OWNING'");
+      }
     }
   }
 
   // If sharding is explicitly specified via OWNER, we are done.
   if (explicit_owners.size() > 0) {
-    return explicit_owners;
+    return std::make_pair(explicit_owners, owning_table);
   }
 
   // Sharding is implicitly deduced, only works if there is one candidate!
@@ -200,7 +224,7 @@ absl::StatusOr<std::list<ShardingInformation>> ShardTable(
     return absl::InvalidArgumentError(
         "Table with several foreign keys to shards or PII!");
   }
-  return implicit_owners;
+  return std::make_pair(implicit_owners, owning_table);
 }
 
 // Determine what should be done about a single foreign key in some
@@ -302,7 +326,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
   // Determine if this table is special: maybe it has PII fields, or maybe it
   // is linked to an existing shard via a foreign key.
   bool has_pii = HasPII(stmt);
-  ASSIGN_OR_RETURN(std::list<ShardingInformation> sharding_information,
+  ASSIGN_OR_RETURN(std::tie(sharding_information, owning_table),
                    ShardTable(stmt, *state));
   for (auto &info : sharding_information) {
     CHECK_STATUS(IsShardingBySupported(&info, *state));
@@ -354,6 +378,37 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
 
   state->AddSchema(table_name, stmt);
   dataflow_state->AddTableSchema(stmt);
+
+  if (owning_table) {
+    if (sharding_information.size() == 0) {
+      return absl::UnimplementedError("Owning table must be sharded. (not sure if it would even make sense otherwise)");
+    }
+    // If this table owns a different table, we need to shard that table now too. 
+    // It was probably installed without any sharding before
+    if (state->IsSharded(owning_table->foreign_table)) {
+      return absl::InvalidArgumentError("Table to own should not be sharded yet!");
+    }
+    if (auto schema = state->RemoveSchema(owning_table->foreign_table)) {
+      const UnshardedTableName &table_name = owning_table->foreign_table;
+      const ColumnName &my_col_name = owning_table->column_name;
+      const ColumnName &other_col_name = owning_table->foreign_column;
+      int sharded_by_index = schema.ColumnIndex(my_col_name);
+      ShardingInformation sharding_info(
+        table_name, // shard kind
+        NameShardedTable(table_name, my_col_name), // sharded table name
+        my_col_name, // sharded by this column. (might have to adjust, since this column is not in the schema)
+        sharded_by_index, 
+        other_col_name,
+      );
+      state->AddShardedTable(
+        owning_table->foriegn_table,
+        sharding_info,
+        schema
+      );
+    } else {
+      return absl::UnimplementedError("Owning tables are expected to have been created previously");
+    }
+  }
 
   perf::End("Create");
   return result;

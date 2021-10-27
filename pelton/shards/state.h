@@ -69,6 +69,8 @@ class SharderState {
 
   void RemoveUserFromShard(const ShardKind &kind, const UserId &user_id);
 
+  std::optional<sqlast::CreateTable> RemoveSchema(const UnshardedTableName &table_name);
+
   // Schema lookups.
   const sqlast::CreateTable &GetSchema(
       const UnshardedTableName &table_name) const;
