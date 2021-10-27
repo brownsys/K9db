@@ -27,9 +27,14 @@ void SharderState::AddSchema(const UnshardedTableName &table_name,
   this->schema_.insert({table_name, table_schema});
 }
 
-std::optional<sqlast::CreateTable> ShardedState::RemoveSchema(const UnshardedTableName &table_name) {
-  auto ct = this->schema_.extract(table_name);
-  return ct ? std::nullopt : std::optional(ct.value());
+std::optional<sqlast::CreateTable> SharderState::RemoveSchema(const UnshardedTableName &table_name) {
+  std::optional<sqlast::CreateTable> ret;
+  const auto ct = this->schema_.find(table_name);
+  if (ct != this->schema_.end()) {
+    ret = ct->second;
+    this->schema_.erase(ct);
+  }
+  return ret;
 }
 
 void SharderState::AddShardKind(const ShardKind &kind, const ColumnName &pk) {

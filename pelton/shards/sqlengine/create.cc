@@ -131,11 +131,10 @@ struct OwningTable {
   ColumnName foreign_column;
   std::string foreign_table;
 
-  OwningTable(const &ColumnName col_name, const &ColumnName foreign_col, const std::string &ftab)
+  OwningTable(const ColumnName &col_name, const ColumnName &foreign_col, const std::string &ftab)
     : column_name(col_name),
       foreign_column(foreign_col),
-      foreign_table(ftab)
-      {}
+      foreign_table(ftab) {}
     
 };
 
@@ -326,6 +325,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
   // Determine if this table is special: maybe it has PII fields, or maybe it
   // is linked to an existing shard via a foreign key.
   bool has_pii = HasPII(stmt);
+  std::list<ShardingInformation> sharding_information;
+  std::optional<OwningTable> owning_table;
   ASSIGN_OR_RETURN(std::tie(sharding_information, owning_table),
                    ShardTable(stmt, *state));
   for (auto &info : sharding_information) {
@@ -392,18 +393,18 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
       const UnshardedTableName &table_name = owning_table->foreign_table;
       const ColumnName &my_col_name = owning_table->column_name;
       const ColumnName &other_col_name = owning_table->foreign_column;
-      int sharded_by_index = schema.ColumnIndex(my_col_name);
-      ShardingInformation sharding_info(
+      int sharded_by_index = schema->ColumnIndex(my_col_name);
+      const ShardingInformation sharding_info(
         table_name, // shard kind
         NameShardedTable(table_name, my_col_name), // sharded table name
         my_col_name, // sharded by this column. (might have to adjust, since this column is not in the schema)
         sharded_by_index, 
-        other_col_name,
+        other_col_name
       );
       state->AddShardedTable(
-        owning_table->foriegn_table,
+        owning_table->foreign_table,
         sharding_info,
-        schema
+        *schema
       );
     } else {
       return absl::UnimplementedError("Owning tables are expected to have been created previously");
