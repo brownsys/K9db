@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "gtest/gtest_prod.h"
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/grouped_data.h"
@@ -14,6 +15,12 @@
 
 namespace pelton {
 namespace dataflow {
+
+#ifdef PELTON_MATVIEW_BENCHMARK  // shuts up compiler warnings
+class MatViewOperator;
+static void InitializeBenchMarkMatview(MatViewOperator *matview,
+                                       SchemaRef schema);
+#endif
 
 // Virtual parent class: this is what the rest of our system uses and interacts
 // with. Allows reading and writing into the materialized view without knowing
@@ -40,6 +47,23 @@ class MatViewOperator : public Operator {
   // We do not know if we are ordered or unordered, this type is revealed
   // to us by the derived class as an argument.
   MatViewOperator() : Operator(Operator::Type::MAT_VIEW) {}
+
+  // Allow tests to set input_schemas_ directly.
+  FRIEND_TEST(MatViewOperatorTest, EmptyMatView);
+  FRIEND_TEST(MatViewOperatorTest, SingleMatView);
+  FRIEND_TEST(MatViewOperatorTest, SingleMatViewDifferentKey);
+  FRIEND_TEST(MatViewOperatorTest, ProcessBatchTest);
+  FRIEND_TEST(MatViewOperatorTest, OrderedKeyTest);
+  FRIEND_TEST(MatViewOperatorTest, OrderedRecordTest);
+  FRIEND_TEST(MatViewOperatorTest, EmptyKeyTest);
+  FRIEND_TEST(MatViewOperatorTest, LimitTest);
+  FRIEND_TEST(MatViewOperatorTest, LookupGreater);
+
+#ifdef PELTON_MATVIEW_BENCHMARK  // shuts up compiler warnings
+  // Allow matview_benchmark.cc to set input_schemas_ directly.
+  friend void InitializeBenchMarkMatview(MatViewOperator *matview,
+                                         SchemaRef schema);
+#endif
 };
 
 // Actual implementation is generic over T: the underlying GroupedDataT
@@ -162,12 +186,8 @@ class MatViewOperatorT : public MatViewOperator {
 
  protected:
   std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records) {
-    bool by_pk = false;
-    if (records.size() > 0) {
-      const std::vector<ColumnID> &keys = records.at(0).schema().keys();
-      by_pk = keys.size() > 0 && keys == this->key_cols_;
-    }
-
+    const std::vector<ColumnID> &keys = this->input_schemas_.at(0).keys();
+    bool by_pk = keys.size() > 0 && keys == this->key_cols_;
     for (Record &r : records) {
       if (!this->contents_.Insert(r.GetValues(this->key_cols_), std::move(r),
                                   by_pk)) {

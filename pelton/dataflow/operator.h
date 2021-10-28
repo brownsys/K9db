@@ -17,7 +17,7 @@ namespace dataflow {
 
 class DataFlowGraphPartition;
 
-#ifdef PELTON_BENCHMARK  // shuts up compiler warnings
+#ifdef PELTON_EQUIJOIN_BENCHMARK  // shuts up compiler warnings
 // NOLINTNEXTLINE
 static void JoinOneToOne(benchmark::State &state);
 #endif
@@ -57,6 +57,7 @@ class Operator {
   NodeIndex index() const { return this->index_; }
   DataFlowGraphPartition *partition() const { return partition_; }
   const SchemaRef &output_schema() const { return this->output_schema_; }
+  const std::vector<NodeIndex> &parents() const { return this->parents_; }
 
   // Meant to generate a clone with same operator specific information, edges,
   // and input/output schemas.
@@ -121,7 +122,7 @@ class Operator {
   Type type_;
   DataFlowGraphPartition *partition_;  // The graph the operator belongs to.
 
-#ifdef PELTON_BENCHMARK  // shuts up compiler warnings
+#ifdef PELTON_EQUIJOIN_BENCHMARK  // shuts up compiler warnings
   // NOLINTNEXTLINE
   friend void JoinOneToOne(benchmark::State &state);
 #endif

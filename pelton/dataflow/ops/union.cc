@@ -19,6 +19,9 @@ bool UnionOperator::DeepCompareSchemas(const SchemaRef s1, const SchemaRef s2) {
   if (s1.column_types() != s2.column_types()) {
     return false;
   }
+  if (s1.keys() != s2.keys()) {
+    return false;
+  }
   return true;
 }
 

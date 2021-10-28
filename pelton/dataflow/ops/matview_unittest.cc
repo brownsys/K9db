@@ -123,6 +123,8 @@ TEST(MatViewOperatorTest, SingleMatView) {
 
   // Test all views.
   for (std::unique_ptr<MatViewOperator> &matview : views) {
+    matview->input_schemas_.push_back(schema);
+
     // Process and check.
     matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));
     EXPECT_EQ(matview->count(), 1);
@@ -156,6 +158,8 @@ TEST(MatViewOperatorTest, SingleMatViewDifferentKey) {
 
   // Test all views.
   for (std::unique_ptr<MatViewOperator> &matview : views) {
+    matview->input_schemas_.push_back(schema);
+
     // Process and check.
     matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));
     EXPECT_EQ(matview->count(), 1);
@@ -209,6 +213,8 @@ TEST(MatViewOperatorTest, ProcessBatchTest) {
 
   // Test all views.
   for (std::unique_ptr<MatViewOperator> &matview : views) {
+    matview->input_schemas_.push_back(schema);
+
     // Process and check.
     matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));
 
@@ -257,6 +263,7 @@ TEST(MatViewOperatorTest, OrderedKeyTest) {
 
   // Create materialized view.
   KeyOrderedMatViewOperator matview{keys};
+  matview.input_schemas_.push_back(schema);
 
   // Process and check.
   matview.ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));
@@ -314,6 +321,7 @@ TEST(MatViewOperatorTest, OrderedRecordTest) {
 
   // Create materialized view.
   RecordOrderedMatViewOperator matview{keys, compare};
+  matview.input_schemas_.push_back(schema);
 
   // Process and check.
   matview.ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));
@@ -367,6 +375,8 @@ TEST(MatViewOperatorTest, EmptyKeyTest) {
 
   // Test all views.
   for (std::unique_ptr<MatViewOperator> &matview : views) {
+    matview->input_schemas_.push_back(schema);
+
     // Process and check.
     matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));
 
@@ -433,6 +443,8 @@ TEST(MatViewOperatorTest, LimitTest) {
 
   // Test all views.
   for (std::unique_ptr<MatViewOperator> &matview : views) {
+    matview->input_schemas_.push_back(schema);
+
     // Process and check.
     matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));
 
@@ -497,6 +509,7 @@ TEST(MatViewOperatorTest, LookupGreater) {
 
   // Create materialized view.
   RecordOrderedMatViewOperator matview{{}, compare};
+  matview.input_schemas_.push_back(schema);
 
   // Process and check.
   matview.ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));

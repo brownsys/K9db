@@ -1,4 +1,4 @@
-#define PELTON_BENCHMARK
+#define PELTON_EQUIJOIN_BENCHMARK
 
 #include <vector>
 

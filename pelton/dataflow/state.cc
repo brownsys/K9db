@@ -44,17 +44,22 @@ SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
 }
 
 // Manage flows.
-void DataFlowState::AddFlow(
-    const FlowName &name, const std::shared_ptr<DataFlowGraphPartition> flow) {
-  this->flows_.insert({name, flow});
+void DataFlowState::AddFlow(const FlowName &name,
+                            std::unique_ptr<DataFlowGraphPartition> &&flow) {
+  // Map input names to this flow.
   for (const auto &[input_name, input] : flow->inputs()) {
     this->flows_per_input_table_[input_name].push_back(name);
   }
+
+  // Turn the given partition into a graph with many partitions.
+
+  // Insert the partition.
+  this->flows_.insert({name, std::move(flow)});
 }
 
-const std::shared_ptr<DataFlowGraphPartition> DataFlowState::GetFlow(
+const DataFlowGraphPartition &DataFlowState::GetFlow(
     const FlowName &name) const {
-  return this->flows_.at(name);
+  return *this->flows_.at(name);
 }
 
 bool DataFlowState::HasFlow(const FlowName &name) const {

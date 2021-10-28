@@ -124,7 +124,7 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
       break;
     }
     case sqlast::Expression::Type::AND: {
-      ExtractConstraintsFromAnd(where, schema, &constraints);
+      CHECK_STATUS(ExtractConstraintsFromAnd(where, schema, &constraints));
       break;
     }
     default:
@@ -220,11 +220,11 @@ absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
                         dataflow::DataFlowState *dataflow_state) {
   perf::Start("CreateView");
   // Plan the query using calcite and generate a concrete graph for it.
-  std::shared_ptr<dataflow::DataFlowGraphPartition> graph =
+  std::unique_ptr<dataflow::DataFlowGraphPartition> graph =
       planner::PlanGraph(dataflow_state, stmt.query());
 
   // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
-  dataflow_state->AddFlow(stmt.view_name(), graph);
+  dataflow_state->AddFlow(stmt.view_name(), std::move(graph));
 
   perf::End("CreateView");
   return absl::OkStatus();
@@ -238,16 +238,17 @@ absl::StatusOr<sql::SqlResult> SelectView(
 
   // Get the corresponding flow.
   const std::string &view_name = stmt.table_name();
-  const std::shared_ptr<dataflow::DataFlowGraphPartition> flow =
+  const dataflow::DataFlowGraphPartition &flow =
       dataflow_state->GetFlow(view_name);
 
   // Only support flow ending with a single output matview for now.
-  if (flow->outputs().size() == 0) {
+  if (flow.outputs().size() == 0) {
     return absl::InvalidArgumentError("Read from flow with no matviews");
-  } else if (flow->outputs().size() > 1) {
+  } else if (flow.outputs().size() > 1) {
     return absl::InvalidArgumentError("Read from flow with several matviews");
   }
-  auto matview = flow->outputs().at(0);
+  const std::shared_ptr<dataflow::MatViewOperator> &matview =
+      flow.outputs().at(0);
   const dataflow::SchemaRef &schema = matview->output_schema();
 
   std::vector<dataflow::Record> records;

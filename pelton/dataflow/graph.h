@@ -53,12 +53,12 @@ class DataFlowGraphPartition {
     return it == nodes_.end() ? nullptr : it->second;
   }
 
-  std::shared_ptr<DataFlowGraphPartition> Clone();
-
   // Debugging.
   std::string DebugString() const;
-
   uint64_t SizeInMemory() const;
+
+  // Cloning to create more partitions.
+  std::unique_ptr<DataFlowGraphPartition> Clone() const;
 
  private:
   // Maps input name to associated input operator.
@@ -67,6 +67,25 @@ class DataFlowGraphPartition {
 
   // Nodes have doubly edges from parent to children and back stored inside.
   std::unordered_map<NodeIndex, std::shared_ptr<Operator>> nodes_;
+};
+
+// A graph is made out of many partitions.
+class DataFlowGraph {
+ public:
+  DataFlowGraph() = default;
+
+  void Initialize(std::unique_ptr<DataFlowGraphPartition> &&partition,
+                  PartitionIndex partitions);
+
+  void Process(const std::string &input_name, std::vector<Record> &&records);
+
+  const std::vector<std::string> &Inputs() const { return this->inputs_; }
+
+ private:
+  std::vector<std::string> inputs_;
+  std::vector<std::unique_ptr<DataFlowGraphPartition>> partitions_;
+  // Maps each input name to the keys that partition records fed to that input.
+  std::unordered_map<std::string, std::vector<ColumnID>> partition_keys_;
 };
 
 }  // namespace dataflow

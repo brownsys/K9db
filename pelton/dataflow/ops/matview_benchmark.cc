@@ -1,3 +1,5 @@
+#define PELTON_MATVIEW_BENCHMARK
+
 #include <vector>
 
 #include "benchmark/benchmark.h"
@@ -13,10 +15,16 @@
 namespace pelton {
 namespace dataflow {
 
+// This is a friend of MatViewOperator
+void InitializeBenchMarkMatview(MatViewOperator *matview, SchemaRef schema) {
+  matview->input_schemas_.push_back(schema);
+}
+
 // NOLINTNEXTLINE
 static void UnorderedMatViewInsert2UInts(benchmark::State &state) {
   SchemaRef schema = MakeSchema(false);
   auto op = new UnorderedMatViewOperator(schema.keys());
+  InitializeBenchMarkMatview(op, schema);
 
   size_t processed = 0;
   for (auto _ : state) {
@@ -34,6 +42,7 @@ static void UnorderedMatViewInsert2UInts(benchmark::State &state) {
 static void UnorderedMatViewInsertUIntString(benchmark::State &state) {
   SchemaRef schema = MakeSchema(true);
   auto op = new UnorderedMatViewOperator(schema.keys());
+  InitializeBenchMarkMatview(op, schema);
 
   size_t processed = 0;
   for (auto _ : state) {
@@ -51,6 +60,7 @@ static void UnorderedMatViewInsertUIntString(benchmark::State &state) {
 static void UnorderedMatViewBatchInsert(benchmark::State &state) {
   SchemaRef schema = MakeSchema(false);
   auto op = new UnorderedMatViewOperator(schema.keys());
+  InitializeBenchMarkMatview(op, schema);
 
   size_t processed = 0;
   for (auto _ : state) {

@@ -125,6 +125,7 @@ cc_library(
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
         "//pelton/dataflow:types",
+        "@com_google_googletest//:gtest_prod",
         "@glog",
     ],
 )

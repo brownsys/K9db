@@ -95,7 +95,7 @@ class EquiJoinOperator : public Operator {
   FRIEND_TEST(EquiJoinOperatorTest, BasicRightJoinTest);
   FRIEND_TEST(EquiJoinOperatorTest, LeftJoinTest);
 
-#ifdef PELTON_BENCHMARK  // shuts up compiler warnings
+#ifdef PELTON_EQUIJOIN_BENCHMARK  // shuts up compiler warnings
   // NOLINTNEXTLINE
   friend void JoinOneToOne(benchmark::State &state);
 #endif
