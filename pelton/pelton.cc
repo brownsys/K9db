@@ -47,27 +47,37 @@ bool SpecialStatements(const std::string &sql, Connection *connection) {
 bool open(const std::string &directory, const std::string &db_name,
           const std::string &db_username, const std::string &db_password,
           Connection *connection) {
+  // initialize path_ in Connection struct with &directory (path to db)
   connection->Initialize(directory);
+  // call SqlEagerExecutor::Initialize, running CREATE DATABASE db_name and USE db_name 
+  // open(), pelton.cc -> Initialize(), shards/state.cc -> Initialize(), eager_executor.cc
   connection->GetSharderState()->Initialize(db_name, db_username, db_password);
+  // load database from disk if directory contains it
   connection->Load();
   return true;
 }
 
 absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
-  // Trim statement.
+  // Trim statement, removing whitespace
   Trim(sql);
+  // print sql statements if echo is set to true
   if (echo) {
     std::cout << sql << std::endl;
   }
 
-  // If special statement, handle it separately.
+  // If special statement to turn echo on, don't execute sql, just print query
+  // returning empty result
   if (SpecialStatements(sql, connection)) {
     return SqlResult(true);
   }
 
   // Parse and rewrite statement.
+  // getting sharder and dataflow state to pass to Shard() so it can update
+  // those fields as it parses/rewrites the input query sql
   shards::SharderState *sstate = connection->GetSharderState();
   dataflow::DataFlowState *dstate = connection->GetDataFlowState();
+  // Parse sql statement via ANTLR, categorizing as CREATE, INSERT, UPDATE,
+  // SELECT, DELETE, CREATE_VIEW, CREATE_INDEX, or GDPR
   return shards::sqlengine::Shard(sql, sstate, dstate);
 }
 

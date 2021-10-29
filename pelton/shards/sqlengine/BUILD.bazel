@@ -39,6 +39,7 @@ cc_library(
     ],
     hdrs = [
         "create.h",
+        "index.h",
     ],
     deps = [
         "//pelton/dataflow:dstate",

@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "pelton/shards/sqlengine/index.h"
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "pelton/shards/sqlengine/util.h"
@@ -143,26 +144,35 @@ absl::StatusOr<std::list<ShardingInformation>> ShardTable(
   std::list<ShardingInformation> implicit_owners;
   std::unordered_map<ColumnName, ColumnIndex> index_map;
 
+  // get table name from ast representation of sql statement
   const std::string &table_name = stmt.table_name();
   // Check column definitions for inlined foreign key constraints.
   const auto &columns = stmt.GetColumns();
   for (size_t index = 0; index < columns.size(); index++) {
     // Record index of column for later constraint processing.
     const std::string &column_name = columns[index].column_name();
+    // map col name to its index in the table (ascending order)
     index_map.insert({column_name, index});
     // Find foreign key constraint (if exists).
+    // check if column starts with OWNER_ (has an owner annotation)
     bool explicit_owner = absl::StartsWith(column_name, "OWNER_");
+     // check if column has a foreign key constraint
     const sqlast::ColumnConstraint *fk_constraint = nullptr;
+    // loop through all columns, getting their constraints from ast
     for (const auto &constraint : columns[index].GetConstraints()) {
+      // if type of constraint is a foreign key, assign value to fk_constraint
       if (constraint.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
         fk_constraint = &constraint;
         break;
       }
     }
 
-    // Determine whether and how to shard by this column.
+    // Use fk_constraint and owner annotation (explicit_owner) 
+    // to determine whether and how to shard by this column.
     if (fk_constraint != nullptr) {
       // We have a foreign key constraint, check if we should shard by it.
+      // pass ShouldShardBy the fk_constraint (linking to the other, foreign table,
+      // and the current table state. Assign return to shard_kind
       ASSIGN_OR_RETURN(std::optional<ShardKind> shard_kind,
                        ShouldShardBy(*fk_constraint, state));
       if (!shard_kind.has_value() && explicit_owner) {
@@ -202,7 +212,52 @@ absl::StatusOr<std::list<ShardingInformation>> ShardTable(
   }
   return implicit_owners;
 }
+// absl::StatusOr<std::list<ShardingInformation>> IndexAccessor(
+void IndexAccessor(
+    const sqlast::CreateTable &stmt, SharderState &state, dataflow::DataFlowState &dataflow_state) {
+  // Result is empty by default.
 
+  // get table name from ast representation of sql statement
+  const std::string &table_name = stmt.table_name();
+  // Check column definitions for inlined foreign key constraints.
+  const auto &columns = stmt.GetColumns();
+  for (size_t index = 0; index < columns.size(); index++) {
+    // Record index of column for later constraint processing.
+    const std::string &column_name = columns[index].column_name();
+   // check if column starts with ACCESSOR_ (has an accessor annotation)
+    bool explicit_accessor = absl::StartsWith(column_name, "ACCESSOR_"); 
+    // make sure std::out is flushed (or use LOG() << ,,.)
+    std::cout << "Column name: " << column_name << std::endl;
+    std::cout << "ACCESSOR BOOL: " << explicit_accessor << std::endl;
+
+    if (explicit_accessor){
+      std::cout << "We have found an accessor: " << column_name << std::endl;
+      // create reference index (flow)
+
+      // CreateIndex(column_name, index);
+      // state->CreateIndex(shard_kind, stmnt.get_table_name(), column_name, &shard_by,
+                  //  flow_name, create_index_stmt, unique )
+      sqlast::CreateIndex create_index_stmt{"ref_accessor", table_name, column_name};          
+      std::cout << "Starting CreateIndex: " << std::endl;
+      pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, &state, &dataflow_state);
+
+      // can print the index with a SELECT * FROM __ stmt?
+
+      // create reference index. index.h has CreateIndex function in it
+      // give it what is the key, what is the value, is the index unique or not
+      // CreateIndex(access_column (doc) key, owner_by_value (patient), not unique (false))
+
+      // in gdpr get, look up all the indices that are reference indices. reference_
+      // get all of those, loop over their data (loop over the part of index that match our doctor)
+      // (loop over our special reference tables and construct the ref table)
+
+      // old approach
+      // create ref_table (check that it was created in the db) // or just create index
+      // sharder_state, add map of <shard to reference_tables>
+    }
+  }
+  std::cout << "finished!" << std::endl;
+  }
 // Determine what should be done about a single foreign key in some
 // sharded table.
 absl::StatusOr<ForeignKeyType> ShardForeignKey(
@@ -294,14 +349,19 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
                                      dataflow::DataFlowState *dataflow_state) {
   perf::Start("Create");
 
+  // extract table_name from the parsed sqlast CreateTable statement
   const std::string &table_name = stmt.table_name();
+  // if table already exists, raise error
   if (state->Exists(table_name)) {
     return absl::InvalidArgumentError("Table already exists!");
   }
 
   // Determine if this table is special: maybe it has PII fields, or maybe it
   // is linked to an existing shard via a foreign key.
+
+  // check if column name starts with PII_
   bool has_pii = HasPII(stmt);
+  // assign return value of ShardTable(..) to sharding_information
   ASSIGN_OR_RETURN(std::list<ShardingInformation> sharding_information,
                    ShardTable(stmt, *state));
   for (auto &info : sharding_information) {
@@ -351,6 +411,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     // Has pii and linked to a shard is a logical schema error.
     return absl::UnimplementedError("Sharded Table cannot have PII fields!");
   }
+  IndexAccessor(stmt, *state, *dataflow_state);
 
   state->AddSchema(table_name, stmt);
   dataflow_state->AddTableSchema(stmt);

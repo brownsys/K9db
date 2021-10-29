@@ -29,11 +29,11 @@ CREATE TABLE address_patients ( \
 CREATE TABLE chat ( \
   id int, \
   OWNER_patient_id int, \
-  doctor_id int, \
+  ACCESSOR_doctor_id int, \
   message text, \
   PRIMARY KEY(id), \
   FOREIGN KEY (OWNER_patient_id) REFERENCES patients(id), \
-  FOREIGN KEY (doctor_id) REFERENCES doctors(id) \
+  FOREIGN KEY (ACCESSOR_doctor_id) REFERENCES doctors(id) \
 );
 
 INSERT INTO doctors VALUES (1, 'Alice');
