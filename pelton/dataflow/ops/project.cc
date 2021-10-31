@@ -1,12 +1,11 @@
 #include "pelton/dataflow/ops/project.h"
 
 #include <algorithm>
-#include <memory>
 #include <tuple>
 #include <utility>
 
 #include "glog/logging.h"
-#include "pelton/dataflow/record.h"
+#include "pelton/dataflow/schema.h"
 #include "pelton/sqlast/ast.h"
 
 #define HANDLE_NULL_MACRO_COLUMN(col, other_col, OP)            \
@@ -360,12 +359,8 @@ std::vector<Record> ProjectOperator::Process(NodeIndex source,
   return output;
 }
 
-std::shared_ptr<Operator> ProjectOperator::Clone() const {
-  auto clone = std::make_shared<ProjectOperator>();
-  clone->children_ = this->children_;
-  clone->parents_ = this->parents_;
-  clone->input_schemas_ = this->input_schemas_;
-  clone->output_schema_ = this->output_schema_;
+std::unique_ptr<Operator> ProjectOperator::Clone() const {
+  auto clone = std::make_unique<ProjectOperator>();
   clone->projections_ = this->projections_;
   return clone;
 }

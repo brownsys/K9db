@@ -10,8 +10,8 @@
 #include <vector>
 
 #include "pelton/dataflow/ops/aggregate_enum.h"
+#include "pelton/dataflow/ops/equijoin_enum.h"
 #include "pelton/dataflow/ops/filter_enum.h"
-#include "pelton/dataflow/ops/join_enum.h"
 #include "pelton/dataflow/ops/project_enum.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast_schema_enums.h"

@@ -1,13 +1,11 @@
 #include <vector>
 
 #include "benchmark/benchmark.h"
-#include "pelton/dataflow/key.h"
 #include "pelton/dataflow/ops/benchmark_utils.h"
 #include "pelton/dataflow/ops/filter.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
-#include "pelton/sqlast/ast.h"
 #include "pelton/util/ints.h"
 
 namespace pelton {
@@ -19,11 +17,16 @@ static void FilterPasses(benchmark::State &state) {
   FilterOperator filter;
   filter.AddOperation(5_u, 0, FilterOperator::Operation::LESS_THAN);
 
+  // Generator function: generates batches of records for benchmarking.
+  RecordGenFunc gen = [schema] {
+    std::vector<Record> records;
+    records.emplace_back(schema, true, 4_u, 5_u);
+    return records;
+  };
+
   size_t processed = 0;
   for (auto _ : state) {
-    std::vector<Record> rs;
-    rs.emplace_back(schema, true, 4_u, 5_u);
-    filter.Process(UNDEFINED_NODE_INDEX, std::move(rs));
+    ProcessBenchmark(&filter, UNDEFINED_NODE_INDEX, gen);
     processed++;
   }
   state.SetItemsProcessed(processed);
@@ -35,11 +38,16 @@ static void FilterDiscards(benchmark::State &state) {
   FilterOperator filter;
   filter.AddOperation(5_u, 0, FilterOperator::Operation::LESS_THAN);
 
+  // Generator function: generates batches of records for benchmarking.
+  RecordGenFunc gen = [schema] {
+    std::vector<Record> records;
+    records.emplace_back(schema, true, 6_u, 5_u);
+    return records;
+  };
+
   size_t processed = 0;
   for (auto _ : state) {
-    std::vector<Record> rs;
-    rs.emplace_back(schema, true, 6_u, 5_u);
-    filter.Process(UNDEFINED_NODE_INDEX, std::move(rs));
+    ProcessBenchmark(&filter, UNDEFINED_NODE_INDEX, gen);
     processed++;
   }
   state.SetItemsProcessed(processed);

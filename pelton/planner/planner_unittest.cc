@@ -40,7 +40,7 @@ inline void EXPECT_EQ_ORDER(dataflow::GenericIterable<T> &&l,
 }
 
 // Expects that a matview and vector are equal (as multi-sets).
-inline void EXPECT_EQ_MSET(std::shared_ptr<dataflow::MatViewOperator> output,
+inline void EXPECT_EQ_MSET(dataflow::MatViewOperator *output,
                            const std::vector<dataflow::Record> &r) {
   std::vector<dataflow::Record> tmp;
   for (const auto &key : output->Keys()) {
@@ -62,7 +62,7 @@ inline void EXPECT_EQ_MSET(std::shared_ptr<dataflow::MatViewOperator> output,
 }
 
 inline void EXPECT_EQ_MSET(const dataflow::Key &key,
-                           std::shared_ptr<dataflow::MatViewOperator> output,
+                           dataflow::MatViewOperator *output,
                            const std::vector<dataflow::Record> &r) {
   std::vector<dataflow::Record> tmp;
   for (const auto &record : output->Lookup(key)) {
@@ -111,14 +111,13 @@ TEST(PlannerTest, SimpleProject) {
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("test_table").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::FILTER);
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::PROJECT);
   EXPECT_EQ(graph->GetNode(3)->type(), dataflow::Operator::Type::MAT_VIEW);
 
   // Get project operator for performing deep schema checks
-  auto projectOp =
-      std::dynamic_pointer_cast<dataflow::ProjectOperator>(graph->GetNode(2));
+  auto projectOp = static_cast<dataflow::ProjectOperator *>(graph->GetNode(2));
   std::vector<dataflow::Record> expected_records;
   expected_records.emplace_back(projectOp->output_schema(), true, 20_s);
 
@@ -154,13 +153,12 @@ TEST(PlannerTest, SimpleProjectLiteral) {
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("test_table").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::MAT_VIEW);
 
   // Get project operator for performing deep schema checks
-  auto projectOp =
-      std::dynamic_pointer_cast<dataflow::ProjectOperator>(graph->GetNode(1));
+  auto projectOp = static_cast<dataflow::ProjectOperator *>(graph->GetNode(1));
 
   // Try to process some records through flow.
   std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
@@ -171,7 +169,7 @@ TEST(PlannerTest, SimpleProjectLiteral) {
   graph->Process("test_table", std::move(records));
 
   // Look at flow output.
-  std::shared_ptr<dataflow::MatViewOperator> output = graph->outputs().at(0);
+  dataflow::MatViewOperator *output = graph->outputs().at(0);
   EXPECT_EQ(projectOp->output_schema().column_names(),
             std::vector<std::string>{"one"});
   EXPECT_EQ(projectOp->output_schema().column_types(),
@@ -203,13 +201,12 @@ TEST(PlannerTest, ProjectArithmeticRightLiteral) {
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("test_table").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::MAT_VIEW);
 
   // Get project operator for performing deep schema checks
-  auto projectOp =
-      std::dynamic_pointer_cast<dataflow::ProjectOperator>(graph->GetNode(1));
+  auto projectOp = static_cast<dataflow::ProjectOperator *>(graph->GetNode(1));
 
   // Try to process some records through flow.
   std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
@@ -252,13 +249,12 @@ TEST(PlannerTest, ProjectArithmeticRightColumn) {
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("test_table").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::MAT_VIEW);
 
   // Get project operator for performing deep schema checks
-  auto projectOp =
-      std::dynamic_pointer_cast<dataflow::ProjectOperator>(graph->GetNode(1));
+  auto projectOp = static_cast<dataflow::ProjectOperator *>(graph->GetNode(1));
 
   // Try to process some records through flow.
   std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
@@ -303,14 +299,14 @@ TEST(PlannerTest, SimpleAggregate) {
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("test_table").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::AGGREGATE);
   EXPECT_EQ(graph->GetNode(3)->type(), dataflow::Operator::Type::MAT_VIEW);
 
   // Get project operator for performing deep schema checks
   auto aggregateOp =
-      std::dynamic_pointer_cast<dataflow::AggregateOperator>(graph->GetNode(2));
+      static_cast<dataflow::AggregateOperator *>(graph->GetNode(2));
 
   // Try to process some records through flow.
   std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
@@ -357,7 +353,7 @@ TEST(PlannerTest, SimpleFilter) {
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("test_table").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::FILTER);
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::MAT_VIEW);
 
@@ -370,7 +366,7 @@ TEST(PlannerTest, SimpleFilter) {
   graph->Process("test_table", CopyVec(records));
 
   // Look at flow output.
-  std::shared_ptr<dataflow::MatViewOperator> output = graph->outputs().at(0);
+  dataflow::MatViewOperator *output = graph->outputs().at(0);
   EXPECT_EQ(output->count(), 1);
   EXPECT_EQ(output->output_schema(), schema);
   for (const auto &key : output->Keys()) {
@@ -400,7 +396,7 @@ TEST(PlannerTest, SingleConditionFilter) {
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("test_table").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::FILTER);
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::MAT_VIEW);
 
@@ -444,7 +440,7 @@ TEST(PlannerTest, FilterSingleORCondition) {
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("test_table").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::FILTER);
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::FILTER);
   EXPECT_EQ(graph->GetNode(3)->type(), dataflow::Operator::Type::UNION);
@@ -461,7 +457,7 @@ TEST(PlannerTest, FilterSingleORCondition) {
   graph->Process("test_table", CopyVec(records));
 
   // Look at flow output.
-  std::shared_ptr<dataflow::MatViewOperator> output = graph->outputs().at(0);
+  dataflow::MatViewOperator *output = graph->outputs().at(0);
   int counter = 0;
   for (const auto &key : output->Keys()) {
     for (const auto &record : output->Lookup(key)) {
@@ -491,7 +487,7 @@ TEST(PlannerTest, FilterSingleANDCondition) {
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("test_table").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::FILTER);
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::MAT_VIEW);
 
@@ -536,7 +532,7 @@ TEST(PlannerTest, FilterNestedORCondition) {
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("test_table").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::FILTER);
   EXPECT_EQ(graph->GetNode(3)->type(), dataflow::Operator::Type::FILTER);
@@ -597,7 +593,7 @@ TEST(PlannerTest, FilterNestedANDCondition) {
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("test_table").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::FILTER);
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::FILTER);
   EXPECT_EQ(graph->GetNode(3)->type(), dataflow::Operator::Type::UNION);
@@ -642,7 +638,7 @@ TEST(PlannerTest, FilterColumnComparison) {
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("test_table").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::FILTER);
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::MAT_VIEW);
 
@@ -684,7 +680,7 @@ TEST(PlannerTest, FilterArithmeticCondition) {
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("test_table").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::FILTER);
   EXPECT_EQ(graph->GetNode(3)->type(), dataflow::Operator::Type::PROJECT);
@@ -700,7 +696,7 @@ TEST(PlannerTest, FilterArithmeticCondition) {
 
   // Get project operators added by filter and perform deep schema checks.
   auto projectOpBefore =
-      std::dynamic_pointer_cast<dataflow::ProjectOperator>(graph->GetNode(1));
+      static_cast<dataflow::ProjectOperator *>(graph->GetNode(1));
   EXPECT_EQ(
       projectOpBefore->output_schema().column_names(),
       (std::vector<std::string>{"Col1", "Col2", "Col3", "_PELTON_TMP_4"}));
@@ -711,7 +707,7 @@ TEST(PlannerTest, FilterArithmeticCondition) {
             std::vector<dataflow::ColumnID>{0});
 
   auto projectOpAfter =
-      std::dynamic_pointer_cast<dataflow::ProjectOperator>(graph->GetNode(3));
+      static_cast<dataflow::ProjectOperator *>(graph->GetNode(3));
   EXPECT_EQ(projectOpAfter->output_schema().column_names(),
             schema.column_names());
   EXPECT_EQ(projectOpAfter->output_schema().column_types(),
@@ -736,7 +732,7 @@ TEST(PlannerTest, FilterArithmeticCondition) {
   expected.emplace_back(output_schema, true, 30_s, std::move(str5), 30_u);
 
   // Look at flow output.
-  std::shared_ptr<dataflow::MatViewOperator> output = graph->outputs().at(0);
+  dataflow::MatViewOperator *output = graph->outputs().at(0);
   EXPECT_EQ_MSET(graph->outputs().at(0), expected);
 }
 
@@ -761,7 +757,7 @@ TEST(PlannerTest, FilterArithmeticConditionTwoColumns) {
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("test_table").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::FILTER);
   EXPECT_EQ(graph->GetNode(3)->type(), dataflow::Operator::Type::PROJECT);
@@ -777,7 +773,7 @@ TEST(PlannerTest, FilterArithmeticConditionTwoColumns) {
 
   // Get project operators added by filter and perform deep schema checks.
   auto projectOpBefore =
-      std::dynamic_pointer_cast<dataflow::ProjectOperator>(graph->GetNode(1));
+      static_cast<dataflow::ProjectOperator *>(graph->GetNode(1));
   EXPECT_EQ(
       projectOpBefore->output_schema().column_names(),
       (std::vector<std::string>{"Col1", "Col2", "Col3", "_PELTON_TMP_4"}));
@@ -788,7 +784,7 @@ TEST(PlannerTest, FilterArithmeticConditionTwoColumns) {
             std::vector<dataflow::ColumnID>{0});
 
   auto projectOpAfter =
-      std::dynamic_pointer_cast<dataflow::ProjectOperator>(graph->GetNode(3));
+      static_cast<dataflow::ProjectOperator *>(graph->GetNode(3));
   EXPECT_EQ(projectOpAfter->output_schema().column_names(),
             schema.column_names());
   EXPECT_EQ(projectOpAfter->output_schema().column_types(),
@@ -813,7 +809,7 @@ TEST(PlannerTest, FilterArithmeticConditionTwoColumns) {
   expected.emplace_back(output_schema, true, 30_u, std::move(str5), 25_u);
 
   // Look at flow output.
-  std::shared_ptr<dataflow::MatViewOperator> matview = graph->outputs().at(0);
+  dataflow::MatViewOperator *matview = graph->outputs().at(0);
   EXPECT_EQ_ORDER(matview->Lookup(dataflow::Key(0)), expected);
 }
 
@@ -838,13 +834,13 @@ TEST(PlannerTest, UniqueSecondaryIndexFlow) {
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("test_table").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::MAT_VIEW);
-  EXPECT_EQ(graph->GetNode(2).get(), graph->outputs().at(0).get());
+  EXPECT_EQ(graph->GetNode(2), graph->outputs().at(0));
 
   // Materialized View.
-  std::shared_ptr<dataflow::MatViewOperator> matview = graph->outputs().at(0);
+  dataflow::MatViewOperator *matview = graph->outputs().at(0);
   EXPECT_EQ(matview->output_schema().column_names(),
             (std::vector<std::string>{"IndexCol", "ShardByCol"}));
   EXPECT_EQ(matview->output_schema().column_types(),
@@ -915,14 +911,14 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
 
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("test_table").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::AGGREGATE);
   EXPECT_EQ(graph->GetNode(3)->type(), dataflow::Operator::Type::MAT_VIEW);
-  EXPECT_EQ(graph->GetNode(3).get(), graph->outputs().at(0).get());
+  EXPECT_EQ(graph->GetNode(3), graph->outputs().at(0));
 
   // Materialized View.
-  std::shared_ptr<dataflow::MatViewOperator> matview = graph->outputs().at(0);
+  dataflow::MatViewOperator *matview = graph->outputs().at(0);
   EXPECT_EQ(matview->output_schema().column_names(),
             (std::vector<std::string>{"I", "S", "Count"}));
   EXPECT_EQ(matview->output_schema().column_types(),
@@ -1030,20 +1026,20 @@ TEST(PlannerTest, ComplexQueryWithKeys) {
   EXPECT_EQ(graph->inputs().at("students")->input_name(), "students");
   EXPECT_EQ(graph->inputs().at("assignments")->input_name(), "assignments");
   EXPECT_EQ(graph->inputs().at("submissions")->input_name(), "submissions");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("submissions").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("submissions"));
   EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
-  EXPECT_EQ(graph->GetNode(2).get(), graph->inputs().at("students").get());
+  EXPECT_EQ(graph->GetNode(2), graph->inputs().at("students"));
   EXPECT_EQ(graph->GetNode(3)->type(), dataflow::Operator::Type::EQUIJOIN);
   EXPECT_EQ(graph->GetNode(4)->type(), dataflow::Operator::Type::PROJECT);
-  EXPECT_EQ(graph->GetNode(5).get(), graph->inputs().at("assignments").get());
+  EXPECT_EQ(graph->GetNode(5), graph->inputs().at("assignments"));
   EXPECT_EQ(graph->GetNode(6)->type(), dataflow::Operator::Type::PROJECT);
   EXPECT_EQ(graph->GetNode(7)->type(), dataflow::Operator::Type::EQUIJOIN);
   EXPECT_EQ(graph->GetNode(8)->type(), dataflow::Operator::Type::PROJECT);
   EXPECT_EQ(graph->GetNode(9)->type(), dataflow::Operator::Type::AGGREGATE);
-  EXPECT_EQ(graph->GetNode(10).get(), graph->outputs().at(0).get());
+  EXPECT_EQ(graph->GetNode(10), graph->outputs().at(0));
 
   // Materialized View.
-  std::shared_ptr<dataflow::MatViewOperator> matview = graph->outputs().at(0);
+  dataflow::MatViewOperator *matview = graph->outputs().at(0);
   EXPECT_EQ(matview->output_schema().column_names(),
             (std::vector<std::string>{"aid", "NAME", "sid", "Count"}));
   EXPECT_EQ(
@@ -1133,13 +1129,13 @@ TEST(PlannerTest, BasicLeftJoin) {
   // Check that the graph is what we expect!
   EXPECT_EQ(graph->inputs().at("students")->input_name(), "students");
   EXPECT_EQ(graph->inputs().at("submissions")->input_name(), "submissions");
-  EXPECT_EQ(graph->GetNode(0).get(), graph->inputs().at("submissions").get());
-  EXPECT_EQ(graph->GetNode(1).get(), graph->inputs().at("students").get());
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("submissions"));
+  EXPECT_EQ(graph->GetNode(1), graph->inputs().at("students"));
   EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::EQUIJOIN);
-  EXPECT_EQ(graph->GetNode(3).get(), graph->outputs().at(0).get());
+  EXPECT_EQ(graph->GetNode(3), graph->outputs().at(0));
 
   // Materialized View.
-  std::shared_ptr<dataflow::MatViewOperator> matview = graph->outputs().at(0);
+  dataflow::MatViewOperator *matview = graph->outputs().at(0);
   EXPECT_EQ(matview->output_schema().column_names(),
             (std::vector<std::string>{"ID", "STUDENT_ID", "ASSIGNMENT_ID", "TS",
                                       "NAME"}));

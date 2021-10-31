@@ -4,8 +4,6 @@
 #include <utility>
 
 #include "glog/logging.h"
-#include "pelton/dataflow/graph.h"
-#include "pelton/dataflow/record.h"
 #include "pelton/sqlast/ast.h"
 
 // The value in v must be of the same type as the corresponding one in the
@@ -146,12 +144,8 @@ bool FilterOperator::Accept(const Record &record) const {
   return true;
 }
 
-std::shared_ptr<Operator> FilterOperator::Clone() const {
-  auto clone = std::make_shared<FilterOperator>();
-  clone->children_ = this->children_;
-  clone->parents_ = this->parents_;
-  clone->input_schemas_ = this->input_schemas_;
-  clone->output_schema_ = this->output_schema_;
+std::unique_ptr<Operator> FilterOperator::Clone() const {
+  auto clone = std::make_unique<FilterOperator>();
   clone->ops_ = this->ops_;
   return clone;
 }

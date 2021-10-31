@@ -124,8 +124,7 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
   }
 
   // Materialized view that we want to look up in.
-  const std::shared_ptr<dataflow::MatViewOperator> &matview =
-      flow.outputs().at(0);
+  dataflow::MatViewOperator *matview = flow.outputs().at(0);
 
   // Construct look up key.
   dataflow::Key lookup_key{1};

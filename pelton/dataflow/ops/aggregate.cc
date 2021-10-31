@@ -1,11 +1,8 @@
 #include "pelton/dataflow/ops/aggregate.h"
 
-#include <memory>
-#include <tuple>
 #include <utility>
 
 #include "glog/logging.h"
-#include "pelton/dataflow/record.h"
 #include "pelton/sqlast/ast.h"
 
 #define SUMFUNC_UPDATE_AGGREGATE_MACRO(OP)                                 \
@@ -297,15 +294,9 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
   return output;
 }
 
-std::shared_ptr<Operator> AggregateOperator::Clone() const {
-  auto clone = std::make_shared<AggregateOperator>(
+std::unique_ptr<Operator> AggregateOperator::Clone() const {
+  return std::make_unique<AggregateOperator>(
       this->group_columns_, this->aggregate_function_, this->aggregate_column_);
-  clone->children_ = this->children_;
-  clone->parents_ = this->parents_;
-  clone->input_schemas_ = this->input_schemas_;
-  clone->output_schema_ = this->output_schema_;
-  clone->aggregate_schema_ = this->aggregate_schema_;
-  return clone;
 }
 
 }  // namespace dataflow

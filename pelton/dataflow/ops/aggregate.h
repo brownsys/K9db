@@ -36,12 +36,12 @@ class AggregateOperator : public Operator {
         aggregate_column_(aggregate_column),
         aggregate_schema_() {}
 
-  std::shared_ptr<Operator> Clone() const override;
-
   ~AggregateOperator() {
     // Ensure that schemas are not destructed first
     state_.~GroupedDataT();
   }
+
+  uint64_t SizeInMemory() const override { return this->state_.SizeInMemory(); }
 
  protected:
   std::vector<Record> Process(NodeIndex source,
@@ -49,7 +49,7 @@ class AggregateOperator : public Operator {
 
   void ComputeOutputSchema() override;
 
-  uint64_t SizeInMemory() const override { return this->state_.SizeInMemory(); }
+  std::unique_ptr<Operator> Clone() const override;
 
  private:
   UnorderedGroupedData state_;

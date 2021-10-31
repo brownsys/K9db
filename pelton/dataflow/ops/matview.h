@@ -6,21 +6,17 @@
 #include <utility>
 #include <vector>
 
+#include "glog/logging.h"
 #include "gtest/gtest_prod.h"
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/grouped_data.h"
 #include "pelton/dataflow/record.h"
+#include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 
 namespace pelton {
 namespace dataflow {
-
-#ifdef PELTON_MATVIEW_BENCHMARK  // shuts up compiler warnings
-class MatViewOperator;
-static void InitializeBenchMarkMatview(MatViewOperator *matview,
-                                       SchemaRef schema);
-#endif
 
 // Virtual parent class: this is what the rest of our system uses and interacts
 // with. Allows reading and writing into the materialized view without knowing
@@ -58,12 +54,6 @@ class MatViewOperator : public Operator {
   FRIEND_TEST(MatViewOperatorTest, EmptyKeyTest);
   FRIEND_TEST(MatViewOperatorTest, LimitTest);
   FRIEND_TEST(MatViewOperatorTest, LookupGreater);
-
-#ifdef PELTON_MATVIEW_BENCHMARK  // shuts up compiler warnings
-  // Allow matview_benchmark.cc to set input_schemas_ directly.
-  friend void InitializeBenchMarkMatview(MatViewOperator *matview,
-                                         SchemaRef schema);
-#endif
 };
 
 // Actual implementation is generic over T: the underlying GroupedDataT
@@ -148,24 +138,6 @@ class MatViewOperatorT : public MatViewOperator {
     return this->contents_.LookupGreater(key, cmp, limit, offset);
   }
 
-  // Make a clone of this node (without any data).
-  std::shared_ptr<Operator> Clone() const override {
-    std::shared_ptr<MatViewOperator> clone;
-    if constexpr (std::is_same<T, UnorderedGroupedData>::value) {
-      clone = std::make_shared<MatViewOperatorT<UnorderedGroupedData>>(
-          this->key_cols_, this->limit_, this->offset_);
-    } else if constexpr (std::is_same<T, RecordOrderedGroupedData>::value) {
-      clone = std::make_shared<MatViewOperatorT<RecordOrderedGroupedData>>(
-          this->key_cols_, this->compare_, this->limit_, this->offset_);
-    } else if constexpr (std::is_same<T, KeyOrderedGroupedData>::value) {
-      clone = std::make_shared<MatViewOperatorT<KeyOrderedGroupedData>>(
-          this->key_cols_, this->limit_, this->offset_);
-    }
-
-    this->CloneInto(clone);
-    return clone;
-  }
-
   // Debugging information
   std::string DebugString() const override {
     std::string result = Operator::DebugString();
@@ -200,6 +172,20 @@ class MatViewOperatorT : public MatViewOperator {
 
   void ComputeOutputSchema() override {
     this->output_schema_ = this->input_schemas_.at(0);
+  }
+
+  // Make a clone of this node (without any data).
+  std::unique_ptr<Operator> Clone() const override {
+    if constexpr (std::is_same<T, UnorderedGroupedData>::value) {
+      return std::make_unique<MatViewOperatorT<UnorderedGroupedData>>(
+          this->key_cols_, this->limit_, this->offset_);
+    } else if constexpr (std::is_same<T, RecordOrderedGroupedData>::value) {
+      return std::make_unique<MatViewOperatorT<RecordOrderedGroupedData>>(
+          this->key_cols_, this->compare_, this->limit_, this->offset_);
+    } else if constexpr (std::is_same<T, KeyOrderedGroupedData>::value) {
+      return std::make_unique<MatViewOperatorT<KeyOrderedGroupedData>>(
+          this->key_cols_, this->limit_, this->offset_);
+    }
   }
 
  private:

@@ -11,10 +11,10 @@ import org.bytedeco.javacpp.tools.InfoMapper;
         @Platform(
             include = {
               "pelton/dataflow/types.h",
-              "pelton/dataflow/ops/filter_enum.h",
               "pelton/dataflow/ops/aggregate_enum.h",
+              "pelton/dataflow/ops/equijoin_enum.h",
+              "pelton/dataflow/ops/filter_enum.h",
               "pelton/dataflow/ops/project_enum.h",
-              "pelton/dataflow/ops/join_enum.h",
               "pelton/sqlast/ast_schema_enums.h",
               "pelton/dataflow/generator.h"
             }),

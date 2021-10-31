@@ -8,8 +8,8 @@
 #include <utility>
 
 #include "glog/logging.h"
-#include "pelton/dataflow/graph.h"
-#include "pelton/dataflow/value.h"
+#include "pelton/dataflow/key.h"
+#include "pelton/dataflow/schema.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -49,14 +49,8 @@ inline void CopyIntoRecord(sqlast::ColumnDefinition::Type datatype,
 
 }  // namespace
 
-std::shared_ptr<Operator> EquiJoinOperator::left() const {
-  NodeIndex parent_index = this->parents_.at(0);
-  return this->partition()->GetNode(parent_index);
-}
-std::shared_ptr<Operator> EquiJoinOperator::right() const {
-  NodeIndex parent_index = this->parents_.at(1);
-  return this->partition()->GetNode(parent_index);
-}
+Operator *EquiJoinOperator::left() const { return this->parents_.at(0); }
+Operator *EquiJoinOperator::right() const { return this->parents_.at(1); }
 
 std::vector<Record> EquiJoinOperator::Process(NodeIndex source,
                                               std::vector<Record> &&records) {
@@ -216,17 +210,9 @@ void EquiJoinOperator::EmitRow(const Record &left, const Record &right,
   output->push_back(std::move(record));
 }
 
-std::shared_ptr<Operator> EquiJoinOperator::Clone() const {
-  auto clone = std::make_shared<EquiJoinOperator>(this->left_id_,
-                                                  this->right_id_, this->mode_);
-  clone->children_ = this->children_;
-  clone->parents_ = this->parents_;
-  clone->input_schemas_ = this->input_schemas_;
-  clone->output_schema_ = this->output_schema_;
-  for (const auto &null_record : this->null_records_) {
-    clone->null_records_.push_back(null_record.Copy());
-  }
-  return clone;
+std::unique_ptr<Operator> EquiJoinOperator::Clone() const {
+  return std::make_unique<EquiJoinOperator>(this->left_id_, this->right_id_,
+                                            this->mode_);
 }
 
 }  // namespace dataflow

@@ -1,4 +1,35 @@
+#define PELTON_BENCHMARK
+
+#include <string>
+#include <vector>
+
 #include "benchmark/benchmark.h"
+#include "pelton/dataflow/operator.h"
+#include "pelton/dataflow/ops/benchmark_utils.h"
+#include "pelton/dataflow/types.h"
+#include "pelton/sqlast/ast.h"
+
+// Utility function used by all benchmarks.
+namespace pelton {
+namespace dataflow {
+
+using CType = pelton::sqlast::ColumnDefinition::Type;
+
+SchemaRef MakeSchema(bool use_strings) {
+  std::vector<std::string> names = {"Col1", "Col2"};
+  CType t = use_strings ? CType::TEXT : CType::UINT;
+  std::vector<CType> types = {CType::UINT, t};
+  std::vector<ColumnID> keys = {0};
+  return SchemaFactory::Create(names, types, keys);
+}
+
+// This function is a friend of pelton::dataflow::Operator.
+void ProcessBenchmark(Operator *op, NodeIndex src, RecordGenFunc gen) {
+  op->Process(src, gen());
+}
+
+}  // namespace dataflow
+}  // namespace pelton
 
 // We want a custom main instead of using BENCHMARK_MAIN macro.
 // The BENCHMARK_MAIN macro throw an error if any command line flags passed

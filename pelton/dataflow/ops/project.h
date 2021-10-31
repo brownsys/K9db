@@ -12,7 +12,6 @@
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/project_enum.h"
 #include "pelton/dataflow/record.h"
-#include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 
 namespace pelton {
@@ -70,13 +69,13 @@ class ProjectOperator : public Operator {
     }
   }
 
-  std::shared_ptr<Operator> Clone() const override;
-
  protected:
   std::vector<Record> Process(NodeIndex source,
                               std::vector<Record> &&records) override;
 
   void ComputeOutputSchema() override;
+
+  std::unique_ptr<Operator> Clone() const override;
 
  private:
   class ProjectionOperation {

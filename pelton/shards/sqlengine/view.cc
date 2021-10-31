@@ -95,8 +95,7 @@ absl::Status ExtractConstraintsFromAnd(
 
 // Unconstrained select (no where).
 absl::StatusOr<std::vector<dataflow::Record>> SelectViewUnconstrained(
-    std::shared_ptr<dataflow::MatViewOperator> matview, int limit,
-    size_t offset) {
+    dataflow::MatViewOperator *matview, int limit, size_t offset) {
   // No where condition: we are reading everything (keys and records).
   std::vector<dataflow::Record> records;
   for (const auto &key : matview->Keys()) {
@@ -109,8 +108,8 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewUnconstrained(
 
 // Constrained with equality or related operations.
 absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
-    std::shared_ptr<dataflow::MatViewOperator> matview,
-    const sqlast::BinaryExpression *where, int limit, size_t offset) {
+    dataflow::MatViewOperator *matview, const sqlast::BinaryExpression *where,
+    int limit, size_t offset) {
   const dataflow::SchemaRef &schema = matview->output_schema();
   std::unordered_map<dataflow::ColumnID, std::vector<std::string>> constraints;
   std::vector<dataflow::Record> records;
@@ -182,8 +181,8 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
 
 // Ordered view.
 absl::StatusOr<std::vector<dataflow::Record>> SelectViewOrdered(
-    std::shared_ptr<dataflow::MatViewOperator> matview,
-    const sqlast::BinaryExpression *where, int limit, size_t offset) {
+    dataflow::MatViewOperator *matview, const sqlast::BinaryExpression *where,
+    int limit, size_t offset) {
   switch (where->type()) {
     case sqlast::Expression::Type::GREATER_THAN: {
       std::vector<dataflow::Record> records;
@@ -247,8 +246,7 @@ absl::StatusOr<sql::SqlResult> SelectView(
   } else if (flow.outputs().size() > 1) {
     return absl::InvalidArgumentError("Read from flow with several matviews");
   }
-  const std::shared_ptr<dataflow::MatViewOperator> &matview =
-      flow.outputs().at(0);
+  dataflow::MatViewOperator *matview = flow.outputs().at(0);
   const dataflow::SchemaRef &schema = matview->output_schema();
 
   std::vector<dataflow::Record> records;

@@ -92,15 +92,14 @@ cc_library(
         "operator.cc",
     ],
     hdrs = [
-        "graph.h",
         "operator.h",
+        "//pelton/dataflow/ops:benchmark_utils.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":record",
         ":schema",
         ":types",
-        "@com_github_google_benchmark//:benchmark",
     ],
 )
 
@@ -114,12 +113,12 @@ cc_library(
 )
 
 cc_library(
-    name = "graph",
+    name = "graph_partition",
     srcs = [
-        "graph.cc",
+        "graph_partition.cc",
     ],
     hdrs = [
-        "graph.h",
+        "graph_partition.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
@@ -129,6 +128,25 @@ cc_library(
         "//pelton/dataflow/ops:input",
         "//pelton/dataflow/ops:matview",
         "@glog",
+    ],
+)
+
+cc_library(
+    name = "graph",
+    srcs = [
+        "graph.cc",
+    ],
+    hdrs = [
+        "graph.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":graph_partition",
+        ":operator",
+        ":record",
+        ":types",
+        "//pelton/dataflow/ops:input",
+        "//pelton/dataflow/ops:matview",
     ],
 )
 
@@ -195,12 +213,12 @@ cc_test(
 )
 
 cc_test(
-    name = "graph-test",
+    name = "graph_partition-test",
     srcs = [
-        "graph_unittest.cc",
+        "graph_partition_unittest.cc",
     ],
     deps = [
-        ":graph",
+        ":graph_partition",
         ":record",
         ":schema",
         ":types",
@@ -218,6 +236,19 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "graph-test",
+    srcs = [
+        "graph_unittest.cc",
+    ],
+    deps = [
+        ":graph",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
+    ],
+)
+
 # Used by the planner / java side of things.
 filegroup(
     name = "generator_h",
@@ -225,8 +256,8 @@ filegroup(
         "generator.h",
         "types.h",
         "//pelton/dataflow/ops:aggregate_enum.h",
+        "//pelton/dataflow/ops:equijoin_enum.h",
         "//pelton/dataflow/ops:filter_enum.h",
-        "//pelton/dataflow/ops:join_enum.h",
         "//pelton/dataflow/ops:project_enum.h",
         "//pelton/sqlast:ast_schema_enums.h",
     ],

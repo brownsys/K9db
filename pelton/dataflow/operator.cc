@@ -3,20 +3,19 @@
 #include <utility>
 
 #include "glog/logging.h"
-#include "pelton/dataflow/graph.h"
 
 namespace pelton {
 namespace dataflow {
 
-void Operator::AddParent(std::shared_ptr<Operator> parent) {
-  this->parents_.push_back(parent->index());
+void Operator::AddParent(Operator *parent) {
+  this->parents_.push_back(parent);
   // Project operator's schema should be computed after operations have been
   // added.
   if (parent->type() == Operator::Type::PROJECT) {
     parent->ComputeOutputSchema();
   }
   this->input_schemas_.push_back(parent->output_schema());
-  parent->children_.push_back(this->index());
+  parent->children_.push_back(this);
   if (this->type() != Operator::Type::PROJECT) {
     this->ComputeOutputSchema();
   }
@@ -45,11 +44,9 @@ void Operator::BroadcastToChildren(std::vector<Record> &&records) {
       copy.push_back(r.Copy());
     }
     // Move the copy to child.
-    this->partition_->GetNode(this->children_.at(i))
-        ->ProcessAndForward(this->index_, std::move(copy));
+    this->children_.at(i)->ProcessAndForward(this->index_, std::move(copy));
   }
-  this->partition_->GetNode(this->children_.back())
-      ->ProcessAndForward(this->index_, std::move(records));
+  this->children_.back()->ProcessAndForward(this->index_, std::move(records));
 }
 
 std::string Operator::DebugString() const {
@@ -81,12 +78,12 @@ std::string Operator::DebugString() const {
       break;
   }
 
-  std::string str = "{";
+  std::string str = "";
   str += "\"operator\": \"" + type_str + "\", ";
   str += "\"id\": " + std::to_string(this->index()) + ", ";
   str += "\"children\": [";
-  for (NodeIndex child_index : this->children_) {
-    str += std::to_string(child_index) + ",";
+  for (Operator *child : this->children_) {
+    str += std::to_string(child->index()) + ",";
   }
   if (this->children_.size() > 0) {
     str.pop_back();
@@ -118,13 +115,6 @@ std::string Operator::DebugString() const {
   str.pop_back();
   str += "],\n";
   return str;
-}
-
-void Operator::CloneInto(std::shared_ptr<Operator> clone) const {
-  clone->children_ = this->children_;
-  clone->parents_ = this->parents_;
-  clone->input_schemas_ = this->input_schemas_;
-  clone->output_schema_ = this->output_schema_;
 }
 
 }  // namespace dataflow

@@ -1,11 +1,8 @@
 #include "pelton/dataflow/ops/input.h"
 
-#include <memory>
 #include <utility>
 
 #include "glog/logging.h"
-#include "pelton/dataflow/graph.h"
-#include "pelton/dataflow/record.h"
 
 namespace pelton {
 namespace dataflow {
@@ -21,11 +18,9 @@ std::vector<Record> InputOperator::Process(NodeIndex source,
   return std::move(records);
 }
 
-std::shared_ptr<Operator> InputOperator::Clone() const {
-  auto clone = std::make_shared<InputOperator>(this->input_name_,
-                                               this->input_schemas_.at(0));
-  clone->children_ = this->children_;
-  return clone;
+std::unique_ptr<Operator> InputOperator::Clone() const {
+  return std::make_unique<InputOperator>(this->input_name_,
+                                         this->input_schemas_.at(0));
 }
 
 }  // namespace dataflow

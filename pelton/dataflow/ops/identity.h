@@ -20,13 +20,13 @@ class IdentityOperator : public Operator {
 
   IdentityOperator() : Operator(Operator::Type::IDENTITY) {}
 
+ protected:
   std::vector<Record> Process(NodeIndex source,
                               std::vector<Record> &&records) override;
 
-  std::shared_ptr<Operator> Clone() const override;
-
- protected:
   void ComputeOutputSchema() override;
+
+  std::unique_ptr<Operator> Clone() const override;
 
   FRIEND_TEST(EquiJoinOperatorTest, BasicJoinTest);
   FRIEND_TEST(EquiJoinOperatorTest, BasicUnjoinableTest);

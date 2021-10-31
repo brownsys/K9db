@@ -7,20 +7,18 @@
 #include <tuple>
 #include <vector>
 
-#include "benchmark/benchmark.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
+
+#ifdef PELTON_BENCHMARK  // shuts up compiler warnings
+#include "pelton/dataflow/ops/benchmark_utils.h"
+#endif
 
 namespace pelton {
 namespace dataflow {
 
 class DataFlowGraphPartition;
-
-#ifdef PELTON_EQUIJOIN_BENCHMARK  // shuts up compiler warnings
-// NOLINTNEXTLINE
-static void JoinOneToOne(benchmark::State &state);
-#endif
 
 class Operator {
  public:
@@ -39,7 +37,7 @@ class Operator {
   Operator(const Operator &other) = delete;
   Operator &operator=(const Operator &other) = delete;
 
-  virtual ~Operator() { this->partition_ = nullptr; }
+  virtual ~Operator() {}
 
   /*!
    * Take a batch of records belonging to operator source and push it
@@ -53,15 +51,11 @@ class Operator {
   void ProcessAndForward(NodeIndex source, std::vector<Record> &&records);
 
   // Accessors (read only).
-  Type type() const { return this->type_; }
   NodeIndex index() const { return this->index_; }
-  DataFlowGraphPartition *partition() const { return partition_; }
-  const SchemaRef &output_schema() const { return this->output_schema_; }
-  const std::vector<NodeIndex> &parents() const { return this->parents_; }
+  Type type() const { return this->type_; }
 
-  // Meant to generate a clone with same operator specific information, edges,
-  // and input/output schemas.
-  virtual std::shared_ptr<Operator> Clone() const = 0;
+  const SchemaRef &output_schema() const { return this->output_schema_; }
+  const std::vector<Operator *> &parents() const { return this->parents_; }
 
   // For debugging.
   virtual std::string DebugString() const;
@@ -70,8 +64,7 @@ class Operator {
   virtual uint64_t SizeInMemory() const { return 0; }
 
  protected:
-  explicit Operator(Type type)
-      : index_(UNDEFINED_NODE_INDEX), type_(type), partition_(nullptr) {}
+  explicit Operator(Type type) : index_(UNDEFINED_NODE_INDEX), type_(type) {}
 
   /*!
    * Push a batch of records through the dataflow graph. Order within this batch
@@ -95,12 +88,17 @@ class Operator {
    */
   virtual void ComputeOutputSchema() = 0;
 
-  // Helper for clone: copies this node's configuration into the given clone.
-  void CloneInto(std::shared_ptr<Operator> clone) const;
+  // Meant to generate a clone of the same operator type and information.
+  // The generated clone does not have its parents or children set, since those
+  // likely need to be cloned as well. The cloned operator must be added to
+  // a partition with the appropriate parent(s) for it to become fully
+  // functional.
+  // This should only be used inside DtaFlowGraphPartition's Clone() function.
+  virtual std::unique_ptr<Operator> Clone() const = 0;
 
   // Edges to children and parents.
-  std::vector<NodeIndex> children_;
-  std::vector<NodeIndex> parents_;
+  std::vector<Operator *> children_;
+  std::vector<Operator *> parents_;
 
   // Input and output schemas.
   std::vector<SchemaRef> input_schemas_;
@@ -109,22 +107,17 @@ class Operator {
  private:
   // Called by DataFlowGraphPartition.
   friend class DataFlowGraphPartition;
-  void AddToPartition(DataFlowGraphPartition *partition, NodeIndex index) {
-    this->partition_ = partition;
-    this->index_ = index;
-  }
-  void AddParent(std::shared_ptr<Operator> parent);
+  void SetIndex(NodeIndex index) { this->index_ = index; }
+  void AddParent(Operator *parent);
 
   // Pass the given batch to the children operators (if any) for processing.
   void BroadcastToChildren(std::vector<Record> &&records);
 
   NodeIndex index_;
   Type type_;
-  DataFlowGraphPartition *partition_;  // The graph the operator belongs to.
 
-#ifdef PELTON_EQUIJOIN_BENCHMARK  // shuts up compiler warnings
-  // NOLINTNEXTLINE
-  friend void JoinOneToOne(benchmark::State &state);
+#ifdef PELTON_BENCHMARK  // shuts up compiler warnings
+  friend void ProcessBenchmark(Operator *op, NodeIndex src, RecordGenFunc gen);
 #endif
 };
 
