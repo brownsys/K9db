@@ -55,12 +55,12 @@ void FFIGflags(int argc, char **argv);
 
 // Initialize pelton_state in pelton.cc. Returns true if successful and false
 // otherwise.
-bool FFIInitialize(const char *db_name, const char *db_dir,
-                   const char *db_username, const char *db_password);
+bool FFIInitialize(const char *db_dir);
 
 // Open a connection for a single client. The returned struct has connected =
 // true if successful. Otherwise connected = false.
-FFIConnection FFIOpen();
+FFIConnection FFIOpen(const char *db_name, const char *db_username,
+                      const char *db_password);
 
 // Execute a DDL statement (e.g. CREATE TABLE, CREATE VIEW, CREATE INDEX).
 bool FFIExecDDL(FFIConnection *c_conn, const char *query);

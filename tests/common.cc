@@ -122,8 +122,8 @@ void InitializeDatabase(const std::string &db_name, size_t file_count,
   DropDatabase(db_name);
 
   // Create and open a connection to pelton.
-  pelton::initialize("", db_name, db_username, db_password);
-  pelton::open(&connection);
+  pelton::initialize("");
+  pelton::open(&connection, db_name, db_username, db_password);
   // connection = new pelton::Connection();
   // CHECK(pelton::open("", db_name, db_username, db_password, connection));
 

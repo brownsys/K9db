@@ -40,7 +40,7 @@ void DropDatabase() {
 }
 
 TEST(PROXY, OPEN_TEST) {
-  c_conn = FFIOpen();
+  c_conn = FFIOpen(DB_NAME, db_username->c_str(), db_password->c_str());
   EXPECT_TRUE(c_conn.connected) << "Opening connection failed!";
 }
 
@@ -142,7 +142,7 @@ int main(int argc, char **argv) {
 
   // Initialize Pelton State
   EXPECT_TRUE(
-      FFIInitialize("", DB_NAME, db_username->c_str(), db_password->c_str()))
+      FFIInitialize(""))
       << "Opening global connection failed!";
 
   // Run tests.

@@ -98,8 +98,8 @@ int main(int argc, char **argv) {
   std::chrono::time_point<std::chrono::high_resolution_clock> end_time;
   try {
     pelton::Connection connection;
-    pelton::initialize(dir, db_name, db_username, db_password);
-    pelton::open(&connection);
+    pelton::initialize(dir);
+    pelton::open(&connection, db_name, db_username, db_password);
 
     std::cout << "SQL Sharder" << std::endl;
     std::cout << "DB directory: " << dir << std::endl;

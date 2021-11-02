@@ -72,7 +72,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         if q_string.starts_with("SET echo")
             || q_string.starts_with("DROP")
             || q_string.starts_with("ALTER")
-            || q_string.starts_with("GDPR")
+            || q_string.starts_with("GDPR GET")
         {
             debug!(self.log, "Rust Proxy: Unsupported query type");
             return results.completed(0, 0);
@@ -102,16 +102,20 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         } else if q_string.starts_with("UPDATE")
             || q_string.starts_with("DELETE")
             || q_string.starts_with("INSERT")
+            || q_string.starts_with("GDPR FORGET")
         {
             let update_response = exec_update_ffi(&mut self.rust_conn, q_string);
 
             // stop measuring runtime and add to total time for this connection
             self.runtime = self.runtime + start.elapsed();
 
+            
             if update_response != -1 {
                 results.completed(update_response as u64, 0)
             } else {
-                error!(self.log, "Rust Proxy: Failed to execute UPDATE");
+                // mysql_srv not synched. Single connection to mariadb? 
+                debug!(self.log, "ROW COUNT is {:?}", update_response);
+                error!(self.log, "Rust Proxy: Failed to execute UPDATE: {:?}", q_string);
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
         } else if q_string.starts_with("SELECT") || q_string.starts_with("GDPR GET") {
@@ -221,7 +225,7 @@ fn main() {
     // pass converted arguments to C-FFI
     unsafe { FFIGflags(c_argc, c_argv.as_mut_ptr()) };
 
-    let global_open = initialize_ffi("", "pelton", "root", "password");
+    let global_open = initialize_ffi("");
     info!(
         log,
         "Rust Proxy: opening connection globally: {:?}", global_open
@@ -267,7 +271,7 @@ fn main() {
                     "Rust Proxy: Successfully connected to mysql proxy\nStream and address are: {:?}",
                     stream
                 );
-                let rust_conn = open_ffi();
+                let rust_conn = open_ffi("pelton", "root", "password");
                 info!(
                     log_client,
                     "Rust Proxy: connection status is: {:?}", rust_conn.connected

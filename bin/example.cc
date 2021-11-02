@@ -149,8 +149,8 @@ int main(int argc, char **argv) {
 
   // Open connection to sharder.
   pelton::Connection connection;
-  pelton::initialize("", "exampledb", db_username, db_password);
-  pelton::open(&connection);
+  pelton::initialize("");
+  pelton::open(&connection, "exampledb", db_username, db_password);
   // CHECK(pelton::exec(&connection, "SET echo;").ok());
 
   // Create all the tables.

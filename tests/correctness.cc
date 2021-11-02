@@ -171,8 +171,8 @@ void RunTest(const std::string &schema_file, const std::string &query_file,
 
   // Open connection to sharder.
   pelton::Connection connection;
-  pelton::initialize("", DB_NAME, *db_username, *db_password);
-  pelton::open(&connection);
+  pelton::initialize("");
+  pelton::open(&connection, DB_NAME, *db_username, *db_password);
   // CHECK(pelton::exec(&connection, "SET echo;").ok());
 
   // Create all the tables.

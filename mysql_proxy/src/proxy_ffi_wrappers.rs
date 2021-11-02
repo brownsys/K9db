@@ -17,10 +17,16 @@ impl Drop for FFIResult {
     }
 }
 
-pub fn initialize_ffi(dir: &str, db: &str, user: &str, pass: &str) -> bool {
+pub fn initialize_ffi(dir: &str) -> bool {
     // convert &str to char* to pass query to C-wrapper
     let dir = CString::new(dir).unwrap();
     let dir: *mut c_char = dir.as_ptr() as *mut i8;
+
+    let conn = unsafe { FFIInitialize(dir) };
+    return conn;
+}
+
+pub fn open_ffi(db: &str, user: &str, pass: &str) -> FFIConnection {
     let db = CString::new(db).unwrap();
     let db: *mut c_char = db.as_ptr() as *mut i8;
     let user = CString::new(user).unwrap();
@@ -28,12 +34,7 @@ pub fn initialize_ffi(dir: &str, db: &str, user: &str, pass: &str) -> bool {
     let pass = CString::new(pass).unwrap();
     let pass: *mut c_char = pass.as_ptr() as *mut i8;
 
-    let conn = unsafe { FFIInitialize(dir, db, user, pass) };
-    return conn;
-}
-
-pub fn open_ffi() -> FFIConnection {
-    let conn = unsafe { FFIOpen() };
+    let conn = unsafe { FFIOpen(db, user, pass) };
     return conn;
 }
 
