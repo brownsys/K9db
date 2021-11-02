@@ -105,9 +105,11 @@ sqlast::Insert InsertRecord(const dataflow::Record &record,
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state) {
+                                     Connection *connection) {
   perf::Start("Update");
+  dataflow::DataFlowState *dataflow_state =
+      connection->pelton_state->GetDataFlowState();
+  shards::SharderState *state = connection->pelton_state->GetSharderState();
 
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
@@ -119,7 +121,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
   size_t old_records_size = 0;
   if (update_flows) {
     MOVE_OR_RETURN(sql::SqlResult domain_result,
-                   select::Shard(stmt.SelectDomain(), state, dataflow_state));
+                   select::Shard(stmt.SelectDomain(), connection));
     records = domain_result.NextResultSet()->Vectorize();
     old_records_size = records.size();
     CHECK_STATUS(UpdateRecords(&records, stmt, state->GetSchema(table_name)));
@@ -127,31 +129,28 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
 
   sql::SqlResult result = sql::SqlResult(0);
 
-  auto &exec = state->executor();
+  auto &exec = connection->executor_;
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
     result = exec.ExecuteDefault(&stmt);
-
   } else {  // is_sharded == true
     // Case 2: table is sharded.
     if (ModifiesShardBy(stmt, state)) {
       // The update statement might move the rows from one shard to another.
       // We can only perform this update by splitting it into a DELETE-INSERT
       // pair.
-      MOVE_OR_RETURN(result, delete_::Shard(stmt.DeleteDomain(), state,
-                                            dataflow_state, false));
+      MOVE_OR_RETURN(result,
+                     delete_::Shard(stmt.DeleteDomain(), connection, false));
 
       // Insert updated records.
       for (size_t i = old_records_size; i < records.size(); i++) {
         sqlast::Insert insert_stmt =
             InsertRecord(records.at(i), state->GetSchema(table_name));
-        MOVE_OR_RETURN(
-            sql::SqlResult tmp,
-            insert::Shard(insert_stmt, state, dataflow_state, false));
+        MOVE_OR_RETURN(sql::SqlResult tmp,
+                       insert::Shard(insert_stmt, connection, false));
         result.Append(std::move(tmp));
       }
-
     } else {
       // The table might be sharded according to different column/owners.
       // We must update all these different duplicates.
@@ -184,7 +183,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
             // Execute statement directly against shard.
             result.Append(exec.ExecuteShard(&cloned, shard_kind, user_id));
           }
-
         } else if (update_flows) {
           // We already have the data we need to delete, we can use it to get an
           // accurate enumeration of shards to execute this one.
@@ -205,7 +203,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
           }
 
           result.Append(exec.ExecuteShards(&cloned, shard_kind, shards));
-
         } else {
           // The update statement by itself does not obviously constraint a
           // shard. Try finding the shard(s) via secondary indices.

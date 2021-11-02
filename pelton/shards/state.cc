@@ -14,13 +14,6 @@
 namespace pelton {
 namespace shards {
 
-// Initialization.
-void SharderState::Initialize(const std::string &db_name,
-                              const std::string &db_username,
-                              const std::string &db_password) {
-  this->executor_.Initialize(db_name, db_username, db_password);
-}
-
 // Schema manipulations.
 void SharderState::AddSchema(const UnshardedTableName &table_name,
                              const sqlast::CreateTable &table_schema) {

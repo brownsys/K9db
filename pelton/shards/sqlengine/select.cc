@@ -55,9 +55,11 @@ dataflow::SchemaRef ResultSchema(const sqlast::Select &stmt,
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state) {
+                                     Connection *connection) {
   perf::Start("Select");
+  dataflow::DataFlowState *dataflow_state =
+      connection->pelton_state->GetDataFlowState();
+  shards::SharderState *state = connection->pelton_state->GetSharderState();
   // Disqualifiy LIMIT and OFFSET queries.
   if (!stmt.SupportedByShards()) {
     return absl::InvalidArgumentError("Query contains unsupported features");
@@ -69,7 +71,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
   dataflow::SchemaRef schema =
       ResultSchema(stmt, dataflow_state->GetTableSchema(table_name));
 
-  auto &exec = state->executor();
+  auto &exec = connection->executor_;
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.

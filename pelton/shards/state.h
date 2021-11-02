@@ -45,13 +45,6 @@ class SharderState {
   SharderState(const SharderState &&) = delete;
   SharderState &operator=(const SharderState &&) = delete;
 
-  // Accessors.
-  sql::SqlLazyExecutor &executor() { return this->executor_; }
-
-  // Initialization.
-  void Initialize(const std::string &db_name, const std::string &db_username,
-                  const std::string &db_password);
-
   // Schema manipulations.
   void AddSchema(const UnshardedTableName &table_name,
                  const sqlast::CreateTable &table_schema);
@@ -162,9 +155,6 @@ class SharderState {
   // The schema matches what is stored physically in the DB after
   // sharding and other transformations.
   std::unordered_map<ShardedTableName, sqlast::CreateTable> sharded_schema_;
-
-  // Connection pool that manages the underlying sqlite3 databases.
-  sql::SqlLazyExecutor executor_;
 
   // Secondary indices.
   std::unordered_map<ShardKind, std::vector<sqlast::CreateIndex>> create_index_;

@@ -18,16 +18,18 @@ namespace sqlengine {
 namespace gdpr {
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state) {
+                                     Connection *connection) {
   perf::Start("GDPR");
+  dataflow::DataFlowState *dataflow_state =
+      connection->pelton_state->GetDataFlowState();
+  shards::SharderState *state = connection->pelton_state->GetSharderState();
   sql::SqlResult result;
 
   int total_count = 0;
   const std::string &shard_kind = stmt.shard_kind();
   const std::string &user_id = stmt.user_id();
   bool is_forget = stmt.operation() == sqlast::GDPRStatement::Operation::FORGET;
-  auto &exec = state->executor();
+  auto &exec = connection->executor_;
   for (const auto &table_name : state->TablesInShard(shard_kind)) {
     sql::SqlResult table_result;
     dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);

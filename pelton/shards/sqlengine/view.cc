@@ -216,9 +216,11 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewOrdered(
 
 }  // namespace
 
-absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
-                        dataflow::DataFlowState *dataflow_state) {
+absl::Status CreateView(const sqlast::CreateView &stmt,
+                        Connection *connection) {
   perf::Start("CreateView");
+  dataflow::DataFlowState *dataflow_state =
+      connection->pelton_state->GetDataFlowState();
   // Plan the query using calcite and generate a concrete graph for it.
   std::shared_ptr<dataflow::DataFlowGraph> graph =
       planner::PlanGraph(dataflow_state, stmt.query());
@@ -230,11 +232,12 @@ absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
   return absl::OkStatus();
 }
 
-absl::StatusOr<sql::SqlResult> SelectView(
-    const sqlast::Select &stmt, SharderState *state,
-    dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
+                                          Connection *connection) {
   // TODO(babman): fix this.
   perf::Start("SelectView");
+  dataflow::DataFlowState *dataflow_state =
+      connection->pelton_state->GetDataFlowState();
 
   // Get the corresponding flow.
   const std::string &view_name = stmt.table_name();

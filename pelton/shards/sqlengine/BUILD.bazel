@@ -41,6 +41,7 @@ cc_library(
         "create.h",
     ],
     deps = [
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -64,6 +65,7 @@ cc_library(
     ],
     deps = [
         ":view",
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:graph",
         "//pelton/dataflow:key",
@@ -88,6 +90,7 @@ cc_library(
     ],
     deps = [
         ":index",
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -110,6 +113,7 @@ cc_library(
     ],
     deps = [
         ":index",
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -132,6 +136,7 @@ cc_library(
     deps = [
         ":index",
         ":select",
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -158,6 +163,7 @@ cc_library(
         ":index",
         ":insert",
         ":select",
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -197,6 +203,7 @@ cc_library(
         "view.h",
     ],
     deps = [
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/planner",
         "//pelton/shards:state",
@@ -220,6 +227,7 @@ cc_library(
     deps = [
         ":delete",
         ":select",
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",

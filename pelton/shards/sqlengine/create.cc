@@ -290,9 +290,11 @@ sqlast::CreateTable UpdateTableSchema(sqlast::CreateTable stmt,
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state) {
+                                     Connection *connection) {
   perf::Start("Create");
+  dataflow::DataFlowState *dataflow_state =
+      connection->pelton_state->GetDataFlowState();
+  shards::SharderState *state = connection->pelton_state->GetSharderState();
 
   const std::string &table_name = stmt.table_name();
   if (state->Exists(table_name)) {
@@ -310,7 +312,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
 
   sql::SqlResult result = sql::SqlResult(false);
   // Sharding scenarios.
-  auto &exec = state->executor();
+  auto &exec = connection->executor_;
   if (has_pii && sharding_information.size() == 0) {
     // Case 1: has pii but not linked to shards.
     // This means that this table define a type of user for which shards must be

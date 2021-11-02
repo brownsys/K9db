@@ -28,10 +28,12 @@ std::string Dequote(const std::string &st) {
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state,
+                                     Connection *connection,
                                      bool update_flows) {
   perf::Start("Insert");
+  dataflow::DataFlowState *dataflow_state =
+      connection->pelton_state->GetDataFlowState();
+  shards::SharderState *state = connection->pelton_state->GetSharderState();
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
   if (!dataflow_state->HasFlowsFor(table_name)) {
@@ -45,7 +47,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
   // sharded database.
   sql::SqlResult result = sql::SqlResult(0);
 
-  auto &exec = state->executor();
+  auto &exec = connection->executor_;
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.

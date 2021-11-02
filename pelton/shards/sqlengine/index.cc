@@ -18,16 +18,16 @@ namespace shards {
 namespace sqlengine {
 namespace index {
 
-absl::StatusOr<sql::SqlResult> CreateIndex(
-    const sqlast::CreateIndex &stmt, SharderState *state,
-    dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<sql::SqlResult> CreateIndex(const sqlast::CreateIndex &stmt,
+                                           Connection *connection) {
   perf::Start("Create Index");
+  shards::SharderState *state = connection->pelton_state->GetSharderState();
   const std::string &table_name = stmt.table_name();
 
   sql::SqlResult result = sql::SqlResult(false);
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
-    result = state->executor().ExecuteDefault(&stmt);
+    result = connection->executor_.ExecuteDefault(&stmt);
 
   } else {  // is_sharded == true
     const std::string &column_name = stmt.column_name();
@@ -60,7 +60,7 @@ absl::StatusOr<sql::SqlResult> CreateIndex(
       sqlast::CreateView create_view{index_name, query};
 
       // Install flow.
-      CHECK_STATUS(view::CreateView(create_view, state, dataflow_state));
+      CHECK_STATUS(view::CreateView(create_view, connection));
 
       // Store the index metadata.
       state->CreateIndex(info.shard_kind, table_name, column_name,
