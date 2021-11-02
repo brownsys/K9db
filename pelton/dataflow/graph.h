@@ -25,11 +25,19 @@ class DataFlowGraph {
 
   const std::vector<std::string> &Inputs() const { return this->inputs_; }
 
+  PartitionIndex Partition(const std::vector<ColumnID> &key,
+                           const Record &record) const;
+
+  void SendToPartition(PartitionIndex partition, NodeIndex node,
+                       std::vector<Record> &&records) const;
+
  private:
   std::vector<std::string> inputs_;
   std::vector<std::unique_ptr<DataFlowGraphPartition>> partitions_;
   // Maps each input name to the keys that partition records fed to that input.
-  std::unordered_map<std::string, std::vector<ColumnID>> partition_keys_;
+  std::unordered_map<std::string, PartitionKey> inkeys_;
+  // Maps each matview to the keys that partition records read from that view.
+  std::vector<PartitionKey> outkeys_;
 };
 
 }  // namespace dataflow

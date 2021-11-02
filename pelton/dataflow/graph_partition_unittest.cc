@@ -200,7 +200,7 @@ inline std::vector<Record> MakeAggregateOnEquiJoinRecords(
 DataFlowGraphPartition MakeTrivialGraph(ColumnID keycol,
                                         const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
 
   auto in = std::make_unique<InputOperator>("test-table", schema);
   auto matview = std::make_unique<UnorderedMatViewOperator>(keys);
@@ -220,7 +220,7 @@ DataFlowGraphPartition MakeTrivialGraph(ColumnID keycol,
 DataFlowGraphPartition MakeFilterGraph(ColumnID keycol,
                                        const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
 
   auto in = std::make_unique<InputOperator>("test-table", schema);
   auto filter = std::make_unique<FilterOperator>();
@@ -244,7 +244,7 @@ DataFlowGraphPartition MakeFilterGraph(ColumnID keycol,
 DataFlowGraphPartition MakeUnionGraph(ColumnID keycol,
                                       const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
 
   auto in1 = std::make_unique<InputOperator>("test-table1", schema);
   auto in2 = std::make_unique<InputOperator>("test-table2", schema);
@@ -272,7 +272,7 @@ DataFlowGraphPartition MakeEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
                                          const SchemaRef &lschema,
                                          const SchemaRef &rschema) {
   std::vector<ColumnID> keys = {ok};
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
 
   auto in1 = std::make_unique<InputOperator>("test-table1", lschema);
   auto in2 = std::make_unique<InputOperator>("test-table2", rschema);
@@ -299,7 +299,7 @@ DataFlowGraphPartition MakeEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
 DataFlowGraphPartition MakeProjectGraph(ColumnID keycol,
                                         const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
 
   auto in = std::make_unique<InputOperator>("test-table", schema);
   auto project = std::make_unique<ProjectOperator>();
@@ -324,7 +324,7 @@ DataFlowGraphPartition MakeProjectGraph(ColumnID keycol,
 DataFlowGraphPartition MakeProjectOnFilterGraph(ColumnID keycol,
                                                 const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
 
   auto in = std::make_unique<InputOperator>("test-table", schema);
   auto filter = std::make_unique<FilterOperator>();
@@ -355,7 +355,7 @@ DataFlowGraphPartition MakeProjectOnEquiJoinGraph(ColumnID ok, ColumnID lk,
                                                   const SchemaRef &lschema,
                                                   const SchemaRef &rschema) {
   std::vector<ColumnID> keys = {ok};
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
 
   auto in1 = std::make_unique<InputOperator>("test-table1", lschema);
   auto in2 = std::make_unique<InputOperator>("test-table2", rschema);
@@ -388,7 +388,7 @@ DataFlowGraphPartition MakeAggregateGraph(ColumnID keycol,
                                           const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
   std::vector<ColumnID> group_columns = {2};
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
 
   auto in = std::make_unique<InputOperator>("test-table", schema);
   auto aggregate = std::make_unique<AggregateOperator>(
@@ -415,7 +415,7 @@ DataFlowGraphPartition MakeAggregateOnEquiJoinGraph(ColumnID ok, ColumnID lk,
                                                     const SchemaRef &rschema) {
   std::vector<ColumnID> keys = {ok};
   std::vector<ColumnID> group_columns = {2};
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
 
   auto in1 = std::make_unique<InputOperator>("test-table1", lschema);
   auto in2 = std::make_unique<InputOperator>("test-table2", rschema);
@@ -632,7 +632,7 @@ TEST(DataFlowGraphPartitionTest, CloneTest) {
   SchemaRef rschema = MakeRightSchema();
   // Make graph.
   auto g = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
-  auto g_clone = g.Clone();
+  auto g_clone = g.Clone(1);
   // Make records.
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
@@ -654,12 +654,12 @@ TEST(DataFlowGraphPartitionTest, CloneReprTest) {
 
   // Test with aggregate and equijoin.
   auto g1 = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
-  auto g1_clone = g1.Clone();
+  auto g1_clone = g1.Clone(1);
   ASSERT_EQ(g1.DebugString(), g1_clone->DebugString());
 
   // Test with filter and project.
   auto g2 = MakeProjectOnFilterGraph(0, lschema);
-  auto g2_clone = g2.Clone();
+  auto g2_clone = g2.Clone(1);
   ASSERT_EQ(g2.DebugString(), g2_clone->DebugString());
 }
 
@@ -669,7 +669,7 @@ TEST(RecordTest, TestDuplicateInputGraph) {
   SchemaRef schema = MakeLeftSchema();
 
   // Make a graph.
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
 
   // Add two input operators to the graph for the same table, expect an error.
   auto in1 = std::make_unique<InputOperator>("test-table", schema);

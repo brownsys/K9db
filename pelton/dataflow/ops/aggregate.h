@@ -43,6 +43,10 @@ class AggregateOperator : public Operator {
 
   uint64_t SizeInMemory() const override { return this->state_.SizeInMemory(); }
 
+  const std::vector<ColumnID> &group_columns() const {
+    return this->group_columns_;
+  }
+
  protected:
   std::vector<Record> Process(NodeIndex source,
                               std::vector<Record> &&records) override;

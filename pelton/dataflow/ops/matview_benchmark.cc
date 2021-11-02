@@ -26,7 +26,7 @@ static void UnorderedMatViewInsert2UInts(benchmark::State &state) {
     return records;
   };
 
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
   auto in = std::make_unique<InputOperator>("test-table1", schema);
   auto op = std::make_unique<UnorderedMatViewOperator>(schema.keys());
   auto in_ptr = in.get();
@@ -54,7 +54,7 @@ static void UnorderedMatViewInsertUIntString(benchmark::State &state) {
     return records;
   };
 
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
   auto in = std::make_unique<InputOperator>("test-table1", schema);
   auto op = std::make_unique<UnorderedMatViewOperator>(schema.keys());
   auto in_ptr = in.get();
@@ -83,7 +83,7 @@ static void UnorderedMatViewBatchInsert(benchmark::State &state) {
     return records;
   };
 
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
   auto in = std::make_unique<InputOperator>("test-table1", schema);
   auto op = std::make_unique<UnorderedMatViewOperator>(schema.keys());
   auto in_ptr = in.get();

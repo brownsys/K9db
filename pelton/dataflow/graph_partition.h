@@ -19,7 +19,7 @@ class MatViewOperator;
 
 class DataFlowGraphPartition {
  public:
-  DataFlowGraphPartition() = default;
+  explicit DataFlowGraphPartition(PartitionIndex id) : id_(id) {}
 
   bool AddNode(std::unique_ptr<Operator> &&op,
                const std::vector<Operator *> &parents);
@@ -36,6 +36,7 @@ class DataFlowGraphPartition {
                          Operator *parent);
 
   NodeIndex LastOperatorIndex() const { return this->nodes_.size() - 1; }
+  NodeIndex Size() const { return this->nodes_.size(); }
 
   void Process(const std::string &input_name, std::vector<Record> &&records);
 
@@ -58,9 +59,11 @@ class DataFlowGraphPartition {
   uint64_t SizeInMemory() const;
 
   // Cloning to create more partitions.
-  std::unique_ptr<DataFlowGraphPartition> Clone() const;
+  std::unique_ptr<DataFlowGraphPartition> Clone(
+      PartitionIndex partition_index) const;
 
  private:
+  PartitionIndex id_;
   // Maps input name to associated input operator.
   std::unordered_map<std::string, InputOperator *> inputs_;
   std::vector<MatViewOperator *> outputs_;

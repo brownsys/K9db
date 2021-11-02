@@ -165,6 +165,9 @@ class Record {
   // Data type transformation.
   void SetValue(const std::string &value, size_t i);
 
+  // Deterministic hashing for partitioning / mutli-threading.
+  size_t Hash(const std::vector<ColumnID> &cols) const;
+
   // Accessors.
   void SetPositive(bool positive) { this->positive_ = positive; }
   const SchemaRef &schema() const { return this->schema_; }

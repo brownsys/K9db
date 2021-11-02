@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 // NOLINTNEXTLINE
 #include <variant>
@@ -68,6 +69,9 @@ class ProjectOperator : public Operator {
       this->projections_.emplace_back(column_name, literal, right_col, op);
     }
   }
+
+  std::optional<ColumnID> ProjectColumn(ColumnID col) const;
+  std::optional<ColumnID> UnprojectColumn(ColumnID col) const;
 
  protected:
   std::vector<Record> Process(NodeIndex source,

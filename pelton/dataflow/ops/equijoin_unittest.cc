@@ -149,7 +149,7 @@ TEST(EquiJoinOperatorTest, BasicJoinTest) {
   rrecords.at(0).SetString(std::move(s2), 2);
 
   // Setup join operator with two parents, left with id 0 and right with id 1.
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
   auto iop1 = std::make_unique<InputOperator>("test-table1", lschema);
   auto iop2 = std::make_unique<InputOperator>("test-table2", rschema);
   auto op = std::make_unique<EquiJoinOperator>(2, 1);
@@ -202,7 +202,7 @@ TEST(EquiJoinOperatorTest, BasicUnjoinableTest) {
   rrecords.at(0).SetString(std::move(s2), 2);
 
   // Setup join operator with two parents, left with id 0 and right with id 1.
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
   auto iop1 = std::make_unique<InputOperator>("test-table1", lschema);
   auto iop2 = std::make_unique<InputOperator>("test-table2", rschema);
   auto op = std::make_unique<EquiJoinOperator>(2, 1);
@@ -300,7 +300,7 @@ TEST(EquiJoinOperatorTest, FullJoinTest) {
   rrecords2.at(0).SetString(std::move(sd3), 2);
 
   // Setup join operator with two parents, left with id 0 and right with id 1.
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
   auto iop1 = std::make_unique<InputOperator>("test-table1", lschema);
   auto iop2 = std::make_unique<InputOperator>("test-table2", rschema);
   auto op = std::make_unique<EquiJoinOperator>(2, 1);
@@ -393,7 +393,7 @@ TEST(EquiJoinOperatorTest, BasicLeftJoinTest) {
   rrecords.emplace_back(rschema, true, 100_u, -5_s, std::move(s2));
 
   // Setup join operator with two parents, left with id 0 and right with id 1.
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
   auto iop1 = std::make_unique<InputOperator>("test-table1", lschema);
   auto iop2 = std::make_unique<InputOperator>("test-table2", rschema);
   auto op =
@@ -449,7 +449,7 @@ TEST(EquiJoinOperatorTest, BasicRightJoinTest) {
   rrecords.emplace_back(rschema, true, 100_u, -5_s, std::move(s2));
 
   // Setup join operator with two parents, left with id 0 and right with id 1.
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
   auto iop1 = std::make_unique<InputOperator>("test-table1", lschema);
   auto iop2 = std::make_unique<InputOperator>("test-table2", rschema);
   auto op =
@@ -519,7 +519,7 @@ TEST(EquiJoinOperatorTest, LeftJoinTest) {
   rrecords2.emplace_back(rschema, true, 50_u, 2_s, std::move(sd3));
 
   // Setup join operator with two parents, left with id 0 and right with id 1.
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
   auto iop1 = std::make_unique<InputOperator>("test-table1", lschema);
   auto iop2 = std::make_unique<InputOperator>("test-table2", rschema);
   auto op =

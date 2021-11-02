@@ -67,7 +67,9 @@ inline void EXPECT_EQ_MSET(GenericIterable<T> &&l, const std::vector<T> &r) {
 template <typename T>
 inline void EXPECT_SIZE_EQ(GenericIterable<T> &&l, size_t size) {
   size_t i = 0;
-  for (const T &v : l) {
+  auto it = l.begin();
+  auto end = l.end();
+  while (it++ != end) {
     i++;
   }
   EXPECT_EQ(i, size);

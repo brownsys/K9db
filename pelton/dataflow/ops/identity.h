@@ -4,7 +4,6 @@
 #include <memory>
 #include <vector>
 
-#include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/types.h"
@@ -27,13 +26,6 @@ class IdentityOperator : public Operator {
   void ComputeOutputSchema() override;
 
   std::unique_ptr<Operator> Clone() const override;
-
-  FRIEND_TEST(EquiJoinOperatorTest, BasicJoinTest);
-  FRIEND_TEST(EquiJoinOperatorTest, BasicUnjoinableTest);
-  FRIEND_TEST(EquiJoinOperatorTest, FullJoinTest);
-  FRIEND_TEST(EquiJoinOperatorTest, BasicLeftJoinTest);
-  FRIEND_TEST(EquiJoinOperatorTest, BasicRightJoinTest);
-  FRIEND_TEST(EquiJoinOperatorTest, LeftJoinTest);
 };
 
 }  // namespace dataflow

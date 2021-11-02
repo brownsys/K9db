@@ -176,6 +176,26 @@ inline sqlast::ColumnDefinition::Type GetLiteralType(
 
 }  // namespace
 
+std::optional<ColumnID> ProjectOperator::ProjectColumn(ColumnID col) const {
+  for (size_t i = 0; i < this->projections_.size(); i++) {
+    const auto &projection = this->projections_.at(i);
+    if (projection.column()) {
+      ColumnID column = projection.getColumn();
+      if (column == col) {
+        return i;
+      }
+    }
+  }
+  return {};
+}
+std::optional<ColumnID> ProjectOperator::UnprojectColumn(ColumnID col) const {
+  const auto &projection = this->projections_.at(col);
+  if (projection.column()) {
+    return projection.getColumn();
+  }
+  return {};
+}
+
 void ProjectOperator::ComputeOutputSchema() {
   // If keys are not provided, we can compute them ourselves by checking
   // if the primary key survives the projection.

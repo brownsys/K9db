@@ -35,6 +35,23 @@ cc_library(
 )
 
 cc_library(
+    name = "exchange",
+    srcs = [
+        "exchange.cc",
+    ],
+    hdrs = [
+        "exchange.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:graph",
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:types",
+    ],
+)
+
+cc_library(
     name = "filter",
     srcs = [
         "filter.cc",
@@ -85,7 +102,6 @@ cc_library(
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
         "//pelton/dataflow:types",
-        "@com_google_googletest//:gtest_prod",
     ],
 )
 

@@ -30,7 +30,7 @@ static void JoinOneToOne(benchmark::State &state) {
     return rightRecords;
   };
 
-  DataFlowGraphPartition g;
+  DataFlowGraphPartition g{0};
   auto iop1 = std::make_unique<InputOperator>("test-table1", leftSchema);
   auto iop2 = std::make_unique<InputOperator>("test-table2", rightSchema);
   auto op = std::make_unique<EquiJoinOperator>(0, 0);

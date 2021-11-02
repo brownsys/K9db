@@ -36,6 +36,7 @@ bool DataFlowGraphPartition::AddNode(std::unique_ptr<Operator> &&op,
                                      const std::vector<Operator *> &parents) {
   NodeIndex idx = this->nodes_.size();
   op->SetIndex(idx);
+  op->SetPartition(this->id_);
   for (Operator *parent : parents) {
     op->AddParent(parent);
   }
@@ -69,8 +70,9 @@ uint64_t DataFlowGraphPartition::SizeInMemory() const {
   return size;
 }
 
-std::unique_ptr<DataFlowGraphPartition> DataFlowGraphPartition::Clone() const {
-  auto partition = std::make_unique<DataFlowGraphPartition>();
+std::unique_ptr<DataFlowGraphPartition> DataFlowGraphPartition::Clone(
+    PartitionIndex partition_index) const {
+  auto partition = std::make_unique<DataFlowGraphPartition>(partition_index);
   // Clone each node.
   for (size_t i = 0; i < this->nodes_.size(); i++) {
     const std::unique_ptr<Operator> &node = this->nodes_.at(i);

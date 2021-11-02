@@ -149,7 +149,7 @@ class GenericIterator {
   GenericIterator<T, C> operator++(int n) {
     // Increment copy, leave this unchanged.
     GenericIterator copy(this->impl_->Clone(), this->size_);
-    ++this;
+    ++(*this);
     return copy;
   }
   bool operator==(const GenericIterator<T, C> &o) const {
@@ -371,8 +371,12 @@ class GroupedDataT : public UntemplatedGroupedData {
 
   // Return an Iterable set of records from the given key that are larger than
   // a given record. Should only be used on record ordered containers.
+  const_RecordIterable LookupGreater(const Key &key, const Record &cmp) const {
+    return this->LookupGreater(key, cmp, -1, 0);
+  }
   const_RecordIterable LookupGreater(const Key &key, const Record &cmp,
-                                     int limit = -1, size_t offset = 0) const {
+                                     const int &limit,
+                                     const size_t &offset) const {
     if constexpr (!std::is_null_pointer<RecordCompare>::value) {
       auto it = this->contents_.find(key);
       if (it == this->contents_.end() ||

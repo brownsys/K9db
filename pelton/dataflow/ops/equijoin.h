@@ -41,6 +41,8 @@ class EquiJoinOperator : public Operator {
 
   Operator *left() const;
   Operator *right() const;
+  ColumnID left_id() const { return this->left_id_; }
+  ColumnID right_id() const { return this->right_id_; }
 
   uint64_t SizeInMemory() const override {
     return this->left_table_.SizeInMemory() +

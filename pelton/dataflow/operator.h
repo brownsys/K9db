@@ -31,6 +31,7 @@ class Operator {
     EQUIJOIN,
     PROJECT,
     AGGREGATE,
+    EXCHANGE,
   };
 
   // Cannot copy an operator.
@@ -53,8 +54,10 @@ class Operator {
   // Accessors (read only).
   NodeIndex index() const { return this->index_; }
   Type type() const { return this->type_; }
+  PartitionIndex partition() const { return this->partition_; }
 
   const SchemaRef &output_schema() const { return this->output_schema_; }
+  const std::vector<Operator *> &children() const { return this->children_; }
   const std::vector<Operator *> &parents() const { return this->parents_; }
 
   // For debugging.
@@ -108,6 +111,7 @@ class Operator {
   // Called by DataFlowGraphPartition.
   friend class DataFlowGraphPartition;
   void SetIndex(NodeIndex index) { this->index_ = index; }
+  void SetPartition(PartitionIndex partition) { this->partition_ = partition; }
   void AddParent(Operator *parent);
 
   // Pass the given batch to the children operators (if any) for processing.
@@ -115,6 +119,7 @@ class Operator {
 
   NodeIndex index_;
   Type type_;
+  PartitionIndex partition_;
 
 #ifdef PELTON_BENCHMARK  // shuts up compiler warnings
   friend void ProcessBenchmark(Operator *op, NodeIndex src, RecordGenFunc gen);

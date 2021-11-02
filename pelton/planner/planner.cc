@@ -88,7 +88,7 @@ std::unique_ptr<dataflow::DataFlowGraphPartition> PlanGraph(
   jmethodID planMethod = env->GetStaticMethodID(QueryPlannerClass, "plan", sig);
 
   // Create the required shared state to pass to the java code.
-  auto graph = std::make_unique<dataflow::DataFlowGraphPartition>();
+  auto graph = std::make_unique<dataflow::DataFlowGraphPartition>(0);
   jlong graph_jptr = reinterpret_cast<jlong>(graph.get());
   jlong state_jptr = reinterpret_cast<jlong>(state);
   jstring query_jstr = env->NewStringUTF(query.c_str());
