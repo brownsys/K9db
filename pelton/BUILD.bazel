@@ -10,6 +10,7 @@ cc_library(
     ],
     visibility = ["//:__subpackages__"],
     deps = [
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:graph",
         "//pelton/dataflow:record",
@@ -23,5 +24,16 @@ cc_library(
         "//pelton/util:status",
         "@absl//absl/status",
         "@absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "connection",
+    hdrs = ["connection.h"],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:dstate",
+        "//pelton/shards:state",
+        "//pelton/sql:lazy_executor",
     ],
 )

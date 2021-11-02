@@ -47,24 +47,25 @@ bool SpecialStatements(const std::string &sql, State *connection) {
 
 }  // namespace
 
-bool initialize(const std::string &directory, const std::string &db_name,
-                const std::string &db_username,
-                const std::string &db_password) {
+bool initialize(const std::string &directory) {
   // if already open
   if (pelton_state != nullptr) {
     // close without shutting down planner
     shutdown(false);
   }
   pelton_state = new State();
+  // initialize path_ in State with &directory (path to db)
   pelton_state->Initialize(directory);
-  pelton_state->GetSharderState()->Initialize(db_name, db_username,
-                                              db_password);
   pelton_state->Load();
   return true;
 }
 
-bool open(Connection *connection) {
+bool open(Connection *connection, const std::string &db_name,
+          const std::string &db_username, const std::string &db_password) {
+  // set global state in local connection struct
   connection->pelton_state = pelton_state;
+  // run SqlEagerExecutor::Initialize, initializing mariadb connection
+  connection->executor_.Initialize(db_name, db_username, db_password);
   return true;
 }
 
@@ -79,20 +80,14 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
   if (echo) {
     std::cout << sql << std::endl;
   }
-
   // If special statement, handle it separately.
   if (SpecialStatements(sql, connection->pelton_state)) {
     return SqlResult(true);
   }
-
-  // Parse and rewrite statement.
-  shards::SharderState *sstate = connection->pelton_state->GetSharderState();
-  // dataflow locking handled by Ishan in his PRs. Here just use global lock
-  dataflow::DataFlowState *dstate =
-      connection->pelton_state->GetDataFlowState();
+  // Parse and rewrite statement, passing local connection with ptr to global
+  // state containing sharder and dataflow state
   absl::lts_2020_09_23::StatusOr<pelton::sql::SqlResult> sql_result =
-      shards::sqlengine::Shard(sql, sstate, dstate);
-
+      shards::sqlengine::Shard(sql, connection);
   return sql_result;
 }
 
