@@ -39,7 +39,7 @@ class SQLParser : public antlr4::BaseErrorListener {
   std::unique_ptr<antlr4::CommonTokenStream> tokens_;
   std::unique_ptr<sqlparser::SQLiteLexer> lexer_;
   std::unique_ptr<antlr4::ANTLRInputStream> input_stream_;
-  static std::shared_mutex MTX;
+  // static std::shared_mutex MTX;
 };
 
 }  // namespace sqlast
