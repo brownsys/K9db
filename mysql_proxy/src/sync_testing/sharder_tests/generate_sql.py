@@ -309,14 +309,14 @@ with open("./benchmark/inserts_new_shard.sql", "w") as f:
     for i in range(NEW_SHARDS):
         f.write(upsert("students0", ID=i, PII_Name=i))
     for i in range(NEW_SHARDS):
-        f.write(upsert("assignments0", ID=i + j, Name=i))
+        f.write(upsert("assignments0", ID=i, Name=i))
     for i in range(NEW_SHARDS):
         f.write(
             upsert("submissions0", student_id=i, assignment_id=i, timestamp=i))
 
 # single threaded baseline (run separately from the multi-threaded benchmark below)
 with open("./benchmark/inserts_existing_shard_all.sql", "w") as f:
-    for i in range(10 * EXISTING_MULT, 60 * EXISTING_MULT):
+    for i in range(NEW_SHARDS): 
         f.write(
             upsert("submissions0", student_id=i, assignment_id=i, timestamp=i))
 
@@ -331,7 +331,7 @@ with open("./benchmark/inserts_existing_shard1.sql", "w") as f:
     #     f.write(upsert("assignments0", ID=i, Name=i))
 
     # new submissions in existing user shards
-    for i in range(20 * EXISTING_MULT, 30 * EXISTING_MULT):
+    for i in range(0, round(NEW_SHARDS * 0.25)):
         f.write(
             upsert("submissions0", student_id=i, assignment_id=i, timestamp=i))
 
@@ -346,7 +346,7 @@ with open("./benchmark/inserts_existing_shard2.sql", "w") as f:
     #     f.write(upsert("assignments0", ID=i, Name=i))
 
     # new submissions in existing user shards
-    for i in range(30 * EXISTING_MULT, 40 * EXISTING_MULT):
+    for i in range(round(NEW_SHARDS * 0.25), round(NEW_SHARDS * 0.5)):
         f.write(
             upsert("submissions0", student_id=i, assignment_id=i, timestamp=i))
 
@@ -361,7 +361,7 @@ with open("./benchmark/inserts_existing_shard3.sql", "w") as f:
     #     f.write(upsert("assignments0", ID=i, Name=i))
 
     # new submissions in existing user shards
-    for i in range(40 * EXISTING_MULT, 50 * EXISTING_MULT):
+    for i in range(round(NEW_SHARDS * 0.5), round(NEW_SHARDS * 0.75)):
         f.write(
             upsert("submissions0", student_id=i, assignment_id=i, timestamp=i))
 
@@ -376,6 +376,6 @@ with open("./benchmark/inserts_existing_shard4.sql", "w") as f:
     #     f.write(upsert("assignments0", ID=i, Name=i))
 
     # new submissions in existing user shards
-    for i in range(50 * EXISTING_MULT, 60 * EXISTING_MULT):
+    for i in range(round(NEW_SHARDS * 0.75), NEW_SHARDS):
         f.write(
             upsert("submissions0", student_id=i, assignment_id=i, timestamp=i))
