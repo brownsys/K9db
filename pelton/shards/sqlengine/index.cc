@@ -105,6 +105,7 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
     perf::End("Lookup Index1");
     return std::make_pair(true, std::move(shards));
   }
+  delete &indexed_cols;
 
   perf::End("Lookup Index1");
   return std::make_pair(false, std::unordered_set<UserId>{});

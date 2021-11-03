@@ -34,8 +34,8 @@ void Java_edu_brown_pelton_PeltonJNI_Open(JNIEnv *env, jobject this_,
   if (ptr == 0) {
     pelton::Connection *connection = new pelton::Connection();
     pelton::initialize(GetString(env, directory));
-    pelton::open(connection, GetString(env, db_name),
-                       GetString(env, username), GetString(env, password));
+    pelton::open(connection, GetString(env, db_name), GetString(env, username),
+                 GetString(env, password));
     env->SetLongField(this_, GetConnectionFieldID(env, this_),
                       reinterpret_cast<int64_t>(connection));
   }

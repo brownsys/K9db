@@ -180,7 +180,8 @@ const std::unordered_set<ColumnName> &SharderState::IndicesFor(
   std::unique_lock<std::shared_mutex> lock(this->mtx4_);
   // if table_name does not exist, return empty unordered_set
   if (this->indices_.find(table_name) == this->indices_.end()) {
-    const std::unordered_set<ColumnName> *empty_column = new std::unordered_set<ColumnName>{};
+    const std::unordered_set<ColumnName> *empty_column =
+        new std::unordered_set<ColumnName>{};
     return *empty_column;
   } else {
     return this->indices_.at(table_name);
