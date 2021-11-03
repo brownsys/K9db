@@ -64,10 +64,8 @@ std::list<const sqlast::AbstractStatement *> SharderState::CreateShard(
     const ShardKind &shard_kind, const UserId &user) {
   // reader lock for kind_to_tables_
   std::shared_lock<std::shared_mutex> lock(this->mtx2_);
-  // writer lock for shards_
+  // writer lock for shards_ and sharded_schema_
   std::unique_lock<std::shared_mutex> lock2(this->mtx3_);
-  // reader lock for sharded_schema_
-  std::shared_lock<std::shared_mutex> lock3(this->mtx3_);
   // reader lock for create_index_
   std::shared_lock<std::shared_mutex> lock4(this->mtx4_);
 
@@ -179,10 +177,11 @@ bool SharderState::HasIndexFor(const UnshardedTableName &table_name,
 const std::unordered_set<ColumnName> &SharderState::IndicesFor(
     const UnshardedTableName &table_name) const {
   // reader lock for indices_
-  std::shared_lock<std::shared_mutex> lock(this->mtx4_);
+  std::unique_lock<std::shared_mutex> lock(this->mtx4_);
   // if table_name does not exist, return empty unordered_set
   if (this->indices_.find(table_name) == this->indices_.end()) {
-    return std::unordered_set<ColumnName>{};
+    const std::unordered_set<ColumnName> *empty_column = new std::unordered_set<ColumnName>{};
+    return *empty_column;
   } else {
     return this->indices_.at(table_name);
   }
