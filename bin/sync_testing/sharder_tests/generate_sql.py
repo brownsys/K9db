@@ -9,13 +9,6 @@ def read(table, **kwargs):
     sql.append(";")
     return "".join(sql)
 
-
-# def create2(table):
-#     """ Generates SQL for a CREATE statement matching the args passed. """
-#     sql = list()
-#     sql.append(table)
-
-
 def create(table, foreign_keys, **kwargs):
     """ Generates SQL for a CREATE statement matching the kwargs passed. """
     keys = ["%s" % k for k in kwargs]
