@@ -91,7 +91,7 @@ class SharderState {
                    const ColumnName &shard_by) const;
 
   const std::unordered_set<ColumnName> &IndicesFor(
-      const UnshardedTableName &table_name) const;
+      const UnshardedTableName &table_name) ;
 
   const FlowName &IndexFlow(const UnshardedTableName &table_name,
                             const ColumnName &column_name,

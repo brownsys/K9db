@@ -175,17 +175,20 @@ bool SharderState::HasIndexFor(const UnshardedTableName &table_name,
 }
 
 const std::unordered_set<ColumnName> &SharderState::IndicesFor(
-    const UnshardedTableName &table_name) const {
+    const UnshardedTableName &table_name)  {
   // reader lock for indices_
+  // std::shared_lock<std::shared_mutex> lock(this->mtx4_);
+  // writer lock for indices_
   std::unique_lock<std::shared_mutex> lock(this->mtx4_);
+  return this->indices_[table_name];
   // if table_name does not exist, return empty unordered_set
-  if (this->indices_.find(table_name) == this->indices_.end()) {
-    const std::unordered_set<ColumnName> *empty_column =
-        new std::unordered_set<ColumnName>{};
-    return *empty_column;
-  } else {
-    return this->indices_.at(table_name);
-  }
+  // if (this->indices_.find(table_name) == this->indices_.end()) {
+  //   const std::unordered_set<ColumnName> *empty_column =
+  //       new std::unordered_set<ColumnName>{};
+  //   return *empty_column;
+  // } else {
+  //   return this->indices_.at(table_name);
+  // }
 }
 
 const FlowName &SharderState::IndexFlow(const UnshardedTableName &table_name,
