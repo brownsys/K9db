@@ -31,9 +31,17 @@ impl<W: io::Write> MysqlShim<W> for Backend {
     type Error = io::Error;
 
     // called when client issues request to prepare query for later execution
-    fn on_prepare(&mut self, _: &str, info: StatementMetaWriter<W>) -> io::Result<()> {
+    fn on_prepare(&mut self, q_string: &str, info: StatementMetaWriter<W>) -> io::Result<()> {
         debug!(self.log, "Rust proxy: starting on_prepare");
-        info.reply(42, &[], &[])
+        // call pelton execDDL (success or failure)
+        let ddl_response = exec_ddl_ffi(&mut self.rust_conn, q_string);
+        debug!(self.log, "ddl_response is {:?}", ddl_response);
+        if ddl_response {
+            info.reply(42, &[], &[])
+        } else {
+            error!(self.log, "Rust Proxy: Failed to execute prepared statement");
+            info.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
+        }
     }
 
     // called when client executes previously prepared statement
@@ -46,6 +54,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         results: QueryResultWriter<W>,
     ) -> io::Result<()> {
         debug!(self.log, "Rust proxy: starting on_execute");
+        // select from view created. exec_select
         results.completed(0, 0)
     }
 
@@ -69,10 +78,8 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         // start measuring runtime
         let start = Instant::now();
 
-        if q_string.starts_with("SET echo")
-            || q_string.starts_with("DROP")
+        if q_string.starts_with("DROP")
             || q_string.starts_with("ALTER")
-            || q_string.starts_with("GDPR GET")
         {
             debug!(self.log, "Rust Proxy: Unsupported query type");
             return results.completed(0, 0);
@@ -192,7 +199,7 @@ impl Drop for Backend {
     fn drop(&mut self) {
         debug!(self.log, "Rust Proxy: Starting destructor for Backend");
         debug!(self.log, "Rust Proxy: Calling c-wrapper for pelton::close");
-        debug!(
+        info!(
             self.log,
             "Total time elapsed for this connection is: {:?}", self.runtime
         );
