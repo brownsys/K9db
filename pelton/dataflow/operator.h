@@ -113,6 +113,7 @@ class Operator {
   void SetIndex(NodeIndex index) { this->index_ = index; }
   void SetPartition(PartitionIndex partition) { this->partition_ = partition; }
   void AddParent(Operator *parent);
+  void RemoveParent(Operator *parent);
 
   // Pass the given batch to the children operators (if any) for processing.
   void BroadcastToChildren(std::vector<Record> &&records);

@@ -1,5 +1,6 @@
 #include "pelton/dataflow/operator.h"
 
+#include <algorithm>
 #include <utility>
 
 #include "glog/logging.h"
@@ -12,13 +13,34 @@ void Operator::AddParent(Operator *parent) {
   // Project operator's schema should be computed after operations have been
   // added.
   if (parent->type() == Operator::Type::PROJECT) {
+    auto old = parent->output_schema_;
     parent->ComputeOutputSchema();
+    if (old) {
+      CHECK_EQ(parent->output_schema_, old);
+    }
   }
   this->input_schemas_.push_back(parent->output_schema());
   parent->children_.push_back(this);
   if (this->type() != Operator::Type::PROJECT) {
+    auto old = this->output_schema_;
     this->ComputeOutputSchema();
+    if (old) {
+      CHECK_EQ(this->output_schema_, old);
+    }
   }
+}
+void Operator::RemoveParent(Operator *parent) {
+  // Remove parent from this.
+  for (size_t i = 0; i < this->parents_.size(); i++) {
+    if (this->parents_.at(i) == parent) {
+      this->parents_.erase(this->parents_.begin() + i);
+      this->input_schemas_.erase(this->input_schemas_.begin() + i);
+      break;
+    }
+  }
+  // Remove this from parent.
+  auto it = std::find(parent->children_.begin(), parent->children_.end(), this);
+  parent->children_.erase(it);
 }
 
 void Operator::ProcessAndForward(NodeIndex source,
@@ -84,39 +106,33 @@ std::string Operator::DebugString() const {
   std::string str = "";
   str += "\"operator\": \"" + type_str + "\", ";
   str += "\"id\": " + std::to_string(this->index()) + ", ";
-  str += "\"children\": [";
+  str += "\"children\": [ ";
   for (Operator *child : this->children_) {
     str += std::to_string(child->index()) + ",";
   }
-  if (this->children_.size() > 0) {
-    str.pop_back();
-    str.pop_back();
-  }
-  str += "],\n";
+  str.pop_back();
+  str += " ],\n";
 
   // print input schema
   str += "  \"input_columns\": [ ";
   for (const SchemaRef schema : this->input_schemas_) {
-    str += "[";
+    str += "[ ";
     for (const std::string col : schema.column_names()) {
-      str += "\"" + col + "\", ";
+      str += "\"" + col + "\",";
     }
     str.pop_back();
-    str.pop_back();
-    str += "], ";
+    str += " ],";
   }
-  str.pop_back();
   str.pop_back();
   str += " ],\n";
 
   // print output schema
-  str += "  \"output_columns\": [";
+  str += "  \"output_columns\": [ ";
   for (const std::string col : this->output_schema_.column_names()) {
-    str += "\"" + col + "\", ";
+    str += "\"" + col + "\",";
   }
   str.pop_back();
-  str.pop_back();
-  str += "],\n";
+  str += " ],\n";
   return str;
 }
 

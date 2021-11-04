@@ -9,6 +9,38 @@ enum class Inconsistent { UNIT };
 using ProducerKey = std::variant<PartitionKey, Any, Inconsistent>;
 using RequiredKey = std::variant<PartitionKey, Any>;
 
+std::string STR(const ProducerKey &k) {
+  std::string key = "";
+  if (std::holds_alternative<PartitionKey>(k)) {
+    key = "[ ";
+    for (const auto &col : std::get<PartitionKey>(k)) {
+      key += std::to_string(col) + ",";
+    }
+    key.pop_back();
+    key += " ]";
+  } else if (std::holds_alternative<Any>(k)) {
+    key = "Any";
+  } else {
+    key = "Inconsistent";
+  }
+  return key;
+}
+
+std::string STR(const RequiredKey &k) {
+  std::string key = "";
+  if (std::holds_alternative<PartitionKey>(k)) {
+    key = "[ ";
+    for (const auto &col : std::get<PartitionKey>(k)) {
+      key += std::to_string(col) + ",";
+    }
+    key.pop_back();
+    key += " ]";
+  } else {
+    key = "Any";
+  }
+  return key;
+}
+
 // Initial keys by operator type.
 ProducerKey ProducerKeyOf(const Operator &op) {
   switch (op.type()) {
@@ -98,23 +130,62 @@ using ProducerMap = std::unordered_map<NodeIndex, ProducerKey>;
 using RequiredMap =
     std::unordered_map<NodeIndex, std::unordered_map<NodeIndex, RequiredKey>>;
 
+// Maps a node to the keys we want to force it to have (externally), rather than
+// allowing the keys to be deduced organically by our BFS.
+// This is useful for cases where we could not deduce any concrete keys (e.g.
+// the flow partitioning is completely free with no constraints).
+using ExternalMap = std::unordered_map<NodeIndex, PartitionKey>;
+
+// Debugging.
+void DebugPrint(DataFlowGraphPartition *partition, const ProducerMap &p,
+                const RequiredMap &r) {
+  std::cout << std::endl;
+  std::cout << "Keys:" << std::endl;
+  std::cout << std::endl;
+  for (NodeIndex i = partition->Size() - 1; i >= 0; i--) {
+    std::cout << "Node " << i << ": ";
+    if (p.count(i)) {
+      std::cout << STR(p.at(i));
+    } else {
+      std::cout << "UNDEFINED";
+    }
+    std::cout << std::endl;
+    for (Operator *child : partition->GetNode(i)->children()) {
+      NodeIndex j = child->index();
+      std::cout << "  child " << j << ": ";
+      if (r.count(j) && r.at(j).count(i)) {
+        std::cout << STR(r.at(j).at(i));
+      } else {
+        std::cout << "UNDEFINED";
+      }
+      std::cout << std::endl;
+    }
+    if (i == 0) {
+      break;
+    }
+  }
+  std::cout << std::endl;
+  std::cout << std::endl;
+}
+
 // Traverse the operator graph in DFS order.
 // Returns the key required by operator op from the parent whose ID is from.
 // Also, fills in the appropriate keys in *p and *r.
 // Pre-condition: key is either a PartitionKey or Any.
 // Pre-condition: from == UNDEFINED_NODE_INDEX iff op is an InputOperator.
 RequiredKey DFS(const Operator &op, NodeIndex from, const ProducerKey &key,
-                ProducerMap *p, RequiredMap *r) {
+                ProducerMap *p, RequiredMap *r, const ExternalMap &e) {
+  bool external = e.count(op.index()) == 1;
   // Initialize r[op] if this is the first time we visit op.
   if (r->count(op.index()) == 0) {
     r->emplace(op.index(), std::unordered_map<NodeIndex, RequiredKey>{});
   }
 
   // Find required key between from and op.
-  RequiredKey rkey = RequiredKeyOf(op, from);
+  RequiredKey rkey = external ? e.at(op.index()) : RequiredKeyOf(op, from);
 
   // Check if op has its own partition key for outputs.
-  ProducerKey opkey = ProducerKeyOf(op);
+  ProducerKey opkey = external ? e.at(op.index()) : ProducerKeyOf(op);
   if (std::holds_alternative<Any>(opkey)) {
     if (std::holds_alternative<PartitionKey>(key)) {
       // Inherit key of parent.
@@ -139,9 +210,9 @@ RequiredKey DFS(const Operator &op, NodeIndex from, const ProducerKey &key,
       // then op becomes an unconstrained operation. We get to select any
       // desired new key post-project for free, since an exchange will be needed
       // anyway after a corrupting project.
-      children_keys.push_back(DFS(*child, op.index(), Any::UNIT, p, r));
+      children_keys.push_back(DFS(*child, op.index(), Any::UNIT, p, r, e));
     } else {
-      children_keys.push_back(DFS(*child, op.index(), opkey, p, r));
+      children_keys.push_back(DFS(*child, op.index(), opkey, p, r, e));
     }
   }
 
@@ -222,6 +293,74 @@ RequiredKey DFS(const Operator &op, NodeIndex from, const ProducerKey &key,
   }
 
   return rkey;
+}
+
+// This is called after a round of DFS was executed. If the provided vector
+// contains an operator for which no partitioning key was assigned, then we
+// externally assign one to it based on its schema.
+// returns true if such operators were found, false if all are assigned a key.
+template <typename T>
+bool ExternallyAssignKey(const std::vector<T *> &operators,
+                         const ProducerMap &p, ExternalMap *e) {
+  bool result = false;
+  for (Operator *op : operators) {
+    if (std::holds_alternative<Any>(p.at(op->index()))) {
+      result = true;
+      SchemaRef schema = op->output_schema();
+      if (schema.keys().size() > 0) {
+        e->emplace(op->index(), schema.keys());
+      } else {
+        PartitionKey key;
+        for (ColumnID c = 0; c < schema.size(); c++) {
+          key.push_back(c);
+        }
+        e->emplace(op->index(), std::move(key));
+      }
+    }
+  }
+  return result;
+}
+
+std::optional<PartitionKey> ExchangeKey(Operator *parent, Operator *child,
+                                        const ProducerMap &p,
+                                        const RequiredMap &r) {
+  // Check that parent produces the required format.
+  RequiredKey rkey = r.at(child->index()).at(parent->index());
+
+  // No required format, anything goes, no need for exchange.
+  if (std::holds_alternative<Any>(rkey)) {
+    return {};
+  }
+
+  // If pkey is Any or inconsistent we need an exchange to specialize to rkey.
+  PartitionKey in = std::get<PartitionKey>(rkey);
+  ProducerKey pkey = p.at(parent->index());
+  if (std::holds_alternative<PartitionKey>(pkey)) {
+    // If out \equiv in, we do not need an exchange.
+    PartitionKey out = std::get<PartitionKey>(pkey);
+    // If parent is a project, we must take order and projectiosn when checking
+    // whether out \equiv in .
+    if (parent->type() == Operator::Type::PROJECT) {
+      auto project = static_cast<ProjectOperator *>(parent);
+      PartitionKey translated_in;
+      for (ColumnID c : in) {
+        auto result = project->UnprojectColumn(c);
+        if (result) {
+          translated_in.push_back(result.value());
+        }
+      }
+      in = translated_in;
+    }
+    // With project accounted for, we just need out == in.
+    if (out == in) {
+      return {};
+    }
+  }
+
+  // We know that pkey conflicts with in. Either because pkey is Any (i.e
+  // underspecified) or Inconsistent, or because pkey is a concrete key that
+  // is not semantically equivalent to in. We must add an exchange.
+  return std::get<PartitionKey>(rkey);
 }
 
 }  // namespace

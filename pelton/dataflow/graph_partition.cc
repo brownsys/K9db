@@ -1,6 +1,9 @@
 #include "pelton/dataflow/graph_partition.h"
 
+#include <functional>
 #include <memory>
+#include <queue>
+#include <unordered_set>
 #include <utility>
 
 #include "glog/logging.h"
@@ -17,6 +20,9 @@ template <typename to, typename from>
 inline std::unique_ptr<to> unique_cast(std::unique_ptr<from> &&ptr) {
   return std::unique_ptr<to>(static_cast<to *>(ptr.release()));
 }
+
+using MinQueue = std::priority_queue<NodeIndex, std::vector<NodeIndex>,
+                                     std::greater<NodeIndex>>;
 
 }  // namespace
 
@@ -46,6 +52,24 @@ bool DataFlowGraphPartition::AddNode(std::unique_ptr<Operator> &&op,
   return inserted;
 }
 
+bool DataFlowGraphPartition::InsertNode(std::unique_ptr<Operator> &&op,
+                                        Operator *parent, Operator *child) {
+  // Remove the edge between parent and child.
+  child->RemoveParent(parent);
+  // Initialize op.
+  NodeIndex idx = this->nodes_.size();
+  op->SetIndex(idx);
+  op->SetPartition(this->id_);
+  // Put op between parent and child.
+  op->AddParent(parent);
+  child->AddParent(op.get());
+
+  const auto &[_, inserted] = this->nodes_.emplace(idx, std::move(op));
+  CHECK(inserted);
+  return inserted;
+  return true;
+}
+
 void DataFlowGraphPartition::Process(const std::string &input_name,
                                      std::vector<Record> &&records) {
   InputOperator *node = this->inputs_.at(input_name);
@@ -73,19 +97,48 @@ uint64_t DataFlowGraphPartition::SizeInMemory() const {
 std::unique_ptr<DataFlowGraphPartition> DataFlowGraphPartition::Clone(
     PartitionIndex partition_index) const {
   auto partition = std::make_unique<DataFlowGraphPartition>(partition_index);
+
+  // Cloning is a BFS starting from inputs and follows NodeIndex.
+  // 1. Every parent must be cloned before any child.
+  // 2. Children of a node must be visited from the smallest to largest index.
+  MinQueue BFS;
+  for (const auto &[_, input] : this->inputs_) {
+    BFS.push(input->index());
+  }
+
   // Clone each node.
-  for (size_t i = 0; i < this->nodes_.size(); i++) {
-    const std::unique_ptr<Operator> &node = this->nodes_.at(i);
+  std::unordered_set<NodeIndex> visited;
+  while (!BFS.empty()) {
+    Operator *node = this->GetNode(BFS.top());
+    BFS.pop();
+    // Skip already cloned nodes.
+    if (visited.count(node->index()) == 1) {
+      continue;
+    }
     // Find the cloned parents.
     std::vector<Operator *> parents;
     parents.reserve(node->parents().size());
     for (Operator *parent : node->parents()) {
-      parents.push_back(partition->GetNode(parent->index()));
+      if (partition->nodes_.count(parent->index()) == 1) {
+        parents.push_back(partition->GetNode(parent->index()));
+      } else {
+        break;
+      }
+    }
+    // If some of the parents were not cloned, skip this node.
+    // We will get back to it when its last parent is cloned.
+    if (parents.size() != node->parents().size()) {
+      continue;
+    }
+    // Add Children to BFS.
+    for (Operator *child : node->children()) {
+      BFS.push(child->index());
     }
     // Clone the operator.
     std::unique_ptr<Operator> cloned = node->Clone();
+    visited.insert(node->index());
     // Add cloned operator to this partition.
-    switch (this->nodes_.at(i)->type()) {
+    switch (cloned->type()) {
       case Operator::Type::INPUT: {
         auto input = unique_cast<InputOperator>(std::move(cloned));
         partition->AddInputNode(std::move(input));

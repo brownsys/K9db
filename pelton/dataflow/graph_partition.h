@@ -35,6 +35,10 @@ class DataFlowGraphPartition {
   bool AddOutputOperator(std::unique_ptr<MatViewOperator> &&op,
                          Operator *parent);
 
+  // Inserting in the middle of the flow (i.e. in lieu of an edge).
+  bool InsertNode(std::unique_ptr<Operator> &&op, Operator *parent,
+                  Operator *child);
+
   NodeIndex LastOperatorIndex() const { return this->nodes_.size() - 1; }
   NodeIndex Size() const { return this->nodes_.size(); }
 

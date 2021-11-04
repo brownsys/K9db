@@ -4,7 +4,7 @@
 #include <memory>
 #include <vector>
 
-#include "pelton/dataflow/graph.h"
+#include "pelton/dataflow/graph_partition.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/types.h"
@@ -12,16 +12,22 @@
 namespace pelton {
 namespace dataflow {
 
+class DataFlowGraph;
+
 class ExchangeOperator : public Operator {
  public:
   // Cannot copy an operator.
   ExchangeOperator(const ExchangeOperator &other) = delete;
   ExchangeOperator &operator=(const ExchangeOperator &other) = delete;
 
-  ExchangeOperator(DataFlowGraph *graph, const std::vector<ColumnID> key)
-      : Operator(Operator::Type::EXCHANGE), graph_(graph), key_(key) {}
+  ExchangeOperator(
+      std::vector<std::unique_ptr<DataFlowGraphPartition>> *partitions,
+      const PartitionKey &outkey)
+      : Operator(Operator::Type::EXCHANGE),
+        partitions_(partitions),
+        outkey_(outkey) {}
 
-  const std::vector<ColumnID> &key() const { return this->key_; }
+  const std::vector<ColumnID> &outkey() const { return this->outkey_; }
 
  protected:
   std::vector<Record> Process(NodeIndex source,
@@ -32,8 +38,8 @@ class ExchangeOperator : public Operator {
   std::unique_ptr<Operator> Clone() const override;
 
  private:
-  DataFlowGraph *graph_;
-  std::vector<ColumnID> key_;  // partitioning key.
+  std::vector<std::unique_ptr<DataFlowGraphPartition>> *partitions_;
+  PartitionKey outkey_;  // partitioning key.
 };
 
 }  // namespace dataflow

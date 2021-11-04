@@ -732,7 +732,6 @@ TEST(PlannerTest, FilterArithmeticCondition) {
   expected.emplace_back(output_schema, true, 30_s, std::move(str5), 30_u);
 
   // Look at flow output.
-  dataflow::MatViewOperator *output = graph->outputs().at(0);
   EXPECT_EQ_MSET(graph->outputs().at(0), expected);
 }
 

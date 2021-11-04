@@ -78,6 +78,7 @@ public class FilterOperatorFactory {
 
     // Remove tmp columns.
     if (hasArithmetic) {
+      assert outputOperator != -1;
       outputOperator = this.context.getGenerator().AddProjectOperator(outputOperator);
       for (int i = 0; i < originalColumnCount; i++) {
         this.projectFactory.addColumnProjection("", i, outputOperator);
@@ -114,6 +115,7 @@ public class FilterOperatorFactory {
       RexNode operand = operands.get(i);
       assert operand instanceof RexCall;
       childrenOperators[i] = this.analyzeCondition((RexCall) operand, inputOperator);
+      assert childrenOperators[i] != -1;
     }
 
     return this.context.getGenerator().AddUnionOperator(childrenOperators);
@@ -130,14 +132,18 @@ public class FilterOperatorFactory {
         // If we have an OR: we process the OR first and generate its operators.
         // The OR's output union operator becomes the input to our Filter.
         // If this And condition contains other ORs, they are chained after this OR.
-        inputOperator = this.analyzeCondition((RexCall) operand, inputOperator);
+        inputOperator = this.analyzeOr((RexCall) operand, inputOperator);
+        assert inputOperator != -1;
       } else {
         throw new IllegalArgumentException("Found illegal " + operand.getKind() + " in AND");
       }
     }
 
     if (directExpressions.size() > 0) {
-      return this.analyzeDirectFilter(directExpressions, inputOperator);
+      int directFilter = this.analyzeDirectFilter(directExpressions, inputOperator);
+      if (directFilter > -1) {
+        return directFilter;
+      }
     }
     return inputOperator;
   }
