@@ -237,7 +237,8 @@ void IndexAccessor(
       // CreateIndex(column_name, index);
       // state->CreateIndex(shard_kind, stmnt.get_table_name(), column_name, &shard_by,
                   //  flow_name, create_index_stmt, unique )
-      sqlast::CreateIndex create_index_stmt{"ref_accessor", table_name, column_name};          
+      const std::string ref ("ref_accessor");
+      sqlast::CreateIndex create_index_stmt{ref, table_name, column_name};          
       std::cout << "Starting CreateIndex: " << std::endl;
       pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, &state, &dataflow_state);
 
@@ -411,10 +412,10 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     // Has pii and linked to a shard is a logical schema error.
     return absl::UnimplementedError("Sharded Table cannot have PII fields!");
   }
-  IndexAccessor(stmt, *state, *dataflow_state);
 
   state->AddSchema(table_name, stmt);
   dataflow_state->AddTableSchema(stmt);
+  IndexAccessor(stmt, *state, *dataflow_state);
 
   perf::End("Create");
   return result;
