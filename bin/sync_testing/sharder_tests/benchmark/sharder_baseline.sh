@@ -1,5 +1,5 @@
 #!/bin/bash
-./bin/drop.sh root password
+../../drop-db.sh root password
 
 # start proxy
 bazel run //mysql_proxy/src:mysql_proxy --config=opt &
