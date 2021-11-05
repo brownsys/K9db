@@ -10,6 +10,7 @@
 #include "gtest/gtest.h"
 #include "pelton/dataflow/ops/aggregate.h"
 #include "pelton/dataflow/ops/equijoin.h"
+#include "pelton/dataflow/ops/exchange.h"
 #include "pelton/dataflow/ops/filter.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/ops/matview.h"
@@ -659,6 +660,28 @@ TEST(DataFlowGraphPartitionTest, CloneReprTest) {
 
   // Test with filter and project.
   auto g2 = MakeProjectOnFilterGraph(0, lschema);
+  auto g2_clone = g2.Clone(1);
+  ASSERT_EQ(g2.DebugString(), g2_clone->DebugString());
+}
+
+TEST(DataFlowGraphPartitionTest, CloneExchangeReprTest) {
+  // Schema must survive records.
+  SchemaRef lschema = MakeLeftSchema();
+  SchemaRef rschema = MakeRightSchema();
+
+  // Test with aggregate and equijoin, but add an exchange in between.
+  auto g1 = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
+  g1.InsertNode(std::make_unique<ExchangeOperator>(nullptr, PartitionKey{2}),
+                g1.GetNode(2), g1.GetNode(3));
+  g1.InsertNode(std::make_unique<ExchangeOperator>(nullptr, PartitionKey{0}),
+                g1.GetNode(3), g1.GetNode(4));
+  auto g1_clone = g1.Clone(1);
+  ASSERT_EQ(g1.DebugString(), g1_clone->DebugString());
+
+  // Test with filter and project.
+  auto g2 = MakeProjectOnFilterGraph(0, lschema);
+  g2.InsertNode(std::make_unique<ExchangeOperator>(nullptr, PartitionKey{0}),
+                g2.GetNode(2), g2.GetNode(3));
   auto g2_clone = g2.Clone(1);
   ASSERT_EQ(g2.DebugString(), g2_clone->DebugString());
 }

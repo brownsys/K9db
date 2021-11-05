@@ -153,6 +153,7 @@ cc_library(
         "//pelton/dataflow/ops:input",
         "//pelton/dataflow/ops:matview",
         "//pelton/dataflow/ops:project",
+        "@com_google_googletest//:gtest_prod",
         "@glog",
     ],
 )
@@ -231,6 +232,7 @@ cc_test(
         ":types",
         "//pelton/dataflow/ops:aggregate",
         "//pelton/dataflow/ops:equijoin",
+        "//pelton/dataflow/ops:exchange",
         "//pelton/dataflow/ops:filter",
         "//pelton/dataflow/ops:input",
         "//pelton/dataflow/ops:matview",
@@ -252,8 +254,11 @@ cc_test(
     deps = [
         ":graph",
         ":graph_partition",
+        ":operator",
         ":schema",
         ":types",
+        "//pelton/dataflow/ops:exchange",
+        "//pelton/dataflow/ops:matview",
         "//pelton/planner",
         "//pelton/sqlast:ast",
         "@com_google_googletest//:gtest",

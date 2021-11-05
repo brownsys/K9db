@@ -21,19 +21,23 @@ class DataFlowGraphPartition {
  public:
   explicit DataFlowGraphPartition(PartitionIndex id) : id_(id) {}
 
-  bool AddNode(std::unique_ptr<Operator> &&op,
-               const std::vector<Operator *> &parents);
-
-  // Special case: input node has no parents.
-  bool AddInputNode(std::unique_ptr<InputOperator> &&op);
-
+  // Add a node with some parents.
+  inline bool AddNode(std::unique_ptr<Operator> &&op,
+                      const std::vector<Operator *> &parents) {
+    return this->AddNode(std::move(op), this->nodes_.size(), parents);
+  }
   // Special case: node with single parent.
   inline bool AddNode(std::unique_ptr<Operator> &&op, Operator *parent) {
     return AddNode(std::move(op), std::vector<Operator *>{parent});
   }
-  // Special case: output operator is added to outputs_.
-  bool AddOutputOperator(std::unique_ptr<MatViewOperator> &&op,
-                         Operator *parent);
+  // Special cases: input and output nodes.
+  inline bool AddInputNode(std::unique_ptr<InputOperator> &&op) {
+    return this->AddInputNode(std::move(op), this->nodes_.size());
+  }
+  inline bool AddOutputOperator(std::unique_ptr<MatViewOperator> &&op,
+                                Operator *parent) {
+    return this->AddOutputOperator(std::move(op), this->nodes_.size(), parent);
+  }
 
   // Inserting in the middle of the flow (i.e. in lieu of an edge).
   bool InsertNode(std::unique_ptr<Operator> &&op, Operator *parent,
@@ -67,6 +71,13 @@ class DataFlowGraphPartition {
       PartitionIndex partition_index) const;
 
  private:
+  // Private versions for adding nodes with a given ID.
+  bool AddNode(std::unique_ptr<Operator> &&op, NodeIndex idx,
+               const std::vector<Operator *> &parents);
+  bool AddInputNode(std::unique_ptr<InputOperator> &&op, NodeIndex idx);
+  bool AddOutputOperator(std::unique_ptr<MatViewOperator> &&op, NodeIndex idx,
+                         Operator *parent);
+
   PartitionIndex id_;
   // Maps input name to associated input operator.
   std::unordered_map<std::string, InputOperator *> inputs_;

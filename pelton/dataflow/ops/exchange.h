@@ -2,6 +2,7 @@
 #define PELTON_DATAFLOW_OPS_EXCHANGE_H_
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "pelton/dataflow/graph_partition.h"
@@ -28,6 +29,20 @@ class ExchangeOperator : public Operator {
         outkey_(outkey) {}
 
   const std::vector<ColumnID> &outkey() const { return this->outkey_; }
+
+  std::string DebugString() const override {
+    std::string result = Operator::DebugString();
+    result += "  \"outkey\": [";
+    for (ColumnID key : this->outkey_) {
+      result += std::to_string(key) + ", ";
+    }
+    if (this->outkey_.size() > 0) {
+      result.pop_back();
+      result.pop_back();
+    }
+    result += "],\n";
+    return result;
+  }
 
  protected:
   std::vector<Record> Process(NodeIndex source,

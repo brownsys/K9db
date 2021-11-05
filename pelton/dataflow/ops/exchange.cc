@@ -31,7 +31,7 @@ std::vector<Record> ExchangeOperator::Process(NodeIndex source,
     }
   }
 
-  return std::move(partitioned.at(this->partition()));
+  return std::move(partitioned[this->partition()]);
 }
 
 void ExchangeOperator::ComputeOutputSchema() {

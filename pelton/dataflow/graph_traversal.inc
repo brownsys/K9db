@@ -9,38 +9,6 @@ enum class Inconsistent { UNIT };
 using ProducerKey = std::variant<PartitionKey, Any, Inconsistent>;
 using RequiredKey = std::variant<PartitionKey, Any>;
 
-std::string STR(const ProducerKey &k) {
-  std::string key = "";
-  if (std::holds_alternative<PartitionKey>(k)) {
-    key = "[ ";
-    for (const auto &col : std::get<PartitionKey>(k)) {
-      key += std::to_string(col) + ",";
-    }
-    key.pop_back();
-    key += " ]";
-  } else if (std::holds_alternative<Any>(k)) {
-    key = "Any";
-  } else {
-    key = "Inconsistent";
-  }
-  return key;
-}
-
-std::string STR(const RequiredKey &k) {
-  std::string key = "";
-  if (std::holds_alternative<PartitionKey>(k)) {
-    key = "[ ";
-    for (const auto &col : std::get<PartitionKey>(k)) {
-      key += std::to_string(col) + ",";
-    }
-    key.pop_back();
-    key += " ]";
-  } else {
-    key = "Any";
-  }
-  return key;
-}
-
 // Initial keys by operator type.
 ProducerKey ProducerKeyOf(const Operator &op) {
   switch (op.type()) {
@@ -136,38 +104,6 @@ using RequiredMap =
 // the flow partitioning is completely free with no constraints).
 using ExternalMap = std::unordered_map<NodeIndex, PartitionKey>;
 
-// Debugging.
-void DebugPrint(DataFlowGraphPartition *partition, const ProducerMap &p,
-                const RequiredMap &r) {
-  std::cout << std::endl;
-  std::cout << "Keys:" << std::endl;
-  std::cout << std::endl;
-  for (NodeIndex i = partition->Size() - 1; i >= 0; i--) {
-    std::cout << "Node " << i << ": ";
-    if (p.count(i)) {
-      std::cout << STR(p.at(i));
-    } else {
-      std::cout << "UNDEFINED";
-    }
-    std::cout << std::endl;
-    for (Operator *child : partition->GetNode(i)->children()) {
-      NodeIndex j = child->index();
-      std::cout << "  child " << j << ": ";
-      if (r.count(j) && r.at(j).count(i)) {
-        std::cout << STR(r.at(j).at(i));
-      } else {
-        std::cout << "UNDEFINED";
-      }
-      std::cout << std::endl;
-    }
-    if (i == 0) {
-      break;
-    }
-  }
-  std::cout << std::endl;
-  std::cout << std::endl;
-}
-
 // Traverse the operator graph in DFS order.
 // Returns the key required by operator op from the parent whose ID is from.
 // Also, fills in the appropriate keys in *p and *r.
@@ -236,31 +172,29 @@ RequiredKey DFS(const Operator &op, NodeIndex from, const ProducerKey &key,
       //   }
       // }
       LOG(FATAL) << "Node has children with different partition keys.";
-    } else if (std::all_of(children_keys.cbegin(), children_keys.cend(),
-                           [](RequiredKey k) {
-                             return std::holds_alternative<PartitionKey>(k);
-                           })) {
-      // Check that all children have been constrained.
+    } else if (children_keys.size() > 0) {
+      // Check that (all) children have been constrained.
       const RequiredKey &child_key = children_keys.front();
       if (std::holds_alternative<PartitionKey>(child_key)) {
+        // This op should produce the same key as required by children.
+        opkey = std::get<PartitionKey>(child_key);
+        // As a result, op must require parents feed in the same key.
+        rkey = child_key;
+        // Key after project must be translated to the key before project.
         if (op.type() == Operator::Type::PROJECT) {
-          // Child key (after project) must be translated to the key before
-          // project.
           auto project = static_cast<const ProjectOperator *>(&op);
-          opkey = UnprojectKey(*project, std::get<PartitionKey>(child_key));
-          // Can the key be translated? (e.g. literal column added by project).
-          if (std::holds_alternative<Inconsistent>(opkey)) {
+          auto tmp = UnprojectKey(*project, std::get<PartitionKey>(child_key));
+          // Can the key be translated? (e.g. no literals added by project).
+          if (std::holds_alternative<Inconsistent>(tmp)) {
             // Projection no longer constrained, we will add an exchange
             // for the new key after project (since it cannot be computed
             // any earlier).
             rkey = Any::UNIT;
+            opkey = Inconsistent::UNIT;
           } else {
-            // Projection translation can only re-order key, but key is valid.
-            rkey = std::get<PartitionKey>(opkey);
+            // Projection translation may have re-ordered key, but key is valid.
+            rkey = std::get<PartitionKey>(tmp);
           }
-        } else {
-          rkey = child_key;
-          opkey = std::get<PartitionKey>(child_key);
         }
       }
     }
@@ -337,21 +271,10 @@ std::optional<PartitionKey> ExchangeKey(Operator *parent, Operator *child,
   ProducerKey pkey = p.at(parent->index());
   if (std::holds_alternative<PartitionKey>(pkey)) {
     // If out \equiv in, we do not need an exchange.
+    // Projections re-ordering of keys and other edge cases are accounted
+    // for by the traversal logic. We can simply check that out is identical
+    // to in.
     PartitionKey out = std::get<PartitionKey>(pkey);
-    // If parent is a project, we must take order and projectiosn when checking
-    // whether out \equiv in .
-    if (parent->type() == Operator::Type::PROJECT) {
-      auto project = static_cast<ProjectOperator *>(parent);
-      PartitionKey translated_in;
-      for (ColumnID c : in) {
-        auto result = project->UnprojectColumn(c);
-        if (result) {
-          translated_in.push_back(result.value());
-        }
-      }
-      in = translated_in;
-    }
-    // With project accounted for, we just need out == in.
     if (out == in) {
       return {};
     }

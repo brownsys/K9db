@@ -1,8 +1,8 @@
 #include "pelton/dataflow/graph_partition.h"
 
-#include <functional>
 #include <memory>
 #include <queue>
+#include <set>
 #include <unordered_set>
 #include <utility>
 
@@ -17,30 +17,28 @@ namespace dataflow {
 namespace {
 
 template <typename to, typename from>
-inline std::unique_ptr<to> unique_cast(std::unique_ptr<from> &&ptr) {
+inline std::unique_ptr<to> UniqueCast(std::unique_ptr<from> &&ptr) {
   return std::unique_ptr<to>(static_cast<to *>(ptr.release()));
 }
-
-using MinQueue = std::priority_queue<NodeIndex, std::vector<NodeIndex>,
-                                     std::greater<NodeIndex>>;
 
 }  // namespace
 
 // DataFlowGraphPartition.
-bool DataFlowGraphPartition::AddInputNode(std::unique_ptr<InputOperator> &&op) {
+bool DataFlowGraphPartition::AddInputNode(std::unique_ptr<InputOperator> &&op,
+                                          NodeIndex idx) {
   CHECK(this->inputs_.count(op->input_name()) == 0)
       << "An operator for this input already exists";
   this->inputs_.emplace(op->input_name(), op.get());
-  return this->AddNode(std::move(op), std::vector<Operator *>{});
+  return this->AddNode(std::move(op), idx, std::vector<Operator *>{});
 }
 bool DataFlowGraphPartition::AddOutputOperator(
-    std::unique_ptr<MatViewOperator> &&op, Operator *parent) {
+    std::unique_ptr<MatViewOperator> &&op, NodeIndex idx, Operator *parent) {
   this->outputs_.emplace_back(op.get());
-  return this->AddNode(std::move(op), parent);
+  return this->AddNode(std::move(op), idx, std::vector<Operator *>{parent});
 }
 bool DataFlowGraphPartition::AddNode(std::unique_ptr<Operator> &&op,
+                                     NodeIndex idx,
                                      const std::vector<Operator *> &parents) {
-  NodeIndex idx = this->nodes_.size();
   op->SetIndex(idx);
   op->SetPartition(this->id_);
   for (Operator *parent : parents) {
@@ -77,8 +75,15 @@ void DataFlowGraphPartition::Process(const std::string &input_name,
 }
 
 std::string DataFlowGraphPartition::DebugString() const {
+  // Go over nodes in order (of index).
+  std::set<NodeIndex> ordered_nodes;
+  for (const auto &[idx, _] : this->nodes_) {
+    ordered_nodes.insert(idx);
+  }
+
   std::string str = "[\n";
-  for (const auto &[_, node] : this->nodes_) {
+  for (auto idx : ordered_nodes) {
+    const auto &node = this->nodes_.at(idx);
     str += " {\n";
     str += node->DebugString();
     str += " },\n";
@@ -101,25 +106,28 @@ std::unique_ptr<DataFlowGraphPartition> DataFlowGraphPartition::Clone(
   // Cloning is a BFS starting from inputs and follows NodeIndex.
   // 1. Every parent must be cloned before any child.
   // 2. Children of a node must be visited from the smallest to largest index.
-  MinQueue BFS;
+  std::queue<Operator *> BFS;
   for (const auto &[_, input] : this->inputs_) {
-    BFS.push(input->index());
+    BFS.push(input);
   }
 
   // Clone each node.
   std::unordered_set<NodeIndex> visited;
   while (!BFS.empty()) {
-    Operator *node = this->GetNode(BFS.top());
+    Operator *node = BFS.front();
     BFS.pop();
+
     // Skip already cloned nodes.
-    if (visited.count(node->index()) == 1) {
+    NodeIndex idx = node->index();
+    if (visited.count(idx) == 1) {
       continue;
     }
+
     // Find the cloned parents.
     std::vector<Operator *> parents;
     parents.reserve(node->parents().size());
     for (Operator *parent : node->parents()) {
-      if (partition->nodes_.count(parent->index()) == 1) {
+      if (visited.count(parent->index())) {
         parents.push_back(partition->GetNode(parent->index()));
       } else {
         break;
@@ -131,26 +139,26 @@ std::unique_ptr<DataFlowGraphPartition> DataFlowGraphPartition::Clone(
       continue;
     }
     // Add Children to BFS.
+    visited.insert(idx);
     for (Operator *child : node->children()) {
-      BFS.push(child->index());
+      BFS.push(child);
     }
     // Clone the operator.
     std::unique_ptr<Operator> cloned = node->Clone();
-    visited.insert(node->index());
     // Add cloned operator to this partition.
     switch (cloned->type()) {
       case Operator::Type::INPUT: {
-        auto input = unique_cast<InputOperator>(std::move(cloned));
-        partition->AddInputNode(std::move(input));
+        auto input = UniqueCast<InputOperator>(std::move(cloned));
+        partition->AddInputNode(std::move(input), idx);
         break;
       }
       case Operator::Type::MAT_VIEW: {
-        auto output = unique_cast<MatViewOperator>(std::move(cloned));
-        partition->AddOutputOperator(std::move(output), parents.at(0));
+        auto output = UniqueCast<MatViewOperator>(std::move(cloned));
+        partition->AddOutputOperator(std::move(output), idx, parents.at(0));
         break;
       }
       default: {
-        partition->AddNode(std::move(cloned), parents);
+        partition->AddNode(std::move(cloned), idx, parents);
         break;
       }
     }

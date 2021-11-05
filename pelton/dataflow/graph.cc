@@ -65,9 +65,6 @@ void DataFlowGraph::Initialize(
     }
   }
 
-  // Printing.
-  DebugPrint(partition.get(), p, r);
-
   // Fill in partition key maps.
   for (const auto &[name, op] : partition->inputs()) {
     this->inkeys_.emplace(name, std::get<PartitionKey>(p.at(op->index())));
@@ -93,8 +90,6 @@ void DataFlowGraph::Initialize(
         child);
   }
 
-  std::cout << partition->DebugString() << std::endl;
-
   // Make the specified number of partitions.
   for (PartitionIndex i = 0; i < partitions; i++) {
     this->partitions_.push_back(partition->Clone(i));
@@ -103,18 +98,18 @@ void DataFlowGraph::Initialize(
 
 void DataFlowGraph::Process(const std::string &input_name,
                             std::vector<Record> &&records) {
-  this->partitions_.front()->Process(input_name, std::move(records));
-}
+  // Map each input record to its output partition.
+  std::unordered_map<PartitionIndex, std::vector<Record>> partitioned;
+  for (Record &record : records) {
+    PartitionIndex partition =
+        record.Hash(this->inkeys_.at(input_name)) % this->partitions_.size();
+    partitioned[partition].push_back(std::move(record));
+  }
 
-PartitionIndex DataFlowGraph::Partition(const std::vector<ColumnID> &key,
-                                        const Record &record) const {
-  return record.Hash(key) % this->partitions_.size();
-}
-
-void DataFlowGraph::SendToPartition(PartitionIndex partition, NodeIndex node,
-                                    std::vector<Record> &&records) const {
-  this->partitions_.at(partition)->GetNode(node)->ProcessAndForward(
-      node, std::move(records));
+  // Send records to each partition.
+  for (auto &[partition, records] : partitioned) {
+    this->partitions_.at(partition)->Process(input_name, std::move(records));
+  }
 }
 
 }  // namespace dataflow
