@@ -86,7 +86,7 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
   // Get all the columns that have a secondary index.
   const std::unordered_set<ColumnName> &indexed_cols =
       state->IndicesFor(table_name);
-  
+
   // See if the where clause conditions on a value for one of these columns.
   for (const ColumnName &column_name : indexed_cols) {
     sqlast::ValueFinder value_finder(column_name);
@@ -106,7 +106,7 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
     return std::make_pair(true, std::move(shards));
   }
   if (indexed_cols.size() == 0) {
-     delete &indexed_cols;
+    delete &indexed_cols;
   }
 
   perf::End("Lookup Index1");
