@@ -11,7 +11,7 @@ sleep 10
 
 # create student shards (by inserting submissions)
 mariadb --host=127.0.0.1 --port=10001 < inserts_new_shard.sql
-sleep 1000
+sleep 2000
 
 # benchmark inserting into existing shards, as well as adding new 
 # students and assignments without submissions (so no new shards created)
