@@ -11,7 +11,7 @@ rust_binary(
         "-Clink-args=-lmariadbcpp",
         "-Clink-args=-rdynamic",
         "-Clink-args=-Wl,-export-dynamic",
-        "-Zsanitizer=thread",
+        # "-Zsanitizer=thread",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -33,9 +33,10 @@ rust_library(
         ":proxy_ffi_bindgen",
         ":proxy_ffi_wrappers",
     ],
-    rustc_flags = [
-        "-Zsanitizer=thread",
-    ],
+    # rustc_flags = [
+    #     "-Zsanitizer=address",
+    #     "-Zsanitizer=thread",
+    # ],
     deps = [
         "//mysql_proxy:msql_srv",
     ],
