@@ -48,7 +48,7 @@ FFIConnection FFIOpen(const char *db_name, const char *db_username,
   // Log debugging information
   LOG(INFO) << "C-Wrapper: db_name is: " << std::string(db_name);
   LOG(INFO) << "C-Wrapper: db_username is: " << std::string(db_username);
-  LOG(INFO) << "C-Wrapper: db_passwored is: " << std::string(db_password);
+  LOG(INFO) << "C-Wrapper: db_password is: " << std::string(db_password);
 
   // convert char* to const std::string
   const std::string c_db(db_name);
