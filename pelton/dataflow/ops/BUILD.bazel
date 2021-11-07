@@ -116,6 +116,7 @@ cc_library(
     deps = [
         "//pelton/dataflow:key",
         "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "@com_google_absl//absl/container:btree",
         "@com_google_absl//absl/container:flat_hash_map",
