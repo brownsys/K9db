@@ -2,6 +2,7 @@
 #define PELTON_DATAFLOW_OPS_AGGREGATE_H_
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <tuple>
 // NOLINTNEXTLINE
@@ -22,6 +23,11 @@ namespace dataflow {
 class AggregateOperator : public Operator {
  public:
   using Function = AggregateFunctionEnum;
+  AggregateOperator() = delete;
+  // Cannot copy an operator.
+  AggregateOperator(const AggregateOperator &other) = delete;
+  AggregateOperator &operator=(const AggregateOperator &other) = delete;
+
   AggregateOperator(std::vector<ColumnID> group_columns,
                     Function aggregate_function, ColumnID aggregate_column)
       : Operator(Operator::Type::AGGREGATE),
@@ -30,14 +36,16 @@ class AggregateOperator : public Operator {
         aggregate_column_(aggregate_column),
         aggregate_schema_() {}
 
+  std::shared_ptr<Operator> Clone() const override;
+
   ~AggregateOperator() {
-    // ensure that schemas are not destructed first
+    // Ensure that schemas are not destructed first
     state_.~GroupedDataT();
   }
 
  protected:
-  bool Process(NodeIndex source, const std::vector<Record> &records,
-               std::vector<Record> *output) override;
+  std::optional<std::vector<Record>> Process(
+      NodeIndex /*source*/, const std::vector<Record> &records) override;
   void ComputeOutputSchema() override;
 
   uint64_t SizeInMemory() const override { return this->state_.SizeInMemory(); }

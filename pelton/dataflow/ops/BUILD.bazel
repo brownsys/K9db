@@ -22,6 +22,7 @@ cc_library(
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":grouped_data",
+        "//pelton/dataflow:graph",
         "//pelton/dataflow:key",
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
@@ -196,6 +197,7 @@ cc_test(
     deps = [
         ":equijoin",
         ":identity",
+        "//pelton/dataflow:graph",
         "//pelton/dataflow:key",
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
@@ -304,7 +306,9 @@ cc_test(
         ":equijoin",
         ":filter",
         ":identity",
+        ":input",
         ":matview",
+        "//pelton/dataflow:graph",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",

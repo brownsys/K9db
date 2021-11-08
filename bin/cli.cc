@@ -67,6 +67,7 @@ bool ReadCommand(std::string *ptr) {
 }
 
 DEFINE_bool(print, true, "Print results to the screen");
+DEFINE_bool(progress, true, "Show progress counter");
 DEFINE_string(db_path, "", "Path to database directory");
 DEFINE_string(db_name, "pelton", "Name of the database");
 DEFINE_string(db_username, "root", "MariaDB username to connect with");
@@ -90,6 +91,7 @@ int main(int argc, char **argv) {
   const std::string &db_username = FLAGS_db_username;
   const std::string &db_password = FLAGS_db_password;
   const std::string &dir = FLAGS_db_path;
+  size_t progress = 0;
 
   // Initialize our sharded state/connection.
   std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
@@ -131,6 +133,12 @@ int main(int argc, char **argv) {
         continue;
       }
 
+      if (FLAGS_progress) {
+        if (++progress % 1000 == 0) {
+          std::cout << progress << std::endl;
+        }
+      }
+
       // Command has been fully read, execute it!
       pelton::perf::Start("exec");
 
@@ -139,6 +147,7 @@ int main(int argc, char **argv) {
       if (!status.ok()) {
         std::cerr << "Fatal error" << std::endl;
         std::cerr << status.status() << std::endl;
+        std::cerr << command << std::endl;
         break;
       }
       Print(std::move(status.value()), print);

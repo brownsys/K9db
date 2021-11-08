@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/util/perf.h"
@@ -13,6 +14,45 @@ namespace pelton {
 namespace shards {
 namespace sqlengine {
 namespace select {
+
+namespace {
+
+bool IsIntLiteral(const std::string &str) {
+  for (char c : str) {
+    if (c < '0' || c > '9') {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool IsStringLiteral(const std::string &str) {
+  size_t e = str.size() - 1;
+  return (str[0] == '"' || str[0] == '\'') && (str[e] == '"' || str[e] == '\'');
+}
+
+dataflow::SchemaRef ResultSchema(const sqlast::Select &stmt,
+                                 dataflow::SchemaRef table_schema) {
+  const std::vector<std::string> &column_names = stmt.GetColumns();
+  if (column_names.at(0) == "*") {
+    return table_schema;
+  }
+
+  std::vector<sqlast::ColumnDefinition::Type> column_types;
+  column_types.reserve(column_names.size());
+  for (const std::string &col : column_names) {
+    if (IsIntLiteral(col)) {
+      column_types.push_back(sqlast::ColumnDefinition::Type::INT);
+    } else if (IsStringLiteral(col)) {
+      column_types.push_back(sqlast::ColumnDefinition::Type::TEXT);
+    } else {
+      column_types.push_back(table_schema.TypeOf(table_schema.IndexOf(col)));
+    }
+  }
+  return dataflow::SchemaFactory::Create(column_names, column_types, {});
+}
+
+}  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
                                      SharderState *state,
@@ -26,12 +66,14 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
   sql::SqlResult result;
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
-  dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
+  dataflow::SchemaRef schema =
+      ResultSchema(stmt, dataflow_state->GetTableSchema(table_name));
 
+  auto &exec = state->executor();
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
-    result = state->executor().ExecuteDefault(&stmt, schema);
+    result = exec.ExecuteDefault(&stmt, schema);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded.
@@ -48,6 +90,21 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
       sqlast::Select cloned = stmt;
       cloned.table_name() = info.sharded_table_name;
 
+      // Figure out if we need to augment the result set with the shard_by
+      // column. This columns is not physically stored in the shards because its
+      // value is trivially deduced from the containing shard. Queries may still
+      // require this column to be in the result, since they are written against
+      // the unsharded logical schema.
+      const std::string &shard_kind = info.shard_kind;
+      int aug_index = -1;
+      if (!info.IsTransitive()) {
+        if (cloned.GetColumns().at(0) == "*") {
+          aug_index = info.shard_by_index;
+        } else {
+          aug_index = cloned.RemoveColumn(info.shard_by);
+        }
+      }
+
       // Find the value assigned to shard_by column in the where clause, and
       // remove it from the where clause.
       sqlast::ValueFinder value_finder(info.shard_by);
@@ -61,19 +118,20 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
           if (lookup.size() == 1) {
             user_id = std::move(*lookup.cbegin());
             // Execute statement directly against shard.
-            result.Append(
-                state->executor().ExecuteShard(&cloned, info, user_id, schema),
-                true);
+            result.Append(exec.ExecuteShard(&cloned, shard_kind, user_id,
+                                            schema, aug_index),
+                          true);
           }
-        } else if (state->ShardExists(info.shard_kind, user_id)) {
+        } else if (state->ShardExists(shard_kind, user_id)) {
           // Remove where condition on the shard by column, since it does not
           // exist in the sharded table.
           sqlast::ExpressionRemover expression_remover(info.shard_by);
           cloned.Visit(&expression_remover);
+
           // Execute statement directly against shard.
-          result.Append(
-              state->executor().ExecuteShard(&cloned, info, user_id, schema),
-              true);
+          result.Append(exec.ExecuteShard(&cloned, shard_kind, user_id, schema,
+                                          aug_index),
+                        true);
         }
 
       } else {
@@ -85,16 +143,16 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
                                state, dataflow_state));
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
-          result.Append(state->executor().ExecuteShards(&cloned, info,
-                                                        pair.second, schema),
+          result.Append(exec.ExecuteShards(&cloned, shard_kind, pair.second,
+                                           schema, aug_index),
                         true);
         } else {
           // Secondary index unhelpful.
           // Select from all the relevant shards.
-          result.Append(
-              state->executor().ExecuteShards(
-                  &cloned, info, state->UsersOfShard(info.shard_kind), schema),
-              true);
+          const auto &user_ids = state->UsersOfShard(shard_kind);
+          result.Append(exec.ExecuteShards(&cloned, shard_kind, user_ids,
+                                           schema, aug_index),
+                        true);
         }
       }
     }

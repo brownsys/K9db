@@ -1,0 +1,1 @@
+SELECT * FROM q32 WHERE id = 0;

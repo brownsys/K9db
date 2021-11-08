@@ -17,11 +17,6 @@ jobs:
         docker run --mount type=bind,source=$(pwd),target=/home/pelton --name pelton-testing -d -t pelton/latest
         sleep 30
 
-    - name: Test dataflow with valgrind
-      env:
-        TEST: bazel test //pelton/dataflow/... --config=valgrind --test_output=all
-      run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
-
     - name: Build all
       env:
         TEST: bazel build ...
@@ -39,6 +34,11 @@ jobs:
 
     - name: Run cli and social chat via mysql proxy
       run: docker exec pelton-testing sh -c "cd /home/pelton/ && ./bin/test_proxy.sh"
+
+    - name: Test dataflow with valgrind
+      env:
+        TEST: bazel test //pelton/dataflow/... --config=valgrind --test_output=all
+      run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
 
     - name: Run cli samples
       env:

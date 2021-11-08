@@ -95,7 +95,7 @@ class Select : public AbstractStatement {
   void AddColumn(const std::string &column);
   const std::vector<std::string> &GetColumns() const;
   std::vector<std::string> &GetColumns();
-  void RemoveColumn(const std::string &column);
+  int RemoveColumn(const std::string &column);
 
   bool HasWhereClause() const;
   const BinaryExpression *const GetWhereClause() const;

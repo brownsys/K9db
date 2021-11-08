@@ -349,7 +349,6 @@ antlrcpp::Any AstTransformer::visitSelect_stmt(
 antlrcpp::Any AstTransformer::visitSelect_core(
     sqlparser::SQLiteParser::Select_coreContext *ctx) {
   if (ctx->DISTINCT() != nullptr || ctx->ALL() != nullptr ||
-      ctx->result_column().size() != 1 ||
       ctx->table_or_subquery().size() != 1 || ctx->GROUP() != nullptr ||
       ctx->HAVING() != nullptr || ctx->WINDOW() != nullptr ||
       ctx->VALUES() != nullptr) {
@@ -385,10 +384,19 @@ antlrcpp::Any AstTransformer::visitSelect_core(
 }
 antlrcpp::Any AstTransformer::visitResult_column(
     sqlparser::SQLiteParser::Result_columnContext *ctx) {
-  if (ctx->STAR() == nullptr) {
-    return absl::InvalidArgumentError("Only support * in select");
+  if (ctx->expr() != nullptr) {
+    if (ctx->expr()->column_name() != nullptr) {
+      return ctx->expr()->column_name()->accept(this);
+    }
+    if (ctx->expr()->literal_value() != nullptr) {
+      return ctx->expr()->literal_value()->accept(this);
+    }
+    return absl::InvalidArgumentError("Bad column expression in SELECT");
   }
-  return std::string("*");
+  if (ctx->STAR() != nullptr) {
+    return std::string("*");
+  }
+  return absl::InvalidArgumentError("SELECT column is not * nor a column name");
 }
 antlrcpp::Any AstTransformer::visitTable_or_subquery(
     sqlparser::SQLiteParser::Table_or_subqueryContext *ctx) {
@@ -460,7 +468,7 @@ antlrcpp::Any AstTransformer::visitExpr(
 
   if ((ctx->literal_value() == nullptr && ctx->ASSIGN() == nullptr &&
        ctx->column_name() == nullptr && ctx->AND() == nullptr &&
-       ctx->GT() == nullptr && ctx->IN() == nullptr) ||
+       ctx->GT() == nullptr && ctx->IN() == nullptr && ctx->IS() == nullptr) ||
       ctx->expr().size() > 2) {
     return absl::InvalidArgumentError("Unsupported expression");
   }
@@ -510,6 +518,9 @@ antlrcpp::Any AstTransformer::visitExpr(
   std::unique_ptr<BinaryExpression> result;
   if (ctx->ASSIGN() != nullptr) {
     result = std::make_unique<BinaryExpression>(Expression::Type::EQ);
+  }
+  if (ctx->IS() != nullptr) {
+    result = std::make_unique<BinaryExpression>(Expression::Type::IS);
   }
   if (ctx->AND() != nullptr) {
     result = std::make_unique<BinaryExpression>(Expression::Type::AND);

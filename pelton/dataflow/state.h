@@ -3,6 +3,7 @@
 // The state includes the currently installed flows, including their operators
 // and state.
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -35,9 +36,9 @@ class DataFlowState {
   SchemaRef GetTableSchema(const TableName &table_name) const;
 
   // Add and manage flows.
-  void AddFlow(const FlowName &name, const DataFlowGraph &flow);
+  void AddFlow(const FlowName &name, const std::shared_ptr<DataFlowGraph> flow);
 
-  const DataFlowGraph &GetFlow(const FlowName &name) const;
+  const std::shared_ptr<DataFlowGraph> GetFlow(const FlowName &name) const;
 
   bool HasFlow(const FlowName &name) const;
 
@@ -52,10 +53,10 @@ class DataFlowState {
   Record CreateRecord(const sqlast::Insert &insert_stmt) const;
 
   // Process raw data from sharder and use it to update flows.
-  bool ProcessRecords(const TableName &table_name,
+  void ProcessRecords(const TableName &table_name,
                       const std::vector<Record> &records);
 
-  uint64_t SizeInMemory() const;
+  void PrintSizeInMemory() const;
 
  private:
   // Maps every table to its logical schema.
@@ -65,7 +66,7 @@ class DataFlowState {
   std::unordered_map<TableName, SchemaRef> schema_;
 
   // DataFlow graphs and views.
-  std::unordered_map<FlowName, DataFlowGraph> flows_;
+  std::unordered_map<FlowName, std::shared_ptr<DataFlowGraph>> flows_;
   std::unordered_map<TableName, std::vector<FlowName>> flows_per_input_table_;
 };
 

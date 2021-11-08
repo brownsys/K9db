@@ -1,3 +1,6 @@
 [submodule "experiments/GDPRbench"]
 	path = experiments/GDPRbench
 	url = https://github.com/GDPRbench/GDPRbench.git
+[submodule "experiments/lobsters/noria"]
+	path = experiments/lobsters/noria
+	url = https://github.com/ishanSharma07/noria.git

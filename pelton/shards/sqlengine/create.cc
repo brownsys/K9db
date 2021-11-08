@@ -310,6 +310,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
 
   sql::SqlResult result = sql::SqlResult(false);
   // Sharding scenarios.
+  auto &exec = state->executor();
   if (has_pii && sharding_information.size() == 0) {
     // Case 1: has pii but not linked to shards.
     // This means that this table define a type of user for which shards must be
@@ -317,7 +318,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     ASSIGN_OR_RETURN(std::string pk, GetPK(stmt));
     state->AddShardKind(table_name, pk);
     state->AddUnshardedTable(table_name, stmt);
-    result = state->executor().ExecuteDefault(&stmt);
+    result = exec.ExecuteDefault(&stmt);
 
   } else if (!has_pii && sharding_information.size() > 0) {
     // Case 2: no pii but is linked to shards.
@@ -345,7 +346,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     // Case 3: neither pii nor linked.
     // The table does not belong to a shard and needs no further modification!
     state->AddUnshardedTable(table_name, stmt);
-    result = state->executor().ExecuteDefault(&stmt);
+    result = exec.ExecuteDefault(&stmt);
   } else {
     // Has pii and linked to a shard is a logical schema error.
     return absl::UnimplementedError("Sharded Table cannot have PII fields!");

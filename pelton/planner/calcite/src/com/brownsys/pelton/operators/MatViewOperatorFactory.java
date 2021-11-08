@@ -29,7 +29,7 @@ public class MatViewOperatorFactory {
     // Find the sorting parameters.
     int[] keyCols = this.context.getMatViewKeys();
 
-    List<RexNode> exps = sort.getChildExps();
+    List<RexNode> exps = sort.getSortExps();
     int[] sortingCols = new int[exps.size()];
     int limit = -1;
     int offset = 0;
