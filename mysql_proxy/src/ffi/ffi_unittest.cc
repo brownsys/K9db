@@ -40,8 +40,8 @@ void DropDatabase() {
 }
 
 TEST(PROXY, OPEN_TEST) {
-  c_conn = FFIOpen("", DB_NAME, db_username->c_str(), db_password->c_str());
-  EXPECT_TRUE(c_conn.connected) << "Openning connection failed!";
+  c_conn = FFIOpen();
+  EXPECT_TRUE(c_conn.connected) << "Opening connection failed!";
 }
 
 // Test creating tables and views.
@@ -83,18 +83,20 @@ TEST(PROXY, QUERY_TEST) {
   EXPECT_EQ(std::string(response_select->col_names[1]), "name") << "Bad schema";
   EXPECT_EQ(response_select->col_types[0], CType::INT) << "Bad types";
   EXPECT_EQ(response_select->col_types[1], CType::TEXT) << "Bad types";
-  EXPECT_EQ(response_select->values[0].INT, 10) << "Bad data";
-  EXPECT_EQ(std::string(response_select->values[1].TEXT), "hello")
+  EXPECT_EQ(response_select->records[0].record.INT, 10) << "Bad data";
+  EXPECT_EQ(std::string(response_select->records[1].record.TEXT), "hello")
       << "Bad data";
-  EXPECT_EQ(response_select->values[2].INT, 2) << "Bad data";
-  EXPECT_EQ(std::string(response_select->values[3].TEXT), "bye") << "Bad data";
-  EXPECT_EQ(response_select->values[4].INT, 50) << "Bad data";
-  EXPECT_EQ(std::string(response_select->values[5].TEXT), "hi") << "Bad data";
+  EXPECT_EQ(response_select->records[2].record.INT, 2) << "Bad data";
+  EXPECT_EQ(std::string(response_select->records[3].record.TEXT), "bye")
+      << "Bad data";
+  EXPECT_EQ(response_select->records[4].record.INT, 50) << "Bad data";
+  EXPECT_EQ(std::string(response_select->records[5].record.TEXT), "hi")
+      << "Bad data";
   free(response_select->col_names[0]);
   free(response_select->col_names[1]);
-  free(response_select->values[1].TEXT);
-  free(response_select->values[3].TEXT);
-  free(response_select->values[5].TEXT);
+  free(response_select->records[1].record.TEXT);
+  free(response_select->records[3].record.TEXT);
+  free(response_select->records[5].record.TEXT);
   FFIDestroySelect(response_select);
 
 #ifndef PELTON_VALGRIND_MODE
@@ -106,15 +108,16 @@ TEST(PROXY, QUERY_TEST) {
   EXPECT_EQ(std::string(response_select->col_names[1]), "name") << "Bad schema";
   EXPECT_EQ(response_select->col_types[0], CType::INT) << "Bad types";
   EXPECT_EQ(response_select->col_types[1], CType::TEXT) << "Bad types";
-  EXPECT_EQ(response_select->values[0].INT, 50) << "Bad data";
-  EXPECT_EQ(std::string(response_select->values[1].TEXT), "hi") << "Bad data";
-  EXPECT_EQ(response_select->values[2].INT, 10) << "Bad data";
-  EXPECT_EQ(std::string(response_select->values[3].TEXT), "hello")
+  EXPECT_EQ(response_select->records[0].record.INT, 50) << "Bad data";
+  EXPECT_EQ(std::string(response_select->records[1].record.TEXT), "hi")
+      << "Bad data";
+  EXPECT_EQ(response_select->records[2].record.INT, 10) << "Bad data";
+  EXPECT_EQ(std::string(response_select->records[3].record.TEXT), "hello")
       << "Bad data";
   free(response_select->col_names[0]);
   free(response_select->col_names[1]);
-  free(response_select->values[1].TEXT);
-  free(response_select->values[3].TEXT);
+  free(response_select->records[1].record.TEXT);
+  free(response_select->records[3].record.TEXT);
   FFIDestroySelect(response_select);
 #endif
 }
@@ -137,9 +140,17 @@ int main(int argc, char **argv) {
   // Drop the database (in case it existed before because of some tests).
   DropDatabase();
 
+  // Initialize Pelton State
+  EXPECT_TRUE(
+      FFIInitialize("", DB_NAME, db_username->c_str(), db_password->c_str()))
+      << "Opening global connection failed!";
+
   // Run tests.
   ::testing::InitGoogleTest(&argc, argv);
   auto result = RUN_ALL_TESTS();
+
+  // Close global connection
+  EXPECT_TRUE(FFIShutdown()) << "Closing global connection failed!";
 
   // Drop the database again.
   DropDatabase();

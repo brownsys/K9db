@@ -15,6 +15,7 @@ rust_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":proxy_ffi",
+        "//mysql_proxy:ctrlc",
         "//mysql_proxy:msql_srv",
         "//mysql_proxy:slog",
         "//mysql_proxy:slog_term",

@@ -33,10 +33,10 @@ mariadb --port=10001 --host=127.0.0.1
 # Summary
 This proxy acts as a mysql database while interfacing with pelton. Queries are converted to C compatible types and sent to pelton. Responses are converted to rust compatible types and returned. Any application that uses a mysql backend may connect to this proxy instead of a traditional database.
 
-- Coarse Grain
+- Coarse Grain  
 Application <=> Mysql Proxy <=> Pelton
 
-- Fine Grain
+- Fine Grain  
 Application <=> Mysql Proxy <=> FFI <=> C++ Wrappers <=> Pelton
 
 # Design overview:

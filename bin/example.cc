@@ -149,8 +149,9 @@ int main(int argc, char **argv) {
 
   // Open connection to sharder.
   pelton::Connection connection;
-  pelton::open("", "exampledb", db_username, db_password, &connection);
-  CHECK(pelton::exec(&connection, "SET echo;").ok());
+  pelton::initialize("", "exampledb", db_username, db_password);
+  pelton::open(&connection);
+  // CHECK(pelton::exec(&connection, "SET echo;").ok());
 
   // Create all the tables.
   std::cout << "Create the tables ... " << std::endl;
@@ -231,11 +232,12 @@ int main(int argc, char **argv) {
   }
   std::cout << std::endl;
 
-  // Print flows memory usage.
-  connection.PrintSizeInMemory();
+  // Find peak memory usage.
+  connection.pelton_state->PrintSizeInMemory();
 
   // Close connection.
   pelton::close(&connection);
+  pelton::shutdown();
 
   // Print performance profile.
   pelton::perf::PrintAll();

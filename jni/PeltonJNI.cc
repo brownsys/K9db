@@ -33,9 +33,9 @@ void Java_edu_brown_pelton_PeltonJNI_Open(JNIEnv *env, jobject this_,
   int64_t ptr = env->GetLongField(this_, GetConnectionFieldID(env, this_));
   if (ptr == 0) {
     pelton::Connection *connection = new pelton::Connection();
-    pelton::open(GetString(env, directory), GetString(env, db_name),
-                 GetString(env, username), GetString(env, password),
-                 connection);
+    pelton::initialize(GetString(env, directory), GetString(env, db_name),
+                       GetString(env, username), GetString(env, password));
+    pelton::open(connection);
     env->SetLongField(this_, GetConnectionFieldID(env, this_),
                       reinterpret_cast<int64_t>(connection));
   }
@@ -129,6 +129,7 @@ void Java_edu_brown_pelton_PeltonJNI_Close(JNIEnv *env, jobject this_) {
     pelton::Connection *connection =
         reinterpret_cast<pelton::Connection *>(ptr);
     pelton::close(connection);
+    pelton::shutdown();
     delete connection;
   }
   env->SetLongField(this_, GetConnectionFieldID(env, this_), 0);
