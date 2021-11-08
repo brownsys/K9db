@@ -107,9 +107,7 @@ cc_library(
 
 cc_library(
     name = "grouped_data",
-    srcs = [
-        "grouped_data.cc",
-    ],
+    srcs = [],
     hdrs = [
         "grouped_data.h",
     ],
@@ -125,9 +123,7 @@ cc_library(
 
 cc_library(
     name = "matview",
-    srcs = [
-        "matview.cc",
-    ],
+    srcs = [],
     hdrs = [
         "matview.h",
     ],
@@ -200,6 +196,7 @@ cc_library(
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
+        "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_googletest//:gtest_prod",
         "@glog",
     ],

@@ -151,7 +151,7 @@ inline void MatViewContentsEquals(MatViewOperator *matview,
                                   ColumnID key) {
   EXPECT_EQ(matview->count(), records.size());
   for (const Record &record : records) {
-    EXPECT_EQ(record, *matview->Lookup(record.GetValues({key})).begin());
+    EXPECT_EQ(record, matview->Lookup(record.GetValues({key})).front());
   }
 }
 

@@ -164,6 +164,7 @@ class Record {
 
   // Data type transformation.
   void SetValue(const std::string &value, size_t i);
+  void SetValue(const Value &value, size_t i);
 
   // Deterministic hashing for partitioning / mutli-threading.
   size_t Hash(const std::vector<ColumnID> &cols) const;

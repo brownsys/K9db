@@ -20,8 +20,8 @@ using CType = sqlast::ColumnDefinition::Type;
 
 // NOLINTNEXTLINE
 static void JoinOneToOne(benchmark::State &state) {
-  SchemaRef leftSchema = MakeSchema(false);
-  SchemaRef rightSchema = MakeSchema(false);
+  SchemaRef leftSchema = MakeSchema(false, true);
+  SchemaRef rightSchema = MakeSchema(false, true);
 
   // Generator function: generates batches of records for benchmarking.
   RecordGenFunc gen = [rightSchema] {

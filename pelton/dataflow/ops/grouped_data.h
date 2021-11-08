@@ -10,7 +10,6 @@
 #include <cstdint>
 #include <list>
 #include <set>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -26,47 +25,22 @@ namespace pelton {
 namespace dataflow {
 
 // This class will either have a RecordCompare member variable or not depending
-// on flag.
+// on whether T == std::nullptr_t.
 template <typename T, typename Enable = void>
-class GroupedData {};
-template <typename T>
-class GroupedData<T, std::enable_if_t<!std::is_null_pointer<T>::value>> {
+class GroupedData {
  protected:
-  T compare_;
+  GroupedData() {}
 };
 
-// A static/compile time way to test if type T has a desired member function.
-// This works for inherited functions, as well as functions with variable number
-// of arguments, and various modifiers of record (ref, const ref, etc).
-template <class F>
-struct HasFunction {
- private:
-  // if p->find(*r) does not exist, this will not cause an error, rather
-  // it will just cause this overloaded variant of Test not to be defined.
-  // This Test(...) has return type std::true_type() only when p->find(*r)
-  // exists and is defined and callable, and std::false_type otherwise.
-  template <typename T>
-  static auto FindTest(T *p, Record *r)
-      -> decltype(p->find(*r), std::true_type());
-
-  template <class>
-  static auto FindTest(...) -> std::false_type;
-
-  // Similar but for insert.
-  template <typename T>
-  static auto InsertTest(T *p, Record *r)
-      -> decltype(p->insert(*r), std::true_type());
-
-  template <class>
-  static auto InsertTest(...) -> std::false_type;
-
+template <typename T>
+class GroupedData<T, std::enable_if_t<!std::is_null_pointer<T>::value>> {
  public:
-  static constexpr bool Find() {
-    return decltype(FindTest<F>(nullptr, nullptr))::value;
-  }
-  static constexpr bool Insert() {
-    return decltype(InsertTest<F>(nullptr, nullptr))::value;
-  }
+  T compare() const { return this->compare_; }
+
+ protected:
+  GroupedData() = delete;
+  explicit GroupedData(T compare) : compare_(compare) {}
+  T compare_;
 };
 
 // This class stores a set of records, this set is divided into groups,
@@ -158,27 +132,33 @@ struct HasFunction {
 //                    in O(log(|keys|) + |records in key|) otherwise.
 //    3) record ordered: in O(1) if PK is part of schema, or
 //                    in O(log(|records in key|)) otherwise.
-template <typename M, typename V, typename RecordCompare = nullptr_t>
-class GroupedDataT : GroupedData<RecordCompare> {
- private:
-  using NoRecordCompare = std::is_null_pointer<RecordCompare>;
-  using IsKeyOrdered = std::is_same<M, absl::btree_map<Key, std::list<Record>>>;
-
+template <typename M, typename V, typename RecordCompare = std::nullptr_t,
+          typename R = Record>
+class GroupedDataT : public GroupedData<RecordCompare> {
  public:
+  using NoCompare = std::is_null_pointer<RecordCompare>;
+  using KeyOrdered = std::is_same<M, absl::btree_map<Key, std::list<Record>>>;
+
   // If this is not ordered, we do not need to provide anything.
-  template <typename = typename std::enable_if<NoRecordCompare::value>>
-  GroupedDataT() {}
+  template <typename X = void,
+            typename std::enable_if<NoCompare::value, X>::type * = nullptr>
+  GroupedDataT() : count_(0), contents_(), schema_has_pk_(false), pk_index_() {}
 
   // If this is ordered, we need to provide a custom comparator.
-  template <typename = typename std::enable_if<!NoRecordCompare::value>>
-  explicit GroupedDataT(const RecordCompare &compare) {
-    this->compare_ = compare;
-  }
+  template <typename X = void,
+            typename std::enable_if<!NoCompare::value, X>::type * = nullptr>
+  explicit GroupedDataT(const RecordCompare &compare)
+      : GroupedData<RecordCompare>(compare),
+        count_(0),
+        contents_(),
+        schema_has_pk_(false),
+        pk_index_() {}
 
   // Initialize with the schema to be used.
-  void Initialize(const std::vector<ColumnID> &keys, const SchemaRef &schema) {
+  void Initialize(const SchemaRef &schema) {
     this->schema_has_pk_ = schema.keys().size() > 0;
   }
+  void Initialize(bool use_pk) { this->schema_has_pk_ = false; }
 
   // Generic API:
   // Count of elements in the entire map.
@@ -187,7 +167,7 @@ class GroupedDataT : GroupedData<RecordCompare> {
   uint64_t SizeInMemory() const {
     uint64_t size = 0;
     for (const Key &key : this->Keys()) {
-      for (const Record &record : this->Lookup(key)) {
+      for (const auto &record : this->Lookup(key)) {
         size += record.SizeInMemory();
       }
     }
@@ -197,8 +177,8 @@ class GroupedDataT : GroupedData<RecordCompare> {
   // Lookup(key) API:
   // Return an Iterable set of records corresponding to the given key, in the
   // underlying order (specified by V).
-  std::vector<Record> Lookup(const Key &key, int limit = -1,
-                             size_t offset = 0) const {
+  std::vector<R> Lookup(const Key &key, int limit = -1,
+                        size_t offset = 0) const {
     auto it = this->contents_.find(key);
     if (it == this->contents_.end()) {
       return {};
@@ -213,20 +193,26 @@ class GroupedDataT : GroupedData<RecordCompare> {
     std::advance(begin, offset);
 
     // Copy records.
-    std::vector<Record> result;
+    std::vector<R> result;
     result.reserve(limit > -1 ? limit : it->second.size() - offset);
-    for (auto it = begin; it < end; ++it) {
+    for (auto it = begin; it != end; ++it) {
       if (limit > -1 && result.size() >= static_cast<size_t>(limit)) {
         break;
       }
-      result.push_back(it->Copy());
+      if constexpr (std::is_same<R, Record>::value) {
+        result.push_back(it->Copy());
+      } else {
+        // Use copy constructor.
+        result.push_back(*it);
+      }
     }
     return result;
   }
   // Looking up within a key, for records > than cmp.
-  template <typename = typename std::enable_if<!NoRecordCompare::value>>
-  std::vector<Record> LookupGreater(const Key &key, const Record &cmp,
-                                    int limit = -1, size_t offset = 0) const {
+  template <typename X = void,
+            typename std::enable_if<!NoCompare::value, X>::type * = nullptr>
+  std::vector<R> LookupGreater(const Key &key, const R &cmp, int limit = -1,
+                               size_t offset = 0) const {
     auto it = this->contents_.find(key);
     if (it == this->contents_.end()) {
       return {};
@@ -244,19 +230,25 @@ class GroupedDataT : GroupedData<RecordCompare> {
     }
 
     // Copy records.
-    std::vector<Record> result;
-    for (auto it = begin; it < end; ++it) {
+    std::vector<R> result;
+    for (auto it = begin; it != end; ++it) {
       if (limit > -1 && result.size() >= static_cast<size_t>(limit)) {
         break;
       }
-      result.push_back(it->Copy());
+      if constexpr (std::is_same<R, Record>::value) {
+        result.push_back(it->Copy());
+      } else {
+        // Use copy constructor.
+        result.push_back(*it);
+      }
     }
     return result;
   }
   // Looking up by > key, only available for key ordered instantiations.
   // Due to hash partitioning, having an offset here is entirely meaningless.
-  template <typename = typename std::enable_if<IsKeyOrdered::value>>
-  std::vector<Record> LookupGreater(const Key &key, int limit = -1) const {
+  template <typename X = void,
+            typename std::enable_if<KeyOrdered::value, X>::type * = nullptr>
+  std::vector<R> LookupGreater(const Key &key, int limit = -1) const {
     // Find smallest k > key.
     auto begin = this->contents_.lower_bound(key);
     auto end = this->contents_.end();
@@ -264,27 +256,37 @@ class GroupedDataT : GroupedData<RecordCompare> {
       return {};
     }
 
-    std::vector<Record> result;
-    for (auto it = begin; it < end; ++it) {
+    std::vector<R> result;
+    for (auto it = begin; it != end; ++it) {
       auto begin = it->second.begin();
       auto end = it->second.end();
-      for (auto it = begin; it < end; ++it) {
+      for (auto it = begin; it != end; ++it) {
         if (limit > -1 && result.size() >= static_cast<size_t>(limit)) {
           return result;
         }
-        result.push_back(it->Copy());
+        if constexpr (std::is_same<R, Record>::value) {
+          result.push_back(it->Copy());
+        } else {
+          // Use copy constructor.
+          result.push_back(*it);
+        }
       }
     }
     return result;
   }
 
   // All() API:
-  std::vector<Record> All() const {
-    std::vector<Record> result;
+  std::vector<R> All() const {
+    std::vector<R> result;
     result.reserve(this->count_);
-    for (auto it = this->contents_.begin(); it < this->contents_.end(); ++it) {
-      for (auto it2 = it->second.begin(); it2 < it->second.end(); ++it2) {
-        result.push_back(it2->Copy());
+    for (auto it = this->contents_.begin(); it != this->contents_.end(); ++it) {
+      for (auto it2 = it->second.begin(); it2 != it->second.end(); ++it2) {
+        if constexpr (std::is_same<R, Record>::value) {
+          result.push_back(it2->Copy());
+        } else {
+          // Use copy constructor.
+          result.push_back(*it2);
+        }
       }
     }
     return result;
@@ -299,7 +301,7 @@ class GroupedDataT : GroupedData<RecordCompare> {
     auto end = this->contents_.end();
 
     std::vector<Key> result;
-    for (auto it = begin; it < end; ++it) {
+    for (auto it = begin; it != end; ++it) {
       if (limit > -1 && result.size() >= static_cast<size_t>(limit)) {
         break;
       }
@@ -309,13 +311,14 @@ class GroupedDataT : GroupedData<RecordCompare> {
   }
   // Looking up by > key, only available for key ordered instantiations.
   // Because of hash partitioning, having an offset here is meaningless.
-  template <typename = typename std::enable_if<IsKeyOrdered::value>>
+  template <typename X = void,
+            typename std::enable_if<KeyOrdered::value, X>::type * = nullptr>
   std::vector<Key> KeysGreater(const Key &key, int limit = -1) const {
     auto begin = this->contents_.lower_bound(key);
     auto end = this->contents_.end();
 
     std::vector<Key> result;
-    for (auto it = begin; it < end; ++it) {
+    for (auto it = begin; it != end; ++it) {
       if (limit > -1 && result.size() >= static_cast<size_t>(limit)) {
         break;
       }
@@ -325,7 +328,7 @@ class GroupedDataT : GroupedData<RecordCompare> {
   }
 
   // Count of records corresponding to a given key
-  size_t count(const Key &key) const {
+  size_t Count(const Key &key) const {
     auto it = this->contents_.find(key);
     if (it == this->contents_.end()) {
       return 0;
@@ -344,13 +347,12 @@ class GroupedDataT : GroupedData<RecordCompare> {
 
   // Insert() API:
   // Insert a record mapped by given key.
-  bool Insert(const Key &k, Record &&r) {
+  bool Insert(const Key &k, R &&r) {
     V *bucket = nullptr;
     auto it = this->contents_.find(k);
     if (it == this->contents_.end()) {
-      if constexpr (NoRecordCompare::value) {
-        auto emplaced = this->contents_.emplace(k);
-        bucket = &emplaced.first->second;
+      if constexpr (NoCompare::value) {
+        bucket = &this->contents_[k];
       } else {
         auto emplaced = this->contents_.emplace(k, this->compare_);
         bucket = &emplaced.first->second;
@@ -360,9 +362,9 @@ class GroupedDataT : GroupedData<RecordCompare> {
     }
     // Add the new record to the approprite bin.
     this->count_++;
-    typename V::constIterator insert_it;
-    if constexpr (HasFunction<V>::Insert()) {
-      // Sorted container.
+    typename V::const_iterator insert_it;
+    if constexpr (!NoCompare::value) {
+      // Sorted (by record) container.
       insert_it = bucket->insert(std::move(r));
     } else {
       // Unsorted container.
@@ -370,12 +372,14 @@ class GroupedDataT : GroupedData<RecordCompare> {
       insert_it = --(bucket->end());
     }
     // Update pk index.
-    if (schema_has_pk_) {
-      return this->pk_index_.emplace(insert_it->GetKey(), insert_it)->second;
+    if constexpr (std::is_same<R, Record>::value) {
+      if (this->schema_has_pk_) {
+        return this->pk_index_.emplace(insert_it->GetKey(), insert_it).second;
+      }
     }
     return true;
   }
-  bool Delete(const Key &k, Record &&r) {
+  bool Delete(const Key &k, R &&r) {
     auto it = this->contents_.find(k);
     if (it == this->contents_.end()) {
       return false;
@@ -383,21 +387,29 @@ class GroupedDataT : GroupedData<RecordCompare> {
     V &bucket = it->second;
 
     // Find the element corresponding to r in the fastest possible way.
-    typename V::constIterator erase_it;
-    if (this->schema_has_pk_) {
-      // Records have a primary key, we can use our PK index!
-      Key pk = r.GetKey();
-      auto pk_it = this->pk_index_.find(pk);
-      if (pk_it == this->pk_index_.end()) {
-        // Should never happen.
-        return false;
+    bool used_pk_index = false;
+    typename V::const_iterator erase_it;
+
+    // Try to find things via the primary key index if possible.
+    if constexpr (std::is_same<R, Record>::value) {
+      if (this->schema_has_pk_) {
+        used_pk_index = true;
+        // Records have a primary key, we can use our PK index!
+        Key pk = r.GetKey();
+        auto pk_it = this->pk_index_.find(pk);
+        if (pk_it == this->pk_index_.end()) {
+          // Should never happen.
+          return false;
+        }
+        erase_it = pk_it->second;
+        this->pk_index_.erase(pk_it);  // Update pk index.
       }
-      erase_it = pk_it->second;
-      this->pk_index.erase(pk_it);  // Update pk index.
-    } else {
-      // No primary key, must look up in V.
-      if constexpr (HasFunction<V>::Find()) {
-        // Sorted container, log(n) search.
+    }
+
+    // No primary key, must look up in V.
+    if (!used_pk_index) {
+      if constexpr (!NoCompare::value) {
+        // Sorted (by record) container, log(n) search.
         erase_it = bucket.find(r);
       } else {
         // Linked list, slow linear scan.
@@ -419,6 +431,9 @@ class GroupedDataT : GroupedData<RecordCompare> {
     }
   }
 
+  // This is not for use in Matview.
+  V &Get(const Key &key) { return this->contents_.at(key); }
+
  private:
   // Total number of records.
   size_t count_ = 0;
@@ -427,7 +442,7 @@ class GroupedDataT : GroupedData<RecordCompare> {
   // Index V by primary key for fast deletion.
   bool schema_has_pk_;
   // Index iterators into V by primary key for fast look up.
-  std::unordered_map<Key, typename V::constIterator> pk_index_;
+  absl::flat_hash_map<Key, typename V::const_iterator> pk_index_;
 };
 
 // Supported instantiations of GroupedData:

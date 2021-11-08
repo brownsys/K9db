@@ -27,22 +27,36 @@ class MatViewOperator : public Operator {
   MatViewOperator(const MatViewOperator &other) = delete;
   MatViewOperator &operator=(const MatViewOperator &other) = delete;
 
-  virtual size_t count() const = 0;
-  virtual const std::vector<ColumnID> &key_cols() const = 0;
-  virtual bool Contains(const Key &key) const = 0;
-  virtual const_RecordIterable Lookup(const Key &key, int limit = -1,
-                                      size_t offset = 0) const = 0;
-  virtual const_RecordIterable LookupGreater(const Key &key, const Record &cmp,
-                                             int limit = -1,
-                                             size_t offset = 0) const = 0;
-  virtual const_KeyIterable Keys() const = 0;
+  // Generic API.
   virtual bool RecordOrdered() const = 0;
   virtual bool KeyOrdered() const = 0;
+  const std::vector<ColumnID> &key_cols() const { return this->key_cols_; }
+
+  // Key API.
+  virtual std::vector<Key> Keys(int limit = -1) const = 0;
+  virtual size_t Count(const Key &key) const = 0;
+  virtual bool Contains(const Key &key) const = 0;
+
+  // Record API.
+  virtual size_t count() const = 0;
+  virtual std::vector<Record> All() const = 0;
+  virtual std::vector<Record> Lookup(const Key &key, int limit = -1,
+                                     size_t offset = 0) const = 0;
 
  protected:
   // We do not know if we are ordered or unordered, this type is revealed
   // to us by the derived class as an argument.
-  MatViewOperator() : Operator(Operator::Type::MAT_VIEW) {}
+  MatViewOperator(const std::vector<ColumnID> &key_cols, int limit,
+                  size_t offset)
+      : Operator(Operator::Type::MAT_VIEW),
+        key_cols_(key_cols),
+        limit_(limit),
+        offset_(offset) {}
+
+  // Data members.
+  std::vector<ColumnID> key_cols_;
+  int limit_;
+  size_t offset_;
 
   // Allow tests to set input_schemas_ directly.
   FRIEND_TEST(MatViewOperatorTest, EmptyMatView);
@@ -70,51 +84,25 @@ class MatViewOperator : public Operator {
 template <typename T>
 class MatViewOperatorT : public MatViewOperator {
  public:
+  // Uncopyable.
   MatViewOperatorT(const MatViewOperatorT &other) = delete;
   MatViewOperatorT &operator=(const MatViewOperatorT &other) = delete;
 
-  template <typename = typename std::enable_if<
-                !std::is_same<T, RecordOrderedGroupedData>::value>>
+  // Constructors: must provide a record comparator if record ordered.
+  template <typename X = void,
+            typename std::enable_if<T::NoCompare::value, X>::type * = nullptr>
   explicit MatViewOperatorT(const std::vector<ColumnID> &key_cols,
                             int limit = -1, size_t offset = 0)
-      : MatViewOperator(),
-        key_cols_(key_cols),
-        contents_(),
-        compare_(Record::Compare{{}}),
-        limit_(limit),
-        offset_(offset) {}
+      : MatViewOperator(key_cols, limit, offset), contents_() {}
 
-  template <typename = typename std::enable_if<
-                std::is_same<T, RecordOrderedGroupedData>::value>>
-  explicit MatViewOperatorT(const std::vector<ColumnID> &key_cols,
-                            const Record::Compare &compare, int limit = -1,
-                            size_t offset = 0)
-      : MatViewOperator(),
-        key_cols_(key_cols),
-        contents_(compare),
-        compare_(Record::Compare{compare.Cols()}),
-        limit_(limit),
-        offset_(offset) {}
+  template <typename X = void,
+            typename std::enable_if<!T::NoCompare::value, X>::type * = nullptr>
+  MatViewOperatorT(const std::vector<ColumnID> &key_cols,
+                   const Record::Compare &compare, int limit = -1,
+                   size_t offset = 0)
+      : MatViewOperator(key_cols, limit, offset), contents_(compare) {}
 
-  size_t count() const override { return this->contents_.count(); }
-
-  const std::vector<ColumnID> &key_cols() const override {
-    return this->key_cols_;
-  }
-
-  bool Contains(const Key &key) const override {
-    return this->contents_.Contains(key);
-  }
-
-  const_RecordIterable Lookup(const Key &key, int limit = -1,
-                              size_t offset = 0) const override {
-    limit = limit == -1 ? this->limit_ : limit;
-    offset = offset == 0 ? this->offset_ : offset;
-    return this->contents_.Lookup(key, limit, offset);
-  }
-
-  const_KeyIterable Keys() const override { return this->contents_.Keys(); }
-
+  // Override MatviewOperator functions.
   bool RecordOrdered() const override {
     if constexpr (std::is_same<T, RecordOrderedGroupedData>::value) {
       return true;
@@ -130,15 +118,45 @@ class MatViewOperatorT : public MatViewOperator {
     }
   }
 
-  const_RecordIterable LookupGreater(const Key &key, const Record &cmp,
-                                     int limit = -1,
-                                     size_t offset = 0) const override {
-    limit = limit == -1 ? this->limit_ : limit;
-    offset = offset == 0 ? this->offset_ : offset;
-    return this->contents_.LookupGreater(key, cmp, limit, offset);
+  // Key API.
+  size_t Count(const Key &key) const override {
+    return this->contents_.Count(key);
+  }
+  bool Contains(const Key &key) const override {
+    return this->contents_.Contains(key);
+  }
+  std::vector<Key> Keys(int limit = -1) const override {
+    return this->contents_.Keys(limit);
+  }
+  // Ordering instantiation specific API.
+  template <typename X = void,
+            typename std::enable_if<T::KeyOrdered::value, X>::type * = nullptr>
+  std::vector<Key> KeysGreater(const Key &key, int limit = -1) const {
+    return this->contents_.KeysGreater(key, limit);
   }
 
-  // Debugging information
+  // Record API.
+  size_t count() const override { return this->contents_.count(); }
+  std::vector<Record> All() const override { return this->contents_.All(); }
+  std::vector<Record> Lookup(const Key &key, int limit = -1,
+                             size_t offset = 0) const override {
+    return this->contents_.Lookup(key, limit, offset);
+  }
+
+  // Ordering instantiation specific API.
+  template <typename X = void,
+            typename std::enable_if<!T::NoCompare::value, X>::type * = nullptr>
+  std::vector<Record> LookupGreater(const Key &key, const Record &cmp,
+                                    int limit = -1, size_t offset = 0) const {
+    return this->contents_.LookupGreater(key, cmp, limit, offset);
+  }
+  template <typename X = void,
+            typename std::enable_if<T::KeyOrdered::value, X>::type * = nullptr>
+  std::vector<Record> LookupGreater(const Key &key, int limit = -1) const {
+    return this->contents_.LookupGreater(key, limit);
+  }
+
+  // Override Operator functions.
   std::string DebugString() const override {
     std::string result = Operator::DebugString();
     result += "  \"keyed_by\": [";
@@ -157,43 +175,39 @@ class MatViewOperatorT : public MatViewOperator {
   }
 
  protected:
+  // Override Operator functions.
   std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records) {
-    const std::vector<ColumnID> &keys = this->input_schemas_.at(0).keys();
-    bool by_pk = keys.size() > 0 && keys == this->key_cols_;
     for (Record &r : records) {
-      if (!this->contents_.Insert(r.GetValues(this->key_cols_), std::move(r),
-                                  by_pk)) {
-        LOG(FATAL) << "Failed to insert record in matview";
+      Key key = r.GetValues(this->key_cols_);
+      if (r.IsPositive()) {
+        if (!this->contents_.Insert(key, std::move(r))) {
+          LOG(FATAL) << "Failed to insert record in matview";
+        }
+      } else {
+        if (!this->contents_.Delete(key, std::move(r))) {
+          LOG(FATAL) << "Failed to delete record in matview";
+        }
       }
     }
-
     return {};
   }
-
   void ComputeOutputSchema() override {
     this->output_schema_ = this->input_schemas_.at(0);
+    this->contents_.Initialize(this->output_schema_);
   }
-
-  // Make a clone of this node (without any data).
   std::unique_ptr<Operator> Clone() const override {
-    if constexpr (std::is_same<T, UnorderedGroupedData>::value) {
-      return std::make_unique<MatViewOperatorT<UnorderedGroupedData>>(
-          this->key_cols_, this->limit_, this->offset_);
-    } else if constexpr (std::is_same<T, RecordOrderedGroupedData>::value) {
-      return std::make_unique<MatViewOperatorT<RecordOrderedGroupedData>>(
-          this->key_cols_, this->compare_, this->limit_, this->offset_);
-    } else if constexpr (std::is_same<T, KeyOrderedGroupedData>::value) {
-      return std::make_unique<MatViewOperatorT<KeyOrderedGroupedData>>(
-          this->key_cols_, this->limit_, this->offset_);
+    if constexpr (!T::NoCompare::value) {
+      return std::make_unique<MatViewOperatorT<T>>(this->key_cols_,
+                                                   this->contents_.compare(),
+                                                   this->limit_, this->offset_);
+    } else {
+      return std::make_unique<MatViewOperatorT<T>>(this->key_cols_,
+                                                   this->limit_, this->offset_);
     }
   }
 
  private:
-  std::vector<ColumnID> key_cols_;
   T contents_;
-  Record::Compare compare_;
-  int limit_;
-  size_t offset_;
 };
 
 using UnorderedMatViewOperator = MatViewOperatorT<UnorderedGroupedData>;

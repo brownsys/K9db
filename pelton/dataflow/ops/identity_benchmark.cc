@@ -13,7 +13,7 @@ namespace dataflow {
 
 // NOLINTNEXTLINE
 static void IdentityForwards(benchmark::State &state) {
-  SchemaRef schema = MakeSchema(false);
+  SchemaRef schema = MakeSchema(false, true);
   IdentityOperator op;
 
   // Generator function: generates batches of records for benchmarking.

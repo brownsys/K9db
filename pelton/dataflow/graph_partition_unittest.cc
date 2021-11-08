@@ -448,7 +448,7 @@ inline void MatViewContentsEquals(MatViewOperator *matview,
                                   const std::vector<Record> &records) {
   EXPECT_EQ(matview->count(), records.size());
   for (const Record &record : records) {
-    EXPECT_EQ(record, *matview->Lookup(record.GetKey()).begin());
+    EXPECT_EQ(record, matview->Lookup(record.GetKey()).front());
   }
 }
 
@@ -463,7 +463,7 @@ inline void MatViewContentsEqualsIndexed(MatViewOperator *matview,
   EXPECT_EQ(matview->count(), records.size());
   std::vector<ColumnID> indexed_keys = {static_cast<ColumnID>(index)};
   for (const Record &record : records) {
-    EXPECT_EQ(record, *matview->Lookup(record.GetValues(indexed_keys)).begin());
+    EXPECT_EQ(record, matview->Lookup(record.GetValues(indexed_keys)).front());
   }
 }
 

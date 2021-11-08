@@ -55,61 +55,79 @@ Operator *EquiJoinOperator::right() const { return this->parents_.at(1); }
 std::vector<Record> EquiJoinOperator::Process(NodeIndex source,
                                               std::vector<Record> &&records) {
   std::vector<Record> output;
-  for (const Record &record : records) {
+  for (Record &record : records) {
     // In comparison to a normal HashJoin in a database, here
     // records flow from one operator in.
 
     // Append all input records to the corresponding hashtable.
     if (source == this->left()->index()) {
-      // Match each record in the right table with this record.
-      Key left_value = record.GetValues({this->left_id_});
-      for (const Record &right : this->right_table_.Lookup(left_value)) {
-        if (this->mode_ == Mode::RIGHT) {
-          // Negate any previously emitted NULL + right records.
-          for (const Record &right_null :
-               this->emitted_nulls_.Lookup(left_value)) {
-            this->EmitRow(this->null_records_.at(0), right_null, &output,
-                          false);
+      // Find matching record from right table.
+      Key lvalue = record.GetValues({this->left_id_});
+      if (this->right_table_.Contains(lvalue)) {
+        // Matching records exist.
+        for (const Record &right : this->right_table_.Get(lvalue)) {
+          if (this->mode_ == Mode::RIGHT) {
+            // Negate any previously emitted NULL + right records.
+            if (this->emitted_nulls_.Contains(lvalue)) {
+              for (const Record &rnull : this->emitted_nulls_.Get(lvalue)) {
+                this->EmitRow(this->null_records_.at(0), rnull, &output, false);
+              }
+              this->emitted_nulls_.Erase(lvalue);
+            }
           }
-          this->emitted_nulls_.Erase(left_value);
+          this->EmitRow(record, right, &output, record.IsPositive());
         }
-        this->EmitRow(record, right, &output, record.IsPositive());
-      }
-
-      // additional check for left join
-      if (this->mode_ == Mode::LEFT &&
-          0 == this->right_table_.Count(left_value)) {
+      } else if (this->mode_ == Mode::LEFT) {
+        // No mathing records with left join, emit this record with some nulls.
         this->EmitRow(record, this->null_records_.at(1), &output,
                       record.IsPositive());
-        this->emitted_nulls_.Insert(left_value, record.Copy());
+        if (record.IsPositive()) {
+          this->emitted_nulls_.Insert(lvalue, record.Copy());
+        } else {
+          this->emitted_nulls_.Delete(lvalue, record.Copy());
+        }
       }
 
       // Save record in the appropriate table.
-      this->left_table_.Insert(left_value, record.Copy());
-    } else if (source == this->right()->index()) {
-      // Match each record in the left table with this record.
-      Key right_value = record.GetValues({this->right_id_});
-      for (const Record &left : this->left_table_.Lookup(right_value)) {
-        if (this->mode_ == Mode::LEFT) {
-          // Negate any previously emitted Left + NULL records.
-          for (const Record &left_null :
-               this->emitted_nulls_.Lookup(right_value)) {
-            this->EmitRow(left_null, this->null_records_.at(1), &output, false);
-          }
-          this->emitted_nulls_.Erase(right_value);
-        }
-        this->EmitRow(left, record, &output, record.IsPositive());
+      if (record.IsPositive()) {
+        this->left_table_.Insert(lvalue, std::move(record));
+      } else {
+        this->left_table_.Delete(lvalue, std::move(record));
       }
-
-      // additional check for right join
-      if (mode_ == Mode::RIGHT && 0 == this->left_table_.Count(right_value)) {
+    } else if (source == this->right()->index()) {
+      // Find matching record from left table.
+      Key rvalue = record.GetValues({this->right_id_});
+      if (this->left_table_.Contains(rvalue)) {
+        // Matching records exist.
+        for (const Record &left : this->left_table_.Get(rvalue)) {
+          if (this->mode_ == Mode::LEFT) {
+            // Negate any previously emitted Left + NULL records.
+            if (this->emitted_nulls_.Contains(rvalue)) {
+              for (const Record &lnull : this->emitted_nulls_.Get(rvalue)) {
+                this->EmitRow(lnull, this->null_records_.at(1), &output, false);
+              }
+              this->emitted_nulls_.Erase(rvalue);
+            }
+          }
+          this->EmitRow(left, record, &output, record.IsPositive());
+        }
+      } else if (mode_ == Mode::RIGHT) {
+        // No mathing records with right join, emit this record with some nulls.
         this->EmitRow(this->null_records_.at(0), record, &output,
                       record.IsPositive());
-        this->emitted_nulls_.Insert(right_value, record.Copy());
+        if (record.IsPositive()) {
+          this->emitted_nulls_.Insert(rvalue, record.Copy());
+        } else {
+          this->emitted_nulls_.Delete(rvalue, record.Copy());
+        }
       }
 
-      // save record hashed to right table
-      this->right_table_.Insert(right_value, record.Copy());
+      // Save record in the appropriate table.
+      if (record.IsPositive()) {
+        this->right_table_.Insert(rvalue, std::move(record));
+      } else {
+        this->right_table_.Delete(rvalue, std::move(record));
+      }
     } else {
       LOG(FATAL) << "EquiJoinOperator got input from Node " << source
                  << " but has parents " << this->left()->index() << " and "
@@ -176,6 +194,11 @@ void EquiJoinOperator::ComputeOutputSchema() {
       std::move(Record::NULLRecord(this->input_schemas_.at(0))));
   this->null_records_.push_back(
       std::move(Record::NULLRecord(this->input_schemas_.at(1))));
+
+  // Initialize the state.
+  this->left_table_.Initialize(this->output_schema_);
+  this->right_table_.Initialize(this->output_schema_);
+  this->emitted_nulls_.Initialize(this->output_schema_);
 }
 
 void EquiJoinOperator::EmitRow(const Record &left, const Record &right,

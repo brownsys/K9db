@@ -17,7 +17,7 @@ namespace dataflow {
 
 // NOLINTNEXTLINE
 static void UnorderedMatViewInsert2UInts(benchmark::State &state) {
-  SchemaRef schema = MakeSchema(false);
+  SchemaRef schema = MakeSchema(false, false);
 
   // Generator function: generates batches of records for benchmarking.
   RecordGenFunc gen = [schema] {
@@ -44,7 +44,7 @@ static void UnorderedMatViewInsert2UInts(benchmark::State &state) {
 
 // NOLINTNEXTLINE
 static void UnorderedMatViewInsertUIntString(benchmark::State &state) {
-  SchemaRef schema = MakeSchema(true);
+  SchemaRef schema = MakeSchema(true, false);
 
   // Generator function: generates batches of records for benchmarking.
   RecordGenFunc gen = [schema] {
@@ -72,7 +72,7 @@ static void UnorderedMatViewInsertUIntString(benchmark::State &state) {
 
 // NOLINTNEXTLINE
 static void UnorderedMatViewBatchInsert(benchmark::State &state) {
-  SchemaRef schema = MakeSchema(false);
+  SchemaRef schema = MakeSchema(false, false);
 
   // Generator function: generates batches of records for benchmarking.
   RecordGenFunc gen = [schema, &state] {

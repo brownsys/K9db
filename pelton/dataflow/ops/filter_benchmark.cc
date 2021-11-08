@@ -13,7 +13,7 @@ namespace dataflow {
 
 // NOLINTNEXTLINE
 static void FilterPasses(benchmark::State &state) {
-  SchemaRef schema = MakeSchema(false);
+  SchemaRef schema = MakeSchema(false, true);
   FilterOperator filter;
   filter.AddOperation(5_u, 0, FilterOperator::Operation::LESS_THAN);
 
@@ -34,7 +34,7 @@ static void FilterPasses(benchmark::State &state) {
 
 // NOLINTNEXTLINE
 static void FilterDiscards(benchmark::State &state) {
-  SchemaRef schema = MakeSchema(false);
+  SchemaRef schema = MakeSchema(false, true);
   FilterOperator filter;
   filter.AddOperation(5_u, 0, FilterOperator::Operation::LESS_THAN);
 

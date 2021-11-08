@@ -86,6 +86,9 @@ class Value {
   // For logging and printing...
   friend std::ostream &operator<<(std::ostream &os, const Value &k);
 
+  // The size in memory.
+  size_t SizeInMemory() const;
+
  private:
   sqlast::ColumnDefinition::Type type_;
 

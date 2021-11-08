@@ -14,7 +14,7 @@ namespace dataflow {
 class Operator;
 using RecordGenFunc = std::function<std::vector<Record>()>;
 
-SchemaRef MakeSchema(bool use_strings);
+SchemaRef MakeSchema(bool use_strings, bool use_pk);
 void ProcessBenchmark(Operator *op, NodeIndex src, RecordGenFunc gen);
 
 }  // namespace dataflow

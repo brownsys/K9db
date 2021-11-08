@@ -15,11 +15,14 @@ namespace dataflow {
 
 using CType = pelton::sqlast::ColumnDefinition::Type;
 
-SchemaRef MakeSchema(bool use_strings) {
+SchemaRef MakeSchema(bool use_strings, bool use_pk) {
   std::vector<std::string> names = {"Col1", "Col2"};
   CType t = use_strings ? CType::TEXT : CType::UINT;
   std::vector<CType> types = {CType::UINT, t};
-  std::vector<ColumnID> keys = {0};
+  std::vector<ColumnID> keys;
+  if (use_pk) {
+    keys.push_back(0);
+  }
   return SchemaFactory::Create(names, types, keys);
 }
 

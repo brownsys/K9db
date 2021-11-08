@@ -5,8 +5,8 @@ namespace dataflow {
 
 // Copy underlying string.
 Value::Value(const Value &o) : type_(o.type_), str_() {
+  this->is_null_ = o.is_null_;
   if (o.is_null_) {
-    this->is_null_ = true;
     return;
   }
   switch (this->type_) {
@@ -26,8 +26,8 @@ Value::Value(const Value &o) : type_(o.type_), str_() {
 }
 Value &Value::operator=(const Value &o) {
   CHECK(this->type_ == o.type_) << "Bad copy assign value type";
+  this->is_null_ = o.is_null_;
   if (o.is_null_) {
-    this->is_null_ = true;
     return *this;
   }
   // Copy stuff.
@@ -50,8 +50,8 @@ Value &Value::operator=(const Value &o) {
 
 // Move moves the string.
 Value::Value(Value &&o) : type_(o.type_), str_() {
+  this->is_null_ = o.is_null_;
   if (o.is_null_) {
-    this->is_null_ = true;
     return;
   }
   switch (this->type_) {
@@ -71,8 +71,8 @@ Value::Value(Value &&o) : type_(o.type_), str_() {
 }
 Value &Value::operator=(Value &&o) {
   CHECK(this->type_ == o.type_) << "Bad move assign value type";
+  this->is_null_ = o.is_null_;
   if (o.is_null_) {
-    this->is_null_ = true;
     return *this;
   }
   // Copy stuff (but move string if o is a string).
@@ -171,9 +171,26 @@ std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Value &v) {
       os << v.str_;
       break;
     default:
-      LOG(FATAL) << "Unsupported data type in record << operator";
+      LOG(FATAL) << "Unsupported data type in Value << operator";
   }
   return os;
+}
+
+// The size in memory.
+size_t Value::SizeInMemory() const {
+  if (this->is_null_) {
+    return sizeof(uint64_t);
+  }
+  switch (this->type_) {
+    case sqlast::ColumnDefinition::Type::UINT:
+    case sqlast::ColumnDefinition::Type::INT:
+      return sizeof(uint64_t);
+    case sqlast::ColumnDefinition::Type::TEXT:
+    case sqlast::ColumnDefinition::Type::DATETIME:
+      return this->str_.size();
+    default:
+      LOG(FATAL) << "Unsupported data type in Value.SizeInMemory()";
+  }
 }
 
 }  // namespace dataflow

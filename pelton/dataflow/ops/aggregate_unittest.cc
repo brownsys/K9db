@@ -356,6 +356,7 @@ TEST(AggregateOperatorTest, SumPositiveNegativeSingleBatch) {
   std::vector<Record> expected_records;
   expected_records.emplace_back(aggregate.output_schema_, true, 2_s, 16_s);
   expected_records.emplace_back(aggregate.output_schema_, true, 5_s, 11_s);
+  expected_records.emplace_back(aggregate.output_schema_, true, 7_s, 0_s);
 
   std::vector<Record> outputs =
       aggregate.Process(UNDEFINED_NODE_INDEX, std::move(records));

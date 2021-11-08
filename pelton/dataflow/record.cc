@@ -233,6 +233,26 @@ void Record::SetValue(const std::string &value, size_t i) {
                  << this->schema_.TypeOf(i);
   }
 }
+void Record::SetValue(const Value &value, size_t i) {
+  if (value.IsNull()) {
+    this->SetNull(true, i);
+    return;
+  }
+  switch (this->schema_.TypeOf(i)) {
+    case sqlast::ColumnDefinition::Type::UINT:
+      this->SetUInt(value.GetUInt(), i);
+      break;
+    case sqlast::ColumnDefinition::Type::INT:
+      this->SetInt(value.GetInt(), i);
+      break;
+    case sqlast::ColumnDefinition::Type::TEXT:
+      this->SetString(std::make_unique<std::string>(value.GetString()), i);
+      break;
+    case sqlast::ColumnDefinition::Type::DATETIME:
+      this->SetDateTime(std::make_unique<std::string>(value.GetString()), i);
+      break;
+  }
+}
 
 // Deterministic hashing for partitioning / mutli-threading.
 size_t Record::Hash(const std::vector<ColumnID> &cols) const {
