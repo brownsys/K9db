@@ -37,7 +37,7 @@ jobs:
 
     - name: Run multi-threaded tests via mysql proxy
       run: docker exec pelton-testing sh -c "cd /home/pelton/ && ./bin/test_multithreaded_proxy.sh"
-      
+
     - name: Test dataflow with valgrind
       env:
         TEST: bazel test //pelton/dataflow/... --config=valgrind --test_output=all
