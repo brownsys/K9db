@@ -170,8 +170,7 @@ int main(int argc, char **argv) {
               << std::endl;
 
     // Find peak memory usage.
-    std::cout << "Memory: " << connection.pelton_state->SizeInMemory()
-              << "bytes" << std::endl;
+    connection.pelton_state->PrintSizeInMemory();
 
     auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(
         end_time - start_time);

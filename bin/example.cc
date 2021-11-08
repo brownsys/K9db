@@ -233,8 +233,7 @@ int main(int argc, char **argv) {
   std::cout << std::endl;
 
   // Find peak memory usage.
-  std::cout << "Memory: " << connection.pelton_state->SizeInMemory() << "bytes"
-            << std::endl;
+  connection.pelton_state->PrintSizeInMemory();
 
   // Close connection.
   pelton::close(&connection);
