@@ -178,11 +178,9 @@ const std::unordered_set<ColumnName> &SharderState::IndicesFor(
     const UnshardedTableName &table_name) const {
   // reader lock for indices_
   std::shared_lock<std::shared_mutex> lock(this->mtx4_);
-  // if table_name does not exist, return empty unordered_set
+  // if table_name does not exist, return empty set of columns
   if (this->indices_.find(table_name) == this->indices_.end()) {
-    const std::unordered_set<ColumnName> *empty_column =
-        new std::unordered_set<ColumnName>{};
-    return *empty_column;
+    return this->empty_columns;
   } else {
     return this->indices_.at(table_name);
   }
