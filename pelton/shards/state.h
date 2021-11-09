@@ -170,6 +170,10 @@ class SharderState {
       std::unordered_map<ColumnName, std::unordered_map<ColumnName, FlowName>>>
       index_to_flow_;
 
+  // empty set to return in SharderState::IndicesFor if table not found
+  // needed to keep IndicesFor a const function (reader)
+  std::unordered_set<ColumnName> empty_columns;
+
   mutable std::shared_mutex mtx1_;
   mutable std::shared_mutex mtx2_;
   mutable std::shared_mutex mtx3_;
