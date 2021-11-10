@@ -237,17 +237,21 @@ void IndexAccessor(
       // CreateIndex(column_name, index);
       // state->CreateIndex(shard_kind, stmnt.get_table_name(), column_name, &shard_by,
                   //  flow_name, create_index_stmt, unique )
-      const std::string ref = "ref_accesor";
-      const std::string &ref_ptr = ref;
-      sqlast::CreateIndex create_index_stmt{ref_ptr, table_name, column_name};          
+      //const std::string ref = "ref_accesor";
+      //const std::string &ref_ptr = ref;
+      //sqlast::CreateIndex create_index_stmt{ref_ptr, table_name, column_name};
       std::cout << "Starting CreateIndex: " << std::endl;
-      pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, &state, &dataflow_state);
+      // pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, &state, &dataflow_state);
 
       // can print the index with a SELECT * FROM __ stmt?
 
       // create reference index. index.h has CreateIndex function in it
       // give it what is the key, what is the value, is the index unique or not
       // CreateIndex(access_column (doc) key, owner_by_value (patient), not unique (false))
+
+      // Index of shard_id (patient) to Primary Key of chat table, in that row we set the doctor_id col to NULL.
+      // Anonymize access annotation. So like if doctor (accessor) deletes his data, his 
+      // ==> can have "on delete retain" or "on delete anonymise" 
 
       // in gdpr get, look up all the indices that are reference indices. reference_
       // get all of those, loop over their data (loop over the part of index that match our doctor)
