@@ -237,8 +237,9 @@ void IndexAccessor(
       // CreateIndex(column_name, index);
       // state->CreateIndex(shard_kind, stmnt.get_table_name(), column_name, &shard_by,
                   //  flow_name, create_index_stmt, unique )
-      const std::string ref ("ref_accessor");
-      sqlast::CreateIndex create_index_stmt{ref, table_name, column_name};          
+      const std::string ref = "ref_accesor";
+      const std::string &ref_ptr = ref;
+      sqlast::CreateIndex create_index_stmt{ref_ptr, table_name, column_name};          
       std::cout << "Starting CreateIndex: " << std::endl;
       pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, &state, &dataflow_state);
 
