@@ -12,6 +12,9 @@
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
+#include "absl/status/status.h"
+#include "absl/strings/match.h"
+
 namespace pelton {
 namespace shards {
 namespace sqlengine {
@@ -66,6 +69,17 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
     } else if (!is_forget) {
       result.AddResultSet(table_result.NextResultSet());
     }
+
+    // Update result with 
+    // for (const auto &column_name : state->IndicesFor(table_name)) {
+    //   bool explicit_accessor = absl::StartsWith(column_name, "ACCESSOR_"); 
+    //   if (explicit_accessor) {
+    //     sqlast::Select tbl_stmt{info.sharded_table_name};
+    //     tbl_stmt.AddColumn("*");
+    //     table_result.Append(exec.ExecuteShard(&tbl_stmt, shard_kind, user_id,
+    //                                           schema, aug_index));
+    //   }
+    // }
   }
 
   perf::End("GDPR");
