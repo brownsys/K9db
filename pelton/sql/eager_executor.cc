@@ -50,14 +50,12 @@ bool SqlEagerExecutor::ExecuteStatement(const std::string &sql) {
 }
 
 int SqlEagerExecutor::ExecuteUpdate(const std::string &sql) {
-  // lock
 #ifndef PELTON_OPT
   LOG(INFO) << "Executing Statement:" << sql;
 #endif
   perf::Start("SQL");
   int result = this->stmt_->executeUpdate(sql);
   perf::End("SQL");
-  // release lock
   return result;
 }
 
