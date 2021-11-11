@@ -22,8 +22,6 @@ CREATE TABLE chat ( \
   FOREIGN KEY (ACCESSOR_doctor_id) REFERENCES doctors(id) \
 );
 
-CREATE INDEX ref_accessor ON chat(ACCESSOR_doctor_id);
-
 INSERT INTO doctors VALUES (1, 'Alice');
 INSERT INTO doctors(id, PII_name) VALUES (2, 'Bob');
 
@@ -42,9 +40,9 @@ SELECT * FROM chat WHERE OWNER_patient_id = 10;
 GDPR GET patients 10;
 GDPR GET doctors 2;
 
-DELETE FROM doctors WHERE id = 2;
 SELECT * FROM chat;
 
-GDPR FORGET patients 10;
+-- GDPR FORGET patients 10;
 SELECT * FROM patients;
 SELECT * FROM chat;
+SELECT * FROM ref_OWNER_patient_id;

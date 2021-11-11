@@ -58,9 +58,12 @@ absl::StatusOr<sql::SqlResult> CreateIndex(
                 ", " + info.shard_by + " HAVING " + column_name + " = ?";
       }
       sqlast::CreateView create_view{index_name, query};
+            std::cout << "NAME:" << index_name << std::endl;
 
       // Install flow.
+      std::cout << "BEFORE CREATE VIEW:" << std::endl;
       CHECK_STATUS(view::CreateView(create_view, state, dataflow_state));
+      std::cout << "AFTER CREATE VIEW: " << std::endl;
 
       // Store the index metadata.
       state->CreateIndex(info.shard_kind, table_name, column_name,

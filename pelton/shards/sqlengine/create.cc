@@ -226,6 +226,8 @@ void IndexAccessor(
     const std::string &column_name = columns[index].column_name();
    // check if column starts with ACCESSOR_ (has an accessor annotation)
     bool explicit_accessor = absl::StartsWith(column_name, "ACCESSOR_"); 
+    // ! TODO: get foreign key to find type of user
+
     // make sure std::out is flushed (or use LOG() << ,,.)
     std::cout << "Column name: " << column_name << std::endl;
     std::cout << "ACCESSOR BOOL: " << explicit_accessor << std::endl;
@@ -237,11 +239,14 @@ void IndexAccessor(
       // CreateIndex(column_name, index);
       // state->CreateIndex(shard_kind, stmnt.get_table_name(), column_name, &shard_by,
                   //  flow_name, create_index_stmt, unique )
-      //const std::string ref = "ref_accesor";
-      //const std::string &ref_ptr = ref;
-      //sqlast::CreateIndex create_index_stmt{ref_ptr, table_name, column_name};
+      const std::string ref = "ref";
+      const std::string &ref_ptr = ref;
+      sqlast::CreateIndex create_index_stmt{"ref", table_name, column_name};
       std::cout << "Starting CreateIndex: " << std::endl;
-      // pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, &state, &dataflow_state);
+      pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, &state, &dataflow_state);
+
+      // ref_doctors_msg_colname
+      // basename_typeofuser_tablename_shardbycol(handled automatically)
 
       // can print the index with a SELECT * FROM __ stmt?
 
