@@ -4,7 +4,6 @@
 #define PELTON_SQL_EAGER_EXECUTOR_H_
 
 #include <memory>
-#include <shared_mutex>
 #include <string>
 
 #include "mariadb/conncpp.hpp"
