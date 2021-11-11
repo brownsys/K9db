@@ -45,6 +45,7 @@ cc_library(
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/shards/sqlengine:util",
+        "//pelton/shards/sqlengine:index",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
