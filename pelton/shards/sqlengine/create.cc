@@ -376,10 +376,14 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt
     my_col_name // the 'next column' in this case is our column
   );
   CHECK_STATUS(IsShardingBySupported(&sharding_info, *state));
+  ASSIGN_OR_RETURN(
+    const ForeignKeyShards fk_shards, 
+    ShardForeignKeys(target_table_schema, sharding_info, *state)
+  );
   state->AddShardedTable(
-    owning_table.foreign_table,
+    target_table_name,
     sharding_info,
-    target_table_schema
+    UpdateTableSchema(target_table_schema, fk_shards, sharded_table)
   );
   LOG(INFO) << "Added sharded table " << target_table_name << " as " << sharded_table;
   return result;
