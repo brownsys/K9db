@@ -31,7 +31,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
     type Error = io::Error;
 
     // called when client issues request to prepare query for later execution
-    fn on_prepare(&mut self, q_string: &str, info: StatementMetaWriter<W>) -> io::Result<()> {
+    fn on_prepare(&mut self, _q_string: &str, _info: StatementMetaWriter<W>) -> io::Result<()> {
         debug!(self.log, "Rust proxy: starting on_prepare");
         unimplemented!();
     }
@@ -43,7 +43,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         // any params included with the client's command:
         _: ParamParser,
         // response to query given using QueryResultWriter:
-        results: QueryResultWriter<W>,
+        _results: QueryResultWriter<W>,
     ) -> io::Result<()> {
         debug!(self.log, "Rust proxy: starting on_execute");
         unimplemented!();
