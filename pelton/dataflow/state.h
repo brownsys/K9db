@@ -70,7 +70,7 @@ class DataFlowState {
   std::unordered_map<FlowName, std::shared_ptr<DataFlowGraph>> flows_;
   std::unordered_map<TableName, std::vector<FlowName>> flows_per_input_table_;
 
-  mutable std::shared_mutex mtx1_;
+  mutable std::shared_mutex mtx_;
 };
 
 }  // namespace dataflow
