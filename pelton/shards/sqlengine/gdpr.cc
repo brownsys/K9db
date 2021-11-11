@@ -58,6 +58,23 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       }
     }
 
+    // check indices that start with a ref_
+    // 1. extract tablename
+    // 2. iterate over index
+    // 3. execute queries, SELECT * FROM <table_name> WHERE Accessor_..._id AND shard_by=index.value
+    // /or/ to do in one shot: shard_by in (index.value,...)
+    // create ast for select{} query, don't hardcode string query
+    // restrict to shard
+    // user that belongs to the user currently accessing the data
+
+    // if more than one index, then more than one table where user has access but not delete rights
+    // extract tablename_colname ==> 
+    // identify user we're tying to get info from
+    // if doctor, we keep it
+    // extract table name out where we find the data (chat)
+
+
+
     // Delete was successful, time to update dataflows.
     if (update_flows) {
       std::vector<dataflow::Record> records =
