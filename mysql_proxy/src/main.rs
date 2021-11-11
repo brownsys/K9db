@@ -111,8 +111,6 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             if update_response != -1 {
                 results.completed(update_response as u64, 0)
             } else {
-                // mysql_srv not synched. Single connection to mariadb? 
-                debug!(self.log, "ROW COUNT is {:?}", update_response);
                 error!(self.log, "Rust Proxy: Failed to execute UPDATE: {:?}", q_string);
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
