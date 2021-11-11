@@ -33,15 +33,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
     // called when client issues request to prepare query for later execution
     fn on_prepare(&mut self, q_string: &str, info: StatementMetaWriter<W>) -> io::Result<()> {
         debug!(self.log, "Rust proxy: starting on_prepare");
-        // call pelton execDDL (success or failure)
-        let ddl_response = exec_ddl_ffi(&mut self.rust_conn, q_string);
-        debug!(self.log, "ddl_response is {:?}", ddl_response);
-        if ddl_response {
-            info.reply(42, &[], &[])
-        } else {
-            error!(self.log, "Rust Proxy: Failed to execute prepared statement");
-            info.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
-        }
+        unimplemented!();
     }
 
     // called when client executes previously prepared statement
@@ -54,8 +46,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         results: QueryResultWriter<W>,
     ) -> io::Result<()> {
         debug!(self.log, "Rust proxy: starting on_execute");
-        // select from view created. exec_select
-        results.completed(0, 0)
+        unimplemented!();
     }
 
     // called when client wants to deallocate resources associated with a prev prepared statement
