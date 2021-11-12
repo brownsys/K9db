@@ -164,12 +164,13 @@ absl::StatusOr<std::pair<std::list<ShardingInformation>, std::optional<OwningTab
   const auto &columns = stmt.GetColumns();
   for (size_t index = 0; index < columns.size(); index++) {
     // Record index of column for later constraint processing.
-    const std::string &column_name = columns[index].column_name();
+    const sqlast::ColumnDefinition &col = columns[index];
+    const std::string &column_name = col.column_name();
     index_map.insert({column_name, index});
     // Find foreign key constraint (if exists).
     bool explicit_owner = absl::StartsWith(column_name, "OWNER_");
     const sqlast::ColumnConstraint *fk_constraint = nullptr;
-    for (const auto &constraint : columns[index].GetConstraints()) {
+    for (const auto &constraint : col.GetConstraints()) {
       if (constraint.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
         fk_constraint = &constraint;
         break;
@@ -197,7 +198,7 @@ absl::StatusOr<std::pair<std::list<ShardingInformation>, std::optional<OwningTab
                                        column_name, index, foreign_column);
         }
       }
-      if (absl::StartsWith(column_name, "OWNING_")) {
+      if (IsOwning(col)) {
         LOG(INFO) << "Detected owning column " << column_name ;
         // This table also denotes a relationship to another (via explicit annotation)
         if (fk_constraint != nullptr) {

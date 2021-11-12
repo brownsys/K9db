@@ -80,6 +80,23 @@ class Value {
   const std::string &GetString() const;
   bool IsNull() const { return this->is_null_; }
 
+  std::string GetSqlString() const {
+    if (this->is_null_)
+      return "NULL";
+    switch (this->type_) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        return std::to_string(this->uint_);
+      case sqlast::ColumnDefinition::Type::INT:
+        return std::to_string(this->sint_);
+      case sqlast::ColumnDefinition::Type::TEXT:
+      case sqlast::ColumnDefinition::Type::DATETIME:
+        // TODO(Justus): Make this actually escape the string!!!
+        return "'" + this->str_ + "'";
+      default:
+        LOG(FATAL) << "unimplemented sql escape for Value";
+    }
+  }
+
   // Access the underlying type.
   sqlast::ColumnDefinition::Type type() const { return this->type_; }
 

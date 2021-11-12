@@ -8,6 +8,8 @@
 
 #include "absl/strings/str_cat.h"
 #include "pelton/shards/types.h"
+#include "pelton/sqlast/ast_schema.h"
+#include "absl/strings/match.h"
 
 namespace pelton {
 namespace shards {
@@ -19,6 +21,10 @@ inline ShardedTableName NameShardedTable(const UnshardedTableName &table_name,
 }
 
 std::string NameShard(const ShardKind &shard_kind, const UserId &user_id);
+
+inline bool IsOwning(const sqlast::ColumnDefinition &column) {
+  return absl::StartsWith(column.column_name(), "OWNING_");
+}
 
 }  // namespace sqlengine
 }  // namespace shards
