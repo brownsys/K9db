@@ -27,6 +27,127 @@ std::string Dequote(const std::string &st) {
   return s;
 }
 
+absl::Status MaybeHandleOwningColumn(
+  const sqlast::Insert &stmt,
+  const sqlast::Insert &cloned,
+  SharderState *state,
+  dataflow::DataFlowState *dataflow_state,
+  bool *update_flows,
+  sql::SqlResult *result,
+  const ShardingInformation &info,
+  const std::string &user_id) 
+{
+  auto &exec = state->executor();
+  const sqlast::CreateTable &rel_schema = state->GetSchema(stmt.table_name());
+  bool was_moved = false;
+  for (auto &col : rel_schema.GetColumns()) {
+    if (IsOwning(col)) {
+      LOG(INFO) << "Found owning column";
+      if (was_moved) {
+        return absl::InvalidArgumentError("Two owning columns?");
+      } else {
+        was_moved = true;
+        const sqlast::ColumnConstraint *constr = nullptr;
+        for (auto &aconstr : col.GetConstraints()) {
+          if (aconstr.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
+            if (constr == nullptr) {
+              constr = &aconstr;
+            } else {
+              return absl::InvalidArgumentError("Too many foreign key constraints");
+            }
+          }
+        }
+        if (!constr) return absl::InvalidArgumentError("Expected to find a foreign key constraint");
+        const std::string &target_table = constr->foreign_table();
+        sqlast::Select select(
+          target_table
+        );
+        auto binexp = std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::EQ);
+        binexp->SetLeft(std::make_unique<sqlast::ColumnExpression>(constr->foreign_column()));
+        // Handle if the insert statement does not set all columns (or in different order)
+        if (cloned.GetColumns().size() != 0)
+          return absl::InternalError("Unhandeled");
+        size_t fk_idx =  rel_schema.ColumnIndex(col.column_name());
+        if (!info.IsTransitive()) 
+          --fk_idx; // this is to account for the dropped column in directly sharded tables. Might be a bit unstable.
+        binexp->SetRight(std::make_unique<sqlast::LiteralExpression>(
+          cloned.GetValue(fk_idx)
+        ));
+        select.SetWhereClause(
+          std::move(binexp)
+        );
+        const sqlast::CreateTable schema = state->GetSchema(target_table);
+        auto &sharding_info = state->GetShardingInformation(target_table);
+        if (sharding_info.size() != 1)
+          return absl::InternalError("Not implemented");
+        sqlast::Insert insert(
+          sharding_info.front().sharded_table_name
+        );
+        for (auto &col0 : schema.GetColumns()) {
+          insert.AddColumn(col0.column_name());
+          select.AddColumn(col0.column_name());
+        }
+        LOG(INFO) << "Doing lookup for " << schema.table_name();
+        ASSIGN_OR_RETURN(sql::SqlResult &inner_result, select::Shard(select, state, dataflow_state));
+        if (inner_result.IsQuery() && !inner_result.HasResultSet()) {
+          LOG(INFO) << "Skipping value moving. Reason: The lookup has no results";
+          continue;
+        }
+        auto result_set = inner_result.NextResultSet();
+        auto iter = result_set->begin();
+        if (iter == result_set->end()) {
+          LOG(INFO) << "Skipping value moving. Reason: The result iter was empty";
+          continue;
+        }
+        dataflow::Record &rec = *iter;
+        LOG(INFO) << rec;
+        uint64_t csize = schema.GetColumns().size();
+        for (uint64_t i = 0; i < csize; i++) {
+          LOG(INFO) << i << " : " << rec.GetValueString(i);
+          insert.AddValue(rec.GetValue(i).GetSqlString());
+        }
+        if (++iter != result_set->end()) {
+          return absl::InvalidArgumentError("Too many results?");
+        }
+        LOG(INFO) << "Inserting the moved value into " << insert.table_name() << " for " << user_id;
+        result->Append(exec.ExecuteShard(&insert, info.shard_kind, user_id));
+        LOG(INFO) << "Moving value done";
+      }
+    }
+  }
+  return absl::OkStatus();
+}
+
+absl::Status HandleShardForUser(
+  const sqlast::Insert &stmt,
+  const sqlast::Insert &cloned,
+  SharderState *state,
+  dataflow::DataFlowState *dataflow_state,
+  bool *update_flows,
+  sql::SqlResult *result,
+  const ShardingInformation &info,
+  const std::string &user_id)
+{
+  auto &exec = state->executor();
+
+  // TODO(babman): better to do this after user insert rather than user data
+  //               insert.
+  if (!state->ShardExists(info.shard_kind, user_id)) {
+    for (auto *create_stmt : state->CreateShard(info.shard_kind, user_id)) {
+      sql::SqlResult tmp =
+          exec.ExecuteShard(create_stmt, info.shard_kind, user_id);
+      if (!tmp.IsStatement() || !tmp.Success()) {
+        return absl::InternalError("Could not created sharded table");
+      }
+    }
+  }
+
+  // Add the modified insert statement.
+  result->Append(exec.ExecuteShard(&cloned, info.shard_kind, user_id));
+  LOG(INFO) << "Basic insert done";
+  return MaybeHandleOwningColumn(stmt, cloned, state, dataflow_state, update_flows, result, info, user_id);
+}
+
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
@@ -94,105 +215,17 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
         ASSIGN_OR_RETURN(
             auto &lookup,
             index::LookupIndex(info.next_index_name, user_id, dataflow_state));
-        if (lookup.size() == 1) {
-          user_id = std::move(*lookup.cbegin());
-        } else {
+        if (lookup.size() < 1) {
+          LOG(INFO) << "Unexpected lookup size " << lookup.size();
           return absl::InvalidArgumentError("Foreign Key Value does not exist");
-        }
-      }
-      LOG(INFO) << "Index lookup succeeded";
-
-      // TODO(babman): better to do this after user insert rather than user data
-      //               insert.
-      if (!state->ShardExists(info.shard_kind, user_id)) {
-        for (auto *create_stmt : state->CreateShard(info.shard_kind, user_id)) {
-          sql::SqlResult tmp =
-              exec.ExecuteShard(create_stmt, info.shard_kind, user_id);
-          if (!tmp.IsStatement() || !tmp.Success()) {
-            return absl::InternalError("Could not created sharded table");
+        } else {
+          LOG(INFO) << "Index lookup succeeded";
+          for (auto &uid : lookup) {
+            CHECK_STATUS(HandleShardForUser(stmt, cloned, state, dataflow_state, &update_flows, &result, info, uid));
           }
         }
-      }
-
-      // Add the modified insert statement.
-      result.Append(exec.ExecuteShard(&cloned, info.shard_kind, user_id));
-
-      const sqlast::CreateTable &rel_schema = state->GetSchema(stmt.table_name());
-      bool was_moved = false;
-      for (auto &col : rel_schema.GetColumns()) {
-        if (IsOwning(col)) {
-          LOG(INFO) << "Found owning column";
-          if (was_moved) {
-            return absl::InvalidArgumentError("Two owning columns?");
-          } else {
-            was_moved = true;
-            const sqlast::ColumnConstraint *constr = nullptr;
-            for (auto &aconstr : col.GetConstraints()) {
-              if (aconstr.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
-                if (constr == nullptr) {
-                  constr = &aconstr;
-                } else {
-                  return absl::InvalidArgumentError("Too many foreign key constraints");
-                }
-              }
-            }
-            if (!constr) return absl::InvalidArgumentError("Expected to find a foreign key constraint");
-            const std::string &target_table = constr->foreign_table();
-            sqlast::Select select(
-              target_table
-            );
-            auto binexp = std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::EQ);
-            binexp->SetLeft(std::make_unique<sqlast::ColumnExpression>(constr->foreign_column()));
-            // Handle if the insert statement does not set all columns (or in different order)
-            if (cloned.GetColumns().size() != 0)
-              return absl::InternalError("Unhandeled");
-            size_t fk_idx =  rel_schema.ColumnIndex(col.column_name());
-            if (!info.IsTransitive()) 
-              --fk_idx; // this is to account for the dropped column in directly sharded tables. Might be a bit unstable.
-            binexp->SetRight(std::make_unique<sqlast::LiteralExpression>(
-              cloned.GetValue(fk_idx)
-            ));
-            select.SetWhereClause(
-              std::move(binexp)
-            );
-            const sqlast::CreateTable schema = state->GetSchema(target_table);
-            auto &sharding_info = state->GetShardingInformation(target_table);
-            if (sharding_info.size() != 1)
-              return absl::InternalError("Not implemented");
-            sqlast::Insert insert(
-              sharding_info.front().sharded_table_name
-            );
-            for (auto &col0 : schema.GetColumns()) {
-              insert.AddColumn(col0.column_name());
-              select.AddColumn(col0.column_name());
-            }
-            LOG(INFO) << "Doing lookup for " << schema.table_name();
-            ASSIGN_OR_RETURN(sql::SqlResult &inner_result, select::Shard(select, state, dataflow_state));
-            if (inner_result.IsQuery() && !inner_result.HasResultSet()) {
-              LOG(INFO) << "Skipping value moving. Reason: The lookup has no results";
-              continue;
-            }
-            auto result_set = inner_result.NextResultSet();
-            auto iter = result_set->begin();
-            if (iter == result_set->end()) {
-              LOG(INFO) << "Skipping value moving. Reason: The result iter was empty";
-              continue;
-            }
-            dataflow::Record &rec = *iter;
-            LOG(INFO) << rec;
-            uint64_t csize = schema.GetColumns().size();
-            for (uint64_t i = 0; i < csize; i++) {
-              LOG(INFO) << i << " : " << rec.GetValueString(i);
-              insert.AddValue(rec.GetValue(i).GetSqlString());
-            }
-            if (++iter != result_set->end()) {
-              return absl::InvalidArgumentError("Too many results?");
-            }
-            LOG(INFO) << "Inserting the moved value into " << insert.table_name() << " for " << user_id;
-            result.Append(exec.ExecuteShard(&insert, info.shard_kind, user_id));
-            LOG(INFO) << "Moving value done";
-          }
-        }
+      } else {
+        CHECK_STATUS(HandleShardForUser(stmt, cloned, state, dataflow_state, &update_flows, &result, info, user_id));
       }
     }
   }

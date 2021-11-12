@@ -74,7 +74,7 @@ absl::StatusOr<std::string> Insert::GetValue(const std::string &colname) {
   return absl::InvalidArgumentError(
       "Insert statement does not have column names set explicitly");
 }
-const std::string &Insert::GetValue(size_t index) {
+const std::string &Insert::GetValue(size_t index) const {
   return this->values_.at(index);
 }
 
