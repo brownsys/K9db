@@ -30,54 +30,25 @@ using CType = sqlast::ColumnDefinition::Type;
 
 // Expects that an iterable and vector have the same elements in the same order.
 template <typename T>
-inline void EXPECT_EQ_ORDER(dataflow::GenericIterable<T> &&l,
-                            const std::vector<T> &r) {
-  size_t i = 0;
-  for (const T &v : l) {
-    EXPECT_EQ(v, r.at(i++));
+inline void EXPECT_EQ_ORDER(const std::vector<T> &l, const std::vector<T> &r) {
+  EXPECT_EQ(l.size(), r.size());
+  for (size_t i = 0; i < l.size(); i++) {
+    EXPECT_EQ(l.at(i), r.at(i));
   }
-  EXPECT_EQ(i, r.size());
 }
 
-// Expects that a matview and vector are equal (as multi-sets).
-inline void EXPECT_EQ_MSET(dataflow::MatViewOperator *output,
-                           const std::vector<dataflow::Record> &r) {
-  std::vector<dataflow::Record> tmp;
-  for (const auto &key : output->Keys()) {
-    for (const auto &record : output->Lookup(key)) {
-      tmp.push_back(record.Copy());
-    }
-  }
-
-  for (const auto &v : r) {
-    auto it = std::find(tmp.begin(), tmp.end(), v);
+// Expects that two vector are equal (as multi-sets).
+template <typename T>
+inline void EXPECT_EQ_MSET(std::vector<T> &&l, const std::vector<T> &r) {
+  for (const T &v : r) {
+    auto it = std::find(l.begin(), l.end(), v);
     // v must be found in tmp.
-    EXPECT_NE(it, tmp.end());
+    EXPECT_NE(it, l.end());
     // Erase v from tmp, ensures that if an equal record is encountered in the
     // future, it will match a different record in r (multiset equality).
-    tmp.erase(it);
+    l.erase(it);
   }
-
-  EXPECT_TRUE(tmp.empty());
-}
-
-inline void EXPECT_EQ_MSET(const dataflow::Key &key,
-                           dataflow::MatViewOperator *output,
-                           const std::vector<dataflow::Record> &r) {
-  std::vector<dataflow::Record> tmp;
-  for (const auto &record : output->Lookup(key)) {
-    tmp.push_back(record.Copy());
-  }
-
-  for (const auto &v : r) {
-    auto it = std::find(tmp.begin(), tmp.end(), v);
-    // v must be found in tmp.
-    EXPECT_NE(it, tmp.end());
-    // Erase v from tmp, ensures that if an equal record is encountered in the
-    // future, it will match a different record in r (multiset equality).
-    tmp.erase(it);
-  }
-  EXPECT_TRUE(tmp.empty());
+  EXPECT_TRUE(l.empty());
 }
 
 std::vector<dataflow::Record> CopyVec(
@@ -130,7 +101,7 @@ TEST(PlannerTest, SimpleProject) {
   graph->Process("test_table", std::move(records));
 
   // Look at flow output.
-  EXPECT_EQ_MSET(graph->outputs().at(0), expected_records);
+  EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
 }
 
 TEST(PlannerTest, SimpleProjectLiteral) {
@@ -226,7 +197,7 @@ TEST(PlannerTest, ProjectArithmeticRightLiteral) {
   // Look at flow output.
   EXPECT_EQ(projectOp->output_schema().column_names(), expected_col_names);
   EXPECT_EQ(projectOp->output_schema().column_types(), expected_col_types);
-  EXPECT_EQ_MSET(graph->outputs().at(0), expected_records);
+  EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
 }
 
 TEST(PlannerTest, ProjectArithmeticRightColumn) {
@@ -274,7 +245,7 @@ TEST(PlannerTest, ProjectArithmeticRightColumn) {
   // // Look at flow output.
   EXPECT_EQ(projectOp->output_schema().column_names(), expected_col_names);
   EXPECT_EQ(projectOp->output_schema().column_types(), expected_col_types);
-  EXPECT_EQ_MSET(graph->outputs().at(0), expected_records);
+  EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
 }
 
 // Aggregate.
@@ -328,7 +299,7 @@ TEST(PlannerTest, SimpleAggregate) {
   // Look at flow output.
   EXPECT_EQ(aggregateOp->output_schema().column_names(), expected_col_names);
   EXPECT_EQ(aggregateOp->output_schema().column_types(), expected_col_types);
-  EXPECT_EQ_MSET(graph->outputs().at(0), expected_records);
+  EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
 }
 
 // Filter.
@@ -416,7 +387,7 @@ TEST(PlannerTest, SingleConditionFilter) {
   expected_records.push_back(records.at(1).Copy());
 
   // Look at flow output.
-  EXPECT_EQ_MSET(graph->outputs().at(0), expected_records);
+  EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
 }
 
 TEST(PlannerTest, FilterSingleORCondition) {
@@ -507,7 +478,7 @@ TEST(PlannerTest, FilterSingleANDCondition) {
   expected_records.push_back(records.at(1).Copy());
 
   // Look at flow output.
-  EXPECT_EQ_MSET(graph->outputs().at(0), expected_records);
+  EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
 }
 
 TEST(PlannerTest, FilterNestedORCondition) {
@@ -569,7 +540,7 @@ TEST(PlannerTest, FilterNestedORCondition) {
                                 std::make_unique<std::string>("bye!"), 20_s);
 
   // Look at flow output.
-  EXPECT_EQ_MSET(graph->outputs().at(0), expected_records);
+  EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
 }
 
 TEST(PlannerTest, FilterNestedANDCondition) {
@@ -615,7 +586,7 @@ TEST(PlannerTest, FilterNestedANDCondition) {
   expected_records.push_back(records.at(2).Copy());
 
   // Look at flow output.
-  EXPECT_EQ_MSET(graph->outputs().at(0), expected_records);
+  EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
 }
 
 TEST(PlannerTest, FilterColumnComparison) {
@@ -657,7 +628,7 @@ TEST(PlannerTest, FilterColumnComparison) {
   expected_records.push_back(records.at(1).Copy());
 
   // Look at flow output.
-  EXPECT_EQ_MSET(graph->outputs().at(0), expected_records);
+  EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
 }
 
 TEST(PlannerTest, FilterArithmeticCondition) {
@@ -732,7 +703,7 @@ TEST(PlannerTest, FilterArithmeticCondition) {
   expected.emplace_back(output_schema, true, 30_s, std::move(str5), 30_u);
 
   // Look at flow output.
-  EXPECT_EQ_MSET(graph->outputs().at(0), expected);
+  EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected);
 }
 
 TEST(PlannerTest, FilterArithmeticConditionTwoColumns) {
@@ -867,7 +838,7 @@ TEST(PlannerTest, UniqueSecondaryIndexFlow) {
                                 std::make_unique<std::string>("shard3"));
 
   // Look at flow output.
-  EXPECT_EQ_MSET(matview, expected_records);
+  EXPECT_EQ_MSET(matview->All(), expected_records);
 
   // Delete some records see if everything is fine.
   std::vector<dataflow::Record> records2;
@@ -885,7 +856,7 @@ TEST(PlannerTest, UniqueSecondaryIndexFlow) {
   expected_records2.emplace_back(matview->output_schema(), true, 100_s,
                                  std::make_unique<std::string>("shard5"));
 
-  EXPECT_EQ_MSET(matview, expected_records2);
+  EXPECT_EQ_MSET(matview->All(), expected_records2);
 }
 
 TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
@@ -937,7 +908,7 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
   std::vector<dataflow::Record> expected_records;
   expected_records.emplace_back(matview->output_schema(), true, 10_s,
                                 std::make_unique<std::string>("shard1"), 2_u);
-  EXPECT_EQ_MSET(matview, expected_records);
+  EXPECT_EQ_MSET(matview->All(), expected_records);
 
   // Another round of processing and checking.
   records.emplace_back(schema, true, 2_s, 10_s,
@@ -955,7 +926,7 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
                                 std::make_unique<std::string>("shard2"), 1_u);
   expected_records.emplace_back(matview->output_schema(), true, 30_s,
                                 std::make_unique<std::string>("shard1"), 1_u);
-  EXPECT_EQ_MSET(matview, expected_records);
+  EXPECT_EQ_MSET(matview->All(), expected_records);
 
   // Another round of processing and checking.
   std::vector<dataflow::Record> records2;
@@ -972,7 +943,7 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
                                 std::make_unique<std::string>("shard2"), 1_u);
   expected_records.emplace_back(matview->output_schema(), true, 30_s,
                                 std::make_unique<std::string>("shard1"), 1_u);
-  EXPECT_EQ_MSET(matview, expected_records);
+  EXPECT_EQ_MSET(matview->All(), expected_records);
 
   // A last round of processing and checking.
   records2.pop_back();
@@ -987,7 +958,7 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
                                 std::make_unique<std::string>("shard1"), 1_u);
   expected_records.emplace_back(matview->output_schema(), true, 20_s,
                                 std::make_unique<std::string>("shard2"), 1_u);
-  EXPECT_EQ_MSET(matview, expected_records);
+  EXPECT_EQ_MSET(matview->All(), expected_records);
 }
 
 // End-to-end complex query.
@@ -1100,7 +1071,7 @@ TEST(PlannerTest, ComplexQueryWithKeys) {
   // Compare to check everything is good!
   for (size_t i = 0; i < keys.size(); i++) {
     const dataflow::Key &key = keys.at(i);
-    EXPECT_EQ_MSET(key, matview, expected.at(i));
+    EXPECT_EQ_MSET(matview->Lookup(key), expected.at(i));
   }
 }
 
@@ -1167,7 +1138,7 @@ TEST(PlannerTest, BasicLeftJoin) {
                                 dataflow::NullValue());
   expected_records.emplace_back(schema4, true, 6_s, 0_s, 10_s, 721_s,
                                 dataflow::NullValue());
-  EXPECT_EQ_MSET(matview, expected_records);
+  EXPECT_EQ_MSET(matview->All(), expected_records);
 
   records.clear();
   records.emplace_back(schema1, true, 0_s, std::make_unique<std::string>("s1"));
@@ -1188,7 +1159,7 @@ TEST(PlannerTest, BasicLeftJoin) {
                                 std::make_unique<std::string>("s2"));
   expected_records.emplace_back(schema4, true, 6_s, 0_s, 10_s, 721_s,
                                 std::make_unique<std::string>("s1"));
-  EXPECT_EQ_MSET(matview, expected_records);
+  EXPECT_EQ_MSET(matview->All(), expected_records);
 }
 
 }  // namespace planner

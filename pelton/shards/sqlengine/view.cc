@@ -3,16 +3,22 @@
 #include "pelton/shards/sqlengine/view.h"
 
 #include <cstring>
+#include <iterator>
+#include <list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "glog/logging.h"
+#include "pelton/dataflow/key.h"
 #include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/value.h"
 #include "pelton/planner/planner.h"
+#include "pelton/util/merge_sort.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
@@ -23,194 +29,304 @@ namespace view {
 
 namespace {
 
-absl::StatusOr<std::string> GetColumnName(const sqlast::Expression *exp) {
-  if (exp->type() != sqlast::Expression::Type::EQ &&
-      exp->type() != sqlast::Expression::Type::IN &&
-      exp->type() != sqlast::Expression::Type::GREATER_THAN) {
-    return absl::InvalidArgumentError("Expected binary expression");
+using Constraint = std::vector<std::pair<size_t, std::string>>;
+
+struct LookupCondition {
+  std::optional<dataflow::Record> greater_record;
+  std::optional<dataflow::Key> greater_key;
+  std::optional<std::vector<dataflow::Key>> equality_keys;
+};
+
+std::vector<dataflow::Record> LookupRecords(dataflow::MatViewOperator *matview,
+                                            const LookupCondition &condition,
+                                            int limit, size_t offset) {
+  int olimit = limit > -1 ? limit + offset : -1;
+
+  // By ordered key.
+  if (condition.greater_key) {
+    auto ord_view = static_cast<dataflow::KeyOrderedMatViewOperator *>(matview);
+    auto result = ord_view->LookupGreater(*condition.greater_key, olimit);
+    util::Trim(&result, limit, offset);
+    return result;
   }
 
-  const sqlast::BinaryExpression *bin =
-      static_cast<const sqlast::BinaryExpression *>(exp);
-  const sqlast::Expression *left = bin->GetLeft();
-  const sqlast::Expression *right = bin->GetRight();
-  if (left->type() == sqlast::Expression::Type::COLUMN) {
-    return static_cast<const sqlast::ColumnExpression *>(left)->column();
-  }
-  if (right->type() == sqlast::Expression::Type::COLUMN) {
-    return static_cast<const sqlast::ColumnExpression *>(right)->column();
-  }
-  return absl::InvalidArgumentError("Invalid view where clause: no column!");
-}
-
-absl::StatusOr<std::vector<std::string>> GetCondValues(
-    const sqlast::Expression *exp) {
-  if (exp->type() != sqlast::Expression::Type::EQ &&
-      exp->type() != sqlast::Expression::Type::IN &&
-      exp->type() != sqlast::Expression::Type::GREATER_THAN) {
-    return absl::InvalidArgumentError("Expected binary expression");
-  }
-
-  const sqlast::BinaryExpression *bin =
-      static_cast<const sqlast::BinaryExpression *>(exp);
-  const sqlast::Expression *left = bin->GetLeft();
-  const sqlast::Expression *right = bin->GetRight();
-  if (left->type() == sqlast::Expression::Type::LITERAL) {
-    return std::vector<std::string>{
-        static_cast<const sqlast::LiteralExpression *>(left)->value()};
-  }
-  if (right->type() == sqlast::Expression::Type::LITERAL) {
-    return std::vector<std::string>{
-        static_cast<const sqlast::LiteralExpression *>(right)->value()};
-  }
-  if (right->type() == sqlast::Expression::Type::LIST) {
-    return static_cast<const sqlast::LiteralListExpression *>(right)->values();
-  }
-  return absl::InvalidArgumentError("Invalid view where clause: no literal!");
-}
-
-absl::Status ExtractConstraintsFromAnd(
-    const sqlast::Expression *exp, dataflow::SchemaRef schema,
-    std::unordered_map<dataflow::ColumnID, std::vector<std::string>> *cnstrs) {
-  const sqlast::BinaryExpression *bin =
-      static_cast<const sqlast::BinaryExpression *>(exp);
-  const sqlast::Expression *left = bin->GetLeft();
-  const sqlast::Expression *right = bin->GetRight();
-  if (left->type() == sqlast::Expression::Type::AND) {
-    CHECK_STATUS(ExtractConstraintsFromAnd(left, schema, cnstrs));
-  } else {
-    ASSIGN_OR_RETURN(std::string lcolumn, GetColumnName(left));
-    MOVE_OR_RETURN(std::vector<std::string> lvalues, GetCondValues(left));
-    cnstrs->insert({schema.IndexOf(lcolumn), std::move(lvalues)});
-  }
-  if (right->type() == sqlast::Expression::Type::AND) {
-    CHECK_STATUS(ExtractConstraintsFromAnd(right, schema, cnstrs));
-  } else {
-    ASSIGN_OR_RETURN(std::string rcolumn, GetColumnName(right));
-    MOVE_OR_RETURN(std::vector<std::string> rvalues, GetCondValues(right));
-    cnstrs->insert({schema.IndexOf(rcolumn), std::move(rvalues)});
-  }
-  return absl::OkStatus();
-}
-
-// Unconstrained select (no where).
-absl::StatusOr<std::vector<dataflow::Record>> SelectViewUnconstrained(
-    dataflow::MatViewOperator *matview, int limit, size_t offset) {
-  // No where condition: we are reading everything (keys and records).
-  std::vector<dataflow::Record> records;
-  for (const auto &key : matview->Keys()) {
-    for (const auto &record : matview->Lookup(key, limit, offset)) {
-      records.push_back(record.Copy());
-    }
-  }
-  return records;
-}
-
-// Constrained with equality or related operations.
-absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
-    dataflow::MatViewOperator *matview, const sqlast::BinaryExpression *where,
-    int limit, size_t offset) {
-  const dataflow::SchemaRef &schema = matview->output_schema();
-  std::unordered_map<dataflow::ColumnID, std::vector<std::string>> constraints;
-  std::vector<dataflow::Record> records;
-  switch (where->type()) {
-    // LITERAL, COLUMN, EQ, AND, GREATER_THAN, IN, LIST
-    case sqlast::Expression::Type::EQ:
-    case sqlast::Expression::Type::IN: {
-      ASSIGN_OR_RETURN(std::string column, GetColumnName(where));
-      MOVE_OR_RETURN(std::vector<std::string> values, GetCondValues(where));
-      constraints.insert({schema.IndexOf(column), values});
-      break;
-    }
-    case sqlast::Expression::Type::AND: {
-      CHECK_STATUS(ExtractConstraintsFromAnd(where, schema, &constraints));
-      break;
-    }
-    default:
-      return absl::InvalidArgumentError(
-          "Illegal where condition for keyed matview");
-  }
-
-  std::vector<dataflow::Key> keys;
-  keys.emplace_back(matview->key_cols().size());
-  for (dataflow::ColumnID col : matview->key_cols()) {
-    if (constraints.count(col) == 0) {
-      return absl::InvalidArgumentError(
-          "Where condition does not constraint column " + schema.NameOf(col));
-    }
-
-    // Cross product of different possible values for keys.
-    std::vector<dataflow::Key> tmp;
-    for (std::string &val : constraints.at(col)) {
-      for (const auto &key : keys) {
-        // Copy key and put val in it
-        dataflow::Key copy = key;
-        if (val == "NULL") {
-          copy.AddNull(schema.TypeOf(col));
-          continue;
+  // By ordered record and potentially key(s).
+  if (matview->RecordOrdered()) {
+    auto ord_view =
+        static_cast<dataflow::RecordOrderedMatViewOperator *>(matview);
+    if (!condition.greater_record) {
+      if (!condition.equality_keys) {
+        auto result = ord_view->All(olimit);
+        util::Trim(&result, limit, offset);
+        return result;
+      } else if (condition.equality_keys->size() == 1) {
+        return ord_view->Lookup(condition.equality_keys->at(0), limit, offset);
+      } else {
+        std::list<dataflow::Record> result;
+        for (const auto &key : *condition.equality_keys) {
+          util::MergeInto(&result, ord_view->Lookup(key, olimit),
+                          ord_view->comparator(), olimit);
         }
-        switch (schema.TypeOf(col)) {
-          case sqlast::ColumnDefinition::Type::UINT:
-            copy.AddValue(static_cast<uint64_t>(std::stoull(val)));
-            break;
-          case sqlast::ColumnDefinition::Type::INT:
-            copy.AddValue(static_cast<int64_t>(std::stoll(val)));
-            break;
-          case sqlast::ColumnDefinition::Type::TEXT:
-          case sqlast::ColumnDefinition::Type::DATETIME:
-            copy.AddValue(dataflow::Record::Dequote(val));
-            break;
-          default:
-            return absl::InvalidArgumentError("Unsupported type in view read");
+        return util::ToVector(&result, limit, offset);
+      }
+    } else {
+      if (!condition.equality_keys) {
+        auto result = ord_view->All(*condition.greater_record, olimit);
+        util::Trim(&result, limit, offset);
+        return result;
+      } else if (condition.equality_keys->size() == 1) {
+        return ord_view->LookupGreater(condition.equality_keys->at(0),
+                                       *condition.greater_record, limit,
+                                       offset);
+      } else {
+        std::list<dataflow::Record> result;
+        for (const auto &key : *condition.equality_keys) {
+          util::MergeInto(
+              &result,
+              ord_view->LookupGreater(key, *condition.greater_record, olimit),
+              ord_view->comparator(), olimit);
         }
-        tmp.push_back(std::move(copy));
+        return util::ToVector(&result, limit, offset);
       }
     }
-    keys = std::move(tmp);
   }
 
-  // Read records attached to key.
-  for (const auto &key : keys) {
-    for (const auto &record : matview->Lookup(key, limit, offset)) {
-      records.push_back(record.Copy());
+  // By key(s).
+  if (!condition.equality_keys) {
+    auto result = matview->All(olimit);
+    util::Trim(&result, limit, offset);
+    return result;
+  } else if (condition.equality_keys->size() == 1) {
+    return matview->Lookup(condition.equality_keys->at(0), limit, offset);
+  } else {
+    std::vector<dataflow::Record> result;
+    for (const auto &key : *condition.equality_keys) {
+      auto vec = matview->Lookup(key, olimit);
+      result.insert(result.end(), std::make_move_iterator(vec.begin()),
+                    std::make_move_iterator(vec.end()));
     }
+    util::Trim(&result, limit, offset);
+    return result;
   }
-
-  return records;
 }
 
-// Ordered view.
-absl::StatusOr<std::vector<dataflow::Record>> SelectViewOrdered(
-    dataflow::MatViewOperator *matview, const sqlast::BinaryExpression *where,
-    int limit, size_t offset) {
-  switch (where->type()) {
+// Constructing a comparator record from values.
+dataflow::Record MakeRecord(const Constraint &constraint,
+                            const std::vector<uint32_t> &comp_col,
+                            const dataflow::SchemaRef &schema) {
+  dataflow::Record record{schema, true};
+  // Fill in key.
+  for (size_t col : comp_col) {
+    bool found_column = false;
+    for (const auto &[index, value] : constraint) {
+      if (index == col) {
+        found_column = true;
+        record.SetValue(value, index);
+        break;
+      }
+    }
+    if (!found_column) {
+      LOG(FATAL) << "Underspecified record order in view lookup";
+    }
+  }
+  return record;
+}
+// Constructing keys from values.
+dataflow::Key MakeKey(const Constraint &constraint,
+                      const std::vector<uint32_t> &key_cols,
+                      const dataflow::SchemaRef &schema) {
+  dataflow::Key key(key_cols.size());
+  // Fill in key.
+  for (size_t col : key_cols) {
+    bool found_column = false;
+    for (const auto &[index, value] : constraint) {
+      if (index == col) {
+        found_column = true;
+        if (value == "NULL") {
+          key.AddNull(schema.TypeOf(index));
+        } else {
+          switch (schema.TypeOf(index)) {
+            case sqlast::ColumnDefinition::Type::UINT:
+              key.AddValue(static_cast<uint64_t>(std::stoull(value)));
+              break;
+            case sqlast::ColumnDefinition::Type::INT:
+              key.AddValue(static_cast<int64_t>(std::stoll(value)));
+              break;
+            case sqlast::ColumnDefinition::Type::TEXT:
+            case sqlast::ColumnDefinition::Type::DATETIME:
+              key.AddValue(dataflow::Record::Dequote(value));
+              break;
+            default:
+              LOG(FATAL) << "Unsupported type in view read";
+          }
+        }
+        break;
+      }
+    }
+    if (!found_column) {
+      LOG(FATAL) << "Underspecified key in view lookup";
+    }
+  }
+  return key;
+}
+
+// sqlast casts and extractions.
+const sqlast::ColumnExpression *ExtractColumnFromConstraint(
+    const sqlast::BinaryExpression *expr) {
+  if (expr->GetLeft()->type() == expr->GetRight()->type()) {
+    LOG(FATAL) << "Binary expression left and right have same type!";
+  }
+  if (expr->GetLeft()->type() == sqlast::Expression::Type::COLUMN) {
+    return static_cast<const sqlast::ColumnExpression *>(expr->GetLeft());
+  } else if (expr->GetRight()->type() == sqlast::Expression::Type::COLUMN) {
+    return static_cast<const sqlast::ColumnExpression *>(expr->GetRight());
+  } else {
+    LOG(FATAL) << "No column in binary expression!";
+  }
+}
+const sqlast::LiteralExpression *ExtractLiteralFromConstraint(
+    const sqlast::BinaryExpression *expr) {
+  if (expr->GetLeft()->type() == expr->GetRight()->type()) {
+    LOG(FATAL) << "Binary expression left and right have same type!";
+  }
+  if (expr->GetLeft()->type() == sqlast::Expression::Type::LITERAL) {
+    return static_cast<const sqlast::LiteralExpression *>(expr->GetLeft());
+  } else if (expr->GetRight()->type() == sqlast::Expression::Type::LITERAL) {
+    return static_cast<const sqlast::LiteralExpression *>(expr->GetRight());
+  } else {
+    LOG(FATAL) << "No literal in binary expression!";
+  }
+}
+
+// Constraint extractions.
+Constraint FindGreaterThanConstraints(dataflow::MatViewOperator *matview,
+                                      const sqlast::BinaryExpression *expr) {
+  Constraint result;
+  switch (expr->type()) {
+    // Make sure Greater than makes sense.
     case sqlast::Expression::Type::GREATER_THAN: {
-      std::vector<dataflow::Record> records;
-      const dataflow::SchemaRef &schema = matview->output_schema();
+      if (expr->GetLeft()->type() != sqlast::Expression::Type::COLUMN) {
+        LOG(FATAL) << "Bad greater than in view select";
+      }
+      const auto &column = ExtractColumnFromConstraint(expr)->column();
+      size_t col = matview->output_schema().IndexOf(column);
+      const std::string &val = ExtractLiteralFromConstraint(expr)->value();
+      result.emplace_back(col, val);
+      break;
+    }
+    // Check sub expressions of AND.
+    case sqlast::Expression::Type::AND: {
+      auto l = static_cast<const sqlast::BinaryExpression *>(expr->GetLeft());
+      auto r = static_cast<const sqlast::BinaryExpression *>(expr->GetRight());
+      auto c1 = FindGreaterThanConstraints(matview, l);
+      auto c2 = FindGreaterThanConstraints(matview, r);
+      result.insert(result.end(), std::make_move_iterator(c1.begin()),
+                    std::make_move_iterator(c1.end()));
+      result.insert(result.end(), std::make_move_iterator(c2.begin()),
+                    std::make_move_iterator(c2.end()));
+      break;
+    }
+    // Do nothing for EQ or IN.
+    case sqlast::Expression::Type::EQ:
+      break;
+    case sqlast::Expression::Type::IN:
+      break;
+    // LITERAL, COLUMN, LIST.
+    default:
+      LOG(FATAL) << "Bad where condition in view select";
+  }
+  return result;
+}
 
-      ASSIGN_OR_RETURN(std::string column, GetColumnName(where));
-      MOVE_OR_RETURN(std::vector<std::string> values, GetCondValues(where));
-      size_t column_index = schema.IndexOf(column);
-      CHECK_EQ(values.size(), 1);
+std::vector<Constraint> FindEqualityConstraints(
+    dataflow::MatViewOperator *matview, const sqlast::BinaryExpression *expr) {
+  std::vector<Constraint> result;
+  switch (expr->type()) {
+    // EQ: easy, one constraint!
+    case sqlast::Expression::Type::EQ: {
+      const auto &column = ExtractColumnFromConstraint(expr)->column();
+      size_t col = matview->output_schema().IndexOf(column);
+      const std::string &val = ExtractLiteralFromConstraint(expr)->value();
+      result.push_back({std::make_pair(col, val)});
+      break;
+    }
+    // IN: each value is a separate OR constraint!
+    case sqlast::Expression::Type::IN: {
+      const auto &column = ExtractColumnFromConstraint(expr)->column();
+      size_t col = matview->output_schema().IndexOf(column);
+      auto l =
+          static_cast<const sqlast::LiteralListExpression *>(expr->GetRight());
+      for (const std::string &val : l->values()) {
+        result.push_back({std::make_pair(col, val)});
+      }
+      break;
+    }
 
-      // Read records > cmp.
-      dataflow::Record cmp{schema};
-      cmp.SetValue(values.at(0), column_index);
-      for (const auto &k : matview->Keys()) {
-        for (const auto &r : matview->LookupGreater(k, cmp, limit, offset)) {
-          records.push_back(r.Copy());
+    // Combine AND conditions.
+    case sqlast::Expression::Type::AND: {
+      auto l = static_cast<const sqlast::BinaryExpression *>(expr->GetLeft());
+      auto r = static_cast<const sqlast::BinaryExpression *>(expr->GetRight());
+      auto v1 = FindEqualityConstraints(matview, l);
+      auto v2 = FindEqualityConstraints(matview, r);
+      for (const Constraint &c1 : v1) {
+        for (const Constraint &c2 : v2) {
+          Constraint combined;
+          combined.reserve(c1.size() + c2.size());
+          combined.insert(combined.end(), std::make_move_iterator(c1.begin()),
+                          std::make_move_iterator(c1.end()));
+          combined.insert(combined.end(), std::make_move_iterator(c2.begin()),
+                          std::make_move_iterator(c2.end()));
+          result.push_back(std::move(combined));
         }
       }
-
-      return records;
+      break;
     }
-    case sqlast::Expression::Type::EQ:
-      return SelectViewConstrained(matview, where, limit, offset);
 
+    // Do nothing for GREATER_THAN.
+    case sqlast::Expression::Type::GREATER_THAN:
+      break;
+    // LITERAL, COLUMN, LIST.
     default:
-      return absl::InvalidArgumentError(
-          "Illegal WHERE condition for sorted view");
+      LOG(FATAL) << "Bad where condition in view select";
   }
+  return result;
+}
+
+// Find the different components of the WHERE condition.
+LookupCondition ConstraintKeys(dataflow::MatViewOperator *matview,
+                               const sqlast::BinaryExpression *where) {
+  LookupCondition condition;
+  const dataflow::SchemaRef &schema = matview->output_schema();
+  const std::vector<uint32_t> &key_cols = matview->key_cols();
+
+  Constraint greater = FindGreaterThanConstraints(matview, where);
+  if (greater.size() > 0) {
+    if (matview->RecordOrdered()) {
+      auto ordered_view =
+          static_cast<dataflow::RecordOrderedMatViewOperator *>(matview);
+      const std::vector<uint32_t> &columns = ordered_view->comparator().cols();
+      condition.greater_record = MakeRecord(greater, columns, schema);
+    } else if (matview->KeyOrdered()) {
+      condition.greater_key = MakeKey(greater, key_cols, schema);
+    } else {
+      LOG(FATAL) << "Ordered lookup into unordered view";
+    }
+  }
+
+  std::vector<Constraint> equality = FindEqualityConstraints(matview, where);
+  if (equality.size() > 0) {
+    condition.equality_keys = std::vector<dataflow::Key>();
+    for (const Constraint &constraint : equality) {
+      condition.equality_keys->push_back(MakeKey(constraint, key_cols, schema));
+    }
+  }
+
+  // Special pattern: ... WHERE key = <v> AND key > <x>.
+  if (condition.equality_keys && condition.greater_key) {
+    LOG(FATAL) << "Where clause has equality and greater conditions on key";
+  }
+
+  return condition;
 }
 
 }  // namespace
@@ -256,15 +372,10 @@ absl::StatusOr<sql::SqlResult> SelectView(
   int limit = stmt.limit();
 
   if (stmt.HasWhereClause()) {
-    const sqlast::BinaryExpression *where = stmt.GetWhereClause();
-    if (matview->RecordOrdered()) {
-      MOVE_OR_RETURN(records, SelectViewOrdered(matview, where, limit, offset));
-    } else {
-      MOVE_OR_RETURN(records,
-                     SelectViewConstrained(matview, where, limit, offset));
-    }
+    LookupCondition condition = ConstraintKeys(matview, stmt.GetWhereClause());
+    records = LookupRecords(matview, condition, limit, offset);
   } else {
-    MOVE_OR_RETURN(records, SelectViewUnconstrained(matview, limit, offset));
+    records = LookupRecords(matview, {}, limit, offset);
   }
 
   perf::End("SelectView");

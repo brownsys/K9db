@@ -184,21 +184,16 @@ class Record {
   friend std::ostream &operator<<(std::ostream &os, const Record &r);
 
   // Custom comparison between records (for ordering).
-  struct Compare {
+  class Compare {
    public:
-    explicit Compare(const std::vector<ColumnID> &cols) {
-      this->cols = std::make_shared<std::vector<ColumnID>>(cols);
-    }
+    explicit Compare(const std::vector<ColumnID> &cols) : cols_(cols) {}
     bool operator()(const Record &l, const Record &r) const {
-      return l.GetValues(*cols) < r.GetValues(*cols);
+      return l.GetValues(this->cols_) < r.GetValues(this->cols_);
     }
-    std::vector<ColumnID> Cols() const {
-      std::vector<ColumnID> compare_cols = *cols;
-      return compare_cols;
-    }
+    const std::vector<ColumnID> &cols() const { return this->cols_; }
 
    private:
-    std::shared_ptr<std::vector<ColumnID>> cols;
+    std::vector<ColumnID> cols_;
   };
 
  private:

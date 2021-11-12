@@ -203,9 +203,11 @@ cc_library(
         "//pelton/shards:types",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
+        "//pelton/util:merge_sort",
         "//pelton/util:perf",
         "//pelton/util:status",
         "@com_google_absl//absl/status",
+        "@glog",
     ],
 )
 

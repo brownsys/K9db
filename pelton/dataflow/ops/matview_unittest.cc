@@ -19,7 +19,7 @@ namespace dataflow {
 
 using CType = sqlast::ColumnDefinition::Type;
 
-// Expects that an iterable and vector have the same elements in the same order.
+// Expects that two vectors are equal with the same order.
 template <typename T>
 inline void EXPECT_EQ_ORDER(std::vector<T> &&l, const std::vector<T> &r) {
   EXPECT_EQ(l.size(), r.size());
@@ -29,7 +29,7 @@ inline void EXPECT_EQ_ORDER(std::vector<T> &&l, const std::vector<T> &r) {
   }
 }
 
-// Expects that an iterable and vector are equal (as multi-sets).
+// Expects that two vectors are equal (as multi-sets).
 template <typename T>
 inline void EXPECT_EQ_MSET(std::vector<T> &&l, const std::vector<T> &r) {
   for (const T &v : r) {
@@ -476,7 +476,7 @@ TEST(MatViewOperatorTest, LookupGreater) {
 
   // Create materialized view.
   RecordOrderedMatViewOperator matview{{}, compare};
-  matview.input_schemas_.push_back(schema);
+  static_cast<MatViewOperator *>(&matview)->input_schemas_.push_back(schema);
 
   // Process and check.
   matview.ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));
@@ -493,6 +493,54 @@ TEST(MatViewOperatorTest, LookupGreater) {
 
   // Get all keys.
   EXPECT_EQ_MSET(matview.Keys(), std::vector<Key>{Key(0)});
+}
+
+TEST(MatViewOperatorTest, AllOnRecordOrdered) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
+  std::vector<ColumnID> keys = {0};
+  Record::Compare compare{{1, 2}};
+  SchemaRef schema = SchemaFactory::Create(names, types, keys);
+
+  // Some string values.
+  std::unique_ptr<std::string> s1 = std::make_unique<std::string>("Hello!");
+  std::unique_ptr<std::string> s2 = std::make_unique<std::string>("Hello!");
+  std::unique_ptr<std::string> s3 = std::make_unique<std::string>("Bye!");
+  std::unique_ptr<std::string> s4 = std::make_unique<std::string>("ABC!");
+  std::unique_ptr<std::string> s5 = std::make_unique<std::string>("");
+
+  // Create some records.
+  Record r1{schema, true, 0_u, std::move(s1), 10_s};
+  Record r2{schema, true, 1_u, std::move(s2), 20_s};
+  Record r3{schema, true, 2_u, std::move(s3), 20_s};
+  Record r4{schema, true, 3_u, std::move(s4), 30_s};
+  Record r5{schema, true, 4_u, std::move(s5), 100_s};
+
+  std::vector<Record> records;
+  records.push_back(r1.Copy());
+  records.push_back(r2.Copy());
+  records.push_back(r3.Copy());
+  records.push_back(r4.Copy());
+  records.push_back(r5.Copy());
+
+  // Expected output.
+  std::vector<Record> sorted;
+  sorted.push_back(r5.Copy());
+  sorted.push_back(r4.Copy());
+  sorted.push_back(r3.Copy());
+  sorted.push_back(r1.Copy());
+  sorted.push_back(r2.Copy());
+
+  // Create materialized view.
+  RecordOrderedMatViewOperator matview{keys, compare};
+  static_cast<MatViewOperator *>(&matview)->input_schemas_.push_back(schema);
+
+  // Process and check.
+  matview.ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));
+  EXPECT_EQ(matview.count(), records.size());
+  EXPECT_EQ_MSET(matview.All(), records);
+  EXPECT_EQ_ORDER(matview.All(), sorted);
 }
 
 }  // namespace dataflow

@@ -116,6 +116,7 @@ cc_library(
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
+        "//pelton/util:merge_sort",
         "@com_google_absl//absl/container:btree",
         "@com_google_absl//absl/container:flat_hash_map",
     ],

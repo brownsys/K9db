@@ -19,6 +19,7 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
+#include "pelton/util/merge_sort.h"
 #include "pelton/util/perf.h"
 
 namespace pelton {
@@ -35,7 +36,7 @@ class GroupedData {
 template <typename T>
 class GroupedData<T, std::enable_if_t<!std::is_null_pointer<T>::value>> {
  public:
-  T compare() const { return this->compare_; }
+  const T &compare() const { return this->compare_; }
 
  protected:
   GroupedData() = delete;
@@ -276,11 +277,18 @@ class GroupedDataT : public GroupedData<RecordCompare> {
   }
 
   // All() API:
-  std::vector<R> All() const {
+  // If not record ordered, All() appends all buckets.
+  template <typename X1 = void,
+            typename std::enable_if<NoCompare::value, X1>::type * = nullptr>
+  std::vector<R> All(int limit = -1) const {
     std::vector<R> result;
     result.reserve(this->count_);
     for (auto it = this->contents_.begin(); it != this->contents_.end(); ++it) {
       for (auto it2 = it->second.begin(); it2 != it->second.end(); ++it2) {
+        if (limit > -1 && result.size() >= static_cast<size_t>(limit)) {
+          break;
+        }
+
         if constexpr (std::is_same<R, Record>::value) {
           result.push_back(it2->Copy());
         } else {
@@ -290,6 +298,29 @@ class GroupedDataT : public GroupedData<RecordCompare> {
       }
     }
     return result;
+  }
+  // If record ordered, each bucket is ordered, and All() returns a merged
+  // concatention of all buckets that is also ordered.
+  template <typename X2 = void,
+            typename std::enable_if<!NoCompare::value, X2>::type * = nullptr>
+  std::vector<R> All(int limit = -1) const {
+    std::list<R> result;
+    for (auto it = this->contents_.begin(); it != this->contents_.end(); ++it) {
+      util::MergeInto(&result, it->second, this->compare_, limit);
+    }
+    return util::ToVector(&result, limit, 0);
+  }
+  // If record ordered, we should be able to get All() with an ordering
+  // filter on records.
+  template <typename X = void,
+            typename std::enable_if<!NoCompare::value, X>::type * = nullptr>
+  std::vector<R> All(const R &cmp, int limit = -1) const {
+    std::list<R> result;
+    for (auto it = this->contents_.begin(); it != this->contents_.end(); ++it) {
+      auto bucket = this->LookupGreater(it->first, cmp, limit);
+      util::MergeInto(&result, bucket, this->compare_, limit);
+    }
+    return util::ToVector(&result, limit, 0);
   }
 
   // Key-based API:

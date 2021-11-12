@@ -39,7 +39,7 @@ class MatViewOperator : public Operator {
 
   // Record API.
   virtual size_t count() const = 0;
-  virtual std::vector<Record> All() const = 0;
+  virtual std::vector<Record> All(int limit = -1) const = 0;
   virtual std::vector<Record> Lookup(const Key &key, int limit = -1,
                                      size_t offset = 0) const = 0;
 
@@ -68,6 +68,7 @@ class MatViewOperator : public Operator {
   FRIEND_TEST(MatViewOperatorTest, EmptyKeyTest);
   FRIEND_TEST(MatViewOperatorTest, LimitTest);
   FRIEND_TEST(MatViewOperatorTest, LookupGreater);
+  FRIEND_TEST(MatViewOperatorTest, AllOnRecordOrdered);
 };
 
 // Actual implementation is generic over T: the underlying GroupedDataT
@@ -137,13 +138,26 @@ class MatViewOperatorT : public MatViewOperator {
 
   // Record API.
   size_t count() const override { return this->contents_.count(); }
-  std::vector<Record> All() const override { return this->contents_.All(); }
+  std::vector<Record> All(int limit = -1) const override {
+    return this->contents_.All(limit);
+  }
   std::vector<Record> Lookup(const Key &key, int limit = -1,
                              size_t offset = 0) const override {
     return this->contents_.Lookup(key, limit, offset);
   }
 
   // Ordering instantiation specific API.
+  template <typename X = void,
+            typename std::enable_if<!T::NoCompare::value, X>::type * = nullptr>
+  const Record::Compare &comparator() const {
+    return this->contents_.compare();
+  }
+  template <typename X = void,
+            typename std::enable_if<!T::NoCompare::value, X>::type * = nullptr>
+  std::vector<Record> All(const Record &cmp, int limit = -1) const {
+    return this->contents_.All(cmp, limit);
+  }
+
   template <typename X = void,
             typename std::enable_if<!T::NoCompare::value, X>::type * = nullptr>
   std::vector<Record> LookupGreater(const Key &key, const Record &cmp,
@@ -168,6 +182,13 @@ class MatViewOperatorT : public MatViewOperator {
       result.pop_back();
     }
     result += "],\n";
+    std::string order_str = "no order";
+    if (this->KeyOrdered()) {
+      order_str = "Key ordered";
+    } else if (this->RecordOrdered()) {
+      order_str = "Record ordered";
+    }
+    result += "  \"order\": \"" + order_str + "\",\n";
     return result;
   }
   uint64_t SizeInMemory() const override {
