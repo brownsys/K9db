@@ -29,18 +29,56 @@ void Operator::AddParent(Operator *parent) {
     }
   }
 }
-void Operator::RemoveParent(Operator *parent) {
+void Operator::AddParentAt(Operator *parent, size_t parent_index) {
+  CHECK_LE(parent_index, this->parents_.size());
+  if (parent_index < this->parents_.size()) {
+    this->parents_.insert(this->parents_.begin() + parent_index, parent);
+  } else {
+    this->parents_.push_back(parent);
+  }
+
+  // Project operator's schema should be computed after operations have been
+  // added.
+  if (parent->type() == Operator::Type::PROJECT) {
+    auto old = parent->output_schema_;
+    parent->ComputeOutputSchema();
+    if (old) {
+      CHECK_EQ(parent->output_schema_, old);
+    }
+  }
+
+  // Push the input schema to the right place.
+  if (parent_index < this->parents_.size()) {
+    this->input_schemas_.insert(this->input_schemas_.begin() + parent_index,
+                                parent->output_schema());
+  } else {
+    this->input_schemas_.push_back(parent->output_schema());
+  }
+
+  parent->children_.push_back(this);
+  if (this->type() != Operator::Type::PROJECT) {
+    auto old = this->output_schema_;
+    this->ComputeOutputSchema();
+    if (old) {
+      CHECK_EQ(this->output_schema_, old);
+    }
+  }
+}
+size_t Operator::RemoveParent(Operator *parent) {
   // Remove parent from this.
+  size_t parent_index = UNDEFINED_NODE_INDEX;
   for (size_t i = 0; i < this->parents_.size(); i++) {
     if (this->parents_.at(i) == parent) {
       this->parents_.erase(this->parents_.begin() + i);
       this->input_schemas_.erase(this->input_schemas_.begin() + i);
-      break;
+      parent_index = i;
     }
   }
+  CHECK_NE(parent_index, UNDEFINED_NODE_INDEX);
   // Remove this from parent.
   auto it = std::find(parent->children_.begin(), parent->children_.end(), this);
   parent->children_.erase(it);
+  return parent_index;
 }
 
 void Operator::ProcessAndForward(NodeIndex source,

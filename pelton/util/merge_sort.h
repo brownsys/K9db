@@ -34,21 +34,41 @@ void MergeInto(std::list<T> *target, const L &source, const C &compare,
     count++;
   }
 }
+template <typename T, typename L, typename C>
+void MergeInto(std::list<T> *target, L &&source, const C &compare, int limit) {
+  auto it = target->begin();
+  auto end = target->end();
+  size_t count = 0;
+  for (T &record : source) {
+    if (limit > -1 && count >= static_cast<size_t>(limit)) {
+      break;
+    }
+    while (it != end && compare(*it, record)) {
+      ++it;
+    }
+    if (it == end) {
+      target->push_back(std::move(record));
+    } else {
+      target->insert(it, std::move(record));
+    }
+    count++;
+  }
+}
 
 // L is a sorted contain of Ts.
 // Elements of T are compared using <.
 template <typename T, typename L>
-void MergeInto(std::list<T> *target, L source) {
+void MergeInto(std::list<T> *target, L &&source) {
   auto it = target->begin();
   auto end = target->end();
-  for (const T &record : source) {
-    while (it != end && *it < record) {
+  for (const T &k : source) {
+    while (it != end && *it < k) {
       ++it;
     }
     if (it == end) {
-      target->push_back(record.Copy());
+      target->push_back(std::move(k));
     } else {
-      target->insert(it, record.Copy());
+      target->insert(it, std::move(k));
     }
   }
 }

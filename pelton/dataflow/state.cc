@@ -52,13 +52,11 @@ void DataFlowState::AddFlow(const FlowName &name,
   }
 
   // Turn the given partition into a graph with many partitions.
-
-  // Insert the partition.
-  this->flows_.insert({name, std::move(flow)});
+  this->flows_.emplace(
+      name, std::make_unique<DataFlowGraph>(std::move(flow), this->workers_));
 }
 
-const DataFlowGraphPartition &DataFlowState::GetFlow(
-    const FlowName &name) const {
+const DataFlowGraph &DataFlowState::GetFlow(const FlowName &name) const {
   return *this->flows_.at(name);
 }
 

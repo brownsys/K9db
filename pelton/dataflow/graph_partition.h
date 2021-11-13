@@ -21,6 +21,12 @@ class DataFlowGraphPartition {
  public:
   explicit DataFlowGraphPartition(PartitionIndex id) : id_(id) {}
 
+  // Not copyable or movable.
+  DataFlowGraphPartition(const DataFlowGraphPartition &) = delete;
+  DataFlowGraphPartition(DataFlowGraphPartition &&) = delete;
+  DataFlowGraphPartition &operator=(const DataFlowGraphPartition &) = delete;
+  DataFlowGraphPartition &operator=(DataFlowGraphPartition &&) = delete;
+
   // Add a node with some parents.
   inline bool AddNode(std::unique_ptr<Operator> &&op,
                       const std::vector<Operator *> &parents) {

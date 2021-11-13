@@ -198,10 +198,10 @@ inline std::vector<Record> MakeAggregateOnEquiJoinRecords(
 }
 
 // Make different types of flows/graphs.
-DataFlowGraphPartition MakeTrivialGraph(ColumnID keycol,
-                                        const SchemaRef &schema) {
+std::unique_ptr<DataFlowGraphPartition> MakeTrivialGraph(
+    ColumnID keycol, const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  DataFlowGraphPartition g{0};
+  auto g = std::make_unique<DataFlowGraphPartition>(0);
 
   auto in = std::make_unique<InputOperator>("test-table", schema);
   auto matview = std::make_unique<UnorderedMatViewOperator>(keys);
@@ -209,19 +209,19 @@ DataFlowGraphPartition MakeTrivialGraph(ColumnID keycol,
   auto in_ptr = in.get();
   auto matview_ptr = matview.get();
 
-  EXPECT_TRUE(g.AddInputNode(std::move(in)));
-  EXPECT_TRUE(g.AddOutputOperator(std::move(matview), in_ptr));
-  EXPECT_EQ(g.inputs().size(), 1);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table"), in_ptr);
-  EXPECT_EQ(g.outputs().at(0), matview_ptr);
+  EXPECT_TRUE(g->AddInputNode(std::move(in)));
+  EXPECT_TRUE(g->AddOutputOperator(std::move(matview), in_ptr));
+  EXPECT_EQ(g->inputs().size(), 1);
+  EXPECT_EQ(g->outputs().size(), 1);
+  EXPECT_EQ(g->inputs().at("test-table"), in_ptr);
+  EXPECT_EQ(g->outputs().at(0), matview_ptr);
   return g;
 }
 
-DataFlowGraphPartition MakeFilterGraph(ColumnID keycol,
-                                       const SchemaRef &schema) {
+std::unique_ptr<DataFlowGraphPartition> MakeFilterGraph(
+    ColumnID keycol, const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  DataFlowGraphPartition g{0};
+  auto g = std::make_unique<DataFlowGraphPartition>(0);
 
   auto in = std::make_unique<InputOperator>("test-table", schema);
   auto filter = std::make_unique<FilterOperator>();
@@ -232,20 +232,20 @@ DataFlowGraphPartition MakeFilterGraph(ColumnID keycol,
   auto filter_ptr = filter.get();
   auto matview_ptr = matview.get();
 
-  EXPECT_TRUE(g.AddInputNode(std::move(in)));
-  EXPECT_TRUE(g.AddNode(std::move(filter), in_ptr));
-  EXPECT_TRUE(g.AddOutputOperator(std::move(matview), filter_ptr));
-  EXPECT_EQ(g.inputs().size(), 1);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table"), in_ptr);
-  EXPECT_EQ(g.outputs().at(0), matview_ptr);
+  EXPECT_TRUE(g->AddInputNode(std::move(in)));
+  EXPECT_TRUE(g->AddNode(std::move(filter), in_ptr));
+  EXPECT_TRUE(g->AddOutputOperator(std::move(matview), filter_ptr));
+  EXPECT_EQ(g->inputs().size(), 1);
+  EXPECT_EQ(g->outputs().size(), 1);
+  EXPECT_EQ(g->inputs().at("test-table"), in_ptr);
+  EXPECT_EQ(g->outputs().at(0), matview_ptr);
   return g;
 }
 
-DataFlowGraphPartition MakeUnionGraph(ColumnID keycol,
-                                      const SchemaRef &schema) {
+std::unique_ptr<DataFlowGraphPartition> MakeUnionGraph(
+    ColumnID keycol, const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  DataFlowGraphPartition g{0};
+  auto g = std::make_unique<DataFlowGraphPartition>(0);
 
   auto in1 = std::make_unique<InputOperator>("test-table1", schema);
   auto in2 = std::make_unique<InputOperator>("test-table2", schema);
@@ -257,23 +257,23 @@ DataFlowGraphPartition MakeUnionGraph(ColumnID keycol,
   auto union_ptr = union_.get();
   auto matview_ptr = matview.get();
 
-  EXPECT_TRUE(g.AddInputNode(std::move(in1)));
-  EXPECT_TRUE(g.AddInputNode(std::move(in2)));
-  EXPECT_TRUE(g.AddNode(std::move(union_), {in1_ptr, in2_ptr}));
-  EXPECT_TRUE(g.AddOutputOperator(std::move(matview), union_ptr));
-  EXPECT_EQ(g.inputs().size(), 2);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table1"), in1_ptr);
-  EXPECT_EQ(g.inputs().at("test-table2"), in2_ptr);
-  EXPECT_EQ(g.outputs().at(0), matview_ptr);
+  EXPECT_TRUE(g->AddInputNode(std::move(in1)));
+  EXPECT_TRUE(g->AddInputNode(std::move(in2)));
+  EXPECT_TRUE(g->AddNode(std::move(union_), {in1_ptr, in2_ptr}));
+  EXPECT_TRUE(g->AddOutputOperator(std::move(matview), union_ptr));
+  EXPECT_EQ(g->inputs().size(), 2);
+  EXPECT_EQ(g->outputs().size(), 1);
+  EXPECT_EQ(g->inputs().at("test-table1"), in1_ptr);
+  EXPECT_EQ(g->inputs().at("test-table2"), in2_ptr);
+  EXPECT_EQ(g->outputs().at(0), matview_ptr);
   return g;
 }
 
-DataFlowGraphPartition MakeEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
-                                         const SchemaRef &lschema,
-                                         const SchemaRef &rschema) {
+std::unique_ptr<DataFlowGraphPartition> MakeEquiJoinGraph(
+    ColumnID ok, ColumnID lk, ColumnID rk, const SchemaRef &lschema,
+    const SchemaRef &rschema) {
   std::vector<ColumnID> keys = {ok};
-  DataFlowGraphPartition g{0};
+  auto g = std::make_unique<DataFlowGraphPartition>(0);
 
   auto in1 = std::make_unique<InputOperator>("test-table1", lschema);
   auto in2 = std::make_unique<InputOperator>("test-table2", rschema);
@@ -285,22 +285,22 @@ DataFlowGraphPartition MakeEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
   auto join_ptr = join.get();
   auto matview_ptr = matview.get();
 
-  EXPECT_TRUE(g.AddInputNode(std::move(in1)));
-  EXPECT_TRUE(g.AddInputNode(std::move(in2)));
-  EXPECT_TRUE(g.AddNode(std::move(join), {in1_ptr, in2_ptr}));
-  EXPECT_TRUE(g.AddOutputOperator(std::move(matview), join_ptr));
-  EXPECT_EQ(g.inputs().size(), 2);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table1"), in1_ptr);
-  EXPECT_EQ(g.inputs().at("test-table2"), in2_ptr);
-  EXPECT_EQ(g.outputs().at(0), matview_ptr);
+  EXPECT_TRUE(g->AddInputNode(std::move(in1)));
+  EXPECT_TRUE(g->AddInputNode(std::move(in2)));
+  EXPECT_TRUE(g->AddNode(std::move(join), {in1_ptr, in2_ptr}));
+  EXPECT_TRUE(g->AddOutputOperator(std::move(matview), join_ptr));
+  EXPECT_EQ(g->inputs().size(), 2);
+  EXPECT_EQ(g->outputs().size(), 1);
+  EXPECT_EQ(g->inputs().at("test-table1"), in1_ptr);
+  EXPECT_EQ(g->inputs().at("test-table2"), in2_ptr);
+  EXPECT_EQ(g->outputs().at(0), matview_ptr);
   return g;
 }
 
-DataFlowGraphPartition MakeProjectGraph(ColumnID keycol,
-                                        const SchemaRef &schema) {
+std::unique_ptr<DataFlowGraphPartition> MakeProjectGraph(
+    ColumnID keycol, const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  DataFlowGraphPartition g{0};
+  auto g = std::make_unique<DataFlowGraphPartition>(0);
 
   auto in = std::make_unique<InputOperator>("test-table", schema);
   auto project = std::make_unique<ProjectOperator>();
@@ -312,20 +312,20 @@ DataFlowGraphPartition MakeProjectGraph(ColumnID keycol,
   auto project_ptr = project.get();
   auto matview_ptr = matview.get();
 
-  EXPECT_TRUE(g.AddInputNode(std::move(in)));
-  EXPECT_TRUE(g.AddNode(std::move(project), in_ptr));
-  EXPECT_TRUE(g.AddOutputOperator(std::move(matview), project_ptr));
-  EXPECT_EQ(g.inputs().size(), 1);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table"), in_ptr);
-  EXPECT_EQ(g.outputs().at(0), matview_ptr);
+  EXPECT_TRUE(g->AddInputNode(std::move(in)));
+  EXPECT_TRUE(g->AddNode(std::move(project), in_ptr));
+  EXPECT_TRUE(g->AddOutputOperator(std::move(matview), project_ptr));
+  EXPECT_EQ(g->inputs().size(), 1);
+  EXPECT_EQ(g->outputs().size(), 1);
+  EXPECT_EQ(g->inputs().at("test-table"), in_ptr);
+  EXPECT_EQ(g->outputs().at(0), matview_ptr);
   return g;
 }
 
-DataFlowGraphPartition MakeProjectOnFilterGraph(ColumnID keycol,
-                                                const SchemaRef &schema) {
+std::unique_ptr<DataFlowGraphPartition> MakeProjectOnFilterGraph(
+    ColumnID keycol, const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
-  DataFlowGraphPartition g{0};
+  auto g = std::make_unique<DataFlowGraphPartition>(0);
 
   auto in = std::make_unique<InputOperator>("test-table", schema);
   auto filter = std::make_unique<FilterOperator>();
@@ -340,23 +340,22 @@ DataFlowGraphPartition MakeProjectOnFilterGraph(ColumnID keycol,
   auto project_ptr = project.get();
   auto matview_ptr = matview.get();
 
-  EXPECT_TRUE(g.AddInputNode(std::move(in)));
-  EXPECT_TRUE(g.AddNode(std::move(filter), in_ptr));
-  EXPECT_TRUE(g.AddNode(std::move(project), filter_ptr));
-  EXPECT_TRUE(g.AddOutputOperator(std::move(matview), project_ptr));
-  EXPECT_EQ(g.inputs().size(), 1);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table"), in_ptr);
-  EXPECT_EQ(g.outputs().at(0), matview_ptr);
+  EXPECT_TRUE(g->AddInputNode(std::move(in)));
+  EXPECT_TRUE(g->AddNode(std::move(filter), in_ptr));
+  EXPECT_TRUE(g->AddNode(std::move(project), filter_ptr));
+  EXPECT_TRUE(g->AddOutputOperator(std::move(matview), project_ptr));
+  EXPECT_EQ(g->inputs().size(), 1);
+  EXPECT_EQ(g->outputs().size(), 1);
+  EXPECT_EQ(g->inputs().at("test-table"), in_ptr);
+  EXPECT_EQ(g->outputs().at(0), matview_ptr);
   return g;
 }
 
-DataFlowGraphPartition MakeProjectOnEquiJoinGraph(ColumnID ok, ColumnID lk,
-                                                  ColumnID rk,
-                                                  const SchemaRef &lschema,
-                                                  const SchemaRef &rschema) {
+std::unique_ptr<DataFlowGraphPartition> MakeProjectOnEquiJoinGraph(
+    ColumnID ok, ColumnID lk, ColumnID rk, const SchemaRef &lschema,
+    const SchemaRef &rschema) {
   std::vector<ColumnID> keys = {ok};
-  DataFlowGraphPartition g{0};
+  auto g = std::make_unique<DataFlowGraphPartition>(0);
 
   auto in1 = std::make_unique<InputOperator>("test-table1", lschema);
   auto in2 = std::make_unique<InputOperator>("test-table2", rschema);
@@ -372,24 +371,24 @@ DataFlowGraphPartition MakeProjectOnEquiJoinGraph(ColumnID ok, ColumnID lk,
   auto project_ptr = project.get();
   auto matview_ptr = matview.get();
 
-  EXPECT_TRUE(g.AddInputNode(std::move(in1)));
-  EXPECT_TRUE(g.AddInputNode(std::move(in2)));
-  EXPECT_TRUE(g.AddNode(std::move(join), {in1_ptr, in2_ptr}));
-  EXPECT_TRUE(g.AddNode(std::move(project), join_ptr));
-  EXPECT_TRUE(g.AddOutputOperator(std::move(matview), project_ptr));
-  EXPECT_EQ(g.inputs().size(), 2);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table1"), in1_ptr);
-  EXPECT_EQ(g.inputs().at("test-table2"), in2_ptr);
-  EXPECT_EQ(g.outputs().at(0), matview_ptr);
+  EXPECT_TRUE(g->AddInputNode(std::move(in1)));
+  EXPECT_TRUE(g->AddInputNode(std::move(in2)));
+  EXPECT_TRUE(g->AddNode(std::move(join), {in1_ptr, in2_ptr}));
+  EXPECT_TRUE(g->AddNode(std::move(project), join_ptr));
+  EXPECT_TRUE(g->AddOutputOperator(std::move(matview), project_ptr));
+  EXPECT_EQ(g->inputs().size(), 2);
+  EXPECT_EQ(g->outputs().size(), 1);
+  EXPECT_EQ(g->inputs().at("test-table1"), in1_ptr);
+  EXPECT_EQ(g->inputs().at("test-table2"), in2_ptr);
+  EXPECT_EQ(g->outputs().at(0), matview_ptr);
   return g;
 }
 
-DataFlowGraphPartition MakeAggregateGraph(ColumnID keycol,
-                                          const SchemaRef &schema) {
+std::unique_ptr<DataFlowGraphPartition> MakeAggregateGraph(
+    ColumnID keycol, const SchemaRef &schema) {
   std::vector<ColumnID> keys = {keycol};
   std::vector<ColumnID> group_columns = {2};
-  DataFlowGraphPartition g{0};
+  auto g = std::make_unique<DataFlowGraphPartition>(0);
 
   auto in = std::make_unique<InputOperator>("test-table", schema);
   auto aggregate = std::make_unique<AggregateOperator>(
@@ -400,23 +399,22 @@ DataFlowGraphPartition MakeAggregateGraph(ColumnID keycol,
   auto aggregate_ptr = aggregate.get();
   auto matview_ptr = matview.get();
 
-  EXPECT_TRUE(g.AddInputNode(std::move(in)));
-  EXPECT_TRUE(g.AddNode(std::move(aggregate), in_ptr));
-  EXPECT_TRUE(g.AddOutputOperator(std::move(matview), aggregate_ptr));
-  EXPECT_EQ(g.inputs().size(), 1);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table"), in_ptr);
-  EXPECT_EQ(g.outputs().at(0), matview_ptr);
+  EXPECT_TRUE(g->AddInputNode(std::move(in)));
+  EXPECT_TRUE(g->AddNode(std::move(aggregate), in_ptr));
+  EXPECT_TRUE(g->AddOutputOperator(std::move(matview), aggregate_ptr));
+  EXPECT_EQ(g->inputs().size(), 1);
+  EXPECT_EQ(g->outputs().size(), 1);
+  EXPECT_EQ(g->inputs().at("test-table"), in_ptr);
+  EXPECT_EQ(g->outputs().at(0), matview_ptr);
   return g;
 }
 
-DataFlowGraphPartition MakeAggregateOnEquiJoinGraph(ColumnID ok, ColumnID lk,
-                                                    ColumnID rk,
-                                                    const SchemaRef &lschema,
-                                                    const SchemaRef &rschema) {
+std::unique_ptr<DataFlowGraphPartition> MakeAggregateOnEquiJoinGraph(
+    ColumnID ok, ColumnID lk, ColumnID rk, const SchemaRef &lschema,
+    const SchemaRef &rschema) {
   std::vector<ColumnID> keys = {ok};
   std::vector<ColumnID> group_columns = {2};
-  DataFlowGraphPartition g{0};
+  auto g = std::make_unique<DataFlowGraphPartition>(0);
 
   auto in1 = std::make_unique<InputOperator>("test-table1", lschema);
   auto in2 = std::make_unique<InputOperator>("test-table2", rschema);
@@ -431,16 +429,16 @@ DataFlowGraphPartition MakeAggregateOnEquiJoinGraph(ColumnID ok, ColumnID lk,
   auto aggregate_ptr = aggregate.get();
   auto matview_ptr = matview.get();
 
-  EXPECT_TRUE(g.AddInputNode(std::move(in1)));
-  EXPECT_TRUE(g.AddInputNode(std::move(in2)));
-  EXPECT_TRUE(g.AddNode(std::move(join), {in1_ptr, in2_ptr}));
-  EXPECT_TRUE(g.AddNode(std::move(aggregate), join_ptr));
-  EXPECT_TRUE(g.AddOutputOperator(std::move(matview), aggregate_ptr));
-  EXPECT_EQ(g.inputs().size(), 2);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table1"), in1_ptr);
-  EXPECT_EQ(g.inputs().at("test-table2"), in2_ptr);
-  EXPECT_EQ(g.outputs().at(0), matview_ptr);
+  EXPECT_TRUE(g->AddInputNode(std::move(in1)));
+  EXPECT_TRUE(g->AddInputNode(std::move(in2)));
+  EXPECT_TRUE(g->AddNode(std::move(join), {in1_ptr, in2_ptr}));
+  EXPECT_TRUE(g->AddNode(std::move(aggregate), join_ptr));
+  EXPECT_TRUE(g->AddOutputOperator(std::move(matview), aggregate_ptr));
+  EXPECT_EQ(g->inputs().size(), 2);
+  EXPECT_EQ(g->outputs().size(), 1);
+  EXPECT_EQ(g->inputs().at("test-table1"), in1_ptr);
+  EXPECT_EQ(g->inputs().at("test-table2"), in2_ptr);
+  EXPECT_EQ(g->outputs().at(0), matview_ptr);
   return g;
 }
 
@@ -477,9 +475,9 @@ TEST(DataFlowGraphPartitionTest, TestTrivialGraph) {
   std::vector<Record> records = MakeLeftRecords(schema);
   std::vector<Record> results = MakeLeftRecords(schema);
   // Process records.
-  g.Process("test-table", std::move(records));
+  g->Process("test-table", std::move(records));
   // Outputs must be equal.
-  MatViewContentsEquals(g.outputs().at(0), results);
+  MatViewContentsEquals(g->outputs().at(0), results);
 }
 
 TEST(DataFlowGraphPartitionTest, TestFilterGraph) {
@@ -490,12 +488,12 @@ TEST(DataFlowGraphPartitionTest, TestFilterGraph) {
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
-  g.Process("test-table", std::move(records));
+  g->Process("test-table", std::move(records));
   // Filter records.
-  auto op = static_cast<FilterOperator *>(g.GetNode(1));
+  auto op = static_cast<FilterOperator *>(g->GetNode(1));
   std::vector<Record> filtered = MakeFilterRecords(op->output_schema());
   // Outputs must be equal.
-  MatViewContentsEquals(g.outputs().at(0), filtered);
+  MatViewContentsEquals(g->outputs().at(0), filtered);
 }
 
 TEST(DataFlowGraphPartitionTest, TestUnionGraph) {
@@ -513,10 +511,10 @@ TEST(DataFlowGraphPartitionTest, TestUnionGraph) {
   second_half.push_back(records.at(3).Copy());
   second_half.push_back(records.at(4).Copy());
   // Process records.
-  g.Process("test-table1", std::move(first_half));
-  g.Process("test-table2", std::move(second_half));
+  g->Process("test-table1", std::move(first_half));
+  g->Process("test-table2", std::move(second_half));
   // Outputs must be equal.
-  MatViewContentsEquals(g.outputs().at(0), records);
+  MatViewContentsEquals(g->outputs().at(0), records);
 }
 
 TEST(DataFlowGraphPartitionTest, TestEquiJoinGraph) {
@@ -529,13 +527,13 @@ TEST(DataFlowGraphPartitionTest, TestEquiJoinGraph) {
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
   // Process records.
-  g.Process("test-table1", std::move(left));
-  g.Process("test-table2", std::move(right));
+  g->Process("test-table1", std::move(left));
+  g->Process("test-table2", std::move(right));
   // Compute expected result.
-  auto op = static_cast<EquiJoinOperator *>(g.GetNode(2));
+  auto op = static_cast<EquiJoinOperator *>(g->GetNode(2));
   std::vector<Record> result = MakeJoinRecords(op->output_schema());
   // Outputs must be equal.
-  MatViewContentsEquals(g.outputs().at(0), result);
+  MatViewContentsEquals(g->outputs().at(0), result);
 }
 
 TEST(DataFlowGraphPartitionTest, TestProjectGraph) {
@@ -546,12 +544,12 @@ TEST(DataFlowGraphPartitionTest, TestProjectGraph) {
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
-  g.Process("test-table", std::move(records));
+  g->Process("test-table", std::move(records));
   // Compute expected result.
-  auto op = static_cast<ProjectOperator *>(g.GetNode(1));
+  auto op = static_cast<ProjectOperator *>(g->GetNode(1));
   std::vector<Record> result = MakeProjectRecords(op->output_schema());
   // Outputs must be equal.
-  MatViewContentsEquals(g.outputs().at(0), result);
+  MatViewContentsEquals(g->outputs().at(0), result);
 }
 
 TEST(DataFlowGraphPartitionTest, TestProjectOnFilterGraph) {
@@ -562,12 +560,12 @@ TEST(DataFlowGraphPartitionTest, TestProjectOnFilterGraph) {
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
-  g.Process("test-table", std::move(records));
+  g->Process("test-table", std::move(records));
   // Compute expected result.
-  auto op = static_cast<ProjectOperator *>(g.GetNode(2));
+  auto op = static_cast<ProjectOperator *>(g->GetNode(2));
   std::vector<Record> result = MakeProjectOnFilterRecords(op->output_schema());
   // Outputs must be equal.
-  MatViewContentsEquals(g.outputs().at(0), result);
+  MatViewContentsEquals(g->outputs().at(0), result);
 }
 
 TEST(DataFlowGraphPartitionTest, TestProjectOnEquiJoinGraph) {
@@ -580,14 +578,14 @@ TEST(DataFlowGraphPartitionTest, TestProjectOnEquiJoinGraph) {
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
   // Process records.
-  g.Process("test-table1", std::move(left));
-  g.Process("test-table2", std::move(right));
+  g->Process("test-table1", std::move(left));
+  g->Process("test-table2", std::move(right));
   // Compute expected result.
-  auto op = static_cast<ProjectOperator *>(g.GetNode(3));
+  auto op = static_cast<ProjectOperator *>(g->GetNode(3));
   std::vector<Record> result =
       MakeProjectOnEquiJoinRecords(op->output_schema());
   // Outputs must be equal.
-  MatViewContentsEquals(g.outputs().at(0), result);
+  MatViewContentsEquals(g->outputs().at(0), result);
 }
 
 TEST(DataFlowGraphPartitionTest, TestAggregateGraph) {
@@ -598,12 +596,12 @@ TEST(DataFlowGraphPartitionTest, TestAggregateGraph) {
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
-  g.Process("test-table", std::move(records));
+  g->Process("test-table", std::move(records));
   // Compute expected result.
-  auto op = static_cast<AggregateOperator *>(g.GetNode(1));
+  auto op = static_cast<AggregateOperator *>(g->GetNode(1));
   std::vector<Record> result = MakeAggregateRecords(op->output_schema());
   // Outputs must be equal.
-  MatViewContentsEqualsIndexed(g.outputs().at(0), result, 0);
+  MatViewContentsEqualsIndexed(g->outputs().at(0), result, 0);
 }
 
 TEST(DataFlowGraphPartitionTest, TestAggregateOnEquiJoinGraph) {
@@ -616,14 +614,14 @@ TEST(DataFlowGraphPartitionTest, TestAggregateOnEquiJoinGraph) {
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
   // Process records.
-  g.Process("test-table1", std::move(left));
-  g.Process("test-table2", std::move(right));
+  g->Process("test-table1", std::move(left));
+  g->Process("test-table2", std::move(right));
   // Compute expected result.
-  auto op = static_cast<AggregateOperator *>(g.GetNode(3));
+  auto op = static_cast<AggregateOperator *>(g->GetNode(3));
   std::vector<Record> result =
       MakeAggregateOnEquiJoinRecords(op->output_schema());
   // Outputs must be equal.
-  MatViewContentsEqualsIndexed(g.outputs().at(0), result, 0);
+  MatViewContentsEqualsIndexed(g->outputs().at(0), result, 0);
 }
 
 // Similar to TestAggregateOnEquiJoinGraph
@@ -633,7 +631,7 @@ TEST(DataFlowGraphPartitionTest, CloneTest) {
   SchemaRef rschema = MakeRightSchema();
   // Make graph.
   auto g = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
-  auto g_clone = g.Clone(1);
+  auto g_clone = g->Clone(1);
   // Make records.
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
@@ -655,13 +653,13 @@ TEST(DataFlowGraphPartitionTest, CloneReprTest) {
 
   // Test with aggregate and equijoin.
   auto g1 = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
-  auto g1_clone = g1.Clone(1);
-  ASSERT_EQ(g1.DebugString(), g1_clone->DebugString());
+  auto g1_clone = g1->Clone(1);
+  ASSERT_EQ(g1->DebugString(), g1_clone->DebugString());
 
   // Test with filter and project.
   auto g2 = MakeProjectOnFilterGraph(0, lschema);
-  auto g2_clone = g2.Clone(1);
-  ASSERT_EQ(g2.DebugString(), g2_clone->DebugString());
+  auto g2_clone = g2->Clone(1);
+  ASSERT_EQ(g2->DebugString(), g2_clone->DebugString());
 }
 
 TEST(DataFlowGraphPartitionTest, CloneExchangeReprTest) {
@@ -671,19 +669,19 @@ TEST(DataFlowGraphPartitionTest, CloneExchangeReprTest) {
 
   // Test with aggregate and equijoin, but add an exchange in between.
   auto g1 = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
-  g1.InsertNode(std::make_unique<ExchangeOperator>(nullptr, PartitionKey{2}),
-                g1.GetNode(2), g1.GetNode(3));
-  g1.InsertNode(std::make_unique<ExchangeOperator>(nullptr, PartitionKey{0}),
-                g1.GetNode(3), g1.GetNode(4));
-  auto g1_clone = g1.Clone(1);
-  ASSERT_EQ(g1.DebugString(), g1_clone->DebugString());
+  g1->InsertNode(std::make_unique<ExchangeOperator>(nullptr, PartitionKey{2}),
+                 g1->GetNode(2), g1->GetNode(3));
+  g1->InsertNode(std::make_unique<ExchangeOperator>(nullptr, PartitionKey{0}),
+                 g1->GetNode(3), g1->GetNode(4));
+  auto g1_clone = g1->Clone(1);
+  ASSERT_EQ(g1->DebugString(), g1_clone->DebugString());
 
   // Test with filter and project.
   auto g2 = MakeProjectOnFilterGraph(0, lschema);
-  g2.InsertNode(std::make_unique<ExchangeOperator>(nullptr, PartitionKey{0}),
-                g2.GetNode(2), g2.GetNode(3));
-  auto g2_clone = g2.Clone(1);
-  ASSERT_EQ(g2.DebugString(), g2_clone->DebugString());
+  g2->InsertNode(std::make_unique<ExchangeOperator>(nullptr, PartitionKey{0}),
+                 g2->GetNode(2), g2->GetNode(3));
+  auto g2_clone = g2->Clone(1);
+  ASSERT_EQ(g2->DebugString(), g2_clone->DebugString());
 }
 
 #ifndef PELTON_VALGRIND_MODE

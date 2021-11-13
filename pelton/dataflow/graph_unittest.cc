@@ -171,8 +171,7 @@ TEST(DataFlowGraphTest, JoinAggregateFunctionality) {
       "GROUP BY input1.Category";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), partitions);
+  DataFlowGraph graph(CreateFlow(query, &state), partitions);
 
   // Make records and process records.
   graph.Process("input1", MakeLeftRecords(MakeLeftSchema()));
@@ -209,8 +208,7 @@ TEST(DataFlowGraphTest, JoinAggregateExchangeFunctionality) {
       "HAVING COUNT(ID) = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), partitions);
+  DataFlowGraph graph(CreateFlow(query, &state), partitions);
 
   // Make records and process records.
   graph.Process("input1", MakeLeftRecords(MakeLeftSchema()));
@@ -242,8 +240,7 @@ TEST(DataFlowGraphTest, TrivialGraphNoKey) {
   std::string query = "SELECT * FROM input1";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -262,8 +259,7 @@ TEST(DataFlowGraphTest, TrivialGraphWithKey) {
   std::string query = "SELECT * FROM input1 WHERE ID = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -284,8 +280,7 @@ TEST(DataFlowGraphTest, TrivialFilterGraph) {
   std::string query = "SELECT * FROM input1 WHERE ID = ? AND Category > 10";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -306,8 +301,7 @@ TEST(DataFlowGraphTest, TrivialUnionGraphWithKey) {
       "(Category = 1 OR Category = 2)) OR ID > 5) AND ID = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -328,8 +322,7 @@ TEST(DataFlowGraphTest, TrivialUnionGraphWithNoKey) {
       "(Category = 1 OR Category = 2)) OR ID > 5)";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -352,8 +345,7 @@ TEST(DataFlowGraphTest, AggregateGraphWithKey) {
       "Count(ID) = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 1);
+  DataFlowGraph graph(CreateFlow(query, &state), 1);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -374,8 +366,7 @@ TEST(DataFlowGraphTest, AggregateGraphSameKey) {
       "Category = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -395,8 +386,7 @@ TEST(DataFlowGraphTest, AggregateGraphNoKey) {
       "SELECT Category, COUNT(ID) FROM input1 GROUP BY Category";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -420,8 +410,7 @@ TEST(DataFlowGraphTest, JoinGraphWithKey) {
       "WHERE ID = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -445,8 +434,7 @@ TEST(DataFlowGraphTest, JoinGraphSameKey) {
       "WHERE Description = Item AND input1.Category = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -469,8 +457,7 @@ TEST(DataFlowGraphTest, JoinGraphNoKey) {
       "WHERE Description = Item";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -492,8 +479,7 @@ TEST(DataFlowGraphTest, ReorderingProjectionWithKey) {
   std::string query = "SELECT Item, Category, ID FROM input1 WHERE ID = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -513,8 +499,7 @@ TEST(DataFlowGraphTest, ReorderingProjectionNoKey) {
   std::string query = "SELECT Item, Category, ID FROM input1";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -534,8 +519,7 @@ TEST(DataFlowGraphTest, ChangingProjectionWithKey) {
   std::string query = "SELECT ID, ID + 1 AS calc FROM input1 WHERE ID = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -555,8 +539,7 @@ TEST(DataFlowGraphTest, ChangingProjectionNoKey) {
   std::string query = "SELECT Item, ID + 1 AS calc FROM input1";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -580,8 +563,7 @@ TEST(DataFlowGraphTest, JoinReorderProjectWithKey) {
       "input1.Category = input2.Category WHERE Description = Item AND ID = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -604,8 +586,7 @@ TEST(DataFlowGraphTest, JoinReorderProjectNoKey) {
       "input1.Category = input2.Category WHERE Description = Item";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -629,8 +610,7 @@ TEST(DataFlowGraphTest, JoinProjectDroppedKeyWithKey) {
       "input1.ID = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -653,8 +633,7 @@ TEST(DataFlowGraphTest, JoinProjectDroppedKeyNoKey) {
       "input1.Category = input2.Category WHERE Description = Item";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -680,8 +659,7 @@ TEST(DataFlowGraphTest, JoinAggregateKey) {
       "input1.Category HAVING COUNT(ID) = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -705,8 +683,7 @@ TEST(DataFlowGraphTest, JoinAggregateUnion) {
       "input1.Category HAVING COUNT(ID) > 10 OR input1.Category = 0";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -731,8 +708,7 @@ TEST(DataFlowGraphTest, UnionJoinAggregateUnionReorderProject) {
       "input1.Category HAVING COUNT(ID) > 10 OR input1.Category = 0";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -757,8 +733,7 @@ TEST(DataFlowGraphTest, UnionJoinAggregateUnionDroppingProject) {
       "HAVING COUNT(ID) > 10 OR input1.Category = 0";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph;
-  graph.Initialize(CreateFlow(query, &state), 3);
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();

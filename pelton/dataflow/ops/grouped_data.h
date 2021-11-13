@@ -318,7 +318,7 @@ class GroupedDataT : public GroupedData<RecordCompare> {
     std::list<R> result;
     for (auto it = this->contents_.begin(); it != this->contents_.end(); ++it) {
       auto bucket = this->LookupGreater(it->first, cmp, limit);
-      util::MergeInto(&result, bucket, this->compare_, limit);
+      util::MergeInto(&result, std::move(bucket), this->compare_, limit);
     }
     return util::ToVector(&result, limit, 0);
   }

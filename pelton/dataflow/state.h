@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "pelton/dataflow/graph.h"
+#include "pelton/dataflow/graph_partition.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
@@ -26,8 +27,7 @@ using FlowName = std::string;
 
 class DataFlowState {
  public:
-  DataFlowState() = default;
-  explicit DataFlowState(size_t workers) : workers_(workers) {}
+  explicit DataFlowState(size_t workers = 3) : workers_(workers) {}
 
   // Manage schemas.
   void AddTableSchema(const sqlast::CreateTable &create);
@@ -40,7 +40,7 @@ class DataFlowState {
   void AddFlow(const FlowName &name,
                std::unique_ptr<DataFlowGraphPartition> &&flow);
 
-  const DataFlowGraphPartition &GetFlow(const FlowName &name) const;
+  const DataFlowGraph &GetFlow(const FlowName &name) const;
 
   bool HasFlow(const FlowName &name) const;
 
@@ -71,7 +71,7 @@ class DataFlowState {
   std::unordered_map<TableName, SchemaRef> schema_;
 
   // DataFlow graphs and views.
-  std::unordered_map<FlowName, std::unique_ptr<DataFlowGraphPartition>> flows_;
+  std::unordered_map<FlowName, std::unique_ptr<DataFlowGraph>> flows_;
   std::unordered_map<TableName, std::vector<FlowName>> flows_per_input_table_;
 };
 

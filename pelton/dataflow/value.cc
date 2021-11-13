@@ -130,7 +130,17 @@ bool Value::operator<(const Value &other) const {
       return this->sint_ < other.sint_;
     case sqlast::ColumnDefinition::Type::TEXT:
     case sqlast::ColumnDefinition::Type::DATETIME:
-      return this->str_ < other.str_;
+      if (this->str_.size() != other.str_.size()) {
+        return this->str_.size() < other.str_.size();
+      }
+      for (size_t i = 0; i < this->str_.size(); i++) {
+        if (this->str_.at(i) < other.str_.at(i)) {
+          return true;
+        } else if (this->str_.at(i) != other.str_.at(i)) {
+          return false;
+        }
+      }
+      return false;
     default:
       LOG(FATAL) << "Unsupported data type in value comparison!";
   }

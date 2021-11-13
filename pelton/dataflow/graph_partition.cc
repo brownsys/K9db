@@ -53,14 +53,14 @@ bool DataFlowGraphPartition::AddNode(std::unique_ptr<Operator> &&op,
 bool DataFlowGraphPartition::InsertNode(std::unique_ptr<Operator> &&op,
                                         Operator *parent, Operator *child) {
   // Remove the edge between parent and child.
-  child->RemoveParent(parent);
+  size_t parent_index = child->RemoveParent(parent);
   // Initialize op.
   NodeIndex idx = this->nodes_.size();
   op->SetIndex(idx);
   op->SetPartition(this->id_);
   // Put op between parent and child.
   op->AddParent(parent);
-  child->AddParent(op.get());
+  child->AddParentAt(op.get(), parent_index);
 
   const auto &[_, inserted] = this->nodes_.emplace(idx, std::move(op));
   CHECK(inserted);

@@ -159,19 +159,37 @@ RequiredKey DFS(const Operator &op, NodeIndex from, const ProducerKey &key,
     if (children_keys.size() > 1 &&
         !std::equal(children_keys.cbegin() + 1, children_keys.cend(),
                     children_keys.cbegin())) {
-      // We can select any of the children keys here and functionaly the
-      // solution would probably work. However, it will lead to in-optimal
-      // partitioning and placement of exchanges.
-      // If we need to support this quickly but sub-optimally uncomment below.
-      // Make sure to reflect projection logic below as well.
-      // for (const RequiredKey &child_key : children_keys) {
-      //   if (std::holds_alternative<PartitionKey>(child_key)) {
-      //     rkey = child_key;
-      //     opkey = std::get<PartitionKey>(rkey);
-      //     break;
-      //   }
-      // }
-      LOG(FATAL) << "Node has children with different partition keys.";
+      // Choose one of the restricted PartitionKey; some child must have one.
+      PartitionKey chosen_child_key;
+      for (const RequiredKey &child_key : children_keys) {
+        if (std::holds_alternative<PartitionKey>(child_key)) {
+          chosen_child_key = std::get<PartitionKey>(child_key);
+          break;
+        }
+      }
+      // We can make it so that our operator produces the chosen_child_key.
+      // This means that we will not require an exchange for that child.
+      // However, we might need an exchange for the other children!
+      opkey = chosen_child_key;
+      rkey = chosen_child_key;
+      // Key after project must be translated to the key before project.
+      if (op.type() == Operator::Type::PROJECT) {
+        auto project = static_cast<const ProjectOperator *>(&op);
+        auto tmp = UnprojectKey(*project, chosen_child_key);
+        // Can the key be translated? (e.g. no literals added by project).
+        if (std::holds_alternative<Inconsistent>(tmp)) {
+          // Projection no longer constrained, we will add an exchange
+          // for the new key after project (since it cannot be computed
+          // any earlier).
+          rkey = Any::UNIT;
+          opkey = Inconsistent::UNIT;
+        } else {
+          // Projection translation may have re-ordered key, but key is valid.
+          rkey = std::get<PartitionKey>(tmp);
+        }
+      }
+      LOG(WARNING) << "Node has children with different partition keys: "
+                      "exchanges may be suboptimal.";
     } else if (children_keys.size() > 0) {
       // Check that (all) children have been constrained.
       const RequiredKey &child_key = children_keys.front();
