@@ -17,7 +17,8 @@ class Client {
       : index_(index), state_(state) {}
 
   // Batch Generation.
-  std::vector<dataflow::Record> GenerateBatch(dataflow::SchemaRef schema,
+  std::vector<dataflow::Record> GenerateBatch(const std::string &table,
+                                              dataflow::SchemaRef schema,
                                               size_t batch_size);
 
   // Batch computation.

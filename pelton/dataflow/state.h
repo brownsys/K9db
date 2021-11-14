@@ -29,6 +29,8 @@ class DataFlowState {
  public:
   explicit DataFlowState(size_t workers = 3) : workers_(workers) {}
 
+  size_t workers() const { return this->workers_; }
+
   // Manage schemas.
   void AddTableSchema(const sqlast::CreateTable &create);
   void AddTableSchema(const std::string &table_name, SchemaRef schema);

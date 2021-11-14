@@ -36,6 +36,12 @@ class DataFlowGraph {
     return this->matview_keys_;
   }
 
+  // Access partitioning keys.
+  const PartitionKey &input_partition_key(const std::string &table) const {
+    return this->inkeys_.at(table);
+  }
+  const PartitionKey &out_partition_key() const { return this->outkey_; }
+
   // Process records.
   void Process(const std::string &input_name, std::vector<Record> &&records);
 
@@ -63,19 +69,19 @@ class DataFlowGraph {
   std::vector<MatViewOperator *> matviews_;  // one per partition.
   // Maps each input name to the keys that partition records fed to that input.
   std::unordered_map<std::string, PartitionKey> inkeys_;
-  // Maps each matview to the keys that partition records read from that view.
-  std::vector<PartitionKey> outkeys_;
+  // The partition key of the matview.
+  PartitionKey outkey_;
   // The output schema.
   SchemaRef output_schema_;
   // The key that the underlying matviews use for lookup.
-  // If the matviews have keys, this is guaranteed to equal outkeys_, and
+  // If the matviews have keys, this is guaranteed to equal outkey_, and
   // matview_partition_match_ will be true.
-  // Otherwise, outkeys_ will be equal to some non empty key, and this
+  // Otherwise, outkey_ will be equal to some non empty key, and this
   // will be empty.
   std::vector<ColumnID> matview_keys_;
   bool matview_partition_match_;
 
-  // Unit tests need to look inside partitions_, inkeys_, and outkeys_.
+  // Unit tests need to look inside partitions_, inkeys_, and outkey_.
   FRIEND_TEST(DataFlowGraphTest, JoinAggregateFunctionality);
   FRIEND_TEST(DataFlowGraphTest, JoinAggregateExchangeFunctionality);
   FRIEND_TEST(DataFlowGraphTest, TrivialGraphNoKey);

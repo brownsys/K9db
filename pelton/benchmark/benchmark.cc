@@ -42,7 +42,7 @@ void Thread(size_t index, size_t batch_size, size_t batch_count,
 void Benchmark(const std::vector<std::string> &tables, const std::string &query,
                size_t threads, size_t batch_size, size_t batch_count) {
   // Create an empty state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(threads);
 
   // Fill the state with schemas.
   for (const std::string &table : tables) {
@@ -81,6 +81,6 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging("cli");
 
   pelton::benchmark::Benchmark(
-      {"CREATE TABLE tbl(col1 INT PRIMARY KEY, col2 VARCHAR, col3 INT);"},
-      "SELECT * FROM tbl WHERE col3 < 10", 1, 10000000, 1);
+      {"CREATE TABLE tbl(col1 INT, col2 VARCHAR, col3 INT);"},
+      "SELECT col2, col3 FROM tbl WHERE col3 > 10 AND col3 = ?", 3, 1, 100000);
 }

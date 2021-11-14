@@ -248,7 +248,7 @@ TEST(DataFlowGraphTest, TrivialGraphNoKey) {
 
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 TEST(DataFlowGraphTest, TrivialGraphWithKey) {
   // Create schemas.
@@ -267,7 +267,7 @@ TEST(DataFlowGraphTest, TrivialGraphWithKey) {
 
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 
 // Filters.
@@ -288,7 +288,7 @@ TEST(DataFlowGraphTest, TrivialFilterGraph) {
 
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 TEST(DataFlowGraphTest, TrivialUnionGraphWithKey) {
   // Create schemas.
@@ -309,7 +309,7 @@ TEST(DataFlowGraphTest, TrivialUnionGraphWithKey) {
 
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 TEST(DataFlowGraphTest, TrivialUnionGraphWithNoKey) {
   // Create schemas.
@@ -330,7 +330,7 @@ TEST(DataFlowGraphTest, TrivialUnionGraphWithNoKey) {
 
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 
 // Aggregate.
@@ -353,7 +353,7 @@ TEST(DataFlowGraphTest, AggregateGraphWithKey) {
 
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{1});
+  EXPECT_EQ(graph.outkey_, PartitionKey{1});
 }
 TEST(DataFlowGraphTest, AggregateGraphSameKey) {
   // Create schemas.
@@ -374,7 +374,7 @@ TEST(DataFlowGraphTest, AggregateGraphSameKey) {
 
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 TEST(DataFlowGraphTest, AggregateGraphNoKey) {
   // Create schemas.
@@ -394,7 +394,7 @@ TEST(DataFlowGraphTest, AggregateGraphNoKey) {
 
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 
 // Join.
@@ -419,7 +419,7 @@ TEST(DataFlowGraphTest, JoinGraphWithKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 
 TEST(DataFlowGraphTest, JoinGraphSameKey) {
@@ -443,7 +443,7 @@ TEST(DataFlowGraphTest, JoinGraphSameKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{2});
+  EXPECT_EQ(graph.outkey_, PartitionKey{2});
 }
 TEST(DataFlowGraphTest, JoinGraphNoKey) {
   // Create schemas.
@@ -466,7 +466,7 @@ TEST(DataFlowGraphTest, JoinGraphNoKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{2});
+  EXPECT_EQ(graph.outkey_, PartitionKey{2});
 }
 
 // Projections.
@@ -487,7 +487,7 @@ TEST(DataFlowGraphTest, ReorderingProjectionWithKey) {
 
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{2});
+  EXPECT_EQ(graph.outkey_, PartitionKey{2});
 }
 TEST(DataFlowGraphTest, ReorderingProjectionNoKey) {
   // Create schemas.
@@ -507,7 +507,7 @@ TEST(DataFlowGraphTest, ReorderingProjectionNoKey) {
 
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{2});
+  EXPECT_EQ(graph.outkey_, PartitionKey{2});
 }
 TEST(DataFlowGraphTest, ChangingProjectionWithKey) {
   // Create schemas.
@@ -527,7 +527,7 @@ TEST(DataFlowGraphTest, ChangingProjectionWithKey) {
 
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 TEST(DataFlowGraphTest, ChangingProjectionNoKey) {
   // Create schemas.
@@ -547,7 +547,7 @@ TEST(DataFlowGraphTest, ChangingProjectionNoKey) {
 
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), (PartitionKey{0, 1}));
+  EXPECT_EQ(graph.outkey_, (PartitionKey{0, 1}));
 }
 
 // Join and projection.
@@ -572,7 +572,7 @@ TEST(DataFlowGraphTest, JoinReorderProjectWithKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{1});
+  EXPECT_EQ(graph.outkey_, PartitionKey{1});
 }
 TEST(DataFlowGraphTest, JoinReorderProjectNoKey) {
   // Create schemas.
@@ -595,7 +595,7 @@ TEST(DataFlowGraphTest, JoinReorderProjectNoKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 TEST(DataFlowGraphTest, JoinProjectDroppedKeyWithKey) {
   // Create schemas.
@@ -619,7 +619,7 @@ TEST(DataFlowGraphTest, JoinProjectDroppedKeyWithKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{1});
+  EXPECT_EQ(graph.outkey_, PartitionKey{1});
 }
 TEST(DataFlowGraphTest, JoinProjectDroppedKeyNoKey) {
   // Create schemas.
@@ -642,7 +642,7 @@ TEST(DataFlowGraphTest, JoinProjectDroppedKeyNoKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{1});
+  EXPECT_EQ(graph.outkey_, PartitionKey{1});
 }
 
 // Complex cases.
@@ -668,7 +668,7 @@ TEST(DataFlowGraphTest, JoinAggregateKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{1});
+  EXPECT_EQ(graph.outkey_, PartitionKey{1});
 }
 TEST(DataFlowGraphTest, JoinAggregateUnion) {
   // Create schemas.
@@ -692,7 +692,7 @@ TEST(DataFlowGraphTest, JoinAggregateUnion) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 TEST(DataFlowGraphTest, UnionJoinAggregateUnionReorderProject) {
   // Create schemas.
@@ -717,7 +717,7 @@ TEST(DataFlowGraphTest, UnionJoinAggregateUnionReorderProject) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{1});
+  EXPECT_EQ(graph.outkey_, PartitionKey{1});
 }
 TEST(DataFlowGraphTest, UnionJoinAggregateUnionDroppingProject) {
   // Create schemas.
@@ -742,7 +742,7 @@ TEST(DataFlowGraphTest, UnionJoinAggregateUnionDroppingProject) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
-  EXPECT_EQ(graph.outkeys_.front(), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 
 }  // namespace dataflow

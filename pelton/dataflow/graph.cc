@@ -79,7 +79,7 @@ DataFlowGraph::DataFlowGraph(
     this->inkeys_.emplace(name, std::get<PartitionKey>(p.at(op->index())));
   }
   for (auto op : partition->outputs()) {
-    this->outkeys_.push_back(std::get<PartitionKey>(p.at(op->index())));
+    this->outkey_ = std::get<PartitionKey>(p.at(op->index()));
   }
 
   // Add in any needed exchanges.
@@ -98,6 +98,10 @@ DataFlowGraph::DataFlowGraph(
         std::make_unique<ExchangeOperator>(&this->partitions_, key), parent,
         child);
   }
+
+  // Print debugging information.
+  LOG(INFO) << "Planned exchanges and partitioning of flow";
+  LOG(INFO) << partition->DebugString();
 
   // Make the specified number of partitions.
   for (PartitionIndex i = 0; i < partitions; i++) {
