@@ -26,6 +26,11 @@ mariadb --port=10001 --host=127.0.0.1
 bazel run //mysql_proxy/src:mysql_proxy
 ```
 
+- Run with rust backtracing enabled
+```bash
+RUST_BACKTRACE=1 bazel run //mysql_proxy/src:mysql_proxy
+```
+
 - Run with FFI debug info
 ```bash
 bazel run //mysql_proxy/src:mysql_proxy -- -logtostderr=1
