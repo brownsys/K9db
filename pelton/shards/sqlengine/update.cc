@@ -109,6 +109,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
                                      dataflow::DataFlowState *dataflow_state) {
   perf::Start("Update");
 
+  // Amrit - ensure this does not modify permission fields
+
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
   bool update_flows = dataflow_state->HasFlowsFor(table_name);

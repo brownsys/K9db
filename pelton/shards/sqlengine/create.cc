@@ -299,6 +299,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     return absl::InvalidArgumentError("Table already exists!");
   }
 
+  // std::cout << stmt.GetColumns()[0].column_name();
+
   // Determine if this table is special: maybe it has PII fields, or maybe it
   // is linked to an existing shard via a foreign key.
   bool has_pii = HasPII(stmt);
@@ -307,6 +309,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
   for (auto &info : sharding_information) {
     CHECK_STATUS(IsShardingBySupported(&info, *state));
   }
+
+  // Amrit - Modify stmt here to add two more columns for permissions
 
   sql::SqlResult result = sql::SqlResult(false);
   // Sharding scenarios.

@@ -39,6 +39,10 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
     // Case 1: CREATE TABLE statement.
     case sqlast::AbstractStatement::Type::CREATE_TABLE: {
       auto *stmt = static_cast<sqlast::CreateTable *>(statement.get());
+
+      const sqlast::ColumnDefinition &gdpr_col_def = sqlast::ColumnDefinition("gdpr_purpose", "varchar(255)");
+      stmt->AddColumn("gdpr_purpose", gdpr_col_def);
+
       return create::Shard(*stmt, state, dataflow_state);
     }
 
@@ -89,6 +93,13 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       auto *stmt = static_cast<sqlast::GDPRStatement *>(statement.get());
       return gdpr::Shard(*stmt, state, dataflow_state);
     }
+
+    // Amrit
+    // Case 9: UPDATE PURPOSE (GDPR) statement.
+    // case sqlast::AbstractStatement::Type::GDPR: {
+    //   auto *stmt = static_cast<sqlast::GDPRStatement *>(statement.get());
+    //   return gdpr::Shard(*stmt, state, dataflow_state);
+    // }
 
     // Unsupported (this should not be reachable).
     default:
