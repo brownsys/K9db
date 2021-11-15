@@ -58,22 +58,48 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       }
     }
 
-    // check indices that start with a ref_
-    // 1. extract tablename
-    // 2. iterate over index
-    // 3. execute queries, SELECT * FROM <table_name> WHERE Accessor_..._id AND shard_by=index.value
-    // /or/ to do in one shot: shard_by in (index.value,...)
-    // create ast for select{} query, don't hardcode string query
-    // restrict to shard
-    // user that belongs to the user currently accessing the data
+    // get data for an accessor
+    // for every table in this shard
+    for (const auto &table_name : state->TablesInShard(shard_kind)) {
+      // for every index associated with this table
+      for (const auto &index : state->IndicesFor(table_name) {
+        // check if index starts with ref_ + shard_kind, indicating an accessor
+        bool explicit_accessor = absl::StartsWith(index, "ref_" + shard_kind); 
+        if (explicit_accessor){
+          // 1. extract tablename from index
+          // remove basename_typeofuser from index_name <basename_typeofuser/shardkind_tablename_accessorcol>
+          // e.g. ref_doctors from ref_doctors_chat_colname
+          // know that colname has to start with "_ACCESSOR" so find substring before it
+          std::String accessor_table_name = "";
+          // TODO: index.substr(1, index.find("ACCESSOR_"));
 
-    // if more than one index, then more than one table where user has access but not delete rights
-    // extract tablename_colname ==> 
-    // identify user we're tying to get info from
-    // if doctor, we keep it
-    // extract table name out where we find the data (chat)
+          // 2. extract shardbycol
+          // TODO: get accessor colname
+          std::String accessor_col_name = "";
 
+          // 3. query this table (iterate over all values in the index that correspond to the user)
+          // requesting the data with user_id
 
+          // SELECT * FROM <table_name> WHERE Accessor_doctor_id = user_id AND OWNER_patient_id in (index.value, ...)
+          sqlast::Select accessor_stmt{accessor_table_name};
+          // TODO: add where condition via ast_expressions.h, constructing children first, then adding parents
+          // 1. Accessor_doctor_id = user_id --> left condition
+          // ===> binary expression. type=equality
+          // ====> left of left: columnExpression (colname). right of right: literalExpression (value/user_id)
+          sqlast::BinaryExpression{...}
+          // 2. OWNER_patient_id in (index.value, ...) --> right condition
+          // ===> binary expression. type=in
+          // ====> left of left: columnExpression (colname). right of right: LiteralListExpression
+          // index.h, 2nd method called LookupIndex(index, user_id, dataflow_state), returns set of user_ids to pass to LiteralListExpression(vector<std::string>)
+          // ==> each id is that of patient related to the doctor (that have exchanged messages)
+          // shard_by is owner_patient_id, get from state->shardingInfo
+          accessor_stmt.AddColumn("*");
+
+          absl::StatusOr<sql::SqlResult> accessor_data = select::Shard(accessor_stmt, state, dataflow_state);
+          table_result.Append(accessor_data);
+        }
+      }
+    }
 
     // Delete was successful, time to update dataflows.
     if (update_flows) {
