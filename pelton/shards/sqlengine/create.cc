@@ -212,59 +212,36 @@ absl::StatusOr<std::list<ShardingInformation>> ShardTable(
   }
   return implicit_owners;
 }
-// absl::StatusOr<std::list<ShardingInformation>> IndexAccessor(
+
 void IndexAccessor(
     const sqlast::CreateTable &stmt, SharderState &state, dataflow::DataFlowState &dataflow_state) {
   // Result is empty by default.
+  std::unordered_map<ColumnName, ColumnIndex> index_map;
 
   // get table name from ast representation of sql statement
   const std::string &table_name = stmt.table_name();
   // Check column definitions for inlined foreign key constraints.
   const auto &columns = stmt.GetColumns();
+
   for (size_t index = 0; index < columns.size(); index++) {
     // Record index of column for later constraint processing.
     const std::string &column_name = columns[index].column_name();
    // check if column starts with ACCESSOR_ (has an accessor annotation)
     bool explicit_accessor = absl::StartsWith(column_name, "ACCESSOR_"); 
-    // ! TODO: get foreign key to find type of user
 
-    // make sure std::out is flushed (or use LOG() << ,,.)
-    std::cout << "Column name: " << column_name << std::endl;
-    std::cout << "ACCESSOR BOOL: " << explicit_accessor << std::endl;
+    LOG(INFO) << "Column name: " << column_name;
+    LOG(INFO) << "ACCESSOR BOOL: " << explicit_accessor;
 
     if (explicit_accessor){
-      std::cout << "We have found an accessor: " << column_name << std::endl;
-      // create reference index (flow)
-
-      // CreateIndex(column_name, index);
-      // state->CreateIndex(shard_kind, stmnt.get_table_name(), column_name, &shard_by,
-                  //  flow_name, create_index_stmt, unique )
-      const std::string ref = "ref";
-      const std::string &ref_ptr = ref;
+      LOG(INFO) << "We have found an accessor: " << column_name;
+      // CreateIndex(access_column (doctor) is the key, owner_by_value (patient), index is not unique)
       sqlast::CreateIndex create_index_stmt{"ref", table_name, column_name};
-      std::cout << "Starting CreateIndex: " << std::endl;
+      LOG(INFO) << "Starting CreateIndex: ";
       pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, &state, &dataflow_state);
-
-      // ref_doctors_msg_colname
-      // basename_typeofuser_tablename_shardbycol(handled automatically)
-
-      // can print the index with a SELECT * FROM __ stmt?
-
-      // create reference index. index.h has CreateIndex function in it
-      // give it what is the key, what is the value, is the index unique or not
-      // CreateIndex(access_column (doc) key, owner_by_value (patient), not unique (false))
 
       // Index of shard_id (patient) to Primary Key of chat table, in that row we set the doctor_id col to NULL.
       // Anonymize access annotation. So like if doctor (accessor) deletes his data, his 
       // ==> can have "on delete retain" or "on delete anonymise" 
-
-      // in gdpr get, look up all the indices that are reference indices. reference_
-      // get all of those, loop over their data (loop over the part of index that match our doctor)
-      // (loop over our special reference tables and construct the ref table)
-
-      // old approach
-      // create ref_table (check that it was created in the db) // or just create index
-      // sharder_state, add map of <shard to reference_tables>
     }
   }
   std::cout << "finished!" << std::endl;
