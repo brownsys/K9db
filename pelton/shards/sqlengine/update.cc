@@ -114,8 +114,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
 
-  // UPDATE does not modify sharder state, so read lock is fine
-  std::shared_lock<std::shared_mutex> state_lock = state->LockShared();
+  // UPDATE does not modify sharder state, so read lock is fine -- unless
+  // the update turns into a insert/delete pair (see below, where we upgrade).
+  SharderStateLock state_lock = state->LockShared();
   bool update_flows = dataflow_state->HasFlowsFor(table_name);
 
   // Get the rows that are going to be deleted prior to deletion to use them
@@ -232,7 +233,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
   }
 
   // No need to access sharder state any more.
-  state_lock.unlock();
+  state_lock.Unlock();
 
   // Delete was successful, time to update dataflows.
   if (update_flows) {

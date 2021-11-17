@@ -34,7 +34,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
   // XXX(malte): if we properly removed the shared on GDPR FORGET below, this
   // would need to be a unique_lock, as it would change sharder state. However,
   // the current code does not update the sharder state AFAICT.
-  std::shared_lock<std::shared_mutex> state_lock = state->LockShared();
+  SharderStateLock state_lock = state->LockShared();
 
   for (const auto &table_name : state->TablesInShard(shard_kind)) {
     sql::SqlResult table_result;
@@ -52,6 +52,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       }
 
       if (is_forget) {
+        // XXX(malte): need to upgrade SharderStateLock here in the future.
         sqlast::Delete tbl_stmt{info.sharded_table_name, update_flows};
         table_result.Append(exec.ExecuteShard(&tbl_stmt, shard_kind, user_id,
                                               schema, aug_index));
@@ -63,7 +64,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       }
     }
 
-    state_lock.unlock();
+    state_lock.Unlock();
 
     // Delete was successful, time to update dataflows.
     if (update_flows) {

@@ -25,7 +25,7 @@ absl::StatusOr<sql::SqlResult> CreateIndex(const sqlast::CreateIndex &stmt,
   const std::string &table_name = stmt.table_name();
 
   // need a unique lock as we are changing index metadata
-  std::unique_lock<std::shared_mutex> state_lock = state->LockUnique();
+  SharderStateLock state_lock = state->LockUnique();
 
   sql::SqlResult result = sql::SqlResult(false);
   bool is_sharded = state->IsSharded(table_name);

@@ -11,6 +11,7 @@
 #include <memory>
 #include <shared_mutex>
 #include <string>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -22,6 +23,51 @@
 
 namespace pelton {
 namespace shards {
+
+class SharderStateLock {
+  public:
+    // Constructor to create a shared lock
+    SharderStateLock(std::shared_lock<std::shared_mutex>&& shared_lock) :
+      upgrade_lock_(std::nullopt),
+      shared_lock_(std::optional(std::move(shared_lock))),
+      unique_lock_(std::nullopt) {
+    }
+    // Constructor to create an exclusive lock
+    SharderStateLock(std::unique_lock<std::shared_mutex>&& unique_lock,
+                     std::unique_lock<std::mutex>&& upgrade_lock) :
+      upgrade_lock_(std::optional(std::move(upgrade_lock))),
+      shared_lock_(std::nullopt),
+      unique_lock_(std::optional(std::move(unique_lock))) {
+    }
+
+    // Not copyable or movable.
+    SharderStateLock(const SharderStateLock &) = delete;
+    SharderStateLock &operator=(const SharderStateLock &) = delete;
+    SharderStateLock(const SharderStateLock &&) = delete;
+    SharderStateLock &operator=(const SharderStateLock &&) = delete;
+
+    // No need for an explicit destructor; locks will be unlocked when
+    // the SharderStateLock is destroyed.
+
+    bool IsExclusive() {
+      CHECK(upgrade_lock_.has_value() == unique_lock_.has_value());
+      return upgrade_lock_.has_value();
+    }
+
+    void Unlock() {
+      if (upgrade_lock_.has_value()) {
+        upgrade_lock_.value().unlock();
+        unique_lock_.value().unlock();
+      } else {
+        shared_lock_.value().unlock();
+      }
+    }
+
+  private:
+    std::optional<std::unique_lock<std::mutex>> upgrade_lock_;
+    std::optional<std::shared_lock<std::shared_mutex>> shared_lock_;
+    std::optional<std::unique_lock<std::shared_mutex>> unique_lock_;
+};
 
 // Our design splits a database into many shards, each shard belongs to a unique
 // user and contains only that users data, and has the schema for tables related
@@ -111,23 +157,29 @@ class SharderState {
 
   // Synchronization of state access is a responsibility of the caller.
   // Caller will unlock automatically once the returned lock goes out of scope.
-  std::shared_lock<std::shared_mutex> LockShared() {
-    return std::shared_lock<std::shared_mutex>(this->metadata_mtx_);
+  SharderStateLock LockShared() {
+    return SharderStateLock(std::shared_lock<std::shared_mutex>(this->metadata_mtx_));
   }
-  std::pair<std::unique_lock<std::shared_mutex>, std::lock_guard<std::mutex>> LockUnique() {
+  SharderStateLock LockUnique() {
     // N.B. lock order must be consistent with LockUpgrade() here, else
     // we risk deadlock.
-    std::lock_guard<std::mutex> upgrade_lock(this->upgrade_mtx_);
+    std::unique_lock<std::mutex> upgrade_lock(this->upgrade_mtx_);
     std::unique_lock<std::shared_mutex> writer_lock(this->metadata_mtx_);
-    return std::make_pair(writer_lock, upgrade_lock);
+    return SharderStateLock(std::move(writer_lock), std::move(upgrade_lock));
   }
-  std::pair<std::unique_lock<std::shared_mutex>, std::lock_guard<std::mutex>> LockUpgrade(std::shared_lock<std::shared_mutex>&& reader_lock) {
-    // Precondition: metadata_mtx_ is locked for reading by this thread.
+  SharderStateLock LockUpgrade(SharderStateLock&& lock) {
+    //if (lock.IsExclusive()) {
+    //  // fast path: SharderStateLock has already acquired both mutexes
+    //  // exclusively.
+    //  return std::move(lock);
+    //}
+    // Precondition: metadata_mtx_ is locked for reading by this thread, but
+    // upgrade_mtx_ is not locked.
     //
     // 1. acquire upgrade mutex. This gives us an exclusive lock that excludes
     //    other writers, since they must hold both upgrade_mtx_ and
     //    metadata_mtx_ with exclusive locks.
-    std::lock_guard<std::mutex> upgrade_lock(this->upgrade_mtx_);
+    std::unique_lock<std::mutex> upgrade_lock(this->upgrade_mtx_);
     // 2. unlock metadata_mtx_ for reading. This is necessarily to re-lock it
     //    with exclusive access.
     //    NOTE: after this line, another reader or writer could acquire
@@ -137,13 +189,13 @@ class SharderState {
     //    b) no writer can lock metadata_mtx_, because the writer would
     //       need to acquire upgrade_mtx_ first, and we have that mutex
     //       locked, so the writer must wait.
-    reader_lock.unlock();
+    lock.Unlock();
     // 3. re-lock metadata_mtx_ for writing, while continuing to hold the lock
     //    on upgrade_mtx_.
     std::unique_lock<std::shared_mutex> writer_lock(this->metadata_mtx_);
     // Postcondition: BOTH upgrade_mtx_ AND metadata_mtx_ are locked exclusively
     // by this thread. Caller must unlock these mutexes.
-    return std::make_pair(writer_lock, upgrade_lock);
+    return SharderStateLock(std::move(writer_lock), std::move(upgrade_lock));
   }
 
   // Returns number of shards in a synchronized way. Callers need not lock the

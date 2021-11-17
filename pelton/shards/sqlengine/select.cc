@@ -72,7 +72,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
       ResultSchema(stmt, dataflow_state->GetTableSchema(table_name));
 
   auto &exec = connection->executor_;
-  std::shared_lock<std::shared_mutex> state_lock = state->LockShared();
+  SharderStateLock state_lock = state->LockShared();
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
