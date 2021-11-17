@@ -229,6 +229,19 @@ void IndexAccessor(
    // check if column starts with ACCESSOR_ (has an accessor annotation)
     bool explicit_accessor = absl::StartsWith(column_name, "ACCESSOR_"); 
 
+    const sqlast::ColumnConstraint *fk_constraint = nullptr;
+    
+    for (const auto &constraint : columns[index].GetConstraints()) {
+      // if type of constraint is a foreign key, assign value to fk_constraint
+      if (constraint.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
+        fk_constraint = &constraint;
+        break;
+      }
+    }
+
+    ASSIGN_OR_RETURN(std::optional<ShardKind> shard_kind,
+                       ShouldShardBy(*fk_constraint, state));
+    
     LOG(INFO) << "Column name: " << column_name;
     LOG(INFO) << "ACCESSOR BOOL: " << explicit_accessor;
 
