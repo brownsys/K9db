@@ -113,6 +113,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
 
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
+
+  // UPDATE does not modify sharder state, so read lock is fine
+  std::shared_lock<std::shared_mutex> state_lock = state->LockShared();
   bool update_flows = dataflow_state->HasFlowsFor(table_name);
 
   // Get the rows that are going to be deleted prior to deletion to use them
@@ -140,6 +143,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
       // The update statement might move the rows from one shard to another.
       // We can only perform this update by splitting it into a DELETE-INSERT
       // pair.
+      // FIXME(malte): this deadlocks, as delete_::Shard() tries to take the
+      // sharder state lock again.
       MOVE_OR_RETURN(result,
                      delete_::Shard(stmt.DeleteDomain(), connection, false));
 
@@ -147,6 +152,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
       for (size_t i = old_records_size; i < records.size(); i++) {
         sqlast::Insert insert_stmt =
             InsertRecord(records.at(i), state->GetSchema(table_name));
+        // FIXME(malte): this calls insert::Shard, which could end up taking the
+        // exclusive lock on the sharder state (as inserts may create a new
+        // shard for the user if none exists).
         MOVE_OR_RETURN(sql::SqlResult tmp,
                        insert::Shard(insert_stmt, connection, false));
         result.Append(std::move(tmp));
@@ -222,6 +230,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
       }
     }
   }
+
+  // No need to access sharder state any more.
+  state_lock.unlock();
 
   // Delete was successful, time to update dataflows.
   if (update_flows) {

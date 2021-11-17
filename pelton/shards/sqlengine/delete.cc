@@ -28,6 +28,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
       connection->pelton_state->GetDataFlowState();
   shards::SharderState *state = connection->pelton_state->GetSharderState();
   const std::string &table_name = stmt.table_name();
+  std::shared_lock<std::shared_mutex> state_lock = state->LockShared();
 
   // If no flows read from this table, we do not need to do anything
   // to update them.
@@ -118,6 +119,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
       result = exec.ExecuteDefault(&stmt);
     }
   }
+
+  // We no longer need to access any sharder state.
+  state_lock.unlock();
 
   // Delete was successful, time to update dataflows.
   if (update_flows) {

@@ -34,6 +34,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
   dataflow::DataFlowState *dataflow_state =
       connection->pelton_state->GetDataFlowState();
   shards::SharderState *state = connection->pelton_state->GetSharderState();
+  std::shared_lock<std::shared_mutex> state_lock = state->LockShared();
+
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
   if (!dataflow_state->HasFlowsFor(table_name)) {
@@ -97,6 +99,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
       // TODO(babman): better to do this after user insert rather than user data
       //               insert.
       if (!state->ShardExists(info.shard_kind, user_id)) {
+        // XXX(malte): need to upgrade to unique_lock on sharder state here!
+        // Not trivial to do without running the (theoretical) risk of an
+        // intervening schema change.
         for (auto *create_stmt : state->CreateShard(info.shard_kind, user_id)) {
           sql::SqlResult tmp =
               exec.ExecuteShard(create_stmt, info.shard_kind, user_id);
@@ -110,6 +115,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
       result.Append(exec.ExecuteShard(&cloned, info.shard_kind, user_id));
     }
   }
+
+  state_lock.unlock();
 
   // Insert was successful, time to update dataflows.
   // Turn inserted values into a record and process it via corresponding flows.
