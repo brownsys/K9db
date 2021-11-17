@@ -109,7 +109,19 @@ class SharderState {
   // Load state from its durable file (if exists).
   void Load(const std::string &dir_path);
 
+  // Synchronization of state access is a responsibility of the caller.
+  // Caller will unlock automatically once the returned lock goes out of scope.
+  std::shared_lock<std::shared_mutex> LockShared() {
+    return std::shared_lock<std::shared_mutex>(this->metadata_mtx_);
+  }
+  std::unique_lock<std::shared_mutex> LockUnique() {
+    return std::unique_lock<std::shared_mutex>(this->metadata_mtx_);
+  }
+
+  // Returns number of shards in a synchronized way. Callers need not lock the
+  // state prior to calling this method.
   size_t NumShards() {
+    std::shared_lock<std::shared_mutex> lock(this->metadata_mtx_);
     size_t count = 0;
     for (auto &s : shards_) {
       count += s.second.size();
@@ -174,10 +186,9 @@ class SharderState {
   // needed to keep IndicesFor a const function (reader)
   std::unordered_set<ColumnName> empty_columns;
 
-  mutable std::shared_mutex mtx1_;
-  mutable std::shared_mutex mtx2_;
-  mutable std::shared_mutex mtx3_;
-  mutable std::shared_mutex mtx4_;
+  // single reader/writer lock to protect sharder state against concurrent
+  // modification when there exist multiple clients.
+  mutable std::shared_mutex metadata_mtx_;
 };
 
 }  // namespace shards
