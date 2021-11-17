@@ -295,6 +295,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
   dataflow::DataFlowState *dataflow_state =
       connection->pelton_state->GetDataFlowState();
   shards::SharderState *state = connection->pelton_state->GetSharderState();
+  std::unique_lock<std::shared_mutex> state_lock = state->LockUnique();
 
   const std::string &table_name = stmt.table_name();
   if (state->Exists(table_name)) {
