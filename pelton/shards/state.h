@@ -63,6 +63,13 @@ class SharderStateLock {
       }
     }
 
+    void Upgrade(std::unique_lock<std::shared_mutex>&& writer_lock,
+                 std::unique_lock<std::mutex>&& upgrade_lock) {
+      upgrade_lock_ = std::optional(std::move(upgrade_lock));
+      unique_lock_ = std::optional(std::move(writer_lock));
+      shared_lock_.reset();
+    }
+
   private:
     std::optional<std::unique_lock<std::mutex>> upgrade_lock_;
     std::optional<std::shared_lock<std::shared_mutex>> shared_lock_;
@@ -167,7 +174,7 @@ class SharderState {
     std::unique_lock<std::shared_mutex> writer_lock(this->metadata_mtx_);
     return SharderStateLock(std::move(writer_lock), std::move(upgrade_lock));
   }
-  SharderStateLock LockUpgrade(SharderStateLock&& lock) {
+  void LockUpgrade(SharderStateLock& lock) {
     //if (lock.IsExclusive()) {
     //  // fast path: SharderStateLock has already acquired both mutexes
     //  // exclusively.
@@ -195,7 +202,7 @@ class SharderState {
     std::unique_lock<std::shared_mutex> writer_lock(this->metadata_mtx_);
     // Postcondition: BOTH upgrade_mtx_ AND metadata_mtx_ are locked exclusively
     // by this thread. Caller must unlock these mutexes.
-    return SharderStateLock(std::move(writer_lock), std::move(upgrade_lock));
+    lock.Upgrade(std::move(writer_lock), std::move(upgrade_lock));
   }
 
   // Returns number of shards in a synchronized way. Callers need not lock the
