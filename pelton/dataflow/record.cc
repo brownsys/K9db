@@ -1,6 +1,7 @@
 #include "pelton/dataflow/record.h"
 
 #include <algorithm>
+#include <functional>
 #include <string>
 
 namespace pelton {
@@ -231,6 +232,48 @@ void Record::SetValue(const std::string &value, size_t i) {
       LOG(FATAL) << "Unsupported data type in setvalue: "
                  << this->schema_.TypeOf(i);
   }
+}
+void Record::SetValue(const Value &value, size_t i) {
+  if (value.IsNull()) {
+    this->SetNull(true, i);
+    return;
+  }
+  switch (this->schema_.TypeOf(i)) {
+    case sqlast::ColumnDefinition::Type::UINT:
+      this->SetUInt(value.GetUInt(), i);
+      break;
+    case sqlast::ColumnDefinition::Type::INT:
+      this->SetInt(value.GetInt(), i);
+      break;
+    case sqlast::ColumnDefinition::Type::TEXT:
+      this->SetString(std::make_unique<std::string>(value.GetString()), i);
+      break;
+    case sqlast::ColumnDefinition::Type::DATETIME:
+      this->SetDateTime(std::make_unique<std::string>(value.GetString()), i);
+      break;
+  }
+}
+
+// Deterministic hashing for partitioning / mutli-threading.
+size_t Record::Hash(const std::vector<ColumnID> &cols) const {
+  size_t hash_value = 0;
+  for (ColumnID col : cols) {
+    switch (this->schema_.TypeOf(col)) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        hash_value += std::hash<std::uint64_t>{}(this->data_[col].uint);
+        break;
+      case sqlast::ColumnDefinition::Type::INT:
+        hash_value += std::hash<std::int64_t>{}(this->data_[col].sint);
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+      case sqlast::ColumnDefinition::Type::DATETIME:
+        hash_value += std::hash<std::string>{}(*this->data_[col].str);
+        break;
+      default:
+        LOG(FATAL) << "Unsupported data type when computing hash of record!";
+    }
+  }
+  return hash_value;
 }
 
 // Equality: schema must be identical (pointer wise) and all values must be

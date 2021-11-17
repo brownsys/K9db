@@ -50,7 +50,9 @@ TEST(PROXY, DDL_TEST) {
   EXPECT_TRUE(FFIExecDDL(&c_conn, table)) << "Creating table failed!";
 
 #ifndef PELTON_VALGRIND_MODE
-  auto view = "CREATE VIEW myview AS '\"SELECT * FROM test3 WHERE ID > 5\"'";
+  auto view =
+      "CREATE VIEW myview AS "
+      "'\"SELECT * FROM test3 WHERE ID > 5 ORDER BY name\"'";
   EXPECT_TRUE(FFIExecDDL(&c_conn, view)) << "Creating view failed!";
 #endif
 }

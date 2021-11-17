@@ -92,7 +92,7 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
   shards::SharderState *sstate = connection->pelton_state->GetSharderState();
   dataflow::DataFlowState *dstate =
       connection->pelton_state->GetDataFlowState();
-  absl::lts_2020_09_23::StatusOr<pelton::sql::SqlResult> sql_result =
+  absl::StatusOr<pelton::sql::SqlResult> sql_result =
       shards::sqlengine::Shard(sql, sstate, dstate);
 
   connection->unlock_mtx();

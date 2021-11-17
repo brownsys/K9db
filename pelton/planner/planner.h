@@ -12,8 +12,8 @@ namespace pelton {
 namespace planner {
 
 // Given a query, use calcite to plan its execution, and generate
-// a DataFlowGraph with all the operators from that plan.
-std::shared_ptr<dataflow::DataFlowGraph> PlanGraph(
+// a DataFlowGraphPartition with all the operators from that plan.
+std::unique_ptr<dataflow::DataFlowGraphPartition> PlanGraph(
     dataflow::DataFlowState *state, const std::string &query);
 
 void ShutdownPlanner();

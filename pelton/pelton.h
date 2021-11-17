@@ -2,6 +2,7 @@
 #ifndef PELTON_PELTON_H_
 #define PELTON_PELTON_H_
 
+// NOLINTNEXTLINE
 #include <mutex>
 #include <string>
 
@@ -71,8 +72,8 @@ class State {
 
 struct Connection {
   State *pelton_state;
-  void lock_mtx() { this->pelton_state->LockMutex(); };
-  void unlock_mtx() { this->pelton_state->UnlockMutex(); };
+  void lock_mtx() { this->pelton_state->LockMutex(); }
+  void unlock_mtx() { this->pelton_state->UnlockMutex(); }
 };
 
 // initialize pelton_state

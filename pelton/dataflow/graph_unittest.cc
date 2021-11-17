@@ -1,32 +1,30 @@
 #include "pelton/dataflow/graph.h"
 
-#include <cstdint>
 #include <iostream>
 #include <memory>
+#include <set>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "pelton/dataflow/ops/aggregate.h"
-#include "pelton/dataflow/ops/equijoin.h"
-#include "pelton/dataflow/ops/filter.h"
-#include "pelton/dataflow/ops/input.h"
+#include "pelton/dataflow/graph_partition.h"
+#include "pelton/dataflow/operator.h"
+#include "pelton/dataflow/ops/exchange.h"
 #include "pelton/dataflow/ops/matview.h"
-#include "pelton/dataflow/ops/project.h"
-#include "pelton/dataflow/ops/union.h"
-#include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
+#include "pelton/dataflow/state.h"
 #include "pelton/dataflow/types.h"
+#include "pelton/planner/planner.h"
 #include "pelton/sqlast/ast.h"
-#include "pelton/util/ints.h"
 
 namespace pelton {
 namespace dataflow {
 
 using CType = sqlast::ColumnDefinition::Type;
 
-// Make schemas.
+// Schemas.
 SchemaRef MakeLeftSchema() {
   std::vector<std::string> names = {"ID", "Item", "Category"};
   std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
@@ -99,96 +97,12 @@ inline std::vector<Record> MakeRightRecords(const SchemaRef &schema) {
   records.at(2).SetString(std::move(sd3), 1);
   return records;
 }
-inline std::vector<Record> MakeJoinRecords(const SchemaRef &schema) {
-  // Allocate some unique_ptrs.
-  std::unique_ptr<std::string> si1 = std::make_unique<std::string>("item0");
-  std::unique_ptr<std::string> si3 = std::make_unique<std::string>("item2");
-  std::unique_ptr<std::string> si4 = std::make_unique<std::string>("item3");
-  std::unique_ptr<std::string> si5 = std::make_unique<std::string>("item4");
-  std::unique_ptr<std::string> sd1 = std::make_unique<std::string>("descrp0");
-  std::unique_ptr<std::string> sd2 = std::make_unique<std::string>("descrp1");
-  std::unique_ptr<std::string> sd2_ = std::make_unique<std::string>("descrp1");
-  std::unique_ptr<std::string> sd2__ = std::make_unique<std::string>("descrp1");
-  // Make records.
-  std::vector<Record> records;
-  records.emplace_back(schema);
-  records.emplace_back(schema);
-  records.emplace_back(schema);
-  records.emplace_back(schema);
-  // Record 1.
-  records.at(0).SetUInt(5UL, 0);
-  records.at(0).SetString(std::move(si3), 1);
-  records.at(0).SetInt(5L, 2);
-  records.at(0).SetString(std::move(sd1), 3);
-  // Record 2.
-  records.at(1).SetUInt(0UL, 0);
-  records.at(1).SetString(std::move(si1), 1);
-  records.at(1).SetInt(1L, 2);
-  records.at(1).SetString(std::move(sd2), 3);
-  // Record 3.
-  records.at(2).SetUInt(7UL, 0);
-  records.at(2).SetString(std::move(si4), 1);
-  records.at(2).SetInt(1L, 2);
-  records.at(2).SetString(std::move(sd2_), 3);
-  // Record 4.
-  records.at(3).SetUInt(2UL, 0);
-  records.at(3).SetString(std::move(si5), 1);
-  records.at(3).SetInt(1L, 2);
-  records.at(3).SetString(std::move(sd2__), 3);
-  return records;
-}
-inline std::vector<Record> MakeFilterRecords(const SchemaRef &schema) {
-  // Allocate some unique_ptrs.
-  std::unique_ptr<std::string> si4 = std::make_unique<std::string>("item3");
-  // Make records.
-  std::vector<Record> records;
-  records.emplace_back(schema);
-  records.at(0).SetUInt(7UL, 0);
-  records.at(0).SetString(std::move(si4), 1);
-  records.at(0).SetInt(1L, 2);
-  return records;
-}
-inline std::vector<Record> MakeProjectRecords(const SchemaRef &schema) {
-  // Make records.
-  std::vector<Record> records;
-  records.emplace_back(schema, true, 0_u, 1_s);
-  records.emplace_back(schema, true, 4_u, 3_s);
-  records.emplace_back(schema, true, 5_u, 5_s);
-  records.emplace_back(schema, true, 7_u, 1_s);
-  records.emplace_back(schema, true, 2_u, 1_s);
-  return records;
-}
-inline std::vector<Record> MakeProjectOnFilterRecords(const SchemaRef &schema) {
-  // Make records.
-  std::vector<Record> records;
-  records.emplace_back(schema, true, 7_u, 1_s);
-  return records;
-}
-inline std::vector<Record> MakeProjectOnEquiJoinRecords(
-    const SchemaRef &schema) {
-  std::unique_ptr<std::string> sd1 = std::make_unique<std::string>("descrp0");
-  std::unique_ptr<std::string> sd2 = std::make_unique<std::string>("descrp1");
-  std::unique_ptr<std::string> sd2_ = std::make_unique<std::string>("descrp1");
-  std::unique_ptr<std::string> sd2__ = std::make_unique<std::string>("descrp1");
-
-  // Make records.
-  std::vector<Record> records;
-  records.emplace_back(schema, true, 5_u, sd1);
-  records.emplace_back(schema, true, 0_u, sd2);
-  records.emplace_back(schema, true, 7_u, sd2_);
-  records.emplace_back(schema, true, 2_u, sd2__);
-  return records;
-}
-inline std::vector<Record> MakeAggregateRecords(const SchemaRef &schema) {
-  // Make records.
-  std::vector<Record> records;
-  records.emplace_back(schema, true, 1L, (uint64_t)3ULL);
-  records.emplace_back(schema, true, 3L, (uint64_t)1ULL);
-  records.emplace_back(schema, true, 5L, (uint64_t)1ULL);
-  return records;
-}
-inline std::vector<Record> MakeAggregateOnEquiJoinRecords(
-    const SchemaRef &schema) {
+inline std::vector<Record> MakeOutputRecords() {
+  // Make output schema.
+  std::vector<std::string> names = {"Category", "Count"};
+  std::vector<CType> types = {CType::INT, CType::UINT};
+  std::vector<ColumnID> keys = {0};
+  SchemaRef schema = SchemaFactory::Create(names, types, keys);
   // Make records.
   std::vector<Record> records;
   records.emplace_back(schema, true, 1L, (uint64_t)3ULL);
@@ -196,424 +110,640 @@ inline std::vector<Record> MakeAggregateOnEquiJoinRecords(
   return records;
 }
 
-// Make different types of flows/graphs.
-DataFlowGraph MakeTrivialGraph(ColumnID keycol, const SchemaRef &schema) {
-  std::vector<ColumnID> keys = {keycol};
-  DataFlowGraph g;
-
-  auto in = std::make_shared<InputOperator>("test-table", schema);
-  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
-
-  EXPECT_TRUE(g.AddInputNode(in));
-  EXPECT_TRUE(g.AddOutputOperator(matview, in));
-  EXPECT_EQ(g.inputs().size(), 1);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table").get(), in.get());
-  EXPECT_EQ(g.outputs().at(0).get(), matview.get());
-  return g;
+// Transform query into a flow using planner.
+std::unique_ptr<DataFlowGraphPartition> CreateFlow(const std::string &query,
+                                                   DataFlowState *state) {
+  return planner::PlanGraph(state, query);
 }
 
-DataFlowGraph MakeFilterGraph(ColumnID keycol, const SchemaRef &schema) {
-  std::vector<ColumnID> keys = {keycol};
-  DataFlowGraph g;
-
-  auto in = std::make_shared<InputOperator>("test-table", schema);
-  auto filter = std::make_shared<FilterOperator>();
-  filter->AddOperation(5UL, 0, FilterOperator::Operation::GREATER_THAN);
-  auto matview = std::make_shared<KeyOrderedMatViewOperator>(keys);
-
-  EXPECT_TRUE(g.AddInputNode(in));
-  EXPECT_TRUE(g.AddNode(filter, in));
-  EXPECT_TRUE(g.AddOutputOperator(matview, filter));
-  EXPECT_EQ(g.inputs().size(), 1);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table").get(), in.get());
-  EXPECT_EQ(g.outputs().at(0).get(), matview.get());
-  return g;
+// Find exchanges.
+std::vector<ExchangeOperator *> Exchanges(DataFlowGraphPartition *partition) {
+  std::vector<ExchangeOperator *> result;
+  for (NodeIndex i = 0; i < partition->Size(); i++) {
+    Operator *op = partition->GetNode(i);
+    if (op->type() == Operator::Type::EXCHANGE) {
+      result.push_back(static_cast<ExchangeOperator *>(op));
+    }
+  }
+  return result;
 }
 
-DataFlowGraph MakeUnionGraph(ColumnID keycol, const SchemaRef &schema) {
-  std::vector<ColumnID> keys = {keycol};
-  DataFlowGraph g;
-
-  auto in1 = std::make_shared<InputOperator>("test-table1", schema);
-  auto in2 = std::make_shared<InputOperator>("test-table2", schema);
-  auto union_ = std::make_shared<UnionOperator>();
-  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
-
-  EXPECT_TRUE(g.AddInputNode(in1));
-  EXPECT_TRUE(g.AddInputNode(in2));
-  EXPECT_TRUE(g.AddNode(union_, {in1, in2}));
-  EXPECT_TRUE(g.AddOutputOperator(matview, union_));
-  EXPECT_EQ(g.inputs().size(), 2);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table1").get(), in1.get());
-  EXPECT_EQ(g.inputs().at("test-table2").get(), in2.get());
-  EXPECT_EQ(g.outputs().at(0).get(), matview.get());
-  return g;
+// Compare exchanges to expected.
+using ExchangeInfo = std::tuple<PartitionKey, NodeIndex, NodeIndex>;
+void ExpectedExchanges(const std::vector<ExchangeOperator *> &exchanges,
+                       std::set<ExchangeInfo> &&expected) {
+  for (auto exchange : exchanges) {
+    EXPECT_EQ(exchange->parents().size(), 1);
+    EXPECT_EQ(exchange->children().size(), 1);
+    ExchangeInfo info = std::make_tuple(exchange->outkey(),
+                                        exchange->parents().front()->index(),
+                                        exchange->children().front()->index());
+    auto it = expected.find(info);
+    EXPECT_NE(it, expected.end());
+    expected.erase(it);
+  }
+  EXPECT_EQ(expected.size(), 0);
 }
 
-DataFlowGraph MakeEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
-                                const SchemaRef &lschema,
-                                const SchemaRef &rschema) {
-  std::vector<ColumnID> keys = {ok};
-  DataFlowGraph g;
-
-  auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
-  auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
-  auto join = std::make_shared<EquiJoinOperator>(lk, rk);
-  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
-
-  EXPECT_TRUE(g.AddInputNode(in1));
-  EXPECT_TRUE(g.AddInputNode(in2));
-  EXPECT_TRUE(g.AddNode(join, {in1, in2}));
-  EXPECT_TRUE(g.AddOutputOperator(matview, join));
-  EXPECT_EQ(g.inputs().size(), 2);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table1").get(), in1.get());
-  EXPECT_EQ(g.inputs().at("test-table2").get(), in2.get());
-  EXPECT_EQ(g.outputs().at(0).get(), matview.get());
-  return g;
-}
-
-DataFlowGraph MakeProjectGraph(ColumnID keycol, const SchemaRef &schema) {
-  std::vector<ColumnID> keys = {keycol};
-  DataFlowGraph g;
-
-  auto in = std::make_shared<InputOperator>("test-table", schema);
-  auto project = std::make_shared<ProjectOperator>();
-  project->AddColumnProjection(schema.NameOf(0), 0);
-  project->AddColumnProjection(schema.NameOf(2), 2);
-  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
-
-  EXPECT_TRUE(g.AddInputNode(in));
-  EXPECT_TRUE(g.AddNode(project, in));
-  EXPECT_TRUE(g.AddOutputOperator(matview, project));
-  EXPECT_EQ(g.inputs().size(), 1);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table").get(), in.get());
-  EXPECT_EQ(g.outputs().at(0).get(), matview.get());
-  return g;
-}
-
-DataFlowGraph MakeProjectOnFilterGraph(ColumnID keycol,
-                                       const SchemaRef &schema) {
-  std::vector<ColumnID> keys = {keycol};
-  DataFlowGraph g;
-
-  auto in = std::make_shared<InputOperator>("test-table", schema);
-  auto filter = std::make_shared<FilterOperator>();
-  filter->AddOperation(5_u, 0, FilterOperator::Operation::GREATER_THAN);
-  auto project = std::make_shared<ProjectOperator>();
-  project->AddColumnProjection(schema.NameOf(0), 0);
-  project->AddColumnProjection(schema.NameOf(2), 2);
-  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
-
-  EXPECT_TRUE(g.AddInputNode(in));
-  EXPECT_TRUE(g.AddNode(filter, in));
-  EXPECT_TRUE(g.AddNode(project, filter));
-  EXPECT_TRUE(g.AddOutputOperator(matview, project));
-  EXPECT_EQ(g.inputs().size(), 1);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table").get(), in.get());
-  EXPECT_EQ(g.outputs().at(0).get(), matview.get());
-  return g;
-}
-
-DataFlowGraph MakeProjectOnEquiJoinGraph(ColumnID ok, ColumnID lk, ColumnID rk,
-                                         const SchemaRef &lschema,
-                                         const SchemaRef &rschema) {
-  std::vector<ColumnID> keys = {ok};
-  DataFlowGraph g;
-
-  auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
-  auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
-  auto join = std::make_shared<EquiJoinOperator>(lk, rk);
-  auto project = std::make_shared<ProjectOperator>();
-  project->AddColumnProjection(lschema.NameOf(0), 0);
-  project->AddColumnProjection(rschema.NameOf(0), 3);
-  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
-
-  EXPECT_TRUE(g.AddInputNode(in1));
-  EXPECT_TRUE(g.AddInputNode(in2));
-  EXPECT_TRUE(g.AddNode(join, {in1, in2}));
-  EXPECT_TRUE(g.AddNode(project, join));
-  EXPECT_TRUE(g.AddOutputOperator(matview, project));
-  EXPECT_EQ(g.inputs().size(), 2);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table1").get(), in1.get());
-  EXPECT_EQ(g.inputs().at("test-table2").get(), in2.get());
-  EXPECT_EQ(g.outputs().at(0).get(), matview.get());
-  return g;
-}
-
-DataFlowGraph MakeAggregateGraph(ColumnID keycol, const SchemaRef &schema) {
-  std::vector<ColumnID> keys = {keycol};
-  std::vector<ColumnID> group_columns = {2};
-  DataFlowGraph g;
-
-  auto in = std::make_shared<InputOperator>("test-table", schema);
-  auto aggregate = std::make_shared<AggregateOperator>(
-      group_columns, AggregateOperator::Function::COUNT, -1);
-  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
-
-  EXPECT_TRUE(g.AddInputNode(in));
-  EXPECT_TRUE(g.AddNode(aggregate, in));
-  EXPECT_TRUE(g.AddOutputOperator(matview, aggregate));
-  EXPECT_EQ(g.inputs().size(), 1);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table").get(), in.get());
-  EXPECT_EQ(g.outputs().at(0).get(), matview.get());
-  return g;
-}
-
-DataFlowGraph MakeAggregateOnEquiJoinGraph(ColumnID ok, ColumnID lk,
-                                           ColumnID rk,
-                                           const SchemaRef &lschema,
-                                           const SchemaRef &rschema) {
-  std::vector<ColumnID> keys = {ok};
-  std::vector<ColumnID> group_columns = {2};
-  DataFlowGraph g;
-
-  auto in1 = std::make_shared<InputOperator>("test-table1", lschema);
-  auto in2 = std::make_shared<InputOperator>("test-table2", rschema);
-  auto join = std::make_shared<EquiJoinOperator>(lk, rk);
-  auto aggregate = std::make_shared<AggregateOperator>(
-      group_columns, AggregateOperator::Function::COUNT, -1);
-  auto matview = std::make_shared<UnorderedMatViewOperator>(keys);
-
-  EXPECT_TRUE(g.AddInputNode(in1));
-  EXPECT_TRUE(g.AddInputNode(in2));
-  EXPECT_TRUE(g.AddNode(join, {in1, in2}));
-  EXPECT_TRUE(g.AddNode(aggregate, join));
-  EXPECT_TRUE(g.AddOutputOperator(matview, aggregate));
-  EXPECT_EQ(g.inputs().size(), 2);
-  EXPECT_EQ(g.outputs().size(), 1);
-  EXPECT_EQ(g.inputs().at("test-table1").get(), in1.get());
-  EXPECT_EQ(g.inputs().at("test-table2").get(), in2.get());
-  EXPECT_EQ(g.outputs().at(0).get(), matview.get());
-  return g;
-}
-
-inline void MatViewContentsEquals(std::shared_ptr<MatViewOperator> matview,
-                                  const std::vector<Record> &records) {
+// Compare expected vector result to matview contents.
+inline void MatViewContentsEquals(MatViewOperator *matview,
+                                  const std::vector<Record> &records,
+                                  ColumnID key) {
   EXPECT_EQ(matview->count(), records.size());
   for (const Record &record : records) {
-    EXPECT_EQ(record, *matview->Lookup(record.GetKey()).begin());
+    EXPECT_EQ(record, matview->Lookup(record.GetValues({key})).front());
   }
 }
 
-// This method is used specifically for tests involving aggregate graphs.
-// The output records in those specific test cases are not keyed because the
-// group by columns are not a subset of the keyed columns of input records.
-// Hence the following method compares matview contents indexed on @param index,
-// which should be 0 for most of the aggregate tests.
-inline void MatViewContentsEqualsIndexed(
-    std::shared_ptr<MatViewOperator> matview,
-    const std::vector<Record> &records, size_t index) {
-  EXPECT_EQ(matview->count(), records.size());
-  std::vector<ColumnID> indexed_keys = {static_cast<ColumnID>(index)};
-  for (const Record &record : records) {
-    EXPECT_EQ(record, *matview->Lookup(record.GetValues(indexed_keys)).begin());
+// Test that partitioned flows work fine.
+TEST(DataFlowGraphTest, JoinAggregateFunctionality) {
+  PartitionIndex partitions = 3;
+
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+  state.AddTableSchema("input2", MakeRightSchema());
+
+  // Turn query into a flow.
+  std::string query =
+      "SELECT input1.Category, COUNT(ID) FROM input1 JOIN input2 ON "
+      "input1.Category = input2.Category WHERE input1.Category = ? "
+      "GROUP BY input1.Category";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), partitions);
+
+  // Make records and process records.
+  graph.Process("input1", MakeLeftRecords(MakeLeftSchema()));
+  graph.Process("input2", MakeRightRecords(MakeRightSchema()));
+  // Compute expected result.
+  std::vector<Record> result = MakeOutputRecords();
+  std::unordered_map<PartitionIndex, std::vector<Record>> partitioned;
+  for (Record &record : result) {
+    PartitionIndex partition = record.Hash({0}) % partitions;
+    partitioned[partition].push_back(std::move(record));
+  }
+
+  // Outputs must be equal per partition.
+  for (PartitionIndex i = 0; i < partitions; i++) {
+    auto view = graph.partitions_[i]->outputs().at(0);
+    MatViewContentsEquals(view, partitioned[i], 0);
   }
 }
 
-// Tests!
-TEST(DataFlowGraphTest, TestTrivialGraph) {
-  // Schema must survive records.
-  SchemaRef schema = MakeLeftSchema();
-  // Make graph.
-  DataFlowGraph g = MakeTrivialGraph(0, schema);
-  // Make records.
-  std::vector<Record> records = MakeLeftRecords(schema);
-  // Process records.
-  g.Process("test-table", records);
-  // Outputs must be equal.
-  MatViewContentsEquals(g.outputs().at(0), records);
-}
+// Test that partitioned flows work fine.
+TEST(DataFlowGraphTest, JoinAggregateExchangeFunctionality) {
+  PartitionIndex partitions = 3;
 
-TEST(DataFlowGraphTest, TestFilterGraph) {
-  // Schema must survive records.
-  SchemaRef schema = MakeLeftSchema();
-  // Make graph.
-  DataFlowGraph g = MakeFilterGraph(0, schema);
-  // Make records.
-  std::vector<Record> records = MakeLeftRecords(schema);
-  // Process records.
-  g.Process("test-table", records);
-  // Filter records.
-  auto op = std::dynamic_pointer_cast<FilterOperator>(g.GetNode(1));
-  std::vector<Record> filtered = MakeFilterRecords(op->output_schema());
-  // Outputs must be equal.
-  MatViewContentsEquals(g.outputs().at(0), filtered);
-}
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+  state.AddTableSchema("input2", MakeRightSchema());
 
-TEST(DataFlowGraphTest, TestUnionGraph) {
-  // Schema must survive records.
-  SchemaRef schema = MakeLeftSchema();
-  // Make graph.
-  DataFlowGraph g = MakeUnionGraph(0, schema);
-  // Make records.
-  std::vector<Record> records = MakeLeftRecords(schema);
-  std::vector<Record> first_half;
-  first_half.push_back(records.at(0).Copy());
-  first_half.push_back(records.at(1).Copy());
-  std::vector<Record> second_half;
-  second_half.push_back(records.at(2).Copy());
-  second_half.push_back(records.at(3).Copy());
-  second_half.push_back(records.at(4).Copy());
-  // Process records.
-  g.Process("test-table1", first_half);
-  g.Process("test-table2", second_half);
-  // Outputs must be equal.
-  MatViewContentsEquals(g.outputs().at(0), records);
-}
+  // Turn query into a flow.
+  std::string query =
+      "SELECT input1.Category, COUNT(ID) FROM input1 JOIN input2 ON "
+      "input1.Category = input2.Category "
+      "GROUP BY input1.Category "
+      "HAVING COUNT(ID) = ?";
 
-TEST(DataFlowGraphTest, TestEquiJoinGraph) {
-  // Schema must survive records.
-  SchemaRef lschema = MakeLeftSchema();
-  SchemaRef rschema = MakeRightSchema();
-  // Make graph.
-  DataFlowGraph g = MakeEquiJoinGraph(0, 2, 0, lschema, rschema);
-  // Make records.
-  std::vector<Record> left = MakeLeftRecords(lschema);
-  std::vector<Record> right = MakeRightRecords(rschema);
-  // Process records.
-  g.Process("test-table1", left);
-  g.Process("test-table2", right);
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), partitions);
+
+  // Make records and process records.
+  graph.Process("input1", MakeLeftRecords(MakeLeftSchema()));
+  graph.Process("input2", MakeRightRecords(MakeRightSchema()));
   // Compute expected result.
-  auto op = std::dynamic_pointer_cast<EquiJoinOperator>(g.GetNode(2));
-  std::vector<Record> result = MakeJoinRecords(op->output_schema());
-  // Outputs must be equal.
-  MatViewContentsEquals(g.outputs().at(0), result);
+  std::vector<Record> result = MakeOutputRecords();
+  std::unordered_map<PartitionIndex, std::vector<Record>> partitioned;
+  for (Record &record : result) {
+    PartitionIndex partition = record.Hash({1}) % partitions;
+    partitioned[partition].push_back(std::move(record));
+  }
+
+  // Outputs must be equal per partition.
+  for (PartitionIndex i = 0; i < partitions; i++) {
+    auto view = graph.partitions_[i]->outputs().at(0);
+    MatViewContentsEquals(view, partitioned[i], 1);
+  }
 }
 
-TEST(DataFlowGraphTest, TestProjectGraph) {
-  // Schema must survive records.
-  SchemaRef schema = MakeLeftSchema();
-  // Make graph.
-  DataFlowGraph g = MakeProjectGraph(0, schema);
-  // Make records.
-  std::vector<Record> records = MakeLeftRecords(schema);
-  // Process records.
-  g.Process("test-table", records);
-  // Compute expected result.
-  auto op = std::dynamic_pointer_cast<ProjectOperator>(g.GetNode(1));
-  std::vector<Record> result = MakeProjectRecords(op->output_schema());
-  // Outputs must be equal.
-  MatViewContentsEquals(g.outputs().at(0), result);
+// Test that exchanges were added in the correct locations, and that
+// input and output partitioning keys are correct.
+// Trivial flows.
+TEST(DataFlowGraphTest, TrivialGraphNoKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+
+  // Turn query into a flow.
+  std::string query = "SELECT * FROM input1";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  EXPECT_EQ(Exchanges(partition).size(), 0);
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
+}
+TEST(DataFlowGraphTest, TrivialGraphWithKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+
+  // Turn query into a flow.
+  std::string query = "SELECT * FROM input1 WHERE ID = ?";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  EXPECT_EQ(Exchanges(partition).size(), 0);
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 
-TEST(DataFlowGraphTest, TestProjectOnFilterGraph) {
-  // Schema must survive records.
-  SchemaRef schema = MakeLeftSchema();
-  // Make graph.
-  DataFlowGraph g = MakeProjectOnFilterGraph(0, schema);
-  // Make records.
-  std::vector<Record> records = MakeLeftRecords(schema);
-  // Process records.
-  g.Process("test-table", records);
-  // Compute expected result.
-  auto op = std::dynamic_pointer_cast<ProjectOperator>(g.GetNode(2));
-  std::vector<Record> result = MakeProjectOnFilterRecords(op->output_schema());
-  // Outputs must be equal.
-  MatViewContentsEquals(g.outputs().at(0), result);
+// Filters.
+TEST(DataFlowGraphTest, TrivialFilterGraph) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+
+  // Turn query into a flow.
+  std::string query = "SELECT * FROM input1 WHERE ID = ? AND Category > 10";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  EXPECT_EQ(Exchanges(partition).size(), 0);
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
+}
+TEST(DataFlowGraphTest, TrivialUnionGraphWithKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+
+  // Turn query into a flow.
+  std::string query =
+      "SELECT * FROM input1 WHERE (((Item = 'it2' OR Item = 'it1') AND "
+      "(Category = 1 OR Category = 2)) OR ID > 5) AND ID = ?";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  EXPECT_EQ(Exchanges(partition).size(), 0);
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
+}
+TEST(DataFlowGraphTest, TrivialUnionGraphWithNoKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+
+  // Turn query into a flow.
+  std::string query =
+      "SELECT * FROM input1 WHERE (((Item = 'it2' OR Item = 'it1') AND "
+      "(Category = 1 OR Category = 2)) OR ID > 5)";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  EXPECT_EQ(Exchanges(partition).size(), 0);
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 
-TEST(DataFlowGraphTest, TestProjectOnEquiJoinGraph) {
-  // Schema must survive records.
-  SchemaRef lschema = MakeLeftSchema();
-  SchemaRef rschema = MakeRightSchema();
-  // Make graph.
-  DataFlowGraph g = MakeProjectOnEquiJoinGraph(0, 2, 0, lschema, rschema);
-  // Make records.
-  std::vector<Record> left = MakeLeftRecords(lschema);
-  std::vector<Record> right = MakeRightRecords(rschema);
-  // Process records.
-  g.Process("test-table1", left);
-  g.Process("test-table2", right);
-  // Compute expected result.
-  auto op = std::dynamic_pointer_cast<ProjectOperator>(g.GetNode(3));
-  std::vector<Record> result =
-      MakeProjectOnEquiJoinRecords(op->output_schema());
-  // Outputs must be equal.
-  MatViewContentsEquals(g.outputs().at(0), result);
+// Aggregate.
+TEST(DataFlowGraphTest, AggregateGraphWithKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+
+  // Turn query into a flow.
+  std::string query =
+      "SELECT Category, COUNT(ID) FROM input1 GROUP BY Category HAVING "
+      "Count(ID) = ?";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 1);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  ExpectedExchanges(Exchanges(partition), {ExchangeInfo({1}, 2, 3)});
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
+  EXPECT_EQ(graph.outkey_, PartitionKey{1});
+}
+TEST(DataFlowGraphTest, AggregateGraphSameKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+
+  // Turn query into a flow.
+  std::string query =
+      "SELECT Category, COUNT(ID) FROM input1 GROUP BY Category HAVING "
+      "Category = ?";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  EXPECT_EQ(Exchanges(partition).size(), 0);
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
+}
+TEST(DataFlowGraphTest, AggregateGraphNoKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+
+  // Turn query into a flow.
+  std::string query =
+      "SELECT Category, COUNT(ID) FROM input1 GROUP BY Category";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  EXPECT_EQ(Exchanges(partition).size(), 0);
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 
-TEST(DataFlowGraphTest, TestAggregateGraph) {
-  // Schema must survive records.
-  SchemaRef schema = MakeLeftSchema();
-  // Make graph.
-  DataFlowGraph g = MakeAggregateGraph(0, schema);
-  // Make records.
-  std::vector<Record> records = MakeLeftRecords(schema);
-  // Process records.
-  g.Process("test-table", records);
-  // Compute expected result.
-  auto op = std::dynamic_pointer_cast<AggregateOperator>(g.GetNode(1));
-  std::vector<Record> result = MakeAggregateRecords(op->output_schema());
-  // Outputs must be equal.
-  MatViewContentsEqualsIndexed(g.outputs().at(0), result, 0);
+// Join.
+TEST(DataFlowGraphTest, JoinGraphWithKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+  state.AddTableSchema("input2", MakeRightSchema());
+
+  // Turn query into a flow.
+  std::string query =
+      "SELECT * FROM input1 JOIN input2 ON input1.Category = input2.Category "
+      "WHERE ID = ?";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  ExpectedExchanges(Exchanges(partition), {ExchangeInfo({0}, 2, 3)});
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
+  EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 
-TEST(DataFlowGraphTest, TestAggregateOnEquiJoinGraph) {
-  // Schema must survive records.
-  SchemaRef lschema = MakeLeftSchema();
-  SchemaRef rschema = MakeRightSchema();
-  // Make graph.
-  DataFlowGraph g = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
-  // Make records.
-  std::vector<Record> left = MakeLeftRecords(lschema);
-  std::vector<Record> right = MakeRightRecords(rschema);
-  // Process records.
-  g.Process("test-table1", left);
-  g.Process("test-table2", right);
-  // Compute expected result.
-  auto op = std::dynamic_pointer_cast<AggregateOperator>(g.GetNode(3));
-  std::vector<Record> result =
-      MakeAggregateOnEquiJoinRecords(op->output_schema());
-  // Outputs must be equal.
-  MatViewContentsEqualsIndexed(g.outputs().at(0), result, 0);
+TEST(DataFlowGraphTest, JoinGraphSameKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+  state.AddTableSchema("input2", MakeRightSchema());
+
+  // Turn query into a flow.
+  std::string query =
+      "SELECT * FROM input1 JOIN input2 ON input1.Category = input2.Category "
+      "WHERE Description = Item AND input1.Category = ?";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  EXPECT_EQ(Exchanges(partition).size(), 0);
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
+  EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{2});
+}
+TEST(DataFlowGraphTest, JoinGraphNoKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+  state.AddTableSchema("input2", MakeRightSchema());
+
+  // Turn query into a flow.
+  std::string query =
+      "SELECT * FROM input1 JOIN input2 ON input1.Category = input2.Category "
+      "WHERE Description = Item";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  EXPECT_EQ(Exchanges(partition).size(), 0);
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
+  EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{2});
 }
 
-// Similar to TestAggregateOnEquiJoinGraph
-TEST(DataFlowGraphTest, CloneTest) {
-  // Schema must survive records.
-  SchemaRef lschema = MakeLeftSchema();
-  SchemaRef rschema = MakeRightSchema();
-  // Make graph.
-  DataFlowGraph g = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
-  auto g_clone = g.Clone();
+// Projections.
+TEST(DataFlowGraphTest, ReorderingProjectionWithKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
 
-  // Make records.
-  std::vector<Record> left = MakeLeftRecords(lschema);
-  std::vector<Record> right = MakeRightRecords(rschema);
-  // Process records.
-  g_clone->Process("test-table1", left);
-  g_clone->Process("test-table2", right);
-  // Compute expected result.
-  auto op = std::dynamic_pointer_cast<AggregateOperator>(g_clone->GetNode(3));
-  std::vector<Record> result =
-      MakeAggregateOnEquiJoinRecords(op->output_schema());
-  // Outputs must be equal.
-  MatViewContentsEqualsIndexed(g_clone->outputs().at(0), result, 0);
+  // Turn query into a flow.
+  std::string query = "SELECT Item, Category, ID FROM input1 WHERE ID = ?";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  EXPECT_EQ(Exchanges(partition).size(), 0);
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{2});
+}
+TEST(DataFlowGraphTest, ReorderingProjectionNoKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+  state.AddTableSchema("input2", MakeRightSchema());
+
+  // Turn query into a flow.
+  std::string query = "SELECT Item, Category, ID FROM input1";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  EXPECT_EQ(Exchanges(partition).size(), 0);
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{2});
+}
+TEST(DataFlowGraphTest, ChangingProjectionWithKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+  state.AddTableSchema("input2", MakeRightSchema());
+
+  // Turn query into a flow.
+  std::string query = "SELECT ID, ID + 1 AS calc FROM input1 WHERE ID = ?";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  EXPECT_EQ(Exchanges(partition).size(), 0);
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
+}
+TEST(DataFlowGraphTest, ChangingProjectionNoKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+  state.AddTableSchema("input2", MakeRightSchema());
+
+  // Turn query into a flow.
+  std::string query = "SELECT Item, ID + 1 AS calc FROM input1";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  ExpectedExchanges(Exchanges(partition), {ExchangeInfo({0, 1}, 1, 2)});
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, (PartitionKey{0, 1}));
 }
 
-#ifndef PELTON_VALGRIND_MODE
-TEST(RecordTest, TestDuplicateInputGraph) {
-  // Create a schema.
-  SchemaRef schema = MakeLeftSchema();
+// Join and projection.
+TEST(DataFlowGraphTest, JoinReorderProjectWithKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+  state.AddTableSchema("input2", MakeRightSchema());
 
-  // Make a graph.
-  DataFlowGraph g;
+  // Turn query into a flow.
+  std::string query =
+      "SELECT input1.Category, input1.ID FROM input1 JOIN input2 ON "
+      "input1.Category = input2.Category WHERE Description = Item AND ID = ?";
 
-  // Add two input operators to the graph for the same table, expect an error.
-  auto in1 = std::make_shared<InputOperator>("test-table", schema);
-  auto in2 = std::make_shared<InputOperator>("test-table", schema);
-  EXPECT_TRUE(g.AddInputNode(in1));
-  ASSERT_DEATH({ g.AddInputNode(in2); }, "input already exists");
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  ExpectedExchanges(Exchanges(partition), {ExchangeInfo({1}, 4, 5)});
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
+  EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{1});
 }
-#endif
+TEST(DataFlowGraphTest, JoinReorderProjectNoKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+  state.AddTableSchema("input2", MakeRightSchema());
+
+  // Turn query into a flow.
+  std::string query =
+      "SELECT input1.Category, input1.ID FROM input1 JOIN input2 ON "
+      "input1.Category = input2.Category WHERE Description = Item";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  EXPECT_EQ(Exchanges(partition).size(), 0);
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
+  EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
+}
+TEST(DataFlowGraphTest, JoinProjectDroppedKeyWithKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+  state.AddTableSchema("input2", MakeRightSchema());
+
+  // Turn query into a flow.
+  std::string query =
+      "SELECT input2.Description, input1.ID FROM input1 JOIN input2 ON "
+      "input1.Category = input2.Category WHERE Description = Item AND "
+      "input1.ID = ?";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  ExpectedExchanges(Exchanges(partition), {ExchangeInfo({1}, 4, 5)});
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
+  EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{1});
+}
+TEST(DataFlowGraphTest, JoinProjectDroppedKeyNoKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+  state.AddTableSchema("input2", MakeRightSchema());
+
+  // Turn query into a flow.
+  std::string query =
+      "SELECT input2.Description, input1.ID FROM input1 JOIN input2 ON "
+      "input1.Category = input2.Category WHERE Description = Item";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  ExpectedExchanges(Exchanges(partition), {ExchangeInfo({1}, 4, 5)});
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
+  EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{1});
+}
+
+// Complex cases.
+TEST(DataFlowGraphTest, JoinAggregateKey) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+  state.AddTableSchema("input2", MakeRightSchema());
+
+  // Turn query into a flow.
+  std::string query =
+      "SELECT input1.Category, COUNT(ID) FROM input1 JOIN input2 ON "
+      "input1.Category = input2.Category WHERE Description = Item GROUP BY "
+      "input1.Category HAVING COUNT(ID) = ?";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  ExpectedExchanges(Exchanges(partition), {ExchangeInfo({1}, 6, 7)});
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
+  EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{1});
+}
+TEST(DataFlowGraphTest, JoinAggregateUnion) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+  state.AddTableSchema("input2", MakeRightSchema());
+
+  // Turn query into a flow.
+  std::string query =
+      "SELECT input1.Category, COUNT(ID) FROM input1 JOIN input2 ON "
+      "input1.Category = input2.Category WHERE Description = Item GROUP BY "
+      "input1.Category HAVING COUNT(ID) > 10 OR input1.Category = 0";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  EXPECT_EQ(Exchanges(partition).size(), 0);
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
+  EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
+}
+TEST(DataFlowGraphTest, UnionJoinAggregateUnionReorderProject) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+  state.AddTableSchema("input2", MakeRightSchema());
+
+  // Turn query into a flow.
+  std::string query =
+      "SELECT COUNT(ID), input1.Category FROM input1 JOIN input2 ON "
+      "input1.Category = input2.Category WHERE (ID = 1 OR input1.Category = 0) "
+      "AND (ID = 3 OR input1.Category = 5) AND Description = Item GROUP BY "
+      "input1.Category HAVING COUNT(ID) > 10 OR input1.Category = 0";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  EXPECT_EQ(Exchanges(partition).size(), 0);
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
+  EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{1});
+}
+TEST(DataFlowGraphTest, UnionJoinAggregateUnionDroppingProject) {
+  // Create schemas.
+  DataFlowState state;
+  state.AddTableSchema("input1", MakeLeftSchema());
+  state.AddTableSchema("input2", MakeRightSchema());
+
+  // Turn query into a flow.
+  std::string query =
+      "SELECT COUNT(ID) FROM input1 JOIN input2 ON input1.Category = "
+      "input2.Category WHERE (ID = 1 OR input1.Category = 0) AND (ID = 3 OR "
+      "input1.Category = 5) AND Description = Item GROUP BY input1.Category "
+      "HAVING COUNT(ID) > 10 OR input1.Category = 0";
+
+  // Create a graph and perform partition key discovery and traversal.
+  DataFlowGraph graph(CreateFlow(query, &state), 3);
+
+  // No exchanges.
+  DataFlowGraphPartition *partition = graph.partitions_.front().get();
+  ExpectedExchanges(Exchanges(partition), {ExchangeInfo({0}, 16, 17)});
+
+  // Assert input and output partition keys are correct.
+  EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
+  EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
+  EXPECT_EQ(graph.outkey_, PartitionKey{0});
+}
 
 }  // namespace dataflow
 }  // namespace pelton

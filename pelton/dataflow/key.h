@@ -43,6 +43,9 @@ class Key {
     return h;
   }
 
+  // Deterministic hashing for partitioning / mutli-threading.
+  size_t Hash() const;
+
   // Data access.
   const Value &value(size_t i) const { return this->values_.at(i); }
   size_t size() const { return this->values_.size(); }

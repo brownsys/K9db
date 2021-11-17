@@ -2,10 +2,11 @@ load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 exports_files(
     [
+        "benchmark_utils.h",
         "filter_enum.h",
         "aggregate_enum.h",
         "project_enum.h",
-        "join_enum.h",
+        "equijoin_enum.h",
     ],
     ["//pelton/dataflow:__subpackages__"],
 )
@@ -17,21 +18,36 @@ cc_library(
     ],
     hdrs = [
         "equijoin.h",
-        "join_enum.h",
+        "equijoin_enum.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":grouped_data",
-        "//pelton/dataflow:graph",
         "//pelton/dataflow:key",
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
-        "@gbenchmark//:benchmark",
+        "@com_google_googletest//:gtest_prod",
         "@glog",
-        "@gtest//:gtest_prod",
+    ],
+)
+
+cc_library(
+    name = "exchange",
+    srcs = [
+        "exchange.cc",
+    ],
+    hdrs = [
+        "exchange.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:graph_partition",
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:types",
     ],
 )
 
@@ -48,11 +64,11 @@ cc_library(
     deps = [
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
-        "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
+        "//pelton/dataflow:value",
         "//pelton/sqlast:ast",
+        "@com_google_googletest//:gtest_prod",
         "@glog",
-        "@gtest//:gtest_prod",
     ],
 )
 
@@ -68,7 +84,6 @@ cc_library(
     deps = [
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
-        "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "@glog",
     ],
@@ -86,35 +101,30 @@ cc_library(
     deps = [
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
-        "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
-        "@glog",
-        "@gtest//:gtest_prod",
     ],
 )
 
 cc_library(
     name = "grouped_data",
-    srcs = [
-        "grouped_data.cc",
-    ],
+    srcs = [],
     hdrs = [
         "grouped_data.h",
     ],
     deps = [
         "//pelton/dataflow:key",
         "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
-        "@absl//absl/container:btree",
-        "@absl//absl/container:flat_hash_map",
+        "//pelton/util:merge_sort",
+        "@com_google_absl//absl/container:btree",
+        "@com_google_absl//absl/container:flat_hash_map",
     ],
 )
 
 cc_library(
     name = "matview",
-    srcs = [
-        "matview.cc",
-    ],
+    srcs = [],
     hdrs = [
         "matview.h",
     ],
@@ -124,7 +134,9 @@ cc_library(
         "//pelton/dataflow:key",
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
+        "@com_google_googletest//:gtest_prod",
         "@glog",
     ],
 )
@@ -162,8 +174,9 @@ cc_library(
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@com_google_googletest//:gtest_prod",
         "@glog",
-        "@gtest//:gtest_prod",
     ],
 )
 
@@ -183,8 +196,10 @@ cc_library(
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
+        "//pelton/sqlast:ast",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_googletest//:gtest_prod",
         "@glog",
-        "@gtest//:gtest_prod",
     ],
 )
 
@@ -193,11 +208,10 @@ cc_test(
     srcs = [
         "equijoin_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":equijoin",
         ":identity",
-        "//pelton/dataflow:graph",
+        "//pelton/dataflow:graph_partition",
         "//pelton/dataflow:key",
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
@@ -205,9 +219,9 @@ cc_test(
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
         "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
     ],
 )
 
@@ -216,7 +230,6 @@ cc_test(
     srcs = [
         "filter_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":filter",
         "//pelton/dataflow:record",
@@ -224,9 +237,9 @@ cc_test(
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
         "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
     ],
 )
 
@@ -235,7 +248,6 @@ cc_test(
     srcs = [
         "matview_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":matview",
         "//pelton/dataflow:key",
@@ -244,9 +256,9 @@ cc_test(
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
         "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
     ],
 )
 
@@ -255,7 +267,6 @@ cc_test(
     srcs = [
         "project_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":project",
         "//pelton/dataflow:key",
@@ -264,9 +275,9 @@ cc_test(
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
         "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
     ],
 )
 
@@ -275,7 +286,6 @@ cc_test(
     srcs = [
         "aggregate_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":aggregate",
         "//pelton/dataflow:key",
@@ -284,9 +294,9 @@ cc_test(
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
         "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
     ],
 )
 
@@ -294,7 +304,6 @@ cc_test(
     name = "benchmarks",
     srcs = [
         "benchmark_main.cc",
-        "benchmark_utils.cc",
         "benchmark_utils.h",
         "equijoin_benchmark.cc",
         "filter_benchmark.cc",
@@ -308,12 +317,13 @@ cc_test(
         ":identity",
         ":input",
         ":matview",
-        "//pelton/dataflow:graph",
+        "//pelton/dataflow:graph_partition",
+        "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/dataflow:types",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
-        "@gbenchmark//:benchmark",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )

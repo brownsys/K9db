@@ -12,7 +12,6 @@
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/filter_enum.h"
 #include "pelton/dataflow/record.h"
-#include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/dataflow/value.h"
 
@@ -54,17 +53,17 @@ class FilterOperator : public Operator {
     this->ops_.emplace_back(left_column, op, right_column);
   }
 
-  std::optional<std::vector<Record>> Process(
-      NodeIndex /*source*/, const std::vector<Record> &records) override;
-
-  std::shared_ptr<Operator> Clone() const override;
-
  protected:
-  bool Accept(const Record &record) const;
+  std::vector<Record> Process(NodeIndex source,
+                              std::vector<Record> &&records) override;
 
   void ComputeOutputSchema() override;
 
+  std::unique_ptr<Operator> Clone() const override;
+
  private:
+  bool Accept(const Record &record) const;
+
   class FilterOperation {
    public:
     // Use this for unary operation with null.
@@ -111,6 +110,7 @@ class FilterOperator : public Operator {
   FRIEND_TEST(FilterOperatorTest, AndAccept);
   FRIEND_TEST(FilterOperatorTest, SeveralOpsPerColumn);
   FRIEND_TEST(FilterOperatorTest, BatchTest);
+  FRIEND_TEST(FilterOperatorTest, ColOps);
   FRIEND_TEST(FilterOperatorTest, TypeMistmatch);
   FRIEND_TEST(FilterOperatorTest, IsNullAccept);
 };

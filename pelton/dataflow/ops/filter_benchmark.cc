@@ -1,49 +1,53 @@
 #include <vector>
 
 #include "benchmark/benchmark.h"
-#include "pelton/dataflow/key.h"
 #include "pelton/dataflow/ops/benchmark_utils.h"
 #include "pelton/dataflow/ops/filter.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
-#include "pelton/sqlast/ast.h"
 #include "pelton/util/ints.h"
 
 namespace pelton {
 namespace dataflow {
 
 // NOLINTNEXTLINE
-static void FilterPasses(benchmark::State& state) {
-  SchemaRef schema = MakeSchema(false);
+static void FilterPasses(benchmark::State &state) {
+  SchemaRef schema = MakeSchema(false, true);
   FilterOperator filter;
   filter.AddOperation(5_u, 0, FilterOperator::Operation::LESS_THAN);
 
-  Record r{schema, true, 4_u, 5_u};
-  std::vector<Record> rs;
-  rs.emplace_back(std::move(r));
+  // Generator function: generates batches of records for benchmarking.
+  RecordGenFunc gen = [schema] {
+    std::vector<Record> records;
+    records.emplace_back(schema, true, 4_u, 5_u);
+    return records;
+  };
 
   size_t processed = 0;
   for (auto _ : state) {
-    filter.Process(UNDEFINED_NODE_INDEX, rs);
+    ProcessBenchmark(&filter, UNDEFINED_NODE_INDEX, gen);
     processed++;
   }
   state.SetItemsProcessed(processed);
 }
 
 // NOLINTNEXTLINE
-static void FilterDiscards(benchmark::State& state) {
-  SchemaRef schema = MakeSchema(false);
+static void FilterDiscards(benchmark::State &state) {
+  SchemaRef schema = MakeSchema(false, true);
   FilterOperator filter;
   filter.AddOperation(5_u, 0, FilterOperator::Operation::LESS_THAN);
 
-  Record r{schema, true, 6_u, 5_u};
-  std::vector<Record> rs;
-  rs.emplace_back(std::move(r));
+  // Generator function: generates batches of records for benchmarking.
+  RecordGenFunc gen = [schema] {
+    std::vector<Record> records;
+    records.emplace_back(schema, true, 6_u, 5_u);
+    return records;
+  };
 
   size_t processed = 0;
   for (auto _ : state) {
-    filter.Process(UNDEFINED_NODE_INDEX, rs);
+    ProcessBenchmark(&filter, UNDEFINED_NODE_INDEX, gen);
     processed++;
   }
   state.SetItemsProcessed(processed);

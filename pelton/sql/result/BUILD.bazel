@@ -58,7 +58,6 @@ cc_test(
     srcs = [
         "resultset_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     linkopts = [
         "-lmariadbcpp",
     ],
@@ -69,7 +68,7 @@ cc_test(
         "//pelton/dataflow:types",
         "//pelton/sql:eager_executor",
         "//pelton/util:ints",
+        "@com_google_googletest//:gtest",
         "@glog",
-        "@gtest",
     ],
 )

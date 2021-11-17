@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "pelton/dataflow/graph.h"
+#include "pelton/dataflow/graph_partition.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
@@ -26,7 +27,9 @@ using FlowName = std::string;
 
 class DataFlowState {
  public:
-  DataFlowState() = default;
+  explicit DataFlowState(size_t workers = 3) : workers_(workers) {}
+
+  size_t workers() const { return this->workers_; }
 
   // Manage schemas.
   void AddTableSchema(const sqlast::CreateTable &create);
@@ -36,9 +39,10 @@ class DataFlowState {
   SchemaRef GetTableSchema(const TableName &table_name) const;
 
   // Add and manage flows.
-  void AddFlow(const FlowName &name, const std::shared_ptr<DataFlowGraph> flow);
+  void AddFlow(const FlowName &name,
+               std::unique_ptr<DataFlowGraphPartition> &&flow);
 
-  const std::shared_ptr<DataFlowGraph> GetFlow(const FlowName &name) const;
+  const DataFlowGraph &GetFlow(const FlowName &name) const;
 
   bool HasFlow(const FlowName &name) const;
 
@@ -54,11 +58,14 @@ class DataFlowState {
 
   // Process raw data from sharder and use it to update flows.
   void ProcessRecords(const TableName &table_name,
-                      const std::vector<Record> &records);
+                      std::vector<Record> &&records);
 
   void PrintSizeInMemory() const;
 
  private:
+  // The number of worker threads.
+  size_t workers_;
+
   // Maps every table to its logical schema.
   // The logical schema is the contract between client code and our DB.
   // The stored schema may not matched the concrete/physical one due to sharding
@@ -66,7 +73,7 @@ class DataFlowState {
   std::unordered_map<TableName, SchemaRef> schema_;
 
   // DataFlow graphs and views.
-  std::unordered_map<FlowName, std::shared_ptr<DataFlowGraph>> flows_;
+  std::unordered_map<FlowName, std::unique_ptr<DataFlowGraph>> flows_;
   std::unordered_map<TableName, std::vector<FlowName>> flows_per_input_table_;
 };
 

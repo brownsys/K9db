@@ -24,6 +24,15 @@ inline SchemaRef CreateSchema() {
   return SchemaFactory::Create(names, types, keys);
 }
 
+std::vector<Record> CopyVec(const std::vector<Record> &records) {
+  std::vector<Record> copy;
+  copy.reserve(records.size());
+  for (const Record &r : records) {
+    copy.push_back(r.Copy());
+  }
+  return copy;
+}
+
 TEST(FilterOperatorTest, SingleAccept) {
   SchemaRef schema = CreateSchema();
 
@@ -152,11 +161,11 @@ TEST(FilterOperatorTest, BatchTest) {
   records.at(3).SetInt(15, 2);
 
   // Test filtering out records.
-  std::optional<std::vector<Record>> outputs =
-      filter.Process(UNDEFINED_NODE_INDEX, records);
-  EXPECT_EQ(outputs.value().size(), 2);
-  EXPECT_EQ(outputs.value().at(0), records.at(1));
-  EXPECT_EQ(outputs.value().at(1), records.at(2));
+  std::vector<Record> outputs =
+      filter.Process(UNDEFINED_NODE_INDEX, CopyVec(records));
+  EXPECT_EQ(outputs.size(), 2);
+  EXPECT_EQ(outputs.at(0), records.at(1));
+  EXPECT_EQ(outputs.at(1), records.at(2));
 }
 
 TEST(FilterOperatorTest, ColOps) {
@@ -181,10 +190,10 @@ TEST(FilterOperatorTest, ColOps) {
                        std::make_unique<std::string>("Bye!"), 15_s);
 
   // Test filtering out records.
-  std::optional<std::vector<Record>> outputs =
-      filter.Process(UNDEFINED_NODE_INDEX, records);
-  EXPECT_EQ(outputs.value().size(), 1);
-  EXPECT_EQ(outputs.value().at(0), records.at(3));
+  std::vector<Record> outputs =
+      filter.Process(UNDEFINED_NODE_INDEX, CopyVec(records));
+  EXPECT_EQ(outputs.size(), 1);
+  EXPECT_EQ(outputs.at(0), records.at(3));
 }
 
 #ifndef PELTON_VALGRIND_MODE

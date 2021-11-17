@@ -7,7 +7,6 @@
 #include "absl/status/status.h"
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/key.h"
-#include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/shards/sqlengine/view.h"
 #include "pelton/util/perf.h"
@@ -114,21 +113,13 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     const std::string &index_name, const std::string &value,
     dataflow::DataFlowState *dataflow_state) {
   perf::Start("Lookup Index");
-  // Find flow.
-  const std::shared_ptr<dataflow::DataFlowGraph> &flow =
-      dataflow_state->GetFlow(index_name);
-  if (flow->outputs().size() == 0) {
-    return absl::InvalidArgumentError("Read from index with no matviews");
-  } else if (flow->outputs().size() > 1) {
-    return absl::InvalidArgumentError("Read from index with several matviews");
-  }
 
-  // Materialized view that we want to look up in.
-  auto matview = flow->outputs().at(0);
+  // Find flow.
+  const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(index_name);
 
   // Construct look up key.
   dataflow::Key lookup_key{1};
-  switch (matview->output_schema().TypeOf(0)) {
+  switch (flow.output_schema().TypeOf(0)) {
     case sqlast::ColumnDefinition::Type::UINT:
       lookup_key.AddValue(static_cast<uint64_t>(std::stoull(value)));
       break;
@@ -144,12 +135,12 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
       break;
     default:
       LOG(FATAL) << "Unsupported data type in LookupIndex: "
-                 << matview->output_schema().TypeOf(0);
+                 << flow.output_schema().TypeOf(0);
   }
 
   // Lookup.
   std::unordered_set<UserId> result;
-  for (const dataflow::Record &record : matview->Lookup(lookup_key)) {
+  for (const dataflow::Record &record : flow.Lookup(lookup_key, -1, 0)) {
     result.insert(record.GetValueString(1));
   }
 

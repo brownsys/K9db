@@ -31,6 +31,6 @@ cc_test(
     deps = [
         ":ffi",
         "@com_github_gflags_gflags//:gflags",
-        "@gtest",
+        "@com_google_googletest//:gtest",
     ],
 )

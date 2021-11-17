@@ -4,13 +4,11 @@
 #include <memory>
 #include <vector>
 
-#include "benchmark/benchmark.h"
 #include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"
+#include "pelton/dataflow/ops/equijoin_enum.h"
 #include "pelton/dataflow/ops/grouped_data.h"
-#include "pelton/dataflow/ops/join_enum.h"
 #include "pelton/dataflow/record.h"
-#include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 
 namespace pelton {
@@ -41,9 +39,18 @@ class EquiJoinOperator : public Operator {
     }
   }
 
-  std::shared_ptr<Operator> left() const;
-  std::shared_ptr<Operator> right() const;
+  Operator *left() const;
+  Operator *right() const;
+  ColumnID left_id() const { return this->left_id_; }
+  ColumnID right_id() const { return this->right_id_; }
 
+  uint64_t SizeInMemory() const override {
+    return this->left_table_.SizeInMemory() +
+           this->right_table_.SizeInMemory() +
+           this->emitted_nulls_.SizeInMemory();
+  }
+
+ protected:
   /*!
    * processes a batch of input rows and writes output to output.
    * Output schema of join (i.e. records written to output) is defined as
@@ -54,19 +61,13 @@ class EquiJoinOperator : public Operator {
    * @param output
    * @return
    */
-  std::optional<std::vector<Record>> Process(
-      NodeIndex source, const std::vector<Record> &records) override;
+  std::vector<Record> Process(NodeIndex source,
+                              std::vector<Record> &&records) override;
 
   // Computes joined_schema_.
   void ComputeOutputSchema() override;
 
-  uint64_t SizeInMemory() const override {
-    return this->left_table_.SizeInMemory() +
-           this->right_table_.SizeInMemory() +
-           this->emitted_nulls_.SizeInMemory();
-  }
-
-  std::shared_ptr<Operator> Clone() const override;
+  std::unique_ptr<Operator> Clone() const override;
 
  private:
   // Columns on which join is computed.
@@ -94,11 +95,6 @@ class EquiJoinOperator : public Operator {
   FRIEND_TEST(EquiJoinOperatorTest, BasicLeftJoinTest);
   FRIEND_TEST(EquiJoinOperatorTest, BasicRightJoinTest);
   FRIEND_TEST(EquiJoinOperatorTest, LeftJoinTest);
-
-#ifdef PELTON_BENCHMARK  // shuts up compiler warnings
-  // NOLINTNEXTLINE
-  friend void JoinOneToOne(benchmark::State &state);
-#endif
 };
 
 }  // namespace dataflow
