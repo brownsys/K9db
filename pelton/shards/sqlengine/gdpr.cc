@@ -164,8 +164,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
           // exchanged messages) 
 
           // set left and right children of where_condition of type AND
-          where_condition->SetLeft(doctor_equality);
-          where_condition->SetRight(patient_in);
+          std::unique_ptr<sqlast::Expression> doctor_equality_cast(static_cast<sqlast::Expression *>(doctor_equality.release()));
+          std::unique_ptr<sqlast::Expression> patient_in_cast(static_cast<sqlast::Expression *>(patient_in.release()));
+          // std::unique_ptr<sqlast::Expression> doctor_equality_cast = static_cast<std::unique_ptr<sqlast::Expression>>(std::move(doctor_equality));
+          // std::unique_ptr<sqlast::Expression> patient_in_cast = static_cast<std::unique_ptr<sqlast::Expression>>(std::move(patient_in));
+          where_condition->SetLeft(doctor_equality_cast);
+          where_condition->SetRight(patient_in_cast);
 
           accessor_stmt.SetWhereClause(std::move(where_condition));
 
