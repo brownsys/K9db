@@ -115,6 +115,8 @@ class SharderState {
   // Load state from its durable file (if exists).
   void Load(const std::string &dir_path);
 
+  std::unordered_map<ShardKind, ColumnName> GetKinds();
+
   size_t NumShards() {
     size_t count = 0;
     for (auto &s : shards_) {
