@@ -14,6 +14,10 @@
 namespace pelton {
 namespace shards {
 
+std::unordered_map<ShardKind, ColumnName> SharderState::GetKinds() {
+  return this->kinds_;
+}
+
 // Initialization.
 void SharderState::Initialize(const std::string &db_name,
                               const std::string &db_username,
