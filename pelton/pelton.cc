@@ -49,8 +49,9 @@ bool open(const std::string &directory, const std::string &db_name,
           Connection *connection) {
   // initialize path_ in Connection struct with &directory (path to db)
   connection->Initialize(directory);
-  // call SqlEagerExecutor::Initialize, running CREATE DATABASE db_name and USE db_name 
-  // open(), pelton.cc -> Initialize(), shards/state.cc -> Initialize(), eager_executor.cc
+  // call SqlEagerExecutor::Initialize, running CREATE DATABASE db_name and USE
+  // db_name open(), pelton.cc -> Initialize(), shards/state.cc -> Initialize(),
+  // eager_executor.cc
   connection->GetSharderState()->Initialize(db_name, db_username, db_password);
   // load database from disk if directory contains it
   connection->Load();
