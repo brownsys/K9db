@@ -256,7 +256,7 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState &state,
       // terminate called after throwing an instance of
       // 'sql::SQLSyntaxErrorException' what():  (conn=90) Identifier name
       // 'pd3d9446802a44259755d38e6_r_doctors_chat_ACCESSOR_doctor_id_OWNER_patient_id'
-      // is too long
+      // is too long (when including column name)
       sqlast::CreateIndex create_index_stmt{
           "r_" + shard_string + "_" + table_name, table_name, column_name};
       std::cout << "Starting CreateIndex: " << std::endl;
