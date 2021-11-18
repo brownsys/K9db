@@ -55,7 +55,7 @@ void FFIGflags(int argc, char **argv);
 
 // Initialize pelton_state in pelton.cc. Returns true if successful and false
 // otherwise.
-bool FFIInitialize(const char *db_name, const char *db_dir,
+bool FFIInitialize(size_t wrks, const char *db_name, const char *db_dir,
                    const char *db_username, const char *db_password);
 
 // Open a connection for a single client. The returned struct has connected =

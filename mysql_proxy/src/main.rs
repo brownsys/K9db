@@ -221,7 +221,7 @@ fn main() {
     // pass converted arguments to C-FFI
     unsafe { FFIGflags(c_argc, c_argv.as_mut_ptr()) };
 
-    let global_open = initialize_ffi("", "pelton", "root", "password");
+    let global_open = initialize_ffi(3, "", "pelton", "root", "password");
     info!(
         log,
         "Rust Proxy: opening connection globally: {:?}", global_open

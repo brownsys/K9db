@@ -18,16 +18,16 @@ std::vector<Record> ExchangeOperator::Process(NodeIndex source,
   // Map each input record to its output partition.
   std::unordered_map<PartitionIndex, std::vector<Record>> partitioned;
   for (Record &record : records) {
-    PartitionIndex partition =
-        record.Hash(this->outkey_) % this->partitions_->size();
+    PartitionIndex partition = record.Hash(this->outkey_) % this->partitions_;
     partitioned[partition].push_back(std::move(record));
   }
 
   // Send records to each partition.
   for (auto &[partition, records] : partitioned) {
     if (partition != this->partition()) {
-      Operator *exchange = partitions_->at(partition)->GetNode(this->index());
-      exchange->ProcessAndForward(this->index(), std::move(records));
+      this->channels_.at(partition)->Write(
+          this->partition(),
+          {this->flow_name_, std::move(records), this->index(), this->index()});
     }
   }
 
@@ -39,7 +39,8 @@ void ExchangeOperator::ComputeOutputSchema() {
 }
 
 std::unique_ptr<Operator> ExchangeOperator::Clone() const {
-  return std::make_unique<ExchangeOperator>(this->partitions_, this->outkey_);
+  return std::make_unique<ExchangeOperator>(this->flow_name_, this->partitions_,
+                                            this->channels_, this->outkey_);
 }
 
 }  // namespace dataflow

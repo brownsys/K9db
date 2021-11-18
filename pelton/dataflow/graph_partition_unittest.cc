@@ -465,6 +465,15 @@ inline void MatViewContentsEqualsIndexed(MatViewOperator *matview,
   }
 }
 
+// Make a placeholder exchange to check that cloning exchanges
+// works correctly.
+std::unique_ptr<ExchangeOperator> MakeExchange(const PartitionKey &key) {
+  std::string flow_name = "testflow";
+  PartitionIndex partitions = 0;
+  std::vector<Channel *> chans;
+  return std::make_unique<ExchangeOperator>(flow_name, partitions, chans, key);
+}
+
 // Tests!
 TEST(DataFlowGraphPartitionTest, TestTrivialGraph) {
   // Schema must survive records.
@@ -663,23 +672,21 @@ TEST(DataFlowGraphPartitionTest, CloneReprTest) {
 }
 
 TEST(DataFlowGraphPartitionTest, CloneExchangeReprTest) {
+  std::vector<Channel *> e;
   // Schema must survive records.
   SchemaRef lschema = MakeLeftSchema();
   SchemaRef rschema = MakeRightSchema();
 
   // Test with aggregate and equijoin, but add an exchange in between.
   auto g1 = MakeAggregateOnEquiJoinGraph(0, 2, 0, lschema, rschema);
-  g1->InsertNode(std::make_unique<ExchangeOperator>(nullptr, PartitionKey{2}),
-                 g1->GetNode(2), g1->GetNode(3));
-  g1->InsertNode(std::make_unique<ExchangeOperator>(nullptr, PartitionKey{0}),
-                 g1->GetNode(3), g1->GetNode(4));
+  g1->InsertNode(MakeExchange({2}), g1->GetNode(2), g1->GetNode(3));
+  g1->InsertNode(MakeExchange({0}), g1->GetNode(3), g1->GetNode(4));
   auto g1_clone = g1->Clone(1);
   ASSERT_EQ(g1->DebugString(), g1_clone->DebugString());
 
   // Test with filter and project.
   auto g2 = MakeProjectOnFilterGraph(0, lschema);
-  g2->InsertNode(std::make_unique<ExchangeOperator>(nullptr, PartitionKey{0}),
-                 g2->GetNode(2), g2->GetNode(3));
+  g2->InsertNode(MakeExchange({0}), g2->GetNode(2), g2->GetNode(3));
   auto g2_clone = g2->Clone(1);
   ASSERT_EQ(g2->DebugString(), g2_clone->DebugString());
 }

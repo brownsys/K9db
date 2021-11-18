@@ -21,12 +21,9 @@ class Client {
                                               dataflow::SchemaRef schema,
                                               size_t batch_size);
 
-  // Batch computation.
-  uint64_t BenchmarkBatch(const std::string &table,
-                          std::vector<dataflow::Record> &&records);
-
   // Entry Point.
-  void Benchmark(size_t batch_size, size_t batch_count);
+  std::chrono::time_point<std::chrono::system_clock> Benchmark(
+      size_t batch_size, size_t batch_count);
 
  private:
   size_t index_;

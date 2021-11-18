@@ -10,13 +10,30 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
+        ":channel",
         ":graph",
         ":graph_partition",
+        ":operator",
         ":record",
         ":schema",
         "//pelton/sqlast:ast",
         "//pelton/util:fs",
         "@glog",
+    ],
+)
+
+cc_library(
+    name = "channel",
+    srcs = [
+        "channel.cc",
+    ],
+    hdrs = [
+        "channel.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":record",
+        ":types",
     ],
 )
 
@@ -143,6 +160,7 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
+        ":channel",
         ":graph_partition",
         ":key",
         ":operator",

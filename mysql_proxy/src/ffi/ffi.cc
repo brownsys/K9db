@@ -22,7 +22,7 @@ void FFIGflags(int argc, char **argv) {
 }
 
 // Initialize pelton_state in pelton.cc
-bool FFIInitialize(const char *db_dir, const char *db_name,
+bool FFIInitialize(size_t wrks, const char *db_dir, const char *db_name,
                    const char *db_username, const char *db_password) {
   // Log debugging information.
   LOG(INFO) << "C-Wrapper: starting open_c";
@@ -39,7 +39,7 @@ bool FFIInitialize(const char *db_dir, const char *db_name,
 
   // call c++ function from C with converted types
   LOG(INFO) << "C-Wrapper: running pelton::initialize";
-  if (pelton::initialize(c_db_dir, c_db, c_db_username, c_db_password)) {
+  if (pelton::initialize(wrks, c_db_dir, c_db, c_db_username, c_db_password)) {
     LOG(INFO) << "C-Wrapper: global connection opened";
   } else {
     LOG(INFO) << "C-Wrapper: failed to open global connection";

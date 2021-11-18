@@ -28,10 +28,10 @@ namespace dataflow {
 // shortcut for std::make_move_iterator
 #define MOVEIT(it) std::make_move_iterator(it)
 
-// DataFlowGraph.
-DataFlowGraph::DataFlowGraph(
+// Initialization given a single partition (to be cloned) and channels.
+void DataFlowGraph::Initialize(
     std::unique_ptr<DataFlowGraphPartition> &&partition,
-    PartitionIndex partitions) {
+    const std::vector<Channel *> &channels) {
   // Store the input names for this graph (i.e. for any partition).
   this->output_schema_ = partition->outputs().at(0)->output_schema();
   this->matview_keys_ = partition->outputs().at(0)->key_cols();
@@ -94,9 +94,9 @@ DataFlowGraph::DataFlowGraph(
     }
   }
   for (const auto &[key, parent, child] : exchanges) {
-    partition->InsertNode(
-        std::make_unique<ExchangeOperator>(&this->partitions_, key), parent,
-        child);
+    auto exchange = std::make_unique<ExchangeOperator>(
+        this->flow_name_, this->size_, channels, key);
+    partition->InsertNode(std::move(exchange), parent, child);
   }
 
   // Print debugging information.
@@ -104,7 +104,7 @@ DataFlowGraph::DataFlowGraph(
   LOG(INFO) << partition->DebugString();
 
   // Make the specified number of partitions.
-  for (PartitionIndex i = 0; i < partitions; i++) {
+  for (PartitionIndex i = 0; i < this->size_; i++) {
     this->partitions_.push_back(partition->Clone(i));
     this->matviews_.push_back(this->partitions_.back()->outputs().at(0));
   }
@@ -112,8 +112,9 @@ DataFlowGraph::DataFlowGraph(
 
 // Processing records: records are hash-partitioning and fed to the input
 // operator of corresponding partion.
-void DataFlowGraph::Process(const std::string &input_name,
-                            std::vector<Record> &&records) {
+std::unordered_map<PartitionIndex, std::vector<Record>>
+DataFlowGraph::PartitionInputs(const std::string &input_name,
+                               std::vector<Record> &&records) {
   // Map each input record to its output partition.
   std::unordered_map<PartitionIndex, std::vector<Record>> partitioned;
   for (Record &record : records) {
@@ -121,11 +122,7 @@ void DataFlowGraph::Process(const std::string &input_name,
         record.Hash(this->inkeys_.at(input_name)) % this->partitions_.size();
     partitioned[partition].push_back(std::move(record));
   }
-
-  // Send records to each partition.
-  for (auto &[partition, records] : partitioned) {
-    this->partitions_.at(partition)->Process(input_name, std::move(records));
-  }
+  return partitioned;
 }
 
 // Reading records from views by different constraints or orders.
@@ -312,75 +309,6 @@ std::vector<Record> DataFlowGraph::LookupKeyGreater(const Key &key, int limit,
   util::Trim(&records, limit, offset);
   return records;
 }
-
-/*
-void test(Key key, const Record &cmp, int limit, size_t offset) {
-  int olimit = limit > -1 ? limit + offset : -1;
-  // Greater KEY
-  //auto ord_view = static_cast<dataflow::KeyOrderedMatViewOperator *>(matview);
-  //auto result = ord_view->LookupGreater(*condition.greater_key, olimit);
-  //util::Trim(&result, limit, offset);
-  // Greater RECORD
-  // By ordered record and potentially key(s).
-  if (matview->RecordOrdered()) {
-    auto ord_view =
-        static_cast<dataflow::RecordOrderedMatViewOperator *>(matview);
-    if (!condition.greater_record) {
-      if (!condition.equality_keys) {
-        auto result = ord_view->All(olimit);
-        util::Trim(&result, limit, offset);
-        return result;
-      } else if (condition.equality_keys->size() == 1) {
-        return ord_view->Lookup(condition.equality_keys->at(0), limit, offset);
-      } else {
-        std::list<dataflow::Record> result;
-        for (const auto &key : *condition.equality_keys) {
-          util::MergeInto(&result, ord_view->Lookup(key, olimit),
-                          ord_view->comparator(), olimit);
-        }
-        return util::ToVector(&result, limit, offset);
-      }
-    } else {
-      if (!condition.equality_keys) {
-        auto result = ord_view->All(*condition.greater_record, olimit);
-        util::Trim(&result, limit, offset);
-        return result;
-      } else if (condition.equality_keys->size() == 1) {
-        return ord_view->LookupGreater(condition.equality_keys->at(0),
-                                       *condition.greater_record, limit,
-                                       offset);
-      } else {
-        std::list<dataflow::Record> result;
-        for (const auto &key : *condition.equality_keys) {
-          util::MergeInto(
-              &result,
-              ord_view->LookupGreater(key, *condition.greater_record, olimit),
-              ord_view->comparator(), olimit);
-        }
-        return util::ToVector(&result, limit, offset);
-      }
-    }
-  }
-
-  // By key(s).
-  if (!condition.equality_keys) {
-    auto result = matview->All(olimit);
-    util::Trim(&result, limit, offset);
-    return result;
-  } else if (condition.equality_keys->size() == 1) {
-    return matview->Lookup(condition.equality_keys->at(0), limit, offset);
-  } else {
-    std::vector<dataflow::Record> result;
-    for (const auto &key : *condition.equality_keys) {
-      auto vec = matview->Lookup(key, olimit);
-      result.insert(result.end(), std::make_move_iterator(vec.begin()),
-                    std::make_move_iterator(vec.end()));
-    }
-    util::Trim(&result, limit, offset);
-    return result;
-  }
-}
-*/
 
 // Debugging information.
 uint64_t DataFlowGraph::SizeInMemory() const {

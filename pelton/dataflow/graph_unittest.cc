@@ -160,7 +160,7 @@ TEST(DataFlowGraphTest, JoinAggregateFunctionality) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -171,11 +171,12 @@ TEST(DataFlowGraphTest, JoinAggregateFunctionality) {
       "GROUP BY input1.Category";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), partitions);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // Make records and process records.
-  graph.Process("input1", MakeLeftRecords(MakeLeftSchema()));
-  graph.Process("input2", MakeRightRecords(MakeRightSchema()));
+  state.ProcessRecords("input1", MakeLeftRecords(MakeLeftSchema()));
+  state.ProcessRecords("input2", MakeRightRecords(MakeRightSchema()));
   // Compute expected result.
   std::vector<Record> result = MakeOutputRecords();
   std::unordered_map<PartitionIndex, std::vector<Record>> partitioned;
@@ -185,6 +186,7 @@ TEST(DataFlowGraphTest, JoinAggregateFunctionality) {
   }
 
   // Outputs must be equal per partition.
+  sleep(1);
   for (PartitionIndex i = 0; i < partitions; i++) {
     auto view = graph.partitions_[i]->outputs().at(0);
     MatViewContentsEquals(view, partitioned[i], 0);
@@ -196,7 +198,7 @@ TEST(DataFlowGraphTest, JoinAggregateExchangeFunctionality) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -208,11 +210,12 @@ TEST(DataFlowGraphTest, JoinAggregateExchangeFunctionality) {
       "HAVING COUNT(ID) = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), partitions);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // Make records and process records.
-  graph.Process("input1", MakeLeftRecords(MakeLeftSchema()));
-  graph.Process("input2", MakeRightRecords(MakeRightSchema()));
+  state.ProcessRecords("input1", MakeLeftRecords(MakeLeftSchema()));
+  state.ProcessRecords("input2", MakeRightRecords(MakeRightSchema()));
   // Compute expected result.
   std::vector<Record> result = MakeOutputRecords();
   std::unordered_map<PartitionIndex, std::vector<Record>> partitioned;
@@ -222,6 +225,7 @@ TEST(DataFlowGraphTest, JoinAggregateExchangeFunctionality) {
   }
 
   // Outputs must be equal per partition.
+  sleep(1);
   for (PartitionIndex i = 0; i < partitions; i++) {
     auto view = graph.partitions_[i]->outputs().at(0);
     MatViewContentsEquals(view, partitioned[i], 1);
@@ -232,15 +236,18 @@ TEST(DataFlowGraphTest, JoinAggregateExchangeFunctionality) {
 // input and output partitioning keys are correct.
 // Trivial flows.
 TEST(DataFlowGraphTest, TrivialGraphNoKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
   std::string query = "SELECT * FROM input1";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -250,16 +257,20 @@ TEST(DataFlowGraphTest, TrivialGraphNoKey) {
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
+
 TEST(DataFlowGraphTest, TrivialGraphWithKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
   std::string query = "SELECT * FROM input1 WHERE ID = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -272,15 +283,18 @@ TEST(DataFlowGraphTest, TrivialGraphWithKey) {
 
 // Filters.
 TEST(DataFlowGraphTest, TrivialFilterGraph) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
   std::string query = "SELECT * FROM input1 WHERE ID = ? AND Category > 10";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -291,8 +305,10 @@ TEST(DataFlowGraphTest, TrivialFilterGraph) {
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 TEST(DataFlowGraphTest, TrivialUnionGraphWithKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
@@ -301,7 +317,8 @@ TEST(DataFlowGraphTest, TrivialUnionGraphWithKey) {
       "(Category = 1 OR Category = 2)) OR ID > 5) AND ID = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -312,8 +329,10 @@ TEST(DataFlowGraphTest, TrivialUnionGraphWithKey) {
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 TEST(DataFlowGraphTest, TrivialUnionGraphWithNoKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
@@ -322,7 +341,8 @@ TEST(DataFlowGraphTest, TrivialUnionGraphWithNoKey) {
       "(Category = 1 OR Category = 2)) OR ID > 5)";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -335,8 +355,10 @@ TEST(DataFlowGraphTest, TrivialUnionGraphWithNoKey) {
 
 // Aggregate.
 TEST(DataFlowGraphTest, AggregateGraphWithKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
@@ -345,7 +367,8 @@ TEST(DataFlowGraphTest, AggregateGraphWithKey) {
       "Count(ID) = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 1);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -356,8 +379,10 @@ TEST(DataFlowGraphTest, AggregateGraphWithKey) {
   EXPECT_EQ(graph.outkey_, PartitionKey{1});
 }
 TEST(DataFlowGraphTest, AggregateGraphSameKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
@@ -366,7 +391,8 @@ TEST(DataFlowGraphTest, AggregateGraphSameKey) {
       "Category = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -377,8 +403,10 @@ TEST(DataFlowGraphTest, AggregateGraphSameKey) {
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 TEST(DataFlowGraphTest, AggregateGraphNoKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
@@ -386,7 +414,8 @@ TEST(DataFlowGraphTest, AggregateGraphNoKey) {
       "SELECT Category, COUNT(ID) FROM input1 GROUP BY Category";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -399,8 +428,10 @@ TEST(DataFlowGraphTest, AggregateGraphNoKey) {
 
 // Join.
 TEST(DataFlowGraphTest, JoinGraphWithKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -410,7 +441,8 @@ TEST(DataFlowGraphTest, JoinGraphWithKey) {
       "WHERE ID = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -423,8 +455,10 @@ TEST(DataFlowGraphTest, JoinGraphWithKey) {
 }
 
 TEST(DataFlowGraphTest, JoinGraphSameKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -434,7 +468,8 @@ TEST(DataFlowGraphTest, JoinGraphSameKey) {
       "WHERE Description = Item AND input1.Category = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -446,8 +481,10 @@ TEST(DataFlowGraphTest, JoinGraphSameKey) {
   EXPECT_EQ(graph.outkey_, PartitionKey{2});
 }
 TEST(DataFlowGraphTest, JoinGraphNoKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -457,7 +494,8 @@ TEST(DataFlowGraphTest, JoinGraphNoKey) {
       "WHERE Description = Item";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -471,15 +509,18 @@ TEST(DataFlowGraphTest, JoinGraphNoKey) {
 
 // Projections.
 TEST(DataFlowGraphTest, ReorderingProjectionWithKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
   std::string query = "SELECT Item, Category, ID FROM input1 WHERE ID = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -490,8 +531,10 @@ TEST(DataFlowGraphTest, ReorderingProjectionWithKey) {
   EXPECT_EQ(graph.outkey_, PartitionKey{2});
 }
 TEST(DataFlowGraphTest, ReorderingProjectionNoKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -499,7 +542,8 @@ TEST(DataFlowGraphTest, ReorderingProjectionNoKey) {
   std::string query = "SELECT Item, Category, ID FROM input1";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -510,8 +554,10 @@ TEST(DataFlowGraphTest, ReorderingProjectionNoKey) {
   EXPECT_EQ(graph.outkey_, PartitionKey{2});
 }
 TEST(DataFlowGraphTest, ChangingProjectionWithKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -519,7 +565,8 @@ TEST(DataFlowGraphTest, ChangingProjectionWithKey) {
   std::string query = "SELECT ID, ID + 1 AS calc FROM input1 WHERE ID = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -530,8 +577,10 @@ TEST(DataFlowGraphTest, ChangingProjectionWithKey) {
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 TEST(DataFlowGraphTest, ChangingProjectionNoKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -539,7 +588,8 @@ TEST(DataFlowGraphTest, ChangingProjectionNoKey) {
   std::string query = "SELECT Item, ID + 1 AS calc FROM input1";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -552,8 +602,10 @@ TEST(DataFlowGraphTest, ChangingProjectionNoKey) {
 
 // Join and projection.
 TEST(DataFlowGraphTest, JoinReorderProjectWithKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -563,7 +615,8 @@ TEST(DataFlowGraphTest, JoinReorderProjectWithKey) {
       "input1.Category = input2.Category WHERE Description = Item AND ID = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -575,8 +628,10 @@ TEST(DataFlowGraphTest, JoinReorderProjectWithKey) {
   EXPECT_EQ(graph.outkey_, PartitionKey{1});
 }
 TEST(DataFlowGraphTest, JoinReorderProjectNoKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -586,7 +641,8 @@ TEST(DataFlowGraphTest, JoinReorderProjectNoKey) {
       "input1.Category = input2.Category WHERE Description = Item";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -598,8 +654,10 @@ TEST(DataFlowGraphTest, JoinReorderProjectNoKey) {
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 TEST(DataFlowGraphTest, JoinProjectDroppedKeyWithKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -610,7 +668,8 @@ TEST(DataFlowGraphTest, JoinProjectDroppedKeyWithKey) {
       "input1.ID = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -622,8 +681,10 @@ TEST(DataFlowGraphTest, JoinProjectDroppedKeyWithKey) {
   EXPECT_EQ(graph.outkey_, PartitionKey{1});
 }
 TEST(DataFlowGraphTest, JoinProjectDroppedKeyNoKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -633,7 +694,8 @@ TEST(DataFlowGraphTest, JoinProjectDroppedKeyNoKey) {
       "input1.Category = input2.Category WHERE Description = Item";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -647,8 +709,10 @@ TEST(DataFlowGraphTest, JoinProjectDroppedKeyNoKey) {
 
 // Complex cases.
 TEST(DataFlowGraphTest, JoinAggregateKey) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -659,7 +723,8 @@ TEST(DataFlowGraphTest, JoinAggregateKey) {
       "input1.Category HAVING COUNT(ID) = ?";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -671,8 +736,10 @@ TEST(DataFlowGraphTest, JoinAggregateKey) {
   EXPECT_EQ(graph.outkey_, PartitionKey{1});
 }
 TEST(DataFlowGraphTest, JoinAggregateUnion) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -683,7 +750,8 @@ TEST(DataFlowGraphTest, JoinAggregateUnion) {
       "input1.Category HAVING COUNT(ID) > 10 OR input1.Category = 0";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -695,8 +763,10 @@ TEST(DataFlowGraphTest, JoinAggregateUnion) {
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
 }
 TEST(DataFlowGraphTest, UnionJoinAggregateUnionReorderProject) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -708,7 +778,8 @@ TEST(DataFlowGraphTest, UnionJoinAggregateUnionReorderProject) {
       "input1.Category HAVING COUNT(ID) > 10 OR input1.Category = 0";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();
@@ -720,8 +791,10 @@ TEST(DataFlowGraphTest, UnionJoinAggregateUnionReorderProject) {
   EXPECT_EQ(graph.outkey_, PartitionKey{1});
 }
 TEST(DataFlowGraphTest, UnionJoinAggregateUnionDroppingProject) {
+  PartitionIndex partitions = 3;
+
   // Create schemas.
-  DataFlowState state;
+  DataFlowState state(partitions);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -733,7 +806,8 @@ TEST(DataFlowGraphTest, UnionJoinAggregateUnionDroppingProject) {
       "HAVING COUNT(ID) > 10 OR input1.Category = 0";
 
   // Create a graph and perform partition key discovery and traversal.
-  DataFlowGraph graph(CreateFlow(query, &state), 3);
+  state.AddFlow("testflow", CreateFlow(query, &state));
+  const DataFlowGraph &graph = state.GetFlow("testflow");
 
   // No exchanges.
   DataFlowGraphPartition *partition = graph.partitions_.front().get();

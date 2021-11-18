@@ -79,11 +79,10 @@ std::vector<std::pair<std::string, std::string>> FLOWS{
                    "CREATE VIEW filter_row3 AS "
                    "'\"SELECT * FROM submissions WHERE ts >= 100 AND "
                    "assignment_id = 2 AND ID > 5\"'"),
-    std::make_pair(
-        "union_flow",
-        "CREATE VIEW union_flow AS "
-        "'\"(SELECT * FROM submissions WHERE ts >= 100) UNION (SELECT "
-        "* FROM submissions WHERE ts < 100)\"'"),
+    std::make_pair("union_flow",
+                   "CREATE VIEW union_flow AS "
+                   "'\"(SELECT * FROM submissions WHERE ts < 100) UNION "
+                   "(SELECT * FROM submissions WHERE ts >= 100)\"'"),
     std::make_pair("join_flow",
                    "CREATE VIEW join_flow AS "
                    "'\"SELECT * from submissions INNER JOIN students ON "
@@ -149,7 +148,7 @@ int main(int argc, char **argv) {
 
   // Open connection to sharder.
   pelton::Connection connection;
-  pelton::initialize("", "exampledb", db_username, db_password);
+  pelton::initialize(1, "", "exampledb", db_username, db_password);
   pelton::open(&connection);
   // CHECK(pelton::exec(&connection, "SET echo;").ok());
 

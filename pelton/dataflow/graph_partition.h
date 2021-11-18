@@ -67,6 +67,9 @@ class DataFlowGraphPartition {
     auto it = nodes_.find(node_index);
     return it == nodes_.end() ? nullptr : it->second.get();
   }
+  InputOperator *GetInputNode(const std::string &input_name) const {
+    return this->inputs_.at(input_name);
+  }
 
   // Debugging.
   std::string DebugString() const;
