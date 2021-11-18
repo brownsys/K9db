@@ -124,6 +124,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
   std::vector<dataflow::Record> records;
   size_t old_records_size = 0;
   if (update_flows) {
+    // NOTE(malte): select::Shard() takes another reader lock on the sharder
+    // state, but this is fine as that lock is never upgraded.
     MOVE_OR_RETURN(sql::SqlResult domain_result,
                    select::Shard(stmt.SelectDomain(), connection));
     records = domain_result.NextResultSet()->Vectorize();
@@ -144,8 +146,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
       // The update statement might move the rows from one shard to another.
       // We can only perform this update by splitting it into a DELETE-INSERT
       // pair.
-      // FIXME(malte): this deadlocks, as delete_::Shard() tries to take the
-      // sharder state lock again.
+      // NOTE(malte): this could deadlock, as delete_::Shard() tries to take the
+      // sharder state lock again, but deletions only take another reader lock,
+      // so this actually works out.
       MOVE_OR_RETURN(result,
                      delete_::Shard(stmt.DeleteDomain(), connection, false));
 
@@ -153,11 +156,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
       for (size_t i = old_records_size; i < records.size(); i++) {
         sqlast::Insert insert_stmt =
             InsertRecord(records.at(i), state->GetSchema(table_name));
-        // FIXME(malte): this calls insert::Shard, which could end up taking the
+        // NOTE(malte): this calls insert::Shard, which could end up taking the
         // exclusive lock on the sharder state (as inserts may create a new
-        // shard for the user if none exists).
+        // shard for the user if none exists). Hence, we pass state_lock here,
+        // so that insert::Shard can upgrade it if need be.
         MOVE_OR_RETURN(sql::SqlResult tmp,
-                       insert::Shard(insert_stmt, connection, false));
+                       insert::Shard(insert_stmt, connection, &state_lock, false));
         result.Append(std::move(tmp));
       }
     } else {

@@ -1,4 +1,4 @@
-// SELECT statements sharding and rewriting.
+// UPDATE statements sharding and rewriting.
 
 #ifndef PELTON_SHARDS_SQLENGINE_UPDATE_H_
 #define PELTON_SHARDS_SQLENGINE_UPDATE_H_

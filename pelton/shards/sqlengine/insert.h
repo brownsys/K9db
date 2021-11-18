@@ -18,6 +18,7 @@ namespace insert {
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
                                      Connection *connection,
+                                     SharderStateLock *state_lock,
                                      bool update_flows = true);
 
 }  // namespace insert

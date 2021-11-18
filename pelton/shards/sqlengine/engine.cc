@@ -13,6 +13,7 @@
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/update.h"
 #include "pelton/shards/sqlengine/view.h"
+#include "pelton/shards/state.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/sqlast/parser.h"
 #include "pelton/util/perf.h"
@@ -47,7 +48,8 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
     // Case 2: Insert statement.
     case sqlast::AbstractStatement::Type::INSERT: {
       auto *stmt = static_cast<sqlast::Insert *>(statement.get());
-      return insert::Shard(*stmt, connection);
+      SharderStateLock state_lock = connection->pelton_state->GetSharderState()->LockShared();
+      return insert::Shard(*stmt, connection, &state_lock);
     }
 
     // Case 3: Update statement.

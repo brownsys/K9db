@@ -29,12 +29,12 @@ std::string Dequote(const std::string &st) {
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
                                      Connection *connection,
+                                     SharderStateLock *state_lock,
                                      bool update_flows) {
   perf::Start("Insert");
   dataflow::DataFlowState *dataflow_state =
       connection->pelton_state->GetDataFlowState();
   shards::SharderState *state = connection->pelton_state->GetSharderState();
-  SharderStateLock state_lock = state->LockShared();
 
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
@@ -101,7 +101,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
       if (!state->ShardExists(info.shard_kind, user_id)) {
         // Need to upgrade to an exclusive lock on sharder state here, as we
         // will modify the state.
-        state->LockUpgrade(state_lock);
+        state->LockUpgrade(*state_lock);
         for (auto *create_stmt : state->CreateShard(info.shard_kind, user_id)) {
           sql::SqlResult tmp =
               exec.ExecuteShard(create_stmt, info.shard_kind, user_id);
@@ -115,8 +115,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
       result.Append(exec.ExecuteShard(&cloned, info.shard_kind, user_id));
     }
   }
-
-  state_lock.Unlock();
 
   // Insert was successful, time to update dataflows.
   // Turn inserted values into a record and process it via corresponding flows.
