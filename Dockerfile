@@ -13,7 +13,8 @@ RUN apt-get update && \
     apt-get install -y software-properties-common
 
 # Add ppa for gcc-11
-RUN add-apt-repository ppa:ubuntu-toolchain-r/test -y
+RUN add-apt-repository -y ppa:ubuntu-toolchain-r/test
+RUN apt-get install gcc-11 g++-11
 
 # Install dependencies
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \

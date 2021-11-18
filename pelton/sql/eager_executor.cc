@@ -32,9 +32,10 @@ void SqlEagerExecutor::Initialize(const std::string &db_name,
   // Create and use the DB.
   this->stmt_->execute("CREATE DATABASE IF NOT EXISTS " + db_name);
   this->stmt_->execute("USE " + db_name);
-  // this->stmt_->execute("SET GLOBAL table_open_cache=50000");
+  this->stmt_->execute("SET GLOBAL table_open_cache=50000");
   // this->stmt_->execute("SET GLOBAL schema_definition_cache=10000");
-  // this->stmt_->execute("SET GLOBAL table_definition_cache=10000");
+  this->stmt_->execute("SET GLOBAL table_definition_cache=10000");
+  this->stmt_->execute("SET autocommit=1");
 }
 
 // Execute statement against the underlying database.

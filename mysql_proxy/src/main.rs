@@ -73,9 +73,42 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             || q_string.starts_with("DROP")
             || q_string.starts_with("ALTER")
             || q_string.starts_with("GDPR")
+            || q_string.starts_with("set")
         {
-            debug!(self.log, "Rust Proxy: Unsupported query type");
+            error!(self.log, "Rust Proxy: Unsupported query type {}", q_string);
             return results.completed(0, 0);
+        }
+
+        if q_string.starts_with("SHOW") {
+            debug!(self.log, "Rust Proxy: SHOW statement simulated {}", q_string);
+
+            let mut cols : Vec<Column> = Vec::with_capacity(2);
+            cols.push(Column {
+                table: "".to_string(),
+                column: "Variable_name".to_string(),
+                coltype: ColumnType::MYSQL_TYPE_VAR_STRING,
+                colflags: ColumnFlags::empty(),
+            });
+            cols.push(Column {
+                table: "".to_string(),
+                column: "Value".to_string(),
+                coltype: ColumnType::MYSQL_TYPE_VAR_STRING,
+                colflags: ColumnFlags::empty(),
+            });
+            let mut rw = results.start(&cols)?;
+            rw.write_col("auto_increment_increment")?;
+            rw.write_col("1")?;
+            rw.end_row()?;
+            rw.write_col("max_allowed_packet")?;
+            rw.write_col("16777216")?;
+            rw.end_row()?;
+            rw.write_col("system_time_zone")?;
+            rw.write_col("EST")?;
+            rw.end_row()?;
+            rw.write_col("time_zone")?;
+            rw.write_col("SYSTEM")?;
+            rw.end_row()?;
+            return rw.finish();
         }
 
         debug!(self.log, "Rust proxy: starting on_query");
@@ -177,7 +210,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             // tell client no more rows coming. Returns an empty Ok to the proxy
             rw.finish()
         } else {
-            error!(self.log, "Rust proxy: unsupported query type");
+            error!(self.log, "Rust proxy: unsupported query type {}", q_string);
             results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
         }
     }
@@ -221,7 +254,7 @@ fn main() {
     // pass converted arguments to C-FFI
     unsafe { FFIGflags(c_argc, c_argv.as_mut_ptr()) };
 
-    let global_open = initialize_ffi(3, "", "pelton", "root", "password");
+    let global_open = initialize_ffi(1, "", "pelton", "root", "password");
     info!(
         log,
         "Rust Proxy: opening connection globally: {:?}", global_open
