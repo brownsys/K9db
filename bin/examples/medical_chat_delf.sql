@@ -45,4 +45,4 @@ SELECT * FROM chat;
 -- GDPR FORGET patients 10;
 SELECT * FROM patients;
 SELECT * FROM chat;
-SELECT * FROM ref_OWNER_patient_id;
+-- SELECT * FROM ref_doctors_OWNER_patient_id;
