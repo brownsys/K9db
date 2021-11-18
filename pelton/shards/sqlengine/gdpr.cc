@@ -6,14 +6,14 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
+#include "absl/strings/match.h"
 #include "pelton/shards/sqlengine/delete.h"
+#include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
-
-#include "absl/status/status.h"
-#include "absl/strings/match.h"
 
 namespace pelton {
 namespace shards {
@@ -58,49 +58,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       }
     }
 
-    // get data for an accessor
-    // for every table in this shard
-    for (const auto &table_name : state->TablesInShard(shard_kind)) {
-      // for every index associated with this table
-      for (const auto &index : state->IndicesFor(table_name) {
-        // check if index starts with ref_ + shard_kind, indicating an accessor
-        bool explicit_accessor = absl::StartsWith(index, "ref_" + shard_kind); 
-        if (explicit_accessor){
-          // 1. extract tablename from index
-          // remove basename_typeofuser from index_name <basename_typeofuser/shardkind_tablename_accessorcol>
-          // e.g. ref_doctors from ref_doctors_chat_colname
-          // know that colname has to start with "_ACCESSOR" so find substring before it
-          std::String accessor_table_name = "";
-          // TODO: index.substr(1, index.find("ACCESSOR_"));
-
-          // 2. extract shardbycol
-          // TODO: get accessor colname
-          std::String accessor_col_name = "";
-
-          // 3. query this table (iterate over all values in the index that correspond to the user)
-          // requesting the data with user_id
-
-          // SELECT * FROM <table_name> WHERE Accessor_doctor_id = user_id AND OWNER_patient_id in (index.value, ...)
-          sqlast::Select accessor_stmt{accessor_table_name};
-          // TODO: add where condition via ast_expressions.h, constructing children first, then adding parents
-          // 1. Accessor_doctor_id = user_id --> left condition
-          // ===> binary expression. type=equality
-          // ====> left of left: columnExpression (colname). right of right: literalExpression (value/user_id)
-          sqlast::BinaryExpression{...}
-          // 2. OWNER_patient_id in (index.value, ...) --> right condition
-          // ===> binary expression. type=in
-          // ====> left of left: columnExpression (colname). right of right: LiteralListExpression
-          // index.h, 2nd method called LookupIndex(index, user_id, dataflow_state), returns set of user_ids to pass to LiteralListExpression(vector<std::string>)
-          // ==> each id is that of patient related to the doctor (that have exchanged messages)
-          // shard_by is owner_patient_id, get from state->shardingInfo
-          accessor_stmt.AddColumn("*");
-
-          absl::StatusOr<sql::SqlResult> accessor_data = select::Shard(accessor_stmt, state, dataflow_state);
-          table_result.Append(accessor_data);
-        }
-      }
-    }
-
     // Delete was successful, time to update dataflows.
     if (update_flows) {
       std::vector<dataflow::Record> records =
@@ -113,9 +70,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       result.AddResultSet(table_result.NextResultSet());
     }
 
-    // Update result with 
+    // Update result with
     // for (const auto &column_name : state->IndicesFor(table_name)) {
-    //   bool explicit_accessor = absl::StartsWith(column_name, "ACCESSOR_"); 
+    //   bool explicit_accessor = absl::StartsWith(column_name, "ACCESSOR_");
     //   if (explicit_accessor) {
     //     sqlast::Select tbl_stmt{info.sharded_table_name};
     //     tbl_stmt.AddColumn("*");
@@ -123,6 +80,93 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
     //                                           schema, aug_index));
     //   }
     // }
+  }
+
+  // TODO: fix loop to get indices of chat (chat not stored in doctor shard,
+  // only in patient shard hence won't have access to the chat's indices) get
+  // data for an accessor for every table in this shard
+  std::cout << "GETTTTT" << std::endl;
+  for (auto &[shard_kind_access, _] : state->GetKinds()) {
+    std::cout << shard_kind_access << std::endl;
+    for (const auto &table_name_access :
+         state->TablesInShard(shard_kind_access)) {
+      for (const auto &index_col : state->IndicesFor(table_name_access)) {
+        std::list<ShardingInformation> infos =
+            state->GetShardingInformation(table_name_access);
+        std::string shard_by_access = "";
+        for (const auto &info : infos) {
+          shard_by_access = info.shard_by;
+        }
+        std::cout << "TABLE_NAME_ACCESS: " << table_name_access << std::endl;
+        std::cout << "INDEX_COL: " << index_col << std::endl;
+        std::cout << "SHARD_BY_ACCESS: " << shard_by_access << std::endl;
+        std::string index_name =
+            state->IndexFlow(table_name_access, index_col, shard_by_access);
+
+        std::cout << "INDEX_NAME: " << index_name << std::endl;
+        // check if index starts with ref_ + shard_kind, indicating an accessor
+        // if this index belongs to the (doctor) shard we're GDPR GETing for
+        bool explicit_accessor =
+            absl::StartsWith(index_name, "r_" + shard_kind);
+        if (explicit_accessor) {
+          // 1. extract tablename from index
+          // remove basename_typeofuser from index_name
+          // <basename_typeofuser/shardkind_tablename_accessorcol> e.g.
+          // ref_doctors from ref_doctors_chat_colname know that colname has to
+          // start with "_ACCESSOR" so find substring before it
+
+          std::string beg = "r_" + shard_kind;
+          std::string copy = index_name;
+          copy.erase(0, beg.length() + 1);
+          std::string accessor_table_name = copy.substr(0, copy.find("_"));
+          std::cout << "ACCESSOR_TABLE_NAME: " << accessor_table_name
+                    << std::endl;
+
+          // 2. extract shardbycol
+          std::string accessor_col_name = index_col;
+
+          // 3. query this table (iterate over all values in the index that
+          // correspond to the user) requesting the data with user_id
+
+          // SELECT * FROM chat WHERE ACCESSOR_doctor_id = user_id AND
+          // OWNER_patient_id in (index.value, ...)
+          sqlast::Select accessor_stmt{accessor_table_name};
+          // for the SELECT *
+          accessor_stmt.AddColumn("*");
+          // 1. Left Hand Side: ACCESSOR_doctor_id = user_id
+          std::unique_ptr<sqlast::BinaryExpression> doctor_equality =
+              std::make_unique<sqlast::BinaryExpression>(
+                  sqlast::Expression::Type::EQ);
+          doctor_equality->SetLeft(
+              std::make_unique<sqlast::ColumnExpression>(index_col));
+          doctor_equality->SetRight(
+              std::make_unique<sqlast::LiteralExpression>(user_id));
+
+          // 2. Right Hand Side: OWNER_patient_id in (index.value, ...)
+          std::unique_ptr<sqlast::BinaryExpression> patient_in =
+              std::make_unique<sqlast::BinaryExpression>(
+                  sqlast::Expression::Type::IN);
+          patient_in->SetLeft(
+              std::make_unique<sqlast::ColumnExpression>(shard_by_access));
+          MOVE_OR_RETURN(
+              std::unordered_set<UserId> ids_set,
+              index::LookupIndex(index_name, user_id, dataflow_state));
+          std::vector<std::string> ids_vector;
+          ids_vector.insert(ids_vector.end(), ids_set.begin(), ids_set.end());
+          patient_in->SetRight(
+              std::make_unique<sqlast::LiteralListExpression>(ids_vector));
+          // ==> each id is that of a patient related to the doctor (that have
+          // exchanged messages) shard_by is owner_patient_id, get from
+          // state->shardingInfo
+
+          // accessor_stmt.SetWhereClause(doctor_equality);
+
+          MOVE_OR_RETURN(sql::SqlResult res,
+                         select::Shard(accessor_stmt, state, dataflow_state));
+          result.AddResultSet(res.NextResultSet());
+        }
+      }
+    }
   }
 
   perf::End("GDPR");
