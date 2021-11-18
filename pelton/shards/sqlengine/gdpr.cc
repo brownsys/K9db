@@ -133,6 +133,11 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
           sqlast::Select accessor_stmt{accessor_table_name};
           // for the SELECT *
           accessor_stmt.AddColumn("*");
+          // Overall where condition of type AND
+          std::unique_ptr<sqlast::BinaryExpression> where_condition =
+              std::make_unique<sqlast::BinaryExpression>(
+                  sqlast::Expression::Type::AND);
+
           // 1. Left Hand Side: ACCESSOR_doctor_id = user_id
           std::unique_ptr<sqlast::BinaryExpression> doctor_equality =
               std::make_unique<sqlast::BinaryExpression>(
@@ -156,10 +161,13 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
           patient_in->SetRight(
               std::make_unique<sqlast::LiteralListExpression>(ids_vector));
           // ==> each id is that of a patient related to the doctor (that have
-          // exchanged messages) shard_by is owner_patient_id, get from
-          // state->shardingInfo
+          // exchanged messages) 
 
-          // accessor_stmt.SetWhereClause(doctor_equality);
+          // set left and right children of where_condition of type AND
+          where_condition->SetLeft(doctor_equality);
+          where_condition->SetRight(patient_in);
+
+          accessor_stmt.SetWhereClause(std::move(where_condition));
 
           MOVE_OR_RETURN(sql::SqlResult res,
                          select::Shard(accessor_stmt, state, dataflow_state));
