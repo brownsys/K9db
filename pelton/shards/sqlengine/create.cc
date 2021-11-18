@@ -9,9 +9,9 @@
 #include <utility>
 #include <vector>
 
-#include "pelton/shards/sqlengine/index.h"
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
+#include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
@@ -156,7 +156,7 @@ absl::StatusOr<std::list<ShardingInformation>> ShardTable(
     // Find foreign key constraint (if exists).
     // check if column starts with OWNER_ (has an owner annotation)
     bool explicit_owner = absl::StartsWith(column_name, "OWNER_");
-     // check if column has a foreign key constraint
+    // check if column has a foreign key constraint
     const sqlast::ColumnConstraint *fk_constraint = nullptr;
     // loop through all columns, getting their constraints from ast
     for (const auto &constraint : columns[index].GetConstraints()) {
@@ -167,12 +167,12 @@ absl::StatusOr<std::list<ShardingInformation>> ShardTable(
       }
     }
 
-    // Use fk_constraint and owner annotation (explicit_owner) 
+    // Use fk_constraint and owner annotation (explicit_owner)
     // to determine whether and how to shard by this column.
     if (fk_constraint != nullptr) {
       // We have a foreign key constraint, check if we should shard by it.
-      // pass ShouldShardBy the fk_constraint (linking to the other, foreign table,
-      // and the current table state. Assign return to shard_kind
+      // pass ShouldShardBy the fk_constraint (linking to the other, foreign
+      // table, and the current table state. Assign return to shard_kind
       ASSIGN_OR_RETURN(std::optional<ShardKind> shard_kind,
                        ShouldShardBy(*fk_constraint, state));
       if (!shard_kind.has_value() && explicit_owner) {
@@ -213,8 +213,8 @@ absl::StatusOr<std::list<ShardingInformation>> ShardTable(
   return implicit_owners;
 }
 
-void IndexAccessor(
-    const sqlast::CreateTable &stmt, SharderState &state, dataflow::DataFlowState &dataflow_state) {
+void IndexAccessor(const sqlast::CreateTable &stmt, SharderState &state,
+                   dataflow::DataFlowState &dataflow_state) {
   // Result is empty by default.
   std::unordered_map<ColumnName, ColumnIndex> index_map;
 
@@ -226,39 +226,51 @@ void IndexAccessor(
   for (size_t index = 0; index < columns.size(); index++) {
     // Record index of column for later constraint processing.
     const std::string &column_name = columns[index].column_name();
-   // check if column starts with ACCESSOR_ (has an accessor annotation)
-    bool explicit_accessor = absl::StartsWith(column_name, "ACCESSOR_"); 
+    // check if column starts with ACCESSOR_ (has an accessor annotation)
+    bool explicit_accessor = absl::StartsWith(column_name, "ACCESSOR_");
 
-    const sqlast::ColumnConstraint *fk_constraint = nullptr;
-    
-    for (const auto &constraint : columns[index].GetConstraints()) {
-      // if type of constraint is a foreign key, assign value to fk_constraint
-      if (constraint.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
-        fk_constraint = &constraint;
-        break;
+    std::cout << "Column name: " << column_name << std::endl;
+    std::cout << "ACCESSOR BOOL: " << explicit_accessor << std::endl;
+
+    if (explicit_accessor) {
+      const sqlast::ColumnConstraint *fk_constraint = nullptr;
+      for (const auto &constraint : columns[index].GetConstraints()) {
+        // if type of constraint is a foreign key, assign value to fk_constraint
+        if (constraint.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
+          fk_constraint = &constraint;
+          break;
+        }
       }
-    }
+      std::string shard_string = "";
+      if (fk_constraint != nullptr) {
+        absl::StatusOr<std::optional<ShardKind>> shard_kind =
+            ShouldShardBy(*fk_constraint, state);
+        shard_string = shard_kind->value();
+        std::cout << "STATUS: " << shard_kind->value() << std::endl;
+      }
+      std::cout << "We have found an accessor: " << column_name << std::endl;
+      // CreateIndex(access_column (doctor) is the key, owner_by_value
+      // (patient), index is not unique)
 
-    ASSIGN_OR_RETURN(std::optional<ShardKind> shard_kind,
-                       ShouldShardBy(*fk_constraint, state));
-    
-    LOG(INFO) << "Column name: " << column_name;
-    LOG(INFO) << "ACCESSOR BOOL: " << explicit_accessor;
+      // TODO: known issue: index name is too long, throwing sqlexception
+      // terminate called after throwing an instance of
+      // 'sql::SQLSyntaxErrorException' what():  (conn=90) Identifier name
+      // 'pd3d9446802a44259755d38e6_r_doctors_chat_ACCESSOR_doctor_id_OWNER_patient_id'
+      // is too long
+      sqlast::CreateIndex create_index_stmt{
+          "r_" + shard_string + "_" + table_name, table_name, column_name};
+      std::cout << "Starting CreateIndex: " << std::endl;
+      pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, &state,
+                                                    &dataflow_state);
 
-    if (explicit_accessor){
-      LOG(INFO) << "We have found an accessor: " << column_name;
-      // CreateIndex(access_column (doctor) is the key, owner_by_value (patient), index is not unique)
-      sqlast::CreateIndex create_index_stmt{"ref", table_name, column_name};
-      LOG(INFO) << "Starting CreateIndex: ";
-      pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, &state, &dataflow_state);
-
-      // Index of shard_id (patient) to Primary Key of chat table, in that row we set the doctor_id col to NULL.
-      // Anonymize access annotation. So like if doctor (accessor) deletes his data, his 
-      // ==> can have "on delete retain" or "on delete anonymise" 
+      // Index of shard_id (patient) to Primary Key of chat table, in that row
+      // we set the doctor_id col to NULL. Anonymize access annotation. So like
+      // if doctor (accessor) deletes his data, his
+      // ==> can have "on delete retain" or "on delete anonymise"
     }
   }
   std::cout << "finished!" << std::endl;
-  }
+}
 // Determine what should be done about a single foreign key in some
 // sharded table.
 absl::StatusOr<ForeignKeyType> ShardForeignKey(
