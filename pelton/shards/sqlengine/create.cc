@@ -257,6 +257,8 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState &state,
       // 'sql::SQLSyntaxErrorException' what():  (conn=90) Identifier name
       // 'pd3d9446802a44259755d38e6_r_doctors_chat_ACCESSOR_doctor_id_OWNER_patient_id'
       // is too long (when including column name)
+      // TODO: fix by replacing string concatenation with field in SharderState containing
+      // struct with all fields we need to access in gdpr.cc when selecting accessor data
       sqlast::CreateIndex create_index_stmt{
           "r_" + shard_string + "_" + table_name, table_name, column_name};
       std::cout << "Starting CreateIndex: " << std::endl;
