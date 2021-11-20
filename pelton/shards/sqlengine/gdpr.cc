@@ -85,9 +85,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
   // TODO: fix loop to get indices of chat (chat not stored in doctor shard,
   // only in patient shard hence won't have access to the chat's indices) get
   // data for an accessor for every table in this shard
-  std::cout << "GETTTTT" << std::endl;
   for (auto &[shard_kind_access, _] : state->GetKinds()) {
-    std::cout << shard_kind_access << std::endl;
+    std::cout << "SHARD_KIND_ACCESS: " << shard_kind_access << std::endl;
     for (const auto &table_name_access :
          state->TablesInShard(shard_kind_access)) {
       for (const auto &index_col : state->IndicesFor(table_name_access)) {
@@ -133,10 +132,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
           sqlast::Select accessor_stmt{accessor_table_name};
           // for the SELECT *
           accessor_stmt.AddColumn("*");
-          // Overall where condition of type AND
-          std::unique_ptr<sqlast::BinaryExpression> where_condition =
-              std::make_unique<sqlast::BinaryExpression>(
-                  sqlast::Expression::Type::AND);
 
           // 1. Left Hand Side: ACCESSOR_doctor_id = user_id
           std::unique_ptr<sqlast::BinaryExpression> doctor_equality =
@@ -163,13 +158,16 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
           // ==> each id is that of a patient related to the doctor (that have
           // exchanged messages) 
 
-          // set left and right children of where_condition of type AND
-          std::unique_ptr<sqlast::Expression> doctor_equality_cast(static_cast<sqlast::Expression *>(doctor_equality.release()));
-          std::unique_ptr<sqlast::Expression> patient_in_cast(static_cast<sqlast::Expression *>(patient_in.release()));
-          // std::unique_ptr<sqlast::Expression> doctor_equality_cast = static_cast<std::unique_ptr<sqlast::Expression>>(std::move(doctor_equality));
-          // std::unique_ptr<sqlast::Expression> patient_in_cast = static_cast<std::unique_ptr<sqlast::Expression>>(std::move(patient_in));
-          where_condition->SetLeft(doctor_equality_cast);
-          where_condition->SetRight(patient_in_cast);
+          // 3. combining both conditions into overall where condition of type AND
+          std::unique_ptr<sqlast::BinaryExpression> where_condition =
+              std::make_unique<sqlast::BinaryExpression>(
+                  sqlast::Expression::Type::AND);
+          // std::unique_ptr<sqlast::Expression> doctor_equality_cast(static_cast<sqlast::Expression *>(doctor_equality.release()));
+          // std::unique_ptr<sqlast::Expression> patient_in_cast(static_cast<sqlast::Expression *>(patient_in.release()));
+          std::unique_ptr<sqlast::Expression> doctor_equality_cast = static_cast<std::unique_ptr<sqlast::Expression>>(std::move(doctor_equality));
+          std::unique_ptr<sqlast::Expression> patient_in_cast = static_cast<std::unique_ptr<sqlast::Expression>>(std::move(patient_in));
+          where_condition->SetLeft(std::move(doctor_equality_cast));
+          where_condition->SetRight(std::move(patient_in_cast));
 
           accessor_stmt.SetWhereClause(std::move(where_condition));
 
