@@ -122,10 +122,14 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
               std::unordered_set<UserId> ids_set,
               index::LookupIndex(index_name, user_id, dataflow_state));
 
-          // looping to make select statement with equality check for each
+          // create select statement with equality check for each id
           for (const auto &id : ids_set) {
             std::cout << "ID: " << id << std::endl;
-            // Left Hand Side: ACCESSOR_doctor_id = user_id
+            sqlast::Select accessor_stmt{accessor_table_name};
+            // SELECT *
+            accessor_stmt.AddColumn("*");
+
+            // LHS: ACCESSOR_doctor_id = user_id
             std::unique_ptr<sqlast::BinaryExpression> doctor_equality =
                 std::make_unique<sqlast::BinaryExpression>(
                     sqlast::Expression::Type::EQ);
@@ -134,12 +138,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
             doctor_equality->SetRight(
                 std::make_unique<sqlast::LiteralExpression>(user_id));
 
-            sqlast::Select accessor_stmt{accessor_table_name};
-            // SELECT *
-            accessor_stmt.AddColumn("*");
-
-            // Right Hand Side: OWNER_patient_id in (index.value, ...)
-            // OWNER_patient_id == index1.value
+            // RHS: OWNER_patient_id in (index.value, ...)
+            // OWNER_patient_id == index.value
             std::unique_ptr<sqlast::BinaryExpression> patient_equality =
                 std::make_unique<sqlast::BinaryExpression>(
                     sqlast::Expression::Type::EQ);
@@ -159,11 +159,13 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
                 std::move(static_cast<std::unique_ptr<sqlast::Expression>>(
                     std::move(patient_equality))));
 
-            // set where condition
+            // set where condition in select statement
             accessor_stmt.SetWhereClause(std::move(where_condition));
 
+            // execute select
             MOVE_OR_RETURN(sql::SqlResult res,
                            select::Shard(accessor_stmt, state, dataflow_state));
+            // add to gdpr get result
             result.AddResultSet(res.NextResultSet());
           }
         }

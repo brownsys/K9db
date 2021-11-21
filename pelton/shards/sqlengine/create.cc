@@ -266,10 +266,12 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState &state,
       pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, &state,
                                                     &dataflow_state);
 
+      // TODO: anonymization
       // Index of shard_id (patient) to Primary Key of chat table, in that row
-      // we set the doctor_id col to NULL. Anonymize access annotation. So like
-      // if doctor (accessor) deletes his data, his
-      // ==> can have "on delete retain" or "on delete anonymise"
+      // we set the doctor_id col to NULL. Anonymize access annotation.
+      // if doctor (accessor) deletes his data, his id will be anonymized in the
+      // chat
+      // ==> schema annotations "on delete retain" or "on delete anonymise"
     }
   }
   std::cout << "finished!" << std::endl;
