@@ -69,23 +69,10 @@ std::vector<dataflow::Record> Client::GenerateBatch(const std::string &table,
   return records;
 }
 
-// Batch computation.
-uint64_t Client::BenchmarkBatch(const std::string &table,
-                                std::vector<dataflow::Record> &&records) {
-  // Process the records.
-  auto start = std::chrono::high_resolution_clock::now();
-  this->state_->ProcessRecords(table, std::move(records));
-
-  // Measure time.
-  auto end = std::chrono::high_resolution_clock::now();
-  auto diff = end - start;
-  return std::chrono::duration_cast<std::chrono::nanoseconds>(diff).count();
-}
-
 // Entry Point.
-void Client::Benchmark(size_t batch_size, size_t batch_count) {
-  TLOG << "Starting...";
-  auto start = std::chrono::high_resolution_clock::now();
+std::chrono::time_point<std::chrono::system_clock> Client::Benchmark(
+    size_t batch_size, size_t batch_count) {
+  TLOG << "Starting..." << batch_size << " " << batch_count;
   std::vector<std::string> tables = this->state_->GetTables();
 
   // Prime all inputs except one.
@@ -100,24 +87,23 @@ void Client::Benchmark(size_t batch_size, size_t batch_count) {
   }
   TLOG << "Done Priming!";
 
-  // Benchmark with the last remaining flow input.
-  uint64_t total_time = 0;
+  // Generate all batches in one go.
+  TLOG << "Creating benchmark batches...";
   const std::string &table = tables.back();
   dataflow::SchemaRef schema = this->state_->GetTableSchema(table);
-  TLOG << "Benchmarking " << table << "...";
+  std::vector<std::vector<dataflow::Record>> batches;
+  batches.reserve(batch_count);
   for (size_t i = 0; i < batch_count; i++) {
-    auto batch = this->GenerateBatch(table, schema, batch_size);
-    total_time += this->BenchmarkBatch(table, std::move(batch));
+    batches.push_back(this->GenerateBatch(table, schema, batch_size));
   }
 
-  auto end = std::chrono::high_resolution_clock::now();
-  auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
-  TLOG << "Total time: " << (diff.count() / 1000.0 / 1000 / 1000);
-
-  double throughput = total_time / 1000.0 / 1000 / 1000;
-  throughput = (batch_size * batch_count) / throughput;
-  TLOG << "Measured time: " << total_time << "ns";
-  TLOG << "Throughput: " << throughput << " records per second";
+  // Benchmark!
+  TLOG << "Benchmarking " << table << "...";
+  auto start = std::chrono::high_resolution_clock::now();
+  for (std::vector<dataflow::Record> &batch : batches) {
+    this->state_->ProcessRecords(table, std::move(batch));
+  }
+  return start;
 }
 
 }  // namespace benchmark

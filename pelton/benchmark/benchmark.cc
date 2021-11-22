@@ -1,3 +1,5 @@
+// NOLINTNEXTLINE
+#include <chrono>
 #include <iostream>
 // NOLINTNEXTLINE
 #include <thread>
@@ -34,15 +36,16 @@ void CreateFlow(const std::string &query, dataflow::DataFlowState *state) {
 }
 
 void Thread(size_t index, size_t batch_size, size_t batch_count,
-            dataflow::DataFlowState *state) {
+            dataflow::DataFlowState *state,
+            std::chrono::time_point<std::chrono::system_clock> *ptr) {
   Client client{index, state};
-  client.Benchmark(batch_size, batch_count);
+  *ptr = client.Benchmark(batch_size, batch_count);
 }
 
 void Benchmark(const std::vector<std::string> &tables, const std::string &query,
                size_t threads, size_t batch_size, size_t batch_count) {
   // Create an empty state.
-  dataflow::DataFlowState state(threads);
+  dataflow::DataFlowState state(threads, batch_size * batch_count);
 
   // Fill the state with schemas.
   for (const std::string &table : tables) {
@@ -59,18 +62,46 @@ void Benchmark(const std::vector<std::string> &tables, const std::string &query,
 
   // Benchmark.
   std::vector<std::thread> clients;
-  for (size_t i = 0; i < threads; i++) {
-    clients.emplace_back(Thread, i, batch_size, batch_count, &state);
+  std::vector<std::chrono::time_point<std::chrono::system_clock> *> starts;
+  for (size_t i = 0; i < threads - 1; i++) {
+    auto *start = new std::chrono::time_point<std::chrono::system_clock>();
+    starts.push_back(start);
+    clients.emplace_back(Thread, i, batch_size, batch_count, &state, start);
   }
-  for (std::thread &client : clients) {
+  // Use current thread as last client.
+  std::chrono::time_point<std::chrono::system_clock> min;
+  Thread(threads - 1, batch_size, batch_count, &state, &min);
+
+  // Wait until everything is done processing.
+  for (auto &client : clients) {
     client.join();
   }
+  state.Join();
 
-  // Done.
-  std::cout << "Done" << std::endl;
+  // Dataflow is done processing.
+  auto end = std::chrono::high_resolution_clock::now();
+  for (auto *start : starts) {
+    if (*start < min) {
+      min = *start;
+    }
+    delete start;
+  }
+  auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(end - min);
+  auto time = (diff.count() / 1000.0 / 1000 / 1000);
+  auto throughput = (batch_size * batch_count * threads) / time;
   std::cout << std::endl;
   std::cout << std::endl;
   std::cout << std::endl;
+  std::cout << "# Threads: " << threads << std::endl;
+  std::cout << "# Batches: " << batch_count << std::endl;
+  std::cout << "BatchSize: " << batch_size << std::endl;
+  std::cout << "# Records: " << threads * batch_count * batch_size << std::endl;
+  std::cout << "Total time: " << time << "sec" << std::endl;
+  std::cout << "Throughput: " << throughput << " records/sec" << std::endl;
+
+  // Print number of records.
+  CHECK_EQ(state.GetFlow("bench_flow").All(-1, 0).size(),
+           batch_size * batch_count * threads);
 }
 
 }  // namespace benchmark
@@ -82,5 +113,5 @@ int main(int argc, char **argv) {
 
   pelton::benchmark::Benchmark(
       {"CREATE TABLE tbl(col1 INT, col2 VARCHAR, col3 INT);"},
-      "SELECT col2, col3 FROM tbl WHERE col3 > 10 AND col3 = ?", 3, 1, 100000);
+      "SELECT col2, col3 FROM tbl WHERE col3 = ?", 1, 1, 100000);
 }

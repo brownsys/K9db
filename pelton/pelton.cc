@@ -47,7 +47,7 @@ bool SpecialStatements(const std::string &sql, State *connection) {
 
 }  // namespace
 
-bool initialize(const std::string &directory, const std::string &db_name,
+bool initialize(size_t workers, const std::string &db_name,
                 const std::string &db_username,
                 const std::string &db_password) {
   // if already open
@@ -55,11 +55,10 @@ bool initialize(const std::string &directory, const std::string &db_name,
     // close without shutting down planner
     shutdown(false);
   }
-  pelton_state = new State();
-  pelton_state->Initialize(directory);
+  pelton_state = new State(workers);
+  pelton_state->Initialize();
   pelton_state->GetSharderState()->Initialize(db_name, db_username,
                                               db_password);
-  pelton_state->Load();
   return true;
 }
 
@@ -105,7 +104,6 @@ bool shutdown(bool shutdown_planner) {
   if (pelton_state == nullptr) {
     return true;
   }
-  pelton_state->Save();
   if (shutdown_planner) {
     planner::ShutdownPlanner();
   }

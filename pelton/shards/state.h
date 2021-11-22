@@ -109,12 +109,6 @@ class SharderState {
                    const FlowName &flow_name,
                    const sqlast::CreateIndex &create_index_stmt, bool unique);
 
-  // Save state to durable file.
-  void Save(const std::string &dir_path);
-
-  // Load state from its durable file (if exists).
-  void Load(const std::string &dir_path);
-
   size_t NumShards() {
     size_t count = 0;
     for (auto &s : shards_) {

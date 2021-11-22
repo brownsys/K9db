@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "pelton/dataflow/graph_partition.h"
+#include "pelton/dataflow/channel.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/types.h"
@@ -21,11 +21,13 @@ class ExchangeOperator : public Operator {
   ExchangeOperator(const ExchangeOperator &other) = delete;
   ExchangeOperator &operator=(const ExchangeOperator &other) = delete;
 
-  ExchangeOperator(
-      std::vector<std::unique_ptr<DataFlowGraphPartition>> *partitions,
-      const PartitionKey &outkey)
+  ExchangeOperator(const std::string &flow_name, size_t partitions,
+                   const std::vector<Channel *> &channels,
+                   const PartitionKey &outkey)
       : Operator(Operator::Type::EXCHANGE),
+        flow_name_(flow_name),
         partitions_(partitions),
+        channels_(channels),
         outkey_(outkey) {}
 
   const std::vector<ColumnID> &outkey() const { return this->outkey_; }
@@ -53,7 +55,9 @@ class ExchangeOperator : public Operator {
   std::unique_ptr<Operator> Clone() const override;
 
  private:
-  std::vector<std::unique_ptr<DataFlowGraphPartition>> *partitions_;
+  std::string flow_name_;
+  size_t partitions_;
+  std::vector<Channel *> channels_;
   PartitionKey outkey_;  // partitioning key.
 };
 

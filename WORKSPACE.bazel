@@ -159,6 +159,9 @@ cc_library(
         ":sqlgrammar",
         "@antlr4_runtimes//:cpp",
     ],
+    copts = [
+        "-fno-char8_t",
+    ],
 )
 """,
     # My non-merged change for create_view_stmt QUERY_LITERAL from Mar 25 2021.

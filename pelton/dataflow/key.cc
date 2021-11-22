@@ -77,7 +77,7 @@ std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Key &k) {
 // Deterministic hashing for partitioning / mutli-threading.
 size_t Key::Hash() const {
   size_t hash_value = 0;
-  for (const Value val : this->values_) {
+  for (const Value &val : this->values_) {
     switch (val.type()) {
       case sqlast::ColumnDefinition::Type::UINT:
         hash_value += std::hash<std::uint64_t>{}(val.GetUInt());

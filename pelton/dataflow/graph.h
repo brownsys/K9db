@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "gtest/gtest_prod.h"
+#include "pelton/dataflow/channel.h"
 #include "pelton/dataflow/graph_partition.h"
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/ops/matview.h"
@@ -20,8 +21,11 @@ namespace dataflow {
 // A graph is made out of many partitions.
 class DataFlowGraph {
  public:
-  DataFlowGraph(std::unique_ptr<DataFlowGraphPartition> &&partition,
-                PartitionIndex partitions);
+  DataFlowGraph(const std::string &flow_name, PartitionIndex partitions)
+      : flow_name_(flow_name), size_(partitions) {}
+
+  void Initialize(std::unique_ptr<DataFlowGraphPartition> &&partition,
+                  const std::vector<Channel *> &channels);
 
   // Not copyable or movable.
   DataFlowGraph(const DataFlowGraph &) = delete;
@@ -30,6 +34,7 @@ class DataFlowGraph {
   DataFlowGraph &operator=(DataFlowGraph &&) = delete;
 
   // Accessors.
+  const std::string &flow_name() const { return this->flow_name_; }
   const std::vector<std::string> &Inputs() const { return this->inputs_; }
   const SchemaRef &output_schema() const { return this->output_schema_; }
   const std::vector<ColumnID> &matview_keys() const {
@@ -42,8 +47,12 @@ class DataFlowGraph {
   }
   const PartitionKey &out_partition_key() const { return this->outkey_; }
 
-  // Process records.
-  void Process(const std::string &input_name, std::vector<Record> &&records);
+  // Partitioning.
+  DataFlowGraphPartition *GetPartition(PartitionIndex partition) const {
+    return this->partitions_.at(partition).get();
+  }
+  std::unordered_map<PartitionIndex, std::vector<Record>> PartitionInputs(
+      const std::string &input_name, std::vector<Record> &&records);
 
   // Read outputs.
   std::vector<Record> All(int limit, size_t offset) const;
@@ -64,8 +73,11 @@ class DataFlowGraph {
   uint64_t SizeInMemory() const;
 
  private:
-  std::vector<std::string> inputs_;
+  std::string flow_name_;
+  PartitionIndex size_;
+  // partitions and their inputs and outputs.
   std::vector<std::unique_ptr<DataFlowGraphPartition>> partitions_;
+  std::vector<std::string> inputs_;
   std::vector<MatViewOperator *> matviews_;  // one per partition.
   // Maps each input name to the keys that partition records fed to that input.
   std::unordered_map<std::string, PartitionKey> inkeys_;

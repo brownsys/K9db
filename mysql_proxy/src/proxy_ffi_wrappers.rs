@@ -17,10 +17,8 @@ impl Drop for FFIResult {
     }
 }
 
-pub fn initialize_ffi(dir: &str, db: &str, user: &str, pass: &str) -> bool {
+pub fn initialize_ffi(workers: usize, db: &str, user: &str, pass: &str) -> bool {
     // convert &str to char* to pass query to C-wrapper
-    let dir = CString::new(dir).unwrap();
-    let dir: *mut c_char = dir.as_ptr() as *mut i8;
     let db = CString::new(db).unwrap();
     let db: *mut c_char = db.as_ptr() as *mut i8;
     let user = CString::new(user).unwrap();
@@ -28,7 +26,7 @@ pub fn initialize_ffi(dir: &str, db: &str, user: &str, pass: &str) -> bool {
     let pass = CString::new(pass).unwrap();
     let pass: *mut c_char = pass.as_ptr() as *mut i8;
 
-    let conn = unsafe { FFIInitialize(dir, db, user, pass) };
+    let conn = unsafe { FFIInitialize(workers, db, user, pass) };
     return conn;
 }
 

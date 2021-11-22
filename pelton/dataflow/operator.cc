@@ -155,7 +155,7 @@ std::string Operator::DebugString() const {
   str += "  \"input_columns\": [ ";
   for (const SchemaRef schema : this->input_schemas_) {
     str += "[ ";
-    for (const std::string col : schema.column_names()) {
+    for (const std::string &col : schema.column_names()) {
       str += "\"" + col + "\",";
     }
     str.pop_back();
@@ -166,7 +166,7 @@ std::string Operator::DebugString() const {
 
   // print output schema
   str += "  \"output_columns\": [ ";
-  for (const std::string col : this->output_schema_.column_names()) {
+  for (const std::string &col : this->output_schema_.column_names()) {
     str += "\"" + col + "\",";
   }
   str.pop_back();

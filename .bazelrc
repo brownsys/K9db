@@ -1,8 +1,8 @@
 # Optional per-user config goes into user.bazelrc, which is .gitignore-ed.
 try-import user.bazelrc
 
-build --cxxopt="-std=c++17"
-build --host_cxxopt="-std=c++17"
+build --cxxopt="-std=c++2a"
+build --host_cxxopt="-std=c++2a"
 build --copt -g
 build --host_copt -g
 build --strip=never

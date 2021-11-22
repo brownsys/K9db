@@ -2,6 +2,10 @@
 #define PELTON_DATAFLOW_OPS_MATVIEW_H_
 
 #include <memory>
+// NOLINTNEXTLINE
+#include <mutex>
+// NOLINTNEXTLINE
+#include <shared_mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -121,28 +125,37 @@ class MatViewOperatorT : public MatViewOperator {
 
   // Key API.
   size_t Count(const Key &key) const override {
+    std::shared_lock<std::shared_mutex> lock(this->mtx_);
     return this->contents_.Count(key);
   }
   bool Contains(const Key &key) const override {
+    std::shared_lock<std::shared_mutex> lock(this->mtx_);
     return this->contents_.Contains(key);
   }
   std::vector<Key> Keys(int limit = -1) const override {
+    std::shared_lock<std::shared_mutex> lock(this->mtx_);
     return this->contents_.Keys(limit);
   }
   // Ordering instantiation specific API.
   template <typename X = void,
             typename std::enable_if<T::KeyOrdered::value, X>::type * = nullptr>
   std::vector<Key> KeysGreater(const Key &key, int limit = -1) const {
+    std::shared_lock<std::shared_mutex> lock(this->mtx_);
     return this->contents_.KeysGreater(key, limit);
   }
 
   // Record API.
-  size_t count() const override { return this->contents_.count(); }
+  size_t count() const override {
+    std::shared_lock<std::shared_mutex> lock(this->mtx_);
+    return this->contents_.count();
+  }
   std::vector<Record> All(int limit = -1) const override {
+    std::shared_lock<std::shared_mutex> lock(this->mtx_);
     return this->contents_.All(limit);
   }
   std::vector<Record> Lookup(const Key &key, int limit = -1,
                              size_t offset = 0) const override {
+    std::shared_lock<std::shared_mutex> lock(this->mtx_);
     return this->contents_.Lookup(key, limit, offset);
   }
 
@@ -155,6 +168,7 @@ class MatViewOperatorT : public MatViewOperator {
   template <typename X = void,
             typename std::enable_if<!T::NoCompare::value, X>::type * = nullptr>
   std::vector<Record> All(const Record &cmp, int limit = -1) const {
+    std::shared_lock<std::shared_mutex> lock(this->mtx_);
     return this->contents_.All(cmp, limit);
   }
 
@@ -162,11 +176,13 @@ class MatViewOperatorT : public MatViewOperator {
             typename std::enable_if<!T::NoCompare::value, X>::type * = nullptr>
   std::vector<Record> LookupGreater(const Key &key, const Record &cmp,
                                     int limit = -1, size_t offset = 0) const {
+    std::shared_lock<std::shared_mutex> lock(this->mtx_);
     return this->contents_.LookupGreater(key, cmp, limit, offset);
   }
   template <typename X = void,
             typename std::enable_if<T::KeyOrdered::value, X>::type * = nullptr>
   std::vector<Record> LookupGreater(const Key &key, int limit = -1) const {
+    std::shared_lock<std::shared_mutex> lock(this->mtx_);
     return this->contents_.LookupGreater(key, limit);
   }
 
@@ -198,6 +214,7 @@ class MatViewOperatorT : public MatViewOperator {
  protected:
   // Override Operator functions.
   std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records) {
+    std::unique_lock<std::shared_mutex> lock(this->mtx_);
     for (Record &r : records) {
       Key key = r.GetValues(this->key_cols_);
       if (r.IsPositive()) {
@@ -229,6 +246,7 @@ class MatViewOperatorT : public MatViewOperator {
 
  private:
   T contents_;
+  mutable std::shared_mutex mtx_;
 };
 
 using UnorderedMatViewOperator = MatViewOperatorT<UnorderedGroupedData>;

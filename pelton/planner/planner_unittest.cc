@@ -74,7 +74,7 @@ TEST(PlannerTest, SimpleProject) {
   std::string query = "SELECT Col3 FROM test_table WHERE Col2 = 'hello!'";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -116,7 +116,7 @@ TEST(PlannerTest, SimpleProjectLiteral) {
   std::string query = "select 1 as `one` from  test_table";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -164,7 +164,7 @@ TEST(PlannerTest, ProjectArithmeticRightLiteral) {
   std::string query = "SELECT Col1, Col3 - 5 as Delta5 FROM test_table";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -212,7 +212,7 @@ TEST(PlannerTest, ProjectArithmeticRightColumn) {
   std::string query = "SELECT Col3 - Col1 as DeltaCol FROM test_table";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -262,7 +262,7 @@ TEST(PlannerTest, SimpleAggregate) {
       "SELECT Col3, COUNT(*) FROM test_table GROUP BY Col3 ORDER BY Col3";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -316,7 +316,7 @@ TEST(PlannerTest, SimpleFilter) {
   std::string query = "SELECT * FROM test_table WHERE 'hello!' = Col2";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -359,7 +359,7 @@ TEST(PlannerTest, SingleConditionFilter) {
   std::string query = "SELECT * FROM test_table WHERE Col3=20";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -403,7 +403,7 @@ TEST(PlannerTest, FilterSingleORCondition) {
       "SELECT * FROM test_table WHERE Col3=20 OR Col3=50 ORDER BY Col3";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -450,7 +450,7 @@ TEST(PlannerTest, FilterSingleANDCondition) {
   std::string query = "SELECT * FROM test_table WHERE Col3=20 AND 5<Col1";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -495,7 +495,7 @@ TEST(PlannerTest, FilterNestedORCondition) {
       " AND (Col1 + 2 < 16 OR Col1 = 20)";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -556,7 +556,7 @@ TEST(PlannerTest, FilterNestedANDCondition) {
       "SELECT * FROM test_table WHERE Col3=50 OR (Col3=20 AND Col1=20)";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -601,7 +601,7 @@ TEST(PlannerTest, FilterColumnComparison) {
   std::string query = "SELECT * FROM test_table WHERE Col1 >= Col3";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -643,7 +643,7 @@ TEST(PlannerTest, FilterArithmeticCondition) {
   std::string query = "SELECT * FROM test_table WHERE 100 > 30 + Col3";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -719,7 +719,7 @@ TEST(PlannerTest, FilterArithmeticConditionTwoColumns) {
       "SELECT * FROM test_table WHERE Col3 - Col1 < 10 ORDER BY Col1";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -796,7 +796,7 @@ TEST(PlannerTest, UniqueSecondaryIndexFlow) {
   std::string query = "SELECT IndexCol, ShardByCol FROM test_table";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -873,7 +873,7 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
       "FROM test_table GROUP BY IndexCol, ShardByCol";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -984,7 +984,7 @@ TEST(PlannerTest, ComplexQueryWithKeys) {
       "HAVING assignments.ID = ?";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("students", schema1);
   state.AddTableSchema("assignments", schema2);
   state.AddTableSchema("submissions", schema3);
@@ -1089,7 +1089,7 @@ TEST(PlannerTest, BasicLeftJoin) {
       "= students.ID";
 
   // Create a dummy state.
-  dataflow::DataFlowState state;
+  dataflow::DataFlowState state(0);
   state.AddTableSchema("students", schema1);
   state.AddTableSchema("submissions", schema3);
 

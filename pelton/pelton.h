@@ -24,7 +24,7 @@ using Record = dataflow::Record;
 
 class State {
  public:
-  State() = default;
+  explicit State(size_t workers) : sharder_state_(), dataflow_state_(workers) {}
 
   // Not copyable or movable.
   State(const State &) = delete;
@@ -34,29 +34,11 @@ class State {
 
   // path to store state if want to store in folder (usually give it empty
   // string)
-  void Initialize(const std::string &path) {
-    this->path_ = path;
-    if (this->path_.size() > 0 && this->path_.back() != '/') {
-      this->path_ += "/";
-    }
-  }
+  void Initialize() {}
 
   // Getters.
   shards::SharderState *GetSharderState() { return &this->sharder_state_; }
   dataflow::DataFlowState *GetDataFlowState() { return &this->dataflow_state_; }
-
-  void Save() {
-    if (this->path_.size() > 0) {
-      this->sharder_state_.Save(this->path_);
-      this->dataflow_state_.Save(this->path_);
-    }
-  }
-  void Load() {
-    if (this->path_.size() > 0) {
-      this->sharder_state_.Load(this->path_);
-      this->dataflow_state_.Load(this->path_);
-    }
-  }
 
   void PrintSizeInMemory() const { this->dataflow_state_.PrintSizeInMemory(); }
 
@@ -77,7 +59,7 @@ struct Connection {
 };
 
 // initialize pelton_state
-bool initialize(const std::string &directory, const std::string &db_name,
+bool initialize(size_t workers, const std::string &db_name,
                 const std::string &db_username, const std::string &db_password);
 
 // delete pelton_state

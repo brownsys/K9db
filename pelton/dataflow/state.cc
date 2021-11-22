@@ -18,6 +18,57 @@
 namespace pelton {
 namespace dataflow {
 
+// DataFlowState::Worker.
+DataFlowState::Worker::Worker(size_t id, DataFlowState *state, int max)
+    : id_(id), state_(state), stop_(false), max_(max) {
+  this->thread_ = std::thread([this]() {
+    std::cout << "Starting dataflow worker " << this->id_ << std::endl;
+    while (!this->stop_ && this->max_ != 0) {
+      std::vector<Channel::Message> messages =
+          this->state_->channels_.at(this->id_)->Read();
+      for (Channel::Message &msg : messages) {
+        if (this->max_ != -1) {
+          this->max_ -= msg.records.size();
+        }
+        auto &flow = this->state_->flows_.at(msg.flow_name);
+        Operator *op = flow->GetPartition(this->id_)->GetNode(msg.target);
+        op->ProcessAndForward(msg.source, std::move(msg.records));
+      }
+    }
+  });
+}
+void DataFlowState::Worker::Shutdown() {
+  if (!this->stop_) {
+    this->stop_ = true;
+    this->state_->channels_.at(this->id_)->Shutdown();
+    this->thread_.join();
+  }
+}
+void DataFlowState::Worker::Join() { this->thread_.join(); }
+
+// DataFlowState.
+// Constructors and destructors.
+DataFlowState::~DataFlowState() { this->Shutdown(); }
+DataFlowState::DataFlowState(size_t workers, int max) : workers_(workers) {
+  // Create a channel for every worker.
+  for (size_t i = 0; i < workers; i++) {
+    this->channels_.emplace_back(std::make_unique<Channel>(workers));
+    this->threads_.emplace_back(i, this, max);
+  }
+}
+
+// Worker related functions.
+void DataFlowState::Shutdown() {
+  for (Worker &worker : this->threads_) {
+    worker.Shutdown();
+  }
+}
+void DataFlowState::Join() {
+  for (Worker &worker : this->threads_) {
+    worker.Join();
+  }
+}
+
 // Manage schemas.
 void DataFlowState::AddTableSchema(const sqlast::CreateTable &create) {
   this->schema_.emplace(create.table_name(), SchemaFactory::Create(create));
@@ -51,9 +102,16 @@ void DataFlowState::AddFlow(const FlowName &name,
     this->flows_per_input_table_[input_name].push_back(name);
   }
 
+  // Create a non-owning vector of channels.
+  std::vector<Channel *> chans;
+  for (auto &channel : this->channels_) {
+    chans.push_back(channel.get());
+  }
+
   // Turn the given partition into a graph with many partitions.
-  this->flows_.emplace(
-      name, std::make_unique<DataFlowGraph>(std::move(flow), this->workers_));
+  auto graph = std::make_unique<DataFlowGraph>(name, this->workers_);
+  graph->Initialize(std::move(flow), chans);
+  this->flows_.emplace(name, std::move(graph));
 }
 
 const DataFlowGraph &DataFlowState::GetFlow(const FlowName &name) const {
@@ -100,16 +158,30 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
     const std::vector<FlowName> &flow_names =
         this->flows_per_input_table_.at(table_name);
     for (size_t i = 0; i < flow_names.size() - 1; i++) {
+      const std::string &flow_name = flow_names.at(i);
       std::vector<Record> copy;
       copy.reserve(records.size());
       for (const Record &r : records) {
         copy.push_back(r.Copy());
       }
-      this->flows_.at(flow_names.at(i))->Process(table_name, std::move(copy));
+      auto &flow = this->flows_.at(flow_name);
+      auto partitions = flow->PartitionInputs(table_name, std::move(copy));
+      for (auto &[partition, vec] : partitions) {
+        this->channels_.at(partition)->WriteInput(
+            {flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
+             flow->GetPartition(partition)->GetInputNode(table_name)->index()});
+      }
     }
 
     // Move into last flow.
-    this->flows_.at(flow_names.back())->Process(table_name, std::move(records));
+    const std::string &flow_name = flow_names.back();
+    auto &flow = this->flows_.at(flow_name);
+    auto partitions = flow->PartitionInputs(table_name, std::move(records));
+    for (auto &[partition, vec] : partitions) {
+      this->channels_.at(partition)->WriteInput(
+          {flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
+           flow->GetPartition(partition)->GetInputNode(table_name)->index()});
+    }
   }
 }
 
@@ -124,87 +196,6 @@ void DataFlowState::PrintSizeInMemory() const {
   }
   std::cout << "Total size: " << (total_size / 1204 / 1024) << "MB"
             << std::endl;
-}
-
-// Load state from its durable file (if exists).
-void DataFlowState::Load(const std::string &dir_path) {
-  // State file does not exists: this is a fresh database that was not
-  // created previously!
-  std::string state_file_path = dir_path + STATE_FILE_NAME;
-  if (!util::FileExists(state_file_path)) {
-    return;
-  }
-
-  // Open file for reading.
-  std::ifstream state_file;
-  util::OpenRead(&state_file, state_file_path);
-
-  // Read content of state file and fill them into state!
-  std::string line;
-
-  // Read schema_.
-  getline(state_file, line);
-  while (line != "") {
-    std::vector<std::string> names;
-    std::vector<sqlast::ColumnDefinition::Type> types;
-    std::string colname;
-    std::underlying_type_t<sqlast::ColumnDefinition::Type> coltype;
-    // Read the column names and types in schema.
-    getline(state_file, colname);
-    while (colname != "") {
-      state_file >> coltype;
-      names.push_back(colname);
-      types.push_back(static_cast<sqlast::ColumnDefinition::Type>(coltype));
-      getline(state_file, colname);
-      getline(state_file, colname);
-    }
-    // Read the key column ids.
-    std::vector<ColumnID> keys;
-    ColumnID key;
-    size_t keys_size;
-    state_file >> keys_size;
-    for (size_t i = 0; i < keys_size; i++) {
-      state_file >> key;
-      keys.push_back(key);
-    }
-
-    // Construct schema in place.
-    this->schema_.insert({line, SchemaFactory::Create(names, types, keys)});
-
-    // Next table.
-    getline(state_file, line);
-    getline(state_file, line);
-  }
-
-  // Done reading!
-  state_file.close();
-}
-
-// Save state to durable file.
-void DataFlowState::Save(const std::string &dir_path) {
-  // Open state file for writing.
-  std::ofstream state_file;
-  util::OpenWrite(&state_file, dir_path + STATE_FILE_NAME);
-
-  for (const auto &[table_name, schema] : this->schema_) {
-    state_file << table_name << "\n";
-    for (size_t i = 0; i < schema.size(); i++) {
-      auto type =
-          static_cast<std::underlying_type_t<sqlast::ColumnDefinition::Type>>(
-              schema.TypeOf(i));
-      state_file << schema.NameOf(i) << "\n" << type << "\n";
-    }
-    state_file << "\n";
-    state_file << schema.keys().size() << " ";
-    for (auto key_id : schema.keys()) {
-      state_file << key_id << " ";
-    }
-    state_file << "\n";
-  }
-  state_file << "\n";
-
-  // Done writing.
-  state_file.close();
 }
 
 }  // namespace dataflow
