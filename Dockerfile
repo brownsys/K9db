@@ -1,6 +1,6 @@
 # Docker image to build pelton incl. all dependencies
 # based on Ubuntu 2004
-FROM ubuntu:groovy-20210225
+FROM ubuntu:focal-20211006
 
 MAINTAINER Pelton team "http://cs.brown.edu/people/malte/research/pbc/"
 
@@ -9,15 +9,13 @@ ENV LANG C.UTF-8
 ENV PATH /usr/local/bin:$PATH
 
 # Add apt-add-repository
-RUN apt-get update && \
-    apt-get install -y software-properties-common
+RUN apt-get update && apt-get upgrade -y && apt-get install -y software-properties-common
 
 # Add ppa for gcc-11
 RUN add-apt-repository -y ppa:ubuntu-toolchain-r/test
-RUN apt-get install gcc-11 g++-11
 
 # Install dependencies
-RUN apt-get update && apt-get upgrade -y && apt-get install -y \
+RUN apt-get update && apt-get install -y \
     apt-utils libssl-dev lsb-release openssl vim git \
     build-essential libssl-dev zlib1g-dev libncurses5-dev \
     libncursesw5-dev libreadline-dev libgdbm-dev libdb5.3-dev libbz2-dev \
