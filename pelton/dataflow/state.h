@@ -68,15 +68,9 @@ class DataFlowState {
 
   bool HasFlowsFor(const TableName &table_name) const;
 
-  // Save state to durable file.
-  void Save(const std::string &dir_path);
-
-  // Load state from its durable file (if exists).
-  void Load(const std::string &dir_path);
-
+  // Process raw data from sharder and use it to update flows.
   Record CreateRecord(const sqlast::Insert &insert_stmt) const;
 
-  // Process raw data from sharder and use it to update flows.
   void ProcessRecords(const TableName &table_name,
                       std::vector<Record> &&records);
 

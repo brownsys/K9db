@@ -144,7 +144,7 @@ int main(int argc, char **argv) {
 
   // Initialize Pelton State
   EXPECT_TRUE(
-      FFIInitialize(3, "", DB_NAME, db_username->c_str(), db_password->c_str()))
+      FFIInitialize(3, DB_NAME, db_username->c_str(), db_password->c_str()))
       << "Opening global connection failed!";
 
   // Run tests.

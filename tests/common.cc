@@ -123,7 +123,7 @@ void InitializeDatabase(const std::string &db_name, size_t file_count,
 
   // Create and open a connection to pelton.
   connection = new pelton::Connection();
-  CHECK(pelton::initialize(3, "", db_name, db_username, db_password));
+  CHECK(pelton::initialize(3, db_name, db_username, db_password));
   CHECK(pelton::open(connection));
 
   // Set echo if specified by cmd flags.
