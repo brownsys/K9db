@@ -73,6 +73,8 @@ bazel run --run_under "valgrind --error-exitcode=1 --errors-for-leak-kinds=defin
 # Design
 This proxy acts as a MySQL database while interfacing with pelton. Queries are converted to C compatible types and sent to pelton. Responses are converted to rust compatible types and returned. Any application that uses a MySQL backend may connect to this proxy instead of a traditional database.
 
+![mysql_proxy_flow_diagram](https://user-images.githubusercontent.com/47846691/142964390-7dc575e4-300e-4388-8006-1070fa82ad5d.png)
+
 - Flow:  
 Application <=> Mysql Proxy <=> FFI <=> Pelton API (C++)
 
