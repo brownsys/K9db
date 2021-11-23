@@ -165,7 +165,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
             // execute select
             MOVE_OR_RETURN(sql::SqlResult res,
                            select::Shard(accessor_stmt, state, dataflow_state));
-            // add to gdpr get result
+
+            // add to GDPR GET result
             result.AddResultSet(res.NextResultSet());
           }
         }

@@ -249,8 +249,6 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState &state,
         std::cout << "STATUS: " << shard_kind->value() << std::endl;
       }
       std::cout << "We have found an accessor: " << column_name << std::endl;
-      // CreateIndex(access_column (doctor) is the key, owner_by_value
-      // (patient), index is not unique)
 
       // TODO: known issue: index name is too long, throwing sqlexception
       // terminate called after throwing an instance of
