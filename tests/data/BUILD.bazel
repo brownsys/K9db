@@ -19,3 +19,12 @@ filegroup(
     ]),
     visibility = ["//tests:__subpackages__"],
 )
+
+filegroup(
+    name = "delf-medical-chat-data",
+    srcs = glob([
+        "delf_medical/*.sql",
+        "delf_medical/*.txt",
+    ]),
+    visibility = ["//tests:__subpackages__"],
+)

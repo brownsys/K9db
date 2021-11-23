@@ -43,3 +43,16 @@ cc_test(
         ":common",
     ],
 )
+
+cc_test(
+    name = "delf_medical",
+    srcs = [
+        "delf_medical.cc",
+    ],
+    data = [
+        "//tests/data:delf-medical-chat-data",
+    ],
+    deps = [
+        ":common",
+    ],
+)
