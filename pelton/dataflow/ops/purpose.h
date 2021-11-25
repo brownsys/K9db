@@ -1,5 +1,5 @@
-#ifndef PELTON_DATAFLOW_OPS_FILTER_H_
-#define PELTON_DATAFLOW_OPS_FILTER_H_
+#ifndef PELTON_DATAFLOW_OPS_PURPOSE_H_
+#define PELTON_DATAFLOW_OPS_PURPOSE_H_
 
 #include <cstdint>
 #include <memory>
@@ -8,7 +8,7 @@
 #include <variant>
 #include <vector>
 
-#include "gtest/gtest_prod.h"
+// #include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/filter_enum.h"
 #include "pelton/dataflow/record.h"
@@ -53,10 +53,10 @@ class PurposeOperator : public Operator {
     this->ops_.emplace_back(left_column, op, right_column);
   }
 
- protected:
+ 
   std::vector<Record> Process(NodeIndex source,
                               std::vector<Record> &&records) override;
-
+protected:
   void ComputeOutputSchema() override;
 
   std::unique_ptr<Operator> Clone() const override;
@@ -106,16 +106,16 @@ class PurposeOperator : public Operator {
   std::vector<PurposeOperation> ops_;
 
   // Allow tests to use .Process(...) directly.
-  FRIEND_TEST(PurposeOperatorTest, SingleAccept);
-  FRIEND_TEST(PurposeOperatorTest, AndAccept);
-  FRIEND_TEST(PurposeOperatorTest, SeveralOpsPerColumn);
-  FRIEND_TEST(PurposeOperatorTest, BatchTest);
-  FRIEND_TEST(PurposeOperatorTest, ColOps);
-  FRIEND_TEST(PurposeOperatorTest, TypeMistmatch);
-  FRIEND_TEST(PurposeOperatorTest, IsNullAccept);
+  // FRIEND_TEST(PurposeOperatorTest, SingleAccept);
+  // FRIEND_TEST(PurposeOperatorTest, AndAccept);
+  // FRIEND_TEST(PurposeOperatorTest, SeveralOpsPerColumn);
+  // FRIEND_TEST(PurposeOperatorTest, BatchTest);
+  // FRIEND_TEST(PurposeOperatorTest, ColOps);
+  // FRIEND_TEST(PurposeOperatorTest, TypeMistmatch);
+  // FRIEND_TEST(PurposeOperatorTest, IsNullAccept);
 };
 
 }  // namespace dataflow
 }  // namespace pelton
 
-#endif  // PELTON_DATAFLOW_OPS_FILTER_H_
+#endif  // PELTON_DATAFLOW_OPS_PURPOSE_H_

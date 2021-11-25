@@ -9,6 +9,7 @@
 #include "pelton/dataflow/ops/aggregate.h"
 #include "pelton/dataflow/ops/equijoin.h"
 #include "pelton/dataflow/ops/filter.h"
+#include "pelton/dataflow/ops/purpose.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/ops/project.h"
@@ -61,6 +62,17 @@ NodeIndex DataFlowGraphGenerator::AddFilterOperator(NodeIndex parent) {
   CHECK(this->graph_->AddNode(std::move(op), parent_ptr));
   return this->graph_->LastOperatorIndex();
 }
+
+NodeIndex DataFlowGraphGenerator::AddPurposeOperator(NodeIndex parent) {
+  // Create purpose operator.
+  std::unique_ptr<PurposeOperator> op = std::make_unique<PurposeOperator>();
+  // Add the operator to the graph.
+  Operator *parent_ptr = this->graph_->GetNode(parent);
+  CHECK(parent_ptr);
+  CHECK(this->graph_->AddNode(std::move(op), parent_ptr));
+  return this->graph_->LastOperatorIndex();
+}
+
 NodeIndex DataFlowGraphGenerator::AddProjectOperator(NodeIndex parent) {
   // Create project operator.
   std::unique_ptr<ProjectOperator> op = std::make_unique<ProjectOperator>();

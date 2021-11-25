@@ -27,6 +27,7 @@ class Operator {
     IDENTITY,
     MAT_VIEW,
     FILTER,
+    PURPOSE,
     UNION,
     EQUIJOIN,
     PROJECT,

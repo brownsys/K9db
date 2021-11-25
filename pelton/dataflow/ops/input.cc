@@ -1,4 +1,5 @@
 #include "pelton/dataflow/ops/input.h"
+#include "pelton/dataflow/ops/purpose.h"
 
 #include <utility>
 
@@ -15,6 +16,14 @@ std::vector<Record> InputOperator::Process(NodeIndex source,
       LOG(FATAL) << "Input record has bad schema";
     }
   }
+
+  // Enforcing gdpr purpose whenever data enters a pipeling from a table
+  PurposeOperator purposeOp;
+  ColumnID gdpr_col_id = this->input_schemas_.size()-1; // get the last column that will be gdpr
+
+  purposeOp.AddOperation("V1",gdpr_col_id, LIKE); // amrit - add value of the gdpr purpose
+  records = purposeOp.Process(source, std::move(records));
+
   return std::move(records);
 }
 

@@ -12,7 +12,8 @@ enum FilterOperationEnum {
   EQUAL,
   NOT_EQUAL,
   IS_NULL,
-  IS_NOT_NULL
+  IS_NOT_NULL,
+  LIKE
 };
 
 }  // namespace dataflow

@@ -275,7 +275,7 @@ absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
   // Plan the query using calcite and generate a concrete graph for it.
   std::unique_ptr<dataflow::DataFlowGraphPartition> graph =
       planner::PlanGraph(dataflow_state, stmt.query());
-
+      
   // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
   dataflow_state->AddFlow(stmt.view_name(), std::move(graph));
 

@@ -38,6 +38,7 @@ class DataFlowGraphGenerator {
   NodeIndex AddInputOperator(const std::string &table_name);
   NodeIndex AddUnionOperator(const std::vector<NodeIndex> &parents);
   NodeIndex AddFilterOperator(NodeIndex parent);
+  NodeIndex AddPurposeOperator(NodeIndex parent);
   NodeIndex AddProjectOperator(NodeIndex parent);
   NodeIndex AddAggregateOperator(NodeIndex parent,
                                  const std::vector<ColumnID> &group_cols,
