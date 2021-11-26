@@ -4,7 +4,6 @@
 #define PELTON_SQLAST_PARSER_H_
 
 #include <memory>
-#include <shared_mutex>
 #include <string>
 
 #include "absl/status/statusor.h"
@@ -39,7 +38,6 @@ class SQLParser : public antlr4::BaseErrorListener {
   std::unique_ptr<antlr4::CommonTokenStream> tokens_;
   std::unique_ptr<sqlparser::SQLiteLexer> lexer_;
   std::unique_ptr<antlr4::ANTLRInputStream> input_stream_;
-  // static std::shared_mutex MTX;
 };
 
 }  // namespace sqlast

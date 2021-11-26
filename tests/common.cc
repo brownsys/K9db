@@ -122,10 +122,8 @@ void InitializeDatabase(const std::string &db_name, size_t file_count,
   DropDatabase(db_name);
 
   // Create and open a connection to pelton.
-  pelton::initialize("");
-  pelton::open(&connection, db_name, db_username, db_password);
-  // connection = new pelton::Connection();
-  // CHECK(pelton::open("", db_name, db_username, db_password, connection));
+  CHECK(pelton::initialize(""));
+  CHECK(pelton::open(&connection, db_name, db_username, db_password));
 
   // Set echo if specified by cmd flags.
   if (FLAGS_echo) {
@@ -146,8 +144,8 @@ void InitializeDatabase(const std::string &db_name, size_t file_count,
 // Clean up after testing is complete.
 void TearDown(const std::string &db_name) {
   // Close connection to pelton.
-  pelton::close(&connection);
-  pelton::shutdown(false);
+  CHECK(pelton::close(&connection));
+  CHECK(pelton::shutdown(false));
 
   // Drop the test database.
   LOG(INFO) << "Dropping DB " << db_name << "...";

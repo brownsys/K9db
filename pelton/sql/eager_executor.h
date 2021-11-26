@@ -5,7 +5,7 @@
 
 #include <memory>
 #include <string>
-#include <shared_mutex>
+#include <mutex>
 
 #include "mariadb/conncpp.hpp"
 
@@ -36,7 +36,7 @@ class SqlEagerExecutor {
   // Connection management.
   std::unique_ptr<::sql::Connection> conn_;
   std::unique_ptr<::sql::Statement> stmt_;
-  static std::shared_mutex MTX;
+  static std::mutex MTX;
 };
 
 }  // namespace sql
