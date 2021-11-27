@@ -26,8 +26,8 @@ cc_library(
         "//pelton/sqlast:parser",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
         "@antlr4_runtimes//:cpp",
+        "@com_google_absl//absl/status",
         "@grammars-v4//:sqlparser",
     ],
 )
@@ -50,8 +50,8 @@ cc_library(
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
-        "@absl//absl/strings",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -76,7 +76,7 @@ cc_library(
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -98,8 +98,8 @@ cc_library(
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
-        "@absl//absl/strings",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -121,7 +121,7 @@ cc_library(
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -145,8 +145,8 @@ cc_library(
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
-        "@absl//absl/strings",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -171,7 +171,7 @@ cc_library(
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -190,7 +190,7 @@ cc_library(
     visibility = ["//pelton:__subpackages__"],
     deps = [
         "//pelton/shards:types",
-        "@absl//absl/strings",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -205,6 +205,10 @@ cc_library(
     deps = [
         "//pelton:connection",
         "//pelton/dataflow:dstate",
+        "//pelton/dataflow:graph",
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
         "//pelton/planner",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -212,7 +216,8 @@ cc_library(
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
+        "@com_google_absl//absl/status",
+        "@glog",
     ],
 )
 
@@ -236,7 +241,7 @@ cc_library(
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
-        "@absl//absl/strings",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )

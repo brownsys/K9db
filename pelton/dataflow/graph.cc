@@ -1,112 +1,322 @@
 #include "pelton/dataflow/graph.h"
 
-#include <memory>
+#include <algorithm>
+#include <iterator>
+#include <list>
+#include <tuple>
+#include <utility>
+// NOLINTNEXTLINE
+#include <variant>
 
 #include "glog/logging.h"
 #include "pelton/dataflow/operator.h"
+#include "pelton/dataflow/ops/aggregate.h"
+#include "pelton/dataflow/ops/equijoin.h"
+#include "pelton/dataflow/ops/exchange.h"
 #include "pelton/dataflow/ops/input.h"
-#include "pelton/dataflow/ops/matview.h"
+#include "pelton/dataflow/ops/project.h"
+#include "pelton/dataflow/schema.h"
+#include "pelton/util/merge_sort.h"
 
 namespace pelton {
 namespace dataflow {
 
-bool DataFlowGraph::AddInputNode(std::shared_ptr<InputOperator> op) {
-  CHECK(this->inputs_.count(op->input_name()) == 0)
-      << "An operator for this input already exists";
-  this->inputs_.emplace(op->input_name(), op);
-  return this->AddNode(op, std::vector<std::shared_ptr<Operator>>{});
-}
+// To avoid clutter, everything related to identifying what operator is
+// partitioned by what key is in this file.
+#include "pelton/dataflow/graph_traversal.inc"
 
-bool DataFlowGraph::AddOutputOperator(std::shared_ptr<MatViewOperator> op,
-                                      std::shared_ptr<Operator> parent) {
-  this->outputs_.emplace_back(op);
-  return this->AddNode(op, parent);
-}
+// shortcut for std::make_move_iterator
+#define MOVEIT(it) std::make_move_iterator(it)
 
-bool DataFlowGraph::AddNode(std::shared_ptr<Operator> op,
-                            std::vector<std::shared_ptr<Operator>> parents) {
-  NodeIndex idx = this->MintNodeIndex();
-  op->SetIndex(idx);
-  op->SetGraph(this);
+// Initialization given a single partition (to be cloned) and channels.
+void DataFlowGraph::Initialize(
+    std::unique_ptr<DataFlowGraphPartition> &&partition,
+    const std::vector<Channel *> &channels) {
+  // Store the input names for this graph (i.e. for any partition).
+  this->output_schema_ = partition->outputs().at(0)->output_schema();
+  this->matview_keys_ = partition->outputs().at(0)->key_cols();
+  for (const auto &[input_name, _] : partition->inputs()) {
+    this->inputs_.push_back(input_name);
+  }
 
-  const auto &[_, inserted] = this->nodes_.emplace(idx, op);
-  CHECK(inserted);
+  // Traverse the graph, adding the needed exchange operators, and deducing
+  // the partitioning keys for the inputs.
+  ProducerMap p;
+  RequiredMap r;
+  ExternalMap e;
+  for (const auto &[_, input_operator] : partition->inputs()) {
+    DFS(*input_operator, UNDEFINED_NODE_INDEX, Any::UNIT, &p, &r, e);
+  }
 
-  for (const auto &parent : parents) {
-    if (parent) {
-      this->AddEdge(parent, op);
+  // Check to see that every MatView was assigned a partition key.
+  // If some were not, assign them one externally.
+  this->matview_partition_match_ = true;
+  if (ExternallyAssignKey(partition->outputs(), p, &e)) {
+    this->matview_partition_match_ = false;
+    // Run again with the new external constraints
+    p.clear();
+    r.clear();
+    for (const auto &[_, input_operator] : partition->inputs()) {
+      DFS(*input_operator, UNDEFINED_NODE_INDEX, Any::UNIT, &p, &r, e);
     }
   }
-  return inserted;
-}
 
-void DataFlowGraph::AddEdge(std::shared_ptr<Operator> parent,
-                            std::shared_ptr<Operator> child) {
-  std::pair<NodeIndex, NodeIndex> edge{parent->index(), child->index()};
-  this->edges_.push_back(edge);
-  // Also implicitly adds op1 as child of op2.
-  child->AddParent(parent, edge);
-}
-
-void DataFlowGraph::Process(const std::string &input_name,
-                            const std::vector<Record> &records) {
-  std::shared_ptr<InputOperator> node = this->inputs_.at(input_name);
-  node->ProcessAndForward(UNDEFINED_NODE_INDEX, records);
-}
-
-std::shared_ptr<DataFlowGraph> DataFlowGraph::Clone() {
-  auto clone = std::make_shared<DataFlowGraph>();
-  for (auto const &item : this->inputs_) {
-    auto input_clone =
-        std::static_pointer_cast<InputOperator>(item.second->Clone());
-    input_clone->graph_ = clone.get();
-    clone->inputs_.emplace(item.first, input_clone);
-    clone->nodes_.emplace(input_clone->index_, input_clone);
-  }
-  for (std::shared_ptr<MatViewOperator> const &matview : this->outputs_) {
-    auto matview_clone =
-        std::static_pointer_cast<MatViewOperator>(matview->Clone());
-    matview_clone->graph_ = clone.get();
-    clone->outputs_.push_back(matview_clone);
-    clone->nodes_.emplace(matview_clone->index_, matview_clone);
-  }
-  // The cloned nodes have their indices set during the operator cloning itself
-  for (size_t i = 0; i < this->nodes_.size(); i++) {
-    switch (this->nodes_.at(i)->type()) {
-      case Operator::Type::INPUT:
-      case Operator::Type::MAT_VIEW:
-        // Inputs and matviews have already been cloned
-        continue;
-      default:
-        break;
+  // Check to see that every input operator was assigned a partition key.
+  // If some were not, assign them one externally.
+  std::vector<InputOperator *> inputs(partition->inputs().size());
+  std::transform(partition->inputs().begin(), partition->inputs().end(),
+                 inputs.begin(), [](auto pair) { return pair.second; });
+  if (ExternallyAssignKey(inputs, p, &e)) {
+    p.clear();
+    r.clear();
+    for (const auto &[_, input_operator] : partition->inputs()) {
+      DFS(*input_operator, UNDEFINED_NODE_INDEX, Any::UNIT, &p, &r, e);
     }
-    auto node_clone = this->nodes_.at(i)->Clone();
-    assert(node_clone->index_ == i);
-    node_clone->graph_ = clone.get();
-    clone->nodes_.emplace(i, node_clone);
   }
-  // Edges can be trivially copied
-  clone->edges_ = this->edges_;
-  return clone;
+
+  // Fill in partition key maps.
+  for (const auto &[name, op] : partition->inputs()) {
+    this->inkeys_.emplace(name, std::get<PartitionKey>(p.at(op->index())));
+  }
+  for (auto op : partition->outputs()) {
+    this->outkey_ = std::get<PartitionKey>(p.at(op->index()));
+  }
+
+  // Add in any needed exchanges.
+  std::vector<std::tuple<PartitionKey, Operator *, Operator *>> exchanges;
+  for (NodeIndex i = 0; i < partition->Size(); i++) {
+    Operator *op = partition->GetNode(i);
+    for (Operator *child : op->children()) {
+      auto result = ExchangeKey(op, child, p, r);
+      if (result) {
+        exchanges.emplace_back(std::move(result.value()), op, child);
+      }
+    }
+  }
+  for (const auto &[key, parent, child] : exchanges) {
+    auto exchange = std::make_unique<ExchangeOperator>(
+        this->flow_name_, this->size_, channels, key);
+    partition->InsertNode(std::move(exchange), parent, child);
+  }
+
+  // Print debugging information.
+  LOG(INFO) << "Planned exchanges and partitioning of flow";
+  LOG(INFO) << partition->DebugString();
+
+  // Make the specified number of partitions.
+  for (PartitionIndex i = 0; i < this->size_; i++) {
+    this->partitions_.push_back(partition->Clone(i));
+    this->matviews_.push_back(this->partitions_.back()->outputs().at(0));
+  }
 }
 
-std::string DataFlowGraph::DebugString() const {
-  std::string str = "[\n";
-  for (const auto &[_, node] : this->nodes_) {
-    str += " {\n";
-    str += node->DebugString();
-    str += " },\n";
+// Processing records: records are hash-partitioning and fed to the input
+// operator of corresponding partion.
+std::unordered_map<PartitionIndex, std::vector<Record>>
+DataFlowGraph::PartitionInputs(const std::string &input_name,
+                               std::vector<Record> &&records) {
+  // Map each input record to its output partition.
+  std::unordered_map<PartitionIndex, std::vector<Record>> partitioned;
+  for (Record &record : records) {
+    PartitionIndex partition =
+        record.Hash(this->inkeys_.at(input_name)) % this->partitions_.size();
+    partitioned[partition].push_back(std::move(record));
   }
-  str += "]";
-  return str;
+  return partitioned;
 }
 
+// Reading records from views by different constraints or orders.
+std::vector<Record> DataFlowGraph::All(int limit, size_t offset) const {
+  int olimit = limit > -1 ? limit + offset : -1;
+  auto matview = this->matviews_.front();
+  if (matview->RecordOrdered()) {
+    // Order actually matters.
+    auto ordview = static_cast<RecordOrderedMatViewOperator *>(matview);
+    std::list<Record> records;
+    for (auto matview : this->matviews_) {
+      util::MergeInto(&records, matview->All(olimit), ordview->comparator(),
+                      olimit);
+    }
+    return util::ToVector(&records, limit, offset);
+  } else {
+    // Order does not matter.
+    std::vector<Record> records;
+    for (auto matview : this->matviews_) {
+      if (records.size() == 0) {
+        records = matview->All(olimit);
+      } else {
+        auto tmp = matview->All(olimit);
+        records.insert(records.end(), MOVEIT(tmp.begin()), MOVEIT(tmp.end()));
+      }
+    }
+    util::Trim(&records, limit, offset);
+    return records;
+  }
+}
+std::vector<Record> DataFlowGraph::Lookup(const Key &key, int limit,
+                                          size_t offset) const {
+  if (this->matview_partition_match_) {
+    PartitionIndex partition = key.Hash() % this->partitions_.size();
+    return this->matviews_.at(partition)->Lookup(key, limit, offset);
+  } else {
+    int olimit = limit > -1 ? limit + offset : -1;
+    auto matview = this->matviews_.front();
+    if (matview->RecordOrdered()) {
+      // Order actually matters.
+      auto ordview = static_cast<RecordOrderedMatViewOperator *>(matview);
+      std::list<Record> records;
+      for (auto matview : this->matviews_) {
+        util::MergeInto(&records, matview->Lookup(key, olimit),
+                        ordview->comparator(), olimit);
+      }
+      return util::ToVector(&records, limit, offset);
+    } else {
+      // Order does not matter.
+      std::vector<Record> records;
+      for (auto matview : this->matviews_) {
+        if (records.size() == 0) {
+          records = matview->Lookup(key, olimit);
+        } else {
+          auto tmp = matview->Lookup(key, olimit);
+          records.insert(records.end(), MOVEIT(tmp.begin()), MOVEIT(tmp.end()));
+        }
+      }
+      util::Trim(&records, limit, offset);
+      return records;
+    }
+  }
+}
+std::vector<Record> DataFlowGraph::Lookup(const std::vector<Key> &keys,
+                                          int limit, size_t offset) const {
+  if (keys.size() == 1) {
+    return this->Lookup(keys.front(), limit, offset);
+  }
+  // Iterate over keys.
+  int olimit = limit > -1 ? limit + offset : -1;
+  auto matview = this->matviews_.front();
+  if (matview->RecordOrdered()) {
+    // Order actually matters.
+    auto ordview = static_cast<RecordOrderedMatViewOperator *>(matview);
+    std::list<Record> records;
+    for (const auto &key : keys) {
+      util::MergeInto(&records, this->Lookup(key, olimit, 0),
+                      ordview->comparator(), olimit);
+    }
+    return util::ToVector(&records, limit, offset);
+  } else {
+    // Order does not matter.
+    std::vector<Record> records;
+    for (const auto &key : keys) {
+      if (records.size() == 0) {
+        records = this->Lookup(key, olimit, 0);
+      } else {
+        auto tmp = this->Lookup(key, olimit, 0);
+        records.insert(records.end(), MOVEIT(tmp.begin()), MOVEIT(tmp.end()));
+      }
+    }
+    util::Trim(&records, limit, offset);
+    return records;
+  }
+}
+std::vector<Record> DataFlowGraph::AllRecordGreater(const Record &cmp,
+                                                    int limit,
+                                                    size_t offset) const {
+  // Must be a Record Ordered Matview.
+  auto matview = this->matviews_.front();
+  if (!matview->RecordOrdered()) {
+    LOG(FATAL) << "Attempting to query incompatible view by record order";
+  }
+  // Get the records from all partitions and merge them.
+  int olimit = limit > -1 ? limit + offset : -1;
+  auto ordview = static_cast<RecordOrderedMatViewOperator *>(matview);
+  std::list<Record> records;
+  for (auto matview : this->matviews_) {
+    ordview = static_cast<RecordOrderedMatViewOperator *>(matview);
+    util::MergeInto(&records, ordview->All(cmp, olimit), ordview->comparator(),
+                    olimit);
+  }
+  return util::ToVector(&records, limit, offset);
+}
+std::vector<Record> DataFlowGraph::LookupRecordGreater(const Key &key,
+                                                       const Record &cmp,
+                                                       int limit,
+                                                       size_t offset) const {
+  // Must be a Record Ordered Matview.
+  auto matview = this->matviews_.front();
+  if (!matview->RecordOrdered()) {
+    LOG(FATAL) << "Attempting to query incompatible view by record order";
+  }
+  // Easy if partition keys match matview keys.
+  if (this->matview_partition_match_) {
+    PartitionIndex partition = key.Hash() % this->partitions_.size();
+    auto matview = this->matviews_.at(partition);
+    auto ordview = static_cast<RecordOrderedMatViewOperator *>(matview);
+    return ordview->LookupGreater(key, cmp, limit, offset);
+  } else {
+    // We do not know which partition, must try them all.
+    int olimit = limit > -1 ? limit + offset : -1;
+    std::list<Record> records;
+    for (auto matview : this->matviews_) {
+      auto ordview = static_cast<RecordOrderedMatViewOperator *>(matview);
+      util::MergeInto(&records, ordview->LookupGreater(key, cmp, olimit),
+                      ordview->comparator(), olimit);
+    }
+    return util::ToVector(&records, limit, offset);
+  }
+}
+std::vector<Record> DataFlowGraph::LookupRecordGreater(
+    const std::vector<Key> &keys, const Record &cmp, int limit,
+    size_t offset) const {
+  // Must be a Record Ordered Matview.
+  auto matview = this->matviews_.front();
+  if (!matview->RecordOrdered()) {
+    LOG(FATAL) << "Attempting to query incompatible view by record order";
+  }
+  // Iterate over all keys.
+  if (keys.size() == 1) {
+    return this->Lookup(keys.front(), limit, offset);
+  }
+  // Iterate over keys.
+  int olimit = limit > -1 ? limit + offset : -1;
+  auto ordview = static_cast<RecordOrderedMatViewOperator *>(matview);
+  std::list<Record> records;
+  for (const auto &key : keys) {
+    util::MergeInto(&records, this->LookupRecordGreater(key, cmp, olimit, 0),
+                    ordview->comparator(), olimit);
+  }
+  return util::ToVector(&records, limit, offset);
+}
+std::vector<Record> DataFlowGraph::LookupKeyGreater(const Key &key, int limit,
+                                                    size_t offset) const {
+  // Must be a Key Ordered Matview.
+  auto matview = this->matviews_.front();
+  if (!matview->KeyOrdered()) {
+    LOG(FATAL) << "Attempting to query incompatible view by record order";
+  }
+  // Get all the keys sorted.
+  std::list<Key> keys;
+  for (auto matview : this->matviews_) {
+    auto ordview = static_cast<KeyOrderedMatViewOperator *>(matview);
+    util::MergeInto(&keys, ordview->KeysGreater(key));
+  }
+  // Get all the records according to the order of the keys.
+  int olimit = limit > -1 ? static_cast<size_t>(limit) + offset : -1;
+  std::vector<Record> records;
+  for (const auto &key : keys) {
+    auto tmp = this->Lookup(key, olimit, 0);
+    records.insert(records.end(), MOVEIT(tmp.begin()), MOVEIT(tmp.end()));
+  }
+  util::Trim(&records, limit, offset);
+  return records;
+}
+
+// Debugging information.
 uint64_t DataFlowGraph::SizeInMemory() const {
-  uint64_t size = 0;
-  for (const auto &[_, node] : this->nodes_) {
-    size += node->SizeInMemory();
+  uint64_t total_size = 0;
+  for (const auto &partition : this->partitions_) {
+    total_size += partition->SizeInMemory();
   }
-  return size;
+  return total_size;
 }
 
 }  // namespace dataflow

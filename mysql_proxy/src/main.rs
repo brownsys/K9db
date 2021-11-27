@@ -15,10 +15,19 @@ use slog::Drain;
 use std::ffi::CString;
 use std::io;
 use std::net;
-use std::os::raw::{c_char, c_int};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+// const USAGE: &str = ;
+
+const USAGE: &str = "
+  Available options:
+  --help (false): displays this help message.
+  --workers (3): number of dataflow workers.
+  --db_name (pelton): name of the database.
+  --db_username (root): database user to connect with to mariadb.
+  --db_password (password): password to connect with to mariadb.";
 
 #[derive(Debug)]
 struct Backend {
@@ -72,8 +81,41 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         if q_string.starts_with("DROP")
             || q_string.starts_with("ALTER")
         {
-            debug!(self.log, "Rust Proxy: Unsupported query type");
+            error!(self.log, "Rust Proxy: Unsupported query type {}", q_string);
             return results.completed(0, 0);
+        }
+
+        // Hardcoded SHOW variables needed for mariadb java connectors.
+        if q_string.starts_with("SHOW") {
+            debug!(self.log, "Rust Proxy: SHOW statement simulated {}", q_string);
+
+            let mut cols : Vec<Column> = Vec::with_capacity(2);
+            cols.push(Column {
+                table: "".to_string(),
+                column: "Variable_name".to_string(),
+                coltype: ColumnType::MYSQL_TYPE_VAR_STRING,
+                colflags: ColumnFlags::empty(),
+            });
+            cols.push(Column {
+                table: "".to_string(),
+                column: "Value".to_string(),
+                coltype: ColumnType::MYSQL_TYPE_VAR_STRING,
+                colflags: ColumnFlags::empty(),
+            });
+            let mut rw = results.start(&cols)?;
+            rw.write_col("auto_increment_increment")?;
+            rw.write_col("1")?;
+            rw.end_row()?;
+            rw.write_col("max_allowed_packet")?;
+            rw.write_col("16777216")?;
+            rw.end_row()?;
+            rw.write_col("system_time_zone")?;
+            rw.write_col("EST")?;
+            rw.end_row()?;
+            rw.write_col("time_zone")?;
+            rw.write_col("SYSTEM")?;
+            rw.end_row()?;
+            return rw.finish();
         }
 
         debug!(self.log, "Rust proxy: starting on_query");
@@ -177,7 +219,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             // tell client no more rows coming. Returns an empty Ok to the proxy
             rw.finish()
         } else {
-            error!(self.log, "Rust proxy: unsupported query type");
+            error!(self.log, "Rust proxy: unsupported query type {}", q_string);
             results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
         }
     }
@@ -207,25 +249,13 @@ fn main() {
     let log: slog::Logger =
         slog::Logger::root(slog_term::FullFormat::new(plain).build().fuse(), o!());
 
-    // process command line arguments with gflags via FFI
-    // create vector of zero terminated CStrings from command line arguments
-    let args = std::env::args()
-        .map(|arg| CString::new(arg).unwrap())
-        .collect::<Vec<CString>>();
-    let c_argc = args.len() as c_int;
-    // convert CStrings to raw pointers
-    let mut c_argv = args
-        .iter()
-        .map(|arg| arg.as_ptr() as *mut i8)
-        .collect::<Vec<*mut c_char>>();
-    // pass converted arguments to C-FFI
-    unsafe { FFIGflags(c_argc, c_argv.as_mut_ptr()) };
+    // Parse command line flags defined using rust's gflags.
+    let flags = gflags_ffi(std::env::args(), USAGE);
+    info!(log, "Rust proxy: running with args: {:?} {:?} {:?} {:?}",
+          flags.workers, flags.db_name, flags.db_username, flags.db_password);
 
-    let global_open = initialize_ffi("");
-    info!(
-        log,
-        "Rust Proxy: opening connection globally: {:?}", global_open
-    );
+    let global_open = initialize_ffi(flags.workers);
+    info!(log, "Rust Proxy: opening connection globally: {:?}", global_open);
 
     let listener = net::TcpListener::bind("127.0.0.1:10001").unwrap();
     info!(log, "Rust Proxy: Listening at: {:?}", listener);
@@ -259,6 +289,9 @@ fn main() {
     // run listener until terminated with SIGTERM
     while !listener_terminated.load(Ordering::Relaxed) {
         while let Ok((stream, _addr)) = listener.accept() {
+            let db_name = flags.db_name.clone();
+            let db_username = flags.db_username.clone();
+            let db_password = flags.db_password.clone();
             // clone log so that each client thread has an owned copy
             let log_client = log.clone();
             threads.push(std::thread::spawn(move || {
@@ -267,7 +300,7 @@ fn main() {
                     "Rust Proxy: Successfully connected to mysql proxy\nStream and address are: {:?}",
                     stream
                 );
-                let rust_conn = open_ffi("pelton", "root", "password");
+                let rust_conn = open_ffi(&db_name, &db_username, &db_password);
                 info!(
                     log_client,
                     "Rust Proxy: connection status is: {:?}", rust_conn.connected

@@ -12,27 +12,35 @@
 #include "glog/logging.h"
 #include "pelton/pelton.h"
 
+DEFINE_uint32(workers, 3, "Number of workers");
+DEFINE_string(db_name, "pelton", "Name of the database");
+DEFINE_string(db_username, "root", "MariaDB username to connect with");
+DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
+
 // process command line arguments with gflags
-void FFIGflags(int argc, char **argv) {
+FFIArgs FFIGflags(int argc, char **argv, const char *usage) {
+  gflags::SetUsageMessage(usage);  // Usage message is in rust.
+  gflags::AllowCommandLineReparsing();
+
   // Command line arguments and help message.
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   // Initialize Google’s logging library.
   google::InitGoogleLogging("proxy");
+
+  // Returned the read command line flags.
+  return {FLAGS_workers, FLAGS_db_name.c_str(), FLAGS_db_username.c_str(),
+          FLAGS_db_password.c_str()};
 }
 
 // Initialize pelton_state in pelton.cc
-bool FFIInitialize(const char *db_dir) {
+bool FFIInitialize(size_t workers) {
   // Log debugging information.
   LOG(INFO) << "C-Wrapper: starting open_c";
-  LOG(INFO) << "C-Wrapper: db_dir is: " << std::string(db_dir);
-
-  // convert char* to const std::string
-  const std::string c_db_dir(db_dir);
 
   // call c++ function from C with converted types
   LOG(INFO) << "C-Wrapper: running pelton::initialize";
-  if (pelton::initialize(c_db_dir)) {
+  if (pelton::initialize(workers)) {
     LOG(INFO) << "C-Wrapper: global connection opened";
   } else {
     LOG(INFO) << "C-Wrapper: failed to open global connection";

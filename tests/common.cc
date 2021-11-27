@@ -122,7 +122,7 @@ void InitializeDatabase(const std::string &db_name, size_t file_count,
   DropDatabase(db_name);
 
   // Create and open a connection to pelton.
-  CHECK(pelton::initialize(""));
+  CHECK(pelton::initialize(3));
   CHECK(pelton::open(&connection, db_name, db_username, db_password));
 
   // Set echo if specified by cmd flags.
@@ -139,6 +139,9 @@ void InitializeDatabase(const std::string &db_name, size_t file_count,
       CHECK(pelton::exec(&connection, command).ok());
     }
   }
+
+  // Sleep to make sure inserts had time to process via flows.
+  sleep(2);
 }
 
 // Clean up after testing is complete.

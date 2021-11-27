@@ -47,16 +47,13 @@ bool SpecialStatements(const std::string &sql, State *connection) {
 
 }  // namespace
 
-bool initialize(const std::string &directory) {
+bool initialize(size_t workers) {
   // if already open
   if (pelton_state != nullptr) {
     // close without shutting down planner
     shutdown(false);
   }
-  pelton_state = new State();
-  // initialize path_ in State with &directory (path to db)
-  pelton_state->Initialize(directory);
-  pelton_state->Load();
+  pelton_state = new State(workers);
   return true;
 }
 
@@ -84,11 +81,10 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
   if (SpecialStatements(sql, connection->pelton_state)) {
     return SqlResult(true);
   }
+
   // Parse and rewrite statement, passing local connection with ptr to global
   // state containing sharder and dataflow state
-  absl::lts_2020_09_23::StatusOr<pelton::sql::SqlResult> sql_result =
-      shards::sqlengine::Shard(sql, connection);
-  return sql_result;
+  return shards::sqlengine::Shard(sql, connection);
 }
 
 void shutdown_planner() { planner::ShutdownPlanner(); }
@@ -97,10 +93,10 @@ bool shutdown(bool shutdown_planner) {
   if (pelton_state == nullptr) {
     return true;
   }
-  pelton_state->Save();
   if (shutdown_planner) {
     planner::ShutdownPlanner();
   }
+  pelton_state->GetDataFlowState()->Shutdown();
   delete pelton_state;
   pelton_state = nullptr;
   return true;

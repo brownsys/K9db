@@ -241,7 +241,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
 
   // Delete was successful, time to update dataflows.
   if (update_flows) {
-    dataflow_state->ProcessRecords(table_name, records);
+    dataflow_state->ProcessRecords(table_name, std::move(records));
   }
 
   perf::End("Update");

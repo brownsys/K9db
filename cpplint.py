@@ -542,6 +542,10 @@ _SEARCH_C_FILE = re.compile(r'\b(?:LINT_C_FILE|'
 # Match string that indicates we're working on a Linux Kernel file.
 _SEARCH_KERNEL_FILE = re.compile(r'\b(?:LINT_KERNEL_FILE)')
 
+# Match string that indicates we're defining a global (per file) NOLINT
+# suppression.
+_SEARCH_GLOBAL_NOLINT = re.compile(r'\bNOLINTFILE\b(\([^)]+\))?')
+
 _regexp_compile_cache = {}
 
 # {str, set(int)}: a map from error categories to sets of linenumbers
@@ -613,7 +617,7 @@ def ParseNolintSuppressions(filename, raw_line, linenum, error):
                 'Unknown NOLINT error category: %s' % category)
 
 
-def ProcessGlobalSuppresions(lines):
+def ProcessGlobalSuppresions(filename, lines, error):
   """Updates the list of global error suppressions.
 
   Parses any lint directives in the file that have global effect.
@@ -622,13 +626,28 @@ def ProcessGlobalSuppresions(lines):
     lines: An array of strings, each representing a line of the file, with the
            last element being empty if the file is terminated with a newline.
   """
-  for line in lines:
+  for linenum, line in enumerate(lines):
     if _SEARCH_C_FILE.search(line):
       for category in _DEFAULT_C_SUPPRESSED_CATEGORIES:
         _global_error_suppressions[category] = True
     if _SEARCH_KERNEL_FILE.search(line):
       for category in _DEFAULT_KERNEL_SUPPRESSED_CATEGORIES:
         _global_error_suppressions[category] = True
+
+    global_lint_match = _SEARCH_GLOBAL_NOLINT.search(line)
+    if global_lint_match:
+      category = global_lint_match.group(1)
+      if category in (None, '(*)'):
+        error(filename, linenum, 'readability/nolint', 5,
+              'Do not disable all categories globally in file!')
+      else:
+        if category.startswith('(') and category.endswith(')'):
+          category = category[1:-1]
+        if category in _ERROR_CATEGORIES:
+          _global_error_suppressions[category] = True
+        elif category not in _LEGACY_ERROR_CATEGORIES:
+          error(filename, linenum, 'readability/nolint', 5,
+                'Unknown NOLINT error category: %s' % category)
 
 
 def ResetNolintSuppressions():
@@ -5918,7 +5937,7 @@ def ProcessFileData(filename, file_extension, lines, error,
   ResetNolintSuppressions()
 
   CheckForCopyright(filename, lines, error)
-  ProcessGlobalSuppresions(lines)
+  ProcessGlobalSuppresions(filename, lines, error)
   RemoveMultiLineComments(filename, lines, error)
   clean_lines = CleansedLines(lines)
 
@@ -6086,6 +6105,8 @@ def ProcessFile(filename, vlevel, extra_check_functions=[]):
 
   # Note, if no dot is found, this will give the entire filename as the ext.
   file_extension = filename[filename.rfind('.') + 1:]
+  if file_extension == "inc":
+    file_extension = "cc"
 
   # When reading from stdin, the extension is unknown, so no cpplint tests
   # should rely on the extension.

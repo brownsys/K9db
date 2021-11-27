@@ -8,12 +8,11 @@ cc_library(
     hdrs = [
         "common.h",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         "//pelton",
         "@com_github_gflags_gflags//:gflags",
+        "@com_google_googletest//:gtest",
         "@glog",
-        "@gtest",
     ],
 )
 
@@ -26,6 +25,7 @@ cc_test(
     data = [
         "//tests/data:lobsters-data",
     ],
+    malloc = "@com_google_tcmalloc//tcmalloc",
     deps = [
         ":common",
     ],
@@ -39,6 +39,7 @@ cc_test(
     data = [
         "//tests/data:medical-chat-data",
     ],
+    malloc = "@com_google_tcmalloc//tcmalloc",
     deps = [
         ":common",
     ],

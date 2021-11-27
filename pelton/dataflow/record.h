@@ -75,7 +75,7 @@ class Record {
 
   // Create record and set all the data together.
   template <typename... Args>
-  Record(const SchemaRef &schema, bool positive, Args &&...ts)
+  Record(const SchemaRef &schema, bool positive, Args &&... ts)
       : Record(schema, positive) {
     this->SetData(std::forward<Args>(ts)...);
   }
@@ -99,7 +99,7 @@ class Record {
 
   // Set all data in one shot regardless of types and counts.
   template <typename... Args>
-  void SetData(Args &&...ts) {
+  void SetData(Args &&... ts) {
     CHECK_NOTNULL(this->data_);
     if constexpr (sizeof...(ts) > 0) {
       SetDataRecursive(0, std::forward<Args>(ts)...);
@@ -164,6 +164,10 @@ class Record {
 
   // Data type transformation.
   void SetValue(const std::string &value, size_t i);
+  void SetValue(const Value &value, size_t i);
+
+  // Deterministic hashing for partitioning / mutli-threading.
+  size_t Hash(const std::vector<ColumnID> &cols) const;
 
   // Accessors.
   void SetPositive(bool positive) { this->positive_ = positive; }
@@ -180,27 +184,22 @@ class Record {
   friend std::ostream &operator<<(std::ostream &os, const Record &r);
 
   // Custom comparison between records (for ordering).
-  struct Compare {
+  class Compare {
    public:
-    explicit Compare(const std::vector<ColumnID> &cols) {
-      this->cols = std::make_shared<std::vector<ColumnID>>(cols);
-    }
+    explicit Compare(const std::vector<ColumnID> &cols) : cols_(cols) {}
     bool operator()(const Record &l, const Record &r) const {
-      return l.GetValues(*cols) < r.GetValues(*cols);
+      return l.GetValues(this->cols_) < r.GetValues(this->cols_);
     }
-    std::vector<ColumnID> Cols() const {
-      std::vector<ColumnID> compare_cols = *cols;
-      return compare_cols;
-    }
+    const std::vector<ColumnID> &cols() const { return this->cols_; }
 
    private:
-    std::shared_ptr<std::vector<ColumnID>> cols;
+    std::vector<ColumnID> cols_;
   };
 
  private:
   // Recursive helper used in SetData(...).
   template <typename Arg, typename... Args>
-  void SetDataRecursive(size_t index, Arg &&t, Args &&...ts) {
+  void SetDataRecursive(size_t index, Arg &&t, Args &&... ts) {
     if (index >= this->schema_.size()) {
       LOG(FATAL) << "Record data received too many arguments";
     }

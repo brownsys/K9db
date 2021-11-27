@@ -36,9 +36,9 @@ cc_library(
         "//pelton/sql/result:resultset",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
-        "@absl//absl/status",
+        "@com_google_absl//absl/status",
+        "@com_google_googletest//:gtest_prod",
         "@glog",
-        "@gtest//:gtest_prod",
     ],
 )
 
@@ -64,14 +64,13 @@ cc_test(
     srcs = [
         "eager_executor_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     linkopts = [
         "-lmariadbcpp",
     ],
     deps = [
         ":eager_executor",
+        "@com_google_googletest//:gtest",
         "@glog",
-        "@gtest",
     ],
 )
 
@@ -80,7 +79,6 @@ cc_test(
     srcs = [
         "lazy_executor_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     linkopts = [
         "-lmariadbcpp",
     ],
@@ -94,7 +92,7 @@ cc_test(
         "//pelton/shards/sqlengine:util",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
+        "@com_google_googletest//:gtest",
         "@glog",
-        "@gtest",
     ],
 )

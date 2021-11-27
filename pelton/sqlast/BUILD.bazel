@@ -25,8 +25,8 @@ cc_library(
     visibility = ["//pelton:__subpackages__"],
     deps = [
         "//pelton/util:perf",
-        "@absl//absl/status:statusor",
-        "@absl//absl/strings",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
         "@glog",
     ],
 )
@@ -45,8 +45,8 @@ cc_library(
         ":hacky",
         ":transformer",
         "//pelton/util:perf",
-        "@absl//absl/status:statusor",
         "@antlr4_runtimes//:cpp",
+        "@com_google_absl//absl/status:statusor",
         "@grammars-v4//:sqlparser",
     ],
 )
@@ -61,9 +61,9 @@ cc_library(
     ],
     deps = [
         ":ast",
-        "@absl//absl/status",
-        "@absl//absl/status:statusor",
         "@antlr4_runtimes//:cpp",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@grammars-v4//:sqlparser",
     ],
 )
@@ -80,6 +80,6 @@ cc_library(
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":ast",
-        "@absl//absl/status:statusor",
+        "@com_google_absl//absl/status:statusor",
     ],
 )

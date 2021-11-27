@@ -2,6 +2,7 @@
 #ifndef PELTON_PELTON_H_
 #define PELTON_PELTON_H_
 
+// NOLINTNEXTLINE
 #include <mutex>
 #include <string>
 
@@ -24,7 +25,7 @@ using Schema = dataflow::SchemaRef;
 using Record = dataflow::Record;
 
 // initialize pelton_state
-bool initialize(const std::string &directory);
+bool initialize(size_t workers);
 
 // delete pelton_state
 bool shutdown(bool shutdown_planner = true);

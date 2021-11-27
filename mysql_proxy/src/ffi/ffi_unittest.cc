@@ -3,17 +3,11 @@
 #include <memory>
 #include <string>
 
-#include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 #include "mariadb/conncpp.hpp"
 
 #define DB_NAME "ffi_test"
-
-// Read DB configurations.
-// Command line flags.
-DEFINE_string(db_username, "root", "MariaDB username to connect with");
-DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
 
 static std::string *db_username;
 static std::string *db_password;
@@ -50,7 +44,9 @@ TEST(PROXY, DDL_TEST) {
   EXPECT_TRUE(FFIExecDDL(&c_conn, table)) << "Creating table failed!";
 
 #ifndef PELTON_VALGRIND_MODE
-  auto view = "CREATE VIEW myview AS '\"SELECT * FROM test3 WHERE ID > 5\"'";
+  auto view =
+      "CREATE VIEW myview AS "
+      "'\"SELECT * FROM test3 WHERE ID > 5 ORDER BY name\"'";
   EXPECT_TRUE(FFIExecDDL(&c_conn, view)) << "Creating view failed!";
 #endif
 }
@@ -130,18 +126,15 @@ TEST(PROXY, CLOSE_TEST) {
 
 int main(int argc, char **argv) {
   // Command line arugments and help message.
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
-  db_username = new std::string(FLAGS_db_username);
-  db_password = new std::string(FLAGS_db_password);
-
-  // Initialize Google’s logging library.
-  google::InitGoogleLogging("proxy_unittest");
+  FFIArgs cmd_args = FFIGflags(argc, argv, "ffi_unittest.cc");
+  db_username = new std::string(cmd_args.db_username);
+  db_password = new std::string(cmd_args.db_password);
 
   // Drop the database (in case it existed before because of some tests).
   DropDatabase();
 
   // Initialize Pelton State
-  EXPECT_TRUE(FFIInitialize("")) << "Opening global connection failed!";
+  EXPECT_TRUE(FFIInitialize(1)) << "Opening global connection failed!";
 
   // Run tests.
   ::testing::InitGoogleTest(&argc, argv);
