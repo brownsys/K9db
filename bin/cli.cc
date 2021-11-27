@@ -170,13 +170,9 @@ int main(int argc, char **argv) {
     // Close the connection
     end_time = std::chrono::high_resolution_clock::now();
 
-    std::cout << std::endl
-              << "Shards: "
-              << connection.pelton_state->GetSharderState()->NumShards()
-              << std::endl;
-
-    // Print flows memory usage.
-    connection.pelton_state->GetDataFlowState()->PrintSizeInMemory();
+    // Display statistics.
+    Print(connection.state->NumShards(), print);
+    Print(connection.state->SizeInMemory(), print);
 
     auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(
         end_time - start_time);

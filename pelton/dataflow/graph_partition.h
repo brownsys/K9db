@@ -73,7 +73,9 @@ class DataFlowGraphPartition {
 
   // Debugging.
   std::string DebugString() const;
-  uint64_t SizeInMemory() const;
+  std::vector<Record> DebugRecords() const;
+  uint64_t SizeInMemory(const std::string &flow_name,
+                        std::vector<Record> *output) const;
 
   // Cloning to create more partitions.
   std::unique_ptr<DataFlowGraphPartition> Clone(

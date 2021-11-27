@@ -232,8 +232,11 @@ int main(int argc, char **argv) {
   }
   std::cout << std::endl;
 
-  // Print flows memory usage.
-  connection.pelton_state->GetDataFlowState()->PrintSizeInMemory();
+  // Print statistics.
+  Print(connection.state->NumShards());
+  std::cout << std::endl;
+  Print(connection.state->SizeInMemory());
+  std::cout << std::endl;
 
   // Close connection.
   pelton::close(&connection);

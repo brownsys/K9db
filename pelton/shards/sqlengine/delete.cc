@@ -21,14 +21,14 @@ namespace sqlengine {
 namespace delete_ {
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
-                                     Connection *connection,
+                                     Connection *connection, SharedLock *lock,
                                      bool update_flows) {
   perf::Start("Delete");
-  dataflow::DataFlowState *dataflow_state =
-      connection->pelton_state->GetDataFlowState();
-  shards::SharderState *state = connection->pelton_state->GetSharderState();
   const std::string &table_name = stmt.table_name();
-  SharderStateLock state_lock = state->LockShared();
+
+  // We only read from state.
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
 
   // If no flows read from this table, we do not need to do anything
   // to update them.
@@ -45,7 +45,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
   sql::SqlResult result;
 
   // Sharding scenarios.
-  auto &exec = connection->executor_;
+  auto &exec = connection->executor;
   bool is_sharded = state->IsSharded(table_name);
   if (is_sharded) {  // is_shared == true
     // Case 3: Table is sharded!
@@ -119,9 +119,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
       result = exec.ExecuteDefault(&stmt);
     }
   }
-
-  // We no longer need to access any sharder state.
-  state_lock.Unlock();
 
   // Delete was successful, time to update dataflows.
   if (update_flows) {

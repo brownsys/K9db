@@ -78,15 +78,11 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         // start measuring runtime
         let start = Instant::now();
 
-        if q_string.starts_with("DROP")
-            || q_string.starts_with("ALTER")
-        {
-            error!(self.log, "Rust Proxy: Unsupported query type {}", q_string);
-            return results.completed(0, 0);
-        }
+        debug!(self.log, "Rust proxy: starting on_query");
+        debug!(self.log, "Rust Proxy: query received is: {:?}", q_string);
 
         // Hardcoded SHOW variables needed for mariadb java connectors.
-        if q_string.starts_with("SHOW") {
+        if q_string.starts_with("SHOW VARIABLE") {
             debug!(self.log, "Rust Proxy: SHOW statement simulated {}", q_string);
 
             let mut cols : Vec<Column> = Vec::with_capacity(2);
@@ -116,17 +112,10 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             rw.write_col("SYSTEM")?;
             rw.end_row()?;
             return rw.finish();
-        }
-
-        debug!(self.log, "Rust proxy: starting on_query");
-        debug!(self.log, "Rust Proxy: query received is: {:?}", q_string);
-
-        // determine query type and return appropriate response
-        if q_string.starts_with("CREATE TABLE")
-            || q_string.starts_with("CREATE INDEX")
-            || q_string.starts_with("CREATE VIEW")
-            || q_string.starts_with("SET")
-        {
+        } else if q_string.starts_with("CREATE TABLE")
+                  || q_string.starts_with("CREATE INDEX")
+                  || q_string.starts_with("CREATE VIEW")
+                  || q_string.starts_with("SET") {
             let ddl_response = exec_ddl_ffi(&mut self.rust_conn, q_string);
             debug!(self.log, "ddl_response is {:?}", ddl_response);
 
@@ -140,23 +129,25 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
         } else if q_string.starts_with("UPDATE")
-            || q_string.starts_with("DELETE")
-            || q_string.starts_with("INSERT")
-            || q_string.starts_with("GDPR FORGET")
-        {
+                  || q_string.starts_with("DELETE")
+                  || q_string.starts_with("INSERT")
+                  || q_string.starts_with("GDPR FORGET") {
             let update_response = exec_update_ffi(&mut self.rust_conn, q_string);
 
             // stop measuring runtime and add to total time for this connection
             self.runtime = self.runtime + start.elapsed();
 
-            
             if update_response != -1 {
                 results.completed(update_response as u64, 0)
             } else {
                 error!(self.log, "Rust Proxy: Failed to execute UPDATE: {:?}", q_string);
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
-        } else if q_string.starts_with("SELECT") || q_string.starts_with("GDPR GET") {
+        } else if q_string.starts_with("SELECT")
+                  || q_string.starts_with("GDPR GET")
+                  || q_string.starts_with("SHOW SHARDS")
+                  || q_string.starts_with("SHOW VIEW")
+                  || q_string.starts_with("SHOW MEMORY") {
             let select_response = exec_select_ffi(&mut self.rust_conn, q_string);
 
             // stop measuring runtime and add to total time for this connection

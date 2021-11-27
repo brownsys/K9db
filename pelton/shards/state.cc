@@ -11,6 +11,9 @@
 
 #include <utility>
 
+#include "pelton/dataflow/record.h"
+#include "pelton/dataflow/schema.h"
+
 namespace pelton {
 namespace shards {
 
@@ -57,11 +60,9 @@ std::list<const sqlast::AbstractStatement *> SharderState::CreateShard(
     result.push_back(&this->sharded_schema_.at(table));
   }
   // if shard_kind exists as key in create_index_, add to result
-  if (this->create_index_.find(shard_kind) != this->create_index_.end()) {
-    for (const sqlast::CreateIndex &create_index :
-         this->create_index_[shard_kind]) {
-      result.push_back(&create_index);
-    }
+  const auto &indices = this->create_index_[shard_kind];
+  for (const sqlast::CreateIndex &create_index : indices) {
+    result.push_back(&create_index);
   }
   return result;
 }
@@ -132,14 +133,13 @@ bool SharderState::HasIndexFor(const UnshardedTableName &table_name,
   return col.count(shard_by) > 0;
 }
 
+bool SharderState::HasIndicesFor(const UnshardedTableName &table_name) const {
+  return this->indices_.count(table_name) > 0;
+}
+
 const std::unordered_set<ColumnName> &SharderState::IndicesFor(
     const UnshardedTableName &table_name) const {
-  // if table_name does not exist, return empty set of columns
-  if (this->indices_.find(table_name) == this->indices_.end()) {
-    return this->empty_columns;
-  } else {
-    return this->indices_.at(table_name);
-  }
+  return this->indices_.at(table_name);
 }
 
 const FlowName &SharderState::IndexFlow(const UnshardedTableName &table_name,
@@ -148,7 +148,6 @@ const FlowName &SharderState::IndexFlow(const UnshardedTableName &table_name,
   return this->index_to_flow_.at(table_name).at(column_name).at(shard_by);
 }
 
-// writes to indices_ (w1 or w2), index_to_flow_ (w/r3?), create_index_ (w2)
 void SharderState::CreateIndex(const ShardKind &shard_kind,
                                const UnshardedTableName &table_name,
                                const ColumnName &column_name,
@@ -162,6 +161,21 @@ void SharderState::CreateIndex(const ShardKind &shard_kind,
     this->create_index_[shard_kind].push_back(create_index_stmt);
   }
 }
+
+sql::SqlResult SharderState::NumShards() const {
+  std::vector<dataflow::Record> records;
+  for (const auto &[kind, set] : this->shards_) {
+    records.emplace_back(dataflow::SchemaFactory::NUM_SHARDS_SCHEMA, true,
+                         std::make_unique<std::string>(kind),
+                         static_cast<uint64_t>(set.size()));
+  }
+  return sql::SqlResult(std::make_unique<sql::_result::SqlInlineResultSet>(
+      dataflow::SchemaFactory::NUM_SHARDS_SCHEMA, std::move(records)));
+}
+
+// Synchronization.
+UniqueLock SharderState::WriterLock() { return UniqueLock(&this->mtx_); }
+SharedLock SharderState::ReaderLock() const { return SharedLock(&this->mtx_); }
 
 }  // namespace shards
 }  // namespace pelton

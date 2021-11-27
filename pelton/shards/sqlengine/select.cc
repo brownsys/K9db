@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "pelton/shards/sqlengine/index.h"
+#include "pelton/shards/upgradable_lock.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
@@ -57,9 +58,10 @@ dataflow::SchemaRef ResultSchema(const sqlast::Select &stmt,
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
                                      Connection *connection) {
   perf::Start("Select");
-  dataflow::DataFlowState *dataflow_state =
-      connection->pelton_state->GetDataFlowState();
-  shards::SharderState *state = connection->pelton_state->GetSharderState();
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  SharedLock lock = state->ReaderLock();
+
   // Disqualifiy LIMIT and OFFSET queries.
   if (!stmt.SupportedByShards()) {
     return absl::InvalidArgumentError("Query contains unsupported features");
@@ -71,8 +73,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
   dataflow::SchemaRef schema =
       ResultSchema(stmt, dataflow_state->GetTableSchema(table_name));
 
-  auto &exec = connection->executor_;
-  SharderStateLock state_lock = state->LockShared();
+  auto &exec = connection->executor;
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.

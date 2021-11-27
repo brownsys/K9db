@@ -12,6 +12,7 @@
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/shards/upgradable_lock.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
@@ -292,10 +293,9 @@ sqlast::CreateTable UpdateTableSchema(sqlast::CreateTable stmt,
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
                                      Connection *connection) {
   perf::Start("Create");
-  dataflow::DataFlowState *dataflow_state =
-      connection->pelton_state->GetDataFlowState();
-  shards::SharderState *state = connection->pelton_state->GetSharderState();
-  SharderStateLock state_lock = state->LockUnique();
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  UniqueLock lock = state->WriterLock();
 
   const std::string &table_name = stmt.table_name();
   if (state->Exists(table_name)) {
@@ -313,7 +313,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
 
   sql::SqlResult result = sql::SqlResult(false);
   // Sharding scenarios.
-  auto &exec = connection->executor_;
+  auto &exec = connection->executor;
   if (has_pii && sharding_information.size() == 0) {
     // Case 1: has pii but not linked to shards.
     // This means that this table define a type of user for which shards must be

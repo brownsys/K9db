@@ -8,6 +8,7 @@
 #include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
+#include "pelton/shards/upgradable_lock.h"
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 
@@ -16,7 +17,8 @@ namespace shards {
 namespace sqlengine {
 namespace view {
 
-absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection);
+absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection,
+                        UniqueLock *lock);
 
 absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
                                           Connection *connection);

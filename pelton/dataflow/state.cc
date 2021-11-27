@@ -22,7 +22,7 @@ namespace dataflow {
 DataFlowState::Worker::Worker(size_t id, Channel *chan, DataFlowState *state,
                               int max)
     : id_(id), state_(state), stop_(false), max_(max) {
-  this->thread_ = std::thread([this,chan]() {
+  this->thread_ = std::thread([this, chan]() {
     LOG(INFO) << "Starting dataflow worker " << this->id_;
     while (!this->stop_ && this->max_ != 0) {
       std::vector<Channel::Message> messages = chan->Read();
@@ -37,9 +37,7 @@ DataFlowState::Worker::Worker(size_t id, Channel *chan, DataFlowState *state,
     }
   });
 }
-DataFlowState::Worker::~Worker() {
-  CHECK(this->stop_);
-}
+DataFlowState::Worker::~Worker() { CHECK(this->stop_); }
 void DataFlowState::Worker::Shutdown() {
   if (!this->stop_) {
     LOG(INFO) << "Shutting down dataflow worker " << this->id_;
@@ -80,12 +78,10 @@ void DataFlowState::Join() {
 
 // Manage schemas.
 void DataFlowState::AddTableSchema(const sqlast::CreateTable &create) {
-  std::unique_lock<std::shared_mutex> lock(this->mtx_);
   this->schema_.emplace(create.table_name(), SchemaFactory::Create(create));
 }
 void DataFlowState::AddTableSchema(const std::string &table_name,
                                    SchemaRef schema) {
-  std::unique_lock<std::shared_mutex> lock(this->mtx_);
   this->schema_.emplace(table_name, schema);
 }
 
@@ -197,16 +193,23 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
 }
 
 // Size in memory of all the dataflow graphs.
-void DataFlowState::PrintSizeInMemory() const {
+sql::SqlResult DataFlowState::SizeInMemory() const {
+  std::vector<Record> records;
   uint64_t total_size = 0;
   for (const auto &[fname, flow] : this->flows_) {
-    uint64_t flow_size = flow->SizeInMemory();
-    uint64_t flow_size_mb = flow_size / 1024 / 1024;
-    std::cout << fname << ": " << flow_size_mb << "MB" << std::endl;
-    total_size += flow_size;
+    total_size += flow->SizeInMemory(&records);
   }
-  std::cout << "Total size: " << (total_size / 1204 / 1024) << "MB"
-            << std::endl;
+  records.emplace_back(SchemaFactory::MEMORY_SIZE_SCHEMA, true,
+                       std::make_unique<std::string>("TOTAL"),
+                       std::make_unique<std::string>("TOTAL"), total_size);
+  return sql::SqlResult(std::make_unique<sql::_result::SqlInlineResultSet>(
+      SchemaFactory::MEMORY_SIZE_SCHEMA, std::move(records)));
+}
+
+sql::SqlResult DataFlowState::FlowDebug(const std::string &flow_name) const {
+  const auto &flow = this->flows_.at(flow_name);
+  return sql::SqlResult(std::make_unique<sql::_result::SqlInlineResultSet>(
+      SchemaFactory::FLOW_DEBUG_SCHEMA, flow->DebugRecords()));
 }
 
 }  // namespace dataflow

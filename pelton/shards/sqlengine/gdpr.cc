@@ -9,6 +9,7 @@
 #include "pelton/shards/sqlengine/delete.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/shards/upgradable_lock.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
@@ -20,22 +21,21 @@ namespace gdpr {
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
                                      Connection *connection) {
   perf::Start("GDPR");
-  dataflow::DataFlowState *dataflow_state =
-      connection->pelton_state->GetDataFlowState();
-  shards::SharderState *state = connection->pelton_state->GetSharderState();
-  sql::SqlResult result;
 
   int total_count = 0;
   const std::string &shard_kind = stmt.shard_kind();
   const std::string &user_id = stmt.user_id();
   bool is_forget = stmt.operation() == sqlast::GDPRStatement::Operation::FORGET;
-  auto &exec = connection->executor_;
+  auto &exec = connection->executor;
 
   // XXX(malte): if we properly removed the shared on GDPR FORGET below, this
   // would need to be a unique_lock, as it would change sharder state. However,
   // the current code does not update the sharder state AFAICT.
-  SharderStateLock state_lock = state->LockShared();
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  SharedLock lock = state->ReaderLock();
 
+  sql::SqlResult result;
   for (const auto &table_name : state->TablesInShard(shard_kind)) {
     sql::SqlResult table_result;
     dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
@@ -63,8 +63,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
                                               schema, aug_index));
       }
     }
-
-    state_lock.Unlock();
 
     // Delete was successful, time to update dataflows.
     if (update_flows) {

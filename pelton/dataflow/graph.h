@@ -70,7 +70,8 @@ class DataFlowGraph {
                                        size_t offset) const;
 
   // Debugging information.
-  uint64_t SizeInMemory() const;
+  uint64_t SizeInMemory(std::vector<Record> *output) const;
+  std::vector<Record> DebugRecords() const;
 
  private:
   std::string flow_name_;

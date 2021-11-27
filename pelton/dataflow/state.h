@@ -6,7 +6,6 @@
 #include <atomic>
 #include <list>
 #include <memory>
-#include <shared_mutex>
 #include <string>
 // NOLINTNEXTLINE
 #include <thread>
@@ -20,6 +19,7 @@
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
+#include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 
 #ifndef PELTON_DATAFLOW_STATE_H_
@@ -76,7 +76,8 @@ class DataFlowState {
   void ProcessRecords(const TableName &table_name,
                       std::vector<Record> &&records);
 
-  void PrintSizeInMemory() const;
+  sql::SqlResult SizeInMemory() const;
+  sql::SqlResult FlowDebug(const std::string &flow_name) const;
 
   // Shutdown all worker threads.
   size_t workers() const { return this->workers_; }
@@ -100,8 +101,6 @@ class DataFlowState {
   // DataFlow graphs and views.
   std::unordered_map<FlowName, std::unique_ptr<DataFlowGraph>> flows_;
   std::unordered_map<TableName, std::vector<FlowName>> flows_per_input_table_;
-
-  mutable std::shared_mutex mtx_;
 };
 
 }  // namespace dataflow

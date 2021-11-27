@@ -2,8 +2,6 @@
 #ifndef PELTON_PELTON_H_
 #define PELTON_PELTON_H_
 
-// NOLINTNEXTLINE
-#include <mutex>
 #include <string>
 
 #include "absl/status/statusor.h"

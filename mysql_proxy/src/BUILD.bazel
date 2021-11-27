@@ -16,10 +16,10 @@ rust_binary(
     deps = [
         ":proxy_ffi",
         "//mysql_proxy:ctrlc",
+        "//mysql_proxy:gflags",
         "//mysql_proxy:msql_srv",
         "//mysql_proxy:slog",
         "//mysql_proxy:slog_term",
-        "//mysql_proxy:gflags",
         "//mysql_proxy/src/ffi",
     ],
 )

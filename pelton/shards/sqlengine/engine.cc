@@ -14,6 +14,7 @@
 #include "pelton/shards/sqlengine/update.h"
 #include "pelton/shards/sqlengine/view.h"
 #include "pelton/shards/state.h"
+#include "pelton/shards/upgradable_lock.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/sqlast/parser.h"
 #include "pelton/util/perf.h"
@@ -27,8 +28,7 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
                                      Connection *connection,
                                      std::string *shard_kind,
                                      std::string *user_id) {
-  dataflow::DataFlowState *dataflow_state =
-      connection->pelton_state->GetDataFlowState();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
 
   // Parse with ANTLR into our AST.
   perf::Start("parsing");
@@ -48,8 +48,8 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
     // Case 2: Insert statement.
     case sqlast::AbstractStatement::Type::INSERT: {
       auto *stmt = static_cast<sqlast::Insert *>(statement.get());
-      SharderStateLock state_lock = connection->pelton_state->GetSharderState()->LockShared();
-      return insert::Shard(*stmt, connection, &state_lock);
+      SharedLock lock = connection->state->sharder_state()->ReaderLock();
+      return insert::Shard(*stmt, connection, &lock, true);
     }
 
     // Case 3: Update statement.
@@ -72,13 +72,15 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
     // Case 5: Delete statement.
     case sqlast::AbstractStatement::Type::DELETE: {
       auto *stmt = static_cast<sqlast::Delete *>(statement.get());
-      return delete_::Shard(*stmt, connection, true);
+      SharedLock lock = connection->state->sharder_state()->ReaderLock();
+      return delete_::Shard(*stmt, connection, &lock, true);
     }
 
     // Case 6: CREATE VIEW statement (e.g. dataflow).
     case sqlast::AbstractStatement::Type::CREATE_VIEW: {
       auto *stmt = static_cast<sqlast::CreateView *>(statement.get());
-      CHECK_STATUS(view::CreateView(*stmt, connection));
+      UniqueLock lock = connection->state->sharder_state()->WriterLock();
+      CHECK_STATUS(view::CreateView(*stmt, connection, &lock));
       return sql::SqlResult(true);
     }
 

@@ -45,6 +45,18 @@ class ExchangeOperator : public Operator {
     result += "],\n";
     return result;
   }
+  Record DebugRecord() const override {
+    Record record = Operator::DebugRecord();
+    std::string outkey = "";
+    for (auto key : this->outkey_) {
+      outkey += std::to_string(key) + ",";
+    }
+    if (this->outkey_.size() > 0) {
+      outkey.pop_back();
+    }
+    record.SetString(std::make_unique<std::string>(outkey), 5);
+    return record;
+  }
 
  protected:
   std::vector<Record> Process(NodeIndex source,

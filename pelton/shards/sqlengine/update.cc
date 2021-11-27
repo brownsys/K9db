@@ -12,6 +12,7 @@
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/insert.h"
 #include "pelton/shards/sqlengine/select.h"
+#include "pelton/shards/upgradable_lock.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
@@ -107,18 +108,17 @@ sqlast::Insert InsertRecord(const dataflow::Record &record,
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
                                      Connection *connection) {
   perf::Start("Update");
-  dataflow::DataFlowState *dataflow_state =
-      connection->pelton_state->GetDataFlowState();
-  shards::SharderState *state = connection->pelton_state->GetSharderState();
-
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
 
   // UPDATE does not modify sharder state, so read lock is fine -- unless
-  // the update turns into a insert/delete pair (see below, where we upgrade).
-  SharderStateLock state_lock = state->LockShared();
-  bool update_flows = dataflow_state->HasFlowsFor(table_name);
+  // the update turns into a insert/delete pair (see below), where we may
+  // upgrade temporarily to a writer lock in insert.
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  SharedLock lock = state->ReaderLock();
 
+  bool update_flows = dataflow_state->HasFlowsFor(table_name);
   // Get the rows that are going to be deleted prior to deletion to use them
   // to update the dataflows.
   std::vector<dataflow::Record> records;
@@ -135,7 +135,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
 
   sql::SqlResult result = sql::SqlResult(0);
 
-  auto &exec = connection->executor_;
+  auto &exec = connection->executor;
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
@@ -149,8 +149,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
       // NOTE(malte): this could deadlock, as delete_::Shard() tries to take the
       // sharder state lock again, but deletions only take another reader lock,
       // so this actually works out.
-      MOVE_OR_RETURN(result,
-                     delete_::Shard(stmt.DeleteDomain(), connection, false));
+      MOVE_OR_RETURN(result, delete_::Shard(stmt.DeleteDomain(), connection,
+                                            &lock, false));
 
       // Insert updated records.
       for (size_t i = old_records_size; i < records.size(); i++) {
@@ -158,10 +158,13 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
             InsertRecord(records.at(i), state->GetSchema(table_name));
         // NOTE(malte): this calls insert::Shard, which could end up taking the
         // exclusive lock on the sharder state (as inserts may create a new
-        // shard for the user if none exists). Hence, we pass state_lock here,
+        // shard for the user if none exists). Hence, we pass lock here,
         // so that insert::Shard can upgrade it if need be.
+        // If insert::Shard upgraded the lock here, it is guaranteed
+        // to downgrade it back to a SharedLock before returning.
+        // lock remains a valid SharedLock after the call returns either way.
         MOVE_OR_RETURN(sql::SqlResult tmp,
-                       insert::Shard(insert_stmt, connection, &state_lock, false));
+                       insert::Shard(insert_stmt, connection, &lock, false));
         result.Append(std::move(tmp));
       }
     } else {
@@ -235,9 +238,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
       }
     }
   }
-
-  // No need to access sharder state any more.
-  state_lock.Unlock();
 
   // Delete was successful, time to update dataflows.
   if (update_flows) {

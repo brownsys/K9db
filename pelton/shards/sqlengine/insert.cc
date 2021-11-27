@@ -28,13 +28,11 @@ std::string Dequote(const std::string &st) {
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
-                                     Connection *connection,
-                                     SharderStateLock *state_lock,
+                                     Connection *connection, SharedLock *lock,
                                      bool update_flows) {
   perf::Start("Insert");
-  dataflow::DataFlowState *dataflow_state =
-      connection->pelton_state->GetDataFlowState();
-  shards::SharderState *state = connection->pelton_state->GetSharderState();
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
 
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
@@ -49,7 +47,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
   // sharded database.
   sql::SqlResult result = sql::SqlResult(0);
 
-  auto &exec = connection->executor_;
+  auto &exec = connection->executor;
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
@@ -101,7 +99,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
       if (!state->ShardExists(info.shard_kind, user_id)) {
         // Need to upgrade to an exclusive lock on sharder state here, as we
         // will modify the state.
-        state->LockUpgrade(*state_lock);
+        UniqueLock upgraded(std::move(*lock));
         for (auto *create_stmt : state->CreateShard(info.shard_kind, user_id)) {
           sql::SqlResult tmp =
               exec.ExecuteShard(create_stmt, info.shard_kind, user_id);
@@ -109,6 +107,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
             return absl::InternalError("Could not created sharded table");
           }
         }
+        *lock = SharedLock(std::move(upgraded));
       }
 
       // Add the modified insert statement.

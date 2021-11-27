@@ -9,6 +9,7 @@
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/shards/sqlengine/view.h"
+#include "pelton/shards/upgradable_lock.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
@@ -20,16 +21,16 @@ namespace index {
 absl::StatusOr<sql::SqlResult> CreateIndex(const sqlast::CreateIndex &stmt,
                                            Connection *connection) {
   perf::Start("Create Index");
-  shards::SharderState *state = connection->pelton_state->GetSharderState();
   const std::string &table_name = stmt.table_name();
 
-  // need a unique lock as we are changing index metadata
-  SharderStateLock state_lock = state->LockUnique();
+  // Need a unique lock as we are changing index metadata
+  shards::SharderState *state = connection->state->sharder_state();
+  UniqueLock lock = state->WriterLock();
 
   sql::SqlResult result = sql::SqlResult(false);
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
-    result = connection->executor_.ExecuteDefault(&stmt);
+    result = connection->executor.ExecuteDefault(&stmt);
 
   } else {  // is_sharded == true
     const std::string &column_name = stmt.column_name();
@@ -62,7 +63,7 @@ absl::StatusOr<sql::SqlResult> CreateIndex(const sqlast::CreateIndex &stmt,
       sqlast::CreateView create_view{index_name, query};
 
       // Install flow.
-      CHECK_STATUS(view::CreateView(create_view, connection));
+      CHECK_STATUS(view::CreateView(create_view, connection, &lock));
 
       // Store the index metadata.
       state->CreateIndex(info.shard_kind, table_name, column_name,
@@ -86,26 +87,28 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
 
   perf::Start("Lookup Index1");
   // Get all the columns that have a secondary index.
-  const std::unordered_set<ColumnName> &indexed_cols =
-      state->IndicesFor(table_name);
+  if (state->HasIndicesFor(table_name)) {
+    const std::unordered_set<ColumnName> &indexed_cols =
+        state->IndicesFor(table_name);
 
-  // See if the where clause conditions on a value for one of these columns.
-  for (const ColumnName &column_name : indexed_cols) {
-    sqlast::ValueFinder value_finder(column_name);
-    auto [found, column_value] = where_clause->Visit(&value_finder);
-    if (!found) {
-      continue;
+    // See if the where clause conditions on a value for one of these columns.
+    for (const ColumnName &column_name : indexed_cols) {
+      sqlast::ValueFinder value_finder(column_name);
+      auto [found, column_value] = where_clause->Visit(&value_finder);
+      if (!found) {
+        continue;
+      }
+
+      // The where clause gives us a value for "column_name", we can translate
+      // it to some value(s) for shard_by column by looking at the index.
+      const FlowName &index_flow =
+          state->IndexFlow(table_name, column_name, shard_by);
+      MOVE_OR_RETURN(std::unordered_set<UserId> shards,
+                     LookupIndex(index_flow, column_value, dataflow_state));
+
+      perf::End("Lookup Index1");
+      return std::make_pair(true, std::move(shards));
     }
-
-    // The where clause gives us a value for "column_name", we can translate
-    // it to some value(s) for shard_by column by looking at the index.
-    const FlowName &index_flow =
-        state->IndexFlow(table_name, column_name, shard_by);
-    MOVE_OR_RETURN(std::unordered_set<UserId> shards,
-                   LookupIndex(index_flow, column_value, dataflow_state));
-
-    perf::End("Lookup Index1");
-    return std::make_pair(true, std::move(shards));
   }
 
   perf::End("Lookup Index1");
