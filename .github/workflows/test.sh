@@ -7,10 +7,10 @@ pid=$!
 sleep 10
 
 # Run the test.
-for $path in "$@"
+for path in "$@"
 do
   mariadb --port=10001 --host=127.0.0.1 < "$path"
-fi
+done
 
 # Kill the proxy.
 kill $pid
