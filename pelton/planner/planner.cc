@@ -103,11 +103,17 @@ std::unique_ptr<dataflow::DataFlowGraphPartition> PlanGraph(
 
 // Shutdown the JVM.
 void ShutdownPlanner() {
+#ifndef PELTON_ASAN
+#ifndef PELTON_TSAN
   if (jvm != nullptr) {
+    LOG(INFO) << "Destroying JVM...";
     jvm->DestroyJavaVM();
     jvm = nullptr;
     env = nullptr;
+    LOG(INFO) << "Destroyed JVM";
   }
+#endif  // PELTON_TSAN
+#endif  // PELTON_ASAN
 }
 
 }  // namespace planner

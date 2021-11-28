@@ -1,40 +1,42 @@
 SET echo;
 
-CREATE TABLE doctors ( \
-  id int, \
-  PII_name text, \
-  PRIMARY KEY(id) \
+CREATE TABLE doctors (
+  id int,
+  PII_name text,
+  PRIMARY KEY(id)
 );
 
-CREATE TABLE patients ( \
-  id int, \
-  PII_name text, \
-  PRIMARY KEY(id) \
+CREATE TABLE patients (
+  id int,
+  PII_name text,
+  PRIMARY KEY(id)
 );
 
-CREATE TABLE address_doctors ( \
-  id int, \
-  doctor_id int REFERENCES doctors(id), \
-  city text, \
-  PRIMARY KEY(id) \
+CREATE TABLE address_doctors (
+  id int,
+  doctor_id int REFERENCES doctors(id),
+  city text,
+  PRIMARY KEY(id)
 );
 
-CREATE TABLE address_patients ( \
-  id int, \
-  patient_id int REFERENCES patients(id), \
-  city text, \
-  PRIMARY KEY(id) \
+CREATE TABLE address_patients (
+  id int,
+  patient_id int REFERENCES patients(id),
+  city text,
+  PRIMARY KEY(id)
 );
 
-CREATE TABLE chat ( \
-  id int, \
-  OWNER_patient_id int, \
-  doctor_id int, \
-  message text, \
-  PRIMARY KEY(id), \
-  FOREIGN KEY (OWNER_patient_id) REFERENCES patients(id), \
-  FOREIGN KEY (doctor_id) REFERENCES doctors(id) \
+CREATE TABLE chat (
+  id int,
+  OWNER_patient_id int,
+  doctor_id int,
+  message text,
+  PRIMARY KEY(id),
+  FOREIGN KEY (OWNER_patient_id) REFERENCES patients(id),
+  FOREIGN KEY (doctor_id) REFERENCES doctors(id)
 );
+
+CREATE VIEW v1 AS '"SELECT doctors.PII_name, patients.PII_name FROM doctors JOIN chat ON doctors.id = chat.doctor_id JOIN patients ON chat.OWNER_patient_id = patients.id"';
 
 INSERT INTO doctors VALUES (1, 'Alice');
 INSERT INTO doctors(id, PII_name) VALUES (2, 'Bob');

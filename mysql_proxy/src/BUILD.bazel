@@ -1,5 +1,14 @@
 load("@rules_rust//rust:rust.bzl", "rust_binary", "rust_library")
 
+config_setting(
+    name = "asan",
+    values = { "copt": "-DPELTON_ASAN" }
+)
+config_setting(
+    name = "tsan",
+    values = { "copt": "-DPELTON_TSAN" }
+)
+
 rust_binary(
     name = "mysql_proxy",
     srcs = [
@@ -11,7 +20,11 @@ rust_binary(
         "-Clink-args=-lmariadbcpp",
         "-Clink-args=-rdynamic",
         "-Clink-args=-Wl,-export-dynamic",
-    ],
+    ] + select({
+        ":asan": ["-Clink-args=-fsanitize=address", "-Zsanitizer=address"],
+        ":tsan": ["-Clink-args=-fsanitize=thread", "-Zsanitizer=thread"],
+        "//conditions:default": []
+    }),
     visibility = ["//visibility:public"],
     deps = [
         ":proxy_ffi",

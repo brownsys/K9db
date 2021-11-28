@@ -13,7 +13,9 @@ build:asan --copt -fsanitize=address
 build:asan --copt -g
 build:asan --copt -O1
 build:asan --copt -fno-omit-frame-pointer
+build:asan --copt -DPELTON_ASAN
 build:asan --linkopt -fsanitize=address
+build:asan --extra_toolchains @rust_nightly_toolchains//:toolchain_for_x86_64-unknown-linux-gnu
 test:asan --test_env ASAN_OPTIONS=allow_user_segv_handler=1:handle_segv=0:malloc_context_size=256:fast_unwind_on_malloc=0
 
 # For running under valgrind
@@ -43,7 +45,10 @@ build:tsan --copt -fsanitize=thread
 build:tsan --copt -g
 build:tsan --copt -O1
 build:tsan --copt -fno-omit-frame-pointer
+build:tsan --copt -DPELTON_TSAN
 build:tsan --linkopt -fsanitize=thread
+build:tsan --extra_toolchains @rust_nightly_toolchains//:toolchain_for_x86_64-unknown-linux-gnu
+test:tsan --test_env ASAN_OPTIONS=allow_user_segv_handler=1:handle_segv=0:malloc_context_size=256:fast_unwind_on_malloc=0
 
 # For running under perf
 build:perf -c opt

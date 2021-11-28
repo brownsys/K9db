@@ -19,8 +19,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-// const USAGE: &str = ;
-
 const USAGE: &str = "
   Available options:
   --help (false): displays this help message.
@@ -34,6 +32,7 @@ struct Backend {
     rust_conn: FFIConnection,
     runtime: std::time::Duration,
     log: slog::Logger,
+    stop: Arc<AtomicBool>,
 }
 
 impl<W: io::Write> MysqlShim<W> for Backend {
@@ -81,8 +80,11 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         debug!(self.log, "Rust proxy: starting on_query");
         debug!(self.log, "Rust Proxy: query received is: {:?}", q_string);
 
-        // Hardcoded SHOW variables needed for mariadb java connectors.
-        if q_string.starts_with("SHOW VARIABLE") {
+        if q_string.starts_with("SET STOP") {
+            self.stop.store(true, Ordering::Relaxed);
+            results.completed(0, 0)
+        } else if q_string.starts_with("SHOW VARIABLE") {
+            // Hardcoded SHOW variables needed for mariadb java connectors.
             debug!(self.log, "Rust Proxy: SHOW statement simulated {}", q_string);
 
             let mut cols : Vec<Column> = Vec::with_capacity(2);
@@ -254,13 +256,13 @@ fn main() {
     listener
         .set_nonblocking(true)
         .expect("Cannot set non-blocking");
-    let listener_terminated = Arc::new(AtomicBool::new(false));
+    let stop = Arc::new(AtomicBool::new(false));
 
     // store client thread handles
     let mut threads = Vec::new();
 
     // detect listener status via shared boolean
-    let listener_terminated_clone = Arc::clone(&listener_terminated);
+    let stop_clone = Arc::clone(&stop);
     // detect SIGTERM to close listener
     let log_ctrlc = log.clone();
     ctrlc::set_handler(move || {
@@ -268,23 +270,23 @@ fn main() {
             log_ctrlc,
             "Rust Proxy: received SIGTERM! Terminating listener once all client connections have closed..."
         );
-        listener_terminated_clone.store(true, Ordering::Relaxed);
+        stop_clone.store(true, Ordering::Relaxed);
         debug!(
             log_ctrlc,
-            "Rust Proxy: listener_terminated = {:?}",
-            listener_terminated_clone.load(Ordering::Relaxed)
+            "Rust Proxy: listener_terminated"
         );
     })
     .expect("Error setting Ctrl-C handler");
 
     // run listener until terminated with SIGTERM
-    while !listener_terminated.load(Ordering::Relaxed) {
+    while !stop.load(Ordering::Relaxed) {
         while let Ok((stream, _addr)) = listener.accept() {
             let db_name = flags.db_name.clone();
             let db_username = flags.db_username.clone();
             let db_password = flags.db_password.clone();
             // clone log so that each client thread has an owned copy
             let log_client = log.clone();
+            let stop_clone = stop.clone();
             threads.push(std::thread::spawn(move || {
                 info!(
                     log_client,
@@ -300,6 +302,7 @@ fn main() {
                     rust_conn: rust_conn,
                     runtime: Duration::new(0, 0),
                     log: log_client,
+                    stop: stop_clone,
                 };
                 let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
             }));
