@@ -97,9 +97,9 @@ RUN rm -rf /tmp/*
 RUN mkdir /home/pelton
 
 # Generate docker.bazelrc
-echo "test:asan --test_env LSAN_OPTIONS=suppressions=/home/pelton/.lsan_jvm_suppress.txt" > /home/docker.bazelrc
-echo "test:tsan --test_env LSAN_OPTIONS=suppressions=/home/pelton/.lsan_jvm_suppress.txt" >> /home/docker.bazelrc
-echo "test:tsan --test_env TSAN_OPTIONS=suppressions=/home/pelton/.tsan_jvm_suppress.txt" >> /home/docker.bazelrc
+RUN echo "test:asan --test_env LSAN_OPTIONS=suppressions=/home/pelton/.lsan_jvm_suppress.txt" > /home/docker.bazelrc
+RUN echo "test:tsan --test_env LSAN_OPTIONS=suppressions=/home/pelton/.lsan_jvm_suppress.txt" >> /home/docker.bazelrc
+RUN echo "test:tsan --test_env TSAN_OPTIONS=suppressions=/home/pelton/.tsan_jvm_suppress.txt" >> /home/docker.bazelrc
 
 # for GDPRBench, replace python with python2
 RUN ln -s /usr/bin/python2 /usr/bin/python
