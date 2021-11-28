@@ -25,7 +25,6 @@ cc_test(
     data = [
         "//tests/data:lobsters-data",
     ],
-    malloc = "@com_google_tcmalloc//tcmalloc",
     deps = [
         ":common",
     ],
@@ -39,7 +38,6 @@ cc_test(
     data = [
         "//tests/data:medical-chat-data",
     ],
-    malloc = "@com_google_tcmalloc//tcmalloc",
     deps = [
         ":common",
     ],

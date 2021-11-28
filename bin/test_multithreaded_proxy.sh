@@ -2,7 +2,7 @@
 ./bin/drop.sh root password
 
 # E2E test for concurrent creates
-bazel run --run_under "valgrind --error-exitcode=1 --errors-for-leak-kinds=definite --leak-check=full --show-leak-kinds=definite" //mysql_proxy/src:mysql_proxy -- -logtostderr=1 &
+bazel run --config valgrind //mysql_proxy/src:mysql_proxy -- -logtostderr=1 &
 sleep 20
 proxy_pid=$!
 mariadb --port=10001 --host=127.0.0.1 < bin/sync_testing/sharder_tests/correctness/creates_simple1.sql &
@@ -14,7 +14,7 @@ kill $proxy_pid
 ./bin/drop.sh root password
 
 # E2E test for concurrent inserts
-bazel run --run_under "valgrind --error-exitcode=1 --errors-for-leak-kinds=definite --leak-check=full --show-leak-kinds=definite" //mysql_proxy/src:mysql_proxy -- -logtostderr=1 &
+bazel run --config valgrind //mysql_proxy/src:mysql_proxy -- -logtostderr=1 &
 sleep 20
 proxy_pid=$!
 mariadb --port=10001 --host=127.0.0.1 < bin/sync_testing/sharder_tests/correctness/creates_unique1.sql &

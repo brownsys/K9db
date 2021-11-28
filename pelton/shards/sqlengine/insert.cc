@@ -100,11 +100,14 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
         // Need to upgrade to an exclusive lock on sharder state here, as we
         // will modify the state.
         UniqueLock upgraded(std::move(*lock));
-        for (auto *create_stmt : state->CreateShard(info.shard_kind, user_id)) {
-          sql::SqlResult tmp =
-              exec.ExecuteShard(create_stmt, info.shard_kind, user_id);
-          if (!tmp.IsStatement() || !tmp.Success()) {
-            return absl::InternalError("Could not created sharded table");
+        if (!state->ShardExists(info.shard_kind, user_id)) {
+          for (auto *create_stmt :
+               state->CreateShard(info.shard_kind, user_id)) {
+            sql::SqlResult tmp =
+                exec.ExecuteShard(create_stmt, info.shard_kind, user_id);
+            if (!tmp.IsStatement() || !tmp.Success()) {
+              return absl::InternalError("Could not created sharded table");
+            }
           }
         }
         *lock = SharedLock(std::move(upgraded));

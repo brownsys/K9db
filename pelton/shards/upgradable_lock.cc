@@ -19,7 +19,8 @@ SharedLock::SharedLock(UpgradableMutex *mutex)
 
 SharedLock::SharedLock(UniqueLock &&unique) : mtx_(unique.mtx_) {
   CHECK(unique.upgraded_);
-  std::unique_lock<std::mutex> lock(this->mtx_->mtx);
+  // TODO(babman): this lock does not seem useful and introduces a deadlock.
+  // std::unique_lock<std::mutex> lock(this->mtx_->mtx);
   this->r1_ = std::move(unique.r1_);
   unique.w2_.unlock();
   this->r2_ = std::shared_lock<std::shared_mutex>(this->mtx_->shared2);
@@ -31,7 +32,8 @@ UniqueLock::UniqueLock(UpgradableMutex *mutex)
 
 UniqueLock::UniqueLock(SharedLock &&shared)
     : mtx_(shared.mtx_), w1_(), upgraded_(true) {
-  std::unique_lock<std::mutex> lock(this->mtx_->mtx);
+  // TODO(babman): this lock does not seem useful and introduces a deadlock.
+  // std::unique_lock<std::mutex> lock(this->mtx_->mtx);
   shared.r2_.unlock();
   this->r1_ = std::move(shared.r1_);
   this->w2_ = std::unique_lock<std::shared_mutex>(this->mtx_->shared2);

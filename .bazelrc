@@ -1,5 +1,6 @@
 # Optional per-user config goes into user.bazelrc, which is .gitignore-ed.
 try-import user.bazelrc
+try-import /home/docker.bazelrc
 
 build --cxxopt="-std=c++2a"
 build --host_cxxopt="-std=c++2a"
@@ -13,6 +14,7 @@ build:asan --copt -g
 build:asan --copt -O1
 build:asan --copt -fno-omit-frame-pointer
 build:asan --linkopt -fsanitize=address
+test:asan --test_env ASAN_OPTIONS=allow_user_segv_handler=1:handle_segv=0:malloc_context_size=256:fast_unwind_on_malloc=0
 
 # For running under valgrind
 build:valgrind --strip=never
@@ -42,7 +44,6 @@ build:tsan --copt -g
 build:tsan --copt -O1
 build:tsan --copt -fno-omit-frame-pointer
 build:tsan --linkopt -fsanitize=thread
-
 
 # For running under perf
 build:perf -c opt
