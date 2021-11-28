@@ -15,7 +15,7 @@ CREATE TABLE assignments ( \
 CREATE TABLE submissions ( \
   student_id int, \
   assignment_id int, \
-  timestamp int, \
+  ts int, \
   FOREIGN KEY (student_id) REFERENCES students(ID), \
   FOREIGN KEY (assignment_id) REFERENCES assignments(ID) \
 );
@@ -26,6 +26,8 @@ CREATE TABLE grades ( \
   grade int, \
   FOREIGN KEY (student_id) REFERENCES students(ID) \
 );
+
+CREATE VIEW v1 AS '"SELECT students.PII_Name, assignments.Name, submissions.ts FROM students JOIN submissions ON students.ID = submissions.student_id JOIN assignments ON submissions.assignment_id = assignments.ID"';
 
 INSERT INTO assignments VALUES (1, 'assignment 1');
 INSERT INTO assignments VALUES (2, 'assignment 2');
@@ -51,12 +53,17 @@ SELECT * FROM submissions WHERE student_id = 1;
 SELECT * FROM submissions WHERE student_id = 1 AND assignment_id = 2;
 SELECT * FROM grades;
 SELECT * FROM grades WHERE student_id = 1;
+SELECT * FROM v1;
+
+SHOW SHARDS;
+SHOW MEMORY;
+SHOW VIEW v1;
 
 GDPR GET students 1;
 GDPR FORGET students 1;
 
 SELECT * FROM submissions;
 
-UPDATE submissions SET timestamp = 20 WHERE student_id = 2 AND assignment_id = 1;
-UPDATE submissions SET timestamp = 30 WHERE assignment_id = 2;
+UPDATE submissions SET ts = 20 WHERE student_id = 2 AND assignment_id = 1;
+UPDATE submissions SET ts = 30 WHERE assignment_id = 2;
 SELECT * FROM submissions;

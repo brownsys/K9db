@@ -4,6 +4,8 @@
 #define PELTON_SQL_EAGER_EXECUTOR_H_
 
 #include <memory>
+// NOLINTNEXTLINE
+#include <mutex>
 #include <string>
 
 #include "mariadb/conncpp.hpp"
@@ -35,6 +37,7 @@ class SqlEagerExecutor {
   // Connection management.
   std::unique_ptr<::sql::Connection> conn_;
   std::unique_ptr<::sql::Statement> stmt_;
+  static std::mutex MTX;
 };
 
 }  // namespace sql

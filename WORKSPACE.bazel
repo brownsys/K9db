@@ -211,9 +211,18 @@ http_archive(
     ],
 )
 
-load("@rules_rust//rust:repositories.bzl", "rust_repositories")
+load("@rules_rust//rust:repositories.bzl", "rust_repositories", "rust_repository_set")
 
+# defines default rust repositories.
 rust_repositories()
+
+# define a nightly toolchain that is only used for asan/tsan.
+rust_repository_set(
+    name = "rust_nightly",
+    exec_triple = "x86_64-unknown-linux-gnu",
+    iso_date = "2021-06-16",
+    version = "nightly",
+)
 
 load("@rules_rust//bindgen:repositories.bzl", "rust_bindgen_repositories")
 

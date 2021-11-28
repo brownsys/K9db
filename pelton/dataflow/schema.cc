@@ -102,5 +102,33 @@ SchemaRef SchemaFactory::Create(
   return SchemaRef(&SchemaFactory::SCHEMAS.back());
 }
 
+// Special hardcoded schemas.
+SchemaRef SchemaFactory::MEMORY_SIZE_SCHEMA = SchemaFactory::Create(
+    std::vector<std::string>{"Flow", "Operator ID", "Size(KB)"},
+    std::vector<sqlast::ColumnDefinition::Type>{
+        sqlast::ColumnDefinition::Type::TEXT,
+        sqlast::ColumnDefinition::Type::TEXT,
+        sqlast::ColumnDefinition::Type::UINT},
+    std::vector<ColumnID>{0, 1});
+
+SchemaRef SchemaFactory::FLOW_DEBUG_SCHEMA = SchemaFactory::Create(
+    std::vector<std::string>{"ID", "Type", "Output Schema", "Children",
+                             "Parents", "Info"},
+    std::vector<sqlast::ColumnDefinition::Type>{
+        sqlast::ColumnDefinition::Type::UINT,
+        sqlast::ColumnDefinition::Type::TEXT,
+        sqlast::ColumnDefinition::Type::TEXT,
+        sqlast::ColumnDefinition::Type::TEXT,
+        sqlast::ColumnDefinition::Type::TEXT,
+        sqlast::ColumnDefinition::Type::TEXT},
+    std::vector<ColumnID>{0});
+
+SchemaRef SchemaFactory::NUM_SHARDS_SCHEMA =
+    SchemaFactory::Create(std::vector<std::string>{"Shard Kind", "Count"},
+                          std::vector<sqlast::ColumnDefinition::Type>{
+                              sqlast::ColumnDefinition::Type::TEXT,
+                              sqlast::ColumnDefinition::Type::UINT},
+                          std::vector<ColumnID>{0});
+
 }  // namespace dataflow
 }  // namespace pelton

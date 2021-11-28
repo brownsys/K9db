@@ -12,32 +12,35 @@
 #include "glog/logging.h"
 #include "pelton/pelton.h"
 
+DEFINE_uint32(workers, 3, "Number of workers");
+DEFINE_string(db_name, "pelton", "Name of the database");
+DEFINE_string(db_username, "root", "MariaDB username to connect with");
+DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
+
 // process command line arguments with gflags
-void FFIGflags(int argc, char **argv) {
+FFIArgs FFIGflags(int argc, char **argv, const char *usage) {
+  gflags::SetUsageMessage(usage);  // Usage message is in rust.
+  gflags::AllowCommandLineReparsing();
+
   // Command line arguments and help message.
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   // Initialize Google’s logging library.
   google::InitGoogleLogging("proxy");
+
+  // Returned the read command line flags.
+  return {FLAGS_workers, FLAGS_db_name.c_str(), FLAGS_db_username.c_str(),
+          FLAGS_db_password.c_str()};
 }
 
 // Initialize pelton_state in pelton.cc
-bool FFIInitialize(size_t wrks, const char *db_name, const char *db_username,
-                   const char *db_password) {
+bool FFIInitialize(size_t workers) {
   // Log debugging information.
   LOG(INFO) << "C-Wrapper: starting open_c";
-  LOG(INFO) << "C-Wrapper: db_name is: " << std::string(db_name);
-  LOG(INFO) << "C-Wrapper: db_username is: " << std::string(db_username);
-  LOG(INFO) << "C-Wrapper: db_passwored is: " << std::string(db_password);
-
-  // convert char* to const std::string
-  const std::string c_db(db_name);
-  const std::string c_db_username(db_username);
-  const std::string c_db_password(db_password);
 
   // call c++ function from C with converted types
   LOG(INFO) << "C-Wrapper: running pelton::initialize";
-  if (pelton::initialize(wrks, c_db, c_db_username, c_db_password)) {
+  if (pelton::initialize(workers)) {
     LOG(INFO) << "C-Wrapper: global connection opened";
   } else {
     LOG(INFO) << "C-Wrapper: failed to open global connection";
@@ -48,7 +51,18 @@ bool FFIInitialize(size_t wrks, const char *db_name, const char *db_username,
 
 // Open a connection for a single client. The returned struct has connected =
 // true if successful. Otherwise connected = false
-FFIConnection FFIOpen() {
+FFIConnection FFIOpen(const char *db_name, const char *db_username,
+                      const char *db_password) {
+  // Log debugging information
+  LOG(INFO) << "C-Wrapper: db_name is: " << std::string(db_name);
+  LOG(INFO) << "C-Wrapper: db_username is: " << std::string(db_username);
+  LOG(INFO) << "C-Wrapper: db_password is: " << std::string(db_password);
+
+  // convert char* to const std::string
+  const std::string c_db(db_name);
+  const std::string c_db_username(db_username);
+  const std::string c_db_password(db_password);
+
   // Create a new client connection.
   FFIConnection c_conn = {new pelton::Connection(), false};
 
@@ -59,7 +73,7 @@ FFIConnection FFIOpen() {
 
   // call c++ function from C with converted types
   LOG(INFO) << "C-Wrapper: running pelton::open";
-  if (pelton::open(cpp_conn)) {
+  if (pelton::open(cpp_conn, c_db, c_db_username, c_db_password)) {
     LOG(INFO) << "C-Wrapper: connection opened";
     c_conn.connected = true;
   } else {

@@ -18,6 +18,13 @@ typedef struct {
   bool connected;
 } FFIConnection;
 
+typedef struct {
+  size_t workers;
+  const char *db_name;
+  const char *db_username;
+  const char *db_password;
+} FFIArgs;
+
 // Our version of pelton/sqlast/ast_schema_enums.h#ColumnDefinitionTypeEnum.
 typedef enum { UINT, INT, TEXT, DATETIME } FFIColumnType;
 
@@ -51,16 +58,16 @@ typedef struct {
 // The FFI API.
 
 // Pass command line arguments to gflags
-void FFIGflags(int argc, char **argv);
+FFIArgs FFIGflags(int argc, char **argv, const char *usage);
 
 // Initialize pelton_state in pelton.cc. Returns true if successful and false
 // otherwise.
-bool FFIInitialize(size_t wrks, const char *db_name, const char *db_username,
-                   const char *db_password);
+bool FFIInitialize(size_t workers);
 
 // Open a connection for a single client. The returned struct has connected =
 // true if successful. Otherwise connected = false.
-FFIConnection FFIOpen();
+FFIConnection FFIOpen(const char *db_name, const char *db_username,
+                      const char *db_password);
 
 // Execute a DDL statement (e.g. CREATE TABLE, CREATE VIEW, CREATE INDEX).
 bool FFIExecDDL(FFIConnection *c_conn, const char *query);

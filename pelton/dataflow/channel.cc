@@ -56,7 +56,10 @@ void Channel::WriteInput(Channel::Message &&msg) {
   this->semaphore_.release();
 }
 
-void Channel::Shutdown() { this->semaphore_.release(); }
+void Channel::Shutdown() {
+  std::shared_lock<std::shared_mutex> produer_lock(this->mtx_);
+  this->semaphore_.release();
+}
 
 }  // namespace dataflow
 }  // namespace pelton

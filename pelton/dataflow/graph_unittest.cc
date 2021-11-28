@@ -191,6 +191,8 @@ TEST(DataFlowGraphTest, JoinAggregateFunctionality) {
     auto view = graph.partitions_[i]->outputs().at(0);
     MatViewContentsEquals(view, partitioned[i], 0);
   }
+
+  state.Shutdown();
 }
 
 // Test that partitioned flows work fine.
@@ -230,6 +232,8 @@ TEST(DataFlowGraphTest, JoinAggregateExchangeFunctionality) {
     auto view = graph.partitions_[i]->outputs().at(0);
     MatViewContentsEquals(view, partitioned[i], 1);
   }
+
+  state.Shutdown();
 }
 
 // Test that exchanges were added in the correct locations, and that
@@ -256,6 +260,8 @@ TEST(DataFlowGraphTest, TrivialGraphNoKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
+
+  state.Shutdown();
 }
 
 TEST(DataFlowGraphTest, TrivialGraphWithKey) {
@@ -279,6 +285,8 @@ TEST(DataFlowGraphTest, TrivialGraphWithKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
+
+  state.Shutdown();
 }
 
 // Filters.
@@ -303,6 +311,8 @@ TEST(DataFlowGraphTest, TrivialFilterGraph) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
+
+  state.Shutdown();
 }
 TEST(DataFlowGraphTest, TrivialUnionGraphWithKey) {
   PartitionIndex partitions = 3;
@@ -327,6 +337,8 @@ TEST(DataFlowGraphTest, TrivialUnionGraphWithKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
+
+  state.Shutdown();
 }
 TEST(DataFlowGraphTest, TrivialUnionGraphWithNoKey) {
   PartitionIndex partitions = 3;
@@ -351,6 +363,8 @@ TEST(DataFlowGraphTest, TrivialUnionGraphWithNoKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
+
+  state.Shutdown();
 }
 
 // Aggregate.
@@ -377,6 +391,8 @@ TEST(DataFlowGraphTest, AggregateGraphWithKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.outkey_, PartitionKey{1});
+
+  state.Shutdown();
 }
 TEST(DataFlowGraphTest, AggregateGraphSameKey) {
   PartitionIndex partitions = 3;
@@ -401,6 +417,8 @@ TEST(DataFlowGraphTest, AggregateGraphSameKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
+
+  state.Shutdown();
 }
 TEST(DataFlowGraphTest, AggregateGraphNoKey) {
   PartitionIndex partitions = 3;
@@ -424,6 +442,8 @@ TEST(DataFlowGraphTest, AggregateGraphNoKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
+
+  state.Shutdown();
 }
 
 // Join.
@@ -452,6 +472,8 @@ TEST(DataFlowGraphTest, JoinGraphWithKey) {
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
+
+  state.Shutdown();
 }
 
 TEST(DataFlowGraphTest, JoinGraphSameKey) {
@@ -479,6 +501,8 @@ TEST(DataFlowGraphTest, JoinGraphSameKey) {
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{2});
+
+  state.Shutdown();
 }
 TEST(DataFlowGraphTest, JoinGraphNoKey) {
   PartitionIndex partitions = 3;
@@ -505,6 +529,8 @@ TEST(DataFlowGraphTest, JoinGraphNoKey) {
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{2});
+
+  state.Shutdown();
 }
 
 // Projections.
@@ -529,7 +555,10 @@ TEST(DataFlowGraphTest, ReorderingProjectionWithKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{2});
+
+  state.Shutdown();
 }
+
 TEST(DataFlowGraphTest, ReorderingProjectionNoKey) {
   PartitionIndex partitions = 3;
 
@@ -552,6 +581,8 @@ TEST(DataFlowGraphTest, ReorderingProjectionNoKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{2});
+
+  state.Shutdown();
 }
 TEST(DataFlowGraphTest, ChangingProjectionWithKey) {
   PartitionIndex partitions = 3;
@@ -575,7 +606,10 @@ TEST(DataFlowGraphTest, ChangingProjectionWithKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
+
+  state.Shutdown();
 }
+
 TEST(DataFlowGraphTest, ChangingProjectionNoKey) {
   PartitionIndex partitions = 3;
 
@@ -598,6 +632,8 @@ TEST(DataFlowGraphTest, ChangingProjectionNoKey) {
   // Assert input and output partition keys are correct.
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, (PartitionKey{0, 1}));
+
+  state.Shutdown();
 }
 
 // Join and projection.
@@ -626,6 +662,8 @@ TEST(DataFlowGraphTest, JoinReorderProjectWithKey) {
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{1});
+
+  state.Shutdown();
 }
 TEST(DataFlowGraphTest, JoinReorderProjectNoKey) {
   PartitionIndex partitions = 3;
@@ -652,6 +690,8 @@ TEST(DataFlowGraphTest, JoinReorderProjectNoKey) {
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
+
+  state.Shutdown();
 }
 TEST(DataFlowGraphTest, JoinProjectDroppedKeyWithKey) {
   PartitionIndex partitions = 3;
@@ -679,6 +719,8 @@ TEST(DataFlowGraphTest, JoinProjectDroppedKeyWithKey) {
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{1});
+
+  state.Shutdown();
 }
 TEST(DataFlowGraphTest, JoinProjectDroppedKeyNoKey) {
   PartitionIndex partitions = 3;
@@ -705,6 +747,8 @@ TEST(DataFlowGraphTest, JoinProjectDroppedKeyNoKey) {
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{1});
+
+  state.Shutdown();
 }
 
 // Complex cases.
@@ -734,6 +778,8 @@ TEST(DataFlowGraphTest, JoinAggregateKey) {
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{1});
+
+  state.Shutdown();
 }
 TEST(DataFlowGraphTest, JoinAggregateUnion) {
   PartitionIndex partitions = 3;
@@ -761,6 +807,8 @@ TEST(DataFlowGraphTest, JoinAggregateUnion) {
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
+
+  state.Shutdown();
 }
 TEST(DataFlowGraphTest, UnionJoinAggregateUnionReorderProject) {
   PartitionIndex partitions = 3;
@@ -789,6 +837,8 @@ TEST(DataFlowGraphTest, UnionJoinAggregateUnionReorderProject) {
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{1});
+
+  state.Shutdown();
 }
 TEST(DataFlowGraphTest, UnionJoinAggregateUnionDroppingProject) {
   PartitionIndex partitions = 3;
@@ -817,6 +867,8 @@ TEST(DataFlowGraphTest, UnionJoinAggregateUnionDroppingProject) {
   EXPECT_EQ(graph.inkeys_.at("input1"), PartitionKey{2});
   EXPECT_EQ(graph.inkeys_.at("input2"), PartitionKey{0});
   EXPECT_EQ(graph.outkey_, PartitionKey{0});
+
+  state.Shutdown();
 }
 
 }  // namespace dataflow
