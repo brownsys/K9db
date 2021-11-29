@@ -71,103 +71,108 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
     }
   }
 
-  // get data for an accessor for every table in this shard
-  for (auto &[shard_kind_access, _] : state->GetKinds()) {
-    std::cout << "SHARD_KIND_ACCESS: " << shard_kind_access << std::endl;
-    for (const auto &table_name_access :
-         state->TablesInShard(shard_kind_access)) {
-      for (const auto &index_col : state->IndicesFor(table_name_access)) {
-        std::list<ShardingInformation> infos =
-            state->GetShardingInformation(table_name_access);
-        std::string shard_by_access = "";
-        for (const auto &info : infos) {
-          shard_by_access = info.shard_by;
-        }
-        std::cout << "TABLE_NAME_ACCESS: " << table_name_access << std::endl;
-        std::cout << "INDEX_COL: " << index_col << std::endl;
-        std::cout << "SHARD_BY_ACCESS: " << shard_by_access << std::endl;
-        std::string index_name =
-            state->IndexFlow(table_name_access, index_col, shard_by_access);
+  if (!is_forget) {
+    // get data for an accessor for every table in this shard
+    for (auto &[shard_kind_access, _] : state->GetKinds()) {
+      std::cout << "SHARD_KIND_ACCESS: " << shard_kind_access << std::endl;
+      for (const auto &table_name_access :
+           state->TablesInShard(shard_kind_access)) {
+        for (const auto &index_col : state->IndicesFor(table_name_access)) {
+          std::list<ShardingInformation> infos =
+              state->GetShardingInformation(table_name_access);
+          std::string shard_by_access = "";
+          for (const auto &info : infos) {
+            shard_by_access = info.shard_by;
+          }
+          std::cout << "TABLE_NAME_ACCESS: " << table_name_access << std::endl;
+          std::cout << "INDEX_COL: " << index_col << std::endl;
+          std::cout << "SHARD_BY_ACCESS: " << shard_by_access << std::endl;
+          std::string index_name =
+              state->IndexFlow(table_name_access, index_col, shard_by_access);
 
-        std::cout << "INDEX_NAME: " << index_name << std::endl;
-        // check if index starts with ref_ + shard_kind, indicating an accessor
-        // if this index belongs to the (doctor) shard we're GDPR GETing for
-        bool explicit_accessor =
-            absl::StartsWith(index_name, "r_" + shard_kind);
-        if (explicit_accessor) {
-          // 1. extract tablename from index
-          // remove basename_typeofuser from index_name
-          // <basename_typeofuser/shardkind_tablename_accessorcol> e.g.
-          // ref_doctors from ref_doctors_chat_colname know that colname has to
-          // start with "_ACCESSOR" so find substring before it
+          std::cout << "INDEX_NAME: " << index_name << std::endl;
+          // check if index starts with ref_ + shard_kind, indicating an
+          // accessor if this index belongs to the (doctor) shard we're GDPR
+          // GETing for
+          bool explicit_accessor =
+              absl::StartsWith(index_name, "r_" + shard_kind);
+          if (explicit_accessor) {
+            // 1. extract tablename from index
+            // remove basename_typeofuser from index_name
+            // <basename_typeofuser/shardkind_tablename_accessorcol> e.g.
+            // ref_doctors from ref_doctors_chat_colname know that colname has
+            // to start with "_ACCESSOR" so find substring before it
 
-          std::string beg = "r_" + shard_kind;
-          std::string copy = index_name;
-          copy.erase(0, beg.length() + 1);
-          std::string accessor_table_name = copy.substr(0, copy.find("_"));
-          std::cout << "ACCESSOR_TABLE_NAME: " << accessor_table_name
-                    << std::endl;
+            std::string beg = "r_" + shard_kind;
+            std::string copy = index_name;
+            copy.erase(0, beg.length() + 1);
+            std::string accessor_table_name = copy.substr(0, copy.find("_"));
+            std::cout << "ACCESSOR_TABLE_NAME: " << accessor_table_name
+                      << std::endl;
 
-          // 2. extract shardbycol
-          std::string accessor_col_name = index_col;
+            // 2. extract shardbycol
+            std::string accessor_col_name = index_col;
 
-          // 3. query this table (iterate over all values in the index that
-          // correspond to the user) requesting the data with user_id
+            // 3. query this table (iterate over all values in the index that
+            // correspond to the user) requesting the data with user_id
 
-          // SELECT * FROM chat WHERE ACCESSOR_doctor_id = user_id AND
-          // OWNER_patient_id IN (index.value, ...)
+            // SELECT * FROM chat WHERE ACCESSOR_doctor_id = user_id AND
+            // OWNER_patient_id IN (index.value, ...)
 
-          // get indices
-          MOVE_OR_RETURN(
-              std::unordered_set<UserId> ids_set,
-              index::LookupIndex(index_name, user_id, dataflow_state));
+            // get indices
+            MOVE_OR_RETURN(
+                std::unordered_set<UserId> ids_set,
+                index::LookupIndex(index_name, user_id, dataflow_state));
 
-          // create select statement with equality check for each id
-          for (const auto &id : ids_set) {
-            std::cout << "ID: " << id << std::endl;
-            sqlast::Select accessor_stmt{accessor_table_name};
-            // SELECT *
-            accessor_stmt.AddColumn("*");
+            // create select statement with equality check for each id
+            for (const auto &id : ids_set) {
+              std::cout << "ID: " << id << std::endl;
+              sqlast::Select accessor_stmt{accessor_table_name};
+              // SELECT *
+              accessor_stmt.AddColumn("*");
 
-            // LHS: ACCESSOR_doctor_id = user_id
-            std::unique_ptr<sqlast::BinaryExpression> doctor_equality =
-                std::make_unique<sqlast::BinaryExpression>(
-                    sqlast::Expression::Type::EQ);
-            doctor_equality->SetLeft(
-                std::make_unique<sqlast::ColumnExpression>(index_col));
-            doctor_equality->SetRight(
-                std::make_unique<sqlast::LiteralExpression>(user_id));
+              // LHS: ACCESSOR_doctor_id = user_id
+              std::unique_ptr<sqlast::BinaryExpression> doctor_equality =
+                  std::make_unique<sqlast::BinaryExpression>(
+                      sqlast::Expression::Type::EQ);
+              doctor_equality->SetLeft(
+                  std::make_unique<sqlast::ColumnExpression>(index_col));
+              doctor_equality->SetRight(
+                  std::make_unique<sqlast::LiteralExpression>(user_id));
 
-            // RHS: OWNER_patient_id in (index.value, ...)
-            // OWNER_patient_id == index.value
-            std::unique_ptr<sqlast::BinaryExpression> patient_equality =
-                std::make_unique<sqlast::BinaryExpression>(
-                    sqlast::Expression::Type::EQ);
-            patient_equality->SetLeft(
-                std::make_unique<sqlast::ColumnExpression>(shard_by_access));
-            patient_equality->SetRight(
-                std::make_unique<sqlast::LiteralExpression>(id));
+              // RHS: OWNER_patient_id in (index.value, ...)
+              // OWNER_patient_id == index.value
+              std::unique_ptr<sqlast::BinaryExpression> patient_equality =
+                  std::make_unique<sqlast::BinaryExpression>(
+                      sqlast::Expression::Type::EQ);
+              patient_equality->SetLeft(
+                  std::make_unique<sqlast::ColumnExpression>(shard_by_access));
+              patient_equality->SetRight(
+                  std::make_unique<sqlast::LiteralExpression>(id));
 
-            // combine both conditions into overall where condition of type AND
-            std::unique_ptr<sqlast::BinaryExpression> where_condition =
-                std::make_unique<sqlast::BinaryExpression>(
-                    sqlast::Expression::Type::AND);
-            where_condition->SetLeft(
-                std::move(static_cast<std::unique_ptr<sqlast::Expression>>(
-                    std::move(doctor_equality))));
-            where_condition->SetRight(
-                std::move(static_cast<std::unique_ptr<sqlast::Expression>>(
-                    std::move(patient_equality))));
+              // combine both conditions into overall where condition of type
+              // AND
+              std::unique_ptr<sqlast::BinaryExpression> where_condition =
+                  std::make_unique<sqlast::BinaryExpression>(
+                      sqlast::Expression::Type::AND);
+              where_condition->SetLeft(
+                  std::move(static_cast<std::unique_ptr<sqlast::Expression>>(
+                      std::move(doctor_equality))));
+              where_condition->SetRight(
+                  std::move(static_cast<std::unique_ptr<sqlast::Expression>>(
+                      std::move(patient_equality))));
 
-            // set where condition in select statement
-            accessor_stmt.SetWhereClause(std::move(where_condition));
+              // set where condition in select statement
+              accessor_stmt.SetWhereClause(std::move(where_condition));
 
-            // execute select
-            MOVE_OR_RETURN(sql::SqlResult res,
-                           select::Shard(accessor_stmt, state, dataflow_state));
+              // execute select
+              MOVE_OR_RETURN(
+                  sql::SqlResult res,
+                  select::Shard(accessor_stmt, state, dataflow_state));
 
-            // add to GDPR GET result
-            result.AddResultSet(res.NextResultSet());
+              // add to result
+              result.AddResultSet(res.NextResultSet());
+            }
           }
         }
       }

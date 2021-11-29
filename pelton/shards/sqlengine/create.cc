@@ -220,6 +220,7 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState &state,
 
   // get table name from ast representation of sql statement
   const std::string &table_name = stmt.table_name();
+  std::cout << "accessor table: " << table_name << std::endl;
   // Check column definitions for inlined foreign key constraints.
   const auto &columns = stmt.GetColumns();
 
