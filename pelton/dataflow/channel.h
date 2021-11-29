@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "pelton/dataflow/future.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/types.h"
 
@@ -25,6 +26,7 @@ class Channel {
     std::vector<Record> records;
     NodeIndex source;
     NodeIndex target;
+    std::optional<Promise> promise;
   };
 
   // Constructor.

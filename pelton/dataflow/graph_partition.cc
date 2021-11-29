@@ -69,9 +69,11 @@ bool DataFlowGraphPartition::InsertNode(std::unique_ptr<Operator> &&op,
 }
 
 void DataFlowGraphPartition::Process(const std::string &input_name,
-                                     std::vector<Record> &&records) {
+                                     std::vector<Record> &&records,
+                                     std::optional<Promise> &&promise) {
   InputOperator *node = this->inputs_.at(input_name);
-  node->ProcessAndForward(UNDEFINED_NODE_INDEX, std::move(records));
+  node->ProcessAndForward(UNDEFINED_NODE_INDEX, std::move(records),
+                          std::move(promise));
 }
 
 std::string DataFlowGraphPartition::DebugString() const {

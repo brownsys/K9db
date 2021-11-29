@@ -28,7 +28,7 @@ SchemaRef MakeSchema(bool use_strings, bool use_pk) {
 
 // This function is a friend of pelton::dataflow::Operator.
 void ProcessBenchmark(Operator *op, NodeIndex src, RecordGenFunc gen) {
-  op->Process(src, gen());
+  op->Process(src, gen(), std::nullopt);
 }
 
 }  // namespace dataflow

@@ -22,8 +22,8 @@ class UnionOperator : public Operator {
  protected:
   bool DeepCompareSchemas(const SchemaRef s1, const SchemaRef s2);
 
-  std::vector<Record> Process(NodeIndex source,
-                              std::vector<Record> &&records) override;
+  std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records,
+                              std::optional<Promise> && /*promise*/) override;
 
   void ComputeOutputSchema() override;
 

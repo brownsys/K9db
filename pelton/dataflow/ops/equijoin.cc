@@ -52,8 +52,9 @@ inline void CopyIntoRecord(sqlast::ColumnDefinition::Type datatype,
 Operator *EquiJoinOperator::left() const { return this->parents_.at(0); }
 Operator *EquiJoinOperator::right() const { return this->parents_.at(1); }
 
-std::vector<Record> EquiJoinOperator::Process(NodeIndex source,
-                                              std::vector<Record> &&records) {
+std::vector<Record> EquiJoinOperator::Process(
+    NodeIndex source, std::vector<Record> &&records,
+    std::optional<Promise> && /*promise*/) {
   std::vector<Record> output;
   for (Record &record : records) {
     // In comparison to a normal HashJoin in a database, here

@@ -61,8 +61,8 @@ class EquiJoinOperator : public Operator {
    * @param output
    * @return
    */
-  std::vector<Record> Process(NodeIndex source,
-                              std::vector<Record> &&records) override;
+  std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records,
+                              std::optional<Promise> && /*promise*/) override;
 
   // Computes joined_schema_.
   void ComputeOutputSchema() override;

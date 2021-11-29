@@ -74,8 +74,8 @@ class ProjectOperator : public Operator {
   std::optional<ColumnID> UnprojectColumn(ColumnID col) const;
 
  protected:
-  std::vector<Record> Process(NodeIndex source,
-                              std::vector<Record> &&records) override;
+  std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records,
+                              std::optional<Promise> && /*promise*/) override;
 
   void ComputeOutputSchema() override;
 

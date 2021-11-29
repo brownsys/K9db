@@ -32,7 +32,8 @@ DataFlowState::Worker::Worker(size_t id, DataFlowState *state, int max)
         }
         auto &flow = this->state_->flows_.at(msg.flow_name);
         Operator *op = flow->GetPartition(this->id_)->GetNode(msg.target);
-        op->ProcessAndForward(msg.source, std::move(msg.records));
+        op->ProcessAndForward(msg.source, std::move(msg.records),
+                              std::move(msg.promise));
       }
     }
   });
@@ -153,6 +154,8 @@ Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
 
 void DataFlowState::ProcessRecords(const TableName &table_name,
                                    std::vector<Record> &&records) {
+  // One future for each partition of each flow.
+  std::vector<std::unique_ptr<Future>> futures;
   if (records.size() > 0 && this->HasFlowsFor(table_name)) {
     // Send copies per flow (except last flow).
     const std::vector<FlowName> &flow_names =
@@ -167,9 +170,11 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
       auto &flow = this->flows_.at(flow_name);
       auto partitions = flow->PartitionInputs(table_name, std::move(copy));
       for (auto &[partition, vec] : partitions) {
+        futures.emplace_back(std::make_unique<Future>());
         this->channels_.at(partition)->WriteInput(
             {flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
-             flow->GetPartition(partition)->GetInputNode(table_name)->index()});
+             flow->GetPartition(partition)->GetInputNode(table_name)->index(),
+             futures.back()->GetPromise()});
       }
     }
 
@@ -178,10 +183,16 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
     auto &flow = this->flows_.at(flow_name);
     auto partitions = flow->PartitionInputs(table_name, std::move(records));
     for (auto &[partition, vec] : partitions) {
+      futures.emplace_back(std::make_unique<Future>());
       this->channels_.at(partition)->WriteInput(
           {flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
-           flow->GetPartition(partition)->GetInputNode(table_name)->index()});
+           flow->GetPartition(partition)->GetInputNode(table_name)->index(),
+           futures.back()->GetPromise()});
     }
+  }
+  // Wait for all futures to get resolved.
+  for (const auto &future : futures) {
+    future->Get();
   }
 }
 

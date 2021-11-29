@@ -7,6 +7,7 @@
 #include <tuple>
 #include <vector>
 
+#include "pelton/dataflow/future.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
@@ -49,7 +50,8 @@ class Operator {
    * @param records
    * @return
    */
-  void ProcessAndForward(NodeIndex source, std::vector<Record> &&records);
+  void ProcessAndForward(NodeIndex source, std::vector<Record> &&records,
+                         std::optional<Promise> &&promise);
 
   // Accessors (read only).
   NodeIndex index() const { return this->index_; }
@@ -81,7 +83,8 @@ class Operator {
    * @return true when processing succeeded, false when an error occurred.
    */
   virtual std::vector<Record> Process(NodeIndex source,
-                                      std::vector<Record> &&records) = 0;
+                                      std::vector<Record> &&records,
+                                      std::optional<Promise> &&promise) = 0;
 
   /*!
    * Compute the output_schema of the operator.
@@ -117,7 +120,8 @@ class Operator {
   size_t RemoveParent(Operator *parent);
 
   // Pass the given batch to the children operators (if any) for processing.
-  void BroadcastToChildren(std::vector<Record> &&records);
+  void BroadcastToChildren(std::vector<Record> &&records,
+                           std::optional<Promise> &&promise);
 
   NodeIndex index_;
   Type type_;

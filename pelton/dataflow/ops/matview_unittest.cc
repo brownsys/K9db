@@ -98,7 +98,8 @@ TEST(MatViewOperatorTest, SingleMatView) {
     matview->ComputeOutputSchema();
 
     // Process and check.
-    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));
+    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records),
+                               std::nullopt);
     EXPECT_EQ(matview->count(), 1);
 
     // Get record by key.
@@ -135,7 +136,8 @@ TEST(MatViewOperatorTest, SingleMatView) {
   // Add negative records.
   records.at(0).SetPositive(false);
   for (std::unique_ptr<MatViewOperator> &matview : views) {
-    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));
+    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records),
+                               std::nullopt);
 
     Key key = records.at(0).GetKey();
     EXPECT_FALSE(matview->Contains(key));
@@ -170,7 +172,8 @@ TEST(MatViewOperatorTest, SingleMatViewDifferentKey) {
     matview->ComputeOutputSchema();
 
     // Process and check.
-    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));
+    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records),
+                               std::nullopt);
     EXPECT_EQ(matview->count(), 1);
 
     // Get record by key.
@@ -241,7 +244,8 @@ TEST(MatViewOperatorTest, ProcessBatchTest) {
     matview->ComputeOutputSchema();
 
     // Process and check.
-    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(process));
+    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(process),
+                               std::nullopt);
 
     EXPECT_EQ(matview->count(), records.size());
     EXPECT_TRUE(matview->Contains(r1.GetValues(keys)));
@@ -339,7 +343,8 @@ TEST(MatViewOperatorTest, EmptyKeyTest) {
     matview->ComputeOutputSchema();
 
     // Process and check.
-    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));
+    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records),
+                               std::nullopt);
 
     EXPECT_EQ(matview->count(), records.size());
     EXPECT_TRUE(matview->Contains(Key(0)));
@@ -408,7 +413,8 @@ TEST(MatViewOperatorTest, LimitTest) {
     matview->ComputeOutputSchema();
 
     // Process and check.
-    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));
+    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records),
+                               std::nullopt);
 
     EXPECT_EQ(matview->count(), records.size());
     EXPECT_TRUE(matview->Contains(Key(0)));
@@ -479,7 +485,8 @@ TEST(MatViewOperatorTest, LookupGreater) {
   static_cast<MatViewOperator *>(&matview)->input_schemas_.push_back(schema);
 
   // Process and check.
-  matview.ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));
+  matview.ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records),
+                            std::nullopt);
 
   EXPECT_EQ(matview.count(), records.size());
   EXPECT_EQ_MSET(matview.All(), records);
@@ -537,7 +544,8 @@ TEST(MatViewOperatorTest, AllOnRecordOrdered) {
   static_cast<MatViewOperator *>(&matview)->input_schemas_.push_back(schema);
 
   // Process and check.
-  matview.ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records));
+  matview.ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(records),
+                            std::nullopt);
   EXPECT_EQ(matview.count(), records.size());
   EXPECT_EQ_MSET(matview.All(), records);
   EXPECT_EQ_ORDER(matview.All(), sorted);

@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "pelton/dataflow/future.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/types.h"
 
@@ -52,7 +53,8 @@ class DataFlowGraphPartition {
   NodeIndex LastOperatorIndex() const { return this->nodes_.size() - 1; }
   NodeIndex Size() const { return this->nodes_.size(); }
 
-  void Process(const std::string &input_name, std::vector<Record> &&records);
+  void Process(const std::string &input_name, std::vector<Record> &&records,
+               std::optional<Promise> &&promise = std::nullopt);
 
   // Accessors.
   const std::unordered_map<std::string, InputOperator *> &inputs() const {

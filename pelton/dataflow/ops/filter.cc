@@ -92,8 +92,9 @@ void FilterOperator::ComputeOutputSchema() {
   this->output_schema_ = this->input_schemas_.at(0);
 }
 
-std::vector<Record> FilterOperator::Process(NodeIndex source,
-                                            std::vector<Record> &&records) {
+std::vector<Record> FilterOperator::Process(
+    NodeIndex source, std::vector<Record> &&records,
+    std::optional<Promise> && /*promise*/) {
   std::vector<Record> output;
   output.reserve(records.size());
   for (Record &record : records) {
