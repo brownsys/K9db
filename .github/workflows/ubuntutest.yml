@@ -30,11 +30,9 @@ jobs:
         TEST: bazel test ... --test_output=all --test_arg=--db_username=root --test_arg=--db_password=password
       run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
 
-    # bin/example.cc
-    - name: Run end-2-end sample
-      env:
-        TEST: bazel run bin:example -- --logtostderr=1
-      run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
+    # prepared statement test.
+    - name: Run prepared statement test
+      run: docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/prepared-test.sh"
 
     # bin/examples/* via proxy
     - name: Run examples via proxy
