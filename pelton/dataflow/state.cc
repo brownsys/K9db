@@ -53,8 +53,8 @@ void DataFlowState::Worker::Join() { this->thread_.join(); }
 // DataFlowState.
 // Constructors and destructors.
 DataFlowState::~DataFlowState() { CHECK(this->joined_); }
-DataFlowState::DataFlowState(size_t workers, int max)
-    : workers_(workers), joined_(false) {
+DataFlowState::DataFlowState(size_t workers, int max, bool serializable)
+    : workers_(workers), joined_(false), serializable_(serializable) {
   // Create a channel for every worker.
   for (size_t i = 0; i < workers; i++) {
     this->channels_.emplace_back(std::make_unique<Channel>(workers));
@@ -177,11 +177,16 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
       auto &flow = this->flows_.at(flow_name);
       auto partitions = flow->PartitionInputs(table_name, std::move(copy));
       for (auto &[partition, vec] : partitions) {
-        futures.emplace_back(std::make_unique<Future>());
-        this->channels_.at(partition)->WriteInput(
-            {flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
-             flow->GetPartition(partition)->GetInputNode(table_name)->index(),
-             futures.back()->GetPromise()});
+        Channel::Message msg = {
+            flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
+            flow->GetPartition(partition)->GetInputNode(table_name)->index()};
+        if (this->serializable_) {
+          futures.emplace_back(std::make_unique<Future>());
+          msg.promise = futures.back()->GetPromise();
+        } else {
+          msg.promise = std::nullopt;
+        }
+        this->channels_.at(partition)->WriteInput(std::move(msg));
       }
     }
 
@@ -190,11 +195,16 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
     auto &flow = this->flows_.at(flow_name);
     auto partitions = flow->PartitionInputs(table_name, std::move(records));
     for (auto &[partition, vec] : partitions) {
-      futures.emplace_back(std::make_unique<Future>());
-      this->channels_.at(partition)->WriteInput(
-          {flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
-           flow->GetPartition(partition)->GetInputNode(table_name)->index(),
-           futures.back()->GetPromise()});
+      Channel::Message msg = {
+          flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
+          flow->GetPartition(partition)->GetInputNode(table_name)->index()};
+      if (this->serializable_) {
+        futures.emplace_back(std::make_unique<Future>());
+        msg.promise = futures.back()->GetPromise();
+      } else {
+        msg.promise = std::nullopt;
+      }
+      this->channels_.at(partition)->WriteInput(std::move(msg));
     }
   }
   // Wait for all futures to get resolved.

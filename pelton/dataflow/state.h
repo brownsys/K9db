@@ -50,7 +50,8 @@ class DataFlowState {
   };
 
  public:
-  explicit DataFlowState(size_t workers, int max = -1);
+  explicit DataFlowState(size_t workers, int max = -1,
+                         bool serializable = true);
   ~DataFlowState();
 
   // Manage schemas.
@@ -88,6 +89,7 @@ class DataFlowState {
   // The number of worker threads.
   size_t workers_;
   bool joined_;
+  bool serializable_;
   // Channel for every worker.
   std::vector<std::unique_ptr<Channel>> channels_;
   std::list<std::unique_ptr<Worker>> threads_;
