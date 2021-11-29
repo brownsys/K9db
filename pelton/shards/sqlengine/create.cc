@@ -247,21 +247,11 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState &state,
         absl::StatusOr<std::optional<ShardKind>> shard_kind =
             ShouldShardBy(*fk_constraint, state);
         shard_string = shard_kind->value();
-        std::cout << "STATUS: " << shard_kind->value() << std::endl;
       }
-      std::cout << "We have found an accessor: " << column_name << std::endl;
-
-      // TODO: known issue: index name is too long, throwing sqlexception
-      // terminate called after throwing an instance of
-      // 'sql::SQLSyntaxErrorException' what():  (conn=90) Identifier name
-      // 'pd3d9446802a44259755d38e6_r_doctors_chat_ACCESSOR_doctor_id_OWNER_patient_id'
-      // is too long (when including column name)
-      // TODO: fix by replacing string concatenation with field in SharderState
-      // containing struct with all fields we need to access in gdpr.cc when
-      // selecting accessor data
+      // TODO: add field in SharderState for table_name instead of adding it
+      // to the index name
       sqlast::CreateIndex create_index_stmt{
-          "r_" + shard_string + "_" + table_name, table_name, column_name};
-      std::cout << "Starting CreateIndex: " << std::endl;
+          "ref_" + shard_string + "_" + table_name, table_name, column_name};
       pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, &state,
                                                     &dataflow_state);
 

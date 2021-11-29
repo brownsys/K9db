@@ -77,35 +77,33 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       std::cout << "SHARD_KIND_ACCESS: " << shard_kind_access << std::endl;
       for (const auto &table_name_access :
            state->TablesInShard(shard_kind_access)) {
+        std::cout << "TABLE_NAME_ACCESS: " << table_name_access << std::endl;
         for (const auto &index_col : state->IndicesFor(table_name_access)) {
+          std::cout << "INDEX_COL: " << index_col << std::endl;
           std::list<ShardingInformation> infos =
               state->GetShardingInformation(table_name_access);
           std::string shard_by_access = "";
           for (const auto &info : infos) {
             shard_by_access = info.shard_by;
           }
-          std::cout << "TABLE_NAME_ACCESS: " << table_name_access << std::endl;
-          std::cout << "INDEX_COL: " << index_col << std::endl;
           std::cout << "SHARD_BY_ACCESS: " << shard_by_access << std::endl;
           std::string index_name =
               state->IndexFlow(table_name_access, index_col, shard_by_access);
 
           std::cout << "INDEX_NAME: " << index_name << std::endl;
           // check if index starts with ref_ + shard_kind, indicating an
-          // accessor if this index belongs to the (doctor) shard we're GDPR
+          // accessor if this index belongs to the shard we're GDPR
           // GETing for
           bool explicit_accessor =
-              absl::StartsWith(index_name, "r_" + shard_kind);
+              absl::StartsWith(index_name, "ref_" + shard_kind);
           if (explicit_accessor) {
             // 1. extract tablename from index
             // remove basename_typeofuser from index_name
             // <basename_typeofuser/shardkind_tablename_accessorcol> e.g.
-            // ref_doctors from ref_doctors_chat_colname know that colname has
-            // to start with "_ACCESSOR" so find substring before it
-
-            std::string beg = "r_" + shard_kind;
+            // ref_doctors from ref_doctors_chat_colname
+            std::string start = "ref_" + shard_kind;
             std::string copy = index_name;
-            copy.erase(0, beg.length() + 1);
+            copy.erase(0, start.length() + 1);
             std::string accessor_table_name = copy.substr(0, copy.find("_"));
             std::cout << "ACCESSOR_TABLE_NAME: " << accessor_table_name
                       << std::endl;
