@@ -19,6 +19,7 @@
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
+#include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 
 #ifndef PELTON_DATAFLOW_STATE_H_
@@ -35,7 +36,8 @@ class DataFlowState {
  private:
   class Worker {
    public:
-    Worker(size_t id, DataFlowState *state, int max);
+    Worker(size_t id, Channel *chan, DataFlowState *state, int max);
+    ~Worker();
     void Shutdown();
     void Join();
 
@@ -74,7 +76,8 @@ class DataFlowState {
   void ProcessRecords(const TableName &table_name,
                       std::vector<Record> &&records);
 
-  void PrintSizeInMemory() const;
+  sql::SqlResult SizeInMemory() const;
+  sql::SqlResult FlowDebug(const std::string &flow_name) const;
 
   // Shutdown all worker threads.
   size_t workers() const { return this->workers_; }
@@ -84,9 +87,10 @@ class DataFlowState {
  private:
   // The number of worker threads.
   size_t workers_;
+  bool joined_;
   // Channel for every worker.
   std::vector<std::unique_ptr<Channel>> channels_;
-  std::list<Worker> threads_;
+  std::list<std::unique_ptr<Worker>> threads_;
 
   // Maps every table to its logical schema.
   // The logical schema is the contract between client code and our DB.

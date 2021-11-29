@@ -93,10 +93,24 @@ std::string DataFlowGraphPartition::DebugString() const {
   str += "]";
   return str;
 }
-uint64_t DataFlowGraphPartition::SizeInMemory() const {
+std::vector<Record> DataFlowGraphPartition::DebugRecords() const {
+  std::vector<Record> records;
+  // Go over nodes in order (of index).
+  std::set<NodeIndex> ordered_nodes;
+  for (const auto &[idx, _] : this->nodes_) {
+    ordered_nodes.insert(idx);
+  }
+  for (auto idx : ordered_nodes) {
+    records.push_back(this->nodes_.at(idx)->DebugRecord());
+  }
+  return records;
+}
+
+uint64_t DataFlowGraphPartition::SizeInMemory(
+    const std::string &flow_name, std::vector<Record> *output) const {
   uint64_t size = 0;
   for (const auto &[_, node] : this->nodes_) {
-    size += node->SizeInMemory();
+    size += node->SizeInMemory(flow_name, output);
   }
   return size;
 }

@@ -102,6 +102,8 @@ TEST(PlannerTest, SimpleProject) {
 
   // Look at flow output.
   EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
+
+  state.Shutdown();
 }
 
 TEST(PlannerTest, SimpleProjectLiteral) {
@@ -150,6 +152,8 @@ TEST(PlannerTest, SimpleProjectLiteral) {
       EXPECT_EQ(record.GetInt(0), 1);
     }
   }
+
+  state.Shutdown();
 }
 
 TEST(PlannerTest, ProjectArithmeticRightLiteral) {
@@ -198,6 +202,8 @@ TEST(PlannerTest, ProjectArithmeticRightLiteral) {
   EXPECT_EQ(projectOp->output_schema().column_names(), expected_col_names);
   EXPECT_EQ(projectOp->output_schema().column_types(), expected_col_types);
   EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
+
+  state.Shutdown();
 }
 
 TEST(PlannerTest, ProjectArithmeticRightColumn) {
@@ -246,6 +252,8 @@ TEST(PlannerTest, ProjectArithmeticRightColumn) {
   EXPECT_EQ(projectOp->output_schema().column_names(), expected_col_names);
   EXPECT_EQ(projectOp->output_schema().column_types(), expected_col_types);
   EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
+
+  state.Shutdown();
 }
 
 // Aggregate.
@@ -300,6 +308,8 @@ TEST(PlannerTest, SimpleAggregate) {
   EXPECT_EQ(aggregateOp->output_schema().column_names(), expected_col_names);
   EXPECT_EQ(aggregateOp->output_schema().column_types(), expected_col_types);
   EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
+
+  state.Shutdown();
 }
 
 // Filter.
@@ -345,6 +355,8 @@ TEST(PlannerTest, SimpleFilter) {
       EXPECT_EQ(record, records.at(0));
     }
   }
+
+  state.Shutdown();
 }
 
 TEST(PlannerTest, SingleConditionFilter) {
@@ -388,6 +400,8 @@ TEST(PlannerTest, SingleConditionFilter) {
 
   // Look at flow output.
   EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
+
+  state.Shutdown();
 }
 
 TEST(PlannerTest, FilterSingleORCondition) {
@@ -436,6 +450,8 @@ TEST(PlannerTest, FilterSingleORCondition) {
       counter++;
     }
   }
+
+  state.Shutdown();
 }
 
 TEST(PlannerTest, FilterSingleANDCondition) {
@@ -479,6 +495,8 @@ TEST(PlannerTest, FilterSingleANDCondition) {
 
   // Look at flow output.
   EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
+
+  state.Shutdown();
 }
 
 TEST(PlannerTest, FilterNestedORCondition) {
@@ -541,6 +559,8 @@ TEST(PlannerTest, FilterNestedORCondition) {
 
   // Look at flow output.
   EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
+
+  state.Shutdown();
 }
 
 TEST(PlannerTest, FilterNestedANDCondition) {
@@ -587,6 +607,8 @@ TEST(PlannerTest, FilterNestedANDCondition) {
 
   // Look at flow output.
   EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
+
+  state.Shutdown();
 }
 
 TEST(PlannerTest, FilterColumnComparison) {
@@ -629,6 +651,8 @@ TEST(PlannerTest, FilterColumnComparison) {
 
   // Look at flow output.
   EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
+
+  state.Shutdown();
 }
 
 TEST(PlannerTest, FilterArithmeticCondition) {
@@ -704,6 +728,8 @@ TEST(PlannerTest, FilterArithmeticCondition) {
 
   // Look at flow output.
   EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected);
+
+  state.Shutdown();
 }
 
 TEST(PlannerTest, FilterArithmeticConditionTwoColumns) {
@@ -781,6 +807,8 @@ TEST(PlannerTest, FilterArithmeticConditionTwoColumns) {
   // Look at flow output.
   dataflow::MatViewOperator *matview = graph->outputs().at(0);
   EXPECT_EQ_ORDER(matview->Lookup(dataflow::Key(0)), expected);
+
+  state.Shutdown();
 }
 
 // Secondary index.
@@ -857,6 +885,8 @@ TEST(PlannerTest, UniqueSecondaryIndexFlow) {
                                  std::make_unique<std::string>("shard5"));
 
   EXPECT_EQ_MSET(matview->All(), expected_records2);
+
+  state.Shutdown();
 }
 
 TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
@@ -959,6 +989,8 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
   expected_records.emplace_back(matview->output_schema(), true, 20_s,
                                 std::make_unique<std::string>("shard2"), 1_u);
   EXPECT_EQ_MSET(matview->All(), expected_records);
+
+  state.Shutdown();
 }
 
 // End-to-end complex query.
@@ -1073,6 +1105,8 @@ TEST(PlannerTest, ComplexQueryWithKeys) {
     const dataflow::Key &key = keys.at(i);
     EXPECT_EQ_MSET(matview->Lookup(key), expected.at(i));
   }
+
+  state.Shutdown();
 }
 
 TEST(PlannerTest, BasicLeftJoin) {
@@ -1160,6 +1194,8 @@ TEST(PlannerTest, BasicLeftJoin) {
   expected_records.emplace_back(schema4, true, 6_s, 0_s, 10_s, 721_s,
                                 std::make_unique<std::string>("s1"));
   EXPECT_EQ_MSET(matview->All(), expected_records);
+
+  state.Shutdown();
 }
 
 }  // namespace planner

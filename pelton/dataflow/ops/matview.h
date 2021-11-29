@@ -207,6 +207,26 @@ class MatViewOperatorT : public MatViewOperator {
     result += "  \"order\": \"" + order_str + "\",\n";
     return result;
   }
+  Record DebugRecord() const override {
+    Record record = Operator::DebugRecord();
+    std::string info = "[";
+    for (auto key : this->key_cols_) {
+      info += std::to_string(key) + ",";
+    }
+    if (this->key_cols_.size() > 0) {
+      info.pop_back();
+    }
+    info += "]";
+    if (this->KeyOrdered()) {
+      info += " Key ordered";
+    } else if (this->RecordOrdered()) {
+      info += " Record ordered";
+    } else {
+      info += " no order";
+    }
+    record.SetString(std::make_unique<std::string>(info), 5);
+    return record;
+  }
   uint64_t SizeInMemory() const override {
     return this->contents_.SizeInMemory();
   }

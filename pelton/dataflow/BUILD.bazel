@@ -16,6 +16,7 @@ cc_library(
         ":operator",
         ":record",
         ":schema",
+        "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:fs",
         "@glog",

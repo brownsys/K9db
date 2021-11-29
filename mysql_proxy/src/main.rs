@@ -15,25 +15,33 @@ use slog::Drain;
 use std::ffi::CString;
 use std::io;
 use std::net;
-use std::os::raw::{c_char, c_int};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+const USAGE: &str = "
+  Available options:
+  --help (false): displays this help message.
+  --workers (3): number of dataflow workers.
+  --db_name (pelton): name of the database.
+  --db_username (root): database user to connect with to mariadb.
+  --db_password (password): password to connect with to mariadb.";
 
 #[derive(Debug)]
 struct Backend {
     rust_conn: FFIConnection,
     runtime: std::time::Duration,
     log: slog::Logger,
+    stop: Arc<AtomicBool>,
 }
 
 impl<W: io::Write> MysqlShim<W> for Backend {
     type Error = io::Error;
 
     // called when client issues request to prepare query for later execution
-    fn on_prepare(&mut self, _: &str, info: StatementMetaWriter<W>) -> io::Result<()> {
+    fn on_prepare(&mut self, _q_string: &str, _info: StatementMetaWriter<W>) -> io::Result<()> {
         debug!(self.log, "Rust proxy: starting on_prepare");
-        info.reply(42, &[], &[])
+        unimplemented!();
     }
 
     // called when client executes previously prepared statement
@@ -43,10 +51,10 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         // any params included with the client's command:
         _: ParamParser,
         // response to query given using QueryResultWriter:
-        results: QueryResultWriter<W>,
+        _results: QueryResultWriter<W>,
     ) -> io::Result<()> {
         debug!(self.log, "Rust proxy: starting on_execute");
-        results.completed(0, 0)
+        unimplemented!();
     }
 
     // called when client wants to deallocate resources associated with a prev prepared statement
@@ -69,17 +77,14 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         // start measuring runtime
         let start = Instant::now();
 
-        if q_string.starts_with("SET echo")
-            || q_string.starts_with("DROP")
-            || q_string.starts_with("ALTER")
-            || q_string.starts_with("GDPR")
-            || q_string.starts_with("set")
-        {
-            error!(self.log, "Rust Proxy: Unsupported query type {}", q_string);
-            return results.completed(0, 0);
-        }
+        debug!(self.log, "Rust proxy: starting on_query");
+        debug!(self.log, "Rust Proxy: query received is: {:?}", q_string);
 
-        if q_string.starts_with("SHOW") {
+        if q_string.starts_with("SET STOP") {
+            self.stop.store(true, Ordering::Relaxed);
+            results.completed(0, 0)
+        } else if q_string.starts_with("SHOW VARIABLE") {
+            // Hardcoded SHOW variables needed for mariadb java connectors.
             debug!(self.log, "Rust Proxy: SHOW statement simulated {}", q_string);
 
             let mut cols : Vec<Column> = Vec::with_capacity(2);
@@ -109,17 +114,10 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             rw.write_col("SYSTEM")?;
             rw.end_row()?;
             return rw.finish();
-        }
-
-        debug!(self.log, "Rust proxy: starting on_query");
-        debug!(self.log, "Rust Proxy: query received is: {:?}", q_string);
-
-        // determine query type and return appropriate response
-        if q_string.starts_with("CREATE TABLE")
-            || q_string.starts_with("CREATE INDEX")
-            || q_string.starts_with("CREATE VIEW")
-            || q_string.starts_with("SET")
-        {
+        } else if q_string.starts_with("CREATE TABLE")
+                  || q_string.starts_with("CREATE INDEX")
+                  || q_string.starts_with("CREATE VIEW")
+                  || q_string.starts_with("SET") {
             let ddl_response = exec_ddl_ffi(&mut self.rust_conn, q_string);
             debug!(self.log, "ddl_response is {:?}", ddl_response);
 
@@ -133,9 +131,9 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
         } else if q_string.starts_with("UPDATE")
-            || q_string.starts_with("DELETE")
-            || q_string.starts_with("INSERT")
-        {
+                  || q_string.starts_with("DELETE")
+                  || q_string.starts_with("INSERT")
+                  || q_string.starts_with("GDPR FORGET") {
             let update_response = exec_update_ffi(&mut self.rust_conn, q_string);
 
             // stop measuring runtime and add to total time for this connection
@@ -144,10 +142,14 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             if update_response != -1 {
                 results.completed(update_response as u64, 0)
             } else {
-                error!(self.log, "Rust Proxy: Failed to execute UPDATE");
+                error!(self.log, "Rust Proxy: Failed to execute UPDATE: {:?}", q_string);
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
-        } else if q_string.starts_with("SELECT") || q_string.starts_with("GDPR GET") {
+        } else if q_string.starts_with("SELECT")
+                  || q_string.starts_with("GDPR GET")
+                  || q_string.starts_with("SHOW SHARDS")
+                  || q_string.starts_with("SHOW VIEW")
+                  || q_string.starts_with("SHOW MEMORY") {
             let select_response = exec_select_ffi(&mut self.rust_conn, q_string);
 
             // stop measuring runtime and add to total time for this connection
@@ -221,7 +223,7 @@ impl Drop for Backend {
     fn drop(&mut self) {
         debug!(self.log, "Rust Proxy: Starting destructor for Backend");
         debug!(self.log, "Rust Proxy: Calling c-wrapper for pelton::close");
-        debug!(
+        info!(
             self.log,
             "Total time elapsed for this connection is: {:?}", self.runtime
         );
@@ -240,25 +242,13 @@ fn main() {
     let log: slog::Logger =
         slog::Logger::root(slog_term::FullFormat::new(plain).build().fuse(), o!());
 
-    // process command line arguments with gflags via FFI
-    // create vector of zero terminated CStrings from command line arguments
-    let args = std::env::args()
-        .map(|arg| CString::new(arg).unwrap())
-        .collect::<Vec<CString>>();
-    let c_argc = args.len() as c_int;
-    // convert CStrings to raw pointers
-    let mut c_argv = args
-        .iter()
-        .map(|arg| arg.as_ptr() as *mut i8)
-        .collect::<Vec<*mut c_char>>();
-    // pass converted arguments to C-FFI
-    unsafe { FFIGflags(c_argc, c_argv.as_mut_ptr()) };
+    // Parse command line flags defined using rust's gflags.
+    let flags = gflags_ffi(std::env::args(), USAGE);
+    info!(log, "Rust proxy: running with args: {:?} {:?} {:?} {:?}",
+          flags.workers, flags.db_name, flags.db_username, flags.db_password);
 
-    let global_open = initialize_ffi(1, "pelton", "root", "password");
-    info!(
-        log,
-        "Rust Proxy: opening connection globally: {:?}", global_open
-    );
+    let global_open = initialize_ffi(flags.workers);
+    info!(log, "Rust Proxy: opening connection globally: {:?}", global_open);
 
     let listener = net::TcpListener::bind("127.0.0.1:10001").unwrap();
     info!(log, "Rust Proxy: Listening at: {:?}", listener);
@@ -266,13 +256,13 @@ fn main() {
     listener
         .set_nonblocking(true)
         .expect("Cannot set non-blocking");
-    let listener_terminated = Arc::new(AtomicBool::new(false));
+    let stop = Arc::new(AtomicBool::new(false));
 
     // store client thread handles
     let mut threads = Vec::new();
 
     // detect listener status via shared boolean
-    let listener_terminated_clone = Arc::clone(&listener_terminated);
+    let stop_clone = Arc::clone(&stop);
     // detect SIGTERM to close listener
     let log_ctrlc = log.clone();
     ctrlc::set_handler(move || {
@@ -280,27 +270,30 @@ fn main() {
             log_ctrlc,
             "Rust Proxy: received SIGTERM! Terminating listener once all client connections have closed..."
         );
-        listener_terminated_clone.store(true, Ordering::Relaxed);
+        stop_clone.store(true, Ordering::Relaxed);
         debug!(
             log_ctrlc,
-            "Rust Proxy: listener_terminated = {:?}",
-            listener_terminated_clone.load(Ordering::Relaxed)
+            "Rust Proxy: listener_terminated"
         );
     })
     .expect("Error setting Ctrl-C handler");
 
     // run listener until terminated with SIGTERM
-    while !listener_terminated.load(Ordering::Relaxed) {
+    while !stop.load(Ordering::Relaxed) {
         while let Ok((stream, _addr)) = listener.accept() {
+            let db_name = flags.db_name.clone();
+            let db_username = flags.db_username.clone();
+            let db_password = flags.db_password.clone();
             // clone log so that each client thread has an owned copy
             let log_client = log.clone();
+            let stop_clone = stop.clone();
             threads.push(std::thread::spawn(move || {
                 info!(
                     log_client,
                     "Rust Proxy: Successfully connected to mysql proxy\nStream and address are: {:?}",
                     stream
                 );
-                let rust_conn = open_ffi();
+                let rust_conn = open_ffi(&db_name, &db_username, &db_password);
                 info!(
                     log_client,
                     "Rust Proxy: connection status is: {:?}", rust_conn.connected
@@ -309,6 +302,7 @@ fn main() {
                     rust_conn: rust_conn,
                     runtime: Duration::new(0, 0),
                     log: log_client,
+                    stop: stop_clone,
                 };
                 let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
             }));

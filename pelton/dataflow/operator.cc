@@ -1,6 +1,7 @@
 #include "pelton/dataflow/operator.h"
 
 #include <algorithm>
+#include <sstream>
 #include <utility>
 
 #include "glog/logging.h"
@@ -197,6 +198,90 @@ std::string Operator::DebugString() const {
   str.pop_back();
   str += " ],\n";
   return str;
+}
+
+Record Operator::DebugRecord() const {
+  Record record{SchemaFactory::FLOW_DEBUG_SCHEMA, true};
+  record.SetUInt(this->index_, 0);
+  // Type.
+  switch (this->type()) {
+    case Operator::Type::INPUT:
+      record.SetString(std::make_unique<std::string>("INPUT"), 1);
+      break;
+    case Operator::Type::IDENTITY:
+      record.SetString(std::make_unique<std::string>("IDENTITY"), 1);
+      break;
+    case Operator::Type::MAT_VIEW:
+      record.SetString(std::make_unique<std::string>("MAT_VIEW"), 1);
+      break;
+    case Operator::Type::FILTER:
+      record.SetString(std::make_unique<std::string>("FILTER"), 1);
+      break;
+    case Operator::Type::UNION:
+      record.SetString(std::make_unique<std::string>("UNION"), 1);
+      break;
+    case Operator::Type::EQUIJOIN:
+      record.SetString(std::make_unique<std::string>("EQUIJOIN"), 1);
+      break;
+    case Operator::Type::PROJECT:
+      record.SetString(std::make_unique<std::string>("PROJECT"), 1);
+      break;
+    case Operator::Type::AGGREGATE:
+      record.SetString(std::make_unique<std::string>("AGGREGATE"), 1);
+      break;
+    case Operator::Type::EXCHANGE:
+      record.SetString(std::make_unique<std::string>("EXCHANGE"), 1);
+      break;
+  }
+  // Output schema.
+  std::stringstream out_buffer;
+  out_buffer << " (" << this->output_schema_ << ") ";
+  record.SetString(std::make_unique<std::string>(out_buffer.str()), 2);
+  // Children.
+  std::string children = "[";
+  for (Operator *child : this->children_) {
+    children += std::to_string(child->index_) + ",";
+  }
+  if (this->children_.size() > 0) {
+    children.pop_back();
+  }
+  children += "]";
+  record.SetString(std::make_unique<std::string>(children), 3);
+  // Parents.
+  std::string parents = "[";
+  for (Operator *parent : this->parents_) {
+    parents += std::to_string(parent->index_) + ",";
+  }
+  if (this->parents_.size() > 0) {
+    parents.pop_back();
+  }
+  parents += "]";
+  record.SetString(std::make_unique<std::string>(parents), 4);
+  // No info unless overriden.
+  record.SetString(std::make_unique<std::string>(""), 5);
+  return record;
+}
+
+uint64_t Operator::SizeInMemory(const std::string &flow_name,
+                                std::vector<Record> *output) const {
+  uint64_t size = this->SizeInMemory() / 1024;
+  std::string id = std::to_string(this->index_);
+  // Combine size into this operator record (from other partitions).
+  bool found = false;
+  for (size_t i = 0; i < output->size(); i++) {
+    Record &r = output->at(i);
+    if (r.GetString(0) == flow_name && r.GetString(1) == id) {
+      found = true;
+      r.SetUInt(r.GetUInt(2) + size, 2);
+      break;
+    }
+  }
+  if (!found) {
+    output->emplace_back(SchemaFactory::MEMORY_SIZE_SCHEMA, true,
+                         std::make_unique<std::string>(flow_name),
+                         std::make_unique<std::string>(id), size);
+  }
+  return size;
 }
 
 }  // namespace dataflow

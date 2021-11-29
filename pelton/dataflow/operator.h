@@ -64,9 +64,10 @@ class Operator {
 
   // For debugging.
   virtual std::string DebugString() const;
+  virtual Record DebugRecord() const;
 
-  // Return the size of any stored state in memory.
-  virtual uint64_t SizeInMemory() const { return 0; }
+  uint64_t SizeInMemory(const std::string &flow_name,
+                        std::vector<Record> *output) const;
 
  protected:
   explicit Operator(Type type) : index_(UNDEFINED_NODE_INDEX), type_(type) {}
@@ -101,6 +102,9 @@ class Operator {
   // functional.
   // This should only be used inside DtaFlowGraphPartition's Clone() function.
   virtual std::unique_ptr<Operator> Clone() const = 0;
+
+  // Return the size of any stored state in memory.
+  virtual uint64_t SizeInMemory() const { return 0; }
 
   // Edges to children and parents.
   std::vector<Operator *> children_;

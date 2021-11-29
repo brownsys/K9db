@@ -269,9 +269,10 @@ LookupCondition ConstraintKeys(const dataflow::DataFlowGraph &flow,
 
 }  // namespace
 
-absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
-                        dataflow::DataFlowState *dataflow_state) {
+absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection,
+                        UniqueLock *lock) {
   perf::Start("CreateView");
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
   // Plan the query using calcite and generate a concrete graph for it.
   std::unique_ptr<dataflow::DataFlowGraphPartition> graph =
       planner::PlanGraph(dataflow_state, stmt.query());
@@ -283,11 +284,12 @@ absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
   return absl::OkStatus();
 }
 
-absl::StatusOr<sql::SqlResult> SelectView(
-    const sqlast::Select &stmt, SharderState *state,
-    dataflow::DataFlowState *dataflow_state) {
-  // TODO(babman): fix this.
+absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
+                                          Connection *connection) {
   perf::Start("SelectView");
+  SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  SharedLock lock = state->ReaderLock();
 
   // Get the corresponding flow.
   const std::string &view_name = stmt.table_name();

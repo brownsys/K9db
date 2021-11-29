@@ -103,9 +103,10 @@ int main(int argc, char **argv) {
   std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
   std::chrono::time_point<std::chrono::high_resolution_clock> end_time;
   try {
+    pelton::initialize(workers);
+
     pelton::Connection connection;
-    pelton::initialize(workers, db_name, db_username, db_password);
-    pelton::open(&connection);
+    pelton::open(&connection, db_name, db_username, db_password);
 
     std::cout << "SQL Sharder" << std::endl;
     std::cout << "DB: " << db_name << std::endl;
@@ -169,13 +170,9 @@ int main(int argc, char **argv) {
     // Close the connection
     end_time = std::chrono::high_resolution_clock::now();
 
-    std::cout << std::endl
-              << "Shards: "
-              << connection.pelton_state->GetSharderState()->NumShards()
-              << std::endl;
-
-    // Find peak memory usage.
-    connection.pelton_state->PrintSizeInMemory();
+    // Display statistics.
+    Print(connection.state->NumShards(), print);
+    Print(connection.state->SizeInMemory(), print);
 
     auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(
         end_time - start_time);

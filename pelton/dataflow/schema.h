@@ -98,6 +98,12 @@ class SchemaFactory {
 
  private:
   static std::list<SchemaData> SCHEMAS;
+
+ public:
+  // Special schemas for debugging and statistics.
+  static SchemaRef MEMORY_SIZE_SCHEMA;
+  static SchemaRef FLOW_DEBUG_SCHEMA;
+  static SchemaRef NUM_SHARDS_SCHEMA;
 };
 
 }  // namespace dataflow

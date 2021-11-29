@@ -311,12 +311,18 @@ std::vector<Record> DataFlowGraph::LookupKeyGreater(const Key &key, int limit,
 }
 
 // Debugging information.
-uint64_t DataFlowGraph::SizeInMemory() const {
+uint64_t DataFlowGraph::SizeInMemory(std::vector<Record> *output) const {
   uint64_t total_size = 0;
   for (const auto &partition : this->partitions_) {
-    total_size += partition->SizeInMemory();
+    total_size += partition->SizeInMemory(this->flow_name_, output);
   }
+  output->emplace_back(SchemaFactory::MEMORY_SIZE_SCHEMA, true,
+                       std::make_unique<std::string>(this->flow_name_),
+                       std::make_unique<std::string>("TOTAL"), total_size);
   return total_size;
+}
+std::vector<Record> DataFlowGraph::DebugRecords() const {
+  return this->partitions_.front()->DebugRecords();
 }
 
 }  // namespace dataflow

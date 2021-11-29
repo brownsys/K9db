@@ -11,6 +11,7 @@ msql-srv = "0.8.7"
 slog = "2.7.0"
 slog-term = "2.8.0"
 ctrlc = "3.1.9"
+gflags = "0.3"
 
 [build-dependencies]
 bindgen = "0.32.2"

@@ -19,13 +19,13 @@ namespace pelton {
 namespace dataflow {
 
 // DataFlowState::Worker.
-DataFlowState::Worker::Worker(size_t id, DataFlowState *state, int max)
+DataFlowState::Worker::Worker(size_t id, Channel *chan, DataFlowState *state,
+                              int max)
     : id_(id), state_(state), stop_(false), max_(max) {
-  this->thread_ = std::thread([this]() {
-    std::cout << "Starting dataflow worker " << this->id_ << std::endl;
+  this->thread_ = std::thread([this, chan]() {
+    LOG(INFO) << "Starting dataflow worker " << this->id_;
     while (!this->stop_ && this->max_ != 0) {
-      std::vector<Channel::Message> messages =
-          this->state_->channels_.at(this->id_)->Read();
+      std::vector<Channel::Message> messages = chan->Read();
       for (Channel::Message &msg : messages) {
         if (this->max_ != -1) {
           this->max_ -= msg.records.size();
@@ -38,36 +38,43 @@ DataFlowState::Worker::Worker(size_t id, DataFlowState *state, int max)
     }
   });
 }
+DataFlowState::Worker::~Worker() { CHECK(this->stop_); }
 void DataFlowState::Worker::Shutdown() {
   if (!this->stop_) {
+    LOG(INFO) << "Shutting down dataflow worker " << this->id_;
     this->stop_ = true;
     this->state_->channels_.at(this->id_)->Shutdown();
     this->thread_.join();
+    LOG(INFO) << "Terminated dataflow worker " << this->id_;
   }
 }
 void DataFlowState::Worker::Join() { this->thread_.join(); }
 
 // DataFlowState.
 // Constructors and destructors.
-DataFlowState::~DataFlowState() { this->Shutdown(); }
-DataFlowState::DataFlowState(size_t workers, int max) : workers_(workers) {
+DataFlowState::~DataFlowState() { CHECK(this->joined_); }
+DataFlowState::DataFlowState(size_t workers, int max)
+    : workers_(workers), joined_(false) {
   // Create a channel for every worker.
   for (size_t i = 0; i < workers; i++) {
     this->channels_.emplace_back(std::make_unique<Channel>(workers));
-    this->threads_.emplace_back(i, this, max);
+    this->threads_.emplace_back(
+        std::make_unique<Worker>(i, this->channels_.at(i).get(), this, max));
   }
 }
 
 // Worker related functions.
 void DataFlowState::Shutdown() {
-  for (Worker &worker : this->threads_) {
-    worker.Shutdown();
+  for (auto &worker : this->threads_) {
+    worker->Shutdown();
   }
+  this->joined_ = true;
 }
 void DataFlowState::Join() {
-  for (Worker &worker : this->threads_) {
-    worker.Join();
+  for (auto &worker : this->threads_) {
+    worker->Join();
   }
+  this->joined_ = true;
 }
 
 // Manage schemas.
@@ -197,16 +204,23 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
 }
 
 // Size in memory of all the dataflow graphs.
-void DataFlowState::PrintSizeInMemory() const {
+sql::SqlResult DataFlowState::SizeInMemory() const {
+  std::vector<Record> records;
   uint64_t total_size = 0;
   for (const auto &[fname, flow] : this->flows_) {
-    uint64_t flow_size = flow->SizeInMemory();
-    uint64_t flow_size_mb = flow_size / 1024 / 1024;
-    std::cout << fname << ": " << flow_size_mb << "MB" << std::endl;
-    total_size += flow_size;
+    total_size += flow->SizeInMemory(&records);
   }
-  std::cout << "Total size: " << (total_size / 1204 / 1024) << "MB"
-            << std::endl;
+  records.emplace_back(SchemaFactory::MEMORY_SIZE_SCHEMA, true,
+                       std::make_unique<std::string>("TOTAL"),
+                       std::make_unique<std::string>("TOTAL"), total_size);
+  return sql::SqlResult(std::make_unique<sql::_result::SqlInlineResultSet>(
+      SchemaFactory::MEMORY_SIZE_SCHEMA, std::move(records)));
+}
+
+sql::SqlResult DataFlowState::FlowDebug(const std::string &flow_name) const {
+  const auto &flow = this->flows_.at(flow_name);
+  return sql::SqlResult(std::make_unique<sql::_result::SqlInlineResultSet>(
+      SchemaFactory::FLOW_DEBUG_SCHEMA, flow->DebugRecords()));
 }
 
 }  // namespace dataflow

@@ -2,16 +2,16 @@
 #ifndef PELTON_PELTON_H_
 #define PELTON_PELTON_H_
 
-// NOLINTNEXTLINE
-#include <mutex>
 #include <string>
 
 #include "absl/status/statusor.h"
+#include "pelton/connection.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
+#include "pelton/sql/lazy_executor.h"
 #include "pelton/sql/result.h"
 
 namespace pelton {
@@ -22,51 +22,15 @@ using SqlResultSet = sql::SqlResultSet;
 using Schema = dataflow::SchemaRef;
 using Record = dataflow::Record;
 
-class State {
- public:
-  explicit State(size_t workers) : sharder_state_(), dataflow_state_(workers) {}
-
-  // Not copyable or movable.
-  State(const State &) = delete;
-  State &operator=(const State &) = delete;
-  State(const State &&) = delete;
-  State &operator=(const State &&) = delete;
-
-  // path to store state if want to store in folder (usually give it empty
-  // string)
-  void Initialize() {}
-
-  // Getters.
-  shards::SharderState *GetSharderState() { return &this->sharder_state_; }
-  dataflow::DataFlowState *GetDataFlowState() { return &this->dataflow_state_; }
-
-  void PrintSizeInMemory() const { this->dataflow_state_.PrintSizeInMemory(); }
-
-  void LockMutex() { this->mtx.lock(); }
-  void UnlockMutex() { this->mtx.unlock(); }
-
- private:
-  shards::SharderState sharder_state_;
-  dataflow::DataFlowState dataflow_state_;
-  std::string path_;
-  std::mutex mtx;
-};
-
-struct Connection {
-  State *pelton_state;
-  void lock_mtx() { this->pelton_state->LockMutex(); }
-  void unlock_mtx() { this->pelton_state->UnlockMutex(); }
-};
-
 // initialize pelton_state
-bool initialize(size_t workers, const std::string &db_name,
-                const std::string &db_username, const std::string &db_password);
+bool initialize(size_t workers);
 
 // delete pelton_state
 bool shutdown(bool shutdown_planner = true);
 
 // open connection
-bool open(Connection *connection);
+bool open(Connection *connection, const std::string &db_name,
+          const std::string &db_username, const std::string &db_password);
 
 absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql);
 
