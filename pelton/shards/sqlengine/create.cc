@@ -220,7 +220,6 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState &state,
 
   // get table name from ast representation of sql statement
   const std::string &table_name = stmt.table_name();
-  std::cout << "accessor table: " << table_name << std::endl;
   // Check column definitions for inlined foreign key constraints.
   const auto &columns = stmt.GetColumns();
 
@@ -229,9 +228,6 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState &state,
     const std::string &column_name = columns[index].column_name();
     // check if column starts with ACCESSOR_ (has an accessor annotation)
     bool explicit_accessor = absl::StartsWith(column_name, "ACCESSOR_");
-
-    std::cout << "Column name: " << column_name << std::endl;
-    std::cout << "ACCESSOR BOOL: " << explicit_accessor << std::endl;
 
     if (explicit_accessor) {
       const sqlast::ColumnConstraint *fk_constraint = nullptr;
@@ -263,7 +259,6 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState &state,
       // ==> schema annotations "on delete retain" or "on delete anonymise"
     }
   }
-  std::cout << "finished!" << std::endl;
 }
 // Determine what should be done about a single foreign key in some
 // sharded table.
