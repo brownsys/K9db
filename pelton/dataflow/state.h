@@ -73,8 +73,13 @@ class DataFlowState {
   // Process raw data from sharder and use it to update flows.
   Record CreateRecord(const sqlast::Insert &insert_stmt) const;
 
+  // Process raw data from sharder and use it to update flows.
   void ProcessRecords(const TableName &table_name,
                       std::vector<Record> &&records);
+
+  void ProcessRecordsByFlowName(const FlowName &flow_name,
+                                const TableName &table_name,
+                                std::vector<Record> &&records);
 
   sql::SqlResult SizeInMemory() const;
   sql::SqlResult FlowDebug(const std::string &flow_name) const;

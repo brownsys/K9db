@@ -38,6 +38,7 @@ struct UpgradableMutex {
 // Class is movable but not copyable.
 class SharedLock {
  public:
+  SharedLock() = default;
   // Shared lock from scratch.
   explicit SharedLock(UpgradableMutex *mutex);
   // Shared lock by downgrading from a UniqueLock.
