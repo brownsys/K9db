@@ -244,8 +244,7 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState &state,
             ShouldShardBy(*fk_constraint, state);
         shard_string = shard_kind->value();
       }
-      // TODO: add field in SharderState for table_name instead of adding it
-      // to the index name
+      // TODO: add field in SharderState instead of encoding in index name
       sqlast::CreateIndex create_index_stmt{
           "ref_" + shard_string + "_" + table_name, table_name, column_name};
       pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, &state,
