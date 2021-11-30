@@ -201,10 +201,14 @@ void RunTest(const std::string &query_file_prefix) {
     // Store output.
     std::vector<std::string> actual;
     pelton::SqlResult &result = status.value();
-    std::unique_ptr<pelton::SqlResultSet> resultset = result.NextResultSet();
-    for (pelton::Record &record : *resultset) {
-      record.SetPositive(true);
-      actual.push_back(ToString(record));
+    if (result.IsQuery()) {
+      std::unique_ptr<pelton::SqlResultSet> resultset = result.NextResultSet();
+      for (pelton::Record &record : *resultset) {
+        record.SetPositive(true);
+        actual.push_back(ToString(record));
+      }
+    } else if (result.IsUpdate()) {
+      actual.push_back("|update # = " + std::to_string(result.UpdateCount()) + "|");
     }
 
     // Check output vs expected.

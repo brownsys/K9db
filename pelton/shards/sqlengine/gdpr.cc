@@ -123,6 +123,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
                 index::LookupIndex(index_name, user_id, dataflow_state));
 
             // create select statement with equality check for each id
+            sql::SqlResult table_result;
             for (const auto &id : ids_set) {
               std::cout << "ID: " << id << std::endl;
               sqlast::Select accessor_stmt{accessor_table_name};
@@ -169,8 +170,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
                   select::Shard(accessor_stmt, state, dataflow_state));
 
               // add to result
-              result.AddResultSet(res.NextResultSet());
+              table_result.Append(std::move(res));
             }
+            result.AddResultSet(table_result.NextResultSet());
           }
         }
       }
