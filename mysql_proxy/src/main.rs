@@ -66,7 +66,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 self.log,
                 "Rust proxy: unsupported prepared statement {}", prepared_statement
             );
-            results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
+            return info.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
         }
 
         let statement_id = self.prepared_statements.len() as u32;
