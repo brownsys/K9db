@@ -37,3 +37,12 @@ filegroup(
     ]),
     visibility = ["//tests:__subpackages__"],
 )
+
+filegroup(
+    name = "delf-ecommerce-data",
+    srcs = glob([
+        "delf_ecommerce/*.sql",
+        "delf_ecommerce/*.txt",
+    ]),
+    visibility = ["//tests:__subpackages__"],
+)
