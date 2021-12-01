@@ -208,6 +208,10 @@ cc_library(
     ],
     hdrs = [
         "view.h",
+        # We can't include :select as a dependency.
+        # It creates a cycle (select -> index -> view -> select).
+        # We can split these files better later.
+        "select.h",
     ],
     deps = [
         "//pelton:connection",

@@ -124,10 +124,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
   std::vector<dataflow::Record> records;
   size_t old_records_size = 0;
   if (update_flows) {
-    // NOTE(malte): select::Shard() takes another reader lock on the sharder
-    // state, but this is fine as that lock is never upgraded.
     MOVE_OR_RETURN(sql::SqlResult domain_result,
-                   select::Shard(stmt.SelectDomain(), connection));
+                   select::Shard(stmt.SelectDomain(), connection, false));
     records = domain_result.NextResultSet()->Vectorize();
     old_records_size = records.size();
     CHECK_STATUS(UpdateRecords(&records, stmt, state->GetSchema(table_name)));

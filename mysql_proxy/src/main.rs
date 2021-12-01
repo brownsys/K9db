@@ -7,10 +7,12 @@ extern crate slog;
 extern crate ctrlc;
 extern crate msql_srv;
 extern crate proxy_ffi;
+extern crate regex;
 extern crate slog_term;
 
 use msql_srv::*;
 use proxy_ffi::*;
+use regex::Regex;
 use slog::Drain;
 use std::ffi::CString;
 use std::io;
@@ -33,28 +35,148 @@ struct Backend {
     runtime: std::time::Duration,
     log: slog::Logger,
     stop: Arc<AtomicBool>,
+    prepared_statements: Vec<Vec<String>>,
 }
 
 impl<W: io::Write> MysqlShim<W> for Backend {
     type Error = io::Error;
 
     // called when client issues request to prepare query for later execution
-    fn on_prepare(&mut self, _q_string: &str, _info: StatementMetaWriter<W>) -> io::Result<()> {
+    fn on_prepare(
+        &mut self,
+        prepared_statement: &str,
+        info: StatementMetaWriter<W>,
+    ) -> io::Result<()> {
         debug!(self.log, "Rust proxy: starting on_prepare");
-        unimplemented!();
+        debug!(
+            self.log,
+            "Rust Proxy: prepared statement received is: {:?}", prepared_statement
+        );
+
+        let statement_id = self.prepared_statements.len() as u32;
+        if prepared_statement.starts_with("SELECT") {
+            let view_name = String::from("q") + &statement_id.to_string();
+
+            // Convert a statement of the form of "SELECT * FROM table WHERE col=?"
+            // to "CREATE VIEW q0 A '"SELECT * FROM table WHERE col=?"'" to be
+            // passed to Pelton
+            let mut create_view_stmt = String::from("CREATE VIEW ");
+            create_view_stmt.push_str(&view_name);
+            create_view_stmt.push_str(" AS '\"");
+            create_view_stmt.push_str(&prepared_statement);
+            create_view_stmt.push_str("\"';");
+
+            // Execute create view statement in Pelton
+            if !exec_ddl_ffi(&mut self.rust_conn, &create_view_stmt) {
+                return info.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
+            }
+
+            // Change query from "SELECT * FROM table WHERE col=?" to
+            // "SELECT * FROM q0 WHERE col=?", where q0 is the view name
+            // assigned to the prepared statement, makes parameterizing and
+            // executing prepared statement later easier.
+            let re = Regex::new(r"(?P<expr>\s[A-Za-z_0-9`]+\s*\(=|>|<|>=|<=\)\s*)[?]").unwrap();
+            let mut view_query: Vec<String> = re
+                .captures_iter(prepared_statement)
+                .map(|caps| caps["expr"].to_string())
+                .collect();
+            if view_query.len() == 0 {
+                view_query.push(String::from("SELECT * FROM ") + &view_name + ";");
+            } else {
+                view_query[0] = String::from("SELECT * FROM ") + &view_name + " " + &view_query[0];
+                view_query.push(String::from(";"));
+            }
+
+            // Used to store the column structs representing the parameters to
+            // be returned to the MySQL client
+            let mut params = Vec::new();
+            for _i in 1..view_query.len() {
+                params.push(Column {
+                    table: "".to_string(),
+                    column: "".to_string(),
+                    coltype: ColumnType::MYSQL_TYPE_VAR_STRING,
+                    colflags: ColumnFlags::empty(),
+                });
+            }
+
+            debug!(self.log, "Rust proxy: Prepared as: {:?}", view_query);
+            self.prepared_statements.push(view_query);
+
+            // Respond to client
+            info.reply(statement_id, &params, &[])
+        } else if prepared_statement.starts_with("INSERT") {
+            // What the prepared statement components are.
+            // This is saved for future use in on_execute.
+            let components: Vec<String> = prepared_statement
+                .split("?")
+                .map(|s| s.to_string())
+                .collect();
+
+            // Used to store the column structs representing the parameters to
+            // be returned to the MySQL client
+            let mut params = Vec::new();
+            for _i in 1..components.len() {
+                params.push(Column {
+                    table: "".to_string(),
+                    column: "".to_string(),
+                    coltype: ColumnType::MYSQL_TYPE_VAR_STRING,
+                    colflags: ColumnFlags::empty(),
+                });
+            }
+
+            debug!(self.log, "Rust proxy: Prepared as: {:?}", components);
+            self.prepared_statements.push(components);
+
+            // Respond to client
+            info.reply(statement_id, &params, &[])
+        } else {
+            error!(self.log, "Rust proxy: unsupported prepared statement type");
+            info.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
+        }
     }
 
     // called when client executes previously prepared statement
+    // params: any params included with the client's command:
+    // response to query given using QueryResultWriter.
     fn on_execute(
         &mut self,
-        _: u32,
-        // any params included with the client's command:
-        _: ParamParser,
-        // response to query given using QueryResultWriter:
-        _results: QueryResultWriter<W>,
+        stmt_id: u32,
+        params: ParamParser,
+        results: QueryResultWriter<W>,
     ) -> io::Result<()> {
         debug!(self.log, "Rust proxy: starting on_execute");
-        unimplemented!();
+
+        let mut query: String = String::new();
+        let tokens = &self.prepared_statements[stmt_id as usize];
+
+        // Add parameters passed to MySQL client to the prepared statement
+        let mut i = 0;
+        for param in params {
+            query.push_str(&tokens[i]);
+            let val = match param.coltype {
+                // If string, surround with \"
+                ColumnType::MYSQL_TYPE_STRING
+                | ColumnType::MYSQL_TYPE_VARCHAR
+                | ColumnType::MYSQL_TYPE_VAR_STRING => {
+                    format!("\'{}\'", Into::<&str>::into(param.value))
+                }
+                ColumnType::MYSQL_TYPE_DECIMAL
+                | ColumnType::MYSQL_TYPE_NEWDECIMAL
+                | ColumnType::MYSQL_TYPE_TINY
+                | ColumnType::MYSQL_TYPE_SHORT
+                | ColumnType::MYSQL_TYPE_INT24
+                | ColumnType::MYSQL_TYPE_LONG
+                | ColumnType::MYSQL_TYPE_LONGLONG => Into::<i64>::into(param.value).to_string(),
+                _ => unimplemented!("Rust proxy: unsupported parameter type"),
+            };
+            query.push_str(&val);
+            i += 1;
+        }
+        query.push_str(tokens.last().unwrap());
+
+        // Execute modified prepared statement like new query
+        debug!(self.log, "Rust proxy: Executing as: {:?}", query);
+        self.on_query(&query, results)
     }
 
     // called when client wants to deallocate resources associated with a prev prepared statement
@@ -83,11 +205,14 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         if q_string.starts_with("SET STOP") {
             self.stop.store(true, Ordering::Relaxed);
             results.completed(0, 0)
-        } else if q_string.starts_with("SHOW VARIABLE") {
+        } else if q_string.starts_with("SHOW VARIABLES") {
             // Hardcoded SHOW variables needed for mariadb java connectors.
-            debug!(self.log, "Rust Proxy: SHOW statement simulated {}", q_string);
+            debug!(
+                self.log,
+                "Rust Proxy: SHOW statement simulated {}", q_string
+            );
 
-            let mut cols : Vec<Column> = Vec::with_capacity(2);
+            let mut cols: Vec<Column> = Vec::with_capacity(2);
             cols.push(Column {
                 table: "".to_string(),
                 column: "Variable_name".to_string(),
@@ -115,9 +240,10 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             rw.end_row()?;
             return rw.finish();
         } else if q_string.starts_with("CREATE TABLE")
-                  || q_string.starts_with("CREATE INDEX")
-                  || q_string.starts_with("CREATE VIEW")
-                  || q_string.starts_with("SET") {
+            || q_string.starts_with("CREATE INDEX")
+            || q_string.starts_with("CREATE VIEW")
+            || q_string.starts_with("SET")
+        {
             let ddl_response = exec_ddl_ffi(&mut self.rust_conn, q_string);
             debug!(self.log, "ddl_response is {:?}", ddl_response);
 
@@ -131,9 +257,10 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
         } else if q_string.starts_with("UPDATE")
-                  || q_string.starts_with("DELETE")
-                  || q_string.starts_with("INSERT")
-                  || q_string.starts_with("GDPR FORGET") {
+            || q_string.starts_with("DELETE")
+            || q_string.starts_with("INSERT")
+            || q_string.starts_with("GDPR FORGET")
+        {
             let update_response = exec_update_ffi(&mut self.rust_conn, q_string);
 
             // stop measuring runtime and add to total time for this connection
@@ -142,14 +269,18 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             if update_response != -1 {
                 results.completed(update_response as u64, 0)
             } else {
-                error!(self.log, "Rust Proxy: Failed to execute UPDATE: {:?}", q_string);
+                error!(
+                    self.log,
+                    "Rust Proxy: Failed to execute UPDATE: {:?}", q_string
+                );
                 results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
             }
         } else if q_string.starts_with("SELECT")
-                  || q_string.starts_with("GDPR GET")
-                  || q_string.starts_with("SHOW SHARDS")
-                  || q_string.starts_with("SHOW VIEW")
-                  || q_string.starts_with("SHOW MEMORY") {
+            || q_string.starts_with("GDPR GET")
+            || q_string.starts_with("SHOW SHARDS")
+            || q_string.starts_with("SHOW VIEW")
+            || q_string.starts_with("SHOW MEMORY")
+        {
             let select_response = exec_select_ffi(&mut self.rust_conn, q_string);
 
             // stop measuring runtime and add to total time for this connection
@@ -181,7 +312,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                         match col_types[c] {
                             // write a value to the next col of the current row (of this resultset)
                             FFIColumnType_UINT => unsafe {
-                                rw.write_col(rows_slice[r * num_cols + c].record.UINT)?
+                                rw.write_col(rows_slice[r * num_cols + c].record.UINT as i64)?
                             },
                             FFIColumnType_INT => unsafe {
                                 rw.write_col(rows_slice[r * num_cols + c].record.INT)?
@@ -211,6 +342,9 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 
             // tell client no more rows coming. Returns an empty Ok to the proxy
             rw.finish()
+        } else if q_string.starts_with("set") {
+            debug!(self.log, "Ignoring set query {}", q_string);
+            results.completed(0, 0)
         } else {
             error!(self.log, "Rust proxy: unsupported query type {}", q_string);
             results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
@@ -244,11 +378,20 @@ fn main() {
 
     // Parse command line flags defined using rust's gflags.
     let flags = gflags_ffi(std::env::args(), USAGE);
-    info!(log, "Rust proxy: running with args: {:?} {:?} {:?} {:?}",
-          flags.workers, flags.db_name, flags.db_username, flags.db_password);
+    info!(
+        log,
+        "Rust proxy: running with args: {:?} {:?} {:?} {:?}",
+        flags.workers,
+        flags.db_name,
+        flags.db_username,
+        flags.db_password
+    );
 
     let global_open = initialize_ffi(flags.workers);
-    info!(log, "Rust Proxy: opening connection globally: {:?}", global_open);
+    info!(
+        log,
+        "Rust Proxy: opening connection globally: {:?}", global_open
+    );
 
     let listener = net::TcpListener::bind("127.0.0.1:10001").unwrap();
     info!(log, "Rust Proxy: Listening at: {:?}", listener);
@@ -303,6 +446,7 @@ fn main() {
                     runtime: Duration::new(0, 0),
                     log: log_client,
                     stop: stop_clone,
+                    prepared_statements: Vec::new(),
                 };
                 let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
             }));

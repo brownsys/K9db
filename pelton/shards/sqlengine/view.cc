@@ -17,6 +17,7 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/value.h"
 #include "pelton/planner/planner.h"
+#include "pelton/shards/sqlengine/select.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
@@ -273,12 +274,38 @@ absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection,
                         UniqueLock *lock) {
   perf::Start("CreateView");
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+
   // Plan the query using calcite and generate a concrete graph for it.
   std::unique_ptr<dataflow::DataFlowGraphPartition> graph =
       planner::PlanGraph(dataflow_state, stmt.query());
 
   // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
-  dataflow_state->AddFlow(stmt.view_name(), std::move(graph));
+  std::string flow_name = stmt.view_name();
+  dataflow_state->AddFlow(flow_name, std::move(graph));
+
+  // Update new View with existing data in tables.
+  std::vector<std::pair<std::string, std::vector<dataflow::Record>>> data;
+
+  // Iterate through each table in the new View's flow.
+  for (const auto &table_name : dataflow_state->GetFlow(flow_name).Inputs()) {
+    // Generate and execute select * query for current table
+    pelton::sqlast::Select select{table_name};
+    select.AddColumn("*");
+    MOVE_OR_RETURN(sql::SqlResult result,
+                   select::Shard(select, connection, false));
+
+    // Vectorize and store records.
+    std::vector<pelton::dataflow::Record> records =
+        result.NextResultSet()->Vectorize();
+
+    // Records will be negative here, need to turn them to positive records.
+    for (auto &record : records) {
+      record.SetPositive(true);
+    }
+
+    dataflow_state->ProcessRecordsByFlowName(flow_name, table_name,
+                                             std::move(records));
+  }
 
   perf::End("CreateView");
   return absl::OkStatus();

@@ -1,7 +1,7 @@
 #!/bin/bash
 if [[ "$1" == "dbg" ]]; then
   ./bin/drop.sh root password
-  bazel run //mysql_proxy/src:mysql_proxy -- --logtostderr=1
+  RUST_BACKTRACE=1 bazel run //mysql_proxy/src:mysql_proxy -- --logtostderr=1
 
 elif [[ "$1" == "opt" ]]; then
   ./bin/drop.sh root password

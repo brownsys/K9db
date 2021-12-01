@@ -174,42 +174,39 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
       for (const Record &r : records) {
         copy.push_back(r.Copy());
       }
-      auto &flow = this->flows_.at(flow_name);
-      auto partitions = flow->PartitionInputs(table_name, std::move(copy));
-      for (auto &[partition, vec] : partitions) {
-        Channel::Message msg = {
-            flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
-            flow->GetPartition(partition)->GetInputNode(table_name)->index()};
-        if (this->serializable_) {
-          futures.emplace_back(std::make_unique<Future>());
-          msg.promise = futures.back()->GetPromise();
-        } else {
-          msg.promise = std::nullopt;
-        }
-        this->channels_.at(partition)->WriteInput(std::move(msg));
-      }
+      this->ProcessRecordsByFlowName(flow_name, table_name, std::move(copy),
+                                     futures);
     }
 
     // Move into last flow.
     const std::string &flow_name = flow_names.back();
-    auto &flow = this->flows_.at(flow_name);
-    auto partitions = flow->PartitionInputs(table_name, std::move(records));
-    for (auto &[partition, vec] : partitions) {
-      Channel::Message msg = {
-          flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
-          flow->GetPartition(partition)->GetInputNode(table_name)->index()};
-      if (this->serializable_) {
-        futures.emplace_back(std::make_unique<Future>());
-        msg.promise = futures.back()->GetPromise();
-      } else {
-        msg.promise = std::nullopt;
-      }
-      this->channels_.at(partition)->WriteInput(std::move(msg));
-    }
+    this->ProcessRecordsByFlowName(flow_name, table_name, std::move(records),
+                                   futures);
   }
+
   // Wait for all futures to get resolved.
   for (const auto &future : futures) {
     future->Get();
+  }
+}
+
+void DataFlowState::ProcessRecordsByFlowName(
+    const FlowName &flow_name, const TableName &table_name,
+    std::vector<Record> &&records,
+    std::vector<std::unique_ptr<Future>> &futures) {
+  auto &flow = this->flows_.at(flow_name);
+  auto partitions = flow->PartitionInputs(table_name, std::move(records));
+  for (auto &[partition, vec] : partitions) {
+    Channel::Message msg = {
+        flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
+        flow->GetPartition(partition)->GetInputNode(table_name)->index()};
+    if (this->serializable_) {
+      futures.emplace_back(std::make_unique<Future>());
+      msg.promise = futures.back()->GetPromise();
+    } else {
+      msg.promise = std::nullopt;
+    }
+    this->channels_.at(partition)->WriteInput(std::move(msg));
   }
 }
 
