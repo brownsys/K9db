@@ -252,18 +252,13 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState *state,
                                             column_name};
       const auto &info_list = state->GetShardingInformation(table_name);
       const auto info = info_list.front();
+      bool anonymize = absl::StartsWith(column_name, "ACCESSOR_ANONYMIZE");
+      sqlast::ColumnDefinition::Type anonymize_column_type = columns[index].column_type();
       state->AddAccessorIndex(shard_string, table_name, column_name,
-                              info.shard_by,
-                              index_prefix + "_" + info.shard_by);
+                              info.shard_by, index_prefix + "_" + info.shard_by,
+                              anonymize, anonymize_column_type);
       pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, state,
                                                     &dataflow_state);
-
-      // TODO: anonymization
-      // Index of shard_id (patient) to Primary Key of chat table, in that row
-      // we set the doctor_id col to NULL. Anonymize access annotation.
-      // if doctor (accessor) deletes his data, his id will be anonymized in the
-      // chat
-      // ==> schema annotations "on delete retain" or "on delete anonymise"
     }
   }
 }

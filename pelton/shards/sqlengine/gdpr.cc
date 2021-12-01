@@ -11,6 +11,7 @@
 #include "pelton/shards/sqlengine/delete.h"
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/select.h"
+#include "pelton/shards/sqlengine/update.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
@@ -136,6 +137,68 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
         table_result.Append(std::move(res));
       }
       result.AddResultSet(table_result.NextResultSet());
+    }
+  }
+
+  // anonymize when accessor deletes their data
+  if (is_forget) {
+    // Get all accessor indices that belong to this shard type
+    std::vector<AccessorIndexInformation> accessor_indices =
+        state->GetAccessorIndices(shard_kind);
+
+    for (auto &accessor_index : accessor_indices) {
+      bool anonymize = accessor_index.anonymize;
+      if (anonymize) {
+        // loop through every single accesor index type
+        std::string accessor_table_name = accessor_index.table_name;
+        std::string index_col = accessor_index.accessor_column_name;
+        std::string index_name = accessor_index.index_name;
+        std::string shard_by_access = accessor_index.shard_by_column_name;
+
+        MOVE_OR_RETURN(std::unordered_set<UserId> ids_set,
+                       index::LookupIndex(index_name, user_id, dataflow_state));
+
+        // create update statement with equality check for each id
+        for (const auto &id : ids_set) {
+          sqlast::Update anonymize_stmt{accessor_table_name};
+
+          // UPDATE doctor_id = NULL WHERE doctor_id = user_id
+
+          // doctor_id = NULL
+          std::string anonymized_value = "";
+          switch (accessor_index.anonymize_type) {
+            case sqlast::ColumnDefinition::Type::UINT:
+              anonymized_value = "0";
+              break;
+            case sqlast::ColumnDefinition::Type::INT:
+              anonymized_value = "-1";
+              break;
+            case sqlast::ColumnDefinition::Type::TEXT:
+              anonymized_value = "\"NULL\"";
+              break;
+            case sqlast::ColumnDefinition::Type::DATETIME:
+              anonymized_value = "\"NULL\"";
+              break;
+          }
+          anonymize_stmt.AddColumnValue(index_col, anonymized_value);
+
+          std::unique_ptr<sqlast::BinaryExpression> where =
+              std::make_unique<sqlast::BinaryExpression>(
+                  sqlast::Expression::Type::EQ);
+          where->SetLeft(std::make_unique<sqlast::ColumnExpression>(index_col));
+          where->SetRight(std::make_unique<sqlast::LiteralExpression>(user_id));
+
+          // set where condition in update statement
+          anonymize_stmt.SetWhereClause(std::move(where));
+
+          // execute select
+          MOVE_OR_RETURN(sql::SqlResult res,
+                         update::Shard(anonymize_stmt, state, dataflow_state));
+
+          // add to result
+          total_count += res.UpdateCount();
+        }
+      }
     }
   }
 

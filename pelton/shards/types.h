@@ -4,6 +4,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include "pelton/sqlast/ast.h"
 
 namespace pelton {
 namespace shards {
@@ -51,15 +52,22 @@ struct AccessorIndexInformation {
   ColumnName shard_by_column_name;
   // The name of the index
   IndexName index_name;
+  // whether to retain or anonymize on delete
+  bool anonymize;
+  // type of column to anonymize
+  sqlast::ColumnDefinition::Type anonymize_type;
 
   AccessorIndexInformation(const ShardKind &sk, const UnshardedTableName &tn,
                            const ColumnName &cn, const ColumnName &sbcn,
-                           const IndexName &in)
+                           const IndexName &in, const bool &an, 
+                           const sqlast::ColumnDefinition::Type &at)
       : shard_kind(sk),
         table_name(tn),
         accessor_column_name(cn),
         shard_by_column_name(sbcn),
-        index_name(in) {}
+        index_name(in),
+        anonymize(an),
+        anonymize_type(at) {}
 };
 
 // Contains the details of how a given table is sharded.

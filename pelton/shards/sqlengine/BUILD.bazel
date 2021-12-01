@@ -222,6 +222,7 @@ cc_library(
         ":delete",
         ":index",
         ":select",
+        ":update",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",

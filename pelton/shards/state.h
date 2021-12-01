@@ -67,7 +67,8 @@ class SharderState {
   void AddAccessorIndex(const ShardKind &kind, const UnshardedTableName &table,
                         const ColumnName &accessor_column,
                         const ColumnName &shard_by_column,
-                        const IndexName &index_name);
+                        const IndexName &index_name, const bool &anonymize,
+                        const sqlast::ColumnDefinition::Type &anonymize_type);
 
   std::list<const sqlast::AbstractStatement *> CreateShard(
       const ShardKind &shard_kind, const UserId &user);
