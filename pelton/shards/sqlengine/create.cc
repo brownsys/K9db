@@ -245,7 +245,6 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState *state,
         shard_string = shard_kind->value();
       }
 
-      // TODO: CHANGE NAME ASSIGNED TO THE INDEX
       std::string index_prefix =
           "ref_" + shard_string +
           std::to_string(state->GetAccessorIndices(shard_string).size());
