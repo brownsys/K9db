@@ -40,7 +40,7 @@ using IndexName = std::string;
 // Used to construct query of the form:
 // SELECT * FROM table WHERE accessor = id AND owner IN (...)
 struct AccessorIndexInformation {
-  // Which shard has access to the information in the table 
+  // Which shard has access to the information in the table
   // (e.g. User, Doctor, Patient, etc)
   ShardKind shard_kind;
   // The table which the index is created on
@@ -53,13 +53,13 @@ struct AccessorIndexInformation {
   IndexName index_name;
 
   AccessorIndexInformation(const ShardKind &sk, const UnshardedTableName &tn,
-                      const ColumnName &cn, const ColumnName &sbcn, const IndexName &in)
+                           const ColumnName &cn, const ColumnName &sbcn,
+                           const IndexName &in)
       : shard_kind(sk),
         table_name(tn),
         accessor_column_name(cn),
         shard_by_column_name(sbcn),
         index_name(in) {}
-
 };
 
 // Contains the details of how a given table is sharded.

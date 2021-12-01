@@ -73,27 +73,27 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
 
   if (!is_forget) {
     // Get all accessor indices that belong to this shard type
-    std::vector<AccessorIndexInformation> accessor_indices = state->GetAccessorIndices(shard_kind);
-  
-    for (auto &accessor_index : accessor_indices){
+    std::vector<AccessorIndexInformation> accessor_indices =
+        state->GetAccessorIndices(shard_kind);
+
+    for (auto &accessor_index : accessor_indices) {
       // loop through every single accesor index type
       std::string accessor_table_name = accessor_index.table_name;
       std::string index_col = accessor_index.accessor_column_name;
       std::string index_name = accessor_index.index_name;
       std::string shard_by_access = accessor_index.shard_by_column_name;
-      
-      MOVE_OR_RETURN(
-                std::unordered_set<UserId> ids_set,
-                index::LookupIndex(index_name, user_id, dataflow_state));
-      
+
+      MOVE_OR_RETURN(std::unordered_set<UserId> ids_set,
+                     index::LookupIndex(index_name, user_id, dataflow_state));
+
       // create select statement with equality check for each id
       sql::SqlResult table_result;
-      
+
       for (const auto &id : ids_set) {
         sqlast::Select accessor_stmt{accessor_table_name};
         // SELECT *
         accessor_stmt.AddColumn("*");
-        
+
         // LHS: ACCESSOR_doctor_id = user_id
         std::unique_ptr<sqlast::BinaryExpression> doctor_equality =
             std::make_unique<sqlast::BinaryExpression>(
@@ -112,7 +112,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
             std::make_unique<sqlast::ColumnExpression>(shard_by_access));
         patient_equality->SetRight(
             std::make_unique<sqlast::LiteralExpression>(id));
-        
+
         // combine both conditions into overall where condition of type
         // AND
         std::unique_ptr<sqlast::BinaryExpression> where_condition =
@@ -129,16 +129,13 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
         accessor_stmt.SetWhereClause(std::move(where_condition));
 
         // execute select
-        MOVE_OR_RETURN(
-            sql::SqlResult res,
-            select::Shard(accessor_stmt, state, dataflow_state));
+        MOVE_OR_RETURN(sql::SqlResult res,
+                       select::Shard(accessor_stmt, state, dataflow_state));
 
         // add to result
         table_result.Append(std::move(res));
       }
       result.AddResultSet(table_result.NextResultSet());
-      
-
     }
   }
 

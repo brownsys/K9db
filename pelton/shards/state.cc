@@ -55,14 +55,14 @@ void SharderState::AddShardedTable(
 }
 
 // Used to add an AccessorIndexInformation struct to sharder state
-void SharderState::AddAccessorIndex(const ShardKind &kind, 
-    const UnshardedTableName &table,
-    const ColumnName &accessor_column,
-    const ColumnName &shard_by_column,
-    const IndexName &index_name) {
-  
+void SharderState::AddAccessorIndex(const ShardKind &kind,
+                                    const UnshardedTableName &table,
+                                    const ColumnName &accessor_column,
+                                    const ColumnName &shard_by_column,
+                                    const IndexName &index_name) {
   // Create an AccessorIndexInformation
-  AccessorIndexInformation accessor_information {kind, table, accessor_column, shard_by_column, index_name};
+  AccessorIndexInformation accessor_information{kind, table, accessor_column,
+                                                shard_by_column, index_name};
   this->accessor_index_[kind].push_back(accessor_information);
 }
 
@@ -127,7 +127,6 @@ const std::unordered_set<UserId> &SharderState::UsersOfShard(
 
 const std::vector<AccessorIndexInformation> SharderState::GetAccessorIndices(
     const ShardKind &kind) const {
-
   if (this->accessor_index_.find(kind) == this->accessor_index_.end()) {
     return std::vector<AccessorIndexInformation>();
   } else {

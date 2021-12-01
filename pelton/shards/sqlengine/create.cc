@@ -246,13 +246,16 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState *state,
       }
 
       // TODO: CHANGE NAME ASSIGNED TO THE INDEX
-      std::string index_prefix = "ref_" + shard_string + 
-        std::to_string(state->GetAccessorIndices(shard_string).size());
-      sqlast::CreateIndex create_index_stmt{
-          index_prefix, table_name, column_name};
+      std::string index_prefix =
+          "ref_" + shard_string +
+          std::to_string(state->GetAccessorIndices(shard_string).size());
+      sqlast::CreateIndex create_index_stmt{index_prefix, table_name,
+                                            column_name};
       const auto &info_list = state->GetShardingInformation(table_name);
       const auto info = info_list.front();
-      state->AddAccessorIndex(shard_string, table_name, column_name, info.shard_by, index_prefix + "_" + info.shard_by);
+      state->AddAccessorIndex(shard_string, table_name, column_name,
+                              info.shard_by,
+                              index_prefix + "_" + info.shard_by);
       pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, state,
                                                     &dataflow_state);
 

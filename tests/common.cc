@@ -208,7 +208,8 @@ void RunTest(const std::string &query_file_prefix) {
         actual.push_back(ToString(record));
       }
     } else if (result.IsUpdate()) {
-      actual.push_back("|update # = " + std::to_string(result.UpdateCount()) + "|");
+      actual.push_back("|update # = " + std::to_string(result.UpdateCount()) +
+                       "|");
     }
 
     // Check output vs expected.
