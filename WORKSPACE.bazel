@@ -164,9 +164,9 @@ cc_library(
     ],
 )
 """,
-    # My non-merged change for create_view_stmt QUERY_LITERAL from Mar 25 2021.
-    # Plus a hacky fix for UPDATE ... SET <table>.<column>.
-    commit = "a65fb4c4ad27e2d15730b6f6c258b3de8b20c084",
+    # My non-merged change for create_view_stmt QUERY_LITERAL from Dec 1 2022.
+    # Disambiguate '...'. Single quotes can never be used for identifiers, only string literals
+    commit = "9618c902760000b8456f42092db797575d031a62",
     #remote = "https://github.com/antlr/grammars-v4",
     remote = "https://github.com/KinanBab/grammars-v4.git",
 )

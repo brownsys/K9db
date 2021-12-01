@@ -252,7 +252,7 @@ std::pair<bool, std::string> ValueFinder::VisitLiteralExpression(
 std::pair<bool, std::string> ValueFinder::VisitLiteralListExpression(
     const LiteralListExpression &ast) {
   if (ast.values().size() == 1) {
-    return std::make_pair(false, Dequote(ast.values().at(0)));
+    return std::make_pair(true, Dequote(ast.values().at(0)));
   }
   return std::make_pair(false, "");
 }
