@@ -304,7 +304,7 @@ absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection,
     }
 
     dataflow_state->ProcessRecordsByFlowName(flow_name, table_name,
-                                             std::move(records));
+                                             std::move(records), nullptr);
   }
 
   perf::End("CreateView");

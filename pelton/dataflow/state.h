@@ -81,7 +81,7 @@ class DataFlowState {
   void ProcessRecordsByFlowName(const FlowName &flow_name,
                                 const TableName &table_name,
                                 std::vector<Record> &&records,
-                                std::vector<std::unique_ptr<Future>> &futures);
+                                std::vector<std::unique_ptr<Future>> *futures);
 
   sql::SqlResult SizeInMemory() const;
   sql::SqlResult FlowDebug(const std::string &flow_name) const;
