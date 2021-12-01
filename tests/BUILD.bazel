@@ -56,3 +56,16 @@ cc_test(
         ":common",
     ],
 )
+
+# cc_test(
+#     name = "delf_ecommerce",
+#     srcs = [
+#         "delf_ecommerce.cc",
+#     ],
+#     data = [
+#         "//tests/data:delf-ecommerce-data",
+#     ],
+#     deps = [
+#         ":common",
+#     ],
+# )
