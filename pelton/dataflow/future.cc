@@ -33,7 +33,6 @@ Promise Promise::Derive() { return Promise(this->future_); }
 
 Promise::~Promise() {
   if (this->future_ != nullptr) {
-    LOG(INFO) << "Future counter: " << this->future_->counter();
     LOG(FATAL) << "Broken promise";
   }
 }
