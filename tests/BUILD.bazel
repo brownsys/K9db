@@ -45,12 +45,25 @@ cc_test(
 )
 
 cc_test(
-    name = "delf_medical",
+    name = "delf_medical_retain",
     srcs = [
-        "delf_medical.cc",
+        "delf_medical_retain.cc",
     ],
     data = [
-        "//tests/data:delf-medical-chat-data",
+        "//tests/data:delf-medical-chat-retain-data",
+    ],
+    deps = [
+        ":common",
+    ],
+)
+
+cc_test(
+    name = "delf_medical_anonymize",
+    srcs = [
+        "delf_medical_anonymize.cc",
+    ],
+    data = [
+        "//tests/data:delf-medical-chat-anonymize-data",
     ],
     deps = [
         ":common",

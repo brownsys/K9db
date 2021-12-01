@@ -21,10 +21,19 @@ filegroup(
 )
 
 filegroup(
-    name = "delf-medical-chat-data",
+    name = "delf-medical-chat-retain-data",
     srcs = glob([
-        "delf_medical/*.sql",
-        "delf_medical/*.txt",
+        "delf_medical_retain/*.sql",
+        "delf_medical_retain/*.txt",
+    ]),
+    visibility = ["//tests:__subpackages__"],
+)
+
+filegroup(
+    name = "delf-medical-chat-anonymize-data",
+    srcs = glob([
+        "delf_medical_anonymize/*.sql",
+        "delf_medical_anonymize/*.txt",
     ]),
     visibility = ["//tests:__subpackages__"],
 )
