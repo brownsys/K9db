@@ -1,5 +1,7 @@
 extern crate sqlparser;
 extern crate regex;
+#[macro_use]
+extern crate lazy_static;
 
 use sqlparser::ast::{ Statement, Expr };
 use std::collections::HashMap;
@@ -279,11 +281,48 @@ impl Categorize for sqlparser::ast::Join {
     }
 }
 
-fn main() {
+lazy_static! {
+    static ref MYSQL_QUERY_LOG_REGEX : regex::Regex = regex::Regex::new(r"(?m)^\s+(\d+)\s(\w+)\t(.*?$(\n\t{4}.*?$)*)").expect("Regex failed to compile");
+}
+
+use std::io::{Read, Write};
+
+fn get_inp() -> String {
     let mut query = String::new();
     use std::io::Read;
     std::io::stdin().read_to_string(&mut query).unwrap();
+    query
+}
 
+fn main2() {
+    let mut buf = String::new();
+    let files = std::env::args().skip(1).collect::<Vec<_>>();
+    println!("Handling {:?}", files);
+    let query_vecs : Vec<Vec<Statement>> = files.iter().map(|a| {
+        buf.clear();
+        println!("Parsing {}", a);
+        std::fs::File::open(a).unwrap().read_to_string(&mut buf).unwrap();
+        MYSQL_QUERY_LOG_REGEX.captures_iter(&buf).filter_map(|mtch| {
+            let q = mtch.get(3).expect("query not found").as_str();
+            sqlparser::parser::Parser::parse_sql(&sqlparser::dialect::MySqlDialect {}, q).ok().and_then(|v| {
+                v.into_iter().next()
+            })
+        }).collect::<Vec<_>>()
+    }).collect::<Vec<_>>();
+    println!("Parsing done, calculating intersections");
+    let common_queries : HashSet<&Statement> = query_vecs.iter().map(|q| q.iter().collect::<HashSet<_>>()).reduce(|q1, q2| q1.intersection(&q2).map(|i| *i).collect()).expect("no queries");
+    for (file, qs) in files.iter().zip(query_vecs.iter()) {
+        let fname = format!("{}-dedup", file);
+        println!("Writing {}", &fname);
+        let mut f = std::fs::File::create(&fname).unwrap();
+        for q in qs.iter().filter(|q| !common_queries.contains(q)) {
+            writeln!(f, "{}", q).unwrap();
+        }
+    }
+}
+
+fn main1() {
+    let query = get_inp();
     //let q2 : String = query.chars().skip_while(|c| *c != '\n').skip(1).skip_while(|c| *c != '\n').skip(1).collect();
 
     //let offsId = q2.chars().enumerate().find_map(|(i, c)| if c == 'I' { Some(i) } else { None }).expect("There should have been an I here");
@@ -291,9 +330,8 @@ fn main() {
     //eprintln!("Found 'Id' offset of {}", offsId);
 
     //let rgx = regex::Regex::new(&format!("^(?m).{{{n}}}(\\d+) (\\w+) +(\\S.*?$( {{{m},}}\\S.*?$)*)", n=offsId, m=offsId + 3)).unwrap();
-    let rgx = regex::Regex::new(r"(?m)^\s+(\d+)\s(\w+)\t(.*?$(\n\t{4}.*?$)*)").expect("Regex failed to compile");
     println!("Parsing queries ...");
-    let mtch_it = rgx.captures_iter(&query).map(|mtch| {
+    let mtch_it = MYSQL_QUERY_LOG_REGEX.captures_iter(&query).map(|mtch| {
         let q_id = mtch.get(1).expect("id not found").as_str().parse::<u32>();
         let q_type =  mtch.get(2).expect("type not found").as_str();
         let q = mtch.get(3).expect("query not found").as_str();
@@ -387,4 +425,9 @@ fn main() {
                       );
 
     }
+}
+
+
+fn main() {
+    main2();
 }
