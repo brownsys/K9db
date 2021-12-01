@@ -1,0 +1,16 @@
+[package]
+name = "owncloud-scenarios"
+version = "0.0.1"
+authors = ["Justus Adam <dev@justus.science"]
+
+[dependencies]
+mysql = "20.1.0"
+chrono = "0.4.19"
+
+[[bin]]
+name = "accessible-documents"
+path = "accessible_documents.rs"
+
+[[bin]]
+name = "granting-access"
+path = "granting_access.rs"
