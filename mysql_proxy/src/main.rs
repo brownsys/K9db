@@ -29,6 +29,13 @@ const USAGE: &str = "
   --db_username (root): database user to connect with to mariadb.
   --db_password (password): password to connect with to mariadb.";
 
+static NO_VIEWS: [&'static str; 2] = [
+    // For ci tests.
+    "SELECT * FROM tbl WHERE id = ?",
+    "SELECT * FROM tbl WHERE id = ? AND age > ?",
+    // TODO: add lobsters here.
+];
+
 #[derive(Debug)]
 struct Backend {
     rust_conn: FFIConnection,
@@ -53,8 +60,18 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             "Rust Proxy: prepared statement received is: {:?}", prepared_statement
         );
 
+        // Only support SELECT and INSERT.
+        if !prepared_statement.starts_with("SELECT") && !prepared_statement.starts_with("INSERT") {
+            error!(
+                self.log,
+                "Rust proxy: unsupported prepared statement {}", prepared_statement
+            );
+            return info.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
+        }
+
         let statement_id = self.prepared_statements.len() as u32;
-        if prepared_statement.starts_with("SELECT") {
+        let make_view = !NO_VIEWS.contains(&prepared_statement);
+        if prepared_statement.starts_with("SELECT") && make_view {
             let view_name = String::from("q") + &statement_id.to_string();
 
             // Convert a statement of the form of "SELECT * FROM table WHERE col=?"
@@ -75,7 +92,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             // "SELECT * FROM q0 WHERE col=?", where q0 is the view name
             // assigned to the prepared statement, makes parameterizing and
             // executing prepared statement later easier.
-            let re = Regex::new(r"(?P<expr>\s[A-Za-z_0-9`]+\s*\(=|>|<|>=|<=\)\s*)[?]").unwrap();
+            let re = Regex::new(r"\s(?P<expr>[A-Za-z_0-9`]+\s*[=><]\s*)\?").unwrap();
             let mut view_query: Vec<String> = re
                 .captures_iter(prepared_statement)
                 .map(|caps| caps["expr"].to_string())
@@ -83,7 +100,11 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             if view_query.len() == 0 {
                 view_query.push(String::from("SELECT * FROM ") + &view_name + ";");
             } else {
-                view_query[0] = String::from("SELECT * FROM ") + &view_name + " " + &view_query[0];
+                view_query[0] =
+                    String::from("SELECT * FROM ") + &view_name + " WHERE " + &view_query[0];
+                for i in 1..view_query.len() {
+                    view_query[i] = String::from(" AND ") + &view_query[i];
+                }
                 view_query.push(String::from(";"));
             }
 
@@ -104,7 +125,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 
             // Respond to client
             info.reply(statement_id, &params, &[])
-        } else if prepared_statement.starts_with("INSERT") {
+        } else if prepared_statement.starts_with("INSERT") || !make_view {
             // What the prepared statement components are.
             // This is saved for future use in on_execute.
             let components: Vec<String> = prepared_statement

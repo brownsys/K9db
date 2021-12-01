@@ -188,6 +188,9 @@ std::string Stringifier::VisitBinaryExpression(const BinaryExpression &ast) {
     case Expression::Type::IN:
       op = " IN ";
       break;
+    case Expression::Type::GREATER_THAN:
+      op = " > ";
+      break;
     default:
       assert(false);
   }
@@ -271,7 +274,7 @@ std::pair<bool, std::string> ValueFinder::VisitBinaryExpression(
       if (result.at(0).first) {
         assert(false);
       }
-      return std::make_pair(result.at(0).first, result.at(1).second);
+      return std::make_pair(false, "");
 
     case Expression::Type::IN:
       // IN can be used on a shard by column when the value list is a singleton.
@@ -286,6 +289,15 @@ std::pair<bool, std::string> ValueFinder::VisitBinaryExpression(
       }
       if (result.at(1).first) {
         return result.at(1);
+      }
+      return std::make_pair(false, "");
+
+    case Expression::Type::GREATER_THAN:
+      // GREATER_THAN cannot be used on a shard by column.
+      if (result.at(0).first) {
+        assert(false);
+      } else if (result.at(1).first) {
+        assert(false);
       }
       return std::make_pair(false, "");
 
