@@ -14,10 +14,6 @@
 namespace pelton {
 namespace shards {
 
-std::unordered_map<ShardKind, ColumnName> SharderState::GetKinds() {
-  return this->kinds_;
-}
-
 // Initialization.
 void SharderState::Initialize(const std::string &db_name,
                               const std::string &db_username,
@@ -56,6 +52,18 @@ void SharderState::AddShardedTable(
   // Store the sharded schema.
   this->sharded_schema_.insert(
       {sharding_information.sharded_table_name, sharded_create_statement});
+}
+
+// Used to add an AccessorIndexInformation struct to sharder state
+void SharderState::AddAccessorIndex(const ShardKind &kind, 
+    const UnshardedTableName &table,
+    const ColumnName &accessor_column,
+    const ColumnName &shard_by_column,
+    const IndexName &index_name) {
+  
+  // Create an AccessorIndexInformation
+  AccessorIndexInformation accessor_information {kind, table, accessor_column, shard_by_column, index_name};
+  this->accessor_index_[kind].push_back(accessor_information);
 }
 
 std::list<const sqlast::AbstractStatement *> SharderState::CreateShard(
@@ -115,6 +123,16 @@ bool SharderState::ShardExists(const ShardKind &shard_kind,
 const std::unordered_set<UserId> &SharderState::UsersOfShard(
     const ShardKind &kind) const {
   return this->shards_.at(kind);
+}
+
+const std::vector<AccessorIndexInformation> SharderState::GetAccessorIndices(
+    const ShardKind &kind) const {
+
+  if (this->accessor_index_.find(kind) == this->accessor_index_.end()) {
+    return std::vector<AccessorIndexInformation>();
+  } else {
+    return this->accessor_index_.at(kind);
+  }
 }
 
 const std::unordered_set<UnshardedTableName> &SharderState::TablesInShard(

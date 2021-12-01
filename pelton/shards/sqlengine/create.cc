@@ -213,7 +213,7 @@ absl::StatusOr<std::list<ShardingInformation>> ShardTable(
   return implicit_owners;
 }
 
-void IndexAccessor(const sqlast::CreateTable &stmt, SharderState &state,
+void IndexAccessor(const sqlast::CreateTable &stmt, SharderState *state,
                    dataflow::DataFlowState &dataflow_state) {
   // Result is empty by default.
   std::unordered_map<ColumnName, ColumnIndex> index_map;
@@ -241,13 +241,17 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState &state,
       std::string shard_string = "";
       if (fk_constraint != nullptr) {
         absl::StatusOr<std::optional<ShardKind>> shard_kind =
-            ShouldShardBy(*fk_constraint, state);
+            ShouldShardBy(*fk_constraint, *state);
         shard_string = shard_kind->value();
       }
-      // TODO: add field in SharderState instead of encoding in index name
+
+      // TODO: CHANGE NAME ASSIGNED TO THE INDEX
       sqlast::CreateIndex create_index_stmt{
           "ref_" + shard_string + "_" + table_name, table_name, column_name};
-      pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, &state,
+      const auto &info_list = state->GetShardingInformation(table_name);
+      const auto info = info_list.front();
+      state->AddAccessorIndex(shard_string, table_name, column_name, info.shard_by, "ref_" + shard_string + "_" + table_name + "_" + info.shard_by);
+      pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, state,
                                                     &dataflow_state);
 
       // TODO: anonymization
@@ -415,7 +419,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
 
   state->AddSchema(table_name, stmt);
   dataflow_state->AddTableSchema(stmt);
-  IndexAccessor(stmt, *state, *dataflow_state);
+  IndexAccessor(stmt, state, *dataflow_state);
 
   perf::End("Create");
   return result;
