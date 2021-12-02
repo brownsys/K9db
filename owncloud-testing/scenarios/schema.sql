@@ -9,14 +9,15 @@
 -- CREATE INDEX appconfig_config_key_index ON "oc_appconfig" ("configkey");
 -- CREATE INDEX appconfig_appid_key ON "oc_appconfig" ("appid");
 
-CREATE TABLE IF NOT EXISTS "oc_storages" (
-  "id" VARCHAR(64) DEFAULT NULL,
-  "numeric_id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  "available" INTEGER DEFAULT 1 NOT NULL,
-  "last_checked" INTEGER DEFAULT NULL
-);
+-- CREATE TABLE "oc_storages" (
+--   "id" VARCHAR(64) ,
+--   "numeric_id" INT NOT NULL,
+--   "available" INT NOT NULL,
+--   "last_checked" INT,
+--   PRIMARY KEY (numeric_id)
+-- );
 
-CREATE UNIQUE INDEX storages_id_index ON "oc_storages" ("id");
+-- CREATE UNIQUE INDEX storages_id_index ON "oc_storages" ("id");
 
 -- CREATE TABLE IF NOT EXISTS "oc_mounts" (
 --   "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -78,13 +79,6 @@ CREATE UNIQUE INDEX storages_id_index ON "oc_storages" ("id");
 -- );
 
 -- CREATE INDEX job_class_index ON "oc_jobs" ("class");
-
-CREATE TABLE IF NOT EXISTS "oc_users" (
-  "uid" VARCHAR(64) DEFAULT '' NOT NULL,
-  "displayname" VARCHAR(64) DEFAULT NULL,
-  "password" VARCHAR(255) DEFAULT '' NOT NULL,
-  PRIMARY KEY("uid")
-);
 
 -- CREATE TABLE IF NOT EXISTS "oc_vcategory" (
 --   "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -364,30 +358,30 @@ CREATE TABLE IF NOT EXISTS "oc_users" (
 -- CREATE INDEX term_index ON oc_account_terms (term);
 -- CREATE INDEX account_id_index ON oc_account_terms (account_id);
 
-CREATE TABLE oc_filecache (
-  fileid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  storage INTEGER DEFAULT 0 NOT NULL REFERENCES oc_storages(numeric_id),
-  path VARCHAR(4000) DEFAULT NULL COLLATE BINARY,
-  path_hash VARCHAR(32) DEFAULT '' NOT NULL COLLATE BINARY,
-  parent BIGINT DEFAULT 0 NOT NULL, --- references self?
-  name VARCHAR(250) DEFAULT NULL COLLATE BINARY,
-  mimetype INTEGER DEFAULT 0 NOT NULL,
-  mimepart INTEGER DEFAULT 0 NOT NULL,
-  size BIGINT DEFAULT 0 NOT NULL,
-  encrypted INTEGER DEFAULT 0 NOT NULL,
-  unencrypted_size BIGINT DEFAULT 0 NOT NULL,
-  etag VARCHAR(40) DEFAULT NULL COLLATE BINARY,
-  permissions INTEGER DEFAULT 0,
-  checksum VARCHAR(255) DEFAULT NULL COLLATE BINARY,
-  mtime BIGINT DEFAULT 0 NOT NULL,
-  storage_mtime BIGINT DEFAULT 0 NOT NULL
-);
+-- CREATE TABLE oc_filecache (
+--   fileid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+--   storage INTEGER DEFAULT 0 NOT NULL REFERENCES oc_storages(numeric_id),
+--   path VARCHAR(4000) DEFAULT NULL COLLATE BINARY,
+--   path_hash VARCHAR(32) DEFAULT '' NOT NULL COLLATE BINARY,
+--   parent BIGINT DEFAULT 0 NOT NULL, --- references self?
+--   name VARCHAR(250) DEFAULT NULL COLLATE BINARY,
+--   mimetype INTEGER DEFAULT 0 NOT NULL,
+--   mimepart INTEGER DEFAULT 0 NOT NULL,
+--   size BIGINT DEFAULT 0 NOT NULL,
+--   encrypted INTEGER DEFAULT 0 NOT NULL,
+--   unencrypted_size BIGINT DEFAULT 0 NOT NULL,
+--   etag VARCHAR(40) DEFAULT NULL COLLATE BINARY,
+--   permissions INTEGER DEFAULT 0,
+--   checksum VARCHAR(255) DEFAULT NULL COLLATE BINARY,
+--   mtime BIGINT DEFAULT 0 NOT NULL,
+--   storage_mtime BIGINT DEFAULT 0 NOT NULL
+-- );
 
-CREATE INDEX fs_storage_size ON oc_filecache (storage, size, fileid);
-CREATE INDEX fs_storage_mimepart ON oc_filecache (storage, mimepart);
-CREATE INDEX fs_storage_mimetype ON oc_filecache (storage, mimetype);
-CREATE INDEX fs_parent_name_hash ON oc_filecache (parent, name);
-CREATE UNIQUE INDEX fs_storage_path_hash ON oc_filecache (storage, path_hash);
+-- CREATE INDEX fs_storage_size ON oc_filecache (storage, size, fileid);
+-- CREATE INDEX fs_storage_mimepart ON oc_filecache (storage, mimepart);
+-- CREATE INDEX fs_storage_mimetype ON oc_filecache (storage, mimetype);
+-- CREATE INDEX fs_parent_name_hash ON oc_filecache (parent, name);
+-- CREATE UNIQUE INDEX fs_storage_path_hash ON oc_filecache (storage, path_hash);
 
 -- CREATE TABLE oc_persistent_locks (
 --   id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -473,44 +467,44 @@ CREATE UNIQUE INDEX fs_storage_path_hash ON oc_filecache (storage, path_hash);
 
 -- CREATE INDEX fileid_index ON oc_properties (fileid);
 
-CREATE TABLE IF NOT EXISTS "oc_activity_mq" (
-  "mail_id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  "amq_timestamp" INTEGER DEFAULT 0 NOT NULL,
-  "amq_latest_send" INTEGER DEFAULT 0 NOT NULL,
-  "amq_type" VARCHAR(255) NOT NULL,
-  "amq_affecteduser" VARCHAR(64) NOT NULL REFERENCES oc_users(uid),
-  "amq_appid" VARCHAR(255) NOT NULL,
-  "amq_subject" VARCHAR(255) NOT NULL,
-  "amq_subjectparams" VARCHAR(4000) NOT NULL
-);
+-- CREATE TABLE IF NOT EXISTS "oc_activity_mq" (
+--   "mail_id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+--   "amq_timestamp" INTEGER DEFAULT 0 NOT NULL,
+--   "amq_latest_send" INTEGER DEFAULT 0 NOT NULL,
+--   "amq_type" VARCHAR(255) NOT NULL,
+--   "amq_affecteduser" VARCHAR(64) NOT NULL REFERENCES oc_users(uid),
+--   "amq_appid" VARCHAR(255) NOT NULL,
+--   "amq_subject" VARCHAR(255) NOT NULL,
+--   "amq_subjectparams" VARCHAR(4000) NOT NULL
+-- );
 
-CREATE INDEX amp_user ON "oc_activity_mq" ("amq_affecteduser");
-CREATE INDEX amp_latest_send_time ON "oc_activity_mq" ("amq_latest_send");
-CREATE INDEX amp_timestamp_time ON "oc_activity_mq" ("amq_timestamp");
+-- CREATE INDEX amp_user ON "oc_activity_mq" ("amq_affecteduser");
+-- CREATE INDEX amp_latest_send_time ON "oc_activity_mq" ("amq_latest_send");
+-- CREATE INDEX amp_timestamp_time ON "oc_activity_mq" ("amq_timestamp");
 
-CREATE TABLE oc_activity (
-  activity_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  timestamp INTEGER DEFAULT 0 NOT NULL,
-  priority INTEGER DEFAULT 0 NOT NULL,
-  type VARCHAR(255) DEFAULT NULL COLLATE BINARY,
-  user VARCHAR(64) DEFAULT NULL REFERENCES oc_users(uid) COLLATE BINARY,
-  affecteduser VARCHAR(64) NOT NULL REFERENCES oc_users(uid) COLLATE BINARY,
-  app VARCHAR(255) NOT NULL COLLATE BINARY,
-  subject VARCHAR(255) NOT NULL COLLATE BINARY,
-  subjectparams CLOB NOT NULL COLLATE BINARY,
-  message VARCHAR(255) DEFAULT NULL COLLATE BINARY,
-  messageparams CLOB DEFAULT NULL COLLATE BINARY,
-  file VARCHAR(4000) DEFAULT NULL COLLATE BINARY,
-  link VARCHAR(4000) DEFAULT NULL COLLATE BINARY,
-  object_type VARCHAR(255) DEFAULT NULL COLLATE BINARY,
-  object_id BIGINT DEFAULT 0 NOT NULL
-);
+-- CREATE TABLE oc_activity (
+--   activity_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+--   timestamp INTEGER DEFAULT 0 NOT NULL,
+--   priority INTEGER DEFAULT 0 NOT NULL,
+--   type VARCHAR(255) DEFAULT NULL COLLATE BINARY,
+--   user VARCHAR(64) DEFAULT NULL REFERENCES oc_users(uid) COLLATE BINARY,
+--   affecteduser VARCHAR(64) NOT NULL REFERENCES oc_users(uid) COLLATE BINARY,
+--   app VARCHAR(255) NOT NULL COLLATE BINARY,
+--   subject VARCHAR(255) NOT NULL COLLATE BINARY,
+--   subjectparams CLOB NOT NULL COLLATE BINARY,
+--   message VARCHAR(255) DEFAULT NULL COLLATE BINARY,
+--   messageparams CLOB DEFAULT NULL COLLATE BINARY,
+--   file VARCHAR(4000) DEFAULT NULL COLLATE BINARY,
+--   link VARCHAR(4000) DEFAULT NULL COLLATE BINARY,
+--   object_type VARCHAR(255) DEFAULT NULL COLLATE BINARY,
+--   object_id BIGINT DEFAULT 0 NOT NULL
+-- );
 
-CREATE INDEX activity_object ON oc_activity (object_type, object_id);
-CREATE INDEX activity_filter_app ON oc_activity (affecteduser, app, timestamp);
-CREATE INDEX activity_filter_by ON oc_activity (affecteduser, user, timestamp);
-CREATE INDEX activity_user_time ON oc_activity (affecteduser, timestamp);
-CREATE INDEX activity_time ON oc_activity (timestamp);
+-- CREATE INDEX activity_object ON oc_activity (object_type, object_id);
+-- CREATE INDEX activity_filter_app ON oc_activity (affecteduser, app, timestamp);
+-- CREATE INDEX activity_filter_by ON oc_activity (affecteduser, user, timestamp);
+-- CREATE INDEX activity_user_time ON oc_activity (affecteduser, timestamp);
+-- CREATE INDEX activity_time ON oc_activity (timestamp);
 
 -- CREATE TABLE oc_federated_reshares (
 --   share_id BIGINT NOT NULL,
@@ -531,34 +525,43 @@ CREATE INDEX activity_time ON oc_activity (timestamp);
 
 -- CREATE UNIQUE INDEX url_hash ON "oc_trusted_servers" ("url_hash");
 
-CREATE TABLE oc_share (
-  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  share_type SMALLINT DEFAULT 0 NOT NULL,
-  share_with VARCHAR(255) DEFAULT NULL COLLATE BINARY,
-  uid_owner VARCHAR(64) DEFAULT '' NOT NULL REFERENCES oc_users(uid) COLLATE BINARY,
-  uid_initiator VARCHAR(64) DEFAULT NULL REFERENCES oc_users(uid) COLLATE BINARY,
-  parent INTEGER DEFAULT NULL,
-  item_type VARCHAR(64) DEFAULT '' NOT NULL COLLATE BINARY,
-  item_source VARCHAR(255) DEFAULT NULL COLLATE BINARY,
-  item_target VARCHAR(255) DEFAULT NULL COLLATE BINARY,
-  file_target VARCHAR(512) DEFAULT NULL COLLATE BINARY,
-  permissions SMALLINT DEFAULT 0 NOT NULL,
-  stime BIGINT DEFAULT 0 NOT NULL,
-  accepted SMALLINT DEFAULT 0 NOT NULL,
-  expiration DATETIME DEFAULT NULL,
-  token VARCHAR(32) DEFAULT NULL COLLATE BINARY,
-  mail_send SMALLINT DEFAULT 0 NOT NULL,
-  share_name VARCHAR(64) DEFAULT NULL COLLATE BINARY,
-  file_source BIGINT DEFAULT NULL,
-  attributes CLOB DEFAULT NULL COLLATE BINARY
+
+CREATE TABLE  oc_users (
+  uid VARCHAR(64) NOT NULL,
+  PII_displayname VARCHAR(64),
+  password VARCHAR(255) NOT NULL,
+  PRIMARY KEY(uid)
 );
 
-CREATE INDEX item_source_index ON oc_share (item_source);
-CREATE INDEX item_share_type_index ON oc_share (item_type, share_type);
-CREATE INDEX file_source_index ON oc_share (file_source);
-CREATE INDEX token_index ON oc_share (token);
-CREATE INDEX share_with_index ON oc_share (share_with);
-CREATE INDEX item_source_type_index ON oc_share (item_source, share_type, item_type);
+CREATE TABLE oc_share (
+  id INT NOT NULL,
+  share_type INT NOT NULL,
+  OWNER_share_with VARCHAR(255) REFERENCES oc_users(uid),
+  --share_with_group VARCHAR(255) REFERENCE oc_groups(gid),
+  uid_owner VARCHAR(64) NOT NULL REFERENCES oc_users(uid),
+  uid_initiator VARCHAR(64) REFERENCES oc_users(uid),
+  parent INT ,
+  item_type VARCHAR(64) NOT NULL ,
+  item_source VARCHAR(255),
+  item_target VARCHAR(255),
+  file_target VARCHAR(512),
+  permissions INT NOT NULL,
+  stime INT NOT NULL,
+  accepted INT NOT NULL,
+  expiration DATETIME ,
+  token VARCHAR(32),
+  mail_send INT NOT NULL,
+  share_name VARCHAR(64),
+  file_source INT,
+  attributes TEXT
+);
+
+-- CREATE INDEX item_source_index ON oc_share (item_source);
+-- CREATE INDEX item_share_type_index ON oc_share (item_type, share_type);
+-- CREATE INDEX file_source_index ON oc_share (file_source);
+-- CREATE INDEX token_index ON oc_share (token);
+-- CREATE INDEX share_with_index ON oc_share (share_with);
+-- CREATE INDEX item_source_type_index ON oc_share (item_source, share_type, item_type);
 
 -- CREATE TABLE oc_share_external (
 --   id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,

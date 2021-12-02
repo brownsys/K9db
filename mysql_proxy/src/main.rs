@@ -155,7 +155,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             // tell client no more rows coming. Returns an empty Ok to the proxy
             rw.finish()
         } else {
-            error!(self.log, "Rust proxy: unsupported query type");
+            error!(self.log, "Rust proxy: unsupported query type '{}'", q_string);
             results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
         }
     }
@@ -193,8 +193,8 @@ fn main() {
     info!(log, "Rust Proxy: Listening at: {:?}", listener);
 
     let join_handle = std::thread::spawn(move || {
-        let log = log.clone();
-        if let Ok((stream, _addr)) = listener.accept() {
+        let ref log = log.clone();
+        while let Ok((stream, _addr)) = listener.accept() {
             info!(log,
                 "Rust Proxy: Successfully connected to mysql proxy\nStream and address are: {:?}",
                 stream
@@ -205,7 +205,7 @@ fn main() {
                 "Rust Proxy: connection status is: {:?}",
                 rust_conn.connected
             );
-            let backend = Backend { rust_conn : rust_conn, runtime : Duration::new(0, 0), log : log };
+            let backend = Backend { rust_conn : rust_conn, runtime : Duration::new(0, 0), log : log.clone() };
             let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
         }
     });

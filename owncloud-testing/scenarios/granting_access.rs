@@ -46,7 +46,7 @@ fn main() {
             get_share,
             (share_id,)
         ).unwrap().unwrap();
-        t.commit();
+        t.commit().unwrap();
     }
 
     let obj_id = 24;
@@ -84,6 +84,6 @@ fn main() {
          time,
          time,
         )
-    );
+    ).unwrap();
 
 }
