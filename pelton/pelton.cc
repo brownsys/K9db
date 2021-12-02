@@ -68,7 +68,15 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
   // Parse and rewrite statement.
   shards::SharderState *sstate = connection->GetSharderState();
   dataflow::DataFlowState *dstate = connection->GetDataFlowState();
-  return shards::sqlengine::Shard(sql, sstate, dstate);
+  try {
+    return shards::sqlengine::Shard(sql, sstate, dstate);
+  } catch (::sql::SQLException &e) {
+    std::stringstream msg;
+    msg << "MySQL exception encountered ";
+    msg << e.getMessage() << " (" << e.what() << ")";
+
+    return absl::InternalError(msg.str());
+  }
 }
 
 void shutdown_planner() { planner::ShutdownPlanner(); }
