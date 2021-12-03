@@ -9,13 +9,13 @@
 -- CREATE INDEX appconfig_config_key_index ON "oc_appconfig" ("configkey");
 -- CREATE INDEX appconfig_appid_key ON "oc_appconfig" ("appid");
 
--- CREATE TABLE "oc_storages" (
---   "id" VARCHAR(64) ,
---   "numeric_id" INT NOT NULL,
---   "available" INT NOT NULL,
---   "last_checked" INT,
---   PRIMARY KEY (numeric_id)
--- );
+CREATE TABLE oc_storages (
+  id VARCHAR(64) ,
+  numeric_id INT NOT NULL,
+  available INT NOT NULL,
+  last_checked INT,
+  PRIMARY KEY (numeric_id)
+);
 
 -- CREATE UNIQUE INDEX storages_id_index ON "oc_storages" ("id");
 
@@ -358,24 +358,24 @@
 -- CREATE INDEX term_index ON oc_account_terms (term);
 -- CREATE INDEX account_id_index ON oc_account_terms (account_id);
 
--- CREATE TABLE oc_filecache (
---   fileid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
---   storage INTEGER DEFAULT 0 NOT NULL REFERENCES oc_storages(numeric_id),
---   path VARCHAR(4000) DEFAULT NULL COLLATE BINARY,
---   path_hash VARCHAR(32) DEFAULT '' NOT NULL COLLATE BINARY,
---   parent BIGINT DEFAULT 0 NOT NULL, --- references self?
---   name VARCHAR(250) DEFAULT NULL COLLATE BINARY,
---   mimetype INTEGER DEFAULT 0 NOT NULL,
---   mimepart INTEGER DEFAULT 0 NOT NULL,
---   size BIGINT DEFAULT 0 NOT NULL,
---   encrypted INTEGER DEFAULT 0 NOT NULL,
---   unencrypted_size BIGINT DEFAULT 0 NOT NULL,
---   etag VARCHAR(40) DEFAULT NULL COLLATE BINARY,
---   permissions INTEGER DEFAULT 0,
---   checksum VARCHAR(255) DEFAULT NULL COLLATE BINARY,
---   mtime BIGINT DEFAULT 0 NOT NULL,
---   storage_mtime BIGINT DEFAULT 0 NOT NULL
--- );
+CREATE TABLE oc_filecache (
+  fileid INTEGER PRIMARY KEY NOT NULL,
+  storage INTEGER NOT NULL REFERENCES oc_storages(numeric_id),
+  path VARCHAR(4000),
+  path_hash VARCHAR(32) NOT NULL,
+  parent INT NOT NULL,
+  name VARCHAR(250),
+  mimetype INTEGER NOT NULL,
+  mimepart INTEGER NOT NULL,
+  size INT NOT NULL,
+  encrypted INTEGER NOT NULL,
+  unencrypted_size INT NOT NULL,
+  etag VARCHAR(40),
+  permissions INTEGER,
+  checksum VARCHAR(255),
+  mtime INT NOT NULL,
+  storage_mtime INT NOT NULL
+);
 
 -- CREATE INDEX fs_storage_size ON oc_filecache (storage, size, fileid);
 -- CREATE INDEX fs_storage_mimepart ON oc_filecache (storage, mimepart);

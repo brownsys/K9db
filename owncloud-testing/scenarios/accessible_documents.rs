@@ -22,7 +22,8 @@ fn main() {
          FROM oc_share s
          LEFT JOIN oc_filecache f ON s.file_source = f.fileid
          LEFT JOIN oc_storages st ON f.storage = st.numeric_id
-         WHERE ((share_type = '0') AND (share_with = ?)) ORDER BY s.id ASC",
+         WHERE ((share_type = '0') AND (OWNER_share_with = ?)) 
+         ORDER BY s.id ASC",
     ).unwrap();
 
     // let grps : Vec<String> = conn.exec(
@@ -33,8 +34,10 @@ fn main() {
     // FIXME This should be the entire vector, but value cannot hold a vector. 
     //let grps_as_val : Value = (&grps[0]).into();
 
-    let _files : Vec<Row> = conn.exec(
+    let files : Vec<Row> = conn.exec(
         get_files,
-        (user_id,)
+        ("wong",)
     ).unwrap();
+
+    println!("Found shares {:?}", files);
 }
