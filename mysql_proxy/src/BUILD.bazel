@@ -42,6 +42,7 @@ rust_binary(
         "//mysql_proxy:slog_term",
         "//mysql_proxy:regex",
         "//mysql_proxy/src/ffi",
+        "//mysql_proxy:lazy_static",
     ],
 )
 

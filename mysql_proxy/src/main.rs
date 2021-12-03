@@ -9,6 +9,8 @@ extern crate msql_srv;
 extern crate proxy_ffi;
 extern crate regex;
 extern crate slog_term;
+#[macro_use]
+extern crate lazy_static;
 
 use msql_srv::*;
 use proxy_ffi::*;
@@ -35,6 +37,11 @@ static NO_VIEWS: [&'static str; 2] = [
     "SELECT * FROM tbl WHERE id = ? AND age > ?",
     // TODO: add lobsters here.
 ];
+
+lazy_static! {
+    static ref PARAMETER_REGEX : Regex = Regex::new(
+        r"(?:\b|\s)(?P<expr>[A-Za-z_0-9`]+\s*[=><]\s*)\?").unwrap();
+}
 
 #[derive(Debug)]
 struct Backend {
@@ -92,8 +99,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             // "SELECT * FROM q0 WHERE col=?", where q0 is the view name
             // assigned to the prepared statement, makes parameterizing and
             // executing prepared statement later easier.
-            let re = Regex::new(r"\s(?P<expr>[A-Za-z_0-9`]+\s*[=><]\s*)\?").unwrap();
-            let mut view_query: Vec<String> = re
+            let mut view_query: Vec<String> = PARAMETER_REGEX
                 .captures_iter(prepared_statement)
                 .map(|caps| caps["expr"].to_string())
                 .collect();

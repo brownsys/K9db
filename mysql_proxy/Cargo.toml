@@ -13,6 +13,7 @@ slog-term = "2.8.0"
 ctrlc = "3.1.9"
 gflags = "0.3"
 regex = "0.2"
+lazy_static = "1.4.0"
 
 [build-dependencies]
 bindgen = "0.32.2"
