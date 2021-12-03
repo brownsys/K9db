@@ -6,11 +6,11 @@ rm -rf cargo && /root/.cargo/bin/cargo raze
 cd -
 
 # Run Mariadb.
-echo "Running mysqld ..."
-mysqld &
-MYSQLID=$!
+echo "Running mariadbd ..."
+mariadbd &
+MARIADBID=$!
 
-# sleep until mysql/mariadb is up
+# sleep until mariadb is up
 sleep 10
 
 if [[ -f "/home/configure_db.sql" ]]; then
@@ -22,5 +22,5 @@ if [[ -f "/home/configure_db.sql" ]]; then
   fi
 fi
 
-wait $MYSQLID
-echo "mysqld exited! $?"
+wait $MARIADBID
+echo "mariadbd exited! $?"

@@ -113,5 +113,4 @@ RUN chmod 750 /home/configure_db.sh
 
 ENTRYPOINT ["/bin/bash", "./home/configure_db.sh"]
 
-
 # Run with docker run -v .:/home/pelton
