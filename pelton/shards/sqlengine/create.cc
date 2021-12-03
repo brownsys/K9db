@@ -349,7 +349,7 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt
     LOG(INFO) << "Skipping index creation, already exists.";
     result = sql::SqlResult(true);
   } else {
-    const std::string &index_name = relationship_table_name + "_" + my_col_name + "_index";
+    const std::string &index_name = state->GenerateUniqueIndexName(lock);
     const sqlast::CreateIndex create_index(
       index_name,
       relationship_table_name,

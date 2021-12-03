@@ -109,6 +109,11 @@ class SharderState {
                    const FlowName &flow_name,
                    const sqlast::CreateIndex &create_index_stmt, bool unique);
 
+  inline std::string GenerateUniqueIndexName(UniqueLock *lock) {
+      this->_unique_index_ctr += 1;
+      return "_unq_indx_" + std::to_string(this->_unique_index_ctr);
+  }
+
   sql::SqlResult NumShards() const;
 
   // Synchronization.
@@ -170,6 +175,8 @@ class SharderState {
 
   // Our implementation of an upgradable shared mutex.
   mutable UpgradableMutex mtx_;
+
+  unsigned int _unique_index_ctr = 0;
 };
 
 }  // namespace shards
