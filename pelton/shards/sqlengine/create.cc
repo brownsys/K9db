@@ -319,7 +319,8 @@ sqlast::CreateTable UpdateTableSchema(sqlast::CreateTable stmt,
 
 absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt,
                                const OwningTable &owning_table,
-                               Connection *connection)
+                               Connection *connection,
+                               UniqueLock *lock)
                                {
   sql::SqlResult result;
   SharderState* state = connection->state->sharder_state();
@@ -355,9 +356,10 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt
       my_col_name
     );
 
-    auto res = index::CreateIndex(
+    auto res = index::CreateIndexStateIsAlreadyLocked(
       create_index,
-      connection
+      connection,
+      lock
     );
 
     if (res.ok()) 
@@ -468,7 +470,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
   if (owning_table) {
     if (has_pii)
       return absl::UnimplementedError("'OWNING' tables cannot be data subject tables!");
-    CHECK_STATUS(HandleOwningTable(stmt, *owning_table, connection));
+    CHECK_STATUS(HandleOwningTable(stmt, *owning_table, connection, &lock));
     result = sql::SqlResult(true);
   }
 

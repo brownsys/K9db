@@ -21,11 +21,19 @@ namespace index {
 absl::StatusOr<sql::SqlResult> CreateIndex(const sqlast::CreateIndex &stmt,
                                            Connection *connection) {
   perf::Start("Create Index");
-  const std::string &table_name = stmt.table_name();
 
   // Need a unique lock as we are changing index metadata
+  UniqueLock lock = connection->state->sharder_state()->WriterLock();
+  return CreateIndexStateIsAlreadyLocked(stmt, connection, &lock);
+}
+
+absl::StatusOr<sql::SqlResult> CreateIndexStateIsAlreadyLocked(
+  const sqlast::CreateIndex &stmt,
+  Connection *connection,
+  UniqueLock *lock) 
+{
+  const std::string &table_name = stmt.table_name();
   shards::SharderState *state = connection->state->sharder_state();
-  UniqueLock lock = state->WriterLock();
 
   sql::SqlResult result = sql::SqlResult(false);
   bool is_sharded = state->IsSharded(table_name);
@@ -63,7 +71,7 @@ absl::StatusOr<sql::SqlResult> CreateIndex(const sqlast::CreateIndex &stmt,
       sqlast::CreateView create_view{index_name, query};
 
       // Install flow.
-      CHECK_STATUS(view::CreateView(create_view, connection, &lock));
+      CHECK_STATUS(view::CreateView(create_view, connection, lock));
 
       // Store the index metadata.
       state->CreateIndex(info.shard_kind, table_name, column_name,
