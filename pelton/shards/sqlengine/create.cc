@@ -317,6 +317,12 @@ sqlast::CreateTable UpdateTableSchema(sqlast::CreateTable stmt,
   return stmt;
 }
 
+const sqlast::CreateTable ResolveTableSchema(const SharderState &state, const UnshardedTableName &table_name) {
+  // if (state.IsSharded(target_table_name))
+  //   return absl::UnimplementedError("Owning tables should not be sharded yet");
+  return state.GetSchema(table_name);
+}
+
 absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt,
                                const OwningTable &owning_table,
                                Connection *connection,
@@ -330,10 +336,8 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt
   // It was probably installed without any sharding before
   if (!state->Exists(target_table_name))
     return absl::UnimplementedError("Owning tables are expected to have been created previously");
-  if (state->IsSharded(target_table_name))
-    return absl::UnimplementedError("Owning tables should not be sharded yet");
 
-  const sqlast::CreateTable &target_table_schema = state->GetSchema(target_table_name);
+  const sqlast::CreateTable &target_table_schema = ResolveTableSchema(*state, target_table_name);
   const ColumnName &my_col_name = owning_table.column_name;
   const ColumnName &other_col_name = owning_table.foreign_column;
   int sharded_by_index = target_table_schema.ColumnIndex(other_col_name);

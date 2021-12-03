@@ -27,7 +27,7 @@ CREATE TABLE oc_filecache (
 CREATE TABLE oc_files (
   id INTEGER PRIMARY KEY NOT NULL,
   file_name VARCHAR(255),
-  owner VARCHAR(64)
+  OWNER_owner VARCHAR(64)
 );
 
 CREATE TABLE  oc_users (

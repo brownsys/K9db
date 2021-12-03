@@ -28,6 +28,23 @@ std::string Dequote(const std::string &st) {
   return s;
 }
 
+const ShardedTableName &VarownShardedTableName(
+  const SharderState &state, 
+  const UnshardedTableName &target_table,
+  const std::string &column_name,
+  const UnshardedTableName &source_table) 
+{
+  for (auto & info : state.GetShardingInformation(target_table)) {
+    LOG(INFO) << "Found sharding info on column " << info.shard_by << " and shard kind " << info.shard_kind << " and next column " << info.next_column << " and next table " << info.next_table;
+    if (info.next_column == column_name && info.next_table == source_table) {
+      return info.sharded_table_name;
+    }
+  }
+  // I really tried to make this work with abseil, but I was unable to make `StatusOr` work with 
+  // references
+  throw std::runtime_error("Could not find sharded schema for table " + target_table + " on column " + column_name);
+}
+
 absl::Status MaybeHandleOwningColumn(
   const sqlast::Insert &stmt,
   const sqlast::Insert &cloned,
@@ -78,11 +95,9 @@ absl::Status MaybeHandleOwningColumn(
           std::move(binexp)
         );
         const sqlast::CreateTable schema = state->GetSchema(target_table);
-        auto &sharding_info = state->GetShardingInformation(target_table);
-        if (sharding_info.size() != 1)
-          return absl::InternalError("Not implemented");
+        const ShardedTableName &sharded_table = VarownShardedTableName(*state, target_table, col.column_name(), stmt.table_name());
         sqlast::Insert insert(
-          sharding_info.front().sharded_table_name
+          sharded_table
         );
         for (auto &col0 : schema.GetColumns()) {
           insert.AddColumn(col0.column_name());
