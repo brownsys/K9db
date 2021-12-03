@@ -13,8 +13,15 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
                                                                size_t size) {
   // INSERT INTO <tablename> VALUES(<val>, <val>, <val>, ...)
   // INSERT.
-  if (!StartsWith(&str, &size, "INSERT", 6)) {
-    return absl::InvalidArgumentError("Hacky insert: INSERT");
+  const char *replace_buf = str;
+  size_t replace_size = size;
+  bool insert = StartsWith(&str, &size, "INSERT", 6);
+  bool replace = StartsWith(&replace_buf, &replace_size, "REPLACE", 7);
+  if (!insert && !replace) {
+    return absl::InvalidArgumentError("Hacky insert: INSERT | REPLACE");
+  } else if (replace) {
+    str = replace_buf;
+    size = replace_size;
   }
   ConsumeWhiteSpace(&str, &size);
 
@@ -32,7 +39,7 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
   ConsumeWhiteSpace(&str, &size);
 
   // Create the insert statement.
-  std::unique_ptr<Insert> stmt = std::make_unique<Insert>(table_name);
+  std::unique_ptr<Insert> stmt = std::make_unique<Insert>(table_name, replace);
 
   // VALUES.
   if (!StartsWith(&str, &size, "VALUES", 6)) {
@@ -182,7 +189,7 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyParse(
   size_t size = sql.size();
   const char *str = sql.c_str();
 
-  if (str[0] == 'I' || str[0] == 'i') {
+  if (str[0] == 'I' || str[0] == 'i' || str[0] == 'R' || str[0] == 'r') {
     return HackyInsert(str, size);
   }
   if (str[0] == 'S' || str[0] == 's') {

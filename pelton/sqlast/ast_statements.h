@@ -18,13 +18,16 @@ namespace sqlast {
 // Insert statement.
 class Insert : public AbstractStatement {
  public:
-  explicit Insert(const std::string &table_name)
+  Insert(const std::string &table_name, bool replace)
       : AbstractStatement(AbstractStatement::Type::INSERT),
-        table_name_(table_name) {}
+        table_name_(table_name),
+        replace_(replace) {}
 
   // Accessors.
   const std::string &table_name() const;
   std::string &table_name();
+  bool replace() const;
+  bool &replace();
 
   // Columns and Values.
   bool HasColumns() const;
@@ -38,8 +41,8 @@ class Insert : public AbstractStatement {
 
   absl::StatusOr<std::string> RemoveValue(const std::string &colname);
   std::string RemoveValue(size_t index);
-  absl::StatusOr<std::string> GetValue(const std::string &colname);
-  const std::string &GetValue(size_t index);
+  absl::StatusOr<std::string> GetValue(const std::string &colname) const;
+  const std::string &GetValue(size_t index) const;
 
   // Visitor pattern.
   template <class T>
@@ -63,6 +66,7 @@ class Insert : public AbstractStatement {
   std::string table_name_;
   std::vector<std::string> columns_;
   std::vector<std::string> values_;
+  bool replace_;
 };
 
 class Select : public AbstractStatement {

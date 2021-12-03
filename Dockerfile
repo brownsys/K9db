@@ -43,11 +43,13 @@ RUN /root/.cargo/bin/cargo install cargo-raze
 
 # install mariadb
 RUN apt-get remove -y --purge mysql*
-RUN apt-get install -y mariadb-server
+
+RUN curl -LsS -O https://downloads.mariadb.com/MariaDB/mariadb_repo_setup
+RUN bash mariadb_repo_setup --mariadb-server-version=10.6
+RUN rm mariadb_repo_setup
+RUN apt-get install -y mariadb-server-10.6 mariadb-client-10.6
 RUN apt-get install -y mariadb-plugin-rocksdb
-RUN echo "[mariadb]" >> /etc/mysql/mariadb.cnf \
-    && echo "plugin_load_add = ha_rocksdb" >> /etc/mysql/mariadb.cnf \
-    && echo "[mysqld]" >> /etc/mysql/mariadb.cnf \
+RUN echo "[mysqld]" >> /etc/mysql/mariadb.cnf \
     && echo "table_open_cache_instances = 1" >> /etc/mysql/mariadb.cnf \
     && echo "table_open_cache = 1000000" >> /etc/mysql/mariadb.cnf \
     && echo "table_definition_cache = 1000000" >> /etc/mysql/mariadb.cnf \

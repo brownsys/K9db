@@ -355,7 +355,14 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     return absl::UnimplementedError("Sharded Table cannot have PII fields!");
   }
 
-  state->AddSchema(table_name, stmt);
+  // Add table schema and its PK column.
+  auto pk_result = GetPK(stmt);
+  if (pk_result.ok()) {
+    const std::string &pk = pk_result.value();
+    state->AddSchema(table_name, stmt, stmt.ColumnIndex(pk), pk);
+  } else {
+    state->AddSchema(table_name, stmt, -1, "");
+  }
   dataflow_state->AddTableSchema(stmt);
 
   perf::End("Create");

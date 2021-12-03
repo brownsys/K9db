@@ -132,8 +132,6 @@ int main(int argc, char **argv) {
       } else if (command[0] == '-' && command[1] == '-') {
         current_endpoint = profiler.Measure(command);
         continue;
-      } else if (command.substr(0, 8) == "REPLACE ") {
-        continue;
       } else if (std::find(TO_SKIP.begin(), TO_SKIP.end(), current_endpoint) !=
                  TO_SKIP.end()) {
         continue;

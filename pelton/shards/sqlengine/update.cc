@@ -77,7 +77,7 @@ bool ModifiesShardBy(const sqlast::Update &stmt, SharderState *state) {
 // table_schema to resolve types of values.
 sqlast::Insert InsertRecord(const dataflow::Record &record,
                             const sqlast::CreateTable &table_schema) {
-  sqlast::Insert stmt{table_schema.table_name()};
+  sqlast::Insert stmt{table_schema.table_name(), false};
   for (size_t i = 0; i < table_schema.GetColumns().size(); i++) {
     sqlast::ColumnDefinition::Type type =
         table_schema.GetColumns().at(i).column_type();

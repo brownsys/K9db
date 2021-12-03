@@ -288,6 +288,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         } else if q_string.starts_with("UPDATE")
             || q_string.starts_with("DELETE")
             || q_string.starts_with("INSERT")
+            || q_string.starts_with("REPLACE")
             || q_string.starts_with("GDPR FORGET")
         {
             let update_response = exec_update_ffi(&mut self.rust_conn, q_string);
