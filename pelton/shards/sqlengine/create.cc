@@ -253,7 +253,8 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState *state,
       const auto &info_list = state->GetShardingInformation(table_name);
       const auto info = info_list.front();
       bool anonymize = absl::StartsWith(column_name, "ACCESSOR_ANONYMIZE");
-      sqlast::ColumnDefinition::Type anonymize_column_type = columns[index].column_type();
+      sqlast::ColumnDefinition::Type anonymize_column_type =
+          columns[index].column_type();
       state->AddAccessorIndex(shard_string, table_name, column_name,
                               info.shard_by, index_prefix + "_" + info.shard_by,
                               anonymize, anonymize_column_type);

@@ -27,6 +27,6 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
-        "//pelton/sqlast:ast"
+        "//pelton/sqlast:ast",
     ],
 )

@@ -70,6 +70,7 @@ cc_test(
     ],
 )
 
+# TODO: uncomment when testing harness supports multi-result sets with different schemas
 # cc_test(
 #     name = "delf_ecommerce",
 #     srcs = [

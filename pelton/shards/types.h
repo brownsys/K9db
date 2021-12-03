@@ -4,6 +4,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -59,7 +60,7 @@ struct AccessorIndexInformation {
 
   AccessorIndexInformation(const ShardKind &sk, const UnshardedTableName &tn,
                            const ColumnName &cn, const ColumnName &sbcn,
-                           const IndexName &in, const bool &an, 
+                           const IndexName &in, const bool &an,
                            const sqlast::ColumnDefinition::Type &at)
       : shard_kind(sk),
         table_name(tn),
