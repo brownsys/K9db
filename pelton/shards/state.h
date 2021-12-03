@@ -34,7 +34,7 @@ namespace shards {
 // kinds. It also keeps an in-memory cache of the user tables, and uses them
 // as a shard directory.
 class SharderState {
- public:
+public:
   // Constructor.
   SharderState() = default;
 
@@ -64,21 +64,21 @@ class SharderState {
                        const ShardingInformation &sharding_information,
                        const sqlast::CreateTable &sharded_create_statement);
 
-  std::list<const sqlast::AbstractStatement *> CreateShard(
-      const ShardKind &shard_kind, const UserId &user);
+  std::list<const sqlast::AbstractStatement *>
+  CreateShard(const ShardKind &shard_kind, const UserId &user);
 
   void RemoveUserFromShard(const ShardKind &kind, const UserId &user_id);
 
   // Schema lookups.
-  const sqlast::CreateTable &GetSchema(
-      const UnshardedTableName &table_name) const;
+  const sqlast::CreateTable &
+  GetSchema(const UnshardedTableName &table_name) const;
 
   bool Exists(const UnshardedTableName &table) const;
 
   bool IsSharded(const UnshardedTableName &table) const;
 
-  const std::list<ShardingInformation> &GetShardingInformation(
-      const UnshardedTableName &table) const;
+  const std::list<ShardingInformation> &
+  GetShardingInformation(const UnshardedTableName &table) const;
 
   bool IsPII(const UnshardedTableName &table) const;
 
@@ -88,16 +88,16 @@ class SharderState {
 
   const std::unordered_set<UserId> &UsersOfShard(const ShardKind &kind) const;
 
-  const std::unordered_set<UnshardedTableName> &TablesInShard(
-      const ShardKind &kind) const;
+  const std::unordered_set<UnshardedTableName> &
+  TablesInShard(const ShardKind &kind) const;
 
   // Manage secondary indices.
   bool HasIndexFor(const UnshardedTableName &table_name,
                    const ColumnName &column_name,
                    const ColumnName &shard_by) const;
 
-  const std::unordered_set<ColumnName> &IndicesFor(
-      const UnshardedTableName &table_name);
+  const std::unordered_set<ColumnName> &
+  IndicesFor(const UnshardedTableName &table_name);
 
   const FlowName &IndexFlow(const UnshardedTableName &table_name,
                             const ColumnName &column_name,
@@ -108,6 +108,12 @@ class SharderState {
                    const ColumnName &column_name, const ColumnName &shard_by,
                    const FlowName &flow_name,
                    const sqlast::CreateIndex &create_index_stmt, bool unique);
+
+  PolicyInformation GetPolicyInformation(const ShardKind &shard_kind,
+                                         const UserId user_id) const;
+
+  void SetPolicyInformation(const ShardKind &shard_kind, const UserId user_id,
+                            const PolicyInformation policy_information);
 
   // Save state to durable file.
   void Save(const std::string &dir_path);
@@ -123,7 +129,7 @@ class SharderState {
     return count;
   }
 
- private:
+private:
   // The logical (unsharded) schema of every table.
   std::unordered_map<UnshardedTableName, sqlast::CreateTable> schema_;
 
@@ -178,9 +184,12 @@ class SharderState {
       UnshardedTableName,
       std::unordered_map<ColumnName, std::unordered_map<ColumnName, FlowName>>>
       index_to_flow_;
+
+  std::unordered_map<ShardKind, std::unordered_map<UserId, PolicyInformation>>
+      policy_information_;
 };
 
-}  // namespace shards
-}  // namespace pelton
+} // namespace shards
+} // namespace pelton
 
-#endif  // PELTON_SHARDS_STATE_H_
+#endif // PELTON_SHARDS_STATE_H_

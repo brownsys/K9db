@@ -52,8 +52,8 @@ void DataFlowState::AddFlow(const FlowName &name,
   }
 }
 
-const std::shared_ptr<DataFlowGraph> DataFlowState::GetFlow(
-    const FlowName &name) const {
+const std::shared_ptr<DataFlowGraph>
+DataFlowState::GetFlow(const FlowName &name) const {
   return this->flows_.at(name);
 }
 
@@ -90,12 +90,30 @@ Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
   return record;
 }
 
-void DataFlowState::ProcessRecords(const TableName &table_name,
-                                   const std::vector<Record> &records) {
+void DataFlowState::ProcessRecords(
+    const TableName &table_name,
+    const std::vector<shards::RecordWithPolicy> &records) {
   if (records.size() > 0 && this->HasFlowsFor(table_name)) {
     for (const FlowName &name : this->flows_per_input_table_.at(table_name)) {
       std::shared_ptr<DataFlowGraph> graph = this->flows_.at(name);
-      graph->Process(table_name, records);
+
+      std::vector<Record> raw_records;
+      if (graph->purpose) {
+        // Check for policy compatibility
+        std::string &purpose = *graph->purpose;
+        std::cout << "PURPOSE: " << purpose << std::endl;
+        for (const auto &r : records) {
+          if (r.policy.allows(purpose)) {
+            raw_records.push_back(r.record.Copy());
+          }
+        }
+      } else {
+        for (const auto &r : records) {
+          raw_records.push_back(r.record.Copy());
+        }
+      }
+
+      graph->Process(table_name, raw_records);
     }
   }
 }
@@ -194,5 +212,5 @@ void DataFlowState::Save(const std::string &dir_path) {
   state_file.close();
 }
 
-}  // namespace dataflow
-}  // namespace pelton
+} // namespace dataflow
+} // namespace pelton

@@ -18,7 +18,7 @@ class InputOperator;
 class MatViewOperator;
 
 class DataFlowGraph {
- public:
+public:
   DataFlowGraph() = default;
 
   bool AddNode(std::shared_ptr<Operator> op,
@@ -40,8 +40,8 @@ class DataFlowGraph {
                const std::vector<Record> &records);
 
   // Accessors.
-  const std::unordered_map<std::string, std::shared_ptr<InputOperator>>
-      &inputs() const {
+  const std::unordered_map<std::string, std::shared_ptr<InputOperator>> &
+  inputs() const {
     return this->inputs_;
   }
   const std::vector<std::shared_ptr<MatViewOperator>> &outputs() const {
@@ -61,7 +61,9 @@ class DataFlowGraph {
 
   uint64_t SizeInMemory() const;
 
- private:
+  std::optional<std::string> purpose;
+
+private:
   void AddEdge(std::shared_ptr<Operator> parent,
                std::shared_ptr<Operator> child);
   // Maps input name to associated input operator.
@@ -75,7 +77,7 @@ class DataFlowGraph {
   inline NodeIndex MintNodeIndex() { return this->nodes_.size(); }
 };
 
-}  // namespace dataflow
-}  // namespace pelton
+} // namespace dataflow
+} // namespace pelton
 
-#endif  // PELTON_DATAFLOW_GRAPH_H_
+#endif // PELTON_DATAFLOW_GRAPH_H_

@@ -43,8 +43,8 @@ absl::StatusOr<std::string> GetColumnName(const sqlast::Expression *exp) {
   return absl::InvalidArgumentError("Invalid view where clause: no column!");
 }
 
-absl::StatusOr<std::vector<std::string>> GetCondValues(
-    const sqlast::Expression *exp) {
+absl::StatusOr<std::vector<std::string>>
+GetCondValues(const sqlast::Expression *exp) {
   if (exp->type() != sqlast::Expression::Type::EQ &&
       exp->type() != sqlast::Expression::Type::IN &&
       exp->type() != sqlast::Expression::Type::GREATER_THAN) {
@@ -94,9 +94,9 @@ absl::Status ExtractConstraintsFromAnd(
 }
 
 // Unconstrained select (no where).
-absl::StatusOr<std::vector<dataflow::Record>> SelectViewUnconstrained(
-    std::shared_ptr<dataflow::MatViewOperator> matview, int limit,
-    size_t offset) {
+absl::StatusOr<std::vector<dataflow::Record>>
+SelectViewUnconstrained(std::shared_ptr<dataflow::MatViewOperator> matview,
+                        int limit, size_t offset) {
   // No where condition: we are reading everything (keys and records).
   std::vector<dataflow::Record> records;
   for (const auto &key : matview->Keys()) {
@@ -108,28 +108,29 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewUnconstrained(
 }
 
 // Constrained with equality or related operations.
-absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
-    std::shared_ptr<dataflow::MatViewOperator> matview,
-    const sqlast::BinaryExpression *where, int limit, size_t offset) {
+absl::StatusOr<std::vector<dataflow::Record>>
+SelectViewConstrained(std::shared_ptr<dataflow::MatViewOperator> matview,
+                      const sqlast::BinaryExpression *where, int limit,
+                      size_t offset) {
   const dataflow::SchemaRef &schema = matview->output_schema();
   std::unordered_map<dataflow::ColumnID, std::vector<std::string>> constraints;
   std::vector<dataflow::Record> records;
   switch (where->type()) {
-    // LITERAL, COLUMN, EQ, AND, GREATER_THAN, IN, LIST
-    case sqlast::Expression::Type::EQ:
-    case sqlast::Expression::Type::IN: {
-      ASSIGN_OR_RETURN(std::string column, GetColumnName(where));
-      MOVE_OR_RETURN(std::vector<std::string> values, GetCondValues(where));
-      constraints.insert({schema.IndexOf(column), values});
-      break;
-    }
-    case sqlast::Expression::Type::AND: {
-      ExtractConstraintsFromAnd(where, schema, &constraints);
-      break;
-    }
-    default:
-      return absl::InvalidArgumentError(
-          "Illegal where condition for keyed matview");
+  // LITERAL, COLUMN, EQ, AND, GREATER_THAN, IN, LIST
+  case sqlast::Expression::Type::EQ:
+  case sqlast::Expression::Type::IN: {
+    ASSIGN_OR_RETURN(std::string column, GetColumnName(where));
+    MOVE_OR_RETURN(std::vector<std::string> values, GetCondValues(where));
+    constraints.insert({schema.IndexOf(column), values});
+    break;
+  }
+  case sqlast::Expression::Type::AND: {
+    ExtractConstraintsFromAnd(where, schema, &constraints);
+    break;
+  }
+  default:
+    return absl::InvalidArgumentError(
+        "Illegal where condition for keyed matview");
   }
 
   std::vector<dataflow::Key> keys;
@@ -151,18 +152,18 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
           continue;
         }
         switch (schema.TypeOf(col)) {
-          case sqlast::ColumnDefinition::Type::UINT:
-            copy.AddValue(static_cast<uint64_t>(std::stoull(val)));
-            break;
-          case sqlast::ColumnDefinition::Type::INT:
-            copy.AddValue(static_cast<int64_t>(std::stoll(val)));
-            break;
-          case sqlast::ColumnDefinition::Type::TEXT:
-          case sqlast::ColumnDefinition::Type::DATETIME:
-            copy.AddValue(dataflow::Record::Dequote(val));
-            break;
-          default:
-            return absl::InvalidArgumentError("Unsupported type in view read");
+        case sqlast::ColumnDefinition::Type::UINT:
+          copy.AddValue(static_cast<uint64_t>(std::stoull(val)));
+          break;
+        case sqlast::ColumnDefinition::Type::INT:
+          copy.AddValue(static_cast<int64_t>(std::stoll(val)));
+          break;
+        case sqlast::ColumnDefinition::Type::TEXT:
+        case sqlast::ColumnDefinition::Type::DATETIME:
+          copy.AddValue(dataflow::Record::Dequote(val));
+          break;
+        default:
+          return absl::InvalidArgumentError("Unsupported type in view read");
         }
         tmp.push_back(std::move(copy));
       }
@@ -181,40 +182,41 @@ absl::StatusOr<std::vector<dataflow::Record>> SelectViewConstrained(
 }
 
 // Ordered view.
-absl::StatusOr<std::vector<dataflow::Record>> SelectViewOrdered(
-    std::shared_ptr<dataflow::MatViewOperator> matview,
-    const sqlast::BinaryExpression *where, int limit, size_t offset) {
+absl::StatusOr<std::vector<dataflow::Record>>
+SelectViewOrdered(std::shared_ptr<dataflow::MatViewOperator> matview,
+                  const sqlast::BinaryExpression *where, int limit,
+                  size_t offset) {
   switch (where->type()) {
-    case sqlast::Expression::Type::GREATER_THAN: {
-      std::vector<dataflow::Record> records;
-      const dataflow::SchemaRef &schema = matview->output_schema();
+  case sqlast::Expression::Type::GREATER_THAN: {
+    std::vector<dataflow::Record> records;
+    const dataflow::SchemaRef &schema = matview->output_schema();
 
-      ASSIGN_OR_RETURN(std::string column, GetColumnName(where));
-      MOVE_OR_RETURN(std::vector<std::string> values, GetCondValues(where));
-      size_t column_index = schema.IndexOf(column);
-      CHECK_EQ(values.size(), 1);
+    ASSIGN_OR_RETURN(std::string column, GetColumnName(where));
+    MOVE_OR_RETURN(std::vector<std::string> values, GetCondValues(where));
+    size_t column_index = schema.IndexOf(column);
+    CHECK_EQ(values.size(), 1);
 
-      // Read records > cmp.
-      dataflow::Record cmp{schema};
-      cmp.SetValue(values.at(0), column_index);
-      for (const auto &k : matview->Keys()) {
-        for (const auto &r : matview->LookupGreater(k, cmp, limit, offset)) {
-          records.push_back(r.Copy());
-        }
+    // Read records > cmp.
+    dataflow::Record cmp{schema};
+    cmp.SetValue(values.at(0), column_index);
+    for (const auto &k : matview->Keys()) {
+      for (const auto &r : matview->LookupGreater(k, cmp, limit, offset)) {
+        records.push_back(r.Copy());
       }
-
-      return records;
     }
-    case sqlast::Expression::Type::EQ:
-      return SelectViewConstrained(matview, where, limit, offset);
 
-    default:
-      return absl::InvalidArgumentError(
-          "Illegal WHERE condition for sorted view");
+    return records;
+  }
+  case sqlast::Expression::Type::EQ:
+    return SelectViewConstrained(matview, where, limit, offset);
+
+  default:
+    return absl::InvalidArgumentError(
+        "Illegal WHERE condition for sorted view");
   }
 }
 
-}  // namespace
+} // namespace
 
 absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
                         dataflow::DataFlowState *dataflow_state) {
@@ -222,6 +224,7 @@ absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
   // Plan the query using calcite and generate a concrete graph for it.
   std::shared_ptr<dataflow::DataFlowGraph> graph =
       planner::PlanGraph(dataflow_state, stmt.query());
+  graph->purpose = stmt.purpose();
 
   // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
   dataflow_state->AddFlow(stmt.view_name(), graph);
@@ -230,9 +233,9 @@ absl::Status CreateView(const sqlast::CreateView &stmt, SharderState *state,
   return absl::OkStatus();
 }
 
-absl::StatusOr<sql::SqlResult> SelectView(
-    const sqlast::Select &stmt, SharderState *state,
-    dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<sql::SqlResult>
+SelectView(const sqlast::Select &stmt, SharderState *state,
+           dataflow::DataFlowState *dataflow_state) {
   // TODO(babman): fix this.
   perf::Start("SelectView");
 
@@ -273,7 +276,7 @@ absl::StatusOr<sql::SqlResult> SelectView(
       schema, std::move(records)));
 }
 
-}  // namespace view
-}  // namespace sqlengine
-}  // namespace shards
-}  // namespace pelton
+} // namespace view
+} // namespace sqlengine
+} // namespace shards
+} // namespace pelton

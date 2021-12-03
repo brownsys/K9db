@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "pelton/dataflow/record.h"
+
 namespace pelton {
 namespace shards {
 
@@ -64,14 +66,9 @@ struct ShardingInformation {
   ShardingInformation(const ShardKind &sk, const ShardedTableName &stn,
                       const ColumnName &sb, ColumnIndex sbi,
                       const ColumnName &nc)
-      : shard_kind(sk),
-        sharded_table_name(stn),
-        shard_by(sb),
-        shard_by_index(sbi),
-        distance_from_shard(0),
-        next_table(""),
-        next_column(nc),
-        next_index_name("") {}
+      : shard_kind(sk), sharded_table_name(stn), shard_by(sb),
+        shard_by_index(sbi), distance_from_shard(0), next_table(""),
+        next_column(nc), next_index_name("") {}
 
   // A transitive sharding information can only be created given the previous
   // sharding information in the transitivity chain.
@@ -88,7 +85,45 @@ struct ShardingInformation {
   bool IsTransitive() const { return this->distance_from_shard > 0; }
 };
 
-}  // namespace shards
-}  // namespace pelton
+// Contains the rules a user has set on how the data in their shards can be
+// used.
+struct PolicyInformation {
+  PolicyInformation()
+      : allow_for_ads(true), allow_for_analytics(true),
+        allow_for_basic_functionality(true), require_aggregation(true) {}
+  PolicyInformation(bool ads, bool analytics, bool basic_functionality,
+                    bool aggregation)
+      : allow_for_ads(ads), allow_for_analytics(analytics),
+        allow_for_basic_functionality(basic_functionality),
+        require_aggregation(aggregation) {}
 
-#endif  // PELTON_SHARDS_TYPES_H_
+  bool allow_for_ads;
+  bool allow_for_analytics;
+  bool allow_for_basic_functionality;
+  bool require_aggregation;
+
+  bool allows(std::string &purpose) const {
+    if (purpose == "ads") {
+      return allow_for_ads;
+    } else if (purpose == "analytics") {
+      return allow_for_analytics;
+    } else if (purpose == "basic_functionality") {
+      return allow_for_basic_functionality;
+    }
+    return false;
+  }
+};
+
+struct RecordWithPolicy {
+  RecordWithPolicy(const dataflow::Record &record,
+                   const PolicyInformation &policy)
+      : record(record), policy(policy) {}
+
+  const dataflow::Record &record;
+  const PolicyInformation &policy;
+};
+
+} // namespace shards
+} // namespace pelton
+
+#endif // PELTON_SHARDS_TYPES_H_

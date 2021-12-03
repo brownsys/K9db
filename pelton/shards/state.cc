@@ -54,10 +54,12 @@ void SharderState::AddShardedTable(
       {sharding_information.sharded_table_name, sharded_create_statement});
 }
 
-std::list<const sqlast::AbstractStatement *> SharderState::CreateShard(
-    const ShardKind &shard_kind, const UserId &user) {
+std::list<const sqlast::AbstractStatement *>
+SharderState::CreateShard(const ShardKind &shard_kind, const UserId &user) {
   // Mark shard for this user as created!
   this->shards_.at(shard_kind).insert(user);
+  // Create this user's policy (default policy for now)
+  this->SetPolicyInformation(shard_kind, user, PolicyInformation());
   // Return the create table statements.
   std::list<const sqlast::AbstractStatement *> result;
   for (const ShardedTableName &table : this->kind_to_tables_.at(shard_kind)) {
@@ -76,8 +78,8 @@ void SharderState::RemoveUserFromShard(const ShardKind &kind,
 }
 
 // Schema lookups.
-const sqlast::CreateTable &SharderState::GetSchema(
-    const UnshardedTableName &table_name) const {
+const sqlast::CreateTable &
+SharderState::GetSchema(const UnshardedTableName &table_name) const {
   return this->schema_.at(table_name);
 }
 
@@ -90,8 +92,8 @@ bool SharderState::IsSharded(const UnshardedTableName &table) const {
   return this->sharded_by_.count(table) == 1;
 }
 
-const std::list<ShardingInformation> &SharderState::GetShardingInformation(
-    const UnshardedTableName &table) const {
+const std::list<ShardingInformation> &
+SharderState::GetShardingInformation(const UnshardedTableName &table) const {
   return this->sharded_by_.at(table);
 }
 
@@ -108,13 +110,13 @@ bool SharderState::ShardExists(const ShardKind &shard_kind,
   return this->shards_.at(shard_kind).count(user) > 0;
 }
 
-const std::unordered_set<UserId> &SharderState::UsersOfShard(
-    const ShardKind &kind) const {
+const std::unordered_set<UserId> &
+SharderState::UsersOfShard(const ShardKind &kind) const {
   return this->shards_.at(kind);
 }
 
-const std::unordered_set<UnshardedTableName> &SharderState::TablesInShard(
-    const ShardKind &kind) const {
+const std::unordered_set<UnshardedTableName> &
+SharderState::TablesInShard(const ShardKind &kind) const {
   return this->kind_to_names_.at(kind);
 }
 
@@ -135,8 +137,8 @@ bool SharderState::HasIndexFor(const UnshardedTableName &table_name,
   return col.count(shard_by) > 0;
 }
 
-const std::unordered_set<ColumnName> &SharderState::IndicesFor(
-    const UnshardedTableName &table_name) {
+const std::unordered_set<ColumnName> &
+SharderState::IndicesFor(const UnshardedTableName &table_name) {
   return this->indices_[table_name];
 }
 
@@ -160,5 +162,23 @@ void SharderState::CreateIndex(const ShardKind &shard_kind,
   }
 }
 
-}  // namespace shards
-}  // namespace pelton
+PolicyInformation
+SharderState::GetPolicyInformation(const ShardKind &shard_kind,
+                                   const UserId user_id) const {
+  return this->policy_information_.at(shard_kind).at(user_id);
+}
+
+void SharderState::SetPolicyInformation(
+    const ShardKind &shard_kind, const UserId user_id,
+    const PolicyInformation policy_information) {
+  // If no policies exists for this shard, make an empty map.
+  if (this->policy_information_.find(shard_kind) ==
+      this->policy_information_.end()) {
+    this->policy_information_.insert({shard_kind, {}});
+  }
+  this->policy_information_.at(shard_kind)
+      .insert({user_id, policy_information});
+}
+
+} // namespace shards
+} // namespace pelton

@@ -47,7 +47,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
         sqlast::Delete tbl_stmt{info.sharded_table_name, update_flows};
         table_result.Append(exec.ExecuteShard(&tbl_stmt, shard_kind, user_id,
                                               schema, aug_index));
-      } else {  // sqlast::GDPRStatement::Operation::GET
+      } else { // sqlast::GDPRStatement::Operation::GET
         sqlast::Select tbl_stmt{info.sharded_table_name};
         tbl_stmt.AddColumn("*");
         table_result.Append(exec.ExecuteShard(&tbl_stmt, shard_kind, user_id,
@@ -59,8 +59,14 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
     if (update_flows) {
       std::vector<dataflow::Record> records =
           table_result.NextResultSet()->Vectorize();
+      PolicyInformation policy =
+          state->GetPolicyInformation(shard_kind, user_id);
+      std::vector<RecordWithPolicy> records_with_policies;
+      for (const auto &r : records) {
+        records_with_policies.push_back(RecordWithPolicy(r, policy));
+      }
       total_count += records.size();
-      dataflow_state->ProcessRecords(table_name, records);
+      dataflow_state->ProcessRecords(table_name, records_with_policies);
     } else if (is_forget) {
       total_count += table_result.UpdateCount();
     } else if (!is_forget) {
@@ -75,7 +81,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
   return result;
 }
 
-}  // namespace gdpr
-}  // namespace sqlengine
-}  // namespace shards
-}  // namespace pelton
+} // namespace gdpr
+} // namespace sqlengine
+} // namespace shards
+} // namespace pelton

@@ -17,7 +17,7 @@ namespace sqlast {
 
 // Insert statement.
 class Insert : public AbstractStatement {
- public:
+public:
   explicit Insert(const std::string &table_name)
       : AbstractStatement(AbstractStatement::Type::INSERT),
         table_name_(table_name) {}
@@ -42,31 +42,28 @@ class Insert : public AbstractStatement {
   const std::string &GetValue(size_t index);
 
   // Visitor pattern.
-  template <class T>
-  T Visit(AbstractVisitor<T> *visitor) const {
+  template <class T> T Visit(AbstractVisitor<T> *visitor) const {
     return visitor->VisitInsert(*this);
   }
-  template <class T>
-  T Visit(MutableVisitor<T> *visitor) {
+  template <class T> T Visit(MutableVisitor<T> *visitor) {
     return visitor->VisitInsert(this);
   }
   template <class T>
   std::vector<T> VisitChildren(AbstractVisitor<T> *visitor) const {
     return {};
   }
-  template <class T>
-  std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
+  template <class T> std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
     return {};
   }
 
- private:
+private:
   std::string table_name_;
   std::vector<std::string> columns_;
   std::vector<std::string> values_;
 };
 
 class Select : public AbstractStatement {
- public:
+public:
   explicit Select(const std::string &table_name)
       : AbstractStatement(AbstractStatement::Type::SELECT),
         table_name_(table_name) {
@@ -112,12 +109,10 @@ class Select : public AbstractStatement {
     return this->offset_ == 0 && this->limit_ == -1;
   }
 
-  template <class T>
-  T Visit(AbstractVisitor<T> *visitor) const {
+  template <class T> T Visit(AbstractVisitor<T> *visitor) const {
     return visitor->VisitSelect(*this);
   }
-  template <class T>
-  T Visit(MutableVisitor<T> *visitor) {
+  template <class T> T Visit(MutableVisitor<T> *visitor) {
     return visitor->VisitSelect(this);
   }
   template <class T>
@@ -128,8 +123,7 @@ class Select : public AbstractStatement {
     }
     return result;
   }
-  template <class T>
-  std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
+  template <class T> std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
     std::vector<T> result;
     if (this->where_clause_.has_value()) {
       result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
@@ -137,7 +131,7 @@ class Select : public AbstractStatement {
     return result;
   }
 
- private:
+private:
   std::string table_name_;
   std::vector<std::string> columns_;
   std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
@@ -146,11 +140,10 @@ class Select : public AbstractStatement {
 };
 
 class Delete : public AbstractStatement {
- public:
+public:
   explicit Delete(const std::string &table_name, bool returning = false)
       : AbstractStatement(AbstractStatement::Type::DELETE),
-        table_name_(table_name),
-        returning_(returning) {}
+        table_name_(table_name), returning_(returning) {}
 
   Delete(const Delete &del)
       : AbstractStatement(AbstractStatement::Type::DELETE) {
@@ -181,12 +174,10 @@ class Delete : public AbstractStatement {
     return stmt;
   }
 
-  template <class T>
-  T Visit(AbstractVisitor<T> *visitor) const {
+  template <class T> T Visit(AbstractVisitor<T> *visitor) const {
     return visitor->VisitDelete(*this);
   }
-  template <class T>
-  T Visit(MutableVisitor<T> *visitor) {
+  template <class T> T Visit(MutableVisitor<T> *visitor) {
     return visitor->VisitDelete(this);
   }
   template <class T>
@@ -197,8 +188,7 @@ class Delete : public AbstractStatement {
     }
     return result;
   }
-  template <class T>
-  std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
+  template <class T> std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
     std::vector<T> result;
     if (this->where_clause_.has_value()) {
       result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
@@ -206,14 +196,14 @@ class Delete : public AbstractStatement {
     return result;
   }
 
- private:
+private:
   std::string table_name_;
   std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
   bool returning_;
 };
 
 class Update : public AbstractStatement {
- public:
+public:
   explicit Update(const std::string &table_name)
       : AbstractStatement(AbstractStatement::Type::UPDATE),
         table_name_(table_name) {}
@@ -250,12 +240,10 @@ class Update : public AbstractStatement {
   Select SelectDomain() const;
   Delete DeleteDomain() const;
 
-  template <class T>
-  T Visit(AbstractVisitor<T> *visitor) const {
+  template <class T> T Visit(AbstractVisitor<T> *visitor) const {
     return visitor->VisitUpdate(*this);
   }
-  template <class T>
-  T Visit(MutableVisitor<T> *visitor) {
+  template <class T> T Visit(MutableVisitor<T> *visitor) {
     return visitor->VisitUpdate(this);
   }
   template <class T>
@@ -266,8 +254,7 @@ class Update : public AbstractStatement {
     }
     return result;
   }
-  template <class T>
-  std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
+  template <class T> std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
     std::vector<T> result;
     if (this->where_clause_.has_value()) {
       result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
@@ -275,7 +262,7 @@ class Update : public AbstractStatement {
     return result;
   }
 
- private:
+private:
   std::string table_name_;
   std::vector<std::string> columns_;
   std::vector<std::string> values_;
@@ -283,47 +270,44 @@ class Update : public AbstractStatement {
 };
 
 class CreateView : public AbstractStatement {
- public:
-  CreateView(const std::string &view_name, const std::string &query, const std::optional<std::string> &purpose)
+public:
+  CreateView(const std::string &view_name, const std::string &query,
+             const std::optional<std::string> &purpose)
       : AbstractStatement(AbstractStatement::Type::CREATE_VIEW),
-        view_name_(view_name),
-        query_(query),
-        purpose_(purpose) {}
+        view_name_(view_name), query_(query), purpose_(purpose) {}
 
   // Accessors.
   const std::string &view_name() const { return this->view_name_; }
   const std::string &query() const { return this->query_; }
   const std::optional<std::string> &purpose() const { return this->purpose_; }
 
- private:
+private:
   std::string view_name_;
   std::string query_;
   std::optional<std::string> purpose_;
 };
 
 class GDPRStatement : public AbstractStatement {
- public:
+public:
   enum class Operation { GET, FORGET };
 
   GDPRStatement(Operation operation, const std::string &shard_kind,
                 const std::string &user_id)
-      : AbstractStatement(AbstractStatement::Type::GDPR),
-        operation_(operation),
-        shard_kind_(shard_kind),
-        user_id_(user_id) {}
+      : AbstractStatement(AbstractStatement::Type::GDPR), operation_(operation),
+        shard_kind_(shard_kind), user_id_(user_id) {}
 
   // Accessors.
   const Operation &operation() const { return this->operation_; }
   const std::string &shard_kind() const { return this->shard_kind_; }
   const std::string &user_id() const { return this->user_id_; }
 
- private:
+private:
   Operation operation_;
   std::string shard_kind_;
   std::string user_id_;
 };
 
-}  // namespace sqlast
-}  // namespace pelton
+} // namespace sqlast
+} // namespace pelton
 
-#endif  // PELTON_SQLAST_AST_STATEMENTS_H_
+#endif // PELTON_SQLAST_AST_STATEMENTS_H_

@@ -44,7 +44,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
   // Sharding scenarios.
   auto &exec = state->executor();
   bool is_sharded = state->IsSharded(table_name);
-  if (is_sharded) {  // is_shared == true
+  if (is_sharded) { // is_shared == true
     // Case 3: Table is sharded!
     // The table might be sharded according to different column/owners.
     // We must delete from all these different duplicates.
@@ -90,10 +90,10 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
       } else {
         // The delete statement by itself does not obviously constraint a
         // shard. Try finding the shard(s) via secondary indices.
-        ASSIGN_OR_RETURN(
-            const auto &pair,
-            index::LookupIndex(table_name, info.shard_by, stmt.GetWhereClause(),
-                               state, dataflow_state));
+        ASSIGN_OR_RETURN(const auto &pair,
+                         index::LookupIndex(table_name, info.shard_by,
+                                            stmt.GetWhereClause(), state,
+                                            dataflow_state));
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
           result.Append(exec.ExecuteShards(&cloned, shard_kind, pair.second,
@@ -122,8 +122,14 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
     if (result.IsQuery()) {
       std::vector<dataflow::Record> records =
           result.NextResultSet()->Vectorize();
+      std::vector<RecordWithPolicy> records_with_policies;
+      for (const auto &r : records) {
+        // TODO: GET ACTUAL POLICY
+        PolicyInformation policy = PolicyInformation();
+        records_with_policies.push_back(RecordWithPolicy(r, policy));
+      }
       result = sql::SqlResult(static_cast<int>(records.size()));
-      dataflow_state->ProcessRecords(table_name, records);
+      dataflow_state->ProcessRecords(table_name, records_with_policies);
     }
   }
   if (!result.IsUpdate()) {
@@ -134,7 +140,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
   return result;
 }
 
-}  // namespace delete_
-}  // namespace sqlengine
-}  // namespace shards
-}  // namespace pelton
+} // namespace delete_
+} // namespace sqlengine
+} // namespace shards
+} // namespace pelton

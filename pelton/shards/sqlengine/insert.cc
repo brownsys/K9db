@@ -3,6 +3,7 @@
 #include "pelton/shards/sqlengine/insert.h"
 
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -25,7 +26,7 @@ std::string Dequote(const std::string &st) {
   return s;
 }
 
-}  // namespace
+} // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
                                      SharderState *state,
@@ -45,6 +46,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
   // sharded database.
   sql::SqlResult result = sql::SqlResult(0);
 
+  PolicyInformation policy;
+
   auto &exec = state->executor();
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
@@ -52,7 +55,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
     // The insertion statement is unmodified.
     result = exec.ExecuteDefault(&stmt);
 
-  } else {  // is_sharded == true
+  } else { // is_sharded == true
     // Case 2: table is sharded!
     // Duplicate the value for every shard this table has.
     for (const ShardingInformation &info :
@@ -106,14 +109,17 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
 
       // Add the modified insert statement.
       result.Append(exec.ExecuteShard(&cloned, info.shard_kind, user_id));
+
+      policy = state->GetPolicyInformation(info.shard_kind, user_id);
     }
   }
 
   // Insert was successful, time to update dataflows.
   // Turn inserted values into a record and process it via corresponding flows.
   if (update_flows) {
-    std::vector<dataflow::Record> records;
-    records.push_back(dataflow_state->CreateRecord(stmt));
+    std::vector<shards::RecordWithPolicy> records;
+    auto r = dataflow_state->CreateRecord(stmt);
+    records.push_back(RecordWithPolicy(r, policy));
     dataflow_state->ProcessRecords(stmt.table_name(), records);
   }
 
@@ -121,7 +127,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
   return result;
 }
 
-}  // namespace insert
-}  // namespace sqlengine
-}  // namespace shards
-}  // namespace pelton
+} // namespace insert
+} // namespace sqlengine
+} // namespace shards
+} // namespace pelton

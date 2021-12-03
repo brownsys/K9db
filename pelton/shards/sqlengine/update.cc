@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/strings/match.h"
 #include "pelton/shards/sqlengine/delete.h"
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/insert.h"
@@ -31,6 +32,55 @@ int IndexOfColumn(const std::string &col_name,
     }
   }
   return -1;
+}
+
+std::string Dequote(const std::string &st) {
+  std::string s(st);
+  s.erase(remove(s.begin(), s.end(), '\"'), s.end());
+  s.erase(remove(s.begin(), s.end(), '\''), s.end());
+  return s;
+}
+
+absl::StatusOr<PolicyInformation>
+GetPolicyOfInsert(sqlast::Insert &stmt, SharderState *state,
+                  dataflow::DataFlowState *dataflow_state) {
+  auto table_name = stmt.table_name();
+  bool is_sharded = state->IsSharded(table_name);
+  if (!is_sharded) {
+    return PolicyInformation();
+  } else {
+    for (const ShardingInformation &info :
+         state->GetShardingInformation(table_name)) {
+      // Find the value corresponding to the shard by column.
+      std::string user_id;
+      if (stmt.HasColumns()) {
+        ASSIGN_OR_RETURN(user_id, stmt.GetValue(info.shard_by));
+      } else {
+        user_id = stmt.GetValue(info.shard_by_index);
+      }
+      if (absl::EqualsIgnoreCase(user_id, "NULL")) {
+        return absl::InvalidArgumentError(info.shard_by + " cannot be NULL");
+      }
+      user_id = Dequote(user_id);
+
+      // If the sharding is transitive, the user id should be resolved via the
+      // secondary index of the target table.
+      if (info.IsTransitive()) {
+        ASSIGN_OR_RETURN(
+            auto &lookup,
+            index::LookupIndex(info.next_index_name, user_id, dataflow_state));
+        if (lookup.size() == 1) {
+          user_id = std::move(*lookup.cbegin());
+        } else {
+          return absl::InvalidArgumentError("Foreign Key Value does not exist");
+        }
+      }
+
+      return state->GetPolicyInformation(info.shard_kind, user_id);
+    }
+    return absl::FailedPreconditionError(
+        "Table claimed to be sharded but had no sharding information");
+  }
 }
 
 // Apply the update statement to every record in records, using table_schema
@@ -81,28 +131,28 @@ sqlast::Insert InsertRecord(const dataflow::Record &record,
     sqlast::ColumnDefinition::Type type =
         table_schema.GetColumns().at(i).column_type();
     switch (type) {
-      case sqlast::ColumnDefinition::Type::UINT:
-      case sqlast::ColumnDefinition::Type::INT:
-        stmt.AddValue(record.GetValueString(i));
-        break;
-      case sqlast::ColumnDefinition::Type::TEXT:
-      case sqlast::ColumnDefinition::Type::DATETIME:
-        // TODO(babman): This can be improved later.
-        // Values acquired from selecting from the database do not have an
-        // enclosing ', while those we get from the ANTLR-parsed queries do
-        // (e.g. the value set by an UPDATE statement).
-        if (record.GetString(i)[0] != '\'') {
-          stmt.AddValue("\'" + record.GetString(i) + "\'");
-        } else {
-          stmt.AddValue(record.GetString(i));
-        }
-        break;
+    case sqlast::ColumnDefinition::Type::UINT:
+    case sqlast::ColumnDefinition::Type::INT:
+      stmt.AddValue(record.GetValueString(i));
+      break;
+    case sqlast::ColumnDefinition::Type::TEXT:
+    case sqlast::ColumnDefinition::Type::DATETIME:
+      // TODO(babman): This can be improved later.
+      // Values acquired from selecting from the database do not have an
+      // enclosing ', while those we get from the ANTLR-parsed queries do
+      // (e.g. the value set by an UPDATE statement).
+      if (record.GetString(i)[0] != '\'') {
+        stmt.AddValue("\'" + record.GetString(i) + "\'");
+      } else {
+        stmt.AddValue(record.GetString(i));
+      }
+      break;
     }
   }
   return stmt;
 }
 
-}  // namespace
+} // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
                                      SharderState *state,
@@ -126,14 +176,17 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
   }
 
   sql::SqlResult result = sql::SqlResult(0);
+  std::vector<RecordWithPolicy> records_with_policies;
 
   auto &exec = state->executor();
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
     result = exec.ExecuteDefault(&stmt);
-
-  } else {  // is_sharded == true
+    for (const auto &r : records) {
+      records_with_policies.push_back(RecordWithPolicy(r, PolicyInformation()));
+    }
+  } else { // is_sharded == true
     // Case 2: table is sharded.
     if (ModifiesShardBy(stmt, state)) {
       // The update statement might move the rows from one shard to another.
@@ -143,13 +196,16 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
                                             dataflow_state, false));
 
       // Insert updated records.
-      for (size_t i = old_records_size; i < records.size(); i++) {
+      for (const auto &r : records) {
         sqlast::Insert insert_stmt =
-            InsertRecord(records.at(i), state->GetSchema(table_name));
+            InsertRecord(r, state->GetSchema(table_name));
         MOVE_OR_RETURN(
             sql::SqlResult tmp,
             insert::Shard(insert_stmt, state, dataflow_state, false));
         result.Append(std::move(tmp));
+        ASSIGN_OR_RETURN(PolicyInformation policy,
+                         GetPolicyOfInsert(insert_stmt, state, dataflow_state));
+        records_with_policies.push_back(RecordWithPolicy(r, policy));
       }
 
     } else {
@@ -184,24 +240,41 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
             // Execute statement directly against shard.
             result.Append(exec.ExecuteShard(&cloned, shard_kind, user_id));
           }
-
+          PolicyInformation policy =
+              state->GetPolicyInformation(shard_kind, user_id);
+          for (const auto &r : records) {
+            records_with_policies.push_back(RecordWithPolicy(r, policy));
+          }
         } else if (update_flows) {
           // We already have the data we need to delete, we can use it to get an
           // accurate enumeration of shards to execute this one.
           std::unordered_set<UserId> shards;
           for (const dataflow::Record &record : records) {
             std::string val = record.GetValueString(info.shard_by_index);
+            UserId user;
             if (info.IsTransitive()) {
               // Transitive sharding: look up via index.
+              assert(false && "SOMETHING SEEMS FUNNY");
+              std::cout << "USER ID THAT SHOULD BE NULL: " << user_id
+                        << std::endl;
+              // FIXME: why is user_id not null below?
               ASSIGN_OR_RETURN(auto &lookup,
                                index::LookupIndex(info.next_index_name, user_id,
                                                   dataflow_state));
               if (lookup.size() == 1) {
-                shards.insert(std::move(*lookup.begin()));
+                user = std::move(*lookup.begin());
+                shards.insert(user);
+              } else {
+                return absl::InvalidArgumentError(
+                    "Foreign Key Value does not exist");
               }
             } else {
-              shards.insert(std::move(val));
+              user = std::move(val);
+              shards.insert(user);
             }
+            PolicyInformation policy =
+                state->GetPolicyInformation(shard_kind, user);
+            records_with_policies.push_back(RecordWithPolicy(record, policy));
           }
 
           result.Append(exec.ExecuteShards(&cloned, shard_kind, shards));
@@ -209,10 +282,10 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
         } else {
           // The update statement by itself does not obviously constraint a
           // shard. Try finding the shard(s) via secondary indices.
-          ASSIGN_OR_RETURN(
-              const auto &pair,
-              index::LookupIndex(table_name, info.shard_by,
-                                 stmt.GetWhereClause(), state, dataflow_state));
+          ASSIGN_OR_RETURN(const auto &pair,
+                           index::LookupIndex(table_name, info.shard_by,
+                                              stmt.GetWhereClause(), state,
+                                              dataflow_state));
           if (pair.first) {
             // Secondary index available for some constrainted column in stmt.
             result.Append(exec.ExecuteShards(&cloned, shard_kind, pair.second));
@@ -228,14 +301,14 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
 
   // Delete was successful, time to update dataflows.
   if (update_flows) {
-    dataflow_state->ProcessRecords(table_name, records);
+    dataflow_state->ProcessRecords(table_name, records_with_policies);
   }
 
   perf::End("Update");
   return result;
 }
 
-}  // namespace update
-}  // namespace sqlengine
-}  // namespace shards
-}  // namespace pelton
+} // namespace update
+} // namespace sqlengine
+} // namespace shards
+} // namespace pelton

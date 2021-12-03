@@ -87,8 +87,8 @@ void Update::AddColumnValue(const std::string &column,
   this->columns_.push_back(column);
   this->values_.push_back(value);
 }
-absl::StatusOr<std::string> Update::RemoveColumnValue(
-    const std::string &column) {
+absl::StatusOr<std::string>
+Update::RemoveColumnValue(const std::string &column) {
   auto it = std::find(this->columns_.begin(), this->columns_.end(), column);
   if (it == this->columns_.end()) {
     return absl::InvalidArgumentError(
@@ -228,5 +228,5 @@ Select Delete::SelectDomain() const {
   return select;
 }
 
-}  // namespace sqlast
-}  // namespace pelton
+} // namespace sqlast
+} // namespace pelton

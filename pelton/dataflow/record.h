@@ -23,7 +23,7 @@ namespace pelton {
 namespace dataflow {
 
 class Record {
- public:
+public:
   // Variant with the same type options as the record data type, can be used
   // by external code to ensure same types are supported.
   using DataVariant = std::variant<std::string, uint64_t, int64_t, NullValue>;
@@ -40,11 +40,8 @@ class Record {
 
   // Records can move (e.g. for inserting into vectors and maps).
   Record(Record &&o)
-      : data_(o.data_),
-        bitmap_(o.bitmap_),
-        schema_(o.schema_),
-        timestamp_(o.timestamp_),
-        positive_(o.positive_) {
+      : data_(o.data_), bitmap_(o.bitmap_), schema_(o.schema_),
+        timestamp_(o.timestamp_), positive_(o.positive_) {
     o.data_ = nullptr;
     o.bitmap_ = nullptr;
   }
@@ -75,7 +72,7 @@ class Record {
 
   // Create record and set all the data together.
   template <typename... Args>
-  Record(const SchemaRef &schema, bool positive, Args &&... ts)
+  Record(const SchemaRef &schema, bool positive, Args &&...ts)
       : Record(schema, positive) {
     this->SetData(std::forward<Args>(ts)...);
   }
@@ -98,8 +95,7 @@ class Record {
   Record Copy() const;
 
   // Set all data in one shot regardless of types and counts.
-  template <typename... Args>
-  void SetData(Args &&... ts) {
+  template <typename... Args> void SetData(Args &&...ts) {
     CHECK_NOTNULL(this->data_);
     if constexpr (sizeof...(ts) > 0) {
       SetDataRecursive(0, std::forward<Args>(ts)...);
@@ -117,7 +113,8 @@ class Record {
   const std::string &GetDateTime(size_t i) const;
 
   inline bool IsNull(size_t i) const {
-    if (!bitmap_) return false;
+    if (!bitmap_)
+      return false;
 
     CHECK(bitmap_);
     auto bitmap_block_idx = i / 64;
@@ -128,7 +125,8 @@ class Record {
 
   inline void SetNull(bool isnull, size_t i) {
     // shortcut: if isnull=false and no bitmap, no change
-    if (!isnull && !bitmap_) return;
+    if (!isnull && !bitmap_)
+      return;
 
     // lazy init bitmap
     lazyBitmap();
@@ -146,7 +144,8 @@ class Record {
     // --> important when using == comparison invariant to remove a couple
     // checks there as well.
     uint64_t reduced_bitmap = 0;
-    for (unsigned i = 0; i < NumBits(); ++i) reduced_bitmap |= bitmap_[i];
+    for (unsigned i = 0; i < NumBits(); ++i)
+      reduced_bitmap |= bitmap_[i];
     if (0 == reduced_bitmap) {
       delete[] bitmap_;
       bitmap_ = nullptr;
@@ -181,7 +180,7 @@ class Record {
 
   // Custom comparison between records (for ordering).
   struct Compare {
-   public:
+  public:
     explicit Compare(const std::vector<ColumnID> &cols) {
       this->cols = std::make_shared<std::vector<ColumnID>>(cols);
     }
@@ -193,14 +192,14 @@ class Record {
       return compare_cols;
     }
 
-   private:
+  private:
     std::shared_ptr<std::vector<ColumnID>> cols;
   };
 
- private:
+private:
   // Recursive helper used in SetData(...).
   template <typename Arg, typename... Args>
-  void SetDataRecursive(size_t index, Arg &&t, Args &&... ts) {
+  void SetDataRecursive(size_t index, Arg &&t, Args &&...ts) {
     if (index >= this->schema_.size()) {
       LOG(FATAL) << "Record data received too many arguments";
     }
@@ -210,48 +209,48 @@ class Record {
     } else {
       // Make sure Arg is of the correct type.
       switch (this->schema_.TypeOf(index)) {
-        case sqlast::ColumnDefinition::Type::UINT:
-          if constexpr (std::is_same<std::remove_reference_t<Arg>,
-                                     uint64_t>::value) {
-            this->data_[index].uint = t;
-          } else {
-            LOG(FATAL) << "Type mismatch in SetData at index " << index
-                       << ", expected " << this->schema_.TypeOf(index)
-                       << ", got " << TypeNameFor(t);
-          }
-          break;
-        case sqlast::ColumnDefinition::Type::INT:
-          if constexpr (std::is_same<std::remove_reference_t<Arg>,
-                                     int64_t>::value) {
-            this->data_[index].sint = t;
-          } else {
-            LOG(FATAL) << "Type mismatch in SetData at index " << index
-                       << ", expected " << this->schema_.TypeOf(index)
-                       << ", got " << TypeNameFor(t);
-          }
-          break;
-        case sqlast::ColumnDefinition::Type::TEXT:
-          if constexpr (std::is_same<std::remove_reference_t<Arg>,
-                                     std::unique_ptr<std::string>>::value) {
-            this->data_[index].str = std::move(t);
-          } else {
-            LOG(FATAL) << "Type mismatch in SetData at index " << index
-                       << ", expected " << this->schema_.TypeOf(index)
-                       << ", got " << TypeNameFor(t);
-          }
-          break;
-        case sqlast::ColumnDefinition::Type::DATETIME:
-          if constexpr (std::is_same<std::remove_reference_t<Arg>,
-                                     std::unique_ptr<std::string>>::value) {
-            this->data_[index].str = std::move(t);
-          } else {
-            LOG(FATAL) << "Type mismatch in SetData at index " << index
-                       << ", expected " << this->schema_.TypeOf(index)
-                       << ", got " << TypeNameFor(t);
-          }
-          break;
-        default:
-          LOG(FATAL) << "Unsupported data type in SetData";
+      case sqlast::ColumnDefinition::Type::UINT:
+        if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                   uint64_t>::value) {
+          this->data_[index].uint = t;
+        } else {
+          LOG(FATAL) << "Type mismatch in SetData at index " << index
+                     << ", expected " << this->schema_.TypeOf(index) << ", got "
+                     << TypeNameFor(t);
+        }
+        break;
+      case sqlast::ColumnDefinition::Type::INT:
+        if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                   int64_t>::value) {
+          this->data_[index].sint = t;
+        } else {
+          LOG(FATAL) << "Type mismatch in SetData at index " << index
+                     << ", expected " << this->schema_.TypeOf(index) << ", got "
+                     << TypeNameFor(t);
+        }
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+        if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                   std::unique_ptr<std::string>>::value) {
+          this->data_[index].str = std::move(t);
+        } else {
+          LOG(FATAL) << "Type mismatch in SetData at index " << index
+                     << ", expected " << this->schema_.TypeOf(index) << ", got "
+                     << TypeNameFor(t);
+        }
+        break;
+      case sqlast::ColumnDefinition::Type::DATETIME:
+        if constexpr (std::is_same<std::remove_reference_t<Arg>,
+                                   std::unique_ptr<std::string>>::value) {
+          this->data_[index].str = std::move(t);
+        } else {
+          LOG(FATAL) << "Type mismatch in SetData at index " << index
+                     << ", expected " << this->schema_.TypeOf(index) << ", got "
+                     << TypeNameFor(t);
+        }
+        break;
+      default:
+        LOG(FATAL) << "Unsupported data type in SetData";
       }
     }
     // Handle the remaining ts.
@@ -276,11 +275,11 @@ class Record {
   };
 
   // 37 bytes but with alignment it is really 40 bytes.
-  RecordData *data_;  // [8 B]
-  uint64_t *bitmap_;  // [8 B]
-  SchemaRef schema_;  // [8 B]
-  int timestamp_;     // [4 B]
-  bool positive_;     // [1 B]
+  RecordData *data_; // [8 B]
+  uint64_t *bitmap_; // [8 B]
+  SchemaRef schema_; // [8 B]
+  int timestamp_;    // [4 B]
+  bool positive_;    // [1 B]
 
   inline size_t NumBits() const { return schema_.size() / 64 + 1; }
 
@@ -321,7 +320,7 @@ class Record {
   }
 };
 
-}  // namespace dataflow
-}  // namespace pelton
+} // namespace dataflow
+} // namespace pelton
 
-#endif  // PELTON_DATAFLOW_RECORD_H_
+#endif // PELTON_DATAFLOW_RECORD_H_

@@ -16,6 +16,7 @@ cc_library(
         "//pelton/dataflow/ops:input",
         "//pelton/sqlast:ast",
         "//pelton/util:fs",
+        "//pelton/shards:types",
         "@glog",
     ],
 )

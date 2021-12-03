@@ -10,8 +10,8 @@
 
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/ops/input.h"
-#include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
+#include "pelton/shards/types.h"
 #include "pelton/sqlast/ast.h"
 
 #ifndef PELTON_DATAFLOW_STATE_H_
@@ -25,7 +25,7 @@ using TableName = std::string;
 using FlowName = std::string;
 
 class DataFlowState {
- public:
+public:
   DataFlowState() = default;
 
   // Manage schemas.
@@ -54,11 +54,11 @@ class DataFlowState {
 
   // Process raw data from sharder and use it to update flows.
   void ProcessRecords(const TableName &table_name,
-                      const std::vector<Record> &records);
+                      const std::vector<shards::RecordWithPolicy> &records);
 
   void PrintSizeInMemory() const;
 
- private:
+private:
   // Maps every table to its logical schema.
   // The logical schema is the contract between client code and our DB.
   // The stored schema may not matched the concrete/physical one due to sharding
@@ -70,7 +70,7 @@ class DataFlowState {
   std::unordered_map<TableName, std::vector<FlowName>> flows_per_input_table_;
 };
 
-}  // namespace dataflow
-}  // namespace pelton
+} // namespace dataflow
+} // namespace pelton
 
-#endif  // PELTON_DATAFLOW_STATE_H_
+#endif // PELTON_DATAFLOW_STATE_H_
