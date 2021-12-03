@@ -13,6 +13,7 @@ cc_library(
         ":create",
         ":delete",
         ":gdpr",
+        ":policy",
         ":index",
         ":insert",
         ":select",
@@ -232,3 +233,28 @@ cc_library(
         "@absl//absl/strings",
     ],
 )
+
+cc_library(
+    name = "policy",
+    srcs = [
+        "policy.cc",
+    ],
+    hdrs = [
+        "policy.h",
+    ],
+    deps = [
+        ":delete",
+        ":select",
+        "//pelton/dataflow:dstate",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/shards/sqlengine:util",
+        "//pelton/sql:result",
+        "//pelton/sqlast:ast",
+        "//pelton/util:perf",
+        "//pelton/util:status",
+        "@absl//absl/status",
+        "@absl//absl/strings",
+    ],
+)
+

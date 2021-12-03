@@ -8,6 +8,7 @@
 #include "pelton/shards/sqlengine/create.h"
 #include "pelton/shards/sqlengine/delete.h"
 #include "pelton/shards/sqlengine/gdpr.h"
+#include "pelton/shards/sqlengine/policy.h"
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/insert.h"
 #include "pelton/shards/sqlengine/select.h"
@@ -88,6 +89,11 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
     case sqlast::AbstractStatement::Type::GDPR: {
       auto *stmt = static_cast<sqlast::GDPRStatement *>(statement.get());
       return gdpr::Shard(*stmt, state, dataflow_state);
+    }
+
+    case sqlast::AbstractStatement::Type::POLICY: {
+      auto *stmt = static_cast<sqlast::PolicyStatement *>(statement.get());
+      return policy::Shard(*stmt, state, dataflow_state);
     }
 
     // Unsupported (this should not be reachable).

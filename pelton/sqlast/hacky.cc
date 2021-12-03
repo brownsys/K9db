@@ -177,11 +177,84 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyGDPR(const char *str,
   return std::make_unique<GDPRStatement>(operation, shard_kind, user_id);
 }
 
+absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyPolicy(const char *str,
+                                                               size_t size) {
+  // SET POLICY FOR table_name primary_key ALLOW (<purpose_name>,
+  // <purpose_name>, <purpose_name>, ...)
+
+  // SET.
+  if (!StartsWith(&str, &size, "SET", 3)) {
+    return absl::InvalidArgumentError("Hacky Policy: SET");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // POLICY.
+  if (!StartsWith(&str, &size, "POLICY", 6)) {
+    return absl::InvalidArgumentError("Hacky Policy: POLICY");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // FOR.
+  if (!StartsWith(&str, &size, "FOR", 3)) {
+    return absl::InvalidArgumentError("Hacky Policy: FOR");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // <table_name>.
+  std::string table_name = ExtractIdentifier(&str, &size);
+  if (table_name.size() == 0) {
+    return absl::InvalidArgumentError("Hacky Policy: table_name");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // <primary_key>.
+  std::string primary_key = ExtractIdentifier(&str, &size);
+  if (primary_key.size() == 0) {
+    return absl::InvalidArgumentError("Hacky Policy: primary_key");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // ALLOW.
+  std::string operation_str = ExtractIdentifier(&str, &size);
+  PolicyStatement::Operation operation;
+  if (EqualIgnoreCase(operation_str, "ALLOW")) {
+    operation = PolicyStatement::Operation::ALLOW;
+  } else {
+    return absl::InvalidArgumentError("Hacky Policy: operation name");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  std::vector<std::string> purpose_names = std::vector<std::string>();
+  // (
+  if (!StartsWith(&str, &size, "(", 1)) {
+    return absl::InvalidArgumentError("Hacky Policy: (");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // <policy_name>, <policy_name>, <policy_name>, ...
+  do {
+    purpose_names.push_back(ExtractIdentifier(&str, &size));
+    ConsumeWhiteSpace(&str, &size);
+  } while (StartsWith(&str, &size, ",", 1));
+
+  // )
+  if (!StartsWith(&str, &size, ");", 2)) {
+    return absl::InvalidArgumentError("Hacky Policy: );");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  return std::make_unique<PolicyStatement>(table_name, primary_key, operation,
+                                           purpose_names);
+}
+
 absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyParse(
     const std::string &sql) {
   size_t size = sql.size();
   const char *str = sql.c_str();
 
+  if ((str[0] == 'S' || str[0] == 's') && (str[1] == 'E' || str[1] == 'e')) {
+    HackyPolicy(str, size);
+  }
   if (str[0] == 'I' || str[0] == 'i') {
     return HackyInsert(str, size);
   }

@@ -307,6 +307,33 @@ private:
   std::string user_id_;
 };
 
+class PolicyStatement : public AbstractStatement {
+ public:
+  enum class Operation { ALLOW };
+
+  PolicyStatement(std::string table_name, std::string primary_key,
+                Operation operation, std::vector<std::string> purpose_names)
+      : AbstractStatement(AbstractStatement::Type::POLICY),
+        table_name_(table_name),
+        primary_key_(primary_key),
+        operation_(operation),
+        purpose_names_(std::vector<std::string>(purpose_names)) {}
+
+  // Accessors.
+  const std::string &table_name() const { return this->table_name_; }
+  const std::string &primary_key() const { return this->primary_key_; }
+  const Operation &operation() const { return this->operation_; }
+  const std::vector<std::string> &purpose_names() const {
+    return this->purpose_names_;
+  }
+
+ private:
+  std::string table_name_;
+  std::string primary_key_;
+  Operation operation_;
+  std::vector<std::string> purpose_names_;
+};
+
 } // namespace sqlast
 } // namespace pelton
 

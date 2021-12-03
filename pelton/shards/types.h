@@ -4,6 +4,9 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <unordered_set>
+
+#include "pelton/dataflow/record.h"
 
 #include "pelton/dataflow/record.h"
 
@@ -89,28 +92,14 @@ struct ShardingInformation {
 // used.
 struct PolicyInformation {
   PolicyInformation()
-      : allow_for_ads(true), allow_for_analytics(true),
-        allow_for_basic_functionality(true), require_aggregation(true) {}
-  PolicyInformation(bool ads, bool analytics, bool basic_functionality,
-                    bool aggregation)
-      : allow_for_ads(ads), allow_for_analytics(analytics),
-        allow_for_basic_functionality(basic_functionality),
-        require_aggregation(aggregation) {}
+      : allowed_purposes(std::unordered_set<std::string>()) {}
+  PolicyInformation(std::unordered_set<std::string> purposes)
+      : allowed_purposes(purposes) {}
 
-  bool allow_for_ads;
-  bool allow_for_analytics;
-  bool allow_for_basic_functionality;
-  bool require_aggregation;
+  std::unordered_set<std::string> allowed_purposes;
 
   bool allows(std::string &purpose) const {
-    if (purpose == "ads") {
-      return allow_for_ads;
-    } else if (purpose == "analytics") {
-      return allow_for_analytics;
-    } else if (purpose == "basic_functionality") {
-      return allow_for_basic_functionality;
-    }
-    return false;
+    return allowed_purposes.count(purpose) > 0;
   }
 };
 
