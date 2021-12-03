@@ -109,6 +109,8 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
     msg << e.getMessage() << " (" << e.what() << ")";
 
     return absl::InternalError(msg.str());
+  } catch (std::exception &e) {
+    return absl::InternalError(e.what());
   }
 }
 
