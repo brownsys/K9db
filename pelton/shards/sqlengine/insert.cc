@@ -28,6 +28,11 @@ std::string Dequote(const std::string &st) {
   return s;
 }
 
+// This is perhaps not the best way to resolve this but it works for the time being. 
+// We can optimize this later. 
+// 
+// The purpose of this function is to select from all the sharding information the one that 
+// corresponds to a variable owner table into which we are copying data
 const ShardedTableName &VarownShardedTableName(
   const SharderState &state, 
   const UnshardedTableName &target_table,
@@ -35,7 +40,6 @@ const ShardedTableName &VarownShardedTableName(
   const UnshardedTableName &source_table) 
 {
   for (auto & info : state.GetShardingInformation(target_table)) {
-    LOG(INFO) << "Found sharding info on column " << info.shard_by << " and shard kind " << info.shard_kind << " and next column " << info.next_column << " and next table " << info.next_table;
     if (info.next_column == column_name && info.next_table == source_table) {
       return info.sharded_table_name;
     }
