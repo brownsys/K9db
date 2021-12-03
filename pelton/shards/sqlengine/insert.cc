@@ -221,6 +221,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
 
       // If the sharding is transitive, the user id should be resolved via the
       // secondary index of the target table.
+      //
+      // Checking the index used to only ever return a single result, because for each *column*   
+      // there could only be one associated owner. Now with variable owners the index may return 
+      // multiple owners *for the same colum*! Hence I refactored the shard handling code into
+      // its own function and I'm calling it here either on the original user (else branch) or in a 
+      // loop for each of the variable owners.
       if (info.IsTransitive()) {
         LOG(INFO) << "Looking up using " << info.next_index_name;
         ASSIGN_OR_RETURN(
