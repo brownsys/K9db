@@ -9,6 +9,7 @@
 #include "pelton/shards/sqlengine/delete.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/shards/upgradable_lock.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
@@ -18,16 +19,23 @@ namespace sqlengine {
 namespace gdpr {
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state) {
+                                     Connection *connection) {
   perf::Start("GDPR");
-  sql::SqlResult result;
 
   int total_count = 0;
   const std::string &shard_kind = stmt.shard_kind();
   const std::string &user_id = stmt.user_id();
   bool is_forget = stmt.operation() == sqlast::GDPRStatement::Operation::FORGET;
-  auto &exec = state->executor();
+  auto &exec = connection->executor;
+
+  // XXX(malte): if we properly removed the shared on GDPR FORGET below, this
+  // would need to be a unique_lock, as it would change sharder state. However,
+  // the current code does not update the sharder state AFAICT.
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  SharedLock lock = state->ReaderLock();
+
+  sql::SqlResult result;
   for (const auto &table_name : state->TablesInShard(shard_kind)) {
     sql::SqlResult table_result;
     dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
@@ -44,6 +52,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       }
 
       if (is_forget) {
+        // XXX(malte): need to upgrade SharderStateLock here in the future.
         sqlast::Delete tbl_stmt{info.sharded_table_name, update_flows};
         table_result.Append(exec.ExecuteShard(&tbl_stmt, shard_kind, user_id,
                                               schema, aug_index));
@@ -60,7 +69,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       std::vector<dataflow::Record> records =
           table_result.NextResultSet()->Vectorize();
       total_count += records.size();
-      dataflow_state->ProcessRecords(table_name, records);
+      dataflow_state->ProcessRecords(table_name, std::move(records));
     } else if (is_forget) {
       total_count += table_result.UpdateCount();
     } else if (!is_forget) {

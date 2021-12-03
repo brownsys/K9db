@@ -1,6 +1,7 @@
-// A graph generator is used to build a DataFlowGraph incrementally.
-// This is used by the planner (Java with calcite) to build a DataFlowGraph
-// using our C++ class structure directly without going through intermediates.
+// A graph generator is used to build a DataFlowGraphPartition incrementally.
+// This is used by the planner (Java with calcite) to build a
+// DataFlowGraphPartition using our C++ class structure directly without going
+// through intermediates.
 #ifndef PELTON_DATAFLOW_GENERATOR_H_
 #define PELTON_DATAFLOW_GENERATOR_H_
 
@@ -9,8 +10,8 @@
 #include <vector>
 
 #include "pelton/dataflow/ops/aggregate_enum.h"
+#include "pelton/dataflow/ops/equijoin_enum.h"
 #include "pelton/dataflow/ops/filter_enum.h"
-#include "pelton/dataflow/ops/join_enum.h"
 #include "pelton/dataflow/ops/project_enum.h"
 #include "pelton/dataflow/types.h"
 #include "pelton/sqlast/ast_schema_enums.h"
@@ -22,15 +23,15 @@ namespace dataflow {
 // pelton/dataflow/state.h here.
 // Including these header files throws off javacpp, which is responsible for
 // generating the java native API and its shims.
-class DataFlowGraph;
+class DataFlowGraphPartition;
 class DataFlowState;
 
-using DataFlowGraphJavaPtr = uint64_t;
+using DataFlowGraphPartitionJavaPtr = uint64_t;
 using DataFlowStateJavaPtr = uint64_t;
 
 class DataFlowGraphGenerator {
  public:
-  DataFlowGraphGenerator(DataFlowGraphJavaPtr graph_ptr,
+  DataFlowGraphGenerator(DataFlowGraphPartitionJavaPtr graph_ptr,
                          DataFlowStateJavaPtr state_ptr);
 
   // Adding operators.
@@ -100,7 +101,7 @@ class DataFlowGraphGenerator {
   std::string DebugString() const;
 
  private:
-  DataFlowGraph *graph_;
+  DataFlowGraphPartition *graph_;
   DataFlowState *state_;
 };
 

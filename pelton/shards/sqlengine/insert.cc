@@ -12,6 +12,7 @@
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/connection.h"
 
 namespace pelton {
 namespace shards {
@@ -30,14 +31,14 @@ std::string Dequote(const std::string &st) {
 absl::Status MaybeHandleOwningColumn(
   const sqlast::Insert &stmt,
   const sqlast::Insert &cloned,
-  SharderState *state,
-  dataflow::DataFlowState *dataflow_state,
+  Connection* connection,
   bool *update_flows,
   sql::SqlResult *result,
   const ShardingInformation &info,
   const std::string &user_id) 
 {
-  auto &exec = state->executor();
+  auto &exec = connection->executor;
+  shards::SharderState *state = connection->state->sharder_state();
   const sqlast::CreateTable &rel_schema = state->GetSchema(stmt.table_name());
   bool was_moved = false;
   for (auto &col : rel_schema.GetColumns()) {
@@ -88,7 +89,7 @@ absl::Status MaybeHandleOwningColumn(
           select.AddColumn(col0.column_name());
         }
         LOG(INFO) << "Doing lookup for " << schema.table_name();
-        ASSIGN_OR_RETURN(sql::SqlResult &inner_result, select::Shard(select, state, dataflow_state));
+        ASSIGN_OR_RETURN(sql::SqlResult &inner_result, select::Shard(select, connection, true));
         if (inner_result.IsQuery() && !inner_result.HasResultSet()) {
           LOG(INFO) << "Skipping value moving. Reason: The lookup has no results";
           continue;
@@ -121,40 +122,50 @@ absl::Status MaybeHandleOwningColumn(
 absl::Status HandleShardForUser(
   const sqlast::Insert &stmt,
   const sqlast::Insert &cloned,
-  SharderState *state,
-  dataflow::DataFlowState *dataflow_state,
+  Connection *connection,
+  SharedLock *lock,
   bool *update_flows,
   sql::SqlResult *result,
   const ShardingInformation &info,
   const std::string &user_id)
 {
-  auto &exec = state->executor();
+  auto &exec = connection->executor;
+  shards::SharderState *state = connection->state->sharder_state();
 
   // TODO(babman): better to do this after user insert rather than user data
   //               insert.
   if (!state->ShardExists(info.shard_kind, user_id)) {
-    for (auto *create_stmt : state->CreateShard(info.shard_kind, user_id)) {
-      sql::SqlResult tmp =
-          exec.ExecuteShard(create_stmt, info.shard_kind, user_id);
-      if (!tmp.IsStatement() || !tmp.Success()) {
-        return absl::InternalError("Could not created sharded table");
+    // Need to upgrade to an exclusive lock on sharder state here, as we
+    // will modify the state.
+    UniqueLock upgraded(std::move(*lock));
+    if (!state->ShardExists(info.shard_kind, user_id)) {
+      for (auto *create_stmt :
+            state->CreateShard(info.shard_kind, user_id)) {
+        sql::SqlResult tmp =
+            exec.ExecuteShard(create_stmt, info.shard_kind, user_id);
+        if (!tmp.IsStatement() || !tmp.Success()) {
+          return absl::InternalError("Could not created sharded table");
+        }
       }
     }
+    *lock = SharedLock(std::move(upgraded));
   }
 
   // Add the modified insert statement.
   result->Append(exec.ExecuteShard(&cloned, info.shard_kind, user_id));
   LOG(INFO) << "Basic insert done";
-  return MaybeHandleOwningColumn(stmt, cloned, state, dataflow_state, update_flows, result, info, user_id);
+  return MaybeHandleOwningColumn(stmt, cloned, connection, update_flows, result, info, user_id);
 }
 
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state,
+                                     Connection *connection, SharedLock *lock,
                                      bool update_flows) {
   perf::Start("Insert");
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
   if (!dataflow_state->HasFlowsFor(table_name)) {
@@ -168,7 +179,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
   // sharded database.
   sql::SqlResult result = sql::SqlResult(0);
 
-  auto &exec = state->executor();
+  auto &exec = connection->executor;
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
@@ -221,11 +232,11 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
         } else {
           LOG(INFO) << "Index lookup succeeded";
           for (auto &uid : lookup) {
-            CHECK_STATUS(HandleShardForUser(stmt, cloned, state, dataflow_state, &update_flows, &result, info, uid));
+            CHECK_STATUS(HandleShardForUser(stmt, cloned, connection, lock, &update_flows, &result, info, uid));
           }
         }
       } else {
-        CHECK_STATUS(HandleShardForUser(stmt, cloned, state, dataflow_state, &update_flows, &result, info, user_id));
+        CHECK_STATUS(HandleShardForUser(stmt, cloned, connection, lock, &update_flows, &result, info, user_id));
       }
     }
   }
@@ -235,7 +246,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
   if (update_flows) {
     std::vector<dataflow::Record> records;
     records.push_back(dataflow_state->CreateRecord(stmt));
-    dataflow_state->ProcessRecords(stmt.table_name(), records);
+    dataflow_state->ProcessRecords(stmt.table_name(), std::move(records));
   }
 
   perf::End("Insert");

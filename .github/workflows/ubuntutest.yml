@@ -8,6 +8,7 @@ jobs:
       with:
         submodules: recursive
 
+    # Docker setup.
     - name: Build docker container
       run: |
         docker build -t pelton/latest .
@@ -17,42 +18,49 @@ jobs:
         docker run --mount type=bind,source=$(pwd),target=/home/pelton --name pelton-testing -d -t pelton/latest
         sleep 30
 
+    # bazel build ...
     - name: Build all
       env:
         TEST: bazel build ...
       run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
 
+    # bazel test ...
     - name: Test all
       env:
         TEST: bazel test ... --test_output=all --test_arg=--db_username=root --test_arg=--db_password=password
       run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
 
-    - name: Run end-2-end sample
-      env:
-        TEST: bazel run bin:example -- --logtostderr=1
-      run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
+    # prepared statement test.
+    - name: Run prepared statement test
+      run: docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/prepared-test.sh"
 
-    - name: Test dataflow with valgrind
-      env:
-        TEST: bazel test //pelton/dataflow/... --config=valgrind --test_output=all
-      run: docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
-
-    - name: Run cli samples
-      env:
-        CLEANUP: ./bin/drop.sh root password
-        WEBSUBMIT: bazel run bin:cli --config=valgrind -- --logtostderr=1 < bin/examples/simple-websubmit.sql
-        MEDICAL: bazel run bin:cli --config=valgrind -- --logtostderr=1 < bin/examples/medical_chat.sql
+    # bin/examples/* via proxy
+    - name: Run examples via proxy
       run: |
-        docker exec pelton-testing sh -c "cd /home/pelton && $CLEANUP"
-        docker exec pelton-testing sh -c "cd /home/pelton && $WEBSUBMIT"
-        docker exec pelton-testing sh -c "cd /home/pelton && $CLEANUP"
-        docker exec pelton-testing sh -c "cd /home/pelton && $MEDICAL"
+        docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/test.sh bin/examples/simple-websubmit.sql"
+        docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/test.sh bin/examples/medical_chat.sql"
 
     - name: Run social chat with restart/recovery
-      env:
-        CLEANUP: rm -rf /tmp/db && mkdir /tmp/db && ./bin/drop.sh root password
-        SOCIAL: bazel run bin:cli --config=valgrind -- --logtostderr=1 --db_path=/tmp/db < bin/examples/social_chat.sql
-        SOCIALCNTD: bazel run bin:cli --config=valgrind -- --logtostderr=1 --db_path=/tmp/db < bin/examples/social_chat.cntd.sql
       run: |
-        docker exec pelton-testing sh -c "cd /home/pelton && $CLEANUP"
-        docker exec pelton-testing sh -c "cd /home/pelton && $SOCIAL"
+        docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/test.sh bin/examples/social_chat.sql bin/examples/social_chat.cntd.sql"
+
+    # bin/test_multithreaded_proxy
+    - name: Run multi-threaded tests via mysql proxy
+      run: docker exec pelton-testing sh -c "cd /home/pelton/ && ./bin/test_multithreaded_proxy.sh"
+
+    # valgrind
+    - name: Test dataflow with valgrind
+      env:
+        TEST_OPS: bazel test //pelton/dataflow/ops/... --config=valgrind --test_output=all
+        TEST_GRAPH_PARTITION: bazel test //pelton/dataflow:graph_partition-test --config=valgrind --test_output=all
+        TEST_KEY: bazel test //pelton/dataflow:key-test --config=valgrind --test_output=all
+        TEST_RECORD: bazel test //pelton/dataflow:record-test --config=valgrind --test_output=all
+        TEST_SCHEMA: bazel test //pelton/dataflow:schema-test --config=valgrind --test_output=all
+        TEST_VALUE: bazel test //pelton/dataflow:value-test --config=valgrind --test_output=all
+      run: |
+        docker exec pelton-testing sh -c "cd /home/pelton && $TEST_OPS"
+        docker exec pelton-testing sh -c "cd /home/pelton && $TEST_GRAPH_PARTITION"
+        docker exec pelton-testing sh -c "cd /home/pelton && $TEST_KEY"
+        docker exec pelton-testing sh -c "cd /home/pelton && $TEST_RECORD"
+        docker exec pelton-testing sh -c "cd /home/pelton && $TEST_SCHEMA"
+        docker exec pelton-testing sh -c "cd /home/pelton && $TEST_VALUE"

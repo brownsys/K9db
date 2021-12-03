@@ -10,13 +10,31 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
+        ":channel",
         ":graph",
+        ":graph_partition",
+        ":operator",
         ":record",
         ":schema",
-        "//pelton/dataflow/ops:input",
+        "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:fs",
         "@glog",
+    ],
+)
+
+cc_library(
+    name = "channel",
+    srcs = [
+        "channel.cc",
+    ],
+    hdrs = [
+        "channel.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":record",
+        ":types",
     ],
 )
 
@@ -93,15 +111,14 @@ cc_library(
         "operator.cc",
     ],
     hdrs = [
-        "graph.h",
         "operator.h",
+        "//pelton/dataflow/ops:benchmark_utils.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":record",
         ":schema",
         ":types",
-        "@gbenchmark//:benchmark",
     ],
 )
 
@@ -115,12 +132,12 @@ cc_library(
 )
 
 cc_library(
-    name = "graph",
+    name = "graph_partition",
     srcs = [
-        "graph.cc",
+        "graph_partition.cc",
     ],
     hdrs = [
-        "graph.h",
+        "graph_partition.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
@@ -133,19 +150,48 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "graph",
+    srcs = [
+        "graph.cc",
+        "graph_traversal.inc",
+    ],
+    hdrs = [
+        "graph.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":channel",
+        ":graph_partition",
+        ":key",
+        ":operator",
+        ":record",
+        ":schema",
+        ":types",
+        "//pelton/dataflow/ops:aggregate",
+        "//pelton/dataflow/ops:equijoin",
+        "//pelton/dataflow/ops:exchange",
+        "//pelton/dataflow/ops:input",
+        "//pelton/dataflow/ops:matview",
+        "//pelton/dataflow/ops:project",
+        "//pelton/util:merge_sort",
+        "@com_google_googletest//:gtest_prod",
+        "@glog",
+    ],
+)
+
 cc_test(
     name = "value-test",
     srcs = [
         "value_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":value",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
         "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
     ],
 )
 
@@ -154,14 +200,13 @@ cc_test(
     srcs = [
         "key_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":key",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
         "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
     ],
 )
 
@@ -170,16 +215,15 @@ cc_test(
     srcs = [
         "record_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":record",
         ":schema",
         ":types",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
         "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
     ],
 )
 
@@ -188,14 +232,39 @@ cc_test(
     srcs = [
         "schema_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":schema",
         ":types",
         "//pelton/sqlast:ast",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
         "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "graph_partition-test",
+    srcs = [
+        "graph_partition_unittest.cc",
+    ],
+    deps = [
+        ":graph_partition",
+        ":record",
+        ":schema",
+        ":types",
+        "//pelton/dataflow/ops:aggregate",
+        "//pelton/dataflow/ops:equijoin",
+        "//pelton/dataflow/ops:exchange",
+        "//pelton/dataflow/ops:filter",
+        "//pelton/dataflow/ops:input",
+        "//pelton/dataflow/ops:matview",
+        "//pelton/dataflow/ops:project",
+        "//pelton/dataflow/ops:union",
+        "//pelton/sqlast:ast",
+        "//pelton/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
     ],
 )
 
@@ -204,23 +273,19 @@ cc_test(
     srcs = [
         "graph_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     deps = [
         ":graph",
-        ":record",
+        ":graph_partition",
+        ":operator",
         ":schema",
         ":types",
-        "//pelton/dataflow/ops:aggregate",
-        "//pelton/dataflow/ops:equijoin",
-        "//pelton/dataflow/ops:filter",
-        "//pelton/dataflow/ops:input",
+        "//pelton/dataflow/ops:exchange",
         "//pelton/dataflow/ops:matview",
-        "//pelton/dataflow/ops:project",
-        "//pelton/dataflow/ops:union",
-        "//pelton/util:ints",
+        "//pelton/planner",
+        "//pelton/sqlast:ast",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
         "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
     ],
 )
 
@@ -231,8 +296,8 @@ filegroup(
         "generator.h",
         "types.h",
         "//pelton/dataflow/ops:aggregate_enum.h",
+        "//pelton/dataflow/ops:equijoin_enum.h",
         "//pelton/dataflow/ops:filter_enum.h",
-        "//pelton/dataflow/ops:join_enum.h",
         "//pelton/dataflow/ops:project_enum.h",
         "//pelton/sqlast:ast_schema_enums.h",
     ],

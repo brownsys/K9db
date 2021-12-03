@@ -1,9 +1,11 @@
 #!/bin/bash
+# Run cargo raze.
 echo "Running cargo-raze"
 cd /home/pelton/mysql_proxy/
 rm -rf cargo && /root/.cargo/bin/cargo raze
 cd -
 
+# Run Mariadb.
 echo "Running mysqld ..."
 mysqld &
 MYSQLID=$!

@@ -6,6 +6,7 @@ cc_binary(
         "example.cc",
     ],
     linkstatic = 0,
+    malloc = "@com_google_tcmalloc//tcmalloc",
     deps = [
         "//pelton",
         "//pelton/util:perf",
@@ -20,6 +21,7 @@ cc_binary(
         "cli.cc",
     ],
     linkstatic = 0,
+    malloc = "@com_google_tcmalloc//tcmalloc",
     deps = [
         "//pelton",
         "//pelton/util:latency",

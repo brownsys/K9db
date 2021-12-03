@@ -83,10 +83,11 @@ genrule(
 
   # Execute javacpp.jar in tmp directory
   cd $${TMP_DIR}
-  java -jar "$${JAVACPP_JAR}"                 \
-      -nodelete                               \
-      -Dplatform.includepath=$${INCLUDE_PATH} \
-      -Dplatform.compiler=gcc                 \
+  java -jar "$${JAVACPP_JAR}"                     \
+      -nodelete                                   \
+      -Dplatform.includepath=$${INCLUDE_PATH}     \
+      -Dplatform.compiler=gcc                     \
+      -Xcompiler -O3                              \
       com/brownsys/pelton/nativelib/DataFlowGraphLibrary.java
 
   # Move outputs to proper directory and remove tmp directory.

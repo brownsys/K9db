@@ -12,6 +12,7 @@
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/shards/upgradable_lock.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 #include "glog/logging.h"
@@ -318,10 +319,10 @@ sqlast::CreateTable UpdateTableSchema(sqlast::CreateTable stmt,
 
 absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt,
                                const OwningTable &owning_table,
-                               SharderState* state,
-                               dataflow::DataFlowState* dataflow_state)
+                               Connection *connection)
                                {
   sql::SqlResult result;
+  SharderState* state = connection->state->sharder_state();
   const UnshardedTableName &relationship_table_name = stmt.table_name(); 
   const ShardedTableName &target_table_name = owning_table.foreign_table;
   // If this table owns a different table, we need to shard that table now too.
@@ -356,8 +357,7 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt
 
     auto res = index::CreateIndex(
       create_index,
-      state,
-      dataflow_state
+      connection
     );
 
     if (res.ok()) 
@@ -394,9 +394,11 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state) {
+                                     Connection *connection) {
   perf::Start("Create");
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  UniqueLock lock = state->WriterLock();
 
   const std::string &table_name = stmt.table_name();
   LOG(INFO) << "Creating table " << stmt.table_name();
@@ -417,8 +419,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
 
   sql::SqlResult result = sql::SqlResult(false);
   // Sharding scenarios.
-  auto &exec = state->executor();
-
+  auto &exec = connection->executor;
   if (has_pii && sharding_information.size() == 0) {
     // Case 1: has pii but not linked to shards.
     // This means that this table define a type of user for which shards must be
@@ -467,7 +468,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
   if (owning_table) {
     if (has_pii)
       return absl::UnimplementedError("'OWNING' tables cannot be data subject tables!");
-    CHECK_STATUS(HandleOwningTable(stmt, *owning_table, state, dataflow_state));
+    CHECK_STATUS(HandleOwningTable(stmt, *owning_table, connection));
     result = sql::SqlResult(true);
   }
 

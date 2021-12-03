@@ -79,11 +79,10 @@ std::vector<std::pair<std::string, std::string>> FLOWS{
                    "CREATE VIEW filter_row3 AS "
                    "'\"SELECT * FROM submissions WHERE ts >= 100 AND "
                    "assignment_id = 2 AND ID > 5\"'"),
-    std::make_pair(
-        "union_flow",
-        "CREATE VIEW union_flow AS "
-        "'\"(SELECT * FROM submissions WHERE ts >= 100) UNION (SELECT "
-        "* FROM submissions WHERE ts < 100)\"'"),
+    std::make_pair("union_flow",
+                   "CREATE VIEW union_flow AS "
+                   "'\"(SELECT * FROM submissions WHERE ts < 100) UNION "
+                   "(SELECT * FROM submissions WHERE ts >= 100)\"'"),
     std::make_pair("join_flow",
                    "CREATE VIEW join_flow AS "
                    "'\"SELECT * from submissions INNER JOIN students ON "
@@ -148,8 +147,10 @@ int main(int argc, char **argv) {
   const std::string &db_password = FLAGS_db_password;
 
   // Open connection to sharder.
+  pelton::initialize(3);
+
   pelton::Connection connection;
-  pelton::open("", "exampledb", db_username, db_password, &connection);
+  pelton::open(&connection, "exampledb", db_username, db_password);
   CHECK(pelton::exec(&connection, "SET echo;").ok());
 
   // Create all the tables.
@@ -231,11 +232,15 @@ int main(int argc, char **argv) {
   }
   std::cout << std::endl;
 
-  // Print flows memory usage.
-  connection.PrintSizeInMemory();
+  // Print statistics.
+  Print(connection.state->NumShards());
+  std::cout << std::endl;
+  Print(connection.state->SizeInMemory());
+  std::cout << std::endl;
 
   // Close connection.
   pelton::close(&connection);
+  pelton::shutdown();
 
   // Print performance profile.
   pelton::perf::PrintAll();

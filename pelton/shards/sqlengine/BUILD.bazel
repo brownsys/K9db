@@ -21,13 +21,14 @@ cc_library(
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
+        "//pelton/shards:upgradable_lock",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/sqlast:parser",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
         "@antlr4_runtimes//:cpp",
+        "@com_google_absl//absl/status",
         "@grammars-v4//:sqlparser",
     ],
 )
@@ -41,17 +42,19 @@ cc_library(
         "create.h",
     ],
     deps = [
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
+        "//pelton/shards:upgradable_lock",
         "//pelton/shards/sqlengine:util",
         "//pelton/shards/sqlengine:index",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
-        "@absl//absl/strings",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -65,17 +68,19 @@ cc_library(
     ],
     deps = [
         ":view",
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:graph",
         "//pelton/dataflow:key",
         "//pelton/dataflow:record",
         "//pelton/shards:state",
         "//pelton/shards:types",
+        "//pelton/shards:upgradable_lock",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -89,17 +94,19 @@ cc_library(
     ],
     deps = [
         ":index",
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/shards/sqlengine:util",
         "//pelton/shards/sqlengine:select",
+        "//pelton/shards:upgradable_lock",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
-        "@absl//absl/strings",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -113,14 +120,16 @@ cc_library(
     ],
     deps = [
         ":index",
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
+        "//pelton/shards:upgradable_lock",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -135,16 +144,18 @@ cc_library(
     deps = [
         ":index",
         ":select",
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
+        "//pelton/shards:upgradable_lock",
         "//pelton/shards/sqlengine:util",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
-        "@absl//absl/strings",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -161,14 +172,16 @@ cc_library(
         ":index",
         ":insert",
         ":select",
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
+        "//pelton/shards:upgradable_lock",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -188,7 +201,7 @@ cc_library(
     deps = [
         "//pelton/shards:types",
         "//pelton/sqlast:ast",
-        "@absl//absl/strings",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -199,17 +212,28 @@ cc_library(
     ],
     hdrs = [
         "view.h",
+        # We can't include :select as a dependency.
+        # It creates a cycle (select -> index -> view -> select).
+        # We can split these files better later.
+        "select.h",
     ],
     deps = [
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
+        "//pelton/dataflow:graph",
+        "//pelton/dataflow:key",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
         "//pelton/planner",
         "//pelton/shards:state",
         "//pelton/shards:types",
+        "//pelton/shards:upgradable_lock",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
+        "@com_google_absl//absl/status",
+        "@glog",
     ],
 )
 
@@ -224,15 +248,17 @@ cc_library(
     deps = [
         ":delete",
         ":select",
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
+        "//pelton/shards:upgradable_lock",
         "//pelton/shards/sqlengine:util",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",
-        "@absl//absl/status",
-        "@absl//absl/strings",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )

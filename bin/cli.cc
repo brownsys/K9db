@@ -68,7 +68,7 @@ bool ReadCommand(std::string *ptr) {
 
 DEFINE_bool(print, true, "Print results to the screen");
 DEFINE_bool(progress, true, "Show progress counter");
-DEFINE_string(db_path, "", "Path to database directory");
+DEFINE_int32(workers, 3, "Number of workers");
 DEFINE_string(db_name, "pelton", "Name of the database");
 DEFINE_string(db_username, "root", "MariaDB username to connect with");
 DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
@@ -86,22 +86,29 @@ int main(int argc, char **argv) {
   // Initialize Google’s logging library.
   google::InitGoogleLogging("cli");
 
-  // Find database directory.
+  // Valdiate command line flags.
+  if (FLAGS_workers < 0) {
+    std::cout << "Bad number of workers" << std::endl;
+    return -1;
+  }
+
+  // Read command line flags.
+  size_t workers = static_cast<size_t>(FLAGS_workers);
   const std::string &db_name = FLAGS_db_name;
   const std::string &db_username = FLAGS_db_username;
   const std::string &db_password = FLAGS_db_password;
-  const std::string &dir = FLAGS_db_path;
   size_t progress = 0;
 
   // Initialize our sharded state/connection.
   std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
   std::chrono::time_point<std::chrono::high_resolution_clock> end_time;
   try {
+    pelton::initialize(workers);
+
     pelton::Connection connection;
-    pelton::open(dir, db_name, db_username, db_password, &connection);
+    pelton::open(&connection, db_name, db_username, db_password);
 
     std::cout << "SQL Sharder" << std::endl;
-    std::cout << "DB directory: " << dir << std::endl;
     std::cout << "DB: " << db_name << std::endl;
     if (print) {
       std::cout << ">>> " << std::flush;
@@ -163,18 +170,16 @@ int main(int argc, char **argv) {
     // Close the connection
     end_time = std::chrono::high_resolution_clock::now();
 
-    std::cout << std::endl
-              << "Shards: " << connection.GetSharderState()->NumShards()
-              << std::endl;
-
-    // Print flows memory usage.
-    connection.PrintSizeInMemory();
+    // Display statistics.
+    Print(connection.state->NumShards(), print);
+    Print(connection.state->SizeInMemory(), print);
 
     auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(
         end_time - start_time);
     std::cout << "Time PELTON: " << diff.count() << "ns" << std::endl;
 
     pelton::close(&connection);
+    pelton::shutdown();
   } catch (const char *err_msg) {
     LOG(FATAL) << "Error: " << err_msg;
   }

@@ -1,39 +1,39 @@
 SET echo;
 
-CREATE TABLE doctors ( \
-  id int, \
-  PII_name text, \
-  PRIMARY KEY(id) \
+CREATE TABLE doctors (
+  id int,
+  PII_name text,
+  PRIMARY KEY(id)
 );
 
-CREATE TABLE patients ( \
-  id int, \
-  PII_name text, \
-  PRIMARY KEY(id) \
+CREATE TABLE patients (
+  id int,
+  PII_name text,
+  PRIMARY KEY(id)
 );
 
-CREATE TABLE address_doctors ( \
-  id int, \
-  doctor_id int REFERENCES doctors(id), \
-  city text, \
-  PRIMARY KEY(id) \
+CREATE TABLE address_doctors (
+  id int,
+  doctor_id int REFERENCES doctors(id),
+  city text,
+  PRIMARY KEY(id)
 );
 
-CREATE TABLE address_patients ( \
-  id int, \
-  patient_id int REFERENCES patients(id), \
-  city text, \
-  PRIMARY KEY(id) \
+CREATE TABLE address_patients (
+  id int,
+  patient_id int REFERENCES patients(id),
+  city text,
+  PRIMARY KEY(id)
 );
 
-CREATE TABLE chat ( \
-  id int, \
-  OWNER_patient_id int, \
-  doctor_id int, \
-  message text, \
-  PRIMARY KEY(id), \
-  FOREIGN KEY (OWNER_patient_id) REFERENCES patients(id), \
-  FOREIGN KEY (doctor_id) REFERENCES doctors(id) \
+CREATE TABLE chat (
+  id int,
+  OWNER_patient_id int,
+  doctor_id int,
+  message text,
+  PRIMARY KEY(id),
+  FOREIGN KEY (OWNER_patient_id) REFERENCES patients(id),
+  FOREIGN KEY (doctor_id) REFERENCES doctors(id)
 );
 
 INSERT INTO doctors VALUES (1, 'Alice');
@@ -61,9 +61,20 @@ SELECT * FROM chat WHERE OWNER_patient_id = 10;
 GDPR GET patients 10;
 GDPR GET doctors 2;
 
+-- Test view creation after inserts.
+CREATE VIEW v1 AS '"SELECT doctors.PII_name, patients.PII_name FROM doctors JOIN chat ON doctors.id = chat.doctor_id JOIN patients ON chat.OWNER_patient_id = patients.id"';
+SELECT * FROM v1;
+
 DELETE FROM doctors WHERE id = 2;
+GDPR FORGET doctors 1;
 SELECT * FROM chat;
 
 GDPR FORGET patients 10;
 SELECT * FROM patients;
 SELECT * FROM chat;
+
+SELECT * FROM v1;
+
+SHOW MEMORY;
+SHOW VIEW v1;
+SHOW SHARDS;

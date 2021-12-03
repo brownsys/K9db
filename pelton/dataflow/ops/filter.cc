@@ -4,8 +4,6 @@
 #include <utility>
 
 #include "glog/logging.h"
-#include "pelton/dataflow/graph.h"
-#include "pelton/dataflow/record.h"
 #include "pelton/sqlast/ast.h"
 
 // The value in v must be of the same type as the corresponding one in the
@@ -94,15 +92,16 @@ void FilterOperator::ComputeOutputSchema() {
   this->output_schema_ = this->input_schemas_.at(0);
 }
 
-std::optional<std::vector<Record>> FilterOperator::Process(
-    NodeIndex /*source*/, const std::vector<Record> &records) {
+std::vector<Record> FilterOperator::Process(NodeIndex source,
+                                            std::vector<Record> &&records) {
   std::vector<Record> output;
-  for (const Record &record : records) {
+  output.reserve(records.size());
+  for (Record &record : records) {
     if (this->Accept(record)) {
-      output.push_back(record.Copy());
+      output.push_back(std::move(record));
     }
   }
-  return std::move(output);
+  return output;
 }
 
 bool FilterOperator::Accept(const Record &record) const {
@@ -145,13 +144,8 @@ bool FilterOperator::Accept(const Record &record) const {
   return true;
 }
 
-std::shared_ptr<Operator> FilterOperator::Clone() const {
-  auto clone = std::make_shared<FilterOperator>();
-  clone->children_ = this->children_;
-  clone->parents_ = this->parents_;
-  clone->input_schemas_ = this->input_schemas_;
-  clone->output_schema_ = this->output_schema_;
-  clone->index_ = this->index_;
+std::unique_ptr<Operator> FilterOperator::Clone() const {
+  auto clone = std::make_unique<FilterOperator>();
   clone->ops_ = this->ops_;
   return clone;
 }

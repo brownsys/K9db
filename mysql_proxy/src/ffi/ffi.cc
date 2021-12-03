@@ -12,27 +12,58 @@
 #include "glog/logging.h"
 #include "pelton/pelton.h"
 
+DEFINE_uint32(workers, 3, "Number of workers");
+DEFINE_string(db_name, "pelton", "Name of the database");
+DEFINE_string(db_username, "root", "MariaDB username to connect with");
+DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
+
 // process command line arguments with gflags
-void FFIGflags(int argc, char **argv) {
+FFIArgs FFIGflags(int argc, char **argv, const char *usage) {
+  gflags::SetUsageMessage(usage);  // Usage message is in rust.
+  gflags::AllowCommandLineReparsing();
+
   // Command line arguments and help message.
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   // Initialize Google’s logging library.
   google::InitGoogleLogging("proxy");
+
+  // Returned the read command line flags.
+  return {FLAGS_workers, FLAGS_db_name.c_str(), FLAGS_db_username.c_str(),
+          FLAGS_db_password.c_str()};
 }
 
-// Open a connection. The returned struct has connected = true if successful.
-// Otherwise connected = false.
-FFIConnection FFIOpen(const char *db_dir, const char *db_name,
-                      const char *db_username, const char *db_password) {
+// Initialize pelton_state in pelton.cc
+bool FFIInitialize(size_t workers) {
   // Log debugging information.
   LOG(INFO) << "C-Wrapper: starting open_c";
-  LOG(INFO) << "C-Wrapper: db_dir is: " << std::string(db_dir);
+
+  // call c++ function from C with converted types
+  LOG(INFO) << "C-Wrapper: running pelton::initialize";
+  if (pelton::initialize(workers)) {
+    LOG(INFO) << "C-Wrapper: global connection opened";
+  } else {
+    LOG(INFO) << "C-Wrapper: failed to open global connection";
+    return false;
+  }
+  return true;
+}
+
+// Open a connection for a single client. The returned struct has connected =
+// true if successful. Otherwise connected = false
+FFIConnection FFIOpen(const char *db_name, const char *db_username,
+                      const char *db_password) {
+  // Log debugging information
   LOG(INFO) << "C-Wrapper: db_name is: " << std::string(db_name);
   LOG(INFO) << "C-Wrapper: db_username is: " << std::string(db_username);
-  LOG(INFO) << "C-Wrapper: db_passwored is: " << std::string(db_password);
+  LOG(INFO) << "C-Wrapper: db_password is: " << std::string(db_password);
 
-  // Create a new connection.
+  // convert char* to const std::string
+  const std::string c_db(db_name);
+  const std::string c_db_username(db_username);
+  const std::string c_db_password(db_password);
+
+  // Create a new client connection.
   FFIConnection c_conn = {new pelton::Connection(), false};
 
   // convert void pointer of ConnectionC struct into c++ class instance
@@ -40,23 +71,27 @@ FFIConnection FFIOpen(const char *db_dir, const char *db_name,
   pelton::Connection *cpp_conn =
       reinterpret_cast<pelton::Connection *>(c_conn.cpp_conn);
 
-  // convert char* to const std::string
-  const std::string c_db_dir(db_dir);
-  const std::string c_db(db_name);
-  const std::string c_db_username(db_username);
-  const std::string c_db_password(db_password);
-
   // call c++ function from C with converted types
   LOG(INFO) << "C-Wrapper: running pelton::open";
-  if (pelton::open(c_db_dir, c_db, c_db_username, c_db_password, cpp_conn)) {
+  if (pelton::open(cpp_conn, c_db, c_db_username, c_db_password)) {
     LOG(INFO) << "C-Wrapper: connection opened";
     c_conn.connected = true;
   } else {
     LOG(INFO) << "C-Wrapper: failed to open connection";
     c_conn.connected = false;
   }
-
   return c_conn;
+}
+
+// Delete pelton_state. Returns true if successful and false otherwise.
+bool FFIShutdown() {
+  LOG(INFO) << "C-Wrapper: Closing global connection";
+  bool response = pelton::shutdown(true);
+  if (response) {
+    LOG(INFO) << "C-Wrapper: global connection closed";
+    return true;
+  }
+  return false;
 }
 
 // Close the connection. Returns true if successful and false otherwise.
@@ -143,7 +178,7 @@ void PopulateSchema(FFIResult *c_result, const pelton::Schema &schema) {
         c_result->col_types[i] = FFIColumnType::DATETIME;
         break;
       default:
-        LOG(INFO) << "C-Wrapper: Unrecognizable column type " << col_type;
+        LOG(FATAL) << "C-Wrapper: Unrecognizable column type " << col_type;
     }
   }
 }
@@ -158,30 +193,37 @@ void PopulateRecords(FFIResult *c_result,
     for (size_t j = 0; j < num_cols; j++) {
       // current row index * num cols per row + current col index
       size_t index = i * num_cols + j;
-      switch (c_result->col_types[j]) {
-        case FFIColumnType::UINT:
-          c_result->values[index].UINT = records[i].GetUInt(j);
-          break;
-        case FFIColumnType::INT:
-          c_result->values[index].INT = records[i].GetInt(j);
-          break;
-        case FFIColumnType::TEXT: {
-          const std::string &cpp_val = records[i].GetString(j);
-          c_result->values[index].TEXT =
-              static_cast<char *>(malloc(cpp_val.size() + 1));
-          memcpy(c_result->values[index].TEXT, cpp_val.c_str(),
-                 cpp_val.size() + 1);
-          break;
+      if (records[i].IsNull(j)) {
+        c_result->records[index].is_null = true;
+      } else {
+        c_result->records[index].is_null = false;
+        switch (c_result->col_types[j]) {
+          case FFIColumnType::UINT:
+            c_result->records[index].record.UINT = records[i].GetUInt(j);
+            break;
+          case FFIColumnType::INT:
+            c_result->records[index].record.INT = records[i].GetInt(j);
+            break;
+          case FFIColumnType::TEXT: {
+            const std::string &cpp_val = records[i].GetString(j);
+            c_result->records[index].record.TEXT =
+                static_cast<char *>(malloc(cpp_val.size() + 1));
+            memcpy(c_result->records[index].record.TEXT, cpp_val.c_str(),
+                   cpp_val.size() + 1);
+            break;
+          }
+          case FFIColumnType::DATETIME: {
+            const std::string &cpp_val = records[i].GetDateTime(j);
+            c_result->records[index].record.DATETIME =
+                static_cast<char *>(malloc(cpp_val.size() + 1));
+            memcpy(c_result->records[index].record.DATETIME, cpp_val.c_str(),
+                   cpp_val.size() + 1);
+            break;
+          }
+          default:
+            LOG(FATAL) << "C-Wrapper: Invalid col_type: "
+                       << c_result->col_types[j];
         }
-        case FFIColumnType::DATETIME: {
-          const std::string &cpp_val = records[i].GetDateTime(j);
-          c_result->values[index].DATETIME =
-              static_cast<char *>(malloc(cpp_val.size() + 1));
-          memcpy(c_result->values[index].DATETIME, cpp_val.c_str(),
-                 cpp_val.size() + 1);
-        }
-        default:
-          LOG(FATAL) << "C-Wrapper: Invalid col_type";
       }
     }
   }
@@ -214,9 +256,8 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
       // unions
       // we have to use malloc here to account for the flexible array.
       FFIResult *c_result = static_cast<FFIResult *>(
-          malloc(sizeof(FFIResult) +
-                 sizeof(FFIResult::RecordData) * num_rows * num_cols));
-      //  |- FFIResult*-|   |union RecordData| |num of records (rows) and cols |
+          malloc(sizeof(FFIResult) + sizeof(FFIRecord) * num_rows * num_cols));
+      //  |- FFIResult*-|   |struct FFIRecord| |num of records (rows) and cols |
 
       // set number of columns
       c_result->num_cols = num_cols;
