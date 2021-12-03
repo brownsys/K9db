@@ -48,7 +48,7 @@ std::string &ColumnConstraint::foreign_column() {
 // ColumnDefinition
 ColumnDefinition::Type ColumnDefinition::StringToType(
     const std::string &column_type) {
-  if (absl::EqualsIgnoreCase(column_type, "INT")) {
+  if (absl::EqualsIgnoreCase(column_type, "INT") || absl::EqualsIgnoreCase(column_type, "INTEGER")) {
     return Type::INT;
   } else if (absl::StartsWithIgnoreCase(column_type, "VARCHAR") ||
              absl::EqualsIgnoreCase(column_type, "TEXT")) {
