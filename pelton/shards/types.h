@@ -4,6 +4,8 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <sstream>
+#include "glog/logging.h"
 
 namespace pelton {
 namespace shards {
@@ -75,7 +77,9 @@ struct ShardingInformation {
 
   // A transitive sharding information can only be created given the previous
   // sharding information in the transitivity chain.
-  bool MakeTransitive(const ShardingInformation &next, const FlowName &index) {
+  bool MakeTransitive(const ShardingInformation &next, const FlowName &index, const UnshardedTableName &original_table_name) {
+    size_t my_hash = std::hash<std::string>{}(next.sharded_table_name) ^ std::hash<std::string>{}(next.shard_by);
+    sharded_table_name = original_table_name + "_" + std::to_string(my_hash);
     distance_from_shard = next.distance_from_shard + 1;
     next_table = shard_kind;
     shard_kind = next.shard_kind;

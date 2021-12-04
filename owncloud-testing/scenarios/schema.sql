@@ -26,8 +26,7 @@ CREATE TABLE oc_filecache (
 );
 CREATE TABLE oc_files (
   id INTEGER PRIMARY KEY NOT NULL,
-  file_name VARCHAR(255),
-  OWNER_owner VARCHAR(64)
+  file_name VARCHAR(255)
 );
 
 CREATE TABLE  oc_users (
@@ -42,7 +41,7 @@ CREATE TABLE oc_share (
   share_type INT NOT NULL,
   OWNER_share_with VARCHAR(255) REFERENCES oc_users(uid),
   --share_with_group VARCHAR(255) REFERENCE oc_groups(gid),
-  uid_owner VARCHAR(64) NOT NULL REFERENCES oc_users(uid),
+  OWNER_uid_owner VARCHAR(64) NOT NULL REFERENCES oc_users(uid),
   uid_initiator VARCHAR(64) REFERENCES oc_users(uid),
   parent INT ,
   item_type VARCHAR(64) NOT NULL ,

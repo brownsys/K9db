@@ -95,39 +95,46 @@ absl::StatusOr<std::optional<ShardKind>> ShouldShardBy(
   return std::optional<ShardKind>{};
 }
 
+
 // Determine whether and how to shard by the given information.
 // Particularly, this resolves transitive shards.
-absl::Status IsShardingBySupported(ShardingInformation *info,
-                                   const SharderState &state) {
-  const std::string &foreign_table = info->shard_kind;
+//
+// I changed the signature here, because this can now have more than one result. 
+// We can find a more efficient implementation later.
+absl::StatusOr<std::list<ShardingInformation>> IsShardingBySupported(
+  const ShardingInformation &info,
+  const SharderState &state,
+  const UnshardedTableName &original_table_name) 
+{
+  const std::string &foreign_table = info.shard_kind;
   bool foreign_sharded = state.IsSharded(foreign_table);
   bool foreign_pii = state.IsPII(foreign_table);
+
+  std::list<ShardingInformation> ways_to_shard;
 
   if (foreign_pii && foreign_sharded) {
     return absl::InvalidArgumentError("Foreign key into a PII + sharded table");
   } else if (foreign_pii) {
-    return absl::OkStatus();
+    ways_to_shard.push_back(info);
   } else if (foreign_sharded) {
-    const auto &info_list = state.GetShardingInformation(foreign_table);
-    if (info_list.size() > 1) {
-      return absl::InvalidArgumentError("Owning FK into mutli owned table");
-    }
 
-    const ShardingInformation &other = info_list.front();
-    if (!state.HasIndexFor(foreign_table, info->next_column, other.shard_by)) {
-      return absl::InvalidArgumentError(
-          "Cannot have a transitive FK pointing to non-index column");
-    }
+    for (const ShardingInformation &other : state.GetShardingInformation(foreign_table)) {
+      ways_to_shard.emplace_back(info);
+      ShardingInformation *info_c = &ways_to_shard.back();
+      if (!state.HasIndexFor(foreign_table, info_c->next_column, other.shard_by)) {
+        return absl::InvalidArgumentError(
+            "Cannot have a transitive FK pointing to non-index column");
+      }
 
-    const FlowName &index =
-        state.IndexFlow(foreign_table, info->next_column, other.shard_by);
-    if (!info->MakeTransitive(other, index)) {
-      return absl::InvalidArgumentError("Transitive FK is too deep");
+      const FlowName &index =
+          state.IndexFlow(foreign_table, info_c->next_column, other.shard_by);
+      if (!info_c->MakeTransitive(other, index, original_table_name)) {
+        return absl::InvalidArgumentError("Transitive FK is too deep");
+      }
     }
-    return absl::OkStatus();
   }
 
-  return absl::OkStatus();
+  return ways_to_shard;
 }
 
 struct OwningTable {
@@ -341,58 +348,57 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt
   const ColumnName &my_col_name = owning_table.column_name;
   const ColumnName &other_col_name = owning_table.foreign_column;
   int sharded_by_index = target_table_schema.ColumnIndex(other_col_name);
-  const ShardedTableName &sharded_table = NameShardedTable(target_table_name, my_col_name);
 
   LOG(INFO) << "Creating secondary index";
-  auto & infos = state->GetShardingInformation(relationship_table_name);
-  if (infos.size() != 1)
-    return absl::InvalidArgumentError("Expected sharding information.");
-  const ShardingInformation &prev_sharding_info = infos.front();
+  for (auto & prev_sharding_info : state->GetShardingInformation(relationship_table_name)) {
+    if (state->HasIndexFor(relationship_table_name, my_col_name, prev_sharding_info.shard_by)) {
+      LOG(INFO) << "Skipping index creation, already exists.";
+      result.Append(sql::SqlResult(true));
+    } else {
+      const std::string &index_name = state->GenerateUniqueIndexName(lock);
+      const sqlast::CreateIndex create_index(
+        index_name,
+        relationship_table_name,
+        my_col_name
+      );
 
-  if (state->HasIndexFor(relationship_table_name, my_col_name, prev_sharding_info.shard_by)) {
-    LOG(INFO) << "Skipping index creation, already exists.";
-    result = sql::SqlResult(true);
-  } else {
-    const std::string &index_name = state->GenerateUniqueIndexName(lock);
-    const sqlast::CreateIndex create_index(
-      index_name,
-      relationship_table_name,
-      my_col_name
-    );
+      auto res = index::CreateIndexStateIsAlreadyLocked(
+        create_index,
+        connection,
+        lock
+      );
 
-    auto res = index::CreateIndexStateIsAlreadyLocked(
-      create_index,
-      connection,
-      lock
-    );
-
-    if (res.ok()) 
-      result.Append(std::move(*res));
-    else 
-      return  res.status();
+      if (res.ok()) 
+        result.Append(std::move(*res));
+      else 
+        return  res.status();
 
 
-    LOG(INFO) << "created index " << index_name << " on " << relationship_table_name;
+      LOG(INFO) << "created index " << index_name << " on " << relationship_table_name;
+    }
   }
 
   ShardingInformation sharding_info(
     relationship_table_name /* shard kind */,
-    sharded_table, // sharded table name
+    NameShardedTable(target_table_name, my_col_name),
     other_col_name,
     sharded_by_index,
     my_col_name // the 'next column' in this case is our column
   );
-  CHECK_STATUS(IsShardingBySupported(&sharding_info, *state));
-  ASSIGN_OR_RETURN(
-    const ForeignKeyShards fk_shards, 
-    ShardForeignKeys(target_table_schema, sharding_info, *state)
-  );
-  state->AddShardedTable(
-    target_table_name,
-    sharding_info,
-    UpdateTableSchema(target_table_schema, fk_shards, sharded_table)
-  );
-  LOG(INFO) << "Added sharded table " << target_table_name << " as " << sharded_table;
+  ASSIGN_OR_RETURN(auto & ways_to_shard, IsShardingBySupported(sharding_info, *state, target_table_name));
+  for (auto & info : ways_to_shard) {
+    const ShardedTableName &sharded_table = info.sharded_table_name;
+    ASSIGN_OR_RETURN(
+      const ForeignKeyShards fk_shards, 
+      ShardForeignKeys(target_table_schema, info, *state)
+    );
+    state->AddShardedTable(
+      target_table_name,
+      info,
+      UpdateTableSchema(target_table_schema, fk_shards, sharded_table)
+    );
+    LOG(INFO) << "Added sharded table " << target_table_name << " as " << sharded_table;
+  }
   return result;
 }
 
@@ -419,12 +425,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
   std::optional<OwningTable> owning_table;
   ASSIGN_OR_RETURN(std::tie(sharding_information, owning_table),
                    ShardTable(stmt, *state));
-  for (auto &info : sharding_information) {
-    CHECK_STATUS(IsShardingBySupported(&info, *state));
-  }
+  sql::SqlResult result = sql::SqlResult(true);
 
-  sql::SqlResult result = sql::SqlResult(false);
-  // Sharding scenarios.
+      // Sharding scenarios.
   auto &exec = connection->executor;
   if (has_pii && sharding_information.size() == 0) {
     // Case 1: has pii but not linked to shards.
@@ -436,26 +439,29 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     result = exec.ExecuteDefault(&stmt);
 
   } else if (!has_pii && sharding_information.size() > 0) {
-    // Case 2: no pii but is linked to shards.
-    // This means that this table should be created inside shards of the kind it
-    // is linked to. We must also drop the foreign key column(s) that link it to
-    // the shard.
-    for (const auto &info : sharding_information) {
-      if (info.shard_kind == table_name) {
-        ASSIGN_OR_RETURN(std::string pk, GetPK(stmt));
-        state->AddShardKind(table_name, pk);
-      }
+    for (auto &info_0 : sharding_information) {
+      ASSIGN_OR_RETURN(auto & ways_to_shard , IsShardingBySupported(info_0, *state, table_name));
+      for (auto & info : ways_to_shard) {
+        // Case 2: no pii but is linked to shards.
+        // This means that this table should be created inside shards of the kind it
+        // is linked to. We must also drop the foreign key column(s) that link it to
+        // the shard.
+        if (info.shard_kind == table_name) {
+          ASSIGN_OR_RETURN(std::string pk, GetPK(stmt));
+          state->AddShardKind(table_name, pk);
+        }
 
-      // Determine what to do to each column that is a foreign key.
-      ASSIGN_OR_RETURN(ForeignKeyShards fk_shards,
-                       ShardForeignKeys(stmt, info, *state));
-      // Apply sharding and come up with new schema.
-      sqlast::CreateTable sharded_stmt =
-          UpdateTableSchema(stmt, fk_shards, info.sharded_table_name);
-      // Add the sharding information to state.
-      state->AddShardedTable(table_name, info, sharded_stmt);
+        // Determine what to do to each column that is a foreign key.
+        ASSIGN_OR_RETURN(ForeignKeyShards fk_shards,
+                        ShardForeignKeys(stmt, info, *state));
+        // Apply sharding and come up with new schema.
+        sqlast::CreateTable sharded_stmt =
+            UpdateTableSchema(stmt, fk_shards, info.sharded_table_name);
+        // Add the sharding information to state.
+        state->AddShardedTable(table_name, info, sharded_stmt);
+        result.Append(sql::SqlResult(true));
+      }
     }
-    result = sql::SqlResult(true);
 
   } else if (!has_pii && sharding_information.size() == 0) {
     // Case 3: neither pii nor linked.
@@ -475,7 +481,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     if (has_pii)
       return absl::UnimplementedError("'OWNING' tables cannot be data subject tables!");
     CHECK_STATUS(HandleOwningTable(stmt, *owning_table, connection, &lock));
-    result = sql::SqlResult(true);
+    result.Append(sql::SqlResult(true));
   }
 
   perf::End("Create");
