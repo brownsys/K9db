@@ -5,7 +5,7 @@
 bazel build @memcached//:memcached
 
 # Run memcached (in the background).
-bazel run @memcached//:memcached -- -vv &> .memtmp &
+bazel run @memcached//:memcached -- -vv -u memcached &> .memtmp &
 pid=$!
 sleep 10
 

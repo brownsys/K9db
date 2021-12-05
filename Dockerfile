@@ -111,6 +111,8 @@ ADD docker/configure_db.sql /home/configure_db.sql
 ADD docker/configure_db.sh /home/configure_db.sh
 RUN chmod 750 /home/configure_db.sh
 
+RUN useradd memcached
+
 ENTRYPOINT ["/bin/bash", "./home/configure_db.sh"]
 
 # Run with docker run -v .:/home/pelton
