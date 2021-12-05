@@ -74,7 +74,7 @@ TEST(PlannerTest, SimpleProject) {
   std::string query = "SELECT Col3 FROM test_table WHERE Col2 = 'hello!'";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -98,7 +98,7 @@ TEST(PlannerTest, SimpleProject) {
   std::vector<dataflow::Record> records;
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
-  graph->Process("test_table", std::move(records));
+  graph->_Process("test_table", std::move(records));
 
   // Look at flow output.
   EXPECT_EQ_MSET(graph->outputs().at(0)->All(), expected_records);
@@ -118,7 +118,7 @@ TEST(PlannerTest, SimpleProjectLiteral) {
   std::string query = "select 1 as `one` from  test_table";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -139,7 +139,7 @@ TEST(PlannerTest, SimpleProjectLiteral) {
   std::vector<dataflow::Record> records;
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
-  graph->Process("test_table", std::move(records));
+  graph->_Process("test_table", std::move(records));
 
   // Look at flow output.
   dataflow::MatViewOperator *output = graph->outputs().at(0);
@@ -168,7 +168,7 @@ TEST(PlannerTest, ProjectArithmeticRightLiteral) {
   std::string query = "SELECT Col1, Col3 - 5 as Delta5 FROM test_table";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -189,7 +189,7 @@ TEST(PlannerTest, ProjectArithmeticRightLiteral) {
   std::vector<dataflow::Record> records;
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
-  graph->Process("test_table", std::move(records));
+  graph->_Process("test_table", std::move(records));
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
@@ -218,7 +218,7 @@ TEST(PlannerTest, ProjectArithmeticRightColumn) {
   std::string query = "SELECT Col3 - Col1 as DeltaCol FROM test_table";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -239,7 +239,7 @@ TEST(PlannerTest, ProjectArithmeticRightColumn) {
   std::vector<dataflow::Record> records;
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
-  graph->Process("test_table", std::move(records));
+  graph->_Process("test_table", std::move(records));
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
@@ -270,7 +270,7 @@ TEST(PlannerTest, SimpleAggregate) {
       "SELECT Col3, COUNT(*) FROM test_table GROUP BY Col3 ORDER BY Col3";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -295,7 +295,7 @@ TEST(PlannerTest, SimpleAggregate) {
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
   records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
-  graph->Process("test_table", std::move(records));
+  graph->_Process("test_table", std::move(records));
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
@@ -326,7 +326,7 @@ TEST(PlannerTest, SimpleFilter) {
   std::string query = "SELECT * FROM test_table WHERE 'hello!' = Col2";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -344,7 +344,7 @@ TEST(PlannerTest, SimpleFilter) {
   std::vector<dataflow::Record> records;
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
-  graph->Process("test_table", CopyVec(records));
+  graph->_Process("test_table", CopyVec(records));
 
   // Look at flow output.
   dataflow::MatViewOperator *output = graph->outputs().at(0);
@@ -371,7 +371,7 @@ TEST(PlannerTest, SingleConditionFilter) {
   std::string query = "SELECT * FROM test_table WHERE Col3=20";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -391,7 +391,7 @@ TEST(PlannerTest, SingleConditionFilter) {
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
   records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
-  graph->Process("test_table", CopyVec(records));
+  graph->_Process("test_table", CopyVec(records));
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
@@ -417,7 +417,7 @@ TEST(PlannerTest, FilterSingleORCondition) {
       "SELECT * FROM test_table WHERE Col3=20 OR Col3=50 ORDER BY Col3";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -439,7 +439,7 @@ TEST(PlannerTest, FilterSingleORCondition) {
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
   records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
-  graph->Process("test_table", CopyVec(records));
+  graph->_Process("test_table", CopyVec(records));
 
   // Look at flow output.
   dataflow::MatViewOperator *output = graph->outputs().at(0);
@@ -466,7 +466,7 @@ TEST(PlannerTest, FilterSingleANDCondition) {
   std::string query = "SELECT * FROM test_table WHERE Col3=20 AND 5<Col1";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -486,7 +486,7 @@ TEST(PlannerTest, FilterSingleANDCondition) {
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
   records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
-  graph->Process("test_table", CopyVec(records));
+  graph->_Process("test_table", CopyVec(records));
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
@@ -513,7 +513,7 @@ TEST(PlannerTest, FilterNestedORCondition) {
       " AND (Col1 + 2 < 16 OR Col1 = 20)";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -547,7 +547,7 @@ TEST(PlannerTest, FilterNestedORCondition) {
   records.emplace_back(schema, true, 21_s, std::move(str3), 20_s);
   records.emplace_back(schema, true, 14_s, std::move(str4), 30_s);
   records.emplace_back(schema, true, 10_s, std::move(str5), 30_s);
-  graph->Process("test_table", std::move(records));
+  graph->_Process("test_table", std::move(records));
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
@@ -576,7 +576,7 @@ TEST(PlannerTest, FilterNestedANDCondition) {
       "SELECT * FROM test_table WHERE Col3=50 OR (Col3=20 AND Col1=20)";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -598,7 +598,7 @@ TEST(PlannerTest, FilterNestedANDCondition) {
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
   records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
-  graph->Process("test_table", CopyVec(records));
+  graph->_Process("test_table", CopyVec(records));
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
@@ -623,7 +623,7 @@ TEST(PlannerTest, FilterColumnComparison) {
   std::string query = "SELECT * FROM test_table WHERE Col1 >= Col3";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -643,7 +643,7 @@ TEST(PlannerTest, FilterColumnComparison) {
   records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 20_s, std::move(str2), 20_s);
   records.emplace_back(schema, true, 30_s, std::move(str3), 50_s);
-  graph->Process("test_table", CopyVec(records));
+  graph->_Process("test_table", CopyVec(records));
 
   // Expected records
   std::vector<dataflow::Record> expected_records;
@@ -667,7 +667,7 @@ TEST(PlannerTest, FilterArithmeticCondition) {
   std::string query = "SELECT * FROM test_table WHERE 100 > 30 + Col3";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -717,7 +717,7 @@ TEST(PlannerTest, FilterArithmeticCondition) {
   records.emplace_back(schema, true, 10_s, std::move(str1), 50_u);
   records.emplace_back(schema, true, 20_s, std::move(str2), 70_u);
   records.emplace_back(schema, true, 30_s, std::move(str3), 30_u);
-  graph->Process("test_table", std::move(records));
+  graph->_Process("test_table", std::move(records));
 
   // Expected records
   std::unique_ptr<std::string> str4 = std::make_unique<std::string>("hello!");
@@ -745,7 +745,7 @@ TEST(PlannerTest, FilterArithmeticConditionTwoColumns) {
       "SELECT * FROM test_table WHERE Col3 - Col1 < 10 ORDER BY Col1";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -795,7 +795,7 @@ TEST(PlannerTest, FilterArithmeticConditionTwoColumns) {
   records.emplace_back(schema, true, 20_u, std::move(str2), 20_u);
   records.emplace_back(schema, true, 10_u, std::move(str1), 20_u);
   records.emplace_back(schema, true, 30_u, std::move(str3), 25_u);
-  graph->Process("test_table", std::move(records));
+  graph->_Process("test_table", std::move(records));
 
   // Expected records
   std::unique_ptr<std::string> str4 = std::make_unique<std::string>("bye!");
@@ -824,7 +824,7 @@ TEST(PlannerTest, UniqueSecondaryIndexFlow) {
   std::string query = "SELECT IndexCol, ShardByCol FROM test_table";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -854,7 +854,7 @@ TEST(PlannerTest, UniqueSecondaryIndexFlow) {
                        std::make_unique<std::string>("shard2"), 20_s);
   records.emplace_back(schema, true, 30_s,
                        std::make_unique<std::string>("shard3"), 50_s);
-  graph->Process("test_table", std::move(records));
+  graph->_Process("test_table", std::move(records));
 
   // Expected records.
   std::vector<dataflow::Record> expected_records;
@@ -876,7 +876,7 @@ TEST(PlannerTest, UniqueSecondaryIndexFlow) {
                         std::make_unique<std::string>("shard2"), 20_s);
   records2.emplace_back(schema, true, 100_s,
                         std::make_unique<std::string>("shard5"), 50_s);
-  graph->Process("test_table", std::move(records2));
+  graph->_Process("test_table", std::move(records2));
 
   // Expected records.
   std::vector<dataflow::Record> expected_records2;
@@ -903,7 +903,7 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
       "FROM test_table GROUP BY IndexCol, ShardByCol";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("test_table", schema);
 
   // Plan the graph via calcite.
@@ -932,7 +932,7 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
                        std::make_unique<std::string>("shard1"), 20_s);
   records.emplace_back(schema, true, 1_s, 10_s,
                        std::make_unique<std::string>("shard1"), 20_s);
-  graph->Process("test_table", CopyVec(records));
+  graph->_Process("test_table", CopyVec(records));
 
   // Check that processing was correct.
   std::vector<dataflow::Record> expected_records;
@@ -947,7 +947,7 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
                        std::make_unique<std::string>("shard2"), 150_s);
   records.emplace_back(schema, true, 2_s, 30_s,
                        std::make_unique<std::string>("shard1"), 200_s);
-  graph->Process("test_table", CopyVec(records));
+  graph->_Process("test_table", CopyVec(records));
 
   expected_records.clear();
   expected_records.emplace_back(matview->output_schema(), true, 10_s,
@@ -964,7 +964,7 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
                         std::make_unique<std::string>("shard1"), 20_s);
   records2.emplace_back(schema, false, 1_s, 10_s,
                         std::make_unique<std::string>("shard1"), 20_s);
-  graph->Process("test_table", CopyVec(records2));
+  graph->_Process("test_table", CopyVec(records2));
 
   expected_records.clear();
   expected_records.emplace_back(matview->output_schema(), true, 10_s,
@@ -981,7 +981,7 @@ TEST(PlannerTest, DuplicatesSecondaryIndexFlow) {
                         std::make_unique<std::string>("shard1"), 50_s);
   records2.emplace_back(schema, false, 2_s, 30_s,
                         std::make_unique<std::string>("shard1"), 200_s);
-  graph->Process("test_table", CopyVec(records2));
+  graph->_Process("test_table", CopyVec(records2));
 
   expected_records.clear();
   expected_records.emplace_back(matview->output_schema(), true, 10_s,
@@ -1016,7 +1016,7 @@ TEST(PlannerTest, ComplexQueryWithKeys) {
       "HAVING assignments.ID = ?";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("students", schema1);
   state.AddTableSchema("assignments", schema2);
   state.AddTableSchema("submissions", schema3);
@@ -1055,14 +1055,14 @@ TEST(PlannerTest, ComplexQueryWithKeys) {
   std::vector<dataflow::Record> records;
   records.emplace_back(schema1, true, 0_s, std::make_unique<std::string>("s1"));
   records.emplace_back(schema1, true, 1_s, std::make_unique<std::string>("s2"));
-  graph->Process("students", std::move(records));
+  graph->_Process("students", std::move(records));
 
   records.clear();
   records.emplace_back(schema2, true, 10_s,
                        std::make_unique<std::string>("a1"));
   records.emplace_back(schema2, true, 20_s,
                        std::make_unique<std::string>("a2"));
-  graph->Process("assignments", std::move(records));
+  graph->_Process("assignments", std::move(records));
 
   records.clear();
   records.emplace_back(schema3, true, 0_s, 0_s, 10_s, 100_s);
@@ -1071,7 +1071,7 @@ TEST(PlannerTest, ComplexQueryWithKeys) {
   records.emplace_back(schema3, true, 4_s, 1_s, 10_s, 440_s);
   records.emplace_back(schema3, true, 5_s, 1_s, 10_s, 465_s);
   records.emplace_back(schema3, true, 6_s, 0_s, 10_s, 721_s);
-  graph->Process("submissions", std::move(records));
+  graph->_Process("submissions", std::move(records));
 
   // Check that processing was correct.
   dataflow::SchemaRef schema4 = matview->output_schema();
@@ -1123,7 +1123,7 @@ TEST(PlannerTest, BasicLeftJoin) {
       "= students.ID";
 
   // Create a dummy state.
-  dataflow::DataFlowState state(0);
+  dataflow::DataFlowState state(0, false);
   state.AddTableSchema("students", schema1);
   state.AddTableSchema("submissions", schema3);
 
@@ -1155,7 +1155,7 @@ TEST(PlannerTest, BasicLeftJoin) {
   records.emplace_back(schema3, true, 4_s, 1_s, 10_s, 440_s);
   records.emplace_back(schema3, true, 5_s, 1_s, 10_s, 465_s);
   records.emplace_back(schema3, true, 6_s, 0_s, 10_s, 721_s);
-  graph->Process("submissions", std::move(records));
+  graph->_Process("submissions", std::move(records));
 
   // Check for appropriate records with null values for left join
   std::vector<dataflow::Record> expected_records;
@@ -1177,7 +1177,7 @@ TEST(PlannerTest, BasicLeftJoin) {
   records.clear();
   records.emplace_back(schema1, true, 0_s, std::make_unique<std::string>("s1"));
   records.emplace_back(schema1, true, 1_s, std::make_unique<std::string>("s2"));
-  graph->Process("students", std::move(records));
+  graph->_Process("students", std::move(records));
 
   // Check if matview gets updated as a consequence of negative records
   expected_records.clear();

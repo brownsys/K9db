@@ -20,6 +20,7 @@ typedef struct {
 
 typedef struct {
   size_t workers;
+  bool consistent;
   const char *db_name;
   const char *db_username;
   const char *db_password;
@@ -62,7 +63,7 @@ FFIArgs FFIGflags(int argc, char **argv, const char *usage);
 
 // Initialize pelton_state in pelton.cc. Returns true if successful and false
 // otherwise.
-bool FFIInitialize(size_t workers);
+bool FFIInitialize(size_t workers, bool consistent);
 
 // Open a connection for a single client. The returned struct has connected =
 // true if successful. Otherwise connected = false.

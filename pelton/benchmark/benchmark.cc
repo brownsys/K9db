@@ -45,7 +45,7 @@ void Thread(size_t index, size_t batch_size, size_t batch_count,
 void Benchmark(const std::vector<std::string> &tables, const std::string &query,
                size_t threads, size_t batch_size, size_t batch_count) {
   // Create an empty state.
-  dataflow::DataFlowState state(threads, batch_size * batch_count);
+  dataflow::DataFlowState state(threads, true);
 
   // Fill the state with schemas.
   for (const std::string &table : tables) {
@@ -76,7 +76,7 @@ void Benchmark(const std::vector<std::string> &tables, const std::string &query,
   for (auto &client : clients) {
     client.join();
   }
-  state.Join();
+  state.Shutdown();
 
   // Dataflow is done processing.
   auto end = std::chrono::high_resolution_clock::now();
@@ -99,7 +99,7 @@ void Benchmark(const std::vector<std::string> &tables, const std::string &query,
   std::cout << "Total time: " << time << "sec" << std::endl;
   std::cout << "Throughput: " << throughput << " records/sec" << std::endl;
 
-  // Print number of records.
+  // Check number of records.
   CHECK_EQ(state.GetFlow("bench_flow").All(-1, 0).size(),
            batch_size * batch_count * threads);
 }
@@ -113,5 +113,5 @@ int main(int argc, char **argv) {
 
   pelton::benchmark::Benchmark(
       {"CREATE TABLE tbl(col1 INT, col2 VARCHAR, col3 INT);"},
-      "SELECT col2, col3 FROM tbl WHERE col3 = ?", 1, 1, 100000);
+      "SELECT col2, col3 FROM tbl WHERE col3 = ?", 3, 10000, 100);
 }

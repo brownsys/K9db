@@ -134,7 +134,7 @@ int main(int argc, char **argv) {
   DropDatabase();
 
   // Initialize Pelton State
-  EXPECT_TRUE(FFIInitialize(1)) << "Opening global connection failed!";
+  EXPECT_TRUE(FFIInitialize(3, true)) << "Opening global connection failed!";
 
   // Run tests.
   ::testing::InitGoogleTest(&argc, argv);

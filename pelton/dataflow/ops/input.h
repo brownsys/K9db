@@ -27,8 +27,8 @@ class InputOperator : public Operator {
   const std::string &input_name() const { return this->input_name_; }
 
  protected:
-  std::vector<Record> Process(NodeIndex source,
-                              std::vector<Record> &&records) override;
+  std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records,
+                              const Promise &promise) override;
 
   void ComputeOutputSchema() override {}
 

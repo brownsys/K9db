@@ -23,7 +23,7 @@ using Schema = dataflow::SchemaRef;
 using Record = dataflow::Record;
 
 // initialize pelton_state
-bool initialize(size_t workers);
+bool initialize(size_t workers, bool consistent);
 
 // delete pelton_state
 bool shutdown(bool shutdown_planner = true);

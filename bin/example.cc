@@ -147,7 +147,7 @@ int main(int argc, char **argv) {
   const std::string &db_password = FLAGS_db_password;
 
   // Open connection to sharder.
-  pelton::initialize(3);
+  pelton::initialize(3, true);
 
   pelton::Connection connection;
   pelton::open(&connection, "exampledb", db_username, db_password);

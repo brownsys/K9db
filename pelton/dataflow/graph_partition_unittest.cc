@@ -484,7 +484,7 @@ TEST(DataFlowGraphPartitionTest, TestTrivialGraph) {
   std::vector<Record> records = MakeLeftRecords(schema);
   std::vector<Record> results = MakeLeftRecords(schema);
   // Process records.
-  g->Process("test-table", std::move(records));
+  g->_Process("test-table", std::move(records));
   // Outputs must be equal.
   MatViewContentsEquals(g->outputs().at(0), results);
 }
@@ -497,7 +497,7 @@ TEST(DataFlowGraphPartitionTest, TestFilterGraph) {
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
-  g->Process("test-table", std::move(records));
+  g->_Process("test-table", std::move(records));
   // Filter records.
   auto op = static_cast<FilterOperator *>(g->GetNode(1));
   std::vector<Record> filtered = MakeFilterRecords(op->output_schema());
@@ -520,8 +520,8 @@ TEST(DataFlowGraphPartitionTest, TestUnionGraph) {
   second_half.push_back(records.at(3).Copy());
   second_half.push_back(records.at(4).Copy());
   // Process records.
-  g->Process("test-table1", std::move(first_half));
-  g->Process("test-table2", std::move(second_half));
+  g->_Process("test-table1", std::move(first_half));
+  g->_Process("test-table2", std::move(second_half));
   // Outputs must be equal.
   MatViewContentsEquals(g->outputs().at(0), records);
 }
@@ -536,8 +536,8 @@ TEST(DataFlowGraphPartitionTest, TestEquiJoinGraph) {
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
   // Process records.
-  g->Process("test-table1", std::move(left));
-  g->Process("test-table2", std::move(right));
+  g->_Process("test-table1", std::move(left));
+  g->_Process("test-table2", std::move(right));
   // Compute expected result.
   auto op = static_cast<EquiJoinOperator *>(g->GetNode(2));
   std::vector<Record> result = MakeJoinRecords(op->output_schema());
@@ -553,7 +553,7 @@ TEST(DataFlowGraphPartitionTest, TestProjectGraph) {
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
-  g->Process("test-table", std::move(records));
+  g->_Process("test-table", std::move(records));
   // Compute expected result.
   auto op = static_cast<ProjectOperator *>(g->GetNode(1));
   std::vector<Record> result = MakeProjectRecords(op->output_schema());
@@ -569,7 +569,7 @@ TEST(DataFlowGraphPartitionTest, TestProjectOnFilterGraph) {
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
-  g->Process("test-table", std::move(records));
+  g->_Process("test-table", std::move(records));
   // Compute expected result.
   auto op = static_cast<ProjectOperator *>(g->GetNode(2));
   std::vector<Record> result = MakeProjectOnFilterRecords(op->output_schema());
@@ -587,8 +587,8 @@ TEST(DataFlowGraphPartitionTest, TestProjectOnEquiJoinGraph) {
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
   // Process records.
-  g->Process("test-table1", std::move(left));
-  g->Process("test-table2", std::move(right));
+  g->_Process("test-table1", std::move(left));
+  g->_Process("test-table2", std::move(right));
   // Compute expected result.
   auto op = static_cast<ProjectOperator *>(g->GetNode(3));
   std::vector<Record> result =
@@ -605,7 +605,7 @@ TEST(DataFlowGraphPartitionTest, TestAggregateGraph) {
   // Make records.
   std::vector<Record> records = MakeLeftRecords(schema);
   // Process records.
-  g->Process("test-table", std::move(records));
+  g->_Process("test-table", std::move(records));
   // Compute expected result.
   auto op = static_cast<AggregateOperator *>(g->GetNode(1));
   std::vector<Record> result = MakeAggregateRecords(op->output_schema());
@@ -623,8 +623,8 @@ TEST(DataFlowGraphPartitionTest, TestAggregateOnEquiJoinGraph) {
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
   // Process records.
-  g->Process("test-table1", std::move(left));
-  g->Process("test-table2", std::move(right));
+  g->_Process("test-table1", std::move(left));
+  g->_Process("test-table2", std::move(right));
   // Compute expected result.
   auto op = static_cast<AggregateOperator *>(g->GetNode(3));
   std::vector<Record> result =
@@ -645,8 +645,8 @@ TEST(DataFlowGraphPartitionTest, CloneTest) {
   std::vector<Record> left = MakeLeftRecords(lschema);
   std::vector<Record> right = MakeRightRecords(rschema);
   // Process records.
-  g_clone->Process("test-table1", std::move(left));
-  g_clone->Process("test-table2", std::move(right));
+  g_clone->_Process("test-table1", std::move(left));
+  g_clone->_Process("test-table2", std::move(right));
   // Compute expected result.
   auto op = static_cast<AggregateOperator *>(g_clone->GetNode(3));
   std::vector<Record> result =

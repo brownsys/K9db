@@ -83,19 +83,23 @@ size_t Operator::RemoveParent(Operator *parent) {
 }
 
 void Operator::ProcessAndForward(NodeIndex source,
-                                 std::vector<Record> &&records) {
+                                 std::vector<Record> &&records,
+                                 Promise &&promise) {
   // Process the records generating the output vector.
-  std::vector<Record> output = this->Process(source, std::move(records));
+  std::vector<Record> output =
+      this->Process(source, std::move(records), promise);
+
   // Pass output vector down to children to process.
-  if (output.size() > 0) {
-    this->BroadcastToChildren(std::move(output));
-  }
+  this->BroadcastToChildren(std::move(output), std::move(promise));
 }
 
-void Operator::BroadcastToChildren(std::vector<Record> &&records) {
-  if (this->children_.size() == 0) {
+void Operator::BroadcastToChildren(std::vector<Record> &&records,
+                                   Promise &&promise) {
+  if (this->children_.size() == 0 || records.size() == 0) {
+    promise.Resolve();
     return;
   }
+
   // We are at a fork in the graph with many children.
   for (size_t i = 0; i < this->children_.size() - 1; i++) {
     // We need to copy the records for each child (except the last one).
@@ -105,9 +109,12 @@ void Operator::BroadcastToChildren(std::vector<Record> &&records) {
       copy.push_back(r.Copy());
     }
     // Move the copy to child.
-    this->children_.at(i)->ProcessAndForward(this->index_, std::move(copy));
+    this->children_.at(i)->ProcessAndForward(this->index_, std::move(copy),
+                                             promise.Derive());
   }
-  this->children_.back()->ProcessAndForward(this->index_, std::move(records));
+  // Reuse promise for the last child.
+  this->children_.back()->ProcessAndForward(this->index_, std::move(records),
+                                            std::move(promise));
 }
 
 std::string Operator::DebugString() const {

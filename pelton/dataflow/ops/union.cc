@@ -30,7 +30,8 @@ void UnionOperator::ComputeOutputSchema() {
 }
 
 std::vector<Record> UnionOperator::Process(NodeIndex source,
-                                           std::vector<Record> &&records) {
+                                           std::vector<Record> &&records,
+                                           const Promise &promise) {
   return std::move(records);
 }
 

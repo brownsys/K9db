@@ -93,7 +93,8 @@ void FilterOperator::ComputeOutputSchema() {
 }
 
 std::vector<Record> FilterOperator::Process(NodeIndex source,
-                                            std::vector<Record> &&records) {
+                                            std::vector<Record> &&records,
+                                            const Promise &promise) {
   std::vector<Record> output;
   output.reserve(records.size());
   for (Record &record : records) {

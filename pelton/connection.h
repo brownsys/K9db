@@ -13,7 +13,8 @@ namespace pelton {
 
 class State {
  public:
-  explicit State(size_t workers) : sharder_state_(), dataflow_state_(workers) {}
+  explicit State(size_t workers, bool consistent)
+      : sharder_state_(), dataflow_state_(workers, consistent) {}
 
   // Not copyable or movable.
   State(const State &) = delete;
