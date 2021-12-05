@@ -43,3 +43,17 @@ cc_test(
         ":common",
     ],
 )
+
+cc_test(
+    name = "retailer",
+    srcs = [
+        "retailer.cc",
+    ],
+    data = [
+        "//tests/data:retailer-data",
+    ],
+    deps = [
+        ":common",
+    ],
+)
+

@@ -12,6 +12,16 @@ filegroup(
 )
 
 filegroup(
+    name = "retailer-data",
+    srcs = glob([
+        "retailer/*.sql",
+        "retailer/*.txt",
+    ]),
+    visibility = ["//tests:__subpackages__"],
+)
+
+
+filegroup(
     name = "medical-chat-data",
     srcs = glob([
         "medical/*.sql",
