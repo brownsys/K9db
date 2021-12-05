@@ -64,13 +64,13 @@ std::optional<SqlResult> SpecialStatements(const std::string &sql,
 
 }  // namespace
 
-bool initialize(size_t workers) {
+bool initialize(size_t workers, bool consistent) {
   // if already open
   if (PELTON_STATE != nullptr) {
     // close without shutting down planner
     shutdown(false);
   }
-  PELTON_STATE = new State(workers);
+  PELTON_STATE = new State(workers, consistent);
   return true;
 }
 

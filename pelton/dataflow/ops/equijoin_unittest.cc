@@ -154,14 +154,14 @@ TEST(EquiJoinOperatorTest, BasicJoinTest) {
 
   // Process records.
   std::vector<Record> output =
-      op_ptr->Process(0, CopyVec(lrecords), std::nullopt);
+      op_ptr->Process(0, CopyVec(lrecords), Promise::None);
   EXPECT_EQ(output.size(), 0);
   EXPECT_EQ(op_ptr->left_table_.count(), 1);
   EXPECT_EQ(op_ptr->left_table_.Lookup(lrecords.at(0).GetValues({2})),
             lrecords);
   EXPECT_EQ(op_ptr->right_table_.count(), 0);
   std::vector<Record> output1 =
-      op_ptr->Process(1, CopyVec(rrecords), std::nullopt);
+      op_ptr->Process(1, CopyVec(rrecords), Promise::None);
   output.insert(output.end(), std::make_move_iterator(output1.begin()),
                 std::make_move_iterator(output1.end()));
   EXPECT_EQ(op_ptr->left_table_.count(), 1);
@@ -209,14 +209,14 @@ TEST(EquiJoinOperatorTest, BasicUnjoinableTest) {
 
   // Process records.
   std::vector<Record> output =
-      op_ptr->Process(0, CopyVec(lrecords), std::nullopt);
+      op_ptr->Process(0, CopyVec(lrecords), Promise::None);
   EXPECT_EQ(output.size(), 0);
   EXPECT_EQ(op_ptr->left_table_.count(), 1);
   EXPECT_EQ(op_ptr->left_table_.Lookup(lrecords.at(0).GetValues({2})),
             lrecords);
   EXPECT_EQ(op_ptr->right_table_.count(), 0);
   std::vector<Record> output1 =
-      op_ptr->Process(1, CopyVec(rrecords), std::nullopt);
+      op_ptr->Process(1, CopyVec(rrecords), Promise::None);
   output.insert(output.end(), std::make_move_iterator(output1.begin()),
                 std::make_move_iterator(output1.end()));
   EXPECT_EQ(op_ptr->left_table_.count(), 1);
@@ -310,34 +310,34 @@ TEST(EquiJoinOperatorTest, FullJoinTest) {
   // Process records.
   // Batch 1.
   std::vector<Record> output =
-      op_ptr->Process(0, CopyVec(lrecords1), std::nullopt);
+      op_ptr->Process(0, CopyVec(lrecords1), Promise::None);
   EXPECT_EQ(op_ptr->left_table_.count(), 2);
   EXPECT_EQ(op_ptr->right_table_.count(), 0);
   EXPECT_EQ(output.size(), 0);
   // Batch 2.
   std::vector<Record> output1 =
-      op_ptr->Process(1, CopyVec(rrecords1), std::nullopt);
+      op_ptr->Process(1, CopyVec(rrecords1), Promise::None);
   output.insert(output.end(), std::make_move_iterator(output1.begin()),
                 std::make_move_iterator(output1.end()));
   EXPECT_EQ(op_ptr->left_table_.count(), 2);
   EXPECT_EQ(op_ptr->right_table_.count(), 2);
   EXPECT_EQ(output.size(), 1);
   // Batch 3.
-  output1 = op_ptr->Process(0, CopyVec(lrecords2), std::nullopt);
+  output1 = op_ptr->Process(0, CopyVec(lrecords2), Promise::None);
   output.insert(output.end(), std::make_move_iterator(output1.begin()),
                 std::make_move_iterator(output1.end()));
   EXPECT_EQ(op_ptr->left_table_.count(), 4);
   EXPECT_EQ(op_ptr->right_table_.count(), 2);
   EXPECT_EQ(output.size(), 1);
   // Batch 4.
-  output1 = op_ptr->Process(0, CopyVec(lrecords3), std::nullopt);
+  output1 = op_ptr->Process(0, CopyVec(lrecords3), Promise::None);
   output.insert(output.end(), std::make_move_iterator(output1.begin()),
                 std::make_move_iterator(output1.end()));
   EXPECT_EQ(op_ptr->left_table_.count(), 5);
   EXPECT_EQ(op_ptr->right_table_.count(), 2);
   EXPECT_EQ(output.size(), 2);
   // Batch 5.
-  output1 = op_ptr->Process(1, CopyVec(rrecords2), std::nullopt);
+  output1 = op_ptr->Process(1, CopyVec(rrecords2), Promise::None);
   output.insert(output.end(), std::make_move_iterator(output1.begin()),
                 std::make_move_iterator(output1.end()));
   EXPECT_EQ(op_ptr->left_table_.count(), 5);
@@ -417,14 +417,14 @@ TEST(EquiJoinOperatorTest, BasicLeftJoinTest) {
 
   // Process records.
   std::vector<Record> output =
-      op_ptr->Process(0, CopyVec(lrecords), std::nullopt);
+      op_ptr->Process(0, CopyVec(lrecords), Promise::None);
   EXPECT_EQ(output.size(), 1);
   EXPECT_EQ(op_ptr->left_table_.count(), 1);
   EXPECT_EQ(op_ptr->left_table_.Lookup(lrecords.at(0).GetValues({2})),
             lrecords);
   EXPECT_EQ(op_ptr->right_table_.count(), 0);
   std::vector<Record> output1 =
-      op_ptr->Process(1, CopyVec(rrecords), std::nullopt);
+      op_ptr->Process(1, CopyVec(rrecords), Promise::None);
   output.insert(output.end(), std::make_move_iterator(output1.begin()),
                 std::make_move_iterator(output1.end()));
   EXPECT_EQ(op_ptr->left_table_.count(), 1);
@@ -475,14 +475,14 @@ TEST(EquiJoinOperatorTest, BasicRightJoinTest) {
 
   // Process records.
   std::vector<Record> output =
-      op_ptr->Process(1, CopyVec(rrecords), std::nullopt);
+      op_ptr->Process(1, CopyVec(rrecords), Promise::None);
   EXPECT_EQ(op_ptr->left_table_.count(), 0);
   EXPECT_EQ(op_ptr->right_table_.count(), 1);
   EXPECT_EQ(op_ptr->right_table_.Lookup(rrecords.at(0).GetValues({1})),
             rrecords);
   EXPECT_EQ(output.size(), 1);
   std::vector<Record> output1 =
-      op_ptr->Process(0, CopyVec(lrecords), std::nullopt);
+      op_ptr->Process(0, CopyVec(lrecords), Promise::None);
   output.insert(output.end(), std::make_move_iterator(output1.begin()),
                 std::make_move_iterator(output1.end()));
   EXPECT_EQ(output.size(), 3);
@@ -536,34 +536,34 @@ TEST(EquiJoinOperatorTest, LeftJoinTest) {
   // Process records.
   // Batch 1.
   std::vector<Record> output =
-      op_ptr->Process(0, CopyVec(lrecords1), std::nullopt);
+      op_ptr->Process(0, CopyVec(lrecords1), Promise::None);
   EXPECT_EQ(op_ptr->left_table_.count(), 2);
   EXPECT_EQ(op_ptr->right_table_.count(), 0);
   EXPECT_EQ(output.size(), 2);
   // Batch 2.
   std::vector<Record> output1 =
-      op_ptr->Process(1, CopyVec(rrecords1), std::nullopt);
+      op_ptr->Process(1, CopyVec(rrecords1), Promise::None);
   output.insert(output.end(), std::make_move_iterator(output1.begin()),
                 std::make_move_iterator(output1.end()));
   EXPECT_EQ(op_ptr->left_table_.count(), 2);
   EXPECT_EQ(op_ptr->right_table_.count(), 2);
   EXPECT_EQ(output.size(), 4);
   // Batch 3.
-  output1 = op_ptr->Process(0, CopyVec(lrecords2), std::nullopt);
+  output1 = op_ptr->Process(0, CopyVec(lrecords2), Promise::None);
   output.insert(output.end(), std::make_move_iterator(output1.begin()),
                 std::make_move_iterator(output1.end()));
   EXPECT_EQ(op_ptr->left_table_.count(), 4);
   EXPECT_EQ(op_ptr->right_table_.count(), 2);
   EXPECT_EQ(output.size(), 6);
   // Batch 4.
-  output1 = op_ptr->Process(0, CopyVec(lrecords3), std::nullopt);
+  output1 = op_ptr->Process(0, CopyVec(lrecords3), Promise::None);
   output.insert(output.end(), std::make_move_iterator(output1.begin()),
                 std::make_move_iterator(output1.end()));
   EXPECT_EQ(op_ptr->left_table_.count(), 5);
   EXPECT_EQ(op_ptr->right_table_.count(), 2);
   EXPECT_EQ(output.size(), 7);
   // Batch 5.
-  output1 = op_ptr->Process(1, CopyVec(rrecords2), std::nullopt);
+  output1 = op_ptr->Process(1, CopyVec(rrecords2), Promise::None);
   output.insert(output.end(), std::make_move_iterator(output1.begin()),
                 std::make_move_iterator(output1.end()));
   EXPECT_EQ(op_ptr->left_table_.count(), 5);

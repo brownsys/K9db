@@ -2,7 +2,6 @@
 #define PELTON_DATAFLOW_OPERATOR_H_
 
 #include <memory>
-#include <optional>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -51,7 +50,7 @@ class Operator {
    * @return
    */
   void ProcessAndForward(NodeIndex source, std::vector<Record> &&records,
-                         std::optional<Promise> &&promise);
+                         Promise &&promise);
 
   // Accessors (read only).
   NodeIndex index() const { return this->index_; }
@@ -79,13 +78,14 @@ class Operator {
    * records of this batch arrive at the same time. Records will NOT be pushed
    * to children.
    * @param source the index of the source operator.
-   * @param records an input target vector.
-   * @param output target vector where to write outputs to.
-   * @return true when processing succeeded, false when an error occurred.
+   * @param records the input vector of records.
+   * @param promise this can be derived from by operators that need sub-promises
+   *                but should not be resolved by the operator.
+   * @return the output vector to broadcast to children operators.
    */
   virtual std::vector<Record> Process(NodeIndex source,
                                       std::vector<Record> &&records,
-                                      std::optional<Promise> &&promise) = 0;
+                                      const Promise &promise) = 0;
 
   /*!
    * Compute the output_schema of the operator.
@@ -124,8 +124,7 @@ class Operator {
   size_t RemoveParent(Operator *parent);
 
   // Pass the given batch to the children operators (if any) for processing.
-  void BroadcastToChildren(std::vector<Record> &&records,
-                           std::optional<Promise> &&promise);
+  void BroadcastToChildren(std::vector<Record> &&records, Promise &&promise);
 
   NodeIndex index_;
   Type type_;

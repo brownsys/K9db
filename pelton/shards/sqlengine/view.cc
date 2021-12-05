@@ -1,5 +1,4 @@
 // Creation and management of dataflows.
-
 #include "pelton/shards/sqlengine/view.h"
 
 #include <cstring>
@@ -287,6 +286,7 @@ absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection,
   std::vector<std::pair<std::string, std::vector<dataflow::Record>>> data;
 
   // Iterate through each table in the new View's flow.
+  dataflow::Future future(true);
   for (const auto &table_name : dataflow_state->GetFlow(flow_name).Inputs()) {
     // Generate and execute select * query for current table
     pelton::sqlast::Select select{table_name};
@@ -303,9 +303,10 @@ absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection,
       record.SetPositive(true);
     }
 
-    dataflow_state->ProcessRecordsByFlowName(flow_name, table_name,
-                                             std::move(records), nullptr);
+    dataflow_state->ProcessRecordsByFlowName(
+        flow_name, table_name, std::move(records), future.GetPromise());
   }
+  future.Wait();
 
   perf::End("CreateView");
   return absl::OkStatus();

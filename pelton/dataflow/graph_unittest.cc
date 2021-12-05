@@ -160,7 +160,7 @@ TEST(DataFlowGraphTest, JoinAggregateFunctionality) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -186,7 +186,6 @@ TEST(DataFlowGraphTest, JoinAggregateFunctionality) {
   }
 
   // Outputs must be equal per partition.
-  sleep(1);
   for (PartitionIndex i = 0; i < partitions; i++) {
     auto view = graph.partitions_[i]->outputs().at(0);
     MatViewContentsEquals(view, partitioned[i], 0);
@@ -200,7 +199,7 @@ TEST(DataFlowGraphTest, JoinAggregateExchangeFunctionality) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -227,7 +226,6 @@ TEST(DataFlowGraphTest, JoinAggregateExchangeFunctionality) {
   }
 
   // Outputs must be equal per partition.
-  sleep(1);
   for (PartitionIndex i = 0; i < partitions; i++) {
     auto view = graph.partitions_[i]->outputs().at(0);
     MatViewContentsEquals(view, partitioned[i], 1);
@@ -243,7 +241,7 @@ TEST(DataFlowGraphTest, TrivialGraphNoKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
@@ -268,7 +266,7 @@ TEST(DataFlowGraphTest, TrivialGraphWithKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
@@ -294,7 +292,7 @@ TEST(DataFlowGraphTest, TrivialFilterGraph) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
@@ -318,7 +316,7 @@ TEST(DataFlowGraphTest, TrivialUnionGraphWithKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
@@ -344,7 +342,7 @@ TEST(DataFlowGraphTest, TrivialUnionGraphWithNoKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
@@ -372,7 +370,7 @@ TEST(DataFlowGraphTest, AggregateGraphWithKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
@@ -398,7 +396,7 @@ TEST(DataFlowGraphTest, AggregateGraphSameKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
@@ -424,7 +422,7 @@ TEST(DataFlowGraphTest, AggregateGraphNoKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
@@ -451,7 +449,7 @@ TEST(DataFlowGraphTest, JoinGraphWithKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -480,7 +478,7 @@ TEST(DataFlowGraphTest, JoinGraphSameKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -508,7 +506,7 @@ TEST(DataFlowGraphTest, JoinGraphNoKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -538,7 +536,7 @@ TEST(DataFlowGraphTest, ReorderingProjectionWithKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
 
   // Turn query into a flow.
@@ -563,7 +561,7 @@ TEST(DataFlowGraphTest, ReorderingProjectionNoKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -588,7 +586,7 @@ TEST(DataFlowGraphTest, ChangingProjectionWithKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -614,7 +612,7 @@ TEST(DataFlowGraphTest, ChangingProjectionNoKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -641,7 +639,7 @@ TEST(DataFlowGraphTest, JoinReorderProjectWithKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -669,7 +667,7 @@ TEST(DataFlowGraphTest, JoinReorderProjectNoKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -697,7 +695,7 @@ TEST(DataFlowGraphTest, JoinProjectDroppedKeyWithKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -726,7 +724,7 @@ TEST(DataFlowGraphTest, JoinProjectDroppedKeyNoKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -756,7 +754,7 @@ TEST(DataFlowGraphTest, JoinAggregateKey) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -785,7 +783,7 @@ TEST(DataFlowGraphTest, JoinAggregateUnion) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -814,7 +812,7 @@ TEST(DataFlowGraphTest, UnionJoinAggregateUnionReorderProject) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 
@@ -844,7 +842,7 @@ TEST(DataFlowGraphTest, UnionJoinAggregateUnionDroppingProject) {
   PartitionIndex partitions = 3;
 
   // Create schemas.
-  DataFlowState state(partitions);
+  DataFlowState state(partitions, true);
   state.AddTableSchema("input1", MakeLeftSchema());
   state.AddTableSchema("input2", MakeRightSchema());
 

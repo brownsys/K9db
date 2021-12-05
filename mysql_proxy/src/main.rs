@@ -401,14 +401,15 @@ fn main() {
     let flags = gflags_ffi(std::env::args(), USAGE);
     info!(
         log,
-        "Rust proxy: running with args: {:?} {:?} {:?} {:?}",
+        "Rust proxy: running with args: {:?} {:?} {:?} {:?} {:?}",
         flags.workers,
+        flags.consistent,
         flags.db_name,
         flags.db_username,
         flags.db_password
     );
 
-    let global_open = initialize_ffi(flags.workers);
+    let global_open = initialize_ffi(flags.workers, flags.consistent);
     info!(
         log,
         "Rust Proxy: opening connection globally: {:?}", global_open

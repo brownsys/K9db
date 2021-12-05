@@ -53,9 +53,6 @@ class DataFlowGraphPartition {
   NodeIndex LastOperatorIndex() const { return this->nodes_.size() - 1; }
   NodeIndex Size() const { return this->nodes_.size(); }
 
-  void Process(const std::string &input_name, std::vector<Record> &&records,
-               std::optional<Promise> &&promise = std::nullopt);
-
   // Accessors.
   const std::unordered_map<std::string, InputOperator *> &inputs() const {
     return this->inputs_;
@@ -82,6 +79,9 @@ class DataFlowGraphPartition {
   // Cloning to create more partitions.
   std::unique_ptr<DataFlowGraphPartition> Clone(
       PartitionIndex partition_index) const;
+
+  // This is only used in tests / micro-benchmarks.
+  void _Process(const std::string &input_name, std::vector<Record> &&records);
 
  private:
   // Private versions for adding nodes with a given ID.

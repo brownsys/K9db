@@ -165,8 +165,8 @@ TEST(AggregateOperatorTest, MultipleGroupColumnsCountPositive) {
                                 6_s, 2_u);
 
   // Feed records and test
-  std::vector<Record> outputs =
-      aggregate.Process(UNDEFINED_NODE_INDEX, std::move(records), std::nullopt);
+  std::vector<Record> outputs = aggregate.Process(
+      UNDEFINED_NODE_INDEX, std::move(records), Promise::None);
   compareRecordStreams(&expected_records, &outputs);
 }
 
@@ -202,8 +202,8 @@ TEST(AggregateOperatorTest, MultipleGroupColumnsSumPositive) {
                                 6_s, 12_s);
 
   // Feed records and test
-  std::vector<Record> outputs =
-      aggregate.Process(UNDEFINED_NODE_INDEX, std::move(records), std::nullopt);
+  std::vector<Record> outputs = aggregate.Process(
+      UNDEFINED_NODE_INDEX, std::move(records), Promise::None);
   compareRecordStreams(&expected_records, &outputs);
 }
 
@@ -233,7 +233,7 @@ TEST(AggregateOperatorTest, CountPositiveNegative) {
 
   // STAGE1
   std::vector<Record> outputs1 = aggregate.Process(
-      UNDEFINED_NODE_INDEX, std::move(records1), std::nullopt);
+      UNDEFINED_NODE_INDEX, std::move(records1), Promise::None);
 
   // Records to be fed
   std::vector<Record> records2;
@@ -251,7 +251,7 @@ TEST(AggregateOperatorTest, CountPositiveNegative) {
 
   // STAGE2
   std::vector<Record> outputs2 = aggregate.Process(
-      UNDEFINED_NODE_INDEX, std::move(records2), std::nullopt);
+      UNDEFINED_NODE_INDEX, std::move(records2), Promise::None);
   compareRecordStreams(&expected_records, &outputs2);
 }
 
@@ -281,7 +281,7 @@ TEST(AggregateOperatorTest, SumPositiveNegative) {
 
   // STAGE1
   std::vector<Record> outputs1 = aggregate.Process(
-      UNDEFINED_NODE_INDEX, std::move(records1), std::nullopt);
+      UNDEFINED_NODE_INDEX, std::move(records1), Promise::None);
 
   // Records to be fed
   std::vector<Record> records2;
@@ -296,7 +296,7 @@ TEST(AggregateOperatorTest, SumPositiveNegative) {
 
   // STAGE2
   std::vector<Record> outputs2 = aggregate.Process(
-      UNDEFINED_NODE_INDEX, std::move(records2), std::nullopt);
+      UNDEFINED_NODE_INDEX, std::move(records2), Promise::None);
   compareRecordStreams(&expected_records, &outputs2);
 }
 
@@ -326,8 +326,8 @@ TEST(AggregateOperatorTest, CountPositiveNegativeSingleBatch) {
   expected_records.emplace_back(aggregate.output_schema_, true, 2_s, 2_u);
   expected_records.emplace_back(aggregate.output_schema_, true, 5_s, 2_u);
 
-  std::vector<Record> outputs =
-      aggregate.Process(UNDEFINED_NODE_INDEX, std::move(records), std::nullopt);
+  std::vector<Record> outputs = aggregate.Process(
+      UNDEFINED_NODE_INDEX, std::move(records), Promise::None);
   compareRecordStreams(&expected_records, &outputs);
 }
 
@@ -358,8 +358,8 @@ TEST(AggregateOperatorTest, SumPositiveNegativeSingleBatch) {
   expected_records.emplace_back(aggregate.output_schema_, true, 5_s, 11_s);
   expected_records.emplace_back(aggregate.output_schema_, true, 7_s, 0_s);
 
-  std::vector<Record> outputs =
-      aggregate.Process(UNDEFINED_NODE_INDEX, std::move(records), std::nullopt);
+  std::vector<Record> outputs = aggregate.Process(
+      UNDEFINED_NODE_INDEX, std::move(records), Promise::None);
   compareRecordStreams(&expected_records, &outputs);
 }
 

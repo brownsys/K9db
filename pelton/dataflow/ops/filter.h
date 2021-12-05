@@ -55,7 +55,7 @@ class FilterOperator : public Operator {
 
  protected:
   std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records,
-                              std::optional<Promise> && /*promise*/) override;
+                              const Promise &promise) override;
 
   void ComputeOutputSchema() override;
 

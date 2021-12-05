@@ -26,7 +26,7 @@ class Channel {
     std::vector<Record> records;
     NodeIndex source;
     NodeIndex target;
-    std::optional<Promise> promise;
+    Promise promise;
   };
 
   // Constructor.

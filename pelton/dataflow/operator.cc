@@ -84,35 +84,22 @@ size_t Operator::RemoveParent(Operator *parent) {
 
 void Operator::ProcessAndForward(NodeIndex source,
                                  std::vector<Record> &&records,
-                                 std::optional<Promise> &&promise) {
+                                 Promise &&promise) {
   // Process the records generating the output vector.
-  std::vector<Record> output;
-  if (promise && this->type_ == Type::EXCHANGE) {
-    output =
-        this->Process(source, std::move(records), promise.value().Derive());
-  } else {
-    output = this->Process(source, std::move(records), std::nullopt);
-  }
+  std::vector<Record> output =
+      this->Process(source, std::move(records), promise);
 
   // Pass output vector down to children to process.
-  if (output.size() > 0) {
-    this->BroadcastToChildren(std::move(output), std::move(promise));
-  } else {
-    if (promise) {
-      promise.value().Set();
-    }
-  }
+  this->BroadcastToChildren(std::move(output), std::move(promise));
 }
 
 void Operator::BroadcastToChildren(std::vector<Record> &&records,
-                                   std::optional<Promise> &&promise) {
-  if (this->children_.size() == 0) {
-    // End of the flow.
-    if (promise) {
-      promise.value().Set();
-    }
+                                   Promise &&promise) {
+  if (this->children_.size() == 0 || records.size() == 0) {
+    promise.Resolve();
     return;
   }
+
   // We are at a fork in the graph with many children.
   for (size_t i = 0; i < this->children_.size() - 1; i++) {
     // We need to copy the records for each child (except the last one).
@@ -122,13 +109,8 @@ void Operator::BroadcastToChildren(std::vector<Record> &&records,
       copy.push_back(r.Copy());
     }
     // Move the copy to child.
-    if (promise) {
-      this->children_.at(i)->ProcessAndForward(this->index_, std::move(copy),
-                                               promise.value().Derive());
-    } else {
-      this->children_.at(i)->ProcessAndForward(this->index_, std::move(copy),
-                                               std::nullopt);
-    }
+    this->children_.at(i)->ProcessAndForward(this->index_, std::move(copy),
+                                             promise.Derive());
   }
   // Reuse promise for the last child.
   this->children_.back()->ProcessAndForward(this->index_, std::move(records),

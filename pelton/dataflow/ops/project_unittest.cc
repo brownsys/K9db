@@ -64,7 +64,7 @@ TEST(ProjectOperatorTest, BatchTestColumn) {
 
   // Feed records and test
   std::vector<Record> outputs =
-      project.Process(UNDEFINED_NODE_INDEX, std::move(records), std::nullopt);
+      project.Process(UNDEFINED_NODE_INDEX, std::move(records), Promise::None);
   EXPECT_EQ(outputs, expected_records);
 }
 
@@ -94,7 +94,7 @@ TEST(ProjectOperatorTest, BatchTestLiteral) {
 
   // Feed records and test
   std::vector<Record> outputs =
-      project.Process(UNDEFINED_NODE_INDEX, std::move(records), std::nullopt);
+      project.Process(UNDEFINED_NODE_INDEX, std::move(records), Promise::None);
   EXPECT_EQ(outputs, expected_records);
 }
 
@@ -126,7 +126,7 @@ TEST(ProjectOperatorTest, BatchTestOperationRightColumn) {
 
   // Feed records and test
   std::vector<Record> outputs =
-      project.Process(UNDEFINED_NODE_INDEX, std::move(records), std::nullopt);
+      project.Process(UNDEFINED_NODE_INDEX, std::move(records), Promise::None);
   EXPECT_EQ(outputs, expected_records);
 }
 
@@ -161,7 +161,7 @@ TEST(ProjectOperatorTest, BatchTestOperationRightLiteral) {
 
   // Feed records and test
   std::vector<Record> outputs =
-      project.Process(UNDEFINED_NODE_INDEX, std::move(records), std::nullopt);
+      project.Process(UNDEFINED_NODE_INDEX, std::move(records), Promise::None);
   EXPECT_EQ(outputs, expected_records);
 }
 
@@ -261,7 +261,7 @@ TEST(ProjectOperatorTest, NullValueTest) {
 
   // Feed records and test
   std::vector<Record> outputs =
-      project.Process(UNDEFINED_NODE_INDEX, std::move(records), std::nullopt);
+      project.Process(UNDEFINED_NODE_INDEX, std::move(records), Promise::None);
   EXPECT_EQ(outputs, expected_records);
 }
 
@@ -303,7 +303,7 @@ TEST(ProjectOperatorTest, ArithmeticAndNullValueTest) {
 
   // Feed records and test
   std::vector<Record> outputs =
-      project.Process(UNDEFINED_NODE_INDEX, std::move(records), std::nullopt);
+      project.Process(UNDEFINED_NODE_INDEX, std::move(records), Promise::None);
   EXPECT_EQ(outputs, expected_records);
 }
 

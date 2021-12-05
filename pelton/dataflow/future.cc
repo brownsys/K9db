@@ -5,37 +5,50 @@
 namespace pelton {
 namespace dataflow {
 
-Promise Future::GetPromise() { return Promise(this); }
+Promise Future::GetPromise() {
+  return Promise(this->consistent_ ? this : nullptr);
+}
 
-void Future::Increment() { this->counter_++; }
+void Future::Increment() {
+  uint16_t value = this->counter_++;
+  CHECK_GT(value, 0) << "Late promise";
+}
 
 void Future::Decrement() {
-  uint16_t updated_value = --this->counter_;
-  if (updated_value == 0) {
+  uint16_t value = this->counter_--;
+  CHECK_GT(value, 0) << "Early promise";
+  if (value == 1) {
     // Only one thread should be waiting on the single future object.
     this->semaphore_.release();
   }
 }
 
-void Future::Get() {
-  // Only wait on the semaphore if there are pending promises.
-  if (this->counter_.load() > 0) {
-    this->semaphore_.acquire();
+void Future::Wait() {
+  if (this->consistent_) {
+    this->Decrement();
+    // Only wait on the semaphore if there are pending promises.
+    if (this->counter_.load() > 0) {
+      this->semaphore_.acquire();
+    }
   }
 }
 
-void Promise::Set() {
-  this->future_->Decrement();
-  this->future_ = nullptr;
+void Promise::Resolve() {
+  if (this->future_ != nullptr) {
+    this->future_->Decrement();
+    this->future_ = nullptr;
+  }
 }
 
-Promise Promise::Derive() { return Promise(this->future_); }
+Promise Promise::Derive() const { return Promise(this->future_); }
 
 Promise::~Promise() {
   if (this->future_ != nullptr) {
     LOG(FATAL) << "Broken promise";
   }
 }
+
+Promise Promise::None = Promise(nullptr);
 
 }  // namespace dataflow
 }  // namespace pelton

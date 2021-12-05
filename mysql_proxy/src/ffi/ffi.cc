@@ -13,6 +13,7 @@
 #include "pelton/pelton.h"
 
 DEFINE_uint32(workers, 3, "Number of workers");
+DEFINE_bool(consistent, true, "Dataflow consistency with futures");
 DEFINE_string(db_name, "pelton", "Name of the database");
 DEFINE_string(db_username, "root", "MariaDB username to connect with");
 DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
@@ -29,18 +30,18 @@ FFIArgs FFIGflags(int argc, char **argv, const char *usage) {
   google::InitGoogleLogging("proxy");
 
   // Returned the read command line flags.
-  return {FLAGS_workers, FLAGS_db_name.c_str(), FLAGS_db_username.c_str(),
-          FLAGS_db_password.c_str()};
+  return {FLAGS_workers, FLAGS_consistent, FLAGS_db_name.c_str(),
+          FLAGS_db_username.c_str(), FLAGS_db_password.c_str()};
 }
 
 // Initialize pelton_state in pelton.cc
-bool FFIInitialize(size_t workers) {
+bool FFIInitialize(size_t workers, bool consistent) {
   // Log debugging information.
   LOG(INFO) << "C-Wrapper: starting open_c";
 
   // call c++ function from C with converted types
   LOG(INFO) << "C-Wrapper: running pelton::initialize";
-  if (pelton::initialize(workers)) {
+  if (pelton::initialize(workers, consistent)) {
     LOG(INFO) << "C-Wrapper: global connection opened";
   } else {
     LOG(INFO) << "C-Wrapper: failed to open global connection";

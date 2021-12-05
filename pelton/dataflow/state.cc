@@ -19,17 +19,13 @@ namespace pelton {
 namespace dataflow {
 
 // DataFlowState::Worker.
-DataFlowState::Worker::Worker(size_t id, Channel *chan, DataFlowState *state,
-                              int max)
-    : id_(id), state_(state), stop_(false), max_(max) {
+DataFlowState::Worker::Worker(size_t id, Channel *chan, DataFlowState *state)
+    : id_(id), state_(state), stop_(false) {
   this->thread_ = std::thread([this, chan]() {
     LOG(INFO) << "Starting dataflow worker " << this->id_;
-    while (!this->stop_ && this->max_ != 0) {
+    while (!this->stop_) {
       std::vector<Channel::Message> messages = chan->Read();
       for (Channel::Message &msg : messages) {
-        if (this->max_ != -1) {
-          this->max_ -= msg.records.size();
-        }
         auto &flow = this->state_->flows_.at(msg.flow_name);
         Operator *op = flow->GetPartition(this->id_)->GetNode(msg.target);
         op->ProcessAndForward(msg.source, std::move(msg.records),
@@ -53,13 +49,13 @@ void DataFlowState::Worker::Join() { this->thread_.join(); }
 // DataFlowState.
 // Constructors and destructors.
 DataFlowState::~DataFlowState() { CHECK(this->joined_); }
-DataFlowState::DataFlowState(size_t workers, int max, bool serializable)
-    : workers_(workers), joined_(false), serializable_(serializable) {
+DataFlowState::DataFlowState(size_t workers, bool consistent)
+    : workers_(workers), consistent_(consistent), joined_(false) {
   // Create a channel for every worker.
   for (size_t i = 0; i < workers; i++) {
     this->channels_.emplace_back(std::make_unique<Channel>(workers));
     this->threads_.emplace_back(
-        std::make_unique<Worker>(i, this->channels_.at(i).get(), this, max));
+        std::make_unique<Worker>(i, this->channels_.at(i).get(), this));
   }
 }
 
@@ -161,9 +157,10 @@ Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
 
 void DataFlowState::ProcessRecords(const TableName &table_name,
                                    std::vector<Record> &&records) {
-  // One future for each partition of each flow.
-  std::vector<std::unique_ptr<Future>> futures;
   if (records.size() > 0 && this->HasFlowsFor(table_name)) {
+    // One future for the entirety of the record processing.
+    Future future(this->consistent_);
+
     // Send copies per flow (except last flow).
     const std::vector<FlowName> &flow_names =
         this->flows_per_input_table_.at(table_name);
@@ -175,39 +172,33 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
         copy.push_back(r.Copy());
       }
       this->ProcessRecordsByFlowName(flow_name, table_name, std::move(copy),
-                                     &futures);
+                                     future.GetPromise());
     }
 
     // Move into last flow.
     const std::string &flow_name = flow_names.back();
     this->ProcessRecordsByFlowName(flow_name, table_name, std::move(records),
-                                   &futures);
-  }
-  
-  // Wait for all futures to get resolved.
-  for (const auto &future : futures) {
-    future->Get();
+                                   future.GetPromise());
+
+    // Wait for the future to get resolved.
+    future.Wait();
   }
 }
 
-void DataFlowState::ProcessRecordsByFlowName(
-    const FlowName &flow_name, const TableName &table_name,
-    std::vector<Record> &&records,
-    std::vector<std::unique_ptr<Future>> *futures) {
+void DataFlowState::ProcessRecordsByFlowName(const FlowName &flow_name,
+                                             const TableName &table_name,
+                                             std::vector<Record> &&records,
+                                             Promise &&promise) {
   auto &flow = this->flows_.at(flow_name);
   auto partitions = flow->PartitionInputs(table_name, std::move(records));
   for (auto &[partition, vec] : partitions) {
     Channel::Message msg = {
         flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
-        flow->GetPartition(partition)->GetInputNode(table_name)->index()};
-    if (this->serializable_ && futures != nullptr) {
-      futures->emplace_back(std::make_unique<Future>());
-      msg.promise = futures->back()->GetPromise();
-    } else {
-      msg.promise = std::nullopt;
-    }
+        flow->GetPartition(partition)->GetInputNode(table_name)->index(),
+        promise.Derive()};
     this->channels_.at(partition)->WriteInput(std::move(msg));
   }
+  promise.Resolve();
 }
 
 // Size in memory of all the dataflow graphs.

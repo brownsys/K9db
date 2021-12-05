@@ -36,7 +36,7 @@ class DataFlowState {
  private:
   class Worker {
    public:
-    Worker(size_t id, Channel *chan, DataFlowState *state, int max);
+    Worker(size_t id, Channel *chan, DataFlowState *state);
     ~Worker();
     void Shutdown();
     void Join();
@@ -46,12 +46,10 @@ class DataFlowState {
     DataFlowState *state_;
     std::thread thread_;
     std::atomic<bool> stop_;
-    int max_;
   };
 
  public:
-  explicit DataFlowState(size_t workers, int max = -1,
-                         bool serializable = false);
+  explicit DataFlowState(size_t workers, bool consistent);
   ~DataFlowState();
 
   // Manage schemas.
@@ -81,7 +79,7 @@ class DataFlowState {
   void ProcessRecordsByFlowName(const FlowName &flow_name,
                                 const TableName &table_name,
                                 std::vector<Record> &&records,
-                                std::vector<std::unique_ptr<Future>> *futures);
+                                Promise &&promise);
 
   sql::SqlResult SizeInMemory() const;
   sql::SqlResult FlowDebug(const std::string &flow_name) const;
@@ -94,8 +92,9 @@ class DataFlowState {
  private:
   // The number of worker threads.
   size_t workers_;
+  bool consistent_;
   bool joined_;
-  bool serializable_;
+
   // Channel for every worker.
   std::vector<std::unique_ptr<Channel>> channels_;
   std::list<std::unique_ptr<Worker>> threads_;

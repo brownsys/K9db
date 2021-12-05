@@ -234,7 +234,7 @@ class MatViewOperatorT : public MatViewOperator {
  protected:
   // Override Operator functions.
   std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records,
-                              std::optional<Promise> && /*promise*/) {
+                              const Promise &promise) {
     std::unique_lock<std::shared_mutex> lock(this->mtx_);
     for (Record &r : records) {
       Key key = r.GetValues(this->key_cols_);

@@ -45,7 +45,7 @@ static void JoinOneToOne(benchmark::State &state) {
 
   std::vector<Record> leftRecords;
   leftRecords.emplace_back(leftSchema, true, 4_u, 5_u);
-  g.Process("test-table1", std::move(leftRecords), std::nullopt);
+  g._Process("test-table1", std::move(leftRecords));
 
   size_t processed = 0;
   for (auto _ : state) {

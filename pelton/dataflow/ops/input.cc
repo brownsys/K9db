@@ -7,9 +7,9 @@
 namespace pelton {
 namespace dataflow {
 
-std::vector<Record> InputOperator::Process(
-    NodeIndex source, std::vector<Record> &&records,
-    std::optional<Promise> && /*promise*/) {
+std::vector<Record> InputOperator::Process(NodeIndex source,
+                                           std::vector<Record> &&records,
+                                           const Promise &promise) {
   // Validate input records have correct schemas.
   for (const Record &record : records) {
     if (record.schema() != this->input_schemas_.at(0)) {
