@@ -27,6 +27,9 @@ class SqlEagerExecutor {
   void Initialize(const std::string &db_name, const std::string &username,
                   const std::string &password);
 
+  // Close the connection.
+  void Close();
+
   // Execute statement against the underlying database.
   // Sharding information should already be baked in the SQL command.
   bool ExecuteStatement(const std::string &sql);

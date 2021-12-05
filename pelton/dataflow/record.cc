@@ -57,10 +57,8 @@ Record Record::Copy() const {
       // TODO(malte): DATETIME should not be stored as a string,
       // see below
       case sqlast::ColumnDefinition::Type::DATETIME:
-        if (this->data_[i].str) {
-          record.data_[i].str =
-              std::make_unique<std::string>(*this->data_[i].str);
-        }
+        record.data_[i].str =
+            std::make_unique<std::string>(*this->data_[i].str);
         break;
       default:
         LOG(FATAL) << "Unsupported data type " << type << " in record copy!";

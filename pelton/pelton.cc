@@ -84,7 +84,7 @@ bool open(Connection *connection, const std::string &db_name,
 }
 
 bool close(Connection *connection) {
-  // empty for now
+  connection->executor.Close();
   return true;
 }
 

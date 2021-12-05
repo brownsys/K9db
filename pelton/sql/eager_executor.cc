@@ -42,6 +42,13 @@ void SqlEagerExecutor::Initialize(const std::string &db_name,
   this->stmt_->execute("SET autocommit=1");
 }
 
+void SqlEagerExecutor::Close() {
+  this->stmt_->close();
+  this->conn_->close();
+  this->stmt_ = nullptr;
+  this->conn_ = nullptr;
+}
+
 // Execute statement against the underlying database.
 // Sharding information should already be baked in the SQL command.
 bool SqlEagerExecutor::ExecuteStatement(const std::string &sql) {

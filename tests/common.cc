@@ -48,6 +48,9 @@ void DropDatabase(const std::string &db_name) {
       std::unique_ptr<sql::Statement>(conn->createStatement());
 
   stmt->execute("DROP DATABASE IF EXISTS " + db_name);
+
+  stmt->close();
+  conn->close();
 }
 
 // Read an SQL file one command at a time.
