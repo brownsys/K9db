@@ -38,20 +38,6 @@ rust_library(
         ":memcached_ffi_bindgen",
         ":memcached_ffi_wrappers",
     ],
-    rustc_flags = [
-        "-Clink-args=-lmariadbcpp",
-        "-Clink-args=-lmemcached",
-    ] + select({
-        ":asan": [
-            "-Clink-args=-fsanitize=address",
-            "-Zsanitizer=address",
-        ],
-        ":tsan": [
-            "-Clink-args=-fsanitize=thread",
-            "-Zsanitizer=thread",
-        ],
-        "//conditions:default": [],
-    }),
     deps = [
         ":memcached",
         "@libmemcached",
@@ -142,7 +128,17 @@ rust_test(
     rustc_flags = [
         "-Clink-args=-lmariadbcpp",
         "-Clink-args=-lmemcached",
-    ],
+    ] + select({
+        ":asan": [
+            "-Clink-args=-fsanitize=address",
+            "-Zsanitizer=address",
+        ],
+        ":tsan": [
+            "-Clink-args=-fsanitize=thread",
+            "-Zsanitizer=thread",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         ":memcached_ffi",
     ],

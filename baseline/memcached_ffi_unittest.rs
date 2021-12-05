@@ -131,5 +131,8 @@ mod tests {
 
     // Done.
     __MemExecuteDB("DROP DATABASE memcached");
+
+    // Free memory.
+    MemClose();
   }
 }

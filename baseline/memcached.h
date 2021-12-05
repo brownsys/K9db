@@ -60,6 +60,9 @@ Result Read(int id, const Record *key);
 // For tests.
 void __ExecuteDB(const char *stmt);
 
+// Freeing memory.
+void Close();
+
 #ifdef __cplusplus
 }
 #endif  // __cplusplus

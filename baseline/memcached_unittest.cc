@@ -235,5 +235,7 @@ int main(int argc, char **argv) {
   // DROP test DB.
   __ExecuteDB("DROP DATABASE " DB_NAME);
 
+  Close();
+
   return result;
 }

@@ -121,3 +121,7 @@ void Java_edu_brown_pelton_MemcachedJNI__1_1ExecuteDB(JNIEnv *env, jclass clazz,
   __ExecuteDB(query);
   env->ReleaseStringUTFChars(jquery, query);
 }
+
+void Java_edu_brown_pelton_MemcachedJNI_Close(JNIEnv *env, jclass clazz) {
+  Close();
+}

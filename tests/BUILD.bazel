@@ -25,10 +25,10 @@ cc_test(
     data = [
         "//tests/data:lobsters-data",
     ],
+    malloc = "@com_google_tcmalloc//tcmalloc",
     deps = [
         ":common",
     ],
-    malloc = "@com_google_tcmalloc//tcmalloc",
 )
 
 cc_test(
@@ -39,8 +39,8 @@ cc_test(
     data = [
         "//tests/data:medical-chat-data",
     ],
+    malloc = "@com_google_tcmalloc//tcmalloc",
     deps = [
         ":common",
     ],
-    malloc = "@com_google_tcmalloc//tcmalloc",
 )

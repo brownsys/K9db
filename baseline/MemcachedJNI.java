@@ -55,6 +55,7 @@ public class MemcachedJNI {
   public static native int Cache(String query);
   public static native void Update(String table);
   public static native MemcachedValue[][] Read(int id, MemcachedValue[] key);
+  public static native void Close();
 
   // For tests.
   public static native void __ExecuteDB(String query);

@@ -454,3 +454,9 @@ Result Read(int id, const Record *key) {
 
 // For tests.
 void __ExecuteDB(const char *stmt_str) { stmt->execute(stmt_str); }
+
+// Close
+void Close() {
+  memcached_free(memc);
+  memcached_server_list_free(servers);
+}

@@ -221,5 +221,8 @@ public class MemcachedJNITest {
     assertTrue(equals(actual, expected));
 
     MemcachedJNI.__ExecuteDB("DROP DATABASE memcached");
+
+    // Free.
+    MemcachedJNI.Close();
   }
 }
