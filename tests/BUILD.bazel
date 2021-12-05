@@ -28,6 +28,7 @@ cc_test(
     deps = [
         ":common",
     ],
+    malloc = "@com_google_tcmalloc//tcmalloc",
 )
 
 cc_test(
@@ -41,4 +42,5 @@ cc_test(
     deps = [
         ":common",
     ],
+    malloc = "@com_google_tcmalloc//tcmalloc",
 )

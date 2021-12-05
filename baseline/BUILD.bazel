@@ -2,6 +2,16 @@ load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 load("@rules_rust//rust:rust.bzl", "rust_library", "rust_test")
 load("@rules_java//java:defs.bzl", "java_library", "java_test")
 
+config_setting(
+    name = "asan",
+    values = {"copt": "-DPELTON_ASAN"},
+)
+
+config_setting(
+    name = "tsan",
+    values = {"copt": "-DPELTON_TSAN"},
+)
+
 cc_library(
     name = "memcached",
     srcs = [
@@ -31,7 +41,17 @@ rust_library(
     rustc_flags = [
         "-Clink-args=-lmariadbcpp",
         "-Clink-args=-lmemcached",
-    ],
+    ] + select({
+        ":asan": [
+            "-Clink-args=-fsanitize=address",
+            "-Zsanitizer=address",
+        ],
+        ":tsan": [
+            "-Clink-args=-fsanitize=thread",
+            "-Zsanitizer=thread",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         ":memcached",
         "@libmemcached",

@@ -12,7 +12,7 @@ pub mod memcached {
   use std::fmt::Write;
   use std::mem;
 
-  use _memcached_ffi_bindgen::{Type_UINT, Type_INT, Type_TEXT, Value, Record, Result};
+  use _memcached_ffi_bindgen::{Type_UINT, Type_INT, Type_TEXT, Value, Record};
   use _memcached_ffi_bindgen::DestroyResult;
   use _memcached_ffi_bindgen::{SetStr, SetInt, SetUInt, GetStr, GetUInt, GetInt};
   use _memcached_ffi_bindgen::{Initialize, Cache, Update, Read, __ExecuteDB};
@@ -71,11 +71,11 @@ pub mod memcached {
       let mut row_str: String = String::from("|");
       for value in values {
         if value.type_ == Type_UINT {
-          write!(row_str, "{}|", unsafe { GetUInt(value) });
+          write!(row_str, "{}|", unsafe { GetUInt(value) }).unwrap();
         } else if value.type_ == Type_INT {
-          write!(row_str, "{}|", unsafe { GetInt(value) });
+          write!(row_str, "{}|", unsafe { GetInt(value) }).unwrap();
         } else if value.type_ == Type_TEXT {
-          write!(row_str, "{}|", unsafe { CStr::from_ptr(GetStr(value)).to_str().unwrap() });
+          write!(row_str, "{}|", unsafe { CStr::from_ptr(GetStr(value)).to_str().unwrap() }).unwrap();
         }
       }
       vec.push(row_str);
