@@ -146,10 +146,10 @@ ColumnDefinition &CreateTable::MutableColumn(const std::string &column_name) {
   return this->columns_.at(column_index);
 }
 
-bool CreateTable::HasColumn(const std::string &column_name) {
+bool CreateTable::HasColumn(const std::string &column_name) const {
   return this->columns_map_.count(column_name) == 1;
 }
-size_t CreateTable::ColumnIndex(const std::string &column_name) {
+size_t CreateTable::ColumnIndex(const std::string &column_name) const {
   return this->columns_map_.at(column_name);
 }
 void CreateTable::RemoveColumn(const std::string &column_name) {

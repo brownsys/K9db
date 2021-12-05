@@ -174,23 +174,31 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         let mut i = 0;
         for param in params {
             query.push_str(&tokens[i]);
-            let val = match param.coltype {
-                // If string, surround with \"
-                ColumnType::MYSQL_TYPE_STRING
-                | ColumnType::MYSQL_TYPE_VARCHAR
-                | ColumnType::MYSQL_TYPE_VAR_STRING => {
-                    format!("\'{}\'", Into::<&str>::into(param.value))
-                }
-                ColumnType::MYSQL_TYPE_DECIMAL
-                | ColumnType::MYSQL_TYPE_NEWDECIMAL
-                | ColumnType::MYSQL_TYPE_TINY
-                | ColumnType::MYSQL_TYPE_SHORT
-                | ColumnType::MYSQL_TYPE_INT24
-                | ColumnType::MYSQL_TYPE_LONG
-                | ColumnType::MYSQL_TYPE_LONGLONG => Into::<i64>::into(param.value).to_string(),
-                _ => unimplemented!("Rust proxy: unsupported parameter type"),
-            };
-            query.push_str(&val);
+            if param.value.is_null() {
+                query.push_str("NULL");
+            } else {
+                let val = match param.coltype {
+                    // If string, surround with \"
+                    ColumnType::MYSQL_TYPE_STRING
+                    | ColumnType::MYSQL_TYPE_VARCHAR
+                    | ColumnType::MYSQL_TYPE_VAR_STRING => {
+                        format!("\'{}\'", Into::<&str>::into(param.value))
+                    }
+                    ColumnType::MYSQL_TYPE_DECIMAL
+                    | ColumnType::MYSQL_TYPE_NEWDECIMAL
+                    | ColumnType::MYSQL_TYPE_TINY
+                    | ColumnType::MYSQL_TYPE_SHORT
+                    | ColumnType::MYSQL_TYPE_INT24
+                    | ColumnType::MYSQL_TYPE_LONG
+                    | ColumnType::MYSQL_TYPE_LONGLONG => match param.value.into_inner() {
+                        ValueInner::Int(v) => v.to_string(),
+                        ValueInner::UInt(v) => v.to_string(),
+                        _ => unimplemented!("Rust proxy: unsupported numeric type"),
+                    },
+                    _ => unimplemented!("Rust proxy: unsupported parameter type"),
+                };
+                query.push_str(&val);
+            }
             i += 1;
         }
         query.push_str(tokens.last().unwrap());
@@ -280,6 +288,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         } else if q_string.starts_with("UPDATE")
             || q_string.starts_with("DELETE")
             || q_string.starts_with("INSERT")
+            || q_string.starts_with("REPLACE")
             || q_string.starts_with("GDPR FORGET")
         {
             let update_response = exec_update_ffi(&mut self.rust_conn, q_string);

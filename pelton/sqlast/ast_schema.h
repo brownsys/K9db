@@ -146,8 +146,8 @@ class CreateTable : public AbstractStatement {
   const ColumnDefinition &GetColumn(const std::string &column_name) const;
   ColumnDefinition &MutableColumn(const std::string &column_name);
 
-  bool HasColumn(const std::string &column_name);
-  size_t ColumnIndex(const std::string &column_name);
+  bool HasColumn(const std::string &column_name) const;
+  size_t ColumnIndex(const std::string &column_name) const;
   void RemoveColumn(const std::string &column_name);
 
   // Visitor pattern.

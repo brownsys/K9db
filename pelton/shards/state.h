@@ -49,7 +49,8 @@ class SharderState {
 
   // Schema manipulations.
   void AddSchema(const UnshardedTableName &table_name,
-                 const sqlast::CreateTable &table_schema);
+                 const sqlast::CreateTable &table_schema, int pk_index,
+                 const std::string &pk);
 
   void AddShardKind(const ShardKind &kind, const ColumnName &pk);
 
@@ -67,6 +68,9 @@ class SharderState {
 
   // Schema lookups.
   const sqlast::CreateTable &GetSchema(
+      const UnshardedTableName &table_name) const;
+
+  const std::pair<int, std::string> &GetPk(
       const UnshardedTableName &table_name) const;
 
   bool Exists(const UnshardedTableName &table) const;
@@ -116,6 +120,7 @@ class SharderState {
  private:
   // The logical (unsharded) schema of every table.
   std::unordered_map<UnshardedTableName, sqlast::CreateTable> schema_;
+  std::unordered_map<UnshardedTableName, std::pair<int, std::string>> pks_;
 
   // All shard kinds as determined from the schema.
   // Maps a shard kind (e.g. a table name with PII) to the primary key of that

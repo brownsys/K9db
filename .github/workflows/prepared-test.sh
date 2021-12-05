@@ -10,6 +10,7 @@ sleep 10
 cd .github/workflows/
 javac PreparedTest.java
 java -cp ./mariadb-java-client-2.5.4.jar:. -enableassertions PreparedTest
+code=$?
 cd -
 
 # Kill the proxy.
@@ -22,3 +23,5 @@ echo "Proxy output"
 echo "================================"
 cat .tmp
 rm -rf .tmp
+
+exit $code
