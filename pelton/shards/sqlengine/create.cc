@@ -254,8 +254,6 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState *state,
       const auto info = info_list.front();
 
       std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type> anon_cols;
-      // std::vector<ColumnName> anon_cols;
-      // std::vector<sqlast::ColumnDefinition::Type> anon_col_types;
 
       if (absl::StartsWith(column_name, "ACCESSOR_ANONYMIZE")) {
         anon_cols[column_name] = columns[index].column_type();

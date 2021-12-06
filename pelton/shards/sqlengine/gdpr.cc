@@ -193,22 +193,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
           MOVE_OR_RETURN(sql::SqlResult res,
                          update::Shard(anonymize_stmt, state, dataflow_state));
 
-          // update index by deleting existing rows
-
-          std::unique_ptr<sqlast::BinaryExpression> delete_where =
-              std::make_unique<sqlast::BinaryExpression>(
-                  sqlast::Expression::Type::EQ);
-          delete_where->SetLeft(
-              std::make_unique<sqlast::ColumnExpression>(index_col));
-          delete_where->SetRight(
-              std::make_unique<sqlast::LiteralExpression>(anonymized_value));
-          sqlast::Delete clean_index_stmt{index_name};
-          clean_index_stmt.SetWhereClause(std::move(delete_where));
-
-          // MOVE_OR_RETURN(sql::SqlResult res_delete,
-          //                delete_::Shard(clean_index_stmt, state,
-          //                dataflow_state));
-
           // add to result
           total_count += res.UpdateCount();
         }
