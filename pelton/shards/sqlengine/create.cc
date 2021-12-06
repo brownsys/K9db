@@ -252,12 +252,24 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState *state,
                                             column_name};
       const auto &info_list = state->GetShardingInformation(table_name);
       const auto info = info_list.front();
-      bool anonymize = absl::StartsWith(column_name, "ACCESSOR_ANONYMIZE");
-      sqlast::ColumnDefinition::Type anonymize_column_type =
-          columns[index].column_type();
+
+      std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type> anon_cols;
+      // std::vector<ColumnName> anon_cols;
+      // std::vector<sqlast::ColumnDefinition::Type> anon_col_types;
+
+      if (absl::StartsWith(column_name, "ACCESSOR_ANONYMIZE")) {
+        anon_cols[column_name] = columns[index].column_type();
+        for (const auto &acces_col_check : stmt.GetColumns()) {
+          const std::string &access_col_name = acces_col_check.column_name();
+          if (absl::StartsWith(access_col_name, "ACCESS_")) {
+            anon_cols[access_col_name] = acces_col_check.column_type();
+          }
+        }
+      }
+
       state->AddAccessorIndex(shard_string, table_name, column_name,
                               info.shard_by, index_prefix + "_" + info.shard_by,
-                              anonymize, anonymize_column_type);
+                              anon_cols);
       pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, state,
                                                     &dataflow_state);
     }

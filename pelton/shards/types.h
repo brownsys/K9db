@@ -53,22 +53,20 @@ struct AccessorIndexInformation {
   ColumnName shard_by_column_name;
   // The name of the index
   IndexName index_name;
-  // whether to retain or anonymize on delete
-  bool anonymize;
-  // type of column to anonymize
-  sqlast::ColumnDefinition::Type anonymize_type;
+  // columns to anonymize on delete and their types
+  std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
+      anonymize_columns;
 
-  AccessorIndexInformation(const ShardKind &sk, const UnshardedTableName &tn,
-                           const ColumnName &cn, const ColumnName &sbcn,
-                           const IndexName &in, const bool &an,
-                           const sqlast::ColumnDefinition::Type &at)
+  AccessorIndexInformation(
+      const ShardKind &sk, const UnshardedTableName &tn, const ColumnName &cn,
+      const ColumnName &sbcn, const IndexName &in,
+      const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type> &an)
       : shard_kind(sk),
         table_name(tn),
         accessor_column_name(cn),
         shard_by_column_name(sbcn),
         index_name(in),
-        anonymize(an),
-        anonymize_type(at) {}
+        anonymize_columns(an) {}
 };
 
 // Contains the details of how a given table is sharded.

@@ -147,14 +147,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
         state->GetAccessorIndices(shard_kind);
 
     for (auto &accessor_index : accessor_indices) {
-      bool anonymize = accessor_index.anonymize;
-      if (anonymize) {
-        // loop through every single accesor index type
-        std::string accessor_table_name = accessor_index.table_name;
-        std::string index_col = accessor_index.accessor_column_name;
-        std::string index_name = accessor_index.index_name;
-        std::string shard_by_access = accessor_index.shard_by_column_name;
-
+      std::string accessor_table_name = accessor_index.table_name;
+      std::string index_col = accessor_index.accessor_column_name;
+      std::string index_name = accessor_index.index_name;
+      std::string shard_by_access = accessor_index.shard_by_column_name;
+      for (auto &[anon_col_name, anon_col_type] :
+           accessor_index.anonymize_columns) {
         MOVE_OR_RETURN(std::unordered_set<UserId> ids_set,
                        index::LookupIndex(index_name, user_id, dataflow_state));
 
@@ -166,7 +164,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
 
           // doctor_id = NULL
           std::string anonymized_value = "";
-          switch (accessor_index.anonymize_type) {
+          switch (anon_col_type) {
             case sqlast::ColumnDefinition::Type::UINT:
               anonymized_value = "0";
               break;
@@ -180,7 +178,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
               anonymized_value = "\"NULL\"";
               break;
           }
-          anonymize_stmt.AddColumnValue(index_col, anonymized_value);
+          anonymize_stmt.AddColumnValue(anon_col_name, anonymized_value);
 
           std::unique_ptr<sqlast::BinaryExpression> where =
               std::make_unique<sqlast::BinaryExpression>(
@@ -194,6 +192,22 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
           // execute select
           MOVE_OR_RETURN(sql::SqlResult res,
                          update::Shard(anonymize_stmt, state, dataflow_state));
+
+          // update index by deleting existing rows
+
+          std::unique_ptr<sqlast::BinaryExpression> delete_where =
+              std::make_unique<sqlast::BinaryExpression>(
+                  sqlast::Expression::Type::EQ);
+          delete_where->SetLeft(
+              std::make_unique<sqlast::ColumnExpression>(index_col));
+          delete_where->SetRight(
+              std::make_unique<sqlast::LiteralExpression>(anonymized_value));
+          sqlast::Delete clean_index_stmt{index_name};
+          clean_index_stmt.SetWhereClause(std::move(delete_where));
+
+          // MOVE_OR_RETURN(sql::SqlResult res_delete,
+          //                delete_::Shard(clean_index_stmt, state,
+          //                dataflow_state));
 
           // add to result
           total_count += res.UpdateCount();
