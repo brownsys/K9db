@@ -48,19 +48,6 @@ CREATE TABLE shuup_payment ( \
   FOREIGN KEY (order_id) REFERENCES shuup_order(id) \
 );
 
-CREATE TABLE shuup_paymentlogentry ( \
-  id int, \
-  target_id int, \
-  ACCESSOR_user_id int, \
-  created_on datetime, \
-  kind int, \
-  identifier text, \
-  message text, \
-  PRIMARY KEY (id) \
-  FOREIGN KEY (target_id) REFERENCES shuup_payment(id) \
-  FOREIGN KEY (ACCESSOR_user_id) REFERENCES auth_users(id) \
-);
-
 CREATE TABLE shuup_mutableaddress ( \
   id int, \
   prefix text, \
