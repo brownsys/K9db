@@ -126,8 +126,7 @@ bool FFIExecDDL(FFIConnection *c_conn, const char *query) {
   if (!result.ok()) {
     LOG(INFO) << "C-Wrapper: " << result.status();
   }
-  return result.ok() && result.value().IsStatement() &&
-         result.value().Success();
+  return result.ok() && result.value().Success();
 }
 
 // Execute an update statement (e.g. INSERT, UPDATE, DELETE).
@@ -140,7 +139,7 @@ int FFIExecUpdate(FFIConnection *c_conn, const char *query) {
   if (!result.ok()) {
     LOG(INFO) << "C-Wrapper: " << result.status();
   }
-  if (result.ok() && result.value().IsUpdate()) {
+  if (result.ok()) {
     return result.value().UpdateCount();
   } else {
     return -1;
@@ -245,12 +244,10 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
 
   if (result.ok()) {
     pelton::SqlResult &sql_result = result.value();
-    if (sql_result.IsQuery() && sql_result.HasResultSet()) {
-      std::unique_ptr<pelton::SqlResultSet> resultset =
-          sql_result.NextResultSet();
-      std::vector<pelton::dataflow::Record> records = resultset->Vectorize();
+    for (pelton::SqlResultSet &resultset : sql_result.ResultSets()) {
+      std::vector<pelton::dataflow::Record> records = resultset.Vec();
       size_t num_rows = records.size();
-      size_t num_cols = resultset->GetSchema().size();
+      size_t num_cols = resultset.schema().size();
 
       LOG(INFO) << "C-Wrapper: malloc FFIResult";
       // allocate memory for CResult struct and the flexible array of RecordData
@@ -263,13 +260,13 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
       // set number of columns
       c_result->num_cols = num_cols;
       c_result->num_rows = num_rows;
-      PopulateSchema(c_result, resultset->GetSchema());
+      PopulateSchema(c_result, resultset.schema());
       PopulateRecords(c_result, records);
-      return c_result;
+      return c_result;  // TODO(babman): this is where we can support GDPR GET.
     }
+  } else {
+    LOG(INFO) << "C-Wrapper: Result.ok()" << result.status();
   }
-
-  LOG(INFO) << "C-Wrapper: Result.ok() or result.value().IsQuery() failed";
   return nullptr;
 }
 

@@ -11,7 +11,6 @@
 #include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
-#include "pelton/sql/lazy_executor.h"
 #include "pelton/sql/result.h"
 
 namespace pelton {

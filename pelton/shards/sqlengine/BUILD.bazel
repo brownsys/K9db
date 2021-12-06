@@ -142,7 +142,6 @@ cc_library(
     ],
     deps = [
         ":index",
-        ":select",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",

@@ -21,13 +21,20 @@ class Insert : public AbstractStatement {
   Insert(const std::string &table_name, bool replace)
       : AbstractStatement(AbstractStatement::Type::INSERT),
         table_name_(table_name),
-        replace_(replace) {}
+        replace_(replace),
+        returning_(false) {}
 
   // Accessors.
   const std::string &table_name() const;
   std::string &table_name();
   bool replace() const;
   bool &replace();
+  bool returning() const { return this->returning_; }
+  Insert MakeReturning() const {
+    Insert stmt = *this;
+    stmt.returning_ = true;
+    return stmt;
+  }
 
   // Columns and Values.
   bool HasColumns() const;
@@ -67,6 +74,7 @@ class Insert : public AbstractStatement {
   std::vector<std::string> columns_;
   std::vector<std::string> values_;
   bool replace_;
+  bool returning_;
 };
 
 class Select : public AbstractStatement {

@@ -14,7 +14,6 @@ cc_library(
         ":upgradable_lock",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
-        "//pelton/sql:lazy_executor",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/sqlast:parser",

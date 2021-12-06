@@ -1,0 +1,18 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "rocksdb",
+    srcs = [
+        "rocksdb.cc",
+    ],
+    hdrs = [
+        "rocksdb.h",
+    ],
+    visibility = ["//pelton/sql:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/sql:connection",
+        "//pelton/sqlast:ast",
+    ],
+)

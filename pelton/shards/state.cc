@@ -198,7 +198,7 @@ sql::SqlResult SharderState::NumShards() const {
                          std::make_unique<std::string>(kind),
                          static_cast<uint64_t>(set.size()));
   }
-  return sql::SqlResult(std::make_unique<sql::_result::SqlInlineResultSet>(
+  return sql::SqlResult(sql::SqlResultSet(
       dataflow::SchemaFactory::NUM_SHARDS_SCHEMA, std::move(records)));
 }
 

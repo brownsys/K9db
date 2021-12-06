@@ -71,17 +71,17 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
     return absl::InvalidArgumentError("Query contains unsupported features");
   }
 
-  sql::SqlResult result;
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
   dataflow::SchemaRef schema =
       ResultSchema(stmt, dataflow_state->GetTableSchema(table_name));
 
+  sql::SqlResult result(schema);
   auto &exec = connection->executor;
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
-    result = exec.ExecuteDefault(&stmt, schema);
+    result = exec.Default(&stmt, schema);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded.
@@ -126,9 +126,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
           if (lookup.size() == 1) {
             user_id = std::move(*lookup.cbegin());
             // Execute statement directly against shard.
-            result.Append(exec.ExecuteShard(&cloned, shard_kind, user_id,
-                                            schema, aug_index),
-                          true);
+            result.Append(
+                exec.Shard(&cloned, shard_kind, user_id, schema, aug_index),
+                true);
           }
         } else if (state->ShardExists(shard_kind, user_id)) {
           // Remove where condition on the shard by column, since it does not
@@ -137,9 +137,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
           cloned.Visit(&expression_remover);
 
           // Execute statement directly against shard.
-          result.Append(exec.ExecuteShard(&cloned, shard_kind, user_id, schema,
-                                          aug_index),
-                        true);
+          result.Append(
+              exec.Shard(&cloned, shard_kind, user_id, schema, aug_index),
+              true);
         }
 
       } else {
@@ -151,25 +151,23 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
                                state, dataflow_state));
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
-          result.Append(exec.ExecuteShards(&cloned, shard_kind, pair.second,
-                                           schema, aug_index),
-                        true);
+          result.Append(
+              exec.Shards(&cloned, shard_kind, pair.second, schema, aug_index),
+              true);
         } else {
           // Secondary index unhelpful.
           // Select from all the relevant shards.
           const auto &user_ids = state->UsersOfShard(shard_kind);
-          LOG(WARNING) << "Query over table " << cloned.table_name()
-                       << " executed over all shards, this will be slow!";
-          result.Append(exec.ExecuteShards(&cloned, shard_kind, user_ids,
-                                           schema, aug_index),
-                        true);
+          sqlast::Stringifier stringifier("");
+          LOG(WARNING) << "Query over table " << stmt.table_name()
+                       << " executed over all shards, this will be slow!"
+                       << " the query: " << stmt.Visit(&stringifier);
+          result.Append(
+              exec.Shards(&cloned, shard_kind, user_ids, schema, aug_index),
+              true);
         }
       }
     }
-  }
-
-  if (!result.IsQuery()) {
-    result = sql::SqlResult(schema);
   }
 
   perf::End("Select");

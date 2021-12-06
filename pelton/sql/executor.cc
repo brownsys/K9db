@@ -1,67 +1,71 @@
-// Manages mysql connections to the different shard/mini-databases.
-#include "pelton/sql/lazy_executor.h"
+// Intermediate layer between pelton and whatever underlying DB we use.
+#include "pelton/sql/executor.h"
 
 #include <memory>
 #include <utility>
 #include <vector>
 
 #include "glog/logging.h"
+#include "pelton/dataflow/record.h"
 #include "pelton/shards/sqlengine/util.h"
-#include "pelton/sql/result/resultset.h"
+#include "pelton/sql/connections/rocksdb.h"
 #include "pelton/util/perf.h"
 
 namespace pelton {
 namespace sql {
 
 // Creates an empty SqlResult that corresponds to the given sql statement type.
-SqlResult SqlLazyExecutor::EmptyResult(const sqlast::AbstractStatement *sql,
-                                       const dataflow::SchemaRef &schema) {
+SqlResult PeltonExecutor::EmptyResult(const sqlast::AbstractStatement *sql,
+                                      const dataflow::SchemaRef &schema) {
   switch (sql->type()) {
+    // Statement was handled successfully.
     case sqlast::AbstractStatement::Type::CREATE_TABLE:
     case sqlast::AbstractStatement::Type::CREATE_INDEX:
       return SqlResult(true);
+    // 0 rows are updated.
     case sqlast::AbstractStatement::Type::INSERT:
     case sqlast::AbstractStatement::Type::UPDATE:
-      return SqlResult(0);
+      return SqlResult(static_cast<int>(0));
+    // Delete is usually an update but might have a "returning" component.
     case sqlast::AbstractStatement::Type::DELETE:
       if (!static_cast<const sqlast::Delete *>(sql)->returning()) {
-        return SqlResult(0);
+        return SqlResult(static_cast<int>(0));
       }
+    // Empty result set.
     case sqlast::AbstractStatement::Type::SELECT:
-      return SqlResult(std::make_unique<_result::SqlLazyResultSet>(
-          schema, &this->eager_executor_));
+      return SqlResult(schema);
+    // Something else.
     default:
-      LOG(FATAL) << "Unsupported SQL statement in SqlLazyExecutor";
+      LOG(FATAL) << "Unsupported SQL statement in PeltonExecutor";
   }
 }
 
 // Initialization: initialize the eager executor so that it maintains
 // an open connection to the underlying DB.
-void SqlLazyExecutor::Initialize(const std::string &db_name,
-                                 const std::string &username,
-                                 const std::string &password) {
-  this->eager_executor_.Initialize(db_name, username, password);
+void PeltonExecutor::Initialize(const std::string &db_name,
+                                const std::string &username,
+                                const std::string &password) {
+  std::string path = "/tmp/pelton_rocks_db";
+  this->connection_ =
+      std::make_unique<RocksdbConnection>(path, db_name, username, password);
 }
 
-// Close the connection.
-void SqlLazyExecutor::Close() { this->eager_executor_.Close(); }
-
-// (lazy) Execution of SQL statements.
+// Execution of SQL statements.
 // Execute statement against the default un-sharded database.
-SqlResult SqlLazyExecutor::ExecuteDefault(const sqlast::AbstractStatement *sql,
-                                          const dataflow::SchemaRef &schema) {
+SqlResult PeltonExecutor::Default(const sqlast::AbstractStatement *sql,
+                                  const dataflow::SchemaRef &schema) {
 #ifndef PELTON_OPT
   LOG(INFO) << "Shard: default";
 #endif
-  return this->Execute(sql, schema);
+  return this->Execute(sql, schema, __UNSHARDED_DB, __NO_AUG, __NO_AUG_VALUE);
 }
 
 // Execute statement against given user shard.
-SqlResult SqlLazyExecutor::ExecuteShard(const sqlast::AbstractStatement *sql,
-                                        const std::string &shard_kind,
-                                        const shards::UserId &user_id,
-                                        const dataflow::SchemaRef &schema,
-                                        int aug_index) {
+SqlResult PeltonExecutor::Shard(const sqlast::AbstractStatement *sql,
+                                const std::string &shard_kind,
+                                const shards::UserId &user_id,
+                                const dataflow::SchemaRef &schema,
+                                int aug_index) {
   // Find the physical shard name (prefix) by hashing the user id and user kind.
   perf::Start("hashing");
   std::string shard_name = shards::sqlengine::NameShard(shard_kind, user_id);
@@ -76,7 +80,7 @@ SqlResult SqlLazyExecutor::ExecuteShard(const sqlast::AbstractStatement *sql,
 }
 
 // Execute statement against given user shards.
-SqlResult SqlLazyExecutor::ExecuteShards(
+SqlResult PeltonExecutor::Shards(
     const sqlast::AbstractStatement *sql, const std::string &shard_kind,
     const std::unordered_set<shards::UserId> &user_ids,
     const dataflow::SchemaRef &schema, int aug_index) {
@@ -86,22 +90,22 @@ SqlResult SqlLazyExecutor::ExecuteShards(
   }
 
   // This result set is a proxy that allows access to results from all shards.
-  SqlResult result;
+  SqlResult result(schema);
   for (const shards::UserId &user_id : user_ids) {
-    result.Append(
-        this->ExecuteShard(sql, shard_kind, user_id, schema, aug_index));
+    result.Append(this->Shard(sql, shard_kind, user_id, schema, aug_index),
+                  true);
   }
 
   return result;
 }
 
 // Actual SQL statement execution.
-SqlResult SqlLazyExecutor::Execute(const sqlast::AbstractStatement *stmt,
-                                   const dataflow::SchemaRef &schema,
-                                   const std::string &shard_name, int aug_index,
-                                   const std::string &aug_value) {
-  std::string sql = sqlast::Stringifier(shard_name).Visit(stmt);
+SqlResult PeltonExecutor::Execute(const sqlast::AbstractStatement *stmt,
+                                  const dataflow::SchemaRef &schema,
+                                  const std::string &shard_name, int aug_index,
+                                  const std::string &aug_value) {
 #ifndef PELTON_OPT
+  std::string sql = sqlast::Stringifier(shard_name).Visit(stmt);
   LOG(INFO) << "Statement: " << sql;
 #endif
 
@@ -109,17 +113,17 @@ SqlResult SqlLazyExecutor::Execute(const sqlast::AbstractStatement *stmt,
     // Statements: return a boolean signifying success.
     case sqlast::AbstractStatement::Type::CREATE_TABLE:
     case sqlast::AbstractStatement::Type::CREATE_INDEX:
-      return SqlResult(this->eager_executor_.ExecuteStatement(sql));
+      return SqlResult(this->connection_->ExecuteStatement(stmt));
 
     // Updates: return a count of rows affected.
     case sqlast::AbstractStatement::Type::INSERT:
     case sqlast::AbstractStatement::Type::UPDATE:
-      return SqlResult(this->eager_executor_.ExecuteUpdate(sql));
+      return SqlResult(this->connection_->ExecuteUpdate(stmt));
 
     // A returning delete is a query, a non returning delete is an update.
     case sqlast::AbstractStatement::Type::DELETE:
       if (!static_cast<const sqlast::Delete *>(stmt)->returning()) {
-        return SqlResult(this->eager_executor_.ExecuteUpdate(sql));
+        return SqlResult(this->connection_->ExecuteUpdate(stmt));
       }
       // No break, next case is executed.
 
@@ -127,20 +131,18 @@ SqlResult SqlLazyExecutor::Execute(const sqlast::AbstractStatement *stmt,
     case sqlast::AbstractStatement::Type::SELECT: {
       // Set up augmentation information to augment any sharding columns to the
       // result set.
-      std::vector<_result::AugmentingInformation> aug_info;
-      if (aug_index > -1) {
+      std::vector<AugInfo> aug_info;
+      if (aug_index > __NO_AUG) {
         aug_info.push_back({static_cast<size_t>(aug_index), aug_value});
       }
-      // Create a lazy result set.
-      std::unique_ptr<_result::SqlLazyResultSet> result_set =
-          std::make_unique<_result::SqlLazyResultSet>(schema,
-                                                      &this->eager_executor_);
-      result_set->AddShardResult({sql, std::move(aug_info)});
-      return SqlResult(std::move(result_set));
+      // Create a result set for output.
+      std::vector<dataflow::Record> records =
+          this->connection_->ExecuteQuery(stmt, schema, aug_info);
+      return SqlResult(SqlResultSet(schema, std::move(records)));
     }
 
     default:
-      LOG(FATAL) << "Unsupported SQL statement in pool.cc";
+      LOG(FATAL) << "Unsupported SQL statement in PeltonExecutor";
   }
 }
 

@@ -12,6 +12,7 @@
 
 #include "gflags/gflags.h"
 #include "glog/logging.h"
+#include "mariadb/conncpp.hpp"
 #include "pelton/pelton.h"
 
 namespace tests {
@@ -207,8 +208,9 @@ void RunTest(const std::string &query_file_prefix) {
     std::vector<std::string> actual;
     pelton::SqlResult &result = status.value();
     if (result.IsQuery()) {
-      std::unique_ptr<pelton::SqlResultSet> resultset = result.NextResultSet();
-      for (pelton::Record &record : *resultset) {
+      pelton::SqlResultSet &resultset = result.ResultSets().at(0);
+      std::vector<pelton::Record> records = resultset.Vec();
+      for (pelton::Record &record : records) {
         record.SetPositive(true);
         actual.push_back(ToString(record));
       }

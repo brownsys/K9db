@@ -78,7 +78,6 @@ bool open(Connection *connection, const std::string &db_name,
           const std::string &db_username, const std::string &db_password) {
   // set global state in local connection struct
   connection->state = PELTON_STATE;
-  // run SqlEagerExecutor::Initialize, initializing mariadb connection
   connection->executor.Initialize(db_name, db_username, db_password);
   return true;
 }

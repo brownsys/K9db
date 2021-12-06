@@ -123,10 +123,10 @@ void Print(pelton::SqlResult &&result) {
   } else if (result.IsUpdate()) {
     std::cout << "Affected rows: " << result.UpdateCount() << std::endl;
   } else if (result.IsQuery()) {
-    while (result.HasResultSet()) {
-      std::unique_ptr<pelton::SqlResultSet> resultset = result.NextResultSet();
-      std::cout << resultset->GetSchema() << std::endl;
-      for (const pelton::Record &record : *resultset) {
+    for (pelton::SqlResultSet &resultset : result.ResultSets()) {
+      std::cout << resultset.schema() << std::endl;
+      std::vector<pelton::Record> records = resultset.Vec();
+      for (pelton::Record &record : records) {
         std::cout << record << std::endl;
       }
     }

@@ -229,15 +229,15 @@ sql::SqlResult DataFlowState::SizeInMemory() const {
   records.emplace_back(SchemaFactory::MEMORY_SIZE_SCHEMA, true,
                        std::make_unique<std::string>("TOTAL"),
                        std::make_unique<std::string>("TOTAL"), total_size);
-  return sql::SqlResult(std::make_unique<sql::_result::SqlInlineResultSet>(
-      SchemaFactory::MEMORY_SIZE_SCHEMA, std::move(records)));
+  return sql::SqlResult(
+      sql::SqlResultSet(SchemaFactory::MEMORY_SIZE_SCHEMA, std::move(records)));
 }
 
 sql::SqlResult DataFlowState::FlowDebug(const std::string &flow_name) const {
   std::shared_lock lock(this->mtx_);
   const auto &flow = this->flows_.at(flow_name);
-  return sql::SqlResult(std::make_unique<sql::_result::SqlInlineResultSet>(
-      SchemaFactory::FLOW_DEBUG_SCHEMA, flow->DebugRecords()));
+  return sql::SqlResult(sql::SqlResultSet(SchemaFactory::FLOW_DEBUG_SCHEMA,
+                                          flow->DebugRecords()));
 }
 
 }  // namespace dataflow

@@ -375,3 +375,40 @@ git_repository(
     commit = "45c59ccbc062ac96d83710205033c656e490d376",
     remote = "https://github.com/google/tcmalloc.git",
 )
+
+# RocksDB.
+new_git_repository(
+    name = "rocksdb",
+    build_file_content = """
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+
+filegroup(
+    name = "all_srcs",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+
+cmake(
+    name = "rocksdb",
+    generate_args = [
+        "-DROCKSDB_BUILD_SHARED=OFF",
+        "-DWITH_GFLAGS=ON",
+    ],
+    build_args = [
+        "--", # pass following args through to `make`
+        "-j 8",
+    ],
+    cache_entries = {
+        "CMAKE_C_FLAGS": "-fPIC",
+        "CMAKE_CXX_FLAGS": "-fPIC",
+    },
+    lib_source = ":all_srcs",
+    out_static_libs = ["librocksdb.a"],
+    deps = [
+        "@com_github_gflags_gflags//:gflags",
+    ]
+)
+""",
+    commit = "e637dca20e06f7347d0fe7aefca8f3619604ebe3",
+    remote = "https://github.com/mulugetam/rocksdb.git",
+)

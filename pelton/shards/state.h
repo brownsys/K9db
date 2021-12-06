@@ -18,7 +18,6 @@
 
 #include "pelton/shards/types.h"
 #include "pelton/shards/upgradable_lock.h"
-#include "pelton/sql/lazy_executor.h"
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 
