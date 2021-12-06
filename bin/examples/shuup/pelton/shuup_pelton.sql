@@ -99,7 +99,7 @@ CREATE TABLE shuup_payment ( \
   payment_identifier text, \
   amount_value int, \
   description text, \
-  PRIMARY KEY (id) \
+  PRIMARY KEY (id), \
   FOREIGN KEY (order_id) REFERENCES shuup_order(id) \
 );
 
