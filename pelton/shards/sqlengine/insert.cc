@@ -233,7 +233,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
       }
       LOG(INFO) << "user_id retrieved";
       if (absl::EqualsIgnoreCase(user_id, "NULL")) {
-        return absl::InvalidArgumentError(info.shard_by + " cannot be NULL");
+        LOG(WARNING) << info.shard_by << " was NULL";
+        LOG(WARNING) << "This could indicate a bug and may lead to data loss!";
+        continue;
       }
       user_id = Dequote(user_id);
       LOG(INFO) << "user_id dequoted";
@@ -252,11 +254,13 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
             auto &lookup,
             index::LookupIndex(info.next_index_name, user_id, dataflow_state));
         if (lookup.size() < 1) {
-          LOG(INFO) << "Unexpected lookup size " << lookup.size();
-          return absl::InvalidArgumentError("Foreign Key Value does not exist");
+          LOG(INFO) << "Lookup result was empty";
+          continue;
         } else {
           LOG(INFO) << "Index lookup succeeded";
           for (auto &uid : lookup) {
+            LOG(INFO) << "one lookup result was null";
+            if (!absl::EqualsIgnoreCase(uid, "NULL")) {
             CHECK_STATUS(HandleShardForUser(stmt, cloned, connection, lock, &update_flows, &result, info, uid));
           }
         }

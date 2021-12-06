@@ -36,11 +36,30 @@ CREATE TABLE  oc_users (
   PRIMARY KEY(uid)
 );
 
+
+CREATE TABLE oc_groups (
+  gid VARCHAR(64) NOT NULL,
+  PRIMARY KEY(gid)
+);
+
+CREATE TABLE oc_group_user (
+  id INT PRIMARY KEY,
+  OWNING_gid VARCHAR(64) NOT NULL REFERENCES oc_groups(gid),
+  uid VARCHAR(64) NOT NULL REFERENCES oc_users(uid)
+  --UNIQUE group_user_uniq(OWNED_gid, uid)
+);
+
+CREATE VIEW users_for_group AS 
+'"SELECT oc_group_user.OWNING_gid, oc_group_user.uid, COUNT(*)
+FROM oc_group_user 
+WHERE oc_group_user.OWNING_gid = ?
+GROUP BY (oc_group_user.OWNING_gid, oc_group_user.uid)"' ;
+
 CREATE TABLE oc_share (
   id INT NOT NULL,
   share_type INT NOT NULL,
   OWNER_share_with VARCHAR(255) REFERENCES oc_users(uid),
-  --share_with_group VARCHAR(255) REFERENCE oc_groups(gid),
+  OWNER_share_with_group VARCHAR(255) REFERENCES oc_groups(gid),
   OWNER_uid_owner VARCHAR(64) NOT NULL REFERENCES oc_users(uid),
   uid_initiator VARCHAR(64) REFERENCES oc_users(uid),
   parent INT ,
@@ -58,3 +77,10 @@ CREATE TABLE oc_share (
   file_source INT,
   attributes TEXT
 );
+
+CREATE VIEW users_for_file_via_group AS 
+'"SELECT oc_share.OWNING_item_source, oc_group_user.uid, COUNT(*)
+FROM oc_share
+JOIN oc_group_user ON oc_share.OWNER_share_with_group = oc_group_user.OWNING_gid
+WHERE oc_share.OWNING_item_source = ?
+GROUP BY (oc_share.OWNING_item_source, oc_group_user.uid)"';

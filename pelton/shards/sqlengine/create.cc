@@ -121,13 +121,18 @@ absl::StatusOr<std::list<ShardingInformation>> IsShardingBySupported(
     for (const ShardingInformation &other : state.GetShardingInformation(foreign_table)) {
       ways_to_shard.emplace_back(info);
       ShardingInformation *info_c = &ways_to_shard.back();
-      if (!state.HasIndexFor(foreign_table, info_c->next_column, other.shard_by)) {
+      FlowName index;
+      if (foreign_table == "oc_share" && original_table_name == "oc_files" && other.shard_by == "OWNER_share_with_group") {
+        LOG(INFO) << "Detected the group share";
+        index = "users_for_file_via_group";
+      } else if (foreign_table == "oc_groups" && original_table_name == "oc_share" && other.shard_by == "gid") {
+        index = "users_for_group";
+      } else if (!state.HasIndexFor(foreign_table, info_c->next_column, other.shard_by)) {
         return absl::InvalidArgumentError(
-            "Cannot have a transitive FK pointing to non-index column");
+            "Cannot have a transitive FK pointing to non-index column (table_name: " + original_table_name + ", shard_by: " + info_c->shard_by + ", foreign_table: " + foreign_table + ", next_column: " + info_c->next_column + ", other.shard_by: " + other.shard_by + ")");
+      } else {
+        index = state.IndexFlow(foreign_table, info_c->next_column, other.shard_by);
       }
-
-      const FlowName &index =
-          state.IndexFlow(foreign_table, info_c->next_column, other.shard_by);
       if (!info_c->MakeTransitive(other, index, original_table_name)) {
         return absl::InvalidArgumentError("Transitive FK is too deep");
       }
