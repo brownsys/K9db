@@ -84,3 +84,22 @@ FROM oc_share
 JOIN oc_group_user ON oc_share.OWNER_share_with_group = oc_group_user.OWNING_gid
 WHERE oc_share.OWNING_item_source = ?
 GROUP BY (oc_share.OWNING_item_source, oc_group_user.uid)"';
+
+
+-- shoudl also return s.*
+CREATE VIEW file_view AS 
+'"(SELECT s.id as sid, f.fileid, f.path, st.id AS storage_string_id, s.OWNER_share_with as share_target
+FROM oc_share s
+LEFT JOIN oc_filecache f ON s.file_source = f.fileid
+LEFT JOIN oc_storages st ON f.storage = st.numeric_id
+WHERE (s.share_type = 0) AND s.OWNER_share_with = ?)
+UNION
+(SELECT s.id as sid, f.fileid, f.path, st.id AS storage_string_id, oc_group_user.uid as share_target
+FROM oc_share s
+LEFT JOIN oc_filecache f ON s.file_source = f.fileid
+LEFT JOIN oc_storages st ON f.storage = st.numeric_id
+JOIN oc_group_user ON s.OWNER_share_with_group = oc_group_user.OWNING_gid
+WHERE (s.share_type = 1) AND oc_group_user.uid = ?
+   )
+ORDER BY sid ASC
+"';

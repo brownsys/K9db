@@ -13,9 +13,11 @@ pub fn run_queries_in_str<Q:Queryable>(conn: &mut Q, file: &str) {
     }
 }
 
-pub fn prepare_database() -> Conn {
+pub fn prepare_database(prepare_and_insert: bool) -> Conn {
     let opts = OptsBuilder::new().tcp_port(10001);
     let mut c = Conn::new(opts).unwrap();
-    run_queries_in_str(&mut c, SCHEMA);
+    if prepare_and_insert {
+        run_queries_in_str(&mut c, SCHEMA);
+    }
     c
 }
