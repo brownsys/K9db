@@ -14,7 +14,7 @@ void PurposeOperator::ComputeOutputSchema() {
   this->output_schema_ = this->input_schemas_.at(0);
 }
 
-std::vector<Record> PurposeOperator::Process(NodeIndex source,
+std::vector<Record> PurposeOperator:: Process(NodeIndex source,
                                             std::vector<Record> &&records) {
   std::vector<Record> output;
   output.reserve(records.size());
@@ -30,9 +30,11 @@ bool PurposeOperator::Accept(const Record &record) const {
   for (const auto &operation : this->ops_) {
     switch (operation.op()) {
       case Operation::LIKE: // amrit
+
         if (record.schema().TypeOf(operation.left()) != Record::TypeOfVariant(operation.right())) {    \
           LOG(FATAL) << "Type mistmatch in purpose value";                \
         }                                                                 \
+        
         if (record.IsNull(operation.left())) {                                         \
           return false;                                                   \
         }                                                                 \

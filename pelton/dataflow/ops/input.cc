@@ -19,9 +19,13 @@ std::vector<Record> InputOperator::Process(NodeIndex source,
 
   // Enforcing gdpr purpose whenever data enters a pipeling from a table
   PurposeOperator purposeOp;
-  ColumnID gdpr_col_id = this->input_schemas_.size()-1; // get the last column that will be gdpr
-
-  purposeOp.AddOperation("V1",gdpr_col_id, LIKE); // amrit - add value of the gdpr purpose
+  
+  // get the last column that will be gdpr
+  ColumnID gdpr_col_id = this->input_schemas_.at(0).IndexOf("gdpr_purpose");
+  
+  std::cout << this->view_name_ << " In input\n";
+  
+  purposeOp.AddOperation(this->view_name_ ,gdpr_col_id, LIKE); // amrit - add value of the gdpr purpose
   records = purposeOp.Process(source, std::move(records));
 
   return std::move(records);

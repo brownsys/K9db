@@ -12,6 +12,8 @@
 namespace pelton {
 namespace dataflow {
 
+using ViewName = std::string;
+
 class InputOperator : public Operator {
  public:
   // Cannot copy an operator.
@@ -26,6 +28,19 @@ class InputOperator : public Operator {
 
   const std::string &input_name() const { return this->input_name_; }
 
+  // amrit
+  void set_name(const ViewName &name){
+    std::size_t pos = name.find("_") + 1;
+    std::cout << name << " before substr\n";
+    this->view_name_ = name.substr(pos);
+    std::cout << name.substr(pos) << " after substr\n";
+    // this->view_name_ = name;
+    // split
+  }
+
+  const std::string &get_flow_name() const { return this->view_name_; }
+
+
  protected:
   std::vector<Record> Process(NodeIndex source,
                               std::vector<Record> &&records) override;
@@ -36,6 +51,7 @@ class InputOperator : public Operator {
 
  private:
   std::string input_name_;
+  ViewName view_name_;
 };
 
 }  // namespace dataflow

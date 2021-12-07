@@ -4,6 +4,7 @@
 // and state.
 
 #include "pelton/dataflow/state.h"
+#include "pelton/dataflow/ops/input.h"
 
 #include <fstream>
 #include <iostream>
@@ -39,7 +40,7 @@ SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
   if (this->schema_.count(table_name) > 0) {
     return this->schema_.at(table_name);
   } else {
-    LOG(FATAL) << "Tried to get schema for non-existent table " << table_name;
+    LOG(FATAL) << "  " << table_name;
   }
 }
 
@@ -49,11 +50,15 @@ void DataFlowState::AddFlow(const FlowName &name,
   // Map input names to this flow.
   for (const auto &[input_name, input] : flow->inputs()) {
     this->flows_per_input_table_[input_name].push_back(name);
+    std::cout << name << "df:addflow\n";
+    input->set_name(name);    
   }
 
   // Turn the given partition into a graph with many partitions.
   this->flows_.emplace(
       name, std::make_unique<DataFlowGraph>(std::move(flow), this->workers_));
+
+
 }
 
 const DataFlowGraph &DataFlowState::GetFlow(const FlowName &name) const {
@@ -105,8 +110,11 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
       for (const Record &r : records) {
         copy.push_back(r.Copy());
       }
+
       this->flows_.at(flow_names.at(i))->Process(table_name, std::move(copy));
     }
+
+    // std::cout << flow_names.back() << " amrit\n";
 
     // Move into last flow.
     this->flows_.at(flow_names.back())->Process(table_name, std::move(records));
