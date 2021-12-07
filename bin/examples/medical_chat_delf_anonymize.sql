@@ -15,11 +15,11 @@ CREATE TABLE patients ( \
 CREATE TABLE chat ( \
   id int, \
   patient_id int, \
-  ACCESSOR_doctor_id int, \
-  doctor_name text, \
+  ACCESSOR_ANONYMIZE_doctor_id int, \
+  ACCESS_doctor_name text, \
   message text, \
   PRIMARY KEY(id), \
-  FOREIGN KEY (ACCESSOR_doctor_id) REFERENCES doctors(id) \
+  FOREIGN KEY (ACCESSOR_ANONYMIZE_doctor_id) REFERENCES doctors(id) \
 );
 
 INSERT INTO doctors VALUES (1, 'Alice');

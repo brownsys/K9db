@@ -178,13 +178,58 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       std::string index_col = accessor_index.accessor_column_name;
       std::string index_name = accessor_index.index_name;
       std::string shard_by_access = accessor_index.shard_by_column_name;
+      bool is_sharded = accessor_index.is_sharded;
       for (auto &[anon_col_name, anon_col_type] :
            accessor_index.anonymize_columns) {
-        MOVE_OR_RETURN(std::unordered_set<UserId> ids_set,
-                       index::LookupIndex(index_name, user_id, dataflow_state));
+        if (is_sharded) {
+          MOVE_OR_RETURN(
+              std::unordered_set<UserId> ids_set,
+              index::LookupIndex(index_name, user_id, dataflow_state));
 
-        // create update statement with equality check for each id
-        for (const auto &id : ids_set) {
+          // create update statement with equality check for each id
+          for (const auto &id : ids_set) {
+            sqlast::Update anonymize_stmt{accessor_table_name};
+
+            // UPDATE doctor_id = NULL WHERE doctor_id = user_id
+
+            // doctor_id = NULL
+            std::string anonymized_value = "";
+            switch (anon_col_type) {
+              case sqlast::ColumnDefinition::Type::UINT:
+                anonymized_value = "0";
+                break;
+              case sqlast::ColumnDefinition::Type::INT:
+                anonymized_value = "-1";
+                break;
+              case sqlast::ColumnDefinition::Type::TEXT:
+                anonymized_value = "\"NULL\"";
+                break;
+              case sqlast::ColumnDefinition::Type::DATETIME:
+                anonymized_value = "\"NULL\"";
+                break;
+            }
+            anonymize_stmt.AddColumnValue(anon_col_name, anonymized_value);
+
+            std::unique_ptr<sqlast::BinaryExpression> where =
+                std::make_unique<sqlast::BinaryExpression>(
+                    sqlast::Expression::Type::EQ);
+            where->SetLeft(
+                std::make_unique<sqlast::ColumnExpression>(index_col));
+            where->SetRight(
+                std::make_unique<sqlast::LiteralExpression>(user_id));
+
+            // set where condition in update statement
+            anonymize_stmt.SetWhereClause(std::move(where));
+
+            // execute select
+            MOVE_OR_RETURN(
+                sql::SqlResult res,
+                update::Shard(anonymize_stmt, state, dataflow_state));
+
+            // add to result
+            total_count += res.UpdateCount();
+          }
+        } else {
           sqlast::Update anonymize_stmt{accessor_table_name};
 
           // UPDATE doctor_id = NULL WHERE doctor_id = user_id
