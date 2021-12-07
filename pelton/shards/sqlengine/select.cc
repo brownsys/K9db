@@ -6,6 +6,8 @@
 #include <utility>
 #include <vector>
 
+#include "glog/logging.h"
+
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/upgradable_lock.h"
 #include "pelton/util/perf.h"
@@ -157,6 +159,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
           // Secondary index unhelpful.
           // Select from all the relevant shards.
           const auto &user_ids = state->UsersOfShard(shard_kind);
+          LOG(WARNING) << "Query over table " << cloned.table_name()
+		       << " executed over all shards, this will be slow!";
           result.Append(exec.ExecuteShards(&cloned, shard_kind, user_ids,
                                            schema, aug_index),
                         true);
