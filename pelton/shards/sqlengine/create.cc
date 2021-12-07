@@ -156,6 +156,8 @@ absl::StatusOr<std::list<ShardingInformation>> ShardTable(
     // Find foreign key constraint (if exists).
     // check if column starts with OWNER_ (has an owner annotation)
     bool explicit_owner = absl::StartsWith(column_name, "OWNER_");
+    // check if column starts with ACCESSOR_ (has an accessor annotation)
+    bool explicit_accessor = absl::StartsWith(column_name, "ACCESSOR_");
     // check if column has a foreign key constraint
     const sqlast::ColumnConstraint *fk_constraint = nullptr;
     // loop through all columns, getting their constraints from ast
@@ -187,8 +189,10 @@ absl::StatusOr<std::list<ShardingInformation>> ShardTable(
           explicit_owners.emplace_back(shard_kind.value(), sharded_table_name,
                                        column_name, index, foreign_column);
         } else {
-          implicit_owners.emplace_back(shard_kind.value(), sharded_table_name,
-                                       column_name, index, foreign_column);
+          if (!explicit_accessor) {
+            implicit_owners.emplace_back(shard_kind.value(), sharded_table_name,
+                                         column_name, index, foreign_column);
+          }
         }
       }
     } else if (explicit_owner) {
@@ -238,23 +242,16 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState *state,
           break;
         }
       }
+
       std::string shard_string = "";
+
       if (fk_constraint != nullptr) {
         absl::StatusOr<std::optional<ShardKind>> shard_kind =
             ShouldShardBy(*fk_constraint, *state);
         shard_string = shard_kind->value();
       }
 
-      std::string index_prefix =
-          "ref_" + shard_string +
-          std::to_string(state->GetAccessorIndices(shard_string).size());
-      sqlast::CreateIndex create_index_stmt{index_prefix, table_name,
-                                            column_name};
-      const auto &info_list = state->GetShardingInformation(table_name);
-      const auto info = info_list.front();
-
       std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type> anon_cols;
-
       if (absl::StartsWith(column_name, "ACCESSOR_ANONYMIZE")) {
         anon_cols[column_name] = columns[index].column_type();
         for (const auto &acces_col_check : stmt.GetColumns()) {
@@ -265,11 +262,29 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState *state,
         }
       }
 
-      state->AddAccessorIndex(shard_string, table_name, column_name,
-                              info.shard_by, index_prefix + "_" + info.shard_by,
-                              anon_cols);
-      pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, state,
-                                                    &dataflow_state);
+      std::string table_key = "";
+      bool is_sharded = state->IsSharded(table_name);
+      if (is_sharded) {
+        const auto &info_list = state->GetShardingInformation(table_name);
+        const auto info = info_list.front();
+        table_key = info.shard_by;
+
+        std::string index_prefix =
+            "ref_" + shard_string +
+            std::to_string(state->GetAccessorIndices(shard_string).size());
+        sqlast::CreateIndex create_index_stmt{index_prefix, table_name,
+                                              column_name};
+
+        pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, state,
+                                                      &dataflow_state);
+
+        state->AddAccessorIndex(shard_string, table_name, column_name,
+                                table_key, index_prefix + "_" + table_key,
+                                anon_cols, is_sharded);
+      } else {
+        state->AddAccessorIndex(shard_string, table_name, column_name,
+                                table_key, "", anon_cols, is_sharded);
+      }
     }
   }
 }

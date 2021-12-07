@@ -69,7 +69,8 @@ class SharderState {
       const ColumnName &accessor_column, const ColumnName &shard_by_column,
       const IndexName &index_name,
       const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
-          &anonymize);
+          &anonymize,
+      const bool is_sharded);
 
   std::list<const sqlast::AbstractStatement *> CreateShard(
       const ShardKind &shard_kind, const UserId &user);

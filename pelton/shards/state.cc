@@ -60,10 +60,12 @@ void SharderState::AddAccessorIndex(
     const ColumnName &accessor_column, const ColumnName &shard_by_column,
     const IndexName &index_name,
     const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
-        &anonymize) {
+        &anonymize,
+    const bool is_sharded) {
   // Create an AccessorIndexInformation
   AccessorIndexInformation accessor_information{
-      kind, table, accessor_column, shard_by_column, index_name, anonymize};
+      kind,       table,     accessor_column, shard_by_column,
+      index_name, anonymize, is_sharded};
   this->accessor_index_[kind].push_back(accessor_information);
 }
 

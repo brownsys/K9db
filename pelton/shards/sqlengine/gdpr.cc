@@ -83,14 +83,63 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       std::string index_col = accessor_index.accessor_column_name;
       std::string index_name = accessor_index.index_name;
       std::string shard_by_access = accessor_index.shard_by_column_name;
+      bool is_sharded = accessor_index.is_sharded;
+      if (is_sharded) {
+        MOVE_OR_RETURN(std::unordered_set<UserId> ids_set,
+                       index::LookupIndex(index_name, user_id, dataflow_state));
 
-      MOVE_OR_RETURN(std::unordered_set<UserId> ids_set,
-                     index::LookupIndex(index_name, user_id, dataflow_state));
+        // create select statement with equality check for each id
+        sql::SqlResult table_result;
 
-      // create select statement with equality check for each id
-      sql::SqlResult table_result;
+        for (const auto &id : ids_set) {
+          sqlast::Select accessor_stmt{accessor_table_name};
+          // SELECT *
+          accessor_stmt.AddColumn("*");
 
-      for (const auto &id : ids_set) {
+          // LHS: ACCESSOR_doctor_id = user_id
+          std::unique_ptr<sqlast::BinaryExpression> doctor_equality =
+              std::make_unique<sqlast::BinaryExpression>(
+                  sqlast::Expression::Type::EQ);
+          doctor_equality->SetLeft(
+              std::make_unique<sqlast::ColumnExpression>(index_col));
+          doctor_equality->SetRight(
+              std::make_unique<sqlast::LiteralExpression>(user_id));
+
+          // RHS: OWNER_patient_id in (index.value, ...)
+          // OWNER_patient_id == index.value
+          std::unique_ptr<sqlast::BinaryExpression> patient_equality =
+              std::make_unique<sqlast::BinaryExpression>(
+                  sqlast::Expression::Type::EQ);
+          patient_equality->SetLeft(
+              std::make_unique<sqlast::ColumnExpression>(shard_by_access));
+          patient_equality->SetRight(
+              std::make_unique<sqlast::LiteralExpression>(id));
+
+          // combine both conditions into overall where condition of type
+          // AND
+          std::unique_ptr<sqlast::BinaryExpression> where_condition =
+              std::make_unique<sqlast::BinaryExpression>(
+                  sqlast::Expression::Type::AND);
+          where_condition->SetLeft(
+              std::move(static_cast<std::unique_ptr<sqlast::Expression>>(
+                  std::move(doctor_equality))));
+          where_condition->SetRight(
+              std::move(static_cast<std::unique_ptr<sqlast::Expression>>(
+                  std::move(patient_equality))));
+
+          // set where condition in select statement
+          accessor_stmt.SetWhereClause(std::move(where_condition));
+
+          // execute select
+          MOVE_OR_RETURN(sql::SqlResult res,
+                         select::Shard(accessor_stmt, state, dataflow_state));
+
+          // add to result
+          table_result.Append(std::move(res));
+        }
+        result.AddResultSet(table_result.NextResultSet());
+      } else {
+        sql::SqlResult table_result;
         sqlast::Select accessor_stmt{accessor_table_name};
         // SELECT *
         accessor_stmt.AddColumn("*");
@@ -104,30 +153,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
         doctor_equality->SetRight(
             std::make_unique<sqlast::LiteralExpression>(user_id));
 
-        // RHS: OWNER_patient_id in (index.value, ...)
-        // OWNER_patient_id == index.value
-        std::unique_ptr<sqlast::BinaryExpression> patient_equality =
-            std::make_unique<sqlast::BinaryExpression>(
-                sqlast::Expression::Type::EQ);
-        patient_equality->SetLeft(
-            std::make_unique<sqlast::ColumnExpression>(shard_by_access));
-        patient_equality->SetRight(
-            std::make_unique<sqlast::LiteralExpression>(id));
-
-        // combine both conditions into overall where condition of type
-        // AND
-        std::unique_ptr<sqlast::BinaryExpression> where_condition =
-            std::make_unique<sqlast::BinaryExpression>(
-                sqlast::Expression::Type::AND);
-        where_condition->SetLeft(
-            std::move(static_cast<std::unique_ptr<sqlast::Expression>>(
-                std::move(doctor_equality))));
-        where_condition->SetRight(
-            std::move(static_cast<std::unique_ptr<sqlast::Expression>>(
-                std::move(patient_equality))));
-
         // set where condition in select statement
-        accessor_stmt.SetWhereClause(std::move(where_condition));
+        accessor_stmt.SetWhereClause(std::move(doctor_equality));
 
         // execute select
         MOVE_OR_RETURN(sql::SqlResult res,
@@ -135,8 +162,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
 
         // add to result
         table_result.Append(std::move(res));
+        result.AddResultSet(table_result.NextResultSet());
       }
-      result.AddResultSet(table_result.NextResultSet());
     }
   }
 

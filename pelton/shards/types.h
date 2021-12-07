@@ -56,17 +56,20 @@ struct AccessorIndexInformation {
   // columns to anonymize on delete and their types
   std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
       anonymize_columns;
+  bool is_sharded;
 
   AccessorIndexInformation(
       const ShardKind &sk, const UnshardedTableName &tn, const ColumnName &cn,
       const ColumnName &sbcn, const IndexName &in,
-      const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type> &an)
+      const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type> &an,
+      const bool is)
       : shard_kind(sk),
         table_name(tn),
         accessor_column_name(cn),
         shard_by_column_name(sbcn),
         index_name(in),
-        anonymize_columns(an) {}
+        anonymize_columns(an),
+        is_sharded(is) {}
 };
 
 // Contains the details of how a given table is sharded.
