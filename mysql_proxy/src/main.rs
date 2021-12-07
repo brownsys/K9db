@@ -14,11 +14,12 @@ use msql_srv::*;
 use proxy_ffi::*;
 use regex::Regex;
 use slog::Drain;
+use std::collections::HashMap;
 use std::ffi::CString;
 use std::io;
 use std::net;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 const USAGE: &str = "
@@ -29,11 +30,31 @@ const USAGE: &str = "
   --db_username (root): database user to connect with to mariadb.
   --db_password (password): password to connect with to mariadb.";
 
-static NO_VIEWS: [&'static str; 2] = [
+static NO_VIEWS: [&'static str; 22] = [
     // For ci tests.
     "SELECT * FROM tbl WHERE id = ?",
     "SELECT * FROM tbl WHERE id = ? AND age > ?",
     // TODO: add lobsters here.
+    "SELECT 1 AS `one` FROM users WHERE users.PII_username = ?",
+    "SELECT 1 AS `one`, short_id FROM stories WHERE stories.short_id = ?",
+    "SELECT tags.* FROM tags WHERE tags.inactive = 0 AND tags.tag = ?",
+    "SELECT keystores.* FROM keystores WHERE keystores.keyX = ?",
+    "SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND votes.story_id = ? AND votes.comment_id IS NULL",
+    "SELECT stories.* FROM stories WHERE stories.short_id = ?",
+    "SELECT users.* FROM users WHERE users.id = ?",
+    "SELECT 1 AS `one`, short_id FROM comments WHERE comments.short_id = ?",
+    "SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND votes.story_id = ? AND votes.comment_id = ?",
+    "SELECT comments.* FROM comments WHERE comments.story_id = ? AND comments.short_id = ?",
+    "SELECT read_ribbons.* FROM read_ribbons WHERE read_ribbons.user_id = ? AND read_ribbons.story_id = ?",
+    "SELECT hidden_stories.story_id, hidden_stories.user_id FROM hidden_stories WHERE hidden_stories.user_id = ?",
+    "SELECT users.* FROM users WHERE users.PII_username = ?",
+    "SELECT hidden_stories.* FROM hidden_stories WHERE hidden_stories.user_id = ? AND hidden_stories.story_id = ?",
+    "SELECT tag_filters.* FROM tag_filters WHERE tag_filters.user_id = ?",
+    "SELECT taggings.story_id FROM taggings WHERE taggings.story_id = ?",
+    "SELECT saved_stories.* FROM saved_stories WHERE saved_stories.user_id = ? AND saved_stories.story_id = ?",
+    "SELECT 1, user_id, story_id FROM hidden_stories WHERE user_id = ? AND hidden_stories.story_id = ?",
+    "SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND votes.comment_id = ?",
+    "SELECT comments.* FROM comments WHERE comments.short_id = ?",
 ];
 
 #[derive(Debug)]
@@ -42,7 +63,10 @@ struct Backend {
     runtime: std::time::Duration,
     log: slog::Logger,
     stop: Arc<AtomicBool>,
-    prepared_statements: Vec<Vec<String>>,
+    // Maps original prepared statement to a (statement_id, param_count) tuple.
+    prepared_statements: Arc<RwLock<HashMap<String, (u32, u32)>>>,
+    // Maps statement_id to internal representation of the prepared statement.
+    prepared_index: Arc<RwLock<HashMap<u32, Vec<String>>>>,
 }
 
 impl<W: io::Write> MysqlShim<W> for Backend {
@@ -54,12 +78,6 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         prepared_statement: &str,
         info: StatementMetaWriter<W>,
     ) -> io::Result<()> {
-        debug!(self.log, "Rust proxy: starting on_prepare");
-        debug!(
-            self.log,
-            "Rust Proxy: prepared statement received is: {:?}", prepared_statement
-        );
-
         // Only support SELECT and INSERT.
         if !prepared_statement.starts_with("SELECT") && !prepared_statement.starts_with("INSERT") {
             error!(
@@ -69,7 +87,59 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             return info.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
         }
 
-        let statement_id = self.prepared_statements.len() as u32;
+        // If the prepared statement has already been constructed then simply return.
+        let prepared_read_guard = self.prepared_statements.read().unwrap();
+        if prepared_read_guard.contains_key(prepared_statement) {
+            let entry = prepared_read_guard.get(prepared_statement).unwrap();
+            let mut params = Vec::new();
+            for _i in 1..entry.1 {
+                params.push(Column {
+                    table: "".to_string(),
+                    column: "".to_string(),
+                    coltype: ColumnType::MYSQL_TYPE_VAR_STRING,
+                    colflags: ColumnFlags::empty(),
+                });
+            }
+            debug!(
+                self.log,
+                "Rust Proxy: prepared statement reuse: {:?}", prepared_statement
+            );
+
+            // Respond to client
+            return info.reply(entry.0, &params, &[]);
+        }
+
+        // The prepared statement needs to be added.
+        // Protocol:
+        // 1. Drop the current shared lock
+        // 2. Acquire the unique lock
+        // 3. Check if the prepared statment has not been added by another thread.
+        // 4. if above condition is true then proceed to add the prepared statement.
+        drop(prepared_read_guard);
+        let mut prepared_write_guard = self.prepared_statements.write().unwrap();
+        if prepared_write_guard.contains_key(prepared_statement) {
+            let entry = prepared_write_guard.get(prepared_statement).unwrap();
+            let mut params = Vec::new();
+            for _i in 1..entry.1 {
+                params.push(Column {
+                    table: "".to_string(),
+                    column: "".to_string(),
+                    coltype: ColumnType::MYSQL_TYPE_VAR_STRING,
+                    colflags: ColumnFlags::empty(),
+                });
+            }
+            // Respond to client
+            return info.reply(entry.0, &params, &[]);
+        } // Else proceceed to add the prepared statement.
+
+        debug!(self.log, "Rust proxy: starting on_prepare");
+        debug!(
+            self.log,
+            "Rust Proxy: prepared statement received is: {:?}", prepared_statement
+        );
+
+        let statement_id = prepared_write_guard.len() as u32;
+
         let make_view = !NO_VIEWS.contains(&prepared_statement);
         if prepared_statement.starts_with("SELECT") && make_view {
             let view_name = String::from("q") + &statement_id.to_string();
@@ -92,7 +162,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             // "SELECT * FROM q0 WHERE col=?", where q0 is the view name
             // assigned to the prepared statement, makes parameterizing and
             // executing prepared statement later easier.
-            let re = Regex::new(r"\s(?P<expr>[A-Za-z_0-9`]+\s*[=><]\s*)\?").unwrap();
+            let re = Regex::new(r"\s(?P<expr>[A-Za-z_0-9`\.]+\s*[=><]\s*)\?").unwrap();
             let mut view_query: Vec<String> = re
                 .captures_iter(prepared_statement)
                 .map(|caps| caps["expr"].to_string())
@@ -121,8 +191,12 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             }
 
             debug!(self.log, "Rust proxy: Prepared as: {:?}", view_query);
-            self.prepared_statements.push(view_query);
-
+            let mut index_write_guard = self.prepared_index.write().unwrap();
+            // Both the indices can now be updated safely.
+            let param_count = view_query.len() as u32;
+            prepared_write_guard
+                .insert(prepared_statement.to_string(), (statement_id, param_count));
+            index_write_guard.insert(statement_id, view_query);
             // Respond to client
             info.reply(statement_id, &params, &[])
         } else if prepared_statement.starts_with("INSERT") || !make_view {
@@ -146,7 +220,13 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             }
 
             debug!(self.log, "Rust proxy: Prepared as: {:?}", components);
-            self.prepared_statements.push(components);
+            let mut index_write_guard = self.prepared_index.write().unwrap();
+            // Now both the indices can be updated safely. Updates to both the indices have to be
+            // atomic.
+            let param_count = components.len() as u32;
+            prepared_write_guard
+                .insert(prepared_statement.to_string(), (statement_id, param_count));
+            index_write_guard.insert(statement_id, components);
 
             // Respond to client
             info.reply(statement_id, &params, &[])
@@ -166,9 +246,9 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         results: QueryResultWriter<W>,
     ) -> io::Result<()> {
         debug!(self.log, "Rust proxy: starting on_execute");
-
+        let index_read_guard = self.prepared_index.read().unwrap();
         let mut query: String = String::new();
-        let tokens = &self.prepared_statements[stmt_id as usize];
+        let tokens = &index_read_guard.get(&stmt_id).unwrap();
 
         // Add parameters passed to MySQL client to the prepared statement
         let mut i = 0;
@@ -202,7 +282,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             i += 1;
         }
         query.push_str(tokens.last().unwrap());
-
+        drop(index_read_guard);
         // Execute modified prepared statement like new query
         debug!(self.log, "Rust proxy: Executing as: {:?}", query);
         self.on_query(&query, results)
@@ -452,6 +532,8 @@ fn main() {
     })
     .expect("Error setting Ctrl-C handler");
 
+    let prepared_statements_lock = Arc::new(RwLock::new(HashMap::new()));
+    let prepared_index_lock = Arc::new(RwLock::new(HashMap::new()));
     // run listener until terminated with SIGTERM
     while !stop.load(Ordering::Relaxed) {
         while let Ok((stream, _addr)) = listener.accept() {
@@ -461,6 +543,8 @@ fn main() {
             // clone log so that each client thread has an owned copy
             let log_client = log.clone();
             let stop_clone = stop.clone();
+            let prepared_statements_clone = prepared_statements_lock.clone();
+            let prepared_index_clone = prepared_index_lock.clone();
             threads.push(std::thread::spawn(move || {
                 info!(
                     log_client,
@@ -477,7 +561,8 @@ fn main() {
                     runtime: Duration::new(0, 0),
                     log: log_client,
                     stop: stop_clone,
-                    prepared_statements: Vec::new(),
+                    prepared_statements: prepared_statements_clone,
+                    prepared_index: prepared_index_clone,
                 };
                 let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
             }));
