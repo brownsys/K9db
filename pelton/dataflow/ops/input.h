@@ -31,9 +31,7 @@ class InputOperator : public Operator {
   // amrit
   void set_name(const ViewName &name){
     std::size_t pos = name.find("_") + 1;
-    std::cout << name << " before substr\n";
     this->view_name_ = name.substr(pos);
-    std::cout << name.substr(pos) << " after substr\n";
     // this->view_name_ = name;
     // split
   }

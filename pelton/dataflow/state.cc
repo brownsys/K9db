@@ -50,7 +50,6 @@ void DataFlowState::AddFlow(const FlowName &name,
   // Map input names to this flow.
   for (const auto &[input_name, input] : flow->inputs()) {
     this->flows_per_input_table_[input_name].push_back(name);
-    std::cout << name << "df:addflow\n";
     input->set_name(name);    
   }
 
@@ -113,8 +112,6 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
 
       this->flows_.at(flow_names.at(i))->Process(table_name, std::move(copy));
     }
-
-    // std::cout << flow_names.back() << " amrit\n";
 
     // Move into last flow.
     this->flows_.at(flow_names.back())->Process(table_name, std::move(records));

@@ -38,11 +38,16 @@ bool PurposeOperator::Accept(const Record &record) const {
         if (record.IsNull(operation.left())) {                                         \
           return false;                                                   \
         }                                                                 \
-                                                                          \
-        if ( !std::regex_match(record.GetString(operation.left()), std::regex(std::get<std::string> (operation.right())) ) ) {              
-          return false;                                                       
-        }
+        
+        // if(!(record.GetString(operation.left()) == std::get<std::string>(operation.right()))){
+        //   std::cout << "failed\n";
+        //   return false;
+        // }
 
+        if(!std::regex_search(record.GetString(operation.left()), std::regex("\\b" + std::get<std::string> (operation.right()) + "\\b") )){
+          return false;
+        }
+        break;
       case Operation::IS_NULL:
         if (!record.IsNull(operation.left())) {
           return false;
