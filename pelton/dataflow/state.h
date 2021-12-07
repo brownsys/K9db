@@ -108,6 +108,9 @@ class DataFlowState {
   // DataFlow graphs and views.
   std::unordered_map<FlowName, std::unique_ptr<DataFlowGraph>> flows_;
   std::unordered_map<TableName, std::vector<FlowName>> flows_per_input_table_;
+  // Mutex that allows safe modification of dataflow's state while it is
+  // processing records.
+  mutable std::shared_mutex mtx_;
 };
 
 }  // namespace dataflow
