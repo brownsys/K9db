@@ -1,5 +1,4 @@
 extern crate mysql;
-pub extern crate chrono;
 
 pub use self::mysql::*;
 pub use self::mysql::prelude::*;
@@ -13,8 +12,21 @@ pub fn run_queries_in_str<Q:Queryable>(conn: &mut Q, file: &str) {
     }
 }
 
+pub enum Backend {
+    Pelton,
+    MySQL,
+}
+
 pub fn prepare_database(prepare_and_insert: bool) -> Conn {
-    let opts = OptsBuilder::new().tcp_port(10001);
+    prepare_backend(Backend::Pelton, prepare_and_insert)
+}
+
+pub fn prepare_backend(backend: Backend, prepare_and_insert: bool) -> Conn {
+    let opts0 = OptsBuilder::new();
+    let opts = match backend {
+        Backend::Pelton => opts0.tcp_port(10001),
+        Backend::MySQL => opts0,
+    };
     let mut c = Conn::new(opts).unwrap();
     if prepare_and_insert {
         run_queries_in_str(&mut c, SCHEMA);

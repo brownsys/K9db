@@ -5,7 +5,8 @@ authors = ["Justus Adam <dev@justus.science"]
 
 [dependencies]
 mysql = "20.1.0"
-chrono = "0.4.19"
+rand = "0.8.4"
+clap = "2.34.0"
 
 [[bin]]
 name = "accessible-documents"
@@ -14,3 +15,7 @@ path = "accessible_documents.rs"
 [[bin]]
 name = "granting-access"
 path = "granting_access.rs"
+
+[[bin]]
+name = "benchmark"
+path = "benchmark.rs"

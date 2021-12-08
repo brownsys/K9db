@@ -2,7 +2,7 @@ mod common;
 use common::*;
 
 fn main() {
-    let mut conn = prepare_database();
+    let mut conn = prepare_database(true);
 
     let share_target = "janine";
     let file_owner = "claire";
