@@ -31,12 +31,10 @@ CREATE TABLE shuup_mutaddress ( \
   region text, \
   country text, \
   tax_number text, \
-  ACCESSOR_user_id int, \
+  ACCESSOR_ANONYMIZE_user_id int, \
   PRIMARY KEY (id), \
-  FOREIGN KEY (ACCESSOR_user_id) REFERENCES auth_users(id) \
+  FOREIGN KEY (ACCESSOR_ANONYMIZE_user_id) REFERENCES auth_users(id) \
 );
-
-CREATE INDEX shuup_mutaddress_index ON shuup_mutaddress (ACCESSOR_user_id);
 
 CREATE TABLE shuup_imaddress ( \
   id int, \
@@ -56,16 +54,14 @@ CREATE TABLE shuup_imaddress ( \
   ACCESS_region text, \
   country text, \
   tax_number text, \
-  ACCESSOR_user_id int, \
+  ACCESSOR_ANONYMIZE_user_id int, \
   PRIMARY KEY (id), \
-  FOREIGN KEY (ACCESSOR_user_id) REFERENCES auth_users(id) \
+  FOREIGN KEY (ACCESSOR_ANONYMIZE_user_id) REFERENCES auth_users(id) \
 );
-
-CREATE INDEX shuup_imaddress_index ON shuup_imaddress (ACCESSOR_user_id);
 
 CREATE TABLE shuup_order ( \
   id int, \
-  ACCESSOR_customer_id int, \
+  ACCESSOR_ANONYMIZE_customer_id int, \
   shop_id int, \
   reference_number text, \
   ACCESS_phone text, \
@@ -81,7 +77,7 @@ CREATE TABLE shuup_order ( \
   billing_address_id int, \
   shipping_address_id int, \
   PRIMARY KEY (id), \
-  FOREIGN KEY (ACCESSOR_customer_id) REFERENCES auth_users(id), \
+  FOREIGN KEY (ACCESSOR_ANONYMIZE_customer_id) REFERENCES auth_users(id), \
   FOREIGN KEY (billing_address_id) REFERENCES shuup_immutableaddress(id), \
   FOREIGN KEY (shipping_address_id) REFERENCES shuup_immutableaddress(id) \
 );
@@ -91,16 +87,9 @@ INSERT INTO shuup_imaddress VALUES (1, 'prefix', 'name', 'suffix', 'name_ext', '
 INSERT INTO shuup_mutaddress VALUES (1, 'prefix', 'name', 'suffix', 'name_ext', 'company_name', '401-401-4010', 'banjy@evil.com', 'street1', 'street2', 'street3', '02912', 'providence', 'NA', 'North America', 'USA', 'tax 123', 1);
 INSERT INTO shuup_order VALUES (1, 1, 5, 'reference_number', '401-401-4010', 'banjy@evil.com', 0, 1, 0, 'cash', 100, 'USD', '2021-04-21 01:00:00', '2021-04-21 01:00:00', 1, 1);
 
-CREATE TABLE shuup_payment ( \
-  id int, \
-  order_id int, \
-  created_on datetime, \
-  gateway_id text, \
-  payment_identifier text, \
-  amount_value int, \
-  description text, \
-  PRIMARY KEY (id), \
-  FOREIGN KEY (order_id) REFERENCES shuup_order(id) \
-);
-
-
+GDPR GET auth_users 1;
+GDPR FORGET auth_users 1;
+SELECT * FROM auth_users;
+SELECT * FROM shuup_imaddress;
+SELECT * FROM shuup_mutaddress;
+SELECT * FROM shuup_order;

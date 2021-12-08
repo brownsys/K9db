@@ -96,7 +96,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
           // SELECT *
           accessor_stmt.AddColumn("*");
 
-          // LHS: ACCESSOR_doctor_id = user_id
+          // LHS: ACCESSOR_col = user_id
           std::unique_ptr<sqlast::BinaryExpression> doctor_equality =
               std::make_unique<sqlast::BinaryExpression>(
                   sqlast::Expression::Type::EQ);
@@ -105,8 +105,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
           doctor_equality->SetRight(
               std::make_unique<sqlast::LiteralExpression>(user_id));
 
-          // RHS: OWNER_patient_id in (index.value, ...)
-          // OWNER_patient_id == index.value
+          // RHS: OWNER_col in (index.value, ...)
+          // OWNER_col == index.value
           std::unique_ptr<sqlast::BinaryExpression> patient_equality =
               std::make_unique<sqlast::BinaryExpression>(
                   sqlast::Expression::Type::EQ);
@@ -144,7 +144,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
         // SELECT *
         accessor_stmt.AddColumn("*");
 
-        // LHS: ACCESSOR_doctor_id = user_id
+        // LHS: ACCESSOR_col = user_id
         std::unique_ptr<sqlast::BinaryExpression> doctor_equality =
             std::make_unique<sqlast::BinaryExpression>(
                 sqlast::Expression::Type::EQ);
@@ -166,6 +166,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       }
     }
   }
+  std::cout << "FORGET: " << is_forget << "\n" << std::flush;
 
   // anonymize when accessor deletes their data
   if (is_forget) {
@@ -190,22 +191,22 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
           for (const auto &id : ids_set) {
             sqlast::Update anonymize_stmt{accessor_table_name};
 
-            // UPDATE doctor_id = NULL WHERE doctor_id = user_id
+            // UPDATE ACCESSOR_col = ANONYMIZED WHERE ACCESSOR_ = user_id
 
-            // doctor_id = NULL
+            // ACCESSOR_col = ANONYMIZED
             std::string anonymized_value = "";
             switch (anon_col_type) {
               case sqlast::ColumnDefinition::Type::UINT:
-                anonymized_value = "0";
+                anonymized_value = "999999";
                 break;
               case sqlast::ColumnDefinition::Type::INT:
-                anonymized_value = "-1";
+                anonymized_value = "-999999";
                 break;
               case sqlast::ColumnDefinition::Type::TEXT:
-                anonymized_value = "\"NULL\"";
+                anonymized_value = "\"ANONYMIZED\"";
                 break;
               case sqlast::ColumnDefinition::Type::DATETIME:
-                anonymized_value = "\"NULL\"";
+                anonymized_value = "\"ANONYMIZED\"";
                 break;
             }
             anonymize_stmt.AddColumnValue(anon_col_name, anonymized_value);
@@ -221,7 +222,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
             // set where condition in update statement
             anonymize_stmt.SetWhereClause(std::move(where));
 
-            // execute select
+            // execute update
             MOVE_OR_RETURN(
                 sql::SqlResult res,
                 update::Shard(anonymize_stmt, state, dataflow_state));
@@ -230,24 +231,25 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
             total_count += res.UpdateCount();
           }
         } else {
+          // anonymizing update statement for non-sharded schemas
           sqlast::Update anonymize_stmt{accessor_table_name};
 
-          // UPDATE doctor_id = NULL WHERE doctor_id = user_id
+          // UPDATE ACCESS_col = ANONYMIZED WHERE ACCESS_col = user_id
 
-          // doctor_id = NULL
+          // ACCESS_col = ANONYMIZED
           std::string anonymized_value = "";
           switch (anon_col_type) {
             case sqlast::ColumnDefinition::Type::UINT:
-              anonymized_value = "0";
+              anonymized_value = "999999";
               break;
             case sqlast::ColumnDefinition::Type::INT:
-              anonymized_value = "-1";
+              anonymized_value = "-999999";
               break;
             case sqlast::ColumnDefinition::Type::TEXT:
-              anonymized_value = "\"NULL\"";
+              anonymized_value = "\"ANONYMIZED\"";
               break;
             case sqlast::ColumnDefinition::Type::DATETIME:
-              anonymized_value = "\"NULL\"";
+              anonymized_value = "\"ANONYMIZED\"";
               break;
           }
           anonymize_stmt.AddColumnValue(anon_col_name, anonymized_value);
@@ -261,7 +263,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
           // set where condition in update statement
           anonymize_stmt.SetWhereClause(std::move(where));
 
-          // execute select
+          // execute update
           MOVE_OR_RETURN(sql::SqlResult res,
                          update::Shard(anonymize_stmt, state, dataflow_state));
 
