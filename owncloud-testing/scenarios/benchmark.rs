@@ -8,6 +8,7 @@ extern crate rand;
 mod common;
 use common::*;
 use rand::Rng;
+use std::collections::HashMap;
 
 
 struct User {
@@ -19,13 +20,14 @@ struct File<'a> {
     owned_by: &'a User,
 }
 
-struct Group {
+struct Group<'a> {
     gid: String,
+    users: Vec<(usize, &'a User)>,
 }
 
 enum ShareType<'a> {
     Direct(&'a User),
-    Group(&'a Group),
+    Group(&'a Group<'a>),
 }
 
 struct Share<'a> {
@@ -34,41 +36,27 @@ struct Share<'a> {
     file: &'a File<'a>,
 }
 
-impl ToValue for Group {
+impl <'a> ToValue for Group<'a> {
     fn to_value(&self) -> Value {
         self.gid.to_value()
     }
 }
 
-impl <'a> Share<'a> {
-    fn generate_direct<'b>(users: &'b [User], files: &'b [File<'b>], num: usize) -> Vec<Share<'b>> {
-        let ref mut rng = rand::thread_rng();
-        files.iter()
-            .flat_map(|f| (0..num).zip(std::iter::repeat(f)))
-            .enumerate()
-            .map(|(id, (_, f))| 
-                Share {
-                    id,
-                    share_with: ShareType::Direct(&users[rng.gen_range(0..users.len())]),
-                    file: f
-                }
-            )
-            .collect()
-    }
-}
 
 impl <'a> InsertDB for Share<'a> {
     fn insert_db(&self, conn: &mut Conn) {
-        let (user_target, group_target) = match self.share_with {
-            ShareType::Direct(u) => (u.to_value(), Value::NULL),
-            ShareType::Group(g) => (Value::NULL, g.to_value()),
+        let (share_type, user_target, group_target) = match self.share_with {
+            ShareType::Direct(u) => (0, u.to_value(), Value::NULL),
+            ShareType::Group(g) => (1, Value::NULL, g.to_value()),
         };
         conn.exec_drop(
             "INSERT INTO oc_share 
-             VALUES (1, 0, :user_target, :group_target, :owner, :initiator, NULL, 'file', :file, '', '', 24, 0, 0, NULL, '', 1, '', 24, 19);",
+             VALUES (:share_id, :share_type, :user_target, :group_target, :owner, :initiator, NULL, 'file', :file, '', '', 24, 0, 0, NULL, '', 1, '', 24, 19);",
             params!(
+                "share_id" => self.id,
                 user_target,
                 group_target,
+                share_type,
                 "owner" => self.file.owned_by,
                 "initiator" => self.file.owned_by,
                 "file" => self.file,
@@ -77,11 +65,6 @@ impl <'a> InsertDB for Share<'a> {
     }
 }
 
-impl User {
-    fn generate(num: usize) -> Vec<Self> {
-        (0..num).map(|i| User { uid: format!("{}", i) }).collect()
-    }
-}
 
 impl ToValue for User {
     fn to_value(&self) -> Value {
@@ -102,15 +85,7 @@ impl InsertDB for User {
     }
 }
 
-impl<'a> File<'a> {
-    fn generate<'b>(users : &'b [User], num: usize) -> Vec<File<'b>>  {
-        users.iter()
-            .flat_map(|u| (0..num).zip(std::iter::repeat(u)))
-            .enumerate()
-            .map(|(id, (_, u))| File {id, owned_by: u})
-            .collect()
-    }
-}
+
 
 impl <'a> ToValue for File<'a> {
     fn to_value(&self) -> Value {
@@ -136,6 +111,77 @@ impl <'a, I:InsertDB> InsertDB for &'a I {
     }
 }
 
+impl <'a> InsertDB for Group<'a> {
+    fn insert_db(&self, conn: &mut Conn) {
+        self.users.iter().for_each(|(i, u)| {
+            conn.exec_drop("INSERT INTO oc_group_user VALUES (?, ?, ?)", (i, self, u)).unwrap()
+        });
+        conn.exec_drop("INSERT INTO oc_groups VALUES (?)", (&self.gid,)).unwrap();
+    }
+}
+
+#[derive(Hash, PartialEq ,Eq)]
+enum EntityT {
+    Group,
+    User,
+    Share,
+    UserGroupAssoc,
+    File,
+}
+
+struct GeneratorState(HashMap<EntityT, usize>);
+
+impl GeneratorState {
+    fn new() -> Self {
+        GeneratorState(HashMap::new())
+    }
+    fn new_id(&mut self, e: EntityT) -> usize {
+        *self.0.entry(e).and_modify(|i| *i += 1).or_insert(0)
+    }
+
+    fn generate_groups<'b> (&mut self, users: &'b [User], num: usize) -> Vec<Group<'b>> {
+        let ref mut rng = rand::thread_rng();
+        let mut raw_groups : Vec<_> = (0..(users.len() / num)).map(|_| Group { gid: self.new_id(EntityT::Group).to_string(), users: vec![] }).collect();
+        let grp_len = raw_groups.len();
+        users.iter().for_each(|u| raw_groups[rng.gen_range(0..grp_len)].users.push((self.new_id(EntityT::UserGroupAssoc), u)));
+        raw_groups
+    }
+    fn generate_files<'b>(&mut self, users : &'b [User], num: usize) -> Vec<File<'b>>  {
+        users.iter()
+            .flat_map(|u| (0..num).zip(std::iter::repeat(u)))
+            .map(|(_, u)| File { id: self.new_id(EntityT::File), owned_by: u})
+            .collect()
+    }
+    fn generate_users(&mut self, num: usize) -> Vec<User> {
+        (0..num).map(|_| User { uid: self.new_id(EntityT::User).to_string() }).collect()
+    }
+    fn generate_direct_shares<'b>(&mut self, users: &'b [User], files: &'b [File<'b>], num: usize) -> Vec<Share<'b>> {
+        let ref mut rng = rand::thread_rng();
+        files.iter()
+            .flat_map(|f| (0..num).zip(std::iter::repeat(f)))
+            .map(|(_, f)| 
+                Share {
+                    id: self.new_id(EntityT::Share),
+                    share_with: ShareType::Direct(&users[rng.gen_range(0..users.len())]),
+                    file: f
+                }
+            )
+            .collect()
+    }
+    fn generate_group_shares<'b>(&mut self, groups: &'b [Group], files: &'b[File<'b>], num:usize) -> Vec<Share<'b>> {
+        let ref mut rng = rand::thread_rng();
+        files.iter()
+            .flat_map(|f| (0..num).zip(std::iter::repeat(f)))
+            .map(|(_, f)| 
+                Share {
+                    id: self.new_id(EntityT::Share),
+                    share_with: ShareType::Group(&groups[rng.gen_range(0..groups.len())]),
+                    file: f
+                }
+            )
+            .collect()
+    }
+}
 
 fn main() {
 
@@ -146,6 +192,8 @@ fn main() {
                 (@arg num_users: --("num-users") +required +takes_value "Number of users (> 1)")
                 (@arg files_per_user: --("files-per-user") +takes_value "Avg files per user (>1)")
                 (@arg direct_shares_per_file: --("direct-shares-per-file") +takes_value "Avg direct shares per file")
+                (@arg group_shares_per_file: --("group-shares-per-file") +takes_value "Avg group shares per file")
+                (@arg users_per_group: --("users-per-group") +takes_value "Avg users per group")
                 (@arg backend: --backend +required +takes_value "Backend type to use")
         ).get_matches();
 
@@ -155,14 +203,20 @@ fn main() {
         other => panic!("Unexpected value for backend '{}'", other)
     }, true);
 
-    let users = User::generate(value_t_or_exit!(matches, "num_users", usize));
-    let files = File::generate(&users, value_t!(matches, "files_per_user", usize).unwrap_or(1));
-    let shares = Share::generate_direct(&users, &files, value_t!(matches, "direct_shares_per_file", usize).unwrap_or(1));
+    let mut st = GeneratorState::new();
+    let users = st.generate_users(value_t_or_exit!(matches, "num_users", usize));
+    let files = st.generate_files(&users, value_t!(matches, "files_per_user", usize).unwrap_or(1));
+    let direct_shares = st.generate_direct_shares(&users, &files, value_t!(matches, "direct_shares_per_file", usize).unwrap_or(1));
+    let groups = st.generate_groups(&users, value_t!(matches, "users_per_group", usize).unwrap_or(1));
+    let group_shares = st.generate_group_shares(&groups, &files, value_t!(matches, "group_shares_per_file", usize).unwrap_or(1));
 
     users.insert_db(conn);
-    shares.insert_db(conn);
+    direct_shares.insert_db(conn);
+    groups.insert_db(conn);
+    group_shares.insert_db(conn);
     files.insert_db(conn);
 
+    std::thread::sleep(std::time::Duration::from_millis(300));
 
     for user in users.iter() {
         let files : Vec<Row> = conn.query(

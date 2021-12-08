@@ -88,13 +88,13 @@ GROUP BY (oc_share.OWNING_item_source, oc_group_user.uid)"';
 
 -- shoudl also return s.*
 CREATE VIEW file_view AS 
-'"(SELECT s.id as sid, f.fileid, f.path, st.id AS storage_string_id, s.OWNER_share_with as share_target
+'"(SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, s.OWNER_share_with as share_target
 FROM oc_share s
 LEFT JOIN oc_filecache f ON s.file_source = f.fileid
 LEFT JOIN oc_storages st ON f.storage = st.numeric_id
 WHERE (s.share_type = 0) AND s.OWNER_share_with = ?)
 UNION
-(SELECT s.id as sid, f.fileid, f.path, st.id AS storage_string_id, oc_group_user.uid as share_target
+(SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, oc_group_user.uid as share_target
 FROM oc_share s
 LEFT JOIN oc_filecache f ON s.file_source = f.fileid
 LEFT JOIN oc_storages st ON f.storage = st.numeric_id
