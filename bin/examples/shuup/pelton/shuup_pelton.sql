@@ -38,20 +38,20 @@ CREATE TABLE shuup_mutaddress ( \
 
 CREATE TABLE shuup_imaddress ( \
   id int, \
-  ACCESS_prefix text, \
-  ACCESS_name text, \
-  ACCESS_suffix text, \
-  ACCESS_name_ext text, \
-  ACCESS_company_name text, \
-  ACCESS_phone text, \
-  ACCESS_email text, \
-  ACCESS_street text, \
-  ACCESS_street2 text, \
-  ACCESS_street3 text, \
-  ACCESS_postal_code text, \
-  ACCESS_city text, \
-  ACCESS_region_code text, \
-  ACCESS_region text, \
+  ANONYMIZE_prefix text, \
+  ANONYMIZE_name text, \
+  ANONYMIZE_suffix text, \
+  ANONYMIZE_name_ext text, \
+  ANONYMIZE_company_name text, \
+  ANONYMIZE_phone text, \
+  ANONYMIZE_email text, \
+  ANONYMIZE_street text, \
+  ANONYMIZE_street2 text, \
+  ANONYMIZE_street3 text, \
+  ANONYMIZE_postal_code text, \
+  ANONYMIZE_city text, \
+  ANONYMIZE_region_code text, \
+  ANONYMIZE_region text, \
   country text, \
   tax_number text, \
   ACCESSOR_ANONYMIZE_user_id int, \
@@ -64,8 +64,8 @@ CREATE TABLE shuup_order ( \
   ACCESSOR_ANONYMIZE_customer_id int, \
   shop_id int, \
   reference_number text, \
-  ACCESS_phone text, \
-  ACCESS_email text, \
+  ANONYMIZE_phone text, \
+  ANONYMIZE_email text, \
   deleted int, \
   payment_status int, \
   shipping_status int, \

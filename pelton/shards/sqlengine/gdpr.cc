@@ -233,9 +233,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
           // anonymizing update statement for non-sharded schemas
           sqlast::Update anonymize_stmt{accessor_table_name};
 
-          // UPDATE ACCESS_col = ANONYMIZED WHERE ACCESS_col = user_id
+          // UPDATE ANONYMIZE_col = ANONYMIZED WHERE ANONYMIZE_col = user_id
 
-          // ACCESS_col = ANONYMIZED
+          // ANONYMIZE_col = ANONYMIZED
           std::string anonymized_value = "";
           switch (anon_col_type) {
             case sqlast::ColumnDefinition::Type::UINT:

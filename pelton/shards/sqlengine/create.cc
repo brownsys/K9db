@@ -256,7 +256,7 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState *state,
         anon_cols[column_name] = columns[index].column_type();
         for (const auto &acces_col_check : stmt.GetColumns()) {
           const std::string &access_col_name = acces_col_check.column_name();
-          if (absl::StartsWith(access_col_name, "ACCESS_")) {
+          if (absl::StartsWith(access_col_name, "ANONYMIZE_")) {
             anon_cols[access_col_name] = acces_col_check.column_type();
           }
         }
