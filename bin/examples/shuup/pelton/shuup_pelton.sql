@@ -13,16 +13,59 @@ CREATE TABLE auth_users ( \
   PRIMARY KEY(id) \
 );
 
+CREATE TABLE shuup_mutaddress ( \
+  id int, \
+  prefix text, \
+  name text, \
+  suffix text, \
+  name_ext text, \
+  company_name text, \
+  phone text, \
+  email text, \
+  street text, \
+  street2 text, \
+  street3 text, \
+  postal_code text, \
+  city text, \
+  region_code text, \
+  region text, \
+  country text, \
+  tax_number text, \
+  ACCESSOR_ANONYMIZE_user_id int, \
+  PRIMARY KEY (id), \
+  FOREIGN KEY (ACCESSOR_ANONYMIZE_user_id) REFERENCES auth_users(id) \
+);
+
+CREATE TABLE shuup_imaddress ( \
+  id int, \
+  ACCESS_prefix text, \
+  ACCESS_name text, \
+  ACCESS_suffix text, \
+  ACCESS_name_ext text, \
+  ACCESS_company_name text, \
+  ACCESS_phone text, \
+  ACCESS_email text, \
+  ACCESS_street text, \
+  ACCESS_street2 text, \
+  ACCESS_street3 text, \
+  ACCESS_postal_code text, \
+  ACCESS_city text, \
+  ACCESS_region_code text, \
+  ACCESS_region text, \
+  country text, \
+  tax_number text, \
+  ACCESSOR_ANONYMIZE_user_id int, \
+  PRIMARY KEY (id), \
+  FOREIGN KEY (ACCESSOR_ANONYMIZE_user_id) REFERENCES auth_users(id) \
+);
+
 CREATE TABLE shuup_order ( \
   id int, \
-  -- TODO: customer is not actually the owner, since order data is retained in anoymized form
-  OWNER_customer_id int, \ 
+  ACCESSOR_ANONYMIZE_customer_id int, \
   shop_id int, \
   reference_number text, \
-  -- anon
-  phone text, \
-  -- anon
-  email text, \
+  ACCESS_phone text, \
+  ACCESS_email text, \
   deleted int, \
   payment_status int, \
   shipping_status int, \
@@ -31,142 +74,22 @@ CREATE TABLE shuup_order ( \
   currency text, \
   order_date datetime, \
   payment_date datetime, \
+  billing_address_id int, \
+  shipping_address_id int, \
   PRIMARY KEY (id), \
-  FOREIGN KEY (OWNER_customer_id) REFERENCES auth_users(id) \
-  -- TODO: add foreign keys into mutableaddress and immutableaddress
+  FOREIGN KEY (ACCESSOR_ANONYMIZE_customer_id) REFERENCES auth_users(id), \
+  FOREIGN KEY (billing_address_id) REFERENCES shuup_immutableaddress(id), \
+  FOREIGN KEY (shipping_address_id) REFERENCES shuup_immutableaddress(id) \
 );
 
-CREATE TABLE "shuup_order"
-             (
-                          "id"               INTEGER NOT NULL PRIMARY KEY autoincrement,
-                          "created_on"       datetime NOT NULL,
-                          "modified_on"      datetime NOT NULL,
-                          "identifier"       VARCHAR(64) NULL UNIQUE,
-                          "label"            VARCHAR(32) NOT NULL,
-                          "key"              VARCHAR(32) NOT NULL UNIQUE,
-                          "reference_number" VARCHAR(64) NULL UNIQUE,
-                          "phone"            VARCHAR(64) NOT NULL,
-                          "email"            VARCHAR(128) NOT NULL,
-                          "deleted" bool NOT NULL,
-                          "payment_status"      INTEGER NOT NULL,
-                          "shipping_status"     INTEGER NOT NULL,
-                          "payment_method_name" VARCHAR(100) NOT NULL,
-                          "payment_data" text NULL,
-                          "shipping_method_name" VARCHAR(100) NOT NULL,
-                          "shipping_data" text NULL,
-                          "extra_data" text NULL,
-                          "taxful_total_price_value"  DECIMAL NOT NULL,
-                          "taxless_total_price_value" DECIMAL NOT NULL,
-                          "currency"                  VARCHAR(4) NOT NULL,
-                          "prices_include_tax" bool NOT NULL,
-                          "display_currency"      VARCHAR(4) NOT NULL,
-                          "display_currency_rate" DECIMAL NOT NULL,
-                          "ip_address"            CHAR(39) NULL,
-                          "order_date"            datetime NOT NULL,
-                          "payment_date"          datetime NULL,
-                          "language"              VARCHAR(10) NOT NULL,
-                          "customer_comment" text NOT NULL,
-                          "admin_comment" text NOT NULL,
-                          "require_verification" bool NOT NULL,
-                          "all_verified" bool NOT NULL,
-                          "marketing_permission" bool NOT NULL,
-                          "_codes" text NULL,
-                          "billing_address_id"  INTEGER NULL REFERENCES "shuup_immutableaddress" ("id") deferrable initially deferred,
-                          "creator_id"          INTEGER NULL REFERENCES "auth_user" ("id") deferrable initially deferred,
-                          "customer_id"         INTEGER NULL REFERENCES "shuup_contact" ("id") deferrable initially deferred,
-                          "modified_by_id"      INTEGER NULL REFERENCES "auth_user" ("id") deferrable initially deferred,
-                          "payment_method_id"   INTEGER NULL REFERENCES "shuup_paymentmethod" ("id") deferrable initially deferred,
-                          "shipping_address_id" INTEGER NULL REFERENCES "shuup_immutableaddress" ("id") deferrable initially deferred,
-                          "shipping_method_id"  INTEGER NULL REFERENCES "shuup_shippingmethod" ("id") deferrable initially deferred,
-                          "shop_id"             INTEGER NOT NULL REFERENCES "shuup_shop" ("id") deferrable initially deferred,
-                          "status_id"           INTEGER NOT NULL REFERENCES "shuup_orderstatus" ("id") deferrable initially deferred,
-                          "orderer_id"          INTEGER NULL REFERENCES "shuup_personcontact" ("contact_ptr_id") deferrable initially deferred,
-                          "account_manager_id"  INTEGER NULL REFERENCES "shuup_personcontact" ("contact_ptr_id") deferrable initially deferred,
-                          "tax_group_id"        INTEGER NULL REFERENCES "shuup_customertaxgroup" ("id") deferrable initially deferred,
-                          "tax_number"          VARCHAR(64) NOT NULL
-             )
+INSERT INTO auth_users VALUES (1, 'password', '2021-04-21 01:00:00', 0, 'user1', 'banjy', 'banjy@evil.com', 0, 1, '2021-04-21 01:00:00', 'evil');
+INSERT INTO shuup_imaddress VALUES (1, 'prefix', 'name', 'suffix', 'name_ext', 'company_name', '401-401-4010', 'banjy@evil.com', 'street1', 'street2', 'street3', '02912', 'providence', 'NA', 'North America', 'USA', 'tax 123', 1);
+INSERT INTO shuup_mutaddress VALUES (1, 'prefix', 'name', 'suffix', 'name_ext', 'company_name', '401-401-4010', 'banjy@evil.com', 'street1', 'street2', 'street3', '02912', 'providence', 'NA', 'North America', 'USA', 'tax 123', 1);
+INSERT INTO shuup_order VALUES (1, 1, 5, 'reference_number', '401-401-4010', 'banjy@evil.com', 0, 1, 0, 'cash', 100, 'USD', '2021-04-21 01:00:00', '2021-04-21 01:00:00', 1, 1);
 
--- note: only open orders are anonymized in the mutableaddress table. Previous orders are retained
--- in clear text form
-CREATE TABLE "shuup_mutableaddress"
-             (
-                          "id"           INTEGER NOT NULL PRIMARY KEY autoincrement,
-                          -- anon
-                          "prefix"       VARCHAR(64) NOT NULL,
-                          -- anon
-                          "name"         VARCHAR(255) NOT NULL,
-                          -- anon
-                          "suffix"       VARCHAR(64) NOT NULL,
-                          -- anon
-                          "name_ext"     VARCHAR(255) NOT NULL,
-                          -- anon
-                          "company_name" VARCHAR(255) NOT NULL,
-                          -- anon
-                          "phone"        VARCHAR(64) NOT NULL,
-                          -- anon
-                          "email"        VARCHAR(128) NOT NULL,
-                          -- anon
-                          "street"       VARCHAR(255) NOT NULL,
-                          -- anon
-                          "street2"      VARCHAR(255) NOT NULL,
-                          -- anon
-                          "street3"      VARCHAR(255) NOT NULL,
-                          -- anon
-                          "postal_code"  VARCHAR(64) NOT NULL,
-                          -- anon
-                          "city"         VARCHAR(255) NOT NULL,
-                          -- anon
-                          "region_code"  VARCHAR(64) NOT NULL,
-                          -- anon
-                          "region"       VARCHAR(64) NOT NULL,
-                          -- NOT anon
-                          "country"      VARCHAR(2) NOT NULL,
-                          -- anon
-                          "longitude"    DECIMAL NULL,
-                          -- anon
-                          "latitude"     DECIMAL NULL,
-                          -- NOT anon
-                          "tax_number"   VARCHAR(64) NOT NULL
-             )
-
-
-CREATE TABLE "shuup_immutableaddress"
-             (
-                          "id"           INTEGER NOT NULL PRIMARY KEY autoincrement,
-                          -- anon
-                          "prefix"       VARCHAR(64) NOT NULL,
-                          -- anon
-                          "name"         VARCHAR(255) NOT NULL,
-                          -- anon
-                          "suffix"       VARCHAR(64) NOT NULL,
-                          -- anon
-                          "name_ext"     VARCHAR(255) NOT NULL,
-                          -- anon
-                          "company_name" VARCHAR(255) NOT NULL,
-                          -- anon
-                          "phone"        VARCHAR(64) NOT NULL,
-                          -- anon
-                          "email"        VARCHAR(128) NOT NULL,
-                          -- anon
-                          "street"       VARCHAR(255) NOT NULL,
-                          -- anon
-                          "street2"      VARCHAR(255) NOT NULL,
-                          -- anon
-                          "street3"      VARCHAR(255) NOT NULL,
-                          -- anon
-                          "postal_code"  VARCHAR(64) NOT NULL,
-                          -- anon
-                          "city"         VARCHAR(255) NOT NULL,
-                          -- anon
-                          "region_code"  VARCHAR(64) NOT NULL,
-                          -- anon
-                          "region"       VARCHAR(64) NOT NULL,
-                          -- NOT anon
-                          "country"      VARCHAR(2) NOT NULL,
-                          -- anon
-                          "longitude"    DECIMAL NULL,
-                          -- anon
-                          "latitude"     DECIMAL NULL,
-                          -- NOT anon
-                          "tax_number"   VARCHAR(64) NOT NULL
-             )
+GDPR GET auth_users 1;
+GDPR FORGET auth_users 1;
+SELECT * FROM auth_users;
+SELECT * FROM shuup_imaddress;
+SELECT * FROM shuup_mutaddress;
+SELECT * FROM shuup_order;

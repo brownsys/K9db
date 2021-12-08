@@ -58,12 +58,14 @@ void SharderState::AddShardedTable(
 void SharderState::AddAccessorIndex(
     const ShardKind &kind, const UnshardedTableName &table,
     const ColumnName &accessor_column, const ColumnName &shard_by_column,
-    const IndexName &index_name, const bool &anonymize,
-    const sqlast::ColumnDefinition::Type &anonymize_type) {
+    const IndexName &index_name,
+    const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
+        &anonymize,
+    const bool is_sharded) {
   // Create an AccessorIndexInformation
   AccessorIndexInformation accessor_information{
       kind,       table,     accessor_column, shard_by_column,
-      index_name, anonymize, anonymize_type};
+      index_name, anonymize, is_sharded};
   this->accessor_index_[kind].push_back(accessor_information);
 }
 

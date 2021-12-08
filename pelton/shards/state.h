@@ -64,11 +64,13 @@ class SharderState {
                        const ShardingInformation &sharding_information,
                        const sqlast::CreateTable &sharded_create_statement);
 
-  void AddAccessorIndex(const ShardKind &kind, const UnshardedTableName &table,
-                        const ColumnName &accessor_column,
-                        const ColumnName &shard_by_column,
-                        const IndexName &index_name, const bool &anonymize,
-                        const sqlast::ColumnDefinition::Type &anonymize_type);
+  void AddAccessorIndex(
+      const ShardKind &kind, const UnshardedTableName &table,
+      const ColumnName &accessor_column, const ColumnName &shard_by_column,
+      const IndexName &index_name,
+      const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
+          &anonymize,
+      const bool is_sharded);
 
   std::list<const sqlast::AbstractStatement *> CreateShard(
       const ShardKind &shard_kind, const UserId &user);
