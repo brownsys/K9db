@@ -166,7 +166,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       }
     }
   }
-  std::cout << "FORGET: " << is_forget << "\n" << std::flush;
 
   // anonymize when accessor deletes their data
   if (is_forget) {
