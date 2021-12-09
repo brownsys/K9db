@@ -87,9 +87,6 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
     // Case 7: CREATE INDEX statement.
     case sqlast::AbstractStatement::Type::CREATE_INDEX: {
       auto *stmt = static_cast<sqlast::CreateIndex *>(statement.get());
-      std::cout << "CREATE INDEX NAME " << stmt->index_name() << std::endl;
-      std::cout << "CREATE INDEX COLUMN " << stmt->column_name() << std::endl;
-      std::cout << "CREATE INDEX TABLE " << stmt->table_name() << std::endl;
       return index::CreateIndex(*stmt, state, dataflow_state);
     }
 

@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -72,9 +73,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
     }
   }
 
-  if (!is_forget) {
+  if (!is_forget && state->HasAccessorIndices(shard_kind)) {
     // Get all accessor indices that belong to this shard type
-    std::vector<AccessorIndexInformation> accessor_indices =
+    const std::vector<AccessorIndexInformation> &accessor_indices =
         state->GetAccessorIndices(shard_kind);
 
     for (auto &accessor_index : accessor_indices) {
@@ -168,9 +169,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
   }
 
   // anonymize when accessor deletes their data
-  if (is_forget) {
+  if (is_forget && state->HasAccessorIndices(shard_kind)) {
     // Get all accessor indices that belong to this shard type
-    std::vector<AccessorIndexInformation> accessor_indices =
+    const std::vector<AccessorIndexInformation> &accessor_indices =
         state->GetAccessorIndices(shard_kind);
 
     for (auto &accessor_index : accessor_indices) {

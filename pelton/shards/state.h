@@ -124,7 +124,8 @@ class SharderState {
   void Load(const std::string &dir_path);
 
   // Returns all accessor indices associated with a given shard
-  const std::vector<AccessorIndexInformation> GetAccessorIndices(
+  bool HasAccessorIndices(const ShardKind &kind) const;
+  const std::vector<AccessorIndexInformation> &GetAccessorIndices(
       const ShardKind &kind) const;
 
   size_t NumShards() {
