@@ -87,7 +87,7 @@ FFIConnection FFIOpen(const char *db_name, const char *db_username,
 // Delete pelton_state. Returns true if successful and false otherwise.
 bool FFIShutdown() {
   LOG(INFO) << "C-Wrapper: Closing global connection";
-  bool response = pelton::shutdown(true);
+  bool response = pelton::shutdown();
   if (response) {
     LOG(INFO) << "C-Wrapper: global connection closed";
     return true;

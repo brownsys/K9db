@@ -112,6 +112,7 @@ ADD docker/configure_db.sh /home/configure_db.sh
 RUN chmod 750 /home/configure_db.sh
 
 RUN useradd memcached
+RUN mkdir -p /tmp/rocksdb
 
 ENTRYPOINT ["/bin/bash", "./home/configure_db.sh"]
 

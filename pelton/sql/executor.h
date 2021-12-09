@@ -44,6 +44,9 @@ class PeltonExecutor {
     }
   }
 
+  // For singleton connections.
+  static void CloseAll();
+
   // Execute statement against the default un-sharded database.
   SqlResult Default(const sqlast::AbstractStatement *sql,
                     const dataflow::SchemaRef &schema = {});

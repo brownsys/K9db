@@ -67,8 +67,7 @@ std::optional<SqlResult> SpecialStatements(const std::string &sql,
 bool initialize(size_t workers, bool consistent) {
   // if already open
   if (PELTON_STATE != nullptr) {
-    // close without shutting down planner
-    shutdown(false);
+    return false;
   }
   PELTON_STATE = new State(workers, consistent);
   return true;
@@ -107,17 +106,14 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
 
 void shutdown_planner() { planner::ShutdownPlanner(); }
 
-bool shutdown(bool shutdown_planner) {
-  if (PELTON_STATE == nullptr) {
+bool shutdown() {
+  if (PELTON_STATE != nullptr) {
+    shutdown_planner();
+    delete PELTON_STATE;
+    PELTON_STATE = nullptr;
     return true;
   }
-  if (shutdown_planner) {
-    planner::ShutdownPlanner();
-  }
-  PELTON_STATE->dataflow_state()->Shutdown();
-  delete PELTON_STATE;
-  PELTON_STATE = nullptr;
-  return true;
+  return false;
 }
 
 }  // namespace pelton

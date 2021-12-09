@@ -20,6 +20,7 @@ rust_binary(
         "-Clink-args=-lcrypto",
         "-Clink-args=-lmariadbcpp",
         "-Clink-args=-rdynamic",
+        "-Clink-args=-lrocksdb",
         "-Clink-args=-Wl,-export-dynamic",
     ] + select({
         ":asan": [
@@ -42,6 +43,7 @@ rust_binary(
         "//mysql_proxy:slog",
         "//mysql_proxy:slog_term",
         "//mysql_proxy/src/ffi",
+        "@rocksdb",
     ],
 )
 

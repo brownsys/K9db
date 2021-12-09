@@ -25,7 +25,7 @@ using Record = dataflow::Record;
 bool initialize(size_t workers, bool consistent);
 
 // delete pelton_state
-bool shutdown(bool shutdown_planner = true);
+bool shutdown();
 
 // open connection
 bool open(Connection *connection, const std::string &db_name,

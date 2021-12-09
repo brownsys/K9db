@@ -22,6 +22,11 @@ class State {
   State(const State &&) = delete;
   State &operator=(const State &&) = delete;
 
+  ~State() {
+    this->dataflow_state_.Shutdown();
+    sql::PeltonExecutor::CloseAll();
+  }
+
   // Getters.
   shards::SharderState *sharder_state() { return &this->sharder_state_; }
   dataflow::DataFlowState *dataflow_state() { return &this->dataflow_state_; }

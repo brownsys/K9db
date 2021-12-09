@@ -406,7 +406,8 @@ cmake(
     out_static_libs = ["librocksdb.a"],
     deps = [
         "@com_github_gflags_gflags//:gflags",
-    ]
+    ],
+    visibility = ["//visibility:public"],
 )
 """,
     commit = "e637dca20e06f7347d0fe7aefca8f3619604ebe3",

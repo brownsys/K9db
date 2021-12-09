@@ -23,14 +23,19 @@ SqlResult PeltonExecutor::EmptyResult(const sqlast::AbstractStatement *sql,
     case sqlast::AbstractStatement::Type::CREATE_INDEX:
       return SqlResult(true);
     // 0 rows are updated.
-    case sqlast::AbstractStatement::Type::INSERT:
     case sqlast::AbstractStatement::Type::UPDATE:
       return SqlResult(static_cast<int>(0));
-    // Delete is usually an update but might have a "returning" component.
-    case sqlast::AbstractStatement::Type::DELETE:
-      if (!static_cast<const sqlast::Delete *>(sql)->returning()) {
-        return SqlResult(static_cast<int>(0));
+    // Insert/Delete are usually updates but might have a "returning" component.
+    case sqlast::AbstractStatement::Type::INSERT:
+      if (static_cast<const sqlast::Insert *>(sql)->returning()) {
+        return SqlResult(schema);
       }
+      return SqlResult(static_cast<int>(0));
+    case sqlast::AbstractStatement::Type::DELETE:
+      if (static_cast<const sqlast::Delete *>(sql)->returning()) {
+        return SqlResult(schema);
+      }
+      return SqlResult(static_cast<int>(0));
     // Empty result set.
     case sqlast::AbstractStatement::Type::SELECT:
       return SqlResult(schema);
@@ -46,8 +51,7 @@ void PeltonExecutor::Initialize(const std::string &db_name,
                                 const std::string &username,
                                 const std::string &password) {
   std::string path = "/tmp/pelton_rocks_db";
-  this->connection_ =
-      std::make_unique<RocksdbConnection>(path, db_name, username, password);
+  this->connection_ = std::make_unique<RocksdbConnection>(path);
 }
 
 // Execution of SQL statements.
@@ -116,35 +120,45 @@ SqlResult PeltonExecutor::Execute(const sqlast::AbstractStatement *stmt,
       return SqlResult(this->connection_->ExecuteStatement(stmt));
 
     // Updates: return a count of rows affected.
-    case sqlast::AbstractStatement::Type::INSERT:
     case sqlast::AbstractStatement::Type::UPDATE:
       return SqlResult(this->connection_->ExecuteUpdate(stmt));
 
-    // A returning delete is a query, a non returning delete is an update.
+    // Insert and Delete might be returning.
+    case sqlast::AbstractStatement::Type::INSERT:
+      if (!static_cast<const sqlast::Insert *>(stmt)->returning()) {
+        return SqlResult(this->connection_->ExecuteUpdate(stmt));
+      }
+      break;
     case sqlast::AbstractStatement::Type::DELETE:
       if (!static_cast<const sqlast::Delete *>(stmt)->returning()) {
         return SqlResult(this->connection_->ExecuteUpdate(stmt));
       }
-      // No break, next case is executed.
+      break;
 
     // Queries: return a (lazy) result set of records.
     case sqlast::AbstractStatement::Type::SELECT: {
-      // Set up augmentation information to augment any sharding columns to the
-      // result set.
-      std::vector<AugInfo> aug_info;
-      if (aug_index > __NO_AUG) {
-        aug_info.push_back({static_cast<size_t>(aug_index), aug_value});
-      }
-      // Create a result set for output.
-      std::vector<dataflow::Record> records =
-          this->connection_->ExecuteQuery(stmt, schema, aug_info);
-      return SqlResult(SqlResultSet(schema, std::move(records)));
+      break;
     }
 
     default:
       LOG(FATAL) << "Unsupported SQL statement in PeltonExecutor";
   }
+
+  // Must be a query (or a returning INSERT/DELETE).
+  // Set up augmentation information to augment any sharding columns to the
+  // result set.
+  std::vector<AugInfo> aug_info;
+  if (aug_index > __NO_AUG) {
+    aug_info.push_back({static_cast<size_t>(aug_index), aug_value});
+  }
+  // Create a result set for output.
+  std::vector<dataflow::Record> records =
+      this->connection_->ExecuteQuery(stmt, schema, aug_info);
+  return SqlResult(SqlResultSet(schema, std::move(records)));
 }
+
+// Close any open singletons.
+void PeltonExecutor::CloseAll() { RocksdbConnection::CloseAll(); }
 
 }  // namespace sql
 }  // namespace pelton

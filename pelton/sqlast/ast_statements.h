@@ -48,6 +48,7 @@ class Insert : public AbstractStatement {
 
   absl::StatusOr<std::string> RemoveValue(const std::string &colname);
   std::string RemoveValue(size_t index);
+  int GetColumnIndex(const std::string &colname) const;
   absl::StatusOr<std::string> GetValue(const std::string &colname) const;
   const std::string &GetValue(size_t index) const;
 
@@ -247,6 +248,7 @@ class Update : public AbstractStatement {
   void AddColumnValue(const std::string &column, const std::string &value);
   absl::StatusOr<std::string> RemoveColumnValue(const std::string &column);
   bool AssignsTo(const std::string &column) const;
+  int ValueIndex(const std::string &column) const;
 
   const std::vector<std::string> &GetColumns() const;
   std::vector<std::string> &GetColumns();

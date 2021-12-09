@@ -63,6 +63,15 @@ std::string Insert::RemoveValue(size_t index) {
   return result;
 }
 
+int Insert::GetColumnIndex(const std::string &colname) const {
+  for (size_t i = 0; i < this->columns_.size(); i++) {
+    if (this->columns_.at(i) == colname) {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
+}
+
 absl::StatusOr<std::string> Insert::GetValue(const std::string &colname) const {
   if (this->columns_.size() > 0) {
     auto it = std::find(this->columns_.begin(), this->columns_.end(), colname);
@@ -105,6 +114,14 @@ absl::StatusOr<std::string> Update::RemoveColumnValue(
 bool Update::AssignsTo(const std::string &column) const {
   return std::find(this->columns_.begin(), this->columns_.end(), column) !=
          this->columns_.end();
+}
+int Update::ValueIndex(const std::string &column) const {
+  for (size_t i = 0; i < this->columns_.size(); i++) {
+    if (this->columns_.at(i) == column) {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
 }
 
 const std::vector<std::string> &Update::GetColumns() const {
