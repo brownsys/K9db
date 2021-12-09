@@ -123,11 +123,14 @@ void DataFlowState::PrintSizeInMemory() const {
   uint64_t total_size = 0;
   for (const auto &[fname, flow] : this->flows_) {
     uint64_t flow_size = flow->SizeInMemory();
-    uint64_t flow_size_mb = flow_size / 1024 / 1024;
-    std::cout << fname << ": " << flow_size_mb << "MB" << std::endl;
+    // uint64_t flow_size_mb = flow_size / 1024 / 1024;
+    uint64_t flow_size_mb = flow_size / 1024;
+    std::cout << fname << ": " << flow_size_mb << "KB" << std::endl;
     total_size += flow_size;
   }
-  std::cout << "Total size: " << (total_size / 1204 / 1024) << "MB"
+  // std::cout << "Total size: " << (total_size / 1204 / 1024) << "MB"
+  //           << std::endl;
+  std::cout << "Total size: " << (total_size / 1024 ) << "KB"
             << std::endl;
 }
 

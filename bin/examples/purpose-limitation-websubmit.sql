@@ -68,26 +68,15 @@ INSERT INTO grades VALUES (1, 1, 100, 1, 'avg_grade_per_student, avg_grade_per_a
 -- INSERT INTO grades VALUES (1, 1, 100, 1, 'avg_grade_per_assignment');
 INSERT INTO grades VALUES (2, 1, 50, 2, 'avg_grade_per_assignment');
 -- INSERT INTO grades VALUES (3, 2, 77, 1, 'avg_grade_per_student, avg_grade_per_assignment');
--- INSERT INTO grades VALUES (3, 2, 77, 1, 'avg_grade_per_assignment');
-
--- SELECT * FROM assignments;
--- SELECT * FROM students;
--- SELECT * FROM submissions;
--- SELECT * FROM submissions WHERE assignment_id = 1;
--- SELECT * FROM submissions WHERE student_id = 1;
--- SELECT * FROM submissions WHERE student_id = 1 AND assignment_id = 2;
--- SELECT * FROM grades;
--- SELECT * FROM grades WHERE student_id = 1;
-
--- GDPR GET students 1;
--- GDPR FORGET students 1;
-
--- SELECT * FROM submissions;
-
--- UPDATE submissions SET timestamp = 20 WHERE student_id = 2 AND assignment_id = 1;
--- UPDATE submissions SET timestamp = 30 WHERE assignment_id = 2;
--- SELECT * FROM submissions;
-
+-- INSERT INTO grades VALUES (3, 2, 77, 1, 'avg_grade_per _assignment');
 
 SELECT * FROM v1_avg_grade_per_student;
 SELECT * FROM v2_avg_grade_per_assignment;
+
+-- UPDATE grades SET gdpr_purpose = '' WHERE ID = 2;
+DELETE FROM grades where ID = 2;
+-- VALUES (2, 1, 50, 2, 'avg_grade_per_assignment');
+
+SELECT * FROM v1_avg_grade_per_student;
+SELECT * FROM v2_avg_grade_per_assignment;
+
