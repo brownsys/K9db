@@ -205,6 +205,7 @@ fn main() {
                 (@arg users_per_group: --("users-per-group") +takes_value "Avg users per group")
                 (@arg backend: --backend +required +takes_value "Backend type to use")
                 (@arg num_samples: --samples +required +takes_value "Number of samples to time")
+                (@arg nump_db: --("dump-db-after") "Dump the entire mysql database after")
         ).get_matches();
 
     let ref mut conn = prepare_backend(match matches.value_of("backend").expect("backend argument is required") {
@@ -228,7 +229,6 @@ fn main() {
 
     std::thread::sleep(std::time::Duration::from_millis(300));
 
-    // Add number of samples to parameters
     let mut rng = rand::thread_rng();
     let ulen = users.len(); 
     let samples = std::iter::repeat_with(|| &users[rng.gen_range(0..ulen)]).take(value_t_or_exit!(matches, "num_samples", usize)).collect::<Vec<_>>();
@@ -242,19 +242,31 @@ fn main() {
     println!("Finished lookups in {} milliseconds", time.as_millis());
 
 
-    if false {
-    std::thread::sleep(std::time::Duration::from_millis(300));
-    println!("Dumping database");
+    if matches.is_present("dump_db") {
+        use std::collections::HashSet;
+        println!("Dumping database");
 
-    let mut conn = Conn::new(OptsBuilder::new().db_name(Some("pelton")).user(Some("root")).pass(Some("password"))).unwrap();
-    for (tab2,) in conn.query("show tables;").unwrap() {
-        use std::process::Command;
-        use std::io::Write;
-        let tab : String = tab2;
-        println!("TABLE {}", tab);
-        std::io::stdout().write_all(
-            &Command::new("mysql").args(["-u", "root", "--password=password", "-B", "pelton", "-e", &format!("SELECT * FROM {};", tab)]).output().unwrap().stdout,
-        ).unwrap();
+        let mut conn = Conn::new(OptsBuilder::new().db_name(Some("pelton")).user(Some("root")).pass(Some("password"))).unwrap();
+        let tables : Vec<String> = conn.query("show tables;").unwrap();
+        let (user_hashes, mut table_names) : (HashSet<_>, HashSet<_>) = tables.iter().filter_map(|s| s.find('_').map(|i| (&s[..i], &s[(i + 1)..]))).unzip();
+        let username_marker_exists = table_names.remove("username_marker");
+        for user_hash in user_hashes.iter() {
+            let user = if username_marker_exists {
+                conn.query_first(format!("SELECT * FROM {}_username_marker;", user_hash)).unwrap().expect("Empty username marker table")
+            } else {
+                user_hash.to_string()
+            };
+            println!("μDB for {}", user);
+            for tab in table_names.iter() {
+                if tab == &"username_marker" { continue; }
+                use std::process::Command;
+                use std::io::Write;
+                println!("TABLE {}", tab);
+                std::io::stdout().write_all(
+                    &Command::new("mysql").args(["-u", "root", "--password=password", "-B", "pelton", "-e", &format!("SELECT * FROM {}_{};", user_hash, tab)]).output().unwrap().stdout,
+                ).unwrap();
+            }
+            println!("");
+        }
     }
-}
 }
