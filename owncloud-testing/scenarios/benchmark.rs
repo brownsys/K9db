@@ -141,25 +141,34 @@ impl GeneratorState {
 
     fn generate_groups<'b> (&mut self, users: &'b [User], num: usize) -> Vec<Group<'b>> {
         let ref mut rng = rand::thread_rng();
-        let mut raw_groups : Vec<_> = (0..(users.len() / num)).map(|_| Group { gid: self.new_id(EntityT::Group).to_string(), users: vec![] }).collect();
+        let mut raw_groups : Vec<_> = 
+                std::iter::repeat_with(||
+                    Group { 
+                        gid: self.new_id(EntityT::Group).to_string(), 
+                        users: vec![] 
+                    })
+                .take(users.len() / num)
+                .collect();
         let grp_len = raw_groups.len();
-        users.iter().for_each(|u| raw_groups[rng.gen_range(0..grp_len)].users.push((self.new_id(EntityT::UserGroupAssoc), u)));
+        users.iter().for_each(|u| 
+            raw_groups[rng.gen_range(0..grp_len)].users.push((self.new_id(EntityT::UserGroupAssoc), u))
+        );
         raw_groups
     }
     fn generate_files<'b>(&mut self, users : &'b [User], num: usize) -> Vec<File<'b>>  {
         users.iter()
-            .flat_map(|u| (0..num).zip(std::iter::repeat(u)))
-            .map(|(_, u)| File { id: self.new_id(EntityT::File), owned_by: u})
+            .flat_map(|u| std::iter::repeat(u).take(num))
+            .map(|u| File { id: self.new_id(EntityT::File), owned_by: u})
             .collect()
     }
     fn generate_users(&mut self, num: usize) -> Vec<User> {
-        (0..num).map(|_| User { uid: self.new_id(EntityT::User).to_string() }).collect()
+        std::iter::repeat_with(|| User { uid: self.new_id(EntityT::User).to_string() }).take(num).collect()
     }
     fn generate_direct_shares<'b>(&mut self, users: &'b [User], files: &'b [File<'b>], num: usize) -> Vec<Share<'b>> {
         let ref mut rng = rand::thread_rng();
         files.iter()
-            .flat_map(|f| (0..num).zip(std::iter::repeat(f)))
-            .map(|(_, f)| 
+            .flat_map(|f| std::iter::repeat(f).take(num))
+            .map(|f|
                 Share {
                     id: self.new_id(EntityT::Share),
                     share_with: ShareType::Direct(&users[rng.gen_range(0..users.len())]),
@@ -168,11 +177,11 @@ impl GeneratorState {
             )
             .collect()
     }
-    fn generate_group_shares<'b>(&mut self, groups: &'b [Group], files: &'b[File<'b>], num:usize) -> Vec<Share<'b>> {
+    fn generate_group_shares<'b>(&mut self, groups: &'b [Group], files: &'b[File<'b>], num: usize) -> Vec<Share<'b>> {
         let ref mut rng = rand::thread_rng();
         files.iter()
-            .flat_map(|f| (0..num).zip(std::iter::repeat(f)))
-            .map(|(_, f)| 
+            .flat_map(|f| std::iter::repeat(f).take(num))
+            .map(|f| 
                 Share {
                     id: self.new_id(EntityT::Share),
                     share_with: ShareType::Group(&groups[rng.gen_range(0..groups.len())]),
@@ -184,7 +193,7 @@ impl GeneratorState {
 }
 
 fn main() {
-
+    // Add distributions later
     let matches = 
             clap_app!((crate_name!()) => 
                 (version: (crate_version!()))
@@ -195,6 +204,7 @@ fn main() {
                 (@arg group_shares_per_file: --("group-shares-per-file") +takes_value "Avg group shares per file")
                 (@arg users_per_group: --("users-per-group") +takes_value "Avg users per group")
                 (@arg backend: --backend +required +takes_value "Backend type to use")
+                (@arg num_samples: --samples +required +takes_value "Number of samples to time")
         ).get_matches();
 
     let ref mut conn = prepare_backend(match matches.value_of("backend").expect("backend argument is required") {
@@ -218,15 +228,18 @@ fn main() {
 
     std::thread::sleep(std::time::Duration::from_millis(300));
 
-    for user in users.iter() {
-        let files : Vec<Row> = conn.query(
+    // Add number of samples to parameters
+    let mut rng = rand::thread_rng();
+    let ulen = users.len(); 
+    let samples = std::iter::repeat_with(|| &users[rng.gen_range(0..ulen)]).take(value_t_or_exit!(matches, "num_samples", usize)).collect::<Vec<_>>();
+    let now = std::time::Instant::now();
+    let results : Vec<Vec<Row>> = samples.iter().map(|user| {
+        conn.query(
             format!("SELECT * FROM file_view WHERE share_target = '{}'", user.uid)
-        ).unwrap();
-        println!("Files shared with user {}", user.uid);
-        for row in files {
-            println!("{:?}", row);
-        }
-    }
+        ).unwrap()
+    }).collect();
+    let time = now.elapsed();
+    println!("Finished lookups in {} milliseconds", time.as_millis());
 
 
     if false {
