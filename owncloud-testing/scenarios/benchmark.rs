@@ -243,30 +243,6 @@ fn main() {
 
 
     if matches.is_present("dump_db") {
-        use std::collections::HashSet;
-        println!("Dumping database");
-
-        let mut conn = Conn::new(OptsBuilder::new().db_name(Some("pelton")).user(Some("root")).pass(Some("password"))).unwrap();
-        let tables : Vec<String> = conn.query("show tables;").unwrap();
-        let (user_hashes, mut table_names) : (HashSet<_>, HashSet<_>) = tables.iter().filter_map(|s| s.find('_').map(|i| (&s[..i], &s[(i + 1)..]))).unzip();
-        let username_marker_exists = table_names.remove("username_marker");
-        for user_hash in user_hashes.iter() {
-            let user = if username_marker_exists {
-                conn.query_first(format!("SELECT * FROM {}_username_marker;", user_hash)).unwrap().expect("Empty username marker table")
-            } else {
-                user_hash.to_string()
-            };
-            println!("μDB for {}", user);
-            for tab in table_names.iter() {
-                if tab == &"username_marker" { continue; }
-                use std::process::Command;
-                use std::io::Write;
-                println!("TABLE {}", tab);
-                std::io::stdout().write_all(
-                    &Command::new("mysql").args(["-u", "root", "--password=password", "-B", "pelton", "-e", &format!("SELECT * FROM {}_{};", user_hash, tab)]).output().unwrap().stdout,
-                ).unwrap();
-            }
-            println!("");
-        }
+        pp_pelton_database()
     }
 }

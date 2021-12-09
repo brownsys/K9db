@@ -49,20 +49,5 @@ fn main() {
         println!("Found share {:?}", row);
     }
 
-
-    if false {
-    std::thread::sleep(std::time::Duration::from_millis(300));
-    println!("Dumping database");
-
-    let mut conn = Conn::new(OptsBuilder::new().db_name(Some("pelton")).user(Some("root")).pass(Some("password"))).unwrap();
-    for (tab2,) in conn.query("show tables;").unwrap() {
-        use std::process::Command;
-        use std::io::Write;
-        let tab : String = tab2;
-        println!("TABLE {}", tab);
-        std::io::stdout().write_all(
-            &Command::new("mysql").args(["-u", "root", "--password=password", "-B", "pelton", "-e", &format!("SELECT * FROM {};", tab)]).output().unwrap().stdout,
-        ).unwrap();
-    }
-}
+    pp_pelton_database()
 }
