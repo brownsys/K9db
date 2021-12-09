@@ -49,7 +49,8 @@ class SharderState {
 
   // Schema manipulations.
   void AddSchema(const UnshardedTableName &table_name,
-                 const sqlast::CreateTable &table_schema);
+                 const sqlast::CreateTable &table_schema, int pk_index,
+                 const std::string &pk);
 
   void AddShardKind(const ShardKind &kind, const ColumnName &pk);
 
@@ -60,6 +61,14 @@ class SharderState {
                        const ShardingInformation &sharding_information,
                        const sqlast::CreateTable &sharded_create_statement);
 
+  void AddAccessorIndex(
+      const ShardKind &kind, const UnshardedTableName &table,
+      const ColumnName &accessor_column, const ColumnName &shard_by_column,
+      const IndexName &index_name,
+      const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
+          &anonymize,
+      const bool is_sharded);
+
   std::list<const sqlast::AbstractStatement *> CreateShard(
       const ShardKind &shard_kind, const UserId &user);
 
@@ -69,6 +78,9 @@ class SharderState {
 
   // Schema lookups.
   const sqlast::CreateTable &GetSchema(
+      const UnshardedTableName &table_name) const;
+
+  const std::pair<int, std::string> &GetPk(
       const UnshardedTableName &table_name) const;
 
   bool Exists(const UnshardedTableName &table) const;
@@ -116,6 +128,19 @@ class SharderState {
 
   sql::SqlResult NumShards() const;
 
+  // Returns all accessor indices associated with a given shard
+  bool HasAccessorIndices(const ShardKind &kind) const;
+  const std::vector<AccessorIndexInformation> &GetAccessorIndices(
+      const ShardKind &kind) const;
+
+  size_t NumShards() {
+    size_t count = 0;
+    for (auto &s : shards_) {
+      count += s.second.size();
+    }
+    return count;
+  }
+
   // Synchronization.
   UniqueLock WriterLock();
   SharedLock ReaderLock() const;
@@ -123,6 +148,7 @@ class SharderState {
  private:
   // The logical (unsharded) schema of every table.
   std::unordered_map<UnshardedTableName, sqlast::CreateTable> schema_;
+  std::unordered_map<UnshardedTableName, std::pair<int, std::string>> pks_;
 
   // All shard kinds as determined from the schema.
   // Maps a shard kind (e.g. a table name with PII) to the primary key of that
@@ -161,6 +187,10 @@ class SharderState {
 
   // Secondary indices.
   std::unordered_map<ShardKind, std::vector<sqlast::CreateIndex>> create_index_;
+
+  // Map to store accessor indices
+  std::unordered_map<ShardKind, std::vector<AccessorIndexInformation>>
+      accessor_index_;
 
   // All columns in a table that have an index.
   std::unordered_map<UnshardedTableName, std::unordered_set<ColumnName>>

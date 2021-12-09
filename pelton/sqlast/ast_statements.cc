@@ -14,6 +14,8 @@ namespace sqlast {
 // Insert.
 const std::string &Insert::table_name() const { return this->table_name_; }
 std::string &Insert::table_name() { return this->table_name_; }
+bool Insert::replace() const { return this->replace_; }
+bool &Insert::replace() { return this->replace_; }
 
 bool Insert::HasColumns() const { return this->columns_.size() > 0; }
 
@@ -61,7 +63,7 @@ std::string Insert::RemoveValue(size_t index) {
   return result;
 }
 
-absl::StatusOr<std::string> Insert::GetValue(const std::string &colname) {
+absl::StatusOr<std::string> Insert::GetValue(const std::string &colname) const {
   if (this->columns_.size() > 0) {
     auto it = std::find(this->columns_.begin(), this->columns_.end(), colname);
     if (it == this->columns_.end()) {

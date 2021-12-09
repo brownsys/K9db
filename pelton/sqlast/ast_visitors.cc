@@ -80,7 +80,8 @@ std::string Stringifier::VisitCreateIndex(const CreateIndex &ast) {
 
 std::string Stringifier::VisitInsert(const Insert &ast) {
   perf::Start("Stringify (insert)");
-  std::string result = "INSERT INTO " + this->shard_prefix_ + ast.table_name();
+  std::string result = ast.replace() ? "REPLACE" : "INSERT";
+  result += " INTO " + this->shard_prefix_ + ast.table_name();
   // Columns if explicitly specified.
   if (ast.GetColumns().size() > 0) {
     result += "(";

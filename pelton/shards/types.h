@@ -3,9 +3,12 @@
 
 #include <functional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <sstream>
 #include "glog/logging.h"
+
+#include "pelton/sqlast/ast.h"
 
 namespace pelton {
 namespace shards {
@@ -34,6 +37,43 @@ using UserId = std::string;
 using ColumnName = std::string;
 
 using ColumnIndex = size_t;
+
+using IndexName = std::string;
+
+// Contains the information mapping an accessor to the relevant tables and
+// columns
+// Used to construct query of the form:
+// SELECT * FROM table WHERE accessor = id AND owner IN (...)
+struct AccessorIndexInformation {
+  // Which shard has access to the information in the table
+  // (e.g. User, Doctor, Patient, etc)
+  ShardKind shard_kind;
+  // The table which the index is created on
+  UnshardedTableName table_name;
+  // The column which the accessor notation is defined on
+  ColumnName accessor_column_name;
+  // The column which the table is sharded on
+  ColumnName shard_by_column_name;
+  // The name of the index
+  IndexName index_name;
+  // columns to anonymize on delete and their types
+  std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
+      anonymize_columns;
+  bool is_sharded;
+
+  AccessorIndexInformation(
+      const ShardKind &sk, const UnshardedTableName &tn, const ColumnName &cn,
+      const ColumnName &sbcn, const IndexName &in,
+      const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type> &an,
+      const bool is)
+      : shard_kind(sk),
+        table_name(tn),
+        accessor_column_name(cn),
+        shard_by_column_name(sbcn),
+        index_name(in),
+        anonymize_columns(an),
+        is_sharded(is) {}
+};
 
 // Contains the details of how a given table is sharded.
 struct ShardingInformation {

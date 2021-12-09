@@ -69,6 +69,7 @@ bool ReadCommand(std::string *ptr) {
 DEFINE_bool(print, true, "Print results to the screen");
 DEFINE_bool(progress, true, "Show progress counter");
 DEFINE_int32(workers, 3, "Number of workers");
+DEFINE_bool(consistent, true, "Dataflow consistency with futures");
 DEFINE_string(db_name, "pelton", "Name of the database");
 DEFINE_string(db_username, "root", "MariaDB username to connect with");
 DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
@@ -94,6 +95,7 @@ int main(int argc, char **argv) {
 
   // Read command line flags.
   size_t workers = static_cast<size_t>(FLAGS_workers);
+  bool consistent = FLAGS_consistent;
   const std::string &db_name = FLAGS_db_name;
   const std::string &db_username = FLAGS_db_username;
   const std::string &db_password = FLAGS_db_password;
@@ -103,7 +105,7 @@ int main(int argc, char **argv) {
   std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
   std::chrono::time_point<std::chrono::high_resolution_clock> end_time;
   try {
-    pelton::initialize(workers);
+    pelton::initialize(workers, consistent);
 
     pelton::Connection connection;
     pelton::open(&connection, db_name, db_username, db_password);
@@ -131,8 +133,6 @@ int main(int argc, char **argv) {
         continue;
       } else if (command[0] == '-' && command[1] == '-') {
         current_endpoint = profiler.Measure(command);
-        continue;
-      } else if (command.substr(0, 8) == "REPLACE ") {
         continue;
       } else if (std::find(TO_SKIP.begin(), TO_SKIP.end(), current_endpoint) !=
                  TO_SKIP.end()) {

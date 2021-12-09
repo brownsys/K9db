@@ -1,0 +1,156 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+load("@rules_rust//rust:rust.bzl", "rust_library", "rust_test")
+load("@rules_java//java:defs.bzl", "java_library", "java_test")
+
+config_setting(
+    name = "asan",
+    values = {"copt": "-DPELTON_ASAN"},
+)
+
+config_setting(
+    name = "tsan",
+    values = {"copt": "-DPELTON_TSAN"},
+)
+
+cc_library(
+    name = "memcached",
+    srcs = [
+        "memcached.cc",
+    ],
+    hdrs = [
+        "memcached.h",
+    ],
+    linkopts = [
+        "-lmariadbcpp",
+    ],
+    deps = [
+        "@glog",
+        "@libmemcached",
+    ],
+)
+
+# Includes both the bindgen generated ffi definitions and our wrappers.
+# Also, depends on the ffi .so library so that it gets linked
+# with our rust code.
+rust_library(
+    name = "memcached_ffi",
+    srcs = [
+        ":memcached_ffi_bindgen",
+        ":memcached_ffi_wrappers",
+    ],
+    deps = [
+        ":memcached",
+        "@libmemcached",
+    ],
+)
+
+# Invoke bindgen to generate rust definitions for the ffi library.
+genrule(
+    name = "memcached_ffi_bindgen",
+    srcs = [
+        "memcached.h",
+    ],
+    outs = [
+        "memcached_ffi_bindgen.rs",
+    ],
+    cmd = """
+        ./$(location @raze__bindgen__0_32_3//:cargo_bin_bindgen) $< -o $@
+    """,
+    tools = [
+        "@raze__bindgen__0_32_3//:cargo_bin_bindgen",
+    ],
+)
+
+# Copy proxy_wrappers to bazel out / working directory
+# This way, it becomes located in the exact same directory that
+# contains proxy_ffi_bindgen.rs, and can thus include! it.
+genrule(
+    name = "memcached_ffi_wrappers",
+    srcs = [
+        "memcached_ffi_wrappers.rs",
+    ],
+    outs = [
+        "memcached_ffi.rs",
+    ],
+    cmd = """
+        cp $< $@
+    """,
+)
+
+# The entire JNI java library.
+java_library(
+    name = "MemcachedJNI",
+    srcs = ["MemcachedJNI.java"],
+    data = [":MemcachedJNI_SO"],
+)
+
+# SO that the JNI uses to link memcached.cc
+cc_binary(
+    name = "MemcachedJNI_SO",
+    srcs = [
+        "MemcachedJNI.cc",
+        ":MemcachedJNI_h",
+    ],
+    linkshared = 1,  # produce a .so with all dependencies linked
+    deps = [
+        ":memcached",
+        "@bazel_tools//tools/jdk:jni",
+        "@glog",
+    ],
+)
+
+# Auto generate the required header file from the JNI .java file.
+genrule(
+    name = "MemcachedJNI_h",
+    srcs = ["MemcachedJNI.java"],
+    outs = ["edu_brown_pelton_MemcachedJNI.h"],
+    cmd = "javac -h $(@D) -d $(@D) $<",
+)
+
+# Tests.
+cc_test(
+    name = "memcached-test",
+    srcs = [
+        "memcached_unittest.cc",
+    ],
+    deps = [
+        ":memcached",
+        "@com_google_googletest//:gtest",
+        "@glog",
+    ],
+)
+
+rust_test(
+    name = "memcached_ffi-test",
+    srcs = [
+        "memcached_ffi_unittest.rs",
+    ],
+    rustc_flags = [
+        "-Clink-args=-lmariadbcpp",
+        "-Clink-args=-lmemcached",
+    ] + select({
+        ":asan": [
+            "-Clink-args=-fsanitize=address",
+            "-Zsanitizer=address",
+        ],
+        ":tsan": [
+            "-Clink-args=-fsanitize=thread",
+            "-Zsanitizer=thread",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":memcached_ffi",
+    ],
+)
+
+java_test(
+    name = "MemcachedJNITest",
+    srcs = [
+        "MemcachedJNITest.java",
+    ],
+    test_class = "edu.brown.pelton.MemcachedJNITest",
+    deps = [
+        ":MemcachedJNI",
+    ],
+)

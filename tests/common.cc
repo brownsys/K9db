@@ -48,6 +48,9 @@ void DropDatabase(const std::string &db_name) {
       std::unique_ptr<sql::Statement>(conn->createStatement());
 
   stmt->execute("DROP DATABASE IF EXISTS " + db_name);
+
+  stmt->close();
+  conn->close();
 }
 
 // Read an SQL file one command at a time.
@@ -122,7 +125,7 @@ void InitializeDatabase(const std::string &db_name, size_t file_count,
   DropDatabase(db_name);
 
   // Create and open a connection to pelton.
-  CHECK(pelton::initialize(3));
+  CHECK(pelton::initialize(3, true));
   CHECK(pelton::open(&connection, db_name, db_username, db_password));
 
   // Set echo if specified by cmd flags.
@@ -139,16 +142,15 @@ void InitializeDatabase(const std::string &db_name, size_t file_count,
       CHECK(pelton::exec(&connection, command).ok());
     }
   }
-
-  // Sleep to make sure inserts had time to process via flows.
-  sleep(2);
+  LOG(INFO) << "Initialized database";
 }
 
 // Clean up after testing is complete.
 void TearDown(const std::string &db_name) {
+  LOG(INFO) << "Closing connections...";
   // Close connection to pelton.
   CHECK(pelton::close(&connection));
-  CHECK(pelton::shutdown(false));
+  CHECK(pelton::shutdown());
 
   // Drop the test database.
   LOG(INFO) << "Dropping DB " << db_name << "...";
@@ -204,10 +206,15 @@ void RunTest(const std::string &query_file_prefix) {
     // Store output.
     std::vector<std::string> actual;
     pelton::SqlResult &result = status.value();
-    std::unique_ptr<pelton::SqlResultSet> resultset = result.NextResultSet();
-    for (pelton::Record &record : *resultset) {
-      record.SetPositive(true);
-      actual.push_back(ToString(record));
+    if (result.IsQuery()) {
+      std::unique_ptr<pelton::SqlResultSet> resultset = result.NextResultSet();
+      for (pelton::Record &record : *resultset) {
+        record.SetPositive(true);
+        actual.push_back(ToString(record));
+      }
+    } else if (result.IsUpdate()) {
+      actual.push_back("|update # = " + std::to_string(result.UpdateCount()) +
+                       "|");
     }
 
     // Check output vs expected.

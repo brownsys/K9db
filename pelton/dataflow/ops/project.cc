@@ -271,7 +271,8 @@ void ProjectOperator::ComputeOutputSchema() {
 }
 
 std::vector<Record> ProjectOperator::Process(NodeIndex source,
-                                             std::vector<Record> &&records) {
+                                             std::vector<Record> &&records,
+                                             const Promise &promise) {
   std::vector<Record> output;
   for (const Record &record : records) {
     output.emplace_back(this->output_schema_, record.IsPositive());

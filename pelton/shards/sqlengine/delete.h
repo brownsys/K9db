@@ -18,7 +18,7 @@ namespace sqlengine {
 namespace delete_ {
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
-                                     Connection *connection, SharedLock *lock,
+                                     Connection *connection, bool synchronize,
                                      bool update_flows);
 
 }  // namespace delete_

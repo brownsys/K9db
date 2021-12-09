@@ -77,7 +77,7 @@ bool ModifiesShardBy(const sqlast::Update &stmt, SharderState *state) {
 // table_schema to resolve types of values.
 sqlast::Insert InsertRecord(const dataflow::Record &record,
                             const sqlast::CreateTable &table_schema) {
-  sqlast::Insert stmt{table_schema.table_name()};
+  sqlast::Insert stmt{table_schema.table_name(), false};
   for (size_t i = 0; i < table_schema.GetColumns().size(); i++) {
     sqlast::ColumnDefinition::Type type =
         table_schema.GetColumns().at(i).column_type();
@@ -106,7 +106,7 @@ sqlast::Insert InsertRecord(const dataflow::Record &record,
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
-                                     Connection *connection) {
+                                     Connection *connection, bool synchronize) {
   perf::Start("Update");
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
@@ -116,7 +116,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
   // upgrade temporarily to a writer lock in insert.
   shards::SharderState *state = connection->state->sharder_state();
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
-  SharedLock lock = state->ReaderLock();
+
+  // Synchronize if needed.
+  SharedLock lock;
+  if (synchronize) {
+    lock = state->ReaderLock();
+  }
 
   bool update_flows = dataflow_state->HasFlowsFor(table_name);
   // Get the rows that are going to be deleted prior to deletion to use them
@@ -148,7 +153,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
       // sharder state lock again, but deletions only take another reader lock,
       // so this actually works out.
       MOVE_OR_RETURN(result, delete_::Shard(stmt.DeleteDomain(), connection,
-                                            &lock, false));
+                                            false, false));
 
       // Insert updated records.
       for (size_t i = old_records_size; i < records.size(); i++) {

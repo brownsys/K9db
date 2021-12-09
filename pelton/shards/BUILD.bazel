@@ -43,5 +43,7 @@ cc_library(
         "types.h",
     ],
     visibility = ["//pelton:__subpackages__"],
-    deps = [],
+    deps = [
+        "//pelton/sqlast:ast",
+    ],
 )

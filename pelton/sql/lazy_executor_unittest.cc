@@ -149,7 +149,7 @@ TEST(LazyExecutorTest, TestUpdatesDefault) {
   CreateUnshardedTable();
 
   // Insert values.
-  sqlast::Insert stmt{"mytest"};
+  sqlast::Insert stmt{"mytest", false};
   stmt.SetValues({"1", "\"s1\""});
   SqlResult result = executor.ExecuteDefault(&stmt);
   EXPECT_TRUE(result.IsUpdate());
@@ -228,7 +228,7 @@ TEST(LazyExecutorTest, TestUpdatesShard) {
   auto [shard2, info2] = CreateShardedTable("2");
 
   // Insert values.
-  sqlast::Insert stmt{"mytest"};
+  sqlast::Insert stmt{"mytest", false};
   stmt.SetValues({"1", "\"s1\""});
   SqlResult result = executor.ExecuteShard(&stmt, info1.shard_kind, "1");
   EXPECT_TRUE(result.IsUpdate());
@@ -322,7 +322,7 @@ TEST(LazyExecutorTest, TestSelectDefault) {
   CreateUnshardedTable();
 
   // Insert values.
-  sqlast::Insert stmt{"mytest"};
+  sqlast::Insert stmt{"mytest", false};
   stmt.SetValues({"1", "\"s1\""});
   SqlResult result = executor.ExecuteDefault(&stmt);
   EXPECT_TRUE(result.IsUpdate());
@@ -387,7 +387,7 @@ TEST(LazyExecutorTest, TestSelectShard) {
   auto [shard2, info2] = CreateShardedTable("2");
 
   // Insert values.
-  sqlast::Insert stmt{"mytest"};
+  sqlast::Insert stmt{"mytest", false};
   stmt.SetValues({"1", "\"s1\""});
   SqlResult result = executor.ExecuteShard(&stmt, info1.shard_kind, "1");
   EXPECT_TRUE(result.IsUpdate());
@@ -466,7 +466,7 @@ TEST(LazyExecutorTest, TestSelectShardSet) {
   auto [shard2, info2] = CreateShardedTable("2");
 
   // Insert values.
-  sqlast::Insert stmt{"mytest"};
+  sqlast::Insert stmt{"mytest", false};
   stmt.SetValues({"1", "\"s1\""});
   SqlResult result = executor.ExecuteShard(&stmt, info1.shard_kind, "1");
   EXPECT_TRUE(result.IsUpdate());

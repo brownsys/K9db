@@ -162,7 +162,7 @@ TEST(FilterOperatorTest, BatchTest) {
 
   // Test filtering out records.
   std::vector<Record> outputs =
-      filter.Process(UNDEFINED_NODE_INDEX, CopyVec(records));
+      filter.Process(UNDEFINED_NODE_INDEX, CopyVec(records), Promise::None);
   EXPECT_EQ(outputs.size(), 2);
   EXPECT_EQ(outputs.at(0), records.at(1));
   EXPECT_EQ(outputs.at(1), records.at(2));
@@ -191,7 +191,7 @@ TEST(FilterOperatorTest, ColOps) {
 
   // Test filtering out records.
   std::vector<Record> outputs =
-      filter.Process(UNDEFINED_NODE_INDEX, CopyVec(records));
+      filter.Process(UNDEFINED_NODE_INDEX, CopyVec(records), Promise::None);
   EXPECT_EQ(outputs.size(), 1);
   EXPECT_EQ(outputs.at(0), records.at(3));
 }

@@ -59,8 +59,8 @@ class ExchangeOperator : public Operator {
   }
 
  protected:
-  std::vector<Record> Process(NodeIndex source,
-                              std::vector<Record> &&records) override;
+  std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records,
+                              const Promise &promise) override;
 
   void ComputeOutputSchema() override;
 

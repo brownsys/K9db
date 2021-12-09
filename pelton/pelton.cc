@@ -64,13 +64,13 @@ std::optional<SqlResult> SpecialStatements(const std::string &sql,
 
 }  // namespace
 
-bool initialize(size_t workers) {
+bool initialize(size_t workers, bool consistent) {
   // if already open
   if (PELTON_STATE != nullptr) {
     // close without shutting down planner
     shutdown(false);
   }
-  PELTON_STATE = new State(workers);
+  PELTON_STATE = new State(workers, consistent);
   return true;
 }
 
@@ -84,13 +84,14 @@ bool open(Connection *connection, const std::string &db_name,
 }
 
 bool close(Connection *connection) {
-  // empty for now
+  connection->executor.Close();
   return true;
 }
 
 absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
-  // Trim statement.
+  // Trim statement, removing whitespace
   Trim(sql);
+  // print sql statements if echo is set to true
   if (echo) {
     std::cout << sql << std::endl;
   }

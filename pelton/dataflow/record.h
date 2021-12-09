@@ -302,7 +302,8 @@ class Record {
       // Destruct unique_ptrs.
       for (size_t i = 0; i < this->schema_.size(); i++) {
         const auto &type = this->schema_.column_types().at(i);
-        if (type == sqlast::ColumnDefinition::Type::TEXT) {
+        if (type == sqlast::ColumnDefinition::Type::TEXT ||
+            type == sqlast::ColumnDefinition::Type::DATETIME) {
           this->data_[i].str = std::unique_ptr<std::string>();
         }
       }

@@ -67,7 +67,8 @@ Record AggregateOperator::EmitRecord(const Key &key, const Value &aggregate,
 }
 
 std::vector<Record> AggregateOperator::Process(NodeIndex source,
-                                               std::vector<Record> &&records) {
+                                               std::vector<Record> &&records,
+                                               const Promise &promise) {
   // old_values[group_key] has the old value associated to that key prior to
   // processing records.
   // if old_values[group_key] is a null Value then there was no value associated

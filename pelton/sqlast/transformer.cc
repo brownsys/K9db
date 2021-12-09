@@ -237,10 +237,9 @@ antlrcpp::Any AstTransformer::visitCreate_index_stmt(
 // Insert constructs.
 antlrcpp::Any AstTransformer::visitInsert_stmt(
     sqlparser::SQLiteParser::Insert_stmtContext *ctx) {
-  if (ctx->REPLACE() != nullptr || ctx->OR() != nullptr ||
-      ctx->AS() != nullptr || ctx->select_stmt() != nullptr ||
-      ctx->upsert_clause() != nullptr || ctx->DEFAULT() != nullptr ||
-      ctx->schema_name() != nullptr) {
+  if (ctx->OR() != nullptr || ctx->AS() != nullptr ||
+      ctx->select_stmt() != nullptr || ctx->upsert_clause() != nullptr ||
+      ctx->DEFAULT() != nullptr || ctx->schema_name() != nullptr) {
     return absl::InvalidArgumentError("Invalid insert constructs");
   }
   if (ctx->expr_list().size() > 1) {
@@ -250,7 +249,8 @@ antlrcpp::Any AstTransformer::visitInsert_stmt(
   // Table name and explicitly specified columns.
   CAST_OR_RETURN(std::string table_name, ctx->table_name()->accept(this),
                  std::string);
-  std::unique_ptr<Insert> insert = std::make_unique<Insert>(table_name);
+  bool rep = ctx->REPLACE() != nullptr;
+  std::unique_ptr<Insert> insert = std::make_unique<Insert>(table_name, rep);
   for (auto column_name_ctx : ctx->column_name()) {
     CAST_OR_RETURN(std::string column_name, column_name_ctx->accept(this),
                    std::string);

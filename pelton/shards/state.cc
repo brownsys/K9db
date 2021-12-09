@@ -9,8 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <utility>
-
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 
@@ -19,8 +17,11 @@ namespace shards {
 
 // Schema manipulations.
 void SharderState::AddSchema(const UnshardedTableName &table_name,
-                             const sqlast::CreateTable &table_schema) {
+                             const sqlast::CreateTable &table_schema,
+                             int pk_index, const std::string &pk_name) {
   this->schema_.insert({table_name, table_schema});
+  this->pks_.emplace(table_name,
+                     std::pair<int, std::string>(pk_index, pk_name));
 }
 
 std::optional<sqlast::CreateTable> SharderState::RemoveSchema(const UnshardedTableName &table_name) {
@@ -60,6 +61,21 @@ void SharderState::AddShardedTable(
       {sharding_information.sharded_table_name, sharded_create_statement});
 }
 
+// Used to add an AccessorIndexInformation struct to sharder state
+void SharderState::AddAccessorIndex(
+    const ShardKind &kind, const UnshardedTableName &table,
+    const ColumnName &accessor_column, const ColumnName &shard_by_column,
+    const IndexName &index_name,
+    const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
+        &anonymize,
+    const bool is_sharded) {
+  // Create an AccessorIndexInformation
+  AccessorIndexInformation accessor_information{
+      kind,       table,     accessor_column, shard_by_column,
+      index_name, anonymize, is_sharded};
+  this->accessor_index_[kind].push_back(accessor_information);
+}
+
 std::list<const sqlast::AbstractStatement *> SharderState::CreateShard(
     const ShardKind &shard_kind, const UserId &user) {
   // Mark shard for this user as created!
@@ -86,6 +102,11 @@ void SharderState::RemoveUserFromShard(const ShardKind &kind,
 const sqlast::CreateTable &SharderState::GetSchema(
     const UnshardedTableName &table_name) const {
   return this->schema_.at(table_name);
+}
+
+const std::pair<int, std::string> &SharderState::GetPk(
+    const UnshardedTableName &table_name) const {
+  return this->pks_.at(table_name);
 }
 
 bool SharderState::Exists(const UnshardedTableName &table) const {
@@ -119,6 +140,14 @@ bool SharderState::ShardExists(const ShardKind &shard_kind,
 const std::unordered_set<UserId> &SharderState::UsersOfShard(
     const ShardKind &kind) const {
   return this->shards_.at(kind);
+}
+
+bool SharderState::HasAccessorIndices(const ShardKind &kind) const {
+  return this->accessor_index_.count(kind) == 1;
+}
+const std::vector<AccessorIndexInformation> &SharderState::GetAccessorIndices(
+    const ShardKind &kind) const {
+  return this->accessor_index_.at(kind);
 }
 
 const std::unordered_set<UnshardedTableName> &SharderState::TablesInShard(

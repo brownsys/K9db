@@ -40,6 +40,7 @@ cc_library(
     ],
     hdrs = [
         "create.h",
+        "index.h",
     ],
     deps = [
         "//pelton:connection",
@@ -94,6 +95,7 @@ cc_library(
     ],
     deps = [
         ":index",
+        ":select",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
@@ -247,7 +249,9 @@ cc_library(
     ],
     deps = [
         ":delete",
+        ":index",
         ":select",
+        ":update",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",

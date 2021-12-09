@@ -45,25 +45,25 @@ Record Record::Copy() const {
 
   // Copy data.
   for (size_t i = 0; i < this->schema_.size(); i++) {
-    const auto &type = this->schema_.column_types().at(i);
-    switch (type) {
-      case sqlast::ColumnDefinition::Type::UINT:
-        record.data_[i].uint = this->data_[i].uint;
-        break;
-      case sqlast::ColumnDefinition::Type::INT:
-        record.data_[i].sint = this->data_[i].sint;
-        break;
-      case sqlast::ColumnDefinition::Type::TEXT:
-      // TODO(malte): DATETIME should not be stored as a string,
-      // see below
-      case sqlast::ColumnDefinition::Type::DATETIME:
-        if (this->data_[i].str) {
+    if (!this->IsNull(i)) {
+      const auto &type = this->schema_.column_types().at(i);
+      switch (type) {
+        case sqlast::ColumnDefinition::Type::UINT:
+          record.data_[i].uint = this->data_[i].uint;
+          break;
+        case sqlast::ColumnDefinition::Type::INT:
+          record.data_[i].sint = this->data_[i].sint;
+          break;
+        case sqlast::ColumnDefinition::Type::TEXT:
+        // TODO(malte): DATETIME should not be stored as a string,
+        // see below
+        case sqlast::ColumnDefinition::Type::DATETIME:
           record.data_[i].str =
               std::make_unique<std::string>(*this->data_[i].str);
-        }
-        break;
-      default:
-        LOG(FATAL) << "Unsupported data type " << type << " in record copy!";
+          break;
+        default:
+          LOG(FATAL) << "Unsupported data type " << type << " in record copy!";
+      }
     }
   }
 

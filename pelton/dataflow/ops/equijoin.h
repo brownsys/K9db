@@ -56,13 +56,9 @@ class EquiJoinOperator : public Operator {
    * Output schema of join (i.e. records written to output) is defined as
    * concatenated left schema and right schema with key column from the right
    * schema dropped.
-   * @param source
-   * @param records
-   * @param output
-   * @return
    */
-  std::vector<Record> Process(NodeIndex source,
-                              std::vector<Record> &&records) override;
+  std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records,
+                              const Promise &promise) override;
 
   // Computes joined_schema_.
   void ComputeOutputSchema() override;

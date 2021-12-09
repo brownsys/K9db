@@ -43,6 +43,9 @@ void SqlLazyExecutor::Initialize(const std::string &db_name,
   this->eager_executor_.Initialize(db_name, username, password);
 }
 
+// Close the connection.
+void SqlLazyExecutor::Close() { this->eager_executor_.Close(); }
+
 // (lazy) Execution of SQL statements.
 // Execute statement against the default un-sharded database.
 SqlResult SqlLazyExecutor::ExecuteDefault(const sqlast::AbstractStatement *sql,

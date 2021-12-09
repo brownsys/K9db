@@ -19,20 +19,19 @@ namespace pelton {
 namespace dataflow {
 
 // DataFlowState::Worker.
-DataFlowState::Worker::Worker(size_t id, Channel *chan, DataFlowState *state,
-                              int max)
-    : id_(id), state_(state), stop_(false), max_(max) {
+DataFlowState::Worker::Worker(size_t id, Channel *chan, DataFlowState *state)
+    : id_(id), state_(state), stop_(false) {
   this->thread_ = std::thread([this, chan]() {
     LOG(INFO) << "Starting dataflow worker " << this->id_;
-    while (!this->stop_ && this->max_ != 0) {
+    while (!this->stop_) {
       std::vector<Channel::Message> messages = chan->Read();
       for (Channel::Message &msg : messages) {
-        if (this->max_ != -1) {
-          this->max_ -= msg.records.size();
-        }
+        this->state_->mtx_.lock_shared();
         auto &flow = this->state_->flows_.at(msg.flow_name);
+        this->state_->mtx_.unlock_shared();
         Operator *op = flow->GetPartition(this->id_)->GetNode(msg.target);
-        op->ProcessAndForward(msg.source, std::move(msg.records));
+        op->ProcessAndForward(msg.source, std::move(msg.records),
+                              std::move(msg.promise));
       }
     }
   });
@@ -52,13 +51,13 @@ void DataFlowState::Worker::Join() { this->thread_.join(); }
 // DataFlowState.
 // Constructors and destructors.
 DataFlowState::~DataFlowState() { CHECK(this->joined_); }
-DataFlowState::DataFlowState(size_t workers, int max)
-    : workers_(workers), joined_(false) {
+DataFlowState::DataFlowState(size_t workers, bool consistent)
+    : workers_(workers), consistent_(consistent), joined_(false) {
   // Create a channel for every worker.
   for (size_t i = 0; i < workers; i++) {
     this->channels_.emplace_back(std::make_unique<Channel>(workers));
     this->threads_.emplace_back(
-        std::make_unique<Worker>(i, this->channels_.at(i).get(), this, max));
+        std::make_unique<Worker>(i, this->channels_.at(i).get(), this));
   }
 }
 
@@ -78,14 +77,17 @@ void DataFlowState::Join() {
 
 // Manage schemas.
 void DataFlowState::AddTableSchema(const sqlast::CreateTable &create) {
+  std::unique_lock lock(this->mtx_);
   this->schema_.emplace(create.table_name(), SchemaFactory::Create(create));
 }
 void DataFlowState::AddTableSchema(const std::string &table_name,
                                    SchemaRef schema) {
+  std::unique_lock lock(this->mtx_);
   this->schema_.emplace(table_name, schema);
 }
 
 std::vector<std::string> DataFlowState::GetTables() const {
+  std::shared_lock lock(this->mtx_);
   std::vector<std::string> result;
   result.reserve(this->schema_.size());
   for (const auto &[table_name, _] : this->schema_) {
@@ -94,6 +96,7 @@ std::vector<std::string> DataFlowState::GetTables() const {
   return result;
 }
 SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
+  std::shared_lock lock(this->mtx_);
   if (this->schema_.count(table_name) > 0) {
     return this->schema_.at(table_name);
   } else {
@@ -104,6 +107,7 @@ SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
 // Manage flows.
 void DataFlowState::AddFlow(const FlowName &name,
                             std::unique_ptr<DataFlowGraphPartition> &&flow) {
+  std::unique_lock lock(this->mtx_);
   // Map input names to this flow.
   for (const auto &[input_name, input] : flow->inputs()) {
     this->flows_per_input_table_[input_name].push_back(name);
@@ -122,21 +126,26 @@ void DataFlowState::AddFlow(const FlowName &name,
 }
 
 const DataFlowGraph &DataFlowState::GetFlow(const FlowName &name) const {
+  std::shared_lock lock(this->mtx_);
   return *this->flows_.at(name);
 }
 
 bool DataFlowState::HasFlow(const FlowName &name) const {
+  std::shared_lock lock(this->mtx_);
   return this->flows_.count(name) == 1;
 }
 
 bool DataFlowState::HasFlowsFor(const TableName &table_name) const {
+  std::shared_lock lock(this->mtx_);
   return this->flows_per_input_table_.count(table_name) == 1;
 }
 
 Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
   // Create an empty positive record with appropriate schema.
   const std::string &table_name = insert_stmt.table_name();
+  this->mtx_.lock_shared();
   SchemaRef schema = this->schema_.at(table_name);
+  this->mtx_.unlock_shared();
   Record record{schema, true};
 
   // Fill in record with data.
@@ -161,9 +170,14 @@ Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
 void DataFlowState::ProcessRecords(const TableName &table_name,
                                    std::vector<Record> &&records) {
   if (records.size() > 0 && this->HasFlowsFor(table_name)) {
+    // One future for the entirety of the record processing.
+    Future future(this->consistent_);
+
     // Send copies per flow (except last flow).
+    this->mtx_.lock_shared();
     const std::vector<FlowName> &flow_names =
         this->flows_per_input_table_.at(table_name);
+    this->mtx_.unlock_shared();
     for (size_t i = 0; i < flow_names.size() - 1; i++) {
       const std::string &flow_name = flow_names.at(i);
       std::vector<Record> copy;
@@ -171,34 +185,47 @@ void DataFlowState::ProcessRecords(const TableName &table_name,
       for (const Record &r : records) {
         copy.push_back(r.Copy());
       }
-      this->ProcessRecordsByFlowName(flow_name, table_name, std::move(copy));
+      this->ProcessRecordsByFlowName(flow_name, table_name, std::move(copy),
+                                     future.GetPromise());
     }
 
     // Move into last flow.
     const std::string &flow_name = flow_names.back();
-    this->ProcessRecordsByFlowName(flow_name, table_name, std::move(records));
+    this->ProcessRecordsByFlowName(flow_name, table_name, std::move(records),
+                                   future.GetPromise());
+
+    // Wait for the future to get resolved.
+    future.Wait();
   }
 }
 
 void DataFlowState::ProcessRecordsByFlowName(const FlowName &flow_name,
                                              const TableName &table_name,
-                                             std::vector<Record> &&records) {
+                                             std::vector<Record> &&records,
+                                             Promise &&promise) {
+  this->mtx_.lock_shared();
   auto &flow = this->flows_.at(flow_name);
+  this->mtx_.unlock_shared();
   auto partitions = flow->PartitionInputs(table_name, std::move(records));
   for (auto &[partition, vec] : partitions) {
-    this->channels_.at(partition)->WriteInput(
-        {flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
-         flow->GetPartition(partition)->GetInputNode(table_name)->index()});
+    Channel::Message msg = {
+        flow_name, std::move(vec), UNDEFINED_NODE_INDEX,
+        flow->GetPartition(partition)->GetInputNode(table_name)->index(),
+        promise.Derive()};
+    this->channels_.at(partition)->WriteInput(std::move(msg));
   }
+  promise.Resolve();
 }
 
 // Size in memory of all the dataflow graphs.
 sql::SqlResult DataFlowState::SizeInMemory() const {
   std::vector<Record> records;
   uint64_t total_size = 0;
+  this->mtx_.lock_shared();
   for (const auto &[fname, flow] : this->flows_) {
     total_size += flow->SizeInMemory(&records);
   }
+  this->mtx_.unlock_shared();
   records.emplace_back(SchemaFactory::MEMORY_SIZE_SCHEMA, true,
                        std::make_unique<std::string>("TOTAL"),
                        std::make_unique<std::string>("TOTAL"), total_size);
@@ -207,6 +234,7 @@ sql::SqlResult DataFlowState::SizeInMemory() const {
 }
 
 sql::SqlResult DataFlowState::FlowDebug(const std::string &flow_name) const {
+  std::shared_lock lock(this->mtx_);
   const auto &flow = this->flows_.at(flow_name);
   return sql::SqlResult(std::make_unique<sql::_result::SqlInlineResultSet>(
       SchemaFactory::FLOW_DEBUG_SCHEMA, flow->DebugRecords()));
