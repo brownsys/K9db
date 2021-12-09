@@ -24,7 +24,7 @@ DEFINE_bool(echo, false, "whether to echo commands before executing them");
 namespace {
 
 // Pelton connection lives from InitializeDatabase(...) until TearDown(...).
-pelton::Connection *connection;
+pelton::Connection connection;
 
 // Turn record into string in format similar to rows in expected files.
 template <typename T>
@@ -48,6 +48,9 @@ void DropDatabase(const std::string &db_name) {
       std::unique_ptr<sql::Statement>(conn->createStatement());
 
   stmt->execute("DROP DATABASE IF EXISTS " + db_name);
+
+  stmt->close();
+  conn->close();
 }
 
 // Read an SQL file one command at a time.
@@ -122,12 +125,12 @@ void InitializeDatabase(const std::string &db_name, size_t file_count,
   DropDatabase(db_name);
 
   // Create and open a connection to pelton.
-  connection = new pelton::Connection();
-  CHECK(pelton::open("", db_name, db_username, db_password, connection));
+  CHECK(pelton::initialize(3, true));
+  CHECK(pelton::open(&connection, db_name, db_username, db_password));
 
   // Set echo if specified by cmd flags.
   if (FLAGS_echo) {
-    CHECK(pelton::exec(connection, "SET echo;").ok());
+    CHECK(pelton::exec(&connection, "SET echo;").ok());
   }
 
   // Create all the tables.
@@ -136,16 +139,18 @@ void InitializeDatabase(const std::string &db_name, size_t file_count,
     LOG(INFO) << "Executing file " << file_path;
     auto commands = ReadSQL(file_path);
     for (const std::string &command : commands) {
-      CHECK(pelton::exec(connection, command).ok());
+      CHECK(pelton::exec(&connection, command).ok());
     }
   }
+  LOG(INFO) << "Initialized database";
 }
 
 // Clean up after testing is complete.
 void TearDown(const std::string &db_name) {
+  LOG(INFO) << "Closing connections...";
   // Close connection to pelton.
-  pelton::close(connection);
-  delete connection;
+  CHECK(pelton::close(&connection));
+  CHECK(pelton::shutdown());
 
   // Drop the test database.
   LOG(INFO) << "Dropping DB " << db_name << "...";
@@ -195,7 +200,7 @@ void RunTest(const std::string &query_file_prefix) {
     std::vector<std::string> &expected = results.at(i);
 
     // Run query.
-    auto status = pelton::exec(connection, query);
+    auto status = pelton::exec(&connection, query);
     EXPECT_TRUE(status.ok()) << status.status();
 
     // Store output.

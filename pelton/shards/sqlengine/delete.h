@@ -4,9 +4,11 @@
 #define PELTON_SHARDS_SQLENGINE_DELETE_H_
 
 #include "absl/status/statusor.h"
+#include "pelton/connection.h"
 #include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
+#include "pelton/shards/upgradable_lock.h"
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 
@@ -16,9 +18,8 @@ namespace sqlengine {
 namespace delete_ {
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state,
-                                     bool update_flows = true);
+                                     Connection *connection, bool synchronize,
+                                     bool update_flows);
 
 }  // namespace delete_
 }  // namespace sqlengine

@@ -13,6 +13,7 @@
 #include "absl/strings/match.h"
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/shards/upgradable_lock.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
@@ -219,8 +220,10 @@ absl::StatusOr<std::list<ShardingInformation>> ShardTable(
   return implicit_owners;
 }
 
-void IndexAccessor(const sqlast::CreateTable &stmt, SharderState *state,
-                   dataflow::DataFlowState *dataflow_state) {
+void IndexAccessor(const sqlast::CreateTable &stmt, Connection *connection) {
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+
   // Result is empty by default.
   std::unordered_map<ColumnName, ColumnIndex> index_map;
 
@@ -273,8 +276,8 @@ void IndexAccessor(const sqlast::CreateTable &stmt, SharderState *state,
         sqlast::CreateIndex create_index_stmt{index_prefix, table_name,
                                               column_name};
 
-        pelton::shards::sqlengine::index::CreateIndex(create_index_stmt, state,
-                                                      dataflow_state);
+        pelton::shards::sqlengine::index::CreateIndex(create_index_stmt,
+                                                      connection, false);
 
         state->AddAccessorIndex(shard_string, table_name, column_name,
                                 table_key, index_prefix + "_" + table_key,
@@ -373,9 +376,11 @@ sqlast::CreateTable UpdateTableSchema(sqlast::CreateTable stmt,
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state) {
+                                     Connection *connection) {
   perf::Start("Create");
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  UniqueLock lock = state->WriterLock();
 
   // extract table_name from the parsed sqlast CreateTable statement
   const std::string &table_name = stmt.table_name();
@@ -398,7 +403,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
 
   sql::SqlResult result = sql::SqlResult(false);
   // Sharding scenarios.
-  auto &exec = state->executor();
+  auto &exec = connection->executor;
   if (has_pii && sharding_information.size() == 0) {
     // Case 1: has pii but not linked to shards.
     // This means that this table define a type of user for which shards must be
@@ -440,9 +445,16 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     return absl::UnimplementedError("Sharded Table cannot have PII fields!");
   }
 
-  state->AddSchema(table_name, stmt);
+  // Add table schema and its PK column.
+  auto pk_result = GetPK(stmt);
+  if (pk_result.ok()) {
+    const std::string &pk = pk_result.value();
+    state->AddSchema(table_name, stmt, stmt.ColumnIndex(pk), pk);
+  } else {
+    state->AddSchema(table_name, stmt, -1, "");
+  }
   dataflow_state->AddTableSchema(stmt);
-  IndexAccessor(stmt, state, dataflow_state);
+  IndexAccessor(stmt, connection);
 
   perf::End("Create");
   return result;

@@ -9,6 +9,7 @@
 
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -16,7 +17,9 @@
 #include <vector>
 
 #include "pelton/shards/types.h"
+#include "pelton/shards/upgradable_lock.h"
 #include "pelton/sql/lazy_executor.h"
+#include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -44,16 +47,10 @@ class SharderState {
   SharderState(const SharderState &&) = delete;
   SharderState &operator=(const SharderState &&) = delete;
 
-  // Accessors.
-  sql::SqlLazyExecutor &executor() { return this->executor_; }
-
-  // Initialization.
-  void Initialize(const std::string &db_name, const std::string &db_username,
-                  const std::string &db_password);
-
   // Schema manipulations.
   void AddSchema(const UnshardedTableName &table_name,
-                 const sqlast::CreateTable &table_schema);
+                 const sqlast::CreateTable &table_schema, int pk_index,
+                 const std::string &pk);
 
   void AddShardKind(const ShardKind &kind, const ColumnName &pk);
 
@@ -81,6 +78,9 @@ class SharderState {
   const sqlast::CreateTable &GetSchema(
       const UnshardedTableName &table_name) const;
 
+  const std::pair<int, std::string> &GetPk(
+      const UnshardedTableName &table_name) const;
+
   bool Exists(const UnshardedTableName &table) const;
 
   bool IsSharded(const UnshardedTableName &table) const;
@@ -104,8 +104,10 @@ class SharderState {
                    const ColumnName &column_name,
                    const ColumnName &shard_by) const;
 
+  bool HasIndicesFor(const UnshardedTableName &table_name) const;
+
   const std::unordered_set<ColumnName> &IndicesFor(
-      const UnshardedTableName &table_name);
+      const UnshardedTableName &table_name) const;
 
   const FlowName &IndexFlow(const UnshardedTableName &table_name,
                             const ColumnName &column_name,
@@ -117,11 +119,7 @@ class SharderState {
                    const FlowName &flow_name,
                    const sqlast::CreateIndex &create_index_stmt, bool unique);
 
-  // Save state to durable file.
-  void Save(const std::string &dir_path);
-
-  // Load state from its durable file (if exists).
-  void Load(const std::string &dir_path);
+  sql::SqlResult NumShards() const;
 
   // Returns all accessor indices associated with a given shard
   bool HasAccessorIndices(const ShardKind &kind) const;
@@ -136,9 +134,14 @@ class SharderState {
     return count;
   }
 
+  // Synchronization.
+  UniqueLock WriterLock();
+  SharedLock ReaderLock() const;
+
  private:
   // The logical (unsharded) schema of every table.
   std::unordered_map<UnshardedTableName, sqlast::CreateTable> schema_;
+  std::unordered_map<UnshardedTableName, std::pair<int, std::string>> pks_;
 
   // All shard kinds as determined from the schema.
   // Maps a shard kind (e.g. a table name with PII) to the primary key of that
@@ -175,9 +178,6 @@ class SharderState {
   // sharding and other transformations.
   std::unordered_map<ShardedTableName, sqlast::CreateTable> sharded_schema_;
 
-  // Connection pool that manages the underlying sqlite3 databases.
-  sql::SqlLazyExecutor executor_;
-
   // Secondary indices.
   std::unordered_map<ShardKind, std::vector<sqlast::CreateIndex>> create_index_;
 
@@ -195,6 +195,9 @@ class SharderState {
       UnshardedTableName,
       std::unordered_map<ColumnName, std::unordered_map<ColumnName, FlowName>>>
       index_to_flow_;
+
+  // Our implementation of an upgradable shared mutex.
+  mutable UpgradableMutex mtx_;
 };
 
 }  // namespace shards

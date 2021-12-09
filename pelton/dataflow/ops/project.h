@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 // NOLINTNEXTLINE
 #include <variant>
@@ -12,7 +13,6 @@
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/project_enum.h"
 #include "pelton/dataflow/record.h"
-#include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 
 namespace pelton {
@@ -70,13 +70,16 @@ class ProjectOperator : public Operator {
     }
   }
 
-  std::shared_ptr<Operator> Clone() const override;
+  std::optional<ColumnID> ProjectColumn(ColumnID col) const;
+  std::optional<ColumnID> UnprojectColumn(ColumnID col) const;
 
  protected:
-  std::optional<std::vector<Record>> Process(
-      NodeIndex /*source*/, const std::vector<Record> &records) override;
+  std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records,
+                              const Promise &promise) override;
 
   void ComputeOutputSchema() override;
+
+  std::unique_ptr<Operator> Clone() const override;
 
  private:
   class ProjectionOperation {

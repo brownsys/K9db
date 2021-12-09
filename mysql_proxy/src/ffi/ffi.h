@@ -11,15 +11,34 @@ extern "C" {
 
 // Connection is essentially a wrapper around pelton connection.
 typedef struct {
-  // cpp_conn is in reality of type pelton::Connection.
+  // cpp_conn is in reality of type pelton::ConnectionLocal.
   void *cpp_conn;
   // connected is used to report whether some error was encountered when opening
   // the connection.
   bool connected;
 } FFIConnection;
 
+typedef struct {
+  size_t workers;
+  bool consistent;
+  const char *db_name;
+  const char *db_username;
+  const char *db_password;
+} FFIArgs;
+
 // Our version of pelton/sqlast/ast_schema_enums.h#ColumnDefinitionTypeEnum.
 typedef enum { UINT, INT, TEXT, DATETIME } FFIColumnType;
+
+// Our representation of a Query result record (row)
+typedef struct {
+  bool is_null;
+  union RecordData {
+    uint64_t UINT;
+    int64_t INT;
+    char *TEXT;
+    char *DATETIME;
+  } record;
+} FFIRecord;
 
 // Our representation of a Query result. Contains schema information as well
 // as the result data.
@@ -34,23 +53,22 @@ typedef struct {
   size_t num_cols;
   // The actual size of this is num_rows * num_cols.
   // The value of col j and row i corresponds to values[i * num_cols + j].
-  union RecordData {
-    uint64_t UINT;
-    int64_t INT;
-    char *TEXT;
-    char *DATETIME;
-  } values[];
+  FFIRecord records[];
 } FFIResult;
 
 // The FFI API.
 
 // Pass command line arguments to gflags
-void FFIGflags(int argc, char **argv);
+FFIArgs FFIGflags(int argc, char **argv, const char *usage);
 
-// Open a connection. The returned struct has connected = true if successful.
-// Otherwise connected = false.
-FFIConnection FFIOpen(const char *db_name, const char *db_dir,
-                      const char *db_username, const char *db_password);
+// Initialize pelton_state in pelton.cc. Returns true if successful and false
+// otherwise.
+bool FFIInitialize(size_t workers, bool consistent);
+
+// Open a connection for a single client. The returned struct has connected =
+// true if successful. Otherwise connected = false.
+FFIConnection FFIOpen(const char *db_name, const char *db_username,
+                      const char *db_password);
 
 // Execute a DDL statement (e.g. CREATE TABLE, CREATE VIEW, CREATE INDEX).
 bool FFIExecDDL(FFIConnection *c_conn, const char *query);
@@ -66,7 +84,10 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query);
 // Clean up the memory allocated by an FFIResult.
 void FFIDestroySelect(FFIResult *c_result);
 
-// Close the connection. Returns true if successful and false otherwise.
+// Delete pelton_state. Returns true if successful and false otherwise.
+bool FFIShutdown();
+
+// Close a client connection. Returns true if successful and false otherwise.
 bool FFIClose(FFIConnection *c_conn);
 
 #ifdef __cplusplus

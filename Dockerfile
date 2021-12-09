@@ -1,6 +1,6 @@
 # Docker image to build pelton incl. all dependencies
 # based on Ubuntu 2004
-FROM ubuntu:groovy-20210225
+FROM ubuntu:focal-20211006
 
 MAINTAINER Pelton team "http://cs.brown.edu/people/malte/research/pbc/"
 
@@ -8,20 +8,26 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG C.UTF-8
 ENV PATH /usr/local/bin:$PATH
 
+# Add apt-add-repository
+RUN apt-get update && apt-get upgrade -y && apt-get install -y software-properties-common
+
+# Add ppa for gcc-11
+RUN add-apt-repository -y ppa:ubuntu-toolchain-r/test
+
 # Install dependencies
-RUN apt-get update && apt-get upgrade -y && apt-get install -y \
+RUN apt-get update && apt-get install -y \
     apt-utils libssl-dev lsb-release openssl vim git \
     build-essential libssl-dev zlib1g-dev libncurses5-dev \
     libncursesw5-dev libreadline-dev libgdbm-dev libdb5.3-dev libbz2-dev \
-    libexpat1-dev liblzma-dev tk-dev libffi-dev wget gcc-9 g++-9 unzip \
-    openjdk-11-jdk maven python2 valgrind curl libclang-dev
+    libexpat1-dev liblzma-dev tk-dev libffi-dev wget gcc-11 g++-11 unzip \
+    openjdk-11-jdk maven python2 valgrind curl libclang-dev flex bison libevent-dev
 
-RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 90 \
-                                 --slave /usr/bin/gcc-ar gcc-ar /usr/bin/gcc-ar-9 \
-                                 --slave /usr/bin/gcc-nm gcc-nm /usr/bin/gcc-nm-9 \
-                                 --slave /usr/bin/gcc-ranlib gcc-ranlib /usr/bin/gcc-ranlib-9 \
-                                 --slave /usr/bin/g++ g++ /usr/bin/g++-9
-RUN update-alternatives --set gcc /usr/bin/gcc-9
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 90 \
+                                 --slave /usr/bin/gcc-ar gcc-ar /usr/bin/gcc-ar-11 \
+                                 --slave /usr/bin/gcc-nm gcc-nm /usr/bin/gcc-nm-11 \
+                                 --slave /usr/bin/gcc-ranlib gcc-ranlib /usr/bin/gcc-ranlib-11 \
+                                 --slave /usr/bin/g++ g++ /usr/bin/g++-11
+RUN update-alternatives --set gcc /usr/bin/gcc-11
 
 # install bazel using installer to get appropriate version 4.0
 RUN cd /tmp \
@@ -37,11 +43,13 @@ RUN /root/.cargo/bin/cargo install cargo-raze
 
 # install mariadb
 RUN apt-get remove -y --purge mysql*
-RUN apt-get install -y mariadb-server
+
+RUN curl -LsS -O https://downloads.mariadb.com/MariaDB/mariadb_repo_setup
+RUN bash mariadb_repo_setup --mariadb-server-version=10.6
+RUN rm mariadb_repo_setup
+RUN apt-get install -y mariadb-server-10.6 mariadb-client-10.6
 RUN apt-get install -y mariadb-plugin-rocksdb
-RUN echo "[mariadb]" >> /etc/mysql/mariadb.cnf \
-    && echo "plugin_load_add = ha_rocksdb" >> /etc/mysql/mariadb.cnf \
-    && echo "[mysqld]" >> /etc/mysql/mariadb.cnf \
+RUN echo "[mysqld]" >> /etc/mysql/mariadb.cnf \
     && echo "table_open_cache_instances = 1" >> /etc/mysql/mariadb.cnf \
     && echo "table_open_cache = 1000000" >> /etc/mysql/mariadb.cnf \
     && echo "table_definition_cache = 1000000" >> /etc/mysql/mariadb.cnf \
@@ -90,6 +98,11 @@ RUN rm -rf /tmp/*
 # Do not copy, instead bind mount during docker run
 RUN mkdir /home/pelton
 
+# Generate docker.bazelrc
+RUN echo "test:asan --test_env LSAN_OPTIONS=suppressions=/home/pelton/.lsan_jvm_suppress.txt" > /home/docker.bazelrc
+RUN echo "test:tsan --test_env LSAN_OPTIONS=suppressions=/home/pelton/.lsan_jvm_suppress.txt" >> /home/docker.bazelrc
+RUN echo "test:tsan --test_env TSAN_OPTIONS=suppressions=/home/pelton/.tsan_jvm_suppress.txt" >> /home/docker.bazelrc
+
 # for GDPRBench, replace python with python2
 RUN ln -s /usr/bin/python2 /usr/bin/python
 
@@ -98,7 +111,8 @@ ADD docker/configure_db.sql /home/configure_db.sql
 ADD docker/configure_db.sh /home/configure_db.sh
 RUN chmod 750 /home/configure_db.sh
 
-ENTRYPOINT ["/bin/bash", "./home/configure_db.sh"]
+RUN useradd memcached
 
+ENTRYPOINT ["/bin/bash", "./home/configure_db.sh"]
 
 # Run with docker run -v .:/home/pelton

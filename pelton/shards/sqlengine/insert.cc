@@ -2,12 +2,14 @@
 
 #include "pelton/shards/sqlengine/insert.h"
 
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "absl/strings/match.h"
 #include "pelton/shards/sqlengine/index.h"
+#include "pelton/shards/sqlengine/select.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
@@ -28,10 +30,12 @@ std::string Dequote(const std::string &st) {
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state,
+                                     Connection *connection, SharedLock *lock,
                                      bool update_flows) {
   perf::Start("Insert");
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
   if (!dataflow_state->HasFlowsFor(table_name)) {
@@ -45,7 +49,35 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
   // sharded database.
   sql::SqlResult result = sql::SqlResult(0);
 
-  auto &exec = state->executor();
+  // this will contain replaced records if the statement is a REPLACE.
+  std::vector<dataflow::Record> records;
+  if (update_flows && stmt.replace()) {
+    const auto &[key_idx, key_col] = state->GetPk(table_name);
+    if (key_idx == -1) {
+      return absl::InvalidArgumentError("Replace without PK is not supported!");
+    }
+    std::string val;
+    if (stmt.HasColumns()) {
+      ASSIGN_OR_RETURN(val, stmt.GetValue(key_col));
+    } else {
+      val = stmt.GetValue(key_idx);
+    }
+    // Build SELECT * FROM <table> WHERE <pk> = <val>;
+    sqlast::Select select{table_name};
+    select.AddColumn("*");
+    auto where = std::make_unique<sqlast::BinaryExpression>(
+        sqlast::Expression::Type::EQ);
+    where->SetLeft(std::make_unique<sqlast::ColumnExpression>(key_col));
+    where->SetRight(std::make_unique<sqlast::LiteralExpression>(val));
+    select.SetWhereClause(std::move(where));
+    std::cout << "HERE" << std::endl;
+    // Execute select to get results.
+    MOVE_OR_RETURN(sql::SqlResult select_result,
+                   select::Shard(select, connection, false));
+    records = select_result.NextResultSet()->Vectorize();
+  }
+
+  auto &exec = connection->executor;
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
@@ -95,13 +127,20 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
       // TODO(babman): better to do this after user insert rather than user data
       //               insert.
       if (!state->ShardExists(info.shard_kind, user_id)) {
-        for (auto *create_stmt : state->CreateShard(info.shard_kind, user_id)) {
-          sql::SqlResult tmp =
-              exec.ExecuteShard(create_stmt, info.shard_kind, user_id);
-          if (!tmp.IsStatement() || !tmp.Success()) {
-            return absl::InternalError("Could not created sharded table");
+        // Need to upgrade to an exclusive lock on sharder state here, as we
+        // will modify the state.
+        UniqueLock upgraded(std::move(*lock));
+        if (!state->ShardExists(info.shard_kind, user_id)) {
+          for (auto *create_stmt :
+               state->CreateShard(info.shard_kind, user_id)) {
+            sql::SqlResult tmp =
+                exec.ExecuteShard(create_stmt, info.shard_kind, user_id);
+            if (!tmp.IsStatement() || !tmp.Success()) {
+              return absl::InternalError("Could not created sharded table");
+            }
           }
         }
+        *lock = SharedLock(std::move(upgraded));
       }
 
       // Add the modified insert statement.
@@ -112,9 +151,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
   // Insert was successful, time to update dataflows.
   // Turn inserted values into a record and process it via corresponding flows.
   if (update_flows) {
-    std::vector<dataflow::Record> records;
     records.push_back(dataflow_state->CreateRecord(stmt));
-    dataflow_state->ProcessRecords(stmt.table_name(), records);
+    dataflow_state->ProcessRecords(stmt.table_name(), std::move(records));
   }
 
   perf::End("Insert");

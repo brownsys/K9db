@@ -4,6 +4,8 @@
 #define PELTON_SQL_EAGER_EXECUTOR_H_
 
 #include <memory>
+// NOLINTNEXTLINE
+#include <mutex>
 #include <string>
 
 #include "mariadb/conncpp.hpp"
@@ -25,6 +27,9 @@ class SqlEagerExecutor {
   void Initialize(const std::string &db_name, const std::string &username,
                   const std::string &password);
 
+  // Close the connection.
+  void Close();
+
   // Execute statement against the underlying database.
   // Sharding information should already be baked in the SQL command.
   bool ExecuteStatement(const std::string &sql);
@@ -35,6 +40,7 @@ class SqlEagerExecutor {
   // Connection management.
   std::unique_ptr<::sql::Connection> conn_;
   std::unique_ptr<::sql::Statement> stmt_;
+  static std::mutex MTX;
 };
 
 }  // namespace sql

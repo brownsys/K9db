@@ -31,7 +31,6 @@ cc_test(
         "planner.h",
         "planner_unittest.cc",
     ],
-    copts = ["-Iexternal/gtest/googletest/include"],
     target_compatible_with = [
         "@platforms//os:linux",
     ],
@@ -50,8 +49,8 @@ cc_test(
         "//pelton/dataflow/ops:project",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
         "@glog",
-        "@gtest",
-        "@gtest//:gtest_main",
     ],
 )

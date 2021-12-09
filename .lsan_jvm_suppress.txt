@@ -1,0 +1,4 @@
+leak:libjvm.so
+leak:libzip.so
+leak:libz.so
+leak:libjniDataFlowGraphLibrary.so

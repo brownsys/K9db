@@ -35,6 +35,9 @@ class SqlLazyExecutor {
   void Initialize(const std::string &db_name, const std::string &username,
                   const std::string &password);
 
+  // Close the connection.
+  void Close();
+
   // Execute statement against the default un-sharded database.
   SqlResult ExecuteDefault(const sqlast::AbstractStatement *sql,
                            const dataflow::SchemaRef &schema = {});

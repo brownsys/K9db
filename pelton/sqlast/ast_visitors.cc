@@ -80,7 +80,8 @@ std::string Stringifier::VisitCreateIndex(const CreateIndex &ast) {
 
 std::string Stringifier::VisitInsert(const Insert &ast) {
   perf::Start("Stringify (insert)");
-  std::string result = "INSERT INTO " + this->shard_prefix_ + ast.table_name();
+  std::string result = ast.replace() ? "REPLACE" : "INSERT";
+  result += " INTO " + this->shard_prefix_ + ast.table_name();
   // Columns if explicitly specified.
   if (ast.GetColumns().size() > 0) {
     result += "(";
@@ -188,6 +189,9 @@ std::string Stringifier::VisitBinaryExpression(const BinaryExpression &ast) {
     case Expression::Type::IN:
       op = " IN ";
       break;
+    case Expression::Type::GREATER_THAN:
+      op = " > ";
+      break;
     default:
       assert(false);
   }
@@ -249,7 +253,7 @@ std::pair<bool, std::string> ValueFinder::VisitLiteralExpression(
 std::pair<bool, std::string> ValueFinder::VisitLiteralListExpression(
     const LiteralListExpression &ast) {
   if (ast.values().size() == 1) {
-    return std::make_pair(false, Dequote(ast.values().at(0)));
+    return std::make_pair(true, Dequote(ast.values().at(0)));
   }
   return std::make_pair(false, "");
 }
@@ -271,7 +275,7 @@ std::pair<bool, std::string> ValueFinder::VisitBinaryExpression(
       if (result.at(0).first) {
         assert(false);
       }
-      return std::make_pair(result.at(0).first, result.at(1).second);
+      return std::make_pair(false, "");
 
     case Expression::Type::IN:
       // IN can be used on a shard by column when the value list is a singleton.
@@ -286,6 +290,15 @@ std::pair<bool, std::string> ValueFinder::VisitBinaryExpression(
       }
       if (result.at(1).first) {
         return result.at(1);
+      }
+      return std::make_pair(false, "");
+
+    case Expression::Type::GREATER_THAN:
+      // GREATER_THAN cannot be used on a shard by column.
+      if (result.at(0).first) {
+        assert(false);
+      } else if (result.at(1).first) {
+        assert(false);
       }
       return std::make_pair(false, "");
 

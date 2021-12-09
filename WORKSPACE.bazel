@@ -1,7 +1,16 @@
 workspace(name = "pelton")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "new_git_repository")
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_repository")
+
+# Get newer version of python_rules so that tcmalloc works
+# Must be defined here, otherwise protobuf_deps will pull in an older version of this
+# repo.
+http_archive(
+    name = "rules_python",
+    sha256 = "954aa89b491be4a083304a2cb838019c8b8c3720a7abb9c4cb81ac7a24230cea",
+    url = "https://github.com/bazelbuild/rules_python/releases/download/0.4.0/rules_python-0.4.0.tar.gz",
+)
 
 # Buildifier
 # buildifier is written in Go and hence needs rules_go to be built.
@@ -54,18 +63,18 @@ http_archive(
 
 # Abseil C++ Libraries
 http_archive(
-    name = "absl",
-    sha256 = "306639352ec60dcbfc695405e989e1f63d0e55001582a5185b0a8caf2e8ea9ca",
-    strip_prefix = "abseil-cpp-20200923.2",
-    urls = ["https://github.com/abseil/abseil-cpp/archive/20200923.2.zip"],
+    name = "com_google_absl",  # 2021-05-20T02:59:16Z
+    sha256 = "aeba534f7307e36fe084b452299e49b97420667a8d28102cf9a0daeed340b859",
+    strip_prefix = "abseil-cpp-7971fb358ae376e016d2d4fc9327aad95659b25e",
+    urls = ["https://github.com/abseil/abseil-cpp/archive/7971fb358ae376e016d2d4fc9327aad95659b25e.zip"],
 )
 
 # Google Test
 http_archive(
-    name = "gtest",
-    sha256 = "9dc9157a9a1551ec7a7e43daea9a694a0bb5fb8bec81235d8a1e6ef64c716dcb",
-    strip_prefix = "googletest-release-1.10.0",
-    urls = ["https://github.com/google/googletest/archive/release-1.10.0.tar.gz"],
+    name = "com_google_googletest",  # 2021-05-19T20:10:13Z
+    sha256 = "8cf4eaab3a13b27a95b7e74c58fb4c0788ad94d1f7ec65b20665c4caf1d245e8",
+    strip_prefix = "googletest-aa9b44a18678dfdf57089a5ac22c1edb69f35da5",
+    urls = ["https://github.com/google/googletest/archive/aa9b44a18678dfdf57089a5ac22c1edb69f35da5.zip"],
 )
 
 # Google GFlags
@@ -92,10 +101,10 @@ http_archive(
 
 # Google Benchmark library for microbenchmarks
 http_archive(
-    name = "gbenchmark",
-    sha256 = "dccbdab796baa1043f04982147e67bb6e118fe610da2c65f88912d73987e700c",
-    strip_prefix = "benchmark-1.5.2",
-    urls = ["https://github.com/google/benchmark/archive/v1.5.2.tar.gz"],
+    name = "com_github_google_benchmark",  # 2021-05-20T16:59:29Z
+    sha256 = "a6abcbe9dec091cd570462bf712661d3944f73f964f82501456eaa5f89036b1a",
+    strip_prefix = "benchmark-a4bcd937b298fdc2b0c7da9961fa202a5aecd56b",
+    urls = ["https://github.com/google/benchmark/archive/a4bcd937b298fdc2b0c7da9961fa202a5aecd56b.zip"],
 )
 
 # C++ rules for Bazel.
@@ -150,13 +159,135 @@ cc_library(
         ":sqlgrammar",
         "@antlr4_runtimes//:cpp",
     ],
+    copts = [
+        "-fno-char8_t",
+    ],
 )
 """,
-    # My non-merged change for create_view_stmt QUERY_LITERAL from Mar 25 2021.
-    # Plus a hacky fix for UPDATE ... SET <table>.<column>.
-    commit = "a65fb4c4ad27e2d15730b6f6c258b3de8b20c084",
+    # My non-merged change for create_view_stmt QUERY_LITERAL from Dec 1 2022.
+    # Disambiguate '...'. Single quotes can never be used for identifiers, only string literals
+    commit = "9618c902760000b8456f42092db797575d031a62",
     #remote = "https://github.com/antlr/grammars-v4",
     remote = "https://github.com/KinanBab/grammars-v4.git",
+)
+
+# External/foreign tools to include make projects.
+http_archive(
+    name = "rules_foreign_cc",
+    sha256 = "33a5690733c5cc2ede39cb62ebf89e751f2448e27f20c8b2fbbc7d136b166804",
+    strip_prefix = "rules_foreign_cc-0.5.1",
+    url = "https://github.com/bazelbuild/rules_foreign_cc/archive/0.5.1.tar.gz",
+)
+
+load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
+
+rules_foreign_cc_dependencies()
+
+# Memcached dependencies.
+http_archive(
+    name = "libevent",
+    build_file_content = """
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "configure_make")
+
+filegroup(
+    name = "all",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+
+configure_make(
+    name = "libevent",
+    lib_source = ":all",
+    visibility = ["//visibility:public"],
+)
+
+""",
+    strip_prefix = "libevent-2.1.12-stable",
+    type = "tar.gz",
+    url = "https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz",
+)
+
+# Memcached (the binary).
+http_archive(
+    name = "memcached",
+    build_file_content = """
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "configure_make")
+
+filegroup(
+    name = "all",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+
+configure_make(
+    name = "memcached_build",
+    lib_source = ":all",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@libevent//:libevent",
+    ],
+    out_binaries = ["memcached"],
+    out_static_libs = [],
+    out_shared_libs = [],
+    configure_options = [ "CFLAGS='-Wno-error'" ],
+)
+
+filegroup(  # filters the output of memcached_build to only contain the binary
+    name = "bin",
+    srcs = [":memcached_build"],
+    output_group = "memcached"
+)
+
+sh_binary(  # Runnable binary.
+    name = "memcached",
+    srcs = [":bin"],
+)
+""",
+    strip_prefix = "memcached-1.6.10",
+    type = "tar.gz",
+    url = "https://memcached.org/files/memcached-1.6.10.tar.gz",
+)
+
+# Memcached C client.
+http_archive(
+    name = "libmemcached",
+    build_file_content = """
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+
+filegroup(
+    name = "all",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+
+cmake(
+    name = "libmemcached",
+    lib_source = ":all",
+    visibility = ["//visibility:public"],
+    linkopts = [
+        "-ldl",
+    ],
+    out_shared_libs = [
+        "libhashkit.so",
+        "libhashkit.so.2",
+        "libhashkit.so.2.0.0",
+        "libmemcachedprotocol.so",
+        "libmemcachedprotocol.so.0",
+        "libmemcachedprotocol.so.0.0.0",
+        "libmemcached.so",
+        "libmemcached.so.11",
+        "libmemcached.so.11.0.0",
+        "libmemcachedutil.so",
+        "libmemcachedutil.so.2",
+        "libmemcachedutil.so.2.0.0",
+    ],
+    out_static_libs = [],
+    out_binaries = [],
+)
+""",
+    strip_prefix = "libmemcached-1.1.0",
+    type = "zip",
+    url = "https://github.com/awesomized/libmemcached/archive/refs/tags/1.1.0.zip",
 )
 
 # Java related tools (for planner / calcite)
@@ -199,9 +330,18 @@ http_archive(
     ],
 )
 
-load("@rules_rust//rust:repositories.bzl", "rust_repositories")
+load("@rules_rust//rust:repositories.bzl", "rust_repositories", "rust_repository_set")
 
+# defines default rust repositories.
 rust_repositories()
+
+# define a nightly toolchain that is only used for asan/tsan.
+rust_repository_set(
+    name = "rust_nightly",
+    exec_triple = "x86_64-unknown-linux-gnu",
+    iso_date = "2021-06-16",
+    version = "nightly",
+)
 
 load("@rules_rust//bindgen:repositories.bzl", "rust_bindgen_repositories")
 
@@ -210,3 +350,28 @@ rust_bindgen_repositories()
 load("//mysql_proxy/cargo:crates.bzl", "raze_fetch_remote_crates")
 
 raze_fetch_remote_crates()
+
+# TCMalloc dependencies: Fuzzing
+# Need to install python3-distutils or python3-dev
+# Also: sudo ln -s /usr/bin/python3 /usr/bin/python
+http_archive(
+    name = "rules_fuzzing",
+    sha256 = "a5734cb42b1b69395c57e0bbd32ade394d5c3d6afbfe782b24816a96da24660d",
+    strip_prefix = "rules_fuzzing-0.1.1",
+    urls = ["https://github.com/bazelbuild/rules_fuzzing/archive/v0.1.1.zip"],
+)
+
+load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
+
+rules_fuzzing_dependencies()
+
+load("@rules_fuzzing//fuzzing:init.bzl", "rules_fuzzing_init")
+
+rules_fuzzing_init()
+
+# TCMalloc
+git_repository(
+    name = "com_google_tcmalloc",
+    commit = "45c59ccbc062ac96d83710205033c656e490d376",
+    remote = "https://github.com/google/tcmalloc.git",
+)

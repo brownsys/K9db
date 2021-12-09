@@ -11,7 +11,9 @@ SELECT * FROM chat;
 GDPR GET Users 1;
 
 DELETE FROM Users WHERE id = 1;
+GDPR FORGET Users 1;
 SELECT * FROM chat;
 
 DELETE FROM Users WHERE id = 2;
+GDPR FORGET Users 2;
 SELECT * FROM chat;

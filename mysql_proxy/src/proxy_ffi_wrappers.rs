@@ -5,10 +5,18 @@
 extern crate msql_srv;
 
 use msql_srv::{ColumnType, Column, ColumnFlags};
-use std::ffi::CString;
-use std::os::raw::c_char;
+use std::ffi::{CString, CStr};
+use std::os::raw::{c_char, c_int};
 
 include!("proxy_ffi_bindgen.rs");
+
+pub struct CommandLineArgs {
+  pub workers: usize,
+  pub consistent: bool,
+  pub db_name: String,
+  pub db_username: String,
+  pub db_password: String
+}
 
 // Custom destructor
 impl Drop for FFIResult {
@@ -17,41 +25,69 @@ impl Drop for FFIResult {
     }
 }
 
-pub fn open(dir: &str, db: &str, user: &str, pass: &str) -> FFIConnection {
-    // convert &str to char* to pass query to C-wrapper
-    let dir = CString::new(dir).unwrap();
-    let dir: *mut c_char = dir.as_ptr() as *mut i8;
+pub fn gflags_ffi(args: std::env::Args, usage: &str) -> CommandLineArgs {
+    let usage = CString::new(usage).unwrap();
+    // Encode args as char**.
+    let args = args.map(|arg| CString::new(arg).unwrap()).collect::<Vec<CString>>();
+    let mut c_argv = args
+        .iter()
+        .map(|arg| arg.as_ptr() as *mut c_char)
+        .collect::<Vec<*mut c_char>>();
+    // Pass to FFI.
+    let flags = unsafe { FFIGflags(args.len() as c_int, c_argv.as_mut_ptr(), usage.as_ptr()) };
+    // Transform FFIArgs to CommandLineArgs.
+    let db_name = unsafe { CStr::from_ptr(flags.db_name) };
+    let db_name = db_name.to_str().unwrap();
+    let db_username = unsafe { CStr::from_ptr(flags.db_username) };
+    let db_username = db_username.to_str().unwrap();
+    let db_password = unsafe { CStr::from_ptr(flags.db_password) };
+    let db_password = db_password.to_str().unwrap();
+    return CommandLineArgs {
+        workers: flags.workers,
+        consistent: flags.consistent,
+        db_name: db_name.to_string(),
+        db_username: db_username.to_string(),
+        db_password: db_password.to_string()
+    };
+}
+
+pub fn initialize_ffi(workers: usize, consistent: bool) -> bool {
+    return unsafe { FFIInitialize(workers, consistent) };
+}
+
+pub fn open_ffi(db: &str, user: &str, pass: &str) -> FFIConnection {
     let db = CString::new(db).unwrap();
-    let db: *mut c_char = db.as_ptr() as *mut i8;
+    let db = db.as_ptr();
     let user = CString::new(user).unwrap();
-    let user: *mut c_char = user.as_ptr() as *mut i8;
+    let user = user.as_ptr();
     let pass = CString::new(pass).unwrap();
-    let pass: *mut c_char = pass.as_ptr() as *mut i8;
-
-    let conn = unsafe { FFIOpen(dir, db, user, pass) };
-    return conn;
+    let pass = pass.as_ptr();
+    return unsafe { FFIOpen(db, user, pass) };
 }
 
-pub fn close(rust_conn: *mut FFIConnection) -> bool {
-    let response = unsafe { FFIClose(rust_conn) };
-    return response;
+pub fn shutdown_ffi() -> bool {
+    return unsafe { FFIShutdown() };
 }
 
-pub fn exec_ddl(rust_conn: *mut FFIConnection, query: &str) -> bool {
+pub fn close_ffi(rust_conn: *mut FFIConnection) -> bool {
+    return unsafe { FFIClose(rust_conn) };
+}
+
+pub fn exec_ddl_ffi(rust_conn: *mut FFIConnection, query: &str) -> bool {
     let c_query = CString::new(query).unwrap();
-    let char_query = c_query.as_ptr() as *mut i8;
+    let char_query: *const c_char = c_query.as_ptr();
     return unsafe { FFIExecDDL(rust_conn, char_query) };
 }
 
-pub fn exec_update(rust_conn: *mut FFIConnection, query: &str) -> i32 {
+pub fn exec_update_ffi(rust_conn: *mut FFIConnection, query: &str) -> i32 {
     let c_query = CString::new(query).unwrap();
-    let char_query = c_query.as_ptr() as *mut i8;
+    let char_query: *const c_char = c_query.as_ptr();
     return unsafe { FFIExecUpdate(rust_conn, char_query) };
 }
 
-pub fn exec_select(rust_conn: *mut FFIConnection, query: &str) -> *mut FFIResult {
+pub fn exec_select_ffi(rust_conn: *mut FFIConnection, query: &str) -> *mut FFIResult {
     let c_query = CString::new(query).unwrap();
-    let char_query = c_query.as_ptr() as *mut i8;
+    let char_query: *const c_char = c_query.as_ptr();
     return unsafe { FFIExecSelect(rust_conn, char_query) };
 }
 

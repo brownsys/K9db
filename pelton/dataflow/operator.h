@@ -2,25 +2,23 @@
 #define PELTON_DATAFLOW_OPERATOR_H_
 
 #include <memory>
-#include <optional>
 #include <string>
 #include <tuple>
 #include <vector>
 
-#include "benchmark/benchmark.h"
+#include "pelton/dataflow/future.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 
+#ifdef PELTON_BENCHMARK  // shuts up compiler warnings
+#include "pelton/dataflow/ops/benchmark_utils.h"
+#endif
+
 namespace pelton {
 namespace dataflow {
 
-class DataFlowGraph;
-
-#ifdef PELTON_BENCHMARK  // shuts up compiler warnings
-// NOLINTNEXTLINE
-static void JoinOneToOne(benchmark::State &state);
-#endif
+class DataFlowGraphPartition;
 
 class Operator {
  public:
@@ -33,13 +31,14 @@ class Operator {
     EQUIJOIN,
     PROJECT,
     AGGREGATE,
+    EXCHANGE,
   };
 
   // Cannot copy an operator.
   Operator(const Operator &other) = delete;
   Operator &operator=(const Operator &other) = delete;
 
-  virtual ~Operator() { graph_ = nullptr; }
+  virtual ~Operator() {}
 
   /*!
    * Take a batch of records belonging to operator source and push it
@@ -50,36 +49,27 @@ class Operator {
    * @param records
    * @return
    */
-  virtual void ProcessAndForward(NodeIndex source,
-                                 const std::vector<Record> &records);
-  // TODO(babman): we can have an optimized version for the case where this
-  // operator is a single child of another operator. The records can then be
-  // moved into ProcessAndForward, modified in place, and then moved/passed
-  // by const ref to its child/children.
+  void ProcessAndForward(NodeIndex source, std::vector<Record> &&records,
+                         Promise &&promise);
 
-  Type type() const { return this->type_; }
+  // Accessors (read only).
   NodeIndex index() const { return this->index_; }
-  DataFlowGraph *graph() const { return graph_; }
+  Type type() const { return this->type_; }
+  PartitionIndex partition() const { return this->partition_; }
+
   const SchemaRef &output_schema() const { return this->output_schema_; }
-
-  // Constructs a vector of parent operators from parents_ edge vector.
-  std::vector<std::shared_ptr<Operator>> GetParents() const;
-
-  // Meant to generate a clone with same operator specific information, edges,
-  // and input/output schemas.
-  virtual std::shared_ptr<Operator> Clone() const = 0;
+  const std::vector<Operator *> &children() const { return this->children_; }
+  const std::vector<Operator *> &parents() const { return this->parents_; }
 
   // For debugging.
   virtual std::string DebugString() const;
+  virtual Record DebugRecord() const;
+
+  uint64_t SizeInMemory(const std::string &flow_name,
+                        std::vector<Record> *output) const;
 
  protected:
-  explicit Operator(Type type)
-      : index_(UNDEFINED_NODE_INDEX), type_(type), graph_(nullptr) {}
-
-  void SetGraph(DataFlowGraph *graph) { this->graph_ = graph; }
-  void SetIndex(NodeIndex index) { this->index_ = index; }
-  void AddParent(std::shared_ptr<Operator> parent,
-                 std::tuple<NodeIndex, NodeIndex> edge);
+  explicit Operator(Type type) : index_(UNDEFINED_NODE_INDEX), type_(type) {}
 
   /*!
    * Push a batch of records through the dataflow graph. Order within this batch
@@ -88,12 +78,14 @@ class Operator {
    * records of this batch arrive at the same time. Records will NOT be pushed
    * to children.
    * @param source the index of the source operator.
-   * @param records an input target vector.
-   * @param output target vector where to write outputs to.
-   * @return true when processing succeeded, false when an error occurred.
+   * @param records the input vector of records.
+   * @param promise this can be derived from by operators that need sub-promises
+   *                but should not be resolved by the operator.
+   * @return the output vector to broadcast to children operators.
    */
-  virtual std::optional<std::vector<Record>> Process(
-      NodeIndex source, const std::vector<Record> &records) = 0;
+  virtual std::vector<Record> Process(NodeIndex source,
+                                      std::vector<Record> &&records,
+                                      const Promise &promise) = 0;
 
   /*!
    * Compute the output_schema of the operator.
@@ -103,31 +95,43 @@ class Operator {
    */
   virtual void ComputeOutputSchema() = 0;
 
+  // Meant to generate a clone of the same operator type and information.
+  // The generated clone does not have its parents or children set, since those
+  // likely need to be cloned as well. The cloned operator must be added to
+  // a partition with the appropriate parent(s) for it to become fully
+  // functional.
+  // This should only be used inside DtaFlowGraphPartition's Clone() function.
+  virtual std::unique_ptr<Operator> Clone() const = 0;
+
   // Return the size of any stored state in memory.
   virtual uint64_t SizeInMemory() const { return 0; }
 
   // Edges to children and parents.
-  std::vector<NodeIndex> children_;
-  std::vector<NodeIndex> parents_;
+  std::vector<Operator *> children_;
+  std::vector<Operator *> parents_;
 
   // Input and output schemas.
   std::vector<SchemaRef> input_schemas_;
   SchemaRef output_schema_;
-  NodeIndex index_;
 
  private:
-  Type type_;
-  DataFlowGraph *graph_;  // The graph the operator belongs to.
-  void BroadcastToChildren(const std::vector<Record> &records);
+  // Called by DataFlowGraphPartition.
+  friend class DataFlowGraphPartition;
+  void SetIndex(NodeIndex index) { this->index_ = index; }
+  void SetPartition(PartitionIndex partition) { this->partition_ = partition; }
+  void AddParent(Operator *parent);
+  void AddParentAt(Operator *parent, size_t parent_index);
+  size_t RemoveParent(Operator *parent);
 
-  // Allow DataFlowGraph to use SetGraph, SetIndex, and AddParent functions.
-  friend class DataFlowGraph;
-  template <typename T>
-  friend class MatViewOperatorT;
+  // Pass the given batch to the children operators (if any) for processing.
+  void BroadcastToChildren(std::vector<Record> &&records, Promise &&promise);
+
+  NodeIndex index_;
+  Type type_;
+  PartitionIndex partition_;
 
 #ifdef PELTON_BENCHMARK  // shuts up compiler warnings
-  // NOLINTNEXTLINE
-  friend void JoinOneToOne(benchmark::State &state);
+  friend void ProcessBenchmark(Operator *op, NodeIndex src, RecordGenFunc gen);
 #endif
 };
 

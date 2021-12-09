@@ -11,7 +11,7 @@ Bazel will pull some dependencies automatically. If not or you get errors, you m
 install the following via your package manager:
  * [Abseil](https://abseil.io/) (v2020-02-25)
  * [googletest](https://github.com/google/googletest) (v1.10)
- * GCC-9 (`apt-get install gcc-9 g++-9`)
+ * GCC-11 (`apt-get install gcc-11 g++-11`)
  * mysql8 and mysqlcppconn8 (the c++ mysql connector), follow instructions here
    to install for [ubuntu](https://dev.mysql.com/doc/mysql-apt-repo-quick-guide/en/).
    Make sure to afterwards run `apt-get install libmysqlcppconn8-2 libmysqlcppconn-dev` (the

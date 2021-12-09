@@ -6,6 +6,7 @@
 
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/record.h"
+#include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
 
 namespace pelton {
@@ -18,14 +19,15 @@ class UnionOperator : public Operator {
 
   UnionOperator() : Operator(Operator::Type::UNION) {}
 
-  std::optional<std::vector<Record>> Process(
-      NodeIndex /*source*/, const std::vector<Record> & /*records*/) override;
-
-  std::shared_ptr<Operator> Clone() const override;
-
  protected:
   bool DeepCompareSchemas(const SchemaRef s1, const SchemaRef s2);
+
+  std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records,
+                              const Promise &promise) override;
+
   void ComputeOutputSchema() override;
+
+  std::unique_ptr<Operator> Clone() const override;
 };
 
 }  // namespace dataflow

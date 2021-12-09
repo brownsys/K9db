@@ -2,6 +2,7 @@
 #define PELTON_DATAFLOW_OPS_AGGREGATE_H_
 
 #include <cstdint>
+#include <list>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -9,6 +10,7 @@
 #include <variant>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
 #include "gtest/gtest_prod.h"
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/aggregate_enum.h"
@@ -23,6 +25,9 @@ namespace dataflow {
 class AggregateOperator : public Operator {
  public:
   using Function = AggregateFunctionEnum;
+  using State = GroupedDataT<absl::flat_hash_map<Key, std::list<Value>>,
+                             std::list<Value>, std::nullptr_t, Value>;
+
   AggregateOperator() = delete;
   // Cannot copy an operator.
   AggregateOperator(const AggregateOperator &other) = delete;
@@ -31,44 +36,41 @@ class AggregateOperator : public Operator {
   AggregateOperator(std::vector<ColumnID> group_columns,
                     Function aggregate_function, ColumnID aggregate_column)
       : Operator(Operator::Type::AGGREGATE),
+        state_(),
         group_columns_(group_columns),
         aggregate_function_(aggregate_function),
-        aggregate_column_(aggregate_column),
-        aggregate_schema_() {}
-
-  std::shared_ptr<Operator> Clone() const override;
-
-  ~AggregateOperator() {
-    // Ensure that schemas are not destructed first
-    state_.~GroupedDataT();
-  }
-
- protected:
-  std::optional<std::vector<Record>> Process(
-      NodeIndex /*source*/, const std::vector<Record> &records) override;
-  void ComputeOutputSchema() override;
+        aggregate_column_index_(aggregate_column) {}
 
   uint64_t SizeInMemory() const override { return this->state_.SizeInMemory(); }
 
+  const std::vector<ColumnID> &group_columns() const {
+    return this->group_columns_;
+  }
+
+ protected:
+  std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records,
+                              const Promise &promise) override;
+
+  void ComputeOutputSchema() override;
+
+  std::unique_ptr<Operator> Clone() const override;
+
  private:
-  UnorderedGroupedData state_;
+  State state_;
+  // Group by columns information.
   std::vector<ColumnID> group_columns_;
+  // Aggregate column information.
   Function aggregate_function_;
-  ColumnID aggregate_column_;
-  // This contains a single column (the one resulting from the aggregate).
-  SchemaRef aggregate_schema_;
+  ColumnID aggregate_column_index_;
+  std::string aggregate_column_name_;
+  sqlast::ColumnDefinition::Type aggregate_column_type_;
 
-  // Equivalent of doing a logical project on record
-  // std::vector<Key> GenerateKey(const Record &record) const;
-  // Combine key from state with computed aggregate and emit record. Used for
-  // emitting both positive and negative records
-  void EmitRecord(const Key &key, const Record &aggregate_record, bool positive,
-                  std::vector<Record> *output) const;
-
-  // A helper function to improve code readability inside the process function
-  inline void InitAggregateValue(Record *aggregate_record,
-                                 const Record &from_record,
-                                 ColumnID from_column) const;
+  // Construct an output record with this->output_schema_.
+  // The first n-1 columns are assigned values from the given key corresponding
+  // to group by columns.
+  // The last column is assigned value from the aggregate value.
+  Record EmitRecord(const Key &key, const Value &aggregate,
+                    bool positive) const;
 
   // Allow tests to use .Process(...) directly.
   FRIEND_TEST(AggregateOperatorTest, MultipleGroupColumnsCountPositive);

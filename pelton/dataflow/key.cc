@@ -74,5 +74,27 @@ std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Key &k) {
   return os;
 }
 
+// Deterministic hashing for partitioning / mutli-threading.
+size_t Key::Hash() const {
+  size_t hash_value = 0;
+  for (const Value &val : this->values_) {
+    switch (val.type()) {
+      case sqlast::ColumnDefinition::Type::UINT:
+        hash_value += std::hash<std::uint64_t>{}(val.GetUInt());
+        break;
+      case sqlast::ColumnDefinition::Type::INT:
+        hash_value += std::hash<std::int64_t>{}(val.GetInt());
+        break;
+      case sqlast::ColumnDefinition::Type::TEXT:
+      case sqlast::ColumnDefinition::Type::DATETIME:
+        hash_value += std::hash<std::string>{}(val.GetString());
+        break;
+      default:
+        LOG(FATAL) << "Unsupported data type when computing hash of record!";
+    }
+  }
+  return hash_value;
+}
+
 }  // namespace dataflow
 }  // namespace pelton

@@ -164,6 +164,10 @@ class Record {
 
   // Data type transformation.
   void SetValue(const std::string &value, size_t i);
+  void SetValue(const Value &value, size_t i);
+
+  // Deterministic hashing for partitioning / mutli-threading.
+  size_t Hash(const std::vector<ColumnID> &cols) const;
 
   // Accessors.
   void SetPositive(bool positive) { this->positive_ = positive; }
@@ -180,21 +184,16 @@ class Record {
   friend std::ostream &operator<<(std::ostream &os, const Record &r);
 
   // Custom comparison between records (for ordering).
-  struct Compare {
+  class Compare {
    public:
-    explicit Compare(const std::vector<ColumnID> &cols) {
-      this->cols = std::make_shared<std::vector<ColumnID>>(cols);
-    }
+    explicit Compare(const std::vector<ColumnID> &cols) : cols_(cols) {}
     bool operator()(const Record &l, const Record &r) const {
-      return l.GetValues(*cols) < r.GetValues(*cols);
+      return l.GetValues(this->cols_) < r.GetValues(this->cols_);
     }
-    std::vector<ColumnID> Cols() const {
-      std::vector<ColumnID> compare_cols = *cols;
-      return compare_cols;
-    }
+    const std::vector<ColumnID> &cols() const { return this->cols_; }
 
    private:
-    std::shared_ptr<std::vector<ColumnID>> cols;
+    std::vector<ColumnID> cols_;
   };
 
  private:
@@ -303,7 +302,8 @@ class Record {
       // Destruct unique_ptrs.
       for (size_t i = 0; i < this->schema_.size(); i++) {
         const auto &type = this->schema_.column_types().at(i);
-        if (type == sqlast::ColumnDefinition::Type::TEXT) {
+        if (type == sqlast::ColumnDefinition::Type::TEXT ||
+            type == sqlast::ColumnDefinition::Type::DATETIME) {
           this->data_[i].str = std::unique_ptr<std::string>();
         }
       }
