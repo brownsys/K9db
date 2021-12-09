@@ -21,7 +21,8 @@ namespace sqlengine {
 namespace index {
 
 absl::StatusOr<sql::SqlResult> CreateIndex(const sqlast::CreateIndex &stmt,
-                                           Connection *connection);
+                                           Connection *connection,
+                                           bool synchronize);
 
 absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
     const std::string &table_name, const std::string &shard_by,

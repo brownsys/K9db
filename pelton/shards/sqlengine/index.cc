@@ -19,13 +19,17 @@ namespace sqlengine {
 namespace index {
 
 absl::StatusOr<sql::SqlResult> CreateIndex(const sqlast::CreateIndex &stmt,
-                                           Connection *connection) {
+                                           Connection *connection,
+                                           bool synchronize) {
   perf::Start("Create Index");
   const std::string &table_name = stmt.table_name();
 
   // Need a unique lock as we are changing index metadata
   shards::SharderState *state = connection->state->sharder_state();
-  UniqueLock lock = state->WriterLock();
+  UniqueLock lock;
+  if (synchronize) {
+    lock = state->WriterLock();
+  }
 
   sql::SqlResult result = sql::SqlResult(false);
   bool is_sharded = state->IsSharded(table_name);

@@ -21,7 +21,7 @@ namespace sqlengine {
 namespace delete_ {
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
-                                     Connection *connection, SharedLock *lock,
+                                     Connection *connection, bool synchronize,
                                      bool update_flows) {
   perf::Start("Delete");
   const std::string &table_name = stmt.table_name();
@@ -29,6 +29,11 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
   // We only read from state.
   shards::SharderState *state = connection->state->sharder_state();
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+
+  SharedLock lock;
+  if (synchronize) {
+    lock = state->ReaderLock();
+  }
 
   // If no flows read from this table, we do not need to do anything
   // to update them.

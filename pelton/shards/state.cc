@@ -51,6 +51,21 @@ void SharderState::AddShardedTable(
       {sharding_information.sharded_table_name, sharded_create_statement});
 }
 
+// Used to add an AccessorIndexInformation struct to sharder state
+void SharderState::AddAccessorIndex(
+    const ShardKind &kind, const UnshardedTableName &table,
+    const ColumnName &accessor_column, const ColumnName &shard_by_column,
+    const IndexName &index_name,
+    const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
+        &anonymize,
+    const bool is_sharded) {
+  // Create an AccessorIndexInformation
+  AccessorIndexInformation accessor_information{
+      kind,       table,     accessor_column, shard_by_column,
+      index_name, anonymize, is_sharded};
+  this->accessor_index_[kind].push_back(accessor_information);
+}
+
 std::list<const sqlast::AbstractStatement *> SharderState::CreateShard(
     const ShardKind &shard_kind, const UserId &user) {
   // Mark shard for this user as created!
@@ -115,6 +130,14 @@ bool SharderState::ShardExists(const ShardKind &shard_kind,
 const std::unordered_set<UserId> &SharderState::UsersOfShard(
     const ShardKind &kind) const {
   return this->shards_.at(kind);
+}
+
+bool SharderState::HasAccessorIndices(const ShardKind &kind) const {
+  return this->accessor_index_.count(kind) == 1;
+}
+const std::vector<AccessorIndexInformation> &SharderState::GetAccessorIndices(
+    const ShardKind &kind) const {
+  return this->accessor_index_.at(kind);
 }
 
 const std::unordered_set<UnshardedTableName> &SharderState::TablesInShard(

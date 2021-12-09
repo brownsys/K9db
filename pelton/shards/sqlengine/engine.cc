@@ -33,11 +33,16 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
   // Parse with ANTLR into our AST.
   perf::Start("parsing");
   sqlast::SQLParser parser;
+  // parse the statement, move result of parsing sql string to newly created
+  // <sqlast::AbstractStatement> statement.
   MOVE_OR_RETURN(std::unique_ptr<sqlast::AbstractStatement> statement,
                  parser.Parse(sql));
   perf::End("parsing");
 
-  // Compute result.
+  // Get type of sql statement, initialize stmt (statement) as the associated
+  // type custom defined in pelton via the sqlast class. Then call Shard in the
+  // appropriate file. Eg if CreateTable we call create::Shard() from
+  // sqlengine/create.cc
   switch (statement->type()) {
     // Case 1: CREATE TABLE statement.
     case sqlast::AbstractStatement::Type::CREATE_TABLE: {
@@ -55,7 +60,7 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
     // Case 3: Update statement.
     case sqlast::AbstractStatement::Type::UPDATE: {
       auto *stmt = static_cast<sqlast::Update *>(statement.get());
-      return update::Shard(*stmt, connection);
+      return update::Shard(*stmt, connection, true);
     }
 
     // Case 4: Select statement.
@@ -72,8 +77,7 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
     // Case 5: Delete statement.
     case sqlast::AbstractStatement::Type::DELETE: {
       auto *stmt = static_cast<sqlast::Delete *>(statement.get());
-      SharedLock lock = connection->state->sharder_state()->ReaderLock();
-      return delete_::Shard(*stmt, connection, &lock, true);
+      return delete_::Shard(*stmt, connection, true, true);
     }
 
     // Case 6: CREATE VIEW statement (e.g. dataflow).
@@ -84,10 +88,10 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       return sql::SqlResult(true);
     }
 
-    // Case 7: CREATE INEDX statement.
+    // Case 7: CREATE INDEX statement.
     case sqlast::AbstractStatement::Type::CREATE_INDEX: {
       auto *stmt = static_cast<sqlast::CreateIndex *>(statement.get());
-      return index::CreateIndex(*stmt, connection);
+      return index::CreateIndex(*stmt, connection, true);
     }
 
     // Case 8: GDPR (GET | FORGET) statements.

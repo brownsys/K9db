@@ -57,6 +57,7 @@ class SharedLock {
 // Class is movable but not copyable.
 class UniqueLock {
  public:
+  UniqueLock() = default;
   // Unique lock from scratch.
   explicit UniqueLock(UpgradableMutex *mutex);
   // Upgrade a shared lock to a unique lock!

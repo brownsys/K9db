@@ -89,8 +89,9 @@ bool close(Connection *connection) {
 }
 
 absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
-  // Trim statement.
+  // Trim statement, removing whitespace
   Trim(sql);
+  // print sql statements if echo is set to true
   if (echo) {
     std::cout << sql << std::endl;
   }

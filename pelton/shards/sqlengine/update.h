@@ -17,7 +17,7 @@ namespace sqlengine {
 namespace update {
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
-                                     Connection *connection);
+                                     Connection *connection, bool synchronize);
 
 }  // namespace update
 }  // namespace sqlengine
