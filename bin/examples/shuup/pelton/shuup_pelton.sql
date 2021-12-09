@@ -13,6 +13,31 @@ CREATE TABLE auth_users ( \
   PRIMARY KEY(id) \
 );
 
+-- # TODO:
+-- add annotations to auth_users, double check the anonymized cols
+-- what tables might be sharded: gdpr related tables, shuup_basket, shuup_contactinfo..
+-- open github bug report for shuup regarded 
+-- 1. anonymization button anonymizes everyone not just single user as shown
+-- 2. some orders not anonymized
+-- 3. user download data button doesn't return any data
+
+-- benchmarking: cost of accessor annotations on insert
+
+
+-- expressiveness, no overhead, class of applications in e-commerce where all data needs
+-- to be retained for tax purposes
+-- our annotations support this with no overhead bc all data is retained, so no microDBs/sharding needed
+
+-- read shuup python code 180 lines and check if they delete anything (this would need sharding)
+-- if they delete smthn, then clearly that needs to be sharded, add the right annotations
+-- if they don't delete anything, go thru and check tables that should be deleted (like gdpr consent, bookmarked products, wishlist, basket 
+-- - anything you don't need to keep like browsing history, likes, things clicked on )
+-- go thru whole schema and decide whether would be sharded
+
+-- quickly benchmark GDPR GET 
+
+-- in future can run script to fill with fake data to see
+
 CREATE TABLE shuup_mutaddress ( \
   id int, \
   prefix text, \
@@ -50,8 +75,8 @@ CREATE TABLE shuup_imaddress ( \
   ANONYMIZE_street3 text, \
   ANONYMIZE_postal_code text, \
   ANONYMIZE_city text, \
-  ANONYMIZE_region_code text, \
-  ANONYMIZE_region text, \
+  region_code text, \
+  region text, \
   country text, \
   tax_number text, \
   ACCESSOR_ANONYMIZE_user_id int, \
