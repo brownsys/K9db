@@ -42,16 +42,17 @@ pub fn pp_pelton_database() {
     let mut conn = Conn::new(OptsBuilder::new().db_name(Some("pelton")).user(Some("root")).pass(Some("password"))).unwrap();
     let tables : Vec<String> = conn.query("show tables;").unwrap();
     let (user_hashes, mut table_names) : (HashSet<_>, HashSet<_>) = tables.iter().filter_map(|s| s.find('_').map(|i| (&s[..i], &s[(i + 1)..]))).filter(|t| t.0 != "default").unzip();
-    let username_marker_exists = table_names.remove("username_marker_uid");
+    let username_marker_table = "username_marker_uid";
+    let username_marker_exists = table_names.remove(username_marker_table);
     for user_hash in user_hashes.iter() {
         let user = if username_marker_exists {
-            conn.query_first(format!("SELECT * FROM {}_username_marker_uid;", user_hash)).unwrap().expect("Empty username marker table")
+            conn.query_first(format!("SELECT * FROM {}_{};", user_hash, username_marker_table)).unwrap().expect("Empty username marker table")
         } else {
             user_hash.to_string()
         };
         println!("=============== μDB for {} ===============", user);
         for tab in table_names.iter() {
-            if tab == &"username_marker" { continue; }
+            if tab == &username_marker_table { continue; }
             use std::process::Command;
             use std::io::Write;
             println!("TABLE {}", tab);
