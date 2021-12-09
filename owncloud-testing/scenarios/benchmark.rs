@@ -204,8 +204,8 @@ fn main() {
                 (@arg group_shares_per_file: --("group-shares-per-file") +takes_value "Avg group shares per file")
                 (@arg users_per_group: --("users-per-group") +takes_value "Avg users per group")
                 (@arg backend: --backend +required +takes_value "Backend type to use")
-                (@arg num_samples: --samples +required +takes_value "Number of samples to time")
-                (@arg nump_db: --("dump-db-after") "Dump the entire mysql database after")
+                (@arg num_samples: --samples +takes_value "Number of samples to time")
+                (@arg dump_db: --("dump-db-after") "Dump the entire mysql database after")
         ).get_matches();
 
     let ref mut conn = prepare_backend(match matches.value_of("backend").expect("backend argument is required") {
@@ -231,7 +231,7 @@ fn main() {
 
     let mut rng = rand::thread_rng();
     let ulen = users.len(); 
-    let samples = std::iter::repeat_with(|| &users[rng.gen_range(0..ulen)]).take(value_t_or_exit!(matches, "num_samples", usize)).collect::<Vec<_>>();
+    let samples = std::iter::repeat_with(|| &users[rng.gen_range(0..ulen)]).take(value_t!(matches, "num_samples", usize).unwrap_or(1)).collect::<Vec<_>>();
     let now = std::time::Instant::now();
     let results : Vec<Vec<Row>> = samples.iter().map(|user| {
         conn.query(
