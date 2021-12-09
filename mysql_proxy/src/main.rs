@@ -78,6 +78,12 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         prepared_statement: &str,
         info: StatementMetaWriter<W>,
     ) -> io::Result<()> {
+        debug!(self.log, "Rust proxy: starting on_prepare");
+        debug!(
+            self.log,
+            "Rust Proxy: prepared statement received is: {:?}", prepared_statement
+        );
+
         // Only support SELECT and INSERT.
         if !prepared_statement.starts_with("SELECT") && !prepared_statement.starts_with("INSERT") {
             error!(
@@ -139,7 +145,6 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         );
 
         let statement_id = prepared_write_guard.len() as u32;
-
         let make_view = !NO_VIEWS.contains(&prepared_statement);
         if prepared_statement.starts_with("SELECT") && make_view {
             let view_name = String::from("q") + &statement_id.to_string();
