@@ -102,7 +102,8 @@ absl::Status MaybeHandleOwningColumn(
         const sqlast::CreateTable schema = state->GetSchema(target_table);
         const ShardedTableName &sharded_table = VarownShardedTableName(*state, target_table, col.column_name(), stmt.table_name());
         sqlast::Insert insert(
-          sharded_table
+          sharded_table,
+          false
         );
         for (auto &col0 : schema.GetColumns()) {
           insert.AddColumn(col0.column_name());

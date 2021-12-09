@@ -19,8 +19,7 @@ namespace sqlengine {
 namespace index {
 
 absl::StatusOr<sql::SqlResult> CreateIndex(const sqlast::CreateIndex &stmt,
-                                           Connection *connection,
-                                           bool synchronize) {
+                                           Connection *connection) {
   perf::Start("Create Index");
 
   // Need a unique lock as we are changing index metadata

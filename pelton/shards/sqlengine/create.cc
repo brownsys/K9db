@@ -258,9 +258,8 @@ absl::StatusOr<std::pair<std::list<ShardingInformation>, std::optional<OwningTab
   return std::make_pair(implicit_owners, owning_table);
 }
 
-void IndexAccessor(const sqlast::CreateTable &stmt, Connection *connection) {
+absl::Status IndexAccessor(const sqlast::CreateTable &stmt, Connection *connection, UniqueLock *lock) {
   shards::SharderState *state = connection->state->sharder_state();
-  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
 
   // Result is empty by default.
   std::unordered_map<ColumnName, ColumnIndex> index_map;
@@ -314,8 +313,12 @@ void IndexAccessor(const sqlast::CreateTable &stmt, Connection *connection) {
         sqlast::CreateIndex create_index_stmt{index_prefix, table_name,
                                               column_name};
 
-        pelton::shards::sqlengine::index::CreateIndex(create_index_stmt,
-                                                      connection, false);
+        auto status = 
+          pelton::shards::sqlengine::index::CreateIndexStateIsAlreadyLocked(
+            create_index_stmt,
+            connection, lock);
+        if (!status.ok())
+          return status.status();
 
         state->AddAccessorIndex(shard_string, table_name, column_name,
                                 table_key, index_prefix + "_" + table_key,
@@ -326,6 +329,7 @@ void IndexAccessor(const sqlast::CreateTable &stmt, Connection *connection) {
       }
     }
   }
+  return absl::OkStatus();
 }
 // Determine what should be done about a single foreign key in some
 // sharded table.
@@ -572,7 +576,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     state->AddSchema(table_name, stmt, -1, "");
   }
   dataflow_state->AddTableSchema(stmt);
-  IndexAccessor(stmt, connection);
+  CHECK_STATUS(IndexAccessor(stmt, connection, &lock));
 
 
   if (owning_table) {
