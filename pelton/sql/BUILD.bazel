@@ -48,6 +48,7 @@ cc_library(
     ],
     visibility = ["//:__subpackages__"],
     deps = [
+        ":connection",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "@glog",

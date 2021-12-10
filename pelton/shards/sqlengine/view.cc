@@ -330,7 +330,7 @@ absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
 
   perf::End("SelectView");
   return sql::SqlResult(
-      sql::SqlResultSet(flow.output_schema(), std::move(records)));
+      sql::SqlResultSet(flow.output_schema(), {std::move(records), {}}));
 }
 
 }  // namespace view

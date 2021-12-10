@@ -17,6 +17,10 @@
 namespace pelton {
 namespace sql {
 
+// Comparisons over rocksdb::Slice.
+bool SlicesEq(const rocksdb::Slice &l, const rocksdb::Slice &r);
+bool SlicesGt(const rocksdb::Slice &l, const rocksdb::Slice &r);
+
 bool IsNull(const char *buf, size_t size);
 
 std::string EncodeInsert(const sqlast::Insert &stmt,
@@ -24,7 +28,18 @@ std::string EncodeInsert(const sqlast::Insert &stmt,
 
 dataflow::Record DecodeRecord(const rocksdb::Slice &slice,
                               const dataflow::SchemaRef &schema,
-                              const std::vector<AugInfo> &augments);
+                              const std::vector<AugInfo> &augments,
+                              const std::vector<int> &projections);
+
+rocksdb::Slice ExtractColumn(const rocksdb::Slice &slice, size_t col);
+
+std::string Update(const std::unordered_map<std::string, std::string> &update,
+                   const dataflow::SchemaRef &schema, const std::string &str);
+
+// Schema Manipulation.
+std::vector<int> ProjectionSchema(
+    const dataflow::SchemaRef &db_schema, const dataflow::SchemaRef &out_schema,
+    const std::vector<AugInfo> &augments);
 
 // Transforms Where clauses into a map from variable name to condition values.
 // std::string -> std::vector<std::string>

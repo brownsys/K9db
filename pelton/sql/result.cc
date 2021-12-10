@@ -8,32 +8,21 @@
 namespace pelton {
 namespace sql {
 
-namespace {
-
-// Turn record into a concatenated string.
-std::string StringifyRecord(const dataflow::Record &record) {
-  std::string delim("\0", 1);
-  std::string str = "";
-  for (size_t i = 0; i < record.schema().size(); i++) {
-    str += record.GetValueString(i) + delim;
-  }
-  return str;
-}
-
-}  // namespace
-
 // SqlResultSet.
 void SqlResultSet::Append(SqlResultSet &&other, bool deduplicate) {
   if (this->schema_ != other.schema_) {
     LOG(FATAL) << "Appending different schemas";
   }
   std::unordered_set<std::string> duplicates;
-  for (const dataflow::Record &r : this->records_) {
-    duplicates.insert(StringifyRecord(r));
+  if (deduplicate) {
+    for (size_t i = 0; i < this->records_.keys.size(); i++) {
+      duplicates.insert(this->records_.keys.at(i));
+    }
   }
-  for (dataflow::Record &r : other.records_) {
-    if (duplicates.count(StringifyRecord(r)) == 0) {
-      this->records_.push_back(std::move(r));
+  for (size_t i = 0; i < other.records_.records.size(); i++) {
+    if (deduplicate && duplicates.count(other.records_.keys.at(i)) == 0) {
+      this->records_.records.push_back(std::move(other.records_.records.at(i)));
+      this->records_.keys.push_back(std::move(other.records_.keys.at(i)));
     }
   }
 }

@@ -73,11 +73,10 @@ bool initialize(size_t workers, bool consistent) {
   return true;
 }
 
-bool open(Connection *connection, const std::string &db_name,
-          const std::string &db_username, const std::string &db_password) {
+bool open(Connection *connection, const std::string &db_name) {
   // set global state in local connection struct
   connection->state = PELTON_STATE;
-  connection->executor.Initialize(db_name, db_username, db_password);
+  connection->executor.Initialize(db_name);
   return true;
 }
 

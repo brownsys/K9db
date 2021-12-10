@@ -3,6 +3,7 @@
 #define PELTON_SQL_CONNECTIONS_ROCKSDB_H__
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -25,15 +26,25 @@ class SingletonRocksdbConnection {
   void Close();
 
   // Execute statement by type.
-  bool ExecuteStatement(const sqlast::AbstractStatement *sql);
+  bool ExecuteStatement(const sqlast::AbstractStatement *sql,
+                        const std::string &shard_name);
 
-  int ExecuteUpdate(const sqlast::AbstractStatement *sql);
+  int ExecuteUpdate(const sqlast::AbstractStatement *sql,
+                    const std::string &shard_name);
 
-  std::vector<dataflow::Record> ExecuteQuery(
-      const sqlast::AbstractStatement *sql, const dataflow::SchemaRef &schema,
-      const std::vector<AugInfo> &augments);
+  RecordKeyVecs ExecuteQuery(const sqlast::AbstractStatement *sql,
+                                      const dataflow::SchemaRef &schema,
+                                      const std::vector<AugInfo> &augments,
+                                      const std::string &shard_name);
 
  private:
+  // Helpers.
+  std::vector<std::string> LookupAndFilter(
+      const std::string table_name, const sqlast::AbstractStatement *sql);
+  std::optional<std::string> ReplacedRow(const std::string table_name,
+                                         const sqlast::AbstractStatement *stmt);
+
+  // Members.
   std::unique_ptr<rocksdb::DB> db_;
   std::unordered_map<std::string, std::unique_ptr<rocksdb::ColumnFamilyHandle>>
       handlers_;
@@ -55,16 +66,19 @@ class RocksdbConnection : public PeltonConnection {
   void Close() override { this->singleton_ = nullptr; }
 
   // Execute statement by type.
-  bool ExecuteStatement(const sqlast::AbstractStatement *sql) override {
-    return this->singleton_->ExecuteStatement(sql);
+  bool ExecuteStatement(const sqlast::AbstractStatement *sql,
+                        const std::string &shard_name) override {
+    return this->singleton_->ExecuteStatement(sql, shard_name);
   }
-  int ExecuteUpdate(const sqlast::AbstractStatement *sql) override {
-    return this->singleton_->ExecuteUpdate(sql);
+  int ExecuteUpdate(const sqlast::AbstractStatement *sql,
+                        const std::string &shard_name) override {
+    return this->singleton_->ExecuteUpdate(sql, shard_name);
   }
-  std::vector<dataflow::Record> ExecuteQuery(
-      const sqlast::AbstractStatement *sql, const dataflow::SchemaRef &schema,
-      const std::vector<AugInfo> &augments) override {
-    return this->singleton_->ExecuteQuery(sql, schema, augments);
+  RecordKeyVecs ExecuteQuery(const sqlast::AbstractStatement *sql,
+                                      const dataflow::SchemaRef &schema,
+                                      const std::vector<AugInfo> &augments,
+                                      const std::string &shard_name) override {
+    return this->singleton_->ExecuteQuery(sql, schema, augments, shard_name);
   }
 
   // Call to close the DB completely.

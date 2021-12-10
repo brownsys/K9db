@@ -6,6 +6,7 @@
 
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
+#include "pelton/sql/connection.h"
 
 namespace pelton {
 namespace sql {
@@ -18,7 +19,7 @@ class SqlResultSet {
   explicit SqlResultSet(const dataflow::SchemaRef &schema) : schema_(schema) {}
 
   SqlResultSet(const dataflow::SchemaRef &schema,
-               std::vector<dataflow::Record> &&records)
+               RecordKeyVecs &&records)
       : schema_(schema), records_(std::move(records)) {}
 
   // Adding additional results to this set.
@@ -26,11 +27,13 @@ class SqlResultSet {
 
   // Query API.
   const dataflow::SchemaRef &schema() const { return this->schema_; }
-  std::vector<dataflow::Record> &&Vec() { return std::move(this->records_); }
+  std::vector<dataflow::Record> &&Vec() {
+    return std::move(this->records_.records);
+  }
 
  private:
   dataflow::SchemaRef schema_;
-  std::vector<dataflow::Record> records_;
+  RecordKeyVecs records_;
 };
 
 // Our version of an SqlResult.

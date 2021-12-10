@@ -199,7 +199,7 @@ sql::SqlResult SharderState::NumShards() const {
                          static_cast<uint64_t>(set.size()));
   }
   return sql::SqlResult(sql::SqlResultSet(
-      dataflow::SchemaFactory::NUM_SHARDS_SCHEMA, std::move(records)));
+      dataflow::SchemaFactory::NUM_SHARDS_SCHEMA, {std::move(records), {}}));
 }
 
 // Synchronization.

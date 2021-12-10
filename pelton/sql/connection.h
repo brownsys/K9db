@@ -17,6 +17,11 @@ struct AugInfo {
   std::string value;
 };
 
+struct RecordKeyVecs {
+  std::vector<dataflow::Record> records;
+  std::vector<std::string> keys;
+};
+
 class PeltonConnection {
  public:
   PeltonConnection() = default;
@@ -26,11 +31,13 @@ class PeltonConnection {
   virtual void Close() = 0;
 
   // Execute statement by type.
-  virtual bool ExecuteStatement(const sqlast::AbstractStatement *sql) = 0;
-  virtual int ExecuteUpdate(const sqlast::AbstractStatement *sql) = 0;
-  virtual std::vector<dataflow::Record> ExecuteQuery(
+  virtual bool ExecuteStatement(const sqlast::AbstractStatement *sql,
+                                const std::string &shard_name) = 0;
+  virtual int ExecuteUpdate(const sqlast::AbstractStatement *sql,
+                            const std::string &shard_name) = 0;
+  virtual RecordKeyVecs ExecuteQuery(
       const sqlast::AbstractStatement *sql, const dataflow::SchemaRef &schema,
-      const std::vector<AugInfo> &augments) = 0;
+      const std::vector<AugInfo> &augments, const std::string &shard_name) = 0;
 };
 
 }  // namespace sql

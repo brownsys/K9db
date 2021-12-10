@@ -64,8 +64,11 @@ void DecodeValue(sqlast::ColumnDefinition::Type type,
     }
   }
 }
+
+}  // namespace
+
 // Comparisons over rocksdb::Slice.
-bool SlicesEq(const rocksdb::Slice l, const rocksdb::Slice r) {
+bool SlicesEq(const rocksdb::Slice &l, const rocksdb::Slice &r) {
   if (l.size() != r.size()) {
     return false;
   }
@@ -76,7 +79,7 @@ bool SlicesEq(const rocksdb::Slice l, const rocksdb::Slice r) {
   }
   return true;
 }
-bool SlicesGt(const rocksdb::Slice l, const rocksdb::Slice r) {
+bool SlicesGt(const rocksdb::Slice &l, const rocksdb::Slice &r) {
   if (l.size() > r.size()) {
     return true;
   } else if (l.size() < r.size()) {
@@ -91,8 +94,6 @@ bool SlicesGt(const rocksdb::Slice l, const rocksdb::Slice r) {
   }
   return false;
 }
-
-}  // namespace
 
 // Returns true if the next value in buff represents a null.
 bool IsNull(const char *buf, size_t size) {
@@ -122,31 +123,126 @@ std::string EncodeInsert(const sqlast::Insert &stmt,
 // Decode the value from rocksdb to a record.
 dataflow::Record DecodeRecord(const rocksdb::Slice &slice,
                               const dataflow::SchemaRef &schema,
-                              const std::vector<AugInfo> &augments) {
+                              const std::vector<AugInfo> &augments,
+                              const std::vector<int> &projections) {
   dataflow::Record record{schema, false};
+  if (projections.size() == 0) {
+    size_t begin = 0;
+    size_t end = 0;
+    const char *data = slice.data();
+    for (size_t i = 0; i < schema.size(); i++) {
+      rocksdb::Slice value;
+      if (augments.size() == 1 && i == augments.front().index) {
+        // Augmented value.
+        const std::string &aug = augments.front().value;
+        value = rocksdb::Slice(aug.data(), aug.size());
+      } else {
+        // Value must be read from input slice.
+        while (data[end] != __ROCKSSEP) {
+          end++;
+        }
+        // We are done with one value.
+        value = rocksdb::Slice(data + begin, end - begin);
+        // Continue to the next value.
+        begin = end + 1;
+        end = begin;
+      }
+      DecodeValue(schema.TypeOf(i), value, i, &record);
+    }
+  } else {
+    // map[i] -> region of slice for column i.
+    std::vector<std::pair<size_t, size_t>> map;
+    size_t begin = 0;
+    for (size_t end = 0; end < slice.size(); end++) {
+      if (slice.data()[end] == __ROCKSSEP) {
+        map.emplace_back(begin, end - begin);
+        begin = end + 1;
+      }
+    }
+    for (size_t i = 0; i < projections.size(); i++) {
+      size_t target = projections.at(i);
+      rocksdb::Slice value;
+      if (target == -1) {
+        const std::string &aug = augments.front().value;
+        value = rocksdb::Slice(aug.data(), aug.size());
+      } else if (target == -2) {
+        // Literal projection.
+        value = EncodeValue(schema.TypeOf(i), &schema.NameOf(i));
+      } else {
+        auto &pair = map.at(target);
+        value = rocksdb::Slice(slice.data() + pair.first, pair.second);
+      }
+      DecodeValue(schema.TypeOf(i), value, i, &record);
+    }
+  }
+  return record;
+}
+
+rocksdb::Slice ExtractColumn(const rocksdb::Slice &slice, size_t col) {
   size_t begin = 0;
   size_t end = 0;
   const char *data = slice.data();
-  for (size_t i = 0; i < schema.size(); i++) {
-    rocksdb::Slice value;
-    if (augments.size() == 1 && i == augments.front().index) {
-      // Augmented value.
-      const std::string &aug = augments.front().value;
-      value = rocksdb::Slice(aug.data(), aug.size());
-    } else {
-      // Value must be read from input slice.
-      while (data[end] != __ROCKSSEP) {
-        end++;
-      }
-      // We are done with one value.
-      value = rocksdb::Slice(data + begin, end - begin);
-      // Continue to the next value.
+  for (size_t i = 0; i <= col; i++) {
+    while (data[end] != __ROCKSSEP) {
+      end++;
+    }
+    if (i < col) {
       begin = end + 1;
       end = begin;
     }
-    DecodeValue(schema.TypeOf(i), value, i, &record);
   }
-  return record;
+  return rocksdb::Slice{data + begin, end - begin};
+}
+
+std::string Update(const std::unordered_map<std::string, std::string> &update,
+                   const dataflow::SchemaRef &schema, const std::string &str) {
+  std::string replaced = "";
+  size_t begin = 0;
+  size_t end = 0;
+  for (size_t i = 0; i < schema.size(); i++) {
+    while (str[end] != __ROCKSSEP) {
+      end++;
+    }
+    const std::string &name = schema.NameOf(i);
+    if (update.count(name) == 1) {
+      rocksdb::Slice slice = EncodeValue(schema.TypeOf(i), &update.at(name));
+      replaced.reserve(replaced.size() + slice.size() + 1);
+      for (size_t j = 0; j < slice.size(); j++) {
+        replaced.push_back(slice.data()[j]);
+      }
+      replaced.push_back(__ROCKSSEP);
+    } else {
+      replaced.reserve(replaced.size() + end - begin + 1);
+      for (size_t j = begin; j < end; j++) {
+        replaced.push_back(str.at(j));
+      }
+      replaced.push_back(__ROCKSSEP);
+    }
+    begin = end + 1;
+    end = begin;
+  }
+  return replaced;
+}
+
+// Schema Manipulation.
+std::vector<int> ProjectionSchema(
+    const dataflow::SchemaRef &db_schema, const dataflow::SchemaRef &out_schema,
+    const std::vector<AugInfo> &augments) {
+  std::vector<int> projections;
+  for (size_t i = 0; i < out_schema.size(); i++) {
+    if (augments.size() == 1 && i == augments.front().index) {
+      projections.push_back(-1);
+    } else {
+      const std::string &name = out_schema.NameOf(i);
+      if ((name[0] >= '0' && name[0] <= '9') || name[0] == '\'') {
+        projections.push_back(-2);
+      } else {
+        size_t idx = db_schema.IndexOf(out_schema.NameOf(i));
+        projections.push_back(static_cast<int>(idx));
+      }
+    }
+  }
+  return projections;
 }
 
 // Find all values mapped to any column from a column set.

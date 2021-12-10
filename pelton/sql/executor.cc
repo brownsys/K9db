@@ -47,10 +47,8 @@ SqlResult PeltonExecutor::EmptyResult(const sqlast::AbstractStatement *sql,
 
 // Initialization: initialize the eager executor so that it maintains
 // an open connection to the underlying DB.
-void PeltonExecutor::Initialize(const std::string &db_name,
-                                const std::string &username,
-                                const std::string &password) {
-  std::string path = "/tmp/pelton_rocks_db";
+void PeltonExecutor::Initialize(const std::string &db_name) {
+  std::string path = "/tmp/pelton/" + db_name;
   this->connection_ = std::make_unique<RocksdbConnection>(path);
 }
 
@@ -117,21 +115,21 @@ SqlResult PeltonExecutor::Execute(const sqlast::AbstractStatement *stmt,
     // Statements: return a boolean signifying success.
     case sqlast::AbstractStatement::Type::CREATE_TABLE:
     case sqlast::AbstractStatement::Type::CREATE_INDEX:
-      return SqlResult(this->connection_->ExecuteStatement(stmt));
+      return SqlResult(this->connection_->ExecuteStatement(stmt, shard_name));
 
     // Updates: return a count of rows affected.
     case sqlast::AbstractStatement::Type::UPDATE:
-      return SqlResult(this->connection_->ExecuteUpdate(stmt));
+      return SqlResult(this->connection_->ExecuteUpdate(stmt, shard_name));
 
     // Insert and Delete might be returning.
     case sqlast::AbstractStatement::Type::INSERT:
       if (!static_cast<const sqlast::Insert *>(stmt)->returning()) {
-        return SqlResult(this->connection_->ExecuteUpdate(stmt));
+        return SqlResult(this->connection_->ExecuteUpdate(stmt, shard_name));
       }
       break;
     case sqlast::AbstractStatement::Type::DELETE:
       if (!static_cast<const sqlast::Delete *>(stmt)->returning()) {
-        return SqlResult(this->connection_->ExecuteUpdate(stmt));
+        return SqlResult(this->connection_->ExecuteUpdate(stmt, shard_name));
       }
       break;
 
@@ -152,8 +150,8 @@ SqlResult PeltonExecutor::Execute(const sqlast::AbstractStatement *stmt,
     aug_info.push_back({static_cast<size_t>(aug_index), aug_value});
   }
   // Create a result set for output.
-  std::vector<dataflow::Record> records =
-      this->connection_->ExecuteQuery(stmt, schema, aug_info);
+  RecordKeyVecs records =
+      this->connection_->ExecuteQuery(stmt, schema, aug_info, shard_name);
   return SqlResult(SqlResultSet(schema, std::move(records)));
 }
 

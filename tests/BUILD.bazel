@@ -8,9 +8,6 @@ cc_library(
     hdrs = [
         "common.h",
     ],
-    linkopts = [
-        "-lmariadbcpp",
-    ],
     deps = [
         "//pelton",
         "@com_github_gflags_gflags//:gflags",

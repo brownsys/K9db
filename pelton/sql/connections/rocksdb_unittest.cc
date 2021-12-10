@@ -86,6 +86,43 @@ TEST(RocksdbConnectionTest, OpenTest) {
   records = conn.ExecuteQuery(parsed.get(), schema, {});
   Print(std::move(records), schema);
 
+  // Replace.
+  parsed = Parse("REPLACE INTO tbl VALUES(5, 'BENJI');");
+  records = conn.ExecuteQuery(parsed.get(), schema, {});
+  Print(std::move(records), schema);
+  parsed = Parse("REPLACE INTO tbl VALUES(3, 'ISHAN-NEW');");
+  std::cout << conn.ExecuteUpdate(parsed.get()) << std::endl;
+
+  // Read rows.
+  parsed = Parse("SELECT * FROM tbl;");
+  records = conn.ExecuteQuery(parsed.get(), schema, {});
+  Print(std::move(records), schema);
+
+  // Delete rows.
+  parsed = Parse("DELETE FROM tbl WHERE name = 'BENJI';");
+  records = conn.ExecuteQuery(parsed.get(), schema, {});
+  Print(std::move(records), schema);
+  parsed = Parse("DELETE FROM tbl WHERE id = 2;");
+  std::cout << conn.ExecuteUpdate(parsed.get()) << std::endl;
+
+  // Read rows.
+  parsed = Parse("SELECT * FROM tbl;");
+  records = conn.ExecuteQuery(parsed.get(), schema, {});
+  Print(std::move(records), schema);
+  
+  // Update rows.
+  parsed = Parse("UPDATE tbl SET id = 10 WHERE id = 3;");
+  std::cout << conn.ExecuteUpdate(parsed.get()) << std::endl;
+  parsed = Parse("UPDATE tbl SET name = NULL WHERE id = 2;");
+  std::cout << conn.ExecuteUpdate(parsed.get()) << std::endl;
+  parsed = Parse("UPDATE tbl SET name = 'DOESNOTAPPEAR' WHERE id = 33;");
+  std::cout << conn.ExecuteUpdate(parsed.get()) << std::endl;
+  
+  // Read rows.
+  parsed = Parse("SELECT * FROM tbl;");
+  records = conn.ExecuteQuery(parsed.get(), schema, {});
+  Print(std::move(records), schema);
+
   conn.Close();
   RocksdbConnection::CloseAll();
 }
