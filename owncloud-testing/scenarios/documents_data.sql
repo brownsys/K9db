@@ -8,6 +8,8 @@ INSERT INTO username_marker VALUES ('claire', 'claire');
 INSERT INTO username_marker VALUES ('wong', 'wong');
 
 
+-- INSERT INTO oc_share 
+-- VALUES (0, 0, 'wong', NULL, 'claire', 'claire', NULL, 'file', 0, '', '', 24, 0, 0, NULL, '', 1, '', 24, 19);
 INSERT INTO oc_share 
 VALUES (0, 0, 'wong', NULL, 'claire', 'claire', NULL, 'file', 0, '', '', 24, 0, 0, NULL, '', 1, '', 24, 19);
 

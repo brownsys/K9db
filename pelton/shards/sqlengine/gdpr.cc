@@ -18,10 +18,36 @@
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
+
+
 namespace pelton {
 namespace shards {
 namespace sqlengine {
 namespace gdpr {
+
+namespace {
+
+void PrintResult(sql::SqlResult &result, bool print) {
+  if (result.IsStatement() && print) {
+    std::cout << "Success: " << result.Success() << std::endl;
+  } else if (result.IsUpdate() && print) {
+    std::cout << "Affected rows: " << result.UpdateCount() << std::endl;
+  } else if (result.IsQuery()) {
+    while (result.HasResultSet()) {
+      auto resultset = result.NextResultSet();
+      if (print) {
+        std::cout << resultset->GetSchema() << std::endl;
+      }
+      for (const auto &record : *resultset) {
+        if (print) {
+          std::cout << record << std::endl;
+        }
+      }
+    }
+  }
+}
+
+}
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
                                      Connection *connection) {
@@ -30,6 +56,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
   int total_count = 0;
   const std::string &shard_kind = stmt.shard_kind();
   const std::string &user_id = stmt.user_id();
+  const std::string &unquoted_user_id = Dequote(user_id);
   bool is_forget = stmt.operation() == sqlast::GDPRStatement::Operation::FORGET;
   auto &exec = connection->executor;
 
@@ -59,12 +86,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       if (is_forget) {
         // XXX(malte): need to upgrade SharderStateLock here in the future.
         sqlast::Delete tbl_stmt{info.sharded_table_name, update_flows};
-        table_result.Append(exec.ExecuteShard(&tbl_stmt, shard_kind, user_id,
+        table_result.Append(exec.ExecuteShard(&tbl_stmt, shard_kind, unquoted_user_id,
                                               schema, aug_index));
       } else {  // sqlast::GDPRStatement::Operation::GET
         sqlast::Select tbl_stmt{info.sharded_table_name};
         tbl_stmt.AddColumn("*");
-        table_result.Append(exec.ExecuteShard(&tbl_stmt, shard_kind, user_id,
+        table_result.Append(exec.ExecuteShard(&tbl_stmt, shard_kind, unquoted_user_id,
                                               schema, aug_index));
       }
     }
@@ -194,7 +221,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
         if (is_sharded) {
           MOVE_OR_RETURN(
               std::unordered_set<UserId> ids_set,
-              index::LookupIndex(index_name, user_id, dataflow_state));
+              index::LookupIndex(index_name, unquoted_user_id, dataflow_state));
 
           // create update statement with equality check for each id
           for (const auto &id : ids_set) {
@@ -286,6 +313,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
   if (is_forget) {
     return sql::SqlResult(total_count);
   }
+  LOG(INFO) << "Dumping GDPR result";
+  if (!is_forget)
+    PrintResult(result, true);
   return result;
 }
 

@@ -49,5 +49,11 @@ fn main() {
         println!("Found share {:?}", row);
     }
 
+    println!("Running GDPR get for wong");
+
+    for row in conn.query::<Row,_>("GDPR GET oc_users 'wong'").unwrap() {
+        println!("{:?}", row);
+    }
+
     pp_pelton_database()
 }

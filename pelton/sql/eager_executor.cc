@@ -34,7 +34,8 @@ void SqlEagerExecutor::Initialize(const std::string &db_name,
   lock.unlock();
 
   // Create and use the DB.
-  this->stmt_->execute("CREATE DATABASE IF NOT EXISTS " + db_name);
+  this->stmt_->execute("DROP DATABASE IF EXISTS " + db_name);
+  this->stmt_->execute("CREATE DATABASE " + db_name);
   this->stmt_->execute("USE " + db_name);
   this->stmt_->execute("SET GLOBAL table_open_cache=50000");
   // this->stmt_->execute("SET GLOBAL schema_definition_cache=10000");
@@ -63,7 +64,7 @@ bool SqlEagerExecutor::ExecuteStatement(const std::string &sql) {
 
 int SqlEagerExecutor::ExecuteUpdate(const std::string &sql) {
 #ifndef PELTON_OPT
-  LOG(INFO) << "Executing Statement:" << sql;
+  LOG(INFO) << "Executing Update Statement:" << sql;
 #endif
   perf::Start("SQL");
   int result = this->stmt_->executeUpdate(sql);
@@ -74,7 +75,7 @@ int SqlEagerExecutor::ExecuteUpdate(const std::string &sql) {
 std::unique_ptr<DBResultSet> SqlEagerExecutor::ExecuteQuery(
     const std::string &sql) {
 #ifndef PELTON_OPT
-  LOG(INFO) << "Executing Statement:" << sql;
+  //LOG(INFO) << "Executing Query Statement:" << sql;
 #endif
   perf::Start("SQL");
   DBResultSet *result = this->stmt_->executeQuery(sql);

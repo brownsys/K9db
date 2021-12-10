@@ -22,13 +22,6 @@ namespace insert {
 
 namespace {
 
-std::string Dequote(const std::string &st) {
-  std::string s(st);
-  s.erase(remove(s.begin(), s.end(), '\"'), s.end());
-  s.erase(remove(s.begin(), s.end(), '\''), s.end());
-  return s;
-}
-
 // This is perhaps not the best way to resolve this but it works for the time being. 
 // We can optimize this later. 
 // 
