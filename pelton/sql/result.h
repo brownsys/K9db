@@ -1,12 +1,12 @@
 #ifndef PELTON_SQL_RESULT_H_
 #define PELTON_SQL_RESULT_H_
 
+#include <string>
 #include <utility>
 #include <vector>
 
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
-#include "pelton/sql/connection.h"
 
 namespace pelton {
 namespace sql {
@@ -19,21 +19,25 @@ class SqlResultSet {
   explicit SqlResultSet(const dataflow::SchemaRef &schema) : schema_(schema) {}
 
   SqlResultSet(const dataflow::SchemaRef &schema,
-               RecordKeyVecs &&records)
-      : schema_(schema), records_(std::move(records)) {}
+               std::vector<dataflow::Record> &&records)
+      : schema_(schema), records_(std::move(records)), keys_() {}
+
+  SqlResultSet(const dataflow::SchemaRef &schema,
+               std::vector<dataflow::Record> &&records,
+               std::vector<std::string> &&keys)
+      : schema_(schema), records_(std::move(records)), keys_(std::move(keys)) {}
 
   // Adding additional results to this set.
   void Append(SqlResultSet &&other, bool deduplicate);
 
   // Query API.
   const dataflow::SchemaRef &schema() const { return this->schema_; }
-  std::vector<dataflow::Record> &&Vec() {
-    return std::move(this->records_.records);
-  }
+  std::vector<dataflow::Record> &&Vec() { return std::move(this->records_); }
 
  private:
   dataflow::SchemaRef schema_;
-  RecordKeyVecs records_;
+  std::vector<dataflow::Record> records_;
+  std::vector<std::string> keys_;
 };
 
 // Our version of an SqlResult.

@@ -150,9 +150,9 @@ SqlResult PeltonExecutor::Execute(const sqlast::AbstractStatement *stmt,
     aug_info.push_back({static_cast<size_t>(aug_index), aug_value});
   }
   // Create a result set for output.
-  RecordKeyVecs records =
+  SqlResultSet resultset =
       this->connection_->ExecuteQuery(stmt, schema, aug_info, shard_name);
-  return SqlResult(SqlResultSet(schema, std::move(records)));
+  return SqlResult(std::move(resultset));
 }
 
 // Close any open singletons.

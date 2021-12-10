@@ -7,6 +7,7 @@ cc_library(
     ],
     visibility = ["//pelton/sql:__subpackages__"],
     deps = [
+        ":result",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/sqlast:ast",
@@ -48,7 +49,6 @@ cc_library(
     ],
     visibility = ["//:__subpackages__"],
     deps = [
-        ":connection",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "@glog",

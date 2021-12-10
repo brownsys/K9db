@@ -37,9 +37,9 @@ std::string Update(const std::unordered_map<std::string, std::string> &update,
                    const dataflow::SchemaRef &schema, const std::string &str);
 
 // Schema Manipulation.
-std::vector<int> ProjectionSchema(
-    const dataflow::SchemaRef &db_schema, const dataflow::SchemaRef &out_schema,
-    const std::vector<AugInfo> &augments);
+std::vector<int> ProjectionSchema(const dataflow::SchemaRef &db_schema,
+                                  const dataflow::SchemaRef &out_schema,
+                                  const std::vector<AugInfo> &augments);
 
 // Transforms Where clauses into a map from variable name to condition values.
 // std::string -> std::vector<std::string>

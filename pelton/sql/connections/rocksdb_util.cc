@@ -57,9 +57,12 @@ void DecodeValue(sqlast::ColumnDefinition::Type type,
       record->SetInt(std::stol(value), idx);
       break;
     }
-    case sqlast::ColumnDefinition::Type::TEXT:
-    case sqlast::ColumnDefinition::Type::DATETIME: {
+    case sqlast::ColumnDefinition::Type::TEXT: {
       record->SetString(std::make_unique<std::string>(std::move(value)), idx);
+      break;
+    }
+    case sqlast::ColumnDefinition::Type::DATETIME: {
+      record->SetDateTime(std::make_unique<std::string>(std::move(value)), idx);
       break;
     }
   }
@@ -225,9 +228,9 @@ std::string Update(const std::unordered_map<std::string, std::string> &update,
 }
 
 // Schema Manipulation.
-std::vector<int> ProjectionSchema(
-    const dataflow::SchemaRef &db_schema, const dataflow::SchemaRef &out_schema,
-    const std::vector<AugInfo> &augments) {
+std::vector<int> ProjectionSchema(const dataflow::SchemaRef &db_schema,
+                                  const dataflow::SchemaRef &out_schema,
+                                  const std::vector<AugInfo> &augments) {
   std::vector<int> projections;
   for (size_t i = 0; i < out_schema.size(); i++) {
     if (augments.size() == 1 && i == augments.front().index) {

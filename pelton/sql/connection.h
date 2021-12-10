@@ -7,6 +7,7 @@
 
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
+#include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -35,9 +36,10 @@ class PeltonConnection {
                                 const std::string &shard_name) = 0;
   virtual int ExecuteUpdate(const sqlast::AbstractStatement *sql,
                             const std::string &shard_name) = 0;
-  virtual RecordKeyVecs ExecuteQuery(
-      const sqlast::AbstractStatement *sql, const dataflow::SchemaRef &schema,
-      const std::vector<AugInfo> &augments, const std::string &shard_name) = 0;
+  virtual SqlResultSet ExecuteQuery(const sqlast::AbstractStatement *sql,
+                                    const dataflow::SchemaRef &schema,
+                                    const std::vector<AugInfo> &augments,
+                                    const std::string &shard_name) = 0;
 };
 
 }  // namespace sql

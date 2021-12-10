@@ -914,12 +914,10 @@ fn main() {
     let flags = gflags_ffi(std::env::args(), USAGE);
     info!(
         log,
-        "Rust proxy: running with args: {:?} {:?} {:?} {:?} {:?}",
+        "Rust proxy: running with args: {:?} {:?} {:?}",
         flags.workers,
         flags.consistent,
-        flags.db_name,
-        flags.db_username,
-        flags.db_password
+        flags.db_name
     );
 
     let global_open = initialize_ffi(flags.workers, flags.consistent);
@@ -964,8 +962,6 @@ fn main() {
     while !stop.load(Ordering::Relaxed) {
         while let Ok((stream, _addr)) = listener.accept() {
             let db_name = flags.db_name.clone();
-            let db_username = flags.db_username.clone();
-            let db_password = flags.db_password.clone();
             // clone log so that each client thread has an owned copy
             let log_client = log.clone();
             let stop_clone = stop.clone();
@@ -979,7 +975,7 @@ fn main() {
                     "Rust Proxy: Successfully connected to mysql proxy\nStream and address are: {:?}",
                     stream
                 );
-                let rust_conn = open_ffi(&db_name, &db_username, &db_password);
+                let rust_conn = open_ffi(&db_name);
                 info!(
                     log_client,
                     "Rust Proxy: connection status is: {:?}", rust_conn.connected

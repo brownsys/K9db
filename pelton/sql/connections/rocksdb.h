@@ -32,10 +32,10 @@ class SingletonRocksdbConnection {
   int ExecuteUpdate(const sqlast::AbstractStatement *sql,
                     const std::string &shard_name);
 
-  RecordKeyVecs ExecuteQuery(const sqlast::AbstractStatement *sql,
-                                      const dataflow::SchemaRef &schema,
-                                      const std::vector<AugInfo> &augments,
-                                      const std::string &shard_name);
+  SqlResultSet ExecuteQuery(const sqlast::AbstractStatement *sql,
+                            const dataflow::SchemaRef &schema,
+                            const std::vector<AugInfo> &augments,
+                            const std::string &shard_name);
 
  private:
   // Helpers.
@@ -71,13 +71,13 @@ class RocksdbConnection : public PeltonConnection {
     return this->singleton_->ExecuteStatement(sql, shard_name);
   }
   int ExecuteUpdate(const sqlast::AbstractStatement *sql,
-                        const std::string &shard_name) override {
+                    const std::string &shard_name) override {
     return this->singleton_->ExecuteUpdate(sql, shard_name);
   }
-  RecordKeyVecs ExecuteQuery(const sqlast::AbstractStatement *sql,
-                                      const dataflow::SchemaRef &schema,
-                                      const std::vector<AugInfo> &augments,
-                                      const std::string &shard_name) override {
+  SqlResultSet ExecuteQuery(const sqlast::AbstractStatement *sql,
+                            const dataflow::SchemaRef &schema,
+                            const std::vector<AugInfo> &augments,
+                            const std::string &shard_name) override {
     return this->singleton_->ExecuteQuery(sql, schema, augments, shard_name);
   }
 

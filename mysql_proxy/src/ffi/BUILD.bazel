@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 exports_files(
     ["ffi.h"],
@@ -24,7 +24,6 @@ cc_library(
     ],
 )
 
-'''
 cc_test(
     name = "ffi-test",
     srcs = [
@@ -35,4 +34,3 @@ cc_test(
         "@com_google_googletest//:gtest",
     ],
 )
-'''

@@ -6,9 +6,6 @@
 #include "pelton/pelton.h"
 #include "pelton/util/perf.h"
 
-DEFINE_string(db_username, "root", "MYSQL username to connect with");
-DEFINE_string(db_password, "password", "MYSQL pwd to connect with");
-
 namespace {
 
 // CREATE TABLE queries.
@@ -142,15 +139,11 @@ int main(int argc, char **argv) {
   // Initialize Google’s logging library.
   google::InitGoogleLogging("example");
 
-  // Read MySql configurations.
-  const std::string &db_username = FLAGS_db_username;
-  const std::string &db_password = FLAGS_db_password;
-
   // Open connection to sharder.
   pelton::initialize(3, true);
 
   pelton::Connection connection;
-  pelton::open(&connection, "exampledb", db_username, db_password);
+  pelton::open(&connection, "exampledb");
   CHECK(pelton::exec(&connection, "SET echo;").ok());
 
   // Create all the tables.

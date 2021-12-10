@@ -1,5 +1,7 @@
 #include "pelton/sql/connections/rocksdb.h"
 
+#include <utility>
+
 #include "glog/logging.h"
 #include "pelton/sql/connections/rocksdb_util.h"
 #include "pelton/util/status.h"
@@ -142,8 +144,8 @@ int SingletonRocksdbConnection::ExecuteUpdate(
       const sqlast::Delete *stmt = static_cast<const sqlast::Delete *>(sql);
       std::string table_name = shard_name + stmt->table_name();
       const dataflow::SchemaRef &schema = this->schemas_.at(table_name);
-      RecordKeyVecs rows = this->ExecuteQuery(sql, schema, {}, shard_name);
-      return rows.records.size();
+      auto resultset = this->ExecuteQuery(sql, schema, {}, shard_name);
+      return resultset.Vec().size();
     }
     default:
       LOG(FATAL) << "Illegal statement type in ExecuteUpdate";
@@ -151,10 +153,15 @@ int SingletonRocksdbConnection::ExecuteUpdate(
   return rowcount;
 }
 
-RecordKeyVecs SingletonRocksdbConnection::ExecuteQuery(
+SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
     const sqlast::AbstractStatement *sql, const dataflow::SchemaRef &out_schema,
     const std::vector<AugInfo> &augments, const std::string &shard_name) {
   CHECK_LE(augments.size(), 1) << "Too many augmentations";
+
+  // Result components.
+  std::vector<dataflow::Record> records;
+  std::vector<std::string> keys;
+
   switch (sql->type()) {
     case sqlast::AbstractStatement::Type::SELECT: {
       const sqlast::Select *stmt = static_cast<const sqlast::Select *>(sql);
@@ -170,15 +177,15 @@ RecordKeyVecs SingletonRocksdbConnection::ExecuteQuery(
         projections = ProjectionSchema(db_schema, out_schema, augments);
       }
 
-      RecordKeyVecs result;
       std::vector<std::string> rows = this->LookupAndFilter(table_name, sql);
       for (std::string &row : rows) {
         rocksdb::Slice slice(row);
         rocksdb::Slice key = ExtractColumn(row, pk);
-        result.keys.push_back(key.ToString());
-        result.records.push_back(DecodeRecord(slice, projection_schema, augments, projections));
+        keys.push_back(key.ToString());
+        records.push_back(
+            DecodeRecord(slice, projection_schema, augments, projections));
       }
-      return result;
+      break;
     }
     case sqlast::AbstractStatement::Type::DELETE: {
       const sqlast::Delete *stmt = static_cast<const sqlast::Delete *>(sql);
@@ -193,12 +200,12 @@ RecordKeyVecs SingletonRocksdbConnection::ExecuteQuery(
         rocksdb::Slice slice(row);
         rocksdb::Slice key = ExtractColumn(row, pk);
         // Add record before deleting to returned vector.
-        result.keys.push_back(key.ToString());
-        result.records.push_back(DecodeRecord(slice, out_schema, augments, {}));
+        keys.push_back(key.ToString());
+        records.push_back(DecodeRecord(slice, out_schema, augments, {}));
         // Delete record by key.
         PANIC_STATUS(this->db_->Delete(rocksdb::WriteOptions(), handler, key));
       }
-      return result;
+      break;
     }
     case sqlast::AbstractStatement::Type::INSERT: {
       const sqlast::Insert *stmt = static_cast<const sqlast::Insert *>(sql);
@@ -210,16 +217,16 @@ RecordKeyVecs SingletonRocksdbConnection::ExecuteQuery(
       if (row) {
         rocksdb::Slice slice(*row);
         rocksdb::Slice key = ExtractColumn(slice, pk);
-        result.keys.push_back(key.ToString());
-        result.records.push_back(DecodeRecord(slice, out_schema, augments, {}));
+        keys.push_back(key.ToString());
+        records.push_back(DecodeRecord(slice, out_schema, augments, {}));
       }
       this->ExecuteUpdate(sql, shard_name);
-      return result;
+      break;
     }
     default:
       LOG(FATAL) << "Illegal statement type in ExecuteQuery";
   }
-  return {};
+  return SqlResultSet(out_schema, std::move(records), std::move(keys));
 }
 
 // Helpers.

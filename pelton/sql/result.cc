@@ -13,16 +13,23 @@ void SqlResultSet::Append(SqlResultSet &&other, bool deduplicate) {
   if (this->schema_ != other.schema_) {
     LOG(FATAL) << "Appending different schemas";
   }
+  if (deduplicate) {
+    CHECK_EQ(this->keys_.size(), this->records_.size())
+        << "Deduplicating keyless result set";
+    CHECK_EQ(other.keys_.size(), other.records_.size())
+        << "Deduplicating keyless result set";
+  }
+  // Deduplicate using a hash set.
   std::unordered_set<std::string> duplicates;
   if (deduplicate) {
-    for (size_t i = 0; i < this->records_.keys.size(); i++) {
-      duplicates.insert(this->records_.keys.at(i));
+    for (const std::string &key : this->keys_) {
+      duplicates.insert(key);
     }
   }
-  for (size_t i = 0; i < other.records_.records.size(); i++) {
-    if (deduplicate && duplicates.count(other.records_.keys.at(i)) == 0) {
-      this->records_.records.push_back(std::move(other.records_.records.at(i)));
-      this->records_.keys.push_back(std::move(other.records_.keys.at(i)));
+  for (size_t i = 0; i < other.records_.size(); i++) {
+    if (!deduplicate || duplicates.count(other.keys_.at(i)) == 0) {
+      this->records_.push_back(std::move(other.records_.at(i)));
+      this->keys_.push_back(std::move(other.keys_.at(i)));
     }
   }
 }

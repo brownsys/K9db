@@ -1,5 +1,6 @@
 #include "mysql_proxy/src/ffi/ffi.h"
 
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -18,29 +19,17 @@ namespace {
 
 using CType = FFIColumnType;
 
-void DropDatabase() {
-  sql::ConnectOptionsMap connection_properties;
-  connection_properties["hostName"] = "localhost";
-  connection_properties["userName"] = *db_username;
-  connection_properties["password"] = *db_password;
-
-  sql::Driver *driver = sql::mariadb::get_driver_instance();
-  std::unique_ptr<sql::Connection> conn =
-      std::unique_ptr<sql::Connection>(driver->connect(connection_properties));
-  std::unique_ptr<sql::Statement> stmt =
-      std::unique_ptr<sql::Statement>(conn->createStatement());
-
-  stmt->execute("DROP DATABASE IF EXISTS " DB_NAME);
-}
+// Drop the database (if it exists).
+void DropDatabase() { std::filesystem::remove_all("/tmp/pelton/" DB_NAME); }
 
 TEST(PROXY, OPEN_TEST) {
-  c_conn = FFIOpen(DB_NAME, db_username->c_str(), db_password->c_str());
+  c_conn = FFIOpen(DB_NAME);
   EXPECT_TRUE(c_conn.connected) << "Opening connection failed!";
 }
 
 // Test creating tables and views.
 TEST(PROXY, DDL_TEST) {
-  auto table = "CREATE TABLE test3 (ID int, name VARCHAR(10));";
+  auto table = "CREATE TABLE test3 (ID int PRIMARY KEY, name VARCHAR(10));";
   EXPECT_TRUE(FFIExecDDL(&c_conn, table)) << "Creating table failed!";
 
 #ifndef PELTON_VALGRIND_MODE
@@ -127,8 +116,6 @@ TEST(PROXY, CLOSE_TEST) {
 int main(int argc, char **argv) {
   // Command line arugments and help message.
   FFIArgs cmd_args = FFIGflags(argc, argv, "ffi_unittest.cc");
-  db_username = new std::string(cmd_args.db_username);
-  db_password = new std::string(cmd_args.db_password);
 
   // Drop the database (in case it existed before because of some tests).
   DropDatabase();

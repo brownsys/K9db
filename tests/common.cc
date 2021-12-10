@@ -3,6 +3,7 @@
 #include <stdarg.h>
 
 #include <algorithm>
+// NOLINTNEXTLINE
 #include <filesystem>
 #include <fstream>
 #include <iostream>
