@@ -156,7 +156,8 @@ absl::StatusOr<std::list<ShardingInformation>> ShardTable(
     index_map.insert({column_name, index});
     // Find foreign key constraint (if exists).
     // check if column starts with OWNER_ (has an owner annotation)
-    bool explicit_owner = absl::StartsWith(column_name, "OWNER_");
+    bool explicit_owner =
+        absl::StartsWith(column_name, "OWNER_") || columns[index].owner();
     // check if column starts with ACCESSOR_ (has an accessor annotation)
     bool explicit_accessor = absl::StartsWith(column_name, "ACCESSOR_");
     // check if column has a foreign key constraint
@@ -338,7 +339,7 @@ absl::StatusOr<ForeignKeyShards> ShardForeignKeys(
       ASSIGN_OR_RETURN(ForeignKeyType fk_type,
                        ShardForeignKey(colname, *fk_constraint, info, state));
       result.emplace(colname, fk_type);
-    } else if (absl::StartsWith(colname, "OWNER_") &&
+    } else if ((absl::StartsWith(colname, "OWNER_") || column.owner()) &&
                colname == info.shard_by) {
       result.emplace(colname, FK_REMOVED);
     }
@@ -362,10 +363,12 @@ sqlast::CreateTable UpdateTableSchema(sqlast::CreateTable stmt,
       case FK_REMOVED:
         stmt.RemoveColumn(col);
         break;
+      /*
       case FK_EXTERNAL:
         stmt.MutableColumn(col).RemoveConstraint(
             sqlast::ColumnConstraint::Type::FOREIGN_KEY);
         break;
+      */
       default:
         continue;
     }

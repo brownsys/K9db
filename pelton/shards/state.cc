@@ -186,9 +186,7 @@ void SharderState::CreateIndex(const ShardKind &shard_kind,
                                bool unique) {
   this->indices_[table_name].insert(column_name);
   this->index_to_flow_[table_name][column_name][shard_by] = flow_name;
-  if (!unique) {
-    this->create_index_[shard_kind].push_back(create_index_stmt);
-  }
+  this->create_index_[shard_kind].push_back(create_index_stmt);
 }
 
 sql::SqlResult SharderState::NumShards() const {

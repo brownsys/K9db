@@ -164,9 +164,9 @@ cc_library(
     ],
 )
 """,
-    # My non-merged change for create_view_stmt QUERY_LITERAL from Dec 1 2022.
-    # Disambiguate '...'. Single quotes can never be used for identifiers, only string literals
-    commit = "9618c902760000b8456f42092db797575d031a62",
+    # My non-merged change for create_view_stmt QUERY_LITERAL from Dec 10 2022.
+    # Add less intrusive OWNER annotation.
+    commit = "112ce675b73b23588a2262f9eb7f85c0abb41428",
     #remote = "https://github.com/antlr/grammars-v4",
     remote = "https://github.com/KinanBab/grammars-v4.git",
 )

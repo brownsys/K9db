@@ -6,12 +6,14 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/sql/connection.h"
+#include "pelton/sql/connections/rocksdb_index.h"
+#include "pelton/sql/connections/rocksdb_util.h"
+#include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 #include "rocksdb/db.h"
 
@@ -39,10 +41,13 @@ class SingletonRocksdbConnection {
 
  private:
   // Helpers.
-  std::vector<std::string> LookupAndFilter(
-      const std::string table_name, const sqlast::AbstractStatement *sql);
-  std::optional<std::string> ReplacedRow(const std::string table_name,
-                                         const sqlast::AbstractStatement *stmt);
+  // Get record matching values in a value mapper (either by key, index, or it).
+  std::vector<std::string> Get(const std::string &table_name,
+                               const ValueMapper &value_mapper);
+  // Filter records by where clause in abstract statement.
+  std::vector<std::string> Filter(const dataflow::SchemaRef &schema,
+                                  const sqlast::AbstractStatement *sql,
+                                  std::vector<std::string> &&rows);
 
   // Members.
   std::unique_ptr<rocksdb::DB> db_;
@@ -50,7 +55,8 @@ class SingletonRocksdbConnection {
       handlers_;
   std::unordered_map<std::string, dataflow::SchemaRef> schemas_;
   std::unordered_map<std::string, size_t> primary_keys_;
-  std::unordered_map<std::string, std::unordered_set<size_t>> indicies_;
+  std::unordered_map<std::string, std::vector<size_t>> indexed_columns_;
+  std::unordered_map<std::string, std::vector<RocksdbIndex>> indices_;
 };
 
 class RocksdbConnection : public PeltonConnection {

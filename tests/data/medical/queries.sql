@@ -9,6 +9,7 @@ SELECT 1, 'str' FROM chat WHERE doctor_id = 2;
 
 SELECT * FROM chat WHERE message IN ('HELLO', 'Good bye');
 SELECT * FROM chat WHERE doctor_id IN (2);
+SELECT * FROM chat WHERE id IN (2, 4);
 
 SELECT * FROM address_doctors;
 SELECT * FROM city_doctor_count;

@@ -4,7 +4,6 @@
 
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -47,8 +46,8 @@ std::vector<int> ProjectionSchema(const dataflow::SchemaRef &db_schema,
 using ValuePair = std::pair<bool, std::vector<const std::string *>>;
 class ValueMapper : public sqlast::AbstractVisitor<ValuePair> {
  public:
-  explicit ValueMapper(size_t pk, const std::unordered_set<size_t> &indices,
-                       const dataflow::SchemaRef &schema)
+  ValueMapper(size_t pk, const std::vector<size_t> &indices,
+              const dataflow::SchemaRef &schema)
       : AbstractVisitor() {
     for (size_t col : indices) {
       const std::string &name = schema.NameOf(col);
@@ -61,11 +60,17 @@ class ValueMapper : public sqlast::AbstractVisitor<ValuePair> {
   }
 
   // Get the value(s) of a column.
-  std::vector<rocksdb::Slice> &Before(const std::string &col) {
-    return this->before_[col];
+  bool HasBefore(const std::string &col) const {
+    return this->before_.count(col) == 1;
   }
-  std::vector<rocksdb::Slice> &After(const std::string &col) {
-    return this->after_[col];
+  bool HasAfter(const std::string &col) const {
+    return this->after_.count(col) == 1;
+  }
+  const std::vector<rocksdb::Slice> &Before(const std::string &col) const {
+    return this->before_.at(col);
+  }
+  const std::vector<rocksdb::Slice> &After(const std::string &col) const {
+    return this->after_.at(col);
   }
 
   // Visitors.
