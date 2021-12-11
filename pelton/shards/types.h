@@ -52,6 +52,8 @@ struct AccessorIndexInformation {
   UnshardedTableName table_name;
   // The column which the accessor notation is defined on
   ColumnName accessor_column_name;
+  // Table from which this is acessed, if not PII
+  std::optional<UnshardedTableName> foreign_table;
   // The column which the table is sharded on
   ColumnName shard_by_column_name;
   // The name of the index
@@ -63,12 +65,28 @@ struct AccessorIndexInformation {
 
   AccessorIndexInformation(
       const ShardKind &sk, const UnshardedTableName &tn, const ColumnName &cn,
+      const UnshardedTableName &ftab,
       const ColumnName &sbcn, const IndexName &in,
       const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type> &an,
       const bool is)
       : shard_kind(sk),
         table_name(tn),
         accessor_column_name(cn),
+        foreign_table(ftab),
+        shard_by_column_name(sbcn),
+        index_name(in),
+        anonymize_columns(an),
+        is_sharded(is) {}
+
+  AccessorIndexInformation(
+      const ShardKind &sk, const UnshardedTableName &tn, const ColumnName &cn,
+      const ColumnName &sbcn, const IndexName &in,
+      const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type> &an,
+      const bool is)
+      : shard_kind(sk),
+        table_name(tn),
+        accessor_column_name(cn),
+        foreign_table(),
         shard_by_column_name(sbcn),
         index_name(in),
         anonymize_columns(an),

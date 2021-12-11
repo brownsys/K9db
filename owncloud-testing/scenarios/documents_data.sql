@@ -15,9 +15,9 @@ VALUES (0, 0, 'wong', NULL, 'claire', 'claire', NULL, 'file', 0, '', '', 24, 0, 
 
 INSERT INTO oc_files (id, file_name) VALUES (0, '/books/The Sorcerers Stone.ebook');
 
-INSERT INTO oc_groups VALUES ('HP Fans');
 INSERT INTO oc_group_user VALUES (0, 'HP Fans', 'wong');
 INSERT INTO oc_group_user VALUES (1, 'HP Fans', 'claire');
+INSERT INTO oc_groups VALUES ('HP Fans');
 
 INSERT INTO oc_users VALUES ('kashvi', 'Kashvi', 'password');
 INSERT INTO username_marker VALUES ('kashvi', 'kashvi');

@@ -76,6 +76,20 @@ void SharderState::AddAccessorIndex(
   this->accessor_index_[kind].push_back(accessor_information);
 }
 
+void SharderState::AddAccessorIndex(
+    const ShardKind &kind, const UnshardedTableName &table,
+    const ColumnName &accessor_column, const UnshardedTableName &foreign_table,
+    const ColumnName &shard_by_column, const IndexName &index_name,
+    const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
+        &anonymize,
+    const bool is_sharded) {
+  // Create an AccessorIndexInformation
+  AccessorIndexInformation accessor_information{
+      kind,       table,     accessor_column, foreign_table,
+      shard_by_column, index_name, anonymize, is_sharded};
+  this->accessor_index_[kind].push_back(accessor_information);
+}
+
 std::list<const sqlast::AbstractStatement *> SharderState::CreateShard(
     const ShardKind &shard_kind, const UserId &user) {
   // Mark shard for this user as created!

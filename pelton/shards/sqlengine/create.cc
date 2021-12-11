@@ -269,9 +269,8 @@ const std::string &GetShardFor(const UnshardedTableName &table, const shards::Sh
     return sinfo.front().shard_kind;
   } else if (state.IsPII(table)) {
     return table;
-  } else {
-    LOG(FATAL) << "Expected " << table << " to be sharded or PII";
   }
+  LOG(FATAL) << "Expected " << table << " to be sharded or PII";
 }
 
 // Factored out version of the acessor creation. This makes the `target_table`, specifically the version in `shard_string` accessible via `column_name`.
@@ -293,7 +292,7 @@ absl::Status MakeAccessible(
     const std::string &table_key = info.shard_by;
     const auto &index_name = "users_for_share_via_group";
     LOG(INFO) << "Found special case, installing index " << index_name;
-    state->AddAccessorIndex(shard_string, table_name, column_name,
+    state->AddAccessorIndex(shard_string, table_name, column_name, foreign_table,
                             table_key, index_name,
                             anon_cols, is_sharded);
   }
