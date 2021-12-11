@@ -257,6 +257,7 @@ cc_library(
         "//pelton/shards:upgradable_lock",
         "//pelton/shards/sqlengine:util",
         "//pelton/sql:result",
+        "//pelton/sql/result:resultset",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",

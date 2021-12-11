@@ -259,18 +259,45 @@ absl::StatusOr<std::pair<std::list<ShardingInformation>, std::optional<OwningTab
   return std::make_pair(implicit_owners, owning_table);
 }
 
+const std::string &GetShardFor(const UnshardedTableName &table, const shards::SharderState &state) 
+{
+  if (state.IsSharded(table)) {
+    const std::list<ShardingInformation> &sinfo = state.GetShardingInformation(table);
+    if (sinfo.size() != 1) {
+      LOG(FATAL) << "Expected only one sharding information, got " << sinfo.size();
+    }
+    return sinfo.front().shard_kind;
+  } else if (state.IsPII(table)) {
+    return table;
+  } else {
+    LOG(FATAL) << "Expected " << table << " to be sharded or PII";
+  }
+}
+
 // Factored out version of the acessor creation. This makes the `target_table`, specifically the version in `shard_string` accessible via `column_name`.
 absl::Status MakeAccessible(
   Connection *connection, 
+  const UnshardedTableName &foreign_table,
   const UnshardedTableName &table_name,
   const ColumnName &column_name,
-  const std::string &shard_string,
   const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type> &anon_cols,
   UniqueLock *lock) 
 {
   shards::SharderState *state = connection->state->sharder_state();
   bool is_sharded = state->IsSharded(table_name);
-  if (is_sharded) {
+  LOG(INFO) << "Making " << table_name << " available via " << column_name << " -> "
+     << foreign_table;
+  const std::string &shard_string = GetShardFor(foreign_table, *state);
+  if (table_name == "oc_share" && foreign_table == "oc_groups" && column_name == "ACCESSOR_share_with_group") {
+    const auto &info = state->GetShardingInformation(table_name).front();
+    const std::string &table_key = info.shard_by;
+    const auto &index_name = "users_for_share_via_group";
+    LOG(INFO) << "Found special case, installing index " << index_name;
+    state->AddAccessorIndex(shard_string, table_name, column_name,
+                            table_key, index_name,
+                            anon_cols, is_sharded);
+  }
+  else if (is_sharded) {
     const auto &info = state->GetShardingInformation(table_name).front();
     const std::string &table_key = info.shard_by;
 
@@ -289,9 +316,11 @@ absl::Status MakeAccessible(
         connection, lock);
     if (!status.ok())
       return status.status();
-
+    const IndexName index_name = index_prefix + "_" + table_key;
+    LOG(INFO) << "Installing accessor index " << index_name << " for " << table_name << "(" << column_name <<
+      ") -> " << foreign_table << " sharded_by " << shard_string << " (" << table_key << ")";
     state->AddAccessorIndex(shard_string, table_name, column_name,
-                            table_key, index_prefix + "_" + table_key,
+                            table_key, index_name,
                             anon_cols, is_sharded);
   } else {
     state->AddAccessorIndex("", table_name, column_name, "", "",
@@ -343,14 +372,10 @@ absl::Status IndexAccessor(const sqlast::CreateTable &stmt, Connection *connecti
         }
       }
       // Find anonymized columns.
-      // Must be a foreign key and must point to shard.
-      std::optional<ShardKind> shard_kind =
-          ShouldShardBy(*fk_constraint, *state);
-      std::string &shard_string = shard_kind.value();
 
       const auto anon_cols = GetAnonCols(columns[index], stmt.GetColumns());
 
-      CHECK_STATUS(MakeAccessible(connection, table_name, column_name, shard_string, anon_cols, lock));
+      CHECK_STATUS(MakeAccessible(connection, fk_constraint->foreign_table(), table_name, column_name, anon_cols, lock));
     }
   }
   return absl::OkStatus();
@@ -613,13 +638,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     if (owning_table->owning_type == OwningT::OWNING) {
       CHECK_STATUS(HandleOwningTable(stmt, *owning_table, connection, &lock));
     } else if (owning_table->owning_type == OwningT::ACCESSING) {
+      LOG(INFO) << "Found ACCESSING table";
       const auto anon_cols = GetAnonCols(owning_table->column, stmt.GetColumns());
-      const auto shard_kind =
-        ShouldShardBy(owning_table->fk_constraint, *state);
-      if (!shard_kind) 
-        return absl::InvalidArgumentError("Accessible table is not sharded");
-      const auto &shard_string = shard_kind.value();
-      CHECK_STATUS(MakeAccessible(connection, table_name, owning_table->column.column_name(), shard_string, anon_cols, &lock));
+      CHECK_STATUS(MakeAccessible(connection, owning_table->fk_constraint.foreign_table(), table_name, owning_table->column.column_name(), anon_cols, &lock));
     } else {
       LOG(FATAL) << "Weird `OwningT` value";
     }

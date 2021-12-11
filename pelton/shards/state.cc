@@ -124,6 +124,17 @@ const std::list<ShardingInformation> &SharderState::GetShardingInformation(
   return this->sharded_by_.at(table);
 }
 
+std::vector<const ShardingInformation *> SharderState::GetShardingInformationFor(
+    const UnshardedTableName &table,
+    const std::string &shard_kind) const {
+  std::vector<const ShardingInformation *> result;
+  for (const auto &info : this->GetShardingInformation(table)) {
+    if (info.shard_kind == shard_kind)
+      result.push_back(&info);
+  }
+  return result;
+}
+
 bool SharderState::IsPII(const UnshardedTableName &table) const {
   return this->kinds_.count(table) > 0;
 }
@@ -148,6 +159,16 @@ bool SharderState::HasAccessorIndices(const ShardKind &kind) const {
 const std::vector<AccessorIndexInformation> &SharderState::GetAccessorIndices(
     const ShardKind &kind) const {
   return this->accessor_index_.at(kind);
+}
+std::vector<const AccessorIndexInformation *> SharderState::GetAccessorInformationFor(
+    const ShardKind &kind,
+    const UnshardedTableName &table_name) const {
+  std::vector<const AccessorIndexInformation *> result;
+  for (const auto &info : this->GetAccessorIndices(kind)) {
+    if (info.table_name == table_name)
+      result.push_back(&info);
+  }
+  return result;
 }
 
 const std::unordered_set<UnshardedTableName> &SharderState::TablesInShard(

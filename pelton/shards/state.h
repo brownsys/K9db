@@ -90,6 +90,10 @@ class SharderState {
   const std::list<ShardingInformation> &GetShardingInformation(
       const UnshardedTableName &table) const;
 
+  std::vector<const ShardingInformation *> GetShardingInformationFor(
+      const UnshardedTableName &table,
+      const std::string &shard_kind) const;
+
   bool IsPII(const UnshardedTableName &table) const;
 
   const ColumnName &PkOfPII(const UnshardedTableName &table) const;
@@ -132,6 +136,9 @@ class SharderState {
   bool HasAccessorIndices(const ShardKind &kind) const;
   const std::vector<AccessorIndexInformation> &GetAccessorIndices(
       const ShardKind &kind) const;
+  std::vector<const AccessorIndexInformation *> GetAccessorInformationFor(
+      const ShardKind &kind,
+      const UnshardedTableName &table_name) const;
 
   size_t NumShards() {
     size_t count = 0;
