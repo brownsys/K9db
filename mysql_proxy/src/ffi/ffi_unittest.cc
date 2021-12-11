@@ -10,9 +10,6 @@
 
 #define DB_NAME "ffi_test"
 
-static std::string *db_username;
-static std::string *db_password;
-
 FFIConnection c_conn;
 
 namespace {
