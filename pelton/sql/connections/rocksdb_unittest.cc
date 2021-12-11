@@ -1,4 +1,4 @@
-#include "pelton/sql/connections/rocksdb.h"
+#include "pelton/sql/connections/rocksdb_connection.h"
 
 #include <filesystem>
 #include <iostream>
@@ -14,7 +14,8 @@
 // NOLINTNEXTLINE
 #include "gtest/gtest.h"
 
-#define DB_NAME "/tmp/pelton/test"
+#define DB_NAME "test"
+#define DB_PATH "/tmp/pelton/test"
 
 namespace pelton {
 namespace sql {
@@ -22,7 +23,7 @@ namespace sql {
 namespace {
 
 // Drop the database (if it exists).
-void DropDatabase() { std::filesystem::remove_all(DB_NAME); }
+void DropDatabase() { std::filesystem::remove_all(DB_PATH); }
 
 std::unique_ptr<sqlast::AbstractStatement> Parse(const std::string &sql) {
   sqlast::SQLParser parser;

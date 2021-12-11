@@ -1,4 +1,4 @@
-#include "pelton/sql/connections/rocksdb.h"
+#include "pelton/sql/connections/rocksdb_connection.h"
 
 #include <utility>
 
@@ -47,7 +47,8 @@ const std::string &GetTableName(const sqlast::AbstractStatement *stmt) {
 
 // SingletonRocksdbConnection.
 SingletonRocksdbConnection::SingletonRocksdbConnection(
-    const std::string &path) {
+    const std::string &db_name) {
+  std::string path = "/tmp/pelton/" + db_name;
   // Options.
   rocksdb::Options opts;
   opts.create_if_missing = true;

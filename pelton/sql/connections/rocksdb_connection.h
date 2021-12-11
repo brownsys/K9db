@@ -22,7 +22,7 @@ namespace sql {
 
 class SingletonRocksdbConnection {
  public:
-  explicit SingletonRocksdbConnection(const std::string &path);
+  explicit SingletonRocksdbConnection(const std::string &db_name);
 
   // Close the connection.
   void Close();
@@ -61,9 +61,9 @@ class SingletonRocksdbConnection {
 
 class RocksdbConnection : public PeltonConnection {
  public:
-  explicit RocksdbConnection(const std::string &path) {
+  explicit RocksdbConnection(const std::string &db_name) {
     if (INSTANCE == nullptr) {
-      INSTANCE = std::make_unique<SingletonRocksdbConnection>(path);
+      INSTANCE = std::make_unique<SingletonRocksdbConnection>(db_name);
     }
     this->singleton_ = INSTANCE.get();
   }

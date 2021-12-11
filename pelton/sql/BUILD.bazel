@@ -30,7 +30,7 @@ cc_library(
         "//pelton/dataflow:schema",
         "//pelton/shards:types",
         "//pelton/shards/sqlengine:util",
-        "//pelton/sql/connections:rocksdb",
+        "//pelton/sql/connections:rocksdb_connection",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "@com_google_absl//absl/status",

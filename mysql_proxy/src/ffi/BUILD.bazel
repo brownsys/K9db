@@ -20,7 +20,6 @@ cc_library(
         "//pelton",
         "@com_github_gflags_gflags//:gflags",
         "@glog",
-        "@rocksdb",
     ],
 )
 

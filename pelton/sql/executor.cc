@@ -8,7 +8,7 @@
 #include "glog/logging.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/shards/sqlengine/util.h"
-#include "pelton/sql/connections/rocksdb.h"
+#include "pelton/sql/connections/rocksdb_connection.h"
 #include "pelton/util/perf.h"
 
 namespace pelton {
@@ -48,8 +48,7 @@ SqlResult PeltonExecutor::EmptyResult(const sqlast::AbstractStatement *sql,
 // Initialization: initialize the eager executor so that it maintains
 // an open connection to the underlying DB.
 void PeltonExecutor::Initialize(const std::string &db_name) {
-  std::string path = "/tmp/pelton/" + db_name;
-  this->connection_ = std::make_unique<RocksdbConnection>(path);
+  this->connection_ = std::make_unique<RocksdbConnection>(db_name);
 }
 
 // Execution of SQL statements.

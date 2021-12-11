@@ -1,12 +1,12 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 cc_library(
-    name = "rocksdb",
+    name = "rocksdb_connection",
     srcs = [
-        "rocksdb.cc",
+        "rocksdb_connection.cc",
     ],
     hdrs = [
-        "rocksdb.h",
+        "rocksdb_connection.h",
     ],
     visibility = ["//pelton/sql:__subpackages__"],
     deps = [
@@ -63,7 +63,7 @@ cc_test(
         "rocksdb_unittest.cc",
     ],
     deps = [
-        ":rocksdb",
+        ":rocksdb_connection",
         "//pelton/sqlast:ast",
         "//pelton/sqlast:parser",
         "@com_google_googletest//:gtest",
