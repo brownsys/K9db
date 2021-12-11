@@ -36,6 +36,7 @@ void SqlResultSet::Append(SqlResultSet &&other, bool deduplicate) {
 
 // SqlResult.
 void SqlResult::Append(SqlResult &&other, bool deduplicate) {
+  CHECK(this->type_ == other.type_) << "Append different types";
   switch (this->type_) {
     case Type::STATEMENT: {
       if (this->status_ != false) {
@@ -56,7 +57,8 @@ void SqlResult::Append(SqlResult &&other, bool deduplicate) {
         LOG(FATAL) << "Appending bad ResultSet size";
       }
       this->sets_.front().Append(std::move(other.sets_.front()), deduplicate);
-    } break;
+      break;
+    }
   }
 }
 

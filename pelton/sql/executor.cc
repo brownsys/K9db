@@ -86,12 +86,9 @@ SqlResult PeltonExecutor::Shards(
     const std::unordered_set<shards::UserId> &user_ids,
     const dataflow::SchemaRef &schema, int aug_index) {
   // If no user_ids are provided, we return an empty result.
-  if (user_ids.size() == 0) {
-    return EmptyResult(sql, schema);
-  }
+  SqlResult result = EmptyResult(sql, schema);
 
   // This result set is a proxy that allows access to results from all shards.
-  SqlResult result(schema);
   for (const shards::UserId &user_id : user_ids) {
     result.Append(this->Shard(sql, shard_kind, user_id, schema, aug_index),
                   true);
