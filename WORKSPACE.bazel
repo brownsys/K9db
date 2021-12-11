@@ -391,8 +391,13 @@ filegroup(
 cmake(
     name = "rocksdb",
     generate_args = [
-        "-DROCKSDB_BUILD_SHARED=OFF",
+        "-DROCKSDB_BUILD_SHARED=ON",
         "-DWITH_GFLAGS=ON",
+        "-DWITH_BZ2=1",
+        "-DWITH_ZLIB=1",
+        "-DWITH_SNAPPY=1",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
     ],
     build_args = [
         "--", # pass following args through to `make`
@@ -403,7 +408,7 @@ cmake(
         "CMAKE_CXX_FLAGS": "-fPIC",
     },
     lib_source = ":all_srcs",
-    out_static_libs = ["librocksdb.a"],
+    out_shared_libs = ["librocksdb.so"],
     deps = [
         "@com_github_gflags_gflags//:gflags",
     ],

@@ -66,10 +66,8 @@ cc_test(
         ":rocksdb",
         "//pelton/sqlast:ast",
         "//pelton/sqlast:parser",
-        #"@antlr4_runtimes//:cpp",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
         "@glog",
-        #"@grammars-v4//:sqlparser",
     ],
 )
