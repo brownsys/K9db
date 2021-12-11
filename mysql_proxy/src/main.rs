@@ -253,13 +253,13 @@ impl Backend {
                     return (stmt_id.clone(), self.compute_param_count(&metadata));
                 } // Else proceed to perform wiring.
                 let reduced_stmt_id = self
-                    .get_reduced_stmt_id(&prepared_write_guard.get(prepared_statement).unwrap());
+                    .get_reduced_stmt_id(&prepared_write_guard.get(&reduced_form).unwrap());
                 let mut wherein_write_guard = self.wherein_view_index.write().unwrap();
                 let new_stmt_id = self.id_generator.fetch_add(1, Ordering::SeqCst);
                 let param_count = self.compute_param_count(&metadata);
                 // Update data structures
                 prepared_write_guard
-                    .get_mut(prepared_statement)
+                    .get_mut(&reduced_form)
                     .unwrap()
                     .insert(metadata.clone(), new_stmt_id);
                 wherein_write_guard.insert(new_stmt_id, (reduced_stmt_id, metadata));
@@ -296,13 +296,13 @@ impl Backend {
                 // reduced form's statement id.
                 // Proceed to perform wiring.
                 let reduced_stmt_id = self
-                    .get_reduced_stmt_id(&prepared_write_guard.get(prepared_statement).unwrap());
+                    .get_reduced_stmt_id(&prepared_write_guard.get(&reduced_form).unwrap());
                 let mut wherein_write_guard = self.wherein_view_index.write().unwrap();
                 let new_stmt_id = self.id_generator.fetch_add(1, Ordering::SeqCst);
                 let param_count = self.compute_param_count(&metadata);
                 // Update data structures
                 prepared_write_guard
-                    .get_mut(prepared_statement)
+                    .get_mut(&reduced_form)
                     .unwrap()
                     .insert(metadata.clone(), new_stmt_id);
                 wherein_write_guard.insert(new_stmt_id, (reduced_stmt_id, metadata));
