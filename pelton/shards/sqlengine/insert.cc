@@ -58,6 +58,7 @@ absl::Status MaybeHandleOwningColumn(
   bool was_moved = false;
   for (auto &col : rel_schema.GetColumns()) {
     if (IsOwning(col)) {
+      continue;
       LOG(INFO) << "Found owning column";
       if (was_moved) {
         return absl::InvalidArgumentError("Two owning columns?");
@@ -85,7 +86,7 @@ absl::Status MaybeHandleOwningColumn(
           return absl::InternalError("Unhandeled");
         size_t fk_idx =  rel_schema.ColumnIndex(col.column_name());
         if (!info.IsTransitive()) 
-          --fk_idx; // this is to account for the dropped column in directly sharded tables. Might be a bit unstable.
+          --fk_idx; // this is to account for the dropped column in directly sharded tables. This is unstable.
         binexp->SetRight(std::make_unique<sqlast::LiteralExpression>(
           cloned.GetValue(fk_idx)
         ));
@@ -103,18 +104,23 @@ absl::Status MaybeHandleOwningColumn(
           select.AddColumn(col0.column_name());
         }
         ASSIGN_OR_RETURN(sql::SqlResult &inner_result, select::Shard(select, connection, true));
-        if (inner_result.IsQuery() && inner_result.ResultSets().size() == 0) {
-          LOG(INFO) << "Skipping value moving. Reason: The lookup has no results";
+        if ((inner_result.IsStatement() && !inner_result.Success()) 
+          || (inner_result.IsQuery() && inner_result.ResultSets().size() == 0)) {
+          LOG(INFO) << "Skipping value moving. Reason: The lookup has no results or failed";
           continue;
         }
-        auto &result_set = inner_result.ResultSets().at(0);
+        auto &result_set = inner_result.ResultSets().front();
         if (inner_result.ResultSets().size() > 1 || result_set.size() > 1) {
           LOG(WARNING) << "Too many results for " << schema.table_name() << " during value move";
         }
         dataflow::Record &rec = result_set.Vec().front();
+        LOG(INFO) << "Found first record";
         uint64_t csize = schema.GetColumns().size();
+        if (csize != rec.schema().size())
+          LOG(FATAL) << csize << " != " << rec.schema().size();
         for (uint64_t i = 0; i < csize; i++) {
-          insert.AddValue(rec.GetValue(i).GetSqlString());
+          auto v = rec.GetValue(i).GetSqlString();
+          insert.AddValue(v);
         }
         result->Append(exec.Shard(&insert, info.shard_kind, user_id), false);
       }

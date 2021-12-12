@@ -57,7 +57,7 @@ absl::StatusOr<sql::SqlResult> GetAllMyValuesFromTable(
   const UnshardedTableName &table_name,
   Connection *connection) 
 {
-  sql::SqlResult result(true);
+  sql::SqlResult result(std::vector<sql::SqlResultSet>{});
   const auto *state = connection->state->sharder_state();
   if (state->HasAccessorIndices(shard_kind)) {
     const std::vector<const AccessorIndexInformation *> acc_info = state->GetAccessorInformationFor(shard_kind, table_name);
@@ -72,7 +72,7 @@ absl::StatusOr<sql::SqlResult> GetAllMyValuesFromTable(
     if (shard_info.size() > 0) {
       for (const auto *info : shard_info) {
         dataflow::SchemaRef schema = connection->state->dataflow_state()->GetTableSchema(table_name);
-        result.Append(GetDataFromShardedTable(*info, Dequote(user_id), schema, connection->executor), true);
+        result.AddResultSet(std::move(GetDataFromShardedTable(*info, Dequote(user_id), schema, connection->executor).ResultSets().front()));
       }
     } else {
       LOG(INFO) << "No sharding info found for " << shard_kind;
@@ -92,7 +92,7 @@ absl::StatusOr<std::vector<std::string>> GetLookupValues(
     lookup_values.push_back(user_id);
   } else {
     MOVE_OR_RETURN(sql::SqlResult result, GetAllMyValuesFromTable(shard_kind, user_id, *table_name, connection));
-    while (result.IsQuery() && result.Success()) {
+    if (result.IsQuery() && result.Success()) {
       auto &resultsets = result.ResultSets();
       const auto &schema = resultsets.front().schema();
       const auto &keys = schema.keys();
@@ -124,7 +124,13 @@ absl::Status GetAccessableDataForAccessor(
   std::string shard_by_access = accessor_index.shard_by_column_name;
   bool is_sharded = accessor_index.is_sharded;
 
+  LOG(INFO) << "Handling accessor for " << accessor_table_name;
+
   MOVE_OR_RETURN(const std::vector<std::string> lookup_values, GetLookupValues(accessor_index.shard_kind, user_id, accessor_index.foreign_table, connection));
+  LOG(INFO) << "Lookup values retrieved";
+  for (const auto & v : lookup_values) {
+    LOG(INFO) << v;
+  }
   if (is_sharded) {
     MOVE_OR_RETURN(std::unordered_set<UserId> ids_set,
                     index::LookupIndex(index_name, user_id, dataflow_state));
@@ -179,9 +185,13 @@ absl::Status GetAccessableDataForAccessor(
         MOVE_OR_RETURN(sql::SqlResult res,
                         select::Shard(accessor_stmt, connection, false));
 
+        LOG(INFO) << "Adding results";
         result->AddResultSet(std::move(res.ResultSets().at(0)));
+        LOG(INFO) << "Done";
       }
+      LOG(INFO) << "Lookups for id " << id << " done";
     }
+    LOG(INFO) << "Last id handled";
   } else {
     for (const auto &val : lookup_values) {
       sqlast::Select accessor_stmt{accessor_table_name};
@@ -208,6 +218,7 @@ absl::Status GetAccessableDataForAccessor(
       result->AddResultSet(std::move(res.ResultSets().at(0)));
     }
   }
+  LOG(INFO) << "GetAccessableData done ";
   return absl::OkStatus();
 }
 
@@ -387,12 +398,31 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
   }
   return result;
 }
+void Print(sql::SqlResult &&result, bool print) {
+  if (print) {
+    if (result.IsStatement()) {
+      std::cout << "Success: " << result.Success() << std::endl;
+    } else if (result.IsUpdate()) {
+      std::cout << "Affected rows: " << result.UpdateCount() << std::endl;
+    } else if (result.IsQuery()) {
+      for (sql::SqlResultSet &resultset : result.ResultSets()) {
+        std::cout << std::endl;
+        std::cout << resultset.schema() << std::endl;
+        std::vector<dataflow::Record> records = resultset.Vec();
+        for (dataflow::Record &record : records) {
+          std::cout << record << std::endl;
+        }
+      }
+    }
+  }
+}
 
 absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
                                    Connection *connection) {
   perf::Start("GET");
   const std::string &shard_kind = stmt.shard_kind();
   const std::string &user_id = stmt.user_id();
+  const std::string &unquoted_user_id = Dequote(user_id);
   auto &exec = connection->executor;
 
   shards::SharderState *state = connection->state->sharder_state();
@@ -401,33 +431,37 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
 
   sql::SqlResult result(std::vector<sql::SqlResultSet>{});
   for (const auto &table_name : state->TablesInShard(shard_kind)) {
+    LOG(INFO) << "handling table " << table_name << " for shard " << shard_kind;
     dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
 
     sql::SqlResult table_result(schema);
-    for (const auto &info : state->GetShardingInformation(table_name)) {
-      if (info.shard_kind != shard_kind) {
-        continue;
-      }
-
+    for (const ShardingInformation *info : state->GetShardingInformationFor(table_name, shard_kind)) {
+      LOG(INFO) << "Dealing with sharding information for " << info->sharded_table_name;
       // Augment returned results with the user_id.
       int aug_index = -1;
-      if (!info.IsTransitive()) {
-        aug_index = info.shard_by_index;
+      if (!info->IsTransitive()) {
+        aug_index = info->shard_by_index;
       }
 
-      sqlast::Select tbl_stmt{info.sharded_table_name};
+      sqlast::Select tbl_stmt{info->sharded_table_name};
       tbl_stmt.AddColumn("*");
       table_result.Append(
-          exec.Shard(&tbl_stmt, shard_kind, user_id, schema, aug_index), true);
+          exec.Shard(&tbl_stmt, shard_kind, unquoted_user_id, schema, aug_index), true);
     }
-    result.AddResultSet(std::move(table_result.ResultSets().at(0)));
+    result.AddResultSet(std::move(table_result.ResultSets().front()));
   }
   
   if (state->HasAccessorIndices(shard_kind)) {
+    LOG(INFO) << "Handling acessor indices";
     CHECK_STATUS(GetAccessableData(shard_kind, user_id, connection, &result));
   }
-  return result;
+  auto schema = result.ResultSets().front().schema();
+  LOG(INFO) << "Printing";
+  Print(std::move(result), true);
+  return sql::SqlResult(schema);
 }
+
+
 
 } // namespace
 

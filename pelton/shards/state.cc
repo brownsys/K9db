@@ -124,12 +124,12 @@ const std::pair<int, std::string> &SharderState::GetPk(
 }
 
 bool SharderState::Exists(const UnshardedTableName &table) const {
-  return this->sharded_schema_.count(table) > 0 ||
-         this->sharded_by_.count(table) > 0;
+  return this->sharded_schema_.contains(table) ||
+         this->sharded_by_.contains(table);
 }
 
 bool SharderState::IsSharded(const UnshardedTableName &table) const {
-  return this->sharded_by_.count(table) == 1;
+  return this->sharded_by_.contains(table);
 }
 
 // reads from sharded_by_ (r3)
@@ -143,6 +143,7 @@ std::vector<const ShardingInformation *> SharderState::GetShardingInformationFor
     const std::string &shard_kind) const {
   std::vector<const ShardingInformation *> result;
   for (const auto &info : this->GetShardingInformation(table)) {
+    LOG(INFO) << "Found info " << info.sharded_table_name;
     if (info.shard_kind == shard_kind)
       result.push_back(&info);
   }
@@ -150,7 +151,7 @@ std::vector<const ShardingInformation *> SharderState::GetShardingInformationFor
 }
 
 bool SharderState::IsPII(const UnshardedTableName &table) const {
-  return this->kinds_.count(table) > 0;
+  return this->kinds_.contains(table);
 }
 
 const ColumnName &SharderState::PkOfPII(const UnshardedTableName &table) const {
@@ -159,7 +160,7 @@ const ColumnName &SharderState::PkOfPII(const UnshardedTableName &table) const {
 
 bool SharderState::ShardExists(const ShardKind &shard_kind,
                                const UserId &user) const {
-  return this->shards_.at(shard_kind).count(user) > 0;
+  return this->shards_.at(shard_kind).contains(user);
 }
 
 const std::unordered_set<UserId> &SharderState::UsersOfShard(
@@ -168,7 +169,7 @@ const std::unordered_set<UserId> &SharderState::UsersOfShard(
 }
 
 bool SharderState::HasAccessorIndices(const ShardKind &kind) const {
-  return this->accessor_index_.count(kind) == 1;
+  return this->accessor_index_.contains(kind);
 }
 const std::vector<AccessorIndexInformation> &SharderState::GetAccessorIndices(
     const ShardKind &kind) const {
@@ -194,12 +195,12 @@ const std::unordered_set<UnshardedTableName> &SharderState::TablesInShard(
 bool SharderState::HasIndexFor(const UnshardedTableName &table_name,
                                const ColumnName &column_name,
                                const ColumnName &shard_by) const {
-  if (this->index_to_flow_.count(table_name) == 0) {
+  if (!this->index_to_flow_.contains(table_name)) {
     return false;
   }
 
   auto &tbl = this->index_to_flow_.at(table_name);
-  if (this->index_to_flow_.at(table_name).count(column_name) == 0) {
+  if (!this->index_to_flow_.at(table_name).contains(column_name)) {
     return false;
   }
 
@@ -208,7 +209,7 @@ bool SharderState::HasIndexFor(const UnshardedTableName &table_name,
 }
 
 bool SharderState::HasIndicesFor(const UnshardedTableName &table_name) const {
-  return this->indices_.count(table_name) > 0;
+  return this->indices_.contains(table_name);
 }
 
 const std::unordered_set<ColumnName> &SharderState::IndicesFor(

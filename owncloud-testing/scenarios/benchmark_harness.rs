@@ -201,6 +201,27 @@ impl GeneratorState {
     }
 }
 
+struct CloseProc(Child);
+
+impl CloseProc {
+    fn new(c: Child) -> Self {
+        CloseProc(c)
+    }
+}
+
+impl std::ops::Deref for CloseProc {
+    type Target = Child;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Drop for CloseProc {
+    fn drop(&mut self) {
+        self.0.kill().unwrap()
+    }
+}
+
 
 pub struct Args {
     pub num_users: Vec<usize>,
@@ -288,6 +309,7 @@ fn main() {
             let pelton_handle = if backend.is_pelton() {
                 std::fs::read_dir("/tmp/pelton/pelton").unwrap().for_each(|p| {
                     let entry = p.unwrap();
+                    eprintln!("Deleting {}", entry.path().to_str().unwrap());
                     if entry.file_type().unwrap().is_dir() {
                         std::fs::remove_dir_all(entry.path()).unwrap();
                     } else {
@@ -295,7 +317,7 @@ fn main() {
                     }
                 });
                 Some(
-                    run_bazel_command("run", &pelton_args)
+                    CloseProc::new(run_bazel_command("run", &pelton_args))
                 )
             } else {
                 None
@@ -347,7 +369,6 @@ fn main() {
             if args.dump_db && backend.is_pelton() {
                 pp_pelton_database();
             }
-            let h_res = pelton_handle.map(|mut h| h.kill());
             writeln!(f, "{},{},{}", 0, backend, time.as_millis()).unwrap();
         })
     });

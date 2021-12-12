@@ -573,7 +573,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
   ASSIGN_OR_RETURN(std::tie(sharding_information, owning_table),
                    ShardTable(stmt, *state));
 
-  sql::SqlResult result(false);
+  sql::SqlResult result(true);
   // Sharding scenarios.
   auto &exec = connection->executor;
   if (has_pii && sharding_information.size() == 0) {
