@@ -246,7 +246,7 @@ impl Backend {
                     // Some other thread has already performed the insert while this thread was
                     // busy grabbing the write lock.
                     let stmt_id = prepared_write_guard
-                        .get(prepared_statement)
+                        .get(&reduced_form)
                         .unwrap()
                         .get(&metadata)
                         .unwrap();
@@ -285,7 +285,7 @@ impl Backend {
             {
                 // The statement with the exact parameter count has already been inserted before.
                 let stmt_id = prepared_write_guard
-                    .get(prepared_statement)
+                    .get(&reduced_form)
                     .unwrap()
                     .get(&metadata)
                     .unwrap();
