@@ -2,8 +2,10 @@ extern crate mysql;
 
 pub use self::mysql::*;
 pub use self::mysql::prelude::*;
+use std::str::FromStr;
 
 const SCHEMA : &'static str = include_str!("schema.sql");
+const MYSQL_SCHEMA : &'static str = include_str!("mysql-schema.sql");
 
 pub fn run_queries_in_str<Q:Queryable>(conn: &mut Q, file: &str) {
     let qs = file.lines().filter(|l| !l.trim_start().starts_with("--")).fold(String::new(), |mut s, l| { if !s.is_empty() { s.push_str(" "); } s.push_str(l); s });
@@ -12,27 +14,64 @@ pub fn run_queries_in_str<Q:Queryable>(conn: &mut Q, file: &str) {
     }
 }
 
+#[derive(PartialEq, Eq, Debug)]
 pub enum Backend {
     Pelton,
     MySQL,
 }
 
-pub fn prepare_database(prepare_and_insert: bool) -> Conn {
-    prepare_backend(Backend::Pelton, prepare_and_insert)
+impl FromStr for Backend {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "pelton" => Ok(Backend::Pelton),
+            "mysql" => Ok(Backend::MySQL),
+            _ => Err(format!("Unknown backend {}", s)),
+        }
+    }
 }
 
-pub fn prepare_backend(backend: Backend, prepare_and_insert: bool) -> Conn {
-    let opts0 = OptsBuilder::new();
-    let opts = match backend {
-        Backend::Pelton => opts0.tcp_port(10001),
-        Backend::MySQL => opts0,
-    };
-    let mut c = Conn::new(opts).unwrap();
-    if prepare_and_insert {
-        run_queries_in_str(&mut c, SCHEMA);
+impl std::fmt::Display for Backend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(
+            match self {
+                Backend::Pelton => "pelton",
+                Backend::MySQL => "mysql",
+            }
+        )
     }
-    c
 }
+
+impl Backend {
+    pub fn is_mysql(&self) -> bool {
+        self == &Backend::MySQL
+    }
+    pub fn is_pelton(&self) -> bool {
+        self == &Backend::Pelton
+    }
+    pub fn prepare(&self, prepare_and_insert: bool) -> Conn {
+        let opts0 = OptsBuilder::new();
+        let opts = match self {
+            Backend::Pelton => opts0.tcp_port(10001),
+            Backend::MySQL => opts0.user(Some("root")).pass(Some("password")),
+        };
+        let mut c = Conn::new(opts).unwrap();
+        if self.is_mysql() {
+            let db_name = "owncloud_test";
+            c.query_drop(format!("DROP DATABASE IF EXISTS {};", db_name)).unwrap();
+            c.query_drop(format!("CREATE DATABASE {};", db_name)).unwrap();
+            c.query_drop(format!("USE {}", db_name)).unwrap();
+        }
+        if prepare_and_insert {
+            run_queries_in_str(&mut c, match self {
+                Backend::Pelton => SCHEMA,
+                Backend::MySQL => MYSQL_SCHEMA,
+            });
+        }
+        c
+    }
+}
+
 
 pub fn pp_pelton_database() {
 

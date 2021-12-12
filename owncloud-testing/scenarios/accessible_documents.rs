@@ -1,11 +1,11 @@
-mod common;
-use common::*;
+extern crate owncloud_scenarios;
+use owncloud_scenarios::*;
 
 fn main() {
     let prepare_and_insert = true;
-    let mut conn = prepare_database(prepare_and_insert);
+    let ref backend = Backend::MySQL;
+    let mut conn = backend.prepare(prepare_and_insert);
 
-    let user_id = "claire";
     if prepare_and_insert {
         run_queries_in_str(&mut conn, include_str!("documents_data.sql"));
     }
@@ -49,11 +49,13 @@ fn main() {
         println!("Found share {:?}", row);
     }
 
-    println!("Running GDPR get for wong");
+    if backend.is_pelton() {
+        println!("Running GDPR get for wong");
 
-    for row in conn.query::<Row,_>("GDPR GET oc_users 'wong'").unwrap() {
-        println!("{:?}", row);
+        for row in conn.query::<Row,_>("GDPR GET oc_users 'wong'").unwrap() {
+            println!("{:?}", row);
+        }
+
+        pp_pelton_database()
     }
-
-    pp_pelton_database()
 }

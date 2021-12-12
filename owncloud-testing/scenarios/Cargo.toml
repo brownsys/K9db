@@ -8,6 +8,9 @@ mysql = "20.1.0"
 rand = "0.8.4"
 clap = "2.34.0"
 
+[lib]
+path = "lib.rs"
+
 [[bin]]
 name = "accessible-documents"
 path = "accessible_documents.rs"
@@ -15,6 +18,11 @@ path = "accessible_documents.rs"
 [[bin]]
 name = "granting-access"
 path = "granting_access.rs"
+
+[[bin]]
+name = "benchmark-harness"
+path = "benchmark_harness.rs"
+
 
 [[bin]]
 name = "benchmark"

@@ -1,8 +1,8 @@
-mod common;
-use common::*;
+extern crate owncloud_scenarios;
+use owncloud_scenarios::*;
 
 fn main() {
-    let mut conn = prepare_database(true);
+    let mut conn = Backend::Pelton.prepare(true);
 
     let share_target = "janine";
     let file_owner = "claire";
