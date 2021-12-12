@@ -601,7 +601,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                                 | ColumnType::MYSQL_TYPE_VARCHAR
                                 | ColumnType::MYSQL_TYPE_VAR_STRING => {
                                     // NOTE: For Lobsters harness, remove these single quotes.
-                                    format!("\'{}\'", Into::<&str>::into(param.value))
+                                    format!("{}", Into::<&str>::into(param.value))
                                 }
                                 ColumnType::MYSQL_TYPE_DECIMAL
                                 | ColumnType::MYSQL_TYPE_NEWDECIMAL
@@ -638,7 +638,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                                     | ColumnType::MYSQL_TYPE_VARCHAR
                                     | ColumnType::MYSQL_TYPE_VAR_STRING => {
                                         // NOTE: For Lobsters harness, remove these single quotes.
-                                        format!("\'{}\'", Into::<&str>::into(param.value))
+                                        format!("{}", Into::<&str>::into(param.value))
                                     }
                                     ColumnType::MYSQL_TYPE_DECIMAL
                                     | ColumnType::MYSQL_TYPE_NEWDECIMAL
@@ -686,7 +686,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                         | ColumnType::MYSQL_TYPE_VARCHAR
                         | ColumnType::MYSQL_TYPE_VAR_STRING => {
                             // NOTE: For Lobsters harness, remove these single quotes.
-                            format!("\'{}\'", Into::<&str>::into(param.value))
+                            format!("{}", Into::<&str>::into(param.value))
                         }
                         ColumnType::MYSQL_TYPE_DECIMAL
                         | ColumnType::MYSQL_TYPE_NEWDECIMAL
