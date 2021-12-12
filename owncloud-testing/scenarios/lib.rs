@@ -63,10 +63,17 @@ impl Backend {
             c.query_drop(format!("USE {}", db_name)).unwrap();
         }
         if prepare_and_insert {
-            run_queries_in_str(&mut c, match self {
+            let schema = match self {
                 Backend::Pelton => SCHEMA,
                 Backend::MySQL => MYSQL_SCHEMA,
-            });
+            };
+            if self.is_pelton() {
+                run_queries_in_str(&mut c, schema);
+            } else {
+                let mut t = c.start_transaction(TxOpts::default()).unwrap();
+                run_queries_in_str(&mut t, schema);
+                t.commit().unwrap();
+            }
         }
         c
     }

@@ -7,7 +7,7 @@ fn main() {
     let mut conn = backend.prepare(prepare_and_insert);
 
     if prepare_and_insert {
-        run_queries_in_str(&mut conn, include_str!("documents_data.sql"));
+        run_queries_in_str(&mut conn, if backend.is_pelton() { include_str!("documents_data.sql") } else { include_str!("documents_data_mysql.sql")});
     }
 
     // let ref get_files = conn.prep(

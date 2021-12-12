@@ -52,8 +52,8 @@ CREATE TABLE oc_group_user (
 CREATE TABLE oc_share (
   id INT NOT NULL,
   share_type INT NOT NULL,
-  ACCESSOR_share_with VARCHAR(255) REFERENCES oc_users(uid),
-  ACCESSOR_share_with_group VARCHAR(255) REFERENCES oc_groups(gid),
+  ACCESSOR_share_with VARCHAR(64) REFERENCES oc_users(uid),
+  ACCESSOR_share_with_group VARCHAR(64) REFERENCES oc_groups(gid),
   OWNER_uid_owner VARCHAR(64) NOT NULL REFERENCES oc_users(uid),
   uid_initiator VARCHAR(64) REFERENCES oc_users(uid),
   parent INT ,

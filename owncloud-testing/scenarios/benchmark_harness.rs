@@ -10,6 +10,9 @@ extern crate owncloud_scenarios;
 use owncloud_scenarios::*;
 use rand::Rng;
 use std::collections::HashMap;
+use std::process::{Command, Child, Stdio};
+use std::io::Write;
+use std::time::{Duration, Instant};
 
 
 struct User {
@@ -45,7 +48,7 @@ impl <'a> ToValue for Group<'a> {
 
 
 impl <'a> InsertDB for Share<'a> {
-    fn insert_db(&self, conn: &mut Conn) {
+    fn insert_db(&self, conn: &mut Conn, _: &Backend) {
         let (share_type, user_target, group_target) = match self.share_with {
             ShareType::Direct(u) => (0, u.to_value(), Value::NULL),
             ShareType::Group(g) => (1, Value::NULL, g.to_value()),
@@ -74,11 +77,11 @@ impl ToValue for User {
 }
 
 trait InsertDB {
-    fn insert_db(&self, conn: &mut Conn);
+    fn insert_db(&self, conn: &mut Conn, backend: &Backend);
 }
 
 impl InsertDB for User {
-    fn insert_db(&self, conn: &mut Conn) {
+    fn insert_db(&self, conn: &mut Conn, _: &Backend) {
         conn.exec_drop("INSERT INTO oc_users VALUES (:uid, :uid, :pw)", params!(
             "uid" => &self.uid,
             "pw" => ""
@@ -95,29 +98,34 @@ impl <'a> ToValue for File<'a> {
 }
 
 impl <'a> InsertDB for File<'a> {
-    fn insert_db(&self, conn: &mut Conn) {
+    fn insert_db(&self, conn: &mut Conn, _: &Backend) {
         conn.exec_drop("INSERT INTO oc_files VALUES (?, ?)", (self.id, self.id.to_string())).unwrap()
     }
 }
 
 impl <I:InsertDB> InsertDB for [I] {
-    fn insert_db(&self, conn: &mut Conn) {
-        self.iter().for_each(|o| o.insert_db(conn))
+    fn insert_db(&self, conn: &mut Conn, backend: &Backend) {
+        self.iter().for_each(|o| o.insert_db(conn, backend))
     }
 }
 
 impl <'a, I:InsertDB> InsertDB for &'a I {
-    fn insert_db(&self, conn: &mut Conn) {
-        (*self).insert_db(conn)
+    fn insert_db(&self, conn: &mut Conn, backend: &Backend) {
+        (*self).insert_db(conn, backend)
     }
 }
 
 impl <'a> InsertDB for Group<'a> {
-    fn insert_db(&self, conn: &mut Conn) {
+    fn insert_db(&self, conn: &mut Conn, backend: &Backend) {
+        if backend.is_mysql() {
+            conn.exec_drop("INSERT INTO oc_groups VALUES (?)", (&self.gid,)).unwrap();
+        }
         self.users.iter().for_each(|(i, u)| {
             conn.exec_drop("INSERT INTO oc_group_user VALUES (?, ?, ?)", (i, self, u)).unwrap()
         });
-        conn.exec_drop("INSERT INTO oc_groups VALUES (?)", (&self.gid,)).unwrap();
+        if backend.is_pelton() {
+            conn.exec_drop("INSERT INTO oc_groups VALUES (?)", (&self.gid,)).unwrap();
+        }
     }
 }
 
@@ -193,62 +201,154 @@ impl GeneratorState {
     }
 }
 
+
+pub struct Args {
+    pub num_users: Vec<usize>,
+    pub files_per_user: usize,
+    pub direct_shares_per_file: usize,
+    pub group_shares_per_file: usize,
+    pub users_per_group: usize,
+    pub backends: Vec<Backend>,
+    pub num_samples: usize,
+    pub dump_db: bool,
+    pub outfile: Option<String>,
+    pub debug: bool,
+}
+
 fn main() {
     // Add distributions later
     let matches = 
             clap_app!((crate_name!()) => 
                 (version: (crate_version!()))
                 (author: (crate_authors!()))
-                (@arg num_users: --("num-users") +required +takes_value "Number of users (> 1)")
+                (@arg num_users: --("num-users") ... +required +takes_value "Number of users (> 1)")
                 (@arg files_per_user: --("files-per-user") +takes_value "Avg files per user (>1)")
                 (@arg direct_shares_per_file: --("direct-shares-per-file") +takes_value "Avg direct shares per file")
                 (@arg group_shares_per_file: --("group-shares-per-file") +takes_value "Avg group shares per file")
                 (@arg users_per_group: --("users-per-group") +takes_value "Avg users per group")
-                (@arg backend: --backend +required +takes_value "Backend type to use")
+                (@arg backend: --backend ... +required +takes_value "Backend type to use")
                 (@arg num_samples: --samples +takes_value "Number of samples to time")
                 (@arg dump_db: --("dump-db-after") "Dump the entire mysql database after")
+                (@arg outfile: -o "File for writing output to (defaults to stdout")
+                (@arg debug: --debug "Compile and run in debug mode")
         ).get_matches();
 
-    let ref backend = value_t_or_exit!(matches, "backend", Backend);
+    let ref args = Args {
+        files_per_user: value_t!(matches, "files_per_user", usize).unwrap_or(1),
+        direct_shares_per_file: value_t!(matches, "direct_shares_per_file", usize).unwrap_or(1),
+        group_shares_per_file: value_t!(matches, "group_shares_per_file", usize).unwrap_or(1),
+        users_per_group: value_t!(matches, "users_per_group", usize).unwrap_or(1),
+        num_users: values_t_or_exit!(matches, "num_users", usize),
+        backends: values_t_or_exit!(matches, "backend", Backend),
+        dump_db: matches.is_present("dump_db"),
+        num_samples: value_t!(matches, "num_samples", usize).unwrap_or(1),
+        outfile: matches.value_of("outfile").map(&str::to_string),
+        debug: matches.is_present("debug"),
+    };
 
-    let ref mut conn = backend.prepare(true);
+    let mut f = if let Some(fname) = &args.outfile {
+        Box::new(std::fs::File::create(fname).unwrap()) as Box<dyn Write>
+    } else {
+        Box::new(std::io::stdout()) as Box<dyn Write>
+    };
 
-    let mut st = GeneratorState::new();
-    let users = st.generate_users(value_t_or_exit!(matches, "num_users", usize));
-    let files = st.generate_files(&users, value_t!(matches, "files_per_user", usize).unwrap_or(1));
-    let direct_shares = st.generate_direct_shares(&users, &files, value_t!(matches, "direct_shares_per_file", usize).unwrap_or(1));
-    let groups = st.generate_groups(&users, value_t!(matches, "users_per_group", usize).unwrap_or(1));
-    let group_shares = st.generate_group_shares(&groups, &files, value_t!(matches, "group_shares_per_file", usize).unwrap_or(1));
-
-    users.insert_db(conn);
-    direct_shares.insert_db(conn);
-    groups.insert_db(conn);
-    group_shares.insert_db(conn);
-    files.insert_db(conn);
-
-    std::thread::sleep(std::time::Duration::from_millis(300));
-
-    fn select_files_for_user<Q:Queryable>(conn : &mut Q, user: &User) -> Vec<Row> {
-        conn.query(
-            format!("SELECT * FROM file_view WHERE share_target = '{}'", user.uid)
-        ).unwrap()
+    let mut bazel_args = vec!["mysql_proxy/src:mysql_proxy"];
+    let mut pelton_args = vec![];
+    if args.debug {
+        pelton_args.push("-alsologtostderr");
+    } else {
+        bazel_args.push("--config");
+        bazel_args.push("opt");
     }
 
-    // select_files_for_user(conn, &users[0]);
+    let run_bazel_command = |build: &str, run_args: &[&str] | {
+        let mut args = vec![build];
+        args.extend(bazel_args.iter());
+        if !run_args.is_empty() {
+            args.push("--");
+            args.extend(run_args.iter());
+        }
+        Command::new("bazel")
+            .args(args)
+            .current_dir("../..")
+            .spawn()
+            .unwrap()
+    };
+    let mut build = run_bazel_command("build", &vec![]);
 
-    // std::thread::sleep(std::time::Duration::from_millis(300));
-
-    let mut rng = rand::thread_rng();
-    let ulen = users.len(); 
-    let samples = std::iter::repeat_with(|| &users[rng.gen_range(0..ulen)]).take(value_t!(matches, "num_samples", usize).unwrap_or(1)).collect::<Vec<_>>();
-    let now = std::time::Instant::now();
-    let results : Vec<Vec<Row>> = samples.iter().map(|user| select_files_for_user(conn, user)).collect();
-    let time = now.elapsed();
-    eprintln!("Finished lookups in {} milliseconds", time.as_millis());
-    println!("{}", time.as_millis());
-
-
-    if matches.is_present("dump_db") && backend.is_pelton() {
-        pp_pelton_database()
+    if !build.wait().unwrap().success() {
+        panic!("bazel build failed");
     }
+
+    writeln!(f, "Run,Backend,Time").unwrap();
+
+    args.num_users.iter().for_each(|num_users| {
+
+        args.backends.iter().for_each(|backend| {
+            let pelton_handle = if backend.is_pelton() {
+                std::fs::read_dir("/tmp/pelton/pelton").unwrap().for_each(|p| {
+                    let entry = p.unwrap();
+                    if entry.file_type().unwrap().is_dir() {
+                        std::fs::remove_dir_all(entry.path()).unwrap();
+                    } else {
+                        std::fs::remove_file(entry.path()).unwrap();
+                    }
+                });
+                Some(
+                    run_bazel_command("run", &pelton_args)
+                )
+            } else {
+                None
+            };
+
+            std::thread::sleep(Duration::from_secs(3));
+            let ref mut conn = backend.prepare(true);
+
+            let mut st = GeneratorState::new();
+            let users = st.generate_users(*num_users);
+            let files = st.generate_files(&users, args.files_per_user);
+            let direct_shares = st.generate_direct_shares(&users, &files, args.direct_shares_per_file);
+            let groups = st.generate_groups(&users, args.users_per_group);
+            let group_shares = st.generate_group_shares(&groups, &files, args.group_shares_per_file);
+
+            users.insert_db(conn, backend);
+            if backend.is_pelton() {
+                direct_shares.insert_db(conn, backend);
+                groups.insert_db(conn, backend);
+                group_shares.insert_db(conn, backend);
+                files.insert_db(conn, backend);
+            } else {
+                files.insert_db(conn, backend);
+                direct_shares.insert_db(conn, backend);
+                groups.insert_db(conn, backend);
+                group_shares.insert_db(conn, backend);
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(300));
+
+            fn select_files_for_user<Q:Queryable>(conn : &mut Q, user: &User) -> Vec<Row> {
+                conn.query(
+                    format!("SELECT * FROM file_view WHERE share_target = '{}'", user.uid)
+                ).unwrap()
+            }
+
+            // select_files_for_user(conn, &users[0]);
+
+            // std::thread::sleep(std::time::Duration::from_millis(300));
+
+            let mut rng = rand::thread_rng();
+            let ulen = users.len(); 
+            let samples = std::iter::repeat_with(|| &users[rng.gen_range(0..ulen)]).take(args.num_samples).collect::<Vec<_>>();
+            let now = std::time::Instant::now();
+            let _results : Vec<Vec<Row>> = samples.iter().map(|user| select_files_for_user(conn, user)).collect();
+            let time = now.elapsed();
+
+
+            if args.dump_db && backend.is_pelton() {
+                pp_pelton_database();
+            }
+            let h_res = pelton_handle.map(|mut h| h.kill());
+            writeln!(f, "{},{},{}", 0, backend, time.as_millis()).unwrap();
+        })
+    });
 }

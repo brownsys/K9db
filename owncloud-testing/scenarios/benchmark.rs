@@ -2,15 +2,15 @@ extern crate owncloud_scenarios;
 use owncloud_scenarios::{Backend};
 
 fn main() {
-    let num_users = 3;
+    let num_users = 300;
     let files_per_user = 3;
-    let direct_shares_per_file = 1;
+    let direct_shares_per_file = 2;
     let group_shares_per_file = 2;
-    let users_per_group = 3;
+    let users_per_group = 8;
     let backends = [Backend::Pelton, Backend::MySQL];
-    let num_samples = 10;
-    let runs = 1;
-    let debug = false;
+    let num_samples = 100;
+    let runs = 2;
+    let debug = true;
 
     use std::process::{Command, Child, Stdio};
     use std::io::Write;
@@ -52,6 +52,14 @@ fn main() {
     for run in 0..runs {
         for backend in backends.iter() {
             let mut pelton_handle = if backend.is_pelton() {
+                std::fs::read_dir("/tmp/pelton/pelton").unwrap().for_each(|p| {
+                    let entry = p.unwrap();
+                    if entry.file_type().unwrap().is_dir() {
+                        std::fs::remove_dir_all(entry.path());
+                    } else {
+                        std::fs::remove_file(entry.path());
+                    }
+                });
                 Some(
                     run_bazel_command("run", &pelton_args)
                 )
