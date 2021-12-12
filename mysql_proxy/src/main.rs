@@ -624,6 +624,12 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                                     ValueInner::UInt(v) => v.to_string(),
                                     _ => unimplemented!("Rust proxy: unsupported numeric type"),
                                 },
+                                ColumnType::MYSQL_TYPE_DOUBLE
+                                | ColumnType::MYSQL_TYPE_FLOAT => match param.value.into_inner()
+                                {
+                                    ValueInner::Double(v) => (v.floor() as i64).to_string(),
+                                    _ => unimplemented!("Rust proxy: unsupported double type"),
+                                },
                                 _ => unimplemented!("Rust proxy: unsupported parameter 1 type {:?} {:?}", param.coltype, param.value),
                             };
                             query.push_str(&val);
@@ -662,6 +668,12 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                                         ValueInner::Int(v) => v.to_string(),
                                         ValueInner::UInt(v) => v.to_string(),
                                         _ => unimplemented!("Rust proxy: unsupported numeric type"),
+                                    },
+                                    ColumnType::MYSQL_TYPE_DOUBLE
+                                    | ColumnType::MYSQL_TYPE_FLOAT => match param.value.into_inner()
+                                    {
+                                        ValueInner::Double(v) => (v.floor() as i64).to_string(),
+                                        _ => unimplemented!("Rust proxy: unsupported double type"),
                                     },
                                     _ => unimplemented!("Rust proxy: unsupported parameter 2 type {:?} {:?}", param.coltype, param.value),
                                 };
@@ -707,6 +719,12 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                             ValueInner::Int(v) => v.to_string(),
                             ValueInner::UInt(v) => v.to_string(),
                             _ => unimplemented!("Rust proxy: unsupported numeric type"),
+                        },
+                        ColumnType::MYSQL_TYPE_DOUBLE
+                        | ColumnType::MYSQL_TYPE_FLOAT => match param.value.into_inner()
+                        {
+                            ValueInner::Double(v) => (v.floor() as i64).to_string(),
+                            _ => unimplemented!("Rust proxy: unsupported double type"),
                         },
                         _ => unimplemented!("Rust proxy: unsupported parameter 3 type {:?} {:?}", param.coltype, param.value),
                     };
