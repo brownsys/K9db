@@ -30,11 +30,6 @@ cd /tmp \
     && rm bazel-4.0.0-installer-linux-x86_64.sh \
     && cd -
 
-# install rust
-curl https://sh.rustup.rs | sh -s -- -y
-source $HOME/.cargo/env
-cargo install cargo-raze
-
 # install mariadb
 apt-get remove -y --purge mysql*
 curl -LsS -O https://downloads.mariadb.com/MariaDB/mariadb_repo_setup
