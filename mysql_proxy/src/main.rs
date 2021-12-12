@@ -569,7 +569,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         }
         debug!(
             self.log,
-            "[PREPARED] statement: {}, param_count: {}, view_id: {}",
+            "[PREPARED] statement: {}, param_count: {}, view_id: q{}",
             prepared_statement, param_count, stmt_id, 
         );
         // Respond to client
