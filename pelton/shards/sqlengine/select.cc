@@ -158,10 +158,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
           // Secondary index unhelpful.
           // Select from all the relevant shards.
           const auto &user_ids = state->UsersOfShard(shard_kind);
-          sqlast::Stringifier stringifier("");
-          LOG(WARNING) << "Query over table " << stmt.table_name()
-                       << " executed over all shards, this will be slow!"
-                       << " the query: " << stmt.Visit(&stringifier);
+          if (user_ids.size() > 0) {
+            sqlast::Stringifier stringifier("");
+            LOG(WARNING) << "Query over table " << stmt.table_name()
+                         << " executed over all shards, this will be slow!"
+                         << " the query: " << stmt.Visit(&stringifier);
+          }
           result.Append(
               exec.Shards(&cloned, shard_kind, user_ids, schema, aug_index),
               true);
