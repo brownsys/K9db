@@ -624,7 +624,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                                     ValueInner::UInt(v) => v.to_string(),
                                     _ => unimplemented!("Rust proxy: unsupported numeric type"),
                                 },
-                                _ => unimplemented!("Rust proxy: unsupported parameter type"),
+                                _ => unimplemented!("Rust proxy: unsupported parameter 1 type {:?} {:?}", param.coltype, param.value),
                             };
                             query.push_str(&val);
                         }
@@ -663,7 +663,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                                         ValueInner::UInt(v) => v.to_string(),
                                         _ => unimplemented!("Rust proxy: unsupported numeric type"),
                                     },
-                                    _ => unimplemented!("Rust proxy: unsupported parameter type"),
+                                    _ => unimplemented!("Rust proxy: unsupported parameter 2 type {:?} {:?}", param.coltype, param.value),
                                 };
                                 query.push_str(&val);
                             }
@@ -708,7 +708,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                             ValueInner::UInt(v) => v.to_string(),
                             _ => unimplemented!("Rust proxy: unsupported numeric type"),
                         },
-                        _ => unimplemented!("Rust proxy: unsupported parameter type"),
+                        _ => unimplemented!("Rust proxy: unsupported parameter 3 type {:?} {:?}", param.coltype, param.value),
                     };
                     query.push_str(&val);
                 }
