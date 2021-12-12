@@ -405,7 +405,8 @@ class GroupedDataT : public GroupedData<RecordCompare> {
     // Update pk index.
     if constexpr (std::is_same<R, Record>::value) {
       if (this->schema_has_pk_) {
-        return this->pk_index_.emplace(insert_it->GetKey(), insert_it).second;
+        auto &its = this->pk_index_[insert_it->GetKey()];
+        its.emplace_back(insert_it);
       }
     }
     return true;
@@ -419,7 +420,7 @@ class GroupedDataT : public GroupedData<RecordCompare> {
 
     // Find the element corresponding to r in the fastest possible way.
     bool used_pk_index = false;
-    typename V::const_iterator erase_it;
+    typename V::const_iterator erase_it = bucket.end();
 
     // Try to find things via the primary key index if possible.
     if constexpr (std::is_same<R, Record>::value) {
@@ -432,8 +433,18 @@ class GroupedDataT : public GroupedData<RecordCompare> {
           // Should never happen.
           return false;
         }
-        erase_it = pk_it->second;
-        this->pk_index_.erase(pk_it);  // Update pk index.
+        // Find the same record using PK index.
+        auto &list = pk_it->second;
+        for (auto it = list.begin(); it != list.end(); ++it) {
+          if (r == **it) {
+            erase_it = *it;
+            list.erase(it);
+            break;
+          }
+        }
+        if (list.size() == 0) {
+          this->pk_index_.erase(pk_it);
+        }
       }
     }
 
@@ -473,7 +484,7 @@ class GroupedDataT : public GroupedData<RecordCompare> {
   // Index V by primary key for fast deletion.
   bool schema_has_pk_;
   // Index iterators into V by primary key for fast look up.
-  absl::flat_hash_map<Key, typename V::const_iterator> pk_index_;
+  absl::flat_hash_map<Key, std::list<typename V::const_iterator>> pk_index_;
 };
 
 // Supported instantiations of GroupedData:
