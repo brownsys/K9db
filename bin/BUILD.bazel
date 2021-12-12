@@ -30,19 +30,3 @@ cc_binary(
         "@glog",
     ],
 )
-
-cc_binary(
-    name = "mysql",
-    srcs = [
-        "mysql.cc",
-    ],
-    linkopts = [
-        "-lmariadbcpp",
-    ],
-    deps = [
-        "//pelton/util:latency",
-        "//pelton/util:perf",
-        "@com_github_gflags_gflags//:gflags",
-        "@glog",
-    ],
-)
