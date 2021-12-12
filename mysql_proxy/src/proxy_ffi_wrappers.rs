@@ -14,8 +14,6 @@ pub struct CommandLineArgs {
   pub workers: usize,
   pub consistent: bool,
   pub db_name: String,
-  pub db_username: String,
-  pub db_password: String
 }
 
 // Custom destructor
@@ -38,16 +36,10 @@ pub fn gflags_ffi(args: std::env::Args, usage: &str) -> CommandLineArgs {
     // Transform FFIArgs to CommandLineArgs.
     let db_name = unsafe { CStr::from_ptr(flags.db_name) };
     let db_name = db_name.to_str().unwrap();
-    let db_username = unsafe { CStr::from_ptr(flags.db_username) };
-    let db_username = db_username.to_str().unwrap();
-    let db_password = unsafe { CStr::from_ptr(flags.db_password) };
-    let db_password = db_password.to_str().unwrap();
     return CommandLineArgs {
         workers: flags.workers,
         consistent: flags.consistent,
         db_name: db_name.to_string(),
-        db_username: db_username.to_string(),
-        db_password: db_password.to_string()
     };
 }
 
@@ -55,14 +47,10 @@ pub fn initialize_ffi(workers: usize, consistent: bool) -> bool {
     return unsafe { FFIInitialize(workers, consistent) };
 }
 
-pub fn open_ffi(db: &str, user: &str, pass: &str) -> FFIConnection {
+pub fn open_ffi(db: &str) -> FFIConnection {
     let db = CString::new(db).unwrap();
     let db = db.as_ptr();
-    let user = CString::new(user).unwrap();
-    let user = user.as_ptr();
-    let pass = CString::new(pass).unwrap();
-    let pass = pass.as_ptr();
-    return unsafe { FFIOpen(db, user, pass) };
+    return unsafe { FFIOpen(db) };
 }
 
 pub fn shutdown_ffi() -> bool {

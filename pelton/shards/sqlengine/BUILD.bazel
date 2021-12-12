@@ -143,7 +143,6 @@ cc_library(
     ],
     deps = [
         ":index",
-        ":select",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
@@ -256,8 +255,6 @@ cc_library(
         "//pelton/shards:types",
         "//pelton/shards:upgradable_lock",
         "//pelton/shards/sqlengine:util",
-        "//pelton/sql:result",
-        "//pelton/sql/result:resultset",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
         "//pelton/util:status",

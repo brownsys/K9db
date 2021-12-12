@@ -17,7 +17,6 @@
 #include "pelton/shards/upgradable_lock.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
-#include "pelton/sql/result/resultset.h"
 
 
 namespace pelton {
@@ -27,144 +26,12 @@ namespace gdpr {
 
 namespace {
 
-void PrintResult(sql::SqlResult &result, bool print) {
-  if (result.IsStatement() && print) {
-    std::cout << "Success: " << result.Success() << std::endl;
-  } else if (result.IsUpdate() && print) {
-    std::cout << "Affected rows: " << result.UpdateCount() << std::endl;
-  } else if (result.IsQuery()) {
-    while (result.HasResultSet()) {
-      auto resultset = result.NextResultSet();
-      if (print) {
-        std::cout << resultset->GetSchema() << std::endl;
-      }
-      for (const auto &record : *resultset) {
-        if (print) {
-          std::cout << record << std::endl;
-        }
-      }
-    }
-  }
-}
-
-absl::Status AnonymizeAccessor(
-  const std::string &shard_kind, 
-  const std::string &user_id,
-  const std::string &unquoted_user_id, 
-  Connection *connection,
-  int *total_count) 
-{
-  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
-  shards::SharderState *state = connection->state->sharder_state();
-  // Get all accessor indices that belong to this shard type
-  const std::vector<AccessorIndexInformation> &accessor_indices =
-      state->GetAccessorIndices(shard_kind);
-
-  for (auto &accessor_index : accessor_indices) {
-    std::string accessor_table_name = accessor_index.table_name;
-    std::string index_col = accessor_index.accessor_column_name;
-    std::string index_name = accessor_index.index_name;
-    std::string shard_by_access = accessor_index.shard_by_column_name;
-    bool is_sharded = accessor_index.is_sharded;
-    for (auto &[anon_col_name, anon_col_type] :
-          accessor_index.anonymize_columns) {
-      if (is_sharded) {
-        MOVE_OR_RETURN(
-            std::unordered_set<UserId> ids_set,
-            index::LookupIndex(index_name, unquoted_user_id, dataflow_state));
-
-        // create update statement with equality check for each id
-        for (const auto &id : ids_set) {
-          sqlast::Update anonymize_stmt{accessor_table_name};
-
-          // UPDATE ACCESSOR_col = ANONYMIZED WHERE ACCESSOR_ = user_id
-
-          // ACCESSOR_col = ANONYMIZED
-          std::string anonymized_value = "";
-          switch (anon_col_type) {
-            case sqlast::ColumnDefinition::Type::UINT:
-              anonymized_value = "999999";
-              break;
-            case sqlast::ColumnDefinition::Type::INT:
-              anonymized_value = "-999999";
-              break;
-            case sqlast::ColumnDefinition::Type::TEXT:
-              anonymized_value = "\"ANONYMIZED\"";
-              break;
-            case sqlast::ColumnDefinition::Type::DATETIME:
-              anonymized_value = "\"ANONYMIZED\"";
-              break;
-          }
-          anonymize_stmt.AddColumnValue(anon_col_name, anonymized_value);
-
-          std::unique_ptr<sqlast::BinaryExpression> where =
-              std::make_unique<sqlast::BinaryExpression>(
-                  sqlast::Expression::Type::EQ);
-          where->SetLeft(
-              std::make_unique<sqlast::ColumnExpression>(index_col));
-          where->SetRight(
-              std::make_unique<sqlast::LiteralExpression>(user_id));
-
-          // set where condition in update statement
-          anonymize_stmt.SetWhereClause(std::move(where));
-
-          // execute update
-          MOVE_OR_RETURN(sql::SqlResult res,
-                          update::Shard(anonymize_stmt, connection, false));
-
           // add to result
-          *total_count += res.UpdateCount();
-        }
-      } else {
-        // anonymizing update statement for non-sharded schemas
-        sqlast::Update anonymize_stmt{accessor_table_name};
-
-        // UPDATE ANONYMIZE_col = ANONYMIZED WHERE ANONYMIZE_col = user_id
-
-        // ANONYMIZE_col = ANONYMIZED
-        std::string anonymized_value = "";
-        switch (anon_col_type) {
-          case sqlast::ColumnDefinition::Type::UINT:
-            anonymized_value = "999999";
-            break;
-          case sqlast::ColumnDefinition::Type::INT:
-            anonymized_value = "-999999";
-            break;
-          case sqlast::ColumnDefinition::Type::TEXT:
-            anonymized_value = "\"ANONYMIZED\"";
-            break;
-          case sqlast::ColumnDefinition::Type::DATETIME:
-            anonymized_value = "\"ANONYMIZED\"";
-            break;
-        }
-        anonymize_stmt.AddColumnValue(anon_col_name, anonymized_value);
-
-        std::unique_ptr<sqlast::BinaryExpression> where =
-            std::make_unique<sqlast::BinaryExpression>(
-                sqlast::Expression::Type::EQ);
-        where->SetLeft(std::make_unique<sqlast::ColumnExpression>(index_col));
-        where->SetRight(std::make_unique<sqlast::LiteralExpression>(user_id));
-
-        // set where condition in update statement
-        anonymize_stmt.SetWhereClause(std::move(where));
-
-        // execute update
-        MOVE_OR_RETURN(sql::SqlResult res,
-                        update::Shard(anonymize_stmt, connection, false));
-
-        // add to result
-        *total_count += res.UpdateCount();
-      }
-    }
-  }
-  return absl::OkStatus();
-}
-
 sql::SqlResult GetDataFromShardedTable(
   const ShardingInformation &info,
   const std::string &unquoted_user_id,
   const dataflow::SchemaRef &schema,
-  sql::SqlLazyExecutor &exec)
+  sql::PeltonExecutor &exec)
 {
 
   int aug_index = -1;
@@ -174,7 +41,7 @@ sql::SqlResult GetDataFromShardedTable(
 
   sqlast::Select tbl_stmt{info.sharded_table_name};
   tbl_stmt.AddColumn("*");
-  return exec.ExecuteShard(&tbl_stmt, info.shard_kind, unquoted_user_id,
+  return exec.Shard(&tbl_stmt, info.shard_kind, unquoted_user_id,
                     schema, aug_index);
 }
 
@@ -190,7 +57,7 @@ absl::StatusOr<sql::SqlResult> GetAllMyValuesFromTable(
   const UnshardedTableName &table_name,
   Connection *connection) 
 {
-  sql::SqlResult result;
+  sql::SqlResult result(true);
   const auto *state = connection->state->sharder_state();
   if (state->HasAccessorIndices(shard_kind)) {
     const std::vector<const AccessorIndexInformation *> acc_info = state->GetAccessorInformationFor(shard_kind, table_name);
@@ -205,7 +72,7 @@ absl::StatusOr<sql::SqlResult> GetAllMyValuesFromTable(
     if (shard_info.size() > 0) {
       for (const auto *info : shard_info) {
         dataflow::SchemaRef schema = connection->state->dataflow_state()->GetTableSchema(table_name);
-        result.Append(GetDataFromShardedTable(*info, Dequote(user_id), schema, connection->executor));
+        result.Append(GetDataFromShardedTable(*info, Dequote(user_id), schema, connection->executor), true);
       }
     } else {
       LOG(INFO) << "No sharding info found for " << shard_kind;
@@ -225,15 +92,18 @@ absl::StatusOr<std::vector<std::string>> GetLookupValues(
     lookup_values.push_back(user_id);
   } else {
     MOVE_OR_RETURN(sql::SqlResult result, GetAllMyValuesFromTable(shard_kind, user_id, *table_name, connection));
-    while (result.IsQuery() && result.HasResultSet()) {
-      auto resultset = result.NextResultSet();
-      const auto &schema = resultset->GetSchema();
+    while (result.IsQuery() && result.Success()) {
+      auto &resultsets = result.ResultSets();
+      const auto &schema = resultsets.front().schema();
       const auto &keys = schema.keys();
       if (keys.size() != 1)
         LOG(FATAL) << "Too many keys for " << shard_kind << " " << user_id << " " << (table_name ? *table_name : "self") << std::endl << schema;
       const auto &key = keys.front();
-      for (const auto &record : *resultset) {
-        lookup_values.push_back(record.GetValue(key).GetSqlString());
+      for (auto &rset : resultsets) {
+        auto v = rset.Vec();
+        for (const auto &record : v) {
+          lookup_values.push_back(record.GetValue(key).GetSqlString());
+        }
       }
     }
   }
@@ -260,7 +130,6 @@ absl::Status GetAccessableDataForAccessor(
                     index::LookupIndex(index_name, user_id, dataflow_state));
 
     // create select statement with equality check for each id
-    sql::SqlResult table_result;
 
     if (ids_set.size() == 0) {
       LOG(INFO) << "id set was empty";
@@ -310,15 +179,11 @@ absl::Status GetAccessableDataForAccessor(
         MOVE_OR_RETURN(sql::SqlResult res,
                         select::Shard(accessor_stmt, connection, false));
 
-        // add to result
-        table_result.Append(std::move(res));
+        result->AddResultSet(std::move(res.ResultSets().at(0)));
       }
     }
-    if (table_result.IsQuery() && table_result.HasResultSet())
-      result->AddResultSet(table_result.NextResultSet());
   } else {
     for (const auto &val : lookup_values) {
-      sql::SqlResult table_result;
       sqlast::Select accessor_stmt{accessor_table_name};
       // SELECT *
       accessor_stmt.AddColumn("*");
@@ -340,8 +205,7 @@ absl::Status GetAccessableDataForAccessor(
                       select::Shard(accessor_stmt, connection, false));
 
       // add to result
-      table_result.Append(std::move(res));
-      result->AddResultSet(table_result.NextResultSet());
+      result->AddResultSet(std::move(res.ResultSets().at(0)));
     }
   }
   return absl::OkStatus();
@@ -364,18 +228,12 @@ absl::Status GetAccessableData(
   return absl::OkStatus();
 }
 
-} // namespace
+absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
+                                      Connection *connection) {
+  perf::Start("FORGET");
 
-
-absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
-                                     Connection *connection) {
-  perf::Start("GDPR");
-
-  int total_count = 0;
   const std::string &shard_kind = stmt.shard_kind();
   const std::string &user_id = stmt.user_id();
-  const std::string &unquoted_user_id = Dequote(user_id);
-  bool is_forget = stmt.operation() == sqlast::GDPRStatement::Operation::FORGET;
   auto &exec = connection->executor;
 
   // XXX(malte): if we properly removed the shared on GDPR FORGET below, this
@@ -385,57 +243,203 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
   UniqueLock lock = state->WriterLock();
 
-  sql::SqlResult result;
+  sql::SqlResult result(static_cast<int>(0));
   for (const auto &table_name : state->TablesInShard(shard_kind)) {
-    sql::SqlResult table_result;
+    bool update_flows = dataflow_state->HasFlowsFor(table_name);
     dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
-    bool update_flows = is_forget && dataflow_state->HasFlowsFor(table_name);
-    for (const auto *info : state->GetShardingInformationFor(table_name, shard_kind)) {
+
+    sql::SqlResult table_result(static_cast<int>(0));
+    if (update_flows) {
+      table_result = sql::SqlResult(schema);
+    }
+    for (const auto &info : state->GetShardingInformation(table_name)) {
+      if (info.shard_kind != shard_kind) {
+        continue;
+      }
 
       // Augment returned results with the user_id.
-      if (is_forget) {
-        int aug_index = -1;
-        if (!info->IsTransitive()) {
-          aug_index = info->shard_by_index;
-        }
-        // XXX(malte): need to upgrade SharderStateLock here in the future.
-        sqlast::Delete tbl_stmt{info->sharded_table_name, update_flows};
-        table_result.Append(exec.ExecuteShard(&tbl_stmt, shard_kind, unquoted_user_id,
-                                              schema, aug_index));
-      } else {  // sqlast::GDPRStatement::Operation::GET
-        table_result.Append(GetDataFromShardedTable(*info, unquoted_user_id, schema, exec));
+      int aug_index = -1;
+      if (!info.IsTransitive()) {
+        aug_index = info.shard_by_index;
       }
+
+      // XXX(malte): need to upgrade SharderStateLock here in the future.
+      sqlast::Delete tbl_stmt{info.sharded_table_name, update_flows};
+      table_result.Append(
+          exec.Shard(&tbl_stmt, shard_kind, user_id, schema, aug_index), true);
     }
 
     // Delete was successful, time to update dataflows.
     if (update_flows) {
       std::vector<dataflow::Record> records =
-          table_result.NextResultSet()->Vectorize();
-      total_count += records.size();
+          table_result.ResultSets().at(0).Vec();
+      result.Append(sql::SqlResult(records.size()), true);
       dataflow_state->ProcessRecords(table_name, std::move(records));
-    } else if (is_forget) {
-      total_count += table_result.UpdateCount();
-    } else if (!is_forget) {
-      result.AddResultSet(table_result.NextResultSet());
+    } else {
+      result.Append(std::move(table_result), true);
     }
   }
+  
+  // Anonymize when accessor deletes their data
+  if (state->HasAccessorIndices(shard_kind)) {
+    // Get all accessor indices that belong to this shard type
+    const std::vector<AccessorIndexInformation> &accessor_indices =
+        state->GetAccessorIndices(shard_kind);
 
-  if (!is_forget && state->HasAccessorIndices(shard_kind)) {
+    for (auto &accessor_index : accessor_indices) {
+      std::string accessor_table_name = accessor_index.table_name;
+      std::string index_col = accessor_index.accessor_column_name;
+      std::string index_name = accessor_index.index_name;
+      std::string shard_by_access = accessor_index.shard_by_column_name;
+
+      bool is_sharded = accessor_index.is_sharded;
+      for (auto &[anon_col_name, anon_col_type] :
+           accessor_index.anonymize_columns) {
+        if (is_sharded) {
+          MOVE_OR_RETURN(
+              std::unordered_set<UserId> ids_set,
+              index::LookupIndex(index_name, user_id, dataflow_state));
+
+          // create update statement with equality check for each id
+          for (const auto &id : ids_set) {
+            sqlast::Update anonymize_stmt{accessor_table_name};
+
+            // UPDATE ACCESSOR_col = ANONYMIZED WHERE ACCESSOR_ = user_id
+
+            // ACCESSOR_col = ANONYMIZED
+            std::string anonymized_value = "";
+            switch (anon_col_type) {
+              case sqlast::ColumnDefinition::Type::UINT:
+                anonymized_value = "999999";
+                break;
+              case sqlast::ColumnDefinition::Type::INT:
+                anonymized_value = "-999999";
+                break;
+              case sqlast::ColumnDefinition::Type::TEXT:
+                anonymized_value = "\"ANONYMIZED\"";
+                break;
+              case sqlast::ColumnDefinition::Type::DATETIME:
+                anonymized_value = "\"ANONYMIZED\"";
+                break;
+            }
+            anonymize_stmt.AddColumnValue(anon_col_name, anonymized_value);
+
+            std::unique_ptr<sqlast::BinaryExpression> where =
+                std::make_unique<sqlast::BinaryExpression>(
+                    sqlast::Expression::Type::EQ);
+            where->SetLeft(
+                std::make_unique<sqlast::ColumnExpression>(index_col));
+            where->SetRight(
+                std::make_unique<sqlast::LiteralExpression>(user_id));
+
+            // set where condition in update statement
+            anonymize_stmt.SetWhereClause(std::move(where));
+
+            // execute update
+            MOVE_OR_RETURN(sql::SqlResult res,
+                           update::Shard(anonymize_stmt, connection, false));
+
+            // add to result
+            result.Append(std::move(res), true);
+          }
+        } else {
+          // anonymizing update statement for non-sharded schemas
+          sqlast::Update anonymize_stmt{accessor_table_name};
+
+          // UPDATE ANONYMIZE_col = ANONYMIZED WHERE ANONYMIZE_col = user_id
+
+          // ANONYMIZE_col = ANONYMIZED
+          std::string anonymized_value = "";
+          switch (anon_col_type) {
+            case sqlast::ColumnDefinition::Type::UINT:
+              anonymized_value = "999999";
+              break;
+            case sqlast::ColumnDefinition::Type::INT:
+              anonymized_value = "-999999";
+              break;
+            case sqlast::ColumnDefinition::Type::TEXT:
+              anonymized_value = "\"ANONYMIZED\"";
+              break;
+            case sqlast::ColumnDefinition::Type::DATETIME:
+              anonymized_value = "\"ANONYMIZED\"";
+              break;
+          }
+          anonymize_stmt.AddColumnValue(anon_col_name, anonymized_value);
+
+          std::unique_ptr<sqlast::BinaryExpression> where =
+              std::make_unique<sqlast::BinaryExpression>(
+                  sqlast::Expression::Type::EQ);
+          where->SetLeft(std::make_unique<sqlast::ColumnExpression>(index_col));
+          where->SetRight(std::make_unique<sqlast::LiteralExpression>(user_id));
+
+          // set where condition in update statement
+          anonymize_stmt.SetWhereClause(std::move(where));
+
+          // execute update
+          MOVE_OR_RETURN(sql::SqlResult res,
+                         update::Shard(anonymize_stmt, connection, false));
+
+          // add to result
+          result.Append(std::move(res), true);
+        }
+      }
+    }
+  }
+  return result;
+}
+
+absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
+                                   Connection *connection) {
+  perf::Start("GET");
+  const std::string &shard_kind = stmt.shard_kind();
+  const std::string &user_id = stmt.user_id();
+  auto &exec = connection->executor;
+
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  SharedLock lock = state->ReaderLock();
+
+  sql::SqlResult result(std::vector<sql::SqlResultSet>{});
+  for (const auto &table_name : state->TablesInShard(shard_kind)) {
+    dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
+
+    sql::SqlResult table_result(schema);
+    for (const auto &info : state->GetShardingInformation(table_name)) {
+      if (info.shard_kind != shard_kind) {
+        continue;
+      }
+
+      // Augment returned results with the user_id.
+      int aug_index = -1;
+      if (!info.IsTransitive()) {
+        aug_index = info.shard_by_index;
+      }
+
+      sqlast::Select tbl_stmt{info.sharded_table_name};
+      tbl_stmt.AddColumn("*");
+      table_result.Append(
+          exec.Shard(&tbl_stmt, shard_kind, user_id, schema, aug_index), true);
+    }
+    result.AddResultSet(std::move(table_result.ResultSets().at(0)));
+  }
+  
+  if (state->HasAccessorIndices(shard_kind)) {
     CHECK_STATUS(GetAccessableData(shard_kind, user_id, connection, &result));
   }
-
-  // anonymize when accessor deletes their data
-  if (is_forget && state->HasAccessorIndices(shard_kind)) {
-    CHECK_STATUS(AnonymizeAccessor(shard_kind, user_id, unquoted_user_id, connection, &total_count));
-  }
- 
-  perf::End("GDPR");
-  if (is_forget) {
-    return sql::SqlResult(total_count);
-  }
-  //if (!is_forget)
-  //  PrintResult(result, true);
   return result;
+}
+
+} // namespace
+
+
+absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
+                                     Connection *connection) {
+  perf::Start("GDPR");
+  if (stmt.operation() == sqlast::GDPRStatement::Operation::FORGET) {
+    return Forget(stmt, connection);
+  } else {
+    return Get(stmt, connection);
+  }
 }
 
 }  // namespace gdpr

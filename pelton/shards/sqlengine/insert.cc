@@ -102,31 +102,21 @@ absl::Status MaybeHandleOwningColumn(
           insert.AddColumn(col0.column_name());
           select.AddColumn(col0.column_name());
         }
-        LOG(INFO) << "Doing lookup for " << schema.table_name();
         ASSIGN_OR_RETURN(sql::SqlResult &inner_result, select::Shard(select, connection, true));
-        if (inner_result.IsQuery() && !inner_result.HasResultSet()) {
+        if (inner_result.IsQuery() && inner_result.ResultSets().size() == 0) {
           LOG(INFO) << "Skipping value moving. Reason: The lookup has no results";
           continue;
         }
-        auto result_set = inner_result.NextResultSet();
-        auto iter = result_set->begin();
-        if (iter == result_set->end()) {
-          LOG(INFO) << "Skipping value moving. Reason: The result iter was empty";
-          continue;
+        auto &result_set = inner_result.ResultSets().at(0);
+        if (inner_result.ResultSets().size() > 1 || result_set.size() > 1) {
+          LOG(WARNING) << "Too many results for " << schema.table_name() << " during value move";
         }
-        dataflow::Record &rec = *iter;
-        LOG(INFO) << rec;
+        dataflow::Record &rec = result_set.Vec().front();
         uint64_t csize = schema.GetColumns().size();
         for (uint64_t i = 0; i < csize; i++) {
-          LOG(INFO) << i << " : " << rec.GetValueString(i);
           insert.AddValue(rec.GetValue(i).GetSqlString());
         }
-        if (++iter != result_set->end()) {
-          return absl::InvalidArgumentError("Too many results?");
-        }
-        LOG(INFO) << "Inserting the moved value into " << insert.table_name() << " for " << user_id;
-        result->Append(exec.ExecuteShard(&insert, info.shard_kind, user_id));
-        LOG(INFO) << "Moving value done";
+        result->Append(exec.Shard(&insert, info.shard_kind, user_id), false);
       }
     }
   }
@@ -141,7 +131,9 @@ absl::Status HandleShardForUser(
   bool *update_flows,
   sql::SqlResult *result,
   const ShardingInformation &info,
-  const std::string &user_id)
+  const std::string &user_id, 
+  const dataflow::SchemaRef &schema,
+  const int aug_index)
 {
   auto &exec = connection->executor;
   shards::SharderState *state = connection->state->sharder_state();
@@ -155,19 +147,17 @@ absl::Status HandleShardForUser(
     if (!state->ShardExists(info.shard_kind, user_id)) {
       for (auto *create_stmt :
             state->CreateShard(info.shard_kind, user_id)) {
-        sql::SqlResult tmp =
-            exec.ExecuteShard(create_stmt, info.shard_kind, user_id);
-        if (!tmp.IsStatement() || !tmp.Success()) {
+        if (!exec.Shard(create_stmt, info.shard_kind, user_id).Success()) {
           return absl::InternalError("Could not created sharded table");
         }
       }
     }
     *lock = SharedLock(std::move(upgraded));
   }
-
   // Add the modified insert statement.
-  result->Append(exec.ExecuteShard(&cloned, info.shard_kind, user_id));
-  LOG(INFO) << "Basic insert done";
+  result->Append(
+      exec.Shard(&cloned, info.shard_kind, user_id, schema, aug_index),
+      true);
   return MaybeHandleOwningColumn(stmt, cloned, connection, update_flows, result, info, user_id);
 }
 
@@ -189,36 +179,15 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
     return absl::InvalidArgumentError("Table does not exist!");
   }
 
+  // For replace insert statements, we need to get the old records.
+  bool returning = update_flows && stmt.replace();
+  dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
+
   // Shard the insert statement so it is executable against the physical
   // sharded database.
-  sql::SqlResult result = sql::SqlResult(0);
-
-  // this will contain replaced records if the statement is a REPLACE.
-  std::vector<dataflow::Record> records;
-  if (update_flows && stmt.replace()) {
-    const auto &[key_idx, key_col] = state->GetPk(table_name);
-    if (key_idx == -1) {
-      return absl::InvalidArgumentError("Replace without PK is not supported!");
-    }
-    std::string val;
-    if (stmt.HasColumns()) {
-      ASSIGN_OR_RETURN(val, stmt.GetValue(key_col));
-    } else {
-      val = stmt.GetValue(key_idx);
-    }
-    // Build SELECT * FROM <table> WHERE <pk> = <val>;
-    sqlast::Select select{table_name};
-    select.AddColumn("*");
-    auto where = std::make_unique<sqlast::BinaryExpression>(
-        sqlast::Expression::Type::EQ);
-    where->SetLeft(std::make_unique<sqlast::ColumnExpression>(key_col));
-    where->SetRight(std::make_unique<sqlast::LiteralExpression>(val));
-    select.SetWhereClause(std::move(where));
-    std::cout << "HERE" << std::endl;
-    // Execute select to get results.
-    MOVE_OR_RETURN(sql::SqlResult select_result,
-                   select::Shard(select, connection, false));
-    records = select_result.NextResultSet()->Vectorize();
+  sql::SqlResult result(static_cast<int>(0));
+  if (returning) {
+    result = sql::SqlResult(schema);
   }
 
   auto &exec = connection->executor;
@@ -226,14 +195,19 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
   if (!is_sharded) {
     // Case 1: table is not in any shard.
     // The insertion statement is unmodified.
-    result = exec.ExecuteDefault(&stmt);
+    if (returning) {
+      sqlast::Insert cloned = stmt.MakeReturning();
+      result = exec.Default(&cloned, schema);
+    } else {
+      result = exec.Default(&stmt);
+    }
 
   } else {  // is_sharded == true
     // Case 2: table is sharded!
     // Duplicate the value for every shard this table has.
     for (const ShardingInformation &info :
          state->GetShardingInformation(table_name)) {
-      sqlast::Insert cloned = stmt;
+      sqlast::Insert cloned = returning ? stmt.MakeReturning() : stmt;
       cloned.table_name() = info.sharded_table_name;
       // Find the value corresponding to the shard by column.
       std::string user_id;
@@ -258,6 +232,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
       }
       user_id = Dequote(user_id);
 
+      // Augment user_id for returning replaces.
+      int aug_index = -1;
+      if (returning && !info.IsTransitive()) {
+        aug_index = info.shard_by_index;
+      }
+
       // If the sharding is transitive, the user id should be resolved via the
       // secondary index of the target table.
       //
@@ -275,12 +255,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
         } else {
           for (auto &uid : lookup) {
             if (!absl::EqualsIgnoreCase(uid, "NULL")) {
-              CHECK_STATUS(HandleShardForUser(stmt, cloned, connection, lock, &update_flows, &result, info, uid));
+              CHECK_STATUS(HandleShardForUser(stmt, cloned, connection, lock, &update_flows, &result, info, uid, schema, aug_index));
             }
           }
         }
       } else {
-        CHECK_STATUS(HandleShardForUser(stmt, cloned, connection, lock, &update_flows, &result, info, user_id));
+        CHECK_STATUS(HandleShardForUser(stmt, cloned, connection, lock, &update_flows, &result, info, user_id, schema, aug_index));
       }
     }
   }
@@ -288,6 +268,11 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
   // Insert was successful, time to update dataflows.
   // Turn inserted values into a record and process it via corresponding flows.
   if (update_flows) {
+    std::vector<dataflow::Record> records;
+    if (returning) {
+      records = result.ResultSets().at(0).Vec();
+      result = sql::SqlResult(1 + records.size());
+    }
     records.push_back(dataflow_state->CreateRecord(stmt));
     dataflow_state->ProcessRecords(stmt.table_name(), std::move(records));
   }

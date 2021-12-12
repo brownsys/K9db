@@ -73,7 +73,7 @@ class ColumnDefinition {
       : ColumnDefinition(column_name, StringToType(column_type)) {}
 
   ColumnDefinition(const std::string &column_name, Type column_type)
-      : column_name_(column_name), column_type_(column_type) {}
+      : column_name_(column_name), column_type_(column_type), owner_(false) {}
 
   // Accessors.
   const std::string &column_name() const;
@@ -94,6 +94,10 @@ class ColumnDefinition {
   void RemoveConstraint(ColumnConstraint::Type type);
 
   bool HasConstraint(ColumnConstraint::Type type) const;
+
+  // Ownership.
+  bool owner() const { return this->owner_; }
+  bool &owner() { return this->owner_; }
 
   // Visitor pattern.
   template <class T>
@@ -126,6 +130,7 @@ class ColumnDefinition {
   std::string column_name_;
   Type column_type_;
   std::vector<ColumnConstraint> constraints_;
+  bool owner_;
 };
 
 class CreateTable : public AbstractStatement {
@@ -194,8 +199,8 @@ class CreateIndex : public AbstractStatement {
         column_name_(column_name) {}
 
   // Accessors.
-  const std::string &index_name() const { return this->index_name_; }
   const std::string &table_name() const { return this->table_name_; }
+  const std::string &index_name() const { return this->index_name_; }
   const std::string &column_name() const { return this->column_name_; }
 
   // Visitor pattern.

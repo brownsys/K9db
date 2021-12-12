@@ -15,8 +15,6 @@
 DEFINE_uint32(workers, 3, "Number of workers");
 DEFINE_bool(consistent, true, "Dataflow consistency with futures");
 DEFINE_string(db_name, "pelton", "Name of the database");
-DEFINE_string(db_username, "root", "MariaDB username to connect with");
-DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
 
 // process command line arguments with gflags
 FFIArgs FFIGflags(int argc, char **argv, const char *usage) {
@@ -30,8 +28,7 @@ FFIArgs FFIGflags(int argc, char **argv, const char *usage) {
   google::InitGoogleLogging("proxy");
 
   // Returned the read command line flags.
-  return {FLAGS_workers, FLAGS_consistent, FLAGS_db_name.c_str(),
-          FLAGS_db_username.c_str(), FLAGS_db_password.c_str()};
+  return {FLAGS_workers, FLAGS_consistent, FLAGS_db_name.c_str()};
 }
 
 // Initialize pelton_state in pelton.cc
@@ -52,17 +49,12 @@ bool FFIInitialize(size_t workers, bool consistent) {
 
 // Open a connection for a single client. The returned struct has connected =
 // true if successful. Otherwise connected = false
-FFIConnection FFIOpen(const char *db_name, const char *db_username,
-                      const char *db_password) {
+FFIConnection FFIOpen(const char *db_name) {
   // Log debugging information
   LOG(INFO) << "C-Wrapper: db_name is: " << std::string(db_name);
-  LOG(INFO) << "C-Wrapper: db_username is: " << std::string(db_username);
-  LOG(INFO) << "C-Wrapper: db_password is: " << std::string(db_password);
 
   // convert char* to const std::string
   const std::string c_db(db_name);
-  const std::string c_db_username(db_username);
-  const std::string c_db_password(db_password);
 
   // Create a new client connection.
   FFIConnection c_conn = {new pelton::Connection(), false};
@@ -74,7 +66,7 @@ FFIConnection FFIOpen(const char *db_name, const char *db_username,
 
   // call c++ function from C with converted types
   LOG(INFO) << "C-Wrapper: running pelton::open";
-  if (pelton::open(cpp_conn, c_db, c_db_username, c_db_password)) {
+  if (pelton::open(cpp_conn, c_db)) {
     LOG(INFO) << "C-Wrapper: connection opened";
     c_conn.connected = true;
   } else {
@@ -87,7 +79,7 @@ FFIConnection FFIOpen(const char *db_name, const char *db_username,
 // Delete pelton_state. Returns true if successful and false otherwise.
 bool FFIShutdown() {
   LOG(INFO) << "C-Wrapper: Closing global connection";
-  bool response = pelton::shutdown(true);
+  bool response = pelton::shutdown();
   if (response) {
     LOG(INFO) << "C-Wrapper: global connection closed";
     return true;
@@ -126,8 +118,7 @@ bool FFIExecDDL(FFIConnection *c_conn, const char *query) {
   if (!result.ok()) {
     LOG(INFO) << "C-Wrapper: " << result.status();
   }
-  return result.ok() && result.value().IsStatement() &&
-         result.value().Success();
+  return result.ok() && result.value().Success();
 }
 
 // Execute an update statement (e.g. INSERT, UPDATE, DELETE).
@@ -140,7 +131,7 @@ int FFIExecUpdate(FFIConnection *c_conn, const char *query) {
   if (!result.ok()) {
     LOG(INFO) << "C-Wrapper: " << result.status();
   }
-  if (result.ok() && result.value().IsUpdate()) {
+  if (result.ok()) {
     return result.value().UpdateCount();
   } else {
     return -1;
@@ -245,12 +236,10 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
 
   if (result.ok()) {
     pelton::SqlResult &sql_result = result.value();
-    if (sql_result.IsQuery() && sql_result.HasResultSet()) {
-      std::unique_ptr<pelton::SqlResultSet> resultset =
-          sql_result.NextResultSet();
-      std::vector<pelton::dataflow::Record> records = resultset->Vectorize();
+    for (pelton::SqlResultSet &resultset : sql_result.ResultSets()) {
+      std::vector<pelton::dataflow::Record> records = resultset.Vec();
       size_t num_rows = records.size();
-      size_t num_cols = resultset->GetSchema().size();
+      size_t num_cols = resultset.schema().size();
 
       LOG(INFO) << "C-Wrapper: malloc FFIResult";
       // allocate memory for CResult struct and the flexible array of RecordData
@@ -263,13 +252,13 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
       // set number of columns
       c_result->num_cols = num_cols;
       c_result->num_rows = num_rows;
-      PopulateSchema(c_result, resultset->GetSchema());
+      PopulateSchema(c_result, resultset.schema());
       PopulateRecords(c_result, records);
-      return c_result;
+      return c_result;  // TODO(babman): this is where we can support GDPR GET.
     }
+  } else {
+    LOG(INFO) << "C-Wrapper: Result.ok()" << result.status();
   }
-
-  LOG(INFO) << "C-Wrapper: Result.ok() or result.value().IsQuery() failed";
   return nullptr;
 }
 

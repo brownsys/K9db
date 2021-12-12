@@ -3,6 +3,8 @@
 #include <stdarg.h>
 
 #include <algorithm>
+// NOLINTNEXTLINE
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -17,8 +19,6 @@
 namespace tests {
 
 // Command line flags.
-DEFINE_string(db_username, "root", "MariaDB username to connect with");
-DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
 DEFINE_bool(echo, false, "whether to echo commands before executing them");
 
 namespace {
@@ -36,21 +36,7 @@ std::string ToString(const T &x) {
 
 // Drop the database (if it exists).
 void DropDatabase(const std::string &db_name) {
-  sql::ConnectOptionsMap connection_properties;
-  connection_properties["hostName"] = "localhost";
-  connection_properties["userName"] = FLAGS_db_username;
-  connection_properties["password"] = FLAGS_db_password;
-
-  sql::Driver *driver = sql::mariadb::get_driver_instance();
-  std::unique_ptr<sql::Connection> conn =
-      std::unique_ptr<sql::Connection>(driver->connect(connection_properties));
-  std::unique_ptr<sql::Statement> stmt =
-      std::unique_ptr<sql::Statement>(conn->createStatement());
-
-  stmt->execute("DROP DATABASE IF EXISTS " + db_name);
-
-  stmt->close();
-  conn->close();
+  std::filesystem::remove_all("/tmp/pelton/" + db_name);
 }
 
 // Read an SQL file one command at a time.
@@ -117,16 +103,13 @@ std::vector<std::vector<std::string>> ReadExpected(const std::string &file) {
 // Setup the database for testing. This includes its schema, views, and content.
 void InitializeDatabase(const std::string &db_name, size_t file_count,
                         va_list file_path_args) {
-  const std::string &db_username = FLAGS_db_username;
-  const std::string &db_password = FLAGS_db_password;
-
   // Drop test database if it exists.
   LOG(INFO) << "Dropping DB " << db_name << "...";
   DropDatabase(db_name);
 
   // Create and open a connection to pelton.
   CHECK(pelton::initialize(3, true));
-  CHECK(pelton::open(&connection, db_name, db_username, db_password));
+  CHECK(pelton::open(&connection, db_name));
 
   // Set echo if specified by cmd flags.
   if (FLAGS_echo) {
@@ -207,8 +190,9 @@ void RunTest(const std::string &query_file_prefix) {
     std::vector<std::string> actual;
     pelton::SqlResult &result = status.value();
     if (result.IsQuery()) {
-      std::unique_ptr<pelton::SqlResultSet> resultset = result.NextResultSet();
-      for (pelton::Record &record : *resultset) {
+      pelton::SqlResultSet &resultset = result.ResultSets().at(0);
+      std::vector<pelton::Record> records = resultset.Vec();
+      for (pelton::Record &record : records) {
         record.SetPositive(true);
         actual.push_back(ToString(record));
       }

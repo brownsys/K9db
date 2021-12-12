@@ -1,6 +1,6 @@
 CREATE TABLE users ( \
   id int NOT NULL PRIMARY KEY, \
-  PII_username varchar(50), \
+  PII_username varchar(50) UNIQUE, \
   email varchar(100), \
   password_digest varchar(75), \
   created_at datetime, \
@@ -31,9 +31,9 @@ CREATE TABLE comments ( \
   id int NOT NULL PRIMARY KEY, \
   created_at datetime NOT NULL, \
   updated_at datetime, \
-  short_id varchar(10) NOT NULL, \
+  short_id varchar(10) NOT NULL UNIQUE, \
   story_id int NOT NULL, \
-  user_id int NOT NULL, \
+  OWNER user_id int NOT NULL, \
   parent_comment_id int, \
   thread_id int, \
   comment text NOT NULL, \
@@ -73,9 +73,10 @@ CREATE TABLE hats ( \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE TABLE hidden_stories ( \
   id int NOT NULL PRIMARY KEY, \
-  user_id int, \
+  OWNER user_id int, \
   story_id int, \
-  FOREIGN KEY (user_id) REFERENCES users(id) \
+  FOREIGN KEY (user_id) REFERENCES users(id), \
+  FOREIGN KEY (story_id) REFERENCES stories(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE TABLE invitation_requests ( \
   id int NOT NULL PRIMARY KEY, \
@@ -135,17 +136,19 @@ CREATE TABLE read_ribbons ( \
   is_following int, \
   created_at datetime NOT NULL, \
   updated_at datetime NOT NULL, \
-  user_id int, \
+  OWNER user_id int, \
   story_id int, \
-  FOREIGN KEY (user_id) REFERENCES users(id) \
+  FOREIGN KEY (user_id) REFERENCES users(id), \
+  FOREIGN KEY (story_id) REFERENCES stories(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE saved_stories ( \
   id int NOT NULL PRIMARY KEY, \
   created_at datetime NOT NULL, \
   updated_at datetime NOT NULL, \
-  user_id int, \
+  OWNER user_id int, \
   story_id int, \
-  FOREIGN KEY (user_id) REFERENCES users(id) \
+  FOREIGN KEY (user_id) REFERENCES users(id), \
+  FOREIGN KEY (story_id) REFERENCES stories(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE TABLE stories ( \
   id int NOT NULL PRIMARY KEY, \
@@ -154,7 +157,7 @@ CREATE TABLE stories ( \
   url varchar(250), \
   title varchar(150) NOT NULL, \
   description text, \
-  short_id varchar(6) NOT NULL, \
+  short_id varchar(6) NOT NULL UNIQUE, \
   is_expired int NOT NULL, \
   upvotes int NOT NULL, \
   downvotes int NOT NULL, \
@@ -174,7 +177,7 @@ CREATE INDEX storiespk ON stories(id);
 CREATE INDEX stories_short_index ON stories(short_id);
 CREATE TABLE tags ( \
   id int NOT NULL PRIMARY KEY, \
-  tag varchar(25) NOT NULL, \
+  tag varchar(25) NOT NULL UNIQUE, \
   description varchar(100), \
   privileged int, \
   is_media int, \

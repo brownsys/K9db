@@ -38,7 +38,7 @@ absl::StatusOr<sql::SqlResult> CreateIndexStateIsAlreadyLocked(
   sql::SqlResult result = sql::SqlResult(false);
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
-    result = connection->executor.ExecuteDefault(&stmt);
+    result = connection->executor.Default(&stmt);
 
   } else {  // is_sharded == true
     const std::string &column_name = stmt.column_name();

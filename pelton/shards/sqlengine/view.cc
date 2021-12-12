@@ -296,7 +296,7 @@ absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection,
 
     // Vectorize and store records.
     std::vector<pelton::dataflow::Record> records =
-        result.NextResultSet()->Vectorize();
+        result.ResultSets().at(0).Vec();
 
     // Records will be negative here, need to turn them to positive records.
     for (auto &record : records) {
@@ -329,8 +329,8 @@ absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
       LookupRecords(flow, condition, stmt.limit(), stmt.offset());
 
   perf::End("SelectView");
-  return sql::SqlResult(std::make_unique<sql::_result::SqlInlineResultSet>(
-      flow.output_schema(), std::move(records)));
+  return sql::SqlResult(
+      sql::SqlResultSet(flow.output_schema(), {std::move(records), {}}));
 }
 
 }  // namespace view

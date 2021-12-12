@@ -6,7 +6,7 @@
 #include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/upgradable_lock.h"
-#include "pelton/sql/lazy_executor.h"
+#include "pelton/sql/executor.h"
 #include "pelton/sql/result.h"
 
 namespace pelton {
@@ -21,6 +21,11 @@ class State {
   State &operator=(const State &) = delete;
   State(const State &&) = delete;
   State &operator=(const State &&) = delete;
+
+  ~State() {
+    this->dataflow_state_.Shutdown();
+    sql::PeltonExecutor::CloseAll();
+  }
 
   // Getters.
   shards::SharderState *sharder_state() { return &this->sharder_state_; }
@@ -49,7 +54,7 @@ struct Connection {
   // Global pelton state that persists across open connections
   State *state;
   // Connection to the underlying databases.
-  sql::SqlLazyExecutor executor;
+  sql::PeltonExecutor executor;
 };
 
 }  // namespace pelton

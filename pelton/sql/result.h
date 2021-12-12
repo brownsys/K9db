@@ -1,81 +1,98 @@
 #ifndef PELTON_SQL_RESULT_H_
 #define PELTON_SQL_RESULT_H_
 
-#include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
+#include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
-#include "pelton/sql/result/abstract_result.h"
-#include "pelton/sql/result/resultset.h"
 
 namespace pelton {
 namespace sql {
 
-// SqlResultSet should be exposed to client code.
-using SqlResultSet = _result::SqlResultSet;
-
-// Our version of an (abstract) SqlResult.
-// This class provides functions to iterate through the records of a result
-// in addition to the schema.
-class SqlResult {
+// An SqlResultSet represents the content of a single table.
+// An SqlResult may include multiple results when it reads from multiple tables!
+class SqlResultSet {
  public:
   // Constructors.
-  // Generic empty SqlResult without any underlying implementation or specified
-  // type. Gets filled later with actual data by calling .Append(...)
-  SqlResult();
+  explicit SqlResultSet(const dataflow::SchemaRef &schema) : schema_(schema) {}
+
+  SqlResultSet(const dataflow::SchemaRef &schema,
+               std::vector<dataflow::Record> &&records)
+      : schema_(schema), records_(std::move(records)), keys_() {}
+
+  SqlResultSet(const dataflow::SchemaRef &schema,
+               std::vector<dataflow::Record> &&records,
+               std::vector<std::string> &&keys)
+      : schema_(schema), records_(std::move(records)), keys_(std::move(keys)) {}
+
+  // Adding additional results to this set.
+  void Append(SqlResultSet &&other, bool deduplicate);
+
+  // Query API.
+  const dataflow::SchemaRef &schema() const { return this->schema_; }
+  std::vector<dataflow::Record> &&Vec() { return std::move(this->records_); }
+  inline size_t size() const { return this->records_.size(); }
+
+ private:
+  dataflow::SchemaRef schema_;
+  std::vector<dataflow::Record> records_;
+  std::vector<std::string> keys_;
+};
+
+// Our version of an SqlResult.
+// Might store a boolean or int status, or several ResultSets
+class SqlResult {
+ private:
+  enum class Type { STATEMENT, UPDATE, QUERY };
+
+ public:
+  // Constructors.
   // For results of DDL (e.g. CREATE TABLE).
   // Success is true if and only if the DDL statement succeeded.
-  explicit SqlResult(bool success);
+  explicit SqlResult(bool success) : type_(Type::STATEMENT), status_(success) {}
   // For results of DML (e.g. INSERT/UPDATE/DELETE).
-  // row_count specifies how many rows were affected.
-  explicit SqlResult(int row_count);
-  // For results of SELECT, the result_set object is actually a lazy wrapper
-  // around plain SQL commands and some schema and other metadata. The actual
-  // records/rows are produced as they are retrieved from this wrapper.
-  explicit SqlResult(std::unique_ptr<SqlResultSet> &&result_set);
-  explicit SqlResult(const dataflow::SchemaRef &schema);  // For empty SELECTs.
+  // row_count specifies how many rows were affected (-1 for failures).
+  explicit SqlResult(int rows) : type_(Type::UPDATE), status_(rows) {}
+  explicit SqlResult(size_t rows) : SqlResult(static_cast<int>(rows)) {}
+  // For results of SELECT.
+  explicit SqlResult(std::vector<SqlResultSet> &&v)
+      : type_(Type::QUERY), sets_(std::move(v)) {}
+  explicit SqlResult(SqlResultSet &&resultset) : type_(Type::QUERY) {
+    this->sets_.push_back(std::move(resultset));
+  }
+  explicit SqlResult(const dataflow::SchemaRef &schema) : type_(Type::QUERY) {
+    this->sets_.emplace_back(schema);
+  }
 
   // API for accessing the result.
-  inline bool IsStatement() const {
-    return this->impl_ && this->impl_->IsStatement();
-  }
-  inline bool IsUpdate() const {
-    return this->impl_ && this->impl_->IsUpdate();
-  }
-  inline bool IsQuery() const { return this->impl_ && this->impl_->IsQuery(); }
+  inline bool IsStatement() const { return this->type_ == Type::STATEMENT; }
+  inline bool IsUpdate() const { return this->type_ == Type::UPDATE; }
+  inline bool IsQuery() const { return this->type_ == Type::QUERY; }
 
   // Only safe to use if IsStatement() returns true.
-  inline bool Success() const { return this->impl_->Success(); }
+  inline bool Success() const { return this->status_; }
 
   // Only safe to use if IsUpdate() returns true.
-  inline int UpdateCount() const { return this->impl_->UpdateCount(); }
+  inline int UpdateCount() const { return this->status_; }
 
   // Only safe to use if IsQuery() returns true.
-  inline bool HasResultSet() { return this->impl_->HasResultSet(); }
-  inline std::unique_ptr<SqlResultSet> NextResultSet() {
-    return this->impl_->NextResultSet();
-  }
+  const std::vector<SqlResultSet> &ResultSets() const { return this->sets_; }
+  std::vector<SqlResultSet> &ResultSets() { return this->sets_; }
 
   // Internal API: do not use outside of pelton code.
   // Appends the provided SqlResult to this SqlResult, appeneded
   // result is moved and becomes empty after append.
-  inline void Append(SqlResult &&other, bool deduplicate = false) {
-    if (this->impl_ == nullptr) {
-      this->impl_ = std::move(other.impl_);
-    } else {
-      this->impl_->Append(std::move(other.impl_), deduplicate);
-    }
-  }
-  inline void AddResultSet(std::unique_ptr<SqlResultSet> &&result_set) {
-    if (this->impl_ == nullptr) {
-      this->Append(SqlResult(std::move(result_set)));
-    } else {
-      this->impl_->AddResultSet(std::move(result_set));
-    }
+  void Append(SqlResult &&other, bool deduplicate);
+  inline void AddResultSet(SqlResultSet &&resultset) {
+    this->sets_.push_back(std::move(resultset));
   }
 
  private:
-  std::unique_ptr<_result::AbstractSqlResultImpl> impl_;
+  Type type_;
+  int status_;
+  std::vector<SqlResultSet> sets_;
 };
 
 }  // namespace sql

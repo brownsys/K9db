@@ -231,9 +231,7 @@ void SharderState::CreateIndex(const ShardKind &shard_kind,
                                bool unique) {
   this->indices_[table_name].insert(column_name);
   this->index_to_flow_[table_name][column_name][shard_by] = flow_name;
-  if (!unique) {
-    this->create_index_[shard_kind].push_back(create_index_stmt);
-  }
+  this->create_index_[shard_kind].push_back(create_index_stmt);
 }
 
 sql::SqlResult SharderState::NumShards() const {
@@ -243,7 +241,7 @@ sql::SqlResult SharderState::NumShards() const {
                          std::make_unique<std::string>(kind),
                          static_cast<uint64_t>(set.size()));
   }
-  return sql::SqlResult(std::make_unique<sql::_result::SqlInlineResultSet>(
+  return sql::SqlResult(sql::SqlResultSet(
       dataflow::SchemaFactory::NUM_SHARDS_SCHEMA, std::move(records)));
 }
 

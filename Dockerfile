@@ -20,7 +20,8 @@ RUN apt-get update && apt-get install -y \
     build-essential libssl-dev zlib1g-dev libncurses5-dev \
     libncursesw5-dev libreadline-dev libgdbm-dev libdb5.3-dev libbz2-dev \
     libexpat1-dev liblzma-dev tk-dev libffi-dev wget gcc-11 g++-11 unzip \
-    openjdk-11-jdk maven python2 valgrind curl libclang-dev flex bison libevent-dev
+    openjdk-11-jdk maven python2 valgrind curl libclang-dev flex bison libevent-dev \
+    libsnappy-dev
 
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 90 \
                                  --slave /usr/bin/gcc-ar gcc-ar /usr/bin/gcc-ar-11 \
@@ -112,6 +113,8 @@ ADD docker/configure_db.sh /home/configure_db.sh
 RUN chmod 750 /home/configure_db.sh
 
 RUN useradd memcached
+RUN mkdir -p /tmp/pelton
+RUN mkdir -p /tmp/rocksdb
 
 ENTRYPOINT ["/bin/bash", "./home/configure_db.sh"]
 

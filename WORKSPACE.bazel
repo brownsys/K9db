@@ -164,9 +164,9 @@ cc_library(
     ],
 )
 """,
-    # My non-merged change for create_view_stmt QUERY_LITERAL from Dec 1 2022.
-    # Disambiguate '...'. Single quotes can never be used for identifiers, only string literals
-    commit = "9618c902760000b8456f42092db797575d031a62",
+    # My non-merged change for create_view_stmt QUERY_LITERAL from Dec 10 2022.
+    # Add less intrusive OWNER annotation.
+    commit = "112ce675b73b23588a2262f9eb7f85c0abb41428",
     #remote = "https://github.com/antlr/grammars-v4",
     remote = "https://github.com/KinanBab/grammars-v4.git",
 )
@@ -374,4 +374,46 @@ git_repository(
     name = "com_google_tcmalloc",
     commit = "45c59ccbc062ac96d83710205033c656e490d376",
     remote = "https://github.com/google/tcmalloc.git",
+)
+
+# RocksDB.
+new_git_repository(
+    name = "rocksdb",
+    build_file_content = """
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+
+filegroup(
+    name = "all_srcs",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+
+cmake(
+    name = "rocksdb",
+    generate_args = [
+        "-DROCKSDB_BUILD_SHARED=ON",
+        "-DWITH_GFLAGS=OFF",
+        "-DWITH_BZ2=1",
+        "-DWITH_ZLIB=1",
+        "-DWITH_SNAPPY=1",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
+    ],
+    build_args = [
+        "--", # pass following args through to `make`
+        "-j 8",
+    ],
+    cache_entries = {
+        "CMAKE_C_FLAGS": "-fPIC",
+        "CMAKE_CXX_FLAGS": "-fPIC",
+    },
+    lib_source = ":all_srcs",
+    out_shared_libs = ["librocksdb.so.6"],
+    out_static_libs = [],
+    deps = [],
+    visibility = ["//visibility:public"],
+)
+""",
+    commit = "e637dca20e06f7347d0fe7aefca8f3619604ebe3",
+    remote = "https://github.com/mulugetam/rocksdb.git",
 )

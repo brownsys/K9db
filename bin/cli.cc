@@ -16,18 +16,16 @@ std::vector<std::string> TO_SKIP = {"submit"};
 
 // Printing query results.
 void Print(pelton::SqlResult &&result, bool print) {
-  if (result.IsStatement() && print) {
-    std::cout << "Success: " << result.Success() << std::endl;
-  } else if (result.IsUpdate() && print) {
-    std::cout << "Affected rows: " << result.UpdateCount() << std::endl;
-  } else if (result.IsQuery()) {
-    while (result.HasResultSet()) {
-      std::unique_ptr<pelton::SqlResultSet> resultset = result.NextResultSet();
-      if (print) {
-        std::cout << resultset->GetSchema() << std::endl;
-      }
-      for (const pelton::Record &record : *resultset) {
-        if (print) {
+  if (print) {
+    if (result.IsStatement()) {
+      std::cout << "Success: " << result.Success() << std::endl;
+    } else if (result.IsUpdate()) {
+      std::cout << "Affected rows: " << result.UpdateCount() << std::endl;
+    } else if (result.IsQuery()) {
+      for (pelton::SqlResultSet &resultset : result.ResultSets()) {
+        std::cout << resultset.schema() << std::endl;
+        std::vector<pelton::Record> records = resultset.Vec();
+        for (pelton::Record &record : records) {
           std::cout << record << std::endl;
         }
       }
@@ -71,8 +69,6 @@ DEFINE_bool(progress, true, "Show progress counter");
 DEFINE_int32(workers, 3, "Number of workers");
 DEFINE_bool(consistent, true, "Dataflow consistency with futures");
 DEFINE_string(db_name, "pelton", "Name of the database");
-DEFINE_string(db_username, "root", "MariaDB username to connect with");
-DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
 
 int main(int argc, char **argv) {
   // Command line arugments and help message.
@@ -97,8 +93,6 @@ int main(int argc, char **argv) {
   size_t workers = static_cast<size_t>(FLAGS_workers);
   bool consistent = FLAGS_consistent;
   const std::string &db_name = FLAGS_db_name;
-  const std::string &db_username = FLAGS_db_username;
-  const std::string &db_password = FLAGS_db_password;
   size_t progress = 0;
 
   // Initialize our sharded state/connection.
@@ -108,7 +102,7 @@ int main(int argc, char **argv) {
     pelton::initialize(workers, consistent);
 
     pelton::Connection connection;
-    pelton::open(&connection, db_name, db_username, db_password);
+    pelton::open(&connection, db_name);
 
     std::cout << "SQL Sharder" << std::endl;
     std::cout << "DB: " << db_name << std::endl;

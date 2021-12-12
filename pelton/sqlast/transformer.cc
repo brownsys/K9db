@@ -146,6 +146,9 @@ antlrcpp::Any AstTransformer::visitColumn_def(
                    ColumnConstraint);
     column.AddConstraint(constr);
   }
+  if (ctx->OWNER() != nullptr) {
+    column.owner() = true;
+  }
   return column;
 }
 

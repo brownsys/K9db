@@ -22,8 +22,6 @@ typedef struct {
   size_t workers;
   bool consistent;
   const char *db_name;
-  const char *db_username;
-  const char *db_password;
 } FFIArgs;
 
 // Our version of pelton/sqlast/ast_schema_enums.h#ColumnDefinitionTypeEnum.
@@ -67,8 +65,7 @@ bool FFIInitialize(size_t workers, bool consistent);
 
 // Open a connection for a single client. The returned struct has connected =
 // true if successful. Otherwise connected = false.
-FFIConnection FFIOpen(const char *db_name, const char *db_username,
-                      const char *db_password);
+FFIConnection FFIOpen(const char *db_name);
 
 // Execute a DDL statement (e.g. CREATE TABLE, CREATE VIEW, CREATE INDEX).
 bool FFIExecDDL(FFIConnection *c_conn, const char *query);

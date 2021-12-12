@@ -11,7 +11,6 @@
 #include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
-#include "pelton/sql/lazy_executor.h"
 #include "pelton/sql/result.h"
 
 namespace pelton {
@@ -26,11 +25,10 @@ using Record = dataflow::Record;
 bool initialize(size_t workers, bool consistent);
 
 // delete pelton_state
-bool shutdown(bool shutdown_planner = true);
+bool shutdown();
 
 // open connection
-bool open(Connection *connection, const std::string &db_name,
-          const std::string &db_username, const std::string &db_password);
+bool open(Connection *connection, const std::string &db_name);
 
 absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql);
 

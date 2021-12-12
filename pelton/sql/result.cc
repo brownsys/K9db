@@ -1,42 +1,65 @@
 #include "pelton/sql/result.h"
 
-#include "pelton/sql/result/query.h"
-#include "pelton/sql/result/statement.h"
-#include "pelton/sql/result/update.h"
+#include <string>
+#include <unordered_set>
+
+#include "glog/logging.h"
 
 namespace pelton {
 namespace sql {
 
-using StatementSqlResult = _result::StatementSqlResult;
-using UpdateSqlResult = _result::UpdateSqlResult;
-using QuerySqlResult = _result::QuerySqlResult;
-using SqlInlineResultSet = _result::SqlInlineResultSet;
-
-// Constructors.
-
-// Empty generic SqlResult with no specified type.
-SqlResult::SqlResult() : impl_(nullptr) {}
-
-// For results of DDL (e.g. CREATE TABLE).
-SqlResult::SqlResult(bool status)
-    : impl_(std::make_unique<StatementSqlResult>(status)) {}
-
-// For results of DML (e.g. INSERT/UPDATE/DELETE).
-SqlResult::SqlResult(int row_count)
-    : impl_(std::make_unique<UpdateSqlResult>(row_count)) {}
-
-// For results of SELECT, the result_set object is actually a lazy wrapper
-// around plain SQL commands and some schema and other metadata. The actual
-// records/rows are produced as they are retrieved from this wrapper.
-SqlResult::SqlResult(std::unique_ptr<SqlResultSet> &&result_set)
-    : impl_(std::make_unique<QuerySqlResult>()) {
-  this->impl_->AddResultSet(std::move(result_set));
+// SqlResultSet.
+void SqlResultSet::Append(SqlResultSet &&other, bool deduplicate) {
+  if (this->schema_ != other.schema_) {
+    LOG(FATAL) << "Appending different schemas";
+  }
+  if (deduplicate) {
+    CHECK_EQ(this->keys_.size(), this->records_.size())
+        << "Deduplicating keyless result set";
+    CHECK_EQ(other.keys_.size(), other.records_.size())
+        << "Deduplicating keyless result set";
+  }
+  // Deduplicate using a hash set.
+  std::unordered_set<std::string> duplicates;
+  if (deduplicate) {
+    for (const std::string &key : this->keys_) {
+      duplicates.insert(key);
+    }
+  }
+  for (size_t i = 0; i < other.records_.size(); i++) {
+    if (!deduplicate || duplicates.count(other.keys_.at(i)) == 0) {
+      this->records_.push_back(std::move(other.records_.at(i)));
+      this->keys_.push_back(std::move(other.keys_.at(i)));
+    }
+  }
 }
 
-// For empty SELECTs.
-SqlResult::SqlResult(const dataflow::SchemaRef &schema)
-    : impl_(std::make_unique<QuerySqlResult>()) {
-  this->impl_->AddResultSet(std::make_unique<SqlInlineResultSet>(schema));
+// SqlResult.
+void SqlResult::Append(SqlResult &&other, bool deduplicate) {
+  CHECK(this->type_ == other.type_) << "Append different types";
+  switch (this->type_) {
+    case Type::STATEMENT: {
+      if (this->status_ != false) {
+        this->status_ = other.status_;
+      }
+      break;
+    }
+    case Type::UPDATE: {
+      if (other.status_ < 0) {
+        this->status_ = other.status_;
+      } else if (this->status_ >= 0) {
+        this->status_ += other.status_;
+      }
+      break;
+    }
+    case Type::QUERY: {
+      if (this->sets_.size() != 1 || other.sets_.size() != 1) {
+        LOG(FATAL) << "Appending bad ResultSet size";
+      }
+      this->sets_.front().Append(std::move(other.sets_.front()), deduplicate);
+      break;
+    }
+  }
 }
 
 }  // namespace sql

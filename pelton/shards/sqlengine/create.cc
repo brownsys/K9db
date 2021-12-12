@@ -184,7 +184,8 @@ absl::StatusOr<std::pair<std::list<ShardingInformation>, std::optional<OwningTab
     index_map.insert({column_name, index});
     // Find foreign key constraint (if exists).
     // check if column starts with OWNER_ (has an owner annotation)
-    bool explicit_owner = absl::StartsWith(column_name, "OWNER_");
+    bool explicit_owner =
+        absl::StartsWith(column_name, "OWNER_") || columns[index].owner();
     // check if column starts with ACCESSOR_ (has an accessor annotation)
     bool explicit_accessor = absl::StartsWith(column_name, "ACCESSOR_");
     // check if column has a foreign key constraint
@@ -430,7 +431,7 @@ absl::StatusOr<ForeignKeyShards> ShardForeignKeys(
       ASSIGN_OR_RETURN(ForeignKeyType fk_type,
                        ShardForeignKey(colname, *fk_constraint, info, state));
       result.emplace(colname, fk_type);
-    } else if (absl::StartsWith(colname, "OWNER_") &&
+    } else if ((absl::StartsWith(colname, "OWNER_") || column.owner()) &&
                colname == info.shard_by) {
       result.emplace(colname, FK_REMOVED);
     }
@@ -454,10 +455,12 @@ sqlast::CreateTable UpdateTableSchema(sqlast::CreateTable stmt,
       case FK_REMOVED:
         stmt.RemoveColumn(col);
         break;
+      /*
       case FK_EXTERNAL:
         stmt.MutableColumn(col).RemoveConstraint(
             sqlast::ColumnConstraint::Type::FOREIGN_KEY);
         break;
+      */
       default:
         continue;
     }
@@ -477,7 +480,7 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt
                                Connection *connection,
                                UniqueLock *lock)
                                {
-  sql::SqlResult result;
+  sql::SqlResult result(true);
   SharderState* state = connection->state->sharder_state();
   const UnshardedTableName &relationship_table_name = stmt.table_name(); 
   const ShardedTableName &target_table_name = owning_table.fk_constraint.foreign_table();
@@ -495,7 +498,6 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt
   for (auto & prev_sharding_info : state->GetShardingInformation(relationship_table_name)) {
     if (state->HasIndexFor(relationship_table_name, my_col_name, prev_sharding_info.shard_by)) {
       LOG(INFO) << "Skipping index creation, already exists.";
-      result.Append(sql::SqlResult(true));
     } else {
       const std::string &index_name = state->GenerateUniqueIndexName(lock);
       const sqlast::CreateIndex create_index(
@@ -511,7 +513,7 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt
       );
 
       if (res.ok()) 
-        result.Append(std::move(*res));
+        result.Append(std::move(*res), false);
       else 
         return  res.status();
 
@@ -570,9 +572,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
   std::optional<OwningTable> owning_table;
   ASSIGN_OR_RETURN(std::tie(sharding_information, owning_table),
                    ShardTable(stmt, *state));
-  sql::SqlResult result = sql::SqlResult(true);
 
-      // Sharding scenarios.
+  sql::SqlResult result(false);
+  // Sharding scenarios.
   auto &exec = connection->executor;
   if (has_pii && sharding_information.size() == 0) {
     // Case 1: has pii but not linked to shards.
@@ -581,7 +583,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     ASSIGN_OR_RETURN(std::string pk, GetPK(stmt));
     state->AddShardKind(table_name, pk);
     state->AddUnshardedTable(table_name, stmt);
-    result = exec.ExecuteDefault(&stmt);
+    result = exec.Default(&stmt);
 
   } else if (!has_pii && sharding_information.size() > 0) {
     for (auto &info_0 : sharding_information) {
@@ -604,7 +606,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
             UpdateTableSchema(stmt, fk_shards, info.sharded_table_name);
         // Add the sharding information to state.
         state->AddShardedTable(table_name, info, sharded_stmt);
-        result.Append(sql::SqlResult(true));
       }
     }
 
@@ -612,7 +613,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     // Case 3: neither pii nor linked.
     // The table does not belong to a shard and needs no further modification!
     state->AddUnshardedTable(table_name, stmt);
-    result = exec.ExecuteDefault(&stmt);
+    result = exec.Default(&stmt);
   } else {
     // Has pii and linked to a shard is a logical schema error.
     return absl::UnimplementedError("Sharded Table cannot have PII fields!");
@@ -643,7 +644,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     } else {
       LOG(FATAL) << "Weird `OwningT` value";
     }
-    result.Append(sql::SqlResult(true));
   }
 
   perf::End("Create");
