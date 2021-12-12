@@ -5,6 +5,8 @@
 #[macro_use]
 extern crate slog;
 extern crate ctrlc;
+#[macro_use]
+extern crate lazy_static;
 extern crate msql_srv;
 extern crate proxy_ffi;
 extern crate regex;
@@ -22,6 +24,14 @@ use std::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
+
+lazy_static! {
+    // Expression used for extracting "table.column = ?" or "table.column IN"
+    static ref PARAM_RE: Regex = Regex::new(r"\s(?P<expr>[A-Za-z_0-9`\.]+\s*([=><]|(\s+IN\s+))\s*)\?|(\s+IN\s+)").unwrap();
+    // This regex captures " = ?" and "(?,?, ?)". And we iterate over them in order.
+    static ref METADATA_RE: Regex = Regex::new(r"(?P<single>=\s*\?\s*)|(?P<in_clause>\s*\([\?\s,]+\)\s*)").unwrap();
+    static ref IN_RE: Regex = Regex::new(r"IN\s*\([,\s\?]*\)").unwrap();
+}
 
 const USAGE: &str = "
   Available options:
@@ -108,10 +118,7 @@ impl Backend {
         // assigned to the prepared statement, makes parameterizing and
         // executing prepared statement later easier.
         // let re = Regex::new(r"\s(?P<expr>[A-Za-z_0-9`\.]+\s*[=><]\s*)\?").unwrap();
-        // Expression used for extracting "table.column = ?" or "table.column IN"
-        let re = Regex::new(r"\s(?P<expr>[A-Za-z_0-9`\.]+\s*([=><]|(\s+IN\s+))\s*)\?|(\s+IN\s+)")
-            .unwrap();
-        let mut view_query: Vec<String> = re
+        let mut view_query: Vec<String> = PARAM_RE
             .captures_iter(&prepared_statement)
             .map(|caps| caps["expr"].to_string())
             .collect();
@@ -148,9 +155,7 @@ impl Backend {
         // Infer metadata from the query
         let mut metadata: Vec<Option<u32>> = Vec::new();
         // This regex captures " = ?" and "(?,?, ?)". And we iterate over them in order.
-        let re_metadata =
-            Regex::new(r"(?P<single>=\s*\?\s*)|(?P<in_clause>\s*\([\?\s,]+\)\s*)").unwrap();
-        for cap in re_metadata.captures_iter(prepared_statement) {
+        for cap in METADATA_RE.captures_iter(prepared_statement) {
             match cap.get(2) {
                 Some(in_clause) => {
                     metadata.push(Some(in_clause.as_str().matches("?").count() as u32))
@@ -212,8 +217,7 @@ impl Backend {
         );
         // Construct the parametrised form of the statement that contains a single ?mark
         let reduced_form: String;
-        let param_re = Regex::new(r"IN\s*\([,\s\?]*\)").unwrap();
-        reduced_form = param_re.replace_all(prepared_statement, "= ?").into_owned();
+        reduced_form = IN_RE.replace_all(prepared_statement, "= ?").into_owned();
 
         let prepared_read_guard = self.prepared_statements.read().unwrap();
         // Two harness threads could issue the same prepared statement twice hence if the prepared
