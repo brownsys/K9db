@@ -95,4 +95,4 @@ ln -s /usr/bin/python2 /usr/bin/python
 mariadb -u root < docker/configure_db.sql
 
 useradd memcached
-mkdir -p /tmp/pelton
+mkdir -p /var/pelton/rocksdb
