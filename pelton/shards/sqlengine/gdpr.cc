@@ -290,7 +290,7 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
       result.Append(std::move(table_result), true);
     }
   }
-  
+
   // Anonymize when accessor deletes their data
   if (state->HasAccessorIndices(shard_kind)) {
     // Get all accessor indices that belong to this shard type

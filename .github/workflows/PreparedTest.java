@@ -14,7 +14,7 @@ class PreparedTest {
 
   public static String CREATE_TABLE =
       "CREATE TABLE tbl("
-      + "id int,"
+      + "id int PRIMARY KEY,"
       + "name varchar(100),"
       + "age int"
       + ")";
@@ -36,11 +36,11 @@ class PreparedTest {
 
     PreparedStatement prepInsert = connection.prepareStatement(PREP_INSERT);
     prepInsert.setInt(1, 1);
-    prepInsert.setString(2, "John");
+    prepInsert.setString(2, "'John'");
     prepInsert.setInt(3, 25);
     assert prepInsert.executeUpdate() == 1;
     prepInsert.setInt(1, 2);
-    prepInsert.setString(2, "Smith");
+    prepInsert.setString(2, "'Smith'");
     prepInsert.setInt(3, 35);
     assert prepInsert.executeUpdate() == 1;
 
@@ -56,7 +56,7 @@ class PreparedTest {
     assert !resultSet.next();
 
     prepSelect = connection.prepareStatement(PREP_SELECT[1]);
-    prepSelect.setString(1, "Smith");
+    prepSelect.setString(1, "'Smith'");
     prepSelect.setInt(2, 35);
     resultSet = prepSelect.executeQuery();
     metadata = resultSet.getMetaData();

@@ -73,6 +73,7 @@ class MatViewOperator : public Operator {
   FRIEND_TEST(MatViewOperatorTest, LimitTest);
   FRIEND_TEST(MatViewOperatorTest, LookupGreater);
   FRIEND_TEST(MatViewOperatorTest, AllOnRecordOrdered);
+  FRIEND_TEST(MatViewOperatorTest, NightmareScenarioNegativePositiveOutOfOrder);
 };
 
 // Actual implementation is generic over T: the underlying GroupedDataT

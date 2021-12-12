@@ -7,6 +7,8 @@
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
 
+#define PANIC PANIC_STATUS
+
 namespace pelton {
 namespace sql {
 
@@ -48,7 +50,7 @@ const std::string &GetTableName(const sqlast::AbstractStatement *stmt) {
 // SingletonRocksdbConnection.
 SingletonRocksdbConnection::SingletonRocksdbConnection(
     const std::string &db_name) {
-  std::string path = "/tmp/pelton/" + db_name;
+  std::string path = "/var/pelton/rocksdb/" + db_name;
   // Options.
   rocksdb::Options opts;
   opts.create_if_missing = true;
@@ -56,7 +58,7 @@ SingletonRocksdbConnection::SingletonRocksdbConnection(
 
   // Open the database.
   rocksdb::DB *db;
-  PANIC_STATUS(rocksdb::DB::Open(opts, path, &db));
+  PANIC(rocksdb::DB::Open(opts, path, &db));
   this->db_ = std::unique_ptr<rocksdb::DB>(db);
 }
 
@@ -78,42 +80,45 @@ bool SingletonRocksdbConnection::ExecuteStatement(
       const sqlast::CreateTable *stmt =
           static_cast<const sqlast::CreateTable *>(sql);
 
-      // Schema and PK.
-      dataflow::SchemaRef schema = dataflow::SchemaFactory::Create(*stmt);
-      const std::vector<dataflow::ColumnID> &keys = schema.keys();
-      CHECK_EQ(keys.size(), 1u) << "BAD PK ROCKSDB TABLE";
-      size_t pk = keys.at(0);
+      const std::string &table_name = stmt->table_name();
+      if (this->tables_.count(table_name) == 0) {
+        // Schema and PK.
+        dataflow::SchemaRef schema = dataflow::SchemaFactory::Create(*stmt);
+        const std::vector<dataflow::ColumnID> &keys = schema.keys();
+        CHECK_EQ(keys.size(), 1u) << "BAD PK ROCKSDB TABLE";
+        size_t pk = keys.at(0);
 
-      // Create table.
-      std::string table_name = shard_name + stmt->table_name();
-      rocksdb::ColumnFamilyHandle *handle;
-      PANIC_STATUS(this->db_->CreateColumnFamily(rocksdb::ColumnFamilyOptions(),
-                                                 table_name, &handle));
+        // Creating the table's column family.
+        rocksdb::ColumnFamilyHandle *handle;
+        PANIC(this->db_->CreateColumnFamily(rocksdb::ColumnFamilyOptions(),
+                                            table_name, &handle));
 
-      // Update metadata.
-      this->handlers_.emplace(table_name, handle);
-      this->schemas_.emplace(table_name, schema);
-      this->primary_keys_.emplace(table_name, pk);
-      this->indexed_columns_.emplace(table_name, std::vector<size_t>{});
-      this->indices_.emplace(table_name, std::vector<RocksdbIndex>{});
+        // Fill in table metadata.
+        TableID tid = this->tables_.size();
+        this->tables_.emplace(table_name, tid);
+        this->handlers_.emplace(tid, handle);
+        this->schemas_.emplace(tid, schema);
+        this->primary_keys_.emplace(tid, pk);
+        this->indexed_columns_.emplace(tid, std::vector<size_t>{});
+        this->indices_.emplace(tid, std::vector<RocksdbIndex>{});
 
-      // Create indices for table.
-      for (size_t i = 0; i < stmt->GetColumns().size(); i++) {
-        const auto &column = stmt->GetColumns().at(i);
-        bool has_constraint = false;
-        for (const auto &cnstr : column.GetConstraints()) {
-          if (cnstr.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
-            has_constraint = true;
-            break;
-          } else if (cnstr.type() == sqlast::ColumnConstraint::Type::UNIQUE) {
-            has_constraint = true;
-            break;
+        // Create indices for table.
+        for (size_t i = 0; i < stmt->GetColumns().size(); i++) {
+          const auto &column = stmt->GetColumns().at(i);
+          bool has_constraint = false;
+          for (const auto &cnstr : column.GetConstraints()) {
+            if (cnstr.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
+              has_constraint = true;
+              break;
+            } else if (cnstr.type() == sqlast::ColumnConstraint::Type::UNIQUE) {
+              has_constraint = true;
+              break;
+            }
           }
-        }
-        if (has_constraint) {
-          this->indexed_columns_.at(table_name).push_back(i);
-          this->indices_.at(table_name)
-              .emplace_back(this->db_.get(), table_name, i);
+          if (has_constraint) {
+            this->indexed_columns_.at(tid).push_back(i);
+            this->indices_.at(tid).emplace_back(this->db_.get(), tid, i);
+          }
         }
       }
       break;
@@ -124,17 +129,15 @@ bool SingletonRocksdbConnection::ExecuteStatement(
       const sqlast::CreateIndex *stmt =
           static_cast<const sqlast::CreateIndex *>(sql);
 
-      std::string table_name = shard_name + stmt->table_name();
-      const std::string &col_name = stmt->column_name();
-      size_t i = this->schemas_.at(table_name).IndexOf(col_name);
-      if (i != this->primary_keys_.at(table_name)) {
-        auto &indexed_columns = this->indexed_columns_.at(table_name);
-        auto &indices = this->indices_.at(table_name);
-        auto it = std::find(indexed_columns.begin(), indexed_columns.end(), i);
-        if (it == indexed_columns.end()) {
-          indexed_columns.push_back(i);
-          indices.emplace_back(this->db_.get(), table_name, i);
-        }
+      const std::string &table_name = stmt->table_name();
+      TableID tid = this->tables_.at(table_name);
+      size_t cid = this->schemas_.at(tid).IndexOf(stmt->column_name());
+      std::vector<size_t> &indexed_columns = this->indexed_columns_.at(tid);
+      auto it = std::find(indexed_columns.begin(), indexed_columns.end(), cid);
+      if (it == indexed_columns.end()) {
+        std::vector<RocksdbIndex> &indices = this->indices_.at(tid);
+        indexed_columns.push_back(cid);
+        indices.emplace_back(this->db_.get(), tid, cid);
       }
       break;
     }
@@ -146,13 +149,15 @@ bool SingletonRocksdbConnection::ExecuteStatement(
 
 int SingletonRocksdbConnection::ExecuteUpdate(
     const sqlast::AbstractStatement *sql, const std::string &shard_name) {
-  // Preprocess the sql statement condition values.
-  std::string table_name = shard_name + GetTableName(sql);
-  rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(table_name).get();
-  size_t pk = this->primary_keys_.at(table_name);
-  const auto &indexed_columns = this->indexed_columns_.at(table_name);
-  std::vector<RocksdbIndex> &indices = this->indices_.at(table_name);
-  const dataflow::SchemaRef &db_schema = this->schemas_.at(table_name);
+  // Read table metadata.
+  const std::string &table_name = GetTableName(sql);
+  TableID tid = this->tables_.at(table_name);
+  rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(tid).get();
+  const dataflow::SchemaRef &db_schema = this->schemas_.at(tid);
+  size_t pk = this->primary_keys_.at(tid);
+  const auto &indexed_columns = this->indexed_columns_.at(tid);
+  std::vector<RocksdbIndex> &indices = this->indices_.at(tid);
+
   ValueMapper value_mapper(pk, indexed_columns, db_schema);
   value_mapper.Visit(sql);
 
@@ -167,30 +172,39 @@ int SingletonRocksdbConnection::ExecuteUpdate(
         this->ExecuteQuery(sql, db_schema, {}, shard_name);
         return 1;
       }
+      ShardID sid = this->GetOrCreateShardID(shard_name);
       // if we are not replacing, then we will need to update indices for
       // the insert only (nothing is removed).
       // if no indices, then we do not need to know what rows got replaced.
       const auto &vals = value_mapper.After(db_schema.NameOf(pk));
       CHECK_EQ(vals.size(), 1u) << "Insert has no value for PK!";
-      const rocksdb::Slice &key = vals.at(0);
-      CHECK(!IsNull(key.data(), key.size())) << "Insert has NULL for PK!";
+      const rocksdb::Slice &pkslice = vals.at(0);
+      CHECK(!IsNull(pkslice.data(), pkslice.size())) << "Insert has NULL PK!";
+      std::string skey = sid + pkslice.ToString();
 
       // Insert/replace new row.
       std::string row = EncodeInsert(*stmt, db_schema);
-      PANIC_STATUS(this->db_->Put(rocksdb::WriteOptions(), handler, key, row));
+      PANIC(this->db_->Put(rocksdb::WriteOptions(), handler, skey, row));
 
       // Update indices.
       rocksdb::Slice rslice(row);
-      rocksdb::Slice pkslice = ExtractColumn(rslice, pk);
       for (size_t i = 0; i < indexed_columns.size(); i++) {
         RocksdbIndex &index = indices.at(i);
         size_t indexed_column = indexed_columns.at(i);
-        index.Add(ExtractColumn(rslice, indexed_column), pkslice);
+        std::string index_value =
+            sid + ExtractColumn(rslice, indexed_column).ToString();
+        index.Add(index_value, rocksdb::Slice(skey));
       }
       return 1;
     }
     case sqlast::AbstractStatement::Type::UPDATE: {
       const sqlast::Update *stmt = static_cast<const sqlast::Update *>(sql);
+
+      // Get the shard ID.
+      std::optional<ShardID> sid = this->GetShardID(shard_name);
+      if (!sid) {
+        return 0;
+      }
 
       // Turn update effects into an easy to process form.
       std::unordered_map<std::string, std::string> update;
@@ -201,7 +215,7 @@ int SingletonRocksdbConnection::ExecuteUpdate(
       }
 
       // Look up all affected rows.
-      std::vector<std::string> rows = this->Get(table_name, value_mapper);
+      std::vector<std::string> rows = this->Get(tid, *sid, value_mapper);
       rows = this->Filter(db_schema, sql, std::move(rows));
       for (std::string &row : rows) {
         // Compute updated row.
@@ -211,24 +225,27 @@ int SingletonRocksdbConnection::ExecuteUpdate(
         }
         rocksdb::Slice oslice(row);
         rocksdb::Slice nslice(nrow);
-        rocksdb::Slice okey = ExtractColumn(oslice, pk);
-        rocksdb::Slice nkey = ExtractColumn(nslice, pk);
+        std::string okey = *sid + ExtractColumn(oslice, pk).ToString();
+        std::string nkey = *sid + ExtractColumn(nslice, pk).ToString();
+        bool keychanged = okey != nkey;
         // If the PK is unchanged, we do not need to delete, and can replace.
-        if (!SlicesEq(nkey, okey)) {
-          PANIC_STATUS(db_->Delete(rocksdb::WriteOptions(), handler, okey));
+        if (keychanged) {
+          PANIC(db_->Delete(rocksdb::WriteOptions(), handler, okey));
         }
-        PANIC_STATUS(db_->Put(rocksdb::WriteOptions(), handler, nkey, nrow));
+        PANIC(db_->Put(rocksdb::WriteOptions(), handler, nkey, nrow));
         // Update indices.
         for (size_t i = 0; i < indexed_columns.size(); i++) {
           RocksdbIndex &index = indices.at(i);
           size_t indexed_column = indexed_columns.at(i);
           rocksdb::Slice oval = ExtractColumn(oslice, indexed_column);
           rocksdb::Slice nval = ExtractColumn(nslice, indexed_column);
-          if (SlicesEq(oval, nval) && SlicesEq(okey, nkey)) {
+          if (!keychanged && SlicesEq(oval, nval)) {
             continue;
           }
-          index.Delete(oval, okey);
-          index.Add(nval, nkey);
+          std::string ovalstr = *sid + oval.ToString();
+          std::string nvalstr = *sid + nval.ToString();
+          index.Delete(ovalstr, okey);
+          index.Add(nvalstr, nkey);
         }
       }
       return rows.size();
@@ -248,13 +265,15 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
     const std::vector<AugInfo> &augments, const std::string &shard_name) {
   CHECK_LE(augments.size(), 1u) << "Too many augmentations";
 
-  // Preprocess the sql statement condition values.
-  std::string table_name = shard_name + GetTableName(sql);
-  rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(table_name).get();
-  size_t pk = this->primary_keys_.at(table_name);
-  const auto &indexed_columns = this->indexed_columns_.at(table_name);
-  std::vector<RocksdbIndex> &indices = this->indices_.at(table_name);
-  const dataflow::SchemaRef &db_schema = this->schemas_.at(table_name);
+  // Read table metadata.
+  const std::string &table_name = GetTableName(sql);
+  TableID tid = this->tables_.at(table_name);
+  rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(tid).get();
+  const dataflow::SchemaRef &db_schema = this->schemas_.at(tid);
+  size_t pk = this->primary_keys_.at(tid);
+  const auto &indexed_columns = this->indexed_columns_.at(tid);
+  std::vector<RocksdbIndex> &indices = this->indices_.at(tid);
+
   ValueMapper value_mapper(pk, indexed_columns, db_schema);
   value_mapper.Visit(sql);
 
@@ -266,6 +285,12 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
     case sqlast::AbstractStatement::Type::SELECT: {
       const sqlast::Select *stmt = static_cast<const sqlast::Select *>(sql);
 
+      // Get the shard ID.
+      std::optional<ShardID> sid = this->GetShardID(shard_name);
+      if (!sid) {
+        break;
+      }
+
       // Figure out the projections (including order).
       bool has_projection = stmt->GetColumns().at(0) != "*";
       std::vector<int> projections;
@@ -274,7 +299,7 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
       }
 
       // Look up all the rows.
-      std::vector<std::string> rows = this->Get(table_name, value_mapper);
+      std::vector<std::string> rows = this->Get(tid, *sid, value_mapper);
       rows = this->Filter(db_schema, sql, std::move(rows));
       for (std::string &row : rows) {
         rocksdb::Slice slice(row);
@@ -286,46 +311,62 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
       break;
     }
     case sqlast::AbstractStatement::Type::DELETE: {
+      // Get the shard ID.
+      std::optional<ShardID> sid = this->GetShardID(shard_name);
+      if (!sid) {
+        break;
+      }
       // Look up all the rows.
-      std::vector<std::string> rows = this->Get(table_name, value_mapper);
+      std::vector<std::string> rows = this->Get(tid, *sid, value_mapper);
       rows = this->Filter(db_schema, sql, std::move(rows));
       for (std::string &row : rows) {
         rocksdb::Slice slice(row);
         // Get the key of the existing row.
-        rocksdb::Slice key = ExtractColumn(row, pk);
-        keys.push_back(key.ToString());
+        rocksdb::Slice keyslice = ExtractColumn(row, pk);
+        keys.push_back(keyslice.ToString());
         records.push_back(DecodeRecord(slice, out_schema, augments, {}));
         // Delete the existing row by key.
-        PANIC_STATUS(this->db_->Delete(rocksdb::WriteOptions(), handler, key));
+        std::string skey = *sid + keyslice.ToString();
+        PANIC(this->db_->Delete(rocksdb::WriteOptions(), handler, skey));
         // Update indices.
         for (size_t i = 0; i < indexed_columns.size(); i++) {
           RocksdbIndex &index = indices.at(i);
           size_t indexed_column = indexed_columns.at(i);
-          index.Delete(ExtractColumn(slice, indexed_column), key);
+          std::string index_value =
+              *sid + ExtractColumn(slice, indexed_column).ToString();
+          index.Delete(*sid, skey);
         }
       }
       break;
     }
     case sqlast::AbstractStatement::Type::INSERT: {
       const sqlast::Insert *stmt = static_cast<const sqlast::Insert *>(sql);
+
+      // Get the shard id.
+      std::optional<ShardID> opt = this->GetShardID(shard_name);
+      ShardID sid = opt ? *opt : this->GetOrCreateShardID(shard_name);
+
       // A replacing AND returning INSERT.
       // Make sure insert provides a correct PK.
       const auto &vals = value_mapper.After(db_schema.NameOf(pk));
       CHECK_EQ(vals.size(), 1u) << "Insert has no value for PK!";
-      const rocksdb::Slice &key = vals.at(0);
-      CHECK(!IsNull(key.data(), key.size())) << "Insert has NULL for PK!";
+      const rocksdb::Slice &pkslice = vals.at(0);
+      CHECK(!IsNull(pkslice.data(), pkslice.size())) << "Insert has NULL PK!";
 
       // Lookup existing row.
+      std::string skey = sid + pkslice.ToString();
       std::string orow;
       rocksdb::Slice oslice(nullptr, 0);
-      auto status = this->db_->Get(rocksdb::ReadOptions(), handler, key, &orow);
-      if (status.ok()) {
-        // There is a pre-existing row with that PK (that will get replaced).
-        oslice = rocksdb::Slice(orow);
-        keys.push_back(key.ToString());
-        records.push_back(DecodeRecord(oslice, out_schema, augments, {}));
-      } else if (!status.IsNotFound()) {
-        PANIC_STATUS(status);
+      if (opt) {
+        auto st = this->db_->Get(rocksdb::ReadOptions(), handler, skey, &orow);
+        if (st.ok()) {
+          // There is a pre-existing row with that PK (that will get replaced).
+          oslice = rocksdb::Slice(orow);
+          keys.push_back(pkslice.ToString());
+          records.push_back(DecodeRecord(oslice, out_schema, augments, {}));
+        } else if (!st.IsNotFound()) {
+          PANIC(st);
+        }
       }
 
       // Insert/replace new row.
@@ -334,7 +375,7 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
       if (SlicesEq(oslice, nslice)) {  // No-op.
         break;
       }
-      PANIC_STATUS(this->db_->Put(rocksdb::WriteOptions(), handler, key, nrow));
+      PANIC(this->db_->Put(rocksdb::WriteOptions(), handler, skey, nrow));
       // Update indices.
       for (size_t i = 0; i < indexed_columns.size(); i++) {
         RocksdbIndex &index = indices.at(i);
@@ -345,9 +386,9 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
           if (SlicesEq(oval, nval)) {
             continue;
           }
-          index.Delete(oval, key);
+          index.Delete(sid + oval.ToString(), rocksdb::Slice(skey));
         }
-        index.Add(nval, key);
+        index.Add(sid + nval.ToString(), rocksdb::Slice(skey));
       }
       break;
     }
@@ -360,33 +401,33 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
 // Helpers.
 // Get record matching values in a value mapper (either by key, index, or it).
 std::vector<std::string> SingletonRocksdbConnection::Get(
-    const std::string &table_name, const ValueMapper &value_mapper) {
+    TableID table_id, ShardID shard_id, const ValueMapper &value_mapper) {
   // Read Metadata.
-  const dataflow::SchemaRef &schema = this->schemas_.at(table_name);
-  rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(table_name).get();
-  size_t pk = this->primary_keys_.at(table_name);
+  rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(table_id).get();
+  const dataflow::SchemaRef &schema = this->schemas_.at(table_id);
+  size_t pk = this->primary_keys_.at(table_id);
+  const auto &indexed_columns = this->indexed_columns_.at(table_id);
+  std::vector<RocksdbIndex> &indices = this->indices_.at(table_id);
   const std::string &pkname = schema.NameOf(pk);
-  const auto &indexed_columns = this->indexed_columns_.at(table_name);
-  std::vector<RocksdbIndex> &indices = this->indices_.at(table_name);
 
   // Lookup either by PK or index.
-  std::vector<std::string> strs;
-  std::vector<rocksdb::Slice> tmp;
-  const std::vector<rocksdb::Slice> *keys = nullptr;
+  bool found = false;
+  std::vector<std::string> keys;
   if (value_mapper.HasBefore(pkname)) {
     // Use the PK value(s).
-    keys = &value_mapper.Before(pkname);
+    const std::vector<rocksdb::Slice> &slices = value_mapper.Before(pkname);
+    for (const auto &slice : slices) {
+      keys.push_back(shard_id + slice.ToString());
+    }
+    found = true;
   } else {
     // No PK, use any index.
     for (size_t i = 0; i < indexed_columns.size(); i++) {
       RocksdbIndex &index = indices.at(i);
       const std::string &idxcolumn = schema.NameOf(indexed_columns.at(i));
       if (value_mapper.HasBefore(idxcolumn)) {
-        strs = index.Get(value_mapper.Before(idxcolumn));
-        for (const auto &str : strs) {
-          tmp.emplace_back(str);
-        }
-        keys = &tmp;
+        keys = index.Get(shard_id, value_mapper.Before(idxcolumn));
+        found = true;
         break;
       }
     }
@@ -394,16 +435,16 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
 
   // Look in rocksdb.
   std::vector<std::string> result;
-  if (keys != nullptr) {
+  if (found) {
     // Can look up by keys directly.
-    for (const rocksdb::Slice &key : *keys) {
+    for (const std::string &skey : keys) {
       std::string str;
       rocksdb::Status status =
-          this->db_->Get(rocksdb::ReadOptions(), handler, key, &str);
+          this->db_->Get(rocksdb::ReadOptions(), handler, skey, &str);
       if (status.ok()) {
         result.push_back(std::move(str));
       } else if (!status.IsNotFound()) {
-        PANIC_STATUS(status);
+        PANIC(status);
       }
     }
   } else {
@@ -411,7 +452,15 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
     LOG(INFO) << "rocksdb: Query has no rocksdb index";
     auto ptr = this->db_->NewIterator(rocksdb::ReadOptions(), handler);
     std::unique_ptr<rocksdb::Iterator> it(ptr);
-    for (it->SeekToFirst(); it->Valid(); it->Next()) {
+    rocksdb::Slice pslice(shard_id);
+    for (it->Seek(shard_id); it->Valid(); it->Next()) {
+      rocksdb::Slice keyslice = it->key();
+      if (keyslice.size() < pslice.size()) {
+        break;
+      }
+      if (!SlicesEq(pslice, rocksdb::Slice(keyslice.data(), pslice.size()))) {
+        break;
+      }
       result.push_back(it->value().ToString());
     }
   }

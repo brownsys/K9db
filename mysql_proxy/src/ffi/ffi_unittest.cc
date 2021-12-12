@@ -17,7 +17,9 @@ namespace {
 using CType = FFIColumnType;
 
 // Drop the database (if it exists).
-void DropDatabase() { std::filesystem::remove_all("/tmp/pelton/" DB_NAME); }
+void DropDatabase() {
+  std::filesystem::remove_all("/var/pelton/rocksdb/" DB_NAME);
+}
 
 TEST(PROXY, OPEN_TEST) {
   c_conn = FFIOpen(DB_NAME);

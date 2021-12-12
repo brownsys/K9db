@@ -17,6 +17,7 @@ rust_binary(
     ],
     rustc_flags = [
         "-Clink-args=-L/home/pelton/bazel-bin/external/rocksdb/copy_rocksdb/rocksdb/lib",
+        "-Clink-args=-L/home/pelton/pelton/bazel-bin/external/rocksdb/copy_rocksdb/rocksdb/lib",
         "-Clink-args=-lssl",
         "-Clink-args=-lcrypto",
         "-Clink-args=-rdynamic",
@@ -37,12 +38,12 @@ rust_binary(
         ":proxy_ffi",
         "//mysql_proxy:ctrlc",
         "//mysql_proxy:gflags",
+        "//mysql_proxy:lazy_static",
         "//mysql_proxy:msql_srv",
         "//mysql_proxy:regex",
         "//mysql_proxy:slog",
         "//mysql_proxy:slog_term",
         "//mysql_proxy/src/ffi",
-        "//mysql_proxy:lazy_static",
     ],
 )
 

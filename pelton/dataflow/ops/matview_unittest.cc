@@ -551,5 +551,96 @@ TEST(MatViewOperatorTest, AllOnRecordOrdered) {
   EXPECT_EQ_ORDER(matview.All(), sorted);
 }
 
+TEST(MatViewOperatorTest, NightmareScenarioNegativePositiveOutOfOrder) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::UINT, CType::TEXT, CType::INT};
+  std::vector<ColumnID> keys = {0};  // Has PK, will use PK index.
+  Record::Compare compare{{2}};
+  SchemaRef schema = SchemaFactory::Create(names, types, keys);
+
+  // Matview. Key is Col2.
+  std::vector<std::unique_ptr<MatViewOperator>> views;
+  views.emplace_back(new UnorderedMatViewOperator({1}));
+  views.emplace_back(new KeyOrderedMatViewOperator({1}));
+  views.emplace_back(new RecordOrderedMatViewOperator({1}, compare));
+
+  // Some string values.
+  std::unique_ptr<std::string> s1 = std::make_unique<std::string>("Hello!");
+  std::unique_ptr<std::string> s2 = std::make_unique<std::string>("Hello!");
+  std::unique_ptr<std::string> s3 = std::make_unique<std::string>("Bye!");
+  std::unique_ptr<std::string> s4 = std::make_unique<std::string>("Hello!");
+  std::unique_ptr<std::string> s5 = std::make_unique<std::string>("Hello!");
+  std::unique_ptr<std::string> s6 = std::make_unique<std::string>("Hello!");
+  std::unique_ptr<std::string> es1 = std::make_unique<std::string>("Hello!");
+  std::unique_ptr<std::string> es2 = std::make_unique<std::string>("Hello!");
+  std::unique_ptr<std::string> es3 = std::make_unique<std::string>("Bye!");
+  std::unique_ptr<std::string> es4 = std::make_unique<std::string>("Hello!");
+  std::unique_ptr<std::string> es5 = std::make_unique<std::string>("Hello!");
+  std::unique_ptr<std::string> es6 = std::make_unique<std::string>("Hello!");
+  std::unique_ptr<std::string> es7 = std::make_unique<std::string>("Hello!");
+
+  // Some keys for lookup.
+  Key khello(1);
+  Key kbye(1);
+  khello.AddValue("Hello!");
+  kbye.AddValue("Bye!");
+
+  // Create some records.
+  std::vector<Record> first_batch;
+  first_batch.emplace_back(schema, true, 0_u, std::move(s1), 10_s);
+  first_batch.emplace_back(schema, true, 1_u, std::move(s2), 10_s);
+  first_batch.emplace_back(schema, true, 2_u, std::move(s3), 20_s);
+  // First and second are in order.
+  std::vector<Record> second_batch;
+  second_batch.emplace_back(schema, false, 1_u, std::move(s4), 10_s);
+  // Third and fourth are out of order.
+  std::vector<Record> third_batch;
+  third_batch.emplace_back(schema, true, 0_u, std::move(s5), 30_s);
+  std::vector<Record> fourth_batch;
+  fourth_batch.emplace_back(schema, false, 0_u, std::move(s6), 10_s);
+
+  // Expected records.
+  std::vector<Record> ebye;
+  ebye.emplace_back(schema, true, 2_u, std::move(es3), 20_s);
+  std::vector<Record> e1;
+  e1.emplace_back(schema, true, 0_u, std::move(es1), 10_s);
+  e1.emplace_back(schema, true, 1_u, std::move(es2), 10_s);
+  std::vector<Record> e2;
+  e2.emplace_back(schema, false, 0_u, std::move(es4), 10_s);
+  std::vector<Record> e3;
+  e3.emplace_back(schema, true, 0_u, std::move(es5), 10_s);
+  e3.emplace_back(schema, true, 0_u, std::move(es6), 30_s);
+  std::vector<Record> e4;
+  e4.emplace_back(schema, false, 0_u, std::move(es7), 30_s);
+
+  // Test all views.
+  for (std::unique_ptr<MatViewOperator> &matview : views) {
+    matview->input_schemas_.push_back(schema);
+    matview->ComputeOutputSchema();
+
+    // Process a batch and check.
+    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(first_batch),
+                               Promise::None.Derive());
+    EXPECT_EQ_ORDER(matview->Lookup(khello), e1);
+    EXPECT_EQ_ORDER(matview->Lookup(kbye), ebye);
+
+    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(second_batch),
+                               Promise::None.Derive());
+    EXPECT_EQ_ORDER(matview->Lookup(khello), e2);
+    EXPECT_EQ_ORDER(matview->Lookup(kbye), ebye);
+
+    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(third_batch),
+                               Promise::None.Derive());
+    EXPECT_EQ_ORDER(matview->Lookup(khello), e3);
+    EXPECT_EQ_ORDER(matview->Lookup(kbye), ebye);
+
+    matview->ProcessAndForward(UNDEFINED_NODE_INDEX, CopyVec(fourth_batch),
+                               Promise::None.Derive());
+    EXPECT_EQ_ORDER(matview->Lookup(khello), e4);
+    EXPECT_EQ_ORDER(matview->Lookup(kbye), ebye);
+  }
+}
+
 }  // namespace dataflow
 }  // namespace pelton

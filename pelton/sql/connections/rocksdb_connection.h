@@ -20,6 +20,9 @@
 namespace pelton {
 namespace sql {
 
+using TableID = size_t;
+using ShardID = std::string;
+
 class SingletonRocksdbConnection {
  public:
   explicit SingletonRocksdbConnection(const std::string &db_name);
@@ -41,8 +44,26 @@ class SingletonRocksdbConnection {
 
  private:
   // Helpers.
+  // Get the shard id or create a new one if new.
+  ShardID GetOrCreateShardID(const std::string &shard_name) {
+    if (this->shards_.count(shard_name) == 0) {
+      std::string sid = std::to_string(this->shards_.size());
+      sid.push_back('_');
+      this->shards_.emplace(shard_name, sid);
+      return sid;
+    } else {
+      return this->shards_.at(shard_name);
+    }
+  }
+  // Get the shard id or none if it does not exist.
+  std::optional<ShardID> GetShardID(const std::string &shard_name) {
+    if (this->shards_.count(shard_name) == 1) {
+      return this->shards_.at(shard_name);
+    }
+    return {};
+  }
   // Get record matching values in a value mapper (either by key, index, or it).
-  std::vector<std::string> Get(const std::string &table_name,
+  std::vector<std::string> Get(TableID table_id, ShardID shard_id,
                                const ValueMapper &value_mapper);
   // Filter records by where clause in abstract statement.
   std::vector<std::string> Filter(const dataflow::SchemaRef &schema,
@@ -51,12 +72,14 @@ class SingletonRocksdbConnection {
 
   // Members.
   std::unique_ptr<rocksdb::DB> db_;
-  std::unordered_map<std::string, std::unique_ptr<rocksdb::ColumnFamilyHandle>>
+  std::unordered_map<std::string, ShardID> shards_;
+  std::unordered_map<std::string, TableID> tables_;
+  std::unordered_map<TableID, std::unique_ptr<rocksdb::ColumnFamilyHandle>>
       handlers_;
-  std::unordered_map<std::string, dataflow::SchemaRef> schemas_;
-  std::unordered_map<std::string, size_t> primary_keys_;
-  std::unordered_map<std::string, std::vector<size_t>> indexed_columns_;
-  std::unordered_map<std::string, std::vector<RocksdbIndex>> indices_;
+  std::unordered_map<TableID, dataflow::SchemaRef> schemas_;
+  std::unordered_map<TableID, size_t> primary_keys_;
+  std::unordered_map<TableID, std::vector<size_t>> indexed_columns_;
+  std::unordered_map<TableID, std::vector<RocksdbIndex>> indices_;
 };
 
 class RocksdbConnection : public PeltonConnection {

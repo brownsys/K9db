@@ -28,7 +28,8 @@ CREATE TABLE grades ( \
   ID int, \
   student_id int, \
   grade int, \
-  FOREIGN KEY (student_id) REFERENCES students(ID) \
+  FOREIGN KEY (student_id) REFERENCES students(ID), \
+  PRIMARY KEY(ID) \
 );
 
 CREATE VIEW v1 AS '"SELECT students.PII_Name, assignments.Name, submissions.ts FROM students JOIN submissions ON students.ID = submissions.student_id JOIN assignments ON submissions.assignment_id = assignments.ID"';

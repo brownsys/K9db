@@ -3,6 +3,7 @@
 
 # Build memcached.
 bazel build @memcached//:memcached
+bazel build //baseline/...
 
 # Run memcached (in the background).
 bazel run @memcached//:memcached -- -vv -u memcached &> .memtmp &

@@ -5,12 +5,12 @@
 #[macro_use]
 extern crate slog;
 extern crate ctrlc;
+#[macro_use]
+extern crate lazy_static;
 extern crate msql_srv;
 extern crate proxy_ffi;
 extern crate regex;
 extern crate slog_term;
-#[macro_use]
-extern crate lazy_static;
 
 use msql_srv::*;
 use proxy_ffi::*;
@@ -24,6 +24,14 @@ use std::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
+
+lazy_static! {
+    // Expression used for extracting "table.column = ?" or "table.column IN"
+    static ref PARAM_RE: Regex = Regex::new(r"\s(?P<expr>[A-Za-z_0-9`\.]+\s*([=><]|(\s+IN\s+))\s*)\?|(\s+IN\s+)").unwrap();
+    // This regex captures " = ?" and "(?,?, ?)". And we iterate over them in order.
+    static ref METADATA_RE: Regex = Regex::new(r"(?P<single>=\s*\?\s*)|(?P<in_clause>\s*\([\?\s,]+\)\s*)").unwrap();
+    static ref IN_RE: Regex = Regex::new(r"IN\s*\([,\s\?]*\)").unwrap();
+}
 
 const USAGE: &str = "
   Available options:
@@ -115,10 +123,7 @@ impl Backend {
         // assigned to the prepared statement, makes parameterizing and
         // executing prepared statement later easier.
         // let re = Regex::new(r"\s(?P<expr>[A-Za-z_0-9`\.]+\s*[=><]\s*)\?").unwrap();
-        // Expression used for extracting "table.column = ?" or "table.column IN"
-        let re = Regex::new(r"\s(?P<expr>[A-Za-z_0-9`\.]+\s*([=><]|(\s+IN\s+))\s*)\?|(\s+IN\s+)")
-            .unwrap();
-        let mut view_query: Vec<String> = re
+        let mut view_query: Vec<String> = PARAM_RE
             .captures_iter(&prepared_statement)
             .map(|caps| caps["expr"].to_string())
             .collect();
@@ -155,9 +160,7 @@ impl Backend {
         // Infer metadata from the query
         let mut metadata: Vec<Option<u32>> = Vec::new();
         // This regex captures " = ?" and "(?,?, ?)". And we iterate over them in order.
-        let re_metadata =
-            Regex::new(r"(?P<single>=\s*\?\s*)|(?P<in_clause>\s*\([\?\s,]+\)\s*)").unwrap();
-        for cap in re_metadata.captures_iter(prepared_statement) {
+        for cap in METADATA_RE.captures_iter(prepared_statement) {
             match cap.get(2) {
                 Some(in_clause) => {
                     metadata.push(Some(in_clause.as_str().matches("?").count() as u32))
@@ -219,8 +222,7 @@ impl Backend {
         );
         // Construct the parametrised form of the statement that contains a single ?mark
         let reduced_form: String;
-        let param_re = Regex::new(r"IN\s*\([,\s\?]*\)").unwrap();
-        reduced_form = param_re.replace_all(prepared_statement, "= ?").into_owned();
+        reduced_form = IN_RE.replace_all(prepared_statement, "= ?").into_owned();
 
         let prepared_read_guard = self.prepared_statements.read().unwrap();
         // Two harness threads could issue the same prepared statement twice hence if the prepared
@@ -253,7 +255,7 @@ impl Backend {
                     // Some other thread has already performed the insert while this thread was
                     // busy grabbing the write lock.
                     let stmt_id = prepared_write_guard
-                        .get(prepared_statement)
+                        .get(&reduced_form)
                         .unwrap()
                         .get(&metadata)
                         .unwrap();
@@ -292,7 +294,7 @@ impl Backend {
             {
                 // The statement with the exact parameter count has already been inserted before.
                 let stmt_id = prepared_write_guard
-                    .get(prepared_statement)
+                    .get(&reduced_form)
                     .unwrap()
                     .get(&metadata)
                     .unwrap();
@@ -321,6 +323,10 @@ impl Backend {
         if !NO_VIEWS.contains(&reduced_form.as_str()) {
             let view_name = String::from("q") + &reduced_stmt_id.to_string();
             let create_view_stmt = self.create_view_stmt(&view_name, &reduced_form);
+            debug!(
+                self.log,
+                "[PREPARED] view_name: {}, create view: {}", view_name, create_view_stmt
+            );
             // Execute create view statement in Pelton
             if !exec_ddl_ffi(&mut self.rust_conn, &create_view_stmt) {
                 error!(
@@ -568,7 +574,8 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         }
         debug!(
             self.log,
-            "[PREPARED] statement: {}, param_count: {}", prepared_statement, param_count
+            "[PREPARED] statement: {}, param_count: {}, view_id: q{}",
+            prepared_statement, param_count, stmt_id, 
         );
         // Respond to client
         return info.reply(stmt_id, &params, &[]);
@@ -608,7 +615,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                                 | ColumnType::MYSQL_TYPE_VARCHAR
                                 | ColumnType::MYSQL_TYPE_VAR_STRING => {
                                     // NOTE: For Lobsters harness, remove these single quotes.
-                                    format!("\'{}\'", Into::<&str>::into(param.value))
+                                    format!("{}", Into::<&str>::into(param.value))
                                 }
                                 ColumnType::MYSQL_TYPE_DECIMAL
                                 | ColumnType::MYSQL_TYPE_NEWDECIMAL
@@ -622,7 +629,13 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                                     ValueInner::UInt(v) => v.to_string(),
                                     _ => unimplemented!("Rust proxy: unsupported numeric type"),
                                 },
-                                _ => unimplemented!("Rust proxy: unsupported parameter type"),
+                                ColumnType::MYSQL_TYPE_DOUBLE
+                                | ColumnType::MYSQL_TYPE_FLOAT => match param.value.into_inner()
+                                {
+                                    ValueInner::Double(v) => (v.floor() as i64).to_string(),
+                                    _ => unimplemented!("Rust proxy: unsupported double type"),
+                                },
+                                _ => unimplemented!("Rust proxy: unsupported parameter 1 type {:?} {:?}", param.coltype, param.value),
                             };
                             query.push_str(&val);
                         }
@@ -645,7 +658,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                                     | ColumnType::MYSQL_TYPE_VARCHAR
                                     | ColumnType::MYSQL_TYPE_VAR_STRING => {
                                         // NOTE: For Lobsters harness, remove these single quotes.
-                                        format!("\'{}\'", Into::<&str>::into(param.value))
+                                        format!("{}", Into::<&str>::into(param.value))
                                     }
                                     ColumnType::MYSQL_TYPE_DECIMAL
                                     | ColumnType::MYSQL_TYPE_NEWDECIMAL
@@ -661,7 +674,13 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                                         ValueInner::UInt(v) => v.to_string(),
                                         _ => unimplemented!("Rust proxy: unsupported numeric type"),
                                     },
-                                    _ => unimplemented!("Rust proxy: unsupported parameter type"),
+                                    ColumnType::MYSQL_TYPE_DOUBLE
+                                    | ColumnType::MYSQL_TYPE_FLOAT => match param.value.into_inner()
+                                    {
+                                        ValueInner::Double(v) => (v.floor() as i64).to_string(),
+                                        _ => unimplemented!("Rust proxy: unsupported double type"),
+                                    },
+                                    _ => unimplemented!("Rust proxy: unsupported parameter 2 type {:?} {:?}", param.coltype, param.value),
                                 };
                                 query.push_str(&val);
                             }
@@ -693,7 +712,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                         | ColumnType::MYSQL_TYPE_VARCHAR
                         | ColumnType::MYSQL_TYPE_VAR_STRING => {
                             // NOTE: For Lobsters harness, remove these single quotes.
-                            format!("\'{}\'", Into::<&str>::into(param.value))
+                            format!("{}", Into::<&str>::into(param.value))
                         }
                         ColumnType::MYSQL_TYPE_DECIMAL
                         | ColumnType::MYSQL_TYPE_NEWDECIMAL
@@ -706,7 +725,13 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                             ValueInner::UInt(v) => v.to_string(),
                             _ => unimplemented!("Rust proxy: unsupported numeric type"),
                         },
-                        _ => unimplemented!("Rust proxy: unsupported parameter type"),
+                        ColumnType::MYSQL_TYPE_DOUBLE
+                        | ColumnType::MYSQL_TYPE_FLOAT => match param.value.into_inner()
+                        {
+                            ValueInner::Double(v) => (v.floor() as i64).to_string(),
+                            _ => unimplemented!("Rust proxy: unsupported double type"),
+                        },
+                        _ => unimplemented!("Rust proxy: unsupported parameter 3 type {:?} {:?}", param.coltype, param.value),
                     };
                     query.push_str(&val);
                 }

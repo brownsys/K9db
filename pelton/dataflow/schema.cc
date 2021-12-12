@@ -27,14 +27,14 @@ size_t SchemaRef::size() const {
 // Accessor by index.
 sqlast::ColumnDefinition::Type SchemaRef::TypeOf(size_t i) const {
   if (i >= this->ptr_->column_types.size()) {
-    LOG(FATAL) << "Schema: index out of bounds " << i << " / "
+    LOG(FATAL) << "Schema " << *this << ": index out of bounds " << i << " / "
                << this->ptr_->column_types.size();
   }
   return this->ptr_->column_types.at(i);
 }
 const std::string &SchemaRef::NameOf(size_t i) const {
   if (i >= this->ptr_->column_names.size()) {
-    LOG(FATAL) << "Schema: index out of bounds " << i << " / "
+    LOG(FATAL) << "Schema " << *this << ": index out of bounds " << i << " / "
                << this->ptr_->column_names.size();
   }
   return this->ptr_->column_names.at(i);
@@ -45,7 +45,8 @@ size_t SchemaRef::IndexOf(const std::string &column_name) const {
   auto it = find(this->ptr_->column_names.cbegin(),
                  this->ptr_->column_names.cend(), column_name);
   if (it == this->ptr_->column_names.cend()) {
-    LOG(FATAL) << "Schema: column does not exist " << column_name;
+    LOG(FATAL) << "Schema " << *this << ": column does not exist "
+               << column_name;
   }
   return it - this->ptr_->column_names.cbegin();
 }
