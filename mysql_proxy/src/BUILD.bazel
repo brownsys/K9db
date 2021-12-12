@@ -16,7 +16,7 @@ rust_binary(
         "main.rs",
     ],
     rustc_flags = [
-        "-Clink-args=-L/home/pelton/bazel-bin/external/rocksdb/copy_rocksdb/rocksdb/lib",
+        "-Clink-args=-L/home/pelton/pelton/bazel-bin/external/rocksdb/copy_rocksdb/rocksdb/lib",
         "-Clink-args=-lssl",
         "-Clink-args=-lcrypto",
         "-Clink-args=-rdynamic",
