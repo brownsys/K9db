@@ -318,6 +318,10 @@ impl Backend {
         if !NO_VIEWS.contains(&reduced_form.as_str()) {
             let view_name = String::from("q") + &reduced_stmt_id.to_string();
             let create_view_stmt = self.create_view_stmt(&view_name, &reduced_form);
+            debug!(
+                self.log,
+                "[PREPARED] view_name: {}, create view: {}", view_name, create_view_stmt
+            );
             // Execute create view statement in Pelton
             if !exec_ddl_ffi(&mut self.rust_conn, &create_view_stmt) {
                 error!(
@@ -565,7 +569,8 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         }
         debug!(
             self.log,
-            "[PREPARED] statement: {}, param_count: {}", prepared_statement, param_count
+            "[PREPARED] statement: {}, param_count: {}, view_id: {}",
+            prepared_statement, param_count, stmt_id, 
         );
         // Respond to client
         return info.reply(stmt_id, &params, &[]);
