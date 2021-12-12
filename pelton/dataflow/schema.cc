@@ -46,7 +46,7 @@ size_t SchemaRef::IndexOf(const std::string &column_name) const {
                  this->ptr_->column_names.cend(), column_name);
   if (it == this->ptr_->column_names.cend()) {
     LOG(FATAL) << "Schema " << *this << ": column does not exist "
-                << column_name;
+               << column_name;
   }
   return it - this->ptr_->column_names.cbegin();
 }

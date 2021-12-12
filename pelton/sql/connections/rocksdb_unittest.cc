@@ -1,11 +1,10 @@
-#include "pelton/sql/connections/rocksdb_connection.h"
-
 #include <filesystem>
 #include <iostream>
 #include <memory>
 #include <string>
 #include <utility>
 
+#include "pelton/sql/connections/rocksdb_connection.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/sqlast/parser.h"
 // Mut be included after parser to avoid duplicating FAIL() definition as macro.

@@ -11,15 +11,18 @@
 namespace pelton {
 namespace sql {
 
+using ShardID = std::string;
+
 class RocksdbIndex {
  public:
-  RocksdbIndex(rocksdb::DB *db, const std::string &table_name, size_t column);
+  RocksdbIndex(rocksdb::DB *db, size_t table_id, size_t column);
 
-  void Add(const rocksdb::Slice &index_value, const rocksdb::Slice &key);
-  void Delete(const rocksdb::Slice &index_value, const rocksdb::Slice &key);
+  void Add(const std::string &index_value, const rocksdb::Slice &key);
+  void Delete(const std::string &index_value, const rocksdb::Slice &key);
 
-  std::vector<std::string> Get(const rocksdb::Slice &index_value);
-  std::vector<std::string> Get(const std::vector<rocksdb::Slice> &values);
+  std::vector<std::string> Get(const std::string &index_value);
+  std::vector<std::string> Get(const ShardID &shard_id,
+                               const std::vector<rocksdb::Slice> &values);
 
  private:
   rocksdb::DB *db_;

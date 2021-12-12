@@ -9,41 +9,39 @@ namespace pelton {
 namespace sql {
 
 // Constructor.
-RocksdbIndex::RocksdbIndex(rocksdb::DB *db, const std::string &table_name,
-                           size_t column)
+RocksdbIndex::RocksdbIndex(rocksdb::DB *db, size_t table_id, size_t column)
     : db_(db) {
   // Create a name for the index.
-  std::string index_name = table_name + "_" + std::to_string(column);
+  std::string name = std::to_string(table_id) + "_" + std::to_string(column);
   // Create a column family for this index.
   rocksdb::ColumnFamilyHandle *handle;
   PANIC_STATUS(this->db_->CreateColumnFamily(rocksdb::ColumnFamilyOptions(),
-                                             index_name, &handle));
+                                             name, &handle));
   this->handle_ = std::unique_ptr<rocksdb::ColumnFamilyHandle>(handle);
 }
 
 // Adding things to index.
-void RocksdbIndex::Add(const rocksdb::Slice &value, const rocksdb::Slice &key) {
+void RocksdbIndex::Add(const std::string &value, const rocksdb::Slice &key) {
   // key.ToString() << std::endl;
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
-  std::string str = value.ToString() + __ROCKSSEP + key.ToString() + __ROCKSSEP;
+  std::string str = value + __ROCKSSEP + key.ToString() + __ROCKSSEP;
   rocksdb::Slice kslice(str);
   PANIC_STATUS(this->db_->Put(rocksdb::WriteOptions(), handle, kslice, ""));
 }
 
 // Deleting things from index.
-void RocksdbIndex::Delete(const rocksdb::Slice &value,
-                          const rocksdb::Slice &key) {
+void RocksdbIndex::Delete(const std::string &value, const rocksdb::Slice &key) {
   // key.ToString() << std::endl;
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
-  std::string str = value.ToString() + __ROCKSSEP + key.ToString() + __ROCKSSEP;
+  std::string str = value + __ROCKSSEP + key.ToString() + __ROCKSSEP;
   rocksdb::Slice kslice(str);
   PANIC_STATUS(this->db_->Delete(rocksdb::WriteOptions(), handle, kslice));
 }
 
 // Lookup by a single value.
-std::vector<std::string> RocksdbIndex::Get(const rocksdb::Slice &value) {
+std::vector<std::string> RocksdbIndex::Get(const std::string &value) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
-  std::string prefix = value.ToString() + __ROCKSSEP;
+  std::string prefix = value + __ROCKSSEP;
   rocksdb::Slice pslice(prefix);
   // Read using prefix.
   std::vector<std::string> result;
@@ -65,13 +63,15 @@ std::vector<std::string> RocksdbIndex::Get(const rocksdb::Slice &value) {
 
 // Lookup by multiple values.
 std::vector<std::string> RocksdbIndex::Get(
-    const std::vector<rocksdb::Slice> &values) {
+    const ShardID &shard_id, const std::vector<rocksdb::Slice> &values) {
   if (values.size() == 0) {
     return {};
   }
-  std::vector<std::string> result = this->Get(values.front());
+  std::string key = shard_id + values.front().ToString();
+  std::vector<std::string> result = this->Get(key);
   for (size_t i = 1; i < values.size(); i++) {
-    std::vector<std::string> tmp = this->Get(values.at(i));
+    key = shard_id + values.at(i).ToString();
+    std::vector<std::string> tmp = this->Get(key);
     for (auto &str : tmp) {
       result.push_back(std::move(str));
     }

@@ -258,6 +258,4 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
 }
 
 // Clean up the memory allocated by an FFIResult.
-void FFIDestroySelect(FFIResult *c_result) {
-  free(c_result);
-}
+void FFIDestroySelect(FFIResult *c_result) { free(c_result); }
