@@ -60,8 +60,28 @@ echo "* soft nproc 10240" >> /etc/security/limits.d/90-nproc.conf
 echo "* hard nproc 10240" >> /etc/security/limits.d/90-nproc.conf
 echo "root soft nproc unlimited" >> /etc/security/limits.d/90-nproc.conf
 
+# mariadb connector
+apt-get install -y libmariadb3 libmariadb-dev
+cd /tmp
+wget https://dlm.mariadb.com/1601342/Connectors/cpp/connector-cpp-1.0.0/mariadb-connector-cpp-1.0.0-ubuntu-groovy-amd64.tar.gz
+tar -xvzf mariadb-connector-cpp-1.0.0-*.tar.gz
+rm mariadb-connector-cpp-1.0.0-*.tar.gz
+cd -
+
+cd /tmp/mariadb-connector-cpp-1.0.0-*
+install -d /usr/include/mariadb/conncpp
+install -d /usr/include/mariadb/conncpp/compat
+install -v include/mariadb/*.hpp /usr/include/mariadb/
+install -v include/mariadb/conncpp/*.hpp /usr/include/mariadb/conncpp
+install -v include/mariadb/conncpp/compat/* /usr/include/mariadb/conncpp/compat
+install -d /usr/lib/mariadb
+install -d /usr/lib/mariadb/plugin
+install -v lib64/mariadb/libmariadbcpp.so /usr/lib
+install -v lib64/mariadb/plugin/* /usr/lib/mariadb/plugin
+cd -
+
 # clear tmp folder
-rm -rf /tmp/*
+rm -rf /tmp/mariadb*
 
 # Generate docker.bazelrc
 echo "test:asan --test_env LSAN_OPTIONS=suppressions=/home/pelton/.lsan_jvm_suppress.txt" > /home/docker.bazelrc

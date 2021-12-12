@@ -1,5 +1,6 @@
 #!/bin/bash
-./bin/drop.sh root password
+rm -rf /tmp/pelton
+mkdir -p /tmp/pelton
 
 # Run the proxy (in the background).
 bazel run //mysql_proxy/src:mysql_proxy -- -logtostderr=1 &> .tmp &
