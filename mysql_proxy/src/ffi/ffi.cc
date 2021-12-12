@@ -33,15 +33,12 @@ FFIArgs FFIGflags(int argc, char **argv, const char *usage) {
 
 // Initialize pelton_state in pelton.cc
 bool FFIInitialize(size_t workers, bool consistent) {
-  // Log debugging information.
-  LOG(INFO) << "C-Wrapper: starting open_c";
-
   // call c++ function from C with converted types
-  LOG(INFO) << "C-Wrapper: running pelton::initialize";
+  VLOG(2) << "C-Wrapper: running pelton::initialize";
   if (pelton::initialize(workers, consistent)) {
-    LOG(INFO) << "C-Wrapper: global connection opened";
+    VLOG(1) << "C-Wrapper: global connection opened";
   } else {
-    LOG(INFO) << "C-Wrapper: failed to open global connection";
+    LOG(ERROR) << "C-Wrapper: failed to open global connection";
     return false;
   }
   return true;
@@ -51,7 +48,7 @@ bool FFIInitialize(size_t workers, bool consistent) {
 // true if successful. Otherwise connected = false
 FFIConnection FFIOpen(const char *db_name) {
   // Log debugging information
-  LOG(INFO) << "C-Wrapper: db_name is: " << std::string(db_name);
+  VLOG(2) << "C-Wrapper: db_name is: " << std::string(db_name);
 
   // convert char* to const std::string
   const std::string c_db(db_name);
@@ -65,12 +62,12 @@ FFIConnection FFIOpen(const char *db_name) {
       reinterpret_cast<pelton::Connection *>(c_conn.cpp_conn);
 
   // call c++ function from C with converted types
-  LOG(INFO) << "C-Wrapper: running pelton::open";
+  VLOG(2) << "C-Wrapper: running pelton::open";
   if (pelton::open(cpp_conn, c_db)) {
-    LOG(INFO) << "C-Wrapper: connection opened";
+    VLOG(1) << "C-Wrapper: connection opened";
     c_conn.connected = true;
   } else {
-    LOG(INFO) << "C-Wrapper: failed to open connection";
+    LOG(ERROR) << "C-Wrapper: failed to open connection";
     c_conn.connected = false;
   }
   return c_conn;
@@ -78,10 +75,10 @@ FFIConnection FFIOpen(const char *db_name) {
 
 // Delete pelton_state. Returns true if successful and false otherwise.
 bool FFIShutdown() {
-  LOG(INFO) << "C-Wrapper: Closing global connection";
+  VLOG(2) << "C-Wrapper: Closing global connection";
   bool response = pelton::shutdown();
   if (response) {
-    LOG(INFO) << "C-Wrapper: global connection closed";
+    VLOG(1) << "C-Wrapper: global connection closed";
     return true;
   }
   return false;
@@ -89,20 +86,19 @@ bool FFIShutdown() {
 
 // Close the connection. Returns true if successful and false otherwise.
 bool FFIClose(FFIConnection *c_conn) {
-  LOG(INFO) << "C-Wrapper: starting close_c";
   pelton::Connection *cpp_conn =
       reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
 
   if (cpp_conn != nullptr) {
     bool response = pelton::close(cpp_conn);
     if (response) {
-      LOG(INFO) << "C-Wrapper: connection closed";
+      VLOG(1) << "C-Wrapper: connection closed";
       delete reinterpret_cast<pelton::Connection *>(cpp_conn);
       c_conn->connected = false;
       c_conn->cpp_conn = nullptr;
       return true;
     } else {
-      LOG(INFO) << "C-Wrapper: failed to close connection";
+      LOG(ERROR) << "C-Wrapper: failed to close connection";
       return false;
     }
   }
@@ -111,12 +107,12 @@ bool FFIClose(FFIConnection *c_conn) {
 
 // Execute a DDL statement (e.g. CREATE TABLE, CREATE VIEW, CREATE INDEX).
 bool FFIExecDDL(FFIConnection *c_conn, const char *query) {
-  LOG(INFO) << "C-Wrapper: executing ddl " << std::string(query);
+  VLOG(2) << "C-Wrapper: executing ddl " << std::string(query);
   pelton::Connection *cpp_conn =
       reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
   absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
   if (!result.ok()) {
-    LOG(INFO) << "C-Wrapper: " << result.status();
+    VLOG(2) << "C-Wrapper: " << result.status();
   }
   return result.ok() && result.value().Success();
 }
@@ -124,12 +120,12 @@ bool FFIExecDDL(FFIConnection *c_conn, const char *query) {
 // Execute an update statement (e.g. INSERT, UPDATE, DELETE).
 // Returns -1 if error, otherwise returns the number of affected rows.
 int FFIExecUpdate(FFIConnection *c_conn, const char *query) {
-  LOG(INFO) << "C-Wrapper: executing update " << std::string(query);
+  VLOG(2) << "C-Wrapper: executing update " << std::string(query);
   pelton::Connection *cpp_conn =
       reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
   absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
   if (!result.ok()) {
-    LOG(INFO) << "C-Wrapper: " << result.status();
+    VLOG(2) << "C-Wrapper: " << result.status();
   }
   if (result.ok()) {
     return result.value().UpdateCount();
@@ -226,12 +222,12 @@ void PopulateRecords(FFIResult *c_result,
 // Executes a query (SELECT).
 // Returns nullptr (0) on error.
 FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
-  LOG(INFO) << "C-Wrapper: executing query " << std::string(query);
+  VLOG(2) << "C-Wrapper: executing query " << std::string(query);
   pelton::Connection *cpp_conn =
       reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
   absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
   if (!result.ok()) {
-    LOG(INFO) << "C-Wrapper: " << result.status();
+    VLOG(2) << "C-Wrapper: " << result.status();
   }
 
   if (result.ok()) {
@@ -241,7 +237,6 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
       size_t num_rows = records.size();
       size_t num_cols = resultset.schema().size();
 
-      LOG(INFO) << "C-Wrapper: malloc FFIResult";
       // allocate memory for CResult struct and the flexible array of RecordData
       // unions
       // we have to use malloc here to account for the flexible array.
@@ -257,13 +252,12 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
       return c_result;  // TODO(babman): this is where we can support GDPR GET.
     }
   } else {
-    LOG(INFO) << "C-Wrapper: Result.ok()" << result.status();
+    VLOG(2) << "C-Wrapper: Result.ok()" << result.status();
   }
   return nullptr;
 }
 
 // Clean up the memory allocated by an FFIResult.
 void FFIDestroySelect(FFIResult *c_result) {
-  LOG(INFO) << "C-Wrapper: starting destroy_select to delete CResult";
   free(c_result);
 }
