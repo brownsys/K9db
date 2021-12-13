@@ -14,6 +14,22 @@ namespace sql {
 
 namespace {
 
+bool HasWhereClause(const sqlast::AbstractStatement *stmt) {
+  switch (stmt->type()) {
+    case sqlast::AbstractStatement::Type::UPDATE: {
+      return static_cast<const sqlast::Update *>(stmt)->HasWhereClause();
+    }
+    case sqlast::AbstractStatement::Type::DELETE: {
+      return static_cast<const sqlast::Delete *>(stmt)->HasWhereClause();
+    }
+    case sqlast::AbstractStatement::Type::SELECT: {
+      return static_cast<const sqlast::Select *>(stmt)->HasWhereClause();
+    }
+    default:
+      LOG(FATAL) << "UNREACHABLE";
+  }
+}
+
 const std::string &GetTableName(const sqlast::AbstractStatement *stmt) {
   switch (stmt->type()) {
     case sqlast::AbstractStatement::Type::CREATE_TABLE: {
@@ -450,9 +466,11 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
     }
   } else {
     // Need to lookup all records.
-    LOG(WARNING) << "rocksdb: Query has no rocksdb index";
-    sqlast::Stringifier stringifier("");
-    LOG(WARNING) << stringifier.Visit(stmt);
+    if (HasWhereClause(stmt)) {
+      sqlast::Stringifier stringifier("");
+      LOG(WARNING) << "rocksdb: Query has no rocksdb index "
+                   << stringifier.Visit(stmt);
+    }
     auto ptr = this->db_->NewIterator(rocksdb::ReadOptions(), handler);
     std::unique_ptr<rocksdb::Iterator> it(ptr);
     rocksdb::Slice pslice(shard_id);

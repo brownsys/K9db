@@ -114,9 +114,10 @@ static VIEWS: [&'static str; 16] = [
    "SELECT taggings.story_id, taggings.tag_id FROM taggings WHERE taggings.story_id = ? AND taggings.tag_id = ?",
 ];
 
-static CREATES: [&'static str; 23] = [
+static CREATES: [&'static str; 24] = [
 "CREATE TABLE users ( id int NOT NULL PRIMARY KEY, PII_username varchar(50) UNIQUE, email varchar(100), password_digest varchar(75), created_at datetime, is_admin int, password_reset_token varchar(75), session_token varchar(75) NOT NULL, about text, invited_by_user_id int, is_moderator int, pushover_mentions int, rss_token varchar(75), mailing_list_token varchar(75), mailing_list_mode int, karma int NOT NULL, banned_at datetime, banned_by_user_id int, banned_reason varchar(200), deleted_at datetime, disabled_invite_at datetime, disabled_invite_by_user_id int, disabled_invite_reason varchar(200), settings text, FOREIGN KEY (banned_by_user_id) REFERENCES users(id), FOREIGN KEY (invited_by_user_id) REFERENCES users(id), FOREIGN KEY (disabled_invite_by_user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
 "CREATE TABLE comments ( id int NOT NULL PRIMARY KEY, created_at datetime NOT NULL, updated_at datetime, short_id varchar(10) NOT NULL UNIQUE, story_id int NOT NULL, OWNER user_id int NOT NULL, parent_comment_id int, thread_id int, comment text NOT NULL, upvotes int NOT NULL, downvotes int NOT NULL, confidence int NOT NULL, markeddown_comment text, is_deleted int, is_moderated int, is_from_email int, hat_id int, FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;",
+"CREATE INDEX comments_id ON comments(id);",
 "CREATE INDEX comments_short_index ON comments(short_id);",
 "CREATE TABLE hat_requests ( id int NOT NULL PRIMARY KEY, created_at datetime, updated_at datetime, user_id int, hat varchar(255), link varchar(255), comment text, FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
 "CREATE TABLE hats ( id int NOT NULL PRIMARY KEY, created_at datetime, updated_at datetime, OWNER_user_id int, OWNER_granted_by_user_id int, hat varchar(255) NOT NULL, link varchar(255), modlog_use int, doffed_at datetime, FOREIGN KEY (OWNER_user_id) REFERENCES users(id), FOREIGN KEY (OWNER_granted_by_user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
