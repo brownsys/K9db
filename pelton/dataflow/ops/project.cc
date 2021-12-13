@@ -1,12 +1,11 @@
 #include "pelton/dataflow/ops/project.h"
 
 #include <algorithm>
-#include <memory>
 #include <tuple>
 #include <utility>
 
 #include "glog/logging.h"
-#include "pelton/dataflow/record.h"
+#include "pelton/dataflow/schema.h"
 #include "pelton/sqlast/ast.h"
 
 #define HANDLE_NULL_MACRO_COLUMN(col, other_col, OP)            \
@@ -177,6 +176,26 @@ inline sqlast::ColumnDefinition::Type GetLiteralType(
 
 }  // namespace
 
+std::optional<ColumnID> ProjectOperator::ProjectColumn(ColumnID col) const {
+  for (size_t i = 0; i < this->projections_.size(); i++) {
+    const auto &projection = this->projections_.at(i);
+    if (projection.column()) {
+      ColumnID column = projection.getColumn();
+      if (column == col) {
+        return i;
+      }
+    }
+  }
+  return {};
+}
+std::optional<ColumnID> ProjectOperator::UnprojectColumn(ColumnID col) const {
+  const auto &projection = this->projections_.at(col);
+  if (projection.column()) {
+    return projection.getColumn();
+  }
+  return {};
+}
+
 void ProjectOperator::ComputeOutputSchema() {
   // If keys are not provided, we can compute them ourselves by checking
   // if the primary key survives the projection.
@@ -251,8 +270,9 @@ void ProjectOperator::ComputeOutputSchema() {
       SchemaFactory::Create(out_column_names, out_column_types, out_keys);
 }
 
-std::optional<std::vector<Record>> ProjectOperator::Process(
-    NodeIndex /*source*/, const std::vector<Record> &records) {
+std::vector<Record> ProjectOperator::Process(NodeIndex source,
+                                             std::vector<Record> &&records,
+                                             const Promise &promise) {
   std::vector<Record> output;
   for (const Record &record : records) {
     output.emplace_back(this->output_schema_, record.IsPositive());
@@ -357,17 +377,12 @@ std::optional<std::vector<Record>> ProjectOperator::Process(
     }
   }
 
-  return std::move(output);
+  return output;
 }
 
-std::shared_ptr<Operator> ProjectOperator::Clone() const {
-  auto clone = std::make_shared<ProjectOperator>();
-  clone->children_ = this->children_;
-  clone->parents_ = this->parents_;
-  clone->input_schemas_ = this->input_schemas_;
-  clone->output_schema_ = this->output_schema_;
+std::unique_ptr<Operator> ProjectOperator::Clone() const {
+  auto clone = std::make_unique<ProjectOperator>();
   clone->projections_ = this->projections_;
-  clone->index_ = this->index_;
   return clone;
 }
 

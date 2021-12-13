@@ -18,13 +18,23 @@ namespace sqlast {
 // Insert statement.
 class Insert : public AbstractStatement {
  public:
-  explicit Insert(const std::string &table_name)
+  Insert(const std::string &table_name, bool replace)
       : AbstractStatement(AbstractStatement::Type::INSERT),
-        table_name_(table_name) {}
+        table_name_(table_name),
+        replace_(replace),
+        returning_(false) {}
 
   // Accessors.
   const std::string &table_name() const;
   std::string &table_name();
+  bool replace() const;
+  bool &replace();
+  bool returning() const { return this->returning_; }
+  Insert MakeReturning() const {
+    Insert stmt = *this;
+    stmt.returning_ = true;
+    return stmt;
+  }
 
   // Columns and Values.
   bool HasColumns() const;
@@ -38,8 +48,9 @@ class Insert : public AbstractStatement {
 
   absl::StatusOr<std::string> RemoveValue(const std::string &colname);
   std::string RemoveValue(size_t index);
-  absl::StatusOr<std::string> GetValue(const std::string &colname);
-  const std::string &GetValue(size_t index);
+  int GetColumnIndex(const std::string &colname) const;
+  absl::StatusOr<std::string> GetValue(const std::string &colname) const;
+  const std::string &GetValue(size_t index) const;
 
   // Visitor pattern.
   template <class T>
@@ -63,6 +74,8 @@ class Insert : public AbstractStatement {
   std::string table_name_;
   std::vector<std::string> columns_;
   std::vector<std::string> values_;
+  bool replace_;
+  bool returning_;
 };
 
 class Select : public AbstractStatement {
@@ -235,6 +248,7 @@ class Update : public AbstractStatement {
   void AddColumnValue(const std::string &column, const std::string &value);
   absl::StatusOr<std::string> RemoveColumnValue(const std::string &column);
   bool AssignsTo(const std::string &column) const;
+  int ValueIndex(const std::string &column) const;
 
   const std::vector<std::string> &GetColumns() const;
   std::vector<std::string> &GetColumns();

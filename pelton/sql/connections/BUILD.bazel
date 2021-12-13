@@ -1,0 +1,73 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+cc_library(
+    name = "rocksdb_connection",
+    srcs = [
+        "rocksdb_connection.cc",
+    ],
+    hdrs = [
+        "rocksdb_connection.h",
+    ],
+    visibility = ["//pelton/sql:__subpackages__"],
+    deps = [
+        ":rocksdb_index",
+        ":rocksdb_util",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/sql:connection",
+        "//pelton/sql:result",
+        "//pelton/sqlast:ast",
+        "//pelton/util:status",
+        "@glog",
+        "@rocksdb",
+    ],
+)
+
+cc_library(
+    name = "rocksdb_index",
+    srcs = [
+        "rocksdb_index.cc",
+    ],
+    hdrs = [
+        "rocksdb_index.h",
+    ],
+    deps = [
+        ":rocksdb_util",
+        "//pelton/util:status",
+        "@glog",
+        "@rocksdb",
+    ],
+)
+
+cc_library(
+    name = "rocksdb_util",
+    srcs = [
+        "rocksdb_util.cc",
+    ],
+    hdrs = [
+        "rocksdb_util.h",
+    ],
+    deps = [
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/sql:connection",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@rocksdb",
+    ],
+)
+
+cc_test(
+    name = "rocksdb-test",
+    srcs = [
+        "rocksdb_unittest.cc",
+    ],
+    deps = [
+        ":rocksdb_connection",
+        "//pelton/sqlast:ast",
+        "//pelton/sqlast:parser",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
+    ],
+)

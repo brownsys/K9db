@@ -42,9 +42,11 @@ SELECT * FROM chat WHERE OWNER_sender_id = 1;
 SELECT * FROM chat WHERE OWNER_sender_id = 2;
 SELECT * FROM chat WHERE OWNER_sender_id = 3;
 
+GDPR FORGET Users 1;
 DELETE FROM Users WHERE id = 1;
 SELECT * FROM chat;
 SELECT * FROM chat WHERE OWNER_sender_id = 1;
 
+GDPR FORGET Users 2;
 DELETE FROM Users WHERE id = 2;
 SELECT * FROM chat;

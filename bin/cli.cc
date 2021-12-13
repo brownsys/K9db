@@ -16,18 +16,16 @@ std::vector<std::string> TO_SKIP = {"submit"};
 
 // Printing query results.
 void Print(pelton::SqlResult &&result, bool print) {
-  if (result.IsStatement() && print) {
-    std::cout << "Success: " << result.Success() << std::endl;
-  } else if (result.IsUpdate() && print) {
-    std::cout << "Affected rows: " << result.UpdateCount() << std::endl;
-  } else if (result.IsQuery()) {
-    while (result.HasResultSet()) {
-      std::unique_ptr<pelton::SqlResultSet> resultset = result.NextResultSet();
-      if (print) {
-        std::cout << resultset->GetSchema() << std::endl;
-      }
-      for (const pelton::Record &record : *resultset) {
-        if (print) {
+  if (print) {
+    if (result.IsStatement()) {
+      std::cout << "Success: " << result.Success() << std::endl;
+    } else if (result.IsUpdate()) {
+      std::cout << "Affected rows: " << result.UpdateCount() << std::endl;
+    } else if (result.IsQuery()) {
+      for (pelton::SqlResultSet &resultset : result.ResultSets()) {
+        std::cout << resultset.schema() << std::endl;
+        std::vector<pelton::Record> records = resultset.Vec();
+        for (pelton::Record &record : records) {
           std::cout << record << std::endl;
         }
       }
@@ -68,10 +66,9 @@ bool ReadCommand(std::string *ptr) {
 
 DEFINE_bool(print, true, "Print results to the screen");
 DEFINE_bool(progress, true, "Show progress counter");
-DEFINE_string(db_path, "", "Path to database directory");
+DEFINE_int32(workers, 3, "Number of workers");
+DEFINE_bool(consistent, true, "Dataflow consistency with futures");
 DEFINE_string(db_name, "pelton", "Name of the database");
-DEFINE_string(db_username, "root", "MariaDB username to connect with");
-DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
 
 int main(int argc, char **argv) {
   // Command line arugments and help message.
@@ -86,22 +83,28 @@ int main(int argc, char **argv) {
   // Initialize Google’s logging library.
   google::InitGoogleLogging("cli");
 
-  // Find database directory.
+  // Valdiate command line flags.
+  if (FLAGS_workers < 0) {
+    std::cout << "Bad number of workers" << std::endl;
+    return -1;
+  }
+
+  // Read command line flags.
+  size_t workers = static_cast<size_t>(FLAGS_workers);
+  bool consistent = FLAGS_consistent;
   const std::string &db_name = FLAGS_db_name;
-  const std::string &db_username = FLAGS_db_username;
-  const std::string &db_password = FLAGS_db_password;
-  const std::string &dir = FLAGS_db_path;
   size_t progress = 0;
 
   // Initialize our sharded state/connection.
   std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
   std::chrono::time_point<std::chrono::high_resolution_clock> end_time;
   try {
+    pelton::initialize(workers, consistent);
+
     pelton::Connection connection;
-    pelton::open(dir, db_name, db_username, db_password, &connection);
+    pelton::open(&connection, db_name);
 
     std::cout << "SQL Sharder" << std::endl;
-    std::cout << "DB directory: " << dir << std::endl;
     std::cout << "DB: " << db_name << std::endl;
     if (print) {
       std::cout << ">>> " << std::flush;
@@ -124,8 +127,6 @@ int main(int argc, char **argv) {
         continue;
       } else if (command[0] == '-' && command[1] == '-') {
         current_endpoint = profiler.Measure(command);
-        continue;
-      } else if (command.substr(0, 8) == "REPLACE ") {
         continue;
       } else if (std::find(TO_SKIP.begin(), TO_SKIP.end(), current_endpoint) !=
                  TO_SKIP.end()) {
@@ -163,18 +164,16 @@ int main(int argc, char **argv) {
     // Close the connection
     end_time = std::chrono::high_resolution_clock::now();
 
-    std::cout << std::endl
-              << "Shards: " << connection.GetSharderState()->NumShards()
-              << std::endl;
-
-    // Print flows memory usage.
-    connection.PrintSizeInMemory();
+    // Display statistics.
+    Print(connection.state->NumShards(), print);
+    Print(connection.state->SizeInMemory(), print);
 
     auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(
         end_time - start_time);
     std::cout << "Time PELTON: " << diff.count() << "ns" << std::endl;
 
     pelton::close(&connection);
+    pelton::shutdown();
   } catch (const char *err_msg) {
     LOG(FATAL) << "Error: " << err_msg;
   }

@@ -75,7 +75,7 @@ class Record {
 
   // Create record and set all the data together.
   template <typename... Args>
-  Record(const SchemaRef &schema, bool positive, Args &&...ts)
+  Record(const SchemaRef &schema, bool positive, Args &&... ts)
       : Record(schema, positive) {
     this->SetData(std::forward<Args>(ts)...);
   }
@@ -99,7 +99,7 @@ class Record {
 
   // Set all data in one shot regardless of types and counts.
   template <typename... Args>
-  void SetData(Args &&...ts) {
+  void SetData(Args &&... ts) {
     CHECK_NOTNULL(this->data_);
     if constexpr (sizeof...(ts) > 0) {
       SetDataRecursive(0, std::forward<Args>(ts)...);
@@ -164,6 +164,10 @@ class Record {
 
   // Data type transformation.
   void SetValue(const std::string &value, size_t i);
+  void SetValue(const Value &value, size_t i);
+
+  // Deterministic hashing for partitioning / mutli-threading.
+  size_t Hash(const std::vector<ColumnID> &cols) const;
 
   // Accessors.
   void SetPositive(bool positive) { this->positive_ = positive; }
@@ -180,27 +184,65 @@ class Record {
   friend std::ostream &operator<<(std::ostream &os, const Record &r);
 
   // Custom comparison between records (for ordering).
-  struct Compare {
+  class Compare {
    public:
-    explicit Compare(const std::vector<ColumnID> &cols) {
-      this->cols = std::make_shared<std::vector<ColumnID>>(cols);
-    }
+    explicit Compare(const std::vector<ColumnID> &cols) : cols_(cols) {}
     bool operator()(const Record &l, const Record &r) const {
-      return l.GetValues(*cols) < r.GetValues(*cols);
+      CHECK_EQ(l.schema(), r.schema());
+      const auto &types = l.schema().column_types();
+      for (size_t i : this->cols_) {
+        bool l_null = l.IsNull(i);
+        bool r_null = r.IsNull(i);
+        if (l_null && !r_null) {
+          return true;
+        } else if (!l_null && r_null) {
+          return false;
+        } else if (l_null && r_null) {
+          continue;
+        }
+        switch (types.at(i)) {
+          case sqlast::ColumnDefinition::Type::UINT:
+            if (l.data_[i].uint < r.data_[i].uint) {
+              return true;
+            } else if (l.data_[i].uint != r.data_[i].uint) {
+              return false;
+            }
+            break;
+          case sqlast::ColumnDefinition::Type::INT:
+            if (l.data_[i].sint < r.data_[i].sint) {
+              return true;
+            } else if (l.data_[i].sint != r.data_[i].sint) {
+              return false;
+            }
+            break;
+          case sqlast::ColumnDefinition::Type::TEXT:
+          case sqlast::ColumnDefinition::Type::DATETIME: {
+            if (l.data_[i].str->size() != r.data_[i].str->size()) {
+              return l.data_[i].str->size() < r.data_[i].str->size();
+            }
+            for (size_t i = 0; i < l.data_[i].str->size(); i++) {
+              if (l.data_[i].str->at(i) < r.data_[i].str->at(i)) {
+                return true;
+              } else if (l.data_[i].str->at(i) != r.data_[i].str->at(i)) {
+                return false;
+              }
+            }
+            break;
+          }
+        }
+      }
+      return false;
     }
-    std::vector<ColumnID> Cols() const {
-      std::vector<ColumnID> compare_cols = *cols;
-      return compare_cols;
-    }
+    const std::vector<ColumnID> &cols() const { return this->cols_; }
 
    private:
-    std::shared_ptr<std::vector<ColumnID>> cols;
+    std::vector<ColumnID> cols_;
   };
 
  private:
   // Recursive helper used in SetData(...).
   template <typename Arg, typename... Args>
-  void SetDataRecursive(size_t index, Arg &&t, Args &&...ts) {
+  void SetDataRecursive(size_t index, Arg &&t, Args &&... ts) {
     if (index >= this->schema_.size()) {
       LOG(FATAL) << "Record data received too many arguments";
     }
@@ -303,7 +345,8 @@ class Record {
       // Destruct unique_ptrs.
       for (size_t i = 0; i < this->schema_.size(); i++) {
         const auto &type = this->schema_.column_types().at(i);
-        if (type == sqlast::ColumnDefinition::Type::TEXT) {
+        if (type == sqlast::ColumnDefinition::Type::TEXT ||
+            type == sqlast::ColumnDefinition::Type::DATETIME) {
           this->data_[i].str = std::unique_ptr<std::string>();
         }
       }

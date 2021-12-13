@@ -14,6 +14,8 @@ namespace sqlast {
 // Insert.
 const std::string &Insert::table_name() const { return this->table_name_; }
 std::string &Insert::table_name() { return this->table_name_; }
+bool Insert::replace() const { return this->replace_; }
+bool &Insert::replace() { return this->replace_; }
 
 bool Insert::HasColumns() const { return this->columns_.size() > 0; }
 
@@ -61,7 +63,16 @@ std::string Insert::RemoveValue(size_t index) {
   return result;
 }
 
-absl::StatusOr<std::string> Insert::GetValue(const std::string &colname) {
+int Insert::GetColumnIndex(const std::string &colname) const {
+  for (size_t i = 0; i < this->columns_.size(); i++) {
+    if (this->columns_.at(i) == colname) {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
+}
+
+absl::StatusOr<std::string> Insert::GetValue(const std::string &colname) const {
   if (this->columns_.size() > 0) {
     auto it = std::find(this->columns_.begin(), this->columns_.end(), colname);
     if (it == this->columns_.end()) {
@@ -74,7 +85,7 @@ absl::StatusOr<std::string> Insert::GetValue(const std::string &colname) {
   return absl::InvalidArgumentError(
       "Insert statement does not have column names set explicitly");
 }
-const std::string &Insert::GetValue(size_t index) {
+const std::string &Insert::GetValue(size_t index) const {
   return this->values_.at(index);
 }
 
@@ -103,6 +114,14 @@ absl::StatusOr<std::string> Update::RemoveColumnValue(
 bool Update::AssignsTo(const std::string &column) const {
   return std::find(this->columns_.begin(), this->columns_.end(), column) !=
          this->columns_.end();
+}
+int Update::ValueIndex(const std::string &column) const {
+  for (size_t i = 0; i < this->columns_.size(); i++) {
+    if (this->columns_.at(i) == column) {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
 }
 
 const std::vector<std::string> &Update::GetColumns() const {

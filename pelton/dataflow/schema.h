@@ -41,7 +41,7 @@ class SchemaRef {
  public:
   // Empty SchemaRef: this is used to create a temporary so that Operators can
   // compute their output schema after creation.
-  SchemaRef() = default;
+  SchemaRef() : ptr_(nullptr) {}
 
   // Can be moved and copied!
   SchemaRef(const SchemaRef &other) = default;
@@ -50,6 +50,7 @@ class SchemaRef {
   SchemaRef &operator=(SchemaRef &&other) = default;
 
   // Equality is underlying pointer equality.
+  operator bool() const { return this->ptr_ != nullptr; }
   bool operator==(const SchemaRef &other) const {
     return this->ptr_ == other.ptr_;
   }
@@ -97,6 +98,12 @@ class SchemaFactory {
 
  private:
   static std::list<SchemaData> SCHEMAS;
+
+ public:
+  // Special schemas for debugging and statistics.
+  static SchemaRef MEMORY_SIZE_SCHEMA;
+  static SchemaRef FLOW_DEBUG_SCHEMA;
+  static SchemaRef NUM_SHARDS_SCHEMA;
 };
 
 }  // namespace dataflow

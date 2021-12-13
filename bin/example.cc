@@ -6,9 +6,6 @@
 #include "pelton/pelton.h"
 #include "pelton/util/perf.h"
 
-DEFINE_string(db_username, "root", "MYSQL username to connect with");
-DEFINE_string(db_password, "password", "MYSQL pwd to connect with");
-
 namespace {
 
 // CREATE TABLE queries.
@@ -79,11 +76,10 @@ std::vector<std::pair<std::string, std::string>> FLOWS{
                    "CREATE VIEW filter_row3 AS "
                    "'\"SELECT * FROM submissions WHERE ts >= 100 AND "
                    "assignment_id = 2 AND ID > 5\"'"),
-    std::make_pair(
-        "union_flow",
-        "CREATE VIEW union_flow AS "
-        "'\"(SELECT * FROM submissions WHERE ts >= 100) UNION (SELECT "
-        "* FROM submissions WHERE ts < 100)\"'"),
+    std::make_pair("union_flow",
+                   "CREATE VIEW union_flow AS "
+                   "'\"(SELECT * FROM submissions WHERE ts < 100) UNION "
+                   "(SELECT * FROM submissions WHERE ts >= 100)\"'"),
     std::make_pair("join_flow",
                    "CREATE VIEW join_flow AS "
                    "'\"SELECT * from submissions INNER JOIN students ON "
@@ -124,10 +120,10 @@ void Print(pelton::SqlResult &&result) {
   } else if (result.IsUpdate()) {
     std::cout << "Affected rows: " << result.UpdateCount() << std::endl;
   } else if (result.IsQuery()) {
-    while (result.HasResultSet()) {
-      std::unique_ptr<pelton::SqlResultSet> resultset = result.NextResultSet();
-      std::cout << resultset->GetSchema() << std::endl;
-      for (const pelton::Record &record : *resultset) {
+    for (pelton::SqlResultSet &resultset : result.ResultSets()) {
+      std::cout << resultset.schema() << std::endl;
+      std::vector<pelton::Record> records = resultset.Vec();
+      for (pelton::Record &record : records) {
         std::cout << record << std::endl;
       }
     }
@@ -143,13 +139,11 @@ int main(int argc, char **argv) {
   // Initialize Google’s logging library.
   google::InitGoogleLogging("example");
 
-  // Read MySql configurations.
-  const std::string &db_username = FLAGS_db_username;
-  const std::string &db_password = FLAGS_db_password;
-
   // Open connection to sharder.
+  pelton::initialize(3, true);
+
   pelton::Connection connection;
-  pelton::open("", "exampledb", db_username, db_password, &connection);
+  pelton::open(&connection, "exampledb");
   CHECK(pelton::exec(&connection, "SET echo;").ok());
 
   // Create all the tables.
@@ -231,11 +225,15 @@ int main(int argc, char **argv) {
   }
   std::cout << std::endl;
 
-  // Print flows memory usage.
-  connection.PrintSizeInMemory();
+  // Print statistics.
+  Print(connection.state->NumShards());
+  std::cout << std::endl;
+  Print(connection.state->SizeInMemory());
+  std::cout << std::endl;
 
   // Close connection.
   pelton::close(&connection);
+  pelton::shutdown();
 
   // Print performance profile.
   pelton::perf::PrintAll();

@@ -7,9 +7,13 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+lazy_static = "1.4.0"
 msql-srv = "0.8.7"
-slog = "2.7.0"
+slog = { version = "2.7.0", features = ["max_level_error", "release_max_level_error"] }
 slog-term = "2.8.0"
+ctrlc = "3.1.9"
+gflags = "0.3"
+regex = "0.2"
 
 [build-dependencies]
 bindgen = "0.32.2"

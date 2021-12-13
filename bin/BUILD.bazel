@@ -6,6 +6,7 @@ cc_binary(
         "example.cc",
     ],
     linkstatic = 0,
+    malloc = "@com_google_tcmalloc//tcmalloc",
     deps = [
         "//pelton",
         "//pelton/util:perf",
@@ -20,24 +21,9 @@ cc_binary(
         "cli.cc",
     ],
     linkstatic = 0,
+    malloc = "@com_google_tcmalloc//tcmalloc",
     deps = [
         "//pelton",
-        "//pelton/util:latency",
-        "//pelton/util:perf",
-        "@com_github_gflags_gflags//:gflags",
-        "@glog",
-    ],
-)
-
-cc_binary(
-    name = "mysql",
-    srcs = [
-        "mysql.cc",
-    ],
-    linkopts = [
-        "-lmariadbcpp",
-    ],
-    deps = [
         "//pelton/util:latency",
         "//pelton/util:perf",
         "@com_github_gflags_gflags//:gflags",

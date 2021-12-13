@@ -7,9 +7,9 @@
 #include "absl/status/status.h"
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/key.h"
-#include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/shards/sqlengine/view.h"
+#include "pelton/shards/upgradable_lock.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
@@ -18,16 +18,23 @@ namespace shards {
 namespace sqlengine {
 namespace index {
 
-absl::StatusOr<sql::SqlResult> CreateIndex(
-    const sqlast::CreateIndex &stmt, SharderState *state,
-    dataflow::DataFlowState *dataflow_state) {
+absl::StatusOr<sql::SqlResult> CreateIndex(const sqlast::CreateIndex &stmt,
+                                           Connection *connection,
+                                           bool synchronize) {
   perf::Start("Create Index");
   const std::string &table_name = stmt.table_name();
+
+  // Need a unique lock as we are changing index metadata
+  shards::SharderState *state = connection->state->sharder_state();
+  UniqueLock lock;
+  if (synchronize) {
+    lock = state->WriterLock();
+  }
 
   sql::SqlResult result = sql::SqlResult(false);
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
-    result = state->executor().ExecuteDefault(&stmt);
+    result = connection->executor.Default(&stmt);
 
   } else {  // is_sharded == true
     const std::string &column_name = stmt.column_name();
@@ -60,7 +67,7 @@ absl::StatusOr<sql::SqlResult> CreateIndex(
       sqlast::CreateView create_view{index_name, query};
 
       // Install flow.
-      CHECK_STATUS(view::CreateView(create_view, state, dataflow_state));
+      CHECK_STATUS(view::CreateView(create_view, connection, &lock));
 
       // Store the index metadata.
       state->CreateIndex(info.shard_kind, table_name, column_name,
@@ -84,26 +91,28 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
 
   perf::Start("Lookup Index1");
   // Get all the columns that have a secondary index.
-  const std::unordered_set<ColumnName> &indexed_cols =
-      state->IndicesFor(table_name);
+  if (state->HasIndicesFor(table_name)) {
+    const std::unordered_set<ColumnName> &indexed_cols =
+        state->IndicesFor(table_name);
 
-  // See if the where clause conditions on a value for one of these columns.
-  for (const ColumnName &column_name : indexed_cols) {
-    sqlast::ValueFinder value_finder(column_name);
-    auto [found, column_value] = where_clause->Visit(&value_finder);
-    if (!found) {
-      continue;
+    // See if the where clause conditions on a value for one of these columns.
+    for (const ColumnName &column_name : indexed_cols) {
+      sqlast::ValueFinder value_finder(column_name);
+      auto [found, column_value] = where_clause->Visit(&value_finder);
+      if (!found) {
+        continue;
+      }
+
+      // The where clause gives us a value for "column_name", we can translate
+      // it to some value(s) for shard_by column by looking at the index.
+      const FlowName &index_flow =
+          state->IndexFlow(table_name, column_name, shard_by);
+      MOVE_OR_RETURN(std::unordered_set<UserId> shards,
+                     LookupIndex(index_flow, column_value, dataflow_state));
+
+      perf::End("Lookup Index1");
+      return std::make_pair(true, std::move(shards));
     }
-
-    // The where clause gives us a value for "column_name", we can translate
-    // it to some value(s) for shard_by column by looking at the index.
-    const FlowName &index_flow =
-        state->IndexFlow(table_name, column_name, shard_by);
-    MOVE_OR_RETURN(std::unordered_set<UserId> shards,
-                   LookupIndex(index_flow, column_value, dataflow_state));
-
-    perf::End("Lookup Index1");
-    return std::make_pair(true, std::move(shards));
   }
 
   perf::End("Lookup Index1");
@@ -114,21 +123,13 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     const std::string &index_name, const std::string &value,
     dataflow::DataFlowState *dataflow_state) {
   perf::Start("Lookup Index");
-  // Find flow.
-  const std::shared_ptr<dataflow::DataFlowGraph> &flow =
-      dataflow_state->GetFlow(index_name);
-  if (flow->outputs().size() == 0) {
-    return absl::InvalidArgumentError("Read from index with no matviews");
-  } else if (flow->outputs().size() > 1) {
-    return absl::InvalidArgumentError("Read from index with several matviews");
-  }
 
-  // Materialized view that we want to look up in.
-  auto matview = flow->outputs().at(0);
+  // Find flow.
+  const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(index_name);
 
   // Construct look up key.
   dataflow::Key lookup_key{1};
-  switch (matview->output_schema().TypeOf(0)) {
+  switch (flow.output_schema().TypeOf(0)) {
     case sqlast::ColumnDefinition::Type::UINT:
       lookup_key.AddValue(static_cast<uint64_t>(std::stoull(value)));
       break;
@@ -144,12 +145,12 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
       break;
     default:
       LOG(FATAL) << "Unsupported data type in LookupIndex: "
-                 << matview->output_schema().TypeOf(0);
+                 << flow.output_schema().TypeOf(0);
   }
 
   // Lookup.
   std::unordered_set<UserId> result;
-  for (const dataflow::Record &record : matview->Lookup(lookup_key)) {
+  for (const dataflow::Record &record : flow.Lookup(lookup_key, -1, 0)) {
     result.insert(record.GetValueString(1));
   }
 

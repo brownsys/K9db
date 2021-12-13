@@ -2,6 +2,8 @@
 #ifndef PELTON_SQLAST_AST_ABSTRACT_H_
 #define PELTON_SQLAST_AST_ABSTRACT_H_
 
+#include <ostream>
+
 namespace pelton {
 namespace sqlast {
 
@@ -27,11 +29,13 @@ class AbstractStatement {
 
   // Constructor.
   explicit AbstractStatement(Type type) : type_(type) {}
-
   virtual ~AbstractStatement() {}
 
   // Accessors.
   const Type &type() const { return this->type_; }
+
+  // Printing to screen.
+  friend std::ostream &operator<<(std::ostream &os, const AbstractStatement &r);
 
  private:
   Type type_;

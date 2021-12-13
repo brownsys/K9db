@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -13,6 +14,7 @@
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/update.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/shards/upgradable_lock.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
@@ -21,21 +23,22 @@ namespace shards {
 namespace sqlengine {
 namespace gdpr {
 
-absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state) {
-  perf::Start("GDPR");
-  sql::SqlResult result;
-
-  int total_count = 0;
+absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
+                                   Connection *connection) {
+  perf::Start("GET");
   const std::string &shard_kind = stmt.shard_kind();
   const std::string &user_id = stmt.user_id();
-  bool is_forget = stmt.operation() == sqlast::GDPRStatement::Operation::FORGET;
-  auto &exec = state->executor();
+  auto &exec = connection->executor;
+
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  SharedLock lock = state->ReaderLock();
+
+  sql::SqlResult result(std::vector<sql::SqlResultSet>{});
   for (const auto &table_name : state->TablesInShard(shard_kind)) {
-    sql::SqlResult table_result;
     dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
-    bool update_flows = is_forget && dataflow_state->HasFlowsFor(table_name);
+
+    sql::SqlResult table_result(schema);
     for (const auto &info : state->GetShardingInformation(table_name)) {
       if (info.shard_kind != shard_kind) {
         continue;
@@ -47,34 +50,17 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
         aug_index = info.shard_by_index;
       }
 
-      if (is_forget) {
-        sqlast::Delete tbl_stmt{info.sharded_table_name, update_flows};
-        table_result.Append(exec.ExecuteShard(&tbl_stmt, shard_kind, user_id,
-                                              schema, aug_index));
-      } else {  // sqlast::GDPRStatement::Operation::GET
-        sqlast::Select tbl_stmt{info.sharded_table_name};
-        tbl_stmt.AddColumn("*");
-        table_result.Append(exec.ExecuteShard(&tbl_stmt, shard_kind, user_id,
-                                              schema, aug_index));
-      }
+      sqlast::Select tbl_stmt{info.sharded_table_name};
+      tbl_stmt.AddColumn("*");
+      table_result.Append(
+          exec.Shard(&tbl_stmt, shard_kind, user_id, schema, aug_index), true);
     }
-
-    // Delete was successful, time to update dataflows.
-    if (update_flows) {
-      std::vector<dataflow::Record> records =
-          table_result.NextResultSet()->Vectorize();
-      total_count += records.size();
-      dataflow_state->ProcessRecords(table_name, records);
-    } else if (is_forget) {
-      total_count += table_result.UpdateCount();
-    } else if (!is_forget) {
-      result.AddResultSet(table_result.NextResultSet());
-    }
+    result.AddResultSet(std::move(table_result.ResultSets().at(0)));
   }
 
-  if (!is_forget) {
+  if (state->HasAccessorIndices(shard_kind)) {
     // Get all accessor indices that belong to this shard type
-    std::vector<AccessorIndexInformation> accessor_indices =
+    const std::vector<AccessorIndexInformation> &accessor_indices =
         state->GetAccessorIndices(shard_kind);
 
     for (auto &accessor_index : accessor_indices) {
@@ -85,11 +71,14 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       std::string shard_by_access = accessor_index.shard_by_column_name;
       bool is_sharded = accessor_index.is_sharded;
       if (is_sharded) {
+        dataflow::SchemaRef schema =
+            dataflow_state->GetTableSchema(accessor_table_name);
+
         MOVE_OR_RETURN(std::unordered_set<UserId> ids_set,
                        index::LookupIndex(index_name, user_id, dataflow_state));
 
         // create select statement with equality check for each id
-        sql::SqlResult table_result;
+        sql::SqlResult table_result(schema);
 
         for (const auto &id : ids_set) {
           sqlast::Select accessor_stmt{accessor_table_name};
@@ -132,14 +121,13 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
 
           // execute select
           MOVE_OR_RETURN(sql::SqlResult res,
-                         select::Shard(accessor_stmt, state, dataflow_state));
+                         select::Shard(accessor_stmt, connection, false));
 
           // add to result
-          table_result.Append(std::move(res));
+          table_result.Append(std::move(res), true);
         }
-        result.AddResultSet(table_result.NextResultSet());
+        result.AddResultSet(std::move(table_result.ResultSets().at(0)));
       } else {
-        sql::SqlResult table_result;
         sqlast::Select accessor_stmt{accessor_table_name};
         // SELECT *
         accessor_stmt.AddColumn("*");
@@ -158,19 +146,73 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
 
         // execute select
         MOVE_OR_RETURN(sql::SqlResult res,
-                       select::Shard(accessor_stmt, state, dataflow_state));
+                       select::Shard(accessor_stmt, connection, false));
 
-        // add to result
-        table_result.Append(std::move(res));
-        result.AddResultSet(table_result.NextResultSet());
+        result.AddResultSet(std::move(res.ResultSets().at(0)));
       }
     }
   }
 
-  // anonymize when accessor deletes their data
-  if (is_forget) {
+  perf::End("GET");
+  return result;
+}
+
+absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
+                                      Connection *connection) {
+  perf::Start("FORGET");
+
+  const std::string &shard_kind = stmt.shard_kind();
+  const std::string &user_id = stmt.user_id();
+  auto &exec = connection->executor;
+
+  // XXX(malte): if we properly removed the shared on GDPR FORGET below, this
+  // would need to be a unique_lock, as it would change sharder state. However,
+  // the current code does not update the sharder state AFAICT.
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  UniqueLock lock = state->WriterLock();
+
+  sql::SqlResult result(static_cast<int>(0));
+  for (const auto &table_name : state->TablesInShard(shard_kind)) {
+    bool update_flows = dataflow_state->HasFlowsFor(table_name);
+    dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
+
+    sql::SqlResult table_result(static_cast<int>(0));
+    if (update_flows) {
+      table_result = sql::SqlResult(schema);
+    }
+    for (const auto &info : state->GetShardingInformation(table_name)) {
+      if (info.shard_kind != shard_kind) {
+        continue;
+      }
+
+      // Augment returned results with the user_id.
+      int aug_index = -1;
+      if (!info.IsTransitive()) {
+        aug_index = info.shard_by_index;
+      }
+
+      // XXX(malte): need to upgrade SharderStateLock here in the future.
+      sqlast::Delete tbl_stmt{info.sharded_table_name, update_flows};
+      table_result.Append(
+          exec.Shard(&tbl_stmt, shard_kind, user_id, schema, aug_index), true);
+    }
+
+    // Delete was successful, time to update dataflows.
+    if (update_flows) {
+      std::vector<dataflow::Record> records =
+          table_result.ResultSets().at(0).Vec();
+      result.Append(sql::SqlResult(records.size()), true);
+      dataflow_state->ProcessRecords(table_name, std::move(records));
+    } else {
+      result.Append(std::move(table_result), true);
+    }
+  }
+
+  // Anonymize when accessor deletes their data
+  if (state->HasAccessorIndices(shard_kind)) {
     // Get all accessor indices that belong to this shard type
-    std::vector<AccessorIndexInformation> accessor_indices =
+    const std::vector<AccessorIndexInformation> &accessor_indices =
         state->GetAccessorIndices(shard_kind);
 
     for (auto &accessor_index : accessor_indices) {
@@ -178,6 +220,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
       std::string index_col = accessor_index.accessor_column_name;
       std::string index_name = accessor_index.index_name;
       std::string shard_by_access = accessor_index.shard_by_column_name;
+
       bool is_sharded = accessor_index.is_sharded;
       for (auto &[anon_col_name, anon_col_type] :
            accessor_index.anonymize_columns) {
@@ -222,12 +265,11 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
             anonymize_stmt.SetWhereClause(std::move(where));
 
             // execute update
-            MOVE_OR_RETURN(
-                sql::SqlResult res,
-                update::Shard(anonymize_stmt, state, dataflow_state));
+            MOVE_OR_RETURN(sql::SqlResult res,
+                           update::Shard(anonymize_stmt, connection, false));
 
             // add to result
-            total_count += res.UpdateCount();
+            result.Append(std::move(res), true);
           }
         } else {
           // anonymizing update statement for non-sharded schemas
@@ -264,20 +306,25 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
 
           // execute update
           MOVE_OR_RETURN(sql::SqlResult res,
-                         update::Shard(anonymize_stmt, state, dataflow_state));
+                         update::Shard(anonymize_stmt, connection, false));
 
           // add to result
-          total_count += res.UpdateCount();
+          result.Append(std::move(res), true);
         }
       }
     }
   }
-
-  perf::End("GDPR");
-  if (is_forget) {
-    return sql::SqlResult(total_count);
-  }
   return result;
+}
+
+absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
+                                     Connection *connection) {
+  perf::Start("GDPR");
+  if (stmt.operation() == sqlast::GDPRStatement::Operation::FORGET) {
+    return Forget(stmt, connection);
+  } else {
+    return Get(stmt, connection);
+  }
 }
 
 }  // namespace gdpr

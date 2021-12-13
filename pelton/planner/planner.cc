@@ -28,83 +28,93 @@ namespace planner {
 // Internal helpers for starting a JVM.
 namespace {
 
-// Start a JVM embedded in this process.
-std::pair<JavaVM *, JNIEnv *> StartJVM(bool run = true) {
-  // JVM is created once and kept until no longer needed.
-  static JavaVM *jvm = nullptr;
-  static JNIEnv *env = nullptr;
+// JVM is created once and kept until no longer needed.
+static std::atomic<JavaVM *> jvm = nullptr;
 
-  if (run && jvm == nullptr) {
+// Start a JVM embedded in this process.
+void StartJVM() {
+  if (jvm.load() == nullptr) {
+    JavaVM *jvm_local = nullptr;
+    JNIEnv *env_local = nullptr;
     // Specify the class path and library path arguments to the JVM
     // so that it can locate our calcite java package, and can load
     // the needed C++ JNI interfaces.
     JavaVMInitArgs jvm_args;
 
-    // Class path and library path arguments to the JVM.
-    std::string cp = CLASS_PATH_ARG CALCITE_PATH JAR_NAME;
-    std::string lp = LIBRARY_PATH_ARG CALCITE_PATH NATIVELIB_PATH;
-
-    // Create c-style strings that jvm understands.
-    char *cp_ptr = new char[cp.size() + 1];
-    char *lp_ptr = new char[lp.size() + 1];
-    memcpy(cp_ptr, cp.c_str(), cp.size() + 1);
-    memcpy(lp_ptr, lp.c_str(), lp.size() + 1);
-
     // Finally, add all these arguments to *args.
-    JavaVMOption options[2];
-    options[0].optionString = cp_ptr;
-    options[1].optionString = lp_ptr;
-
+    JavaVMOption *options = new JavaVMOption[2];
+    options[0].optionString =
+        static_cast<char *>(CLASS_PATH_ARG CALCITE_PATH JAR_NAME);
+    options[1].optionString =
+        static_cast<char *>(LIBRARY_PATH_ARG CALCITE_PATH NATIVELIB_PATH);
     // options[2].optionString = "-verbose:jni";
+
     jvm_args.version = JNI_VERSION_1_8;
     jvm_args.options = options;
     jvm_args.nOptions = 2;
-    jvm_args.ignoreUnrecognized = JNI_TRUE;
+    jvm_args.ignoreUnrecognized = false;
 
     // Start the JVM.
-    CHECK(!JNI_CreateJavaVM(&jvm, reinterpret_cast<void **>(&env), &jvm_args))
+    CHECK(!JNI_CreateJavaVM(&jvm_local, reinterpret_cast<void **>(&env_local),
+                            &jvm_args))
         << "failed to start JVM";
+    jvm.store(jvm_local);
+    delete[] options;
   }
-
-  // All good.
-  return std::make_pair(std::move(jvm), std::move(env));
 }
 
 }  // namespace
 
 // Given a query, use calcite to plan its execution, and generate
-// a DataFlowGraph with all the operators from that plan.
-std::shared_ptr<dataflow::DataFlowGraph> PlanGraph(
+// a DataFlowGraphPartition with all the operators from that plan.
+std::unique_ptr<dataflow::DataFlowGraphPartition> PlanGraph(
     dataflow::DataFlowState *state, const std::string &query) {
+  LOG(WARNING) << "Functionality Warning: PLANNER IS CALLED! " << query;
   perf::Start("planner");
   // Start a JVM.
-  auto [jvm, env] = StartJVM();
+  StartJVM();
+
+  // This function could be called by different threads. Hence each for safety
+  // we will attach the current thread to the JVM and get a fresh JNIEnv.
+  // If the current thread is already attached to the JVM then this will be a
+  // no-op.
+  JNIEnv *env_local;
+  JavaVMAttachArgs jvm_args;
+  jvm_args.name = NULL;
+  jvm_args.group = NULL;
+  jvm.load()->AttachCurrentThread((void **)&env_local, &jvm_args);
 
   // First get the java/calcite entry point class.
-  jclass QueryPlannerClass = env->FindClass("com/brownsys/pelton/QueryPlanner");
+  jclass QueryPlannerClass =
+      env_local->FindClass("com/brownsys/pelton/QueryPlanner");
 
   // Get the (static) entry method from that class.
   const char *sig = "(JJLjava/lang/String;Z)V";
-  jmethodID planMethod = env->GetStaticMethodID(QueryPlannerClass, "plan", sig);
+
+  jmethodID planMethod =
+      env_local->GetStaticMethodID(QueryPlannerClass, "plan", sig);
 
   // Create the required shared state to pass to the java code.
-  auto graph = std::make_shared<dataflow::DataFlowGraph>();
+  auto graph = std::make_unique<dataflow::DataFlowGraphPartition>(0);
   jlong graph_jptr = reinterpret_cast<jlong>(graph.get());
   jlong state_jptr = reinterpret_cast<jlong>(state);
-  jstring query_jstr = env->NewStringUTF(query.c_str());
+  jstring query_jstr = env_local->NewStringUTF(query.c_str());
 
   // Call the method on the object
-  env->CallStaticVoidMethod(QueryPlannerClass, planMethod, graph_jptr,
-                            state_jptr, query_jstr, PELTON_JAVA_DEBUG);
-  if (env->ExceptionCheck()) {  // Handle any exception.
-    env->ExceptionDescribe();
-    env->ExceptionClear();
+  env_local->CallStaticVoidMethod(QueryPlannerClass, planMethod, graph_jptr,
+                                  state_jptr, query_jstr, PELTON_JAVA_DEBUG);
+  if (env_local->ExceptionCheck()) {  // Handle any exception.
+    env_local->ExceptionDescribe();
+    env_local->ExceptionClear();
     LOG(FATAL) << "--- Java exception encountered during planning";
   }
 
   // Free up the created jstring.
-  env->DeleteLocalRef(query_jstr);
+  env_local->DeleteLocalRef(query_jstr);
+  env_local->DeleteLocalRef(QueryPlannerClass);
   perf::End("planner");
+  // Detach the current thread from the JVM.
+  jvm.load()->DetachCurrentThread();
 
   // Return the graph.
   return graph;
@@ -112,10 +122,16 @@ std::shared_ptr<dataflow::DataFlowGraph> PlanGraph(
 
 // Shutdown the JVM.
 void ShutdownPlanner() {
-  auto [jvm, env] = StartJVM(false);
-  if (jvm != nullptr) {
-    jvm->DestroyJavaVM();
+#ifndef PELTON_ASAN
+#ifndef PELTON_TSAN
+  if (jvm.load() != nullptr) {
+    LOG(INFO) << "Destroying JVM...";
+    jvm.load()->DestroyJavaVM();
+    jvm.store(nullptr);
+    LOG(INFO) << "Destroyed JVM";
   }
+#endif  // PELTON_TSAN
+#endif  // PELTON_ASAN
 }
 
 }  // namespace planner

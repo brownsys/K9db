@@ -2,12 +2,14 @@
 
 #include "pelton/shards/sqlengine/insert.h"
 
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "absl/strings/match.h"
 #include "pelton/shards/sqlengine/index.h"
+#include "pelton/shards/sqlengine/select.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
@@ -28,10 +30,12 @@ std::string Dequote(const std::string &st) {
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state,
+                                     Connection *connection, SharedLock *lock,
                                      bool update_flows) {
   perf::Start("Insert");
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+
   // Make sure table exists in the schema first.
   const std::string &table_name = stmt.table_name();
   if (!dataflow_state->HasFlowsFor(table_name)) {
@@ -41,23 +45,35 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
     return absl::InvalidArgumentError("Table does not exist!");
   }
 
+  // For replace insert statements, we need to get the old records.
+  bool returning = update_flows && stmt.replace();
+  dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
+
   // Shard the insert statement so it is executable against the physical
   // sharded database.
-  sql::SqlResult result = sql::SqlResult(0);
+  sql::SqlResult result(static_cast<int>(0));
+  if (returning) {
+    result = sql::SqlResult(schema);
+  }
 
-  auto &exec = state->executor();
+  auto &exec = connection->executor;
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
     // The insertion statement is unmodified.
-    result = exec.ExecuteDefault(&stmt);
+    if (returning) {
+      sqlast::Insert cloned = stmt.MakeReturning();
+      result = exec.Default(&cloned, schema);
+    } else {
+      result = exec.Default(&stmt);
+    }
 
   } else {  // is_sharded == true
     // Case 2: table is sharded!
     // Duplicate the value for every shard this table has.
     for (const ShardingInformation &info :
          state->GetShardingInformation(table_name)) {
-      sqlast::Insert cloned = stmt;
+      sqlast::Insert cloned = returning ? stmt.MakeReturning() : stmt;
       cloned.table_name() = info.sharded_table_name;
       // Find the value corresponding to the shard by column.
       std::string user_id;
@@ -79,6 +95,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
       }
       user_id = Dequote(user_id);
 
+      // Augment user_id for returning replaces.
+      int aug_index = -1;
+      if (returning && !info.IsTransitive()) {
+        aug_index = info.shard_by_index;
+      }
+
       // If the sharding is transitive, the user id should be resolved via the
       // secondary index of the target table.
       if (info.IsTransitive()) {
@@ -95,17 +117,24 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
       // TODO(babman): better to do this after user insert rather than user data
       //               insert.
       if (!state->ShardExists(info.shard_kind, user_id)) {
-        for (auto *create_stmt : state->CreateShard(info.shard_kind, user_id)) {
-          sql::SqlResult tmp =
-              exec.ExecuteShard(create_stmt, info.shard_kind, user_id);
-          if (!tmp.IsStatement() || !tmp.Success()) {
-            return absl::InternalError("Could not created sharded table");
+        // Need to upgrade to an exclusive lock on sharder state here, as we
+        // will modify the state.
+        UniqueLock upgraded(std::move(*lock));
+        if (!state->ShardExists(info.shard_kind, user_id)) {
+          for (auto *create_stmt :
+               state->CreateShard(info.shard_kind, user_id)) {
+            if (!exec.Shard(create_stmt, info.shard_kind, user_id).Success()) {
+              return absl::InternalError("Could not created sharded table");
+            }
           }
         }
+        *lock = SharedLock(std::move(upgraded));
       }
 
       // Add the modified insert statement.
-      result.Append(exec.ExecuteShard(&cloned, info.shard_kind, user_id));
+      result.Append(
+          exec.Shard(&cloned, info.shard_kind, user_id, schema, aug_index),
+          true);
     }
   }
 
@@ -113,8 +142,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
   // Turn inserted values into a record and process it via corresponding flows.
   if (update_flows) {
     std::vector<dataflow::Record> records;
+    if (returning) {
+      records = result.ResultSets().at(0).Vec();
+      result = sql::SqlResult(1 + records.size());
+    }
     records.push_back(dataflow_state->CreateRecord(stmt));
-    dataflow_state->ProcessRecords(stmt.table_name(), records);
+    dataflow_state->ProcessRecords(stmt.table_name(), std::move(records));
   }
 
   perf::End("Insert");

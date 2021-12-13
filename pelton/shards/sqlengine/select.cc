@@ -6,7 +6,9 @@
 #include <utility>
 #include <vector>
 
+#include "glog/logging.h"
 #include "pelton/shards/sqlengine/index.h"
+#include "pelton/shards/upgradable_lock.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
@@ -55,25 +57,31 @@ dataflow::SchemaRef ResultSchema(const sqlast::Select &stmt,
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
-                                     SharderState *state,
-                                     dataflow::DataFlowState *dataflow_state) {
+                                     Connection *connection, bool synchronize) {
   perf::Start("Select");
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  SharedLock lock;
+  if (synchronize) {
+    lock = state->ReaderLock();
+  }
+
   // Disqualifiy LIMIT and OFFSET queries.
   if (!stmt.SupportedByShards()) {
     return absl::InvalidArgumentError("Query contains unsupported features");
   }
 
-  sql::SqlResult result;
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
   dataflow::SchemaRef schema =
       ResultSchema(stmt, dataflow_state->GetTableSchema(table_name));
 
-  auto &exec = state->executor();
+  sql::SqlResult result(schema);
+  auto &exec = connection->executor;
   bool is_sharded = state->IsSharded(table_name);
   if (!is_sharded) {
     // Case 1: table is not in any shard.
-    result = exec.ExecuteDefault(&stmt, schema);
+    result = exec.Default(&stmt, schema);
 
   } else {  // is_sharded == true
     // Case 2: table is sharded.
@@ -118,9 +126,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
           if (lookup.size() == 1) {
             user_id = std::move(*lookup.cbegin());
             // Execute statement directly against shard.
-            result.Append(exec.ExecuteShard(&cloned, shard_kind, user_id,
-                                            schema, aug_index),
-                          true);
+            result.Append(
+                exec.Shard(&cloned, shard_kind, user_id, schema, aug_index),
+                true);
           }
         } else if (state->ShardExists(shard_kind, user_id)) {
           // Remove where condition on the shard by column, since it does not
@@ -129,9 +137,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
           cloned.Visit(&expression_remover);
 
           // Execute statement directly against shard.
-          result.Append(exec.ExecuteShard(&cloned, shard_kind, user_id, schema,
-                                          aug_index),
-                        true);
+          result.Append(
+              exec.Shard(&cloned, shard_kind, user_id, schema, aug_index),
+              true);
         }
 
       } else {
@@ -143,23 +151,24 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
                                state, dataflow_state));
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
-          result.Append(exec.ExecuteShards(&cloned, shard_kind, pair.second,
-                                           schema, aug_index),
-                        true);
+          result.Append(
+              exec.Shards(&cloned, shard_kind, pair.second, schema, aug_index),
+              true);
         } else {
           // Secondary index unhelpful.
           // Select from all the relevant shards.
           const auto &user_ids = state->UsersOfShard(shard_kind);
-          result.Append(exec.ExecuteShards(&cloned, shard_kind, user_ids,
-                                           schema, aug_index),
-                        true);
+          if (user_ids.size() > 0) {
+            sqlast::Stringifier stringifier("");
+            LOG(WARNING) << "Perf Warning: query executed over all shards. "
+                         << "This will be slow! The query: " << stmt;
+          }
+          result.Append(
+              exec.Shards(&cloned, shard_kind, user_ids, schema, aug_index),
+              true);
         }
       }
     }
-  }
-
-  if (!result.IsQuery()) {
-    result = sql::SqlResult(schema);
   }
 
   perf::End("Select");

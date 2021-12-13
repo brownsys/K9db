@@ -2,11 +2,12 @@
 #include "pelton/pelton.h"
 
 #include <iostream>
+#include <optional>
 #include <utility>
+#include <vector>
 
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
-#include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "pelton/planner/planner.h"
 #include "pelton/shards/sqlengine/engine.h"
@@ -16,6 +17,9 @@
 namespace pelton {
 
 namespace {
+
+// global state that persists between client connections
+static State *PELTON_STATE = nullptr;
 
 // String whitespace trimming.
 // https://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring/25385766
@@ -33,28 +37,51 @@ static inline void Trim(std::string &s) {
 // Special statements we added to SQL.
 bool echo = false;
 
-bool SpecialStatements(const std::string &sql, Connection *connection) {
+std::optional<SqlResult> SpecialStatements(const std::string &sql,
+                                           Connection *connection) {
   if (sql == "SET echo;" || sql == "SET echo") {
     echo = true;
-    std::cout << "SET echo;" << std::endl;
-    return true;
+    return SqlResult(true);
   }
-  return false;
+  if (absl::StartsWith(sql, "SHOW ")) {
+    std::vector<std::string> split = absl::StrSplit(sql, ' ');
+    if (absl::StartsWith(split.at(1), "VIEW")) {
+      std::string &flow_name = split.at(2);
+      if (flow_name.back() == ';') {
+        flow_name.pop_back();
+      }
+      return connection->state->FlowDebug(flow_name);
+    }
+    if (absl::StartsWith(split.at(1), "MEMORY")) {
+      return connection->state->SizeInMemory();
+    }
+    if (absl::StartsWith(split.at(1), "SHARDS")) {
+      return connection->state->NumShards();
+    }
+  }
+  return {};
 }
 
 }  // namespace
 
-bool open(const std::string &directory, const std::string &db_name,
-          const std::string &db_username, const std::string &db_password,
-          Connection *connection) {
-  // initialize path_ in Connection struct with &directory (path to db)
-  connection->Initialize(directory);
-  // call SqlEagerExecutor::Initialize, running CREATE DATABASE db_name and USE
-  // db_name open(), pelton.cc -> Initialize(), shards/state.cc -> Initialize(),
-  // eager_executor.cc
-  connection->GetSharderState()->Initialize(db_name, db_username, db_password);
-  // load database from disk if directory contains it
-  connection->Load();
+bool initialize(size_t workers, bool consistent) {
+  // if already open
+  if (PELTON_STATE != nullptr) {
+    return false;
+  }
+  PELTON_STATE = new State(workers, consistent);
+  return true;
+}
+
+bool open(Connection *connection, const std::string &db_name) {
+  // set global state in local connection struct
+  connection->state = PELTON_STATE;
+  connection->executor.Initialize(db_name);
+  return true;
+}
+
+bool close(Connection *connection) {
+  connection->executor.Close();
   return true;
 }
 
@@ -65,31 +92,27 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
   if (echo) {
     std::cout << sql << std::endl;
   }
-
-  // If special statement to turn echo on, don't execute sql, just print query
-  // returning empty result
-  if (SpecialStatements(sql, connection)) {
-    return SqlResult(true);
+  // If special statement, handle it separately.
+  auto special = SpecialStatements(sql, connection);
+  if (special) {
+    return std::move(special.value());
   }
 
-  // Parse and rewrite statement.
-  // getting sharder and dataflow state to pass to Shard() so it can update
-  // those fields as it parses/rewrites the input query sql
-  shards::SharderState *sstate = connection->GetSharderState();
-  dataflow::DataFlowState *dstate = connection->GetDataFlowState();
-  // Parse sql statement via ANTLR, categorizing as CREATE, INSERT, UPDATE,
-  // SELECT, DELETE, CREATE_VIEW, CREATE_INDEX, or GDPR
-  return shards::sqlengine::Shard(sql, sstate, dstate);
+  // Parse and rewrite statement, passing local connection with ptr to global
+  // state containing sharder and dataflow state
+  return shards::sqlengine::Shard(sql, connection);
 }
 
 void shutdown_planner() { planner::ShutdownPlanner(); }
 
-bool close(Connection *connection, bool shutdown_planner) {
-  connection->Save();
-  if (shutdown_planner) {
-    planner::ShutdownPlanner();
+bool shutdown() {
+  if (PELTON_STATE != nullptr) {
+    shutdown_planner();
+    delete PELTON_STATE;
+    PELTON_STATE = nullptr;
+    return true;
   }
-  return true;
+  return false;
 }
 
 }  // namespace pelton
