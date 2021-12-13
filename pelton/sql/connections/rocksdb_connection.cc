@@ -4,8 +4,10 @@
 
 #include "glog/logging.h"
 #include "pelton/util/status.h"
+#include "rocksdb/cache.h"
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
+#include "rocksdb/table.h"
 
 #define PANIC PANIC_STATUS
 
@@ -67,8 +69,14 @@ const std::string &GetTableName(const sqlast::AbstractStatement *stmt) {
 SingletonRocksdbConnection::SingletonRocksdbConnection(
     const std::string &db_name) {
   std::string path = "/var/pelton/rocksdb/" + db_name;
+
+  rocksdb::BlockBasedTableOptions block_opts;
+  // 500MB uncompressed cache
+  block_opts.block_cache = rocksdb::NewLRUCache(500*1048576);
+
   // Options.
   rocksdb::Options opts;
+  opts.table_factory.reset(rocksdb::NewBlockBasedTableFactory(block_opts));
   opts.create_if_missing = true;
   opts.error_if_exists = true;
 
@@ -506,7 +514,9 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
     if (HasWhereClause(stmt)) {
       LOG(WARNING) << "Perf Warning: Query has no rocksdb index " << *stmt;
     }
-    auto ptr = this->db_->NewIterator(rocksdb::ReadOptions(), handler);
+    rocksdb::ReadOptions options;
+    options.fill_cache = false;
+    auto ptr = this->db_->NewIterator(options, handler);
     std::unique_ptr<rocksdb::Iterator> it(ptr);
     rocksdb::Slice pslice(shard_id);
     for (it->Seek(shard_id); it->Valid(); it->Next()) {

@@ -49,8 +49,9 @@ std::vector<std::string> RocksdbIndex::Get(
   // Will store result.
   std::vector<std::string> result;
   // Open an iterator.
-  auto ptr =
-      this->db_->NewIterator(rocksdb::ReadOptions(), this->handle_.get());
+  rocksdb::ReadOptions options;
+  options.fill_cache = false;
+  auto ptr = this->db_->NewIterator(options, this->handle_.get());
   std::unique_ptr<rocksdb::Iterator> it(ptr);
   // Make and sort all prefixes.
   std::vector<std::string> prefixes;
