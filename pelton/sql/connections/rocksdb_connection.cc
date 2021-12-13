@@ -306,11 +306,11 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
       if (!sid) {
 	if (stmt->table_name().find("stories") != std::string::npos) {
 	  sqlast::Stringifier stringifier(shard_name);
-	  LOG(WARNING) << "did not find a story " << stringifier.Visit(stmt);
+	  //LOG(WARNING) << "did not find a story " << stringifier.Visit(stmt);
 	}
 	if (stmt->table_name().find("tags") != std::string::npos) {
 	  sqlast::Stringifier stringifier(shard_name);
-	  LOG(WARNING) << "did not find a tag" << stringifier.Visit(stmt);
+	  //LOG(WARNING) << "did not find a tag" << stringifier.Visit(stmt);
 	}
         break;
       }
@@ -335,12 +335,12 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
       if (records.size() == 0) {
 	if (stmt->table_name().find("stories") != std::string::npos) {
 	sqlast::Stringifier stringifier(shard_name);
-	LOG(WARNING) << "did not find a story 2 " << stringifier.Visit(stmt);
+	//LOG(WARNING) << "did not find a story 2 " << stringifier.Visit(stmt);
 	}
 	if (stmt->table_name().find("tags") != std::string::npos) {
 	sqlast::Stringifier stringifier("");
-	LOG(WARNING) << "did not find a tag 2 " << stringifier.Visit(stmt)
-		     << " at shard " << shard_name;
+	//LOG(WARNING) << "did not find a tag 2 " << stringifier.Visit(stmt)
+	//	     << " at shard " << shard_name;
 	}
       }
 
