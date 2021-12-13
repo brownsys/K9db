@@ -1246,6 +1246,5 @@ TEST(PlannerTest, SimpleLimitOffset) {
   state.Shutdown();
 }
 
-
 }  // namespace planner
 }  // namespace pelton

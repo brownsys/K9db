@@ -526,7 +526,7 @@ rocksdb::Slice ShardPrefixTransform::Transform(
     if (key.data()[i] == 30) {
       count++;
       if (count == this->seps_) {
-        return rocksdb::Slice(key.data(), i+1);
+        return rocksdb::Slice(key.data(), i + 1);
       }
     }
   }

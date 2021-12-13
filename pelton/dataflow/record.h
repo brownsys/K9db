@@ -188,7 +188,50 @@ class Record {
    public:
     explicit Compare(const std::vector<ColumnID> &cols) : cols_(cols) {}
     bool operator()(const Record &l, const Record &r) const {
-      return l.GetValues(this->cols_) < r.GetValues(this->cols_);
+      CHECK_EQ(l.schema(), r.schema());
+      const auto &types = l.schema().column_types();
+      for (size_t i : this->cols_) {
+        bool l_null = l.IsNull(i);
+        bool r_null = r.IsNull(i);
+        if (l_null && !r_null) {
+          return true;
+        } else if (!l_null && r_null) {
+          return false;
+        } else if (l_null && r_null) {
+          continue;
+        }
+        switch (types.at(i)) {
+          case sqlast::ColumnDefinition::Type::UINT:
+            if (l.data_[i].uint < r.data_[i].uint) {
+              return true;
+            } else if (l.data_[i].uint != r.data_[i].uint) {
+              return false;
+            }
+            break;
+          case sqlast::ColumnDefinition::Type::INT:
+            if (l.data_[i].sint < r.data_[i].sint) {
+              return true;
+            } else if (l.data_[i].sint != r.data_[i].sint) {
+              return false;
+            }
+            break;
+          case sqlast::ColumnDefinition::Type::TEXT:
+          case sqlast::ColumnDefinition::Type::DATETIME: {
+            if (l.data_[i].str->size() != r.data_[i].str->size()) {
+              return l.data_[i].str->size() < r.data_[i].str->size();
+            }
+            for (size_t i = 0; i < l.data_[i].str->size(); i++) {
+              if (l.data_[i].str->at(i) < r.data_[i].str->at(i)) {
+                return true;
+              } else if (l.data_[i].str->at(i) != r.data_[i].str->at(i)) {
+                return false;
+              }
+            }
+            break;
+          }
+        }
+      }
+      return false;
     }
     const std::vector<ColumnID> &cols() const { return this->cols_; }
 
