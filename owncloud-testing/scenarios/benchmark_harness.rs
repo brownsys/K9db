@@ -46,28 +46,32 @@ impl <'a> ToValue for Group<'a> {
     }
 }
 
+fn quoted(s: &str) -> String {
+    format!("'{}'", s)
+}
 
 impl <'a> InsertDB for Share<'a> {
     fn insert_db(&self, conn: &mut Conn, _: &Backend) {
         let (share_type, user_target, group_target) = match self.share_with {
-            ShareType::Direct(u) => (0, u.to_value(), Value::NULL),
-            ShareType::Group(g) => (1, Value::NULL, g.to_value()),
+            ShareType::Direct(u) => (0, quoted(&u.uid), "NULL".to_string()),
+            ShareType::Group(g) => (1, "NULL".to_string(), quoted(&g.gid)),
         };
-        conn.exec_drop(
+        conn.query_drop(
+            format!(
             "INSERT INTO oc_share 
-             VALUES (:share_id, :share_type, :user_target, :group_target, :owner, :initiator, NULL, 'file', :file, '', '', 24, 0, 0, NULL, '', 1, '', 24, 19);",
-            params!(
-                "share_id" => self.id,
-                user_target,
-                group_target,
-                share_type,
-                "owner" => self.file.owned_by,
-                "initiator" => self.file.owned_by,
-                "file" => self.file,
+             VALUES ({share_id}, {share_type}, {user_target}, {group_target}, '{owner}', '{initiator}', NULL, 'file', {file}, '', '', 24, 0, 0, NULL, '', 1, '', 24, 19);",
+                share_id = self.id,
+                user_target = user_target,
+                group_target = group_target,
+                share_type = share_type,
+                owner = self.file.owned_by.uid,
+                initiator = self.file.owned_by.uid,
+                file = self.file.id,
             ),
         ).unwrap()
     }
 }
+
 
 
 impl ToValue for User {
@@ -82,9 +86,9 @@ trait InsertDB {
 
 impl InsertDB for User {
     fn insert_db(&self, conn: &mut Conn, _: &Backend) {
-        conn.exec_drop("INSERT INTO oc_users VALUES (:uid, :uid, :pw)", params!(
-            "uid" => &self.uid,
-            "pw" => ""
+        conn.query_drop(&format!("INSERT INTO oc_users VALUES ('{uid}', '{uid}', '{pw}')", 
+            uid = &self.uid,
+            pw = ""
         )).unwrap();
     }
 }
@@ -99,7 +103,7 @@ impl <'a> ToValue for File<'a> {
 
 impl <'a> InsertDB for File<'a> {
     fn insert_db(&self, conn: &mut Conn, _: &Backend) {
-        conn.exec_drop("INSERT INTO oc_files VALUES (?, ?)", (self.id, self.id.to_string())).unwrap()
+        conn.query_drop(&format!("INSERT INTO oc_files VALUES ({}, '{}')", self.id, self.id)).unwrap()
     }
 }
 
@@ -118,13 +122,13 @@ impl <'a, I:InsertDB> InsertDB for &'a I {
 impl <'a> InsertDB for Group<'a> {
     fn insert_db(&self, conn: &mut Conn, backend: &Backend) {
         if backend.is_mysql() {
-            conn.exec_drop("INSERT INTO oc_groups VALUES (?)", (&self.gid,)).unwrap();
+            conn.query_drop(&format!("INSERT INTO oc_groups VALUES ('{}')", &self.gid)).unwrap();
         }
         self.users.iter().for_each(|(i, u)| {
-            conn.exec_drop("INSERT INTO oc_group_user VALUES (?, ?, ?)", (i, self, u)).unwrap()
+            conn.query_drop(&format!("INSERT INTO oc_group_user VALUES ({}, '{}', '{}')", i, self.gid, u.uid)).unwrap()
         });
         if backend.is_pelton() {
-            conn.exec_drop("INSERT INTO oc_groups VALUES (?)", (&self.gid,)).unwrap();
+            conn.query_drop(&format!("INSERT INTO oc_groups VALUES ('{}')", &self.gid)).unwrap();
         }
     }
 }
@@ -250,7 +254,7 @@ fn main() {
                 (@arg backend: --backend ... +required +takes_value "Backend type to use")
                 (@arg num_samples: --samples +takes_value "Number of samples to time")
                 (@arg dump_db: --("dump-db-after") "Dump the entire mysql database after")
-                (@arg outfile: -o "File for writing output to (defaults to stdout")
+                (@arg outfile: -o --out +takes_value "File for writing output to (defaults to stdout")
                 (@arg debug: --debug "Compile and run in debug mode")
         ).get_matches();
 
@@ -267,13 +271,18 @@ fn main() {
         debug: matches.is_present("debug"),
     };
 
+
     let mut f = if let Some(fname) = &args.outfile {
         Box::new(std::fs::File::create(fname).unwrap()) as Box<dyn Write>
     } else {
         Box::new(std::io::stdout()) as Box<dyn Write>
     };
 
-    let mut bazel_args = vec!["mysql_proxy/src:mysql_proxy"];
+    Command::new("env").spawn().unwrap().wait().unwrap();
+
+    return;
+
+    let mut bazel_args = vec!["mysql_proxy/src:mysql_proxy", "--config", "asan"];
     let mut pelton_args = vec![];
     if args.debug {
         pelton_args.push("-alsologtostderr");
@@ -291,7 +300,7 @@ fn main() {
         }
         Command::new("bazel")
             .args(args)
-            .current_dir("../..")
+            .current_dir("/home/pelton")
             .spawn()
             .unwrap()
     };
@@ -307,15 +316,12 @@ fn main() {
 
         args.backends.iter().for_each(|backend| {
             let pelton_handle = if backend.is_pelton() {
-                std::fs::read_dir("/tmp/pelton/pelton").unwrap().for_each(|p| {
-                    let entry = p.unwrap();
-                    eprintln!("Deleting {}", entry.path().to_str().unwrap());
-                    if entry.file_type().unwrap().is_dir() {
-                        std::fs::remove_dir_all(entry.path()).unwrap();
-                    } else {
-                        std::fs::remove_file(entry.path()).unwrap();
+                let rm_res = std::fs::remove_dir_all("/var/pelton/rocksdb/pelton");
+                if let Err(e) = &rm_res {
+                    if e.kind() != std::io::ErrorKind::NotFound {
+                        panic!("{}", e);
                     }
-                });
+                }
                 Some(
                     CloseProc::new(run_bazel_command("run", &pelton_args))
                 )
