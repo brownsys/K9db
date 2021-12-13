@@ -146,6 +146,10 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
   } else {  // is_sharded == true
     // Case 2: table is sharded.
     if (ModifiesShardBy(stmt, state)) {
+      if (!update_flows) {
+        LOG(FATAL) << "Moving update with update_flows = false";
+      }
+
       // The update statement might move the rows from one shard to another.
       // We can only perform this update by splitting it into a DELETE-INSERT
       // pair.
@@ -158,6 +162,13 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
       result.Append(std::move(tmp), true);
 
       // Insert updated records.
+      if (old_records_size > 10 || records.size() - old_records_size > 10) {
+        size_t deletes = old_records_size;
+        size_t inserts = records.size() - old_records_size;
+        LOG(WARNING) << "Perf Warning: large moving update with " << inserts
+                     << " inserts and " << deletes
+                     << " deletes. Query: " << stmt;
+      }
       for (size_t i = old_records_size; i < records.size(); i++) {
         sqlast::Insert insert_stmt =
             InsertRecord(records.at(i), state->GetSchema(table_name));
@@ -208,6 +219,10 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
           // We already have the data we need to delete, we can use it to get an
           // accurate enumeration of shards to execute this one.
           std::unordered_set<UserId> shards;
+          if (records.size() > 10) {
+            LOG(WARNING) << "Perf Warning: " << records.size() << " updates "
+                         << stmt;
+          }
           for (const dataflow::Record &record : records) {
             std::string val = record.GetValueString(info.shard_by_index);
             if (info.IsTransitive()) {
@@ -222,7 +237,10 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
               shards.insert(std::move(val));
             }
           }
-
+          if (shards.size() > 5) {
+            LOG(WARNING) << "Perf Warning: Update over " << shards.size()
+                         << " shards with update_flows = true. " << stmt;
+          }
           result.Append(exec.Shards(&cloned, shard_kind, shards), true);
         } else {
           // The update statement by itself does not obviously constraint a
@@ -237,6 +255,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
           } else {
             // Update against all shards.
             const auto &user_ids = state->UsersOfShard(shard_kind);
+            if (user_ids.size() > 0) {
+              LOG(WARNING) << "Perf Warning: Update over all shards " << stmt;
+            }
             result.Append(exec.Shards(&cloned, shard_kind, user_ids), true);
           }
         }

@@ -54,6 +54,12 @@ struct LookupCondition {
 std::vector<dataflow::Record> LookupRecords(const dataflow::DataFlowGraph &flow,
                                             const LookupCondition &condition,
                                             int limit, size_t offset) {
+  if (limit == -1) {
+    limit = flow.GetPartition(0)->outputs().at(0)->limit();
+  }
+  if (offset == 0) {
+    offset = flow.GetPartition(0)->outputs().at(0)->offset();
+  }
   // By ordered key.
   if (condition.greater_key) {
     return flow.LookupKeyGreater(*condition.greater_key, limit, offset);

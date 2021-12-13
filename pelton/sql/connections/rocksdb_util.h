@@ -12,6 +12,7 @@
 #include "pelton/sql/connection.h"
 #include "pelton/sqlast/ast.h"
 #include "rocksdb/slice.h"
+#include "rocksdb/slice_transform.h"
 
 namespace pelton {
 namespace sql {
@@ -124,6 +125,18 @@ class FilterVisitor : public sqlast::AbstractVisitor<bool> {
   rocksdb::Slice slice_;
   dataflow::SchemaRef schema_;
   std::unordered_map<size_t, std::pair<size_t, size_t>> positions_;
+};
+
+class ShardPrefixTransform : public rocksdb::SliceTransform {
+ public:
+  ShardPrefixTransform(size_t seps) : seps_(seps) {}
+
+  const char *Name() const override { return "ShardPrefix"; }
+  bool InDomain(const rocksdb::Slice &key) const override { return true; }
+  rocksdb::Slice Transform(const rocksdb::Slice &key) const override;
+
+ private:
+  size_t seps_;
 };
 
 }  // namespace sql

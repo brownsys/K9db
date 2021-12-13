@@ -34,11 +34,11 @@ FFIArgs FFIGflags(int argc, char **argv, const char *usage) {
 // Initialize pelton_state in pelton.cc
 bool FFIInitialize(size_t workers, bool consistent) {
   // call c++ function from C with converted types
-  VLOG(2) << "C-Wrapper: running pelton::initialize";
+  LOG(INFO) << "C-Wrapper: running pelton::initialize";
   if (pelton::initialize(workers, consistent)) {
-    VLOG(1) << "C-Wrapper: global connection opened";
+    LOG(INFO) << "C-Wrapper: global connection opened";
   } else {
-    LOG(ERROR) << "C-Wrapper: failed to open global connection";
+    LOG(FATAL) << "C-Wrapper: failed to open global connection";
     return false;
   }
   return true;
@@ -47,9 +47,6 @@ bool FFIInitialize(size_t workers, bool consistent) {
 // Open a connection for a single client. The returned struct has connected =
 // true if successful. Otherwise connected = false
 FFIConnection FFIOpen(const char *db_name) {
-  // Log debugging information
-  VLOG(2) << "C-Wrapper: db_name is: " << std::string(db_name);
-
   // convert char* to const std::string
   const std::string c_db(db_name);
 
@@ -62,12 +59,10 @@ FFIConnection FFIOpen(const char *db_name) {
       reinterpret_cast<pelton::Connection *>(c_conn.cpp_conn);
 
   // call c++ function from C with converted types
-  VLOG(2) << "C-Wrapper: running pelton::open";
   if (pelton::open(cpp_conn, c_db)) {
-    VLOG(1) << "C-Wrapper: connection opened";
     c_conn.connected = true;
   } else {
-    LOG(ERROR) << "C-Wrapper: failed to open connection";
+    LOG(FATAL) << "C-Wrapper: failed to open connection";
     c_conn.connected = false;
   }
   return c_conn;
@@ -75,13 +70,15 @@ FFIConnection FFIOpen(const char *db_name) {
 
 // Delete pelton_state. Returns true if successful and false otherwise.
 bool FFIShutdown() {
-  VLOG(2) << "C-Wrapper: Closing global connection";
+  LOG(INFO) << "C-Wrapper: Closing global connection";
   bool response = pelton::shutdown();
   if (response) {
-    VLOG(1) << "C-Wrapper: global connection closed";
+    LOG(INFO) << "C-Wrapper: global connection closed";
     return true;
+  } else {
+    LOG(FATAL) << "C-Wrapper: global connection close false";
+    return false;
   }
-  return false;
 }
 
 // Close the connection. Returns true if successful and false otherwise.
@@ -92,13 +89,12 @@ bool FFIClose(FFIConnection *c_conn) {
   if (cpp_conn != nullptr) {
     bool response = pelton::close(cpp_conn);
     if (response) {
-      VLOG(1) << "C-Wrapper: connection closed";
       delete reinterpret_cast<pelton::Connection *>(cpp_conn);
       c_conn->connected = false;
       c_conn->cpp_conn = nullptr;
       return true;
     } else {
-      LOG(ERROR) << "C-Wrapper: failed to close connection";
+      LOG(FATAL) << "C-Wrapper: failed to close connection";
       return false;
     }
   }
@@ -107,12 +103,11 @@ bool FFIClose(FFIConnection *c_conn) {
 
 // Execute a DDL statement (e.g. CREATE TABLE, CREATE VIEW, CREATE INDEX).
 bool FFIExecDDL(FFIConnection *c_conn, const char *query) {
-  VLOG(2) << "C-Wrapper: executing ddl " << std::string(query);
   pelton::Connection *cpp_conn =
       reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
   absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
   if (!result.ok()) {
-    VLOG(2) << "C-Wrapper: " << result.status();
+    LOG(FATAL) << "C-Wrapper: " << result.status();
   }
   return result.ok() && result.value().Success();
 }
@@ -120,12 +115,11 @@ bool FFIExecDDL(FFIConnection *c_conn, const char *query) {
 // Execute an update statement (e.g. INSERT, UPDATE, DELETE).
 // Returns -1 if error, otherwise returns the number of affected rows.
 int FFIExecUpdate(FFIConnection *c_conn, const char *query) {
-  VLOG(2) << "C-Wrapper: executing update " << std::string(query);
   pelton::Connection *cpp_conn =
       reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
   absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
   if (!result.ok()) {
-    VLOG(2) << "C-Wrapper: " << result.status();
+    LOG(FATAL) << "C-Wrapper: " << result.status();
   }
   if (result.ok()) {
     return result.value().UpdateCount();
@@ -222,12 +216,11 @@ void PopulateRecords(FFIResult *c_result,
 // Executes a query (SELECT).
 // Returns nullptr (0) on error.
 FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
-  VLOG(2) << "C-Wrapper: executing query " << std::string(query);
   pelton::Connection *cpp_conn =
       reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
   absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
   if (!result.ok()) {
-    VLOG(2) << "C-Wrapper: " << result.status();
+    LOG(FATAL) << "C-Wrapper: " << result.status();
   }
 
   if (result.ok()) {
@@ -251,8 +244,6 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
       PopulateRecords(c_result, records);
       return c_result;  // TODO(babman): this is where we can support GDPR GET.
     }
-  } else {
-    VLOG(2) << "C-Wrapper: Result.ok()" << result.status();
   }
   return nullptr;
 }

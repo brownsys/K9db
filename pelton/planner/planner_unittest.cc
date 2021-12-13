@@ -1198,5 +1198,53 @@ TEST(PlannerTest, BasicLeftJoin) {
   state.Shutdown();
 }
 
+// Test case with limit and offset.
+TEST(PlannerTest, SimpleLimitOffset) {
+  // Create a schema.
+  std::vector<std::string> names = {"Col1", "Col2", "Col3"};
+  std::vector<CType> types = {CType::INT, CType::TEXT, CType::INT};
+  std::vector<dataflow::ColumnID> keys = {0};
+  dataflow::SchemaRef schema =
+      dataflow::SchemaFactory::Create(names, types, keys);
+
+  // Make a dummy query.
+  std::string query = "SELECT Col3 FROM test_table ORDER BY Col3 LIMIT 1";
+
+  // Create a dummy state.
+  dataflow::DataFlowState state(0, false);
+  state.AddTableSchema("test_table", schema);
+
+  // Plan the graph via calcite.
+  auto graph = PlanGraph(&state, query);
+
+  // Check that the graph is what we expect!
+  EXPECT_EQ(graph->inputs().at("test_table")->input_name(), "test_table");
+  EXPECT_EQ(graph->GetNode(0), graph->inputs().at("test_table"));
+  EXPECT_EQ(graph->GetNode(1)->type(), dataflow::Operator::Type::PROJECT);
+  EXPECT_EQ(graph->GetNode(2)->type(), dataflow::Operator::Type::MAT_VIEW);
+
+  // Get project operator for performing deep schema checks
+  auto projectOp = static_cast<dataflow::ProjectOperator *>(graph->GetNode(1));
+  std::vector<dataflow::Record> expected_records;
+  expected_records.emplace_back(projectOp->output_schema(), true, 20_s);
+  std::vector<dataflow::Record> expected_records2;
+  expected_records2.emplace_back(projectOp->output_schema(), true, 20_s);
+  expected_records2.emplace_back(projectOp->output_schema(), true, 50_s);
+
+  // Try to process some records through flow.
+  std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
+  std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
+  std::vector<dataflow::Record> records;
+  records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
+  records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
+  graph->_Process("test_table", std::move(records));
+
+  // Look at flow output.
+  EXPECT_EQ_MSET(graph->outputs().at(0)->All(1), expected_records);
+  EXPECT_EQ_MSET(graph->outputs().at(0)->All(2), expected_records2);
+
+  state.Shutdown();
+}
+
 }  // namespace planner
 }  // namespace pelton

@@ -160,9 +160,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
           const auto &user_ids = state->UsersOfShard(shard_kind);
           if (user_ids.size() > 0) {
             sqlast::Stringifier stringifier("");
-            LOG(WARNING) << "Query over table " << stmt.table_name()
-                         << " executed over all shards, this will be slow!"
-                         << " the query: " << stmt.Visit(&stringifier);
+            LOG(WARNING) << "Perf Warning: query executed over all shards. "
+                         << "This will be slow! The query: " << stmt;
           }
           result.Append(
               exec.Shards(&cloned, shard_kind, user_ids, schema, aug_index),
