@@ -46,21 +46,11 @@ class SingletonRocksdbConnection {
   // Helpers.
   // Get the shard id or create a new one if new.
   ShardID GetOrCreateShardID(const std::string &shard_name) {
-    if (this->shards_.count(shard_name) == 0) {
-      std::string sid = std::to_string(this->shards_.size());
-      sid.push_back('_');
-      this->shards_.emplace(shard_name, sid);
-      return sid;
-    } else {
-      return this->shards_.at(shard_name);
-    }
+    return shard_name + "_";
   }
   // Get the shard id or none if it does not exist.
   std::optional<ShardID> GetShardID(const std::string &shard_name) {
-    if (this->shards_.count(shard_name) == 1) {
-      return this->shards_.at(shard_name);
-    }
-    return {};
+    return shard_name + "_";
   }
   // Get record matching values in a value mapper (either by key, index, or it).
   std::vector<std::string> Get(const sqlast::AbstractStatement *stmt,
@@ -73,7 +63,6 @@ class SingletonRocksdbConnection {
 
   // Members.
   std::unique_ptr<rocksdb::DB> db_;
-  std::unordered_map<std::string, ShardID> shards_;
   std::unordered_map<std::string, TableID> tables_;
   std::unordered_map<TableID, std::unique_ptr<rocksdb::ColumnFamilyHandle>>
       handlers_;
