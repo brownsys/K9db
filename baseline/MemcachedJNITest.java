@@ -88,7 +88,7 @@ public class MemcachedJNITest {
     String[] expected;
 
     // Initialize.
-    MemcachedJNI.Initialize("memcached", "root", "password", "jni");
+    MemcachedJNI.Initialize("memcachedjni", "root", "password", "jni");
 
     // Create tables and insert data.
     for (String create : SCHEMA) {
@@ -220,7 +220,7 @@ public class MemcachedJNITest {
     expected = new String[] {"|Zidane|-45|8000|"};
     assertTrue(equals(actual, expected));
 
-    MemcachedJNI.__ExecuteDB("DROP DATABASE memcached");
+    MemcachedJNI.__ExecuteDB("DROP DATABASE memcachedjni");
 
     // Free.
     MemcachedJNI.Close();

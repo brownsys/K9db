@@ -421,5 +421,11 @@ std::unique_ptr<Expression> ExpressionRemover::VisitBinaryExpression(
   }
 }
 
+std::ostream &operator<<(std::ostream &os, const AbstractStatement &r) {
+  Stringifier stringifier("");
+  os << stringifier.Visit(&r);
+  return os;
+}
+
 }  // namespace sqlast
 }  // namespace pelton

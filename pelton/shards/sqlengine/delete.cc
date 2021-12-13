@@ -112,11 +112,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
               exec.Shards(&cloned, shard_kind, pair.second, schema, aug_index),
               true);
         } else {
-	  sqlast::Stringifier stringifier("");
-	  LOG(WARNING) << "Delete over all shards " << stringifier.Visit(&stmt);
           // Secondary index unhelpful.
           // Execute statement against all shards of this kind.
           const auto &user_ids = state->UsersOfShard(shard_kind);
+          if (user_ids.size() > 0) {
+            LOG(WARNING) << "Perf Warning: Delete over all shards " << stmt;
+          }
           result.Append(
               exec.Shards(&cloned, shard_kind, user_ids, schema, aug_index),
               true);

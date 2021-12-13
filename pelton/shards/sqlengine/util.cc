@@ -15,7 +15,7 @@ namespace sqlengine {
 static std::unordered_map<std::string, std::string> HASHMAP;
 
 std::string NameShard(const ShardKind &shard_kind, const UserId &user_id) {
-	return shard_kind + user_id;
+  return shard_kind + user_id;
 }
 
 }  // namespace sqlengine

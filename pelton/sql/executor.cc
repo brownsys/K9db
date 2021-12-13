@@ -88,10 +88,9 @@ SqlResult PeltonExecutor::Shards(
   // If no user_ids are provided, we return an empty result.
   SqlResult result = EmptyResult(sql, schema);
 
-  if (user_ids.size() > 10) {
-    sqlast::Stringifier stringifier("");
-    LOG(WARNING) << "Some query executes over more than 10 shards "
-	         << user_ids.size() << " query " << stringifier.Visit(sql);
+  if (user_ids.size() > 5) {
+    LOG(WARNING) << "Perf Warning: some query executes over more than 5 shards "
+                 << user_ids.size() << " query " << *sql;
   }
 
   // This result set is a proxy that allows access to results from all shards.

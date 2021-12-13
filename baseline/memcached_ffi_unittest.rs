@@ -66,7 +66,7 @@ mod tests {
   #[test]
   fn test1() {
     // Initialize.
-    MemInitialize("memcached", "root", "password", "rust");
+    MemInitialize("memcachedrust", "root", "password", "rust");
     for schema in &SCHEMA {
       __MemExecuteDB(schema);
     }
@@ -130,7 +130,7 @@ mod tests {
     assert!(eq(MemRead(3, MemCreateKey(vec![MemSetStr("Zidane"), MemSetInt(-45)])), "|Zidane|-45|8000|"));
 
     // Done.
-    __MemExecuteDB("DROP DATABASE memcached");
+    __MemExecuteDB("DROP DATABASE memcachedrust");
 
     // Free memory.
     MemClose();

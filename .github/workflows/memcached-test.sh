@@ -11,7 +11,7 @@ pid=$!
 sleep 10
 
 # Run the test.
-bazel test //baseline/... --test_output=all
+bazel test //baseline/... --test_output=all --cache_test_results=no
 code=$?
 
 # Kill memcached.

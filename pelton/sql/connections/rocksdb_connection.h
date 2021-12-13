@@ -54,7 +54,7 @@ class SingletonRocksdbConnection {
   }
   // Get record matching values in a value mapper (either by key, index, or it).
   std::vector<std::string> Get(const sqlast::AbstractStatement *stmt,
-		               TableID table_id, ShardID shard_id,
+                               TableID table_id, ShardID shard_id,
                                const ValueMapper &value_mapper);
   // Filter records by where clause in abstract statement.
   std::vector<std::string> Filter(const dataflow::SchemaRef &schema,

@@ -233,6 +233,10 @@ int SingletonRocksdbConnection::ExecuteUpdate(
       // Look up all affected rows.
       std::vector<std::string> rows = this->Get(sql, tid, *sid, value_mapper);
       rows = this->Filter(db_schema, sql, std::move(rows));
+      if (rows.size() > 5) {
+        LOG(WARNING) << "Perf Warning: " << rows.size()
+                     << " rocksdb updates in a loop" << *sql;
+      }
       for (std::string &row : rows) {
         // Compute updated row.
         std::string nrow = Update(update, db_schema, row);
@@ -304,14 +308,6 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
       // Get the shard ID.
       std::optional<ShardID> sid = this->GetShardID(shard_name);
       if (!sid) {
-	if (stmt->table_name().find("stories") != std::string::npos) {
-	  sqlast::Stringifier stringifier(shard_name);
-	  //LOG(WARNING) << "did not find a story " << stringifier.Visit(stmt);
-	}
-	if (stmt->table_name().find("tags") != std::string::npos) {
-	  sqlast::Stringifier stringifier(shard_name);
-	  //LOG(WARNING) << "did not find a tag" << stringifier.Visit(stmt);
-	}
         break;
       }
 
@@ -332,18 +328,6 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
         records.push_back(
             DecodeRecord(slice, out_schema, augments, projections));
       }
-      if (records.size() == 0) {
-	if (stmt->table_name().find("stories") != std::string::npos) {
-	sqlast::Stringifier stringifier(shard_name);
-	//LOG(WARNING) << "did not find a story 2 " << stringifier.Visit(stmt);
-	}
-	if (stmt->table_name().find("tags") != std::string::npos) {
-	sqlast::Stringifier stringifier("");
-	//LOG(WARNING) << "did not find a tag 2 " << stringifier.Visit(stmt)
-	//	     << " at shard " << shard_name;
-	}
-      }
-
       break;
     }
     case sqlast::AbstractStatement::Type::DELETE: {
@@ -355,6 +339,10 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
       // Look up all the rows.
       std::vector<std::string> rows = this->Get(sql, tid, *sid, value_mapper);
       rows = this->Filter(db_schema, sql, std::move(rows));
+      if (rows.size() > 5) {
+        LOG(WARNING) << "Perf Warning: " << rows.size()
+                     << " rocksdb deletes in a loop" << *sql;
+      }
       for (std::string &row : rows) {
         rocksdb::Slice slice(row);
         // Get the key of the existing row.
@@ -437,8 +425,8 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
 // Helpers.
 // Get record matching values in a value mapper (either by key, index, or it).
 std::vector<std::string> SingletonRocksdbConnection::Get(
-    const sqlast::AbstractStatement *stmt,
-    TableID table_id, ShardID shard_id, const ValueMapper &value_mapper) {
+    const sqlast::AbstractStatement *stmt, TableID table_id, ShardID shard_id,
+    const ValueMapper &value_mapper) {
   // Read Metadata.
   rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(table_id).get();
   const dataflow::SchemaRef &schema = this->schemas_.at(table_id);
@@ -473,6 +461,10 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
   // Look in rocksdb.
   std::vector<std::string> result;
   if (found) {
+    if (keys.size() > 5) {
+      LOG(WARNING) << "Perf Warning: " << keys.size()
+                   << " rocksdb gets in a loop" << *stmt;
+    }
     // Can look up by keys directly.
     for (const std::string &skey : keys) {
       std::string str;
@@ -487,9 +479,7 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
   } else {
     // Need to lookup all records.
     if (HasWhereClause(stmt)) {
-      sqlast::Stringifier stringifier("");
-      LOG(WARNING) << "rocksdb: Query has no rocksdb index "
-                   << stringifier.Visit(stmt);
+      LOG(WARNING) << "Perf Warning: Query has no rocksdb index " << *stmt;
     }
     auto ptr = this->db_->NewIterator(rocksdb::ReadOptions(), handler);
     std::unique_ptr<rocksdb::Iterator> it(ptr);

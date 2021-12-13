@@ -188,8 +188,8 @@ RequiredKey DFS(const Operator &op, NodeIndex from, const ProducerKey &key,
           rkey = std::get<PartitionKey>(tmp);
         }
       }
-      LOG(WARNING) << "Node has children with different partition keys: "
-                      "exchanges may be suboptimal.";
+      LOG(WARNING) << "Plan Warning: Node has children with different partition"
+                      " keys: exchanges may be suboptimal.";
     } else if (children_keys.size() > 0) {
       // Check that (all) children have been constrained.
       const RequiredKey &child_key = children_keys.front();

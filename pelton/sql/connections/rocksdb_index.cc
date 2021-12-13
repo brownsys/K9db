@@ -64,6 +64,10 @@ std::vector<std::string> RocksdbIndex::Get(const std::string &value) {
 // Lookup by multiple values.
 std::vector<std::string> RocksdbIndex::Get(
     const ShardID &shard_id, const std::vector<rocksdb::Slice> &values) {
+  if (values.size() > 5) {
+    LOG(WARNING) << "Perf Warning: " << values.size() << " rocksdb index gets "
+                 << "in a loop";
+  }
   if (values.size() == 0) {
     return {};
   }
