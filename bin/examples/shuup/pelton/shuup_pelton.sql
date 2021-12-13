@@ -1,20 +1,3 @@
--- # TODO:
--- open github bug report for shuup regarded 
--- 1. anonymization button anonymizes everyone not just single user as shown
--- 2. mutaddress rows associated with completed orders are not anonymized, only outstanding orders are anonymized
--- 3. user download data button doesn't return any data
--- 4. cookies active by default?
--- 5. shuup doesn't delete any data, only anonymizes it 
-
--- # TODO: paper text on shuup
--- expressiveness, no overhead, class of applications in e-commerce where all data needs
--- to be retained for tax purposes
--- our annotations support this with no overhead bc all data is retained, so no microDBs/sharding needed
-
--- benchmarking: cost of accessor annotations on insert
--- quickly benchmark GDPR GET 
--- in future can run script to fill with fake data to see
-
 CREATE TABLE auth_users ( \
   id int, \
   password text, \
@@ -30,7 +13,7 @@ CREATE TABLE auth_users ( \
   PRIMARY KEY(id) \
 );
 
--- table that can be deleted (sharded)
+-- sharded
 CREATE TABLE shuup_basket ( \
   id int, \
   key text, \
@@ -55,7 +38,7 @@ CREATE TABLE shuup_basket ( \
   FOREIGN KEY (customer_id) REFERENCES shuup_contact(id) \
 );
 
--- table that can be deleted (sharded)
+-- sharded
 CREATE TABLE shuup_gdpr_gdpruserconsent ( \
   id int, \
   created_on datetime, \
@@ -74,38 +57,6 @@ CREATE TABLE shuup_personcontact ( \
   OWNER_user_id text, \
   PRIMARY KEY (contact_ptr_id), \
   FOREIGN KEY (user_id) REFERENCES auth_users(id) \
-);
-
--- ?
-CREATE TABLE shuup_contact ( \
-  id int, \
-  created_on datetime, \
-  modified_on datetime, \
-  identifier text, \
-  is_active int, \
-  _language text, \
-  marketing_permission text, \
-  phone int, \
-  www text, \
-  timezone text, \
-  prefix text, \
-  name text, \
-  name_ext text, \
-  email text, \
-  merchant_notes text, \
-  default_billing_address_id int, \
-  default_payment_method_id int, \
-  default_shipping_address_id int, \
-  default_shipping_method_id int, \
-  account_manager_id int, \
-  registration_shop_id int, \
-  options text, \
-  picture_id int, \
-  tax_group_id int, \
-  PRIMARY KEY (id), \
-  FOREIGN KEY (account_manager_id) REFERENCES shuup_personcontact(contact_ptr_id), \
-  FOREIGN KEY (default_billing_address_id) REFERENCES shuup_mutableaddress(id), \
-  FOREIGN KEY (default_shipping_address_id) REFERENCES shuup_mutableaddress(id), \
 );
 
 -- anonymized, retained
