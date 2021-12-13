@@ -114,7 +114,7 @@ static VIEWS: [&'static str; 16] = [
    "SELECT taggings.story_id, taggings.tag_id FROM taggings WHERE taggings.story_id = ? AND taggings.tag_id = ?",
 ];
 
-static CREATES: [&'static str; 22] = [
+static CREATES: [&'static str; 23] = [
 "CREATE TABLE users ( id int NOT NULL PRIMARY KEY, PII_username varchar(50) UNIQUE, email varchar(100), password_digest varchar(75), created_at datetime, is_admin int, password_reset_token varchar(75), session_token varchar(75) NOT NULL, about text, invited_by_user_id int, is_moderator int, pushover_mentions int, rss_token varchar(75), mailing_list_token varchar(75), mailing_list_mode int, karma int NOT NULL, banned_at datetime, banned_by_user_id int, banned_reason varchar(200), deleted_at datetime, disabled_invite_at datetime, disabled_invite_by_user_id int, disabled_invite_reason varchar(200), settings text, FOREIGN KEY (banned_by_user_id) REFERENCES users(id), FOREIGN KEY (invited_by_user_id) REFERENCES users(id), FOREIGN KEY (disabled_invite_by_user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
 "CREATE TABLE comments ( id int NOT NULL PRIMARY KEY, created_at datetime NOT NULL, updated_at datetime, short_id varchar(10) NOT NULL UNIQUE, story_id int NOT NULL, OWNER user_id int NOT NULL, parent_comment_id int, thread_id int, comment text NOT NULL, upvotes int NOT NULL, downvotes int NOT NULL, confidence int NOT NULL, markeddown_comment text, is_deleted int, is_moderated int, is_from_email int, hat_id int, FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;",
 "CREATE INDEX comments_short_index ON comments(short_id);",
@@ -127,6 +127,7 @@ static CREATES: [&'static str; 22] = [
 "CREATE TABLE messages ( id int NOT NULL PRIMARY KEY, created_at datetime, OWNER_author_user_id int, OWNER_recipient_user_id int, has_been_read int, subject varchar(100), body text, short_id varchar(30), deleted_by_author int, deleted_by_recipient int, FOREIGN KEY (OWNER_author_user_id) REFERENCES users(id), FOREIGN KEY (OWNER_recipient_user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;",
 "CREATE TABLE moderations ( id int NOT NULL PRIMARY KEY, created_at datetime NOT NULL, updated_at datetime NOT NULL, OWNER_moderator_user_id int, story_id int, comment_id int, OWNER_user_id int, `action` text, reason text, is_from_suggestions int, FOREIGN KEY (OWNER_user_id) REFERENCES users(id), FOREIGN KEY (OWNER_moderator_user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;",
 "CREATE TABLE read_ribbons ( id int NOT NULL PRIMARY KEY, is_following int, created_at datetime NOT NULL, updated_at datetime NOT NULL, OWNER user_id int, story_id int, FOREIGN KEY (user_id) REFERENCES users(id), FOREIGN KEY (story_id) REFERENCES stories(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;",
+"CREATE INDEX read_ribbons_id ON read_ribbons(id);",
 "CREATE TABLE saved_stories ( id int NOT NULL PRIMARY KEY, created_at datetime NOT NULL, updated_at datetime NOT NULL, OWNER user_id int, story_id int, FOREIGN KEY (user_id) REFERENCES users(id), FOREIGN KEY (story_id) REFERENCES stories(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
 "CREATE TABLE stories ( id int NOT NULL PRIMARY KEY, created_at datetime, user_id int, url varchar(250), title varchar(150) NOT NULL, description text, short_id varchar(6) NOT NULL UNIQUE, is_expired int NOT NULL, upvotes int NOT NULL, downvotes int NOT NULL, is_moderated int NOT NULL, hotness int NOT NULL, markeddown_description text, story_cache text, comments_count int NOT NULL, merged_story_id int, unavailable_at datetime, twitter_id varchar(20), user_is_author int, FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;",
 "CREATE INDEX storiespk ON stories(id);",
@@ -537,7 +538,6 @@ impl Backend {
         let create_view_stmt = self.create_view_stmt(&view_name, &prepared_statement);
         // Execute create view statement in Pelton
         panic!(
-            self.log,
             "[SELECT] Proxy thread tried to create view. prepared statement: {}",
             prepared_statement
         );

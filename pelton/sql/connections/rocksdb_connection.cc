@@ -215,7 +215,7 @@ int SingletonRocksdbConnection::ExecuteUpdate(
       }
 
       // Look up all affected rows.
-      std::vector<std::string> rows = this->Get(tid, *sid, value_mapper);
+      std::vector<std::string> rows = this->Get(sql, tid, *sid, value_mapper);
       rows = this->Filter(db_schema, sql, std::move(rows));
       for (std::string &row : rows) {
         // Compute updated row.
@@ -299,7 +299,7 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
       }
 
       // Look up all the rows.
-      std::vector<std::string> rows = this->Get(tid, *sid, value_mapper);
+      std::vector<std::string> rows = this->Get(sql, tid, *sid, value_mapper);
       rows = this->Filter(db_schema, sql, std::move(rows));
       for (std::string &row : rows) {
         rocksdb::Slice slice(row);
@@ -317,7 +317,7 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
         break;
       }
       // Look up all the rows.
-      std::vector<std::string> rows = this->Get(tid, *sid, value_mapper);
+      std::vector<std::string> rows = this->Get(sql, tid, *sid, value_mapper);
       rows = this->Filter(db_schema, sql, std::move(rows));
       for (std::string &row : rows) {
         rocksdb::Slice slice(row);
@@ -401,6 +401,7 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
 // Helpers.
 // Get record matching values in a value mapper (either by key, index, or it).
 std::vector<std::string> SingletonRocksdbConnection::Get(
+    const sqlast::AbstractStatement *stmt,
     TableID table_id, ShardID shard_id, const ValueMapper &value_mapper) {
   // Read Metadata.
   rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(table_id).get();
@@ -450,6 +451,8 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
   } else {
     // Need to lookup all records.
     LOG(WARNING) << "rocksdb: Query has no rocksdb index";
+    sqlast::Stringifier stringifier("");
+    LOG(WARNING) << stringifier.Visit(stmt);
     auto ptr = this->db_->NewIterator(rocksdb::ReadOptions(), handler);
     std::unique_ptr<rocksdb::Iterator> it(ptr);
     rocksdb::Slice pslice(shard_id);
