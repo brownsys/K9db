@@ -702,6 +702,11 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             param_count,
             stmt_id,
         );
+
+        if (param_count > 1000) {
+          println!("HIGH PARAM COUNT {} QUERY {}", param_count, prepared_statement);
+        }
+
         // Respond to client
         return info.reply(stmt_id, &params, &[]);
     }
