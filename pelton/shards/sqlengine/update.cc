@@ -208,6 +208,11 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
           // We already have the data we need to delete, we can use it to get an
           // accurate enumeration of shards to execute this one.
           std::unordered_set<UserId> shards;
+	  if (records.size() > 10) {
+            sqlast::Stringifier stringifier("");
+            LOG(WARNING) << "BIG UPDATE with update flows " << records.size()
+		         << " " << stringifier.Visit(&stmt);
+	  }
           for (const dataflow::Record &record : records) {
             std::string val = record.GetValueString(info.shard_by_index);
             if (info.IsTransitive()) {
@@ -235,6 +240,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
             // Secondary index available for some constrainted column in stmt.
             result.Append(exec.Shards(&cloned, shard_kind, pair.second), true);
           } else {
+            sqlast::Stringifier stringifier("");
+	    LOG(WARNING) << "Update over all shards " << stringifier.Visit(&stmt);
             // Update against all shards.
             const auto &user_ids = state->UsersOfShard(shard_kind);
             result.Append(exec.Shards(&cloned, shard_kind, user_ids), true);
