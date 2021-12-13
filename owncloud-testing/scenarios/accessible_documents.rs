@@ -87,14 +87,14 @@ fn main() {
 
         conn.query_drop("INSERT INTO oc_group_user VALUES (2, 'sanity', 'wong')").unwrap();
         conn.query_drop("INSERT INTO oc_group_user VALUES (3, 'sanity', 'claire')").unwrap();
-        conn.query_drop("INSERT INTO oc_users VALUES ('mindy', 'Mindy', '')").unwrap();
         conn.query_drop("INSERT INTO oc_groups VALUES ('sanity')").unwrap();
-        conn.query_drop("INSERT INTO oc_share VALUES (4, 1, NULL, 'sanity', 'mindy', 'mindy', NULL, 'file', 4, '', '', 24, 0, 0, NULL, '', 1, '', 24, 19)").unwrap();
+        conn.query_drop("INSERT INTO oc_share VALUES (4, 1, NULL, 'sanity', 'kashvi', 'kashvi', NULL, 'file', 4, '', '', 24, 0, 0, NULL, '', 1, '', 24, 19)").unwrap();
         conn.query_drop("INSERT INTO oc_files VALUES (4, 'The Order of the Phoenix')").unwrap();
         std::thread::sleep(std::time::Duration::from_secs(1));
         accessible_files(&mut conn, "wong");
 
         conn.query_drop("GDPR GET oc_users 'wong'").unwrap();
+        conn.query_drop("GDPR GET oc_users 'claire'").unwrap();
 
         wait_for_enter("Order of the phoenix shared with group");
 
