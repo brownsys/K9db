@@ -43,7 +43,7 @@ class Value {
 
   // Manually destruct string if value is a string.
   ~Value() {
-    if (this->null_) {
+    if (this->is_null_) {
       return;
     }
     if (this->type_ == sqlast::ColumnDefinition::Type::TEXT) {

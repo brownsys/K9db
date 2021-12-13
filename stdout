@@ -1,0 +1,28 @@
+Dec 13 01:40:05.473 INFO Rust proxy: running with args: 3 true "pelton"
+Dec 13 01:40:05.474 INFO Rust Proxy: opening connection globally: true
+Dec 13 01:40:05.474 INFO Rust Proxy: Listening at: TcpListener { addr: 127.0.0.1:10001, fd: 3 }
+Dec 13 01:40:05.573 DEBG [INIT] ddl_response is true
+Dec 13 01:40:05.576 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.224 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.240 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.241 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.243 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.243 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.258 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.259 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.273 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.275 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.276 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.277 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.290 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.292 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.294 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.307 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.321 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.351 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.352 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.353 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.354 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.354 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.356 DEBG [INIT] ddl_response is true
+Dec 13 01:40:07.373 DEBG [INIT] update response is 1
