@@ -16,7 +16,7 @@ CREATE TABLE auth_users ( \
 -- sharded
 CREATE TABLE shuup_basket ( \
   id int, \
-  key text, \
+  basket_key text, \
   created_on datetime, \
   updated_on datetime, \
   persistent int, \
@@ -34,7 +34,7 @@ CREATE TABLE shuup_basket ( \
   shop_id int, \
   orderer_id int, \
   PRIMARY KEY (id), \
-  FOREIGN KEY (creator_id) REFERENCES auth_users(id), \
+  FOREIGN KEY (OWNER_creator_id) REFERENCES auth_users(id), \
   FOREIGN KEY (customer_id) REFERENCES shuup_contact(id) \
 );
 
@@ -44,7 +44,7 @@ CREATE TABLE shuup_gdpr_gdpruserconsent ( \
   created_on datetime, \
   shop_id int, \
   OWNER_user_id int, \
-  FOREIGN KEY (user_id) REFERENCES auth_users(id) \
+  FOREIGN KEY (OWNER_user_id) REFERENCES auth_users(id) \
 );
 
 -- sharded
@@ -56,7 +56,7 @@ CREATE TABLE shuup_personcontact ( \
   last_name int, \
   OWNER_user_id text, \
   PRIMARY KEY (contact_ptr_id), \
-  FOREIGN KEY (user_id) REFERENCES auth_users(id) \
+  FOREIGN KEY (OWNER_user_id) REFERENCES auth_users(id) \
 );
 
 -- anonymized, retained
