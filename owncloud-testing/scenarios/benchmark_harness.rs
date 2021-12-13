@@ -278,17 +278,14 @@ fn main() {
         Box::new(std::io::stdout()) as Box<dyn Write>
     };
 
-    Command::new("env").spawn().unwrap().wait().unwrap();
-
-    return;
-
-    let mut bazel_args = vec!["mysql_proxy/src:mysql_proxy", "--config", "asan"];
+    let mut bazel_args = vec!["mysql_proxy/src:mysql_proxy"];
     let mut pelton_args = vec![];
     if args.debug {
         pelton_args.push("-alsologtostderr");
     } else {
         bazel_args.push("--config");
         bazel_args.push("opt");
+        pelton_args.push("-minloglevel=2");
     }
 
     let run_bazel_command = |build: &str, run_args: &[&str] | {
