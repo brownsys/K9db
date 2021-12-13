@@ -1,5 +1,7 @@
 #include "pelton/sql/connections/rocksdb_index.h"
 
+#include <algorithm>
+
 #include "pelton/sql/connections/rocksdb_util.h"
 #include "pelton/util/status.h"
 
@@ -38,46 +40,37 @@ void RocksdbIndex::Delete(const std::string &value, const rocksdb::Slice &key) {
   PANIC_STATUS(this->db_->Delete(rocksdb::WriteOptions(), handle, kslice));
 }
 
-// Lookup by a single value.
-std::vector<std::string> RocksdbIndex::Get(const std::string &value) {
-  rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
-  std::string prefix = value + __ROCKSSEP;
-  rocksdb::Slice pslice(prefix);
-  // Read using prefix.
-  std::vector<std::string> result;
-  auto ptr = this->db_->NewIterator(rocksdb::ReadOptions(), handle);
-  std::unique_ptr<rocksdb::Iterator> it(ptr);
-  for (it->Seek(pslice); it->Valid(); it->Next()) {
-    rocksdb::Slice row = it->key();
-    if (row.size() < pslice.size()) {
-      break;
-    }
-    if (!SlicesEq(pslice, rocksdb::Slice(row.data(), pslice.size()))) {
-      break;
-    }
-    rocksdb::Slice key = ExtractColumn(row, 1);
-    result.push_back(key.ToString());
-  }
-  return result;
-}
-
 // Lookup by multiple values.
 std::vector<std::string> RocksdbIndex::Get(
     const ShardID &shard_id, const std::vector<rocksdb::Slice> &values) {
-  if (values.size() > 5) {
-    LOG(WARNING) << "Perf Warning: " << values.size() << " rocksdb index gets "
-                 << "in a loop";
-  }
   if (values.size() == 0) {
     return {};
   }
-  std::string key = shard_id + values.front().ToString();
-  std::vector<std::string> result = this->Get(key);
-  for (size_t i = 1; i < values.size(); i++) {
-    key = shard_id + values.at(i).ToString();
-    std::vector<std::string> tmp = this->Get(key);
-    for (auto &str : tmp) {
-      result.push_back(std::move(str));
+  // Will store result.
+  std::vector<std::string> result;
+  // Open an iterator.
+  auto ptr =
+      this->db_->NewIterator(rocksdb::ReadOptions(), this->handle_.get());
+  std::unique_ptr<rocksdb::Iterator> it(ptr);
+  // Make and sort all prefixes.
+  std::vector<std::string> prefixes;
+  prefixes.reserve(values.size());
+  for (const rocksdb::Slice &slice : values) {
+    prefixes.push_back(shard_id + slice.ToString() + __ROCKSSEP);
+  }
+  std::sort(prefixes.begin(), prefixes.end());
+  // Go through prefixes in order.
+  for (const std::string &prefix : prefixes) {
+    rocksdb::Slice pslice(prefix);
+    for (it->Seek(pslice); it->Valid(); it->Next()) {
+      rocksdb::Slice row = it->key();
+      if (row.size() < pslice.size()) {
+        break;
+      }
+      if (!SlicesEq(pslice, rocksdb::Slice(row.data(), pslice.size()))) {
+        break;
+      }
+      result.push_back(ExtractColumn(row, 1).ToString());
     }
   }
   return result;

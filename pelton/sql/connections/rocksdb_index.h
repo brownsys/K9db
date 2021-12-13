@@ -20,7 +20,6 @@ class RocksdbIndex {
   void Add(const std::string &index_value, const rocksdb::Slice &key);
   void Delete(const std::string &index_value, const rocksdb::Slice &key);
 
-  std::vector<std::string> Get(const std::string &index_value);
   std::vector<std::string> Get(const ShardID &shard_id,
                                const std::vector<rocksdb::Slice> &values);
 

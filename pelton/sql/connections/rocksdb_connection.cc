@@ -461,20 +461,45 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
   // Look in rocksdb.
   std::vector<std::string> result;
   if (found) {
-    if (keys.size() > 5) {
-      LOG(WARNING) << "Perf Warning: " << keys.size()
-                   << " rocksdb gets in a loop" << *stmt;
-    }
-    // Can look up by keys directly.
-    for (const std::string &skey : keys) {
+    if (keys.size() == 1) {
       std::string str;
       rocksdb::Status status =
-          this->db_->Get(rocksdb::ReadOptions(), handler, skey, &str);
+          this->db_->Get(rocksdb::ReadOptions(), handler, keys.front(), &str);
       if (status.ok()) {
         result.push_back(std::move(str));
       } else if (!status.IsNotFound()) {
         PANIC(status);
       }
+    } else if (keys.size() > 1) {
+      // Make slices for keys.
+      rocksdb::Slice *slices = new rocksdb::Slice[keys.size()];
+      std::string *tmp = new std::string[keys.size()];
+      rocksdb::PinnableSlice *pins = new rocksdb::PinnableSlice[keys.size()];
+      rocksdb::Status *statuses = new rocksdb::Status[keys.size()];
+      for (size_t i = 0; i < keys.size(); i++) {
+        slices[i] = rocksdb::Slice(keys.at(i));
+        pins[i] = rocksdb::PinnableSlice(tmp + i);
+      }
+      // Use MultiGet.
+      this->db_->MultiGet(rocksdb::ReadOptions(), handler, keys.size(), slices,
+                          pins, statuses);
+      // Read values that were found.
+      for (size_t i = 0; i < keys.size(); i++) {
+        rocksdb::Status &status = statuses[i];
+        if (status.ok()) {
+          if (pins[i].IsPinned()) {
+            tmp[i].assign(pins[i].data(), pins[i].size());
+          }
+          result.push_back(std::move(tmp[i]));
+        } else if (!status.IsNotFound()) {
+          PANIC(status);
+        }
+      }
+      // Cleanup memory.
+      delete[] statuses;
+      delete[] pins;
+      delete[] tmp;
+      delete[] slices;
     }
   } else {
     // Need to lookup all records.
