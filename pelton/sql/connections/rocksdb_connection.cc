@@ -449,7 +449,7 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
     }
   } else {
     // Need to lookup all records.
-    LOG(INFO) << "rocksdb: Query has no rocksdb index";
+    LOG(WARNING) << "rocksdb: Query has no rocksdb index";
     auto ptr = this->db_->NewIterator(rocksdb::ReadOptions(), handler);
     std::unique_ptr<rocksdb::Iterator> it(ptr);
     rocksdb::Slice pslice(shard_id);
