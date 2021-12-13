@@ -125,10 +125,12 @@ CREATE TABLE shuup_order ( \
   payment_date datetime, \
   billing_address_id int, \
   shipping_address_id int, \
+  customer_id int, \
   PRIMARY KEY (id), \
   FOREIGN KEY (ACCESSOR_ANONYMIZE_customer_id) REFERENCES auth_users(id), \
   FOREIGN KEY (billing_address_id) REFERENCES shuup_immutableaddress(id), \
   FOREIGN KEY (shipping_address_id) REFERENCES shuup_immutableaddress(id) \
+  FOREIGN KEY (customer_id) REFERENCES shuup_contact(id) \
 );
 
 INSERT INTO auth_users VALUES (1, 'password', '2021-04-21 01:00:00', 0, 'user1', 'banjy', 'banjy@evil.com', 0, 1, '2021-04-21 01:00:00', 'evil');
