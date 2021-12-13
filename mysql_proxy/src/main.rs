@@ -47,13 +47,13 @@ static NO_VIEWS: [&'static str; 22] = [
     "SELECT * FROM tbl WHERE id = ? AND age > ?",
     // TODO: add lobsters here.
     "SELECT 1 AS `one` FROM users WHERE users.PII_username = ?",
-    "SELECT 1 AS `one`, short_id FROM stories WHERE stories.short_id = ?",
+    "SELECT 1 AS `one`, stories.short_id FROM stories WHERE stories.short_id = ?",
     "SELECT tags.* FROM tags WHERE tags.inactive = 0 AND tags.tag = ?",
     "SELECT keystores.* FROM keystores WHERE keystores.keyX = ?",
     "SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND votes.story_id = ? AND votes.comment_id IS NULL",
     "SELECT stories.* FROM stories WHERE stories.short_id = ?",
     "SELECT users.* FROM users WHERE users.id = ?",
-    "SELECT 1 AS `one`, short_id FROM comments WHERE comments.short_id = ?",
+    "SELECT 1 AS `one`, comments.short_id FROM comments WHERE comments.short_id = ?",
     "SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND votes.story_id = ? AND votes.comment_id = ?",
     "SELECT comments.* FROM comments WHERE comments.story_id = ? AND comments.short_id = ?",
     "SELECT read_ribbons.* FROM read_ribbons WHERE read_ribbons.user_id = ? AND read_ribbons.story_id = ?",
@@ -69,6 +69,127 @@ static NO_VIEWS: [&'static str; 22] = [
     "SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND votes.comment_id = ?",
     "SELECT comments.* FROM comments WHERE comments.short_id = ?",
 ];
+
+static VIEWS: [&'static str; 16] = [
+    "SELECT comments.upvotes, comments.downvotes, comments.story_id FROM comments JOIN stories ON comments.story_id = stories.id WHERE comments.story_id = ? AND comments.user_id != stories.user_id",
+    "SELECT stories.id, stories.merged_story_id FROM stories WHERE stories.merged_story_id = ?",
+    "SELECT comments.*, comments.upvotes - comments.downvotes AS saldo FROM comments WHERE comments.story_id = ? ORDER BY saldo ASC, confidence DESC",
+    "SELECT tags.*, taggings.story_id FROM tags INNER JOIN taggings ON tags.id = taggings.tag_id WHERE taggings.story_id = ?",
+    "SELECT stories.* FROM stories WHERE stories.merged_story_id IS NULL AND stories.is_expired = 0 AND stories.upvotes - stories.downvotes >= 0 ORDER BY hotness ASC LIMIT 51",
+    "SELECT votes.* FROM votes WHERE votes.comment_id = ?",
+    "SELECT tags.id, stories.user_id, count(*) AS `count` FROM tags INNER JOIN taggings ON tags.id = taggings.tag_id INNER JOIN stories ON taggings.story_id = stories.id WHERE tags.inactive = 0 AND stories.user_id = ? GROUP BY tags.id, stories.user_id ORDER BY `count` DESC LIMIT 1",
+    "SELECT suggested_titles.* FROM suggested_titles WHERE suggested_titles.story_id = ?",
+    "SELECT taggings.* FROM taggings WHERE taggings.story_id = ?",
+    "SELECT 1 AS `one`, hats.OWNER_user_id FROM hats WHERE hats.OWNER_user_id = ? LIMIT 1",
+    "SELECT suggested_taggings.* FROM suggested_taggings WHERE suggested_taggings.story_id = ?",
+    "SELECT comments.* FROM comments WHERE comments.is_deleted = 0 AND comments.is_moderated = 0 ORDER BY id DESC LIMIT 40",
+    "SELECT stories.* FROM stories WHERE stories.id = ?",
+    "SELECT stories.* FROM stories WHERE stories.merged_story_id IS NULL AND stories.is_expired = 0 AND stories.upvotes - stories.downvotes <= 5 ORDER BY stories.id DESC LIMIT 51",
+    "SELECT read_ribbons.user_id, COUNT(*) \
+    FROM read_ribbons \
+    JOIN stories ON (read_ribbons.story_id = stories.id) \
+    JOIN comments ON (read_ribbons.story_id = comments.story_id) \
+    LEFT JOIN comments AS parent_comments \
+    ON (comments.parent_comment_id = parent_comments.id) \
+    WHERE read_ribbons.is_following = 1 \
+    AND comments.user_id <> read_ribbons.user_id \
+    AND comments.is_deleted = 0 \
+    AND comments.is_moderated = 0 \
+    AND ( comments.upvotes - comments.downvotes ) >= 0 \
+    AND read_ribbons.updated_at < comments.created_at \
+    AND ( \
+       ( \
+              parent_comments.user_id = read_ribbons.user_id \
+              AND \
+              ( parent_comments.upvotes - parent_comments.downvotes ) >= 0 \
+       ) \
+       OR \
+       ( \
+              parent_comments.id IS NULL \
+              AND \
+              stories.user_id = read_ribbons.user_id \
+       ) \
+   ) GROUP BY read_ribbons.user_id HAVING read_ribbons.user_id = ?",
+   // Not present in the schema file in pelton's repo but this requires a view.
+   "SELECT taggings.story_id, taggings.tag_id FROM taggings WHERE taggings.story_id = ? AND taggings.tag_id = ?",
+];
+
+static CREATES: [&'static str; 22] = [
+"CREATE TABLE users ( id int NOT NULL PRIMARY KEY, PII_username varchar(50) UNIQUE, email varchar(100), password_digest varchar(75), created_at datetime, is_admin int, password_reset_token varchar(75), session_token varchar(75) NOT NULL, about text, invited_by_user_id int, is_moderator int, pushover_mentions int, rss_token varchar(75), mailing_list_token varchar(75), mailing_list_mode int, karma int NOT NULL, banned_at datetime, banned_by_user_id int, banned_reason varchar(200), deleted_at datetime, disabled_invite_at datetime, disabled_invite_by_user_id int, disabled_invite_reason varchar(200), settings text, FOREIGN KEY (banned_by_user_id) REFERENCES users(id), FOREIGN KEY (invited_by_user_id) REFERENCES users(id), FOREIGN KEY (disabled_invite_by_user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
+"CREATE TABLE comments ( id int NOT NULL PRIMARY KEY, created_at datetime NOT NULL, updated_at datetime, short_id varchar(10) NOT NULL UNIQUE, story_id int NOT NULL, OWNER user_id int NOT NULL, parent_comment_id int, thread_id int, comment text NOT NULL, upvotes int NOT NULL, downvotes int NOT NULL, confidence int NOT NULL, markeddown_comment text, is_deleted int, is_moderated int, is_from_email int, hat_id int, FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;",
+"CREATE INDEX comments_short_index ON comments(short_id);",
+"CREATE TABLE hat_requests ( id int NOT NULL PRIMARY KEY, created_at datetime, updated_at datetime, user_id int, hat varchar(255), link varchar(255), comment text, FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
+"CREATE TABLE hats ( id int NOT NULL PRIMARY KEY, created_at datetime, updated_at datetime, OWNER_user_id int, OWNER_granted_by_user_id int, hat varchar(255) NOT NULL, link varchar(255), modlog_use int, doffed_at datetime, FOREIGN KEY (OWNER_user_id) REFERENCES users(id), FOREIGN KEY (OWNER_granted_by_user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
+"CREATE TABLE hidden_stories ( id int NOT NULL PRIMARY KEY, OWNER user_id int, story_id int, FOREIGN KEY (user_id) REFERENCES users(id), FOREIGN KEY (story_id) REFERENCES stories(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
+"CREATE TABLE invitation_requests ( id int NOT NULL PRIMARY KEY, code varchar(255), is_verified int, PII_email varchar(255), name varchar(255), memo text, ip_address varchar(255), created_at datetime NOT NULL, updated_at datetime NOT NULL) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;",
+"CREATE TABLE invitations ( id int NOT NULL PRIMARY KEY, OWNER_user_id int, OWNER_email varchar(255), code varchar(255), created_at datetime NOT NULL, updated_at datetime NOT NULL, memo text, FOREIGN KEY (OWNER_user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;",
+"CREATE TABLE keystores ( keyX varchar(50) NOT NULL PRIMARY KEY, valueX int) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
+"CREATE TABLE messages ( id int NOT NULL PRIMARY KEY, created_at datetime, OWNER_author_user_id int, OWNER_recipient_user_id int, has_been_read int, subject varchar(100), body text, short_id varchar(30), deleted_by_author int, deleted_by_recipient int, FOREIGN KEY (OWNER_author_user_id) REFERENCES users(id), FOREIGN KEY (OWNER_recipient_user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;",
+"CREATE TABLE moderations ( id int NOT NULL PRIMARY KEY, created_at datetime NOT NULL, updated_at datetime NOT NULL, OWNER_moderator_user_id int, story_id int, comment_id int, OWNER_user_id int, `action` text, reason text, is_from_suggestions int, FOREIGN KEY (OWNER_user_id) REFERENCES users(id), FOREIGN KEY (OWNER_moderator_user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;",
+"CREATE TABLE read_ribbons ( id int NOT NULL PRIMARY KEY, is_following int, created_at datetime NOT NULL, updated_at datetime NOT NULL, OWNER user_id int, story_id int, FOREIGN KEY (user_id) REFERENCES users(id), FOREIGN KEY (story_id) REFERENCES stories(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;",
+"CREATE TABLE saved_stories ( id int NOT NULL PRIMARY KEY, created_at datetime NOT NULL, updated_at datetime NOT NULL, OWNER user_id int, story_id int, FOREIGN KEY (user_id) REFERENCES users(id), FOREIGN KEY (story_id) REFERENCES stories(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
+"CREATE TABLE stories ( id int NOT NULL PRIMARY KEY, created_at datetime, user_id int, url varchar(250), title varchar(150) NOT NULL, description text, short_id varchar(6) NOT NULL UNIQUE, is_expired int NOT NULL, upvotes int NOT NULL, downvotes int NOT NULL, is_moderated int NOT NULL, hotness int NOT NULL, markeddown_description text, story_cache text, comments_count int NOT NULL, merged_story_id int, unavailable_at datetime, twitter_id varchar(20), user_is_author int, FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;",
+"CREATE INDEX storiespk ON stories(id);",
+"CREATE INDEX stories_short_index ON stories(short_id);",
+"CREATE TABLE tags ( id int NOT NULL PRIMARY KEY, tag varchar(25) NOT NULL UNIQUE, description varchar(100), privileged int, is_media int, inactive int, hotness_mod int) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
+"CREATE TABLE suggested_taggings ( id int NOT NULL PRIMARY KEY, story_id int, tag_id int, user_id int, FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
+"CREATE TABLE suggested_titles ( id int NOT NULL PRIMARY KEY, story_id int, user_id int, title varchar(150) NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
+"CREATE TABLE tag_filters ( id int NOT NULL PRIMARY KEY, created_at datetime NOT NULL, updated_at datetime NOT NULL, user_id int, tag_id int, FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
+"CREATE TABLE taggings ( id int NOT NULL PRIMARY KEY, story_id int NOT NULL, tag_id int NOT NULL, FOREIGN KEY (tag_id) REFERENCES tags(id), FOREIGN KEY (story_id) REFERENCES stories(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
+"CREATE TABLE votes ( id int NOT NULL PRIMARY KEY, OWNER_user_id int NOT NULL, story_id int NOT NULL, comment_id int, vote int NOT NULL, reason varchar(1), FOREIGN KEY (OWNER_user_id) REFERENCES users(id), FOREIGN KEY (story_id) REFERENCES stories(id), FOREIGN KEY (comment_id) REFERENCES comments(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;",
+];
+
+static INSERTS: [&'static str; 1] = ["INSERT INTO tags VALUES (1, 'test', NULL, 0, 0, 0, 0)"];
+
+fn create_view_stmt(view_name: &str, prepared_statement: &str) -> String {
+    // Form the query
+    let mut create_view_stmt = String::from("CREATE VIEW ");
+    create_view_stmt.push_str(&view_name);
+    create_view_stmt.push_str(" AS '\"");
+    create_view_stmt.push_str(&prepared_statement);
+    create_view_stmt.push_str("\"';");
+    return create_view_stmt;
+}
+
+// This function specifically handles the case where a prepared statement needs to be modified so
+// that it queries a planned view instead.
+fn construct_internal_format(view_name: &str, prepared_statement: &str) -> Vec<String> {
+    // Change query from "SELECT * FROM table WHERE col=?" to
+    // "SELECT * FROM q0 WHERE col=?", where q0 is the view name
+    // assigned to the prepared statement, makes parameterizing and
+    // executing prepared statement later easier.
+    // let re = Regex::new(r"\s(?P<expr>[A-Za-z_0-9`\.]+\s*[=><]\s*)\?").unwrap();
+    let mut view_query: Vec<String> = PARAM_RE
+        .captures_iter(&prepared_statement)
+        .map(|caps| caps["expr"].to_string())
+        .collect();
+    if view_query.len() == 0 {
+        view_query.push(String::from("SELECT * FROM ") + &view_name + ";");
+    } else {
+        // Truncate the table name from the where clause
+        let split = view_query[0].split(".");
+        let split_result: Vec<&str> = split.collect();
+        let column_name = match split_result.len() {
+            1 => split_result[0],
+            2 => split_result[1],
+            _ => panic!("Rust proxy: The where clause contains more than one '.'"),
+        };
+        view_query[0] = String::from("SELECT * FROM ") + &view_name + " WHERE " + column_name;
+        for i in 1..view_query.len() {
+            // Truncate the table name from each where clause.
+            let split = view_query[i].split(".");
+            let split_result: Vec<&str> = split.collect();
+            let column_name = match split_result.len() {
+                1 => split_result[0],
+                2 => split_result[1],
+                _ => panic!("Rust proxy: The where clause contains more than one '.'"),
+            };
+            view_query[i] = String::from(" AND ") + column_name;
+        }
+        view_query.push(String::from(";"));
+    }
+    return view_query;
+}
 
 #[derive(Debug)]
 struct Backend {
@@ -256,8 +377,8 @@ impl Backend {
                         .unwrap();
                     return (stmt_id.clone(), self.compute_param_count(&metadata));
                 } // Else proceed to perform wiring.
-                let reduced_stmt_id = self
-                    .get_reduced_stmt_id(&prepared_write_guard.get(&reduced_form).unwrap());
+                let reduced_stmt_id =
+                    self.get_reduced_stmt_id(&prepared_write_guard.get(&reduced_form).unwrap());
                 let mut wherein_write_guard = self.wherein_view_index.write().unwrap();
                 let new_stmt_id = self.id_generator.fetch_add(1, Ordering::SeqCst);
                 let param_count = self.compute_param_count(&metadata);
@@ -299,8 +420,8 @@ impl Backend {
                 // a new statement id (without creating a prepared statement) and wire it to the
                 // reduced form's statement id.
                 // Proceed to perform wiring.
-                let reduced_stmt_id = self
-                    .get_reduced_stmt_id(&prepared_write_guard.get(&reduced_form).unwrap());
+                let reduced_stmt_id =
+                    self.get_reduced_stmt_id(&prepared_write_guard.get(&reduced_form).unwrap());
                 let mut wherein_write_guard = self.wherein_view_index.write().unwrap();
                 let new_stmt_id = self.id_generator.fetch_add(1, Ordering::SeqCst);
                 let param_count = self.compute_param_count(&metadata);
@@ -323,6 +444,7 @@ impl Backend {
                 "[PREPARED] view_name: {}, create view: {}", view_name, create_view_stmt
             );
             // Execute create view statement in Pelton
+            panic!("[WHERE_IN] Proxy thread tried to create view. prepared statement: {}, reduced form: {}", prepared_statement, reduced_form);
             if !exec_ddl_ffi(&mut self.rust_conn, &create_view_stmt) {
                 error!(
                     self.log,
@@ -414,6 +536,11 @@ impl Backend {
         let view_name = String::from("q") + &stmt_id.to_string();
         let create_view_stmt = self.create_view_stmt(&view_name, &prepared_statement);
         // Execute create view statement in Pelton
+        panic!(
+            self.log,
+            "[SELECT] Proxy thread tried to create view. prepared statement: {}",
+            prepared_statement
+        );
         if !exec_ddl_ffi(&mut self.rust_conn, &create_view_stmt) {
             error!(
                 self.log,
@@ -569,8 +696,10 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         }
         debug!(
             self.log,
-            "[PREPARED] statement: {}, param_count: {}, view_id: q{}",
-            prepared_statement, param_count, stmt_id, 
+            "[PREPARED] statement: {}, param_count: {}, view_id: {}",
+            prepared_statement,
+            param_count,
+            stmt_id,
         );
         // Respond to client
         return info.reply(stmt_id, &params, &[]);
@@ -624,13 +753,13 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                                     ValueInner::UInt(v) => v.to_string(),
                                     _ => unimplemented!("Rust proxy: unsupported numeric type"),
                                 },
-                                ColumnType::MYSQL_TYPE_DOUBLE
-                                | ColumnType::MYSQL_TYPE_FLOAT => match param.value.into_inner()
-                                {
-                                    ValueInner::Double(v) => (v.floor() as i64).to_string(),
-                                    _ => unimplemented!("Rust proxy: unsupported double type"),
-                                },
-                                _ => unimplemented!("Rust proxy: unsupported parameter 1 type {:?} {:?}", param.coltype, param.value),
+                                ColumnType::MYSQL_TYPE_DOUBLE | ColumnType::MYSQL_TYPE_FLOAT => {
+                                    match param.value.into_inner() {
+                                        ValueInner::Double(v) => (v.floor() as i64).to_string(),
+                                        _ => unimplemented!("Rust proxy: unsupported double type"),
+                                    }
+                                }
+                                _ => unimplemented!("Rust proxy: unsupported parameter type"),
                             };
                             query.push_str(&val);
                         }
@@ -670,12 +799,15 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                                         _ => unimplemented!("Rust proxy: unsupported numeric type"),
                                     },
                                     ColumnType::MYSQL_TYPE_DOUBLE
-                                    | ColumnType::MYSQL_TYPE_FLOAT => match param.value.into_inner()
-                                    {
-                                        ValueInner::Double(v) => (v.floor() as i64).to_string(),
-                                        _ => unimplemented!("Rust proxy: unsupported double type"),
-                                    },
-                                    _ => unimplemented!("Rust proxy: unsupported parameter 2 type {:?} {:?}", param.coltype, param.value),
+                                    | ColumnType::MYSQL_TYPE_FLOAT => {
+                                        match param.value.into_inner() {
+                                            ValueInner::Double(v) => (v.floor() as i64).to_string(),
+                                            _ => unimplemented!(
+                                                "Rust proxy: unsupported double type"
+                                            ),
+                                        }
+                                    }
+                                    _ => unimplemented!("Rust proxy: unsupported parameter type"),
                                 };
                                 query.push_str(&val);
                             }
@@ -720,13 +852,13 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                             ValueInner::UInt(v) => v.to_string(),
                             _ => unimplemented!("Rust proxy: unsupported numeric type"),
                         },
-                        ColumnType::MYSQL_TYPE_DOUBLE
-                        | ColumnType::MYSQL_TYPE_FLOAT => match param.value.into_inner()
-                        {
-                            ValueInner::Double(v) => (v.floor() as i64).to_string(),
-                            _ => unimplemented!("Rust proxy: unsupported double type"),
-                        },
-                        _ => unimplemented!("Rust proxy: unsupported parameter 3 type {:?} {:?}", param.coltype, param.value),
+                        ColumnType::MYSQL_TYPE_DOUBLE | ColumnType::MYSQL_TYPE_FLOAT => {
+                            match param.value.into_inner() {
+                                ValueInner::Double(v) => (v.floor() as i64).to_string(),
+                                _ => unimplemented!("Rust proxy: unsupported double type"),
+                            }
+                        }
+                        _ => unimplemented!("Rust proxy: unsupported parameter type"),
                     };
                     query.push_str(&val);
                 }
@@ -981,10 +1113,62 @@ fn main() {
     })
     .expect("Error setting Ctrl-C handler");
 
-    let prepared_statements_lock = Arc::new(RwLock::new(HashMap::new()));
-    let prepared_index_lock = Arc::new(RwLock::new(HashMap::new()));
-    let wherein_view_index = Arc::new(RwLock::new(HashMap::new()));
+    let prepared_statements_lock: Arc<RwLock<HashMap<String, HashMap<Vec<Option<u32>>, u32>>>> =
+        Arc::new(RwLock::new(HashMap::new()));
+    let prepared_index_lock: Arc<RwLock<HashMap<u32, Vec<String>>>> =
+        Arc::new(RwLock::new(HashMap::new()));
+    let wherein_view_index: Arc<RwLock<HashMap<u32, (u32, Vec<Option<u32>>)>>> =
+        Arc::new(RwLock::new(HashMap::new()));
     let id_generator = Arc::new(AtomicU32::new(0));
+
+    let db_name = flags.db_name.clone();
+    let mut rust_conn = open_ffi(&db_name);
+    // Execute all the create statements.
+    for create_stmt in &CREATES {
+        let ddl_response = exec_ddl_ffi(&mut rust_conn, create_stmt);
+        debug!(log, "[INIT] ddl_response is {:?}", ddl_response);
+    }
+
+    // Execute all the insert statements.
+    // Execute all the create statements.
+    for insert_stmt in &INSERTS {
+        let update_response = exec_update_ffi(&mut rust_conn, insert_stmt);
+        debug!(log, "[INIT] update response is {:?}", update_response);
+    }
+
+    let mut prepared_write_guard = prepared_statements_lock.write().unwrap();
+    let mut index_write_guard = prepared_index_lock.write().unwrap();
+
+    // Create necessary views for all the queries.
+    for view_query in &VIEWS {
+        let stmt_id = id_generator.fetch_add(1, Ordering::SeqCst);
+        let view_name: String = String::from("q") + &stmt_id.to_string();
+        // Form the query
+        let create_view_stmt = create_view_stmt(&view_name, view_query);
+        // Create view in pelton.
+        if !exec_ddl_ffi(&mut rust_conn, &create_view_stmt) {
+            error!(
+                log,
+                "[INIT] Rust proxy: Failed to execute create view {}", create_view_stmt
+            );
+        }
+        let internal_format = construct_internal_format(&view_name, view_query);
+        let param_count = view_query.matches("?").count();
+        let mut default_metadata: Vec<Option<u32>> = Vec::new();
+        for _i in 0..param_count {
+            default_metadata.push(None);
+        }
+        // Update data structures
+        prepared_write_guard.insert(view_query.clone().to_string(), HashMap::new());
+        prepared_write_guard
+            .get_mut(view_query.to_owned())
+            .unwrap()
+            .insert(default_metadata, stmt_id);
+        index_write_guard.insert(stmt_id, internal_format);
+    }
+    drop(prepared_write_guard);
+    drop(index_write_guard);
+    close_ffi(&mut rust_conn);
     // run listener until terminated with SIGTERM
     while !stop.load(Ordering::Relaxed) {
         while let Ok((stream, _addr)) = listener.accept() {
