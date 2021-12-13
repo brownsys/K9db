@@ -47,6 +47,9 @@ class MatViewOperator : public Operator {
   virtual std::vector<Record> Lookup(const Key &key, int limit = -1,
                                      size_t offset = 0) const = 0;
 
+  int limit() const { return this->limit_; }
+  size_t offset() const { return this->offset_; }
+
  protected:
   // We do not know if we are ordered or unordered, this type is revealed
   // to us by the derived class as an argument.
@@ -206,6 +209,8 @@ class MatViewOperatorT : public MatViewOperator {
       order_str = "Record ordered";
     }
     result += "  \"order\": \"" + order_str + "\",\n";
+    result += "  \"LIMIT\": " + std::to_string(this->limit_) + ",\n";
+    result += "  \"OFFSET\": " + std::to_string(this->offset_) + ",\n";
     return result;
   }
   Record DebugRecord() const override {
@@ -225,6 +230,8 @@ class MatViewOperatorT : public MatViewOperator {
     } else {
       info += " no order";
     }
+    info += " LIMIT = " + std::to_string(this->limit_);
+    info += " OFFSET = " + std::to_string(this->offset_);
     record.SetString(std::make_unique<std::string>(info), 5);
     return record;
   }
