@@ -150,6 +150,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
             index::LookupIndex(table_name, info.shard_by, stmt.GetWhereClause(),
                                state, dataflow_state));
         if (pair.first) {
+          if (cloned.table_name() == "stories") {
+            if (pair.second.size() == 0) {
+	      sqlast::Stringifier stringifier("");
+              LOG(WARNING) << "Could not find stories in index " << stringifier.Visit(&cloned);
+	    }
+	  }
           // Secondary index available for some constrainted column in stmt.
           result.Append(
               exec.Shards(&cloned, shard_kind, pair.second, schema, aug_index),

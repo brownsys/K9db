@@ -69,6 +69,7 @@ void StartJVM() {
 // a DataFlowGraphPartition with all the operators from that plan.
 std::unique_ptr<dataflow::DataFlowGraphPartition> PlanGraph(
     dataflow::DataFlowState *state, const std::string &query) {
+  LOG(WARNING) << "PLANNER IS CALLED! " << query;
   perf::Start("planner");
   // Start a JVM.
   StartJVM();
