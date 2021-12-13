@@ -47,7 +47,7 @@ CREATE TABLE shuup_gdpr_gdpruserconsent ( \
   FOREIGN KEY (user_id) REFERENCES auth_users(id) \
 );
 
--- table that can be deleted (sharded)
+-- sharded
 CREATE TABLE shuup_personcontact ( \
   contact_ptr_id int, \
   gender datetime, \
