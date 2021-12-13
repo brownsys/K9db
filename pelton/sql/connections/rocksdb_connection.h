@@ -44,17 +44,9 @@ class SingletonRocksdbConnection {
 
  private:
   // Helpers.
-  // Get the shard id or create a new one if new.
-  ShardID GetOrCreateShardID(const std::string &shard_name) {
-    return shard_name + "_";
-  }
-  // Get the shard id or none if it does not exist.
-  std::optional<ShardID> GetShardID(const std::string &shard_name) {
-    return shard_name + "_";
-  }
   // Get record matching values in a value mapper (either by key, index, or it).
   std::vector<std::string> Get(const sqlast::AbstractStatement *stmt,
-                               TableID table_id, ShardID shard_id,
+                               TableID table_id, const std::string &shard_name,
                                const ValueMapper &value_mapper);
   // Filter records by where clause in abstract statement.
   std::vector<std::string> Filter(const dataflow::SchemaRef &schema,

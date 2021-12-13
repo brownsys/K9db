@@ -519,5 +519,19 @@ std::pair<rocksdb::Slice, rocksdb::Slice> FilterVisitor::ToSlice(
                         col_is_left ? othslice : colslice);
 }
 
+rocksdb::Slice ShardPrefixTransform::Transform(
+    const rocksdb::Slice &key) const {
+  size_t count = 0;
+  for (size_t i = 0; i < key.size(); i++) {
+    if (key.data()[i] == 30) {
+      count++;
+      if (count == this->seps_) {
+        return rocksdb::Slice(key.data(), i+1);
+      }
+    }
+  }
+  LOG(FATAL) << "Cannot find separator in Transform" << key.ToString();
+}
+
 }  // namespace sql
 }  // namespace pelton
