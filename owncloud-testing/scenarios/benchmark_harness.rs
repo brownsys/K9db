@@ -270,7 +270,7 @@ impl <'a> Workload<'a> {
                     file: &files[rng.gen_range(0..flen)]
                 }
             }).take(args.num_samples).collect()
-        }).collect())
+        }).take(10).collect())
     }
 
     fn make_group_shares<'b>(args: &Args, st: &mut GeneratorState, groups: &'b[Group<'b>], files: &'b[File<'b>]) -> Workload<'b> {
@@ -286,11 +286,45 @@ impl <'a> Workload<'a> {
                     file: &files[rng.gen_range(0..flen)]
                 }
             }).take(args.num_samples).collect()
-        }).collect())
+        }).take(10).collect())
+    }
+
+    fn wl_type(&self, is_revert: bool) -> String {
+        match self {
+            Workload::Reads(_) => "select".to_string(),
+            Workload::Writes(shr) =>
+                format!("{}-{}-share",
+                    if is_revert { "delete" } else { "insert" },
+                    match shr.first().and_then(|v| v.first()).map(|s| &s.share_with) {
+                        Some(ShareType::Direct(_)) => "direct",
+                        Some(ShareType::Group(_)) => "group",
+                        None => "empty"
+                    },
+                ),
+        }
+    }
+
+    fn run_revert<F: Write>(&self, num_users: usize, mcd_quid: Option<i32>, conn: &mut mysql::Conn, f: &mut F, backend: &Backend) {
+        let wlt = self.wl_type(true);
+        match self {
+            Workload::Reads(_) => (),
+            Workload::Writes(shr) => {
+               shr.iter().enumerate().for_each(|(id, ws0)| {
+                    let now = std::time::Instant::now();
+                    ws0.iter().for_each(|s| 
+                        conn.query_drop(&format!("DELETE FROM oc_share WHERE id = {}", s.id)).unwrap()
+                    );
+                    if mcd_quid.is_some() { memcached::MemUpdate("file_view"); }
+                    let time = now.elapsed();
+                    writeln!(f, "{},{},{},{},{},{}", id, backend, time.as_millis(), num_users, mcd_quid.is_some(), wlt).unwrap();
+                })
+            }
+        }
     }
 
     fn run<F: Write>(&self, num_users : usize, mcd_quid: Option<i32>, conn: &mut mysql::Conn, f: &mut F, backend: &Backend) {
         use memcached::{MemCreateKey,MemUpdate,MemSetStr, MemReadValue, Val};
+        let wlt = self.wl_type(false);
         match self {
             Workload::Reads(samples) => {
                 samples.iter().enumerate().for_each(|(id, sample)| {
@@ -299,12 +333,12 @@ impl <'a> Workload<'a> {
                     let query = format!("SELECT * FROM file_view WHERE share_target IN ({})", sstring.join(","));
                     //eprintln!("QUERY: {}", query);
                     let now = std::time::Instant::now();
-                    let _ : Vec<Vec<Value>> =
+                    let r : Vec<Vec<Value>> =
                             mcd_quid.map_or_else( || {
                                 conn.query(query).unwrap().into_iter().map(|v : Row| v.unwrap()).collect()
                             }, |id| {
                                 sample.iter().map(|s|
-                                    MemReadValue(id, MemCreateKey(vec![MemSetStr(&format!("'{}'", s.uid))])).into_iter().flat_map(|row| 
+                                    MemReadValue(id, MemCreateKey(vec![MemSetStr(&format!("{}", s.uid))])).into_iter().flat_map(|row| 
                                         row.into_iter().map(|value|
                                             match value {
                                                 Val::UInt(u) => Value::UInt(u),
@@ -318,16 +352,16 @@ impl <'a> Workload<'a> {
                             );
                     
                     let time = now.elapsed();
-                    writeln!(f, "{},{},{},{}", id, backend, time.as_millis(), num_users).unwrap();
+                    writeln!(f, "{},{},{},{},{},{}", id, backend, time.as_millis(), num_users, mcd_quid.is_some(),wlt).unwrap();
                 });
             }
             Workload::Writes(ws) => {
                 ws.iter().enumerate().for_each(|(id, ws0)| {
                     let now = std::time::Instant::now();
                     ws0.insert_db(conn, backend);
-                    MemUpdate("oc_share");
+                    if mcd_quid.is_some() { MemUpdate("file_view"); }
                     let time = now.elapsed();
-                    writeln!(f, "{},{},{},{}", id, backend, time.as_millis(), num_users).unwrap();
+                    writeln!(f, "{},{},{},{},{},{}", id, backend, time.as_millis(), num_users, mcd_quid.is_some(),wlt).unwrap();
                 })
             }
         }
@@ -347,8 +381,9 @@ pub struct Args {
     pub outfile: Option<String>,
     pub debug: bool,
     pub check_consistency: bool,
-    pub workload: String,
+    pub workloads: Vec<String>,
     pub memcached: bool,
+    pub revokes: bool,
 }
 
 fn main() {
@@ -369,8 +404,9 @@ fn main() {
                 (@arg outfile: -o --out +takes_value "File for writing output to (defaults to stdout")
                 (@arg debug: --debug "Compile and run in debug mode")
                 (@arg check_consistency: --check "Check consistency between backends")
-                (@arg workload: --workload +required +takes_value "Type of workload to run")
+                (@arg workload: --workloads ... +required  +takes_value "Type of workload to run")
                 (@arg memcached: --memcached "Enable memcached")
+                (@arg revokes: --revokes "Also check revokes")
         ).get_matches();
 
     let ref args = Args {
@@ -385,8 +421,9 @@ fn main() {
         outfile: matches.value_of("outfile").map(&str::to_string),
         debug: matches.is_present("debug"),
         check_consistency: matches.is_present("check_consistency"),
-        workload: matches.value_of("workload").unwrap().to_string(),
+        workloads: matches.values_of("workload").unwrap().map(|s| s.to_string()).collect(),
         memcached: matches.is_present("memcached"),
+        revokes: matches.is_present("revokes"),
     };
 
 
@@ -436,15 +473,17 @@ fn main() {
     let groups = st.generate_groups(&users, args.users_per_group);
     let group_shares = st.generate_group_shares(&groups, &files, args.group_shares_per_file);
 
-    let workload = match args.workload.as_str() {
-        "reads" => Workload::make_reads(args, &users),
-        "direct-share" => Workload::make_direct_shares(args, st, &users, &files),
-        "group-share" => Workload::make_group_shares(args, st, &groups, &files),
-        _ => panic!(),
-    };
+    let workloads = args.workloads.iter().map(|wl| 
+        match wl.as_str() {
+            "reads" => Workload::make_reads(args, &users),
+            "direct-share" => Workload::make_direct_shares(args, st, &users, &files),
+            "group-share" => Workload::make_group_shares(args, st, &groups, &files),
+            _ => panic!(),
+        }
+    ).collect::<Vec<_>>();
 
 
-    writeln!(f, "Run,Backend,Time(ms),Users").unwrap();
+    writeln!(f, "Run,Backend,Time(ms),Users,Memcached,Workload").unwrap();
 
 
     let mut results : Vec<Vec<Vec<Row>>> = args.backends.iter().map(|backend| {
@@ -464,10 +503,9 @@ fn main() {
 
         std::thread::sleep(Duration::from_secs(3));
         let ref mut conn = backend.prepare(true);
-        let mcd_quid = if args.memcached {
-            eprintln!("Memcached starting");
+        let mcd_quid = if args.memcached && backend.is_mysql() {
             memcached::MemInitialize(DB_NAME, DB_USER, DB_PASSWORD, "rust");
-            Some(memcached::MemCache("SELECT FROM file_view WHERE share_target = ?"))
+            Some(memcached::MemCache("SELECT * FROM file_view WHERE share_target = ?"))
         } else {
             None
         };
@@ -491,24 +529,40 @@ fn main() {
 
         //std::io::stdin().read_line(&mut String::new());
 
-        fn select_files_for_user<Q:Queryable>(conn : &mut Q, user: &User) -> Vec<Row> {
-            conn.query(
-                format!("SELECT * FROM file_view WHERE share_target = '{}'", user.uid)
-            ).unwrap()
-        }
 
-        eprintln!("Memcached updating");
-        mcd_quid.map(|_| { 
-            memcached::MemUpdate("oc_share"); 
-            memcached::MemUpdate("oc_user_group") 
-        });
 
         // select_files_for_user(conn, &users[0]);
 
         // std::thread::sleep(std::time::Duration::from_millis(300));
-        workload.run(*num_users, mcd_quid, conn, &mut f, backend);
-        let results = vec![];
 
+        // Don't run memcached on pelton
+
+        if mcd_quid.is_some()  {
+            //eprintln!("{:?}", conn.query("SELECT * FROM file_view").unwrap().into_iter().map(|r:Row| r.unwrap()).collect::<Vec<_>>());
+            memcached::MemUpdate("file_view"); 
+        }
+
+        workloads.iter().for_each(|wl| 
+            wl.run(*num_users, mcd_quid, conn, &mut f, backend)
+        );
+        if args.revokes {
+            workloads.iter().for_each(|wl| 
+                wl.run_revert(*num_users, mcd_quid, conn, &mut f, backend)
+            );
+        }
+
+        if mcd_quid.is_some() {
+            workloads.iter().for_each(|wl| 
+                wl.run(*num_users, None, conn, &mut f, backend)
+            );
+            if args.revokes {
+                workloads.iter().for_each(|wl| 
+                    wl.run_revert(*num_users, None, conn, &mut f, backend)
+                );
+            }
+        }
+
+        let results = vec![];
         //eprintln!("Returned {} rows", vs.len());
 
         if args.dump_db && backend.is_pelton() {
