@@ -132,12 +132,12 @@ std::vector<Record> DataFlowGraph::All(int limit, size_t offset) const {
   if (matview->RecordOrdered()) {
     // Order actually matters.
     auto ordview = static_cast<RecordOrderedMatViewOperator *>(matview);
-    std::list<Record> records;
+    std::vector<std::vector<Record>> records;
     for (auto matview : this->matviews_) {
-      util::MergeInto(&records, matview->All(olimit), ordview->comparator(),
-                      olimit);
+      records.push_back(matview->All(olimit));
     }
-    return util::ToVector(&records, limit, offset);
+    return util::KMerge(std::move(records), ordview->comparator(), limit,
+                        offset);
   } else {
     // Order does not matter.
     std::vector<Record> records;
@@ -164,12 +164,12 @@ std::vector<Record> DataFlowGraph::Lookup(const Key &key, int limit,
     if (matview->RecordOrdered()) {
       // Order actually matters.
       auto ordview = static_cast<RecordOrderedMatViewOperator *>(matview);
-      std::list<Record> records;
+      std::vector<std::vector<Record>> records;
       for (auto matview : this->matviews_) {
-        util::MergeInto(&records, matview->Lookup(key, olimit),
-                        ordview->comparator(), olimit);
+        records.push_back(matview->Lookup(key, olimit));
       }
-      return util::ToVector(&records, limit, offset);
+      return util::KMerge(std::move(records), ordview->comparator(), limit,
+                          offset);
     } else {
       // Order does not matter.
       std::vector<Record> records;
@@ -197,12 +197,12 @@ std::vector<Record> DataFlowGraph::Lookup(const std::vector<Key> &keys,
   if (matview->RecordOrdered()) {
     // Order actually matters.
     auto ordview = static_cast<RecordOrderedMatViewOperator *>(matview);
-    std::list<Record> records;
+    std::vector<std::vector<Record>> records;
     for (const auto &key : keys) {
-      util::MergeInto(&records, this->Lookup(key, olimit, 0),
-                      ordview->comparator(), olimit);
+      records.push_back(this->Lookup(key, olimit, 0));
     }
-    return util::ToVector(&records, limit, offset);
+    return util::KMerge(std::move(records), ordview->comparator(), limit,
+                        offset);
   } else {
     // Order does not matter.
     std::vector<Record> records;
@@ -229,13 +229,12 @@ std::vector<Record> DataFlowGraph::AllRecordGreater(const Record &cmp,
   // Get the records from all partitions and merge them.
   int olimit = limit > -1 ? limit + offset : -1;
   auto ordview = static_cast<RecordOrderedMatViewOperator *>(matview);
-  std::list<Record> records;
+  std::vector<std::vector<Record>> records;
   for (auto matview : this->matviews_) {
     ordview = static_cast<RecordOrderedMatViewOperator *>(matview);
-    util::MergeInto(&records, ordview->All(cmp, olimit), ordview->comparator(),
-                    olimit);
+    records.push_back(ordview->All(cmp, olimit));
   }
-  return util::ToVector(&records, limit, offset);
+  return util::KMerge(std::move(records), ordview->comparator(), limit, offset);
 }
 std::vector<Record> DataFlowGraph::LookupRecordGreater(const Key &key,
                                                        const Record &cmp,
@@ -255,13 +254,15 @@ std::vector<Record> DataFlowGraph::LookupRecordGreater(const Key &key,
   } else {
     // We do not know which partition, must try them all.
     int olimit = limit > -1 ? limit + offset : -1;
-    std::list<Record> records;
+    std::vector<std::vector<Record>> records;
     for (auto matview : this->matviews_) {
       auto ordview = static_cast<RecordOrderedMatViewOperator *>(matview);
-      util::MergeInto(&records, ordview->LookupGreater(key, cmp, olimit),
-                      ordview->comparator(), olimit);
+      records.push_back(ordview->LookupGreater(key, cmp, olimit));
     }
-    return util::ToVector(&records, limit, offset);
+    auto ordview =
+        static_cast<RecordOrderedMatViewOperator *>(this->matviews_.front());
+    return util::KMerge(std::move(records), ordview->comparator(), limit,
+                        offset);
   }
 }
 std::vector<Record> DataFlowGraph::LookupRecordGreater(
@@ -279,12 +280,11 @@ std::vector<Record> DataFlowGraph::LookupRecordGreater(
   // Iterate over keys.
   int olimit = limit > -1 ? limit + offset : -1;
   auto ordview = static_cast<RecordOrderedMatViewOperator *>(matview);
-  std::list<Record> records;
+  std::vector<std::vector<Record>> records;
   for (const auto &key : keys) {
-    util::MergeInto(&records, this->LookupRecordGreater(key, cmp, olimit, 0),
-                    ordview->comparator(), olimit);
+    records.push_back(this->LookupRecordGreater(key, cmp, olimit, 0));
   }
-  return util::ToVector(&records, limit, offset);
+  return util::KMerge(std::move(records), ordview->comparator(), limit, offset);
 }
 std::vector<Record> DataFlowGraph::LookupKeyGreater(const Key &key, int limit,
                                                     size_t offset) const {
@@ -294,15 +294,16 @@ std::vector<Record> DataFlowGraph::LookupKeyGreater(const Key &key, int limit,
     LOG(FATAL) << "Attempting to query incompatible view by record order";
   }
   // Get all the keys sorted.
-  std::list<Key> keys;
+  std::vector<std::vector<Key>> keys;
   for (auto matview : this->matviews_) {
     auto ordview = static_cast<KeyOrderedMatViewOperator *>(matview);
-    util::MergeInto(&keys, ordview->KeysGreater(key));
+    keys.push_back(ordview->KeysGreater(key));
   }
+  std::vector<Key> merged_keys = util::KMerge(std::move(keys));
   // Get all the records according to the order of the keys.
   int olimit = limit > -1 ? static_cast<size_t>(limit) + offset : -1;
   std::vector<Record> records;
-  for (const auto &key : keys) {
+  for (const auto &key : merged_keys) {
     auto tmp = this->Lookup(key, olimit, 0);
     records.insert(records.end(), MOVEIT(tmp.begin()), MOVEIT(tmp.end()));
   }

@@ -2,96 +2,115 @@
 #ifndef PELTON_UTIL_MERGE_SORT_H_
 #define PELTON_UTIL_MERGE_SORT_H_
 
-#include <list>
-#include <type_traits>
+#include <queue>
+#include <set>
 #include <utility>
 #include <vector>
 
 namespace pelton {
 namespace util {
 
+using element = std::pair<size_t, size_t>;
+
 // T is usually dataflow::Record.
-// L is a sorted container of Ts.
+// V is a sorted container of Ts, usually a std::vector.
 // C is a comparator of Ts, e.g. dataflow::Record::Compare.
-template <typename T, typename L, typename C>
-void MergeInto(std::list<T> *target, const L &source, const C &compare,
-               int limit) {
-  auto it = target->begin();
-  auto end = target->end();
+template <typename T, typename C>
+std::vector<T> KMerge(std::vector<const std::multiset<T, C> *> &&V,
+                      const dataflow::Record::Compare &compare, int limit,
+                      size_t offset) {
+  using itelm = std::pair<size_t, typename std::multiset<T, C>::const_iterator>;
+  auto cmp = [&](itelm &l, itelm &r) { return compare(*r.second, *l.second); };
+
+  std::vector<T> result;
+  std::priority_queue<itelm, std::vector<itelm>, decltype(cmp)> queue(cmp);
+  for (size_t i = 0; i < V.size(); i++) {
+    if (V.at(i)->size() > 0) {
+      queue.emplace(i, V.at(i)->begin());
+    }
+  }
+
   size_t count = 0;
-  for (const T &record : source) {
-    if (limit > -1 && count >= static_cast<size_t>(limit)) {
-      break;
+  while (!queue.empty()) {
+    const auto &e = queue.top();
+    size_t i = e.first;
+    typename std::multiset<T, C>::const_iterator j = e.second;
+    queue.pop();
+    if (i >= offset) {
+      if (limit == -1 || count < offset + static_cast<size_t>(limit)) {
+        result.push_back(j->Copy());
+      } else {
+        break;
+      }
     }
-    while (it != end && compare(*it, record)) {
-      ++it;
-    }
-    if (it == end) {
-      target->push_back(record.Copy());
-    } else {
-      target->insert(it, record.Copy());
+    if (++j != V.at(i)->end()) {
+      queue.emplace(i, j);
     }
     count++;
   }
-}
-template <typename T, typename L, typename C>
-void MergeInto(std::list<T> *target, L &&source, const C &compare, int limit) {
-  auto it = target->begin();
-  auto end = target->end();
-  size_t count = 0;
-  for (T &record : source) {
-    if (limit > -1 && count >= static_cast<size_t>(limit)) {
-      break;
-    }
-    while (it != end && compare(*it, record)) {
-      ++it;
-    }
-    if (it == end) {
-      target->push_back(std::move(record));
-    } else {
-      target->insert(it, std::move(record));
-    }
-    count++;
-  }
+  return result;
 }
 
-// L is a sorted contain of Ts.
-// Elements of T are compared using <.
-template <typename T, typename L>
-void MergeInto(std::list<T> *target, L &&source) {
-  auto it = target->begin();
-  auto end = target->end();
-  for (const T &k : source) {
-    while (it != end && *it < k) {
-      ++it;
-    }
-    if (it == end) {
-      target->push_back(std::move(k));
-    } else {
-      target->insert(it, std::move(k));
+template <typename T, typename C>
+std::vector<T> KMerge(std::vector<std::vector<T>> &&V, const C &compare,
+                      int limit, size_t offset) {
+  auto cmp = [&](element &l, element &r) {
+    return compare(V.at(r.first).at(r.second), V.at(l.first).at(l.second));
+  };
+
+  std::vector<T> result;
+  std::priority_queue<element, std::vector<element>, decltype(cmp)> queue(cmp);
+  for (size_t i = 0; i < V.size(); i++) {
+    if (V.at(i).size() > 0) {
+      queue.emplace(i, 0);
     }
   }
+
+  size_t count = 0;
+  while (!queue.empty()) {
+    const auto &e = queue.top();
+    size_t i = e.first;
+    size_t j = e.second;
+    queue.pop();
+    if (i >= offset) {
+      if (limit == -1 || count < offset + static_cast<size_t>(limit)) {
+        result.push_back(std::move(V.at(i).at(j)));
+      } else {
+        break;
+      }
+    }
+    if (j + 1 < V.at(i).size()) {
+      queue.emplace(i, j + 1);
+    }
+    count++;
+  }
+  return result;
 }
 
 template <typename T>
-std::vector<T> ToVector(std::list<T> *list, int limit, size_t offset) {
-  std::vector<T> vec;
-  if (limit == -1 || vec.size() < static_cast<size_t>(limit)) {
-    vec.reserve(vec.size());
-  } else {
-    vec.reserve(static_cast<size_t>(limit));
-  }
-  for (T &e : *list) {
-    if (offset != 0) {
-      offset--;
-      continue;
+std::vector<T> KMerge(std::vector<std::vector<T>> &&V) {
+  auto cmp = [&](element &l, element &r) {
+    return V.at(r.first).at(r.second) < V.at(l.first).at(l.second);
+  };
+
+  std::vector<T> result;
+  std::priority_queue<element, std::vector<element>, decltype(cmp)> queue(cmp);
+  for (size_t i = 0; i < V.size(); i++) {
+    if (V.at(i).size() > 0) {
+      queue.emplace(i, 0);
     }
-    if (limit > -1 && vec.size() >= static_cast<size_t>(limit)) {
-      break;
-    }
-    vec.push_back(std::move(e));
   }
-  return vec;
+  while (!queue.empty()) {
+    const auto &e = queue.top();
+    size_t i = e.first;
+    size_t j = e.second;
+    queue.pop();
+    result.push_back(std::move(V.at(i).at(j)));
+    if (j + 1 < V.at(i).size()) {
+      queue.emplace(i, j + 1);
+    }
+  }
+  return result;
 }
 
 template <typename T>
