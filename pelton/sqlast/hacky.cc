@@ -37,9 +37,26 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
     return absl::InvalidArgumentError("Hacky insert: table name");
   }
   ConsumeWhiteSpace(&str, &size);
-
+  
   // Create the insert statement.
   std::unique_ptr<Insert> stmt = std::make_unique<Insert>(table_name, replace);
+
+  // Has columns inlined.
+  if (StartsWith(&str, &size, "(", 1)) {
+    ConsumeWhiteSpace(&str, &size);
+    while (true) {
+      stmt->AddColumn(ExtractIdentifier(&str, &size));
+      ConsumeWhiteSpace(&str, &size);
+      if (!StartsWith(&str, &size, ",", 1)) {
+        break;
+      }
+      ConsumeWhiteSpace(&str, &size);
+    }
+    if (!StartsWith(&str, &size, ")", 1)) {
+      return absl::InvalidArgumentError("Hacking insert: columns )");
+    }
+    ConsumeWhiteSpace(&str, &size);
+  }
 
   // VALUES.
   if (!StartsWith(&str, &size, "VALUES", 6)) {
@@ -59,15 +76,15 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
   } while (StartsWith(&str, &size, ",", 1));
 
   // )
-  if (!StartsWith(&str, &size, ");", 2)) {
-    return absl::InvalidArgumentError("Hacky insert: );");
+  if (!StartsWith(&str, &size, ")", 1)) {
+    return absl::InvalidArgumentError("Hacky insert: )");
   }
   ConsumeWhiteSpace(&str, &size);
 
-  if (size != 0) {
-    return absl::InvalidArgumentError("Hacky insert: EOF");
+  // ;
+  if (size != 0 && !StartsWith(&str, &size, ";", 1)) {
+    return absl::InvalidArgumentError("Hacky insert: ;");
   }
-
   return stmt;
 }
 
