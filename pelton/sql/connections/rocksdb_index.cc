@@ -20,8 +20,7 @@ RocksdbIndex::RocksdbIndex(rocksdb::DB *db, size_t table_id, size_t column)
   rocksdb::ColumnFamilyOptions options;
   options.prefix_extractor.reset(new ShardPrefixTransform(2));
   options.comparator = rocksdb::BytewiseComparator();
-  PANIC_STATUS(this->db_->CreateColumnFamily(options,
-                                             name, &handle));
+  PANIC_STATUS(this->db_->CreateColumnFamily(options, name, &handle));
   this->handle_ = std::unique_ptr<rocksdb::ColumnFamilyHandle>(handle);
 }
 
@@ -30,7 +29,8 @@ void RocksdbIndex::Add(const std::string &shard_name,
                        const rocksdb::Slice &value, const rocksdb::Slice &key) {
   // key.ToString() << std::endl;
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
-  std::string str = shard_name + __ROCKSSEP + value.ToString() + __ROCKSSEP + key.ToString() + __ROCKSSEP;
+  std::string str = shard_name + __ROCKSSEP + value.ToString() + __ROCKSSEP +
+                    key.ToString() + __ROCKSSEP;
   rocksdb::Slice kslice(str);
   PANIC_STATUS(this->db_->Put(rocksdb::WriteOptions(), handle, kslice, ""));
 }
@@ -41,7 +41,8 @@ void RocksdbIndex::Delete(const std::string &shard_name,
                           const rocksdb::Slice &key) {
   // key.ToString() << std::endl;
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
-  std::string str = shard_name + __ROCKSSEP + value.ToString() + __ROCKSSEP + key.ToString() + __ROCKSSEP;
+  std::string str = shard_name + __ROCKSSEP + value.ToString() + __ROCKSSEP +
+                    key.ToString() + __ROCKSSEP;
   rocksdb::Slice kslice(str);
   PANIC_STATUS(this->db_->Delete(rocksdb::WriteOptions(), handle, kslice));
 }

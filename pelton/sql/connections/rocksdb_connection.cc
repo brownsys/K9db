@@ -74,7 +74,7 @@ SingletonRocksdbConnection::SingletonRocksdbConnection(
 
   rocksdb::BlockBasedTableOptions block_opts;
   // 500MB uncompressed cache
-  block_opts.block_cache = rocksdb::NewLRUCache(500*1048576);
+  block_opts.block_cache = rocksdb::NewLRUCache(500 * 1048576);
 
   // Options.
   rocksdb::Options opts;
@@ -235,7 +235,8 @@ int SingletonRocksdbConnection::ExecuteUpdate(
       }
 
       // Look up all affected rows.
-      std::vector<std::string> rows = this->Get(sql, tid, shard_name, value_mapper);
+      std::vector<std::string> rows =
+          this->Get(sql, tid, shard_name, value_mapper);
       rows = this->Filter(db_schema, sql, std::move(rows));
       if (rows.size() > 5) {
         LOG(WARNING) << "Perf Warning: " << rows.size()
@@ -253,7 +254,7 @@ int SingletonRocksdbConnection::ExecuteUpdate(
         rocksdb::Slice npk = ExtractColumn(nslice, pk);
         std::string okey = sid + opk.ToString() + __ROCKSSEP;
         std::string nkey = sid + npk.ToString() + __ROCKSSEP;
-        bool keychanged = SlicesEq(opk, npk);
+        bool keychanged = !SlicesEq(opk, npk);
         // If the PK is unchanged, we do not need to delete, and can replace.
         if (keychanged) {
           PANIC(db_->Delete(rocksdb::WriteOptions(), handler, okey));
@@ -318,7 +319,8 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
       }
 
       // Look up all the rows.
-      std::vector<std::string> rows = this->Get(sql, tid, shard_name, value_mapper);
+      std::vector<std::string> rows =
+          this->Get(sql, tid, shard_name, value_mapper);
       rows = this->Filter(db_schema, sql, std::move(rows));
       for (std::string &row : rows) {
         rocksdb::Slice slice(row);
@@ -331,7 +333,8 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
     }
     case sqlast::AbstractStatement::Type::DELETE: {
       // Look up all the rows.
-      std::vector<std::string> rows = this->Get(sql, tid, shard_name, value_mapper);
+      std::vector<std::string> rows =
+          this->Get(sql, tid, shard_name, value_mapper);
       rows = this->Filter(db_schema, sql, std::move(rows));
       if (rows.size() > 5) {
         LOG(WARNING) << "Perf Warning: " << rows.size()
@@ -412,8 +415,7 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
 // Get record matching values in a value mapper (either by key, index, or it).
 std::vector<std::string> SingletonRocksdbConnection::Get(
     const sqlast::AbstractStatement *stmt, TableID table_id,
-    const std::string &shard_name,
-    const ValueMapper &value_mapper) {
+    const std::string &shard_name, const ValueMapper &value_mapper) {
   ShardID shard_id = shard_name + __ROCKSSEP;
   // Read Metadata.
   rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(table_id).get();

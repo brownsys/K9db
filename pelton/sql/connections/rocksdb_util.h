@@ -127,14 +127,14 @@ class FilterVisitor : public sqlast::AbstractVisitor<bool> {
   std::unordered_map<size_t, std::pair<size_t, size_t>> positions_;
 };
 
-
 class ShardPrefixTransform : public rocksdb::SliceTransform {
  public:
   ShardPrefixTransform(size_t seps) : seps_(seps) {}
 
-  const char* Name() const override { return "ShardPrefix"; }
-  bool InDomain(const rocksdb::Slice& key) const override { return true; }
-  rocksdb::Slice Transform(const rocksdb::Slice& key) const override;
+  const char *Name() const override { return "ShardPrefix"; }
+  bool InDomain(const rocksdb::Slice &key) const override { return true; }
+  rocksdb::Slice Transform(const rocksdb::Slice &key) const override;
+
  private:
   size_t seps_;
 };
