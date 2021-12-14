@@ -32,7 +32,6 @@ cc_library(
         "//pelton/shards/sqlengine:util",
         "//pelton/sql/connections:rocksdb_connection",
         "//pelton/sqlast:ast",
-        "//pelton/util:perf",
         "@com_google_absl//absl/status",
         "@com_google_googletest//:gtest_prod",
         "@glog",

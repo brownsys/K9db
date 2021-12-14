@@ -941,6 +941,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             || q_string.starts_with("CREATE INDEX")
             || q_string.starts_with("CREATE VIEW")
             || q_string.starts_with("SET")
+            || q_string.starts_with("SHOW PERF")
         {
             let ddl_response = exec_ddl_ffi(&mut self.rust_conn, q_string);
             debug!(self.log, "ddl_response is {:?}", ddl_response);

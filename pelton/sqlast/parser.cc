@@ -7,7 +7,6 @@
 #include "absl/status/status.h"
 #include "pelton/sqlast/hacky.h"
 #include "pelton/sqlast/transformer.h"
-#include "pelton/util/perf.h"
 
 namespace pelton {
 namespace sqlast {
@@ -22,7 +21,6 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> SQLParser::Parse(
   this->error_ = false;
 
   // Initialize ANTLR things.
-  perf::Start("ANTLR");
   this->input_stream_ = std::make_unique<antlr4::ANTLRInputStream>(sql);
   this->lexer_ =
       std::make_unique<sqlparser::SQLiteLexer>(this->input_stream_.get());
@@ -40,12 +38,9 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> SQLParser::Parse(
   if (this->error_) {  // Syntax errors!
     return absl::InvalidArgumentError("SQL SYNTAX ERROR");
   }
-  perf::End("ANTLR");
 
   // Makes sure that all constructs used in the statement are supported!
-  perf::Start("Transformer");
   auto result = AstTransformer().TransformStatement(statement);
-  perf::End("Transformer");
   return result;
 }
 

@@ -4,7 +4,6 @@
 #include <utility>
 
 #include "glog/logging.h"
-#include "pelton/util/perf.h"
 // NOLINTNEXTLINE
 #include "jni.h"
 
@@ -70,7 +69,6 @@ void StartJVM() {
 std::unique_ptr<dataflow::DataFlowGraphPartition> PlanGraph(
     dataflow::DataFlowState *state, const std::string &query) {
   LOG(WARNING) << "Functionality Warning: PLANNER IS CALLED! " << query;
-  perf::Start("planner");
   // Start a JVM.
   StartJVM();
 
@@ -112,7 +110,6 @@ std::unique_ptr<dataflow::DataFlowGraphPartition> PlanGraph(
   // Free up the created jstring.
   env_local->DeleteLocalRef(query_jstr);
   env_local->DeleteLocalRef(QueryPlannerClass);
-  perf::End("planner");
   // Detach the current thread from the JVM.
   jvm.load()->DetachCurrentThread();
 

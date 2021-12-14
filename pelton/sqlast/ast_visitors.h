@@ -188,6 +188,50 @@ class ExpressionRemover : public MutableVisitor<std::unique_ptr<Expression>> {
   std::string colname_;
 };
 
+class ListCountVisitor : public AbstractVisitor<size_t> {
+ public:
+  ListCountVisitor() = default;
+
+  size_t VisitCreateTable(const CreateTable &ast) override { return 0; }
+  size_t VisitColumnDefinition(const ColumnDefinition &ast) override { return 0; }
+  size_t VisitColumnConstraint(const ColumnConstraint &ast) override { return 0; }
+  size_t VisitCreateIndex(const CreateIndex &ast) override { return 0; }
+  size_t VisitInsert(const Insert &ast) override { return 0; }
+  size_t VisitUpdate(const Update &ast) override {
+    if (ast.HasWhereClause()) {
+      return ast.GetWhereClause()->Visit(this);
+    }
+    return 0;
+  }
+  size_t VisitSelect(const Select &ast) override {
+    if (ast.HasWhereClause()) {
+      return ast.GetWhereClause()->Visit(this);
+    }
+    return 0;
+  }
+  size_t VisitDelete(const Delete &ast) override {
+    if (ast.HasWhereClause()) {
+      return ast.GetWhereClause()->Visit(this);
+    }
+    return 0;
+  }
+  size_t VisitColumnExpression(const ColumnExpression &ast) override { return 0; }
+  size_t VisitLiteralExpression(const LiteralExpression &ast) override { return 0; }
+  size_t VisitLiteralListExpression(const LiteralListExpression &ast) override {
+    return ast.values().size();
+  }
+  size_t VisitBinaryExpression(const BinaryExpression &ast) override {
+    auto v = ast.VisitChildren(this);
+    size_t sum = 0;
+    for (size_t i : v) { sum += i; }
+    return sum;
+  }
+
+ private:
+  std::string shard_prefix_;
+  bool supports_foreign_keys_;
+}; 
+
 }  // namespace sqlast
 }  // namespace pelton
 

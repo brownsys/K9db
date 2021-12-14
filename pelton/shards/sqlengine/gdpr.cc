@@ -15,7 +15,6 @@
 #include "pelton/shards/sqlengine/update.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/shards/upgradable_lock.h"
-#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -25,7 +24,6 @@ namespace gdpr {
 
 absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
                                    Connection *connection) {
-  perf::Start("GET");
   const std::string &shard_kind = stmt.shard_kind();
   const std::string &user_id = stmt.user_id();
   auto &exec = connection->executor;
@@ -75,7 +73,7 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
             dataflow_state->GetTableSchema(accessor_table_name);
 
         MOVE_OR_RETURN(std::unordered_set<UserId> ids_set,
-                       index::LookupIndex(index_name, user_id, dataflow_state));
+                       index::LookupIndex(index_name, user_id, connection));
 
         // create select statement with equality check for each id
         sql::SqlResult table_result(schema);
@@ -153,14 +151,11 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
     }
   }
 
-  perf::End("GET");
   return result;
 }
 
 absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
                                       Connection *connection) {
-  perf::Start("FORGET");
-
   const std::string &shard_kind = stmt.shard_kind();
   const std::string &user_id = stmt.user_id();
   auto &exec = connection->executor;
@@ -227,7 +222,7 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
         if (is_sharded) {
           MOVE_OR_RETURN(
               std::unordered_set<UserId> ids_set,
-              index::LookupIndex(index_name, user_id, dataflow_state));
+              index::LookupIndex(index_name, user_id, connection));
 
           // create update statement with equality check for each id
           for (const auto &id : ids_set) {
@@ -319,7 +314,6 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
                                      Connection *connection) {
-  perf::Start("GDPR");
   if (stmt.operation() == sqlast::GDPRStatement::Operation::FORGET) {
     return Forget(stmt, connection);
   } else {

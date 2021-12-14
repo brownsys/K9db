@@ -235,9 +235,6 @@ int main(int argc, char **argv) {
   pelton::close(&connection);
   pelton::shutdown();
 
-  // Print performance profile.
-  pelton::perf::PrintAll();
-
   // Done.
   std::cout << "exit" << std::endl;
   return 0;
