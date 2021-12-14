@@ -1208,7 +1208,8 @@ TEST(PlannerTest, SimpleLimitOffset) {
       dataflow::SchemaFactory::Create(names, types, keys);
 
   // Make a dummy query.
-  std::string query = "SELECT Col3 FROM test_table ORDER BY Col3 LIMIT 1";
+  std::string query =
+      "SELECT Col3 FROM test_table WHERE Col2 = ? ORDER BY Col3 LIMIT 1";
 
   // Create a dummy state.
   dataflow::DataFlowState state(0, false);

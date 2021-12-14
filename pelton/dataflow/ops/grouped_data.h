@@ -304,23 +304,22 @@ class GroupedDataT : public GroupedData<RecordCompare> {
   template <typename X2 = void,
             typename std::enable_if<!NoCompare::value, X2>::type * = nullptr>
   std::vector<R> All(int limit = -1) const {
-    std::list<R> result;
+    std::vector<const std::multiset<Record, Record::Compare> *> records;
     for (auto it = this->contents_.begin(); it != this->contents_.end(); ++it) {
-      util::MergeInto(&result, it->second, this->compare_, limit);
+      records.push_back(&it->second);
     }
-    return util::ToVector(&result, limit, 0);
+    return util::KMerge(std::move(records), this->compare_, limit, 0u);
   }
   // If record ordered, we should be able to get All() with an ordering
   // filter on records.
   template <typename X = void,
             typename std::enable_if<!NoCompare::value, X>::type * = nullptr>
   std::vector<R> All(const R &cmp, int limit = -1) const {
-    std::list<R> result;
+    std::vector<std::vector<R>> records;
     for (auto it = this->contents_.begin(); it != this->contents_.end(); ++it) {
-      auto bucket = this->LookupGreater(it->first, cmp, limit);
-      util::MergeInto(&result, std::move(bucket), this->compare_, limit);
+      records.push_back(this->LookupGreater(it->first, cmp, limit));
     }
-    return util::ToVector(&result, limit, 0);
+    return util::KMerge(std::move(records), this->compare_, limit, 0u);
   }
 
   // Key-based API:

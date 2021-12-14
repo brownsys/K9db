@@ -220,10 +220,10 @@ class Record {
             if (l.data_[i].str->size() != r.data_[i].str->size()) {
               return l.data_[i].str->size() < r.data_[i].str->size();
             }
-            for (size_t i = 0; i < l.data_[i].str->size(); i++) {
-              if (l.data_[i].str->at(i) < r.data_[i].str->at(i)) {
+            for (size_t j = 0; j < l.data_[i].str->size(); j++) {
+              if (l.data_[i].str->at(j) < r.data_[i].str->at(j)) {
                 return true;
-              } else if (l.data_[i].str->at(i) != r.data_[i].str->at(i)) {
+              } else if (l.data_[i].str->at(j) != r.data_[i].str->at(j)) {
                 return false;
               }
             }
