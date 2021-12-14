@@ -289,7 +289,8 @@ impl <'a> Workload<'a> {
         }).collect())
     }
 
-    fn run<F: Write>(&self, num_users : usize, conn: &mut mysql::Conn, f: &mut F, backend: &Backend) {
+    fn run<F: Write>(&self, num_users : usize, mcd_quid: Option<i32>, conn: &mut mysql::Conn, f: &mut F, backend: &Backend) {
+        use memcached::{MemCreateKey,MemUpdate,MemSetStr, MemReadValue, Val};
         match self {
             Workload::Reads(samples) => {
                 samples.iter().enumerate().for_each(|(id, sample)| {
@@ -298,9 +299,23 @@ impl <'a> Workload<'a> {
                     let query = format!("SELECT * FROM file_view WHERE share_target IN ({})", sstring.join(","));
                     //eprintln!("QUERY: {}", query);
                     let now = std::time::Instant::now();
-                    let vs : Vec<Row> =
-                    
-                            conn.query(query).unwrap();
+                    let _ : Vec<Vec<Value>> =
+                            mcd_quid.map_or_else( || {
+                                conn.query(query).unwrap().into_iter().map(|v : Row| v.unwrap()).collect()
+                            }, |id| {
+                                sample.iter().map(|s|
+                                    MemReadValue(id, MemCreateKey(vec![MemSetStr(&format!("'{}'", s.uid))])).into_iter().flat_map(|row| 
+                                        row.into_iter().map(|value|
+                                            match value {
+                                                Val::UInt(u) => Value::UInt(u),
+                                                Val::Int(i) => Value::Int(i),
+                                                Val::Str(s) => Value::Bytes(s.into_bytes()),
+                                            }
+                                        )
+                                    ).collect()
+                                ).collect::<Vec<_>>()
+                            }
+                            );
                     
                     let time = now.elapsed();
                     writeln!(f, "{},{},{},{}", id, backend, time.as_millis(), num_users).unwrap();
@@ -310,6 +325,7 @@ impl <'a> Workload<'a> {
                 ws.iter().enumerate().for_each(|(id, ws0)| {
                     let now = std::time::Instant::now();
                     ws0.insert_db(conn, backend);
+                    MemUpdate("oc_share");
                     let time = now.elapsed();
                     writeln!(f, "{},{},{},{}", id, backend, time.as_millis(), num_users).unwrap();
                 })
@@ -332,6 +348,7 @@ pub struct Args {
     pub debug: bool,
     pub check_consistency: bool,
     pub workload: String,
+    pub memcached: bool,
 }
 
 fn main() {
@@ -353,6 +370,7 @@ fn main() {
                 (@arg debug: --debug "Compile and run in debug mode")
                 (@arg check_consistency: --check "Check consistency between backends")
                 (@arg workload: --workload +required +takes_value "Type of workload to run")
+                (@arg memcached: --memcached "Enable memcached")
         ).get_matches();
 
     let ref args = Args {
@@ -368,6 +386,7 @@ fn main() {
         debug: matches.is_present("debug"),
         check_consistency: matches.is_present("check_consistency"),
         workload: matches.value_of("workload").unwrap().to_string(),
+        memcached: matches.is_present("memcached"),
     };
 
 
@@ -424,6 +443,7 @@ fn main() {
         _ => panic!(),
     };
 
+
     writeln!(f, "Run,Backend,Time(ms),Users").unwrap();
 
 
@@ -444,6 +464,13 @@ fn main() {
 
         std::thread::sleep(Duration::from_secs(3));
         let ref mut conn = backend.prepare(true);
+        let mcd_quid = if args.memcached {
+            eprintln!("Memcached starting");
+            memcached::MemInitialize(DB_NAME, DB_USER, DB_PASSWORD, "rust");
+            Some(memcached::MemCache("SELECT FROM file_view WHERE share_target = ?"))
+        } else {
+            None
+        };
 
         let i_ins = Instant::now();
         users.insert_db(conn, backend);
@@ -470,10 +497,16 @@ fn main() {
             ).unwrap()
         }
 
+        eprintln!("Memcached updating");
+        mcd_quid.map(|_| { 
+            memcached::MemUpdate("oc_share"); 
+            memcached::MemUpdate("oc_user_group") 
+        });
+
         // select_files_for_user(conn, &users[0]);
 
         // std::thread::sleep(std::time::Duration::from_millis(300));
-        workload.run(*num_users, conn, &mut f, backend);
+        workload.run(*num_users, mcd_quid, conn, &mut f, backend);
         let results = vec![];
 
         //eprintln!("Returned {} rows", vs.len());

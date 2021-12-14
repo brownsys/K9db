@@ -1,9 +1,6 @@
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
 
 pub mod _memcached_ffi_bindgen {
-  include!("memcached_ffi_bindgen.rs");
+  include!("../bazel-bin/baseline/memcached_ffi_bindgen.rs");
 }
 
 pub mod memcached {
@@ -82,6 +79,32 @@ pub mod memcached {
     }
     unsafe { DestroyResult(&mut result) }
     return vec;
+  }
+  pub enum Val {
+    UInt(u64),
+    Int(i64),
+    Str(String),
+  }
+  pub fn MemReadValue(id: i32, key: Record) -> Vec<Vec<Val>> {
+    let mut result = unsafe { Read(id, &key) };
+    let records = unsafe { slice::from_raw_parts(result.records, result.size) };
+    let rows = records.into_iter().map(|rec| {
+      let values = unsafe { slice::from_raw_parts(rec.values, rec.size) };
+      values.into_iter().map(|value| {
+        
+        if value.type_ == Type_UINT {
+          Val::UInt( unsafe { GetUInt(value) } )
+        } else if value.type_ == Type_INT {
+          Val::Int(unsafe { GetInt(value) })
+        } else if value.type_ == Type_TEXT {
+          Val::Str(unsafe { CStr::from_ptr(GetStr(value)).to_str().unwrap() }.to_string())
+        } else {
+          panic!("Deserialization Error")
+        }
+      }).collect()
+    }).collect();
+    unsafe { DestroyResult(&mut result) }
+    return rows;
   }
 
   pub fn __MemExecuteDB(stmt: &str) {

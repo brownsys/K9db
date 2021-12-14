@@ -4,6 +4,8 @@ pub use self::mysql::*;
 pub use self::mysql::prelude::*;
 use std::str::FromStr;
 
+include!("../../baseline/memcached_ffi_wrappers.rs");
+
 const SCHEMA : &'static str = include_str!("schema.sql");
 const MYSQL_SCHEMA : &'static str = include_str!("mysql-schema.sql");
 
@@ -42,6 +44,10 @@ impl std::fmt::Display for Backend {
     }
 }
 
+pub const DB_NAME : &'static str = "owncloud_test";
+pub const DB_USER : &'static str = "root";
+pub const DB_PASSWORD : &'static str = "password";
+
 impl Backend {
     pub fn is_mysql(&self) -> bool {
         self == &Backend::MySQL
@@ -53,14 +59,13 @@ impl Backend {
         let opts0 = OptsBuilder::new();
         let opts = match self {
             Backend::Pelton => opts0.tcp_port(10001),
-            Backend::MySQL => opts0.user(Some("root")).pass(Some("password")),
+            Backend::MySQL => opts0.user(Some(DB_USER)).pass(Some(DB_PASSWORD)),
         };
         let mut c = Conn::new(opts).unwrap();
         if self.is_mysql() {
-            let db_name = "owncloud_test";
-            c.query_drop(format!("DROP DATABASE IF EXISTS {};", db_name)).unwrap();
-            c.query_drop(format!("CREATE DATABASE {};", db_name)).unwrap();
-            c.query_drop(format!("USE {}", db_name)).unwrap();
+            c.query_drop(format!("DROP DATABASE IF EXISTS {};", DB_NAME)).unwrap();
+            c.query_drop(format!("CREATE DATABASE {};", DB_NAME)).unwrap();
+            c.query_drop(format!("USE {}", DB_NAME)).unwrap();
         }
         if prepare_and_insert {
             let schema = match self {
