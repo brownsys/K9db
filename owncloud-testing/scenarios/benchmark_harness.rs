@@ -19,6 +19,12 @@ struct User {
     uid: String,
 }
 
+impl PartialEq for User {
+    fn eq(&self, other: &Self) -> bool {
+        &self.uid == &other.uid
+    }
+}
+
 struct File<'a> {
     id: usize,
     owned_by: &'a User,
@@ -238,9 +244,11 @@ pub struct Args {
     pub dump_db: bool,
     pub outfile: Option<String>,
     pub debug: bool,
+    pub check_consistency: bool,
 }
 
 fn main() {
+    let spawn_pelton_yourself = false;
     // Add distributions later
     let matches = 
             clap_app!((crate_name!()) => 
@@ -256,6 +264,7 @@ fn main() {
                 (@arg dump_db: --("dump-db-after") "Dump the entire mysql database after")
                 (@arg outfile: -o --out +takes_value "File for writing output to (defaults to stdout")
                 (@arg debug: --debug "Compile and run in debug mode")
+                (@arg check_consistency: --check "Check consistency between backends")
         ).get_matches();
 
     let ref args = Args {
@@ -269,6 +278,7 @@ fn main() {
         num_samples: value_t!(matches, "num_samples", usize).unwrap_or(1),
         outfile: matches.value_of("outfile").map(&str::to_string),
         debug: matches.is_present("debug"),
+        check_consistency: matches.is_present("check_consistency"),
     };
 
 
@@ -301,78 +311,116 @@ fn main() {
             .spawn()
             .unwrap()
     };
-    let mut build = run_bazel_command("build", &vec![]);
+    
+    if spawn_pelton_yourself {
+        let mut build = run_bazel_command("build", &vec![]);
 
-    if !build.wait().unwrap().success() {
-        panic!("bazel build failed");
+        if !build.wait().unwrap().success() {
+            panic!("bazel build failed");
+        }
+    }
+    let num_users = &args.num_users[0];
+
+    let mut st = GeneratorState::new();
+    let users = st.generate_users(*num_users);
+    let files = st.generate_files(&users, args.files_per_user);
+    let direct_shares = st.generate_direct_shares(&users, &files, args.direct_shares_per_file);
+    let groups = st.generate_groups(&users, args.users_per_group);
+    let group_shares = st.generate_group_shares(&groups, &files, args.group_shares_per_file);
+
+    let mut rng = rand::thread_rng();
+    let ulen = users.len(); 
+    let mut samples : Vec<&User> = Vec::with_capacity(args.num_samples); 
+    if users.len() < args.num_samples {
+        panic!("Too few users, need at least as many as samples");
+    }
+    while samples.len() != args.num_samples {
+        let u = &users[rng.gen_range(0..ulen)];
+        if !samples.contains(&u) {
+            samples.push(u);
+        }
     }
 
-    writeln!(f, "Run,Backend,Time").unwrap();
+    writeln!(f, "Run,Backend,Time(ms)").unwrap();
 
-    args.num_users.iter().for_each(|num_users| {
 
-        args.backends.iter().for_each(|backend| {
-            let pelton_handle = if backend.is_pelton() {
-                let rm_res = std::fs::remove_dir_all("/var/pelton/rocksdb/pelton");
-                if let Err(e) = &rm_res {
-                    if e.kind() != std::io::ErrorKind::NotFound {
-                        panic!("{}", e);
-                    }
+    let mut results : Vec<Vec<Vec<Row>>> = args.backends.iter().map(|backend| {
+        let pelton_handle = if spawn_pelton_yourself && backend.is_pelton() {
+            let rm_res = std::fs::remove_dir_all("/var/pelton/rocksdb/pelton");
+            if let Err(e) = &rm_res {
+                if e.kind() != std::io::ErrorKind::NotFound {
+                    panic!("{}", e);
                 }
-                Some(
-                    CloseProc::new(run_bazel_command("run", &pelton_args))
-                )
-            } else {
-                None
-            };
-
-            std::thread::sleep(Duration::from_secs(3));
-            let ref mut conn = backend.prepare(true);
-
-            let mut st = GeneratorState::new();
-            let users = st.generate_users(*num_users);
-            let files = st.generate_files(&users, args.files_per_user);
-            let direct_shares = st.generate_direct_shares(&users, &files, args.direct_shares_per_file);
-            let groups = st.generate_groups(&users, args.users_per_group);
-            let group_shares = st.generate_group_shares(&groups, &files, args.group_shares_per_file);
-
-            users.insert_db(conn, backend);
-            if backend.is_pelton() {
-                direct_shares.insert_db(conn, backend);
-                groups.insert_db(conn, backend);
-                group_shares.insert_db(conn, backend);
-                files.insert_db(conn, backend);
-            } else {
-                files.insert_db(conn, backend);
-                direct_shares.insert_db(conn, backend);
-                groups.insert_db(conn, backend);
-                group_shares.insert_db(conn, backend);
             }
+            Some(
+                CloseProc::new(run_bazel_command("run", &pelton_args))
+            )
+        } else {
+            None
+        };
 
-            std::thread::sleep(std::time::Duration::from_millis(300));
+        std::thread::sleep(Duration::from_secs(3));
+        let ref mut conn = backend.prepare(true);
 
-            fn select_files_for_user<Q:Queryable>(conn : &mut Q, user: &User) -> Vec<Row> {
-                conn.query(
-                    format!("SELECT * FROM file_view WHERE share_target = '{}'", user.uid)
-                ).unwrap()
+        let i_ins = Instant::now();
+        users.insert_db(conn, backend);
+        if backend.is_pelton() {
+            direct_shares.insert_db(conn, backend);
+            groups.insert_db(conn, backend);
+            group_shares.insert_db(conn, backend);
+            files.insert_db(conn, backend);
+        } else {
+            files.insert_db(conn, backend);
+            direct_shares.insert_db(conn, backend);
+            groups.insert_db(conn, backend);
+            group_shares.insert_db(conn, backend);
+        }
+        let t_ins = i_ins.elapsed();
+        //conn.query_drop("SET echo");
+        eprintln!("Inserts done in {}ms", t_ins.as_millis());
+
+        //std::io::stdin().read_line(&mut String::new());
+
+        fn select_files_for_user<Q:Queryable>(conn : &mut Q, user: &User) -> Vec<Row> {
+            conn.query(
+                format!("SELECT * FROM file_view WHERE share_target = '{}'", user.uid)
+            ).unwrap()
+        }
+
+        // select_files_for_user(conn, &users[0]);
+
+        // std::thread::sleep(std::time::Duration::from_millis(300));
+        let mut sstring = samples.iter().map(|s| format!("'{}'", s.uid)).collect::<Vec<_>>();
+        //sstring.extend(std::iter::repeat("'-1'".to_string()).take(args.num_samples));
+        let query = format!("SELECT * FROM file_view WHERE share_target IN ({})", sstring.join(","));
+        //eprintln!("QUERY: {}", query);
+        let now = std::time::Instant::now();
+        let vs : Vec<Row> =
+        
+                conn.query(query).unwrap();
+        
+        let time = now.elapsed();
+        let results = vec![];
+
+        eprintln!("Returned {} rows", vs.len());
+
+        if args.dump_db && backend.is_pelton() {
+            pp_pelton_database();
+        }
+        writeln!(f, "{},{},{}", 0, backend, time.as_millis()).unwrap();
+
+        results
+    }).collect::<Vec<_>>();
+
+    if results.len() == 2 && args.check_consistency {
+        let res1 = results.pop().unwrap().into_iter();
+        let res2 = results.pop().unwrap().into_iter();
+        for (mut r1, mut r2) in res1.zip(res2) {
+            for (f1, f2) in r1.into_iter().zip(r2.into_iter()) {
+                if f1 != f2 {
+                    eprintln!("{:?} != {:?}", f1.unwrap(), f2.unwrap());
+                }
             }
-
-            // select_files_for_user(conn, &users[0]);
-
-            // std::thread::sleep(std::time::Duration::from_millis(300));
-
-            let mut rng = rand::thread_rng();
-            let ulen = users.len(); 
-            let samples = std::iter::repeat_with(|| &users[rng.gen_range(0..ulen)]).take(args.num_samples).collect::<Vec<_>>();
-            let now = std::time::Instant::now();
-            let _results : Vec<Vec<Row>> = samples.iter().map(|user| select_files_for_user(conn, user)).collect();
-            let time = now.elapsed();
-
-
-            if args.dump_db && backend.is_pelton() {
-                pp_pelton_database();
-            }
-            writeln!(f, "{},{},{}", 0, backend, time.as_millis()).unwrap();
-        })
-    });
+        }
+    }
 }
