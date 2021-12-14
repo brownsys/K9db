@@ -31,13 +31,13 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
 
   // Parse with ANTLR into our AST.
-  perf::Start("parsing");
+  connection->perf->Start("parsing");
   sqlast::SQLParser parser;
   // parse the statement, move result of parsing sql string to newly created
   // <sqlast::AbstractStatement> statement.
   MOVE_OR_RETURN(std::unique_ptr<sqlast::AbstractStatement> statement,
                  parser.Parse(sql));
-  perf::End("parsing");
+  connection->perf->End("parsing");
 
   // Get type of sql statement, initialize stmt (statement) as the associated
   // type custom defined in pelton via the sqlast class. Then call Shard in the

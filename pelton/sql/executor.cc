@@ -9,7 +9,6 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/sql/connections/rocksdb_connection.h"
-#include "pelton/util/perf.h"
 
 namespace pelton {
 namespace sql {
@@ -68,9 +67,7 @@ SqlResult PeltonExecutor::Shard(const sqlast::AbstractStatement *sql,
                                 const dataflow::SchemaRef &schema,
                                 int aug_index) {
   // Find the physical shard name (prefix) by hashing the user id and user kind.
-  perf::Start("hashing");
   std::string shard_name = shards::sqlengine::NameShard(shard_kind, user_id);
-  perf::End("hashing");
 
 #ifndef PELTON_OPT
   LOG(INFO) << "Shard: " << shard_name << " (userid: " << user_id << ")";

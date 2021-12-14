@@ -20,7 +20,6 @@ namespace index {
 
 absl::StatusOr<sql::SqlResult> CreateIndex(const sqlast::CreateIndex &stmt,
                                            Connection *connection) {
-  perf::Start("Create Index");
 
   // Need a unique lock as we are changing index metadata
   UniqueLock lock = connection->state->sharder_state()->WriterLock();
@@ -81,19 +80,20 @@ absl::StatusOr<sql::SqlResult> CreateIndexStateIsAlreadyLocked(
     result = sql::SqlResult(true);
   }
 
-  perf::End("Create Index");
+  connection->perf->End("Create Index");
   return result;
 }
 
 absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
     const std::string &table_name, const std::string &shard_by,
-    const sqlast::BinaryExpression *where_clause, SharderState *state,
-    dataflow::DataFlowState *dataflow_state) {
+    const sqlast::BinaryExpression *where_clause, Connection *connection) {
+  SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
   if (where_clause == nullptr) {
     return std::make_pair(false, std::unordered_set<UserId>{});
   }
 
-  perf::Start("Lookup Index1");
+  connection->perf->Start("Lookup Index1");
   // Get all the columns that have a secondary index.
   if (state->HasIndicesFor(table_name)) {
     const std::unordered_set<ColumnName> &indexed_cols =
@@ -112,23 +112,24 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
       const FlowName &index_flow =
           state->IndexFlow(table_name, column_name, shard_by);
       MOVE_OR_RETURN(std::unordered_set<UserId> shards,
-                     LookupIndex(index_flow, column_value, dataflow_state));
+                     LookupIndex(index_flow, column_value, connection));
 
-      perf::End("Lookup Index1");
+      connection->perf->End("Lookup Index1");
       return std::make_pair(true, std::move(shards));
     }
   }
 
-  perf::End("Lookup Index1");
+  connection->perf->End("Lookup Index1");
   return std::make_pair(false, std::unordered_set<UserId>{});
 }
 
 absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     const std::string &index_name, const std::string &value,
-    dataflow::DataFlowState *dataflow_state) {
-  perf::Start("Lookup Index");
+    Connection *connection) {
+  connection->perf->Start("Lookup Index");
 
   // Find flow.
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
   const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(index_name);
 
   // Construct look up key.
@@ -158,7 +159,7 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     result.insert(record.GetValueString(1));
   }
 
-  perf::End("Lookup Index");
+  connection->perf->End("Lookup Index");
   return result;
 }
 

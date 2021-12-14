@@ -172,7 +172,7 @@ absl::Status HandleShardForUser(
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
                                      Connection *connection, SharedLock *lock,
                                      bool update_flows) {
-  perf::Start("Insert");
+  connection->perf->Start("Insert");
   shards::SharderState *state = connection->state->sharder_state();
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
 
@@ -255,9 +255,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
       if (info.IsTransitive()) {
         ASSIGN_OR_RETURN(
             auto &lookup,
-            index::LookupIndex(info.next_index_name, user_id, dataflow_state));
-        if (lookup.size() < 1) {
-          continue;
+            index::LookupIndex(info.next_index_name, user_id, connection));
+        if (lookup.size() == 1) {
+          user_id = std::move(*lookup.cbegin());
         } else {
           for (auto &uid : lookup) {
             if (!absl::EqualsIgnoreCase(uid, "NULL")) {
@@ -283,7 +283,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
     dataflow_state->ProcessRecords(stmt.table_name(), std::move(records));
   }
 
-  perf::End("Insert");
+  connection->perf->End("Insert");
   return result;
 }
 

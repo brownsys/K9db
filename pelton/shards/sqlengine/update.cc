@@ -107,7 +107,7 @@ sqlast::Insert InsertRecord(const dataflow::Record &record,
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
                                      Connection *connection, bool synchronize) {
-  perf::Start("Update");
+  connection->perf->Start("Update");
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
 
@@ -201,7 +201,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
             // Transitive sharding: look up via index.
             ASSIGN_OR_RETURN(auto &lookup,
                              index::LookupIndex(info.next_index_name, user_id,
-                                                dataflow_state));
+                                                connection));
             if (lookup.size() == 1) {
               user_id = std::move(*lookup.cbegin());
               // Execute statement directly against shard.
@@ -229,7 +229,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
               // Transitive sharding: look up via index.
               ASSIGN_OR_RETURN(auto &lookup,
                                index::LookupIndex(info.next_index_name, user_id,
-                                                  dataflow_state));
+                                                  connection));
               if (lookup.size() == 1) {
                 shards.insert(std::move(*lookup.begin()));
               }
@@ -248,7 +248,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
           ASSIGN_OR_RETURN(
               const auto &pair,
               index::LookupIndex(table_name, info.shard_by,
-                                 stmt.GetWhereClause(), state, dataflow_state));
+                                 stmt.GetWhereClause(), connection));
           if (pair.first) {
             // Secondary index available for some constrainted column in stmt.
             result.Append(exec.Shards(&cloned, shard_kind, pair.second), true);
@@ -270,7 +270,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
     dataflow_state->ProcessRecords(table_name, std::move(records));
   }
 
-  perf::End("Update");
+  connection->perf->End("Update");
   return result;
 }
 

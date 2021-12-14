@@ -256,7 +256,6 @@ cc_library(
         "//pelton/shards:upgradable_lock",
         "//pelton/shards/sqlengine:util",
         "//pelton/sqlast:ast",
-        "//pelton/util:perf",
         "//pelton/util:status",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",

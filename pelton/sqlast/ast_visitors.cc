@@ -7,8 +7,6 @@
 #include <utility>
 #include <vector>
 
-#include "pelton/util/perf.h"
-
 namespace pelton {
 namespace sqlast {
 
@@ -25,7 +23,6 @@ std::string Dequote(const std::string &st) {
 
 // Stringifier.
 std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
-  perf::Start("Stringify (create)");
   std::string result =
       "CREATE TABLE " + this->shard_prefix_ + ast.table_name() + " (";
   bool first = true;
@@ -38,7 +35,6 @@ std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
   }
   result += ")";
   result += " ENGINE ROCKSDB";
-  perf::End("Stringify (create)");
   return result;
 }
 std::string Stringifier::VisitColumnDefinition(const ColumnDefinition &ast) {
@@ -70,16 +66,13 @@ std::string Stringifier::VisitColumnConstraint(const ColumnConstraint &ast) {
 }
 
 std::string Stringifier::VisitCreateIndex(const CreateIndex &ast) {
-  perf::Start("Stringify (create index)");
   std::string result = "CREATE INDEX " + this->shard_prefix_ +
                        ast.index_name() + " ON " + this->shard_prefix_ +
                        ast.table_name() + "(" + ast.column_name() + ")";
-  perf::End("Stringify (create index)");
   return result;
 }
 
 std::string Stringifier::VisitInsert(const Insert &ast) {
-  perf::Start("Stringify (insert)");
   std::string result = ast.replace() ? "REPLACE" : "INSERT";
   result += " INTO " + this->shard_prefix_ + ast.table_name();
   // Columns if explicitly specified.
@@ -106,11 +99,9 @@ std::string Stringifier::VisitInsert(const Insert &ast) {
     result += val;
   }
   result += ")";
-  perf::End("Stringify (insert)");
   return result;
 }
 std::string Stringifier::VisitUpdate(const Update &ast) {
-  perf::Start("Stringify (update)");
   std::string result =
       "UPDATE " + this->shard_prefix_ + ast.table_name() + " SET ";
   // Columns and values.
@@ -125,11 +116,9 @@ std::string Stringifier::VisitUpdate(const Update &ast) {
   if (ast.HasWhereClause()) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
-  perf::End("Stringify (update)");
   return result;
 }
 std::string Stringifier::VisitSelect(const Select &ast) {
-  perf::Start("Stringify (select)");
   std::string result = "SELECT ";
   bool first = true;
   for (const std::string &col : ast.GetColumns()) {
@@ -143,11 +132,9 @@ std::string Stringifier::VisitSelect(const Select &ast) {
   if (ast.HasWhereClause()) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
-  perf::End("Stringify (select)");
   return result;
 }
 std::string Stringifier::VisitDelete(const Delete &ast) {
-  perf::Start("Stringify (delete)");
   std::string result = "DELETE FROM " + this->shard_prefix_ + ast.table_name();
   if (ast.HasWhereClause()) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
@@ -155,7 +142,6 @@ std::string Stringifier::VisitDelete(const Delete &ast) {
   if (ast.returning()) {
     result += " RETURNING *";
   }
-  perf::End("Stringify (delete)");
   return result;
 }
 

@@ -551,7 +551,7 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
                                      Connection *connection) {
-  perf::Start("Create");
+  connection->perf->Start("Create");
   shards::SharderState *state = connection->state->sharder_state();
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
   UniqueLock lock = state->WriterLock();
@@ -646,7 +646,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     }
   }
 
-  perf::End("Create");
+  connection->perf->End("Create");
   return result;
 }
 

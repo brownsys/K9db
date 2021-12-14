@@ -19,7 +19,6 @@ cc_library(
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:generator",
         "//pelton/dataflow:graph",
-        "//pelton/util:perf",
         "@bazel_tools//tools/jdk:jni",
         "@glog",
     ],

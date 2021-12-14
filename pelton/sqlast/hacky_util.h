@@ -39,11 +39,15 @@ inline void ConsumeWhiteSpace(const char **ptr, size_t *size) {
 
 inline std::string ExtractIdentifier(const char **ptr, size_t *size) {
   const char *s = *ptr;
+  size_t pos = 0;
   size_t i;
   for (i = 0; i < *size; i++) {
     if (s[i] == ' ' || s[i] == '>' || s[i] == '=' || s[i] == ';' || s[i] == ')'
-        || s[i] == '(') {
+        || s[i] == '(' || s[i] == ',') {
       break;
+    }
+    if (s[i] == '.') {
+      pos = i+1;
     }
   }
 
@@ -51,7 +55,7 @@ inline std::string ExtractIdentifier(const char **ptr, size_t *size) {
     return "";
   }
 
-  std::string idn(s, i);
+  std::string idn(s + pos, i - pos);
   *ptr += i;
   *size -= i;
   return idn;

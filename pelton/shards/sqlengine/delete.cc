@@ -69,7 +69,7 @@ void HandleOWNINGColumn(
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
                                      Connection *connection, bool synchronize,
                                      bool update_flows) {
-  perf::Start("Delete");
+  connection->perf->Start("Delete");
   const std::string &table_name = stmt.table_name();
 
   // We only read from state.
@@ -126,7 +126,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
           // Transitive sharding: look up via index.
           ASSIGN_OR_RETURN(auto &lookup,
                            index::LookupIndex(info.next_index_name, user_id,
-                                              dataflow_state));
+                                              connection));
           if (lookup.size() == 1) {
             user_id = std::move(*lookup.cbegin());
             // Execute statement directly against shard.
@@ -162,7 +162,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
         ASSIGN_OR_RETURN(
             const auto &pair,
             index::LookupIndex(table_name, info.shard_by, stmt.GetWhereClause(),
-                               state, dataflow_state));
+                               connection));
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
           auto res = exec.Shards(&cloned, shard_kind, pair.second, schema, aug_index);
@@ -208,7 +208,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
     dataflow_state->ProcessRecords(table_name, std::move(records));
   }
 
-  perf::End("Delete");
+  connection->perf->End("Delete");
   return result;
 }
 

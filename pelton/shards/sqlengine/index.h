@@ -29,12 +29,11 @@ absl::StatusOr<sql::SqlResult> CreateIndexStateIsAlreadyLocked(
 
 absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
     const std::string &table_name, const std::string &shard_by,
-    const sqlast::BinaryExpression *where_clause, SharderState *state,
-    dataflow::DataFlowState *dataflow_state);
+    const sqlast::BinaryExpression *where_clause, Connection *connection);
 
 absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     const std::string &index_name, const std::string &value,
-    dataflow::DataFlowState *dataflow_state);
+    Connection *connection);
 
 }  // namespace index
 }  // namespace sqlengine

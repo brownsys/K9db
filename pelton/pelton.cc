@@ -13,6 +13,7 @@
 #include "pelton/shards/sqlengine/engine.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/status.h"
+#include "pelton/util/perf.h"
 
 namespace pelton {
 
@@ -58,6 +59,10 @@ std::optional<SqlResult> SpecialStatements(const std::string &sql,
     if (absl::StartsWith(split.at(1), "SHARDS")) {
       return connection->state->NumShards();
     }
+    if (absl::StartsWith(split.at(1), "PERF")) {
+      PELTON_STATE->CombinePerfs().PrintAll();
+      return SqlResult(true);
+    }
   }
   return {};
 }
@@ -77,6 +82,7 @@ bool open(Connection *connection, const std::string &db_name) {
   // set global state in local connection struct
   connection->state = PELTON_STATE;
   connection->executor.Initialize(db_name);
+  connection->perf = PELTON_STATE->GetPerf();
   return true;
 }
 

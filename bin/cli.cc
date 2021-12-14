@@ -10,7 +10,6 @@
 #include "glog/logging.h"
 #include "pelton/pelton.h"
 #include "pelton/util/latency.h"
-#include "pelton/util/perf.h"
 
 std::vector<std::string> TO_SKIP = {"submit"};
 
@@ -35,7 +34,6 @@ void Print(pelton::SqlResult &&result, bool print) {
 
 // Read SQL commands one at a time.
 bool ReadCommand(std::string *ptr) {
-  pelton::perf::Start("Read std::cin");
   ptr->clear();
   std::string line;
   while (std::getline(std::cin, line)) {
@@ -45,7 +43,6 @@ bool ReadCommand(std::string *ptr) {
     }
     if (line.front() == '#' || (line[0] == '-' && line[1] == '-')) {
       *ptr = line;
-      pelton::perf::End("Read std::cin");
       return true;
     }
     // Wait until command is fully read (in case it spans several lines).
@@ -56,11 +53,9 @@ bool ReadCommand(std::string *ptr) {
     }
 
     // Done, read command successfully.
-    pelton::perf::End("Read std::cin");
     return true;
   }
 
-  pelton::perf::End("Read std::cin");
   return false;
 }
 
@@ -120,7 +115,6 @@ int main(int argc, char **argv) {
       if (command[0] == '#') {
         if (command == "# perf start") {
           std::cout << "Perf start" << std::endl;
-          pelton::perf::Start();
           current_endpoint = profiler.TurnOn();
           start_time = std::chrono::high_resolution_clock::now();
         }
@@ -139,9 +133,7 @@ int main(int argc, char **argv) {
         }
       }
 
-      // Command has been fully read, execute it!
-      pelton::perf::Start("exec");
-
+      // Command has been fully read, execute it
       absl::StatusOr<pelton::SqlResult> status =
           pelton::exec(&connection, command);
       if (!status.ok()) {
@@ -156,7 +148,6 @@ int main(int argc, char **argv) {
       if (print) {
         std::cout << std::endl << ">>> " << std::flush;
       }
-      pelton::perf::End("exec");
     }
 
     profiler.PrintAll();
@@ -177,9 +168,6 @@ int main(int argc, char **argv) {
   } catch (const char *err_msg) {
     LOG(FATAL) << "Error: " << err_msg;
   }
-
-  // Print performance profile.
-  pelton::perf::PrintAll();
 
   // Exit!
   std::cout << "exit" << std::endl;

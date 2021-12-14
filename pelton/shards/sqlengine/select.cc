@@ -58,7 +58,7 @@ dataflow::SchemaRef ResultSchema(const sqlast::Select &stmt,
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
                                      Connection *connection, bool synchronize) {
-  perf::Start("Select");
+  connection->perf->Start("Select");
   shards::SharderState *state = connection->state->sharder_state();
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
   SharedLock lock;
@@ -122,7 +122,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
           // Transitive sharding: look up via index.
           ASSIGN_OR_RETURN(auto &lookup,
                            index::LookupIndex(info.next_index_name, user_id,
-                                              dataflow_state));
+                                              connection));
           if (lookup.size() == 1) {
             user_id = std::move(*lookup.cbegin());
             // Execute statement directly against shard.
@@ -148,7 +148,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
         ASSIGN_OR_RETURN(
             const auto &pair,
             index::LookupIndex(table_name, info.shard_by, stmt.GetWhereClause(),
-                               state, dataflow_state));
+                               connection));
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
           result.Append(
@@ -171,7 +171,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
     }
   }
 
-  perf::End("Select");
+  connection->perf->End("Select");
   return result;
 }
 
