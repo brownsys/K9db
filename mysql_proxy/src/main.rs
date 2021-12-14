@@ -220,6 +220,7 @@ struct Backend {
     // statements never get prepared in reality. Their statement_id internally gets wired to the
     // reduced statement_id via the above data structures.
     id_generator: Arc<AtomicU32>,
+    perf: Arc<RwLock<HashMap<String, Vec<std::time::Duration>>>>,
 }
 
 impl Backend {
@@ -650,6 +651,8 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         prepared_statement: &str,
         info: StatementMetaWriter<W>,
     ) -> io::Result<()> {
+        let start = Instant::now();
+    
         // Filter out supported statements.
         if !prepared_statement.starts_with("SELECT")
             && !prepared_statement.starts_with("INSERT")
@@ -707,6 +710,16 @@ impl<W: io::Write> MysqlShim<W> for Backend {
           println!("HIGH PARAM COUNT {} QUERY {}", param_count, prepared_statement);
         }
 
+        // stop measuring runtime and add to total time for this connection
+        let total_perf = start.elapsed();
+        let mut perf_guard = self.perf.write().unwrap();
+        if !perf_guard.contains_key("ONPREPARE") {
+          perf_guard.insert(String::from("ONPREPARE"), Vec::new());
+        }
+        let vec = perf_guard.get_mut("ONPREPARE").unwrap();
+        vec.push(total_perf);
+        drop(perf_guard);
+
         // Respond to client
         return info.reply(stmt_id, &params, &[]);
     }
@@ -720,6 +733,8 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         params: ParamParser,
         results: QueryResultWriter<W>,
     ) -> io::Result<()> {
+        let start = Instant::now();
+        
         debug!(self.log, "Rust proxy: starting on_execute");
         let index_read_guard = self.prepared_index.read().unwrap();
         let wherein_read_guard = self.wherein_view_index.read().unwrap();
@@ -874,6 +889,16 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 
         drop(index_read_guard);
         drop(wherein_read_guard);
+        
+        let total_perf = start.elapsed();
+        let mut perf_guard = self.perf.write().unwrap();
+        if !perf_guard.contains_key("EXECUTE") {
+          perf_guard.insert(String::from("EXECUTE"), Vec::new());
+        }
+        let vec = perf_guard.get_mut("EXECUTE").unwrap();
+        vec.push(total_perf);
+        drop(perf_guard);
+        // Call on query.
         self.on_query(&query, results)
     }
 
@@ -943,6 +968,17 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             || q_string.starts_with("SET")
             || q_string.starts_with("SHOW PERF")
         {
+            if (q_string.starts_with("SHOW PERF")) {
+              let perf_guard = self.perf.read().unwrap();
+              for key in perf_guard.keys() {
+                let vec = perf_guard.get(key).unwrap();
+                let sum: std::time::Duration = vec.iter().sum();
+                let count = vec.len();
+                println!("RUST {}: {}. Count: {}.", key, sum.as_millis() / (count as u128), count);
+              }
+              println!("");
+            }
+        
             let ddl_response = exec_ddl_ffi(&mut self.rust_conn, q_string);
             debug!(self.log, "ddl_response is {:?}", ddl_response);
 
@@ -961,10 +997,22 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             || q_string.starts_with("REPLACE")
             || q_string.starts_with("GDPR FORGET")
         {
+            let perf_before = Instant::now();
             let update_response = exec_update_ffi(&mut self.rust_conn, q_string);
+            let perf_duration_ffi = perf_before.elapsed();
+            let total_perf = start.elapsed();
 
             // stop measuring runtime and add to total time for this connection
-            self.runtime = self.runtime + start.elapsed();
+            let mut perf_guard = self.perf.write().unwrap();
+            if !perf_guard.contains_key("Q UPDATE") {
+              perf_guard.insert(String::from("Q UPDATE"), Vec::new());
+              perf_guard.insert(String::from("Q UPDATE (ffi)"), Vec::new());            
+            }
+            let vec = perf_guard.get_mut("Q UPDATE").unwrap();
+            vec.push(total_perf);
+            let vec = perf_guard.get_mut("Q UPDATE (ffi)").unwrap();
+            vec.push(perf_duration_ffi);
+            drop(perf_guard);
 
             if update_response != -1 {
                 results.completed(update_response as u64, 0)
@@ -980,8 +1028,11 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             || q_string.starts_with("SHOW SHARDS")
             || q_string.starts_with("SHOW VIEW")
             || q_string.starts_with("SHOW MEMORY")
-        {
+        {           
+            let perf_before = Instant::now();
             let select_response = exec_select_ffi(&mut self.rust_conn, q_string);
+            let perf_duration_ffi = perf_before.elapsed();
+            let total_perf = start.elapsed();
 
             // stop measuring runtime and add to total time for this connection
             self.runtime = self.runtime + start.elapsed();
@@ -1039,6 +1090,18 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             }
             // call destructor for CResult (after results are written/copied via row writer)
             unsafe { std::ptr::drop_in_place(select_response) };
+            
+            // stop measuring runtime and add to total time for this connection
+            let mut perf_guard = self.perf.write().unwrap();
+            if !perf_guard.contains_key("Q SELECT") {
+              perf_guard.insert(String::from("Q SELECT"), Vec::new());
+              perf_guard.insert(String::from("Q SELECT (ffi)"), Vec::new());            
+            }
+            let vec = perf_guard.get_mut("Q SELECT").unwrap();
+            vec.push(total_perf);
+            let vec = perf_guard.get_mut("Q SELECT (ffi)").unwrap();
+            vec.push(perf_duration_ffi);
+            drop(perf_guard);
 
             // tell client no more rows coming. Returns an empty Ok to the proxy
             rw.finish()
@@ -1127,6 +1190,7 @@ fn main() {
     let wherein_view_index: Arc<RwLock<HashMap<u32, (u32, Vec<Option<u32>>)>>> =
         Arc::new(RwLock::new(HashMap::new()));
     let id_generator = Arc::new(AtomicU32::new(0));
+    let perf_lock = Arc::new(RwLock::new(HashMap::new()));
 
     let db_name = flags.db_name.clone();
     let mut rust_conn = open_ffi(&db_name);
@@ -1187,6 +1251,7 @@ fn main() {
             let prepared_index_clone = prepared_index_lock.clone();
             let wherein_view_index_clone = wherein_view_index.clone();
             let id_generrator_clone = id_generator.clone();
+            let perf_clone = perf_lock.clone();
             threads.push(std::thread::spawn(move || {
                 info!(
                     log_client,
@@ -1207,6 +1272,7 @@ fn main() {
                     prepared_index: prepared_index_clone,
                     wherein_view_index: wherein_view_index_clone,
                     id_generator: id_generrator_clone,
+                    perf: perf_clone,
                 };
                 let _inter = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
             }));
