@@ -321,7 +321,7 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
       // Look up all the rows.
       std::vector<std::string> rows =
           this->Get(sql, tid, shard_name, value_mapper);
-      rows = this->Filter(db_schema, sql, std::move(rows));
+      // rows = this->Filter(db_schema, sql, std::move(rows));
       for (std::string &row : rows) {
         rocksdb::Slice slice(row);
         rocksdb::Slice key = ExtractColumn(row, pk);

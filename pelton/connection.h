@@ -1,7 +1,6 @@
 #ifndef PELTON_CONNECTION_H_
 #define PELTON_CONNECTION_H_
 
-#include <atomic>
 #include <string>
 
 #include "pelton/dataflow/state.h"
@@ -16,11 +15,7 @@ namespace pelton {
 class State {
  public:
   explicit State(size_t workers, bool consistent)
-      : sharder_state_(), dataflow_state_(workers, consistent) {
-    for (size_t i = 0; i < 500; i++) {
-      this->perfs_.push_back(perf::Perf());
-    }
-  }
+      : sharder_state_(), dataflow_state_(workers, consistent) {}
 
   // Not copyable or movable.
   State(const State &) = delete;
@@ -52,22 +47,17 @@ class State {
   }
   
   perf::Perf CombinePerfs() const {
-    perf::Perf perf;
-    for (const auto &p : this->perfs_) {
-      perf.Combine(p);
-    }
-    return perf;
+    return perf_;
   }
   
   perf::Perf *GetPerf() {
-    return &this->perfs_.at(this->atomic_++);
+    return &perf_;
   }
 
  private:
   shards::SharderState sharder_state_;
   dataflow::DataFlowState dataflow_state_;
-  std::vector<perf::Perf> perfs_;
-  std::atomic<size_t> atomic_;
+  perf::Perf perf_;
 };
 
 struct Connection {

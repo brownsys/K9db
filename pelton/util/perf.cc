@@ -21,6 +21,7 @@ bool CompareSecond(const std::pair<std::string, uint64_t> &l,
 
 }  // namespace
 
+/*
 // Combine many perfs.
 void Perf::Combine(const Perf &perf) {
   for (const auto &[label, v] : perf.times_) {
@@ -67,6 +68,7 @@ void Perf::PrintAll() {
               << " count: " << this->times_[label].size() << std::endl;
   }
 }
+*/
 
 }  // namespace perf
 }  // namespace pelton

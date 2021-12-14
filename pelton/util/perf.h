@@ -15,10 +15,10 @@ class Perf {
  public:
   Perf() : begin_(true), start_times_(), times_() {}
 
-  void Start(const std::string &label);
-  void End(const std::string &label);
-  void PrintAll();
-  void Combine(const Perf &perf);
+  void Start(const std::string &label) {}
+  void End(const std::string &label) {}
+  void PrintAll() {}
+  void Combine(const Perf &perf) {}
 
  private:
   using TimeType = std::chrono::time_point<std::chrono::high_resolution_clock>;

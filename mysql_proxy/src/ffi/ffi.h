@@ -84,6 +84,9 @@ void FFIDestroySelect(FFIResult *c_result);
 // Delete pelton_state. Returns true if successful and false otherwise.
 bool FFIShutdown();
 
+// Shutdown planner.
+void FFIPlannerShutdown();
+
 // Close a client connection. Returns true if successful and false otherwise.
 bool FFIClose(FFIConnection *c_conn);
 

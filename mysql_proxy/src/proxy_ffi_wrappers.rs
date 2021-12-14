@@ -108,3 +108,7 @@ pub fn convert_columns(
     }
     return cols;
 }
+
+pub fn shutdown_planner_ffi() {
+  unsafe { FFIPlannerShutdown() }
+}
