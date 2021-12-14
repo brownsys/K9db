@@ -27,6 +27,11 @@ typedef struct {
   Record *records;
 } Result;
 
+typedef struct {
+  size_t size;
+  Result *results;
+} Results;
+
 // Destructors.
 void DestroyValue(Value *v);
 void DestroyRecord(Record *r);
@@ -56,6 +61,7 @@ void Update(const char *table);
 
 // Read by id and key.
 Result Read(int id, const Record *key);
+Results ReadMany(int id, const Record *keys, size_t count);
 
 // For tests.
 void __ExecuteDB(const char *stmt);

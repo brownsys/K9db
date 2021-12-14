@@ -55,9 +55,9 @@ void MemcachedConnect() {
   servers = memcached_server_list_append(nullptr, "localhost", 11211, &status);
   status = memcached_server_push(memc, servers);
   if (status != MEMCACHED_SUCCESS) {
-    std::cout << "Couldn't add server: " << memcached_strerror(memc, status)
+    std::cerr << "Couldn't add server: " << memcached_strerror(memc, status)
               << std::endl;
-    assert(false);
+    throw std::runtime_error("no success");
   }
 }
 // Connect to MariaDB.
@@ -69,6 +69,7 @@ void MariaDBConnect(const char *db, const char *db_username,
   props["password"] = db_password;
 
   sql::Driver *driver = sql::mariadb::get_driver_instance();
+  if (!driver) throw std::runtime_error("no driver");
   conn = std::unique_ptr<sql::Connection>(driver->connect(props));
   stmt = std::unique_ptr<sql::Statement>(conn->createStatement());
   stmt->execute((std::string("CREATE DATABASE IF NOT EXISTS ") + db).c_str());
@@ -247,11 +248,10 @@ void ComputeAndCache(int id, const char *query) {
     if (std::regex_match(key_col, matches, regex_var)) {
       query_keys.push_back(matches[2]);
     } else {
-      // LOG(FATAL) << "where column did not match regex " << key_col;
+      throw std::runtime_error("where column did not match regex " + key_col);
 
     }
   }
-
   // Execute the query.
   std::unique_ptr<sql::ResultSet> rows{stmt->executeQuery(str.c_str())};
   std::unique_ptr<sql::ResultSetMetaData> schema{rows->getMetaData()};
@@ -330,6 +330,14 @@ void DestroyResult(Result *r) {
     delete[] r->records;
   }
 }
+void DestroyResults(Results *r) {
+  if (r->results != nullptr) {
+    for (size_t i = 0; i < r->size; i++) {
+      DestroyResult(r->results + i);
+    }
+    delete[] r->results;
+  }
+}
 
 // Get value by type.
 int64_t GetInt(const Value *val) {
@@ -355,8 +363,12 @@ bool Initialize(const char *db_name, const char *db_username,
                 const char *db_password, const char *seed) {
   prefix = seed;
   // Connect to server.
-  MemcachedConnect();
-  MariaDBConnect(db_name, db_username, db_password);
+  try {
+    MemcachedConnect();
+    MariaDBConnect(db_name, db_username, db_password);
+  } catch (std::exception &e) {
+    std::cerr << e.what();
+  }
   return true;
 }
 
@@ -364,25 +376,30 @@ bool Initialize(const char *db_name, const char *db_username,
 // returns -1 on error, otherwise returns a cache id which can be used to
 // lookup data for the query in cache.
 int Cache(const char *query) {
-  int id = keys.size();
+  try {
+    int id = keys.size();
 
-  std::string str = query;
+    std::string str = query;
 
-  auto begin = std::sregex_iterator(str.begin(), str.end(), regex_table);
-  auto end = std::sregex_iterator();
-  for (auto it = begin; it != end; ++it) {
-    std::smatch matches = *it;
-    std::string table_name = matches[2];
-    views[table_name].insert(id);
-  }
+    auto begin = std::sregex_iterator(str.begin(), str.end(), regex_table);
+    auto end = std::sregex_iterator();
+    for (auto it = begin; it != end; ++it) {
+      std::smatch matches = *it;
+      std::string table_name = matches[2];
+      views[table_name].insert(id);
+    }
 
-  queries.emplace(id, query);
+    queries.emplace(id, query);
 
-  // Compute the query and cache the results.
-  ComputeAndCache(id, query);
+    // Compute the query and cache the results.
+    ComputeAndCache(id, query);
 
   // Return id.
-  return id;
+    return id;
+  } catch (std::exception &e) {
+    std::cerr << e.what();
+    throw e;
+  }
 }
 
 // Recompute all cached queries involving given table.
@@ -422,6 +439,73 @@ void Update(const char *table) {
     // Compute it again.
     ComputeAndCache(id, queries.at(id).c_str());
   }
+}
+
+Results ReadMany(int id, const Record *keys, size_t count) {
+  Result* out = new Result[count];
+  size_t padded_i_size = 8;
+  size_t short_key_size =
+    prefix.size() 
+    + 1 // id is always length 1 (right now)
+    + 8; // size of a serialzied input key
+  size_t key_size = short_key_size 
+    + 1 // '@'
+    + padded_i_size; // padded `i`
+  std::vector<char *> keybuf;
+  keybuf.reserve(count);
+  std::unordered_map<std::string, size_t> fetched_keys;
+  fetched_keys.reserve(count);
+
+  for (size_t j = 0; j < count; j++) {
+    const Record *key = &keys[j];
+    std::string serialized_key(prefix + std::to_string(id) + ToMemcached(*key));
+    size_t result_count = key_counts.at(serialized_key);
+    Record *records = new Record[result_count];
+    out[j] = {0, records};
+    if (key_counts.count(serialized_key) > 0) {
+      for (size_t i = 0; i < key_counts.at(serialized_key); i++) {
+        std::string the_key = serialized_key;
+        the_key.push_back('@');
+        std::string i_str = std::to_string(i);
+        for (size_t b = i_str.size(); b < padded_i_size; b++ ) {
+          the_key.push_back('0');
+        }
+        char * k_buf = new char[key_size];
+        strcpy(k_buf, the_key.c_str());
+        keybuf.push_back(k_buf);
+      }
+      fetched_keys.emplace(std::move(serialized_key), j);
+    } else {
+      count --;
+    }
+  }
+  auto status = memcached_mget(memc, keybuf.data(), &key_size, count);
+  
+  if (memcached_failed(status)) {
+    throw std::runtime_error(memcached_strerror(memc, status));
+  }
+
+  size_t size;
+  memcached_return_t err;
+  memcached_result_st result;
+
+  while (memcached_fetch_result(memc, &result, &err) != nullptr) {
+    if (memcached_failed(err)) {
+      throw std::runtime_error(memcached_strerror(memc, err));
+    }
+    std::string key(memcached_result_key_value(&result));
+    key.resize(short_key_size);
+    size_t place = fetched_keys.at(key);
+    std::string serialized_val{memcached_result_value(&result), memcached_result_length(&result)};
+    Result * plc = &out[place];
+    plc->records[plc->size] = FromMemcached(types.at(id), serialized_val);
+    plc->size += 1;
+    memcached_fetch_result(memc, &result, &err);
+  }
+  for (auto * k : keybuf) {
+    delete[] k;
+  }
+  return {count,out};
 }
 
 Result Read(int id, const Record *key) {
