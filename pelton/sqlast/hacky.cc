@@ -92,7 +92,6 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
   }
   ConsumeWhiteSpace(&str, &size);
 
-  std::cout << std::string(str, size) << std::endl;
   if (!StartsWith(&str, &size, "FROM", 4)) {
     return absl::InvalidArgumentError("Hacky select: FROM");
   }
