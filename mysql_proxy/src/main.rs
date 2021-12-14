@@ -972,9 +972,9 @@ impl<W: io::Write> MysqlShim<W> for Backend {
               let perf_guard = self.perf.read().unwrap();
               for key in perf_guard.keys() {
                 let vec = perf_guard.get(key).unwrap();
-                let sum: std::time::Duration = vec.iter().sum();
+                let sum: u128 = vec.iter().map(|x| x.as_nanos()).sum();
                 let count = vec.len();
-                println!("RUST {}: {}. Count: {}.", key, sum.as_millis() / (count as u128), count);
+                println!("RUST {}: {}. Count: {}.", key, sum / (count as u128), count);
               }
               println!("");
             }
@@ -1032,10 +1032,9 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             let perf_before = Instant::now();
             let select_response = exec_select_ffi(&mut self.rust_conn, q_string);
             let perf_duration_ffi = perf_before.elapsed();
-            let total_perf = start.elapsed();
 
             // stop measuring runtime and add to total time for this connection
-            self.runtime = self.runtime + start.elapsed();
+            // self.runtime = self.runtime + start.elapsed();
 
             let num_cols = unsafe { (*select_response).num_cols as usize };
             let num_rows = unsafe { (*select_response).num_rows as usize };
@@ -1092,6 +1091,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
             unsafe { std::ptr::drop_in_place(select_response) };
             
             // stop measuring runtime and add to total time for this connection
+            let total_perf = start.elapsed();
             let mut perf_guard = self.perf.write().unwrap();
             if !perf_guard.contains_key("Q SELECT") {
               perf_guard.insert(String::from("Q SELECT"), Vec::new());
