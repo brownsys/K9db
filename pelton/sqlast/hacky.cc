@@ -81,11 +81,18 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
   ConsumeWhiteSpace(&str, &size);
 
   // * FROM.
-  if (!StartsWith(&str, &size, "*", 1)) {
-    return absl::InvalidArgumentError("Hacky select: *");
+  std::vector<std::string> columns;
+  while (true) {
+    columns.push_back(ExtractIdentifier(&str, &size));
+    ConsumeWhiteSpace(&str, &size);
+    if (!StartsWith(&str, &size, ",", 1)) {
+      break;
+    }
+    ConsumeWhiteSpace(&str, &size);
   }
   ConsumeWhiteSpace(&str, &size);
 
+  std::cout << std::string(str, size) << std::endl;
   if (!StartsWith(&str, &size, "FROM", 4)) {
     return absl::InvalidArgumentError("Hacky select: FROM");
   }
@@ -100,7 +107,9 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
 
   // Create the select statement.
   std::unique_ptr<Select> stmt = std::make_unique<Select>(table_name);
-  stmt->AddColumn("*");
+  for (const std::string &col : columns) {
+    stmt->AddColumn(col);
+  }
 
   // WHERE.
   if (StartsWith(&str, &size, "WHERE", 5)) {
@@ -115,11 +124,8 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
   }
 
   // End of statement.
-  if (!StartsWith(&str, &size, ";", 1)) {
+  if (size != 0 && !StartsWith(&str, &size, ";", 1)) {
     return absl::InvalidArgumentError("Hacky select: ;");
-  }
-  if (size != 0) {
-    return absl::InvalidArgumentError("Hacky select: EOF");
   }
 
   return stmt;
