@@ -13,7 +13,7 @@ config_setting(
 )
 
 cc_library(
-    name = "memcached",
+    name = "mymemcached",
     srcs = [
         "memcached.cc",
     ],
@@ -24,7 +24,7 @@ cc_library(
         "-lmariadbcpp",
     ],
     deps = [
-        "@glog",
+        #"@glog",
         "@libmemcached",
     ],
 )
@@ -39,7 +39,7 @@ rust_library(
         ":memcached_ffi_wrappers",
     ],
     deps = [
-        ":memcached",
+        ":mymemcached",
         "@libmemcached",
     ],
 )
@@ -93,7 +93,7 @@ cc_binary(
     ],
     linkshared = 1,  # produce a .so with all dependencies linked
     deps = [
-        ":memcached",
+        ":mymemcached",
         "@bazel_tools//tools/jdk:jni",
         "@glog",
     ],
@@ -114,7 +114,7 @@ cc_test(
         "memcached_unittest.cc",
     ],
     deps = [
-        ":memcached",
+        ":mymemcached",
         "@com_google_googletest//:gtest",
         "@glog",
     ],
