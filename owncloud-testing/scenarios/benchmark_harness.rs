@@ -232,6 +232,92 @@ impl Drop for CloseProc {
     }
 }
 
+enum Workload<'a> {
+    Reads(Vec<Vec<&'a User>>),
+    Writes(Vec<Vec<Share<'a>>>),
+}
+
+impl <'a> Workload<'a> {
+    fn make_reads<'b>(args: &Args, users: &'b[User]) -> Workload<'b> {
+
+        let mut rng = rand::thread_rng();
+        let ulen = users.len(); 
+        let samples = std::iter::repeat_with(|| {
+            let mut samples : Vec<&'b User> = Vec::with_capacity(args.num_samples); 
+            if users.len() < args.num_samples {
+                panic!("Too few users, need at least as many as samples");
+            }
+            while samples.len() != args.num_samples {
+                let u : &'b User = & users[rng.gen_range(0..ulen)];
+                if !samples.contains(&u) {
+                    samples.push(u);
+                }
+            }
+            samples
+        }).take(10).collect::<Vec<_>>();
+        Workload::Reads(samples)
+    }
+
+    fn make_direct_shares<'b>(args: &Args, st: &mut GeneratorState, users: &'b[User], files: &'b[File<'b>]) -> Workload<'b> {
+        let mut rng = rand::thread_rng();
+        let ulen = users.len(); 
+        let flen = files.len();
+        Workload::Writes(std::iter::repeat_with(|| {
+            std::iter::repeat_with(|| {
+                Share {
+                    id: st.new_id(EntityT::Share),
+                    share_with: ShareType::Direct(&users[rng.gen_range(0..ulen)]),
+                    file: &files[rng.gen_range(0..flen)]
+                }
+            }).take(args.num_samples).collect()
+        }).collect())
+    }
+
+    fn make_group_shares<'b>(args: &Args, st: &mut GeneratorState, groups: &'b[Group<'b>], files: &'b[File<'b>]) -> Workload<'b> {
+        let mut rng = rand::thread_rng();
+        let glen = groups.len(); 
+        let flen = files.len();
+        Workload::Writes(
+            std::iter::repeat_with(|| {
+                std::iter::repeat_with(|| {
+                Share {
+                    id: st.new_id(EntityT::Share),
+                    share_with: ShareType::Group(&groups[rng.gen_range(0..glen)]),
+                    file: &files[rng.gen_range(0..flen)]
+                }
+            }).take(args.num_samples).collect()
+        }).collect())
+    }
+
+    fn run<F: Write>(&self, num_users : usize, conn: &mut mysql::Conn, f: &mut F, backend: &Backend) {
+        match self {
+            Workload::Reads(samples) => {
+                samples.iter().enumerate().for_each(|(id, sample)| {
+                    let mut sstring = sample.iter().map(|s| format!("'{}'", s.uid)).collect::<Vec<_>>();
+                    //sstring.extend(std::iter::repeat("'-1'".to_string()).take(args.num_samples));
+                    let query = format!("SELECT * FROM file_view WHERE share_target IN ({})", sstring.join(","));
+                    //eprintln!("QUERY: {}", query);
+                    let now = std::time::Instant::now();
+                    let vs : Vec<Row> =
+                    
+                            conn.query(query).unwrap();
+                    
+                    let time = now.elapsed();
+                    writeln!(f, "{},{},{},{}", id, backend, time.as_millis(), num_users).unwrap();
+                });
+            }
+            Workload::Writes(ws) => {
+                ws.iter().enumerate().for_each(|(id, ws0)| {
+                    let now = std::time::Instant::now();
+                    ws0.insert_db(conn, backend);
+                    let time = now.elapsed();
+                    writeln!(f, "{},{},{},{}", id, backend, time.as_millis(), num_users).unwrap();
+                })
+            }
+        }
+    }
+}
+
 
 pub struct Args {
     pub num_users: Vec<usize>,
@@ -245,6 +331,7 @@ pub struct Args {
     pub outfile: Option<String>,
     pub debug: bool,
     pub check_consistency: bool,
+    pub workload: String,
 }
 
 fn main() {
@@ -265,6 +352,7 @@ fn main() {
                 (@arg outfile: -o --out +takes_value "File for writing output to (defaults to stdout")
                 (@arg debug: --debug "Compile and run in debug mode")
                 (@arg check_consistency: --check "Check consistency between backends")
+                (@arg workload: --workload +required +takes_value "Type of workload to run")
         ).get_matches();
 
     let ref args = Args {
@@ -279,6 +367,7 @@ fn main() {
         outfile: matches.value_of("outfile").map(&str::to_string),
         debug: matches.is_present("debug"),
         check_consistency: matches.is_present("check_consistency"),
+        workload: matches.value_of("workload").unwrap().to_string(),
     };
 
 
@@ -321,27 +410,21 @@ fn main() {
     }
     let num_users = &args.num_users[0];
 
-    let mut st = GeneratorState::new();
+    let ref mut st = GeneratorState::new();
     let users = st.generate_users(*num_users);
     let files = st.generate_files(&users, args.files_per_user);
     let direct_shares = st.generate_direct_shares(&users, &files, args.direct_shares_per_file);
     let groups = st.generate_groups(&users, args.users_per_group);
     let group_shares = st.generate_group_shares(&groups, &files, args.group_shares_per_file);
 
-    let mut rng = rand::thread_rng();
-    let ulen = users.len(); 
-    let mut samples : Vec<&User> = Vec::with_capacity(args.num_samples); 
-    if users.len() < args.num_samples {
-        panic!("Too few users, need at least as many as samples");
-    }
-    while samples.len() != args.num_samples {
-        let u = &users[rng.gen_range(0..ulen)];
-        if !samples.contains(&u) {
-            samples.push(u);
-        }
-    }
+    let workload = match args.workload.as_str() {
+        "reads" => Workload::make_reads(args, &users),
+        "direct-share" => Workload::make_direct_shares(args, st, &users, &files),
+        "group-share" => Workload::make_group_shares(args, st, &groups, &files),
+        _ => panic!(),
+    };
 
-    writeln!(f, "Run,Backend,Time(ms)").unwrap();
+    writeln!(f, "Run,Backend,Time(ms),Users").unwrap();
 
 
     let mut results : Vec<Vec<Vec<Row>>> = args.backends.iter().map(|backend| {
@@ -390,24 +473,14 @@ fn main() {
         // select_files_for_user(conn, &users[0]);
 
         // std::thread::sleep(std::time::Duration::from_millis(300));
-        let mut sstring = samples.iter().map(|s| format!("'{}'", s.uid)).collect::<Vec<_>>();
-        //sstring.extend(std::iter::repeat("'-1'".to_string()).take(args.num_samples));
-        let query = format!("SELECT * FROM file_view WHERE share_target IN ({})", sstring.join(","));
-        //eprintln!("QUERY: {}", query);
-        let now = std::time::Instant::now();
-        let vs : Vec<Row> =
-        
-                conn.query(query).unwrap();
-        
-        let time = now.elapsed();
+        workload.run(*num_users, conn, &mut f, backend);
         let results = vec![];
 
-        eprintln!("Returned {} rows", vs.len());
+        //eprintln!("Returned {} rows", vs.len());
 
         if args.dump_db && backend.is_pelton() {
             pp_pelton_database();
         }
-        writeln!(f, "{},{},{}", 0, backend, time.as_millis()).unwrap();
 
         results
     }).collect::<Vec<_>>();

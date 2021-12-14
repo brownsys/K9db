@@ -1131,6 +1131,7 @@ fn main() {
     let mut rust_conn = open_ffi(&db_name);
     // Execute all the create statements.
     for create_stmt in &CREATES {
+        if true { continue ;}
         let ddl_response = exec_ddl_ffi(&mut rust_conn, create_stmt);
         debug!(log, "[INIT] ddl_response is {:?}", ddl_response);
     }
@@ -1138,6 +1139,7 @@ fn main() {
     // Execute all the insert statements.
     // Execute all the create statements.
     for insert_stmt in &INSERTS {
+        if true { continue ;}
         let update_response = exec_update_ffi(&mut rust_conn, insert_stmt);
         debug!(log, "[INIT] update response is {:?}", update_response);
     }
@@ -1147,6 +1149,7 @@ fn main() {
 
     // Create necessary views for all the queries.
     for view_query in &VIEWS {
+        if true { continue ;}
         let stmt_id = id_generator.fetch_add(1, Ordering::SeqCst);
         let view_name: String = String::from("q") + &stmt_id.to_string();
         // Form the query
