@@ -41,7 +41,8 @@ inline std::string ExtractIdentifier(const char **ptr, size_t *size) {
   const char *s = *ptr;
   size_t i;
   for (i = 0; i < *size; i++) {
-    if (s[i] == ' ') {
+    if (s[i] == ' ' || s[i] == '>' || s[i] == '=' || s[i] == ';' || s[i] == ')'
+        || s[i] == '(') {
       break;
     }
   }
@@ -65,6 +66,11 @@ inline std::string ExtractValue(const char **ptr, size_t *size) {
   const char *str = *ptr;
   bool squote = str[0] == '\'';
   bool dquote = str[0] == '"';
+  if (!squote && !dquote) {
+    if (StartsWith(ptr, size, "NULL", 4)) {
+      return "NULL";
+    }
+  }
   bool escape = false;
   size_t i;
   for (i = squote || dquote ? 1 : 0; i < *size; i++) {
@@ -107,6 +113,119 @@ inline bool EqualIgnoreCase(const std::string &str1, const std::string &upper) {
     }
   }
   return true;
+}
+
+
+std::unique_ptr<BinaryExpression> HackyCondition(
+    const char **ptr, size_t *size) {
+  std::vector<std::unique_ptr<BinaryExpression>> conditions;
+  
+  bool has_and = false;
+  do {     
+    // <column_name>
+    std::string column_name = ExtractIdentifier(ptr, size);
+    if (column_name.size() == 0) {
+      return nullptr;
+    }
+    ConsumeWhiteSpace(ptr, size);
+    std::unique_ptr<Expression> left =
+        std::make_unique<ColumnExpression>(column_name);
+
+    // =, >, or IN.
+    bool in = StartsWith(ptr, size, "IN", 2);
+    bool eq = StartsWith(ptr, size, "=", 1);
+    bool gt = StartsWith(ptr, size, ">", 1);
+    bool is = StartsWith(ptr, size, "IS", 2);
+    if (!eq && !gt && !in && !is) {
+      return nullptr;
+    }
+    ConsumeWhiteSpace(ptr, size);
+
+    // Value.
+    std::unique_ptr<Expression> right;
+    if (gt) {
+      std::string value = ExtractValue(ptr, size);
+      if (value.size() == 0) {
+        return nullptr;
+      }
+      right = std::make_unique<LiteralExpression>(value);
+    } else if (eq || is) {
+      // value or column
+      std::string value = ExtractValue(ptr, size);
+      if (value.size() > 0) {
+        right = std::make_unique<LiteralExpression>(value);
+      } else {
+        std::string column = ExtractIdentifier(ptr, size);
+        if (column.size() == 0) {
+          return nullptr;
+        }
+        right = std::make_unique<ColumnExpression>(column);
+      }
+    } else {
+      // in
+      if (!StartsWith(ptr, size, "(", 1)) {
+        return nullptr;
+      }
+      ConsumeWhiteSpace(ptr, size);
+      
+      std::vector<std::string> values;
+      while (true) {
+        std::string value = ExtractValue(ptr, size);
+        if (value.size() == 0) {
+          break;
+        }
+        values.push_back(std::move(value));
+        ConsumeWhiteSpace(ptr, size);
+        if (!StartsWith(ptr, size, ",", 1)) {
+          break;
+        }
+        ConsumeWhiteSpace(ptr, size);
+      }
+
+      ConsumeWhiteSpace(ptr, size);
+      if (!StartsWith(ptr, size, ")", 1)) {
+        return nullptr;
+      }
+      right = std::make_unique<LiteralListExpression>(values);
+    }
+
+    std::unique_ptr<BinaryExpression> binary;
+    if (eq) {
+      binary = std::make_unique<BinaryExpression>(Expression::Type::EQ);
+    } else if (gt) {
+      binary = std::make_unique<BinaryExpression>(Expression::Type::GREATER_THAN);
+    } else if (in) {
+      binary = std::make_unique<BinaryExpression>(Expression::Type::IN);
+    } else if (is) {
+      binary = std::make_unique<BinaryExpression>(Expression::Type::IS);
+    }
+    binary->SetLeft(std::move(left));
+    binary->SetRight(std::move(right));
+    conditions.push_back(std::move(binary));
+
+    ConsumeWhiteSpace(ptr, size);
+    if (StartsWith(ptr, size, "AND", 3)) {
+      has_and = true;
+      ConsumeWhiteSpace(ptr, size);
+    } else {
+      has_and = false;
+    }
+  } while (has_and);
+
+  if (conditions.size() == 1) {
+    return std::move(conditions.front());
+  }
+
+  // Combine ands.
+  std::unique_ptr<BinaryExpression> left = std::move(conditions.front());
+  for (size_t i = 1; i < conditions.size(); i++) {
+    std::unique_ptr<BinaryExpression> expr =
+        std::make_unique<BinaryExpression>(Expression::Type::AND);
+    expr->SetLeft(std::move(left));
+    expr->SetRight(std::move(conditions.at(i)));
+    left = std::move(expr);
+  }
+  return left;
 }
 
 }  // namespace sqlast

@@ -7,7 +7,7 @@
 #include "pelton/sqlast/hacky_util.h"
 
 namespace pelton {
-namespace sqlast {
+namespace sqlast {                                                                 
 
 absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
                                                                size_t size) {
@@ -103,30 +103,16 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
   stmt->AddColumn("*");
 
   // WHERE.
-  if (!StartsWith(&str, &size, "WHERE", 5)) {
-    return absl::InvalidArgumentError("Hacky select: WHERE");
-  }
-  ConsumeWhiteSpace(&str, &size);
+  if (StartsWith(&str, &size, "WHERE", 5)) {
+    ConsumeWhiteSpace(&str, &size);
 
-  // <column_name>
-  std::string column_name = ExtractIdentifier(&str, &size);
-  if (column_name.size() == 0) {
-    return absl::InvalidArgumentError("Hacky select: column name");
+    // Condition.
+    auto condition = HackyCondition(&str, &size);
+    if (condition == nullptr) {
+      return absl::InvalidArgumentError("Hacky select: condition");
+    }
+    stmt->SetWhereClause(std::move(condition));
   }
-  ConsumeWhiteSpace(&str, &size);
-
-  // =.
-  if (!StartsWith(&str, &size, "=", 1)) {
-    return absl::InvalidArgumentError("Hacky select: =");
-  }
-  ConsumeWhiteSpace(&str, &size);
-
-  // Value.
-  std::string value = ExtractValue(&str, &size);
-  if (value.size() == 0) {
-    return absl::InvalidArgumentError("Hacky select: value");
-  }
-  ConsumeWhiteSpace(&str, &size);
 
   // End of statement.
   if (!StartsWith(&str, &size, ";", 1)) {
@@ -135,13 +121,6 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
   if (size != 0) {
     return absl::InvalidArgumentError("Hacky select: EOF");
   }
-
-  // Create condition and add it to the select stmt.
-  std::unique_ptr<BinaryExpression> condition =
-      std::make_unique<BinaryExpression>(Expression::Type::EQ);
-  condition->SetLeft(std::make_unique<ColumnExpression>(column_name));
-  condition->SetRight(std::make_unique<LiteralExpression>(value));
-  stmt->SetWhereClause(std::move(condition));
 
   return stmt;
 }
