@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-#include "glog/logging.h"
+// #include "glog/logging.h"
 #include "libmemcached/memcached.h"
 #include "mariadb/conncpp.hpp"
 
@@ -188,7 +188,7 @@ std::vector<size_t> KeyIndices(sql::ResultSetMetaData *schema,
       }
     }
     if (!found) {
-      LOG(FATAL) << "Key " << key_name << " is not part of the result";
+      // LOG(FATAL) << "Key " << key_name << " is not part of the result";
     }
   }
   return key_indices;
@@ -225,7 +225,8 @@ std::vector<Type> AllTypes(sql::ResultSetMetaData *schema) {
         break;
       }
       default:
-        LOG(FATAL) << "Unrecognized type " << schema->getColumnType(i);
+        continue;
+        // LOG(FATAL) << "Unrecognized type " << schema->getColumnType(i);
     }
   }
   return all_types;
@@ -246,7 +247,8 @@ void ComputeAndCache(int id, const char *query) {
     if (std::regex_match(key_col, matches, regex_var)) {
       query_keys.push_back(matches[2]);
     } else {
-      LOG(FATAL) << "where column did not match regex " << key_col;
+      // LOG(FATAL) << "where column did not match regex " << key_col;
+
     }
   }
 
