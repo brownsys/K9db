@@ -123,11 +123,16 @@ absl::StatusOr<std::list<ShardingInformation>> IsShardingBySupported(
       ways_to_shard.emplace_back(info);
       ShardingInformation *info_c = &ways_to_shard.back();
       FlowName index;
-      if (foreign_table == "oc_share" && original_table_name == "oc_files" && other.shard_by == "OWNER_share_with_group") {
-        LOG(INFO) << "Detected the group share";
+      if (foreign_table       == "oc_share" 
+       && original_table_name == "oc_files" 
+       && other.shard_by      == "OWNER_share_with_group") {
         index = "users_for_file_via_group";
-      } else if (foreign_table == "oc_groups" && original_table_name == "oc_share" && other.shard_by == "gid") {
+        LOG(WARNING) << "Hard coded index '" << index << "' triggered.";
+      } else if (foreign_table       == "oc_groups" 
+              && original_table_name == "oc_share" 
+              && other.shard_by      == "gid") {
         index = "users_for_group";
+        LOG(WARNING) << "Hard coded index '" << index << "' triggered.";
       } else if (!state.HasIndexFor(foreign_table, info_c->next_column, other.shard_by)) {
         return absl::InvalidArgumentError(
             "Cannot have a transitive FK pointing to non-index column (table_name: " + original_table_name + ", shard_by: " + info_c->shard_by + ", foreign_table: " + foreign_table + ", next_column: " + info_c->next_column + ", other.shard_by: " + other.shard_by + ")");
@@ -225,7 +230,6 @@ absl::StatusOr<std::pair<std::list<ShardingInformation>, std::optional<OwningTab
       }
       auto is_owning = IsOwning(col);
       if (is_owning) {
-        LOG(INFO) << "Detected owning column " << column_name ;
         // This table also denotes a relationship to another (via explicit annotation)
         if (fk_constraint != nullptr) {
           if (owning_table) {
@@ -285,14 +289,14 @@ absl::Status MakeAccessible(
 {
   shards::SharderState *state = connection->state->sharder_state();
   bool is_sharded = state->IsSharded(table_name);
-  LOG(INFO) << "Making " << table_name << " available via " << column_name << " -> "
-     << foreign_table;
   const std::string &shard_string = GetShardFor(foreign_table, *state);
-  if (table_name == "oc_share" && foreign_table == "oc_groups" && column_name == "ACCESSOR_share_with_group") {
+  if (table_name    == "oc_share" 
+   && foreign_table == "oc_groups" 
+   && column_name   == "ACCESSOR_share_with_group") {
     const auto &info = state->GetShardingInformation(table_name).front();
     const std::string &table_key = info.shard_by;
     const auto &index_name = "users_for_share_via_group";
-    LOG(INFO) << "Found special case, installing index " << index_name;
+    LOG(WARNING) << "Hard coded accessor index '" << index_name << "' triggered";
     state->AddAccessorIndex(shard_string, table_name, column_name, foreign_table,
                             table_key, index_name,
                             anon_cols, is_sharded);
@@ -317,8 +321,6 @@ absl::Status MakeAccessible(
     if (!status.ok())
       return status.status();
     const IndexName index_name = index_prefix + "_" + table_key;
-    LOG(INFO) << "Installing accessor index " << index_name << " for " << table_name << "(" << column_name <<
-      ") -> " << foreign_table << " sharded_by " << shard_string << " (" << table_key << ")";
     state->AddAccessorIndex(shard_string, table_name, column_name,
                             table_key, index_name,
                             anon_cols, is_sharded);
@@ -494,10 +496,8 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt
   const ColumnName &other_col_name = owning_table.fk_constraint.foreign_column();
   int sharded_by_index = target_table_schema.ColumnIndex(other_col_name);
 
-  LOG(INFO) << "Creating secondary index";
   for (auto & prev_sharding_info : state->GetShardingInformation(relationship_table_name)) {
     if (state->HasIndexFor(relationship_table_name, my_col_name, prev_sharding_info.shard_by)) {
-      LOG(INFO) << "Skipping index creation, already exists.";
     } else {
       const std::string &index_name = state->GenerateUniqueIndexName(lock);
       const sqlast::CreateIndex create_index(
@@ -516,9 +516,6 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt
         result.Append(std::move(*res), false);
       else 
         return  res.status();
-
-
-      LOG(INFO) << "created index " << index_name << " on " << relationship_table_name;
     }
   }
 
@@ -541,7 +538,6 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(const sqlast::CreateTable &stmt
       info,
       UpdateTableSchema(target_table_schema, fk_shards, sharded_table)
     );
-    LOG(INFO) << "Added sharded table " << target_table_name << " as " << sharded_table;
   }
   return result;
 }
@@ -638,7 +634,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     if (owning_table->owning_type == OwningT::OWNING) {
       CHECK_STATUS(HandleOwningTable(stmt, *owning_table, connection, &lock));
     } else if (owning_table->owning_type == OwningT::ACCESSING) {
-      LOG(INFO) << "Found ACCESSING table";
       const auto anon_cols = GetAnonCols(owning_table->column, stmt.GetColumns());
       CHECK_STATUS(MakeAccessible(connection, owning_table->fk_constraint.foreign_table(), table_name, owning_table->column.column_name(), anon_cols, &lock));
     } else {
