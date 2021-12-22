@@ -1,3 +1,7 @@
+// This used to be a separate application as part of the owncloud scenarios
+// Currently the file is unused and not built as part of anything.
+// I just left the code here in case we need it at some point.
+
 extern crate owncloud_scenarios;
 use owncloud_scenarios::*;
 
