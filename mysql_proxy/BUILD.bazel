@@ -36,14 +36,14 @@ rust_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":proxy_ffi",
-        "//mysql_proxy:ctrlc",
-        "//mysql_proxy:gflags",
-        "//mysql_proxy:lazy_static",
-        "//mysql_proxy:msql_srv",
-        "//mysql_proxy:regex",
-        "//mysql_proxy:slog",
-        "//mysql_proxy:slog_term",
-        "//mysql_proxy/src/ffi",
+        "//mysql_proxy/cargo:ctrlc",
+        "//mysql_proxy/cargo:gflags",
+        "//mysql_proxy/cargo:lazy_static",
+        "//mysql_proxy/cargo:msql_srv",
+        "//mysql_proxy/cargo:regex",
+        "//mysql_proxy/cargo:slog",
+        "//mysql_proxy/cargo:slog_term",
+        "//mysql_proxy/ffi",
     ],
 )
 

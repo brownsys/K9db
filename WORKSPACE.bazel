@@ -347,7 +347,7 @@ load("@rules_rust//bindgen:repositories.bzl", "rust_bindgen_repositories")
 
 rust_bindgen_repositories()
 
-load("//mysql_proxy/cargo:crates.bzl", "raze_fetch_remote_crates")
+load("//cargo:crates.bzl", "raze_fetch_remote_crates")
 
 raze_fetch_remote_crates()
 
