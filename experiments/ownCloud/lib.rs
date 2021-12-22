@@ -1,10 +1,12 @@
 extern crate mysql;
 
+extern crate memcached_ffi;
+
 pub use self::mysql::*;
 pub use self::mysql::prelude::*;
 use std::str::FromStr;
 
-include!("../../baseline/memcached_ffi_wrappers.rs");
+pub use memcached_ffi::memcached;
 
 const SCHEMA : &'static str = include_str!("schema.sql");
 const MYSQL_SCHEMA : &'static str = include_str!("mysql-schema.sql");
@@ -108,7 +110,7 @@ pub fn pp_pelton_database() {
             use std::io::Write;
             println!("TABLE {}", tab);
             std::io::stdout().write_all(
-                &Command::new("mysql").args(["-u", "root", "--password=password", "-B", "pelton", "-e", &format!("SELECT * FROM {}_{};", user_hash, tab)]).output().unwrap().stdout,
+                &Command::new("mysql").args(&["-u", "root", "--password=password", "-B", "pelton", "-e", &format!("SELECT * FROM {}_{};", user_hash, tab)]).output().unwrap().stdout,
             ).unwrap();
         }
         println!("");

@@ -1,6 +1,7 @@
 
+mod memcached_ffi_bindgen;
 pub mod _memcached_ffi_bindgen {
-  include!("../bazel-bin/baseline/memcached_ffi_bindgen.rs");
+  pub use memcached_ffi_bindgen::*;
 }
 
 pub mod memcached {

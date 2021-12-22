@@ -43,7 +43,7 @@ rust_binary(
         "//mysql_proxy/cargo:regex",
         "//mysql_proxy/cargo:slog",
         "//mysql_proxy/cargo:slog_term",
-        "//mysql_proxy/ffi",
+        "//mysql_proxy/src/ffi",
     ],
 )
 
@@ -57,7 +57,7 @@ rust_library(
         ":proxy_ffi_wrappers",
     ],
     deps = [
-        "//mysql_proxy:msql_srv",
+        "//mysql_proxy/cargo:msql_srv",
     ],
 )
 
@@ -84,7 +84,7 @@ genrule(
 genrule(
     name = "proxy_ffi_wrappers",
     srcs = [
-        "proxy_ffi_wrappers.rs",
+        "src/proxy_ffi_wrappers.rs",
     ],
     outs = [
         "proxy_ffi.rs",

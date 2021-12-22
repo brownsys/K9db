@@ -5,9 +5,9 @@ extern crate mysql;
 
 extern crate rand;
 
-extern crate owncloud_scenarios;
+extern crate ownCloud;
 
-use owncloud_scenarios::*;
+use ownCloud::*;
 use rand::Rng;
 use std::collections::HashMap;
 use std::process::{Command, Child, Stdio};

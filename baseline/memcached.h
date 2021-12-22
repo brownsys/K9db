@@ -36,6 +36,7 @@ typedef struct {
 void DestroyValue(Value *v);
 void DestroyRecord(Record *r);
 void DestroyResult(Result *r);
+void DestroyResults(Results *r);
 
 // Get value by type.
 int64_t GetInt(const Value *val);

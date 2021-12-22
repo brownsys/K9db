@@ -9,6 +9,14 @@ rust_library(
     deps = [
         "//experiments/ownCloud/cargo:mysql",
         "//experiments/ownCloud/cargo:rand",
+        "//baseline:memcached_ffi",
+    ],
+    compile_data = [
+        "schema.sql",
+        "mysql-schema.sql",
+    ],
+    rustc_flags = [
+        "-lmariadbcpp",
     ]
 )
 

@@ -42,6 +42,7 @@ rust_library(
         ":mymemcached",
         "@libmemcached",
     ],
+    visibility = ["//experiments/ownCloud:__pkg__" ]
 )
 
 # Invoke bindgen to generate rust definitions for the ffi library.
