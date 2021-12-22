@@ -5,14 +5,12 @@ Steps to start:
 rust dependencies declared in Cargo.toml.
 ```bash
 cargo install cargo-raze
-cd <pelton_root>/mysql_proxy
 cargo raze
-cd <pelton_root>
 ```
 
 2. Run with compiler optimizations
 ```bash
-bazel run //mysql_proxy/src:mysql_proxy --config=opt
+bazel run //mysql_proxy --config=opt
 ```
 
 3. Connect to the proxy using a mariadb client (from another terminal).
@@ -23,22 +21,22 @@ mariadb --port=10001 --host=127.0.0.1
 # Debugging
 - Run with rust debug info
 ```bash
-bazel run //mysql_proxy/src:mysql_proxy
+bazel run //mysql_proxy
 ```
 
 - Run with rust backtracing enabled
 ```bash
-RUST_BACKTRACE=1 bazel run //mysql_proxy/src:mysql_proxy
+RUST_BACKTRACE=1 bazel run //mysql_proxy
 ```
 
 - Run with FFI debug info
 ```bash
-bazel run //mysql_proxy/src:mysql_proxy -- -logtostderr=1
+bazel run //mysql_proxy -- -logtostderr=1
 ```
 
 - Run with valgrind (asan)
 ```bash
-bazel run --run_under "valgrind --error-exitcode=1 --errors-for-leak-kinds=definite --leak-check=full --show-leak-kinds=definite" //mysql_proxy/src:mysql_proxy
+bazel run --run_under "valgrind --error-exitcode=1 --errors-for-leak-kinds=definite --leak-check=full --show-leak-kinds=definite" //mysql_proxy
 ```
 
 - Run with thread sanitizer. (requires switching to rust nightly compiler)
@@ -67,7 +65,7 @@ bazel run --run_under "valgrind --error-exitcode=1 --errors-for-leak-kinds=defin
 
     3. run with tsan
     ```bash
-    bazel run //mysql_proxy/src:mysql_proxy --config=tsan
+    bazel run //mysql_proxy --config=tsan
     ```
 
 # Design
