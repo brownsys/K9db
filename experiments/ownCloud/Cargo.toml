@@ -14,3 +14,9 @@ path = "lib.rs"
 [[bin]]
 name = "benchmark-harness"
 path = "benchmark_harness.rs"
+
+[package.metadata.raze]
+workspace_path = "raze/crates"
+
+package_aliases_dir = "raze"
+genmode = "Remote"

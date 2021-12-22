@@ -1,0 +1,24 @@
+load("@rules_rust//rust:rust.bzl", "rust_binary", "rust_library")
+
+rust_library(
+    name = "owncloud-common",
+    srcs = [
+        "lib.rs"
+    ],
+    visibility = [ "//visibility:public" ],
+    deps = [
+        "raze:mysql",
+        "raze:rand",
+    ]
+)
+
+rust_binary(
+    name = "ownCloud-benchmark",
+    srcs = "benchmark_harness.rs",
+    deps = [
+        ":owncloud-common",
+        "raze:mysql",
+        "raze:rand",
+        "raze:clap",
+    ]
+)
