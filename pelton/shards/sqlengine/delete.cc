@@ -48,7 +48,6 @@ void HandleOWNINGColumn(
       const auto &infos = state.GetShardingInformationFor(foreign_table, shard_kind);
       for (const auto info : infos) {
         if (info->next_table != table_name) {
-          LOG(INFO) << "Skipping info of " << info->shard_by << " -> " << info->next_table;
           continue;
         }
 
@@ -173,7 +172,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
           auto &rec = records.front();
           HandleOWNINGColumn(table_name, info.sharded_table_name, user_id, shard_kind, rec, schema, connection);
         } else {
-          LOG(INFO) << "Secondary index unhelpful";
           // Secondary index unhelpful.
           // Execute statement against all shards of this kind.
           const auto &user_ids = state->UsersOfShard(shard_kind);
@@ -187,7 +185,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
           records = res.ResultSets().front().Vec();
           auto &rec = records.front();
           auto &id = rec.GetString(schema.IndexOf(info.shard_by));
-          LOG(INFO) << "Deelting for user " << id;
           HandleOWNINGColumn(table_name, info.sharded_table_name, id, shard_kind, rec, schema, connection);
         }
       }

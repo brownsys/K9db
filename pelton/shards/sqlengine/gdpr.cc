@@ -73,8 +73,6 @@ absl::StatusOr<sql::SqlResult> GetAllMyValuesFromTable(
         dataflow::SchemaRef schema = connection->state->dataflow_state()->GetTableSchema(table_name);
         result.AddResultSet(std::move(GetDataFromShardedTable(*info, Dequote(user_id), schema, connection->executor).ResultSets().front()));
       }
-    } else {
-      LOG(INFO) << "No sharding info found for " << shard_kind;
     }
   }
   return result;
@@ -126,7 +124,6 @@ absl::Status GetAccessableDataForAccessor(
   LOG(INFO) << "Handling accessor for " << accessor_table_name;
 
   MOVE_OR_RETURN(const std::vector<std::string> lookup_values, GetLookupValues(accessor_index.shard_kind, user_id, accessor_index.foreign_table, connection));
-  LOG(INFO) << "Lookup values retrieved";
   for (const auto & v : lookup_values) {
     LOG(INFO) << v;
   }
@@ -135,10 +132,6 @@ absl::Status GetAccessableDataForAccessor(
                     index::LookupIndex(index_name, user_id, connection));
 
     // create select statement with equality check for each id
-
-    if (ids_set.size() == 0) {
-      LOG(INFO) << "id set was empty";
-    }
 
     for (const auto &id : ids_set) {
       for (const auto &val : lookup_values) {
@@ -184,13 +177,9 @@ absl::Status GetAccessableDataForAccessor(
         MOVE_OR_RETURN(sql::SqlResult res,
                         select::Shard(accessor_stmt, connection, false));
 
-        LOG(INFO) << "Adding results";
         result->AddResultSet(std::move(res.ResultSets().at(0)));
-        LOG(INFO) << "Done";
       }
-      LOG(INFO) << "Lookups for id " << id << " done";
     }
-    LOG(INFO) << "Last id handled";
   } else {
     for (const auto &val : lookup_values) {
       sqlast::Select accessor_stmt{accessor_table_name};
@@ -427,12 +416,10 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
 
   sql::SqlResult result(std::vector<sql::SqlResultSet>{});
   for (const auto &table_name : state->TablesInShard(shard_kind)) {
-    LOG(INFO) << "handling table " << table_name << " for shard " << shard_kind;
     dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
 
     sql::SqlResult table_result(schema);
     for (const ShardingInformation *info : state->GetShardingInformationFor(table_name, shard_kind)) {
-      LOG(INFO) << "Dealing with sharding information for " << info->sharded_table_name;
       // Augment returned results with the user_id.
       int aug_index = -1;
       if (!info->IsTransitive()) {
@@ -448,13 +435,10 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
   }
   
   if (state->HasAccessorIndices(shard_kind)) {
-    LOG(INFO) << "Handling acessor indices";
     CHECK_STATUS(GetAccessableData(shard_kind, user_id, connection, &result));
   }
   auto schema = result.ResultSets().front().schema();
-  LOG(INFO) << "Printing";
-  Print(std::move(result), true);
-  return sql::SqlResult(schema);
+  return result;
 }
 
 
