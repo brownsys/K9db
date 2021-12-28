@@ -46,3 +46,12 @@ filegroup(
     ]),
     visibility = ["//tests:__subpackages__"],
 )
+
+filegroup(
+    name = "varown",
+    srcs = glob ([
+        "varown/*.txt",
+        "varown/*.sql",
+    ]),
+    visibility = ["//tests:__subpackages__"],
+)

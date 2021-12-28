@@ -69,6 +69,13 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "varown_basic",
+    srcs = [ "varown.cc" ],
+    data = [ "//tests/data:varown" ],
+    deps = [ ":common" ],
+)
+
 # TODO: uncomment when testing harness supports multi-result sets with different schemas
 # cc_test(
 #     name = "delf_ecommerce",

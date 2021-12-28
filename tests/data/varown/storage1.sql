@@ -1,0 +1,7 @@
+INSERT INTO user VALUES (0, "test");
+
+INSERT INTO rel VALUES (100, 0, 1000);
+
+INSERT INTO t VALUES (1000, "target");
+
+GDPR GET user 0;

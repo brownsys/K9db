@@ -122,7 +122,10 @@ void InitializeDatabase(const std::string &db_name, size_t file_count,
     LOG(INFO) << "Executing file " << file_path;
     auto commands = ReadSQL(file_path);
     for (const std::string &command : commands) {
-      CHECK(pelton::exec(&connection, command).ok());
+      const auto status = pelton::exec(&connection, command);
+      if (!status.ok()) {
+        LOG(FATAL) << status.status();
+      }
     }
   }
   LOG(INFO) << "Initialized database";
@@ -177,6 +180,8 @@ void RunTest(const std::string &query_file_prefix) {
   auto queries = ReadSQL(query_file_prefix + ".sql");
   auto results = ReadExpected(query_file_prefix + ".txt");
 
+  ASSERT_EQ(queries.size(), results.size());
+
   // Run each query and compare its output to expected.
   for (size_t i = 0; i < queries.size(); i++) {
     const std::string &query = queries.at(i);
@@ -184,7 +189,7 @@ void RunTest(const std::string &query_file_prefix) {
 
     // Run query.
     auto status = pelton::exec(&connection, query);
-    EXPECT_TRUE(status.ok()) << status.status();
+    EXPECT_TRUE(status.ok()) << status.status() << query;
 
     // Store output.
     std::vector<std::string> actual;
