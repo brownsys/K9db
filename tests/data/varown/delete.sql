@@ -10,8 +10,3 @@ DELETE FROM t WHERE id = 1002;
 
 GDPR GET user 3;
 GDPR GET user 4;
-
-DELETE FROM rel WHERE id = 103;
-DELETE FROM rel WHERE id = 104;
-DELETE FROM user WHERE id = 3;
-DELETE FROM user WHERE id = 4;

@@ -17,6 +17,7 @@ std::unique_ptr<dataflow::DataFlowGraphPartition> PlanGraph(
     dataflow::DataFlowState *state, const std::string &query);
 
 void ShutdownPlanner();
+void ShutdownPlanner(bool shutdown_jvm);
 
 }  // namespace planner
 }  // namespace pelton

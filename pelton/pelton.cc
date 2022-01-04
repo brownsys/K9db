@@ -112,16 +112,22 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
   }
 }
 
-void shutdown_planner() { planner::ShutdownPlanner(); }
+void shutdown_planner(bool shutdown_jvm) { planner::ShutdownPlanner(shutdown_jvm); }
 
-bool shutdown() {
+void shutdown_planner() { shutdown_planner(true); }
+
+bool shutdown(bool shutdown_jvm) {
   if (PELTON_STATE != nullptr) {
-    shutdown_planner();
+    shutdown_planner(shutdown_jvm);
     delete PELTON_STATE;
     PELTON_STATE = nullptr;
     return true;
   }
   return false;
+}
+
+bool shutdown() {
+  return shutdown(true);
 }
 
 }  // namespace pelton
