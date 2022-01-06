@@ -21,18 +21,19 @@ namespace delete_ {
 
 namespace {
 
-void HandleOWNINGColumn(
+sql::SqlResult HandleOWNINGColumn(
   const UnshardedTableName &table_name,
   const UnshardedTableName &sharded_table_name,
   const std::string &user_id,
   const std::string &shard_kind,
   dataflow::Record &delete_result,
-  const dataflow::SchemaRef &schema,
   Connection *connection
 ) 
 {
   const auto &state = *connection->state->sharder_state();
   auto &exec = connection->executor;
+
+  sql::SqlResult result(static_cast<int>(0));
   for (const auto & col : state.GetSchema(table_name).GetColumns()) {
     if (IsOwning(col)) {
       const sqlast::ColumnConstraint * fk_constr;
@@ -54,13 +55,16 @@ void HandleOWNINGColumn(
         sqlast::Delete del(info->sharded_table_name);
         auto where = std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::EQ);
         where->SetLeft(std::make_unique<sqlast::ColumnExpression>(fk_constr->foreign_column()));
-        where->SetRight(std::make_unique<sqlast::LiteralExpression>(delete_result.GetValue(schema.IndexOf(col.column_name())).GetSqlString()));
+        std::cerr << "Is it here?" << std::endl;
+        where->SetRight(std::make_unique<sqlast::LiteralExpression>(delete_result.GetValue(delete_result.schema().IndexOf(col.column_name())).GetSqlString()));
+        std::cerr << "No";
         del.SetWhereClause(std::move(where));
-        exec.Shard(&del, shard_kind, user_id);
+        result.Append(exec.Shard(&del, shard_kind, user_id), true);
       }
       
     }
   }
+  return result;
 }
 
 } // namespace
@@ -70,6 +74,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
                                      bool update_flows) {
   connection->perf->Start("Delete");
   const std::string &table_name = stmt.table_name();
+  LOG(INFO) << "Delete statement started";
 
   // We only read from state.
   shards::SharderState *state = connection->state->sharder_state();
@@ -129,12 +134,15 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
           for (auto &uid : lookup) {
             // Execute statement directly against shard.
             auto res = exec.Shard(&cloned, shard_kind, uid, schema, aug_index);
+            CHECK_EQ(res.ResultSets().size(), 1);
+            auto these_records = res.ResultSets().front().Vec();
             result.Append(
-                sql::SqlResult(res.UpdateCount()),
+                sql::SqlResult(these_records.size()),
                 true);
-            records = res.ResultSets().front().Vec();
-            auto &rec = records.front();
-            HandleOWNINGColumn(table_name, info.sharded_table_name, uid, shard_kind, rec, schema, connection);
+            for (auto &rec : these_records) {
+              result.Append(HandleOWNINGColumn(table_name, info.sharded_table_name, uid, shard_kind, rec, connection), true);
+              records.push_back(std::move(rec));
+            }
           }
         } else if (state->ShardExists(info.shard_kind, user_id)) {
           // Remove where condition on the shard by column, since it does not
@@ -143,15 +151,15 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
           cloned.Visit(&expression_remover);
           // Execute statement directly against shard.
           auto res = exec.Shard(&cloned, shard_kind, user_id, schema, aug_index);
+          CHECK_EQ(res.ResultSets().size(), 1);
+          auto these_records = res.ResultSets().front().Vec();
           result.Append(
-              sql::SqlResult(res.UpdateCount()),
+              sql::SqlResult(these_records.size()),
               true);
-          records = res.ResultSets().front().Vec();
-          auto &rec = records.front();
-          result.Append(
-              sql::SqlResult(res.UpdateCount()),
-              true);
-          HandleOWNINGColumn(table_name, info.sharded_table_name, user_id, shard_kind, rec,schema, connection);
+          for (auto &rec : these_records) {
+            result.Append(HandleOWNINGColumn(table_name, info.sharded_table_name, user_id, shard_kind, rec, connection), true);
+            records.push_back(std::move(rec));
+          }
         }
 
       } else {
@@ -164,12 +172,15 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
           auto res = exec.Shards(&cloned, shard_kind, pair.second, schema, aug_index);
+          CHECK_EQ(res.ResultSets().size(), 1);
+          auto these_records = res.ResultSets().front().Vec();
           result.Append(
-              sql::SqlResult(res.UpdateCount()),
+              sql::SqlResult(these_records.size()),
               true);
-          records = res.ResultSets().front().Vec();
-          auto &rec = records.front();
-          HandleOWNINGColumn(table_name, info.sharded_table_name, user_id, shard_kind, rec, schema, connection);
+          for (auto &rec : these_records) {
+            result.Append(HandleOWNINGColumn(table_name, info.sharded_table_name, user_id, shard_kind, rec, connection), true);
+            records.push_back(std::move(rec));
+          }
         } else {
           // Secondary index unhelpful.
           // Execute statement against all shards of this kind.
@@ -178,13 +189,16 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
           if (user_ids.size() > 0) {
             LOG(WARNING) << "Perf Warning: Delete over all shards " << stmt;
           }
+          CHECK_EQ(res.ResultSets().size(), 1);
+          auto these_records = res.ResultSets().front().Vec();
           result.Append(
-              sql::SqlResult(res.UpdateCount()),
+              sql::SqlResult(these_records.size()),
               true);
-          records = res.ResultSets().front().Vec();
-          auto &rec = records.front();
-          auto &id = rec.GetString(schema.IndexOf(info.shard_by));
-          HandleOWNINGColumn(table_name, info.sharded_table_name, id, shard_kind, rec, schema, connection);
+          for (auto &rec : these_records) {
+            auto id = rec.GetValueString(rec.schema().IndexOf(info.shard_by));
+            result.Append(HandleOWNINGColumn(table_name, info.sharded_table_name, id, shard_kind, rec, connection), true);
+            records.push_back(std::move(rec));
+          }
         }
       }
     }

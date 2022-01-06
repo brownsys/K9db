@@ -41,9 +41,9 @@ TEST_F(Varown, Delete) {
 
 // Relationship Deletes: Deleting the connecting row also deletes the pointed-to resource
 // Commented out because of record-type error
-// TEST_F(Varown, DeleteRel1) {
-//   tests::RunTest(data_file("delete_rel1"));
-// }
+TEST_F(Varown, DeleteRel1) {
+  tests::RunTest(data_file("delete_rel1"));
+}
 
 // Relationship Deletes: Deleting the connecting row deletes the pointed-to resource only
 // for the user mentioned in that row
