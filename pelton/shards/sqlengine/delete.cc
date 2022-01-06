@@ -126,16 +126,15 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
           ASSIGN_OR_RETURN(auto &lookup,
                            index::LookupIndex(info.next_index_name, user_id,
                                               connection));
-          if (lookup.size() == 1) {
-            user_id = std::move(*lookup.cbegin());
+          for (auto &uid : lookup) {
             // Execute statement directly against shard.
-            auto res = exec.Shard(&cloned, shard_kind, user_id, schema, aug_index);
+            auto res = exec.Shard(&cloned, shard_kind, uid, schema, aug_index);
             result.Append(
                 sql::SqlResult(res.UpdateCount()),
                 true);
             records = res.ResultSets().front().Vec();
             auto &rec = records.front();
-            HandleOWNINGColumn(table_name, info.sharded_table_name, user_id, shard_kind, rec, schema, connection);
+            HandleOWNINGColumn(table_name, info.sharded_table_name, uid, shard_kind, rec, schema, connection);
           }
         } else if (state->ShardExists(info.shard_kind, user_id)) {
           // Remove where condition on the shard by column, since it does not
