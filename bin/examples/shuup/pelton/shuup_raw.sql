@@ -1,3 +1,4 @@
+-- shuup incompatibility: auth_users would not be anonymized, but removed since data subject (can't fully support shuup's current implementation which doesn't delete anything)
 CREATE TABLE auth_users ( \
   id int, \
   password text, \
@@ -13,53 +14,9 @@ CREATE TABLE auth_users ( \
   PRIMARY KEY(id) \
 );
 
--- sharded
-CREATE TABLE shuup_basket ( \
-  id int, \
-  basket_key text, \
-  created_on datetime, \
-  updated_on datetime, \
-  persistent int, \
-  deleted int, \
-  finished int, \
-  title text, \
-  data text, \
-  taxless_total_price_value text, \
-  taxful_total_price_value text, \
-  currency text, \
-  prices_include_tax int, \
-  product_count int, \
-  OWNER_creator_id int, \
-  customer_id int, \
-  shop_id int, \
-  orderer_id int, \
-  PRIMARY KEY (id), \
-  FOREIGN KEY (OWNER_creator_id) REFERENCES auth_users(id), \
-  FOREIGN KEY (customer_id) REFERENCES shuup_contact(id) \
-);
-
--- sharded
-CREATE TABLE shuup_gdpr_gdpruserconsent ( \
-  id int, \
-  created_on datetime, \
-  shop_id int, \
-  OWNER_user_id int, \
-  FOREIGN KEY (OWNER_user_id) REFERENCES auth_users(id) \
-);
-
--- sharded
-CREATE TABLE shuup_personcontact ( \
-  contact_ptr_id int, \
-  gender datetime, \
-  birth_date datetime, \
-  first_name text, \
-  last_name int, \
-  OWNER_user_id text, \
-  PRIMARY KEY (contact_ptr_id), \
-  FOREIGN KEY (OWNER_user_id) REFERENCES auth_users(id) \
-);
-
--- anonymized, retained
+-- What shuup does: completed orders are retained in clear text for tax reasons while outstanding orders are anonymized (?)
+-- => don't support this conditional, data dependent anonymization
+-- What shuup should do IMHO: outstanding orders should be retained to complete the order, while completed orders should be anonymized
 CREATE TABLE shuup_mutaddress ( \
   id int, \
   prefix text, \
@@ -83,7 +40,6 @@ CREATE TABLE shuup_mutaddress ( \
   FOREIGN KEY (ACCESSOR_ANONYMIZE_user_id) REFERENCES auth_users(id) \
 );
 
--- anonymized, retained
 CREATE TABLE shuup_imaddress ( \
   id int, \
   ANONYMIZE_prefix text, \
@@ -107,7 +63,6 @@ CREATE TABLE shuup_imaddress ( \
   FOREIGN KEY (ACCESSOR_ANONYMIZE_user_id) REFERENCES auth_users(id) \
 );
 
--- anonymized, retained
 CREATE TABLE shuup_order ( \
   id int, \
   ACCESSOR_ANONYMIZE_customer_id int, \
@@ -125,12 +80,10 @@ CREATE TABLE shuup_order ( \
   payment_date datetime, \
   billing_address_id int, \
   shipping_address_id int, \
-  customer_id int, \
   PRIMARY KEY (id), \
   FOREIGN KEY (ACCESSOR_ANONYMIZE_customer_id) REFERENCES auth_users(id), \
   FOREIGN KEY (billing_address_id) REFERENCES shuup_immutableaddress(id), \
   FOREIGN KEY (shipping_address_id) REFERENCES shuup_immutableaddress(id) \
-  FOREIGN KEY (customer_id) REFERENCES shuup_contact(id) \
 );
 
 INSERT INTO auth_users VALUES (1, 'password', '2021-04-21 01:00:00', 0, 'user1', 'banjy', 'banjy@evil.com', 0, 1, '2021-04-21 01:00:00', 'evil');
