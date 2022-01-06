@@ -333,7 +333,11 @@ http_archive(
 load("@rules_rust//rust:repositories.bzl", "rust_repositories", "rust_repository_set")
 
 # defines default rust repositories.
-rust_repositories()
+rust_repositories(
+    version = "nightly",
+    iso_date = "2021-08-08",
+    edition = "2018",
+)
 
 # define a nightly toolchain that is only used for asan/tsan.
 rust_repository_set(

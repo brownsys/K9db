@@ -57,3 +57,5 @@ cmake-build-debug/
 .vscode/
 
 /cargo/
+target/
+Cargo.lock

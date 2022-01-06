@@ -1,0 +1,31 @@
+load("@rules_rust//rust:rust.bzl", "rust_binary", "rust_library")
+
+#rust_repositories(version = "nightly", iso_date = "2021-08-08")
+
+rust_binary(
+    name = "lobsters-harness",
+    srcs = [
+        "src/main.rs",
+        "src/lib.rs"
+    ],
+    rustc_flags = [
+        "-Clink-args=-lssl",
+        "-Clink-args=-lcrypto",
+        "-Clink-args=-rdynamic",
+        "-Clink-args=-Wl,-export-dynamic",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//experiments/lobsters/harness/cargo:clap",
+        "//experiments/lobsters/harness/cargo:mysql_async",
+        "//experiments/lobsters/harness/cargo:tower_service",
+        "//experiments/lobsters/harness/cargo:trawler",
+        "//experiments/lobsters/harness/cargo:futures_util",
+        "//experiments/lobsters/harness/cargo:hdrhistogram",
+        "//experiments/lobsters/harness/src/endpoints:pelton",
+    ],
+    compile_data = [
+        "src/pelton.sql",
+        "src/rocks-mariadb.sql"
+    ],
+)
