@@ -13,7 +13,7 @@ config_setting(
 rust_binary(
     name = "mysql_proxy",
     srcs = [
-        "main.rs",
+        "src/main.rs",
     ],
     rustc_flags = [
         "-Clink-args=-L/home/pelton/bazel-bin/external/rocksdb/copy_rocksdb/rocksdb/lib",
