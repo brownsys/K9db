@@ -334,8 +334,7 @@ load("@rules_rust//rust:repositories.bzl", "rust_repositories", "rust_repository
 
 # defines default rust repositories.
 rust_repositories(
-    version = "nightly",
-    iso_date = "2021-08-08",
+    version = "1.57.0",
     edition = "2018",
 )
 
