@@ -433,6 +433,7 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
       table_result.Append(
           exec.Shard(&tbl_stmt, shard_kind, unquoted_user_id, schema, aug_index), true);
     }
+    CHECK_EQ(table_result.ResultSets().size(), 1);
     result.AddResultSet(std::move(table_result.ResultSets().front()));
   }
   

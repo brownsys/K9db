@@ -55,3 +55,12 @@ filegroup(
     ]),
     visibility = ["//tests:__subpackages__"],
 )
+
+filegroup(
+    name = "varacc",
+    srcs = glob ([
+        "varacc/*.txt",
+        "varacc/*.sql",
+    ]),
+    visibility = ["//tests:__subpackages__"],
+)

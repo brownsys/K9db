@@ -80,7 +80,7 @@ std::unique_ptr<dataflow::DataFlowGraphPartition> PlanGraph(
   JavaVMAttachArgs jvm_args;
   jvm_args.name = NULL;
   jvm_args.group = NULL;
-  jvm.load()->AttachCurrentThread((void **)&env_local, &jvm_args);
+  CHECK_EQ(jvm.load()->AttachCurrentThread((void **)&env_local, &jvm_args), JNI_OK);
 
   // First get the java/calcite entry point class.
   jclass QueryPlannerClass =
@@ -111,24 +111,31 @@ std::unique_ptr<dataflow::DataFlowGraphPartition> PlanGraph(
   env_local->DeleteLocalRef(query_jstr);
   env_local->DeleteLocalRef(QueryPlannerClass);
   // Detach the current thread from the JVM.
-  jvm.load()->DetachCurrentThread();
+  CHECK_EQ(jvm.load()->DetachCurrentThread(), JNI_OK);
 
   // Return the graph.
   return graph;
 }
 
 // Shutdown the JVM.
-void ShutdownPlanner() {
+void ShutdownPlanner(bool shutdown_jvm) {
 #ifndef PELTON_ASAN
 #ifndef PELTON_TSAN
-  if (jvm.load() != nullptr) {
+  if (shutdown_jvm && jvm.load() != nullptr) {
     LOG(INFO) << "Destroying JVM...";
-    jvm.load()->DestroyJavaVM();
-    jvm.store(nullptr);
-    LOG(INFO) << "Destroyed JVM";
+    if (!jvm.load()->DestroyJavaVM()) {
+      LOG(WARNING) << "Unloading the jvm is not supported (resources not reclaimed).";
+    } else {
+      jvm.store(nullptr);
+      LOG(INFO) << "Destroyed JVM";
+    }
   }
 #endif  // PELTON_TSAN
 #endif  // PELTON_ASAN
+}
+
+void ShutdownPlanner() {
+  ShutdownPlanner(true);
 }
 
 }  // namespace planner

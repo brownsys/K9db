@@ -256,13 +256,11 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
         ASSIGN_OR_RETURN(
             auto &lookup,
             index::LookupIndex(info.next_index_name, user_id, connection));
-        if (lookup.size() == 1) {
-          user_id = std::move(*lookup.cbegin());
-        } else {
           for (auto &uid : lookup) {
             if (!absl::EqualsIgnoreCase(uid, "NULL")) {
               CHECK_STATUS(HandleShardForUser(stmt, cloned, connection, lock, &update_flows, &result, info, uid, schema, aug_index));
-            }
+          } else {
+            LOG(INFO) << "UID lookup was null";
           }
         }
       } else {

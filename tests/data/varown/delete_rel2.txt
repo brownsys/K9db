@@ -6,21 +6,11 @@ update # = 1
 ;
 update # = 1
 ;
-update # = 0
+update # = 2
 ;
-update # = 1
+update # = 2
 ;
-8|"test"
 ;
-9|"b"
-109|1|1008
-1008|"target_del_2"
-;
-update # = 1
-;
-update # = 1
-;
-update # = 1
-;
-update # = 1
+109|9|1008
+1008|target_del_2
 ;

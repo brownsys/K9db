@@ -7,6 +7,3 @@ INSERT INTO t VALUES (1005, "target_del");
 DELETE FROM rel WHERE id = 105;
 
 GDPR GET user 5;
-
-DELETE FROM t WHERE id = 1005;
-DELETE FROM  user WHERE id = 5;
