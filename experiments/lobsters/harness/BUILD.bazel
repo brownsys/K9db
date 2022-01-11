@@ -1,7 +1,5 @@
 load("@rules_rust//rust:rust.bzl", "rust_binary", "rust_library")
 
-#rust_repositories(version = "nightly", iso_date = "2021-08-08")
-
 rust_binary(
     name = "lobsters-harness",
     srcs = [
