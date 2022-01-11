@@ -446,7 +446,6 @@ fn main() {
         wl.with_histogram(h);
     }
 
-    println!("Database stuff: {:?}", args.value_of("dbn").unwrap());
     // check that we can indeed connect
     let mut opts = my::OptsBuilder::from_opts(args.value_of("dbn").unwrap());
     opts.tcp_nodelay(true);
