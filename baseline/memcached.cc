@@ -248,7 +248,6 @@ void ComputeAndCache(int id, const char *query) {
       query_keys.push_back(matches[2]);
     } else {
       // LOG(FATAL) << "where column did not match regex " << key_col;
-
     }
   }
 

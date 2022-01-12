@@ -12,10 +12,10 @@ pub mod memcached {
   use std::fmt::Write;
   use std::mem;
 
-  use _memcached_ffi_bindgen::{Type_UINT, Type_INT, Type_TEXT, Value, Record};
-  use _memcached_ffi_bindgen::DestroyResult;
-  use _memcached_ffi_bindgen::{SetStr, SetInt, SetUInt, GetStr, GetUInt, GetInt};
-  use _memcached_ffi_bindgen::{Initialize, Cache, Update, Read, __ExecuteDB, Close};
+  use crate::_memcached_ffi_bindgen::{Type_UINT, Type_INT, Type_TEXT, Value, Record};
+  use crate::_memcached_ffi_bindgen::DestroyResult;
+  use crate::_memcached_ffi_bindgen::{SetStr, SetInt, SetUInt, GetStr, GetUInt, GetInt};
+  use crate::_memcached_ffi_bindgen::{Initialize, Cache, Update, Read, __ExecuteDB, Close};
 
   // Initializing.
   pub fn MemInitialize(db: &str, db_user: &str, db_pass: &str, seed: &str) -> bool {

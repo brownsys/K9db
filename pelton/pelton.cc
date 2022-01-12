@@ -12,8 +12,8 @@
 #include "pelton/planner/planner.h"
 #include "pelton/shards/sqlengine/engine.h"
 #include "pelton/shards/sqlengine/util.h"
-#include "pelton/util/status.h"
 #include "pelton/util/perf.h"
+#include "pelton/util/status.h"
 
 namespace pelton {
 

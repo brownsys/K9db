@@ -78,9 +78,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
       if (found) {
         if (info.IsTransitive()) {
           // Transitive sharding: look up via index.
-          ASSIGN_OR_RETURN(auto &lookup,
-                           index::LookupIndex(info.next_index_name, user_id,
-                                              connection));
+          ASSIGN_OR_RETURN(
+              auto &lookup,
+              index::LookupIndex(info.next_index_name, user_id, connection));
           if (lookup.size() == 1) {
             user_id = std::move(*lookup.cbegin());
             // Execute statement directly against shard.
@@ -102,10 +102,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
       } else {
         // The delete statement by itself does not obviously constraint a
         // shard. Try finding the shard(s) via secondary indices.
-        ASSIGN_OR_RETURN(
-            const auto &pair,
-            index::LookupIndex(table_name, info.shard_by, stmt.GetWhereClause(),
-                               connection));
+        ASSIGN_OR_RETURN(const auto &pair,
+                         index::LookupIndex(table_name, info.shard_by,
+                                            stmt.GetWhereClause(), connection));
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
           result.Append(

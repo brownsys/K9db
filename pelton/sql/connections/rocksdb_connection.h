@@ -1,6 +1,6 @@
 // Connection to rocksdb.
-#ifndef PELTON_SQL_CONNECTIONS_ROCKSDB_H__
-#define PELTON_SQL_CONNECTIONS_ROCKSDB_H__
+#ifndef PELTON_SQL_CONNECTIONS_ROCKSDB_CONNECTION_H_
+#define PELTON_SQL_CONNECTIONS_ROCKSDB_CONNECTION_H_
 
 #include <memory>
 #include <optional>
@@ -108,4 +108,4 @@ class RocksdbConnection : public PeltonConnection {
 }  // namespace sql
 }  // namespace pelton
 
-#endif  // PELTON_SQL_CONNECTIONS_ROCKSDB_H__
+#endif  // PELTON_SQL_CONNECTIONS_ROCKSDB_CONNECTION_H_

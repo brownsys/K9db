@@ -193,8 +193,12 @@ class ListCountVisitor : public AbstractVisitor<size_t> {
   ListCountVisitor() = default;
 
   size_t VisitCreateTable(const CreateTable &ast) override { return 0; }
-  size_t VisitColumnDefinition(const ColumnDefinition &ast) override { return 0; }
-  size_t VisitColumnConstraint(const ColumnConstraint &ast) override { return 0; }
+  size_t VisitColumnDefinition(const ColumnDefinition &ast) override {
+    return 0;
+  }
+  size_t VisitColumnConstraint(const ColumnConstraint &ast) override {
+    return 0;
+  }
   size_t VisitCreateIndex(const CreateIndex &ast) override { return 0; }
   size_t VisitInsert(const Insert &ast) override { return 0; }
   size_t VisitUpdate(const Update &ast) override {
@@ -215,22 +219,28 @@ class ListCountVisitor : public AbstractVisitor<size_t> {
     }
     return 0;
   }
-  size_t VisitColumnExpression(const ColumnExpression &ast) override { return 0; }
-  size_t VisitLiteralExpression(const LiteralExpression &ast) override { return 0; }
+  size_t VisitColumnExpression(const ColumnExpression &ast) override {
+    return 0;
+  }
+  size_t VisitLiteralExpression(const LiteralExpression &ast) override {
+    return 0;
+  }
   size_t VisitLiteralListExpression(const LiteralListExpression &ast) override {
     return ast.values().size();
   }
   size_t VisitBinaryExpression(const BinaryExpression &ast) override {
     auto v = ast.VisitChildren(this);
     size_t sum = 0;
-    for (size_t i : v) { sum += i; }
+    for (size_t i : v) {
+      sum += i;
+    }
     return sum;
   }
 
  private:
   std::string shard_prefix_;
   bool supports_foreign_keys_;
-}; 
+};
 
 }  // namespace sqlast
 }  // namespace pelton

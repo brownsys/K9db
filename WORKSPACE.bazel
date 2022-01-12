@@ -315,7 +315,7 @@ maven_install(
     ],
     fetch_sources = True,
     repositories = [
-        "https://jcenter.bintray.com/",
+        "https://repo.maven.apache.org/maven2/",
     ],
 )
 
@@ -333,13 +333,17 @@ http_archive(
 load("@rules_rust//rust:repositories.bzl", "rust_repositories", "rust_repository_set")
 
 # defines default rust repositories.
-rust_repositories()
+rust_repositories(
+    edition = "2018",
+    version = "1.56.0",
+)
 
 # define a nightly toolchain that is only used for asan/tsan.
 rust_repository_set(
     name = "rust_nightly",
+    edition = "2018",
     exec_triple = "x86_64-unknown-linux-gnu",
-    iso_date = "2021-06-16",
+    iso_date = "2021-11-01",
     version = "nightly",
 )
 

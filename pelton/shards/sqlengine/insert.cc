@@ -104,9 +104,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
       // If the sharding is transitive, the user id should be resolved via the
       // secondary index of the target table.
       if (info.IsTransitive()) {
-        ASSIGN_OR_RETURN(
-            auto &lookup,
-            index::LookupIndex(info.next_index_name, user_id, connection));
+        ASSIGN_OR_RETURN(auto &lookup, index::LookupIndex(info.next_index_name,
+                                                          user_id, connection));
         if (lookup.size() == 1) {
           user_id = std::move(*lookup.cbegin());
         } else {

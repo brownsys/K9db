@@ -45,14 +45,10 @@ class State {
     shards::SharedLock lock = this->sharder_state_.ReaderLock();
     return this->sharder_state_.NumShards();
   }
-  
-  perf::Perf CombinePerfs() const {
-    return perf_;
-  }
-  
-  perf::Perf *GetPerf() {
-    return &perf_;
-  }
+
+  perf::Perf CombinePerfs() const { return perf_; }
+
+  perf::Perf *GetPerf() { return &perf_; }
 
  private:
   shards::SharderState sharder_state_;
