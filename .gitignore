@@ -56,4 +56,12 @@ cmake-build-debug/
 .DS_Store
 .vscode/
 
-/cargo/
+
+# Rust 
+
+# Build directory
+target/
+# Lockfile
+Cargo.lock
+# Raze output directory
+cargo/
