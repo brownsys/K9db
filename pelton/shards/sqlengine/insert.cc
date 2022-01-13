@@ -114,7 +114,6 @@ absl::Status MaybeHandleOwningColumn(
           LOG(WARNING) << "Too many results for " << schema.table_name() << " during value move";
         }
         dataflow::Record &rec = result_set.Vec().front();
-        LOG(INFO) << "Found first record";
         uint64_t csize = schema.GetColumns().size();
         if (csize != rec.schema().size())
           LOG(FATAL) << csize << " != " << rec.schema().size();
@@ -230,7 +229,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
           user_id = cloned.RemoveValue(info.shard_by_index);
         }
       }
-      LOG(INFO) << "user_id retrieved";
       if (absl::EqualsIgnoreCase(user_id, "NULL")) {
         LOG(WARNING) << info.shard_by << " was NULL";
         LOG(WARNING) << "This could indicate a bug and may lead to data loss!";
@@ -259,8 +257,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
           for (auto &uid : lookup) {
             if (!absl::EqualsIgnoreCase(uid, "NULL")) {
               CHECK_STATUS(HandleShardForUser(stmt, cloned, connection, lock, &update_flows, &result, info, uid, schema, aug_index));
-          } else {
-            LOG(INFO) << "UID lookup was null";
           }
         }
       } else {
