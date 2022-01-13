@@ -254,9 +254,13 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
         ASSIGN_OR_RETURN(
             auto &lookup,
             index::LookupIndex(info.next_index_name, user_id, connection));
-          for (auto &uid : lookup) {
-            if (!absl::EqualsIgnoreCase(uid, "NULL")) {
-              CHECK_STATUS(HandleShardForUser(stmt, cloned, connection, lock, &update_flows, &result, info, uid, schema, aug_index));
+        if (lookup.size() < 1) {
+          return absl::InvalidArgumentError("Foreign Key Value does not exist");
+        }
+
+        for (auto &uid : lookup) {
+          if (!absl::EqualsIgnoreCase(uid, "NULL")) {
+            CHECK_STATUS(HandleShardForUser(stmt, cloned, connection, lock, &update_flows, &result, info, uid, schema, aug_index));
           }
         }
       } else {

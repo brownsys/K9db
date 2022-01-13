@@ -294,9 +294,8 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
       for (auto &[anon_col_name, anon_col_type] :
            accessor_index.anonymize_columns) {
         if (is_sharded) {
-          MOVE_OR_RETURN(
-              std::unordered_set<UserId> ids_set,
-              index::LookupIndex(index_name, user_id, connection));
+          MOVE_OR_RETURN(std::unordered_set<UserId> ids_set,
+                         index::LookupIndex(index_name, user_id, connection));
 
           // create update statement with equality check for each id
           for (const auto &id : ids_set) {

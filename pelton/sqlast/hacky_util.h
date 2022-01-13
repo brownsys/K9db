@@ -1,7 +1,10 @@
 #ifndef PELTON_SQLAST_HACKY_UTIL_H_
 #define PELTON_SQLAST_HACKY_UTIL_H_
 
+#include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace pelton {
 namespace sqlast {
@@ -42,12 +45,12 @@ inline std::string ExtractIdentifier(const char **ptr, size_t *size) {
   size_t pos = 0;
   size_t i;
   for (i = 0; i < *size; i++) {
-    if (s[i] == ' ' || s[i] == '>' || s[i] == '=' || s[i] == ';' || s[i] == ')'
-        || s[i] == '(' || s[i] == ',') {
+    if (s[i] == ' ' || s[i] == '>' || s[i] == '=' || s[i] == ';' ||
+        s[i] == ')' || s[i] == '(' || s[i] == ',') {
       break;
     }
     if (s[i] == '.') {
-      pos = i+1;
+      pos = i + 1;
     }
   }
 
@@ -119,13 +122,12 @@ inline bool EqualIgnoreCase(const std::string &str1, const std::string &upper) {
   return true;
 }
 
-
-std::unique_ptr<BinaryExpression> HackyCondition(
-    const char **ptr, size_t *size) {
+std::unique_ptr<BinaryExpression> HackyCondition(const char **ptr,
+                                                 size_t *size) {
   std::vector<std::unique_ptr<BinaryExpression>> conditions;
-  
+
   bool has_and = false;
-  do {     
+  do {
     // <column_name>
     std::string column_name = ExtractIdentifier(ptr, size);
     if (column_name.size() == 0) {
@@ -171,7 +173,7 @@ std::unique_ptr<BinaryExpression> HackyCondition(
         return nullptr;
       }
       ConsumeWhiteSpace(ptr, size);
-      
+
       std::vector<std::string> values;
       while (true) {
         std::string value = ExtractValue(ptr, size);
@@ -197,7 +199,8 @@ std::unique_ptr<BinaryExpression> HackyCondition(
     if (eq) {
       binary = std::make_unique<BinaryExpression>(Expression::Type::EQ);
     } else if (gt) {
-      binary = std::make_unique<BinaryExpression>(Expression::Type::GREATER_THAN);
+      binary =
+          std::make_unique<BinaryExpression>(Expression::Type::GREATER_THAN);
     } else if (in) {
       binary = std::make_unique<BinaryExpression>(Expression::Type::IN);
     } else if (is) {

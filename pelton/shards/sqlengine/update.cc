@@ -199,9 +199,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
         if (found) {
           if (info.IsTransitive()) {
             // Transitive sharding: look up via index.
-            ASSIGN_OR_RETURN(auto &lookup,
-                             index::LookupIndex(info.next_index_name, user_id,
-                                                connection));
+            ASSIGN_OR_RETURN(
+                auto &lookup,
+                index::LookupIndex(info.next_index_name, user_id, connection));
             if (lookup.size() == 1) {
               user_id = std::move(*lookup.cbegin());
               // Execute statement directly against shard.

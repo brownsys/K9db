@@ -80,7 +80,7 @@ std::unique_ptr<dataflow::DataFlowGraphPartition> PlanGraph(
   JavaVMAttachArgs jvm_args;
   jvm_args.name = NULL;
   jvm_args.group = NULL;
-  CHECK_EQ(jvm.load()->AttachCurrentThread((void **)&env_local, &jvm_args), JNI_OK);
+  CHECK_EQ(jvm.load()->AttachCurrentThread(reinterpret_cast<void **>(&env_local), &jvm_args), JNI_OK);
 
   // First get the java/calcite entry point class.
   jclass QueryPlannerClass =
