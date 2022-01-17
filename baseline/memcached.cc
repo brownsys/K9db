@@ -367,7 +367,7 @@ bool Initialize(const char *db_name, const char *db_username,
     MemcachedConnect();
     MariaDBConnect(db_name, db_username, db_password);
   } catch (std::exception &e) {
-    std::cerr << e.what();
+    LOG(FATAL) << "Encoutered exception: " << e.what();
   }
   return true;
 }
@@ -397,8 +397,7 @@ int Cache(const char *query) {
   // Return id.
     return id;
   } catch (std::exception &e) {
-    std::cerr << e.what();
-    throw e;
+    LOG(FATAL) << "Encoutered exception: " << e.what();
   }
 }
 
