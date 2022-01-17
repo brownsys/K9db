@@ -105,7 +105,7 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
       auto [found, column_value] = where_clause->Visit(&value_finder);
       if (!found) {
         continue;
-      }
+      } 
 
       // The where clause gives us a value for "column_name", we can translate
       // it to some value(s) for shard_by column by looking at the index.

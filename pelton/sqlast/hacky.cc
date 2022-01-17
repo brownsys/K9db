@@ -3,11 +3,12 @@
 #include "pelton/sqlast/hacky.h"
 
 #include <utility>
+#include <vector>
 
 #include "pelton/sqlast/hacky_util.h"
 
 namespace pelton {
-namespace sqlast {                                                                 
+namespace sqlast {
 
 absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
                                                                size_t size) {
@@ -37,7 +38,7 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
     return absl::InvalidArgumentError("Hacky insert: table name");
   }
   ConsumeWhiteSpace(&str, &size);
-  
+
   // Create the insert statement.
   std::unique_ptr<Insert> stmt = std::make_unique<Insert>(table_name, replace);
 

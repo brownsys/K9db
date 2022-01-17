@@ -129,7 +129,7 @@ class FilterVisitor : public sqlast::AbstractVisitor<bool> {
 
 class ShardPrefixTransform : public rocksdb::SliceTransform {
  public:
-  ShardPrefixTransform(size_t seps) : seps_(seps) {}
+  explicit ShardPrefixTransform(size_t seps) : seps_(seps) {}
 
   const char *Name() const override { return "ShardPrefix"; }
   bool InDomain(const rocksdb::Slice &key) const override { return true; }

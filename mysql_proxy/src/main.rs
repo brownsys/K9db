@@ -25,6 +25,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
+const LOAD_LOBSTERS : bool = option_env!("LOBSTERS").is_none();
+
 lazy_static! {
     // Expression used for extracting "table.column = ?" or "table.column IN"
     static ref PARAM_RE: Regex = Regex::new(r"\s(?P<expr>[A-Za-z_0-9`\.]+\s*([=><]|(\s+IN\s+))\s*)\?|(\s+IN\s+)").unwrap();
@@ -1203,55 +1205,52 @@ fn main() {
     let db_name = flags.db_name.clone();
     let mut rust_conn = open_ffi(&db_name);
     // Execute all the create statements.
-    for create_stmt in &CREATES {
-        if true { continue ;}
-        let ddl_response = exec_ddl_ffi(&mut rust_conn, create_stmt);
-        debug!(log, "[INIT] ddl_response is {:?}", ddl_response);
-    }
-
-    // Execute all the insert statements.
-    // Execute all the create statements.
-    for insert_stmt in &INSERTS {
-        if true { continue ;}
-        let update_response = exec_update_ffi(&mut rust_conn, insert_stmt);
-        debug!(log, "[INIT] update response is {:?}", update_response);
-    }
-
-    let mut prepared_write_guard = prepared_statements_lock.write().unwrap();
-    let mut index_write_guard = prepared_index_lock.write().unwrap();
-
-    // Create necessary views for all the queries.
-    for view_query in &VIEWS {
-        if true { continue ;}
-        let stmt_id = id_generator.fetch_add(1, Ordering::SeqCst);
-        let view_name: String = String::from("q") + &stmt_id.to_string();
-        // Form the query
-        let create_view_stmt = create_view_stmt(&view_name, view_query);
-        // Create view in pelton.
-        if !exec_ddl_ffi(&mut rust_conn, &create_view_stmt) {
-            error!(
-                log,
-                "[INIT] Rust proxy: Failed to execute create view {}", create_view_stmt
-            );
+    if LOAD_LOBSTERS {
+        for create_stmt in &CREATES {
+            let ddl_response = exec_ddl_ffi(&mut rust_conn, create_stmt);
+            debug!(log, "[INIT] ddl_response is {:?}", ddl_response);
         }
-        let internal_format = construct_internal_format(&view_name, view_query);
-        let param_count = view_query.matches("?").count();
-        let mut default_metadata: Vec<Option<u32>> = Vec::new();
-        for _i in 0..param_count {
-            default_metadata.push(None);
+
+        // Execute all the insert statements.
+        // Execute all the create statements.
+        for insert_stmt in &INSERTS {
+            let update_response = exec_update_ffi(&mut rust_conn, insert_stmt);
+            debug!(log, "[INIT] update response is {:?}", update_response);
         }
-        // Update data structures
-        prepared_write_guard.insert(view_query.clone().to_string(), HashMap::new());
-        prepared_write_guard
-            .get_mut(view_query.to_owned())
-            .unwrap()
-            .insert(default_metadata, stmt_id);
-        index_write_guard.insert(stmt_id, internal_format);
+
+        let mut prepared_write_guard = prepared_statements_lock.write().unwrap();
+        let mut index_write_guard = prepared_index_lock.write().unwrap();
+
+        // Create necessary views for all the queries.
+        for view_query in &VIEWS {
+            let stmt_id = id_generator.fetch_add(1, Ordering::SeqCst);
+            let view_name: String = String::from("q") + &stmt_id.to_string();
+            // Form the query
+            let create_view_stmt = create_view_stmt(&view_name, view_query);
+            // Create view in pelton.
+            if !exec_ddl_ffi(&mut rust_conn, &create_view_stmt) {
+                error!(
+                    log,
+                    "[INIT] Rust proxy: Failed to execute create view {}", create_view_stmt
+                );
+            }
+            let internal_format = construct_internal_format(&view_name, view_query);
+            let param_count = view_query.matches("?").count();
+            let mut default_metadata: Vec<Option<u32>> = Vec::new();
+            for _i in 0..param_count {
+                default_metadata.push(None);
+            }
+            // Update data structures
+            prepared_write_guard.insert(view_query.clone().to_string(), HashMap::new());
+            prepared_write_guard
+                .get_mut(view_query.to_owned())
+                .unwrap()
+                .insert(default_metadata, stmt_id);
+            index_write_guard.insert(stmt_id, internal_format);
+        }
+        close_ffi(&mut rust_conn);
+        shutdown_planner_ffi();
     }
-    drop(prepared_write_guard);
-    drop(index_write_guard);
-    close_ffi(&mut rust_conn);
-    shutdown_planner_ffi();
     // run listener until terminated with SIGTERM
     while !stop.load(Ordering::Relaxed) {
         while let Ok((stream, _addr)) = listener.accept() {

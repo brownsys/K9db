@@ -177,7 +177,8 @@ absl::Status GetAccessableDataForAccessor(
         MOVE_OR_RETURN(sql::SqlResult res,
                         select::Shard(accessor_stmt, connection, false));
 
-        result->AddResultSet(std::move(res.ResultSets().at(0)));
+        CHECK_EQ(res.ResultSets().size(), 1);
+        result->AddResultSet(std::move(res.ResultSets().front()));
       }
     }
   } else {
@@ -293,9 +294,8 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
       for (auto &[anon_col_name, anon_col_type] :
            accessor_index.anonymize_columns) {
         if (is_sharded) {
-          MOVE_OR_RETURN(
-              std::unordered_set<UserId> ids_set,
-              index::LookupIndex(index_name, user_id, connection));
+          MOVE_OR_RETURN(std::unordered_set<UserId> ids_set,
+                         index::LookupIndex(index_name, user_id, connection));
 
           // create update statement with equality check for each id
           for (const auto &id : ids_set) {
@@ -428,12 +428,15 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
         aug_index = info->shard_by_index;
       }
 
+      LOG(INFO) << "Looking up from table " << info->sharded_table_name;
+
       sqlast::Select tbl_stmt{info->sharded_table_name};
       tbl_stmt.AddColumn("*");
       table_result.Append(
           exec.Shard(&tbl_stmt, shard_kind, unquoted_user_id, schema, aug_index), true);
     }
     CHECK_EQ(table_result.ResultSets().size(), 1);
+    LOG(INFO) << "Found a total of " << table_result.ResultSets().front().size() << " rows";
     result.AddResultSet(std::move(table_result.ResultSets().front()));
   }
   

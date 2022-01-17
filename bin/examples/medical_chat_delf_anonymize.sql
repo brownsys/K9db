@@ -34,18 +34,6 @@ INSERT INTO chat VALUES (3, 20, 1, 'Alice', 'HELLO');
 INSERT INTO chat VALUES (4, 20, 2, 'Bob', 'HELLO 2');
 INSERT INTO chat VALUES (5, 20, 1, 'Alice', 'HELLO 3');
 
+SELECT * FROM chat;
 GDPR FORGET doctors 2;
 SELECT * FROM chat;
-
--- SELECT * FROM chat;
--- SELECT * FROM chat WHERE ACCESSOR_doctor_id = 2;
--- SELECT * FROM chat WHERE OWNER_patient_id = 10;
--- GDPR GET patients 10;
--- GDPR GET doctors 2;
-
--- SELECT * FROM chat;
-
--- GDPR FORGET patients 10;
--- SELECT * FROM patients;
--- SELECT * FROM chat;
--- SELECT * FROM ref_doctors_OWNER_patient_id;
