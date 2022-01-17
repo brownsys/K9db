@@ -16,6 +16,7 @@
 // #include "glog/logging.h"
 #include "libmemcached/memcached.h"
 #include "mariadb/conncpp.hpp"
+#include "glog/logging.h"
 
 namespace {
 
