@@ -41,6 +41,8 @@ class AbstractStatement {
   Type type_;
 };
 
+std::ostream &operator<<(std::ostream &os, const AbstractStatement::Type &t);
+
 }  // namespace sqlast
 }  // namespace pelton
 

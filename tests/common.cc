@@ -216,6 +216,7 @@ void RunTest(const std::string &query_file_prefix) {
     const std::string &query = queries.at(i);
     std::vector<std::string> &expected = results.at(i);
 
+    VLOG(1) << "Running query: " << query;
     // Run query.
     auto status = pelton::exec(&connection, query);
     EXPECT_TRUE(status.ok()) << status.status() << query;

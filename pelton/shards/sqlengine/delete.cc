@@ -205,11 +205,13 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
     // Case 2: Table is not sharded.
     if (update_flows) {
       sqlast::Delete cloned = stmt.MakeReturning();
-      result = exec.Default(&cloned, schema);
+      auto res = exec.Default(&cloned, schema);
+      CHECK_EQ(res.ResultSets().size(), 1);
+      records = res.ResultSets().front().Vec();
+      result.Append(sql::SqlResult(records.size()), true);
     } else {
       result = exec.Default(&stmt);
     }
-    records = result.ResultSets().at(0).Vec();
   }
 
   // Delete was successful, time to update dataflows.
