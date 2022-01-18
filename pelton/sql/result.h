@@ -5,9 +5,9 @@
 #include <utility>
 #include <vector>
 
+#include "glog/logging.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
-#include "glog/logging.h"
 
 namespace pelton {
 namespace sql {
@@ -73,32 +73,34 @@ class SqlResult {
   inline bool IsQuery() const { return this->type_ == Type::QUERY; }
 
   // Only safe to use if IsStatement() returns true.
-  inline bool Success() const { 
+  inline bool Success() const {
     if (!this->IsStatement())
-      DLOG(FATAL) << "Success() called on non-statement result (" << this->type_ << ")";
-    return this->status_; 
+      DLOG(FATAL) << "Success() called on non-statement result (" << this->type_
+                  << ")";
+    return this->status_;
   }
 
   // Only safe to use if IsUpdate() returns true.
-  inline int UpdateCount() const { 
+  inline int UpdateCount() const {
     if (!this->IsUpdate()) {
-      DLOG(FATAL) << "UpdateCount() called on non-update result (" << this->type_ << ")";
+      DLOG(FATAL) << "UpdateCount() called on non-update result ("
+                  << this->type_ << ")";
     }
-    return this->status_; 
+    return this->status_;
   }
 
   // Only safe to use if IsQuery() returns true.
-  const std::vector<SqlResultSet> &ResultSets() const { 
+  const std::vector<SqlResultSet> &ResultSets() const {
     if (!this->IsQuery()) {
       DLOG(FATAL) << "ResultSets() called on non-query result";
     }
-    return this->sets_; 
+    return this->sets_;
   }
-  std::vector<SqlResultSet> &ResultSets() { 
+  std::vector<SqlResultSet> &ResultSets() {
     if (!this->IsQuery()) {
       DLOG(FATAL) << "ResultSets() called on non-query result";
     }
-    return this->sets_; 
+    return this->sets_;
   }
 
   // Internal API: do not use outside of pelton code.
@@ -109,7 +111,8 @@ class SqlResult {
     this->sets_.push_back(std::move(resultset));
   }
 
-  friend std::ostream& operator<<(std::ostream& str, const SqlResult::Type & res);
+  friend std::ostream &operator<<(std::ostream &str,
+                                  const SqlResult::Type &res);
 
  private:
   Type type_;

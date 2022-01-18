@@ -48,7 +48,8 @@ std::string &ColumnConstraint::foreign_column() {
 // ColumnDefinition
 ColumnDefinition::Type ColumnDefinition::StringToType(
     const std::string &column_type) {
-  if (absl::EqualsIgnoreCase(column_type, "INT") || absl::EqualsIgnoreCase(column_type, "INTEGER")) {
+  if (absl::EqualsIgnoreCase(column_type, "INT") ||
+      absl::EqualsIgnoreCase(column_type, "INTEGER")) {
     return Type::INT;
   } else if (absl::StartsWithIgnoreCase(column_type, "VARCHAR") ||
              absl::EqualsIgnoreCase(column_type, "TEXT")) {
@@ -205,7 +206,8 @@ std::ostream &operator<<(std::ostream &os, const AbstractStatement::Type &t) {
     case AbstractStatement::Type::GDPR:
       return os << "GDPR";
     default:
-      LOG(FATAL) << "No string representation defined for an enum variant for " << typeid(t).name();
+      LOG(FATAL) << "No string representation defined for an enum variant for "
+                 << typeid(t).name();
   }
 }
 

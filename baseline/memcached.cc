@@ -14,9 +14,9 @@
 #include <vector>
 
 // #include "glog/logging.h"
+#include "glog/logging.h"
 #include "libmemcached/memcached.h"
 #include "mariadb/conncpp.hpp"
-#include "glog/logging.h"
 
 namespace {
 
@@ -250,7 +250,6 @@ void ComputeAndCache(int id, const char *query) {
       query_keys.push_back(matches[2]);
     } else {
       throw std::runtime_error("where column did not match regex " + key_col);
-
     }
   }
   // Execute the query.
@@ -395,7 +394,7 @@ int Cache(const char *query) {
     // Compute the query and cache the results.
     ComputeAndCache(id, query);
 
-  // Return id.
+    // Return id.
     return id;
   } catch (std::exception &e) {
     LOG(FATAL) << "Encoutered exception: " << e.what();
@@ -442,15 +441,13 @@ void Update(const char *table) {
 }
 
 Results ReadMany(int id, const Record *keys, size_t count) {
-  Result* out = new Result[count];
+  Result *out = new Result[count];
   size_t padded_i_size = 8;
-  size_t short_key_size =
-    prefix.size() 
-    + 1 // id is always length 1 (right now)
-    + 8; // size of a serialzied input key
-  size_t key_size = short_key_size 
-    + 1 // '@'
-    + padded_i_size; // padded `i`
+  size_t short_key_size = prefix.size() +
+                          1             // id is always length 1 (right now)
+                          + 8;          // size of a serialzied input key
+  size_t key_size = short_key_size + 1  // '@'
+                    + padded_i_size;    // padded `i`
   std::vector<char *> keybuf;
   keybuf.reserve(count);
   std::unordered_map<std::string, size_t> fetched_keys;
@@ -467,20 +464,20 @@ Results ReadMany(int id, const Record *keys, size_t count) {
         std::string the_key = serialized_key;
         the_key.push_back('@');
         std::string i_str = std::to_string(i);
-        for (size_t b = i_str.size(); b < padded_i_size; b++ ) {
+        for (size_t b = i_str.size(); b < padded_i_size; b++) {
           the_key.push_back('0');
         }
-        char * k_buf = new char[key_size];
+        char *k_buf = new char[key_size];
         strcpy(k_buf, the_key.c_str());
         keybuf.push_back(k_buf);
       }
       fetched_keys.emplace(std::move(serialized_key), j);
     } else {
-      count --;
+      count--;
     }
   }
   auto status = memcached_mget(memc, keybuf.data(), &key_size, count);
-  
+
   if (memcached_failed(status)) {
     throw std::runtime_error(memcached_strerror(memc, status));
   }
@@ -496,16 +493,17 @@ Results ReadMany(int id, const Record *keys, size_t count) {
     std::string key(memcached_result_key_value(&result));
     key.resize(short_key_size);
     size_t place = fetched_keys.at(key);
-    std::string serialized_val{memcached_result_value(&result), memcached_result_length(&result)};
-    Result * plc = &out[place];
+    std::string serialized_val{memcached_result_value(&result),
+                               memcached_result_length(&result)};
+    Result *plc = &out[place];
     plc->records[plc->size] = FromMemcached(types.at(id), serialized_val);
     plc->size += 1;
     memcached_fetch_result(memc, &result, &err);
   }
-  for (auto * k : keybuf) {
+  for (auto *k : keybuf) {
     delete[] k;
   }
-  return {count,out};
+  return {count, out};
 }
 
 Result Read(int id, const Record *key) {

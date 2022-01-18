@@ -80,7 +80,9 @@ std::unique_ptr<dataflow::DataFlowGraphPartition> PlanGraph(
   JavaVMAttachArgs jvm_args;
   jvm_args.name = NULL;
   jvm_args.group = NULL;
-  CHECK_EQ(jvm.load()->AttachCurrentThread(reinterpret_cast<void **>(&env_local), &jvm_args), JNI_OK);
+  CHECK_EQ(jvm.load()->AttachCurrentThread(
+               reinterpret_cast<void **>(&env_local), &jvm_args),
+           JNI_OK);
 
   // First get the java/calcite entry point class.
   jclass QueryPlannerClass =
@@ -124,7 +126,8 @@ void ShutdownPlanner(bool shutdown_jvm) {
   if (shutdown_jvm && jvm.load() != nullptr) {
     LOG(INFO) << "Destroying JVM...";
     if (!jvm.load()->DestroyJavaVM()) {
-      LOG(WARNING) << "Unloading the jvm is not supported (resources not reclaimed).";
+      LOG(WARNING)
+          << "Unloading the jvm is not supported (resources not reclaimed).";
     } else {
       jvm.store(nullptr);
       LOG(INFO) << "Destroyed JVM";
@@ -134,9 +137,7 @@ void ShutdownPlanner(bool shutdown_jvm) {
 #endif  // PELTON_ASAN
 }
 
-void ShutdownPlanner() {
-  ShutdownPlanner(true);
-}
+void ShutdownPlanner() { ShutdownPlanner(true); }
 
 }  // namespace planner
 }  // namespace pelton

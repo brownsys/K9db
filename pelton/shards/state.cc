@@ -24,7 +24,8 @@ void SharderState::AddSchema(const UnshardedTableName &table_name,
                      std::pair<int, std::string>(pk_index, pk_name));
 }
 
-std::optional<sqlast::CreateTable> SharderState::RemoveSchema(const UnshardedTableName &table_name) {
+std::optional<sqlast::CreateTable> SharderState::RemoveSchema(
+    const UnshardedTableName &table_name) {
   std::optional<sqlast::CreateTable> ret;
   const auto ct = this->schema_.find(table_name);
   if (ct != this->schema_.end()) {
@@ -85,8 +86,8 @@ void SharderState::AddAccessorIndex(
     const bool is_sharded) {
   // Create an AccessorIndexInformation
   AccessorIndexInformation accessor_information{
-      kind,       table,     accessor_column, foreign_table,
-      shard_by_column, index_name, anonymize, is_sharded};
+      kind,       table,     accessor_column, foreign_table, shard_by_column,
+      index_name, anonymize, is_sharded};
   this->accessor_index_[kind].push_back(accessor_information);
 }
 
@@ -138,14 +139,13 @@ const std::list<ShardingInformation> &SharderState::GetShardingInformation(
   return this->sharded_by_.at(table);
 }
 
-std::vector<const ShardingInformation *> SharderState::GetShardingInformationFor(
-    const UnshardedTableName &table,
-    const std::string &shard_kind) const {
+std::vector<const ShardingInformation *>
+SharderState::GetShardingInformationFor(const UnshardedTableName &table,
+                                        const std::string &shard_kind) const {
   std::vector<const ShardingInformation *> result;
   for (const auto &info : this->GetShardingInformation(table)) {
     LOG(INFO) << "Found info " << info.sharded_table_name;
-    if (info.shard_kind == shard_kind)
-      result.push_back(&info);
+    if (info.shard_kind == shard_kind) result.push_back(&info);
   }
   return result;
 }
@@ -175,13 +175,12 @@ const std::vector<AccessorIndexInformation> &SharderState::GetAccessorIndices(
     const ShardKind &kind) const {
   return this->accessor_index_.at(kind);
 }
-std::vector<const AccessorIndexInformation *> SharderState::GetAccessorInformationFor(
-    const ShardKind &kind,
-    const UnshardedTableName &table_name) const {
+std::vector<const AccessorIndexInformation *>
+SharderState::GetAccessorInformationFor(
+    const ShardKind &kind, const UnshardedTableName &table_name) const {
   std::vector<const AccessorIndexInformation *> result;
   for (const auto &info : this->GetAccessorIndices(kind)) {
-    if (info.table_name == table_name)
-      result.push_back(&info);
+    if (info.table_name == table_name) result.push_back(&info);
   }
   return result;
 }

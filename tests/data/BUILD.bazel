@@ -49,7 +49,7 @@ filegroup(
 
 filegroup(
     name = "varown",
-    srcs = glob ([
+    srcs = glob([
         "varown/*.txt",
         "varown/*.sql",
     ]),
@@ -58,7 +58,7 @@ filegroup(
 
 filegroup(
     name = "varacc",
-    srcs = glob ([
+    srcs = glob([
         "varacc/*.txt",
         "varacc/*.sql",
     ]),

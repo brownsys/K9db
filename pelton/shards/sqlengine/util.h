@@ -6,10 +6,10 @@
 
 #include <string>
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "pelton/shards/types.h"
 #include "pelton/sqlast/ast_schema.h"
-#include "absl/strings/match.h"
 
 namespace pelton {
 namespace shards {
@@ -34,7 +34,6 @@ inline std::optional<OwningT> IsOwning(const sqlast::ColumnDefinition &column) {
     return OwningT::ACCESSING;
   else
     return std::optional<OwningT>{};
-
 }
 
 std::string Dequote(const std::string &st);

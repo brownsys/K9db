@@ -21,22 +21,19 @@ namespace delete_ {
 
 namespace {
 
-sql::SqlResult HandleOWNINGColumn(
-  const UnshardedTableName &table_name,
-  const UnshardedTableName &sharded_table_name,
-  const std::string &user_id,
-  const std::string &shard_kind,
-  dataflow::Record &delete_result,
-  Connection *connection
-) 
-{
+sql::SqlResult HandleOWNINGColumn(const UnshardedTableName &table_name,
+                                  const UnshardedTableName &sharded_table_name,
+                                  const std::string &user_id,
+                                  const std::string &shard_kind,
+                                  dataflow::Record &delete_result,
+                                  Connection *connection) {
   const auto &state = *connection->state->sharder_state();
   auto &exec = connection->executor;
 
   sql::SqlResult result(static_cast<int>(0));
-  for (const auto & col : state.GetSchema(table_name).GetColumns()) {
+  for (const auto &col : state.GetSchema(table_name).GetColumns()) {
     if (IsOwning(col)) {
-      const sqlast::ColumnConstraint * fk_constr;
+      const sqlast::ColumnConstraint *fk_constr;
       for (const auto &constr : col.GetConstraints()) {
         if (constr.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
           fk_constr = &constr;
@@ -46,28 +43,33 @@ sql::SqlResult HandleOWNINGColumn(
         LOG(FATAL) << "Expected foreign key constraint";
       }
       const auto &foreign_table = fk_constr->foreign_table();
-      const auto &infos = state.GetShardingInformationFor(foreign_table, shard_kind);
+      const auto &infos =
+          state.GetShardingInformationFor(foreign_table, shard_kind);
       for (const auto info : infos) {
         if (info->next_table != table_name) {
           continue;
         }
 
         sqlast::Delete del(info->sharded_table_name);
-        auto where = std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::EQ);
-        where->SetLeft(std::make_unique<sqlast::ColumnExpression>(fk_constr->foreign_column()));
+        auto where = std::make_unique<sqlast::BinaryExpression>(
+            sqlast::Expression::Type::EQ);
+        where->SetLeft(std::make_unique<sqlast::ColumnExpression>(
+            fk_constr->foreign_column()));
         std::cerr << "Is it here?" << std::endl;
-        where->SetRight(std::make_unique<sqlast::LiteralExpression>(delete_result.GetValue(delete_result.schema().IndexOf(col.column_name())).GetSqlString()));
+        where->SetRight(std::make_unique<sqlast::LiteralExpression>(
+            delete_result
+                .GetValue(delete_result.schema().IndexOf(col.column_name()))
+                .GetSqlString()));
         std::cerr << "No";
         del.SetWhereClause(std::move(where));
         result.Append(exec.Shard(&del, shard_kind, user_id), true);
       }
-      
     }
   }
   return result;
 }
 
-} // namespace
+}  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
                                      Connection *connection, bool synchronize,
@@ -128,19 +130,20 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
       if (found) {
         if (info.IsTransitive()) {
           // Transitive sharding: look up via index.
-          ASSIGN_OR_RETURN(auto &lookup,
-                           index::LookupIndex(info.next_index_name, user_id,
-                                              connection));
+          ASSIGN_OR_RETURN(
+              auto &lookup,
+              index::LookupIndex(info.next_index_name, user_id, connection));
           for (auto &uid : lookup) {
             // Execute statement directly against shard.
             auto res = exec.Shard(&cloned, shard_kind, uid, schema, aug_index);
             CHECK_EQ(res.ResultSets().size(), 1);
             auto these_records = res.ResultSets().front().Vec();
-            result.Append(
-                sql::SqlResult(these_records.size()),
-                true);
+            result.Append(sql::SqlResult(these_records.size()), true);
             for (auto &rec : these_records) {
-              result.Append(HandleOWNINGColumn(table_name, info.sharded_table_name, uid, shard_kind, rec, connection), true);
+              result.Append(
+                  HandleOWNINGColumn(table_name, info.sharded_table_name, uid,
+                                     shard_kind, rec, connection),
+                  true);
               records.push_back(std::move(rec));
             }
           }
@@ -150,14 +153,16 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
           sqlast::ExpressionRemover expression_remover(info.shard_by);
           cloned.Visit(&expression_remover);
           // Execute statement directly against shard.
-          auto res = exec.Shard(&cloned, shard_kind, user_id, schema, aug_index);
+          auto res =
+              exec.Shard(&cloned, shard_kind, user_id, schema, aug_index);
           CHECK_EQ(res.ResultSets().size(), 1);
           auto these_records = res.ResultSets().front().Vec();
-          result.Append(
-              sql::SqlResult(these_records.size()),
-              true);
+          result.Append(sql::SqlResult(these_records.size()), true);
           for (auto &rec : these_records) {
-            result.Append(HandleOWNINGColumn(table_name, info.sharded_table_name, user_id, shard_kind, rec, connection), true);
+            result.Append(
+                HandleOWNINGColumn(table_name, info.sharded_table_name, user_id,
+                                   shard_kind, rec, connection),
+                true);
             records.push_back(std::move(rec));
           }
         }
@@ -170,32 +175,36 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
                                             stmt.GetWhereClause(), connection));
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
-          auto res = exec.Shards(&cloned, shard_kind, pair.second, schema, aug_index);
+          auto res =
+              exec.Shards(&cloned, shard_kind, pair.second, schema, aug_index);
           CHECK_EQ(res.ResultSets().size(), 1);
           auto these_records = res.ResultSets().front().Vec();
-          result.Append(
-              sql::SqlResult(these_records.size()),
-              true);
+          result.Append(sql::SqlResult(these_records.size()), true);
           for (auto &rec : these_records) {
-            result.Append(HandleOWNINGColumn(table_name, info.sharded_table_name, user_id, shard_kind, rec, connection), true);
+            result.Append(
+                HandleOWNINGColumn(table_name, info.sharded_table_name, user_id,
+                                   shard_kind, rec, connection),
+                true);
             records.push_back(std::move(rec));
           }
         } else {
           // Secondary index unhelpful.
           // Execute statement against all shards of this kind.
           const auto &user_ids = state->UsersOfShard(shard_kind);
-          auto res = exec.Shards(&cloned, shard_kind, user_ids, schema, aug_index);
+          auto res =
+              exec.Shards(&cloned, shard_kind, user_ids, schema, aug_index);
           if (user_ids.size() > 0) {
             LOG(WARNING) << "Perf Warning: Delete over all shards " << stmt;
           }
           CHECK_EQ(res.ResultSets().size(), 1);
           auto these_records = res.ResultSets().front().Vec();
-          result.Append(
-              sql::SqlResult(these_records.size()),
-              true);
+          result.Append(sql::SqlResult(these_records.size()), true);
           for (auto &rec : these_records) {
             auto id = rec.GetValueString(rec.schema().IndexOf(info.shard_by));
-            result.Append(HandleOWNINGColumn(table_name, info.sharded_table_name, id, shard_kind, rec, connection), true);
+            result.Append(
+                HandleOWNINGColumn(table_name, info.sharded_table_name, id,
+                                   shard_kind, rec, connection),
+                true);
             records.push_back(std::move(rec));
           }
         }

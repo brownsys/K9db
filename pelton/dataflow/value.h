@@ -84,8 +84,7 @@ class Value {
   bool IsNull() const { return this->is_null_; }
 
   std::string GetSqlString() const {
-    if (this->is_null_)
-      return "NULL";
+    if (this->is_null_) return "NULL";
     switch (this->type_) {
       case sqlast::ColumnDefinition::Type::UINT:
         return std::to_string(this->uint_);

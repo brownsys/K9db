@@ -25,8 +25,6 @@ namespace {
 
 pelton::Connection connection;
 
-
-
 // Turn record into string in format similar to rows in expected files.
 template <typename T>
 std::string ToString(const T &x) {
@@ -102,7 +100,8 @@ std::vector<std::vector<std::string>> ReadExpected(const std::string &file) {
 }
 
 // Setup the database for testing. This includes its schema, views, and content.
-void InitializeDatabase(const std::string &db_name, const std::vector<std::string> &file_path_args) {
+void InitializeDatabase(const std::string &db_name,
+                        const std::vector<std::string> &file_path_args) {
   // Drop test database if it exists.
   LOG(INFO) << "Dropping DB " << db_name << "...";
   DropDatabase(db_name);
@@ -117,7 +116,7 @@ void InitializeDatabase(const std::string &db_name, const std::vector<std::strin
   }
 
   // Create all the tables.
-  for (const auto & file_path : file_path_args) {
+  for (const auto &file_path : file_path_args) {
     LOG(INFO) << "Executing file " << file_path;
     auto commands = ReadSQL(file_path);
     for (const std::string &command : commands) {
@@ -142,18 +141,16 @@ void TearDown(const std::string &db_name, bool shutdown_jvm) {
   DropDatabase(db_name);
 }
 
-void TearDown(const std::string &db_name) {
-  TearDown(db_name, true);
-}
+void TearDown(const std::string &db_name) { TearDown(db_name, true); }
 
-int GenericTestingMain(bool use_fixture, int argc, char **argv, const std::string &testname,
-                       size_t file_count, va_list file_path_args) {
+int GenericTestingMain(bool use_fixture, int argc, char **argv,
+                       const std::string &testname, size_t file_count,
+                       va_list file_path_args) {
   std::vector<std::string> file_path_vec;
   for (size_t i = 0; i < file_count; i++) {
     const char *file_path = va_arg(file_path_args, const char *);
     file_path_vec.emplace_back(file_path);
   }
-
 
   // Command line arugments and help message.
   gflags::ParseCommandLineFlags(&argc, &argv, true);
@@ -163,23 +160,20 @@ int GenericTestingMain(bool use_fixture, int argc, char **argv, const std::strin
   google::InitGoogleLogging(testname.c_str());
   ::testing::InitGoogleTest(&argc, argv);
 
-
-  if (use_fixture) 
+  if (use_fixture)
     CleanDatabaseFixture::InitStatics(db_name, file_path_vec);
   else
-  // Setup the schema (once).
+    // Setup the schema (once).
     InitializeDatabase(db_name, file_path_vec);
 
   // Run tests.
   auto result = RUN_ALL_TESTS();
 
   // Tear down database.
-  if (!use_fixture)
-    TearDown(db_name);
+  if (!use_fixture) TearDown(db_name);
 
   return result;
 }
-
 
 }  // namespace
 
@@ -187,7 +181,8 @@ int TestingMain(int argc, char **argv, const std::string &testname,
                 size_t file_count, ...) {
   va_list file_path_args;
   va_start(file_path_args, file_count);
-  int res = GenericTestingMain(false, argc, argv, testname, file_count, file_path_args);
+  int res = GenericTestingMain(false, argc, argv, testname, file_count,
+                               file_path_args);
 
   // Clean up the va list.
   va_end(file_path_args);
@@ -199,7 +194,8 @@ int TestingMainFixture(int argc, char **argv, const std::string &testname,
                        size_t file_count, ...) {
   va_list file_path_args;
   va_start(file_path_args, file_count);
-  int res = GenericTestingMain(true, argc, argv, testname, file_count, file_path_args);
+  int res = GenericTestingMain(true, argc, argv, testname, file_count,
+                               file_path_args);
 
   // Clean up the va list.
   va_end(file_path_args);
@@ -255,24 +251,25 @@ void RunTest(const std::string &query_file_prefix) {
 }
 
 const std::string &CleanDatabaseFixture::db_name() {
-  if (!CleanDatabaseFixture::_db_name) 
-    LOG(FATAL) << "DB name not initialized";
+  if (!CleanDatabaseFixture::_db_name) LOG(FATAL) << "DB name not initialized";
   return *CleanDatabaseFixture::_db_name;
 }
 
 const std::vector<std::string> &CleanDatabaseFixture::file_path_args() {
-  if (!CleanDatabaseFixture::_file_path_args) 
+  if (!CleanDatabaseFixture::_file_path_args)
     LOG(FATAL) << "File path arguments not initialized";
   return *CleanDatabaseFixture::_file_path_args;
 }
 
-void CleanDatabaseFixture::InitStatics(const std::string &db_name, const std::vector<std::string> &file_path_args) {
+void CleanDatabaseFixture::InitStatics(
+    const std::string &db_name,
+    const std::vector<std::string> &file_path_args) {
   CleanDatabaseFixture::_db_name = db_name;
   CleanDatabaseFixture::_file_path_args = file_path_args;
 }
 
 void CleanDatabaseFixture::SetUp() {
-  InitializeDatabase(this->db_name(),this->file_path_args());
+  InitializeDatabase(this->db_name(), this->file_path_args());
 }
 
 void CleanDatabaseFixture::TearDown() {

@@ -71,16 +71,16 @@ cc_test(
 
 cc_test(
     name = "varown_basic",
-    srcs = [ "varown.cc" ],
-    data = [ "//tests/data:varown" ],
-    deps = [ ":common" ],
+    srcs = ["varown.cc"],
+    data = ["//tests/data:varown"],
+    deps = [":common"],
 )
 
 cc_test(
     name = "varacc_basic",
-    srcs = [ "varacc.cc" ],
-    data = [ "//tests/data:varacc" ],
-    deps = [ ":common" ],
+    srcs = ["varacc.cc"],
+    data = ["//tests/data:varacc"],
+    deps = [":common"],
 )
 
 # TODO: uncomment when testing harness supports multi-result sets with different schemas

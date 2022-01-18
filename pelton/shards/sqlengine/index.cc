@@ -20,17 +20,13 @@ namespace index {
 
 absl::StatusOr<sql::SqlResult> CreateIndex(const sqlast::CreateIndex &stmt,
                                            Connection *connection) {
-
   // Need a unique lock as we are changing index metadata
   UniqueLock lock = connection->state->sharder_state()->WriterLock();
   return CreateIndexStateIsAlreadyLocked(stmt, connection, &lock);
 }
 
 absl::StatusOr<sql::SqlResult> CreateIndexStateIsAlreadyLocked(
-  const sqlast::CreateIndex &stmt,
-  Connection *connection,
-  UniqueLock *lock) 
-{
+    const sqlast::CreateIndex &stmt, Connection *connection, UniqueLock *lock) {
   const std::string &table_name = stmt.table_name();
   shards::SharderState *state = connection->state->sharder_state();
 
@@ -105,7 +101,7 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
       auto [found, column_value] = where_clause->Visit(&value_finder);
       if (!found) {
         continue;
-      } 
+      }
 
       // The where clause gives us a value for "column_name", we can translate
       // it to some value(s) for shard_by column by looking at the index.

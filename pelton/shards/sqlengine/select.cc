@@ -120,11 +120,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
       if (found) {
         if (info.IsTransitive()) {
           // Transitive sharding: look up via index.
-          ASSIGN_OR_RETURN(auto &lookup,
-                           index::LookupIndex(info.next_index_name, user_id,
-                                              connection));
-          // REVIEW This changed, because in varown cases the lookup can return multiple user id's
-          // I think it is safe just to use the first element, but I am not 100% sure.
+          ASSIGN_OR_RETURN(
+              auto &lookup,
+              index::LookupIndex(info.next_index_name, user_id, connection));
+          // REVIEW This changed, because in varown cases the lookup can return
+          // multiple user id's I think it is safe just to use the first
+          // element, but I am not 100% sure.
           if (lookup.size() >= 1) {
             user_id = std::move(*lookup.cbegin());
             // Execute statement directly against shard.

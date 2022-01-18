@@ -41,15 +41,14 @@ TEST(PROXY, DDL_TEST) {
 
 // Test insertion/updating/deletion.
 TEST(PROXY, UPDATE_TEST) {
-  std::vector<std::pair<std::string, int>> tests = { 
-    { "INSERT INTO test3 VALUES (1, 'hello');", 1 },
-    { "INSERT INTO test3 VALUES (2, 'bye');", 1 },
-    { "INSERT INTO test3 VALUES (3, 'world');", 1 },
-    { "INSERT INTO test3 VALUES (50, 'hi');", 1 },
-    { "UPDATE test3 SET ID = 10 WHERE ID = 1;", 1 },
-    { "DELETE FROM test3 WHERE ID = 3;", 1 }
-  };
-  for (auto  &[q, count] : tests) {
+  std::vector<std::pair<std::string, int>> tests = {
+      {"INSERT INTO test3 VALUES (1, 'hello');", 1},
+      {"INSERT INTO test3 VALUES (2, 'bye');", 1},
+      {"INSERT INTO test3 VALUES (3, 'world');", 1},
+      {"INSERT INTO test3 VALUES (50, 'hi');", 1},
+      {"UPDATE test3 SET ID = 10 WHERE ID = 1;", 1},
+      {"DELETE FROM test3 WHERE ID = 3;", 1}};
+  for (auto &[q, count] : tests) {
     VLOG(1) << "Running query: " << q;
     EXPECT_EQ(FFIExecUpdate(&c_conn, q.c_str()), count)
         << "Query \"" << q << "\" failed";

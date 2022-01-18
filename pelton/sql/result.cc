@@ -62,7 +62,7 @@ void SqlResult::Append(SqlResult &&other, bool deduplicate) {
   }
 }
 
-std::ostream &operator<<(std::ostream& s, const SqlResult::Type & res) {
+std::ostream &operator<<(std::ostream &s, const SqlResult::Type &res) {
   switch (res) {
     case SqlResult::Type::STATEMENT:
       s << "Statement";
