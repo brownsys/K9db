@@ -8,7 +8,6 @@
 
 namespace tests {
 
-pelton::Connection connection;
 
 // This function is responsible for setting up, running, and shutting down
 // any correctness tests defined in enclosing .cc files.

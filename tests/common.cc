@@ -23,6 +23,10 @@ DEFINE_bool(echo, false, "whether to echo commands before executing them");
 
 namespace {
 
+pelton::Connection connection;
+
+
+
 // Turn record into string in format similar to rows in expected files.
 template <typename T>
 std::string ToString(const T &x) {
