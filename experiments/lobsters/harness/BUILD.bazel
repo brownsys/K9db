@@ -6,12 +6,6 @@ rust_binary(
         "src/main.rs",
         "src/lib.rs"
     ],
-    rustc_flags = [
-        "-Clink-args=-lssl",
-        "-Clink-args=-lcrypto",
-        "-Clink-args=-rdynamic",
-        "-Clink-args=-Wl,-export-dynamic",
-    ],
     visibility = ["//visibility:public"],
     deps = [
         "//experiments/lobsters/harness/cargo:clap",
