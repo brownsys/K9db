@@ -2,10 +2,12 @@
 #define PELTON_SHARDS_TYPES_H_
 
 #include <functional>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "glog/logging.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -50,6 +52,8 @@ struct AccessorIndexInformation {
   UnshardedTableName table_name;
   // The column which the accessor notation is defined on
   ColumnName accessor_column_name;
+  // Table from which this is acessed, if not PII
+  std::optional<UnshardedTableName> foreign_table;
   // The column which the table is sharded on
   ColumnName shard_by_column_name;
   // The name of the index
@@ -61,12 +65,28 @@ struct AccessorIndexInformation {
 
   AccessorIndexInformation(
       const ShardKind &sk, const UnshardedTableName &tn, const ColumnName &cn,
+      const UnshardedTableName &ftab, const ColumnName &sbcn,
+      const IndexName &in,
+      const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type> &an,
+      const bool is)
+      : shard_kind(sk),
+        table_name(tn),
+        accessor_column_name(cn),
+        foreign_table(ftab),
+        shard_by_column_name(sbcn),
+        index_name(in),
+        anonymize_columns(an),
+        is_sharded(is) {}
+
+  AccessorIndexInformation(
+      const ShardKind &sk, const UnshardedTableName &tn, const ColumnName &cn,
       const ColumnName &sbcn, const IndexName &in,
       const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type> &an,
       const bool is)
       : shard_kind(sk),
         table_name(tn),
         accessor_column_name(cn),
+        foreign_table(),
         shard_by_column_name(sbcn),
         index_name(in),
         anonymize_columns(an),
@@ -115,13 +135,19 @@ struct ShardingInformation {
 
   // A transitive sharding information can only be created given the previous
   // sharding information in the transitivity chain.
-  bool MakeTransitive(const ShardingInformation &next, const FlowName &index) {
+  bool MakeTransitive(const ShardingInformation &next, const FlowName &index,
+                      const UnshardedTableName &original_table_name) {
+    auto hash = std::hash<std::string>{};
+    size_t my_hash =
+        hash(next.sharded_table_name) ^ hash(next.shard_by) ^ hash(shard_by);
+    sharded_table_name = original_table_name + "_" + std::to_string(my_hash);
     distance_from_shard = next.distance_from_shard + 1;
     next_table = shard_kind;
     shard_kind = next.shard_kind;
     next_index_name = index;
     // Cannot support deeply transitive things yet.
-    return distance_from_shard == 1;
+    // return distance_from_shard < 1;
+    return true;
   }
 
   // Helpers.

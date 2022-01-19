@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "glog/logging.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 
@@ -33,6 +34,7 @@ class SqlResultSet {
   // Query API.
   const dataflow::SchemaRef &schema() const { return this->schema_; }
   std::vector<dataflow::Record> &&Vec() { return std::move(this->records_); }
+  inline size_t size() const { return this->records_.size(); }
 
  private:
   dataflow::SchemaRef schema_;
@@ -71,14 +73,35 @@ class SqlResult {
   inline bool IsQuery() const { return this->type_ == Type::QUERY; }
 
   // Only safe to use if IsStatement() returns true.
-  inline bool Success() const { return this->status_; }
+  inline bool Success() const {
+    if (!this->IsStatement())
+      DLOG(FATAL) << "Success() called on non-statement result (" << this->type_
+                  << ")";
+    return this->status_;
+  }
 
   // Only safe to use if IsUpdate() returns true.
-  inline int UpdateCount() const { return this->status_; }
+  inline int UpdateCount() const {
+    if (!this->IsUpdate()) {
+      DLOG(FATAL) << "UpdateCount() called on non-update result ("
+                  << this->type_ << ")";
+    }
+    return this->status_;
+  }
 
   // Only safe to use if IsQuery() returns true.
-  const std::vector<SqlResultSet> &ResultSets() const { return this->sets_; }
-  std::vector<SqlResultSet> &ResultSets() { return this->sets_; }
+  const std::vector<SqlResultSet> &ResultSets() const {
+    if (!this->IsQuery()) {
+      DLOG(FATAL) << "ResultSets() called on non-query result";
+    }
+    return this->sets_;
+  }
+  std::vector<SqlResultSet> &ResultSets() {
+    if (!this->IsQuery()) {
+      DLOG(FATAL) << "ResultSets() called on non-query result";
+    }
+    return this->sets_;
+  }
 
   // Internal API: do not use outside of pelton code.
   // Appends the provided SqlResult to this SqlResult, appeneded
@@ -87,6 +110,9 @@ class SqlResult {
   inline void AddResultSet(SqlResultSet &&resultset) {
     this->sets_.push_back(std::move(resultset));
   }
+
+  friend std::ostream &operator<<(std::ostream &str,
+                                  const SqlResult::Type &res);
 
  private:
   Type type_;

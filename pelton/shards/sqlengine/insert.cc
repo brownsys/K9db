@@ -8,8 +8,10 @@
 #include <vector>
 
 #include "absl/strings/match.h"
+#include "pelton/connection.h"
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/select.h"
+#include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
@@ -20,11 +22,142 @@ namespace insert {
 
 namespace {
 
-std::string Dequote(const std::string &st) {
-  std::string s(st);
-  s.erase(remove(s.begin(), s.end(), '\"'), s.end());
-  s.erase(remove(s.begin(), s.end(), '\''), s.end());
-  return s;
+// This is perhaps not the best way to resolve this but it works for the time
+// being. We can optimize this later.
+//
+// The purpose of this function is to select from all the sharding information
+// the one that corresponds to a variable owner table into which we are copying
+// data
+const ShardedTableName &VarownShardedTableName(
+    const SharderState &state, const UnshardedTableName &target_table,
+    const std::string &column_name, const UnshardedTableName &source_table) {
+  for (auto &info : state.GetShardingInformation(target_table)) {
+    if (info.next_column == column_name && info.next_table == source_table) {
+      return info.sharded_table_name;
+    }
+  }
+  // I really tried to make this work with abseil, but I was unable to make
+  // `StatusOr` work with references
+  throw std::runtime_error("Could not find sharded schema for table " +
+                           target_table + " on column " + column_name);
+}
+
+absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
+                                     const sqlast::Insert &cloned,
+                                     Connection *connection, bool *update_flows,
+                                     sql::SqlResult *result,
+                                     const ShardingInformation &info,
+                                     const std::string &user_id) {
+  auto &exec = connection->executor;
+  shards::SharderState *state = connection->state->sharder_state();
+  const sqlast::CreateTable &rel_schema = state->GetSchema(stmt.table_name());
+  bool was_moved = false;
+  for (auto &col : rel_schema.GetColumns()) {
+    if (IsOwning(col)) {
+      continue;
+      VLOG(1) << "Found owning column";
+      if (was_moved) {
+        return absl::InvalidArgumentError("Two owning columns?");
+      } else {
+        was_moved = true;
+        const sqlast::ColumnConstraint *constr = nullptr;
+        for (auto &aconstr : col.GetConstraints()) {
+          if (aconstr.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
+            if (constr == nullptr) {
+              constr = &aconstr;
+            } else {
+              return absl::InvalidArgumentError(
+                  "Too many foreign key constraints");
+            }
+          }
+        }
+        if (!constr)
+          return absl::InvalidArgumentError(
+              "Expected to find a foreign key constraint");
+        const std::string &target_table = constr->foreign_table();
+        sqlast::Select select(target_table);
+        auto binexp = std::make_unique<sqlast::BinaryExpression>(
+            sqlast::Expression::Type::EQ);
+        binexp->SetLeft(std::make_unique<sqlast::ColumnExpression>(
+            constr->foreign_column()));
+        // Handle if the insert statement does not set all columns (or in
+        // different order)
+        if (cloned.GetColumns().size() != 0)
+          return absl::InternalError("Unhandeled");
+        size_t fk_idx = rel_schema.ColumnIndex(col.column_name());
+        if (!info.IsTransitive())
+          --fk_idx;  // this is to account for the dropped column in directly
+                     // sharded tables. This is unstable.
+        binexp->SetRight(std::make_unique<sqlast::LiteralExpression>(
+            cloned.GetValue(fk_idx)));
+        select.SetWhereClause(std::move(binexp));
+        const sqlast::CreateTable schema = state->GetSchema(target_table);
+        const ShardedTableName &sharded_table = VarownShardedTableName(
+            *state, target_table, col.column_name(), stmt.table_name());
+        sqlast::Insert insert(sharded_table, false);
+        for (auto &col0 : schema.GetColumns()) {
+          insert.AddColumn(col0.column_name());
+          select.AddColumn(col0.column_name());
+        }
+        ASSIGN_OR_RETURN(sql::SqlResult & inner_result,
+                         select::Shard(select, connection, true));
+        if ((inner_result.IsStatement() && !inner_result.Success()) ||
+            (inner_result.IsQuery() && inner_result.ResultSets().size() == 0)) {
+          VLOG(1) << "Skipping value moving. Reason: The lookup has no results "
+                     "or failed";
+          continue;
+        }
+        auto &result_set = inner_result.ResultSets().front();
+        if (inner_result.ResultSets().size() > 1 || result_set.size() > 1) {
+          LOG(WARNING) << "Too many results for " << schema.table_name()
+                       << " during value move";
+        }
+        dataflow::Record &rec = result_set.Vec().front();
+        uint64_t csize = schema.GetColumns().size();
+        if (csize != rec.schema().size())
+          LOG(FATAL) << csize << " != " << rec.schema().size();
+        for (uint64_t i = 0; i < csize; i++) {
+          auto v = rec.GetValue(i).GetSqlString();
+          insert.AddValue(v);
+        }
+        result->Append(exec.Shard(&insert, info.shard_kind, user_id), false);
+      }
+    }
+  }
+  return absl::OkStatus();
+}
+
+absl::Status HandleShardForUser(const sqlast::Insert &stmt,
+                                const sqlast::Insert &cloned,
+                                Connection *connection, SharedLock *lock,
+                                bool *update_flows, sql::SqlResult *result,
+                                const ShardingInformation &info,
+                                const std::string &user_id,
+                                const dataflow::SchemaRef &schema,
+                                const int aug_index) {
+  auto &exec = connection->executor;
+  shards::SharderState *state = connection->state->sharder_state();
+
+  // TODO(babman): better to do this after user insert rather than user data
+  //               insert.
+  if (!state->ShardExists(info.shard_kind, user_id)) {
+    // Need to upgrade to an exclusive lock on sharder state here, as we
+    // will modify the state.
+    UniqueLock upgraded(std::move(*lock));
+    if (!state->ShardExists(info.shard_kind, user_id)) {
+      for (auto *create_stmt : state->CreateShard(info.shard_kind, user_id)) {
+        if (!exec.Shard(create_stmt, info.shard_kind, user_id).Success()) {
+          return absl::InternalError("Could not created sharded table");
+        }
+      }
+    }
+    *lock = SharedLock(std::move(upgraded));
+  }
+  // Add the modified insert statement.
+  result->Append(
+      exec.Shard(&cloned, info.shard_kind, user_id, schema, aug_index), true);
+  return MaybeHandleOwningColumn(stmt, cloned, connection, update_flows, result,
+                                 info, user_id);
 }
 
 }  // namespace
@@ -91,7 +224,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
         }
       }
       if (absl::EqualsIgnoreCase(user_id, "NULL")) {
-        return absl::InvalidArgumentError(info.shard_by + " cannot be NULL");
+        LOG(WARNING) << info.shard_by << " was NULL";
+        LOG(WARNING) << "This could indicate a bug and may lead to data loss!";
+        continue;
       }
       user_id = Dequote(user_id);
 
@@ -103,37 +238,32 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
 
       // If the sharding is transitive, the user id should be resolved via the
       // secondary index of the target table.
+      //
+      // Checking the index used to only ever return a single result, because
+      // for each *column* there could only be one associated owner. Now with
+      // variable owners the index may return multiple owners *for the same
+      // colum*! Hence I refactored the shard handling code into its own
+      // function and I'm calling it here either on the original user (else
+      // branch) or in a loop for each of the variable owners.
       if (info.IsTransitive()) {
         ASSIGN_OR_RETURN(auto &lookup, index::LookupIndex(info.next_index_name,
                                                           user_id, connection));
-        if (lookup.size() == 1) {
-          user_id = std::move(*lookup.cbegin());
-        } else {
+        if (lookup.size() < 1) {
           return absl::InvalidArgumentError("Foreign Key Value does not exist");
         }
-      }
 
-      // TODO(babman): better to do this after user insert rather than user data
-      //               insert.
-      if (!state->ShardExists(info.shard_kind, user_id)) {
-        // Need to upgrade to an exclusive lock on sharder state here, as we
-        // will modify the state.
-        UniqueLock upgraded(std::move(*lock));
-        if (!state->ShardExists(info.shard_kind, user_id)) {
-          for (auto *create_stmt :
-               state->CreateShard(info.shard_kind, user_id)) {
-            if (!exec.Shard(create_stmt, info.shard_kind, user_id).Success()) {
-              return absl::InternalError("Could not created sharded table");
-            }
+        for (auto &uid : lookup) {
+          if (!absl::EqualsIgnoreCase(uid, "NULL")) {
+            CHECK_STATUS(HandleShardForUser(stmt, cloned, connection, lock,
+                                            &update_flows, &result, info, uid,
+                                            schema, aug_index));
           }
         }
-        *lock = SharedLock(std::move(upgraded));
+      } else {
+        CHECK_STATUS(HandleShardForUser(stmt, cloned, connection, lock,
+                                        &update_flows, &result, info, user_id,
+                                        schema, aug_index));
       }
-
-      // Add the modified insert statement.
-      result.Append(
-          exec.Shard(&cloned, info.shard_kind, user_id, schema, aug_index),
-          true);
     }
   }
 

@@ -91,7 +91,7 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
     // Case 7: CREATE INDEX statement.
     case sqlast::AbstractStatement::Type::CREATE_INDEX: {
       auto *stmt = static_cast<sqlast::CreateIndex *>(statement.get());
-      return index::CreateIndex(*stmt, connection, true);
+      return index::CreateIndex(*stmt, connection);
     }
 
     // Case 8: GDPR (GET | FORGET) statements.

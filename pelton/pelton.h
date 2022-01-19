@@ -25,6 +25,7 @@ using Record = dataflow::Record;
 bool initialize(size_t workers, bool consistent);
 
 // delete pelton_state
+bool shutdown(bool shutdown_jvm);
 bool shutdown();
 
 // open connection
@@ -38,6 +39,7 @@ bool close(Connection *connection);
 // Call this if you are certain you are not going to make more calls to
 // make_view to shutdown the JVM.
 void shutdown_planner();
+void shutdown_planner(bool shutdown_jvm);
 
 }  // namespace pelton
 

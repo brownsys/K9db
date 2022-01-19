@@ -258,6 +258,9 @@ void Record::SetValue(const Value &value, size_t i) {
 size_t Record::Hash(const std::vector<ColumnID> &cols) const {
   size_t hash_value = 0;
   for (ColumnID col : cols) {
+    if (this->IsNull(col)) {
+      continue;
+    }
     switch (this->schema_.TypeOf(col)) {
       case sqlast::ColumnDefinition::Type::UINT:
         hash_value += std::hash<std::uint64_t>{}(this->data_[col].uint);

@@ -24,7 +24,10 @@ void UnionOperator::ComputeOutputSchema() {
   this->output_schema_ = this->input_schemas_.at(0);
   for (const SchemaRef &input_schema : this->input_schemas_) {
     if (!DeepCompareSchemas(this->output_schema_, input_schema)) {
-      LOG(FATAL) << "UnionOperator has inputs with different schemas";
+      LOG(FATAL) << "UnionOperator has inputs with different schemas "
+                 << std::endl
+                 << this->output_schema_ << std::endl
+                 << input_schema;
     }
   }
 }

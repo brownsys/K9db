@@ -1,0 +1,17 @@
+[package]
+name = "ownCloud"
+version = "0.0.1"
+authors = ["Justus Adam <dev@justus.science"]
+
+[dependencies]
+mysql = "20.1.0"
+rand = "0.8.4"
+clap = "2.34.0"
+
+[lib]
+path = "lib.rs"
+
+[[bin]]
+name = "benchmark-harness"
+path = "benchmark_harness.rs"
+

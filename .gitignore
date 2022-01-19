@@ -55,3 +55,11 @@ cmake-build-debug/
 
 .DS_Store
 .vscode/
+
+
+# Rust 
+
+# Build directory
+target/
+# Raze output directory
+cargo/

@@ -62,5 +62,22 @@ void SqlResult::Append(SqlResult &&other, bool deduplicate) {
   }
 }
 
+std::ostream &operator<<(std::ostream &s, const SqlResult::Type &res) {
+  switch (res) {
+    case SqlResult::Type::STATEMENT:
+      s << "Statement";
+      break;
+    case SqlResult::Type::UPDATE:
+      s << "Update";
+      break;
+    case SqlResult::Type::QUERY:
+      s << "Query";
+      break;
+    default:
+      s << "Impossible! SqlResult::Type enum has invalid value.";
+  }
+  return s;
+}
+
 }  // namespace sql
 }  // namespace pelton

@@ -104,21 +104,30 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
     return std::move(special.value());
   }
 
-  // Parse and rewrite statement, passing local connection with ptr to global
-  // state containing sharder and dataflow state
-  return shards::sqlengine::Shard(sql, connection);
+  // Parse and rewrite statement.
+  try {
+    return shards::sqlengine::Shard(sql, connection);
+  } catch (std::exception &e) {
+    return absl::InternalError(e.what());
+  }
 }
 
-void shutdown_planner() { planner::ShutdownPlanner(); }
+void shutdown_planner(bool shutdown_jvm) {
+  planner::ShutdownPlanner(shutdown_jvm);
+}
 
-bool shutdown() {
+void shutdown_planner() { shutdown_planner(true); }
+
+bool shutdown(bool shutdown_jvm) {
   if (PELTON_STATE != nullptr) {
-    shutdown_planner();
+    shutdown_planner(shutdown_jvm);
     delete PELTON_STATE;
     PELTON_STATE = nullptr;
     return true;
   }
   return false;
 }
+
+bool shutdown() { return shutdown(true); }
 
 }  // namespace pelton

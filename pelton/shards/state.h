@@ -68,10 +68,22 @@ class SharderState {
           &anonymize,
       const bool is_sharded);
 
+  void AddAccessorIndex(
+      const ShardKind &kind, const UnshardedTableName &table,
+      const ColumnName &accessor_column,
+      const UnshardedTableName &foreign_table,
+      const ColumnName &shard_by_column, const IndexName &index_name,
+      const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
+          &anonymize,
+      const bool is_sharded);
+
   std::list<const sqlast::AbstractStatement *> CreateShard(
       const ShardKind &shard_kind, const UserId &user);
 
   void RemoveUserFromShard(const ShardKind &kind, const UserId &user_id);
+
+  std::optional<sqlast::CreateTable> RemoveSchema(
+      const UnshardedTableName &table_name);
 
   // Schema lookups.
   const sqlast::CreateTable &GetSchema(
@@ -86,6 +98,9 @@ class SharderState {
 
   const std::list<ShardingInformation> &GetShardingInformation(
       const UnshardedTableName &table) const;
+
+  std::vector<const ShardingInformation *> GetShardingInformationFor(
+      const UnshardedTableName &table, const std::string &shard_kind) const;
 
   bool IsPII(const UnshardedTableName &table) const;
 
@@ -118,12 +133,19 @@ class SharderState {
                    const FlowName &flow_name,
                    const sqlast::CreateIndex &create_index_stmt, bool unique);
 
+  inline std::string GenerateUniqueIndexName(UniqueLock *lock) {
+    this->_unique_index_ctr += 1;
+    return "_unq_indx_" + std::to_string(this->_unique_index_ctr);
+  }
+
   sql::SqlResult NumShards() const;
 
   // Returns all accessor indices associated with a given shard
   bool HasAccessorIndices(const ShardKind &kind) const;
   const std::vector<AccessorIndexInformation> &GetAccessorIndices(
       const ShardKind &kind) const;
+  std::vector<const AccessorIndexInformation *> GetAccessorInformationFor(
+      const ShardKind &kind, const UnshardedTableName &table_name) const;
 
   size_t NumShards() {
     size_t count = 0;
@@ -197,6 +219,8 @@ class SharderState {
 
   // Our implementation of an upgradable shared mutex.
   mutable UpgradableMutex mtx_;
+
+  unsigned int _unique_index_ctr = 0;
 };
 
 }  // namespace shards

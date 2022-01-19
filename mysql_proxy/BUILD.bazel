@@ -13,7 +13,7 @@ config_setting(
 rust_binary(
     name = "mysql_proxy",
     srcs = [
-        "main.rs",
+        "src/main.rs",
     ],
     rustc_flags = [
         "-Clink-args=-L/home/pelton/bazel-bin/external/rocksdb/copy_rocksdb/rocksdb/lib",
@@ -36,13 +36,13 @@ rust_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":proxy_ffi",
-        "//mysql_proxy:ctrlc",
-        "//mysql_proxy:gflags",
-        "//mysql_proxy:lazy_static",
-        "//mysql_proxy:msql_srv",
-        "//mysql_proxy:regex",
-        "//mysql_proxy:slog",
-        "//mysql_proxy:slog_term",
+        "//mysql_proxy/cargo:ctrlc",
+        "//mysql_proxy/cargo:gflags",
+        "//mysql_proxy/cargo:lazy_static",
+        "//mysql_proxy/cargo:msql_srv",
+        "//mysql_proxy/cargo:regex",
+        "//mysql_proxy/cargo:slog",
+        "//mysql_proxy/cargo:slog_term",
         "//mysql_proxy/src/ffi",
     ],
 )
@@ -57,7 +57,7 @@ rust_library(
         ":proxy_ffi_wrappers",
     ],
     deps = [
-        "//mysql_proxy:msql_srv",
+        "//mysql_proxy/cargo:msql_srv",
     ],
 )
 
@@ -84,7 +84,7 @@ genrule(
 genrule(
     name = "proxy_ffi_wrappers",
     srcs = [
-        "proxy_ffi_wrappers.rs",
+        "src/proxy_ffi_wrappers.rs",
     ],
     outs = [
         "proxy_ffi.rs",

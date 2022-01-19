@@ -6,12 +6,19 @@
 
 #include <string>
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "pelton/shards/types.h"
+#include "pelton/sqlast/ast_schema.h"
 
 namespace pelton {
 namespace shards {
 namespace sqlengine {
+
+enum OwningT {
+  OWNING,
+  ACCESSING,
+};
 
 inline ShardedTableName NameShardedTable(const UnshardedTableName &table_name,
                                          const ColumnName &shard_by_column) {
@@ -19,6 +26,17 @@ inline ShardedTableName NameShardedTable(const UnshardedTableName &table_name,
 }
 
 std::string NameShard(const ShardKind &shard_kind, const UserId &user_id);
+
+inline std::optional<OwningT> IsOwning(const sqlast::ColumnDefinition &column) {
+  if (absl::StartsWith(column.column_name(), "OWNING_"))
+    return OwningT::OWNING;
+  else if (absl::StartsWith(column.column_name(), "ACCESSING_"))
+    return OwningT::ACCESSING;
+  else
+    return std::optional<OwningT>{};
+}
+
+std::string Dequote(const std::string &st);
 
 }  // namespace sqlengine
 }  // namespace shards

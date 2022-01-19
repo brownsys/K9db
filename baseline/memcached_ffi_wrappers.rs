@@ -1,9 +1,7 @@
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
 
+mod memcached_ffi_bindgen;
 pub mod _memcached_ffi_bindgen {
-  include!("memcached_ffi_bindgen.rs");
+  pub use crate::memcached_ffi_bindgen::*;
 }
 
 pub mod memcached {
@@ -13,9 +11,9 @@ pub mod memcached {
   use std::mem;
 
   use crate::_memcached_ffi_bindgen::{Type_UINT, Type_INT, Type_TEXT, Value, Record};
-  use crate::_memcached_ffi_bindgen::DestroyResult;
+  use crate::_memcached_ffi_bindgen::{DestroyResult, DestroyResults};
   use crate::_memcached_ffi_bindgen::{SetStr, SetInt, SetUInt, GetStr, GetUInt, GetInt};
-  use crate::_memcached_ffi_bindgen::{Initialize, Cache, Update, Read, __ExecuteDB, Close};
+  use crate::_memcached_ffi_bindgen::{Initialize, Cache, Update, Read, ReadMany, __ExecuteDB, Close};
 
   // Initializing.
   pub fn MemInitialize(db: &str, db_user: &str, db_pass: &str, seed: &str) -> bool {
@@ -83,6 +81,58 @@ pub mod memcached {
     unsafe { DestroyResult(&mut result) }
     return vec;
   }
+  pub enum Val {
+    UInt(u64),
+    Int(i64),
+    Str(String),
+  }
+  pub fn MemReadManyValues(id: i32, keys: &[Record]) -> Vec<Vec<Vec<Val>>> {
+    let mut result = unsafe { ReadMany(id, keys.as_ptr(), keys.len()) };
+    let results = unsafe { slice::from_raw_parts(result.results, result.size) };
+    let rust_results = results.into_iter().map(|res| {
+      let c_result = unsafe { slice::from_raw_parts(res.records, result.size) };
+      c_result.into_iter().map(|rec| {
+        let values = unsafe { slice::from_raw_parts(rec.values, rec.size) };
+        values.into_iter().map(|value| {
+          
+          if value.type_ == Type_UINT {
+            Val::UInt( unsafe { GetUInt(value) } )
+          } else if value.type_ == Type_INT {
+            Val::Int(unsafe { GetInt(value) })
+          } else if value.type_ == Type_TEXT {
+            Val::Str(unsafe { CStr::from_ptr(GetStr(value)).to_str().unwrap() }.to_string())
+          } else {
+            panic!("Deserialization Error")
+          }
+        }).collect()
+      }).collect()
+    }).collect();
+    unsafe { DestroyResults(&mut result) };
+    return rust_results;
+  }
+
+  pub fn MemReadValue(id: i32, key: Record) -> Vec<Vec<Val>> {
+    let mut result = unsafe { Read(id, &key) };
+    let records = unsafe { slice::from_raw_parts(result.records, result.size) };
+    let rows = records.into_iter().map(|rec| {
+      let values = unsafe { slice::from_raw_parts(rec.values, rec.size) };
+      values.into_iter().map(|value| {
+        
+        if value.type_ == Type_UINT {
+          Val::UInt( unsafe { GetUInt(value) } )
+        } else if value.type_ == Type_INT {
+          Val::Int(unsafe { GetInt(value) })
+        } else if value.type_ == Type_TEXT {
+          Val::Str(unsafe { CStr::from_ptr(GetStr(value)).to_str().unwrap() }.to_string())
+        } else {
+          panic!("Deserialization Error")
+        }
+      }).collect()
+    }).collect();
+    unsafe { DestroyResult(&mut result) }
+    return rows;
+  }
+
 
   pub fn __MemExecuteDB(stmt: &str) {
     let cstring = CString::new(stmt).unwrap();

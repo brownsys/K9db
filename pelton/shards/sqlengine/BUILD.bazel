@@ -40,15 +40,15 @@ cc_library(
     ],
     hdrs = [
         "create.h",
-        "index.h",
     ],
     deps = [
+        ":index",
+        ":util",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/shards:upgradable_lock",
-        "//pelton/shards/sqlengine:util",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
@@ -100,6 +100,7 @@ cc_library(
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/shards:upgradable_lock",
+        "//pelton/shards/sqlengine:util",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:perf",
@@ -198,6 +199,7 @@ cc_library(
     visibility = ["//pelton:__subpackages__"],
     deps = [
         "//pelton/shards:types",
+        "//pelton/sqlast:ast",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -253,7 +255,6 @@ cc_library(
         "//pelton/shards:types",
         "//pelton/shards:upgradable_lock",
         "//pelton/shards/sqlengine:util",
-        "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:status",
         "@com_google_absl//absl/status",

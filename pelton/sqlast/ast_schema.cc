@@ -48,7 +48,8 @@ std::string &ColumnConstraint::foreign_column() {
 // ColumnDefinition
 ColumnDefinition::Type ColumnDefinition::StringToType(
     const std::string &column_type) {
-  if (absl::EqualsIgnoreCase(column_type, "INT")) {
+  if (absl::EqualsIgnoreCase(column_type, "INT") ||
+      absl::EqualsIgnoreCase(column_type, "INTEGER")) {
     return Type::INT;
   } else if (absl::StartsWithIgnoreCase(column_type, "VARCHAR") ||
              absl::EqualsIgnoreCase(column_type, "TEXT")) {
@@ -184,6 +185,30 @@ std::ostream &operator<<(std::ostream &os, const ColumnDefinition::Type &r) {
       LOG(FATAL) << "Unsupported column type: " << r;
   }
   return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const AbstractStatement::Type &t) {
+  switch (t) {
+    case AbstractStatement::Type::CREATE_TABLE:
+      return os << "CREATE TABLE";
+    case AbstractStatement::Type::CREATE_INDEX:
+      return os << "CREATE INDEX";
+    case AbstractStatement::Type::INSERT:
+      return os << "INSERT";
+    case AbstractStatement::Type::UPDATE:
+      return os << "UPDATE";
+    case AbstractStatement::Type::SELECT:
+      return os << "SELECT";
+    case AbstractStatement::Type::DELETE:
+      return os << "DELETE";
+    case AbstractStatement::Type::CREATE_VIEW:
+      return os << "CREATE VIEW";
+    case AbstractStatement::Type::GDPR:
+      return os << "GDPR";
+    default:
+      LOG(FATAL) << "No string representation defined for an enum variant for "
+                 << typeid(t).name();
+  }
 }
 
 }  // namespace sqlast
