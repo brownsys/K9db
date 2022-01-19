@@ -345,7 +345,6 @@ rust_repository_set(
     exec_triple = "x86_64-unknown-linux-gnu",
     iso_date = "2021-11-01",
     version = "nightly",
-    edition = "2018",
 )
 
 load("@rules_rust//bindgen:repositories.bzl", "rust_bindgen_repositories")
