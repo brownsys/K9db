@@ -65,3 +65,15 @@ sanitizers and provides more helpful output on memory errors (e.g., segfaults).
 We follow [the Google C++ style guide](https://google.github.io/styleguide/cppguide.html);
 please run `clang-format` on your code before pushing.
 
+# Build tooling
+
+## Rust
+
+Rust dependencies are also managed by bazel. When using Rust you can list your
+dependencies as usual in a Cargo.toml file. Then you need to register it with
+the workspace by adding the path to your Rust component to the Cargo.toml file
+in the root directory. Lastly you run `cargo raze` in the root directory, which
+will automatically generate bazel build rules for your Rust dependencies.
+
+You will also need to define a BUILD.bazel file for your rust project. You can
+use `mysql_proxy/BUILD.bazel` as inspiration of how that should look like.
