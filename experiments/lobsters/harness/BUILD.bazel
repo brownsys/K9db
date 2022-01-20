@@ -1,0 +1,23 @@
+load("@rules_rust//rust:rust.bzl", "rust_binary", "rust_library")
+
+rust_binary(
+    name = "lobsters-harness",
+    srcs = [
+        "src/main.rs",
+        "src/lib.rs"
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//experiments/lobsters/harness/cargo:clap",
+        "//experiments/lobsters/harness/cargo:mysql_async",
+        "//experiments/lobsters/harness/cargo:tower_service",
+        "//experiments/lobsters/harness/cargo:trawler",
+        "//experiments/lobsters/harness/cargo:futures_util",
+        "//experiments/lobsters/harness/cargo:hdrhistogram",
+        "//experiments/lobsters/harness/src/endpoints:pelton",
+    ],
+    compile_data = [
+        "src/pelton.sql",
+        "src/rocks-mariadb.sql"
+    ],
+)

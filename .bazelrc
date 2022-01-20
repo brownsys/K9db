@@ -57,3 +57,5 @@ build:perf --host_copt -DPELTON_OPT
 test:perf --run_under "sudo perf stat -B -e cache-references,cache-misses,cycles,instructions,branches,faults,migrations "
 run:perf --run_under "sudo perf stat -B -e cache-references,cache-misses,cycles,instructions,branches,faults,migrations "
 
+# For specifying rust nightly toolchain (required by the lobsters harness)
+build:nightly --extra_toolchains @rust_nightly_toolchains//:toolchain_for_x86_64-unknown-linux-gnu

@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "experiments/ownCloud",
+    "experiments/lobsters/harness",
     "mysql_proxy",
 ]
 
