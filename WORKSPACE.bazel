@@ -183,113 +183,6 @@ load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_depende
 
 rules_foreign_cc_dependencies()
 
-# Memcached dependencies.
-http_archive(
-    name = "libevent",
-    build_file_content = """
-load("@rules_foreign_cc//foreign_cc:defs.bzl", "configure_make")
-
-filegroup(
-    name = "all",
-    srcs = glob(["**"]),
-    visibility = ["//visibility:public"],
-)
-
-configure_make(
-    name = "libevent",
-    lib_source = ":all",
-    visibility = ["//visibility:public"],
-)
-
-""",
-    strip_prefix = "libevent-2.1.12-stable",
-    type = "tar.gz",
-    url = "https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz",
-)
-
-# Memcached (the binary).
-http_archive(
-    name = "memcached",
-    build_file_content = """
-load("@rules_foreign_cc//foreign_cc:defs.bzl", "configure_make")
-
-filegroup(
-    name = "all",
-    srcs = glob(["**"]),
-    visibility = ["//visibility:public"],
-)
-
-configure_make(
-    name = "memcached_build",
-    lib_source = ":all",
-    visibility = ["//visibility:public"],
-    deps = [
-        "@libevent//:libevent",
-    ],
-    out_binaries = ["memcached"],
-    out_static_libs = [],
-    out_shared_libs = [],
-    configure_options = [ "CFLAGS='-Wno-error'" ],
-)
-
-filegroup(  # filters the output of memcached_build to only contain the binary
-    name = "bin",
-    srcs = [":memcached_build"],
-    output_group = "memcached"
-)
-
-sh_binary(  # Runnable binary.
-    name = "memcached",
-    srcs = [":bin"],
-)
-""",
-    strip_prefix = "memcached-1.6.10",
-    type = "tar.gz",
-    url = "https://memcached.org/files/memcached-1.6.10.tar.gz",
-)
-
-# Memcached C client.
-http_archive(
-    name = "libmemcached",
-    build_file_content = """
-load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
-
-filegroup(
-    name = "all",
-    srcs = glob(["**"]),
-    visibility = ["//visibility:public"],
-)
-
-cmake(
-    name = "libmemcached",
-    lib_source = ":all",
-    visibility = ["//visibility:public"],
-    linkopts = [
-        "-ldl",
-    ],
-    out_shared_libs = [
-        "libhashkit.so",
-        "libhashkit.so.2",
-        "libhashkit.so.2.0.0",
-        "libmemcachedprotocol.so",
-        "libmemcachedprotocol.so.0",
-        "libmemcachedprotocol.so.0.0.0",
-        "libmemcached.so",
-        "libmemcached.so.11",
-        "libmemcached.so.11.0.0",
-        "libmemcachedutil.so",
-        "libmemcachedutil.so.2",
-        "libmemcachedutil.so.2.0.0",
-    ],
-    out_static_libs = [],
-    out_binaries = [],
-)
-""",
-    strip_prefix = "libmemcached-1.1.0",
-    type = "zip",
-    url = "https://github.com/awesomized/libmemcached/archive/refs/tags/1.1.0.zip",
-)
-
 # Java related tools (for planner / calcite)
 RULES_JVM_EXTERNAL_TAG = "2.5"
 
@@ -335,7 +228,7 @@ load("@rules_rust//rust:repositories.bzl", "rust_repositories", "rust_repository
 # defines default rust repositories.
 rust_repositories(
     edition = "2018",
-    version = "1.56.0",
+    version = "1.58.0",
 )
 
 # define a nightly toolchain that is only used for asan/tsan.
@@ -343,7 +236,7 @@ rust_repository_set(
     name = "rust_nightly",
     edition = "2018",
     exec_triple = "x86_64-unknown-linux-gnu",
-    iso_date = "2021-11-01",
+    iso_date = "2022-01-13",
     version = "nightly",
 )
 
@@ -351,7 +244,7 @@ load("@rules_rust//bindgen:repositories.bzl", "rust_bindgen_repositories")
 
 rust_bindgen_repositories()
 
-load("//cargo:crates.bzl", "raze_fetch_remote_crates")
+load("//mysql_proxy/cargo:crates.bzl", "raze_fetch_remote_crates")
 
 raze_fetch_remote_crates()
 

@@ -35,7 +35,7 @@ std::string ToString(const T &x) {
 
 // Drop the database (if it exists).
 void DropDatabase(const std::string &db_name) {
-  std::filesystem::remove_all("/var/pelton/rocksdb/" + db_name);
+  std::filesystem::remove_all("/tmp/pelton/rocksdb/" + db_name);
 }
 
 // Read an SQL file one command at a time.

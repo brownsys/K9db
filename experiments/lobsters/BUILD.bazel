@@ -1,1 +1,44 @@
-exports_files(glob(["schema/*.sql"]))
+load("@rules_rust//rust:rust.bzl", "rust_binary", "rust_library")
+
+rust_library(
+    name = "endpoints",
+    srcs = [
+        "src/endpoints/comment.rs",
+        "src/endpoints/comment_vote.rs",
+        "src/endpoints/comments.rs",
+        "src/endpoints/frontpage.rs",
+        "src/endpoints/lib.rs",
+        "src/endpoints/recent.rs",
+        "src/endpoints/story.rs",
+        "src/endpoints/story_vote.rs",
+        "src/endpoints/submit.rs",
+        "src/endpoints/user.rs",
+    ],
+    deps = [
+        "//cargo:chrono",
+        "//cargo:mysql_async",
+        "//cargo:trawler",
+    ],
+)
+
+rust_binary(
+    name = "lobsters-harness",
+    srcs = [
+        "src/main.rs",
+        "src/lib.rs"
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":endpoints",
+        "//cargo:clap",
+        "//cargo:mysql_async",
+        "//cargo:tower_service",
+        "//cargo:trawler",
+        "//cargo:futures_util",
+        "//cargo:hdrhistogram",
+    ],
+    compile_data = [
+        "schema/pelton.sql",
+        "schema/rocks-mariadb.sql"
+    ],
+)

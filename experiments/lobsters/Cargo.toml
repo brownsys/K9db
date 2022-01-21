@@ -1,0 +1,33 @@
+[package]
+name = "lobsters-harness"
+version = "0.0.1"
+authors = ["The Noria developers <noria@pdos.csail.mit.edu>", "Ishan Sharma <isharm11@brown.edu>"]
+edition = "2018"
+
+[dependencies]
+chrono = { version = "0.4.0", features = ["serde"] }
+clap = "2.25.0"
+futures-util = "0.3.0"
+hdrhistogram = "7"
+mysql_async = "0.23.0"
+tower-service = "0.3.0"
+trawler = { git = "https://github.com/ms705/trawler.git", branch = "master" }
+
+[lib]
+path = "src/endpoints/lib.rs"
+
+[[bin]]
+name = "lobsters-harness"
+path = "src/main.rs"
+
+[package.metadata.raze]
+workspace_path = "//cargo"
+genmode = "Remote"
+
+# The set of targets to generate BUILD rules for.
+targets = [
+    "x86_64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+    "x86_64-unknown-linux-gnu",
+]
+

@@ -114,6 +114,7 @@ RUN chmod 750 /home/configure_db.sh
 
 RUN useradd memcached
 RUN mkdir -p /var/pelton/rocksdb
+RUN mkdir -p /tmp/pelton/rocksdb
 
 ENTRYPOINT ["/bin/bash", "./home/configure_db.sh"]
 

@@ -9,9 +9,18 @@ rand = "0.8.4"
 clap = "2.34.0"
 
 [lib]
-path = "lib.rs"
+path = "src/lib.rs"
 
 [[bin]]
 name = "benchmark-harness"
-path = "benchmark_harness.rs"
+path = "src/benchmark_harness.rs"
 
+[package.metadata.raze]
+workspace_path = "//cargo"
+genmode = "Remote"
+# The set of targets to generate BUILD rules for.
+targets = [
+    "x86_64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+    "x86_64-unknown-linux-gnu",
+]

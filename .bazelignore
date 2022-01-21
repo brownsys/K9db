@@ -1,1 +1,4 @@
 pelton/planner/calcite/.bin/
+experiments/lobsters
+experiments/memcached
+experiments/ownCloud

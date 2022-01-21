@@ -1,0 +1,34 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+
+exports_files(["memcached.h"], visibility = ["//:__subpackages__"])
+
+cc_library(
+    name = "mymemcached",
+    srcs = [
+        "memcached.cc",
+    ],
+    hdrs = [
+        "memcached.h",
+    ],
+    linkopts = [
+        "-lmariadbcpp",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@glog",
+        "@libmemcached",
+    ],
+)
+
+# Tests.
+cc_test(
+    name = "memcached-test",
+    srcs = [
+        "memcached_unittest.cc",
+    ],
+    deps = [
+        ":mymemcached",
+        "@com_google_googletest//:gtest",
+        "@glog",
+    ],
+)

@@ -1,0 +1,45 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("@rules_java//java:defs.bzl", "java_library", "java_test")
+
+# The entire JNI java library.
+java_library(
+    name = "MemcachedJNI",
+    srcs = ["MemcachedJNI.java"],
+    data = [":MemcachedJNI_SO"],
+    visibility = ["//visibility:public"],
+)
+
+# SO that the JNI uses to link memcached.cc
+cc_binary(
+    name = "MemcachedJNI_SO",
+    srcs = [
+        "MemcachedJNI.cc",
+        ":MemcachedJNI_h",
+    ],
+    linkshared = 1,  # produce a .so with all dependencies linked
+    deps = [
+        "//memcached:mymemcached",
+        "@bazel_tools//tools/jdk:jni",
+        "@glog",
+    ],
+)
+
+# Auto generate the required header file from the JNI .java file.
+genrule(
+    name = "MemcachedJNI_h",
+    srcs = ["MemcachedJNI.java"],
+    outs = ["edu_brown_pelton_MemcachedJNI.h"],
+    cmd = "javac -h $(@D) -d $(@D) $<",
+)
+
+# Tests.
+java_test(
+    name = "MemcachedJNITest",
+    srcs = [
+        "MemcachedJNITest.java",
+    ],
+    test_class = "edu.brown.pelton.MemcachedJNITest",
+    deps = [
+        ":MemcachedJNI",
+    ],
+)

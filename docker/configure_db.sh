@@ -1,9 +1,10 @@
 #!/bin/bash
 # Run cargo raze.
 echo "Running cargo-raze"
-cd /home/pelton/mysql_proxy/
-rm -rf cargo && /root/.cargo/bin/cargo raze
-cd -
+cd /home/pelton/mysql_proxy && /root/.cargo/bin/cargo raze && cd -
+cd /home/pelton/experiments/lobsters && /root/.cargo/bin/cargo raze && cd -
+cd /home/pelton/experiments/memcached && /root/.cargo/bin/cargo raze && cd -
+cd /home/pelton/experiments/ownCloud && /root/.cargo/bin/cargo raze && cd -
 
 # Run Mariadb.
 echo "Running mariadbd ..."

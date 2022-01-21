@@ -18,7 +18,7 @@ using CType = FFIColumnType;
 
 // Drop the database (if it exists).
 void DropDatabase() {
-  std::filesystem::remove_all("/var/pelton/rocksdb/" DB_NAME);
+  std::filesystem::remove_all("/tmp/pelton/rocksdb/" DB_NAME);
 }
 
 TEST(PROXY, OPEN_TEST) {

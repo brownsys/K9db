@@ -14,7 +14,7 @@
 #include "gtest/gtest.h"
 
 #define DB_NAME "test"
-#define DB_PATH "/var/pelton/rocksdb/test"
+#define DB_PATH "/tmp/pelton/rocksdb/test"
 
 namespace pelton {
 namespace sql {

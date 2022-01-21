@@ -3,32 +3,32 @@ load("@rules_rust//rust:rust.bzl", "rust_binary", "rust_library")
 rust_library(
     name = "ownCloud",
     srcs = [
-        "lib.rs",
+        "src/lib.rs",
     ],
     compile_data = [
-        "schema.sql",
-        "mysql-schema.sql",
+        "data/schema.sql",
+        "data/mysql-schema.sql",
     ],
     rustc_flags = [
         "-lmariadbcpp",
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//baseline:memcached_ffi",
-        "//experiments/ownCloud/cargo:mysql",
-        "//experiments/ownCloud/cargo:rand",
+        "@memcached//rust:memcached_ffi",
+        "//cargo:mysql",
+        "//cargo:rand",
     ],
 )
 
 rust_binary(
     name = "benchmark",
     srcs = [
-        "benchmark_harness.rs",
+        "src/benchmark_harness.rs",
     ],
     deps = [
         ":ownCloud",
-        "//experiments/ownCloud/cargo:clap",
-        "//experiments/ownCloud/cargo:mysql",
-        "//experiments/ownCloud/cargo:rand",
+        "//cargo:clap",
+        "//cargo:mysql",
+        "//cargo:rand",
     ],
 )

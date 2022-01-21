@@ -70,7 +70,7 @@ const std::string &GetTableName(const sqlast::AbstractStatement *stmt) {
 // SingletonRocksdbConnection.
 SingletonRocksdbConnection::SingletonRocksdbConnection(
     const std::string &db_name) {
-  std::string path = "/var/pelton/rocksdb/" + db_name;
+  std::string path = "/tmp/pelton/rocksdb/" + db_name;
 
   rocksdb::BlockBasedTableOptions block_opts;
   // 500MB uncompressed cache

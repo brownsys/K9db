@@ -1,0 +1,39 @@
+workspace(name = "pelton-memcached")
+
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("//:deps.bzl", "cc_deps", "java_deps", "rust_deps")
+
+# Google Test
+http_archive(
+    name = "com_google_googletest",  # 2021-05-19T20:10:13Z
+    sha256 = "8cf4eaab3a13b27a95b7e74c58fb4c0788ad94d1f7ec65b20665c4caf1d245e8",
+    strip_prefix = "googletest-aa9b44a18678dfdf57089a5ac22c1edb69f35da5",
+    urls = ["https://github.com/google/googletest/archive/aa9b44a18678dfdf57089a5ac22c1edb69f35da5.zip"],
+)
+
+# C++ rules for Bazel.
+http_archive(
+    name = "rules_cc",
+    sha256 = "954b7a3efc8752da957ae193a13b9133da227bdacf5ceb111f2e11264f7e8c95",
+    strip_prefix = "rules_cc-9e10b8a6db775b1ecd358d8ddd3dab379a2c29a5",
+    urls = ["https://github.com/bazelbuild/rules_cc/archive/9e10b8a6db775b1ecd358d8ddd3dab379a2c29a5.zip"],
+)
+
+
+# Rust dependencies.
+cc_deps()
+java_deps()
+rust_deps()
+
+load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
+rules_foreign_cc_dependencies()
+
+# defines default rust repositories.
+load("@rules_rust//rust:repositories.bzl", "rust_repositories", "rust_repository_set")
+rust_repositories(
+    edition = "2018",
+    version = "1.58.0",
+)
+
+load("@rules_rust//bindgen:repositories.bzl", "rust_bindgen_repositories")
+rust_bindgen_repositories()
