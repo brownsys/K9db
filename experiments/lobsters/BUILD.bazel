@@ -24,21 +24,21 @@ rust_library(
 rust_binary(
     name = "lobsters-harness",
     srcs = [
+        "src/lib.rs",
         "src/main.rs",
-        "src/lib.rs"
+    ],
+    compile_data = [
+        "schema/pelton.sql",
+        "schema/rocks-mariadb.sql",
     ],
     visibility = ["//visibility:public"],
     deps = [
         ":endpoints",
         "//cargo:clap",
+        "//cargo:futures_util",
+        "//cargo:hdrhistogram",
         "//cargo:mysql_async",
         "//cargo:tower_service",
         "//cargo:trawler",
-        "//cargo:futures_util",
-        "//cargo:hdrhistogram",
-    ],
-    compile_data = [
-        "schema/pelton.sql",
-        "schema/rocks-mariadb.sql"
     ],
 )

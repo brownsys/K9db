@@ -468,6 +468,7 @@ Results ReadMany(int id, const Record *keys, size_t count) {
           the_key.push_back('0');
         }
         char *k_buf = new char[key_size];
+        // NOLINTNEXTLINE
         strcpy(k_buf, the_key.c_str());
         keybuf.push_back(k_buf);
       }

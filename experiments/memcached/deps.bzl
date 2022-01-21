@@ -1,4 +1,3 @@
-
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "new_git_repository")  # buildifier: disable=load
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")  # buildifier: disable=load
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")  # buildifier: disable=load
@@ -25,7 +24,7 @@ def cc_deps():
         strip_prefix = "glog-0.4.0",
         urls = ["https://github.com/google/glog/archive/v0.4.0.tar.gz"],
     )
-    
+
     maybe(
         http_archive,
         name = "rules_foreign_cc",
@@ -33,7 +32,7 @@ def cc_deps():
         strip_prefix = "rules_foreign_cc-0.5.1",
         url = "https://github.com/bazelbuild/rules_foreign_cc/archive/0.5.1.tar.gz",
     )
-    
+
     maybe(
         http_archive,
         name = "libevent",
@@ -158,7 +157,7 @@ def rust_deps():
         ],
     )
     raze_fetch_remote_crates()
-        
+
 def java_deps():
     cc_deps()
 

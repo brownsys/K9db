@@ -2,6 +2,7 @@
 #define TESTS_COMMON_H_
 
 #include <string>
+#include <vector>
 
 #include "gtest/gtest.h"
 #include "pelton/pelton.h"
@@ -16,7 +17,6 @@ namespace tests {
 int TestingMain(int argc, char **argv, const std::string &testname,
                 size_t file_count, ...);
 
-
 // Run tests  with per-test setup and tear-down using a fixture. This means that
 // you'll have a clean database for every single test (with the schema you
 // provide to this function loaded). To use this feature you can define your
@@ -27,7 +27,7 @@ int TestingMain(int argc, char **argv, const std::string &testname,
 // What this fixture does is it deletes the database after every test and
 // reloads your schema and the initial inserts you defined. This should make it
 // easier to define multiple tests in a file, especially if they use GDPR
-// queries, and have them not interfere. 
+// queries, and have them not interfere.
 int TestingMainFixture(int argc, char **argv, const std::string &testname,
                        size_t file_count, ...);
 
@@ -44,8 +44,8 @@ class CleanDatabaseFixture : public ::testing::Test {
  protected:
   void SetUp() override;
   void TearDown() override;
-  const static std::string &db_name();
-  const static std::vector<std::string> &file_path_args();
+  static const std::string &db_name();
+  static const std::vector<std::string> &file_path_args();
 
  private:
   static std::optional<std::string> _db_name;

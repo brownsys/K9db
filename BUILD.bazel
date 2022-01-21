@@ -25,3 +25,9 @@ format_java(
     name = "format_java",
     tool = ":google_java_format_binary",
 )
+
+# Alias: pelton mysql proxy.
+alias(
+    name = "pelton",
+    actual = "//mysql_proxy:mysql_proxy",
+)

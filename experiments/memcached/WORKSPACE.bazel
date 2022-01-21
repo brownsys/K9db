@@ -19,21 +19,25 @@ http_archive(
     urls = ["https://github.com/bazelbuild/rules_cc/archive/9e10b8a6db775b1ecd358d8ddd3dab379a2c29a5.zip"],
 )
 
-
 # Rust dependencies.
 cc_deps()
+
 java_deps()
+
 rust_deps()
 
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
+
 rules_foreign_cc_dependencies()
 
 # defines default rust repositories.
-load("@rules_rust//rust:repositories.bzl", "rust_repositories", "rust_repository_set")
+load("@rules_rust//rust:repositories.bzl", "rust_repositories")
+
 rust_repositories(
     edition = "2018",
     version = "1.58.0",
 )
 
 load("@rules_rust//bindgen:repositories.bzl", "rust_bindgen_repositories")
+
 rust_bindgen_repositories()

@@ -518,8 +518,8 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(
       relationship_table_name /* shard kind */,
       NameShardedTable(target_table_name, my_col_name), other_col_name,
       sharded_by_index,
-      my_col_name  // the 'next column' in this case is our column
-  );
+      // the 'next column' in this case is our column
+      my_col_name);
   ASSIGN_OR_RETURN(
       auto &ways_to_shard,
       IsShardingBySupported(sharding_info, *state, target_table_name));

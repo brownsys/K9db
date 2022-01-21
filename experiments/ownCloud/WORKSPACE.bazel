@@ -1,7 +1,6 @@
 workspace(name = "pelton-ownCloud")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_repository")
 
 # Rust toolchain
 http_archive(
@@ -14,7 +13,7 @@ http_archive(
     ],
 )
 
-load("@rules_rust//rust:repositories.bzl", "rust_repositories", "rust_repository_set")
+load("@rules_rust//rust:repositories.bzl", "rust_repositories")
 
 # defines default rust repositories.
 rust_repositories(
@@ -33,10 +32,13 @@ local_repository(
 )
 
 load("@memcached//:deps.bzl", "rust_deps")
+
 rust_deps()
 
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
+
 rules_foreign_cc_dependencies()
 
 load("@rules_rust//bindgen:repositories.bzl", "rust_bindgen_repositories")
+
 rust_bindgen_repositories()

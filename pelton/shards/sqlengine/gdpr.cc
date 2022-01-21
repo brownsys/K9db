@@ -28,7 +28,7 @@ namespace {
 sql::SqlResult GetDataFromShardedTable(const ShardingInformation &info,
                                        const std::string &unquoted_user_id,
                                        const dataflow::SchemaRef &schema,
-                                       sql::PeltonExecutor &exec) {
+                                       sql::PeltonExecutor *exec) {
   int aug_index = -1;
   if (!info.IsTransitive()) {
     aug_index = info.shard_by_index;
@@ -36,7 +36,7 @@ sql::SqlResult GetDataFromShardedTable(const ShardingInformation &info,
 
   sqlast::Select tbl_stmt{info.sharded_table_name};
   tbl_stmt.AddColumn("*");
-  return exec.Shard(&tbl_stmt, info.shard_kind, unquoted_user_id, schema,
+  return exec->Shard(&tbl_stmt, info.shard_kind, unquoted_user_id, schema,
                     aug_index);
 }
 
@@ -68,7 +68,7 @@ absl::StatusOr<sql::SqlResult> GetAllMyValuesFromTable(
             connection->state->dataflow_state()->GetTableSchema(table_name);
         result.AddResultSet(
             std::move(GetDataFromShardedTable(*info, Dequote(user_id), schema,
-                                              connection->executor)
+                                              &connection->executor)
                           .ResultSets()
                           .front()));
       }

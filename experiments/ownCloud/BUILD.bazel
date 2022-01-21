@@ -14,9 +14,9 @@ rust_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@memcached//rust:memcached_ffi",
         "//cargo:mysql",
         "//cargo:rand",
+        "@memcached//rust:memcached_ffi",
     ],
 )
 

@@ -25,7 +25,7 @@ sql::SqlResult HandleOWNINGColumn(const UnshardedTableName &table_name,
                                   const UnshardedTableName &sharded_table_name,
                                   const std::string &user_id,
                                   const std::string &shard_kind,
-                                  dataflow::Record &delete_result,
+                                  const dataflow::Record &delete_result,
                                   Connection *connection) {
   const auto &state = *connection->state->sharder_state();
   auto &exec = connection->executor;

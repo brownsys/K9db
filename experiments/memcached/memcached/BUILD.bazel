@@ -1,6 +1,9 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
-exports_files(["memcached.h"], visibility = ["//:__subpackages__"])
+exports_files(
+    ["memcached.h"],
+    visibility = ["//:__subpackages__"],
+)
 
 cc_library(
     name = "mymemcached",

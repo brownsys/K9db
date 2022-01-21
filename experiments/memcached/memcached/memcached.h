@@ -1,5 +1,5 @@
-#ifndef BASELINE_MEMCACHED_H_
-#define BASELINE_MEMCACHED_H_
+#ifndef EXPERIMENTS_MEMCACHED_MEMCACHED_MEMCACHED_H_
+#define EXPERIMENTS_MEMCACHED_MEMCACHED_MEMCACHED_H_
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -74,4 +74,4 @@ void Close();
 }
 #endif  // __cplusplus
 
-#endif  // BASELINE_MEMCACHED_H_
+#endif  // EXPERIMENTS_MEMCACHED_MEMCACHED_MEMCACHED_H_

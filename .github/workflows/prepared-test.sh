@@ -1,10 +1,10 @@
 #!/bin/bash
-rm -rf /var/pelton/rocksdb
-mkdir -p /var/pelton/rocksdb
+rm -rf /tmp/pelton/rocksdb
+mkdir -p /tmp/pelton/rocksdb
 
 # Run the proxy (in the background).
-bazel build //mysql_proxy/src:mysql_proxy
-bazel run //mysql_proxy/src:mysql_proxy -- -logtostderr=1 &> .tmp &
+bazel build //:pelton
+bazel run //:pelton -- -logtostderr=1 &> .tmp &
 pid=$!
 sleep 10
 
