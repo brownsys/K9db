@@ -21,7 +21,7 @@ CREATE INDEX hidden_stories_user_story ON hidden_stories (user_id, story_id);
 CREATE INDEX hidden_stories_user_id ON hidden_stories (user_id);
 CREATE INDEX hidden_stories_story_id ON hidden_stories (story_id);
 CREATE TABLE invitation_requests ( id int NOT NULL PRIMARY KEY, code varchar(255), is_verified int, PII_email varchar(255), name varchar(255), memo text, ip_address varchar(255), created_at datetime NOT NULL, updated_at datetime NOT NULL) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
-CREATE TABLE invitations ( id int NOT NULL PRIMARY KEY, OWNER_user_id int, OWNER_email varchar(255), code varchar(255), created_at datetime NOT NULL, updated_at datetime NOT NULL, memo text) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE invitations ( id int NOT NULL PRIMARY KEY, OWNER_user_id int, email varchar(255), code varchar(255), created_at datetime NOT NULL, updated_at datetime NOT NULL, memo text) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
 CREATE INDEX invitations_user_id ON invitations (OWNER_user_id);
 CREATE TABLE keystores ( keyX varchar(50) NOT NULL PRIMARY KEY, valueX int) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE TABLE messages ( id int NOT NULL PRIMARY KEY, created_at datetime, OWNER_author_user_id int, OWNER_recipient_user_id int, has_been_read int, subject varchar(100), body text, short_id varchar(30), deleted_by_author int, deleted_by_recipient int) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;

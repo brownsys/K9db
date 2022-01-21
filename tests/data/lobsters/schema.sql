@@ -92,7 +92,7 @@ CREATE TABLE invitation_requests ( \
 CREATE TABLE invitations ( \
   id int NOT NULL PRIMARY KEY, \
   OWNER_user_id int, \
-  OWNER_email varchar(255), \
+  email varchar(255), \
   code varchar(255), \
   created_at datetime NOT NULL, \
   updated_at datetime NOT NULL, \
