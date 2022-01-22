@@ -9,7 +9,6 @@
 #include "glog/logging.h"
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/upgradable_lock.h"
-#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -58,7 +57,6 @@ dataflow::SchemaRef ResultSchema(const sqlast::Select &stmt,
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
                                      Connection *connection, bool synchronize) {
-  connection->perf->Start("Select");
   shards::SharderState *state = connection->state->sharder_state();
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
   SharedLock lock;
@@ -173,7 +171,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
     }
   }
 
-  connection->perf->End("Select");
   return result;
 }
 

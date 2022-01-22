@@ -10,7 +10,6 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/shards/sqlengine/view.h"
 #include "pelton/shards/upgradable_lock.h"
-#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -76,7 +75,6 @@ absl::StatusOr<sql::SqlResult> CreateIndexStateIsAlreadyLocked(
     result = sql::SqlResult(true);
   }
 
-  connection->perf->End("Create Index");
   return result;
 }
 
@@ -89,7 +87,6 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
     return std::make_pair(false, std::unordered_set<UserId>{});
   }
 
-  connection->perf->Start("Lookup Index1");
   // Get all the columns that have a secondary index.
   if (state->HasIndicesFor(table_name)) {
     const std::unordered_set<ColumnName> &indexed_cols =
@@ -110,20 +107,16 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
       MOVE_OR_RETURN(std::unordered_set<UserId> shards,
                      LookupIndex(index_flow, column_value, connection));
 
-      connection->perf->End("Lookup Index1");
       return std::make_pair(true, std::move(shards));
     }
   }
 
-  connection->perf->End("Lookup Index1");
   return std::make_pair(false, std::unordered_set<UserId>{});
 }
 
 absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     const std::string &index_name, const std::string &value,
     Connection *connection) {
-  connection->perf->Start("Lookup Index");
-
   // Find flow.
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
   const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(index_name);
@@ -155,7 +148,6 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     result.insert(record.GetValueString(1));
   }
 
-  connection->perf->End("Lookup Index");
   return result;
 }
 

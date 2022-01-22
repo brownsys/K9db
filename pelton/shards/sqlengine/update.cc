@@ -13,7 +13,6 @@
 #include "pelton/shards/sqlengine/insert.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/upgradable_lock.h"
-#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -107,7 +106,6 @@ sqlast::Insert InsertRecord(const dataflow::Record &record,
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
                                      Connection *connection, bool synchronize) {
-  connection->perf->Start("Update");
   // Table name to select from.
   const std::string &table_name = stmt.table_name();
 
@@ -270,7 +268,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
     dataflow_state->ProcessRecords(table_name, std::move(records));
   }
 
-  connection->perf->End("Update");
   return result;
 }
 

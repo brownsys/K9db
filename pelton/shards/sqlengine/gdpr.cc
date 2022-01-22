@@ -37,7 +37,7 @@ sql::SqlResult GetDataFromShardedTable(const ShardingInformation &info,
   sqlast::Select tbl_stmt{info.sharded_table_name};
   tbl_stmt.AddColumn("*");
   return exec->Shard(&tbl_stmt, info.shard_kind, unquoted_user_id, schema,
-                    aug_index);
+                     aug_index);
 }
 
 absl::Status GetAccessableDataForAccessor(

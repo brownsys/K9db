@@ -8,7 +8,6 @@
 #include "pelton/shards/upgradable_lock.h"
 #include "pelton/sql/executor.h"
 #include "pelton/sql/result.h"
-#include "pelton/util/perf.h"
 
 namespace pelton {
 
@@ -46,14 +45,9 @@ class State {
     return this->sharder_state_.NumShards();
   }
 
-  perf::Perf CombinePerfs() const { return perf_; }
-
-  perf::Perf *GetPerf() { return &perf_; }
-
  private:
   shards::SharderState sharder_state_;
   dataflow::DataFlowState dataflow_state_;
-  perf::Perf perf_;
 };
 
 struct Connection {
@@ -61,8 +55,6 @@ struct Connection {
   State *state;
   // Connection to the underlying databases.
   sql::PeltonExecutor executor;
-  // Perf tracker.
-  perf::Perf *perf;
 };
 
 }  // namespace pelton

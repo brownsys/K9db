@@ -28,14 +28,7 @@ jobs:
 
     # bazel test all except memcached
     - name: Test all
-      env:
-        PELTON: bazel test //pelton/... --test_output=all
-        PROXY: bazel test //mysql_proxy/... --test_output=all
-        TEST: bazel test //tests/... --test_output=all
-      run: |
-        docker exec pelton-testing sh -c "cd /home/pelton && $PELTON"
-        docker exec pelton-testing sh -c "cd /home/pelton && $PROXY"
-        docker exec pelton-testing sh -c "cd /home/pelton && $TEST"
+      run: docker exec pelton-testing sh -c "cd /home/pelton && bazel test... --test_output=all"
 
     # Test memcached baseline
     - name : Test memcached

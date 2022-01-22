@@ -15,7 +15,6 @@
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/shards/upgradable_lock.h"
-#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -538,7 +537,6 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
                                      Connection *connection) {
-  connection->perf->Start("Create");
   shards::SharderState *state = connection->state->sharder_state();
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
   UniqueLock lock = state->WriterLock();
@@ -636,7 +634,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     }
   }
 
-  connection->perf->End("Create");
   return result;
 }
 

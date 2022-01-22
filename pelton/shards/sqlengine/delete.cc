@@ -11,7 +11,6 @@
 #include "absl/strings/str_cat.h"
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/util.h"
-#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -74,7 +73,6 @@ sql::SqlResult HandleOWNINGColumn(const UnshardedTableName &table_name,
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
                                      Connection *connection, bool synchronize,
                                      bool update_flows) {
-  connection->perf->Start("Delete");
   const std::string &table_name = stmt.table_name();
   LOG(INFO) << "Delete statement started";
 
@@ -228,7 +226,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
     dataflow_state->ProcessRecords(table_name, std::move(records));
   }
 
-  connection->perf->End("Delete");
   return result;
 }
 

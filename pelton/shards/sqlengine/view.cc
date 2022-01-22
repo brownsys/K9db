@@ -17,7 +17,6 @@
 #include "pelton/dataflow/value.h"
 #include "pelton/planner/planner.h"
 #include "pelton/shards/sqlengine/select.h"
-#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -277,7 +276,6 @@ LookupCondition ConstraintKeys(const dataflow::DataFlowGraph &flow,
 
 absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection,
                         UniqueLock *lock) {
-  connection->perf->Start("CreateView");
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
 
   // Plan the query using calcite and generate a concrete graph for it.
@@ -314,7 +312,6 @@ absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection,
   }
   future.Wait();
 
-  connection->perf->End("CreateView");
   return absl::OkStatus();
 }
 
@@ -322,7 +319,6 @@ absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
                                           Connection *connection) {
   sqlast::ListCountVisitor listcount;
   std::string count = std::to_string(listcount.Visit(&stmt));
-  connection->perf->Start("SelectView " + stmt.table_name() + " " + count);
   SharderState *state = connection->state->sharder_state();
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
   SharedLock lock = state->ReaderLock();
@@ -336,7 +332,6 @@ absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
   std::vector<dataflow::Record> records =
       LookupRecords(flow, condition, stmt.limit(), stmt.offset());
 
-  connection->perf->End("SelectView " + stmt.table_name() + " " + count);
   return sql::SqlResult(
       sql::SqlResultSet(flow.output_schema(), {std::move(records), {}}));
 }

@@ -12,7 +12,6 @@
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/util.h"
-#include "pelton/util/perf.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -165,7 +164,6 @@ absl::Status HandleShardForUser(const sqlast::Insert &stmt,
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
                                      Connection *connection, SharedLock *lock,
                                      bool update_flows) {
-  connection->perf->Start("Insert");
   shards::SharderState *state = connection->state->sharder_state();
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
 
@@ -279,7 +277,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
     dataflow_state->ProcessRecords(stmt.table_name(), std::move(records));
   }
 
-  connection->perf->End("Insert");
   return result;
 }
 

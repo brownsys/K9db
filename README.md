@@ -123,3 +123,16 @@ fi
 # (Dry)-run google java format.
 bazel run //:format_java -- CHECK
 ```
+
+## MySQL Proxy
+
+The proxy acts as a MySQL database while interfacing with pelton.
+Queries are converted to C compatible types and sent to pelton.
+Responses are converted to rust compatible types and returned.
+Any application that uses a MySQL backend may connect to this proxy instead of a traditional database.
+
+The flow of the proxy is essentially as follows:
+Application <=> Mysql Proxy <=> FFI <=> Pelton API (C++)
+
+You can find more details in this
+![design diagram](https://user-images.githubusercontent.com/47846691/142964390-7dc575e4-300e-4388-8006-1070fa82ad5d.png).
