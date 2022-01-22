@@ -1,4 +1,4 @@
-#include "mysql_proxy/src/ffi/ffi.h"
+#include "pelton/proxy/src/ffi/ffi.h"
 
 #include <stdlib.h>
 #include <string.h>

@@ -1,5 +1,5 @@
-#ifndef MYSQL_PROXY_SRC_FFI_FFI_H_
-#define MYSQL_PROXY_SRC_FFI_FFI_H_
+#ifndef PELTON_PROXY_SRC_FFI_FFI_H_
+#define PELTON_PROXY_SRC_FFI_FFI_H_
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -94,4 +94,4 @@ bool FFIClose(FFIConnection *c_conn);
 }
 #endif  // __cplusplus
 
-#endif  // MYSQL_PROXY_SRC_FFI_FFI_H_
+#endif  // PELTON_PROXY_SRC_FFI_FFI_H_

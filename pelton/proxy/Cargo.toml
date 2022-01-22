@@ -23,7 +23,7 @@ name = "mysql_proxy"
 path = "src/main.rs"
 
 [package.metadata.raze]
-workspace_path = "//mysql_proxy/cargo"
+workspace_path = "//pelton/proxy/cargo"
 genmode = "Remote"
 # The set of targets to generate BUILD rules for.
 targets = [

@@ -10,7 +10,7 @@ cargo raze
 
 2. Run with compiler optimizations
 ```bash
-bazel run //mysql_proxy --config=opt
+bazel run //:pelton --config=opt
 ```
 
 3. Connect to the proxy using a mariadb client (from another terminal).
@@ -21,22 +21,22 @@ mariadb --port=10001 --host=127.0.0.1
 # Debugging
 - Run with rust debug info
 ```bash
-bazel run //mysql_proxy
+bazel run //:pelton
 ```
 
 - Run with rust backtracing enabled
 ```bash
-RUST_BACKTRACE=1 bazel run //mysql_proxy
+RUST_BACKTRACE=1 bazel run //:pelton
 ```
 
 - Run with FFI debug info
 ```bash
-bazel run //mysql_proxy -- -logtostderr=1
+bazel run //:pelton -- -logtostderr=1
 ```
 
 - Run with valgrind (asan)
 ```bash
-bazel run --run_under "valgrind --error-exitcode=1 --errors-for-leak-kinds=definite --leak-check=full --show-leak-kinds=definite" //mysql_proxy
+bazel run --run_under "valgrind --error-exitcode=1 --errors-for-leak-kinds=definite --leak-check=full --show-leak-kinds=definite" //:pelton
 ```
 
 - Run with thread sanitizer. (requires switching to rust nightly compiler)

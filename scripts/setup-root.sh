@@ -91,3 +91,4 @@ mariadb -u root < docker/configure_db.sql
 
 useradd memcached
 mkdir -p /var/pelton/rocksdb
+mkdir -p /tmp/pelton/rocksdb

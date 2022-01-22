@@ -42,7 +42,7 @@ RUN cd /tmp \
 RUN curl https://sh.rustup.rs | sh -s -- -y
 RUN /root/.cargo/bin/cargo install cargo-raze
 
-# install mariadb
+# install mariadb (for baselines only)
 RUN apt-get remove -y --purge mysql*
 
 RUN curl -LsS -O https://downloads.mariadb.com/MariaDB/mariadb_repo_setup
@@ -69,25 +69,6 @@ RUN echo "* soft nofile 1024000" >> /etc/security/limits.d/90-nproc.conf \
     && echo "* hard nproc 10240" >> /etc/security/limits.d/90-nproc.conf \
     && echo "root soft nproc unlimited" >> /etc/security/limits.d/90-nproc.conf
 
-# install mariadb connector
-RUN apt-get install -y libmariadb3 libmariadb-dev
-RUN cd /tmp \
-    && wget https://dlm.mariadb.com/1601342/Connectors/cpp/connector-cpp-1.0.0/mariadb-connector-cpp-1.0.0-ubuntu-groovy-amd64.tar.gz \
-    && tar -xvzf mariadb-connector-cpp-1.0.0-*.tar.gz
-
-RUN cd /tmp/mariadb-connector-cpp-1.0.0-* \
-    && install -d /usr/include/mariadb/conncpp \
-    && install -d /usr/include/mariadb/conncpp/compat \
-    && install -v include/mariadb/*.hpp /usr/include/mariadb/ \
-    && install -v include/mariadb/conncpp/*.hpp /usr/include/mariadb/conncpp \
-    && install -v include/mariadb/conncpp/compat/* /usr/include/mariadb/conncpp/compat
-
-RUN cd /tmp/mariadb-connector-cpp-1.0.0-* \
-    && install -d /usr/lib/mariadb \
-    && install -d /usr/lib/mariadb/plugin \
-    && install -v lib64/mariadb/libmariadbcpp.so /usr/lib \
-    && install -v lib64/mariadb/plugin/* /usr/lib/mariadb/plugin
-
 # configure mariadb user
 RUN chown -R mysql:root /var/lib/mysql
 RUN mkdir -p /run/mysqld
@@ -108,8 +89,8 @@ RUN echo "test:tsan --test_env TSAN_OPTIONS=suppressions=/home/pelton/.tsan_jvm_
 RUN ln -s /usr/bin/python2 /usr/bin/python
 
 # configure mariadb on startup and run mysqld in the background
-ADD docker/configure_db.sql /home/configure_db.sql
-ADD docker/configure_db.sh /home/configure_db.sh
+ADD scripts/configure_db.sql /home/configure_db.sql
+ADD scripts/configure_db.sh /home/configure_db.sh
 RUN chmod 750 /home/configure_db.sh
 
 RUN useradd memcached

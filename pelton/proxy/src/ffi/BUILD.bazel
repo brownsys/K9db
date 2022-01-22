@@ -2,7 +2,7 @@ load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 exports_files(
     ["ffi.h"],
-    visibility = ["//mysql_proxy:__subpackages__"],
+    visibility = ["//pelton/proxy:__subpackages__"],
 )
 
 cc_library(

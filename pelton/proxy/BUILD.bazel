@@ -11,7 +11,7 @@ config_setting(
 )
 
 rust_binary(
-    name = "mysql_proxy",
+    name = "proxy",
     srcs = [
         "src/main.rs",
     ],
@@ -37,14 +37,14 @@ rust_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":proxy_ffi",
-        "//mysql_proxy/cargo:ctrlc",
-        "//mysql_proxy/cargo:gflags",
-        "//mysql_proxy/cargo:lazy_static",
-        "//mysql_proxy/cargo:msql_srv",
-        "//mysql_proxy/cargo:regex",
-        "//mysql_proxy/cargo:slog",
-        "//mysql_proxy/cargo:slog_term",
-        "//mysql_proxy/src/ffi",
+        "//pelton/proxy/cargo:ctrlc",
+        "//pelton/proxy/cargo:gflags",
+        "//pelton/proxy/cargo:lazy_static",
+        "//pelton/proxy/cargo:msql_srv",
+        "//pelton/proxy/cargo:regex",
+        "//pelton/proxy/cargo:slog",
+        "//pelton/proxy/cargo:slog_term",
+        "//pelton/proxy/src/ffi",
     ],
 )
 
@@ -58,7 +58,7 @@ rust_library(
         ":proxy_ffi_wrappers",
     ],
     deps = [
-        "//mysql_proxy/cargo:msql_srv",
+        "//pelton/proxy/cargo:msql_srv",
     ],
 )
 
@@ -66,7 +66,7 @@ rust_library(
 genrule(
     name = "proxy_ffi_bindgen",
     srcs = [
-        "//mysql_proxy/src/ffi:ffi.h",
+        "//pelton/proxy/src/ffi:ffi.h",
     ],
     outs = [
         "proxy_ffi_bindgen.rs",
