@@ -28,7 +28,7 @@ jobs:
 
     # bazel test all except memcached
     - name: Test all
-      run: docker exec pelton-testing sh -c "cd /home/pelton && bazel test... --test_output=all"
+      run: docker exec pelton-testing sh -c "cd /home/pelton && bazel test ... --test_output=all"
 
     # Test memcached baseline
     - name : Test memcached
