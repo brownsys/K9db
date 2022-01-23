@@ -11,6 +11,13 @@
   auto __CHECK_STATUS_VAL(__LINE__) = status; \
   if (!__CHECK_STATUS_VAL(__LINE__).ok()) return __CHECK_STATUS_VAL(__LINE__)
 
+#define __CHECK_STATUS_OR_VAR_NAME(arg) __CHECK_STATUS_OR_RESULT_##arg
+#define __CHECK_STATUS_OR_VAL(arg) __CHECK_STATUS_OR_VAR_NAME(arg)
+#define CHECK_STATUS_OR(status_)                  \
+  auto __CHECK_STATUS_OR_VAL(__LINE__) = status_; \
+  if (!__CHECK_STATUS_OR_VAL(__LINE__).ok())      \
+  return __CHECK_STATUS_OR_VAL(__LINE__).status()
+
 #define __PANIC_STATUS_VAR_NAME(arg) __PANIC_STATUS_RESULT_##arg
 #define __PANIC_STATUS_VAL(arg) __PANIC_STATUS_VAR_NAME(arg)
 #define PANIC_STATUS(status)                  \

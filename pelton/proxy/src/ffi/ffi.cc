@@ -252,3 +252,98 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
 void FFIDestroySelect(FFIResult *c_result) { free(c_result); }
 
 void FFIPlannerShutdown() { pelton::shutdown_planner(); }
+
+// Create a prepared statement.
+FFIPreparedStatement *FFIPrepare(FFIConnection *c_conn, const char *query) {
+  pelton::Connection *cpp_conn =
+      reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
+  absl::StatusOr<const pelton::PreparedStatementDescriptor *> result =
+      pelton::prepare(cpp_conn, query);
+  if (!result.ok()) {
+    LOG(FATAL) << "C-Wrapper: " << result.status();
+  }
+
+  if (result.ok()) {
+    const auto *descriptor = result.value();
+    size_t len = descriptor->total_count;
+    // Allocate FFIPreparedStatement with the right number of types.
+    FFIPreparedStatement *c_result = static_cast<FFIPreparedStatement *>(
+        malloc(sizeof(FFIPreparedStatement) + sizeof(FFIColumnType) * len));
+    // Fill in FFIPreparedStatement.
+    c_result->stmt_id = descriptor->stmt_id;
+    c_result->arg_count = len;
+    size_t current = 0;
+    for (size_t i = 0; i < descriptor->arg_flow_key.size(); i++) {
+      size_t key_index = descriptor->arg_flow_key.at(i);
+      size_t value_count = descriptor->arg_value_count.at(i);
+      FFIColumnType c_type;
+      auto type = descriptor->flow_descriptor->key_types.at(key_index);
+      switch (type) {
+        case CType::INT:
+          c_type = FFIColumnType::INT;
+          break;
+        case CType::UINT:
+          c_type = FFIColumnType::UINT;
+          break;
+        case CType::TEXT:
+          c_type = FFIColumnType::TEXT;
+          break;
+        case CType::DATETIME:
+          c_type = FFIColumnType::DATETIME;
+          break;
+        default:
+          LOG(FATAL) << "C-Wrapper: Unrecognizable column type " << type;
+      }
+      for (size_t j = 0; j < value_count; j++) {
+        c_result->args[current + j] = c_type;
+      }
+      current += value_count;
+    }
+    return c_result;
+  }
+  return nullptr;
+}
+void FFIDestroyPreparedStatement(FFIPreparedStatement *c_stmt) { free(c_stmt); }
+
+// Execute a prepared statement.
+FFIResult *FFIExecPrepare(FFIConnection *c_conn, size_t stmt_id,
+                          size_t arg_count, const char **arg_values) {
+  pelton::Connection *cpp_conn =
+      reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
+  // Transform args to cpp format.
+  std::vector<std::string> cpp_args;
+  cpp_args.reserve(arg_count);
+  for (size_t i = 0; i < arg_count; i++) {
+    cpp_args.emplace_back(arg_values[i]);
+  }
+  // Call pelton.
+  absl::StatusOr<pelton::SqlResult> result =
+      pelton::exec(cpp_conn, stmt_id, cpp_args);
+  if (!result.ok()) {
+    LOG(FATAL) << "C-Wrapper: " << result.status();
+  }
+
+  if (result.ok()) {
+    pelton::SqlResult &sql_result = result.value();
+    for (pelton::SqlResultSet &resultset : sql_result.ResultSets()) {
+      std::vector<pelton::dataflow::Record> records = resultset.Vec();
+      size_t num_rows = records.size();
+      size_t num_cols = resultset.schema().size();
+
+      // allocate memory for CResult struct and the flexible array of RecordData
+      // unions
+      // we have to use malloc here to account for the flexible array.
+      FFIResult *c_result = static_cast<FFIResult *>(
+          malloc(sizeof(FFIResult) + sizeof(FFIRecord) * num_rows * num_cols));
+      //  |- FFIResult*-|   |struct FFIRecord| |num of records (rows) and cols |
+
+      // set number of columns
+      c_result->num_cols = num_cols;
+      c_result->num_rows = num_rows;
+      PopulateSchema(c_result, resultset.schema());
+      PopulateRecords(c_result, records);
+      return c_result;
+    }
+  }
+  return nullptr;
+}

@@ -3,6 +3,7 @@
 #define PELTON_PELTON_H_
 
 #include <string>
+#include <vector>
 
 #include "absl/status/statusor.h"
 #include "pelton/connection.h"
@@ -25,8 +26,7 @@ using Record = dataflow::Record;
 bool initialize(size_t workers, bool consistent);
 
 // delete pelton_state
-bool shutdown(bool shutdown_jvm);
-bool shutdown();
+bool shutdown(bool shutdown_jvm = true);
 
 // open connection
 bool open(Connection *connection, const std::string &db_name);
@@ -38,8 +38,14 @@ bool close(Connection *connection);
 
 // Call this if you are certain you are not going to make more calls to
 // make_view to shutdown the JVM.
-void shutdown_planner();
-void shutdown_planner(bool shutdown_jvm);
+void shutdown_planner(bool shutdown_jvm = true);
+
+// Prepared Statement API.
+absl::StatusOr<const PreparedStatementDescriptor *> prepare(
+    Connection *connection, const std::string &query);
+
+absl::StatusOr<SqlResult> exec(Connection *connection, StatementID stmt_id,
+                               const std::vector<std::string> &args);
 
 }  // namespace pelton
 

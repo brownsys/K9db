@@ -22,7 +22,13 @@ impl Drop for FFIResult {
         unsafe {FFIDestroySelect(self)};
     }
 }
+impl Drop for FFIPreparedStatement {
+    fn drop(&mut self) {
+        unsafe {FFIDestroyPreparedStatement(self)};
+    }
+}
 
+// Command line arguments.
 pub fn gflags_ffi(args: std::env::Args, usage: &str) -> CommandLineArgs {
     let usage = CString::new(usage).unwrap();
     // Encode args as char**.
@@ -43,24 +49,28 @@ pub fn gflags_ffi(args: std::env::Args, usage: &str) -> CommandLineArgs {
     };
 }
 
+// Starting and stopping the proxy.
 pub fn initialize_ffi(workers: usize, consistent: bool) -> bool {
     return unsafe { FFIInitialize(workers, consistent) };
 }
+pub fn shutdown_ffi() -> bool {
+    return unsafe { FFIShutdown() };
+}
+pub fn shutdown_planner_ffi() {
+    unsafe { FFIPlannerShutdown() }
+}
 
+// Open and close a new connection.
 pub fn open_ffi(db: &str) -> FFIConnection {
     let db = CString::new(db).unwrap();
     let db = db.as_ptr();
     return unsafe { FFIOpen(db) };
 }
-
-pub fn shutdown_ffi() -> bool {
-    return unsafe { FFIShutdown() };
-}
-
 pub fn close_ffi(rust_conn: *mut FFIConnection) -> bool {
     return unsafe { FFIClose(rust_conn) };
 }
 
+// Handling different types of SQL statements.
 pub fn exec_ddl_ffi(rust_conn: *mut FFIConnection, query: &str) -> bool {
     let c_query = CString::new(query).unwrap();
     let char_query: *const c_char = c_query.as_ptr();
@@ -79,6 +89,16 @@ pub fn exec_select_ffi(rust_conn: *mut FFIConnection, query: &str) -> *mut FFIRe
     return unsafe { FFIExecSelect(rust_conn, char_query) };
 }
 
+pub fn convert_column_type(coltype: FFIColumnType) -> ColumnType {
+    match coltype {
+        FFIColumnType_UINT => ColumnType::MYSQL_TYPE_LONGLONG,
+        FFIColumnType_INT => ColumnType::MYSQL_TYPE_LONGLONG,
+        FFIColumnType_TEXT => ColumnType::MYSQL_TYPE_VAR_STRING,
+        FFIColumnType_DATETIME => ColumnType::MYSQL_TYPE_VAR_STRING,
+        _ => ColumnType::MYSQL_TYPE_NULL,
+    }
+}
+
 pub fn convert_columns(
     num_cols: usize,
     col_types: [FFIColumnType; 64usize],
@@ -91,14 +111,7 @@ pub fn convert_columns(
             unsafe { CString::from_raw(col_names[c]).into_string().unwrap() };
 
         // convert C column type enum to MYSQL type
-        let col_type_c = col_types[c];
-        let col_type = match col_type_c {
-            FFIColumnType_UINT => ColumnType::MYSQL_TYPE_LONGLONG,
-            FFIColumnType_INT => ColumnType::MYSQL_TYPE_LONGLONG,
-            FFIColumnType_TEXT => ColumnType::MYSQL_TYPE_VAR_STRING,
-            FFIColumnType_DATETIME => ColumnType::MYSQL_TYPE_VAR_STRING,
-            _ => ColumnType::MYSQL_TYPE_NULL,
-        };
+        let col_type = convert_column_type(col_types[c]);
         cols.push(Column {
             table: "".to_string(),
             column: col_name_string,
@@ -109,6 +122,22 @@ pub fn convert_columns(
     return cols;
 }
 
-pub fn shutdown_planner_ffi() {
-  unsafe { FFIPlannerShutdown() }
+// Prepared statements.
+pub fn prepare_ffi(rust_conn: *mut FFIConnection, query: &str) -> *mut FFIPreparedStatement {
+    let c_query = CString::new(query).unwrap();
+    let char_query: *const c_char = c_query.as_ptr();
+    return unsafe { FFIPrepare(rust_conn, char_query) };
+}
+
+pub fn exec_prepared_ffi(rust_conn: *mut FFIConnection, stmt_id: usize, args: Vec<String>) -> *mut FFIResult {
+    let args_len = args.len();
+    let mut cstr_args: Vec<CString> = Vec::with_capacity(args_len);
+    let mut c_args: Vec<* const c_char> = Vec::with_capacity(args_len);
+    let mut i = 0;
+    for arg in args {
+      cstr_args.push(CString::new(arg).unwrap());
+      c_args.push(cstr_args[i].as_ptr());
+      i += 1;
+    }
+    return unsafe { FFIExecPrepare(rust_conn, stmt_id, args_len, c_args.as_mut_ptr()) };
 }
