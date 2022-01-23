@@ -8,7 +8,6 @@
 
 #include "glog/logging.h"
 #include "gtest/gtest.h"
-#include "mariadb/conncpp.hpp"
 
 #define DB_NAME "ffi_test"
 

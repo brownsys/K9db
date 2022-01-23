@@ -69,6 +69,25 @@ RUN echo "* soft nofile 1024000" >> /etc/security/limits.d/90-nproc.conf \
     && echo "* hard nproc 10240" >> /etc/security/limits.d/90-nproc.conf \
     && echo "root soft nproc unlimited" >> /etc/security/limits.d/90-nproc.conf
 
+# install mariadb connector (for memcached)
+RUN apt-get install -y libmariadb3 libmariadb-dev
+RUN cd /tmp \
+    && wget https://dlm.mariadb.com/1601342/Connectors/cpp/connector-cpp-1.0.0/mariadb-connector-cpp-1.0.0-ubuntu-groovy-amd64.tar.gz \
+    && tar -xvzf mariadb-connector-cpp-1.0.0-*.tar.gz
+
+RUN cd /tmp/mariadb-connector-cpp-1.0.0-* \
+    && install -d /usr/include/mariadb/conncpp \
+    && install -d /usr/include/mariadb/conncpp/compat \
+    && install -v include/mariadb/*.hpp /usr/include/mariadb/ \
+    && install -v include/mariadb/conncpp/*.hpp /usr/include/mariadb/conncpp \
+    && install -v include/mariadb/conncpp/compat/* /usr/include/mariadb/conncpp/compat
+
+RUN cd /tmp/mariadb-connector-cpp-1.0.0-* \
+    && install -d /usr/lib/mariadb \
+    && install -d /usr/lib/mariadb/plugin \
+    && install -v lib64/mariadb/libmariadbcpp.so /usr/lib \
+    && install -v lib64/mariadb/plugin/* /usr/lib/mariadb/plugin
+
 # configure mariadb user
 RUN chown -R mysql:root /var/lib/mysql
 RUN mkdir -p /run/mysqld
