@@ -54,6 +54,12 @@ typedef struct {
   FFIRecord records[];
 } FFIResult;
 
+typedef struct {
+  size_t stmt_id;
+  size_t arg_count;
+  FFIColumnType args[];
+} FFIPreparedStatement;
+
 // The FFI API.
 
 // Pass command line arguments to gflags
@@ -89,6 +95,14 @@ void FFIPlannerShutdown();
 
 // Close a client connection. Returns true if successful and false otherwise.
 bool FFIClose(FFIConnection *c_conn);
+
+// Create a prepared statement.
+FFIPreparedStatement *FFIPrepare(FFIConnection *c_conn, const char *query);
+void FFIDestroyPreparedStatement(FFIPreparedStatement *c_stmt);
+
+// Execute a prepared statement.
+FFIResult *FFIExecPrepare(FFIConnection *c_conn, size_t stmt_id,
+                          size_t arg_count, const char **arg_values);
 
 #ifdef __cplusplus
 }

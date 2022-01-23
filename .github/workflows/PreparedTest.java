@@ -25,15 +25,18 @@ class PreparedTest {
   public static String[] PREP_SELECT = {
       "SELECT age, Count(id) FROM tbl WHERE age = ? GROUP BY age",
       "SELECT age, name, Count(id) FROM tbl GROUP BY age, name HAVING name = ? AND age = ?",
-      "SELECT * FROM tbl WHERE id = ?",
-      "SELECT * FROM tbl WHERE id = ? AND age > ?"
+      "SELECT * FROM tbl WHERE id = ?"
+      //"SELECT * FROM tbl WHERE id = ? AND age > ?"
   };
 
   public static void main(String[] args) throws SQLException, ClassNotFoundException {
     Connection connection = DriverManager.getConnection(JDBC_STRING);
     Statement stmt = connection.createStatement();
     stmt.execute(CREATE_TABLE);
+    stmt.execute("INSERT INTO tbl VALUES (1, 'John', 25)");
+    stmt.execute("INSERT INTO tbl VALUES (2, 'Smith', 35)");
 
+    /*
     PreparedStatement prepInsert = connection.prepareStatement(PREP_INSERT);
     prepInsert.setInt(1, 1);
     prepInsert.setString(2, "'John'");
@@ -43,6 +46,7 @@ class PreparedTest {
     prepInsert.setString(2, "'Smith'");
     prepInsert.setInt(3, 35);
     assert prepInsert.executeUpdate() == 1;
+    */
 
     PreparedStatement prepSelect = connection.prepareStatement(PREP_SELECT[0]);
     prepSelect.setInt(1, 25);
@@ -82,6 +86,7 @@ class PreparedTest {
     assert resultSet.getInt(3) == 25;
     assert !resultSet.next();
 
+    /*
     prepSelect = connection.prepareStatement(PREP_SELECT[3]);
     prepSelect.setInt(1, 2);
     prepSelect.setInt(2, 30);
@@ -95,6 +100,7 @@ class PreparedTest {
     assert resultSet.getString(2).equals("Smith");
     assert resultSet.getInt(3) == 35;
     assert !resultSet.next();
+    */
 
     connection.close();
   }
