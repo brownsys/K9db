@@ -35,6 +35,8 @@ int TestingMainFixture(int argc, char **argv, const std::string &testname,
 // for the given queries.
 void RunTest(const std::string &query_file_prefix);
 
+pelton::Connection *GetPeltonInstance();
+
 // See documentation for `TestingMainFixture`
 class CleanDatabaseFixture : public ::testing::Test {
  public:

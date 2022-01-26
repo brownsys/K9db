@@ -159,6 +159,10 @@ class SharderState {
   UniqueLock WriterLock();
   SharedLock ReaderLock() const;
 
+  // For testing
+
+  bool HasDefaultTable(const UnshardedTableName &name) const;
+
  private:
   // The logical (unsharded) schema of every table.
   std::unordered_map<UnshardedTableName, sqlast::CreateTable> schema_;

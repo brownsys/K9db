@@ -2,6 +2,8 @@
 #include "glog/logging.h"
 #include "tests/common.h"
 
+#include "pelton/shards/state.h"
+
 // Features / things to test
 
 std::string data_file(const std::string &s) { return "tests/data/varown/" + s; }
@@ -9,6 +11,12 @@ std::string data_file(const std::string &s) { return "tests/data/varown/" + s; }
 class Varown : public tests::CleanDatabaseFixture {};
 
 // ================= OWNS =================
+
+// A simple test that ensures a default table has been isntalled for the
+// pointed-to table in a varown scenario
+TEST_F(Varown, InstallDefaultTable) {
+  EXPECT_TRUE(tests::GetPeltonInstance()->state->sharder_state()->HasDefaultTable("t"));
+}
 
 // Storage: A resource that is variably shared shows up a users muDB's
 TEST_F(Varown, Storage1) {

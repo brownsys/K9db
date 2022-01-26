@@ -249,5 +249,9 @@ sql::SqlResult SharderState::NumShards() const {
 UniqueLock SharderState::WriterLock() { return UniqueLock(&this->mtx_); }
 SharedLock SharderState::ReaderLock() const { return SharedLock(&this->mtx_); }
 
+bool SharderState::HasDefaultTable(const UnshardedTableName &name) const {
+  return this->sharded_schema_.contains(name);
+}
+
 }  // namespace shards
 }  // namespace pelton
