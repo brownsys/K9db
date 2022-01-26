@@ -484,8 +484,8 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(
   // If this table owns a different table, we need to shard that table now too.
   // It was probably installed without any sharding before
   if (!state->Exists(target_table_name))
-    return absl::UnimplementedError(
-        "Owning tables are expected to have been created previously");
+    return absl::InvalidArgumentError(
+        "Foreign key violation: Target table " + target_table_name + " of foreign key " + relationship_table_name + "(" + owning_table.column.column_name() + ") does not exist.");
 
   const sqlast::CreateTable &target_table_schema =
       ResolveTableSchema(*state, target_table_name);
