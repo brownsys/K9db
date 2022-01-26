@@ -117,6 +117,8 @@ struct ShardingInformation {
   ColumnName next_column;
   FlowName next_index_name;
 
+  bool is_varowned_;
+
   // Constructors.
   ShardingInformation() = default;
 
@@ -131,7 +133,8 @@ struct ShardingInformation {
         distance_from_shard(0),
         next_table(""),
         next_column(nc),
-        next_index_name("") {}
+        next_index_name(""),
+        is_varowned_(false) {}
 
   // A transitive sharding information can only be created given the previous
   // sharding information in the transitivity chain.
@@ -152,6 +155,10 @@ struct ShardingInformation {
 
   // Helpers.
   bool IsTransitive() const { return this->distance_from_shard > 0; }
+
+  void MakeVarowned() { this->is_varowned = true; }
+
+  bool is_varowned() { return this->is_varowned_; }
 };
 
 }  // namespace shards

@@ -124,6 +124,19 @@ bool ColumnDefinition::HasConstraint(ColumnConstraint::Type type) const {
   return false;
 }
 
+const ColumnConstraint &GetConstraintOfType(ColumnConstraintTypeEnum::Type type) const {
+  for (const auto &constraint : this->constraints_) {
+    if (type == constraint.type()) {
+      return constraint;
+    }
+  }
+  LOG(FATAL) << "No constraint of type " << constraint.type() << " found for column " << *this;
+}
+
+const ColumnConstraint &GetForeignKeyConstraint() const {
+  return this->GetConstraintOfType(ColumnConstraintTypeEnum::FOREIGN_KEY);
+}
+
 // CreateTable
 const std::string &CreateTable::table_name() const { return this->table_name_; }
 std::string &CreateTable::table_name() { return this->table_name_; }
@@ -146,6 +159,7 @@ ColumnDefinition &CreateTable::MutableColumn(const std::string &column_name) {
   size_t column_index = this->columns_map_.at(column_name);
   return this->columns_.at(column_index);
 }
+
 
 bool CreateTable::HasColumn(const std::string &column_name) const {
   return this->columns_map_.count(column_name) == 1;

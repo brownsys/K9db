@@ -53,26 +53,13 @@ absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
   bool was_moved = false;
   for (auto &col : rel_schema.GetColumns()) {
     if (IsOwning(col)) {
-      continue;
       VLOG(1) << "Found owning column";
       if (was_moved) {
         return absl::InvalidArgumentError("Two owning columns?");
       } else {
         was_moved = true;
-        const sqlast::ColumnConstraint *constr = nullptr;
-        for (auto &aconstr : col.GetConstraints()) {
-          if (aconstr.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
-            if (constr == nullptr) {
-              constr = &aconstr;
-            } else {
-              return absl::InvalidArgumentError(
-                  "Too many foreign key constraints");
-            }
-          }
-        }
-        if (!constr)
-          return absl::InvalidArgumentError(
-              "Expected to find a foreign key constraint");
+        const sqlast::ColumnConstraint &constr = col.GetForeignKeyConstraint();
+  
         const std::string &target_table = constr->foreign_table();
         sqlast::Select select(target_table);
         auto binexp = std::make_unique<sqlast::BinaryExpression>(
@@ -247,7 +234,17 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
         ASSIGN_OR_RETURN(auto &lookup, index::LookupIndex(info.next_index_name,
                                                           user_id, connection));
         if (lookup.size() < 1) {
-          return absl::InvalidArgumentError("Foreign Key Value does not exist");
+          if (info.is_varowned()) { 
+            // In case the table is variably owned this pointed-to resource may
+            // have been inserted before the relationship record is inserted. In
+            // that case we insert into the default table instead and skip the
+            // sharded insert.
+
+            result = exec.Default(&stmt);
+            continue;
+          } else {
+            return absl::InvalidArgumentError("Foreign Key Value does not exist");
+          }
         }
 
         for (auto &uid : lookup) {
