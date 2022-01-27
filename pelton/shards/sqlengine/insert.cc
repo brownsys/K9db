@@ -41,6 +41,20 @@ const ShardedTableName &VarownShardedTableName(
                            target_table + " on column " + column_name);
 }
 
+absl::StatusOr<std::string> GetFKValueHelper(const sqlast::ColumnDefinition &col, const ShardingInformation & info, const sqlast::Insert &stmt, const sqlast::CreateTable &schema) {
+  if (stmt.HasColumns()) {
+    return stmt.GetValue(col.column_name());
+  }
+  size_t fk_idx = schema.ColumnIndex(col.column_name());
+  if (!info.IsTransitive() && info.shard_by_index < fk_idx) {
+    --fk_idx; 
+    CHECK_EQ(schema.GetColumns().size() - 1, stmt.GetValues().size());
+  } else {
+    CHECK_EQ(schema.GetColumns().size(), stmt.GetValues().size());
+  }
+  return stmt.GetValue(fk_idx);
+}
+
 absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
                                      const sqlast::Insert &cloned,
                                      Connection *connection, bool *update_flows,
@@ -60,22 +74,17 @@ absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
         was_moved = true;
         const sqlast::ColumnConstraint &constr = col.GetForeignKeyConstraint();
   
-        const std::string &target_table = constr->foreign_table();
+        const std::string &target_table = constr.foreign_table();
         sqlast::Select select(target_table);
         auto binexp = std::make_unique<sqlast::BinaryExpression>(
             sqlast::Expression::Type::EQ);
         binexp->SetLeft(std::make_unique<sqlast::ColumnExpression>(
-            constr->foreign_column()));
-        // Handle if the insert statement does not set all columns (or in
-        // different order)
-        if (cloned.GetColumns().size() != 0)
-          return absl::InternalError("Unhandeled");
-        size_t fk_idx = rel_schema.ColumnIndex(col.column_name());
-        if (!info.IsTransitive())
-          --fk_idx;  // this is to account for the dropped column in directly
-                     // sharded tables. This is unstable.
+            constr.foreign_column()));
+
+        ASSIGN_OR_RETURN(const auto &col_val, GetFKValueHelper(col, info, cloned, rel_schema));
+        VLOG(1) << "FK value found";
         binexp->SetRight(std::make_unique<sqlast::LiteralExpression>(
-            cloned.GetValue(fk_idx)));
+            col_val));
         select.SetWhereClause(std::move(binexp));
         const sqlast::CreateTable schema = state->GetSchema(target_table);
         const ShardedTableName &sharded_table = VarownShardedTableName(
@@ -87,10 +96,9 @@ absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
         }
         ASSIGN_OR_RETURN(sql::SqlResult & inner_result,
                          select::Shard(select, connection, true));
-        if ((inner_result.IsStatement() && !inner_result.Success()) ||
-            (inner_result.IsQuery() && inner_result.ResultSets().size() == 0)) {
-          VLOG(1) << "Skipping value moving. Reason: The lookup has no results "
-                     "or failed";
+        CHECK(inner_result.IsQuery());
+        if (inner_result.ResultSets().size() == 0) {
+          VLOG(1) << "Skipping value moving. Reason: The lookup has no results";
           continue;
         }
         auto &result_set = inner_result.ResultSets().front();
@@ -98,10 +106,14 @@ absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
           LOG(WARNING) << "Too many results for " << schema.table_name()
                        << " during value move";
         }
-        dataflow::Record &rec = result_set.Vec().front();
+        if (result_set.size() == 0) {
+          VLOG(1) << "Skipping value moving. Reason: The lookup result set is empty";
+          continue;
+        }
+        const dataflow::Record &rec = result_set.Vec().front();
         uint64_t csize = schema.GetColumns().size();
-        if (csize != rec.schema().size())
-          LOG(FATAL) << csize << " != " << rec.schema().size();
+        if (csize != result_set.schema().size())
+          LOG(FATAL) << csize << " != " << result_set.schema().size();
         for (uint64_t i = 0; i < csize; i++) {
           auto v = rec.GetValue(i).GetSqlString();
           insert.AddValue(v);

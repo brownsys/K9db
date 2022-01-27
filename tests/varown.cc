@@ -55,6 +55,10 @@ TEST_F(Varown, DeleteRel2) { tests::RunTest(data_file("delete_rel2")); }
 // Selecting all records from the target table does not return duplicates.
 TEST_F(Varown, SelectStar) { tests::RunTest(data_file("select_star")); }
 
+TEST_F(Varown, MoveFromNonDefaultOrderedColumn) {
+  tests::RunTest(data_file("move_from_non_default_ordered_column"));
+}
+
 // ================= ACCESSES =================
 
 // An accesible resource shows up in a GDPR GET for the user

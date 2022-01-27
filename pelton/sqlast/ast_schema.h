@@ -52,6 +52,8 @@ class ColumnConstraint {
     return {};
   }
 
+  friend std::ostream &operator<<(std::ostream &os, const ColumnConstraint &r);
+
  private:
   Type type_;
   std::string foreign_table_;
@@ -98,7 +100,7 @@ class ColumnDefinition {
   // Get a foreign key constraint on this column. Errors if no such constraint exists.
   const ColumnConstraint &GetForeignKeyConstraint() const;
   // Get the first constraint matching a specific type on this column. Errors if no such constraint exists. Use `HasConstraint()` to check that such a constraint exists first.
-  const ColumnConstraint &GetConstraintOfType(ColumnConstraintTypeEnum::Type) const;
+  const ColumnConstraint &GetConstraintOfType(ColumnConstraint::Type type) const;
 
   // Ownership.
   bool owner() const { return this->owner_; }
@@ -130,6 +132,8 @@ class ColumnDefinition {
     }
     return result;
   }
+
+  friend std::ostream &operator<<(std::ostream &os, const ColumnDefinition &r);
 
  private:
   std::string column_name_;

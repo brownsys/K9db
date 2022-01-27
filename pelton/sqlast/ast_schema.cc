@@ -124,16 +124,16 @@ bool ColumnDefinition::HasConstraint(ColumnConstraint::Type type) const {
   return false;
 }
 
-const ColumnConstraint &GetConstraintOfType(ColumnConstraintTypeEnum::Type type) const {
+const ColumnConstraint &ColumnDefinition::GetConstraintOfType(ColumnConstraint::Type type) const {
   for (const auto &constraint : this->constraints_) {
     if (type == constraint.type()) {
       return constraint;
     }
   }
-  LOG(FATAL) << "No constraint of type " << constraint.type() << " found for column " << *this;
+  LOG(FATAL) << "No constraint of type " << type << " found for column " << *this;
 }
 
-const ColumnConstraint &GetForeignKeyConstraint() const {
+const ColumnConstraint &ColumnDefinition::GetForeignKeyConstraint() const {
   return this->GetConstraintOfType(ColumnConstraintTypeEnum::FOREIGN_KEY);
 }
 
@@ -223,6 +223,22 @@ std::ostream &operator<<(std::ostream &os, const AbstractStatement::Type &t) {
       LOG(FATAL) << "No string representation defined for an enum variant for "
                  << typeid(t).name();
   }
+}
+
+std::ostream &operator<<(std::ostream &os, const ColumnConstraint &r) {
+  os << r.type();
+  if (r.type() == ColumnConstraint::Type::FOREIGN_KEY) {
+    os << " " << r.foreign_table() << " (" << r.foreign_column() << ")";
+  } 
+  return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const ColumnDefinition &r) {
+  os << r.column_name() << " " << r.column_type();
+  for (const auto &constr : r.GetConstraints()) {
+    os << " " << constr;
+  }
+  return os;
 }
 
 }  // namespace sqlast

@@ -156,9 +156,9 @@ struct ShardingInformation {
   // Helpers.
   bool IsTransitive() const { return this->distance_from_shard > 0; }
 
-  void MakeVarowned() { this->is_varowned = true; }
+  void MakeVarowned() { this->is_varowned_ = true; }
 
-  bool is_varowned() { return this->is_varowned_; }
+  bool is_varowned() const { return this->is_varowned_; }
 };
 
 }  // namespace shards
