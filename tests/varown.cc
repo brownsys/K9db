@@ -59,6 +59,10 @@ TEST_F(Varown, MoveFromNonDefaultOrderedColumn) {
   tests::RunTest(data_file("move_from_non_default_ordered_column"));
 }
 
+TEST_F(Varown, NaturalInsertOrder) {
+  tests::RunTest(data_file("natural_insert_order"));
+}
+
 // ================= ACCESSES =================
 
 // An accesible resource shows up in a GDPR GET for the user
