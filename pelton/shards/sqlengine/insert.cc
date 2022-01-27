@@ -55,6 +55,15 @@ absl::StatusOr<std::string> GetFKValueHelper(const sqlast::ColumnDefinition &col
   return stmt.GetValue(fk_idx);
 }
 
+std::unique_ptr<sqlast::BinaryExpression> MakePointSelectBinexp(const std::string &col, const std::string &col_val) {
+  auto binexp = std::make_unique<sqlast::BinaryExpression>(
+    sqlast::Expression::Type::EQ);
+  binexp->SetLeft(std::make_unique<sqlast::ColumnExpression>(col));
+  binexp->SetRight(std::make_unique<sqlast::LiteralExpression>(
+    col_val));
+  return binexp;
+}
+
 absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
                                      const sqlast::Insert &cloned,
                                      Connection *connection, bool *update_flows,
@@ -76,16 +85,13 @@ absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
   
         const std::string &target_table = constr.foreign_table();
         sqlast::Select select(target_table);
-        auto binexp = std::make_unique<sqlast::BinaryExpression>(
-            sqlast::Expression::Type::EQ);
-        binexp->SetLeft(std::make_unique<sqlast::ColumnExpression>(
-            constr.foreign_column()));
 
         ASSIGN_OR_RETURN(const auto &col_val, GetFKValueHelper(col, info, cloned, rel_schema));
         VLOG(1) << "FK value found";
-        binexp->SetRight(std::make_unique<sqlast::LiteralExpression>(
-            col_val));
-        select.SetWhereClause(std::move(binexp));
+        select.SetWhereClause(MakePointSelectBinexp(
+          constr.foreign_column(),
+          col_val
+        ));
         const sqlast::CreateTable schema = state->GetSchema(target_table);
         const ShardedTableName &sharded_table = VarownShardedTableName(
             *state, target_table, col.column_name(), stmt.table_name());
@@ -94,10 +100,11 @@ absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
           insert.AddColumn(col0.column_name());
           select.AddColumn(col0.column_name());
         }
+        bool needs_default_db_delete = false;
         ASSIGN_OR_RETURN(sql::SqlResult & inner_result,
-                         select::Shard(select, connection, true));
+                         select::Shard(select, connection, true, &needs_default_db_delete));
         CHECK(inner_result.IsQuery());
-        if (inner_result.ResultSets().size() == 0) {
+        if (inner_result.empty()) {
           VLOG(1) << "Skipping value moving. Reason: The lookup has no results";
           continue;
         }
@@ -105,10 +112,6 @@ absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
         if (inner_result.ResultSets().size() > 1 || result_set.size() > 1) {
           LOG(WARNING) << "Too many results for " << schema.table_name()
                        << " during value move";
-        }
-        if (result_set.size() == 0) {
-          VLOG(1) << "Skipping value moving. Reason: The lookup result set is empty";
-          continue;
         }
         const dataflow::Record &rec = result_set.Vec().front();
         uint64_t csize = schema.GetColumns().size();
@@ -119,6 +122,11 @@ absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
           insert.AddValue(v);
         }
         result->Append(exec.Shard(&insert, info.shard_kind, user_id), false);
+        if (needs_default_db_delete) {
+          sqlast::Delete del(target_table);
+          del.SetWhereClause(MakePointSelectBinexp(constr.foreign_column(), col_val));
+          exec.Default(&del);
+        }
       }
     }
   }

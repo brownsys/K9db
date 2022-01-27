@@ -63,6 +63,30 @@ TEST_F(Varown, NaturalInsertOrder) {
   tests::RunTest(data_file("natural_insert_order"));
 }
 
+pelton::sql::SqlResult SelectTFromDefaultDB(const std::string &id) {
+  pelton::sqlast::Select select("t");
+  select.AddColumn("*");
+  auto binexp = std::make_unique<pelton::sqlast::BinaryExpression>(
+    pelton::sqlast::Expression::Type::EQ);
+  binexp->SetLeft(std::make_unique<pelton::sqlast::ColumnExpression>("id"));
+  binexp->SetRight(std::make_unique<pelton::sqlast::LiteralExpression>(
+    "0"));
+  select.SetWhereClause(std::move(binexp));
+  auto *instance = tests::GetPeltonInstance();
+  return instance->executor.Default(&select);
+}
+
+TEST_F(Varown, DeleteFromDefaultDb) {
+  tests::RunTest(data_file("delete_from_default_db"));
+  EXPECT_TRUE(SelectTFromDefaultDB("0").empty());
+}
+
+TEST_F(Varown, MoveToDefaultDB) {
+  tests::RunTest(data_file("move_to_default_db_after_delete"));
+  EXPECT_TRUE(!SelectTFromDefaultDB("0").empty());
+
+}
+
 // ================= ACCESSES =================
 
 // An accesible resource shows up in a GDPR GET for the user

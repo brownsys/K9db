@@ -56,7 +56,7 @@ dataflow::SchemaRef ResultSchema(const sqlast::Select &stmt,
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
-                                     Connection *connection, bool synchronize) {
+                                     Connection *connection, bool synchronize, bool *default_db_hit) {
   shards::SharderState *state = connection->state->sharder_state();
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
   SharedLock lock;
@@ -116,6 +116,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
       sqlast::ValueFinder value_finder(info.shard_by);
       auto [found, user_id] = cloned.Visit(&value_finder);
       if (found) {
+        VLOG(1) << "Value finder succeeded";
         if (info.IsTransitive()) {
           // Transitive sharding: look up via index.
           ASSIGN_OR_RETURN(
@@ -130,6 +131,17 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
             result.Append(
                 exec.Shard(&cloned, shard_kind, user_id, schema, aug_index),
                 true);
+          } else if (info.is_varowned()) {
+            // In varown case the lookup can be empty if the value is in the
+            // default shard
+            VLOG(1) << "Hitting default database";
+            auto res = exec.Default(&stmt, schema);
+            if (!res.empty()) {
+              *default_db_hit = true;
+            }
+            result.Append(
+              std::move(res),
+              true);
           }
         } else if (state->ShardExists(shard_kind, user_id)) {
           // Remove where condition on the shard by column, since it does not
@@ -144,17 +156,31 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
         }
 
       } else {
+        VLOG(1) << "Trying secondary indices";
         // The select statement by itself does not obviously constraint a shard.
         // Try finding the shard(s) via secondary indices.
         ASSIGN_OR_RETURN(const auto &pair,
                          index::LookupIndex(table_name, info.shard_by,
                                             stmt.GetWhereClause(), connection));
-        if (pair.first) {
+        bool query_succeeded = pair.first;
+        if (query_succeeded) {
+          VLOG(1)  << "Index succeeded";
           // Secondary index available for some constrainted column in stmt.
           result.Append(
               exec.Shards(&cloned, shard_kind, pair.second, schema, aug_index),
               true);
-        } else {
+        } else if (info.is_varowned()) {
+          // Try lookup in the default table instead (only useful if this is a
+          // varowned table)
+          VLOG(1) << "Looking into default table";
+          auto res = exec.Default(&stmt, schema);
+          if (res.ResultSets().size() > 0 && res.ResultSets().front().size() > 0) {
+            result.Append(std::move(res), true);
+            query_succeeded = true;
+            *default_db_hit = true;
+          }
+        }
+        if (!query_succeeded) {
           // Secondary index unhelpful.
           // Select from all the relevant shards.
           const auto &user_ids = state->UsersOfShard(shard_kind);
@@ -174,6 +200,11 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
   return result;
 }
 
+absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
+                                     Connection *connection, bool synchronize) {
+  bool ignored;
+  return Shard(stmt, connection, synchronize, &ignored);
+}
 }  // namespace select
 }  // namespace sqlengine
 }  // namespace shards

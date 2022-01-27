@@ -36,6 +36,8 @@ class SqlResultSet {
   std::vector<dataflow::Record> &&Vec() { return std::move(this->records_); }
   inline size_t size() const { return this->records_.size(); }
 
+  inline bool empty() const { return this->records_.empty(); }
+
  private:
   dataflow::SchemaRef schema_;
   std::vector<dataflow::Record> records_;
@@ -101,6 +103,13 @@ class SqlResult {
       DLOG(FATAL) << "ResultSets() called on non-query result";
     }
     return this->sets_;
+  }
+
+  // NOTE(justus): This function is only safe to call if `IsQuery()` returns
+  // true. Also the semantics of this check are a little weird (maybe I'll fix
+  // them in the future).
+  inline bool empty() const {
+    return this->ResultSets().empty() || this->ResultSets().front().empty();
   }
 
   // Internal API: do not use outside of pelton code.
