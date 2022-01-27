@@ -48,20 +48,41 @@ sql::SqlResult HandleOWNINGColumn(const UnshardedTableName &table_name,
         if (info->next_table != table_name) {
           continue;
         }
-
-        sqlast::Delete del(info->sharded_table_name);
         auto where = std::make_unique<sqlast::BinaryExpression>(
             sqlast::Expression::Type::EQ);
         where->SetLeft(std::make_unique<sqlast::ColumnExpression>(
             fk_constr->foreign_column()));
-        std::cerr << "Is it here?" << std::endl;
         where->SetRight(std::make_unique<sqlast::LiteralExpression>(
             delete_result
                 .GetValue(delete_result.schema().IndexOf(col.column_name()))
                 .GetSqlString()));
-        std::cerr << "No";
+
+        const auto &index_lookup_res_s = index::LookupIndex(foreign_table, info->shard_by, where.get(), connection);
+        if (!index_lookup_res_s.ok()) {
+          LOG(WARNING) << index_lookup_res_s.status();
+        }
+        const auto &index_lookup_res = index_lookup_res_s.value();
+
+        bool needs_move_to_default_db = index_lookup_res.first && index_lookup_res.second.size() == 1;
+          
+        sqlast::Delete del(info->sharded_table_name);
+        if (needs_move_to_default_db) 
+          del.MakeReturning();
         del.SetWhereClause(std::move(where));
-        result.Append(exec.Shard(&del, shard_kind, user_id), true);
+
+
+        auto move_delete_result = exec.Shard(&del, shard_kind, user_id);
+        if (needs_move_to_default_db) {
+          CHECK(!move_delete_result.empty());
+          sqlast::Insert insert(foreign_table, false);
+          const dataflow::Record &rec = move_delete_result.ResultSets().front().Vec().front();
+          for (uint64_t i = 0; i < rec.schema().size(); i++) {
+            insert.AddValue(rec.GetValue(i).GetSqlString());
+          }
+          exec.Default(&insert);
+        } else {
+          result.Append(std::move(move_delete_result), true);
+        }
       }
     }
   }
