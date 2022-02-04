@@ -104,7 +104,7 @@ dataflow::Key MakeKey(const Constraint &constraint,
           break;
         case sqlast::ColumnDefinition::Type::TEXT:
         case sqlast::ColumnDefinition::Type::DATETIME:
-          key.AddValue(dataflow::Record::Dequote(value));
+          key.AddValue(dataflow::Value::Dequote(value));
           break;
         default:
           LOG(FATAL) << "Unsupported type in view read";

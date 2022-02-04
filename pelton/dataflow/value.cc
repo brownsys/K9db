@@ -3,6 +3,14 @@
 namespace pelton {
 namespace dataflow {
 
+
+std::string Value::Dequote(const std::string &st) {
+  std::string s(st);
+  s.erase(remove(s.begin(), s.end(), '\"'), s.end());
+  s.erase(remove(s.begin(), s.end(), '\''), s.end());
+  return s;
+}
+
 // Copy underlying string.
 Value::Value(const Value &o) : type_(o.type_), str_() {
   this->is_null_ = o.is_null_;

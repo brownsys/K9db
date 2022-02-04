@@ -88,7 +88,8 @@ TEST_F(Varown, MoveToDefaultDB) {
 }
 
 TEST_F(Varown, MovesWithRelDuplicates) {
-  EXPECT_TRUE(false) << "test varown default db stuff when the relationship value is duplicated";
+  tests::RunTest(data_file("no_move_to_default_db_on_duplicate_rel"));
+  EXPECT_TRUE(SelectTFromDefaultDB("1005").empty());
 }
 
 // ================= ACCESSES =================

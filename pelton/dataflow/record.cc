@@ -7,13 +7,6 @@
 namespace pelton {
 namespace dataflow {
 
-std::string Record::Dequote(const std::string &st) {
-  std::string s(st);
-  s.erase(remove(s.begin(), s.end(), '\"'), s.end());
-  s.erase(remove(s.begin(), s.end(), '\''), s.end());
-  return s;
-}
-
 // Helper for Record::DataVariant.
 sqlast::ColumnDefinition::Type Record::TypeOfVariant(const DataVariant &v) {
   switch (v.index()) {
@@ -225,7 +218,7 @@ void Record::SetValue(const std::string &value, size_t i) {
     // a timestamp since the epoch
     case sqlast::ColumnDefinition::Type::DATETIME:
     case sqlast::ColumnDefinition::Type::TEXT: {
-      this->data_[i].str = std::make_unique<std::string>(Dequote(value));
+      this->data_[i].str = std::make_unique<std::string>(Value::Dequote(value));
       break;
     }
     default:

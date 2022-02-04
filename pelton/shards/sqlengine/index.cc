@@ -20,12 +20,7 @@ namespace index {
 namespace {
 
 std::vector<dataflow::Record> LookupIndexRecords(
-    const std::string &index_name, const std::string &value,
-    Connection *connection) {
-  // Find flow.
-  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
-  const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(index_name);
-
+    const dataflow::DataFlowGraph &flow, const std::string &value) {
   // Construct look up key.
   dataflow::Key lookup_key{1};
   switch (flow.output_schema().TypeOf(0)) {
@@ -36,7 +31,7 @@ std::vector<dataflow::Record> LookupIndexRecords(
       lookup_key.AddValue(static_cast<int64_t>(std::stoll(value)));
       break;
     case sqlast::ColumnDefinition::Type::TEXT: {
-      lookup_key.AddValue(dataflow::Record::Dequote(value));
+      lookup_key.AddValue(dataflow::Value::Dequote(value));
       break;
     }
     case sqlast::ColumnDefinition::Type::DATETIME:
@@ -47,6 +42,16 @@ std::vector<dataflow::Record> LookupIndexRecords(
                  << flow.output_schema().TypeOf(0);
   }
   return flow.Lookup(lookup_key, -1, 0);
+}
+
+std::vector<dataflow::Record> LookupIndexRecords(
+    const std::string &index_name, const std::string &value,
+    Connection *connection) {
+  // Find flow.
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(index_name);
+
+  return LookupIndexRecords(flow, value);
 }
 
 }
@@ -159,14 +164,70 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
   return result;
 }
 
-absl::StatusOr<uint64_t> LookupIndexEntryCount(
+// This is a function that is very specifically designed to be used by the
+// deletion handling code for variable owners to figure out if a pointed-to
+// resource needs to be deleted from the user shard and if it needs to be moved
+// to a global database. While the function is designed specifically for this
+// purpose it relies on a specific structure of the indices, and thus I decided
+// to put it here, instead of having distant parts of the code relying on
+// invariants of index layout.
+//
+// The function specifically answers the question whether a given resource is a)
+// present in the user shard (if not returns MISSING) b) whether the copy in
+// *this* users shard is the last copy globally (OWNS_LAST_COPY) c) whether it
+// is the last copy *for this user* (LAST_COPY) or d) if there are other copies
+// of this record in the users shard.
+//
+// Querying this index *should* be correct because pelton stores copies in the
+// user shard of there are multiple relations leading from the user to the
+// resource, and hwnce this index should be the ultimate authority on the cound
+// of copies *with regard to this sharding of the resource*.
+absl::StatusOr<RecordStatus> RecordStatusForUser(
     const std::string &index_name, const std::string &value,
-    Connection *connection) {
+    const std::string &user_id, Connection *connection) {
   uint64_t count = 0;
-  for (const dataflow::Record &record: LookupIndexRecords(index_name, value, connection)) {
-    count += record.GetUInt(2);
+  uint64_t user_copies = 0;
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(index_name);
+
+  const dataflow::Value &user_id_v = dataflow::Value(flow.output_schema().TypeOf(1), user_id);
+
+  for (const dataflow::Record &record: LookupIndexRecords(flow, value)) {
+    uint64_t this_count = record.GetUInt(2);
+    bool is_eq = record.GetValue(1) == user_id_v;
+    if (is_eq) {
+      CHECK_EQ(user_copies, 0);
+      user_copies += this_count;
+    } else {
+      count += this_count;
+    }
   }
-  return count;
+  if (user_copies == 0) {
+    return RecordStatus::MISSING;
+  } else if (user_copies == 1) {
+    if (count == 0) {
+      return RecordStatus::OWNS_LAST_COPY;
+    } else {
+      return RecordStatus::LAST_COPY;
+    }
+  } else {
+    return RecordStatus::MULTI_COPY;
+  }
+}
+
+std::ostream &operator<<(std::ostream &os, const RecordStatus &st) {
+  switch (st) {
+    case RecordStatus::MISSING:
+      return os << "MISSING";
+    case RecordStatus::LAST_COPY:
+      return os << "LAST_COPY";
+    case RecordStatus::OWNS_LAST_COPY:
+      return os << "OWNS_LAST_COPY";
+    case RecordStatus::MULTI_COPY:
+      return os << "MULTI_COPY";
+    default:
+      LOG(FATAL) << "Unknown record status variant";
+  }
 }
 
 }  // namespace index

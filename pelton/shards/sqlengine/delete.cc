@@ -54,20 +54,22 @@ sql::SqlResult HandleOWNINGColumn(const UnshardedTableName &table_name,
             delete_result
                 .GetValue(delete_result.schema().IndexOf(col.column_name()))
                   .GetSqlString();
-        const auto index_lookup_res_s = index::LookupIndexEntryCount(
+        const auto index_lookup_res_s = index::RecordStatusForUser(
           info->next_index_name, 
           key,
+          user_id,
           connection);
 
         if (!index_lookup_res_s.ok()) {
           LOG(WARNING) << index_lookup_res_s.status();
           continue;
         }
-        int index_lookup_res = index_lookup_res_s.value();
+        index::RecordStatus index_lookup_res = index_lookup_res_s.value();
+        if ( index_lookup_res == index::RecordStatus::MISSING 
+          || index_lookup_res == index::RecordStatus::MULTI_COPY) 
+          continue;
+        bool needs_move_to_default_db = index_lookup_res == index::RecordStatus::OWNS_LAST_COPY;
 
-        CHECK_GT(index_lookup_res, 0);
-        bool needs_move_to_default_db = index_lookup_res == 1;
-          
         auto where = std::make_unique<sqlast::BinaryExpression>(
             sqlast::Expression::Type::EQ);
         where->SetLeft(std::make_unique<sqlast::ColumnExpression>(

@@ -28,7 +28,6 @@ class Record {
   // by external code to ensure same types are supported.
   using DataVariant = std::variant<std::string, uint64_t, int64_t, NullValue>;
   static sqlast::ColumnDefinition::Type TypeOfVariant(const DataVariant &v);
-  static std::string Dequote(const std::string &st);
 
   // No default constructor.
   Record() = delete;

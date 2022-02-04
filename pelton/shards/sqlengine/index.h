@@ -20,6 +20,13 @@ namespace shards {
 namespace sqlengine {
 namespace index {
 
+// Helper type for RecordStatusForUser. See comment there for documentation.
+enum RecordStatus {
+    MISSING, OWNS_LAST_COPY, LAST_COPY, MULTI_COPY
+};
+
+std::ostream &operator<<(std::ostream &os, const RecordStatus &st);
+
 absl::StatusOr<sql::SqlResult> CreateIndex(const sqlast::CreateIndex &stmt,
                                            Connection *connection);
 absl::StatusOr<sql::SqlResult> CreateIndexStateIsAlreadyLocked(
@@ -33,9 +40,9 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     const std::string &index_name, const std::string &value,
     Connection *connection);
 
-absl::StatusOr<uint64_t> LookupIndexEntryCount(
+absl::StatusOr<RecordStatus> RecordStatusForUser(
     const std::string &index_name, const std::string &value,
-    Connection *connection);
+    const std::string &user_id, Connection *connection);
 
 }  // namespace index
 }  // namespace sqlengine
