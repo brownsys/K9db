@@ -219,7 +219,7 @@ void RunTest(const std::string &query_file_prefix) {
     VLOG(1) << "Running query: " << query;
     // Run query.
     auto status = pelton::exec(&connection, query);
-    EXPECT_TRUE(status.ok()) << status.status() << query;
+    ASSERT_TRUE(status.ok()) << status.status() << query;
 
     // Store output.
     std::vector<std::string> actual;

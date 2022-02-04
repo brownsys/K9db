@@ -106,11 +106,8 @@ class SqlResult {
   }
 
   // NOTE(justus): This function is only safe to call if `IsQuery()` returns
-  // true. Also the semantics of this check are a little weird (maybe I'll fix
-  // them in the future).
-  inline bool empty() const {
-    return this->ResultSets().empty() || this->ResultSets().front().empty();
-  }
+  // true.
+  bool empty() const;
 
   // Internal API: do not use outside of pelton code.
   // Appends the provided SqlResult to this SqlResult, appeneded

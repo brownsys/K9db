@@ -345,7 +345,6 @@ std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type> GetAnonCols(
 
 absl::Status IndexAccessor(const sqlast::CreateTable &stmt,
                            Connection *connection, UniqueLock *lock) {
-  shards::SharderState *state = connection->state->sharder_state();
 
   // Result is empty by default.
   std::unordered_map<ColumnName, ColumnIndex> index_map;

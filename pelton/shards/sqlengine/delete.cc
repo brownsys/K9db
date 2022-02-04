@@ -28,6 +28,7 @@ sql::SqlResult HandleOWNINGColumn(const UnshardedTableName &table_name,
                                   Connection *connection) {
   const auto &state = *connection->state->sharder_state();
   auto &exec = connection->executor;
+  const auto &dataflow_state = *connection->state->dataflow_state();
 
   sql::SqlResult result(static_cast<int>(0));
   for (const auto &col : state.GetSchema(table_name).GetColumns()) {
@@ -44,38 +45,47 @@ sql::SqlResult HandleOWNINGColumn(const UnshardedTableName &table_name,
       const auto &foreign_table = fk_constr->foreign_table();
       const auto &infos =
           state.GetShardingInformationFor(foreign_table, shard_kind);
+      dataflow::SchemaRef schema = dataflow_state.GetTableSchema(foreign_table);
       for (const auto info : infos) {
         if (info->next_table != table_name) {
           continue;
         }
+        const auto &key = 
+            delete_result
+                .GetValue(delete_result.schema().IndexOf(col.column_name()))
+                  .GetSqlString();
+        const auto index_lookup_res_s = index::LookupIndexEntryCount(
+          info->next_index_name, 
+          key,
+          connection);
+
+        if (!index_lookup_res_s.ok()) {
+          LOG(WARNING) << index_lookup_res_s.status();
+          continue;
+        }
+        int index_lookup_res = index_lookup_res_s.value();
+
+        CHECK_GT(index_lookup_res, 0);
+        bool needs_move_to_default_db = index_lookup_res == 1;
+          
         auto where = std::make_unique<sqlast::BinaryExpression>(
             sqlast::Expression::Type::EQ);
         where->SetLeft(std::make_unique<sqlast::ColumnExpression>(
             fk_constr->foreign_column()));
-        where->SetRight(std::make_unique<sqlast::LiteralExpression>(
-            delete_result
-                .GetValue(delete_result.schema().IndexOf(col.column_name()))
-                .GetSqlString()));
-
-        const auto &index_lookup_res_s = index::LookupIndex(foreign_table, info->shard_by, where.get(), connection);
-        if (!index_lookup_res_s.ok()) {
-          LOG(WARNING) << index_lookup_res_s.status();
-        }
-        const auto &index_lookup_res = index_lookup_res_s.value();
-
-        bool needs_move_to_default_db = index_lookup_res.first && index_lookup_res.second.size() == 1;
+        where->SetRight(std::make_unique<sqlast::LiteralExpression>(key));
           
-        sqlast::Delete del(info->sharded_table_name);
-        if (needs_move_to_default_db) 
-          del.MakeReturning();
+        sqlast::Delete del(info->sharded_table_name, needs_move_to_default_db);
         del.SetWhereClause(std::move(where));
 
 
-        auto move_delete_result = exec.Shard(&del, shard_kind, user_id);
+        auto move_delete_result = exec.Shard(&del, shard_kind, user_id, schema);
         if (needs_move_to_default_db) {
-          CHECK(!move_delete_result.empty());
+          CHECK_EQ(move_delete_result.ResultSets().size(), 1);
+          std::vector<dataflow::Record> move_delete_result_vec = move_delete_result.ResultSets().front().Vec();
+          CHECK_EQ(move_delete_result_vec.size(), 1);
+          const dataflow::Record &rec = move_delete_result_vec.front();
           sqlast::Insert insert(foreign_table, false);
-          const dataflow::Record &rec = move_delete_result.ResultSets().front().Vec().front();
+          CHECK_GT(rec.schema().size(), 0);
           for (uint64_t i = 0; i < rec.schema().size(); i++) {
             insert.AddValue(rec.GetValue(i).GetSqlString());
           }

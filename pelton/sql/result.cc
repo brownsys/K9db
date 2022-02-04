@@ -79,5 +79,13 @@ std::ostream &operator<<(std::ostream &s, const SqlResult::Type &res) {
   return s;
 }
 
+bool SqlResult::empty() const {
+  bool empty = true;
+  for (const auto &s : this->ResultSets()) {
+    empty = empty && s.empty();
+  }
+  return empty;
+}
+
 }  // namespace sql
 }  // namespace pelton

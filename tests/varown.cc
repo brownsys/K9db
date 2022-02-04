@@ -70,7 +70,7 @@ pelton::sql::SqlResult SelectTFromDefaultDB(const std::string &id) {
     pelton::sqlast::Expression::Type::EQ);
   binexp->SetLeft(std::make_unique<pelton::sqlast::ColumnExpression>("id"));
   binexp->SetRight(std::make_unique<pelton::sqlast::LiteralExpression>(
-    "0"));
+    id));
   select.SetWhereClause(std::move(binexp));
   auto *instance = tests::GetPeltonInstance();
   return instance->executor.Default(&select);
@@ -78,12 +78,12 @@ pelton::sql::SqlResult SelectTFromDefaultDB(const std::string &id) {
 
 TEST_F(Varown, DeleteFromDefaultDb) {
   tests::RunTest(data_file("delete_from_default_db"));
-  EXPECT_TRUE(SelectTFromDefaultDB("0").empty());
+  EXPECT_TRUE(SelectTFromDefaultDB("2000").empty());
 }
 
 TEST_F(Varown, MoveToDefaultDB) {
   tests::RunTest(data_file("move_to_default_db_after_delete"));
-  EXPECT_TRUE(!SelectTFromDefaultDB("0").empty());
+  EXPECT_TRUE(!SelectTFromDefaultDB("2000").empty());
 
 }
 

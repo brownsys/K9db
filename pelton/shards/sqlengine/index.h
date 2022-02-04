@@ -33,6 +33,10 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     const std::string &index_name, const std::string &value,
     Connection *connection);
 
+absl::StatusOr<uint64_t> LookupIndexEntryCount(
+    const std::string &index_name, const std::string &value,
+    Connection *connection);
+
 }  // namespace index
 }  // namespace sqlengine
 }  // namespace shards

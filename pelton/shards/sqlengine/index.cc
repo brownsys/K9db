@@ -17,6 +17,40 @@ namespace shards {
 namespace sqlengine {
 namespace index {
 
+namespace {
+
+std::vector<dataflow::Record> LookupIndexRecords(
+    const std::string &index_name, const std::string &value,
+    Connection *connection) {
+  // Find flow.
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(index_name);
+
+  // Construct look up key.
+  dataflow::Key lookup_key{1};
+  switch (flow.output_schema().TypeOf(0)) {
+    case sqlast::ColumnDefinition::Type::UINT:
+      lookup_key.AddValue(static_cast<uint64_t>(std::stoull(value)));
+      break;
+    case sqlast::ColumnDefinition::Type::INT:
+      lookup_key.AddValue(static_cast<int64_t>(std::stoll(value)));
+      break;
+    case sqlast::ColumnDefinition::Type::TEXT: {
+      lookup_key.AddValue(dataflow::Record::Dequote(value));
+      break;
+    }
+    case sqlast::ColumnDefinition::Type::DATETIME:
+      lookup_key.AddValue(value);
+      break;
+    default:
+      LOG(FATAL) << "Unsupported data type in LookupIndex: "
+                 << flow.output_schema().TypeOf(0);
+  }
+  return flow.Lookup(lookup_key, -1, 0);
+}
+
+}
+
 absl::StatusOr<sql::SqlResult> CreateIndex(const sqlast::CreateIndex &stmt,
                                            Connection *connection) {
   // Need a unique lock as we are changing index metadata
@@ -82,7 +116,6 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
     const std::string &table_name, const std::string &shard_by,
     const sqlast::BinaryExpression *where_clause, Connection *connection) {
   SharderState *state = connection->state->sharder_state();
-  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
   if (where_clause == nullptr) {
     return std::make_pair(false, std::unordered_set<UserId>{});
   }
@@ -117,38 +150,23 @@ absl::StatusOr<std::pair<bool, std::unordered_set<UserId>>> LookupIndex(
 absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     const std::string &index_name, const std::string &value,
     Connection *connection) {
-  // Find flow.
-  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
-  const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(index_name);
-
-  // Construct look up key.
-  dataflow::Key lookup_key{1};
-  switch (flow.output_schema().TypeOf(0)) {
-    case sqlast::ColumnDefinition::Type::UINT:
-      lookup_key.AddValue(static_cast<uint64_t>(std::stoull(value)));
-      break;
-    case sqlast::ColumnDefinition::Type::INT:
-      lookup_key.AddValue(static_cast<int64_t>(std::stoll(value)));
-      break;
-    case sqlast::ColumnDefinition::Type::TEXT: {
-      lookup_key.AddValue(dataflow::Record::Dequote(value));
-      break;
-    }
-    case sqlast::ColumnDefinition::Type::DATETIME:
-      lookup_key.AddValue(value);
-      break;
-    default:
-      LOG(FATAL) << "Unsupported data type in LookupIndex: "
-                 << flow.output_schema().TypeOf(0);
-  }
-
   // Lookup.
   std::unordered_set<UserId> result;
-  for (const dataflow::Record &record : flow.Lookup(lookup_key, -1, 0)) {
+  for (const dataflow::Record &record : LookupIndexRecords(index_name, value, connection)) {
     result.insert(record.GetValueString(1));
   }
 
   return result;
+}
+
+absl::StatusOr<uint64_t> LookupIndexEntryCount(
+    const std::string &index_name, const std::string &value,
+    Connection *connection) {
+  uint64_t count = 0;
+  for (const dataflow::Record &record: LookupIndexRecords(index_name, value, connection)) {
+    count += record.GetUInt(2);
+  }
+  return count;
 }
 
 }  // namespace index
