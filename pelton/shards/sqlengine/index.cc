@@ -44,9 +44,9 @@ std::vector<dataflow::Record> LookupIndexRecords(
   return flow.Lookup(lookup_key, -1, 0);
 }
 
-std::vector<dataflow::Record> LookupIndexRecords(
-    const std::string &index_name, const std::string &value,
-    Connection *connection) {
+std::vector<dataflow::Record> LookupIndexRecords(const std::string &index_name,
+                                                 const std::string &value,
+                                                 Connection *connection) {
   // Find flow.
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
   const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(index_name);
@@ -54,7 +54,7 @@ std::vector<dataflow::Record> LookupIndexRecords(
   return LookupIndexRecords(flow, value);
 }
 
-}
+}  // namespace
 
 absl::StatusOr<sql::SqlResult> CreateIndex(const sqlast::CreateIndex &stmt,
                                            Connection *connection) {
@@ -157,7 +157,8 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     Connection *connection) {
   // Lookup.
   std::unordered_set<UserId> result;
-  for (const dataflow::Record &record : LookupIndexRecords(index_name, value, connection)) {
+  for (const dataflow::Record &record :
+       LookupIndexRecords(index_name, value, connection)) {
     result.insert(record.GetValueString(1));
   }
 
@@ -182,17 +183,19 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
 // user shard of there are multiple relations leading from the user to the
 // resource, and hwnce this index should be the ultimate authority on the cound
 // of copies *with regard to this sharding of the resource*.
-absl::StatusOr<RecordStatus> RecordStatusForUser(
-    const std::string &index_name, const std::string &value,
-    const std::string &user_id, Connection *connection) {
+absl::StatusOr<RecordStatus> RecordStatusForUser(const std::string &index_name,
+                                                 const std::string &value,
+                                                 const std::string &user_id,
+                                                 Connection *connection) {
   uint64_t count = 0;
   uint64_t user_copies = 0;
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
   const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(index_name);
 
-  const dataflow::Value &user_id_v = dataflow::Value(flow.output_schema().TypeOf(1), user_id);
+  const dataflow::Value &user_id_v =
+      dataflow::Value(flow.output_schema().TypeOf(1), user_id);
 
-  for (const dataflow::Record &record: LookupIndexRecords(flow, value)) {
+  for (const dataflow::Record &record : LookupIndexRecords(flow, value)) {
     uint64_t this_count = record.GetUInt(2);
     bool is_eq = record.GetValue(1) == user_id_v;
     if (is_eq) {

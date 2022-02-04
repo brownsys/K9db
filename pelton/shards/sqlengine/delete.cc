@@ -50,40 +50,38 @@ sql::SqlResult HandleOWNINGColumn(const UnshardedTableName &table_name,
         if (info->next_table != table_name) {
           continue;
         }
-        const auto &key = 
+        const auto &key =
             delete_result
                 .GetValue(delete_result.schema().IndexOf(col.column_name()))
-                  .GetSqlString();
+                .GetSqlString();
         const auto index_lookup_res_s = index::RecordStatusForUser(
-          info->next_index_name, 
-          key,
-          user_id,
-          connection);
+            info->next_index_name, key, user_id, connection);
 
         if (!index_lookup_res_s.ok()) {
           LOG(WARNING) << index_lookup_res_s.status();
           continue;
         }
         index::RecordStatus index_lookup_res = index_lookup_res_s.value();
-        if ( index_lookup_res == index::RecordStatus::MISSING 
-          || index_lookup_res == index::RecordStatus::MULTI_COPY) 
+        if (index_lookup_res == index::RecordStatus::MISSING ||
+            index_lookup_res == index::RecordStatus::MULTI_COPY)
           continue;
-        bool needs_move_to_default_db = index_lookup_res == index::RecordStatus::OWNS_LAST_COPY;
+        bool needs_move_to_default_db =
+            index_lookup_res == index::RecordStatus::OWNS_LAST_COPY;
 
         auto where = std::make_unique<sqlast::BinaryExpression>(
             sqlast::Expression::Type::EQ);
         where->SetLeft(std::make_unique<sqlast::ColumnExpression>(
             fk_constr->foreign_column()));
         where->SetRight(std::make_unique<sqlast::LiteralExpression>(key));
-          
+
         sqlast::Delete del(info->sharded_table_name, needs_move_to_default_db);
         del.SetWhereClause(std::move(where));
-
 
         auto move_delete_result = exec.Shard(&del, shard_kind, user_id, schema);
         if (needs_move_to_default_db) {
           CHECK_EQ(move_delete_result.ResultSets().size(), 1);
-          std::vector<dataflow::Record> move_delete_result_vec = move_delete_result.ResultSets().front().Vec();
+          std::vector<dataflow::Record> move_delete_result_vec =
+              move_delete_result.ResultSets().front().Vec();
           CHECK_EQ(move_delete_result_vec.size(), 1);
           const dataflow::Record &rec = move_delete_result_vec.front();
           sqlast::Insert insert(foreign_table, false);

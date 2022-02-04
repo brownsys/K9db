@@ -345,7 +345,6 @@ std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type> GetAnonCols(
 
 absl::Status IndexAccessor(const sqlast::CreateTable &stmt,
                            Connection *connection, UniqueLock *lock) {
-
   // Result is empty by default.
   std::unordered_map<ColumnName, ColumnIndex> index_map;
 
@@ -484,7 +483,9 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(
   // It was probably installed without any sharding before
   if (!state->Exists(target_table_name))
     return absl::InvalidArgumentError(
-        "Foreign key violation: Target table " + target_table_name + " of foreign key " + relationship_table_name + "(" + owning_table.column.column_name() + ") does not exist.");
+        "Foreign key violation: Target table " + target_table_name +
+        " of foreign key " + relationship_table_name + "(" +
+        owning_table.column.column_name() + ") does not exist.");
 
   const sqlast::CreateTable &target_table_schema =
       ResolveTableSchema(*state, target_table_name);

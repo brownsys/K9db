@@ -97,10 +97,14 @@ class ColumnDefinition {
 
   bool HasConstraint(ColumnConstraint::Type type) const;
 
-  // Get a foreign key constraint on this column. Errors if no such constraint exists.
+  // Get a foreign key constraint on this column. Errors if no such constraint
+  // exists.
   const ColumnConstraint &GetForeignKeyConstraint() const;
-  // Get the first constraint matching a specific type on this column. Errors if no such constraint exists. Use `HasConstraint()` to check that such a constraint exists first.
-  const ColumnConstraint &GetConstraintOfType(ColumnConstraint::Type type) const;
+  // Get the first constraint matching a specific type on this column. Errors if
+  // no such constraint exists. Use `HasConstraint()` to check that such a
+  // constraint exists first.
+  const ColumnConstraint &GetConstraintOfType(
+      ColumnConstraint::Type type) const;
 
   // Ownership.
   bool owner() const { return this->owner_; }

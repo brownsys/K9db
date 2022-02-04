@@ -124,13 +124,15 @@ bool ColumnDefinition::HasConstraint(ColumnConstraint::Type type) const {
   return false;
 }
 
-const ColumnConstraint &ColumnDefinition::GetConstraintOfType(ColumnConstraint::Type type) const {
+const ColumnConstraint &ColumnDefinition::GetConstraintOfType(
+    ColumnConstraint::Type type) const {
   for (const auto &constraint : this->constraints_) {
     if (type == constraint.type()) {
       return constraint;
     }
   }
-  LOG(FATAL) << "No constraint of type " << type << " found for column " << *this;
+  LOG(FATAL) << "No constraint of type " << type << " found for column "
+             << *this;
 }
 
 const ColumnConstraint &ColumnDefinition::GetForeignKeyConstraint() const {
@@ -159,7 +161,6 @@ ColumnDefinition &CreateTable::MutableColumn(const std::string &column_name) {
   size_t column_index = this->columns_map_.at(column_name);
   return this->columns_.at(column_index);
 }
-
 
 bool CreateTable::HasColumn(const std::string &column_name) const {
   return this->columns_map_.count(column_name) == 1;
@@ -229,7 +230,7 @@ std::ostream &operator<<(std::ostream &os, const ColumnConstraint &r) {
   os << r.type();
   if (r.type() == ColumnConstraint::Type::FOREIGN_KEY) {
     os << " " << r.foreign_table() << " (" << r.foreign_column() << ")";
-  } 
+  }
   return os;
 }
 

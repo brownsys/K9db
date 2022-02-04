@@ -1,8 +1,7 @@
 
 #include "glog/logging.h"
-#include "tests/common.h"
-
 #include "pelton/shards/state.h"
+#include "tests/common.h"
 
 // Features / things to test
 
@@ -15,7 +14,8 @@ class Varown : public tests::CleanDatabaseFixture {};
 // A simple test that ensures a default table has been isntalled for the
 // pointed-to table in a varown scenario
 TEST_F(Varown, InstallDefaultTable) {
-  EXPECT_TRUE(tests::GetPeltonInstance()->state->sharder_state()->HasDefaultTable("t"));
+  EXPECT_TRUE(
+      tests::GetPeltonInstance()->state->sharder_state()->HasDefaultTable("t"));
 }
 
 // Storage: A resource that is variably shared shows up a users muDB's
@@ -67,10 +67,9 @@ pelton::sql::SqlResult SelectTFromDefaultDB(const std::string &id) {
   pelton::sqlast::Select select("t");
   select.AddColumn("*");
   auto binexp = std::make_unique<pelton::sqlast::BinaryExpression>(
-    pelton::sqlast::Expression::Type::EQ);
+      pelton::sqlast::Expression::Type::EQ);
   binexp->SetLeft(std::make_unique<pelton::sqlast::ColumnExpression>("id"));
-  binexp->SetRight(std::make_unique<pelton::sqlast::LiteralExpression>(
-    id));
+  binexp->SetRight(std::make_unique<pelton::sqlast::LiteralExpression>(id));
   select.SetWhereClause(std::move(binexp));
   auto *instance = tests::GetPeltonInstance();
   return instance->executor.Default(&select);
@@ -84,7 +83,6 @@ TEST_F(Varown, DeleteFromDefaultDb) {
 TEST_F(Varown, MoveToDefaultDB) {
   tests::RunTest(data_file("move_to_default_db_after_delete"));
   EXPECT_TRUE(!SelectTFromDefaultDB("2000").empty());
-
 }
 
 TEST_F(Varown, MovesWithRelDuplicates) {

@@ -56,7 +56,8 @@ dataflow::SchemaRef ResultSchema(const sqlast::Select &stmt,
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
-                                     Connection *connection, bool synchronize, bool *default_db_hit) {
+                                     Connection *connection, bool synchronize,
+                                     bool *default_db_hit) {
   shards::SharderState *state = connection->state->sharder_state();
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
   SharedLock lock;
@@ -139,9 +140,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
             if (!res.empty()) {
               *default_db_hit = true;
             }
-            result.Append(
-              std::move(res),
-              true);
+            result.Append(std::move(res), true);
           }
         } else if (state->ShardExists(shard_kind, user_id)) {
           // Remove where condition on the shard by column, since it does not
@@ -164,7 +163,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
                                             stmt.GetWhereClause(), connection));
         bool query_succeeded = pair.first;
         if (query_succeeded) {
-          VLOG(1)  << "Index succeeded";
+          VLOG(1) << "Index succeeded";
           // Secondary index available for some constrainted column in stmt.
           result.Append(
               exec.Shards(&cloned, shard_kind, pair.second, schema, aug_index),
@@ -174,7 +173,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
           // varowned table)
           VLOG(1) << "Looking into default table";
           auto res = exec.Default(&stmt, schema);
-          if (res.ResultSets().size() > 0 && res.ResultSets().front().size() > 0) {
+          if (res.ResultSets().size() > 0 &&
+              res.ResultSets().front().size() > 0) {
             result.Append(std::move(res), true);
             query_succeeded = true;
             *default_db_hit = true;

@@ -41,13 +41,15 @@ const ShardedTableName &VarownShardedTableName(
                            target_table + " on column " + column_name);
 }
 
-absl::StatusOr<std::string> GetFKValueHelper(const sqlast::ColumnDefinition &col, const ShardingInformation & info, const sqlast::Insert &stmt, const sqlast::CreateTable &schema) {
+absl::StatusOr<std::string> GetFKValueHelper(
+    const sqlast::ColumnDefinition &col, const ShardingInformation &info,
+    const sqlast::Insert &stmt, const sqlast::CreateTable &schema) {
   if (stmt.HasColumns()) {
     return stmt.GetValue(col.column_name());
   }
   size_t fk_idx = schema.ColumnIndex(col.column_name());
   if (!info.IsTransitive() && info.shard_by_index < fk_idx) {
-    --fk_idx; 
+    --fk_idx;
     CHECK_EQ(schema.GetColumns().size() - 1, stmt.GetValues().size());
   } else {
     CHECK_EQ(schema.GetColumns().size(), stmt.GetValues().size());
@@ -55,12 +57,12 @@ absl::StatusOr<std::string> GetFKValueHelper(const sqlast::ColumnDefinition &col
   return stmt.GetValue(fk_idx);
 }
 
-std::unique_ptr<sqlast::BinaryExpression> MakePointSelectBinexp(const std::string &col, const std::string &col_val) {
-  auto binexp = std::make_unique<sqlast::BinaryExpression>(
-    sqlast::Expression::Type::EQ);
+std::unique_ptr<sqlast::BinaryExpression> MakePointSelectBinexp(
+    const std::string &col, const std::string &col_val) {
+  auto binexp =
+      std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::EQ);
   binexp->SetLeft(std::make_unique<sqlast::ColumnExpression>(col));
-  binexp->SetRight(std::make_unique<sqlast::LiteralExpression>(
-    col_val));
+  binexp->SetRight(std::make_unique<sqlast::LiteralExpression>(col_val));
   return binexp;
 }
 
@@ -82,16 +84,15 @@ absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
       } else {
         was_moved = true;
         const sqlast::ColumnConstraint &constr = col.GetForeignKeyConstraint();
-  
+
         const std::string &target_table = constr.foreign_table();
         sqlast::Select select(target_table);
 
-        ASSIGN_OR_RETURN(const auto &col_val, GetFKValueHelper(col, info, cloned, rel_schema));
+        ASSIGN_OR_RETURN(const auto &col_val,
+                         GetFKValueHelper(col, info, cloned, rel_schema));
         VLOG(1) << "FK value found";
-        select.SetWhereClause(MakePointSelectBinexp(
-          constr.foreign_column(),
-          col_val
-        ));
+        select.SetWhereClause(
+            MakePointSelectBinexp(constr.foreign_column(), col_val));
         const sqlast::CreateTable schema = state->GetSchema(target_table);
         const ShardedTableName &sharded_table = VarownShardedTableName(
             *state, target_table, col.column_name(), stmt.table_name());
@@ -101,8 +102,9 @@ absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
           select.AddColumn(col0.column_name());
         }
         bool needs_default_db_delete = false;
-        ASSIGN_OR_RETURN(sql::SqlResult & inner_result,
-                         select::Shard(select, connection, true, &needs_default_db_delete));
+        ASSIGN_OR_RETURN(
+            sql::SqlResult & inner_result,
+            select::Shard(select, connection, true, &needs_default_db_delete));
         CHECK(inner_result.IsQuery());
         if (inner_result.empty()) {
           VLOG(1) << "Skipping value moving. Reason: The lookup has no results";
@@ -124,7 +126,8 @@ absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
         result->Append(exec.Shard(&insert, info.shard_kind, user_id), false);
         if (needs_default_db_delete) {
           sqlast::Delete del(target_table);
-          del.SetWhereClause(MakePointSelectBinexp(constr.foreign_column(), col_val));
+          del.SetWhereClause(
+              MakePointSelectBinexp(constr.foreign_column(), col_val));
           exec.Default(&del);
         }
       }
@@ -254,7 +257,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
         ASSIGN_OR_RETURN(auto &lookup, index::LookupIndex(info.next_index_name,
                                                           user_id, connection));
         if (lookup.size() < 1) {
-          if (info.is_varowned()) { 
+          if (info.is_varowned()) {
             // In case the table is variably owned this pointed-to resource may
             // have been inserted before the relationship record is inserted. In
             // that case we insert into the default table instead and skip the
@@ -263,7 +266,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
             result = exec.Default(&stmt);
             continue;
           } else {
-            return absl::InvalidArgumentError("Foreign Key Value does not exist");
+            return absl::InvalidArgumentError(
+                "Foreign Key Value does not exist");
           }
         }
 

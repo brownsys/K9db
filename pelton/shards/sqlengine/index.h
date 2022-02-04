@@ -21,9 +21,7 @@ namespace sqlengine {
 namespace index {
 
 // Helper type for RecordStatusForUser. See comment there for documentation.
-enum RecordStatus {
-    MISSING, OWNS_LAST_COPY, LAST_COPY, MULTI_COPY
-};
+enum RecordStatus { MISSING, OWNS_LAST_COPY, LAST_COPY, MULTI_COPY };
 
 std::ostream &operator<<(std::ostream &os, const RecordStatus &st);
 
@@ -40,9 +38,10 @@ absl::StatusOr<std::unordered_set<UserId>> LookupIndex(
     const std::string &index_name, const std::string &value,
     Connection *connection);
 
-absl::StatusOr<RecordStatus> RecordStatusForUser(
-    const std::string &index_name, const std::string &value,
-    const std::string &user_id, Connection *connection);
+absl::StatusOr<RecordStatus> RecordStatusForUser(const std::string &index_name,
+                                                 const std::string &value,
+                                                 const std::string &user_id,
+                                                 Connection *connection);
 
 }  // namespace index
 }  // namespace sqlengine

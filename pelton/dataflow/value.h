@@ -15,7 +15,6 @@ class NullValue {
   // nothing to see here
 };
 
-
 class Value {
  public:
   static std::string Dequote(const std::string &st);
@@ -52,8 +51,7 @@ class Value {
         this->str_ = v;
         break;
       default:
-        LOG(FATAL) << "Unsupported data type in LookupIndex: "
-                  << type;
+        LOG(FATAL) << "Unsupported data type in LookupIndex: " << type;
     }
   }
 

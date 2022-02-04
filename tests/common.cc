@@ -276,9 +276,7 @@ void CleanDatabaseFixture::TearDown() {
   tests::TearDown(this->db_name(), false);
 }
 
-pelton::Connection *GetPeltonInstance() {
-  return &connection;
-}
+pelton::Connection *GetPeltonInstance() { return &connection; }
 
 std::optional<std::string> CleanDatabaseFixture::_db_name;
 std::optional<std::vector<std::string>> CleanDatabaseFixture::_file_path_args;
