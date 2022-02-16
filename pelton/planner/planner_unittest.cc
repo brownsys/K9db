@@ -1236,8 +1236,8 @@ TEST(PlannerTest, SimpleLimitOffset) {
   std::unique_ptr<std::string> str1 = std::make_unique<std::string>("hello!");
   std::unique_ptr<std::string> str2 = std::make_unique<std::string>("bye!");
   std::vector<dataflow::Record> records;
-  records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   records.emplace_back(schema, true, 2_s, std::move(str2), 50_s);
+  records.emplace_back(schema, true, 10_s, std::move(str1), 20_s);
   graph->_Process("test_table", std::move(records));
 
   // Look at flow output.
