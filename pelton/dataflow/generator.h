@@ -42,7 +42,8 @@ class DataFlowGraphGenerator {
   NodeIndex AddAggregateOperator(NodeIndex parent,
                                  const std::vector<ColumnID> &group_cols,
                                  AggregateFunctionEnum agg_func,
-                                 ColumnID agg_col);
+                                 ColumnID agg_col,
+                                 const std::string &agg_col_name);
   NodeIndex AddJoinOperator(NodeIndex left_parent, NodeIndex right_parent,
                             ColumnID left_column, ColumnID right_column,
                             JoinModeEnum mode);

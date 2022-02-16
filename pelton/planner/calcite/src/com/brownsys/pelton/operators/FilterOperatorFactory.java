@@ -327,14 +327,21 @@ public class FilterOperatorFactory {
   }
 
   private void addQuestionMarkCondition(RexNode otherOperand, int operationEnum) {
-    if (operationEnum != DataFlowGraphLibrary.EQUAL) {
-      throw new IllegalArgumentException("Can only use ? in an equality condition");
-    }
     if (!(otherOperand instanceof RexInputRef)) {
       throw new IllegalArgumentException("Cannot compare ? to a non-column expression");
     }
+
     int columnId = this.context.getPeltonIndex(((RexInputRef) otherOperand).getIndex());
-    this.context.addMatViewKey(columnId);
+    if (operationEnum == DataFlowGraphLibrary.LESS_THAN
+        || operationEnum == DataFlowGraphLibrary.LESS_THAN_OR_EQUAL
+        || operationEnum == DataFlowGraphLibrary.GREATER_THAN
+        || operationEnum == DataFlowGraphLibrary.GREATER_THAN_OR_EQUAL) {
+      this.context.addOrderColumn(columnId);
+    } else if (operationEnum == DataFlowGraphLibrary.EQUAL) {
+      this.context.addMatViewKey(columnId);
+    } else {
+      throw new IllegalArgumentException("Illegal operator with ?");
+    }
   }
 
   private void addColumnBinaryCondition(

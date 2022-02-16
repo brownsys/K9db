@@ -59,7 +59,10 @@ public class QueryPlanner {
             Collections.singletonList(schema.getName()),
             typeFactory,
             CalciteConnectionConfig.DEFAULT);
-    SqlValidator.Config validatorConfig = SqlValidator.Config.DEFAULT.withIdentifierExpansion(true);
+    SqlValidator.Config validatorConfig =
+        SqlValidator.Config.DEFAULT
+            .withIdentifierExpansion(true)
+            .withSqlConformance(SqlConformanceEnum.MYSQL_5);
     this.validator =
         SqlValidatorUtil.newValidator(
             SqlStdOperatorTable.instance(), catalogReader, typeFactory, validatorConfig);

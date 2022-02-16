@@ -25,8 +25,11 @@ class PreparedTest {
   public static String[] PREP_SELECT = {
       "SELECT age, Count(id) FROM tbl WHERE age = ? GROUP BY age",
       "SELECT age, name, Count(id) FROM tbl GROUP BY age, name HAVING name = ? AND age = ?",
-      "SELECT * FROM tbl WHERE id = ?"
-      //"SELECT * FROM tbl WHERE id = ? AND age > ?"
+      "SELECT * FROM tbl WHERE id = ?",
+      "SELECT * FROM tbl WHERE id = ? AND age > ?",
+      "SELECT * FROM tbl WHERE age > ?",
+      "SELECT name, Count(id) as CC FROM tbl GROUP BY name HAVING CC = ?",
+      "SELECT sum(age) as SS, name FROM tbl GROUP BY name HAVING SS = ?"
   };
 
   public static void main(String[] args) throws SQLException, ClassNotFoundException {
@@ -86,7 +89,6 @@ class PreparedTest {
     assert resultSet.getInt(3) == 25;
     assert !resultSet.next();
 
-    /*
     prepSelect = connection.prepareStatement(PREP_SELECT[3]);
     prepSelect.setInt(1, 2);
     prepSelect.setInt(2, 30);
@@ -100,7 +102,42 @@ class PreparedTest {
     assert resultSet.getString(2).equals("Smith");
     assert resultSet.getInt(3) == 35;
     assert !resultSet.next();
-    */
+
+    prepSelect = connection.prepareStatement(PREP_SELECT[4]);
+    prepSelect.setInt(1, 30);
+    resultSet = prepSelect.executeQuery();
+    metadata = resultSet.getMetaData();
+    assert metadata.getColumnName(1).equals("id");
+    assert metadata.getColumnName(2).equals("name");
+    assert metadata.getColumnName(3).equals("age");
+    assert resultSet.next();
+    assert resultSet.getInt(1) == 2;
+    assert resultSet.getString(2).equals("Smith");
+    assert resultSet.getInt(3) == 35;
+    assert !resultSet.next();
+
+    prepSelect = connection.prepareStatement(PREP_SELECT[5]);
+    prepSelect.setInt(1, 1);
+    resultSet = prepSelect.executeQuery();
+    metadata = resultSet.getMetaData();
+    assert metadata.getColumnName(1).equals("name");
+    assert metadata.getColumnName(2).equals("CC");
+    assert resultSet.next();
+    assert resultSet.getInt(2) == 1;
+    assert resultSet.next();
+    assert resultSet.getInt(2) == 1;
+    assert !resultSet.next();
+
+    prepSelect = connection.prepareStatement(PREP_SELECT[6]);
+    prepSelect.setInt(1, 25);
+    resultSet = prepSelect.executeQuery();
+    metadata = resultSet.getMetaData();
+    assert metadata.getColumnName(1).equals("SS");
+    assert metadata.getColumnName(2).equals("name");
+    assert resultSet.next();
+    assert resultSet.getInt(1) == 25;
+    assert resultSet.getString(2).equals("John");
+    assert !resultSet.next();
 
     connection.close();
   }

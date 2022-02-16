@@ -3,9 +3,9 @@
 
 #include <string>
 #include <unordered_map>
-#include <vector>
 
 #include "pelton/dataflow/state.h"
+#include "pelton/prepared.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/upgradable_lock.h"
 #include "pelton/sql/executor.h"
@@ -13,23 +13,6 @@
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
-
-// Prepared statement API.
-using StatementID = size_t;
-struct PreparedFlowDescriptor {
-  std::string flow_name;
-  std::vector<std::string> key_names;
-  std::vector<sqlast::ColumnDefinition::Type> key_types;
-  std::unordered_map<std::string, size_t> key_name_to_index;
-};
-struct PreparedStatementDescriptor {
-  StatementID stmt_id;
-  size_t total_count;
-  std::vector<size_t> arg_value_count;
-  std::vector<size_t> arg_flow_key;
-  // Points to corresponding flow descriptor.
-  const PreparedFlowDescriptor *flow_descriptor;
-};
 
 class State {
  public:
@@ -50,8 +33,8 @@ class State {
   // Getters.
   shards::SharderState *sharder_state() { return &this->sharder_state_; }
   dataflow::DataFlowState *dataflow_state() { return &this->dataflow_state_; }
-  std::unordered_map<std::string, PreparedFlowDescriptor> &flows() {
-    return this->flows_;
+  std::unordered_map<std::string, prepared::CanonicalDescriptor> &stmts() {
+    return this->stmts_;
   }
 
   // Statistics.
@@ -78,7 +61,9 @@ class State {
   // Component states.
   shards::SharderState sharder_state_;
   dataflow::DataFlowState dataflow_state_;
-  std::unordered_map<std::string, PreparedFlowDescriptor> flows_;
+  // Descriptors of queries already encountered in canonical form.
+  std::unordered_map<std::string, prepared::CanonicalDescriptor> stmts_;
+  // Lock for managing stmts_.
   mutable shards::UpgradableMutex mtx_;
 };
 
@@ -88,7 +73,7 @@ struct Connection {
   // Connection to the underlying databases.
   sql::PeltonExecutor executor;
   // Prepared statements created by this connection.
-  std::unordered_map<StatementID, PreparedStatementDescriptor> stmts;
+  std::unordered_map<size_t, prepared::PreparedStatementDescriptor> stmts;
 };
 
 }  // namespace pelton

@@ -72,10 +72,10 @@ NodeIndex DataFlowGraphGenerator::AddProjectOperator(NodeIndex parent) {
 }
 NodeIndex DataFlowGraphGenerator::AddAggregateOperator(
     NodeIndex parent, const std::vector<ColumnID> &group_cols,
-    AggregateFunctionEnum agg_func, ColumnID agg_col) {
+    AggregateFunctionEnum agg_func, ColumnID agg_col, const std::string &name) {
   // Create aggregate operator.
   std::unique_ptr<AggregateOperator> op =
-      std::make_unique<AggregateOperator>(group_cols, agg_func, agg_col);
+      std::make_unique<AggregateOperator>(group_cols, agg_func, agg_col, name);
   // Add the operator to the graph.
   Operator *parent_ptr = this->graph_->GetNode(parent);
   CHECK(parent_ptr);

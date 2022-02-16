@@ -41,12 +41,14 @@ public class PlanningContext {
   private final HashMap<Integer, Integer> columnTranslation;
   private final ArrayList<Integer> keyColumns;
   private final SharedContext shared;
+  private HashSet<Integer> orderColumns; // for lookups with > ?
 
   // The initial context we start from!
   public PlanningContext() {
     this.shared = PlanningContext.SINGLETON;
     this.keyColumns = new ArrayList<Integer>();
     this.columnTranslation = new HashMap<Integer, Integer>();
+    this.orderColumns = new HashSet<Integer>();
   }
 
   // Called when we have sibling operators each making modification to their own contexts.
@@ -56,8 +58,11 @@ public class PlanningContext {
       case UNION:
         assert this.keyColumns.equals(other.keyColumns);
         assert this.columnTranslation.equals(other.columnTranslation);
+        assert this.orderColumns.equals(other.orderColumns);
         break;
       case JOIN:
+        assert this.orderColumns.isEmpty();
+        assert other.orderColumns.isEmpty();
         HashSet<Integer> ids = new HashSet<Integer>();
         for (Map.Entry<Integer, Integer> entry : this.columnTranslation.entrySet()) {
           ids.add(entry.getValue());
@@ -94,6 +99,14 @@ public class PlanningContext {
       result[i] = this.keyColumns.get(i);
     }
     return result;
+  }
+
+  public void addOrderColumn(int col) {
+    this.orderColumns.add(col);
+  }
+
+  public HashSet<Integer> getOrderColumns() {
+    return new HashSet<Integer>(this.orderColumns);
   }
 
   // Input Operators mapping.
@@ -143,6 +156,19 @@ public class PlanningContext {
         this.keyColumns.set(i, key - 1);
       }
     }
+
+    HashSet<Integer> modOrderColumns = new HashSet<Integer>();
+    for (Integer col : this.orderColumns) {
+      if (col == duplicatePeltonIndex) {
+        if (!this.orderColumns.contains(actualPeltonIndex)) {
+          modOrderColumns.add(actualPeltonIndex);
+        }
+        continue;
+      } else if (col > duplicatePeltonIndex) {
+        modOrderColumns.add(col - 1);
+      }
+    }
+    this.orderColumns = modOrderColumns;
   }
 
   public void setColumnTranslation(
@@ -155,13 +181,26 @@ public class PlanningContext {
       if (keyTranslation.containsKey(key)) {
         this.keyColumns.set(i, keyTranslation.get(key));
       } else {
-        this.keyColumns.remove(i);
-        i--;
+        throw new IllegalArgumentException("Key column is dropped by projection");
       }
     }
+
+    HashSet<Integer> modOrderColumns = new HashSet<Integer>();
+    for (Integer col : this.orderColumns) {
+      if (translation.containsKey(col)) {
+        modOrderColumns.add(translation.get(col));
+      } else {
+        throw new IllegalArgumentException("Compare column is dropped by projection");
+      }
+    }
+    this.orderColumns = modOrderColumns;
   }
 
   public void identityTranslation(int count, HashMap<Integer, Integer> keyTranslation) {
+    if (!this.orderColumns.isEmpty()) {
+      throw new IllegalArgumentException("Aggregate after filter with > ?; Use HAVING");
+    }
+
     this.columnTranslation.clear();
     for (int i = 0; i < count; i++) {
       this.columnTranslation.put(i, i);

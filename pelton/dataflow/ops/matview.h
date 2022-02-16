@@ -35,10 +35,6 @@ class MatViewOperator : public Operator {
   virtual bool RecordOrdered() const = 0;
   virtual bool KeyOrdered() const = 0;
   const std::vector<ColumnID> &key_cols() const { return this->key_cols_; }
-  const std::vector<std::string> &key_names() const { return this->key_names_; }
-  const std::vector<sqlast::ColumnDefinition::Type> &key_types() const {
-    return this->key_types_;
-  }
 
   // Key API.
   virtual std::vector<Key> Keys(int limit = -1) const = 0;
@@ -68,8 +64,6 @@ class MatViewOperator : public Operator {
   std::vector<ColumnID> key_cols_;
   int limit_;
   size_t offset_;
-  std::vector<std::string> key_names_;
-  std::vector<sqlast::ColumnDefinition::Type> key_types_;
 
   // Allow tests to set input_schemas_ directly.
   FRIEND_TEST(MatViewOperatorTest, EmptyMatView);
@@ -267,10 +261,6 @@ class MatViewOperatorT : public MatViewOperator {
   void ComputeOutputSchema() override {
     this->output_schema_ = this->input_schemas_.at(0);
     this->contents_.Initialize(this->output_schema_);
-    for (auto column : this->key_cols_) {
-      this->key_names_.push_back(this->output_schema_.NameOf(column));
-      this->key_types_.push_back(this->output_schema_.TypeOf(column));
-    }
   }
   std::unique_ptr<Operator> Clone() const override {
     if constexpr (!T::NoCompare::value) {
