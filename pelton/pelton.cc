@@ -136,12 +136,15 @@ absl::StatusOr<const PreparedStatement *> prepare(Connection *connection,
   // Check if canonicalized query was handled before (avoids duplicating views).
   auto &stmts = connection->state->stmts();
   if (stmts.find(canonical) == stmts.end()) {
-    // Canonical statement not found.
-    if (prepared::NeedsFlow(canonical)) {
-      shards::UniqueLock upgraded(std::move(reader_lock));
-      if (stmts.find(canonical) == stmts.end()) {
-        prepared::CanonicalDescriptor descriptor =
-            prepared::MakeCanonical(canonical);
+    // Upgrade lock to a writer lock, we need to modify stmts.
+    shards::UniqueLock upgraded(std::move(reader_lock));
+    // Make sure another thread did not create the canonical statement while we
+    // were upgrading.
+    if (stmts.find(canonical) == stmts.end()) {
+      prepared::CanonicalDescriptor descriptor =
+          prepared::MakeCanonical(canonical);
+      // Check if statement should be served via a view or directly.
+      if (prepared::NeedsFlow(canonical)) {
         // Plan the query.
         std::string flow_name = "_" + std::to_string(stmts.size());
         std::string create_view_stmt =
@@ -151,13 +154,15 @@ absl::StatusOr<const PreparedStatement *> prepare(Connection *connection,
         const auto &graph =
             connection->state->dataflow_state()->GetFlow(flow_name);
         prepared::FromFlow(flow_name, graph, &descriptor);
-        // Store descriptor for future queries.
-        stmts.emplace(canonical, std::move(descriptor));
+      } else {
+        prepared::FromTables(canonical, *connection->state->dataflow_state(),
+                             &descriptor);
       }
-      reader_lock = shards::SharedLock(std::move(upgraded));
-    } else {
-      assert(false);
+      // Store descriptor for future queries.
+      stmts.emplace(canonical, std::move(descriptor));
     }
+    // Downgrade the lock.
+    reader_lock = shards::SharedLock(std::move(upgraded));
   }
 
   // Canonical statement must exist here.

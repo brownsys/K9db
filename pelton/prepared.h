@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "pelton/dataflow/graph.h"
+#include "pelton/dataflow/state.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -55,6 +56,11 @@ std::string PopulateStatement(const PreparedStatementDescriptor &stmt,
 // Extract type information about ? arguments from flow.
 void FromFlow(const std::string &flow_name,
               const dataflow::DataFlowGraph &graph, CanonicalDescriptor *stmt);
+
+// Extract type information about ? arguments from the underlying tables.
+void FromTables(const CanonicalQuery &query,
+                const dataflow::DataFlowState &dstate,
+                CanonicalDescriptor *stmt);
 
 }  // namespace prepared
 }  // namespace pelton

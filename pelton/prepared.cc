@@ -4,6 +4,7 @@
 #include <cassert>
 // NOLINTNEXTLINE
 #include <regex>
+#include <unordered_set>
 
 #include "glog/logging.h"
 #include "pelton/dataflow/ops/input.h"
@@ -14,6 +15,7 @@ namespace prepared {
 
 namespace {
 
+#define FROM_TABLE "\\s[Ff][Rr][Oo][Mm]\\s+([A-Za-z0-9_]+)\\b"
 #define TABLE_COLUMN_NAME "\\b(?:([A-Za-z0-9_]+)\\.|)([A-Za-z0-9_]+)"
 #define COLUMN_NAME "\\b([A-Za-z0-9_]+)"
 #define OP "\\s*(=|<|>|<=|>=)\\s*"
@@ -22,9 +24,15 @@ namespace {
 #define IN "\\s+[Ii][Nn]\\s*"
 #define MQ "\\(\\s*\\?\\s*((?:\\s*,\\s*\\?)*)\\)"
 
+static std::regex FROM_TABLE_REGEX{FROM_TABLE};
 static std::regex CANONICAL_PARAM_REGEX{TABLE_COLUMN_NAME OP Q};
 static std::regex CANONICAL_REGEX{IN MQ};
 static std::regex PARAM_REGEX{COLUMN_NAME "(?:" OP Q "|" IN MQ ")"};
+
+// Prepared statements that should not be served from views.
+std::unordered_set<std::string> NO_VIEWS = {
+    "SELECT * FROM tbl WHERE id = ?",
+    "SELECT * FROM tbl WHERE id = ? AND age > ?"};
 
 }  // namespace
 
@@ -90,7 +98,9 @@ PreparedStatementDescriptor MakeStmt(const std::string &query) {
 }
 
 // Find out if a query needs to be served from a flow.
-bool NeedsFlow(const CanonicalQuery &query) { return true; }
+bool NeedsFlow(const CanonicalQuery &query) {
+  return NO_VIEWS.count(query) == 0;
+}
 
 // Populate prepared statement with concrete values.
 std::string PopulateStatement(const PreparedStatementDescriptor &stmt,
@@ -162,6 +172,29 @@ void FromFlow(const std::string &flow_name,
       stmt->stems.push_back("AND");
     }
     stmt->stems.push_back(";");
+  }
+}
+
+// Extract type information about ? arguments from the underlying tables.
+void FromTables(const CanonicalQuery &query,
+                const dataflow::DataFlowState &dstate,
+                CanonicalDescriptor *stmt) {
+  // Find source table.
+  std::smatch sm;
+  if (!regex_search(query, sm, FROM_TABLE_REGEX)) {
+    LOG(FATAL) << "Cannot find source table in prepared statement " << query;
+  }
+  // Look up table schema.
+  std::string table_name = sm[1].str();
+  auto schema = dstate.GetTableSchema(table_name);
+  // Go over all ? parameters and figure out their types.
+  for (size_t i = 0; i < stmt->args_count; i++) {
+    const std::string &column_name = stmt->arg_names.at(i);
+    // Look up the column in the base tables.
+    if (stmt->arg_tables.at(i) != "" && stmt->arg_tables.at(i) != table_name) {
+      LOG(FATAL) << "Prepared stmt refers to invalid direct table " << query;
+    }
+    stmt->arg_types.push_back(schema.TypeOf(schema.IndexOf(column_name)));
   }
 }
 
