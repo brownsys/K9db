@@ -48,8 +48,14 @@ public class AggregateOperatorFactory {
 
     this.context.identityTranslation(groupCols.length + 1, keyTranslation);
 
+    // Get any alias assigned to the aggregate column.
+    String aggName = aggregate.getRowType().getFieldNames().get(groupCols.length);
+    if (aggName.startsWith("EXPR$")) {
+      aggName = "";
+    }
+
     return this.context
         .getGenerator()
-        .AddAggregateOperator(children.get(0), groupCols, functionEnum, aggCol);
+        .AddAggregateOperator(children.get(0), groupCols, functionEnum, aggCol, aggName);
   }
 }

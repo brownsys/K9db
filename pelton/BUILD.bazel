@@ -11,6 +11,7 @@ cc_library(
     visibility = ["//:__subpackages__"],
     deps = [
         ":connection",
+        ":prepared",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:graph",
         "//pelton/dataflow:record",
@@ -33,11 +34,29 @@ cc_library(
     hdrs = ["connection.h"],
     visibility = ["//:__subpackages__"],
     deps = [
+        ":prepared",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:upgradable_lock",
         "//pelton/sql:executor",
         "//pelton/sql:result",
+    ],
+)
+
+cc_library(
+    name = "prepared",
+    srcs = [
+        "prepared.cc",
+    ],
+    hdrs = [
+        "prepared.h",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:graph",
+        "//pelton/dataflow/ops:input",
+        "//pelton/dataflow/ops:matview",
         "//pelton/sqlast:ast",
+        "@glog",
     ],
 )

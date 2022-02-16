@@ -40,12 +40,6 @@ class DataFlowGraph {
   const std::vector<ColumnID> &matview_keys() const {
     return this->matview_keys_;
   }
-  const std::vector<std::string> &matview_key_names() const {
-    return this->matviews_.at(0)->key_names();
-  }
-  const std::vector<sqlast::ColumnDefinition::Type> &matview_key_types() const {
-    return this->matviews_.at(0)->key_types();
-  }
 
   // Access partitioning keys.
   const PartitionKey &input_partition_key(const std::string &table) const {

@@ -257,7 +257,7 @@ void FFIPlannerShutdown() { pelton::shutdown_planner(); }
 FFIPreparedStatement *FFIPrepare(FFIConnection *c_conn, const char *query) {
   pelton::Connection *cpp_conn =
       reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
-  absl::StatusOr<const pelton::PreparedStatementDescriptor *> result =
+  absl::StatusOr<const pelton::PreparedStatement *> result =
       pelton::prepare(cpp_conn, query);
   if (!result.ok()) {
     LOG(FATAL) << "C-Wrapper: " << result.status();
@@ -273,11 +273,10 @@ FFIPreparedStatement *FFIPrepare(FFIConnection *c_conn, const char *query) {
     c_result->stmt_id = descriptor->stmt_id;
     c_result->arg_count = len;
     size_t current = 0;
-    for (size_t i = 0; i < descriptor->arg_flow_key.size(); i++) {
-      size_t key_index = descriptor->arg_flow_key.at(i);
-      size_t value_count = descriptor->arg_value_count.at(i);
+    for (size_t i = 0; i < descriptor->canonical->args_count; i++) {
       FFIColumnType c_type;
-      auto type = descriptor->flow_descriptor->key_types.at(key_index);
+      // Find type of parameter i.
+      auto type = descriptor->canonical->arg_types.at(i);
       switch (type) {
         case CType::INT:
           c_type = FFIColumnType::INT;
@@ -294,6 +293,8 @@ FFIPreparedStatement *FFIPrepare(FFIConnection *c_conn, const char *query) {
         default:
           LOG(FATAL) << "C-Wrapper: Unrecognizable column type " << type;
       }
+      // Fill in the type of parameter i for all the values assoicated with it.
+      size_t value_count = descriptor->arg_value_count.at(i);
       for (size_t j = 0; j < value_count; j++) {
         c_result->args[current + j] = c_type;
       }

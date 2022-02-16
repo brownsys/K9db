@@ -39,7 +39,18 @@ class AggregateOperator : public Operator {
         state_(),
         group_columns_(group_columns),
         aggregate_function_(aggregate_function),
-        aggregate_column_index_(aggregate_column) {}
+        aggregate_column_index_(aggregate_column),
+        aggregate_column_name_("") {}
+
+  AggregateOperator(std::vector<ColumnID> group_columns,
+                    Function aggregate_function, ColumnID aggregate_column,
+                    const std::string &agg_column_name)
+      : Operator(Operator::Type::AGGREGATE),
+        state_(),
+        group_columns_(group_columns),
+        aggregate_function_(aggregate_function),
+        aggregate_column_index_(aggregate_column),
+        aggregate_column_name_(agg_column_name) {}
 
   uint64_t SizeInMemory() const override { return this->state_.SizeInMemory(); }
 

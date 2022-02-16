@@ -10,6 +10,7 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/state.h"
+#include "pelton/prepared.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
 #include "pelton/sql/result.h"
@@ -21,6 +22,7 @@ using SqlResult = sql::SqlResult;
 using SqlResultSet = sql::SqlResultSet;
 using Schema = dataflow::SchemaRef;
 using Record = dataflow::Record;
+using PreparedStatement = prepared::PreparedStatementDescriptor;
 
 // initialize pelton_state
 bool initialize(size_t workers, bool consistent);
@@ -41,10 +43,10 @@ bool close(Connection *connection);
 void shutdown_planner(bool shutdown_jvm = true);
 
 // Prepared Statement API.
-absl::StatusOr<const PreparedStatementDescriptor *> prepare(
-    Connection *connection, const std::string &query);
+absl::StatusOr<const PreparedStatement *> prepare(Connection *connection,
+                                                  const std::string &query);
 
-absl::StatusOr<SqlResult> exec(Connection *connection, StatementID stmt_id,
+absl::StatusOr<SqlResult> exec(Connection *connection, size_t stmt_id,
                                const std::vector<std::string> &args);
 
 }  // namespace pelton

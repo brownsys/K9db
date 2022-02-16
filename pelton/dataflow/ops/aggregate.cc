@@ -13,10 +13,14 @@ void AggregateOperator::ComputeOutputSchema() {
 
   // Figure out the aggregate column information.
   if (aggregate_function_ == Function::COUNT) {
-    this->aggregate_column_name_ = "Count";
+    if (this->aggregate_column_name_ == "") {
+      this->aggregate_column_name_ = "Count";
+    }
     this->aggregate_column_type_ = sqlast::ColumnDefinition::Type::UINT;
   } else {
-    this->aggregate_column_name_ = "Sum";
+    if (this->aggregate_column_name_ == "") {
+      this->aggregate_column_name_ = "Sum";
+    }
     this->aggregate_column_type_ =
         this->input_schemas_.at(0).TypeOf(this->aggregate_column_index_);
     if (this->aggregate_column_type_ != sqlast::ColumnDefinition::Type::UINT &&
@@ -192,9 +196,9 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
 
 // Clone this operator.
 std::unique_ptr<Operator> AggregateOperator::Clone() const {
-  return std::make_unique<AggregateOperator>(this->group_columns_,
-                                             this->aggregate_function_,
-                                             this->aggregate_column_index_);
+  return std::make_unique<AggregateOperator>(
+      this->group_columns_, this->aggregate_function_,
+      this->aggregate_column_index_, this->aggregate_column_name_);
 }
 
 }  // namespace dataflow
