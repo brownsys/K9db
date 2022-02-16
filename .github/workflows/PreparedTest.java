@@ -33,6 +33,10 @@ class PreparedTest {
   };
 
   public static void main(String[] args) throws SQLException, ClassNotFoundException {
+    PreparedStatement prepSelect = null;
+    ResultSet resultSet = null;
+    ResultSetMetaData metadata = null;
+
     Connection connection = DriverManager.getConnection(JDBC_STRING);
     Statement stmt = connection.createStatement();
     stmt.execute(CREATE_TABLE);
@@ -51,10 +55,10 @@ class PreparedTest {
     assert prepInsert.executeUpdate() == 1;
     */
 
-    PreparedStatement prepSelect = connection.prepareStatement(PREP_SELECT[0]);
+    prepSelect = connection.prepareStatement(PREP_SELECT[0]);
     prepSelect.setInt(1, 25);
-    ResultSet resultSet = prepSelect.executeQuery();
-    ResultSetMetaData metadata = resultSet.getMetaData();
+    resultSet = prepSelect.executeQuery();
+    metadata = resultSet.getMetaData();
     assert metadata.getColumnName(1).equals("age");
     assert metadata.getColumnName(2).equals("Count");
     assert resultSet.next();
