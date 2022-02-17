@@ -133,7 +133,9 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
 
   // Query from views.
   const char *args1[] = {"10"};
-  FFIResult *result1 = FFIExecPrepare(&c_conn, 0, 1, args1);
+  FFIPreparedResult struct1 = FFIExecPrepare(&c_conn, 0, 1, args1);
+  EXPECT_TRUE(struct1.query);
+  FFIResult *result1 = struct1.query_result;
   EXPECT_EQ(result1->num_cols, 2) << "Bad column count";
   EXPECT_EQ(result1->num_rows, 1) << "Bad row count";
   EXPECT_EQ(std::string(result1->col_names[0]), "ID") << "Bad schema";
@@ -148,7 +150,9 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
   FFIDestroySelect(result1);
 
   const char *args2[] = {"10", "50"};
-  FFIResult *result2 = FFIExecPrepare(&c_conn, 1, 2, args2);
+  FFIPreparedResult struct2 = FFIExecPrepare(&c_conn, 1, 2, args2);
+  EXPECT_TRUE(struct2.query);
+  FFIResult *result2 = struct2.query_result;
   EXPECT_EQ(result2->num_cols, 2) << "Bad column count";
   EXPECT_EQ(result2->num_rows, 2) << "Bad row count";
   EXPECT_EQ(std::string(result2->col_names[0]), "ID") << "Bad schema";
@@ -166,7 +170,9 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
   FFIDestroySelect(result2);
 
   const char *args3[] = {"10", "50", "'hi'"};
-  FFIResult *result3 = FFIExecPrepare(&c_conn, 2, 3, args3);
+  FFIPreparedResult struct3 = FFIExecPrepare(&c_conn, 2, 3, args3);
+  EXPECT_TRUE(struct3.query);
+  FFIResult *result3 = struct3.query_result;
   EXPECT_EQ(result3->num_cols, 2) << "Bad column count";
   EXPECT_EQ(result3->num_rows, 1) << "Bad row count";
   EXPECT_EQ(std::string(result3->col_names[0]), "ID") << "Bad schema";

@@ -22,6 +22,9 @@ class PreparedTest {
   public static String PREP_INSERT =
       "INSERT INTO tbl VALUES(?, ?, ?);";
 
+  public static String PREP_UPDATE =
+      "UPDATE tbl SET id = ? WHERE id = ?";
+
   public static String[] PREP_SELECT = {
       "SELECT age, Count(id) FROM tbl WHERE age = ? GROUP BY age",
       "SELECT age, name, Count(id) FROM tbl GROUP BY age, name HAVING name = ? AND age = ?",
@@ -40,20 +43,21 @@ class PreparedTest {
     Connection connection = DriverManager.getConnection(JDBC_STRING);
     Statement stmt = connection.createStatement();
     stmt.execute(CREATE_TABLE);
-    stmt.execute("INSERT INTO tbl VALUES (1, 'John', 25)");
-    stmt.execute("INSERT INTO tbl VALUES (2, 'Smith', 35)");
 
-    /*
     PreparedStatement prepInsert = connection.prepareStatement(PREP_INSERT);
-    prepInsert.setInt(1, 1);
-    prepInsert.setString(2, "'John'");
+    prepInsert.setInt(1, 10);
+    prepInsert.setString(2, "John");
     prepInsert.setInt(3, 25);
     assert prepInsert.executeUpdate() == 1;
     prepInsert.setInt(1, 2);
-    prepInsert.setString(2, "'Smith'");
+    prepInsert.setString(2, "Smith");
     prepInsert.setInt(3, 35);
     assert prepInsert.executeUpdate() == 1;
-    */
+
+    PreparedStatement prepUpdate = connection.prepareStatement(PREP_UPDATE);
+    prepUpdate.setInt(1, 1);
+    prepUpdate.setInt(2, 10);
+    assert prepUpdate.executeUpdate() == 1;
 
     prepSelect = connection.prepareStatement(PREP_SELECT[0]);
     prepSelect.setInt(1, 25);
@@ -67,7 +71,7 @@ class PreparedTest {
     assert !resultSet.next();
 
     prepSelect = connection.prepareStatement(PREP_SELECT[1]);
-    prepSelect.setString(1, "'Smith'");
+    prepSelect.setString(1, "Smith");
     prepSelect.setInt(2, 35);
     resultSet = prepSelect.executeQuery();
     metadata = resultSet.getMetaData();

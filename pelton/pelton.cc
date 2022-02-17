@@ -130,9 +130,6 @@ absl::StatusOr<const PreparedStatement *> prepare(Connection *connection,
   // Canonicalize the query.
   prepared::CanonicalQuery canonical = prepared::Canonicalize(query);
 
-  // Extract information about the count of each parameter.
-  prepared::PreparedStatementDescriptor stmt = prepared::MakeStmt(query);
-
   // Check if canonicalized query was handled before (avoids duplicating views).
   auto &stmts = connection->state->stmts();
   if (stmts.find(canonical) == stmts.end()) {
@@ -141,33 +138,48 @@ absl::StatusOr<const PreparedStatement *> prepare(Connection *connection,
     // Make sure another thread did not create the canonical statement while we
     // were upgrading.
     if (stmts.find(canonical) == stmts.end()) {
-      prepared::CanonicalDescriptor descriptor =
-          prepared::MakeCanonical(canonical);
-      // Check if statement should be served via a view or directly.
-      if (prepared::NeedsFlow(canonical)) {
-        // Plan the query.
-        std::string flow_name = "_" + std::to_string(stmts.size());
-        std::string create_view_stmt =
-            "CREATE VIEW " + flow_name + " AS '\"" + canonical + "\"'";
-        CHECK_STATUS_OR(exec(connection, create_view_stmt));
-        // Query is planned: fill in the ? types.
-        const auto &graph =
-            connection->state->dataflow_state()->GetFlow(flow_name);
-        prepared::FromFlow(flow_name, graph, &descriptor);
+      char c = query[0];
+      if (c == 'I' || c == 'i' || c == 'R' || c == 'r') {
+        // Handling insert is almost trivial.
+        // We need to parse the statement, and find all ?.
+        // For each ?, we build the appropriate stem and find the corresponding
+        // column type.
+        const auto &dstate = *connection->state->dataflow_state();
+        MOVE_OR_RETURN(prepared::CanonicalDescriptor descriptor,
+                       prepared::MakeInsertCanonical(canonical, dstate));
+        // Store descriptor for future queries.
+        stmts.emplace(canonical, std::move(descriptor));
       } else {
-        prepared::FromTables(canonical, *connection->state->dataflow_state(),
-                             &descriptor);
+        prepared::CanonicalDescriptor descriptor =
+            prepared::MakeCanonical(canonical);
+        // Check if statement should be served via a view or directly.
+        if (prepared::NeedsFlow(canonical)) {
+          // Plan the query.
+          std::string flow_name = "_" + std::to_string(stmts.size());
+          std::string create_view_stmt =
+              "CREATE VIEW " + flow_name + " AS '\"" + canonical + "\"'";
+          CHECK_STATUS_OR(exec(connection, create_view_stmt));
+          // Query is planned: fill in the ? types.
+          const auto &graph =
+              connection->state->dataflow_state()->GetFlow(flow_name);
+          prepared::FromFlow(flow_name, graph, &descriptor);
+        } else {
+          prepared::FromTables(canonical, *connection->state->dataflow_state(),
+                               &descriptor);
+        }
+        // Store descriptor for future queries.
+        stmts.emplace(canonical, std::move(descriptor));
       }
-      // Store descriptor for future queries.
-      stmts.emplace(canonical, std::move(descriptor));
     }
     // Downgrade the lock.
     reader_lock = shards::SharedLock(std::move(upgraded));
   }
 
   // Canonical statement must exist here.
+  // Extract information about the count of each parameter.
+  prepared::PreparedStatementDescriptor stmt =
+      prepared::MakeStmt(query, &stmts.at(canonical));
   stmt.stmt_id = connection->stmts.size();
-  stmt.canonical = &stmts.at(canonical);
   connection->stmts.emplace(stmt.stmt_id, std::move(stmt));
   return &connection->stmts.at(connection->stmts.size() - 1);
 }

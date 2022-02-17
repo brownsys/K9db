@@ -69,23 +69,22 @@ inline std::string ExtractValue(const char **ptr, size_t *size) {
   if (size == 0) {
     return "";
   }
+  if (StartsWith(ptr, size, "NULL", 4)) {
+    return "NULL";
+  }
 
   const char *str = *ptr;
   bool squote = str[0] == '\'';
   bool dquote = str[0] == '"';
-  if (!squote && !dquote) {
-    if (StartsWith(ptr, size, "NULL", 4)) {
-      return "NULL";
-    }
-  }
+  bool quote = squote || dquote;
   bool escape = false;
   size_t i;
-  for (i = squote || dquote ? 1 : 0; i < *size; i++) {
+  for (i = quote ? 1 : 0; i < *size; i++) {
     if (escape) {
       escape = false;
       continue;
     }
-    if (str[i] == '\\') {
+    if (quote && str[i] == '\\') {
       escape = true;
       continue;
     }
@@ -95,7 +94,7 @@ inline std::string ExtractValue(const char **ptr, size_t *size) {
     } else if (dquote && str[i] == '"') {
       i++;
       break;
-    } else if (!squote && !dquote && (str[i] < '0' || str[i] > '9')) {
+    } else if (!quote && !(str[i] >= '0' && str[i] <= '9') && str[i] != '?') {
       break;
     }
   }

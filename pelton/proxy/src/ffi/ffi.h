@@ -60,6 +60,12 @@ typedef struct {
   FFIColumnType args[];
 } FFIPreparedStatement;
 
+typedef struct {
+  bool query;
+  FFIResult *query_result;
+  int update_result;
+} FFIPreparedResult;
+
 // The FFI API.
 
 // Pass command line arguments to gflags
@@ -101,8 +107,8 @@ FFIPreparedStatement *FFIPrepare(FFIConnection *c_conn, const char *query);
 void FFIDestroyPreparedStatement(FFIPreparedStatement *c_stmt);
 
 // Execute a prepared statement.
-FFIResult *FFIExecPrepare(FFIConnection *c_conn, size_t stmt_id,
-                          size_t arg_count, const char **arg_values);
+FFIPreparedResult FFIExecPrepare(FFIConnection *c_conn, size_t stmt_id,
+                                 size_t arg_count, const char **arg_values);
 
 #ifdef __cplusplus
 }

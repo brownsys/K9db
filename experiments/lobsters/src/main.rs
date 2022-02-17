@@ -274,7 +274,7 @@ impl Service<TrawlerRequest> for MysqlTrawler {
                                     disabled_invite_by_user_id, disabled_invite_reason, settings) \
                                     VALUES (?, ?, 'x@gmail.com', 'asdf', '2021-05-07 18:00', 0, NULL, ?, NULL, NULL, NULL, NULL, NULL, \
                                         NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)",
-                                    (format!("{}", uid), format!("user{}", uid), format!("session_token_{}", uid),),
+                                    (uid, format!("user{}", uid), format!("session_token_{}", uid),),
                                 )
                                 .await?;
                         }

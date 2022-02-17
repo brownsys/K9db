@@ -129,7 +129,7 @@ pub fn prepare_ffi(rust_conn: *mut FFIConnection, query: &str) -> *mut FFIPrepar
     return unsafe { FFIPrepare(rust_conn, char_query) };
 }
 
-pub fn exec_prepared_ffi(rust_conn: *mut FFIConnection, stmt_id: usize, args: Vec<String>) -> *mut FFIResult {
+pub fn exec_prepared_ffi(rust_conn: *mut FFIConnection, stmt_id: usize, args: Vec<String>) -> FFIPreparedResult {
     let args_len = args.len();
     let mut cstr_args: Vec<CString> = Vec::with_capacity(args_len);
     let mut c_args: Vec<* const c_char> = Vec::with_capacity(args_len);

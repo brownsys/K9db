@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "absl/status/statusor.h"
 #include "pelton/dataflow/graph.h"
 #include "pelton/dataflow/state.h"
 #include "pelton/sqlast/ast.h"
@@ -44,7 +45,8 @@ CanonicalQuery Canonicalize(const std::string &query);
 CanonicalDescriptor MakeCanonical(const CanonicalQuery &query);
 
 // Turn query into a prepared statement struct.
-PreparedStatementDescriptor MakeStmt(const std::string &query);
+PreparedStatementDescriptor MakeStmt(const std::string &query,
+                                     const CanonicalDescriptor *canonical);
 
 // Find out if a query needs to be served from a flow.
 bool NeedsFlow(const CanonicalQuery &query);
@@ -61,6 +63,10 @@ void FromFlow(const std::string &flow_name,
 void FromTables(const CanonicalQuery &query,
                 const dataflow::DataFlowState &dstate,
                 CanonicalDescriptor *stmt);
+
+// For handling insert/replace prepared statements.
+absl::StatusOr<CanonicalDescriptor> MakeInsertCanonical(
+    const std::string &insert, const dataflow::DataFlowState &dstate);
 
 }  // namespace prepared
 }  // namespace pelton

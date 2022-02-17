@@ -91,14 +91,14 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
 
 absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
                                                                size_t size) {
-  // SELECT * FROM <tablename> WHERE <colum_name> = <value>
+  // SELECT <cols>, ... FROM <tablename> WHERE <colum_name> = <value>
   // SELECT.
   if (!StartsWith(&str, &size, "SELECT", 6)) {
     return absl::InvalidArgumentError("Hacky select: SELECT");
   }
   ConsumeWhiteSpace(&str, &size);
 
-  // * FROM.
+  // <col>, ...
   std::vector<std::string> columns;
   while (true) {
     columns.push_back(ExtractIdentifier(&str, &size));
@@ -110,6 +110,7 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
   }
   ConsumeWhiteSpace(&str, &size);
 
+  // FROM.
   if (!StartsWith(&str, &size, "FROM", 4)) {
     return absl::InvalidArgumentError("Hacky select: FROM");
   }
@@ -189,7 +190,7 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyGDPR(const char *str,
 absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyParse(
     const std::string &sql) {
   size_t size = sql.size();
-  const char *str = sql.c_str();
+  const char *str = sql.data();
 
   if (str[0] == 'I' || str[0] == 'i' || str[0] == 'R' || str[0] == 'r') {
     return HackyInsert(str, size);
