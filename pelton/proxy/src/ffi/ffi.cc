@@ -231,8 +231,7 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
       size_t num_cols = resultset.schema().size();
 
       // allocate memory for CResult struct and the flexible array of RecordData
-      // unions
-      // we have to use malloc here to account for the flexible array.
+      // unions. we have to use malloc here to account for the flexible array.
       FFIResult *c_result = static_cast<FFIResult *>(
           malloc(sizeof(FFIResult) + sizeof(FFIRecord) * num_rows * num_cols));
       //  |- FFIResult*-|   |struct FFIRecord| |num of records (rows) and cols |
@@ -307,8 +306,8 @@ FFIPreparedStatement *FFIPrepare(FFIConnection *c_conn, const char *query) {
 void FFIDestroyPreparedStatement(FFIPreparedStatement *c_stmt) { free(c_stmt); }
 
 // Execute a prepared statement.
-FFIResult *FFIExecPrepare(FFIConnection *c_conn, size_t stmt_id,
-                          size_t arg_count, const char **arg_values) {
+FFIPreparedResult FFIExecPrepare(FFIConnection *c_conn, size_t stmt_id,
+                                 size_t arg_count, const char **arg_values) {
   pelton::Connection *cpp_conn =
       reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
   // Transform args to cpp format.
@@ -326,25 +325,31 @@ FFIResult *FFIExecPrepare(FFIConnection *c_conn, size_t stmt_id,
 
   if (result.ok()) {
     pelton::SqlResult &sql_result = result.value();
-    for (pelton::SqlResultSet &resultset : sql_result.ResultSets()) {
-      std::vector<pelton::dataflow::Record> records = resultset.Vec();
-      size_t num_rows = records.size();
-      size_t num_cols = resultset.schema().size();
+    if (sql_result.IsUpdate()) {
+      return {false, nullptr, sql_result.UpdateCount()};
+    } else if (sql_result.IsQuery()) {
+      for (pelton::SqlResultSet &resultset : sql_result.ResultSets()) {
+        std::vector<pelton::dataflow::Record> records = resultset.Vec();
+        size_t num_rows = records.size();
+        size_t num_cols = resultset.schema().size();
 
-      // allocate memory for CResult struct and the flexible array of RecordData
-      // unions
-      // we have to use malloc here to account for the flexible array.
-      FFIResult *c_result = static_cast<FFIResult *>(
-          malloc(sizeof(FFIResult) + sizeof(FFIRecord) * num_rows * num_cols));
-      //  |- FFIResult*-|   |struct FFIRecord| |num of records (rows) and cols |
+        // allocate memory for CResult struct and the flexible array of
+        // RecordData unions we have to use malloc here to account for the
+        // flexible array.
+        FFIResult *c_result = static_cast<FFIResult *>(malloc(
+            sizeof(FFIResult) + sizeof(FFIRecord) * num_rows * num_cols));
+        //  |- FFIResult*-|   |struct FFIRecord| |num of records * cols|
 
-      // set number of columns
-      c_result->num_cols = num_cols;
-      c_result->num_rows = num_rows;
-      PopulateSchema(c_result, resultset.schema());
-      PopulateRecords(c_result, records);
-      return c_result;
+        // set number of columns
+        c_result->num_cols = num_cols;
+        c_result->num_rows = num_rows;
+        PopulateSchema(c_result, resultset.schema());
+        PopulateRecords(c_result, records);
+        return {true, c_result, -1};
+      }
+    } else {
+      LOG(FATAL) << "Illegal prepared statement result type";
     }
   }
-  return nullptr;
+  return {true, nullptr, -1};
 }

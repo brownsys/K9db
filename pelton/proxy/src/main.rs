@@ -43,7 +43,11 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 info: StatementMetaWriter<W>)
                 -> io::Result<()> {
     // Filter out supported statements.
-    if !stmt.starts_with("SELECT") {
+    if !stmt.starts_with("SELECT")
+       && !stmt.starts_with("UPDATE")
+       && !stmt.starts_with("INSERT")
+       && !stmt.starts_with("REPLACE")
+    {
       error!(self.log, "Rust proxy: unsupported prepared statement {}", stmt);
       return info.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
     }
@@ -90,7 +94,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
           ColumnType::MYSQL_TYPE_STRING
           | ColumnType::MYSQL_TYPE_VARCHAR
           | ColumnType::MYSQL_TYPE_VAR_STRING => {
-            format!("\"{}\"", Into::<&str>::into(param.value))
+            format!("'{}'", Into::<&str>::into(param.value))
           }
           ColumnType::MYSQL_TYPE_DECIMAL
           | ColumnType::MYSQL_TYPE_NEWDECIMAL
@@ -116,61 +120,77 @@ impl<W: io::Write> MysqlShim<W> for Backend {
     }
 
     // Call pelton via ffi.
-    let select_response =
+    let response =
       exec_prepared_ffi(&mut self.rust_conn, stmt_id as usize, args);
 
-    let num_cols = unsafe { (*select_response).num_cols as usize };
-    let num_rows = unsafe { (*select_response).num_rows as usize };
-    let col_names = unsafe { (*select_response).col_names };
-    let col_types = unsafe { (*select_response).col_types };
+    if response.query {
+      let select_response = response.query_result;
+      if !select_response.is_null() {
+        let num_cols = unsafe { (*select_response).num_cols as usize };
+        let num_rows = unsafe { (*select_response).num_rows as usize };
+        let col_names = unsafe { (*select_response).col_names };
+        let col_types = unsafe { (*select_response).col_types };
 
-    let cols = convert_columns(num_cols, col_types, col_names);
-    let mut rw = results.start(&cols)?;
+        let cols = convert_columns(num_cols, col_types, col_names);
+        let mut rw = results.start(&cols)?;
 
-    // convert incomplete array field (flexible array) to rust slice, starting
-    // with the outer array
-    let rows_slice =
-      unsafe { (*select_response).records.as_slice(num_rows * num_cols) };
-    for r in 0..num_rows {
-      for c in 0..num_cols {
-        if rows_slice[r * num_cols + c].is_null {
-          rw.write_col(None::<i32>)?
-        } else {
-          match col_types[c] {
-            // write a value to the next col of the current row (of this
-            // resultset)
-            FFIColumnType_UINT => unsafe {
-              rw.write_col(rows_slice[r * num_cols + c].record.UINT as i64)?
-            },
-            FFIColumnType_INT => unsafe {
-              rw.write_col(rows_slice[r * num_cols + c].record.INT)?
-            },
-            FFIColumnType_TEXT => unsafe {
-              rw.write_col(
-                CString::from_raw(rows_slice[r * num_cols + c].record.TEXT)
-                  .into_string()
-                  .unwrap(),
-              )?
-            },
-            FFIColumnType_DATETIME => unsafe {
-              rw.write_col(
-                CString::from_raw(rows_slice[r * num_cols + c].record.DATETIME)
-                  .into_string()
-                  .unwrap(),
-              )?
-            },
-            _ => error!(self.log, "Rust Proxy: Invalid column type"),
+        // convert incomplete array field (flexible array) to rust slice,
+        // starting with the outer array
+        let rows_slice =
+          unsafe { (*select_response).records.as_slice(num_rows * num_cols) };
+        for r in 0..num_rows {
+          for c in 0..num_cols {
+            if rows_slice[r * num_cols + c].is_null {
+              rw.write_col(None::<i32>)?
+            } else {
+              match col_types[c] {
+                // write a value to the next col of the current row (of this
+                // resultset)
+                FFIColumnType_UINT => unsafe {
+                  rw.write_col(rows_slice[r * num_cols + c].record.UINT as i64)?
+                },
+                FFIColumnType_INT => unsafe {
+                  rw.write_col(rows_slice[r * num_cols + c].record.INT)?
+                },
+                FFIColumnType_TEXT => unsafe {
+                  rw.write_col(
+                    CString::from_raw(rows_slice[r * num_cols + c].record.TEXT)
+                      .into_string()
+                      .unwrap(),
+                  )?
+                },
+                FFIColumnType_DATETIME => unsafe {
+                  rw.write_col(
+                    CString::from_raw(
+                      rows_slice[r * num_cols + c].record.DATETIME,
+                    )
+                    .into_string()
+                    .unwrap(),
+                  )?
+                },
+                _ => error!(self.log, "Rust Proxy: Invalid column type"),
+              }
+            }
           }
+          rw.end_row()?;
         }
-      }
-      rw.end_row()?;
-    }
-    // call destructor for CResult (after results are written/copied via row
-    // writer)
-    unsafe { std::ptr::drop_in_place(select_response) };
+        // call destructor for CResult (after results are written/copied via row
+        // writer)
+        unsafe { std::ptr::drop_in_place(select_response) };
 
-    // tell client no more rows coming. Returns an empty Ok to the proxy
-    return rw.finish();
+        // tell client no more rows coming. Returns an empty Ok to the proxy
+        return rw.finish();
+      }
+      error!(self.log, "Rust Proxy: Failed to exec prepared select");
+      return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
+    } else {
+      let update_response = response.update_result;
+      if update_response != -1 {
+        return results.completed(update_response as u64, 0);
+      }
+      error!(self.log, "Rust Proxy: Failed to exec prepared update");
+      return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
+    }
   }
 
   // called when client wants to deallocate resources associated with a prev
@@ -261,61 +281,64 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("SHOW MEMORY")
     {
       let select_response = exec_select_ffi(&mut self.rust_conn, q_string);
+      if !select_response.is_null() {
+        let num_cols = unsafe { (*select_response).num_cols as usize };
+        let num_rows = unsafe { (*select_response).num_rows as usize };
+        let col_names = unsafe { (*select_response).col_names };
+        let col_types = unsafe { (*select_response).col_types };
 
-      let num_cols = unsafe { (*select_response).num_cols as usize };
-      let num_rows = unsafe { (*select_response).num_rows as usize };
-      let col_names = unsafe { (*select_response).col_names };
-      let col_types = unsafe { (*select_response).col_types };
+        let cols = convert_columns(num_cols, col_types, col_names);
+        let mut rw = results.start(&cols)?;
 
-      let cols = convert_columns(num_cols, col_types, col_names);
-      let mut rw = results.start(&cols)?;
-
-      // convert incomplete array field (flexible array) to rust slice, starting
-      // with the outer array
-      let rows_slice =
-        unsafe { (*select_response).records.as_slice(num_rows * num_cols) };
-      for r in 0..num_rows {
-        for c in 0..num_cols {
-          if rows_slice[r * num_cols + c].is_null {
-            rw.write_col(None::<i32>)?
-          } else {
-            match col_types[c] {
-              // write a value to the next col of the current row (of this
-              // resultset)
-              FFIColumnType_UINT => unsafe {
-                rw.write_col(rows_slice[r * num_cols + c].record.UINT as i64)?
-              },
-              FFIColumnType_INT => unsafe {
-                rw.write_col(rows_slice[r * num_cols + c].record.INT)?
-              },
-              FFIColumnType_TEXT => unsafe {
-                rw.write_col(
-                  CString::from_raw(rows_slice[r * num_cols + c].record.TEXT)
+        // convert incomplete array field (flexible array) to rust slice,
+        // starting with the outer array
+        let rows_slice =
+          unsafe { (*select_response).records.as_slice(num_rows * num_cols) };
+        for r in 0..num_rows {
+          for c in 0..num_cols {
+            if rows_slice[r * num_cols + c].is_null {
+              rw.write_col(None::<i32>)?
+            } else {
+              match col_types[c] {
+                // write a value to the next col of the current row (of this
+                // resultset)
+                FFIColumnType_UINT => unsafe {
+                  rw.write_col(rows_slice[r * num_cols + c].record.UINT as i64)?
+                },
+                FFIColumnType_INT => unsafe {
+                  rw.write_col(rows_slice[r * num_cols + c].record.INT)?
+                },
+                FFIColumnType_TEXT => unsafe {
+                  rw.write_col(
+                    CString::from_raw(rows_slice[r * num_cols + c].record.TEXT)
+                      .into_string()
+                      .unwrap(),
+                  )?
+                },
+                FFIColumnType_DATETIME => unsafe {
+                  rw.write_col(
+                    CString::from_raw(
+                      rows_slice[r * num_cols + c].record.DATETIME,
+                    )
                     .into_string()
                     .unwrap(),
-                )?
-              },
-              FFIColumnType_DATETIME => unsafe {
-                rw.write_col(
-                  CString::from_raw(
-                    rows_slice[r * num_cols + c].record.DATETIME,
-                  )
-                  .into_string()
-                  .unwrap(),
-                )?
-              },
-              _ => error!(self.log, "Rust Proxy: Invalid column type"),
+                  )?
+                },
+                _ => error!(self.log, "Rust Proxy: Invalid column type"),
+              }
             }
           }
+          rw.end_row()?;
         }
-        rw.end_row()?;
-      }
-      // call destructor for CResult (after results are written/copied via row
-      // writer)
-      unsafe { std::ptr::drop_in_place(select_response) };
+        // call destructor for CResult (after results are written/copied via row
+        // writer)
+        unsafe { std::ptr::drop_in_place(select_response) };
 
-      // tell client no more rows coming. Returns an empty Ok to the proxy
-      return rw.finish();
+        // tell client no more rows coming. Returns an empty Ok to the proxy
+        return rw.finish();
+      }
+      error!(self.log, "Rust Proxy: Failed to execute SELECT: {:?}", q_string);
+      return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
     }
 
     if q_string.starts_with("set") {
