@@ -3,6 +3,7 @@
 #include "pelton/shards/sqlengine/index.h"
 
 #include <memory>
+#include <vector>
 
 #include "absl/status/status.h"
 #include "pelton/dataflow/graph.h"

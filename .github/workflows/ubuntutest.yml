@@ -11,12 +11,12 @@ jobs:
     # Docker setup.
     - name: Build docker container
       run: |
-        docker build -t pelton/latest .
+        docker build --no-cache -t pelton/latest .
 
     - name: Run docker container
       run: |
         docker run --mount type=bind,source=$(pwd),target=/home/pelton --name pelton-testing -d -t pelton/latest
-        sleep 30
+        sleep 60
 
     # bazel build ...
     - name: Build all

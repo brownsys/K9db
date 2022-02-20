@@ -1,19 +1,12 @@
 #!/bin/bash
-# Run cargo raze.
-echo "Running cargo-raze"
-cd /home/pelton/pelton/proxy && /root/.cargo/bin/cargo raze && cd -
-cd /home/pelton/experiments/lobsters && /root/.cargo/bin/cargo raze && cd -
-cd /home/pelton/experiments/memcached && /root/.cargo/bin/cargo raze && cd -
-cd /home/pelton/experiments/ownCloud && /root/.cargo/bin/cargo raze && cd -
-
 # Run Mariadb.
 echo "Running mariadbd ..."
-mariadbd &
-MARIADBID=$!
+service mariadb start
 
 # sleep until mariadb is up
 sleep 10
 
+# Setup the DB if it is the first time we run
 if [[ -f "/home/configure_db.sql" ]]; then
   echo "Configuring mariadb ..."
   mariadb -u root < /home/configure_db.sql
@@ -23,5 +16,9 @@ if [[ -f "/home/configure_db.sql" ]]; then
   fi
 fi
 
-wait $MARIADBID
-echo "mariadbd exited! $?"
+# Run cargo raze.
+echo "Running cargo-raze"
+cd /home/pelton/pelton/proxy && /root/.cargo/bin/cargo raze && cd -
+cd /home/pelton/experiments/lobsters && /root/.cargo/bin/cargo raze && cd -
+cd /home/pelton/experiments/memcached && /root/.cargo/bin/cargo raze && cd -
+cd /home/pelton/experiments/ownCloud && /root/.cargo/bin/cargo raze && cd -

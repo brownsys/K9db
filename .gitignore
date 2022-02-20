@@ -60,5 +60,7 @@ cmake-build-debug/
 
 # Build directory
 target/
-# Raze output directory
-cargo/
+
+# Cargo raze directories except lockfiles
+**/cargo/*
+!**/cargo/Cargo.raze.lock
