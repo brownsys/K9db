@@ -227,7 +227,20 @@ void DataFlowGraphGenerator::AddProjectionArithmeticColumns(
 
 // Reading schema.
 std::vector<std::string> DataFlowGraphGenerator::GetTables() const {
-  return this->state_->GetTables();
+  std::vector<std::string> tables;
+  std::vector<std::string> views;
+  std::vector<std::string> tables_and_views;
+
+  // return names of both tables and views
+  tables = this->state_->GetTables();
+  views = this->state_->GetFlows();
+
+  // concatenate names
+  tables_and_views.reserve(tables.size() + views.size());
+  tables_and_views.insert(tables_and_views.end(), tables.begin(), tables.end());
+  tables_and_views.insert(tables_and_views.end(), views.begin(), views.end());
+
+  return tables_and_views;
 }
 size_t DataFlowGraphGenerator::GetTableColumnCount(
     const std::string &table_name) const {
