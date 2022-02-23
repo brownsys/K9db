@@ -22,6 +22,49 @@ use std::sync::Arc;
 
 const PELTON_SCHEMA: &'static str = include_str!("../schema/pelton.sql");
 const MARIADB_SCHEMA: &'static str = include_str!("../schema/rocks-mariadb.sql");
+static VIEWS: [&'static str; 16] = [
+    "SELECT comments.upvotes, comments.downvotes, comments.story_id FROM comments JOIN stories ON comments.story_id = stories.id WHERE comments.story_id = ? AND comments.user_id != stories.user_id",
+    "SELECT stories.id, stories.merged_story_id FROM stories WHERE stories.merged_story_id = ?",
+    "SELECT comments.*, comments.upvotes - comments.downvotes AS saldo FROM comments WHERE comments.story_id = ? ORDER BY saldo ASC, confidence DESC",
+    "SELECT tags.*, taggings.story_id FROM tags INNER JOIN taggings ON tags.id = taggings.tag_id WHERE taggings.story_id = ?",
+    "SELECT stories.* FROM stories WHERE stories.merged_story_id IS NULL AND stories.is_expired = 0 AND stories.upvotes - stories.downvotes >= 0 ORDER BY hotness ASC LIMIT 51",
+    "SELECT votes.* FROM votes WHERE votes.comment_id = ?",
+    "SELECT tags.id, stories.user_id, count(*) AS `count` FROM tags INNER JOIN taggings ON tags.id = taggings.tag_id INNER JOIN stories ON taggings.story_id = stories.id WHERE tags.inactive = 0 AND stories.user_id = ? GROUP BY tags.id, stories.user_id ORDER BY `count` DESC LIMIT 1",
+    "SELECT suggested_titles.* FROM suggested_titles WHERE suggested_titles.story_id = ?",
+    "SELECT taggings.* FROM taggings WHERE taggings.story_id = ?",
+    "SELECT 1 AS `one`, hats.OWNER_user_id FROM hats WHERE hats.OWNER_user_id = ? LIMIT 1",
+    "SELECT suggested_taggings.* FROM suggested_taggings WHERE suggested_taggings.story_id = ?",
+    "SELECT comments.* FROM comments WHERE comments.is_deleted = 0 AND comments.is_moderated = 0 ORDER BY id DESC LIMIT 40",
+    "SELECT stories.* FROM stories WHERE stories.id = ?",
+    "SELECT stories.* FROM stories WHERE stories.merged_story_id IS NULL AND stories.is_expired = 0 AND stories.upvotes - stories.downvotes <= 5 ORDER BY stories.id DESC LIMIT 51",
+    "SELECT read_ribbons.user_id, COUNT(*) \
+    FROM read_ribbons \
+    JOIN stories ON (read_ribbons.story_id = stories.id) \
+    JOIN comments ON (read_ribbons.story_id = comments.story_id) \
+    LEFT JOIN comments AS parent_comments \
+    ON (comments.parent_comment_id = parent_comments.id) \
+    WHERE read_ribbons.is_following = 1 \
+    AND comments.user_id <> read_ribbons.user_id \
+    AND comments.is_deleted = 0 \
+    AND comments.is_moderated = 0 \
+    AND ( comments.upvotes - comments.downvotes ) >= 0 \
+    AND read_ribbons.updated_at < comments.created_at \
+    AND ( \
+       ( \
+              parent_comments.user_id = read_ribbons.user_id \
+              AND \
+              ( parent_comments.upvotes - parent_comments.downvotes ) >= 0 \
+       ) \
+       OR \
+       ( \
+              parent_comments.id IS NULL \
+              AND \
+              stories.user_id = read_ribbons.user_id \
+       ) \
+   ) GROUP BY read_ribbons.user_id HAVING read_ribbons.user_id = ?",
+   // Not present in the schema file in pelton's repo but this requires a view.
+   "SELECT taggings.story_id, taggings.tag_id FROM taggings WHERE taggings.story_id = ? AND taggings.tag_id = ?",
+];
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 enum Variant {
@@ -103,7 +146,7 @@ impl Service<bool> for MysqlTrawlerBuilder {
             let db_create = format!("CREATE DATABASE {}", db);
             let db_use = format!("USE {}", db);
             Box::pin(async move {
-                let mut c = my::Conn::new(opts).await?;
+                let mut c = my::Conn::new(opts.clone()).await?;
                 if backend_variant == BackendVariant::MariaDB {
                     // TODO(Ishan): Should we support this in pelton's proxy as well?
                     c = c.drop_query(&db_drop).await?;
@@ -126,6 +169,14 @@ impl Service<bool> for MysqlTrawlerBuilder {
                     if current_q.ends_with(';') {
                         c = c.drop_query(&current_q).await?;
                         current_q.clear();
+                    }
+                }
+
+                // Dispatch prepared statements for the queries that need views.
+                if backend_variant == BackendVariant::Pelton{
+                    for view_query in &VIEWS{
+                        let prepared_conn = my::Conn::new(opts.clone()).await?;
+                        prepared_conn.prepare(&view_query).await?;
                     }
                 }
 
