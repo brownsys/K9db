@@ -100,7 +100,7 @@ SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
   if (this->schema_.count(table_name) > 0) {
     return this->schema_.at(table_name);
   } else if (this->flows_.count(table_name) > 0) {
-    return this->flows_.at(table_name).output_schema();
+    return this->flows_.at(table_name)->output_schema();
   } else {
     LOG(FATAL) << "Tried to get schema for non-existent table or view" << table_name;
   }
