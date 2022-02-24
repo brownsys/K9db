@@ -12,6 +12,6 @@ cargo install cargo-raze
 
 # run cargo raze
 cd pelton/proxy && cargo raze && cd -
-cd experiments/lobsters && /root/.cargo/bin/cargo raze && cd -
-cd experiments/memcached && /root/.cargo/bin/cargo raze && cd -
-cd experiments/ownCloud && /root/.cargo/bin/cargo raze && cd -
+cd experiments/lobsters && cargo raze && cd -
+cd experiments/memcached && cargo raze && cd -
+cd experiments/ownCloud && cargo raze && cd -
