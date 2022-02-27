@@ -57,8 +57,10 @@ CREATE TABLE tags ( id int NOT NULL PRIMARY KEY, tag varchar(25) NOT NULL, descr
 CREATE UNIQUE INDEX tags_tag ON tags (tag);
 CREATE TABLE suggested_taggings ( id int NOT NULL PRIMARY KEY, story_id int, tag_id int, user_id int) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE INDEX suggested_taggings_user_id ON suggested_taggings (user_id);
+CREATE INDEX suggested_taggings_story_id ON suggested_taggings (story_id);
 CREATE TABLE suggested_titles ( id int NOT NULL PRIMARY KEY, story_id int, user_id int, title varchar(150) NOT NULL) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE INDEX suggested_titles_user_id ON suggested_titles (user_id);
+CREATE INDEX suggested_titles_story_id ON suggested_titles (story_id);
 CREATE TABLE tag_filters ( id int NOT NULL PRIMARY KEY, created_at datetime NOT NULL, updated_at datetime NOT NULL, user_id int, tag_id int) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE INDEX tag_filters_user_id ON tag_filters (user_id);
 CREATE INDEX tag_filters_user_tagd ON tag_filters (user_id, tag_id);
