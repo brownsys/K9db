@@ -7,7 +7,6 @@
 
 #include "glog/logging.h"
 #include "pelton/dataflow/record.h"
-#include "pelton/shards/sqlengine/util.h"
 #include "pelton/sql/connections/rocksdb_connection.h"
 
 namespace pelton {
@@ -57,29 +56,25 @@ SqlResult PeltonExecutor::Default(const sqlast::AbstractStatement *sql,
 #ifndef PELTON_OPT
   LOG(INFO) << "Shard: default";
 #endif
-  return this->Execute(sql, schema, __UNSHARDED_DB, __NO_AUG, __NO_AUG_VALUE);
+  return this->Execute(sql, schema, "", -1);
 }
 
 // Execute statement against given user shard.
 SqlResult PeltonExecutor::Shard(const sqlast::AbstractStatement *sql,
-                                const std::string &shard_kind,
                                 const shards::UserId &user_id,
                                 const dataflow::SchemaRef &schema,
                                 int aug_index) {
-  // Find the physical shard name (prefix) by hashing the user id and user kind.
-  std::string shard_name = shards::sqlengine::NameShard(shard_kind, user_id);
-
 #ifndef PELTON_OPT
-  LOG(INFO) << "Shard: " << shard_name << " (userid: " << user_id << ")";
+  LOG(INFO) << "Shard: " << user_id;
 #endif
 
   // Execute against the underlying shard.
-  return this->Execute(sql, schema, shard_name, aug_index, user_id);
+  return this->Execute(sql, schema, user_id, aug_index);
 }
 
 // Execute statement against given user shards.
 SqlResult PeltonExecutor::Shards(
-    const sqlast::AbstractStatement *sql, const std::string &shard_kind,
+    const sqlast::AbstractStatement *sql,
     const std::unordered_set<shards::UserId> &user_ids,
     const dataflow::SchemaRef &schema, int aug_index) {
   // If no user_ids are provided, we return an empty result.
@@ -92,8 +87,7 @@ SqlResult PeltonExecutor::Shards(
 
   // This result set is a proxy that allows access to results from all shards.
   for (const shards::UserId &user_id : user_ids) {
-    result.Append(this->Shard(sql, shard_kind, user_id, schema, aug_index),
-                  true);
+    result.Append(this->Shard(sql, user_id, schema, aug_index), true);
   }
 
   return result;
@@ -102,32 +96,31 @@ SqlResult PeltonExecutor::Shards(
 // Actual SQL statement execution.
 SqlResult PeltonExecutor::Execute(const sqlast::AbstractStatement *stmt,
                                   const dataflow::SchemaRef &schema,
-                                  const std::string &shard_name, int aug_index,
-                                  const std::string &aug_value) {
+                                  const shards::UserId &user_id,
+                                  int aug_index) {
 #ifndef PELTON_OPT
-  std::string sql = sqlast::Stringifier(shard_name).Visit(stmt);
-  LOG(INFO) << "Statement: " << sql;
+  LOG(INFO) << "Statement: " << stmt;
 #endif
 
   switch (stmt->type()) {
     // Statements: return a boolean signifying success.
     case sqlast::AbstractStatement::Type::CREATE_TABLE:
     case sqlast::AbstractStatement::Type::CREATE_INDEX:
-      return SqlResult(this->connection_->ExecuteStatement(stmt, shard_name));
+      return SqlResult(this->connection_->ExecuteStatement(stmt, user_id));
 
     // Updates: return a count of rows affected.
     case sqlast::AbstractStatement::Type::UPDATE:
-      return SqlResult(this->connection_->ExecuteUpdate(stmt, shard_name));
+      return SqlResult(this->connection_->ExecuteUpdate(stmt, user_id));
 
     // Insert and Delete might be returning.
     case sqlast::AbstractStatement::Type::INSERT:
       if (!static_cast<const sqlast::Insert *>(stmt)->returning()) {
-        return SqlResult(this->connection_->ExecuteUpdate(stmt, shard_name));
+        return SqlResult(this->connection_->ExecuteUpdate(stmt, user_id));
       }
       break;
     case sqlast::AbstractStatement::Type::DELETE:
       if (!static_cast<const sqlast::Delete *>(stmt)->returning()) {
-        return SqlResult(this->connection_->ExecuteUpdate(stmt, shard_name));
+        return SqlResult(this->connection_->ExecuteUpdate(stmt, user_id));
       }
       break;
 
@@ -144,12 +137,12 @@ SqlResult PeltonExecutor::Execute(const sqlast::AbstractStatement *stmt,
   // Set up augmentation information to augment any sharding columns to the
   // result set.
   std::vector<AugInfo> aug_info;
-  if (aug_index > __NO_AUG) {
-    aug_info.push_back({static_cast<size_t>(aug_index), aug_value});
+  if (aug_index > -1) {
+    aug_info.push_back({static_cast<size_t>(aug_index), user_id});
   }
   // Create a result set for output.
   SqlResultSet resultset =
-      this->connection_->ExecuteQuery(stmt, schema, aug_info, shard_name);
+      this->connection_->ExecuteQuery(stmt, schema, aug_info, user_id);
   return SqlResult(std::move(resultset));
 }
 
