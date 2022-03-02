@@ -9,6 +9,7 @@
 #include "pelton/dataflow/ops/aggregate.h"
 #include "pelton/dataflow/ops/equijoin.h"
 #include "pelton/dataflow/ops/filter.h"
+#include "pelton/dataflow/ops/identity.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/ops/project.h"
@@ -30,26 +31,25 @@ DataFlowGraphGenerator::DataFlowGraphGenerator(
 // Adding operators.
 NodeIndex DataFlowGraphGenerator::AddInputOperator(
     const std::string &table_name) {
-  // Create input operator
-  SchemaRef table_schema = this->state_->GetTableSchema(table_name);
-  std::unique_ptr<InputOperator> input =
-      std::make_unique<InputOperator>(table_name, table_schema);
-  // Check if input name is a view name.
+  // Check if table_name is a view name.
   if (this->state_->HasFlow(table_name)) {
-    // Get MAT VIEW operator from dataflow
-    // Assumption: MAT VIEW is the last operator in the graph
-    // NodeIndex matview_idx = this->graph_->LastOperatorIndex();
-    // Operator *op = this->graph_->GetNode(matview_idx);
-    std::vector<MatViewOperator *> matviews =
-        this->state_->GetFlow(table_name).get_matviews();
-    LOG(INFO) << "SIZE OF MATVIEWS = " << matviews.size();
+    // get MAT VIEW operator from dataflow
+    const auto partition = this->state_->GetFlow(table_name).GetPartition(0);
+    MatViewOperator *matview = partition->outputs().front();
+    PCHECK(matview);
 
-    MatViewOperator *op = matviews.front();
-    PCHECK(op);
+    // create an IdentityOperator
+    std::unique_ptr<IdentityOperator> op = std::make_unique<IdentityOperator>();
+    CHECK(op);
 
-    // Add the input operator (view) to the graph, where MAT VIEW is a parent
-    CHECK(this->graph_->AddNode(std::move(input), std::vector<Operator *>{op}));
+    // Add the identity operator to the graph, where MAT VIEW is a parent
+    CHECK(this->graph_->AddNode(op, std::vector<Operator *>{matview}));
   } else {
+    // Doesn't correspond to view, create input operator
+    SchemaRef table_schema = this->state_->GetTableSchema(table_name);
+    std::unique_ptr<InputOperator> input =
+    std::make_unique<InputOperator>(table_name, table_schema);
+
     // Add the input operator (table) to the graph.
     CHECK(this->graph_->AddInputNode(std::move(input)));
   }
