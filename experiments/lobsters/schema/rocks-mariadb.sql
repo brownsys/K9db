@@ -43,7 +43,7 @@ CREATE TABLE stories ( id int NOT NULL PRIMARY KEY, created_at datetime, user_id
 CREATE UNIQUE INDEX stories_short_id ON stories (short_id);
 CREATE INDEX stories_user_id ON stories (user_id);
 CREATE INDEX stories_created_at ON stories (created_at);
-CREATE INDEX stories_description ON stories (description);
+-- CREATE INDEX stories_description ON stories (description);
 CREATE INDEX stories_hotness ON stories (hotness);
 -- CREATE INDEX stories_exp_mod ON stories (is_expired, is_moderated);
 -- CREATE INDEX stories_is_expired ON stories (is_expired);
