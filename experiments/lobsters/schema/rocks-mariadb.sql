@@ -43,16 +43,17 @@ CREATE TABLE stories ( id int NOT NULL PRIMARY KEY, created_at datetime, user_id
 CREATE UNIQUE INDEX stories_short_id ON stories (short_id);
 CREATE INDEX stories_user_id ON stories (user_id);
 CREATE INDEX stories_created_at ON stories (created_at);
-CREATE INDEX stories_description ON stories (description);
+--(not needed) CREATE INDEX stories_description ON stories (description);
 CREATE INDEX stories_hotness ON stories (hotness);
-CREATE INDEX stories_exp_mod ON stories (is_expired, is_moderated);
-CREATE INDEX stories_is_expired ON stories (is_expired);
-CREATE INDEX stories_is_moderated ON stories (is_moderated);
+--(not needed) CREATE INDEX stories_exp_mod ON stories (is_expired, is_moderated);
+-- Although there are queries that make use of this column, it has a cardinality of 1 and the current queries always search on the value present in the column. But more importantly this causes rocksdb to plan the first query in recent.rs in an unusual non-optimal way.
+--(enable with care) CREATE INDEX stories_is_expired ON stories (is_expired);
+--(not needed) CREATE INDEX stories_is_moderated ON stories (is_moderated);
 CREATE INDEX stories_merged_story ON stories (merged_story_id);
-CREATE INDEX stories_story_cache ON stories (story_cache);
+--(not needed) CREATE INDEX stories_story_cache ON stories (story_cache);
 CREATE INDEX stories_title ON stories (title);
-CREATE INDEX stories_twitter_id ON stories (twitter_id);
-CREATE INDEX stories_url ON stories (url);
+--(not needed) CREATE INDEX stories_twitter_id ON stories (twitter_id);
+--(not needed) CREATE INDEX stories_url ON stories (url);
 CREATE TABLE tags ( id int NOT NULL PRIMARY KEY, tag varchar(25) NOT NULL, description varchar(100), privileged int, is_media int, inactive int, hotness_mod int) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE UNIQUE INDEX tags_tag ON tags (tag);
 CREATE TABLE suggested_taggings ( id int NOT NULL PRIMARY KEY, story_id int, tag_id int, user_id int) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
