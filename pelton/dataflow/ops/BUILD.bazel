@@ -102,6 +102,7 @@ cc_library(
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
         "//pelton/dataflow:types",
+        "@glog",
     ],
 )
 

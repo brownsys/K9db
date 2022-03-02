@@ -37,19 +37,16 @@ NodeIndex DataFlowGraphGenerator::AddInputOperator(
     const auto partition = this->state_->GetFlow(table_name).GetPartition(0);
     MatViewOperator *matview = partition->outputs().front();
     PCHECK(matview);
-
     // create an IdentityOperator
     std::unique_ptr<IdentityOperator> op = std::make_unique<IdentityOperator>();
     CHECK(op);
-
     // Add the identity operator to the graph, where MAT VIEW is a parent
-    CHECK(this->graph_->AddNode(op, std::vector<Operator *>{matview}));
+    CHECK(this->graph_->AddNode(std::move(op), matview));
   } else {
-    // Doesn't correspond to view, create input operator
+    // Doesn't correspond to view, create input operator as normal
     SchemaRef table_schema = this->state_->GetTableSchema(table_name);
     std::unique_ptr<InputOperator> input =
     std::make_unique<InputOperator>(table_name, table_schema);
-
     // Add the input operator (table) to the graph.
     CHECK(this->graph_->AddInputNode(std::move(input)));
   }
