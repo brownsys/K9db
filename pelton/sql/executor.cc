@@ -146,6 +146,22 @@ SqlResult PeltonExecutor::Execute(const sqlast::AbstractStatement *stmt,
   return SqlResult(std::move(resultset));
 }
 
+// Execute a (select) statement against all shards.
+SqlResult PeltonExecutor::All(const sqlast::AbstractStatement *sql,
+                              const dataflow::SchemaRef &schema,
+                              int aug_index) {
+#ifndef PELTON_OPT
+  LOG(INFO) << "All shards statement: " << sql;
+#endif
+  std::vector<AugInfo> aug_info;
+  if (aug_index > -1) {
+    aug_info.push_back({aug_index, ""});
+  }
+  SqlResultSet resultset =
+      this->connection_->ExecuteQueryAll(sql, schema, aug_info);
+  return SqlResult(std::move(resultset));
+}
+
 // Close any open singletons.
 void PeltonExecutor::CloseAll() { RocksdbConnection::CloseAll(); }
 

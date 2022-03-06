@@ -151,6 +151,13 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
           result.Append(exec.Shard(&cloned, user_id, schema, aug_index), true);
         }
 
+      } else if (stmt.GetWhereClause() == nullptr) {
+        VLOG(1) << "Select from all";
+        // SELECT has no WHERE condition, we want to get the entire content of
+        // logical table from all shards, we can do this in one shot with
+        // rocksdb.
+        result.Append(exec.All(&cloned, schema, aug_index), true);
+
       } else {
         VLOG(1) << "Trying secondary indices";
         // The select statement by itself does not obviously constraint a shard.

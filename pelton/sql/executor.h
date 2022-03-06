@@ -56,6 +56,10 @@ class PeltonExecutor {
                    const std::unordered_set<shards::UserId> &user_ids,
                    const dataflow::SchemaRef &schema = {}, int aug_index = -1);
 
+  // Execute a (select) statement against all shards.
+  SqlResult All(const sqlast::AbstractStatement *sql,
+                const dataflow::SchemaRef &schema, int aug_index = -1);
+
  private:
   SqlResult EmptyResult(const sqlast::AbstractStatement *sql,
                         const dataflow::SchemaRef &schema);
