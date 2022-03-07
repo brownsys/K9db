@@ -68,7 +68,8 @@ CREATE INDEX tag_filters_user_tagd ON tag_filters (user_id, tag_id);
 CREATE TABLE taggings ( id int NOT NULL PRIMARY KEY, story_id int NOT NULL, tag_id int NOT NULL) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE INDEX taggings ON taggings (story_id, tag_id);
 CREATE INDEX taggings_story_id ON taggings (story_id);
-CREATE INDEX taggings_tag_id ON taggings (tag_id);
+-- tag_id column in the taggings table contains only one value(of the only tag present in tags table). This index did not add much value but ended up leading the query planner to make sub-optimal plans.
+-- (enable with care) CREATE INDEX taggings_tag_id ON taggings (tag_id);
 CREATE TABLE votes ( id int NOT NULL PRIMARY KEY, OWNER_user_id int NOT NULL, story_id int NOT NULL, comment_id int, vote int NOT NULL, reason varchar(1)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE INDEX votes_user_id ON votes (OWNER_user_id);
 CREATE INDEX votes_user_comment ON votes (OWNER_user_id, comment_id);
