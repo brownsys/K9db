@@ -131,6 +131,11 @@ TEST(RocksdbConnectionTest, OpenTest) {
   resultset = conn.ExecuteQuery(parsed.get(), schema, {}, "");
   Print(resultset.Vec(), schema);
 
+  // Real all using new All API.
+  parsed = Parse("SELECT * FROM tbl;");
+  resultset = conn.ExecuteQueryAll(parsed.get(), schema, {});
+  Print(resultset.Vec(), schema);
+
   conn.Close();
   RocksdbConnection::CloseAll();
 }

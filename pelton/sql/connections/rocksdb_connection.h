@@ -42,6 +42,10 @@ class SingletonRocksdbConnection {
                             const std::vector<AugInfo> &augments,
                             const std::string &shard_name);
 
+  SqlResultSet ExecuteQueryAll(const sqlast::AbstractStatement *sql,
+                               const dataflow::SchemaRef &schema,
+                               const std::vector<AugInfo> &augments);
+
  private:
   // Helpers.
   // Get record matching values in a value mapper (either by key, index, or it).
@@ -90,6 +94,11 @@ class RocksdbConnection : public PeltonConnection {
                             const std::vector<AugInfo> &augments,
                             const std::string &shard_name) override {
     return this->singleton_->ExecuteQuery(sql, schema, augments, shard_name);
+  }
+  SqlResultSet ExecuteQueryAll(const sqlast::AbstractStatement *sql,
+                               const dataflow::SchemaRef &schema,
+                               const std::vector<AugInfo> &augments) override {
+    return this->singleton_->ExecuteQueryAll(sql, schema, augments);
   }
 
   // Call to close the DB completely.

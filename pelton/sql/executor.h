@@ -13,10 +13,6 @@
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 
-#define __UNSHARDED_DB "default_db"
-#define __NO_AUG -1
-#define __NO_AUG_VALUE ""
-
 namespace pelton {
 namespace sql {
 
@@ -52,14 +48,17 @@ class PeltonExecutor {
 
   // Execute statement against given user shard.
   SqlResult Shard(const sqlast::AbstractStatement *sql,
-                  const std::string &shard_kind, const shards::UserId &user_id,
+                  const shards::UserId &user_id,
                   const dataflow::SchemaRef &schema = {}, int aug_index = -1);
 
   // Execute statement against given user shards.
   SqlResult Shards(const sqlast::AbstractStatement *sql,
-                   const std::string &shard_kind,
                    const std::unordered_set<shards::UserId> &user_ids,
                    const dataflow::SchemaRef &schema = {}, int aug_index = -1);
+
+  // Execute a (select) statement against all shards.
+  SqlResult All(const sqlast::AbstractStatement *sql,
+                const dataflow::SchemaRef &schema, int aug_index = -1);
 
  private:
   SqlResult EmptyResult(const sqlast::AbstractStatement *sql,
@@ -67,8 +66,7 @@ class PeltonExecutor {
 
   SqlResult Execute(const sqlast::AbstractStatement *sql,
                     const dataflow::SchemaRef &schema,
-                    const std::string &shard_name = "default_db",
-                    int aug_index = -1, const std::string &aug_value = "");
+                    const shards::UserId &user_id = "", int aug_index = -1);
 
   // The connection to the underlying DB.
   std::unique_ptr<PeltonConnection> connection_;

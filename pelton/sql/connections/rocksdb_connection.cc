@@ -1,5 +1,6 @@
 #include "pelton/sql/connections/rocksdb_connection.h"
 
+#include <unordered_set>
 #include <utility>
 
 #include "glog/logging.h"
@@ -407,6 +408,72 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
     }
     default:
       LOG(FATAL) << "Illegal statement type in ExecuteQuery";
+  }
+  return SqlResultSet(out_schema, std::move(records), std::move(keys));
+}
+
+SqlResultSet SingletonRocksdbConnection::ExecuteQueryAll(
+    const sqlast::AbstractStatement *sql, const dataflow::SchemaRef &out_schema,
+    const std::vector<AugInfo> &augments) {
+  CHECK_LE(augments.size(), 1u) << "Too many augmentations";
+  std::vector<AugInfo> augments_copy = augments;
+  bool must_augment = augments_copy.size() > 0;
+
+  // Read table metadata.
+  const std::string &table_name = GetTableName(sql);
+  if (this->tables_.count(table_name) == 0) {
+    // The table has not been concretely created yet (lazy on insert)!
+    return SqlResultSet(out_schema, {}, {});
+  }
+
+  TableID tid = this->tables_.at(table_name);
+  rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(tid).get();
+  const dataflow::SchemaRef &db_schema = this->schemas_.at(tid);
+  size_t pk = this->primary_keys_.at(tid);
+
+  // Result components.
+  std::vector<dataflow::Record> records;
+  std::vector<std::string> keys;
+  std::unordered_set<std::string> duplicates;
+  switch (sql->type()) {
+    case sqlast::AbstractStatement::Type::SELECT: {
+      const sqlast::Select *stmt = static_cast<const sqlast::Select *>(sql);
+
+      // Figure out the projections (including order).
+      bool has_projection = stmt->GetColumns().at(0) != "*";
+      std::vector<int> projections;
+      if (has_projection) {
+        projections = ProjectionSchema(db_schema, out_schema, augments);
+      }
+
+      // Look up all the rows.
+      rocksdb::ReadOptions options;
+      options.fill_cache = false;
+      auto ptr = this->db_->NewIterator(options, handler);
+      std::unique_ptr<rocksdb::Iterator> it(ptr);
+      for (it->SeekToFirst(); it->Valid(); it->Next()) {
+        rocksdb::Slice rowslice = it->value();
+        // Extract PK.
+        rocksdb::Slice pk_value = ExtractColumn(rowslice, pk);
+        std::string keystr = pk_value.ToString();
+        if (duplicates.count(keystr) == 0) {
+          keys.push_back(std::move(keystr));
+          duplicates.emplace(pk_value.ToString());
+          // Figure out the shard_by column if needed to augment into the
+          // result.
+          if (must_augment) {
+            rocksdb::Slice keyslice = it->key();
+            rocksdb::Slice aug_value = ExtractColumn(keyslice, 0);
+            augments_copy.at(0).value = aug_value.ToString();
+          }
+          records.push_back(
+              DecodeRecord(rowslice, out_schema, augments_copy, projections));
+        }
+      }
+      break;
+    }
+    default:
+      LOG(FATAL) << "Illegal statement type in ExecuteQueryAll";
   }
   return SqlResultSet(out_schema, std::move(records), std::move(keys));
 }

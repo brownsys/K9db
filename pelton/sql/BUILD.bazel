@@ -29,7 +29,6 @@ cc_library(
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/shards:types",
-        "//pelton/shards/sqlengine:util",
         "//pelton/sql/connections:rocksdb_connection",
         "//pelton/sqlast:ast",
         "@com_google_absl//absl/status",

@@ -129,9 +129,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
           if (lookup.size() >= 1) {
             user_id = std::move(*lookup.cbegin());
             // Execute statement directly against shard.
-            result.Append(
-                exec.Shard(&cloned, shard_kind, user_id, schema, aug_index),
-                true);
+            result.Append(exec.Shard(&cloned, user_id, schema, aug_index),
+                          true);
           } else if (info.is_varowned()) {
             // In varown case the lookup can be empty if the value is in the
             // default shard
@@ -149,10 +148,15 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
           cloned.Visit(&expression_remover);
 
           // Execute statement directly against shard.
-          result.Append(
-              exec.Shard(&cloned, shard_kind, user_id, schema, aug_index),
-              true);
+          result.Append(exec.Shard(&cloned, user_id, schema, aug_index), true);
         }
+
+      } else if (stmt.GetWhereClause() == nullptr) {
+        VLOG(1) << "Select from all";
+        // SELECT has no WHERE condition, we want to get the entire content of
+        // logical table from all shards, we can do this in one shot with
+        // rocksdb.
+        result.Append(exec.All(&cloned, schema, aug_index), true);
 
       } else {
         VLOG(1) << "Trying secondary indices";
@@ -165,9 +169,8 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
         if (query_succeeded) {
           VLOG(1) << "Index succeeded";
           // Secondary index available for some constrainted column in stmt.
-          result.Append(
-              exec.Shards(&cloned, shard_kind, pair.second, schema, aug_index),
-              true);
+          result.Append(exec.Shards(&cloned, pair.second, schema, aug_index),
+                        true);
         } else if (info.is_varowned()) {
           // Try lookup in the default table instead (only useful if this is a
           // varowned table)
@@ -185,13 +188,11 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
           // Select from all the relevant shards.
           const auto &user_ids = state->UsersOfShard(shard_kind);
           if (user_ids.size() > 0) {
-            sqlast::Stringifier stringifier("");
             LOG(WARNING) << "Perf Warning: query executed over all shards. "
                          << "This will be slow! The query: " << stmt;
           }
-          result.Append(
-              exec.Shards(&cloned, shard_kind, user_ids, schema, aug_index),
-              true);
+          result.Append(exec.Shards(&cloned, user_ids, schema, aug_index),
+                        true);
         }
       }
     }
