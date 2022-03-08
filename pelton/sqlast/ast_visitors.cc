@@ -55,6 +55,8 @@ std::string Stringifier::VisitColumnConstraint(const ColumnConstraint &ast) {
     case ColumnConstraint::Type::FOREIGN_KEY:
       return "REFERENCES " + ast.foreign_table() + "(" + ast.foreign_column() +
              ")";
+    case ColumnConstraint::Type::AUTOINCREMENT:
+      return "AUTO_INCREMENT";
     default:
       assert(false);
   }

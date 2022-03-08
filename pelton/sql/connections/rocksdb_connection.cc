@@ -130,6 +130,9 @@ bool SingletonRocksdbConnection::ExecuteStatement(
         this->primary_keys_.emplace(tid, pk);
         this->indexed_columns_.emplace(tid, std::vector<size_t>{});
         this->indices_.emplace(tid, std::vector<RocksdbIndex>{});
+        if (stmt->GetColumns().at(pk).auto_increment()) {
+          this->auto_increment_counters_.emplace(tid, 0);
+        }
 
         // Create indices for table.
         for (size_t i = 0; i < stmt->GetColumns().size(); i++) {
@@ -205,17 +208,30 @@ int SingletonRocksdbConnection::ExecuteUpdate(
       // if we are not replacing, then we will need to update indices for
       // the insert only (nothing is removed).
       // if no indices, then we do not need to know what rows got replaced.
-      const auto &vals = value_mapper.After(db_schema.NameOf(pk));
-      CHECK_EQ(vals.size(), 1u) << "Insert has no value for PK!";
-      const rocksdb::Slice &pkslice = vals.at(0);
-      CHECK(!IsNull(pkslice.data(), pkslice.size())) << "Insert has NULL PK!";
-      std::string skey = sid + pkslice.ToString() + __ROCKSSEP;
+      std::string pk_value = "";
+      if (value_mapper.HasAfter(db_schema.NameOf(pk))) {
+        if (this->auto_increment_counters_.count(tid) == 1) {
+          LOG(FATAL) << "Insert has value for PK but it is auto increment!";
+        }
+        const auto &vals = value_mapper.After(db_schema.NameOf(pk));
+        CHECK_EQ(vals.size(), 1u) << "Insert has no value for PK!";
+        pk_value = vals.at(0).ToString();
+        CHECK(!IsNull(pk_value.data(), pk_value.size()))
+            << "Insert has NULL PK!";
+      } else {
+        if (this->auto_increment_counters_.count(tid) == 0) {
+          LOG(FATAL) << "Insert has no value for PK and not auto increment!";
+        }
+        pk_value = std::to_string(++(this->auto_increment_counters_.at(tid)));
+      }
 
       // Insert/replace new row.
-      std::string row = EncodeInsert(*stmt, db_schema);
+      std::string skey = sid + pk_value + __ROCKSSEP;
+      std::string row = EncodeInsert(*stmt, db_schema, pk_value);
       PANIC(this->db_->Put(rocksdb::WriteOptions(), handler, skey, row));
 
       // Update indices.
+      rocksdb::Slice pkslice(pk_value.data(), pk_value.size());
       rocksdb::Slice rslice(row);
       for (size_t i = 0; i < indexed_columns.size(); i++) {
         RocksdbIndex &index = indices.at(i);
@@ -384,7 +400,7 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
       }
 
       // Insert/replace new row.
-      std::string nrow = EncodeInsert(*stmt, db_schema);
+      std::string nrow = EncodeInsert(*stmt, db_schema, "");
       rocksdb::Slice nslice(nrow);
       if (SlicesEq(oslice, nslice)) {  // No-op.
         break;

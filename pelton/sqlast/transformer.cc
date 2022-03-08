@@ -157,7 +157,7 @@ antlrcpp::Any AstTransformer::visitColumn_constraint(
   if (ctx->asc_desc() != nullptr || ctx->conflict_clause() != nullptr ||
       ctx->CHECK() != nullptr || ctx->DEFAULT() != nullptr ||
       ctx->COLLATE() != nullptr || ctx->AS() != nullptr ||
-      ctx->CONSTRAINT() != nullptr || ctx->AUTOINCREMENT() != nullptr) {
+      ctx->CONSTRAINT() != nullptr) {
     return absl::InvalidArgumentError("Invalid inline constraint");
   }
 
@@ -169,6 +169,9 @@ antlrcpp::Any AstTransformer::visitColumn_constraint(
   }
   if (ctx->UNIQUE() != nullptr) {
     return ColumnConstraint(ColumnConstraint::Type::UNIQUE);
+  }
+  if (ctx->AUTOINCREMENT() != nullptr) {
+    return ColumnConstraint(ColumnConstraint::Type::AUTOINCREMENT);
   }
   return ctx->foreign_key_clause()->accept(this);
 }

@@ -2,6 +2,7 @@
 #ifndef PELTON_SQL_CONNECTIONS_ROCKSDB_CONNECTION_H_
 #define PELTON_SQL_CONNECTIONS_ROCKSDB_CONNECTION_H_
 
+#include <atomic>
 #include <memory>
 #include <optional>
 #include <string>
@@ -66,6 +67,7 @@ class SingletonRocksdbConnection {
   std::unordered_map<TableID, size_t> primary_keys_;
   std::unordered_map<TableID, std::vector<size_t>> indexed_columns_;
   std::unordered_map<TableID, std::vector<RocksdbIndex>> indices_;
+  std::unordered_map<TableID, std::atomic<int64_t>> auto_increment_counters_;
 };
 
 class RocksdbConnection : public PeltonConnection {

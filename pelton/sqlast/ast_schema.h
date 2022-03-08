@@ -110,6 +110,11 @@ class ColumnDefinition {
   bool owner() const { return this->owner_; }
   bool &owner() { return this->owner_; }
 
+  // Auto increments.
+  bool auto_increment() const {
+    return this->HasConstraint(ColumnConstraint::Type::AUTOINCREMENT);
+  }
+
   // Visitor pattern.
   template <class T>
   T Visit(AbstractVisitor<T> *visitor) const {
