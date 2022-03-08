@@ -2,10 +2,10 @@
 
 ## Baseline
 ```bash
-bazel run //:lobsters-harness -- \
-  --runtime 30 \
+bazel run -c opt //:lobsters-harness -- \
+  --runtime 60 \
   --datascale 0.05 \
-  --reqscale 1 \
+  --reqscale 10 \
   --queries pelton \
   --backend rocks-mariadb \
   --prime \
@@ -14,9 +14,9 @@ bazel run //:lobsters-harness -- \
 
 ## Pelton
 ```bash
-bazel run //:lobsters-harness -- \
+bazel run -c opt //:lobsters-harness -- \
   --runtime 60 \
-  --datascale 0.01 \
+  --datascale 0.05 \
   --reqscale 10 \
   --queries pelton \
   --backend pelton \
