@@ -618,10 +618,6 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
   CHECK_STATUS(IndexAccessor(stmt, connection, &lock));
 
   if (owning_table) {
-    if (has_pii)
-      return absl::UnimplementedError(
-          "'OWNING' tables cannot be data subject tables!");
-
     if (owning_table->owning_type == OwningT::OWNING) {
       CHECK_STATUS(HandleOwningTable(stmt, *owning_table, connection, &lock));
     } else if (owning_table->owning_type == OwningT::ACCESSING) {
