@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <optional>
 
 #include "pelton/sqlast/ast_abstract.h"
 #include "pelton/sqlast/ast_schema_enums.h"
@@ -100,11 +101,14 @@ class ColumnDefinition {
   // Get a foreign key constraint on this column. Errors if no such constraint
   // exists.
   const ColumnConstraint &GetForeignKeyConstraint() const;
+  const std::optional<const ColumnConstraint *> GetForeignKeyConstraintOpt() const;
   // Get the first constraint matching a specific type on this column. Errors if
   // no such constraint exists. Use `HasConstraint()` to check that such a
   // constraint exists first.
   const ColumnConstraint &GetConstraintOfType(
       ColumnConstraint::Type type) const;
+  const std::optional<const ColumnConstraint *> GetConstraintOfTypeOpt(
+    ColumnConstraint::Type Type) const;
 
   // Ownership.
   bool owner() const { return this->owner_; }

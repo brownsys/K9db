@@ -126,12 +126,25 @@ bool ColumnDefinition::HasConstraint(ColumnConstraint::Type type) const {
   return false;
 }
 
-const ColumnConstraint &ColumnDefinition::GetConstraintOfType(
-    ColumnConstraint::Type type) const {
+const std::optional<const ColumnConstraint *> ColumnDefinition::GetConstraintOfTypeOpt(
+  ColumnConstraint::Type type) const {
   for (const auto &constraint : this->constraints_) {
     if (type == constraint.type()) {
-      return constraint;
+      return &constraint;
     }
+  }
+  return {};
+}
+
+const std::optional<const ColumnConstraint *> ColumnDefinition::GetForeignKeyConstraintOpt() const {
+  return this->GetConstraintOfTypeOpt(ColumnConstraint::Type::FOREIGN_KEY);
+}
+
+const ColumnConstraint &ColumnDefinition::GetConstraintOfType(
+    ColumnConstraint::Type type) const {
+  auto m = this->GetConstraintOfTypeOpt(type);
+  if (m) {
+    return **m;
   }
   LOG(FATAL) << "No constraint of type " << type << " found for column "
              << *this;
