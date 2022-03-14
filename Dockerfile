@@ -116,6 +116,9 @@ RUN useradd memcached
 RUN mkdir -p /var/pelton/rocksdb
 RUN mkdir -p /tmp/pelton/rocksdb
 
+EXPOSE 10001/tcp
+EXPOSE 3306/tcp
+
 ENTRYPOINT /bin/bash ./home/configure_db.sh && /bin/bash
 
 # Run with docker run -v .:/home/pelton
