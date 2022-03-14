@@ -22,6 +22,7 @@ typedef struct {
   size_t workers;
   bool consistent;
   const char *db_name;
+  const char *hostname;
 } FFIArgs;
 
 // Our version of pelton/sqlast/ast_schema_enums.h#ColumnDefinitionTypeEnum.

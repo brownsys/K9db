@@ -15,6 +15,7 @@
 DEFINE_uint32(workers, 3, "Number of workers");
 DEFINE_bool(consistent, true, "Dataflow consistency with futures");
 DEFINE_string(db_name, "pelton", "Name of the database");
+DEFINE_string(hostname, "127.0.0.1:10001", "Hostname to bind against");
 
 // process command line arguments with gflags
 FFIArgs FFIGflags(int argc, char **argv, const char *usage) {
@@ -28,7 +29,8 @@ FFIArgs FFIGflags(int argc, char **argv, const char *usage) {
   google::InitGoogleLogging("proxy");
 
   // Returned the read command line flags.
-  return {FLAGS_workers, FLAGS_consistent, FLAGS_db_name.c_str()};
+  return {FLAGS_workers, FLAGS_consistent, FLAGS_db_name.c_str(),
+          FLAGS_hostname.c_str()};
 }
 
 // Initialize pelton_state in pelton.cc

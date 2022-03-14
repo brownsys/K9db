@@ -372,17 +372,18 @@ fn main() {
   // Parse command line flags defined using rust's gflags.
   let flags = gflags_ffi(std::env::args(), USAGE);
   info!(log,
-        "Rust proxy: running with args: {:?} {:?} {:?}",
+        "Rust proxy: running with args: {:?} {:?} {:?} {:?}",
         flags.workers,
         flags.consistent,
-        flags.db_name);
+        flags.db_name,
+        flags.hostname);
 
   let global_open = initialize_ffi(flags.workers, flags.consistent);
   if !global_open {
     std::process::exit(-1);
   }
 
-  let listener = net::TcpListener::bind("127.0.0.1:10001").unwrap();
+  let listener = net::TcpListener::bind(flags.hostname).unwrap();
   info!(log, "Rust Proxy: Listening at: {:?}", listener);
   listener.set_nonblocking(true)
           .expect("Cannot set non-blocking");

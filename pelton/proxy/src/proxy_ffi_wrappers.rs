@@ -14,6 +14,7 @@ pub struct CommandLineArgs {
   pub workers: usize,
   pub consistent: bool,
   pub db_name: String,
+  pub hostname: String,
 }
 
 // Custom destructor
@@ -42,10 +43,13 @@ pub fn gflags_ffi(args: std::env::Args, usage: &str) -> CommandLineArgs {
     // Transform FFIArgs to CommandLineArgs.
     let db_name = unsafe { CStr::from_ptr(flags.db_name) };
     let db_name = db_name.to_str().unwrap();
+    let hostname = unsafe { CStr::from_ptr(flags.hostname) };
+    let hostname = hostname.to_str().unwrap();
     return CommandLineArgs {
         workers: flags.workers,
         consistent: flags.consistent,
         db_name: db_name.to_string(),
+        hostname: hostname.to_string(),
     };
 }
 

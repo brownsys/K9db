@@ -20,7 +20,10 @@ cd pelton
 # Run the setup scripts
 ./scripts/setup-user.sh
 
-# Do this on server: https://cloud.google.com/architecture/mysql-remote-access
+# Do this on the server only: https://cloud.google.com/architecture/mysql-remote-access
 LOCAL_IP=$(curl  http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip -H "Metadata-Flavor: Google")
 sudo sed -i "s|bind-address.*|bind-address = $LOCAL_IP|" /etc/mysql/mariadb.conf.d/50-server.cnf
 sudo service mariadb restart
+
+# Do this on the client only
+sudo service mariadb stop
