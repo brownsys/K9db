@@ -21,3 +21,7 @@ newgrp docker
 
 
 # Do this on server: https://cloud.google.com/architecture/mysql-remote-access
+# RUN THIS INSIDE DOCKER
+LOCAL_IP=$(curl  http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip -H "Metadata-Flavor: Google")
+sed -i "s|bind-address.*|bind-address = $LOCAL_IP|" /etc/mysql/mariadb.conf.d/50-server.cnf
+service mariadb restart
