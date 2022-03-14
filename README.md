@@ -57,7 +57,7 @@ in it using docker exec:
 ```bash
 # Run the container and name it pelton-testing
 # Mount pelton into the container.
-docker run --mount type=bind,source=$(pwd),target=/home/pelton --name pelton-testing -d -t pelton/latest
+docker run --mount type=bind,source=$(pwd),target=/home/pelton --name pelton-testing -d -p 3306:3306 -p 10001:10001 -t pelton/latest
 
 # Wait a few seconds for mysqld to run successfully inside the container
 
