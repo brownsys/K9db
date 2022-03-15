@@ -37,6 +37,7 @@ rust_binary(
         "//cargo:clap",
         "//cargo:futures_util",
         "//cargo:hdrhistogram",
+        "//cargo:lazy_static",
         "//cargo:mysql_async",
         "//cargo:tower_service",
         "//cargo:trawler",

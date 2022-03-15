@@ -8,6 +8,7 @@ extern crate trawler;
 
 use clap::value_t_or_exit;
 use clap::{App, Arg};
+use lazy_static::lazy_static;
 use my::prelude::*;
 use std::future::Future;
 use std::pin::Pin;
@@ -16,9 +17,31 @@ use std::time;
 use tower_service::Service;
 use trawler::{LobstersRequest, TrawlerRequest};
 // use rand::Rng;
+use std::collections::HashMap;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+
+lazy_static! {
+  // Entries between -1 (never occurs) and 100000 (always).
+  // Sum should be 100000 or less (excluding -1s).
+  // Comment out entry to use default weight.
+  static ref WEIGHTS: HashMap<String, isize> = HashMap::from([
+    // ("story".into(), -1),
+    // ("frontpage".into(), -1),
+    // ("user".into(), -1),
+    // ("comments".into(), -1),
+    // ("recent".into(), -1),
+    // ("commentvoteup".into(), -1),
+    // ("commentvotedown".into(), -1),
+    // ("storyvoteup".into(), -1),
+    // ("storyvotedown".into(), -1),
+    // ("comment".into(), -1),
+    // ("subcomment".into(), -1),
+    // ("login".into(), -1),
+    // ("submit".into(), -1),
+  ]);
+}
 
 const PELTON_SCHEMA: &'static str = include_str!("../schema/pelton.sql");
 const MARIADB_SCHEMA: &'static str = include_str!("../schema/rocks-mariadb.sql");
@@ -173,8 +196,8 @@ impl Service<bool> for MysqlTrawlerBuilder {
                 }
 
                 // Dispatch prepared statements for the queries that need views.
-                if backend_variant == BackendVariant::Pelton{
-                    for view_query in &VIEWS{
+                if backend_variant == BackendVariant::Pelton {
+                    for view_query in &VIEWS {
                         let prepared_conn = my::Conn::new(opts.clone()).await?;
                         prepared_conn.prepare(&view_query).await?;
                     }
@@ -524,5 +547,5 @@ fn main() {
         comments_counter: comments_counter,
     };
 
-    wl.run(s, args.is_present("prime"));
+    wl.run(s, args.is_present("prime"), &WEIGHTS);
 }
