@@ -32,6 +32,43 @@ namespace dataflow {
 void DataFlowGraph::Initialize(
     std::unique_ptr<DataFlowGraphPartition> &&partition,
     const std::vector<Channel *> &channels) {
+
+  LOG(INFO) << "Entering Initialize()...";
+
+  if (partition->inputs().size() == 0) {
+    LOG(INFO) << "NESTED VIEWS CASE";
+
+    // Store the input names for this graph (i.e. for any partition).
+    this->output_schema_ = partition->outputs().at(0)->output_schema();
+    this->matview_keys_ = partition->outputs().at(0)->key_cols();
+    LOG(INFO) << "1";
+    for (const auto &[input_name, _] : partition->inputs()) {
+      this->inputs_.push_back(input_name);
+    }
+    LOG(INFO) << "2";
+
+    // Fill in partition key maps.
+    this->inkeys_ = std::unordered_map<std::string, PartitionKey>();
+    LOG(INFO) << "3";
+    this->outkey_ = std::vector<ColumnID>();
+    LOG(INFO) << "4";
+
+    // Print debugging information.
+    LOG(INFO) << "Planned exchanges and partitioning of flow";
+    LOG(INFO) << partition->DebugString();
+
+    // Make the specified number of partitions.
+    for (PartitionIndex i = 0; i < this->size_; i++) {
+      LOG(INFO) << "5";
+      this->partitions_.push_back(partition->Clone(i));
+      LOG(INFO) << "6";
+      this->matviews_.push_back(this->partitions_.back()->outputs().at(0));
+    }
+    LOG(INFO) << "7";
+    
+    return;
+  }
+
   // Store the input names for this graph (i.e. for any partition).
   this->output_schema_ = partition->outputs().at(0)->output_schema();
   this->matview_keys_ = partition->outputs().at(0)->key_cols();
@@ -108,6 +145,8 @@ void DataFlowGraph::Initialize(
     this->partitions_.push_back(partition->Clone(i));
     this->matviews_.push_back(this->partitions_.back()->outputs().at(0));
   }
+
+  LOG(INFO) << "Exiting Initialize()...";
 }
 
 // Processing records: records are hash-partitioning and fed to the input
