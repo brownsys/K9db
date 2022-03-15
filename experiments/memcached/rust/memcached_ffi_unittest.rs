@@ -66,7 +66,7 @@ mod tests {
   #[test]
   fn test1() {
     // Initialize.
-    MemInitialize("memcachedrust", "root", "password", "rust");
+    MemInitialize("memcachedrust", "pelton", "password", "rust");
     for schema in &SCHEMA {
       __MemExecuteDB(schema);
     }

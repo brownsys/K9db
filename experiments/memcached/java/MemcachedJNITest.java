@@ -88,7 +88,7 @@ public class MemcachedJNITest {
     String[] expected;
 
     // Initialize.
-    MemcachedJNI.Initialize("memcachedjni", "root", "password", "jni");
+    MemcachedJNI.Initialize("memcachedjni", "pelton", "password", "jni");
 
     // Create tables and insert data.
     for (String create : SCHEMA) {
