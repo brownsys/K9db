@@ -58,12 +58,11 @@ void DataFlowGraph::Initialize(
     LOG(INFO) << partition->DebugString();
 
     // Make the specified number of partitions.
-    for (PartitionIndex i = 0; i < this->size_; i++) {
-      LOG(INFO) << "5";
-      this->partitions_.push_back(partition->Clone(i));
-      LOG(INFO) << "6";
-      this->matviews_.push_back(this->partitions_.back()->outputs().at(0));
-    }
+    LOG(INFO) << "5";
+    this->partitions_.push_back(std::move(partition));
+    LOG(INFO) << "6";
+    this->matviews_.push_back(this->partitions_.back()->outputs().at(0));
+    
     LOG(INFO) << "7";
     
     return;
