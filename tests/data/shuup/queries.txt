@@ -1,0 +1,11 @@
+1|Alice|10|email@email.com
+1|Alice
+10|coolguy|secure
+;
+2|Banji|20|banj@gmail.com
+2|Banji
+20|user|password
+;
+3|Keenan|0|keenan@hotmail.com
+3|Keenan
+;
