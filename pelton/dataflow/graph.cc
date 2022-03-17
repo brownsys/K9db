@@ -35,36 +35,47 @@ void DataFlowGraph::Initialize(
 
   LOG(INFO) << "Entering Initialize()...";
 
+  //if (this->size_ == 1) {
   if (partition->inputs().size() == 0) {
-    LOG(INFO) << "NESTED VIEWS CASE";
+    LOG(INFO) << "SINGLE WORKER CASE";
 
     // Store the input names for this graph (i.e. for any partition).
     this->output_schema_ = partition->outputs().at(0)->output_schema();
     this->matview_keys_ = partition->outputs().at(0)->key_cols();
-    LOG(INFO) << "1";
-    for (const auto &[input_name, _] : partition->inputs()) {
-      this->inputs_.push_back(input_name);
-    }
-    LOG(INFO) << "2";
 
     // Fill in partition key maps.
     this->inkeys_ = std::unordered_map<std::string, PartitionKey>();
-    LOG(INFO) << "3";
     this->outkey_ = std::vector<ColumnID>();
-    LOG(INFO) << "4";
+
+    // Add in any needed exchanges.
+    LOG(INFO) << "Adding exchanges";
+    ProducerMap p;
+    RequiredMap r;
+    std::vector<std::tuple<PartitionKey, Operator *, Operator *>> exchanges;
+
+    for (NodeIndex i = 0; i < partition->Size(); i++) {
+      Operator *op = partition->GetNode(i);
+      for (Operator *child : op->children()) {
+        auto result = ExchangeKey(op, child, p, r);
+        if (result) {
+          exchanges.emplace_back(std::move(result.value()), op, child);
+        }
+      }
+    }
+    for (const auto &[key, parent, child] : exchanges) {
+      auto exchange = std::make_unique<ExchangeOperator>(
+          this->flow_name_, this->size_, channels, key);
+      partition->InsertNode(std::move(exchange), parent, child);
+    }
 
     // Print debugging information.
     LOG(INFO) << "Planned exchanges and partitioning of flow";
     LOG(INFO) << partition->DebugString();
 
     // Make the specified number of partitions.
-    LOG(INFO) << "5";
     this->partitions_.push_back(std::move(partition));
-    LOG(INFO) << "6";
     this->matviews_.push_back(this->partitions_.back()->outputs().at(0));
-    
-    LOG(INFO) << "7";
-    
+    LOG(INFO) << "Exiting Initialize()...";
     return;
   }
 
