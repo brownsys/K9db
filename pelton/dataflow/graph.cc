@@ -47,26 +47,26 @@ void DataFlowGraph::Initialize(
     this->inkeys_ = std::unordered_map<std::string, PartitionKey>();
     this->outkey_ = std::vector<ColumnID>();
 
-    // Add in any needed exchanges.
-    LOG(INFO) << "Adding exchanges";
-    ProducerMap p;
-    RequiredMap r;
-    std::vector<std::tuple<PartitionKey, Operator *, Operator *>> exchanges;
+    // // Add in any needed exchanges.
+    // LOG(INFO) << "Adding exchanges";
+    // ProducerMap p;
+    // RequiredMap r;
+    // std::vector<std::tuple<PartitionKey, Operator *, Operator *>> exchanges;
 
-    for (NodeIndex i = 0; i < partition->Size(); i++) {
-      Operator *op = partition->GetNode(i);
-      for (Operator *child : op->children()) {
-        auto result = ExchangeKey(op, child, p, r);
-        if (result) {
-          exchanges.emplace_back(std::move(result.value()), op, child);
-        }
-      }
-    }
-    for (const auto &[key, parent, child] : exchanges) {
-      auto exchange = std::make_unique<ExchangeOperator>(
-          this->flow_name_, this->size_, channels, key);
-      partition->InsertNode(std::move(exchange), parent, child);
-    }
+    // for (NodeIndex i = 0; i < partition->Size(); i++) {
+    //   Operator *op = partition->GetNode(i);
+    //   for (Operator *child : op->children()) {
+    //     auto result = ExchangeKey(op, child, p, r);
+    //     if (result) {
+    //       exchanges.emplace_back(std::move(result.value()), op, child);
+    //     }
+    //   }
+    // }
+    // for (const auto &[key, parent, child] : exchanges) {
+    //   auto exchange = std::make_unique<ExchangeOperator>(
+    //       this->flow_name_, this->size_, channels, key);
+    //   partition->InsertNode(std::move(exchange), parent, child);
+    // }
 
     // Print debugging information.
     LOG(INFO) << "Planned exchanges and partitioning of flow";
