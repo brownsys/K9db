@@ -201,7 +201,6 @@ CanonicalDescriptor MakeCanonical(const CanonicalQuery &query) {
 PreparedStatementDescriptor MakeStmt(const std::string &query,
                                      const CanonicalDescriptor *canonical,
                                      std::vector<size_t> &&arg_value_count) {
-  std::cout << query << std::endl;
   PreparedStatementDescriptor descriptor;
   descriptor.canonical = canonical;
   // Check type of query.
@@ -218,7 +217,6 @@ PreparedStatementDescriptor MakeStmt(const std::string &query,
     // assigned to the same canonical ?.
     descriptor.total_count = 0;
     for (size_t count : arg_value_count) {
-      std::cout << count << std::endl;
       descriptor.total_count += count;
     }
     descriptor.arg_value_count = std::move(arg_value_count);
