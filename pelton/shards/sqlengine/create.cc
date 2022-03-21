@@ -484,22 +484,24 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(
       owning_table.fk_constraint.foreign_column();
   int sharded_by_index = target_table_schema.ColumnIndex(other_col_name);
 
-  for (auto &prev_sharding_info :
+  if (state->IsSharded(relationship_table_name)){
+    for (auto &prev_sharding_info :
        state->GetShardingInformation(relationship_table_name)) {
-    if (state->HasIndexFor(relationship_table_name, my_col_name,
-                           prev_sharding_info.shard_by)) {
-    } else {
-      const std::string &index_name = state->GenerateUniqueIndexName(lock);
-      const sqlast::CreateIndex create_index(
-          index_name, relationship_table_name, my_col_name);
+      if (state->HasIndexFor(relationship_table_name, my_col_name,
+                            prev_sharding_info.shard_by)) {
+      } else {
+        const std::string &index_name = state->GenerateUniqueIndexName(lock);
+        const sqlast::CreateIndex create_index(
+            index_name, relationship_table_name, my_col_name);
 
-      auto res = index::CreateIndexStateIsAlreadyLocked(create_index,
-                                                        connection, lock);
+        auto res = index::CreateIndexStateIsAlreadyLocked(create_index,
+                                                          connection, lock);
 
-      if (res.ok())
-        result.Append(std::move(*res), false);
-      else
-        return res.status();
+        if (res.ok())
+          result.Append(std::move(*res), false);
+        else
+          return res.status();
+      }
     }
   }
 
