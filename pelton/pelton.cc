@@ -131,16 +131,21 @@ absl::StatusOr<const PreparedStatement *> prepare(Connection *connection,
   shards::SharedLock reader_lock = connection->state->ReaderLock();
 
   // Canonicalize the query.
-  prepared::CanonicalQuery canonical = prepared::Canonicalize(query);
+  auto pair = prepared::Canonicalize(query);
+  prepared::CanonicalQuery &canonical = pair.first;
+  std::vector<size_t> &arg_value_count = pair.second;
 
   // Check if canonicalized query was handled before (avoids duplicating views).
   auto &stmts = connection->state->stmts();
-  if (stmts.find(canonical) == stmts.end()) {
+  prepared::CanonicalDescriptor *ptr = nullptr;
+  auto it = stmts.find(canonical);
+  if (it == stmts.end()) {
     // Upgrade lock to a writer lock, we need to modify stmts.
     shards::UniqueLock upgraded(std::move(reader_lock));
     // Make sure another thread did not create the canonical statement while we
     // were upgrading.
-    if (stmts.find(canonical) == stmts.end()) {
+    it = stmts.find(canonical);
+    if (it == stmts.end()) {
       char c = query[0];
       if (c == 'I' || c == 'i' || c == 'R' || c == 'r') {
         // Handling insert is almost trivial.
@@ -151,7 +156,8 @@ absl::StatusOr<const PreparedStatement *> prepare(Connection *connection,
         MOVE_OR_RETURN(prepared::CanonicalDescriptor descriptor,
                        prepared::MakeInsertCanonical(canonical, dstate));
         // Store descriptor for future queries.
-        stmts.emplace(canonical, std::move(descriptor));
+        auto pair = stmts.emplace(canonical, std::move(descriptor));
+        ptr = &pair.first->second;
       } else {
         prepared::CanonicalDescriptor descriptor =
             prepared::MakeCanonical(canonical);
@@ -171,20 +177,25 @@ absl::StatusOr<const PreparedStatement *> prepare(Connection *connection,
                                &descriptor);
         }
         // Store descriptor for future queries.
-        stmts.emplace(canonical, std::move(descriptor));
+        auto pair = stmts.emplace(canonical, std::move(descriptor));
+        ptr = &pair.first->second;
       }
+    } else {
+      ptr = &it->second;
     }
     // Downgrade the lock.
     reader_lock = shards::SharedLock(std::move(upgraded));
+  } else {
+    ptr = &it->second;
   }
 
   // Canonical statement must exist here.
   // Extract information about the count of each parameter.
   prepared::PreparedStatementDescriptor stmt =
-      prepared::MakeStmt(query, &stmts.at(canonical));
+      prepared::MakeStmt(query, ptr, std::move(arg_value_count));
   stmt.stmt_id = connection->stmts.size();
-  connection->stmts.emplace(stmt.stmt_id, std::move(stmt));
-  return &connection->stmts.at(connection->stmts.size() - 1);
+  connection->stmts.push_back(std::move(stmt));
+  return &connection->stmts.back();
 }
 
 absl::StatusOr<SqlResult> exec(Connection *connection, size_t stmt_id,

@@ -98,7 +98,7 @@ struct Connection {
   // Connection to the underlying databases.
   sql::PeltonExecutor executor;
   // Prepared statements created by this connection.
-  std::unordered_map<size_t, prepared::PreparedStatementDescriptor> stmts;
+  std::vector<prepared::PreparedStatementDescriptor> stmts;
 };
 
 }  // namespace pelton

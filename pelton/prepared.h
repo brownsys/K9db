@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "absl/status/statusor.h"
 #include "pelton/dataflow/graph.h"
@@ -39,14 +40,16 @@ struct PreparedStatementDescriptor {
 };
 
 // Turn query into canonical form.
-CanonicalQuery Canonicalize(const std::string &query);
+std::pair<CanonicalQuery, std::vector<size_t>> Canonicalize(
+    const std::string &query);
 
 // Extract canonical statement information from canonical query.
 CanonicalDescriptor MakeCanonical(const CanonicalQuery &query);
 
 // Turn query into a prepared statement struct.
 PreparedStatementDescriptor MakeStmt(const std::string &query,
-                                     const CanonicalDescriptor *canonical);
+                                     const CanonicalDescriptor *canonical,
+                                     std::vector<size_t> &&arg_value_count);
 
 // Find out if a query needs to be served from a flow.
 bool NeedsFlow(const CanonicalQuery &query);
