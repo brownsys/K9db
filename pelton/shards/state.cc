@@ -136,6 +136,8 @@ bool SharderState::IsSharded(const UnshardedTableName &table) const {
 // reads from sharded_by_ (r3)
 const std::list<ShardingInformation> &SharderState::GetShardingInformation(
     const UnshardedTableName &table) const {
+  LOG(INFO) << "Get sharding info for: " << table;
+  LOG(INFO) << "Number of tables in sharded_by_ " << this->sharded_by_.size();
   return this->sharded_by_.at(table);
 }
 
