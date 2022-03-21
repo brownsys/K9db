@@ -1,8 +1,12 @@
 #ifndef PELTON_CONNECTION_H_
 #define PELTON_CONNECTION_H_
 
+#include <algorithm>
+#include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "pelton/dataflow/state.h"
 #include "pelton/prepared.h"
@@ -49,6 +53,27 @@ class State {
   sql::SqlResult NumShards() const {
     shards::SharedLock lock = this->sharder_state_.ReaderLock();
     return this->sharder_state_.NumShards();
+  }
+  sql::SqlResult PreparedDebug() const {
+    // Acquire reader lock.
+    shards::SharedLock reader_lock = this->ReaderLock();
+    // Create schema.
+    dataflow::SchemaRef schema = dataflow::SchemaFactory::Create(
+        {"Statement"}, {sqlast::ColumnDefinition::Type::TEXT}, {0});
+    // Get all canonicalized statements and sort them.
+    std::vector<std::string> vec;
+    for (const auto &[canonical, _] : this->stmts_) {
+      vec.push_back(canonical);
+    }
+    std::sort(vec.begin(), vec.end());
+    // Create records.
+    std::vector<dataflow::Record> records;
+    for (const auto &canonical : vec) {
+      records.emplace_back(schema, true,
+                           std::make_unique<std::string>(canonical));
+    }
+    // Return result.
+    return sql::SqlResult(sql::SqlResultSet(schema, std::move(records)));
   }
 
   // Locks.

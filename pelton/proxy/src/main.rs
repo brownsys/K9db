@@ -279,6 +279,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("SHOW SHARDS")
        || q_string.starts_with("SHOW VIEW")
        || q_string.starts_with("SHOW MEMORY")
+       || q_string.starts_with("SHOW PREPARED")
     {
       let select_response = exec_select_ffi(&mut self.rust_conn, q_string);
       if !select_response.is_null() {

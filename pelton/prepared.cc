@@ -110,15 +110,51 @@ CanonicalQuery Canonicalize(const std::string &query) {
   } else {
     // Select/Update needs to canonicalize IN (?, ...).
     CanonicalQuery canonical;
-    std::smatch sm;
-    std::string q = query;
-    while (regex_search(q, sm, CANONICAL_REGEX)) {
-      canonical.append(sm.prefix().str());
-      canonical.append(" = ?");
-      q = sm.suffix().str();
+    canonical.reserve(query.size());
+    // Iterate over query, append everything to canonical except IN (?, ?, ...).
+    bool token_start = true;
+    bool in = false;
+    size_t in_index = 0;
+    for (size_t i = 0; i < query.size(); i++) {
+      char c = query.at(i);
+      // Parsing an in.
+      if (in) {
+        if (c == ')') {
+          in = false;
+          canonical.push_back('=');
+          canonical.push_back(' ');
+          canonical.push_back('?');
+        } else if (c != '?' && c != ',' && c != ' ' && c != '(') {
+          in = false;
+          for (size_t j = in_index; j <= i; j++) {
+            canonical.push_back(query.at(j));
+          }
+        }
+        continue;
+      }
+      // Space between tokens.
+      if (query.at(i) == ' ') {
+        token_start = true;
+        canonical.push_back(' ');
+        continue;
+      }
+      // Start of a token, maybe it is IN!
+      if (token_start && i + 2 < query.size()) {
+        if ((c == 'I' || c == 'i') &&
+            (query.at(i + 1) == 'N' || query.at(i + 1) == 'n') &&
+            (query.at(i + 2) == ' ' || query.at(i + 2) == '(')) {
+          token_start = false;
+          in = true;
+          in_index = i;
+          i += 2;
+          continue;
+        }
+      }
+      // Not IN and no a space.
+      token_start = false;
+      canonical.push_back(c);
     }
-    canonical.append(q);
-    if (canonical.back() == ';') {
+    if (canonical.at(canonical.size() - 1) == ';') {
       canonical.pop_back();
     }
     return canonical;

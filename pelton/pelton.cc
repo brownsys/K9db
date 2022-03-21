@@ -59,6 +59,9 @@ std::optional<SqlResult> SpecialStatements(const std::string &sql,
     if (absl::StartsWith(split.at(1), "SHARDS")) {
       return connection->state->NumShards();
     }
+    if (absl::StartsWith(split.at(1), "PREPARED")) {
+      return connection->state->PreparedDebug();
+    }
   }
   return {};
 }
