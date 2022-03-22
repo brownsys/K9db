@@ -1,3 +1,36 @@
+-- data subject
+CREATE TABLE shuup_contact ( \
+  id int, \
+  created_on datetime, \
+  modified_on datetime, \
+  identifier text, \
+  is_active int, \
+  _language text, \
+  marketing_permission text, \
+  phone int, \
+  www text, \
+  timezone text, \
+  prefix text, \
+  name text, \
+  name_ext text, \
+  email text, \
+  merchant_notes text, \
+  default_billing_address_id int, \
+  default_payment_method_id int, \
+  default_shipping_address_id int, \
+  default_shipping_method_id int, \
+  account_manager_id int, \
+  registration_shop_id int, \
+  options text, \
+  picture_id int, \
+  tax_group_id int, \
+  PRIMARY KEY (id), \
+  FOREIGN KEY (account_manager_id) REFERENCES shuup_personcontact(contact_ptr_id), \
+  FOREIGN KEY (default_billing_address_id) REFERENCES shuup_mutaddress(id), \
+  FOREIGN KEY (default_shipping_address_id) REFERENCES shuup_mutaddress(id), \
+);
+
+-- data subject
 CREATE TABLE auth_users ( \
   id int, \
   password text, \
@@ -11,6 +44,19 @@ CREATE TABLE auth_users ( \
   date_joined datetime, \
   last_name text, \
   PRIMARY KEY(id) \
+);
+
+-- sharded
+CREATE TABLE shuup_personcontact ( \
+  contact_ptr_id int, \
+  gender datetime, \
+  birth_date datetime, \
+  first_name text, \
+  last_name int, \
+  OWNER_user_id text, \
+  PRIMARY KEY (contact_ptr_id), \
+  FOREIGN KEY (OWNER_user_id) REFERENCES auth_users(id) \
+  FOREIGN KEY (contact_ptr_id) REFERENCES shuup_contact(id) \
 );
 
 -- sharded
@@ -44,18 +90,6 @@ CREATE TABLE shuup_gdpr_gdpruserconsent ( \
   created_on datetime, \
   shop_id int, \
   OWNER_user_id int, \
-  FOREIGN KEY (OWNER_user_id) REFERENCES auth_users(id) \
-);
-
--- sharded
-CREATE TABLE shuup_personcontact ( \
-  contact_ptr_id int, \
-  gender datetime, \
-  birth_date datetime, \
-  first_name text, \
-  last_name int, \
-  OWNER_user_id text, \
-  PRIMARY KEY (contact_ptr_id), \
   FOREIGN KEY (OWNER_user_id) REFERENCES auth_users(id) \
 );
 
