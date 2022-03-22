@@ -40,9 +40,20 @@ bool echo = false;
 
 std::optional<SqlResult> SpecialStatements(const std::string &sql,
                                            Connection *connection) {
-  if (sql == "SET echo;" || sql == "SET echo") {
-    echo = true;
-    return SqlResult(true);
+  if (absl::StartsWith(sql, "SET ")) {
+    std::vector<std::string> split = absl::StrSplit(sql, ' ');
+    if (absl::StartsWith(split.at(1), "echo")) {
+      echo = true;
+      return SqlResult(true);
+    }
+    if (absl::StartsWith(split.at(1), "ENDPOINT")) {
+      if (split.size() == 2) {
+        connection->state->perf().AddEndPoint(std::move(connection->endpoint));
+      } else {
+        connection->endpoint.Initialize(split.at(2));
+      }
+      return SqlResult(true);
+    }
   }
   if (absl::StartsWith(sql, "SHOW ")) {
     std::vector<std::string> split = absl::StrSplit(sql, ' ');
@@ -61,6 +72,9 @@ std::optional<SqlResult> SpecialStatements(const std::string &sql,
     }
     if (absl::StartsWith(split.at(1), "PREPARED")) {
       return connection->state->PreparedDebug();
+    }
+    if (absl::StartsWith(split.at(1), "PERF")) {
+      return connection->state->PerfList();
     }
   }
   return {};
@@ -104,7 +118,14 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
 
   // Parse and rewrite statement.
   try {
-    return shards::sqlengine::Shard(sql, connection);
+    connection->endpoint.AddQuery(sql);
+    auto result = shards::sqlengine::Shard(sql, connection);
+    if (result.ok()) {
+      connection->endpoint.DoneQuery(result.value());
+    } else {
+      connection->endpoint.DoneQuery(-5);
+    }
+    return result;
   } catch (std::exception &e) {
     return absl::InternalError(e.what());
   }
@@ -127,6 +148,7 @@ bool shutdown(bool shutdown_jvm) {
 // Prepared Statement API.
 absl::StatusOr<const PreparedStatement *> prepare(Connection *connection,
                                                   const std::string &query) {
+  connection->endpoint.AddQuery("prep:: " + query);
   // Acquire a reader shared lock.
   shards::SharedLock reader_lock = connection->state->ReaderLock();
 
@@ -195,6 +217,7 @@ absl::StatusOr<const PreparedStatement *> prepare(Connection *connection,
       prepared::MakeStmt(query, ptr, std::move(arg_value_count));
   stmt.stmt_id = connection->stmts.size();
   connection->stmts.push_back(std::move(stmt));
+  connection->endpoint.DoneQuery(0);
   return &connection->stmts.back();
 }
 

@@ -36,6 +36,7 @@ cc_library(
     deps = [
         ":prepared",
         "//pelton/dataflow:dstate",
+        "//pelton/perf",
         "//pelton/shards:state",
         "//pelton/shards:upgradable_lock",
         "//pelton/sql:executor",

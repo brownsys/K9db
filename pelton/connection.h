@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "pelton/dataflow/state.h"
+#include "pelton/perf/perf.h"
 #include "pelton/prepared.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/upgradable_lock.h"
@@ -37,6 +38,7 @@ class State {
   // Getters.
   shards::SharderState *sharder_state() { return &this->sharder_state_; }
   dataflow::DataFlowState *dataflow_state() { return &this->dataflow_state_; }
+  perf::PerfManager &perf() { return this->perf_manager_; }
   std::unordered_map<std::string, prepared::CanonicalDescriptor> &stmts() {
     return this->stmts_;
   }
@@ -75,6 +77,11 @@ class State {
     // Return result.
     return sql::SqlResult(sql::SqlResultSet(schema, std::move(records)));
   }
+  sql::SqlResult PerfList() const {
+    return sql::SqlResult(
+        sql::SqlResultSet(dataflow::SchemaFactory::PERF_LIST_SCHEMA,
+                          this->perf_manager_.ToRecords()));
+  }
 
   // Locks.
   shards::UniqueLock WriterLock() { return shards::UniqueLock(&this->mtx_); }
@@ -88,6 +95,8 @@ class State {
   dataflow::DataFlowState dataflow_state_;
   // Descriptors of queries already encountered in canonical form.
   std::unordered_map<std::string, prepared::CanonicalDescriptor> stmts_;
+  // For tracking perf information.
+  perf::PerfManager perf_manager_;
   // Lock for managing stmts_.
   mutable shards::UpgradableMutex mtx_;
 };
@@ -99,6 +108,8 @@ struct Connection {
   sql::PeltonExecutor executor;
   // Prepared statements created by this connection.
   std::vector<prepared::PreparedStatementDescriptor> stmts;
+  // For tracking perf information about endpoints.
+  perf::EndpointPerf endpoint;
 };
 
 }  // namespace pelton

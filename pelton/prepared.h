@@ -2,8 +2,8 @@
 #define PELTON_PREPARED_H_
 
 #include <string>
-#include <vector>
 #include <utility>
+#include <vector>
 
 #include "absl/status/statusor.h"
 #include "pelton/dataflow/graph.h"
