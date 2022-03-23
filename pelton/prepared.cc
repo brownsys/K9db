@@ -92,7 +92,9 @@ std::unordered_set<std::string> NO_VIEWS = {
     "SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND "
     "votes.comment_id = ?",
     // Q34.
-    "SELECT comments.* FROM comments WHERE comments.short_id = ?"};
+    "SELECT comments.* FROM comments WHERE comments.short_id = ?",
+    // GDPRBench.
+    "SELECT * FROM usertable WHERE YCSB_KEY = ?"};
 
 }  // namespace
 
