@@ -74,14 +74,21 @@ SingletonRocksdbConnection::SingletonRocksdbConnection(
   std::string path = "/tmp/pelton/rocksdb/" + db_name;
 
   rocksdb::BlockBasedTableOptions block_opts;
+  // block_opts.data_block_index_type =
+  // rocksdb::BlockBasedTableOptions::kDataBlockBinaryAndHash;
+  // block_opts.index_type = rocksdb::BlockBasedTableOptions::kHashSearch;
   // 500MB uncompressed cache
-  block_opts.block_cache = rocksdb::NewLRUCache(500 * 1048576);
+  // block_opts.block_cache = rocksdb::NewLRUCache(5000 * 1048576);
 
   // Options.
   rocksdb::Options opts;
-  opts.table_factory.reset(rocksdb::NewBlockBasedTableFactory(block_opts));
+  // opts.table_factory.reset(rocksdb::NewBlockBasedTableFactory(block_opts));
   opts.create_if_missing = true;
   opts.error_if_exists = true;
+  // opts.IncreaseParallelism();
+  // opts.OptimizeLevelStyleCompaction();
+  // opts.prefix_extractor.reset(new ShardPrefixTransform(1));
+  // opts.comparator = rocksdb::BytewiseComparator();
 
   // Open the database.
   rocksdb::DB *db;
@@ -118,8 +125,8 @@ bool SingletonRocksdbConnection::ExecuteStatement(
         // Creating the table's column family.
         rocksdb::ColumnFamilyHandle *handle;
         rocksdb::ColumnFamilyOptions options;
-        options.prefix_extractor.reset(new ShardPrefixTransform(1));
-        options.comparator = rocksdb::BytewiseComparator();
+        // options.prefix_extractor.reset(new ShardPrefixTransform(1));
+        // options.comparator = rocksdb::BytewiseComparator();
         PANIC(this->db_->CreateColumnFamily(options, table_name, &handle));
 
         // Fill in table metadata.
@@ -228,7 +235,9 @@ int SingletonRocksdbConnection::ExecuteUpdate(
       // Insert/replace new row.
       std::string skey = sid + pk_value + __ROCKSSEP;
       std::string row = EncodeInsert(*stmt, db_schema, pk_value);
-      PANIC(this->db_->Put(rocksdb::WriteOptions(), handler, skey, row));
+      auto opts = rocksdb::WriteOptions();
+      opts.sync = true;
+      PANIC(this->db_->Put(opts, handler, skey, row));
 
       // Update indices.
       rocksdb::Slice pkslice(pk_value.data(), pk_value.size());
@@ -539,8 +548,11 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
   if (found) {
     if (keys.size() == 1) {
       std::string str;
+      rocksdb::ReadOptions opts;
+      opts.total_order_seek = true;
+      opts.verify_checksums = false;
       rocksdb::Status status =
-          this->db_->Get(rocksdb::ReadOptions(), handler, keys.front(), &str);
+          this->db_->Get(opts, handler, keys.front(), &str);
       if (status.ok()) {
         result.push_back(std::move(str));
       } else if (!status.IsNotFound()) {

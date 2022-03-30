@@ -18,7 +18,7 @@ use std::io;
 use std::net;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const USAGE: &str = "
   Available options:
@@ -32,6 +32,8 @@ const USAGE: &str = "
 struct Backend {
   rust_conn: FFIConnection,
   log: slog::Logger,
+  total_time: u128,
+  total_count: u128,
 }
 
 impl<W: io::Write> MysqlShim<W> for Backend {
@@ -215,6 +217,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
               q_string: &str,
               results: QueryResultWriter<W>)
               -> io::Result<()> {
+    let now = Instant::now();
     // Hardcoded SHOW variables needed for mariadb java connectors.
     if q_string.starts_with("SHOW VARIABLES") {
       info!(self.log, "Rust Proxy: SHOW statement simulated {}", q_string);
@@ -282,6 +285,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("SHOW PREPARED")
        || q_string.starts_with("SHOW PERF")
     {
+      self.total_count += 1;
       let select_response = exec_select_ffi(&mut self.rust_conn, q_string);
       if !select_response.is_null() {
         let num_cols = unsafe { (*select_response).num_cols as usize };
@@ -337,7 +341,18 @@ impl<W: io::Write> MysqlShim<W> for Backend {
         unsafe { std::ptr::drop_in_place(select_response) };
 
         // tell client no more rows coming. Returns an empty Ok to the proxy
-        return rw.finish();
+        let res = rw.finish();
+        
+        // Take time measurement.
+        self.total_time += now.elapsed().as_micros();
+        
+        if self.total_count == 20000 {
+          println!("Avg read latency: {}", self.total_time / self.total_count);
+          self.total_count = 0;
+          self.total_time = 0;
+        }
+        
+        return res;
       }
       error!(self.log, "Rust Proxy: Failed to execute SELECT: {:?}", q_string);
       return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
@@ -406,6 +421,7 @@ fn main() {
   // run listener until terminated with SIGTERM
   while !stop.load(Ordering::Relaxed) {
     while let Ok((stream, _addr)) = listener.accept() {
+      stream.set_nodelay(true);
       let db_name = flags.db_name.clone();
       // clone log so that each client thread has an owned copy
       let log = log.clone();
@@ -417,7 +433,8 @@ fn main() {
               let rust_conn = open_ffi(&db_name);
               if rust_conn.connected {
                 let backend = Backend { rust_conn: rust_conn,
-                                        log: log };
+                                        log: log, total_time: 0,
+                                        total_count: 0 };
                 let _ = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
               }
             }));

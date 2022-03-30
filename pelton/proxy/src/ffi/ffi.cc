@@ -17,6 +17,9 @@ DEFINE_bool(consistent, true, "Dataflow consistency with futures");
 DEFINE_string(db_name, "pelton", "Name of the database");
 DEFINE_string(hostname, "127.0.0.1:10001", "Hostname to bind against");
 
+uint64_t ffi_total_time = 0;
+uint64_t ffi_total_count = 0;
+
 // process command line arguments with gflags
 FFIArgs FFIGflags(int argc, char **argv, const char *usage) {
   gflags::SetUsageMessage(usage);  // Usage message is in rust.
@@ -218,6 +221,9 @@ void PopulateRecords(FFIResult *c_result,
 // Executes a query (SELECT).
 // Returns nullptr (0) on error.
 FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
+  ffi_total_count++;
+  auto start = std::chrono::steady_clock::now();
+
   pelton::Connection *cpp_conn =
       reinterpret_cast<pelton::Connection *>(c_conn->cpp_conn);
   absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
@@ -243,6 +249,19 @@ FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query) {
       c_result->num_rows = num_rows;
       PopulateSchema(c_result, resultset.schema());
       PopulateRecords(c_result, records);
+
+      auto end = std::chrono::steady_clock::now();
+      auto diff =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+              .count();
+      ffi_total_time += diff;
+
+      if (ffi_total_count == 20000) {
+        std::cout << "C++ Avg latency " << (ffi_total_time / ffi_total_count)
+                  << "nanoseconds" << std::endl;
+        ffi_total_count = 0;
+        ffi_total_time = 0;
+      }
       return c_result;  // TODO(babman): this is where we can support GDPR GET.
     }
   }

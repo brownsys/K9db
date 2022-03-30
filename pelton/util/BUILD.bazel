@@ -7,7 +7,9 @@ cc_library(
         "status.h",
     ],
     visibility = ["//visibility:public"],
-    deps = [],
+    deps = [
+        "@glog",
+    ],
 )
 
 cc_library(

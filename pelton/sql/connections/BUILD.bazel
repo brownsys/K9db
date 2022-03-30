@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 
 cc_library(
     name = "rocksdb_connection",
@@ -69,5 +69,26 @@ cc_test(
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
         "@glog",
+    ],
+)
+
+cc_binary(
+    name = "bench",
+    srcs = [
+        "bench.cc",
+    ],
+    visibility = ["//pelton/sql:__subpackages__"],
+    deps = [
+        ":rocksdb_connection",
+        ":rocksdb_index",
+        ":rocksdb_util",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/sql:connection",
+        "//pelton/sql:result",
+        "//pelton/sqlast:ast",
+        "//pelton/util:status",
+        "@glog",
+        "@rocksdb",
     ],
 )
