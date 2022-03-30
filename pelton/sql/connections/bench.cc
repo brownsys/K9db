@@ -31,7 +31,8 @@ static const std::vector<std::string> THIRD_COLS = {"shr"};
 std::string randomDigits(size_t size) {
   std::string digits = "";
   for (size_t i = 0; i < size; i++) {
-    digits += std::to_string(rand_r() % 10);
+    // NOLINTNEXTLINE
+    digits += std::to_string(rand() % 10);
   }
   return digits;
 }
@@ -182,8 +183,8 @@ int main(int argc, char **argv) {
   // Read data.
   start = std::chrono::steady_clock::now();
   for (size_t i = 0; i < READ_COUNT; i++) {
-    // const std::string &key = data.at(i % ROW_COUNT).first;
-    const std::string &key = data.at(rand_r() % data.size()).first;
+    // NOLINTNEXTLINE
+    const std::string &key = data.at(rand() % data.size()).first;
     std::string row = rdb::Read(key);
   }
   end = std::chrono::steady_clock::now();

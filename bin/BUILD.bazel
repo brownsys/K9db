@@ -5,6 +5,9 @@ cc_test(
     srcs = [
         "cli.cc",
     ],
+    data = [
+        "//bin/bench",
+    ],
     visibility = ["//:__subpackages__"],
     deps = [
         "//pelton",

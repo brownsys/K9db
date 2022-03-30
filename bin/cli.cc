@@ -57,8 +57,8 @@ double freq(size_t count, uint64_t time) {
 }  // namespace
 
 #define DATABASE "cli"
-#define PRIME "/tmp/prime.sql"
-#define RUN "/tmp/run.sql"
+#define PRIME "bin/bench/prime.sql"
+#define RUN "bin/bench/run.sql"
 
 int main(int argc, char **argv) {
   DropDatabase(DATABASE);
