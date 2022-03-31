@@ -103,7 +103,7 @@ fn write_result<W: io::Write>(writer: msql_srv::QueryResultWriter<W>,
       }
       match pelton::result::column_type(result, c) {
         pelton::FFIColumnType_UINT => {
-          rw.write_col(pelton::result::uint(result, r, c))
+          rw.write_col(pelton::result::uint(result, r, c) as i64)
         }
         pelton::FFIColumnType_INT => {
           rw.write_col(pelton::result::int(result, r, c))
@@ -128,8 +128,6 @@ fn write_result<W: io::Write>(writer: msql_srv::QueryResultWriter<W>,
 struct Backend {
   rust_conn: pelton::FFIConnection,
   log: slog::Logger,
-  total_time: u128,
-  total_count: u128,
 }
 
 impl<W: io::Write> MysqlShim<W> for Backend {
@@ -367,9 +365,7 @@ fn main() {
                            stream);
                      let rust_conn = pelton::open(&db_name);
                      let backend = Backend { rust_conn: rust_conn,
-                                             log: log,
-                                             total_time: 0,
-                                             total_count: 0 };
+                                             log: log };
                      let _ =
                        MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
                    }));
