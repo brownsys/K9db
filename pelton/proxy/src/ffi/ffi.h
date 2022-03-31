@@ -9,15 +9,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Connection is essentially a wrapper around pelton connection.
-typedef struct {
-  // cpp_conn is in reality of type pelton::ConnectionLocal.
-  void *cpp_conn;
-  // connected is used to report whether some error was encountered when opening
-  // the connection.
-  bool connected;
-} FFIConnection;
-
+// Command line arguments read via gflags.
 typedef struct {
   size_t workers;
   bool consistent;
@@ -25,45 +17,22 @@ typedef struct {
   const char *hostname;
 } FFIArgs;
 
+// In reality, this is of type pelton::ConnectionLocal.
+typedef void *FFIConnection;
+
 // Our version of pelton/sqlast/ast_schema_enums.h#ColumnDefinitionTypeEnum.
-typedef enum { UINT, INT, TEXT, DATETIME } FFIColumnType;
+typedef enum { UINT = 0, INT = 1, TEXT = 2, DATETIME = 3 } FFIColumnType;
 
-// Our representation of a Query result record (row)
-typedef struct {
-  bool is_null;
-  union RecordData {
-    uint64_t UINT;
-    int64_t INT;
-    char *TEXT;
-    char *DATETIME;
-  } record;
-} FFIRecord;
+// A pointer to a SqlResult but we use void * to simplify rust handling.
+typedef void *FFIResult;
 
-// Our representation of a Query result. Contains schema information as well
-// as the result data.
-// Data inside FFIResult is owned by the FFIResult and must be freed manually
-// when FFIResult expires.
-typedef struct {
-  // Schema information.
-  FFIColumnType col_types[64];
-  char *col_names[128];
-  // Counts.
-  size_t num_rows;
-  size_t num_cols;
-  // The actual size of this is num_rows * num_cols.
-  // The value of col j and row i corresponds to values[i * num_cols + j].
-  FFIRecord records[];
-} FFIResult;
+// A pointer to PreparedStatementDescriptor but we use void * for rust.
+typedef const void *FFIPreparedStatement;
 
+// The result of executing a prepared statement.
 typedef struct {
-  size_t stmt_id;
-  size_t arg_count;
-  FFIColumnType args[];
-} FFIPreparedStatement;
-
-typedef struct {
-  bool query;
-  FFIResult *query_result;
+  bool query;  // if true, query_result is set.
+  FFIResult query_result;
   int update_result;
 } FFIPreparedResult;
 
@@ -81,35 +50,53 @@ bool FFIInitialize(size_t workers, bool consistent);
 FFIConnection FFIOpen(const char *db_name);
 
 // Execute a DDL statement (e.g. CREATE TABLE, CREATE VIEW, CREATE INDEX).
-bool FFIExecDDL(FFIConnection *c_conn, const char *query);
+bool FFIExecDDL(FFIConnection c_conn, const char *query);
 
 // Execute an update statement (e.g. INSERT, UPDATE, DELETE).
 // Returns -1 if error, otherwise returns the number of affected rows.
-int FFIExecUpdate(FFIConnection *c_conn, const char *query);
+int FFIExecUpdate(FFIConnection c_conn, const char *query);
 
 // Executes a query (SELECT).
 // Returns nullptr (0) on error.
-FFIResult *FFIExecSelect(FFIConnection *c_conn, const char *query);
+FFIResult FFIExecSelect(FFIConnection c_conn, const char *query);
 
-// Clean up the memory allocated by an FFIResult.
-void FFIDestroySelect(FFIResult *c_result);
+// Create a prepared statement.
+FFIPreparedStatement FFIPrepare(FFIConnection c_conn, const char *query);
 
-// Delete pelton_state. Returns true if successful and false otherwise.
-bool FFIShutdown();
+// Execute a prepared statement.
+FFIPreparedResult FFIExecPrepare(FFIConnection c_conn, size_t stmt_id,
+                                 size_t arg_count, const char **arg_values);
+
+// Close a client connection. Returns true if successful and false otherwise.
+bool FFIClose(FFIConnection c_conn);
 
 // Shutdown planner.
 void FFIPlannerShutdown();
 
-// Close a client connection. Returns true if successful and false otherwise.
-bool FFIClose(FFIConnection *c_conn);
+// Delete pelton_state. Returns true if successful and false otherwise.
+bool FFIShutdown();
 
-// Create a prepared statement.
-FFIPreparedStatement *FFIPrepare(FFIConnection *c_conn, const char *query);
-void FFIDestroyPreparedStatement(FFIPreparedStatement *c_stmt);
+// FFIResult schema handling.
+size_t FFIResultColumnCount(FFIResult c_result);
+const char *FFIResultColumnName(FFIResult c_result, size_t col);
+FFIColumnType FFIResultColumnType(FFIResult c_result, size_t col);
 
-// Execute a prepared statement.
-FFIPreparedResult FFIExecPrepare(FFIConnection *c_conn, size_t stmt_id,
-                                 size_t arg_count, const char **arg_values);
+// FFIResult data handling.
+size_t FFIResultRowCount(FFIResult c_result);
+bool FFIResultIsNull(FFIResult c_result, size_t row, size_t col);
+uint64_t FFIResultGetUInt(FFIResult c_result, size_t row, size_t col);
+int64_t FFIResultGetInt(FFIResult c_result, size_t row, size_t col);
+const char *FFIResultGetString(FFIResult c_result, size_t row, size_t col);
+const char *FFIResultGetDatetime(FFIResult c_result, size_t row, size_t col);
+
+// Clean up the memory allocated by an FFIResult.
+void FFIResultDestroy(FFIResult c_result);
+
+// FFIPreparedStatement handling.
+size_t FFIPreparedStatementID(FFIPreparedStatement c_stmt);
+size_t FFIPreparedStatementArgCount(FFIPreparedStatement c_stmt);
+FFIColumnType FFIPreparedStatementArgType(FFIPreparedStatement c_stmt,
+                                          size_t arg);
 
 #ifdef __cplusplus
 }

@@ -24,19 +24,19 @@ void DropDatabase() {
 
 TEST(PROXY, OPEN_TEST) {
   c_conn = FFIOpen(DB_NAME);
-  EXPECT_TRUE(c_conn.connected) << "Opening connection failed!";
+  EXPECT_NE(c_conn, nullptr);
 }
 
 // Test creating tables and views.
 TEST(PROXY, DDL_TEST) {
   auto table = "CREATE TABLE test3 (ID int PRIMARY KEY, name VARCHAR(10));";
-  EXPECT_TRUE(FFIExecDDL(&c_conn, table)) << "Creating table failed!";
+  EXPECT_TRUE(FFIExecDDL(c_conn, table)) << "Creating table failed!";
 
 #ifndef PELTON_VALGRIND_MODE
   auto view =
       "CREATE VIEW myview AS "
       "'\"SELECT * FROM test3 WHERE ID > 5 ORDER BY name\"'";
-  EXPECT_TRUE(FFIExecDDL(&c_conn, view)) << "Creating view failed!";
+  EXPECT_TRUE(FFIExecDDL(c_conn, view)) << "Creating view failed!";
 #endif
 }
 
@@ -51,57 +51,53 @@ TEST(PROXY, UPDATE_TEST) {
       {"DELETE FROM test3 WHERE ID = 3;", 1}};
   for (auto &[q, count] : tests) {
     VLOG(1) << "Running query: " << q;
-    EXPECT_EQ(FFIExecUpdate(&c_conn, q.c_str()), count)
-        << "Query \"" << q << "\" failed";
+    EXPECT_EQ(FFIExecUpdate(c_conn, q.c_str()), count) << "Failed: " << q;
   }
 }
 
 // Test queries.
 TEST(PROXY, QUERY_TEST) {
   // Query from table.
-  FFIResult *response_select = FFIExecSelect(&c_conn, "SELECT * FROM test3;");
-  EXPECT_EQ(response_select->num_cols, 2) << "Bad column count";
-  EXPECT_EQ(response_select->num_rows, 3) << "Bad row count";
-  EXPECT_EQ(std::string(response_select->col_names[0]), "ID") << "Bad schema";
-  EXPECT_EQ(std::string(response_select->col_names[1]), "name") << "Bad schema";
-  EXPECT_EQ(response_select->col_types[0], CType::INT) << "Bad types";
-  EXPECT_EQ(response_select->col_types[1], CType::TEXT) << "Bad types";
-  EXPECT_EQ(response_select->records[0].record.INT, 10) << "Bad data";
-  EXPECT_EQ(std::string(response_select->records[1].record.TEXT), "hello")
+  FFIResult response_select = FFIExecSelect(c_conn, "SELECT * FROM test3;");
+  EXPECT_EQ(FFIResultColumnCount(response_select), 2) << "Bad column count";
+  EXPECT_EQ(FFIResultRowCount(response_select), 3) << "Bad row count";
+  EXPECT_EQ(FFIResultColumnType(response_select, 0), CType::INT) << "Bad types";
+  EXPECT_EQ(FFIResultColumnType(response_select, 1), CType::TEXT)
+      << "Bad types";
+  EXPECT_EQ(std::string(FFIResultColumnName(response_select, 0)), "ID")
+      << "Bad schema";
+  EXPECT_EQ(std::string(FFIResultColumnName(response_select, 1)), "name")
+      << "Bad schema";
+  EXPECT_EQ(FFIResultGetInt(response_select, 0, 0), 10) << "Bad data";
+  EXPECT_EQ(std::string(FFIResultGetString(response_select, 0, 1)), "hello")
       << "Bad data";
-  EXPECT_EQ(response_select->records[2].record.INT, 2) << "Bad data";
-  EXPECT_EQ(std::string(response_select->records[3].record.TEXT), "bye")
+  EXPECT_EQ(FFIResultGetInt(response_select, 1, 0), 2) << "Bad data";
+  EXPECT_EQ(std::string(FFIResultGetString(response_select, 1, 1)), "bye")
       << "Bad data";
-  EXPECT_EQ(response_select->records[4].record.INT, 50) << "Bad data";
-  EXPECT_EQ(std::string(response_select->records[5].record.TEXT), "hi")
+  EXPECT_EQ(FFIResultGetInt(response_select, 2, 0), 50) << "Bad data";
+  EXPECT_EQ(std::string(FFIResultGetString(response_select, 2, 1)), "hi")
       << "Bad data";
-  free(response_select->col_names[0]);
-  free(response_select->col_names[1]);
-  free(response_select->records[1].record.TEXT);
-  free(response_select->records[3].record.TEXT);
-  free(response_select->records[5].record.TEXT);
-  FFIDestroySelect(response_select);
+  FFIResultDestroy(response_select);
 
 #ifndef PELTON_VALGRIND_MODE
   // Query from view.
-  response_select = FFIExecSelect(&c_conn, "SELECT * FROM myview;");
-  EXPECT_EQ(response_select->num_cols, 2) << "Bad column count";
-  EXPECT_EQ(response_select->num_rows, 2) << "Bad row count";
-  EXPECT_EQ(std::string(response_select->col_names[0]), "ID") << "Bad schema";
-  EXPECT_EQ(std::string(response_select->col_names[1]), "name") << "Bad schema";
-  EXPECT_EQ(response_select->col_types[0], CType::INT) << "Bad types";
-  EXPECT_EQ(response_select->col_types[1], CType::TEXT) << "Bad types";
-  EXPECT_EQ(response_select->records[0].record.INT, 50) << "Bad data";
-  EXPECT_EQ(std::string(response_select->records[1].record.TEXT), "hi")
+  response_select = FFIExecSelect(c_conn, "SELECT * FROM myview;");
+  EXPECT_EQ(FFIResultColumnCount(response_select), 2) << "Bad column count";
+  EXPECT_EQ(FFIResultRowCount(response_select), 2) << "Bad row count";
+  EXPECT_EQ(FFIResultColumnType(response_select, 0), CType::INT) << "Bad types";
+  EXPECT_EQ(FFIResultColumnType(response_select, 1), CType::TEXT)
+      << "Bad types";
+  EXPECT_EQ(std::string(FFIResultColumnName(response_select, 0)), "ID")
+      << "Bad schema";
+  EXPECT_EQ(std::string(FFIResultColumnName(response_select, 1)), "name")
+      << "Bad schema";
+  EXPECT_EQ(FFIResultGetInt(response_select, 0, 0), 50) << "Bad data";
+  EXPECT_EQ(std::string(FFIResultGetString(response_select, 0, 1)), "hi")
       << "Bad data";
-  EXPECT_EQ(response_select->records[2].record.INT, 10) << "Bad data";
-  EXPECT_EQ(std::string(response_select->records[3].record.TEXT), "hello")
+  EXPECT_EQ(FFIResultGetInt(response_select, 1, 0), 10) << "Bad data";
+  EXPECT_EQ(std::string(FFIResultGetString(response_select, 1, 1)), "hello")
       << "Bad data";
-  free(response_select->col_names[0]);
-  free(response_select->col_names[1]);
-  free(response_select->records[1].record.TEXT);
-  free(response_select->records[3].record.TEXT);
-  FFIDestroySelect(response_select);
+  FFIResultDestroy(response_select);
 #endif
 }
 
@@ -109,87 +105,76 @@ TEST(PROXY, QUERY_TEST) {
 #ifndef PELTON_VALGRIND_MODE
 TEST(PROXY, PREPARED_STATMENT_TEST) {
   // Query from table.
-  FFIPreparedStatement *stmt1 =
-      FFIPrepare(&c_conn, "SELECT * FROM test3 where ID = ?;");
-  EXPECT_EQ(stmt1->stmt_id, 0) << "Bad statement id";
-  EXPECT_EQ(stmt1->arg_count, 1) << "Bad arg count";
-  EXPECT_EQ(stmt1->args[0], CType::INT) << "Bad arg type";
-  FFIPreparedStatement *stmt2 =
-      FFIPrepare(&c_conn, "SELECT * FROM test3 where ID IN (?, ?);");
-  EXPECT_EQ(stmt2->stmt_id, 1) << "Bad statement id";
-  EXPECT_EQ(stmt2->arg_count, 2) << "Bad arg count";
-  EXPECT_EQ(stmt2->args[0], CType::INT) << "Bad arg type";
-  EXPECT_EQ(stmt2->args[1], CType::INT) << "Bad arg type";
-  FFIPreparedStatement *stmt3 = FFIPrepare(
-      &c_conn, "SELECT * FROM test3 where ID IN (?, ?) AND test3.name = ?;");
-  EXPECT_EQ(stmt3->stmt_id, 2) << "Bad statement id";
-  EXPECT_EQ(stmt3->arg_count, 3) << "Bad arg count";
-  EXPECT_EQ(stmt3->args[0], CType::INT) << "Bad arg type";
-  EXPECT_EQ(stmt3->args[1], CType::INT) << "Bad arg type";
-  EXPECT_EQ(stmt3->args[2], CType::TEXT) << "Bad arg type";
-  FFIDestroyPreparedStatement(stmt1);
-  FFIDestroyPreparedStatement(stmt2);
-  FFIDestroyPreparedStatement(stmt3);
+  FFIPreparedStatement stmt1 =
+      FFIPrepare(c_conn, "SELECT * FROM test3 where ID = ?;");
+  EXPECT_EQ(FFIPreparedStatementID(stmt1), 0) << "Bad statement id";
+  EXPECT_EQ(FFIPreparedStatementArgCount(stmt1), 1) << "Bad arg count";
+  EXPECT_EQ(FFIPreparedStatementArgType(stmt1, 0), CType::INT) << "Arg type";
+  FFIPreparedStatement stmt2 =
+      FFIPrepare(c_conn, "SELECT * FROM test3 where ID IN (?, ?);");
+  EXPECT_EQ(FFIPreparedStatementID(stmt2), 1) << "Bad statement id";
+  EXPECT_EQ(FFIPreparedStatementArgCount(stmt2), 2) << "Bad arg count";
+  EXPECT_EQ(FFIPreparedStatementArgType(stmt2, 0), CType::INT) << "Arg type";
+  EXPECT_EQ(FFIPreparedStatementArgType(stmt2, 1), CType::INT) << "Arg type";
+  FFIPreparedStatement stmt3 = FFIPrepare(
+      c_conn, "SELECT * FROM test3 where ID IN (?, ?) AND test3.name = ?;");
+  EXPECT_EQ(FFIPreparedStatementID(stmt3), 2) << "Bad statement id";
+  EXPECT_EQ(FFIPreparedStatementArgCount(stmt3), 3) << "Bad arg count";
+  EXPECT_EQ(FFIPreparedStatementArgType(stmt3, 0), CType::INT) << "Arg type";
+  EXPECT_EQ(FFIPreparedStatementArgType(stmt3, 1), CType::INT) << "Arg type";
+  EXPECT_EQ(FFIPreparedStatementArgType(stmt3, 2), CType::TEXT) << "Arg type";
 
   // Query from views.
   const char *args1[] = {"10"};
-  FFIPreparedResult struct1 = FFIExecPrepare(&c_conn, 0, 1, args1);
+  FFIPreparedResult struct1 = FFIExecPrepare(c_conn, 0, 1, args1);
   EXPECT_TRUE(struct1.query);
-  FFIResult *result1 = struct1.query_result;
-  EXPECT_EQ(result1->num_cols, 2) << "Bad column count";
-  EXPECT_EQ(result1->num_rows, 1) << "Bad row count";
-  EXPECT_EQ(std::string(result1->col_names[0]), "ID") << "Bad schema";
-  EXPECT_EQ(std::string(result1->col_names[1]), "name") << "Bad schema";
-  EXPECT_EQ(result1->col_types[0], CType::INT) << "Bad types";
-  EXPECT_EQ(result1->col_types[1], CType::TEXT) << "Bad types";
-  EXPECT_EQ(result1->records[0].record.INT, 10) << "Bad data";
-  EXPECT_EQ(std::string(result1->records[1].record.TEXT), "hello") << "Bad str";
-  free(result1->col_names[0]);
-  free(result1->col_names[1]);
-  free(result1->records[1].record.TEXT);
-  FFIDestroySelect(result1);
+  FFIResult result1 = struct1.query_result;
+  EXPECT_EQ(FFIResultColumnCount(result1), 2) << "Bad column count";
+  EXPECT_EQ(FFIResultRowCount(result1), 1) << "Bad row count";
+  EXPECT_EQ(std::string(FFIResultColumnName(result1, 0)), "ID") << "Schema";
+  EXPECT_EQ(std::string(FFIResultColumnName(result1, 1)), "name") << "Schema";
+  EXPECT_EQ(FFIResultColumnType(result1, 0), CType::INT) << "Bad types";
+  EXPECT_EQ(FFIResultColumnType(result1, 1), CType::TEXT) << "Bad types";
+  EXPECT_EQ(FFIResultGetInt(result1, 0, 0), 10) << "Bad data";
+  EXPECT_EQ(std::string(FFIResultGetString(result1, 0, 1)), "hello")
+      << "Bad str";
+  FFIResultDestroy(result1);
 
   const char *args2[] = {"10", "50"};
-  FFIPreparedResult struct2 = FFIExecPrepare(&c_conn, 1, 2, args2);
+  FFIPreparedResult struct2 = FFIExecPrepare(c_conn, 1, 2, args2);
   EXPECT_TRUE(struct2.query);
-  FFIResult *result2 = struct2.query_result;
-  EXPECT_EQ(result2->num_cols, 2) << "Bad column count";
-  EXPECT_EQ(result2->num_rows, 2) << "Bad row count";
-  EXPECT_EQ(std::string(result2->col_names[0]), "ID") << "Bad schema";
-  EXPECT_EQ(std::string(result2->col_names[1]), "name") << "Bad schema";
-  EXPECT_EQ(result2->col_types[0], CType::INT) << "Bad types";
-  EXPECT_EQ(result2->col_types[1], CType::TEXT) << "Bad types";
-  EXPECT_EQ(result2->records[0].record.INT, 10) << "Bad data";
-  EXPECT_EQ(std::string(result2->records[1].record.TEXT), "hello") << "Bad str";
-  EXPECT_EQ(result2->records[2].record.INT, 50) << "Bad data";
-  EXPECT_EQ(std::string(result2->records[3].record.TEXT), "hi") << "Bad str";
-  free(result2->col_names[0]);
-  free(result2->col_names[1]);
-  free(result2->records[1].record.TEXT);
-  free(result2->records[3].record.TEXT);
-  FFIDestroySelect(result2);
+  FFIResult result2 = struct2.query_result;
+  EXPECT_EQ(FFIResultColumnCount(result2), 2) << "Bad column count";
+  EXPECT_EQ(FFIResultRowCount(result2), 2) << "Bad row count";
+  EXPECT_EQ(std::string(FFIResultColumnName(result2, 0)), "ID") << "Schema";
+  EXPECT_EQ(std::string(FFIResultColumnName(result2, 1)), "name") << "Schema";
+  EXPECT_EQ(FFIResultColumnType(result2, 0), CType::INT) << "Bad types";
+  EXPECT_EQ(FFIResultColumnType(result2, 1), CType::TEXT) << "Bad types";
+  EXPECT_EQ(FFIResultGetInt(result2, 0, 0), 10) << "Bad data";
+  EXPECT_EQ(std::string(FFIResultGetString(result2, 0, 1)), "hello")
+      << "Bad str";
+  EXPECT_EQ(FFIResultGetInt(result2, 1, 0), 50) << "Bad data";
+  EXPECT_EQ(std::string(FFIResultGetString(result2, 1, 1)), "hi") << "Bad str";
+  FFIResultDestroy(result2);
 
   const char *args3[] = {"10", "50", "'hi'"};
-  FFIPreparedResult struct3 = FFIExecPrepare(&c_conn, 2, 3, args3);
+  FFIPreparedResult struct3 = FFIExecPrepare(c_conn, 2, 3, args3);
   EXPECT_TRUE(struct3.query);
-  FFIResult *result3 = struct3.query_result;
-  EXPECT_EQ(result3->num_cols, 2) << "Bad column count";
-  EXPECT_EQ(result3->num_rows, 1) << "Bad row count";
-  EXPECT_EQ(std::string(result3->col_names[0]), "ID") << "Bad schema";
-  EXPECT_EQ(std::string(result3->col_names[1]), "name") << "Bad schema";
-  EXPECT_EQ(result3->col_types[0], CType::INT) << "Bad types";
-  EXPECT_EQ(result3->col_types[1], CType::TEXT) << "Bad types";
-  EXPECT_EQ(result3->records[0].record.INT, 50) << "Bad data";
-  EXPECT_EQ(std::string(result3->records[1].record.TEXT), "hi") << "Bad str";
-  free(result3->col_names[0]);
-  free(result3->col_names[1]);
-  free(result3->records[1].record.TEXT);
-  FFIDestroySelect(result3);
+  FFIResult result3 = struct3.query_result;
+  EXPECT_EQ(FFIResultColumnCount(result3), 2) << "Bad column count";
+  EXPECT_EQ(FFIResultRowCount(result3), 1) << "Bad row count";
+  EXPECT_EQ(std::string(FFIResultColumnName(result3, 0)), "ID") << "Schema";
+  EXPECT_EQ(std::string(FFIResultColumnName(result3, 1)), "name") << "Schema";
+  EXPECT_EQ(FFIResultColumnType(result3, 0), CType::INT) << "Bad types";
+  EXPECT_EQ(FFIResultColumnType(result3, 1), CType::TEXT) << "Bad types";
+  EXPECT_EQ(FFIResultGetInt(result3, 0, 0), 50) << "Bad data";
+  EXPECT_EQ(std::string(FFIResultGetString(result3, 0, 1)), "hi") << "Bad str";
+  FFIResultDestroy(result3);
 }
 #endif
 
 TEST(PROXY, CLOSE_TEST) {
-  EXPECT_TRUE(FFIClose(&c_conn)) << "Closing connection failed!";
+  EXPECT_TRUE(FFIClose(c_conn)) << "Closing connection failed!";
 }
 
 }  // namespace

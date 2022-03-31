@@ -112,4 +112,8 @@ int main(int argc, char **argv) {
   std::cout << "Run complete " << d << "[us]" << std::endl;
   std::cout << "Run " << freq(commands.size(), d) << "ops/sec" << std::endl;
   std::cout << std::endl;
+
+  // Shutdown.
+  pelton::close(&connection);
+  pelton::shutdown();
 }

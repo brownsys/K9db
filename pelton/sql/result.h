@@ -34,6 +34,7 @@ class SqlResultSet {
   // Query API.
   const dataflow::SchemaRef &schema() const { return this->schema_; }
   std::vector<dataflow::Record> &&Vec() { return std::move(this->records_); }
+  const std::vector<dataflow::Record> &rows() const { return this->records_; }
   inline size_t size() const { return this->records_.size(); }
 
   inline bool empty() const { return this->records_.empty(); }

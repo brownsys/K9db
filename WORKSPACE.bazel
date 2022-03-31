@@ -45,7 +45,7 @@ gazelle_dependencies(go_repository_default_config = "@//:WORKSPACE.bazel")
 
 http_archive(
     name = "com_google_protobuf",
-    strip_prefix = "protobuf-master",
+    strip_prefix = "protobuf-main",
     urls = ["https://github.com/protocolbuffers/protobuf/archive/master.zip"],
 )
 
