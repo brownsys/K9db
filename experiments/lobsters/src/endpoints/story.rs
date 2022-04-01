@@ -16,7 +16,6 @@ where
 {
     // XXX: at the end there are also a bunch of repeated, seemingly superfluous queries
     let c = c.await?;
-    let c = c.drop_query("SET ENDPOINT story").await?;
     let (mut c, mut story) = c
         .prep_exec(
             "SELECT stories.* \
@@ -202,8 +201,6 @@ where
             tags
         ))
         .await?;
-
-    let c = c.drop_query("SET ENDPOINT").await?;
 
     Ok((c, true))
 }
