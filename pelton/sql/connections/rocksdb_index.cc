@@ -60,6 +60,7 @@ std::vector<std::string> RocksdbIndex::Get(
   options.fill_cache = false;
   options.total_order_seek = false;
   options.prefix_same_as_start = true;
+  options.verify_checksums = false;
   auto ptr = this->db_->NewIterator(options, this->handle_.get());
   std::unique_ptr<rocksdb::Iterator> it(ptr);
   // Make and sort all prefixes.
@@ -74,12 +75,6 @@ std::vector<std::string> RocksdbIndex::Get(
     rocksdb::Slice pslice(prefix);
     for (it->Seek(pslice); it->Valid(); it->Next()) {
       rocksdb::Slice row = it->key();
-      if (row.size() < pslice.size()) {
-        break;
-      }
-      if (!SlicesEq(pslice, rocksdb::Slice(row.data(), pslice.size()))) {
-        break;
-      }
       result.push_back(ExtractColumn(row, 2).ToString());
     }
   }

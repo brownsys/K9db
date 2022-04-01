@@ -29,17 +29,12 @@ namespace {
 #define TABLE_COLUMN_NAME "\\b(?:([A-Za-z0-9_]+)\\.|)([A-Za-z0-9_]+)"
 
 // Components for matching expressions with ? in WHERE clauses.
-#define COLUMN_NAME "\\b([A-Za-z0-9_]+)"
 #define OP "\\s*(=|<|>|<=|>=)\\s*"
 #define Q "\\?"
-#define IN "\\s+[Ii][Nn]\\s*"
-#define MQ "\\(\\s*\\?\\s*((?:\\s*,\\s*\\?)*)\\)"
 
 // Regexes made out of above components.
 static std::regex FROM_TABLE_REGEX{FROM_TABLE};
 static std::regex CANONICAL_PARAM_REGEX{TABLE_COLUMN_NAME OP Q};
-static std::regex CANONICAL_REGEX{IN MQ};
-static std::regex PARAM_REGEX{COLUMN_NAME "(?:" OP Q "|" IN MQ ")"};
 
 // Prepared statements that should not be served from views.
 std::unordered_set<std::string> NO_VIEWS = {
@@ -97,31 +92,89 @@ std::unordered_set<std::string> NO_VIEWS = {
     "SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND "
     "votes.comment_id = ?",
     // Q34.
-    "SELECT comments.* FROM comments WHERE comments.short_id = ?"};
+    "SELECT comments.* FROM comments WHERE comments.short_id = ?",
+    // GDPRBench.
+    "SELECT * FROM usertable WHERE YCSB_KEY = ?"};
 
 }  // namespace
 
 // Turn query into canonical form.
-CanonicalQuery Canonicalize(const std::string &query) {
+std::pair<CanonicalQuery, std::vector<size_t>> Canonicalize(
+    const std::string &query) {
   char c = query[0];
   if (c == 'I' || c == 'i' || c == 'R' || c == 'r') {
     // Insert/Replace are already canonical.
-    return query;
+    return std::make_pair(query, std::vector<size_t>{});
   } else {
+    std::vector<size_t> arg_value_count;
     // Select/Update needs to canonicalize IN (?, ...).
     CanonicalQuery canonical;
-    std::smatch sm;
-    std::string q = query;
-    while (regex_search(q, sm, CANONICAL_REGEX)) {
-      canonical.append(sm.prefix().str());
-      canonical.append(" = ?");
-      q = sm.suffix().str();
+    canonical.reserve(query.size());
+    // Iterate over query, append everything to canonical except IN (?, ?, ...).
+    bool token_start = true;
+    bool in = false;
+    bool quotes = false;
+    size_t current_value_count = 0;
+    for (size_t i = 0; i < query.size(); i++) {
+      char c = query.at(i);
+      // Parsing an in.
+      if (in) {
+        if (c == ')') {
+          in = false;
+          canonical.push_back('=');
+          canonical.push_back(' ');
+          canonical.push_back('?');
+          arg_value_count.push_back(current_value_count);
+        } else if (c == '?') {
+          current_value_count++;
+        } else if (c != ',' && c != ' ' && c != '(') {
+          LOG(FATAL) << "Mixed ? and values in IN";
+        }
+        continue;
+      }
+      if (!quotes) {
+        // Space between tokens.
+        if (c == ' ') {
+          token_start = true;
+          canonical.push_back(' ');
+          continue;
+        }
+        // Start of a string.
+        if (c == '\'') {
+          quotes = true;
+          token_start = false;
+          canonical.push_back('\'');
+          continue;
+        }
+        // A ? parameter.
+        if (c == '?') {
+          arg_value_count.push_back(1);
+        }
+        // Start of a token, maybe it is IN!
+        if (token_start && i + 2 < query.size()) {
+          if ((c == 'I' || c == 'i') &&
+              (query.at(i + 1) == 'N' || query.at(i + 1) == 'n') &&
+              (query.at(i + 2) == ' ' || query.at(i + 2) == '(')) {
+            token_start = false;
+            in = true;
+            i += 2;
+            continue;
+          }
+        }
+      } else {
+        // inside quotes, check for terminating quote.
+        if (c == '\'' && query.at(i - 1) != '\\') {
+          quotes = false;
+        }
+      }
+      // Not IN and no a space.
+      token_start = false;
+      canonical.push_back(c);
     }
-    canonical.append(q);
-    if (canonical.back() == ';') {
+    if (canonical.at(canonical.size() - 1) == ';') {
       canonical.pop_back();
     }
-    return canonical;
+    return std::make_pair(canonical, std::move(arg_value_count));
   }
 }
 
@@ -148,7 +201,8 @@ CanonicalDescriptor MakeCanonical(const CanonicalQuery &query) {
 
 // Turn query into a prepared statement struct.
 PreparedStatementDescriptor MakeStmt(const std::string &query,
-                                     const CanonicalDescriptor *canonical) {
+                                     const CanonicalDescriptor *canonical,
+                                     std::vector<size_t> &&arg_value_count) {
   PreparedStatementDescriptor descriptor;
   descriptor.canonical = canonical;
   // Check type of query.
@@ -164,22 +218,10 @@ PreparedStatementDescriptor MakeStmt(const std::string &query,
     // Select/Update can have IN (?, ...) statements where many values are
     // assigned to the same canonical ?.
     descriptor.total_count = 0;
-    // Find the count of values to each arguments.
-    std::smatch sm;
-    std::string q = query;
-    while (regex_search(q, sm, PARAM_REGEX)) {
-      auto question_marks = sm[3];
-      size_t parameter_count = 1;
-      for (auto it = question_marks.first; it != question_marks.second; ++it) {
-        if (*it == '?') {
-          parameter_count++;
-        }
-      }
-      descriptor.total_count += parameter_count;
-      descriptor.arg_value_count.push_back(parameter_count);
-      // Next match.
-      q = sm.suffix().str();
+    for (size_t count : arg_value_count) {
+      descriptor.total_count += count;
     }
+    descriptor.arg_value_count = std::move(arg_value_count);
   }
   return descriptor;
 }

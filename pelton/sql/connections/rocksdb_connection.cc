@@ -5,7 +5,6 @@
 
 #include "glog/logging.h"
 #include "pelton/util/status.h"
-#include "rocksdb/cache.h"
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/table.h"
@@ -73,15 +72,14 @@ SingletonRocksdbConnection::SingletonRocksdbConnection(
     const std::string &db_name) {
   std::string path = "/tmp/pelton/rocksdb/" + db_name;
 
-  rocksdb::BlockBasedTableOptions block_opts;
-  // 500MB uncompressed cache
-  block_opts.block_cache = rocksdb::NewLRUCache(500 * 1048576);
-
   // Options.
   rocksdb::Options opts;
-  opts.table_factory.reset(rocksdb::NewBlockBasedTableFactory(block_opts));
   opts.create_if_missing = true;
   opts.error_if_exists = true;
+  opts.IncreaseParallelism();
+  opts.OptimizeLevelStyleCompaction();
+  opts.prefix_extractor.reset(new ShardPrefixTransform(1));
+  opts.comparator = rocksdb::BytewiseComparator();
 
   // Open the database.
   rocksdb::DB *db;
@@ -115,9 +113,9 @@ bool SingletonRocksdbConnection::ExecuteStatement(
         CHECK_EQ(keys.size(), 1u) << "BAD PK ROCKSDB TABLE";
         size_t pk = keys.at(0);
 
-        // Creating the table's column family.
         rocksdb::ColumnFamilyHandle *handle;
         rocksdb::ColumnFamilyOptions options;
+        options.OptimizeLevelStyleCompaction();
         options.prefix_extractor.reset(new ShardPrefixTransform(1));
         options.comparator = rocksdb::BytewiseComparator();
         PANIC(this->db_->CreateColumnFamily(options, table_name, &handle));
@@ -228,7 +226,9 @@ int SingletonRocksdbConnection::ExecuteUpdate(
       // Insert/replace new row.
       std::string skey = sid + pk_value + __ROCKSSEP;
       std::string row = EncodeInsert(*stmt, db_schema, pk_value);
-      PANIC(this->db_->Put(rocksdb::WriteOptions(), handler, skey, row));
+      auto opts = rocksdb::WriteOptions();
+      opts.sync = true;
+      PANIC(this->db_->Put(opts, handler, skey, row));
 
       // Update indices.
       rocksdb::Slice pkslice(pk_value.data(), pk_value.size());
@@ -389,7 +389,11 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
       std::string skey = sid + pkslice.ToString() + __ROCKSSEP;
       std::string orow;
       rocksdb::Slice oslice(nullptr, 0);
-      auto st = this->db_->Get(rocksdb::ReadOptions(), handler, skey, &orow);
+
+      rocksdb::ReadOptions opts;
+      opts.total_order_seek = true;
+      opts.verify_checksums = false;
+      auto st = this->db_->Get(opts, handler, skey, &orow);
       if (st.ok()) {
         // There is a pre-existing row with that PK (that will get replaced).
         oslice = rocksdb::Slice(orow);
@@ -465,6 +469,7 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQueryAll(
       // Look up all the rows.
       rocksdb::ReadOptions options;
       options.fill_cache = false;
+      options.verify_checksums = false;
       auto ptr = this->db_->NewIterator(options, handler);
       std::unique_ptr<rocksdb::Iterator> it(ptr);
       for (it->SeekToFirst(); it->Valid(); it->Next()) {
@@ -539,8 +544,11 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
   if (found) {
     if (keys.size() == 1) {
       std::string str;
+      rocksdb::ReadOptions opts;
+      opts.total_order_seek = true;
+      opts.verify_checksums = false;
       rocksdb::Status status =
-          this->db_->Get(rocksdb::ReadOptions(), handler, keys.front(), &str);
+          this->db_->Get(opts, handler, keys.front(), &str);
       if (status.ok()) {
         result.push_back(std::move(str));
       } else if (!status.IsNotFound()) {
@@ -557,8 +565,10 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
         pins[i] = rocksdb::PinnableSlice(tmp + i);
       }
       // Use MultiGet.
-      this->db_->MultiGet(rocksdb::ReadOptions(), handler, keys.size(), slices,
-                          pins, statuses);
+      rocksdb::ReadOptions opts;
+      opts.total_order_seek = true;
+      opts.verify_checksums = false;
+      this->db_->MultiGet(opts, handler, keys.size(), slices, pins, statuses);
       // Read values that were found.
       for (size_t i = 0; i < keys.size(); i++) {
         rocksdb::Status &status = statuses[i];
@@ -586,17 +596,12 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
     options.fill_cache = false;
     options.total_order_seek = false;
     options.prefix_same_as_start = true;
+    options.verify_checksums = false;
     auto ptr = this->db_->NewIterator(options, handler);
     std::unique_ptr<rocksdb::Iterator> it(ptr);
     rocksdb::Slice pslice(shard_id);
     for (it->Seek(shard_id); it->Valid(); it->Next()) {
       rocksdb::Slice keyslice = it->key();
-      if (keyslice.size() < pslice.size()) {
-        break;
-      }
-      if (!SlicesEq(pslice, rocksdb::Slice(keyslice.data(), pslice.size()))) {
-        break;
-      }
       result.push_back(it->value().ToString());
     }
   }

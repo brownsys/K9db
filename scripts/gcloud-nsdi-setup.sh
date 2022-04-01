@@ -9,6 +9,12 @@ fi
 # Go to home directory.
 cd ~
 
+# Install PERF.
+sudo apt-get install linux-tools-common linux-tools-generic linux-tools-`uname -r`
+
+# Download flamegraph repo.
+git clone https://github.com/brendangregg/FlameGraph
+
 # Make sure ssh deploy key is added.
 eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/nsdi

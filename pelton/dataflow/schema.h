@@ -104,6 +104,7 @@ class SchemaFactory {
   static SchemaRef MEMORY_SIZE_SCHEMA;
   static SchemaRef FLOW_DEBUG_SCHEMA;
   static SchemaRef NUM_SHARDS_SCHEMA;
+  static SchemaRef PERF_LIST_SCHEMA;
 };
 
 }  // namespace dataflow

@@ -5,21 +5,21 @@
 #[macro_use]
 extern crate slog;
 extern crate ctrlc;
+extern crate ffi;
 extern crate lazy_static;
 extern crate msql_srv;
-extern crate proxy_ffi;
 extern crate slog_term;
 
+use ffi::pelton;
 use msql_srv::*;
-use proxy_ffi::*;
 use slog::Drain;
-use std::ffi::CString;
 use std::io;
 use std::net;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+// Help message.
 const USAGE: &str = "
   Available options:
   --help (false): displays this help message.
@@ -28,9 +28,105 @@ const USAGE: &str = "
   --db_username (root): database user to connect with to mariadb.
   --db_password (password): password to connect with to mariadb.";
 
+// Helper for translating pelton types to msql-srv types.
+fn convert_type(coltype: pelton::FFIColumnType) -> msql_srv::ColumnType {
+  match coltype {
+    pelton::FFIColumnType_UINT => ColumnType::MYSQL_TYPE_LONGLONG,
+    pelton::FFIColumnType_INT => ColumnType::MYSQL_TYPE_LONGLONG,
+    pelton::FFIColumnType_TEXT => ColumnType::MYSQL_TYPE_VAR_STRING,
+    pelton::FFIColumnType_DATETIME => ColumnType::MYSQL_TYPE_VAR_STRING,
+    _ => ColumnType::MYSQL_TYPE_NULL,
+  }
+}
+
+// Helper for translating pelton schema into msql-srv columns.
+fn convert_columns(result: pelton::FFIResult) -> Vec<msql_srv::Column> {
+  let num = pelton::result::column_count(result);
+  let mut cols = Vec::with_capacity(num);
+  for c in 0..num {
+    let slice = pelton::result::column_name(result, c);
+    let coltype = pelton::result::column_type(result, c);
+    cols.push(Column { table: "".to_string(),
+                       column: slice.to_string(),
+                       coltype: convert_type(coltype),
+                       colflags: ColumnFlags::empty() });
+  }
+  return cols;
+}
+
+// Helper for transforming msql-srv parameter to string.
+fn stringify_parameter(param: msql_srv::ParamValue) -> String {
+  if param.value.is_null() {
+    return "NULL".to_string();
+  }
+  match param.coltype {
+    ColumnType::MYSQL_TYPE_STRING
+    | ColumnType::MYSQL_TYPE_VARCHAR
+    | ColumnType::MYSQL_TYPE_VAR_STRING => {
+      format!("'{}'", Into::<&str>::into(param.value))
+    }
+    ColumnType::MYSQL_TYPE_DECIMAL
+    | ColumnType::MYSQL_TYPE_NEWDECIMAL
+    | ColumnType::MYSQL_TYPE_TINY
+    | ColumnType::MYSQL_TYPE_SHORT
+    | ColumnType::MYSQL_TYPE_INT24
+    | ColumnType::MYSQL_TYPE_LONG
+    | ColumnType::MYSQL_TYPE_LONGLONG => match param.value.into_inner() {
+      ValueInner::Int(v) => v.to_string(),
+      ValueInner::UInt(v) => v.to_string(),
+      _ => unimplemented!("Rust proxy: unsupported numeric type"),
+    },
+    ColumnType::MYSQL_TYPE_DOUBLE | ColumnType::MYSQL_TYPE_FLOAT => {
+      match param.value.into_inner() {
+        ValueInner::Double(v) => (v.floor() as i64).to_string(),
+        _ => unimplemented!("Rust proxy: unsupported double type"),
+      }
+    }
+    _ => unimplemented!("Rust proxy: unsupported parameter type"),
+  }
+}
+
+// Helper for writing a pelton result to msql-srv.
+fn write_result<W: io::Write>(writer: msql_srv::QueryResultWriter<W>,
+                              result: pelton::FFIResult)
+                              -> io::Result<()> {
+  let columns = convert_columns(result);
+  let mut rw = writer.start(&columns).unwrap();
+
+  let rows = pelton::result::row_count(result);
+  let cols = columns.len();
+  for r in 0..rows {
+    for c in 0..cols {
+      if pelton::result::null(result, r, c) {
+        rw.write_col(None::<i32>)?;
+        continue;
+      }
+      match pelton::result::column_type(result, c) {
+        pelton::FFIColumnType_UINT => {
+          rw.write_col(pelton::result::uint(result, r, c) as i64)
+        }
+        pelton::FFIColumnType_INT => {
+          rw.write_col(pelton::result::int(result, r, c))
+        }
+        pelton::FFIColumnType_TEXT => {
+          rw.write_col(pelton::result::text(result, r, c))
+        }
+        pelton::FFIColumnType_DATETIME => {
+          rw.write_col(pelton::result::datetime(result, r, c))
+        }
+        _ => unimplemented!("Rust proxy: invalid column type"),
+      }?;
+    }
+    rw.end_row()?;
+  }
+  pelton::result::destroy(result);
+  return rw.finish();
+}
+
+// msql-srv shim struct.
 #[derive(Debug)]
 struct Backend {
-  rust_conn: FFIConnection,
+  rust_conn: pelton::FFIConnection,
   log: slog::Logger,
 }
 
@@ -53,18 +149,18 @@ impl<W: io::Write> MysqlShim<W> for Backend {
     }
 
     // Pass prepared statement to pelton for preparing.
-    let result = prepare_ffi(&mut self.rust_conn, stmt);
-    let stmt_id = unsafe { (*result).stmt_id } as u32;
-    let param_count = unsafe { (*result).arg_count };
-    let types = unsafe { (*result).args.as_slice(param_count) };
+    let result = pelton::prepare(self.rust_conn, stmt);
+    let stmt_id = pelton::statement::id(result) as u32;
+    let param_count = pelton::statement::arg_count(result);
 
     // Return the number and type of parameters.
     let mut params = Vec::with_capacity(param_count);
     for i in 0..param_count {
+      let arg_type = pelton::statement::arg_type(result, i);
       params.push(Column { table: "".to_string(),
                            column: "".to_string(),
                            colflags: ColumnFlags::empty(),
-                           coltype: convert_column_type(types[i]) });
+                           coltype: convert_type(arg_type) });
     }
 
     if param_count > 1000 {
@@ -87,110 +183,19 @@ impl<W: io::Write> MysqlShim<W> for Backend {
     // Push all parameters (in order) into args formatted by type.
     let mut args: Vec<String> = Vec::new();
     for param in params.into_iter() {
-      if param.value.is_null() {
-        args.push("NULL".to_string());
-      } else {
-        let val = match param.coltype {
-          ColumnType::MYSQL_TYPE_STRING
-          | ColumnType::MYSQL_TYPE_VARCHAR
-          | ColumnType::MYSQL_TYPE_VAR_STRING => {
-            format!("'{}'", Into::<&str>::into(param.value))
-          }
-          ColumnType::MYSQL_TYPE_DECIMAL
-          | ColumnType::MYSQL_TYPE_NEWDECIMAL
-          | ColumnType::MYSQL_TYPE_TINY
-          | ColumnType::MYSQL_TYPE_SHORT
-          | ColumnType::MYSQL_TYPE_INT24
-          | ColumnType::MYSQL_TYPE_LONG
-          | ColumnType::MYSQL_TYPE_LONGLONG => match param.value.into_inner() {
-            ValueInner::Int(v) => v.to_string(),
-            ValueInner::UInt(v) => v.to_string(),
-            _ => unimplemented!("Rust proxy: unsupported numeric type"),
-          },
-          ColumnType::MYSQL_TYPE_DOUBLE | ColumnType::MYSQL_TYPE_FLOAT => {
-            match param.value.into_inner() {
-              ValueInner::Double(v) => (v.floor() as i64).to_string(),
-              _ => unimplemented!("Rust proxy: unsupported double type"),
-            }
-          }
-          _ => unimplemented!("Rust proxy: unsupported parameter type"),
-        };
-        args.push(val);
-      }
+      args.push(stringify_parameter(param));
     }
 
     // Call pelton via ffi.
-    let response =
-      exec_prepared_ffi(&mut self.rust_conn, stmt_id as usize, args);
-
+    let response = pelton::exec_prepare(self.rust_conn, stmt_id, args);
     if response.query {
-      let select_response = response.query_result;
-      if !select_response.is_null() {
-        let num_cols = unsafe { (*select_response).num_cols as usize };
-        let num_rows = unsafe { (*select_response).num_rows as usize };
-        let col_names = unsafe { (*select_response).col_names };
-        let col_types = unsafe { (*select_response).col_types };
-
-        let cols = convert_columns(num_cols, col_types, col_names);
-        let mut rw = results.start(&cols)?;
-
-        // convert incomplete array field (flexible array) to rust slice,
-        // starting with the outer array
-        let rows_slice =
-          unsafe { (*select_response).records.as_slice(num_rows * num_cols) };
-        for r in 0..num_rows {
-          for c in 0..num_cols {
-            if rows_slice[r * num_cols + c].is_null {
-              rw.write_col(None::<i32>)?
-            } else {
-              match col_types[c] {
-                // write a value to the next col of the current row (of this
-                // resultset)
-                FFIColumnType_UINT => unsafe {
-                  rw.write_col(rows_slice[r * num_cols + c].record.UINT as i64)?
-                },
-                FFIColumnType_INT => unsafe {
-                  rw.write_col(rows_slice[r * num_cols + c].record.INT)?
-                },
-                FFIColumnType_TEXT => unsafe {
-                  rw.write_col(
-                    CString::from_raw(rows_slice[r * num_cols + c].record.TEXT)
-                      .into_string()
-                      .unwrap(),
-                  )?
-                },
-                FFIColumnType_DATETIME => unsafe {
-                  rw.write_col(
-                    CString::from_raw(
-                      rows_slice[r * num_cols + c].record.DATETIME,
-                    )
-                    .into_string()
-                    .unwrap(),
-                  )?
-                },
-                _ => error!(self.log, "Rust Proxy: Invalid column type"),
-              }
-            }
-          }
-          rw.end_row()?;
-        }
-        // call destructor for CResult (after results are written/copied via row
-        // writer)
-        unsafe { std::ptr::drop_in_place(select_response) };
-
-        // tell client no more rows coming. Returns an empty Ok to the proxy
-        return rw.finish();
-      }
-      error!(self.log, "Rust Proxy: Failed to exec prepared select");
-      return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
+      return write_result(results, response.query_result);
     } else {
-      let update_response = response.update_result;
-      if update_response != -1 {
-        return results.completed(update_response as u64, 0);
+      if response.update_result > -1 {
+        return results.completed(response.update_result as u64, 0);
       }
-      error!(self.log, "Rust Proxy: Failed to exec prepared update");
-      return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
     }
+    return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
   }
 
   // called when client wants to deallocate resources associated with a prev
@@ -250,7 +255,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("CREATE VIEW")
        || q_string.starts_with("SET")
     {
-      let ddl_response = exec_ddl_ffi(&mut self.rust_conn, q_string);
+      let ddl_response = pelton::exec_ddl(self.rust_conn, q_string);
       if ddl_response {
         return results.completed(0, 0);
       }
@@ -265,7 +270,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("REPLACE")
        || q_string.starts_with("GDPR FORGET")
     {
-      let update_response = exec_update_ffi(&mut self.rust_conn, q_string);
+      let update_response = pelton::exec_update(self.rust_conn, q_string);
       if update_response != -1 {
         return results.completed(update_response as u64, 0);
       }
@@ -279,66 +284,11 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("SHOW SHARDS")
        || q_string.starts_with("SHOW VIEW")
        || q_string.starts_with("SHOW MEMORY")
+       || q_string.starts_with("SHOW PREPARED")
+       || q_string.starts_with("SHOW PERF")
     {
-      let select_response = exec_select_ffi(&mut self.rust_conn, q_string);
-      if !select_response.is_null() {
-        let num_cols = unsafe { (*select_response).num_cols as usize };
-        let num_rows = unsafe { (*select_response).num_rows as usize };
-        let col_names = unsafe { (*select_response).col_names };
-        let col_types = unsafe { (*select_response).col_types };
-
-        let cols = convert_columns(num_cols, col_types, col_names);
-        let mut rw = results.start(&cols)?;
-
-        // convert incomplete array field (flexible array) to rust slice,
-        // starting with the outer array
-        let rows_slice =
-          unsafe { (*select_response).records.as_slice(num_rows * num_cols) };
-        for r in 0..num_rows {
-          for c in 0..num_cols {
-            if rows_slice[r * num_cols + c].is_null {
-              rw.write_col(None::<i32>)?
-            } else {
-              match col_types[c] {
-                // write a value to the next col of the current row (of this
-                // resultset)
-                FFIColumnType_UINT => unsafe {
-                  rw.write_col(rows_slice[r * num_cols + c].record.UINT as i64)?
-                },
-                FFIColumnType_INT => unsafe {
-                  rw.write_col(rows_slice[r * num_cols + c].record.INT)?
-                },
-                FFIColumnType_TEXT => unsafe {
-                  rw.write_col(
-                    CString::from_raw(rows_slice[r * num_cols + c].record.TEXT)
-                      .into_string()
-                      .unwrap(),
-                  )?
-                },
-                FFIColumnType_DATETIME => unsafe {
-                  rw.write_col(
-                    CString::from_raw(
-                      rows_slice[r * num_cols + c].record.DATETIME,
-                    )
-                    .into_string()
-                    .unwrap(),
-                  )?
-                },
-                _ => error!(self.log, "Rust Proxy: Invalid column type"),
-              }
-            }
-          }
-          rw.end_row()?;
-        }
-        // call destructor for CResult (after results are written/copied via row
-        // writer)
-        unsafe { std::ptr::drop_in_place(select_response) };
-
-        // tell client no more rows coming. Returns an empty Ok to the proxy
-        return rw.finish();
-      }
-      error!(self.log, "Rust Proxy: Failed to execute SELECT: {:?}", q_string);
-      return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
+      let select_response = pelton::exec_select(self.rust_conn, q_string);
+      return write_result(results, select_response);
     }
 
     if q_string.starts_with("set") {
@@ -355,7 +305,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 impl Drop for Backend {
   fn drop(&mut self) {
     info!(self.log, "Rust Proxy: Starting destructor for Backend");
-    if close_ffi(&mut self.rust_conn) {
+    if pelton::close(self.rust_conn) {
       info!(self.log, "Rust Proxy: successfully closed connection");
     } else {
       info!(self.log, "Rust Proxy: failed to close connection");
@@ -370,7 +320,7 @@ fn main() {
     slog::Logger::root(slog_term::FullFormat::new(plain).build().fuse(), o!());
 
   // Parse command line flags defined using rust's gflags.
-  let flags = gflags_ffi(std::env::args(), USAGE);
+  let flags = pelton::gflags(std::env::args(), USAGE);
   info!(log,
         "Rust proxy: running with args: {:?} {:?} {:?} {:?}",
         flags.workers,
@@ -378,7 +328,7 @@ fn main() {
         flags.db_name,
         flags.hostname);
 
-  let global_open = initialize_ffi(flags.workers, flags.consistent);
+  let global_open = pelton::initialize(flags.workers, flags.consistent);
   if !global_open {
     std::process::exit(-1);
   }
@@ -404,29 +354,29 @@ fn main() {
   // run listener until terminated with SIGTERM
   while !stop.load(Ordering::Relaxed) {
     while let Ok((stream, _addr)) = listener.accept() {
+      stream.set_nodelay(true).expect("Cannot disable nagle");
       let db_name = flags.db_name.clone();
       // clone log so that each client thread has an owned copy
       let log = log.clone();
       threads.push(std::thread::spawn(move || {
-              info!(log,
-                    "Rust Proxy: Successfully connected to mysql \
-                     proxy\nStream and address are: {:?}",
-                    stream);
-              let rust_conn = open_ffi(&db_name);
-              if rust_conn.connected {
-                let backend = Backend { rust_conn: rust_conn,
-                                        log: log };
-                let _ = MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
-              }
-            }));
+                     info!(log,
+                           "Rust Proxy: Successfully connected to mysql \
+                            proxy\nStream and address are: {:?}",
+                           stream);
+                     let rust_conn = pelton::open(&db_name);
+                     let backend = Backend { rust_conn: rust_conn,
+                                             log: log };
+                     let _ =
+                       MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
+                   }));
     }
     // wait before checking listener status
-    std::thread::sleep(Duration::from_secs(1));
+    std::thread::sleep(Duration::from_millis(1));
   }
 
   // join all client threads
   for join_handle in threads {
     join_handle.join().unwrap();
   }
-  shutdown_ffi();
+  pelton::shutdown();
 }
