@@ -4,7 +4,7 @@
 // NOLINTNEXTLINE
 #include "sodium.h"
 
-#define MAX_LEN 1024
+#define MAX_LEN 10000
 
 // a global random string that is the same for all keys and users.
 unsigned char nonce[crypto_aead_aes256gcm_NPUBBYTES];
@@ -28,7 +28,7 @@ std::string Encrypt(unsigned char *key, std::string pt) {
                                 casted_pt_buffer, pt.size(), 
                                 nullptr, 0, NULL, nonce, key);
  
-  std::string ct_str(reinterpret_cast<char*>(ct));
+  std::string ct_str(reinterpret_cast<char const*>(ct), ct_len);
   return ct_str;
 }
 
@@ -43,7 +43,7 @@ std::string Decrypt(unsigned char *key, std::string ct) {
                                 casted_ct_buffer, ct.size(), 
                                 nullptr, 0, nonce, key);
   
-  std::string pt_str(reinterpret_cast<char*>(pt));
+  std::string pt_str(reinterpret_cast<char const*>(pt), pt_len);
   return pt_str;
 }
 
