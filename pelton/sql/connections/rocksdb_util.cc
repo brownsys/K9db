@@ -105,7 +105,8 @@ bool IsNull(const char *buf, size_t size) {
 
 // Encode the values inside an Insert statement as a rocksdb value string.
 std::string EncodeInsert(const sqlast::Insert &stmt,
-                         const dataflow::SchemaRef &schema) {
+                         const dataflow::SchemaRef &schema,
+                         const std::string &pk_value) {
   std::string encoded = "";
   for (size_t i = 0; i < schema.size(); i++) {
     int idx = static_cast<size_t>(i);
@@ -115,6 +116,8 @@ std::string EncodeInsert(const sqlast::Insert &stmt,
     const std::string *value = &NULLSTR;
     if (idx > -1) {
       value = &stmt.GetValue(idx);
+    } else if (schema.keys().at(0) == i) {
+      value = &pk_value;
     }
     rocksdb::Slice slice = EncodeValue(schema.TypeOf(i), value);
     encoded += std::string(slice.data(), slice.size());

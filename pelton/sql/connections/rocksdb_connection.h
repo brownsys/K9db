@@ -2,6 +2,7 @@
 #ifndef PELTON_SQL_CONNECTIONS_ROCKSDB_CONNECTION_H_
 #define PELTON_SQL_CONNECTIONS_ROCKSDB_CONNECTION_H_
 
+#include <atomic>
 #include <memory>
 #include <optional>
 #include <string>
@@ -42,6 +43,10 @@ class SingletonRocksdbConnection {
                             const std::vector<AugInfo> &augments,
                             const std::string &shard_name);
 
+  SqlResultSet ExecuteQueryAll(const sqlast::AbstractStatement *sql,
+                               const dataflow::SchemaRef &schema,
+                               const std::vector<AugInfo> &augments);
+
  private:
   // Helpers.
   // Get record matching values in a value mapper (either by key, index, or it).
@@ -62,6 +67,7 @@ class SingletonRocksdbConnection {
   std::unordered_map<TableID, size_t> primary_keys_;
   std::unordered_map<TableID, std::vector<size_t>> indexed_columns_;
   std::unordered_map<TableID, std::vector<RocksdbIndex>> indices_;
+  std::unordered_map<TableID, std::atomic<int64_t>> auto_increment_counters_;
 };
 
 class RocksdbConnection : public PeltonConnection {
@@ -90,6 +96,11 @@ class RocksdbConnection : public PeltonConnection {
                             const std::vector<AugInfo> &augments,
                             const std::string &shard_name) override {
     return this->singleton_->ExecuteQuery(sql, schema, augments, shard_name);
+  }
+  SqlResultSet ExecuteQueryAll(const sqlast::AbstractStatement *sql,
+                               const dataflow::SchemaRef &schema,
+                               const std::vector<AugInfo> &augments) override {
+    return this->singleton_->ExecuteQueryAll(sql, schema, augments);
   }
 
   // Call to close the DB completely.

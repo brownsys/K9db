@@ -48,12 +48,14 @@ absl::StatusOr<std::string> GetFKValueHelper(
     return stmt.GetValue(col.column_name());
   }
   size_t fk_idx = schema.ColumnIndex(col.column_name());
-  if (!info.IsTransitive() && info.shard_by_index < fk_idx) {
-    --fk_idx;
+  if (!info.IsTransitive()) {
+    if (info.shard_by_index < fk_idx)
+      --fk_idx;
     CHECK_EQ(schema.GetColumns().size() - 1, stmt.GetValues().size());
   } else {
     CHECK_EQ(schema.GetColumns().size(), stmt.GetValues().size());
   }
+  
   return stmt.GetValue(fk_idx);
 }
 
@@ -78,7 +80,7 @@ absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
   bool was_moved = false;
   for (auto &col : rel_schema.GetColumns()) {
     if (IsOwning(col)) {
-      VLOG(1) << "Found owning column";
+      VLOG(1) << "Found owning column" << col;
       if (was_moved) {
         return absl::InvalidArgumentError("Two owning columns?");
       } else {
@@ -123,7 +125,7 @@ absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
           auto v = rec.GetValue(i).GetSqlString();
           insert.AddValue(v);
         }
-        result->Append(exec.Shard(&insert, info.shard_kind, user_id), false);
+        result->Append(exec.Shard(&insert, user_id), false);
         if (needs_default_db_delete) {
           sqlast::Delete del(target_table);
           del.SetWhereClause(
@@ -155,7 +157,7 @@ absl::Status HandleShardForUser(const sqlast::Insert &stmt,
     UniqueLock upgraded(std::move(*lock));
     if (!state->ShardExists(info.shard_kind, user_id)) {
       for (auto *create_stmt : state->CreateShard(info.shard_kind, user_id)) {
-        if (!exec.Shard(create_stmt, info.shard_kind, user_id).Success()) {
+        if (!exec.Shard(create_stmt, user_id).Success()) {
           return absl::InternalError("Could not created sharded table");
         }
       }
@@ -163,8 +165,7 @@ absl::Status HandleShardForUser(const sqlast::Insert &stmt,
     *lock = SharedLock(std::move(upgraded));
   }
   // Add the modified insert statement.
-  result->Append(
-      exec.Shard(&cloned, info.shard_kind, user_id, schema, aug_index), true);
+  result->Append(exec.Shard(&cloned, user_id, schema, aug_index), true);
   return MaybeHandleOwningColumn(stmt, cloned, connection, update_flows, result,
                                  info, user_id);
 }

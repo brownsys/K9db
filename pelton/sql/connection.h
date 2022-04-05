@@ -40,6 +40,9 @@ class PeltonConnection {
                                     const dataflow::SchemaRef &schema,
                                     const std::vector<AugInfo> &augments,
                                     const std::string &shard_name) = 0;
+  virtual SqlResultSet ExecuteQueryAll(const sqlast::AbstractStatement *sql,
+                                       const dataflow::SchemaRef &schema,
+                                       const std::vector<AugInfo> &augs) = 0;
 };
 
 }  // namespace sql

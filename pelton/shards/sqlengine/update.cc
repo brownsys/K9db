@@ -203,7 +203,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
             if (lookup.size() == 1) {
               user_id = std::move(*lookup.cbegin());
               // Execute statement directly against shard.
-              result.Append(exec.Shard(&cloned, shard_kind, user_id), true);
+              result.Append(exec.Shard(&cloned, user_id), true);
             }
           } else if (state->ShardExists(info.shard_kind, user_id)) {
             // Remove where condition on the shard by column, since it does
@@ -211,7 +211,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
             sqlast::ExpressionRemover expression_remover(info.shard_by);
             cloned.Visit(&expression_remover);
             // Execute statement directly against shard.
-            result.Append(exec.Shard(&cloned, shard_kind, user_id), true);
+            result.Append(exec.Shard(&cloned, user_id), true);
           }
         } else if (update_flows) {
           // We already have the data we need to delete, we can use it to get an
@@ -239,7 +239,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
             LOG(WARNING) << "Perf Warning: Update over " << shards.size()
                          << " shards with update_flows = true. " << stmt;
           }
-          result.Append(exec.Shards(&cloned, shard_kind, shards), true);
+          result.Append(exec.Shards(&cloned, shards), true);
         } else {
           // The update statement by itself does not obviously constraint a
           // shard. Try finding the shard(s) via secondary indices.
@@ -249,14 +249,14 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Update &stmt,
                                  stmt.GetWhereClause(), connection));
           if (pair.first) {
             // Secondary index available for some constrainted column in stmt.
-            result.Append(exec.Shards(&cloned, shard_kind, pair.second), true);
+            result.Append(exec.Shards(&cloned, pair.second), true);
           } else {
             // Update against all shards.
             const auto &user_ids = state->UsersOfShard(shard_kind);
             if (user_ids.size() > 0) {
               LOG(WARNING) << "Perf Warning: Update over all shards " << stmt;
             }
-            result.Append(exec.Shards(&cloned, shard_kind, user_ids), true);
+            result.Append(exec.Shards(&cloned, user_ids), true);
           }
         }
       }

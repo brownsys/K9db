@@ -14,10 +14,6 @@ namespace sqlengine {
 
 static std::unordered_map<std::string, std::string> HASHMAP;
 
-std::string NameShard(const ShardKind &shard_kind, const UserId &user_id) {
-  return shard_kind + user_id;
-}
-
 std::string Dequote(const std::string &st) {
   std::string s(st);
   s.erase(remove(s.begin(), s.end(), '\"'), s.end());

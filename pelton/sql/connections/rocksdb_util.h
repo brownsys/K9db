@@ -24,7 +24,8 @@ bool SlicesGt(const rocksdb::Slice &l, const rocksdb::Slice &r);
 bool IsNull(const char *buf, size_t size);
 
 std::string EncodeInsert(const sqlast::Insert &stmt,
-                         const dataflow::SchemaRef &schema);
+                         const dataflow::SchemaRef &schema,
+                         const std::string &pk_value);
 
 dataflow::Record DecodeRecord(const rocksdb::Slice &slice,
                               const dataflow::SchemaRef &schema,

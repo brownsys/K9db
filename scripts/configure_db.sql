@@ -1,4 +1,6 @@
-ALTER USER 'root'@'localhost' IDENTIFIED BY 'password'
+CREATE USER 'pelton'@'%' IDENTIFIED BY 'password'
+\p;
+GRANT ALL PRIVILEGES ON *.* TO 'pelton'@'%' IDENTIFIED BY 'password'
 \p;
 FLUSH PRIVILEGES
 \p;

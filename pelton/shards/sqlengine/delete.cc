@@ -77,7 +77,7 @@ sql::SqlResult HandleOWNINGColumn(const UnshardedTableName &table_name,
         sqlast::Delete del(info->sharded_table_name, needs_move_to_default_db);
         del.SetWhereClause(std::move(where));
 
-        auto move_delete_result = exec.Shard(&del, shard_kind, user_id, schema);
+        auto move_delete_result = exec.Shard(&del, user_id, schema);
         if (needs_move_to_default_db) {
           CHECK_EQ(move_delete_result.ResultSets().size(), 1);
           std::vector<dataflow::Record> move_delete_result_vec =
@@ -164,7 +164,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
               index::LookupIndex(info.next_index_name, user_id, connection));
           for (auto &uid : lookup) {
             // Execute statement directly against shard.
-            auto res = exec.Shard(&cloned, shard_kind, uid, schema, aug_index);
+            auto res = exec.Shard(&cloned, uid, schema, aug_index);
             CHECK_EQ(res.ResultSets().size(), 1);
             auto these_records = res.ResultSets().front().Vec();
             result.Append(sql::SqlResult(these_records.size()), true);
@@ -182,8 +182,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
           sqlast::ExpressionRemover expression_remover(info.shard_by);
           cloned.Visit(&expression_remover);
           // Execute statement directly against shard.
-          auto res =
-              exec.Shard(&cloned, shard_kind, user_id, schema, aug_index);
+          auto res = exec.Shard(&cloned, user_id, schema, aug_index);
           CHECK_EQ(res.ResultSets().size(), 1);
           auto these_records = res.ResultSets().front().Vec();
           result.Append(sql::SqlResult(these_records.size()), true);
@@ -204,8 +203,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
                                             stmt.GetWhereClause(), connection));
         if (pair.first) {
           // Secondary index available for some constrainted column in stmt.
-          auto res =
-              exec.Shards(&cloned, shard_kind, pair.second, schema, aug_index);
+          auto res = exec.Shards(&cloned, pair.second, schema, aug_index);
           CHECK_EQ(res.ResultSets().size(), 1);
           auto these_records = res.ResultSets().front().Vec();
           result.Append(sql::SqlResult(these_records.size()), true);
@@ -220,8 +218,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
           // Secondary index unhelpful.
           // Execute statement against all shards of this kind.
           const auto &user_ids = state->UsersOfShard(shard_kind);
-          auto res =
-              exec.Shards(&cloned, shard_kind, user_ids, schema, aug_index);
+          auto res = exec.Shards(&cloned, user_ids, schema, aug_index);
           if (user_ids.size() > 0) {
             LOG(WARNING) << "Perf Warning: Delete over all shards " << stmt;
           }

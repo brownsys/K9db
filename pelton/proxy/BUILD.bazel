@@ -1,4 +1,4 @@
-load("@rules_rust//rust:rust.bzl", "rust_binary", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library")
 
 config_setting(
     name = "asan",
@@ -13,7 +13,7 @@ config_setting(
 rust_binary(
     name = "proxy",
     srcs = [
-        "src/main.rs",
+        "src/proxy.rs",
     ],
     rustc_flags = [
         "-Clink-args=-L/home/pelton/bazel-bin/external/rocksdb/copy_rocksdb/rocksdb/lib",
@@ -36,7 +36,7 @@ rust_binary(
     }),
     visibility = ["//visibility:public"],
     deps = [
-        ":proxy_ffi",
+        ":ffi",
         "//pelton/proxy/cargo:ctrlc",
         "//pelton/proxy/cargo:gflags",
         "//pelton/proxy/cargo:lazy_static",
@@ -52,10 +52,10 @@ rust_binary(
 # Also, depends on the ffi .so library so that it gets linked
 # with our rust code.
 rust_library(
-    name = "proxy_ffi",
+    name = "ffi",
     srcs = [
-        ":proxy_ffi_bindgen",
-        ":proxy_ffi_wrappers",
+        ":ffi_bindgen",
+        ":ffi_wrappers",
     ],
     deps = [
         "//pelton/proxy/cargo:msql_srv",
@@ -64,12 +64,12 @@ rust_library(
 
 # Invoke bindgen to generate rust definitions for the ffi library.
 genrule(
-    name = "proxy_ffi_bindgen",
+    name = "ffi_bindgen",
     srcs = [
         "//pelton/proxy/src/ffi:ffi.h",
     ],
     outs = [
-        "proxy_ffi_bindgen.rs",
+        "ffi_bindgen.rs",
     ],
     cmd = """
         ./$(location @raze__bindgen__0_32_3//:cargo_bin_bindgen) $< -o $@
@@ -83,12 +83,12 @@ genrule(
 # This way, it becomes located in the exact same directory that
 # contains proxy_ffi_bindgen.rs, and can thus include! it.
 genrule(
-    name = "proxy_ffi_wrappers",
+    name = "ffi_wrappers",
     srcs = [
-        "src/proxy_ffi_wrappers.rs",
+        "src/ffi.rs",
     ],
     outs = [
-        "proxy_ffi.rs",
+        "ffi.rs",
     ],
     cmd = """
         cp $< $@

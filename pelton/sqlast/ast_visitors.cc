@@ -23,8 +23,7 @@ std::string Dequote(const std::string &st) {
 
 // Stringifier.
 std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
-  std::string result =
-      "CREATE TABLE " + this->shard_prefix_ + ast.table_name() + " (";
+  std::string result = "CREATE TABLE " + ast.table_name() + " (";
   bool first = true;
   for (const std::string &col : ast.VisitChildren(this)) {
     if (!first) {
@@ -54,27 +53,24 @@ std::string Stringifier::VisitColumnConstraint(const ColumnConstraint &ast) {
     case ColumnConstraint::Type::NOT_NULL:
       return "NOT NULL";
     case ColumnConstraint::Type::FOREIGN_KEY:
-      if (this->supports_foreign_keys_) {
-        return "REFERENCES " + this->shard_prefix_ + ast.foreign_table() + "(" +
-               ast.foreign_column() + ")";
-      } else {
-        return "";
-      }
+      return "REFERENCES " + ast.foreign_table() + "(" + ast.foreign_column() +
+             ")";
+    case ColumnConstraint::Type::AUTOINCREMENT:
+      return "AUTO_INCREMENT";
     default:
       assert(false);
   }
 }
 
 std::string Stringifier::VisitCreateIndex(const CreateIndex &ast) {
-  std::string result = "CREATE INDEX " + this->shard_prefix_ +
-                       ast.index_name() + " ON " + this->shard_prefix_ +
+  std::string result = "CREATE INDEX " + ast.index_name() + " ON " +
                        ast.table_name() + "(" + ast.column_name() + ")";
   return result;
 }
 
 std::string Stringifier::VisitInsert(const Insert &ast) {
   std::string result = ast.replace() ? "REPLACE" : "INSERT";
-  result += " INTO " + this->shard_prefix_ + ast.table_name();
+  result += " INTO " + ast.table_name();
   // Columns if explicitly specified.
   if (ast.GetColumns().size() > 0) {
     result += "(";
@@ -102,8 +98,7 @@ std::string Stringifier::VisitInsert(const Insert &ast) {
   return result;
 }
 std::string Stringifier::VisitUpdate(const Update &ast) {
-  std::string result =
-      "UPDATE " + this->shard_prefix_ + ast.table_name() + " SET ";
+  std::string result = "UPDATE " + ast.table_name() + " SET ";
   // Columns and values.
   const std::vector<std::string> &cols = ast.GetColumns();
   const std::vector<std::string> &vals = ast.GetValues();
@@ -128,14 +123,14 @@ std::string Stringifier::VisitSelect(const Select &ast) {
     first = false;
     result += col;
   }
-  result += " FROM " + this->shard_prefix_ + ast.table_name();
+  result += " FROM " + ast.table_name();
   if (ast.HasWhereClause()) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
   return result;
 }
 std::string Stringifier::VisitDelete(const Delete &ast) {
-  std::string result = "DELETE FROM " + this->shard_prefix_ + ast.table_name();
+  std::string result = "DELETE FROM " + ast.table_name();
   if (ast.HasWhereClause()) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
@@ -408,7 +403,7 @@ std::unique_ptr<Expression> ExpressionRemover::VisitBinaryExpression(
 }
 
 std::ostream &operator<<(std::ostream &os, const AbstractStatement &r) {
-  Stringifier stringifier("");
+  Stringifier stringifier;
   os << stringifier.Visit(&r);
   return os;
 }

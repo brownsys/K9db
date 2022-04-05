@@ -25,8 +25,6 @@ inline ShardedTableName NameShardedTable(const UnshardedTableName &table_name,
   return absl::StrCat(table_name, "_", shard_by_column);
 }
 
-std::string NameShard(const ShardKind &shard_kind, const UserId &user_id);
-
 inline std::optional<OwningT> IsOwning(const sqlast::ColumnDefinition &column) {
   if (absl::StartsWith(column.column_name(), "OWNING_"))
     return OwningT::OWNING;

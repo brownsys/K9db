@@ -36,8 +36,7 @@ sql::SqlResult GetDataFromShardedTable(const ShardingInformation &info,
 
   sqlast::Select tbl_stmt{info.sharded_table_name};
   tbl_stmt.AddColumn("*");
-  return exec->Shard(&tbl_stmt, info.shard_kind, unquoted_user_id, schema,
-                     aug_index);
+  return exec->Shard(&tbl_stmt, unquoted_user_id, schema, aug_index);
 }
 
 absl::Status GetAccessableDataForAccessor(
@@ -111,8 +110,6 @@ absl::StatusOr<std::vector<std::string>> GetLookupValues(
 absl::Status GetAccessableDataForAccessor(
     const AccessorIndexInformation &accessor_index, const std::string &user_id,
     Connection *connection, sql::SqlResult *result) {
-  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
-  shards::SharderState *state = connection->state->sharder_state();
   std::string accessor_table_name = accessor_index.table_name;
   std::string index_col = accessor_index.accessor_column_name;
   std::string index_name = accessor_index.index_name;
@@ -261,8 +258,8 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
 
       // XXX(malte): need to upgrade SharderStateLock here in the future.
       sqlast::Delete tbl_stmt{info.sharded_table_name, update_flows};
-      table_result.Append(
-          exec.Shard(&tbl_stmt, shard_kind, user_id, schema, aug_index), true);
+      table_result.Append(exec.Shard(&tbl_stmt, user_id, schema, aug_index),
+                          true);
     }
 
     // Delete was successful, time to update dataflows.
@@ -382,24 +379,6 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
   }
   return result;
 }
-void Print(sql::SqlResult &&result, bool print) {
-  if (print) {
-    if (result.IsStatement()) {
-      std::cout << "Success: " << result.Success() << std::endl;
-    } else if (result.IsUpdate()) {
-      std::cout << "Affected rows: " << result.UpdateCount() << std::endl;
-    } else if (result.IsQuery()) {
-      for (sql::SqlResultSet &resultset : result.ResultSets()) {
-        std::cout << std::endl;
-        std::cout << resultset.schema() << std::endl;
-        std::vector<dataflow::Record> records = resultset.Vec();
-        for (dataflow::Record &record : records) {
-          std::cout << record << std::endl;
-        }
-      }
-    }
-  }
-}
 
 absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
                                    Connection *connection) {
@@ -432,9 +411,8 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
 
       sqlast::Select tbl_stmt{info->sharded_table_name};
       tbl_stmt.AddColumn("*");
-      table_result.Append(exec.Shard(&tbl_stmt, shard_kind, unquoted_user_id,
-                                     schema, aug_index),
-                          true);
+      table_result.Append(
+          exec.Shard(&tbl_stmt, unquoted_user_id, schema, aug_index), true);
     }
     CHECK_EQ(table_result.ResultSets().size(), 1);
     LOG(INFO) << "Found a total of " << table_result.ResultSets().front().size()

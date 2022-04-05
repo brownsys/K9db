@@ -5,8 +5,14 @@
 namespace pelton {
 namespace sqlast {
 
-enum ColumnConstraintTypeEnum { PRIMARY_KEY, UNIQUE, NOT_NULL, FOREIGN_KEY };
-enum ColumnDefinitionTypeEnum { UINT, INT, TEXT, DATETIME };
+enum ColumnConstraintTypeEnum {
+  PRIMARY_KEY,
+  UNIQUE,
+  NOT_NULL,
+  FOREIGN_KEY,
+  AUTOINCREMENT
+};
+enum ColumnDefinitionTypeEnum { UINT = 0, INT = 1, TEXT = 2, DATETIME = 3 };
 
 }  // namespace sqlast
 }  // namespace pelton

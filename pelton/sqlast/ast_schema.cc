@@ -23,6 +23,8 @@ std::string ColumnConstraint::TypeToString(Type type) {
       return "UNIQUE";
     case Type::FOREIGN_KEY:
       return "FOREIGN KEY";
+    case Type::AUTOINCREMENT:
+      return "AUTO_INCREMENT";
     default:
       LOG(FATAL) << "Unsupported constraint type!";
   }
