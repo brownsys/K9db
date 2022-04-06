@@ -129,6 +129,9 @@ std::string Operator::DebugString() const {
     case Operator::Type::MAT_VIEW:
       type_str = "MAT_VIEW";
       break;
+    case Operator::Type::FORWARD_VIEW:
+      type_str = "FORWARD_VIEW";
+      break;
     case Operator::Type::FILTER:
       type_str = "FILTER";
       break;

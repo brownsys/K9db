@@ -9,7 +9,7 @@
 #include "pelton/dataflow/ops/aggregate.h"
 #include "pelton/dataflow/ops/equijoin.h"
 #include "pelton/dataflow/ops/filter.h"
-#include "pelton/dataflow/ops/identity.h"
+#include "pelton/dataflow/ops/forward_view.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/ops/project.h"
@@ -37,10 +37,11 @@ NodeIndex DataFlowGraphGenerator::AddInputOperator(
     const auto partition = this->state_->GetFlow(table_name).GetPartition(0);
     MatViewOperator *matview = partition->outputs().front();
     PCHECK(matview);
-    // create an IdentityOperator
-    std::unique_ptr<IdentityOperator> op = std::make_unique<IdentityOperator>();
+    // create an ForwardViewOperator
+    std::unique_ptr<ForwardViewOperator> op =
+      std::make_unique<ForwardViewOperator>();
     CHECK(op);
-    // Add the identity operator to the graph, where MAT VIEW is a parent
+    // Add the ForwardView operator to the graph, where MAT VIEW is a parent
     CHECK(this->graph_->AddNode(std::move(op), matview));
   } else {
     // Doesn't correspond to view, create input operator as normal

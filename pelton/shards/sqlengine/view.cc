@@ -315,18 +315,18 @@ absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection,
   pelton::dataflow::DataFlowGraphPartition *partish =
     dataflow_state->GetFlow(flow_name).GetPartition(0);
   for (const auto &pair : partish->nodes()) {
-    // Identity operator denotes a nested view; we want to populate it.
-    if (pair.second->type() == pelton::dataflow::Operator::Type::IDENTITY) {
-      LOG(INFO) << "CREATE VIEW: FOUND IDENTITY...";
+    // ForwardView operator denotes a nested view; we want to populate it.
+    if (pair.second->type() == pelton::dataflow::Operator::Type::FORWARD_VIEW) {
+      LOG(INFO) << "CREATE VIEW: FOUND FORWARD_VIEW...";
       LOG(INFO) << pair.second->DebugString();
-      // Get parent MatView of the Identity.
+      // Get parent MatView of the ForwardView.
       pelton::dataflow::Operator *parent_op = pair.second->parents().at(0);
       pelton::dataflow::MatViewOperator *parent_mat_view =
         (pelton::dataflow::MatViewOperator *) parent_op;
       LOG(INFO) << "CREATE VIEW: PARENT MATVIEW...";
       LOG(INFO) << parent_mat_view->DebugString();
 
-      // Process and forward the MatView's records through the Identity.
+      // Process and forward the MatView's records through the ForwardView.
       pair.second->ProcessAndForward(pair.first, parent_mat_view->All(),
                                      pelton::dataflow::Promise::None.Derive());
       LOG(INFO) << "CREATE VIEW: PROCESSED AND FORWARDED!";

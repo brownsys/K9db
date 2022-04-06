@@ -354,7 +354,7 @@ cc_library(
         "//pelton/dataflow/ops:aggregate",
         "//pelton/dataflow/ops:equijoin",
         "//pelton/dataflow/ops:filter",
-        "//pelton/dataflow/ops:identity",
+        "//pelton/dataflow/ops:forward_view",
         "//pelton/dataflow/ops:input",
         "//pelton/dataflow/ops:matview",
         "//pelton/dataflow/ops:project",

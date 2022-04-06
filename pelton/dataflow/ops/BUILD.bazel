@@ -107,6 +107,23 @@ cc_library(
 )
 
 cc_library(
+    name = "forward_view",
+    srcs = [
+        "forward_view.cc",
+    ],
+    hdrs = [
+        "forward_view.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:types",
+        "@glog",
+    ],
+)
+
+cc_library(
     name = "grouped_data",
     srcs = [],
     hdrs = [
