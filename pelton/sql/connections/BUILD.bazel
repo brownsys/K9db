@@ -12,6 +12,7 @@ cc_library(
     deps = [
         ":rocksdb_index",
         ":rocksdb_util",
+        ":encryption",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/sql:connection",

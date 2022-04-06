@@ -68,6 +68,7 @@ class SingletonRocksdbConnection {
   std::unordered_map<TableID, std::vector<size_t>> indexed_columns_;
   std::unordered_map<TableID, std::vector<RocksdbIndex>> indices_;
   std::unordered_map<TableID, std::atomic<int64_t>> auto_increment_counters_;
+  unsigned char* global_key_;
 };
 
 class RocksdbConnection : public PeltonConnection {

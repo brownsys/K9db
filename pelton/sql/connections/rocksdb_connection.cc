@@ -8,6 +8,7 @@
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/table.h"
+#include "encryption.h"
 
 #define PANIC PANIC_STATUS
 
@@ -85,6 +86,12 @@ SingletonRocksdbConnection::SingletonRocksdbConnection(
   rocksdb::DB *db;
   PANIC(rocksdb::DB::Open(opts, path, &db));
   this->db_ = std::unique_ptr<rocksdb::DB>(db);
+
+  // Initialize libsodium.
+  InitializeEncryption();
+  
+  // Generate global key.
+  this->global_key_ = KeyGen();
 }
 
 // Close the connection.
@@ -228,7 +235,8 @@ int SingletonRocksdbConnection::ExecuteUpdate(
       std::string row = EncodeInsert(*stmt, db_schema, pk_value);
       auto opts = rocksdb::WriteOptions();
       opts.sync = true;
-      PANIC(this->db_->Put(opts, handler, skey, row));
+      PANIC(this->db_->Put(opts, handler, skey, 
+                            Encrypt(this->global_key_, row)));
 
       // Update indices.
       rocksdb::Slice pkslice(pk_value.data(), pk_value.size());
@@ -276,7 +284,8 @@ int SingletonRocksdbConnection::ExecuteUpdate(
         if (keychanged) {
           PANIC(db_->Delete(rocksdb::WriteOptions(), handler, okey));
         }
-        PANIC(db_->Put(rocksdb::WriteOptions(), handler, nkey, nrow));
+        PANIC(db_->Put(rocksdb::WriteOptions(), handler, nkey, 
+                        Encrypt(this->global_key_, nrow)));
         // Update indices.
         for (size_t i = 0; i < indexed_columns.size(); i++) {
           RocksdbIndex &index = indices.at(i);
@@ -396,7 +405,7 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
       auto st = this->db_->Get(opts, handler, skey, &orow);
       if (st.ok()) {
         // There is a pre-existing row with that PK (that will get replaced).
-        oslice = rocksdb::Slice(orow);
+        oslice = rocksdb::Slice(Decrypt(this->global_key_, orow));
         keys.push_back(pkslice.ToString());
         records.push_back(DecodeRecord(oslice, out_schema, augments, {}));
       } else if (!st.IsNotFound()) {
@@ -409,7 +418,8 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
       if (SlicesEq(oslice, nslice)) {  // No-op.
         break;
       }
-      PANIC(this->db_->Put(rocksdb::WriteOptions(), handler, skey, nrow));
+      PANIC(this->db_->Put(rocksdb::WriteOptions(), handler, skey, 
+                            Encrypt(this->global_key_, nrow)));
       // Update indices.
       for (size_t i = 0; i < indexed_columns.size(); i++) {
         RocksdbIndex &index = indices.at(i);
@@ -473,7 +483,8 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQueryAll(
       auto ptr = this->db_->NewIterator(options, handler);
       std::unique_ptr<rocksdb::Iterator> it(ptr);
       for (it->SeekToFirst(); it->Valid(); it->Next()) {
-        rocksdb::Slice rowslice = it->value();
+        std::string rowstr = Decrypt(this->global_key_, it->value().ToString());
+        rocksdb::Slice rowslice = rocksdb::Slice(rowstr.data(), rowstr.size());
         // Extract PK.
         rocksdb::Slice pk_value = ExtractColumn(rowslice, pk);
         std::string keystr = pk_value.ToString();
@@ -550,7 +561,7 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
       rocksdb::Status status =
           this->db_->Get(opts, handler, keys.front(), &str);
       if (status.ok()) {
-        result.push_back(std::move(str));
+        result.push_back(std::move(Decrypt(this->global_key_, str)));
       } else if (!status.IsNotFound()) {
         PANIC(status);
       }
@@ -576,7 +587,7 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
           if (pins[i].IsPinned()) {
             tmp[i].assign(pins[i].data(), pins[i].size());
           }
-          result.push_back(std::move(tmp[i]));
+          result.push_back(std::move(Decrypt(this->global_key_, tmp[i])));
         } else if (!status.IsNotFound()) {
           PANIC(status);
         }
@@ -602,7 +613,7 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
     rocksdb::Slice pslice(shard_id);
     for (it->Seek(shard_id); it->Valid(); it->Next()) {
       rocksdb::Slice keyslice = it->key();
-      result.push_back(it->value().ToString());
+      result.push_back(Decrypt(this->global_key_, it->value().ToString()));
     }
   }
   return result;
