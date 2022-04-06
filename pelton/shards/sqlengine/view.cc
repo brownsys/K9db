@@ -310,6 +310,29 @@ absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection,
     dataflow_state->ProcessRecordsByFlowName(
         flow_name, table_name, std::move(records), future.GetPromise());
   }
+
+  // Populate nested view upon creation.
+  pelton::dataflow::DataFlowGraphPartition *partish =
+    dataflow_state->GetFlow(flow_name).GetPartition(0);
+  for (const auto &pair : partish->nodes()) {
+    // Identity operator denotes a nested view; we want to populate it.
+    if (pair.second->type() == pelton::dataflow::Operator::Type::IDENTITY) {
+      LOG(INFO) << "CREATE VIEW: FOUND IDENTITY...";
+      LOG(INFO) << pair.second->DebugString();
+      // Get parent MatView of the Identity.
+      pelton::dataflow::Operator *parent_op = pair.second->parents().at(0);
+      pelton::dataflow::MatViewOperator *parent_mat_view =
+        (pelton::dataflow::MatViewOperator *) parent_op;
+      LOG(INFO) << "CREATE VIEW: PARENT MATVIEW...";
+      LOG(INFO) << parent_mat_view->DebugString();
+
+      // Process and forward the MatView's records through the Identity.
+      pair.second->ProcessAndForward(pair.first, parent_mat_view->All(),
+                                     pelton::dataflow::Promise::None.Derive());
+      LOG(INFO) << "CREATE VIEW: PROCESSED AND FORWARDED!";
+    }
+  }
+
   future.Wait();
 
   return absl::OkStatus();

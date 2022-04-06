@@ -35,7 +35,6 @@ void DataFlowGraph::Initialize(
 
   LOG(INFO) << "Entering Initialize()...";
 
-  //if (this->size_ == 1) {
   if (partition->inputs().size() == 0) {
     LOG(INFO) << "SINGLE WORKER CASE";
 

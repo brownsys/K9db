@@ -3,7 +3,9 @@
 #include "tests/common.h"
 
 
-std::string data_file(const std::string &s) { return "tests/data/ownCloud/" + s; }
+std::string data_file(const std::string &s) {
+  return "tests/data/ownCloud/" + s;
+}
 
 class OwnCloud : public tests::CleanDatabaseFixture {};
 

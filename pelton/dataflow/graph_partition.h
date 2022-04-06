@@ -60,6 +60,10 @@ class DataFlowGraphPartition {
   const std::vector<MatViewOperator *> &outputs() const {
     return this->outputs_;
   }
+  const std::unordered_map<NodeIndex, std::unique_ptr<Operator>> &nodes()
+    const {
+    return this->nodes_;
+  }
 
   // Get node by its index.
   inline Operator *GetNode(NodeIndex node_index) const {
