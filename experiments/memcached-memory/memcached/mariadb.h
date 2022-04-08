@@ -16,7 +16,7 @@ class MariaDBConnection {
     // Connect to mariadb server.
     sql::ConnectOptionsMap props;
     props["hostName"] = "localhost";
-    props["userName"] = "pelton";
+    props["userName"] = "root";
     props["password"] = "password";
 
     sql::Driver *driver = sql::mariadb::get_driver_instance();
@@ -30,7 +30,8 @@ class MariaDBConnection {
   }
 
   std::unordered_map<MemcachedKey, std::vector<MemcachedRecord>> Query(
-      const std::vector<std::string> &key_columns, const std::string &q) {
+      const std::vector<std::string> &key_columns, const std::string &q,
+      int limit) {
     // Execute the query.
     std::unique_ptr<sql::ResultSet> rows{this->stmt_->executeQuery(q.c_str())};
     std::unique_ptr<sql::ResultSetMetaData> schema{rows->getMetaData()};
@@ -58,7 +59,9 @@ class MariaDBConnection {
       // Transform row to our representation.
       MemcachedKey key = EncodeBaseKey(rows.get(), schema.get(), key_indices);
       MemcachedRecord record = EncodeRow(rows.get(), schema.get());
-      data[key].push_back(record);
+      if (data[key].size() < limit) {
+        data[key].push_back(record);
+      }
     }
     return data;
   }

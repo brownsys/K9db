@@ -97,8 +97,10 @@ static std::regex REGEX_BEFORE_AND{"(.*) ([A-Za-z0-9\\._]+) \\= \\? AND(.*)"};
 static std::regex REGEX_AFTER_AND{"(.*) AND ([A-Za-z0-9\\._]+) \\= \\?(.*)"};
 static std::regex REGEX_WHERE{"(.*) WHERE ([A-Za-z0-9\\._]+) \\= \\?(.*)"};
 static std::regex REGEX_HAVING{"(.*) HAVING ([A-Za-z0-9\\._]+) \\= \\?(.*)"};
-static std::regex REGEX_COLUMN{
-    std::regex("([A-Za-z_0-9]+\\.)?([A-Za-z0-9_]+)")};
+static std::regex REGEX_COLUMN{"([A-Za-z_0-9]+\\.)?([A-Za-z0-9_]+)"};
+static std::regex REGEX_LIMIT{"(.*) LIMIT ([0-9]+)"};
+
+#define QUERIES REAL_QUERIES
 
 int main(int argc, char **argv) {
   uint64_t total_size = 0;
@@ -108,8 +110,8 @@ int main(int argc, char **argv) {
   MemcachedConnection memcached;
 
   // Loop over queries.
-  for (size_t i = 0; i < ALL_QUERIES.size(); i++) {
-    std::string query = ALL_QUERIES.at(i);
+  for (size_t i = 0; i < QUERIES.size(); i++) {
+    std::string query = QUERIES.at(i);
     // Find the name of the key column (if any).
     std::vector<std::string> key;
     std::smatch matches;
@@ -122,16 +124,22 @@ int main(int argc, char **argv) {
       if (std::regex_match(key_col, matches, REGEX_COLUMN)) {
         key.push_back(matches[2]);
       } else {
-        std::cerr << "Query " << ALL_QUERIES.at(i) << " key " << key_col
+        std::cerr << "Query " << QUERIES.at(i) << " key " << key_col
                   << " did not match regex" << std::endl;
         assert(false);
       }
+    }
+    // Find the limit and remove it.
+    int limit = -1;
+    if (std::regex_match(query, matches, REGEX_LIMIT)) {
+      query = std::string(matches[1]);
+      limit = std::stoi(matches[2]);
     }
 
     // The query now has no ? and the key column is found in key.
     // Execute the query.
     std::unordered_map<MemcachedKey, std::vector<MemcachedRecord>> data =
-        mariadb.Query(key, query);
+        mariadb.Query(key, query, limit);
 
     // Write the data to memcached, keep track of memory.
     uint64_t query_size = 0;
