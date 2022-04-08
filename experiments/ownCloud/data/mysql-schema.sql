@@ -5,7 +5,7 @@ CREATE TABLE oc_storages (
   available INT NOT NULL,
   last_checked INT,
   PRIMARY KEY (numeric_id)
-);
+) ENGINE=ROCKSDB;
 CREATE TABLE oc_filecache (
   fileid INTEGER PRIMARY KEY NOT NULL,
   storage INTEGER NOT NULL REFERENCES oc_storages(numeric_id),
@@ -23,31 +23,31 @@ CREATE TABLE oc_filecache (
   checksum VARCHAR(255),
   mtime INT NOT NULL,
   storage_mtime INT NOT NULL
-);
+) ENGINE=ROCKSDB;
 CREATE TABLE oc_files (
   id INTEGER PRIMARY KEY NOT NULL,
   file_name VARCHAR(255)
-);
+) ENGINE=ROCKSDB;
 
 CREATE TABLE  oc_users (
   uid VARCHAR(64) NOT NULL,
   PII_displayname VARCHAR(64),
   password VARCHAR(255) NOT NULL,
   PRIMARY KEY(uid)
-);
+) ENGINE=ROCKSDB;
 
 
 CREATE TABLE oc_groups (
   gid VARCHAR(64) NOT NULL,
   PRIMARY KEY(gid)
-);
+) ENGINE=ROCKSDB;
 
 CREATE TABLE oc_group_user (
   id INT PRIMARY KEY,
   OWNING_gid VARCHAR(64) NOT NULL REFERENCES oc_groups(gid),
   uid VARCHAR(64) NOT NULL REFERENCES oc_users(uid)
   --UNIQUE group_user_uniq(OWNED_gid, uid)
-);
+) ENGINE=ROCKSDB;
 
 CREATE TABLE oc_share (
   id INT NOT NULL,
@@ -70,7 +70,7 @@ CREATE TABLE oc_share (
   share_name VARCHAR(64),
   file_source INT,
   attributes TEXT
-);
+) ENGINE=ROCKSDB;
 
 -- CREATE VIEW users_for_file_via_group AS 
 -- '"SELECT oc_share.OWNING_item_source, oc_group_user.uid, COUNT(*)
