@@ -50,6 +50,12 @@ void SqlResult::Append(SqlResult &&other, bool deduplicate) {
       } else if (this->status_ >= 0) {
         this->status_ += other.status_;
       }
+      if (this->lid_ != 0 && other.lid_ != 0) {
+        LOG(FATAL) << "Appending results with different last insert id!";
+      }
+      if (this->lid_ == 0) {
+        this->lid_ = other.lid_;
+      }
       break;
     }
     case Type::QUERY: {

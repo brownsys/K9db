@@ -60,9 +60,9 @@ class SqlResult {
   // row_count specifies how many rows were affected (-1 for failures).
   explicit SqlResult(int rows) : type_(Type::UPDATE), status_(rows), lid_(0) {}
   explicit SqlResult(size_t rows) : SqlResult(static_cast<int>(rows)) {}
-  SqlResult(int rows, int64_t lid)
+  SqlResult(int rows, uint64_t lid)
       : type_(Type::UPDATE), status_(rows), lid_(lid) {}
-  SqlResult(size_t rows, int64_t lid)
+  SqlResult(size_t rows, uint64_t lid)
       : SqlResult(static_cast<int>(rows), lid) {}
   // For results of SELECT.
   explicit SqlResult(std::vector<SqlResultSet> &&v)
