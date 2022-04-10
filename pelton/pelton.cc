@@ -54,6 +54,13 @@ std::optional<SqlResult> SpecialStatements(const std::string &sql,
       }
       return SqlResult(true);
     }
+    if (absl::StartsWith(split.at(1), "START")) {
+      for (size_t i = 0; i < 10; i++) {
+        std::cout << std::endl;
+      }
+      std::cout << "############# STARTING LOAD #############" << std::endl;
+      return SqlResult(true);
+    }
   }
   if (absl::StartsWith(sql, "SHOW ")) {
     std::vector<std::string> split = absl::StrSplit(sql, ' ');
