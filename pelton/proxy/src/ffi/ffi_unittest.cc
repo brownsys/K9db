@@ -51,7 +51,8 @@ TEST(PROXY, UPDATE_TEST) {
       {"DELETE FROM test3 WHERE ID = 3;", 1}};
   for (auto &[q, count] : tests) {
     VLOG(1) << "Running query: " << q;
-    EXPECT_EQ(FFIExecUpdate(c_conn, q.c_str()), count) << "Failed: " << q;
+    FFIUpdateResult result = FFIExecUpdate(c_conn, q.c_str());
+    EXPECT_EQ(result.row_count, count) << "Failed: " << q;
   }
 }
 
