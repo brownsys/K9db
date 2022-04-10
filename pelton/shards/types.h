@@ -116,8 +116,10 @@ struct ShardingInformation {
   UnshardedTableName next_table;
   ColumnName next_column;
   FlowName next_index_name;
+  FlowName owned_by_index_name;
 
   bool is_varowned_;
+  bool is_owning_;
 
   // Constructors.
   ShardingInformation() = default;
@@ -134,7 +136,9 @@ struct ShardingInformation {
         next_table(""),
         next_column(nc),
         next_index_name(""),
-        is_varowned_(false) {}
+        owned_by_index_name(""),
+        is_varowned_(false),
+        is_owning_(false) {}
 
   // A transitive sharding information can only be created given the previous
   // sharding information in the transitivity chain.
@@ -155,6 +159,16 @@ struct ShardingInformation {
 
   // Helpers.
   bool IsTransitive() const { return this->distance_from_shard > 0; }
+
+  bool RequiresOwningIndex() const { return this->is_owning_; }
+
+  // owned_by_index_name is the index in the OWNING table which maps the 
+  // foreign key to the primary key in the table to allow us to resolve the
+  // shard to insert a value into
+  void MakeOwning(const FlowName &owning_index) { 
+    this->owned_by_index_name = owning_index;
+    this->is_owning_ = true; 
+  }
 
   void MakeVarowned() { this->is_varowned_ = true; }
 

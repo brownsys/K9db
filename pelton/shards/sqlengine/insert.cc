@@ -277,6 +277,36 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Insert &stmt,
                                             schema, aug_index));
           }
         }
+      } else if (info.RequiresOwningIndex()) {
+        // this is the condition where we need to lookup the value in an index 
+        // in order to resolve which shard to insert a new row into for OWNING 
+        // tables copied the code from the transitive case, the only difference 
+        // is we lookup a different index
+        LOG(INFO) << "info.owned_by_index_name | " << info.owned_by_index_name;
+        // ERROR: ERRORS ON THIS CALL TO LookupIndex
+        ASSIGN_OR_RETURN(auto &lookup, index::LookupIndex(info.owned_by_index_name,
+                                                          user_id, connection));
+        if (lookup.size() < 1) {
+          if (info.is_varowned()) {
+            // In case the table is variably owned this pointed-to resource may
+            // have been inserted before the relationship record is inserted. In
+            // that case we insert into the default table instead and skip the
+            // sharded insert.
+
+            result = exec.Default(&stmt);
+            continue;
+          } else {
+            return absl::InvalidArgumentError(
+                "Foreign Key Value does not exist");
+          }
+        }
+        for (auto &uid : lookup) {
+          if (!absl::EqualsIgnoreCase(uid, "NULL")) {
+            CHECK_STATUS(HandleShardForUser(stmt, cloned, connection, lock,
+                                            &update_flows, &result, info, uid,
+                                            schema, aug_index));
+          }
+        }
       } else {
         CHECK_STATUS(HandleShardForUser(stmt, cloned, connection, lock,
                                         &update_flows, &result, info, user_id,
