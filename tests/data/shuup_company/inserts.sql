@@ -8,6 +8,3 @@ INSERT INTO shuup_contact(id, name) VALUES (8, 300, 'Keenan');
 
 INSERT INTO auth_user(id, ptr, username, password) VALUES (15, 10, 'Alice', 'secure');
 INSERT INTO auth_user VALUES (16, 20, 'Banji', 'password');
-
-INSERT INTO shuup_companycontact VALUES (6, 6666);
-INSERT INTO shuup_companycontact_members VALUES (1, 6, 1);
