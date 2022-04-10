@@ -20,6 +20,12 @@ typedef struct {
 // In reality, this is of type pelton::ConnectionLocal.
 typedef void *FFIConnection;
 
+// Returned result for an Update.
+typedef struct {
+  int row_count;
+  uint64_t last_insert_id;
+} FFIUpdateResult;
+
 // Our version of pelton/sqlast/ast_schema_enums.h#ColumnDefinitionTypeEnum.
 typedef enum { UINT = 0, INT = 1, TEXT = 2, DATETIME = 3 } FFIColumnType;
 
@@ -34,6 +40,7 @@ typedef struct {
   bool query;  // if true, query_result is set.
   FFIResult query_result;
   int update_result;
+  uint64_t last_insert_id;
 } FFIPreparedResult;
 
 // The FFI API.
@@ -54,7 +61,7 @@ bool FFIExecDDL(FFIConnection c_conn, const char *query);
 
 // Execute an update statement (e.g. INSERT, UPDATE, DELETE).
 // Returns -1 if error, otherwise returns the number of affected rows.
-int FFIExecUpdate(FFIConnection c_conn, const char *query);
+FFIUpdateResult FFIExecUpdate(FFIConnection c_conn, const char *query);
 
 // Executes a query (SELECT).
 // Returns nullptr (0) on error.

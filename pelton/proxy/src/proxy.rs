@@ -192,7 +192,8 @@ impl<W: io::Write> MysqlShim<W> for Backend {
       return write_result(results, response.query_result);
     } else {
       if response.update_result > -1 {
-        return results.completed(response.update_result as u64, 0);
+        return results.completed(response.update_result as u64,
+                                 response.last_insert_id);
       }
     }
     return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
@@ -271,8 +272,9 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("GDPR FORGET")
     {
       let update_response = pelton::exec_update(self.rust_conn, q_string);
-      if update_response != -1 {
-        return results.completed(update_response as u64, 0);
+      if update_response.row_count != -1 {
+        return results.completed(update_response.row_count as u64,
+                                 update_response.last_insert_id);
       }
       error!(self.log, "Rust Proxy: Failed to execute UPDATE: {:?}", q_string);
       return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
