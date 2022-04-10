@@ -50,6 +50,8 @@ std::vector<dataflow::Record> LookupIndexRecords(const std::string &index_name,
                                                  Connection *connection) {
   // Find flow.
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  // ERROR: THIS CALL TO GetFlow ERRORS
+  LOG(INFO) << "LookupIndexRecords | Looking up this index: " << index_name;
   const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(index_name);
 
   return LookupIndexRecords(flow, value);

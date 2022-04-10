@@ -516,6 +516,24 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(
       auto &ways_to_shard,
       IsShardingBySupported(sharding_info, *state, target_table_name));
   for (auto &info : ways_to_shard) {
+    // Change: now we create an index to resolve the foreign key pointer ->
+    // shard id, we then store the index name in the sharding info of the
+    // referring table
+    // i.e., in the case where shuup_personcontact OWNS auth_user, we create 
+    // the index on shuup_personcontact, but store the index metadata in the 
+    // auth_user table
+    std::string index_prefix = "owned_by_" + relationship_table_name;
+    sqlast::CreateIndex create_index_stmt{index_prefix, stmt.table_name(),
+                                          owning_table.column.column_name()};
+    auto status =
+        pelton::shards::sqlengine::index::CreateIndexStateIsAlreadyLocked(
+            create_index_stmt, connection, lock);
+    
+    if (!status.ok()) return status.status();
+  
+    info.MakeOwning(index_prefix);
+    // info.MakeTransitive(sharding_info, index_prefix, target_table_name);
+
     const ShardedTableName &sharded_table = info.sharded_table_name;
     ASSIGN_OR_RETURN(const ForeignKeyShards fk_shards,
                      ShardForeignKeys(target_table_schema, info, *state));
