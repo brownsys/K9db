@@ -72,7 +72,6 @@ TEST(RocksdbConnectionTest, OpenTest) {
   // std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
 
   // Read rows.
-  LOG(INFO) << "Read rows 1";
   parsed = Parse("SELECT * FROM tbl;");
   auto resultset = conn.ExecuteQuery(parsed.get(), schema, {}, "");
   Print(resultset.Vec(), schema);
@@ -96,7 +95,6 @@ TEST(RocksdbConnectionTest, OpenTest) {
   Print(resultset.Vec(), schema);
 
   // Replace.
-  LOG(INFO) << "Replace";
   parsed = Parse("REPLACE INTO tbl VALUES(5, 'BENJI');");
   resultset = conn.ExecuteQuery(parsed.get(), schema, {}, "");
   Print(resultset.Vec(), schema);
@@ -104,13 +102,11 @@ TEST(RocksdbConnectionTest, OpenTest) {
   std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
 
   // Read rows.
-  LOG(INFO) << "Read rows 2";
   parsed = Parse("SELECT * FROM tbl;");
   resultset = conn.ExecuteQuery(parsed.get(), schema, {}, "");
   Print(resultset.Vec(), schema);
 
   // Delete rows.
-  LOG(INFO) << "Delete rows 1";
   parsed = Parse("DELETE FROM tbl WHERE name = 'BENJI';");
   resultset = conn.ExecuteQuery(parsed.get(), schema, {}, "");
   Print(resultset.Vec(), schema);
@@ -118,13 +114,11 @@ TEST(RocksdbConnectionTest, OpenTest) {
   std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
 
   // Read rows.
-  LOG(INFO) << "Read rows 3";
   parsed = Parse("SELECT * FROM tbl;");
   resultset = conn.ExecuteQuery(parsed.get(), schema, {}, "");
   Print(resultset.Vec(), schema);
 
   // Update rows.
-  LOG(INFO) << "Update rows";
   parsed = Parse("UPDATE tbl SET id = 10 WHERE id = 3;");
   std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
   parsed = Parse("UPDATE tbl SET name = NULL WHERE id = 2;");
@@ -133,13 +127,11 @@ TEST(RocksdbConnectionTest, OpenTest) {
   std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
 
   // Read rows.
-  LOG(INFO) << "Read rows 4";
   parsed = Parse("SELECT * FROM tbl;");
   resultset = conn.ExecuteQuery(parsed.get(), schema, {}, "");
   Print(resultset.Vec(), schema);
 
   // Real all using new All API.
-  LOG(INFO) << "Read all";
   parsed = Parse("SELECT * FROM tbl;");
   resultset = conn.ExecuteQueryAll(parsed.get(), schema, {});
   Print(resultset.Vec(), schema);
