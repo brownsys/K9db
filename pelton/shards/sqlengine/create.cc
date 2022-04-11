@@ -490,6 +490,7 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(
       if (state->HasIndexFor(relationship_table_name, my_col_name,
                             prev_sharding_info.shard_by)) {
       } else {
+        // TODO: remove this index creation since done manually?
         const std::string &index_name = state->GenerateUniqueIndexName(lock);
         const sqlast::CreateIndex create_index(
             index_name, relationship_table_name, my_col_name);
@@ -522,6 +523,18 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(
     // i.e., in the case where shuup_personcontact OWNS auth_user, we create 
     // the index on shuup_personcontact, but store the index metadata in the 
     // auth_user table
+    std::string index_prefix = "owned_by_" + relationship_table_name;
+    sqlast::CreateIndex create_index_stmt{index_prefix, stmt.table_name(),
+                                          owning_table.column.column_name()};
+    auto status =
+        pelton::shards::sqlengine::index::CreateIndexStateIsAlreadyLocked(
+            create_index_stmt, connection, lock);
+    
+    if (!status.ok()) return status.status();
+  
+    info.MakeOwning(index_prefix);
+
+    // auth_user
     std::string index_prefix = "owned_by_" + relationship_table_name;
     sqlast::CreateIndex create_index_stmt{index_prefix, stmt.table_name(),
                                           owning_table.column.column_name()};

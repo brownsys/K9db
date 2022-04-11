@@ -53,6 +53,7 @@ std::vector<dataflow::Record> LookupIndexRecords(const std::string &index_name,
   // ERROR: THIS CALL TO GetFlow ERRORS
   LOG(INFO) << "LookupIndexRecords | Looking up this index: " << index_name;
   const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(index_name);
+  LOG(INFO) << "FOUND INDEX " << index_name;
 
   return LookupIndexRecords(flow, value);
 }
