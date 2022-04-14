@@ -144,7 +144,6 @@ SharderState::GetShardingInformationFor(const UnshardedTableName &table,
                                         const std::string &shard_kind) const {
   std::vector<const ShardingInformation *> result;
   for (const auto &info : this->GetShardingInformation(table)) {
-    LOG(INFO) << "Found info " << info.sharded_table_name;
     if (info.shard_kind == shard_kind) result.push_back(&info);
   }
   return result;
