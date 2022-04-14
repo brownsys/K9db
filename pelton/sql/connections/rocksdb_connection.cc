@@ -102,7 +102,8 @@ void SingletonRocksdbConnection::Close() {
     this->db_ = nullptr;
     // delete encryption keys
     delete[] this->global_key_;
-    for (const auto &[_, user_key] : this->user_keys_) {
+    for (const auto &[user, user_key] : this->user_keys_) {
+      LOG(INFO) << "Deleting key for: " << user;
       delete[] user_key;
     }
   }
@@ -648,7 +649,8 @@ unsigned char* SingletonRocksdbConnection::GetUserKey(
   if (this->user_keys_.find(shard_name) == this->user_keys_.end()) {
     this->user_keys_.emplace(shard_name, KeyGen());
   } 
-  LOG(INFO) << "GETTING KEY: " << this->user_keys_.at(shard_name);
+  LOG(INFO) << "Getting encryption key: " << this->user_keys_.at(shard_name) 
+            << " for :" << shard_name;
   return this->user_keys_.at(shard_name);
 }
 
