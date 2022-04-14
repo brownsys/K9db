@@ -63,6 +63,9 @@ filegroup(
 
 filegroup(
     name = "ownCloud",
-    srcs = glob(["ownCloud/*.txt", "ownCloud/*.sql"]),
+    srcs = glob([
+        "ownCloud/*.txt",
+        "ownCloud/*.sql",
+    ]),
     visibility = ["//tests:__subpackages__"],
 )

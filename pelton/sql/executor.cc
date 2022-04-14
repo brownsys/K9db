@@ -99,7 +99,7 @@ SqlResult PeltonExecutor::Execute(const sqlast::AbstractStatement *stmt,
                                   const shards::UserId &user_id,
                                   int aug_index) {
 #ifndef PELTON_OPT
-  LOG(INFO) << "Statement: " << stmt;
+  LOG(INFO) << "Statement: " << *stmt;
 #endif
 
   switch (stmt->type()) {
@@ -109,18 +109,23 @@ SqlResult PeltonExecutor::Execute(const sqlast::AbstractStatement *stmt,
       return SqlResult(this->connection_->ExecuteStatement(stmt, user_id));
 
     // Updates: return a count of rows affected.
-    case sqlast::AbstractStatement::Type::UPDATE:
-      return SqlResult(this->connection_->ExecuteUpdate(stmt, user_id));
+    case sqlast::AbstractStatement::Type::UPDATE: {
+      auto [row_count, lid] = this->connection_->ExecuteUpdate(stmt, user_id);
+      return SqlResult(row_count, lid);
+    }
 
     // Insert and Delete might be returning.
-    case sqlast::AbstractStatement::Type::INSERT:
+    case sqlast::AbstractStatement::Type::INSERT: {
       if (!static_cast<const sqlast::Insert *>(stmt)->returning()) {
-        return SqlResult(this->connection_->ExecuteUpdate(stmt, user_id));
+        auto [row_count, lid] = this->connection_->ExecuteUpdate(stmt, user_id);
+        return SqlResult(row_count, lid);
       }
       break;
+    }
     case sqlast::AbstractStatement::Type::DELETE:
       if (!static_cast<const sqlast::Delete *>(stmt)->returning()) {
-        return SqlResult(this->connection_->ExecuteUpdate(stmt, user_id));
+        auto [row_count, lid] = this->connection_->ExecuteUpdate(stmt, user_id);
+        return SqlResult(row_count, lid);
       }
       break;
 
@@ -151,7 +156,7 @@ SqlResult PeltonExecutor::All(const sqlast::AbstractStatement *sql,
                               const dataflow::SchemaRef &schema,
                               int aug_index) {
 #ifndef PELTON_OPT
-  LOG(INFO) << "All shards statement: " << sql;
+  LOG(INFO) << "All shards statement: " << *sql;
 #endif
   std::vector<AugInfo> aug_info;
   if (aug_index > -1) {

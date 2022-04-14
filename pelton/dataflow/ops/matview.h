@@ -109,7 +109,14 @@ class MatViewOperatorT : public MatViewOperator {
   MatViewOperatorT(const std::vector<ColumnID> &key_cols,
                    const Record::Compare &compare, int limit = -1,
                    size_t offset = 0)
-      : MatViewOperator(key_cols, limit, offset), contents_(compare) {}
+      : MatViewOperator(key_cols, limit, offset), contents_(compare) {
+    // Record ordered.
+    // If a limit is provided (but no offset), we can store only the top
+    // 3*limit records, to reduce memory overhead.
+    if (offset == 0 && limit > -1) {
+      this->contents_.TopK(3 * limit);
+    }
+  }
 
   // Override MatviewOperator functions.
   bool RecordOrdered() const override {

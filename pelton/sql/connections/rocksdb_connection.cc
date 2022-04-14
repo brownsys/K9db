@@ -190,7 +190,7 @@ bool SingletonRocksdbConnection::ExecuteStatement(
   return true;
 }
 
-int SingletonRocksdbConnection::ExecuteUpdate(
+std::pair<int, uint64_t> SingletonRocksdbConnection::ExecuteUpdate(
     const sqlast::AbstractStatement *sql, const std::string &shard_name) {
   ShardID sid = shard_name + __ROCKSSEP;
   // Read table metadata.
@@ -214,12 +214,13 @@ int SingletonRocksdbConnection::ExecuteUpdate(
         // to update indices correctly, might as well use the returning
         // code.
         this->ExecuteQuery(sql, db_schema, {}, shard_name);
-        return 1;
+        return std::make_pair(1, 0);
       }
       // if we are not replacing, then we will need to update indices for
       // the insert only (nothing is removed).
       // if no indices, then we do not need to know what rows got replaced.
       std::string pk_value = "";
+      uint64_t last_insert_id = 0;
       if (value_mapper.HasAfter(db_schema.NameOf(pk))) {
         if (this->auto_increment_counters_.count(tid) == 1) {
           LOG(FATAL) << "Insert has value for PK but it is auto increment!";
@@ -233,7 +234,8 @@ int SingletonRocksdbConnection::ExecuteUpdate(
         if (this->auto_increment_counters_.count(tid) == 0) {
           LOG(FATAL) << "Insert has no value for PK and not auto increment!";
         }
-        pk_value = std::to_string(++(this->auto_increment_counters_.at(tid)));
+        last_insert_id = ++(this->auto_increment_counters_.at(tid));
+        pk_value = std::to_string(last_insert_id);
       }
 
       // Insert/replace new row.
@@ -252,7 +254,7 @@ int SingletonRocksdbConnection::ExecuteUpdate(
         size_t indexed_column = indexed_columns.at(i);
         index.Add(shard_name, ExtractColumn(rslice, indexed_column), pkslice);
       }
-      return 1;
+      return std::make_pair(1, last_insert_id);
     }
     case sqlast::AbstractStatement::Type::UPDATE: {
       const sqlast::Update *stmt = static_cast<const sqlast::Update *>(sql);
@@ -305,16 +307,16 @@ int SingletonRocksdbConnection::ExecuteUpdate(
           index.Add(shard_name, nval, npk);
         }
       }
-      return rows.size();
+      return std::make_pair(rows.size(), 0);
     }
     case sqlast::AbstractStatement::Type::DELETE: {
       auto resultset = this->ExecuteQuery(sql, db_schema, {}, shard_name);
-      return resultset.Vec().size();
+      return std::make_pair(resultset.Vec().size(), 0);
     }
     default:
       LOG(FATAL) << "Illegal statement type in ExecuteUpdate";
   }
-  return -1;
+  return std::make_pair(-1, 0);
 }
 
 SqlResultSet SingletonRocksdbConnection::ExecuteQuery(

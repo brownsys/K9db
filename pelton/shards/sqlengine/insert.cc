@@ -49,13 +49,12 @@ absl::StatusOr<std::string> GetFKValueHelper(
   }
   size_t fk_idx = schema.ColumnIndex(col.column_name());
   if (!info.IsTransitive()) {
-    if (info.shard_by_index < fk_idx)
-      --fk_idx;
+    if (info.shard_by_index < fk_idx) --fk_idx;
     CHECK_EQ(schema.GetColumns().size() - 1, stmt.GetValues().size());
   } else {
     CHECK_EQ(schema.GetColumns().size(), stmt.GetValues().size());
   }
-  
+
   return stmt.GetValue(fk_idx);
 }
 

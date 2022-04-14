@@ -75,14 +75,14 @@ bool FFIExecDDL(FFIConnection c_conn, const char *query) {
 
 // Execute an update statement (e.g. INSERT, UPDATE, DELETE).
 // Returns -1 if error, otherwise returns the number of affected rows.
-int FFIExecUpdate(FFIConnection c_conn, const char *query) {
+FFIUpdateResult FFIExecUpdate(FFIConnection c_conn, const char *query) {
   pelton::Connection *cpp_conn = reinterpret_cast<pelton::Connection *>(c_conn);
   absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
   if (result.ok()) {
-    return result.value().UpdateCount();
+    return {result.value().UpdateCount(), result.value().LastInsertId()};
   }
   LOG(FATAL) << "C-Wrapper: " << result.status();
-  return -1;
+  return {-1, 0};
 }
 
 // Executes a query (SELECT).
@@ -131,17 +131,19 @@ FFIPreparedResult FFIExecPrepare(FFIConnection c_conn, size_t stmt_id,
   if (result.ok()) {
     pelton::SqlResult &sql_result = result.value();
     if (sql_result.IsUpdate()) {
-      return {false, nullptr, sql_result.UpdateCount()};
+      int row_count = sql_result.UpdateCount();
+      uint64_t lid = sql_result.LastInsertId();
+      return {false, nullptr, row_count, lid};
     } else if (sql_result.IsQuery()) {
       pelton::SqlResult *ptr = new pelton::SqlResult(std::move(result.value()));
-      return {true, reinterpret_cast<FFIResult>(ptr), -1};
+      return {true, reinterpret_cast<FFIResult>(ptr), -1, 0};
     } else {
       LOG(FATAL) << "Illegal prepared statement result type";
     }
   }
 
   LOG(FATAL) << "C-Wrapper: " << result.status();
-  return {true, nullptr, -1};
+  return {true, nullptr, -1, 0};
 }
 
 // Close the connection. Returns true if successful and false otherwise.
