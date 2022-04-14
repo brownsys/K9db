@@ -57,6 +57,8 @@ class SingletonRocksdbConnection {
   std::vector<std::string> Filter(const dataflow::SchemaRef &schema,
                                   const sqlast::AbstractStatement *sql,
                                   std::vector<std::string> &&rows);
+  // Gets key corresponding to input user. Creates key if does not exist.
+  unsigned char* GetUserKey(const std::string &shard_name);
 
   // Members.
   std::unique_ptr<rocksdb::DB> db_;
@@ -69,6 +71,7 @@ class SingletonRocksdbConnection {
   std::unordered_map<TableID, std::vector<RocksdbIndex>> indices_;
   std::unordered_map<TableID, std::atomic<int64_t>> auto_increment_counters_;
   unsigned char* global_key_;
+  std::unordered_map<std::string, unsigned char*> user_keys_;
 };
 
 class RocksdbConnection : public PeltonConnection {
