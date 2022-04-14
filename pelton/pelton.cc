@@ -38,15 +38,32 @@ static inline void Trim(std::string &s) {
 }
 
 
-void PrintTransitivityChain(std::ostream &out, const shards::ShardingInformation &info, const shards::SharderState &state, const int indent, std::vector<const shards::UnshardedTableName *> *varshards) {
+void PrintTransitivityChain(std::ostream &out, const shards::ShardingInformation &info, const shards::SharderState &state, int indent, std::vector<const shards::UnshardedTableName *> *varshards) {
   const auto & transitive_infos = state.GetShardingInformationFor(info.next_table, info.shard_kind);
-  if (transitive_infos.size() != 1) {
+  const shards::ShardingInformation * tinfo_ptr = nullptr;
+  if (transitive_infos.size() == 0) {
     for (const auto &info : state.GetShardingInformation(info.next_table)) {
       std::cout << info << std::endl;
     }
     LOG(FATAL) << (transitive_infos.size() == 0 ? "No" : "Too many") << " next shardings for table: " << info.next_table << ", shard kind: " << info.shard_kind << ", column: " << info.next_column << " found.";
+  } else if (transitive_infos.size() == 1) {
+    tinfo_ptr = transitive_infos.front();
+  } else {
+    bool duplicate_found = false;
+    for (const auto *tinfo : transitive_infos) {
+      if (tinfo->distance_from_shard == info.distance_from_shard - 1) {
+        duplicate_found = tinfo_ptr != nullptr;
+        tinfo_ptr = tinfo;
+      }
+    }
+    if (tinfo_ptr == nullptr) {
+      LOG(FATAL) << "Tried to disambiguate multiple candidate shardings for " << info.next_table << " using distance from shard but did not find a match, this is concerning!";
+    } else if (duplicate_found) {
+      LOG(WARNING) << "Tried to disambiguate mutliple candidate shardings for " << info.next_table << " using distance from shard but found more than one match. The following information may therefore be incorrect!";
+    }
   }
-  const auto &tinfo = *transitive_infos.front();
+
+  const auto &tinfo = *tinfo_ptr;
   if (tinfo.is_varowned())
     varshards->push_back(&tinfo.next_table);
   out << std::setw(indent) << "" << "via " << info.next_table << "(" << tinfo.shard_by << ") resolved with index " << info.next_index_name << std::endl;
@@ -66,7 +83,6 @@ void ExplainPrivacy(const Connection &connection) {
   for (const auto & [table_name, _] : state.tables()) {
     // Eventually also include if there are sharded tables that have a default
     // table which is non-empty, shich could be a privacy violation
-    bool is_sharded = state.IsSharded(table_name);
     out << table_name << ": ";
 
     if (!state.IsSharded(table_name)) {
@@ -125,13 +141,13 @@ void ExplainPrivacy(const Connection &connection) {
           out << " and ";
         else 
           put_sym = true;
-        out << varown_tables.front();
+        out << *varown_tables.front();
       }
       out << "). This may not be desired behavior." << std::endl;
     } else if (varown_chains.size() == 1) {
       out << "  [Info] this table is variably owned (via " << *varown_chains.front().front() << ")" << std::endl;
     }
-    if (longest_varown_chain_size == 1 && sharding_infos.size() > 1) {
+    if (longest_varown_chain_size == 1 && regular_shardings > 1) {
       out << "  [Warning] This table is variably owned and also copied an additional " << regular_shardings << " times." << std::endl;
     } else if (regular_shardings > 5) {
       out << "  [Warning] This table is sharded " << regular_shardings << " times. This seem excessive, you may want to check your `OWNER` annotations." << std::endl;
