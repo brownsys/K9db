@@ -99,7 +99,7 @@ SqlResult PeltonExecutor::Execute(const sqlast::AbstractStatement *stmt,
                                   const shards::UserId &user_id,
                                   int aug_index) {
 #ifndef PELTON_OPT
-  LOG(INFO) << "Statement: " << stmt;
+  LOG(INFO) << "Statement: " << *stmt;
 #endif
 
   switch (stmt->type()) {
@@ -151,7 +151,7 @@ SqlResult PeltonExecutor::All(const sqlast::AbstractStatement *sql,
                               const dataflow::SchemaRef &schema,
                               int aug_index) {
 #ifndef PELTON_OPT
-  LOG(INFO) << "All shards statement: " << sql;
+  LOG(INFO) << "All shards statement: " << *sql;
 #endif
   std::vector<AugInfo> aug_info;
   if (aug_index > -1) {

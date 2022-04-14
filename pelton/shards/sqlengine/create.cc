@@ -523,7 +523,8 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(
     // i.e., in the case where shuup_personcontact OWNS auth_user, we create 
     // the index on shuup_personcontact, but store the index metadata in the 
     // auth_user table
-    std::string index_prefix = "shuup_contact_owned_by_" + relationship_table_name;
+
+    std::string index_prefix = target_table_name + "_owned_by_" + relationship_table_name;
     sqlast::CreateIndex create_index_stmt{index_prefix, stmt.table_name(),
                                           owning_table.column.column_name()};
     auto status =
@@ -533,18 +534,6 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(
     if (!status.ok()) return status.status();
   
     info.MakeOwning(index_prefix);
-
-    // auth user case
-    std::string index_prefix2 = "auth_user_owned_by_" + relationship_table_name;
-    sqlast::CreateIndex create_index_stmt2{index_prefix2, stmt.table_name(),
-                                          owning_table.column.column_name()};
-    auto status2 =
-        pelton::shards::sqlengine::index::CreateIndexStateIsAlreadyLocked(
-            create_index_stmt2, connection, lock);
-    
-    if (!status2.ok()) return status2.status();
-  
-    info.MakeOwning(index_prefix2);
     // info.MakeTransitive(sharding_info, index_prefix, target_table_name);
 
     const ShardedTableName &sharded_table = info.sharded_table_name;
