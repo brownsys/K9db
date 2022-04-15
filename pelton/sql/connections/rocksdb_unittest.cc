@@ -55,21 +55,21 @@ TEST(RocksdbConnectionTest, OpenTest) {
       *static_cast<sqlast::CreateTable *>(parsed.get()));
   // Insert rows.
   parsed = Parse("INSERT INTO tbl VALUES(1, 'KINAN');");
-  std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
+  std::cout << conn.ExecuteUpdate(parsed.get(), "").first << std::endl;
   parsed = Parse("INSERT INTO tbl (id, name) VALUES(2, 'MALTE');");
-  std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
+  std::cout << conn.ExecuteUpdate(parsed.get(), "").first << std::endl;
   parsed = Parse("INSERT INTO tbl (name, id) VALUES('ISHAN', 3);");
-  std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
+  std::cout << conn.ExecuteUpdate(parsed.get(), "").first << std::endl;
   parsed = Parse("INSERT INTO tbl (name, id) VALUES(NULL, 4);");
-  std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
+  std::cout << conn.ExecuteUpdate(parsed.get(), "").first << std::endl;
   parsed = Parse("INSERT INTO tbl (id) VALUES(5);");
-  std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
+  std::cout << conn.ExecuteUpdate(parsed.get(), "").first << std::endl;
 
   // These should fail.
   // parsed = Parse("INSERT INTO tbl (name) VALUES('JUSTUS');");
-  // std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
+  // std::cout << conn.ExecuteUpdate(parsed.get(), "").first << std::endl;
   // parsed = Parse("INSERT INTO tbl (name, id) VALUES('BENJI', NULL);");
-  // std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
+  // std::cout << conn.ExecuteUpdate(parsed.get(), "").first << std::endl;
 
   // Read rows.
   parsed = Parse("SELECT * FROM tbl;");
@@ -99,7 +99,7 @@ TEST(RocksdbConnectionTest, OpenTest) {
   resultset = conn.ExecuteQuery(parsed.get(), schema, {}, "");
   Print(resultset.Vec(), schema);
   parsed = Parse("REPLACE INTO tbl VALUES(3, 'ISHAN-NEW');");
-  std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
+  std::cout << conn.ExecuteUpdate(parsed.get(), "").first << std::endl;
 
   // Read rows.
   parsed = Parse("SELECT * FROM tbl;");
@@ -111,7 +111,7 @@ TEST(RocksdbConnectionTest, OpenTest) {
   resultset = conn.ExecuteQuery(parsed.get(), schema, {}, "");
   Print(resultset.Vec(), schema);
   parsed = Parse("DELETE FROM tbl WHERE id = 2;");
-  std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
+  std::cout << conn.ExecuteUpdate(parsed.get(), "").first << std::endl;
 
   // Read rows.
   parsed = Parse("SELECT * FROM tbl;");
@@ -120,11 +120,11 @@ TEST(RocksdbConnectionTest, OpenTest) {
 
   // Update rows.
   parsed = Parse("UPDATE tbl SET id = 10 WHERE id = 3;");
-  std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
+  std::cout << conn.ExecuteUpdate(parsed.get(), "").first << std::endl;
   parsed = Parse("UPDATE tbl SET name = NULL WHERE id = 2;");
-  std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
+  std::cout << conn.ExecuteUpdate(parsed.get(), "").first << std::endl;
   parsed = Parse("UPDATE tbl SET name = 'DOESNOTAPPEAR' WHERE id = 33;");
-  std::cout << conn.ExecuteUpdate(parsed.get(), "") << std::endl;
+  std::cout << conn.ExecuteUpdate(parsed.get(), "").first << std::endl;
 
   // Read rows.
   parsed = Parse("SELECT * FROM tbl;");

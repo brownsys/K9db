@@ -90,6 +90,13 @@ cc_test(
     deps = [":common"],
 )
 
+cc_test(
+    name = "ownCloud",
+    srcs = ["ownCloud.cc"],
+    data = ["//tests/data:ownCloud"],
+    deps = [":common"],
+)
+
 '''
 cc_test(
     name = "varacc_basic",

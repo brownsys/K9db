@@ -17,7 +17,7 @@
 #define S SetStr
 
 // Command line flags.
-DEFINE_string(db_username, "root", "MariaDB username to connect with");
+DEFINE_string(db_username, "pelton", "MariaDB username to connect with");
 DEFINE_string(db_password, "password", "MariaDB pwd to connect with");
 
 // Schema.

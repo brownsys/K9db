@@ -1,0 +1,7 @@
+filegroup(
+    name = "bench",
+    srcs = glob([
+        "*.sql",
+    ]),
+    visibility = ["//bin:__subpackages__"],
+)

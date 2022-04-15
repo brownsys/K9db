@@ -20,7 +20,11 @@ bindgen = "0.32.2"
 
 [[bin]]
 name = "mysql_proxy"
-path = "src/main.rs"
+path = "src/proxy.rs"
+
+[lib]
+name = "ffi"
+path = "src/ffi.rs"
 
 [package.metadata.raze]
 workspace_path = "//pelton/proxy/cargo"

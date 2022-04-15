@@ -109,18 +109,23 @@ SqlResult PeltonExecutor::Execute(const sqlast::AbstractStatement *stmt,
       return SqlResult(this->connection_->ExecuteStatement(stmt, user_id));
 
     // Updates: return a count of rows affected.
-    case sqlast::AbstractStatement::Type::UPDATE:
-      return SqlResult(this->connection_->ExecuteUpdate(stmt, user_id));
+    case sqlast::AbstractStatement::Type::UPDATE: {
+      auto [row_count, lid] = this->connection_->ExecuteUpdate(stmt, user_id);
+      return SqlResult(row_count, lid);
+    }
 
     // Insert and Delete might be returning.
-    case sqlast::AbstractStatement::Type::INSERT:
+    case sqlast::AbstractStatement::Type::INSERT: {
       if (!static_cast<const sqlast::Insert *>(stmt)->returning()) {
-        return SqlResult(this->connection_->ExecuteUpdate(stmt, user_id));
+        auto [row_count, lid] = this->connection_->ExecuteUpdate(stmt, user_id);
+        return SqlResult(row_count, lid);
       }
       break;
+    }
     case sqlast::AbstractStatement::Type::DELETE:
       if (!static_cast<const sqlast::Delete *>(stmt)->returning()) {
-        return SqlResult(this->connection_->ExecuteUpdate(stmt, user_id));
+        auto [row_count, lid] = this->connection_->ExecuteUpdate(stmt, user_id);
+        return SqlResult(row_count, lid);
       }
       break;
 

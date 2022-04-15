@@ -34,6 +34,7 @@ class SqlResultSet {
   // Query API.
   const dataflow::SchemaRef &schema() const { return this->schema_; }
   std::vector<dataflow::Record> &&Vec() { return std::move(this->records_); }
+  const std::vector<dataflow::Record> &rows() const { return this->records_; }
   inline size_t size() const { return this->records_.size(); }
 
   inline bool empty() const { return this->records_.empty(); }
@@ -57,8 +58,12 @@ class SqlResult {
   explicit SqlResult(bool success) : type_(Type::STATEMENT), status_(success) {}
   // For results of DML (e.g. INSERT/UPDATE/DELETE).
   // row_count specifies how many rows were affected (-1 for failures).
-  explicit SqlResult(int rows) : type_(Type::UPDATE), status_(rows) {}
+  explicit SqlResult(int rows) : type_(Type::UPDATE), status_(rows), lid_(0) {}
   explicit SqlResult(size_t rows) : SqlResult(static_cast<int>(rows)) {}
+  SqlResult(int rows, uint64_t lid)
+      : type_(Type::UPDATE), status_(rows), lid_(lid) {}
+  SqlResult(size_t rows, uint64_t lid)
+      : SqlResult(static_cast<int>(rows), lid) {}
   // For results of SELECT.
   explicit SqlResult(std::vector<SqlResultSet> &&v)
       : type_(Type::QUERY), sets_(std::move(v)) {}
@@ -89,6 +94,13 @@ class SqlResult {
                   << this->type_ << ")";
     }
     return this->status_;
+  }
+  inline uint64_t LastInsertId() const {
+    if (!this->IsUpdate()) {
+      DLOG(FATAL) << "LastInsertId() called on non-update result ("
+                  << this->type_ << ")";
+    }
+    return this->lid_;
   }
 
   // Only safe to use if IsQuery() returns true.
@@ -123,6 +135,7 @@ class SqlResult {
  private:
   Type type_;
   int status_;
+  uint64_t lid_;
   std::vector<SqlResultSet> sets_;
 };
 

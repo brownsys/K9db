@@ -8,6 +8,7 @@ extern crate trawler;
 
 use clap::value_t_or_exit;
 use clap::{App, Arg};
+use lazy_static::lazy_static;
 use my::prelude::*;
 use std::future::Future;
 use std::pin::Pin;
@@ -16,9 +17,31 @@ use std::time;
 use tower_service::Service;
 use trawler::{LobstersRequest, TrawlerRequest};
 // use rand::Rng;
+use std::collections::HashMap;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+
+lazy_static! {
+  // Entries between -1 (never occurs) and 100000 (always).
+  // Sum should be 100000 or less (excluding -1s).
+  // Comment out entry to use default weight.
+  static ref WEIGHTS: HashMap<String, isize> = HashMap::from([
+    //("story".into(), 100000),
+    //("frontpage".into(), -1),
+    //("user".into(), -1),
+    //("comments".into(), -1),
+    //("recent".into(), -1),
+    //("commentvoteup".into(), -1),
+    //("commentvotedown".into(), -1),
+    //("storyvoteup".into(), -1),
+    //("storyvotedown".into(), -1),
+    //("comment".into(), -1),
+    //("subcomment".into(), -1),
+    //("login".into(), -1),
+    //("submit".into(), -1),
+  ]);
+}
 
 const PELTON_SCHEMA: &'static str = include_str!("../schema/pelton.sql");
 const MARIADB_SCHEMA: &'static str = include_str!("../schema/rocks-mariadb.sql");
@@ -173,8 +196,8 @@ impl Service<bool> for MysqlTrawlerBuilder {
                 }
 
                 // Dispatch prepared statements for the queries that need views.
-                if backend_variant == BackendVariant::Pelton{
-                    for view_query in &VIEWS{
+                if backend_variant == BackendVariant::Pelton {
+                    for view_query in &VIEWS {
                         let prepared_conn = my::Conn::new(opts.clone()).await?;
                         prepared_conn.prepare(&view_query).await?;
                     }
@@ -435,6 +458,16 @@ fn main() {
                 .help("Set if the backend must be primed with initial stories and comments."),
         )
         .arg(
+            Arg::with_name("prime")
+                .long("prime")
+                .help("Set if the backend must be primed with initial stories and comments."),
+        )
+        .arg(
+            Arg::with_name("scale_everything")
+                .long("scale_everything")
+                .help("Set if you want to scale the data per user with the number of users."),
+        )
+        .arg(
             Arg::with_name("queries")
                 .short("q")
                 .long("queries")
@@ -507,11 +540,19 @@ fn main() {
     // Atomic counter to generate ids for stories. This serves as a replacement for auto
     // increment the id column.
     // Preserve a parent counter so that it does not go out of scope.
-    let stories_counter = Arc::new(AtomicU32::new(0));
-    let taggings_counter = Arc::new(AtomicU32::new(0));
-    let votes_counter = Arc::new(AtomicU32::new(0));
-    let ribbons_counter = Arc::new(AtomicU32::new(0));
-    let comments_counter = Arc::new(AtomicU32::new(0));
+    let scale = value_t_or_exit!(args, "datascale", f64);
+    let prime = args.is_present("prime");
+    let stories_start = if prime { 0 } else { (scale * 50000.0) as u32};
+    let taggings_start = if prime { 0 } else { (scale * 100000.0) as u32};
+    let votes_start = if prime { 0 } else { (scale * 300000.0) as u32};
+    let ribbons_start = if prime { 0 } else { (scale * 10000.0) as u32};
+    let comments_start = if prime { 0 } else { (scale * 300000.0) as u32};
+
+    let stories_counter = Arc::new(AtomicU32::new(stories_start));
+    let taggings_counter = Arc::new(AtomicU32::new(taggings_start));
+    let votes_counter = Arc::new(AtomicU32::new(votes_start));
+    let ribbons_counter = Arc::new(AtomicU32::new(ribbons_start));
+    let comments_counter = Arc::new(AtomicU32::new(comments_start));
 
     let s = MysqlTrawlerBuilder {
         variant,
@@ -524,5 +565,5 @@ fn main() {
         comments_counter: comments_counter,
     };
 
-    wl.run(s, args.is_present("prime"));
+    wl.run(s, args.is_present("prime"), &WEIGHTS, args.is_present("scale_everything"));
 }
