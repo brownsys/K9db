@@ -11,7 +11,7 @@ do
   scale=${scales[$index]}
   user=${users[$index]}
   echo "pelton-$user"
-  ./run.sh opt --hostname="10.128.0.18:10001" > log-${user}.txt
+  ./run.sh opt --hostname="10.128.0.18:10001" > log-${user}.txt 2>&1
 done
 
 echo "baseline ..."
