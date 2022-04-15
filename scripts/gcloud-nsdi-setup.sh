@@ -20,6 +20,14 @@ git clone https://github.com/brendangregg/FlameGraph
 eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/nsdi
 
+# Start and stop ssh-agent with the nsdi key on login/logout
+echo '# add git deploy key' >> ~/.bashrc
+echo 'eval "$(ssh-agent -s)"' >> ~/.bashrc
+echo 'ssh-add ~/.ssh/nsdi' >> ~/.bashrc
+echo 'if ( "$SSH_AGENT_PID" != "" ) then' >> ~/.logout
+echo '  eval `/usr/bin/ssh-agent -k`'  >> ~/.logout
+echo 'endif'  >> ~/.logout
+
 # Clones to /home/pelton/pelton
 ssh-keyscan github.com >> ~/.ssh/known_hosts
 git clone git@github.com:brownsys/pelton.git
