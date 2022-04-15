@@ -37,7 +37,9 @@ class State {
 
   // Getters.
   shards::SharderState *sharder_state() { return &this->sharder_state_; }
-  const shards::SharderState &sharder_state() const { return this->sharder_state_; }
+  const shards::SharderState &sharder_state() const {
+    return this->sharder_state_;
+  }
   dataflow::DataFlowState *dataflow_state() { return &this->dataflow_state_; }
   perf::PerfManager &perf() { return this->perf_manager_; }
   std::unordered_map<std::string, prepared::CanonicalDescriptor> &stmts() {
