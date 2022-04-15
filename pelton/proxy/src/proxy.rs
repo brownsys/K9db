@@ -298,6 +298,10 @@ impl<W: io::Write> MysqlShim<W> for Backend {
       return results.completed(0, 0);
     }
 
+    if q_string.starts_with("STOP") {
+      std::process::exit(0);
+    }
+
     error!(self.log, "Rust proxy: unsupported query type {}", q_string);
     results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
   }
@@ -373,7 +377,7 @@ fn main() {
                    }));
     }
     // wait before checking listener status
-    std::thread::sleep(Duration::from_millis(1));
+    std::thread::sleep(Duration::from_secs(1));
   }
 
   // join all client threads
