@@ -74,10 +74,14 @@ absl::StatusOr<sql::SqlResult> CreateIndexStateIsAlreadyLocked(
 
   sql::SqlResult result = sql::SqlResult(false);
   bool is_sharded = state->IsSharded(table_name);
+
+LOG(INFO) << "CreateIndexStateIsAlreadyLocked: " << stmt << "\n";
   if (!is_sharded) {
     result = connection->executor.Default(&stmt);
+LOG(INFO) << "is not sharded: " << stmt << "\n";
 
   } else {  // is_sharded == true
+LOG(INFO) << "is not sharded: " << stmt << "\n";
     const std::string &column_name = stmt.column_name();
     const std::string &base_index_name = stmt.index_name();
 

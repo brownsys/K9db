@@ -138,6 +138,19 @@ absl::StatusOr<std::list<ShardingInformation>> IsShardingBySupported(
                  original_table_name == "oc_share" && other.shard_by == "gid") {
         index = "users_for_group";
         LOG(WARNING) << "Hard coded index '" << index << "' triggered.";
+
+        // for shuup transivity chain: shuup_shop to auth_user to shuup_personcontact
+      } else if (foreign_table == "auth_user" &&
+                 original_table_name == "shuup_shop" && other.shard_by == "ptr") {
+        index = "auth_personcontact";
+        LOG(WARNING) << "Hard coded index '" << index << "' triggered.";
+
+        // shuup: shuup_gdpruserconsent to shuup_shop to auth_user to shuup_personcontact
+      } else if (foreign_table == "auth_user" &&
+                 original_table_name == "shuup_gdpr_gdpruserconsent" && other.shard_by == "ptr") {
+        index = "auth_personcontact";
+        LOG(WARNING) << "Hard coded index '" << index << "' triggered.";
+
       } else if (!state.HasIndexFor(foreign_table, info_c->next_column,
                                     other.shard_by)) {
         return absl::InvalidArgumentError(
