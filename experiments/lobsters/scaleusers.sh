@@ -9,7 +9,7 @@ do
   scale=${scales[$index]}
   user=${users[$index]}
   load=${loads[$index]}
-  echo "pelton-${users}"
+  echo "pelton-${user}"
   bazel run -c opt //:lobsters-harness -- \
     --runtime 120 \
     --datascale $scale \
@@ -30,7 +30,7 @@ do
   scale=${scales[$index]}
   user=${users[$index]}
   load=${loads[$index]}
-  echo "baseline-${users}"
+  echo "baseline-${user}"
   bazel run -c opt //:lobsters-harness -- \
     --runtime 120 \
     --datascale $scale \

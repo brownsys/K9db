@@ -10,7 +10,7 @@ for index in "${!scales[@]}";
 do
   scale=${scales[$index]}
   user=${users[$index]}
-  echo "pelton-$users"
+  echo "pelton-$user"
   ./run.sh opt --hostname="10.128.0.18:10001" > log-${user}.txt
 done
 
