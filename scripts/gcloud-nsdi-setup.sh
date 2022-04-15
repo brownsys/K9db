@@ -1,4 +1,5 @@
 #!/bin/bash
+ROLE="$1"
 
 # Make sure you run as user pelton
 if [[ $(whoami) != "pelton" ]]; then
@@ -35,10 +36,15 @@ sudo service mariadb restart
 # Do this on the client only
 sudo service mariadb stop
 
+# Build ownCloud harness
+cd ~/pelton/experiments/ownCloud
+bazel build ... -c opt
+
 # Build pelton
 cd ~/pelton
-bazel build --config=opt ...
-cd experiments/lobsters
-bazel build -c opt ...
-cd ../ownCloud
-bazel build -c opt ...
+if [[ "$ROLE" == "db" ]]; then
+  bazel build //:pelton --config opt
+else
+  cd experiments/lobsters
+  bazel build ... -c opt
+fi
