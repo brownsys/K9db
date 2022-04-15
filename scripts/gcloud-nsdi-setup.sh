@@ -15,6 +15,8 @@ sudo apt-get install -y linux-tools-common linux-tools-generic linux-tools-`unam
 
 # Download flamegraph repo.
 git clone https://github.com/brendangregg/FlameGraph
+echo '# Add flame alias to generate flamegraphs' >> ~/.bashrc
+echo 'alias flame="~/flame.sh"' >> ~/.bashrc
 
 # Make sure ssh deploy key is added.
 eval "$(ssh-agent -s)"
