@@ -255,6 +255,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("CREATE INDEX")
        || q_string.starts_with("CREATE VIEW")
        || q_string.starts_with("SET")
+       || q_string.starts_with("EXPLAIN PRIVACY")
     {
       let ddl_response = pelton::exec_ddl(self.rust_conn, q_string);
       if ddl_response {
@@ -296,6 +297,10 @@ impl<W: io::Write> MysqlShim<W> for Backend {
     if q_string.starts_with("set") {
       info!(self.log, "Ignoring set query {}", q_string);
       return results.completed(0, 0);
+    }
+
+    if q_string.starts_with("STOP") {
+      std::process::exit(0);
     }
 
     error!(self.log, "Rust proxy: unsupported query type {}", q_string);
@@ -373,7 +378,7 @@ fn main() {
                    }));
     }
     // wait before checking listener status
-    std::thread::sleep(Duration::from_millis(1));
+    std::thread::sleep(Duration::from_secs(1));
   }
 
   // join all client threads

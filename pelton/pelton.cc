@@ -9,6 +9,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_split.h"
 #include "pelton/dataflow/graph.h"
+#include "pelton/explain.h"
 #include "pelton/planner/planner.h"
 #include "pelton/shards/sqlengine/engine.h"
 #include "pelton/shards/sqlengine/util.h"
@@ -61,6 +62,10 @@ std::optional<SqlResult> SpecialStatements(const std::string &sql,
       std::cout << "############# STARTING LOAD #############" << std::endl;
       return SqlResult(true);
     }
+  }
+  if (absl::StartsWith(sql, "EXPLAIN PRIVACY")) {
+    explain::ExplainPrivacy(*connection);
+    return SqlResult(true);
   }
   if (absl::StartsWith(sql, "SHOW ")) {
     std::vector<std::string> split = absl::StrSplit(sql, ' ');

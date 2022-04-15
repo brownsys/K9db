@@ -10,7 +10,7 @@ fi
 cd ~
 
 # Install PERF.
-sudo apt-get install linux-tools-common linux-tools-generic linux-tools-`uname -r`
+sudo apt-get install -y linux-tools-common linux-tools-generic linux-tools-`uname -r`
 
 # Download flamegraph repo.
 git clone https://github.com/brendangregg/FlameGraph
@@ -20,6 +20,7 @@ eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/nsdi
 
 # Clones to /home/pelton/pelton
+ssh-keyscan github.com >> ~/.ssh/known_hosts
 git clone git@github.com:brownsys/pelton.git
 cd pelton
 
@@ -33,3 +34,11 @@ sudo service mariadb restart
 
 # Do this on the client only
 sudo service mariadb stop
+
+# Build pelton
+cd ~/pelton
+bazel build --config=opt ...
+cd experiments/lobsters
+bazel build -c opt ...
+cd ../ownCloud
+bazel build -c opt ...
