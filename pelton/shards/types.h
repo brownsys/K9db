@@ -159,11 +159,9 @@ struct ShardingInformation {
   void MakeVarowned() { this->is_varowned_ = true; }
 
   bool is_varowned() const { return this->is_varowned_; }
-
 };
 
 std::ostream &operator<<(std::ostream &os, const ShardingInformation &);
-
 
 }  // namespace shards
 }  // namespace pelton

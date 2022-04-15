@@ -1,4 +1,5 @@
 #!/bin/bash
+ROLE="$1"
 
 # Make sure you run as user pelton
 if [[ $(whoami) != "pelton" ]]; then
@@ -10,16 +11,28 @@ fi
 cd ~
 
 # Install PERF.
-sudo apt-get install linux-tools-common linux-tools-generic linux-tools-`uname -r`
+sudo apt-get install -y linux-tools-common linux-tools-generic linux-tools-`uname -r`
 
 # Download flamegraph repo.
 git clone https://github.com/brendangregg/FlameGraph
+echo '# Add flame alias to generate flamegraphs' >> ~/.bashrc
+echo 'alias flame="~/flame.sh"' >> ~/.bashrc
 
 # Make sure ssh deploy key is added.
 eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/nsdi
 
+# Start and stop ssh-agent with the nsdi key on login/logout
+echo '# add git deploy key' >> ~/.bashrc
+echo 'eval "$(ssh-agent -s)"' >> ~/.bashrc
+echo 'ssh-add ~/.ssh/nsdi' >> ~/.bashrc
+echo 'if [[ "$SSH_AGENT_PID" != "" ]]; then' >> ~/.bash_logout
+echo '  eval $(/usr/bin/ssh-agent -k)' >> ~/.bash_logout
+echo 'fi' >> ~/.bash_logout
+
+
 # Clones to /home/pelton/pelton
+ssh-keyscan github.com >> ~/.ssh/known_hosts
 git clone git@github.com:brownsys/pelton.git
 cd pelton
 
@@ -33,3 +46,16 @@ sudo service mariadb restart
 
 # Do this on the client only
 sudo service mariadb stop
+
+# Build ownCloud harness
+cd ~/pelton/experiments/ownCloud
+bazel build ... -c opt
+
+# Build pelton
+cd ~/pelton
+if [[ "$ROLE" == "db" ]]; then
+  bazel build //:pelton --config opt
+else
+  cd experiments/lobsters
+  bazel build ... -c opt
+fi
