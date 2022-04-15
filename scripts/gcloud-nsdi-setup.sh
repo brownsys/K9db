@@ -24,9 +24,10 @@ ssh-add ~/.ssh/nsdi
 echo '# add git deploy key' >> ~/.bashrc
 echo 'eval "$(ssh-agent -s)"' >> ~/.bashrc
 echo 'ssh-add ~/.ssh/nsdi' >> ~/.bashrc
-echo 'if ( "$SSH_AGENT_PID" != "" ) then' >> ~/.logout
-echo '  eval `/usr/bin/ssh-agent -k`'  >> ~/.logout
-echo 'endif'  >> ~/.logout
+echo 'if [[ "$SSH_AGENT_PID" != "" ]]; then' >> ~/.bash_logout
+echo '  eval $(/usr/bin/ssh-agent -k)' >> ~/.bash_logout
+echo 'fi' >> ~/.bash_logout
+
 
 # Clones to /home/pelton/pelton
 ssh-keyscan github.com >> ~/.ssh/known_hosts
