@@ -146,8 +146,8 @@ bool SingletonRocksdbConnection::ExecuteStatement(
             }
           }
           if (has_constraint) {
-            this->indexed_columns_.at(tid).push_back(i);
-            this->indices_.at(tid).emplace_back(this->db_.get(), tid, i);
+            // this->indexed_columns_.at(tid).push_back(i);
+            // this->indices_.at(tid).emplace_back(this->db_.get(), tid, i);
           }
         }
       }
@@ -166,8 +166,8 @@ bool SingletonRocksdbConnection::ExecuteStatement(
       auto it = std::find(indexed_columns.begin(), indexed_columns.end(), cid);
       if (it == indexed_columns.end()) {
         std::vector<RocksdbIndex> &indices = this->indices_.at(tid);
-        indexed_columns.push_back(cid);
-        indices.emplace_back(this->db_.get(), tid, cid);
+        // indexed_columns.push_back(cid);
+        // indices.emplace_back(this->db_.get(), tid, cid);
       }
       break;
     }

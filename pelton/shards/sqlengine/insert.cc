@@ -85,13 +85,35 @@ absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
       } else {
         was_moved = true;
         const sqlast::ColumnConstraint &constr = col.GetForeignKeyConstraint();
-
-        const std::string &target_table = constr.foreign_table();
-        sqlast::Select select(target_table);
-
         ASSIGN_OR_RETURN(const auto &col_val,
                          GetFKValueHelper(col, info, cloned, rel_schema));
         VLOG(1) << "FK value found";
+
+        // Short-circuit move if target row is already moved.
+        const auto &info = state->GetShardingInformation(stmt.table_name());
+        if (info.size() == 1) {
+          const auto &stmt_table = stmt.table_name();
+          const auto &col_name = col.column_name();
+          const auto &shard_by = info.front().shard_by;
+          if (state->HasIndexFor(stmt_table, col_name, shard_by)) {
+            const auto &idx = state->IndexFlow(stmt_table, col_name, shard_by);
+            ASSIGN_OR_RETURN(auto &lookup,
+                             index::LookupIndex(idx, col_val, connection));
+            bool already_in_shard = false;
+            for (const auto &val : lookup) {
+              if (val == user_id) {
+                already_in_shard = true;
+              }
+            }
+            if (already_in_shard) {
+              VLOG(1) << "Skipping value moving. Reason: already moved";
+              continue;
+            }
+          }
+        }
+
+        const std::string &target_table = constr.foreign_table();
+        sqlast::Select select(target_table);
         select.SetWhereClause(
             MakePointSelectBinexp(constr.foreign_column(), col_val));
         const sqlast::CreateTable schema = state->GetSchema(target_table);
