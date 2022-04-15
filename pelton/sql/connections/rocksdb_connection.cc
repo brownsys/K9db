@@ -648,9 +648,14 @@ std::vector<std::string> SingletonRocksdbConnection::Filter(
 // Gets key corresponding to input user. Creates key if does not exist.
 unsigned char* SingletonRocksdbConnection::GetUserKey(
     const std::string &shard_name) {
+  shards::SharedLock lock(&this->user_keys_mtx_);
   if (this->user_keys_.find(shard_name) == this->user_keys_.end()) {
-    this->user_keys_.emplace(shard_name, KeyGen());
-  } 
+    shards::UniqueLock upgraded(std::move(lock));
+    if (this->user_keys_.find(shard_name) == this->user_keys_.end()) {
+      this->user_keys_.emplace(shard_name, KeyGen());
+    }
+    lock = shards::SharedLock(std::move(upgraded));
+  }
   LOG(INFO) << "Getting encryption key: " << this->user_keys_.at(shard_name) 
             << " for :" << shard_name;
   return this->user_keys_.at(shard_name);

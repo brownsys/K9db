@@ -15,6 +15,7 @@ cc_library(
         ":encryption",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
+        "//pelton/shards:upgradable_lock",
         "//pelton/sql:connection",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
