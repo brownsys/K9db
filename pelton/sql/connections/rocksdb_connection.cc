@@ -79,8 +79,8 @@ SingletonRocksdbConnection::SingletonRocksdbConnection(
   opts.error_if_exists = true;
   opts.IncreaseParallelism();
   opts.OptimizeLevelStyleCompaction();
-  opts.prefix_extractor.reset(new ShardPrefixTransform(1));
-  opts.comparator = rocksdb::BytewiseComparator();
+  opts.prefix_extractor.reset(new EncryptedPrefixTransform());
+  opts.comparator = EncryptedComparator::SINGLETON;
 
   // Open the database.
   rocksdb::DB *db;
@@ -129,8 +129,8 @@ bool SingletonRocksdbConnection::ExecuteStatement(
         rocksdb::ColumnFamilyHandle *handle;
         rocksdb::ColumnFamilyOptions options;
         options.OptimizeLevelStyleCompaction();
-        options.prefix_extractor.reset(new ShardPrefixTransform(1));
-        options.comparator = rocksdb::BytewiseComparator();
+        options.prefix_extractor.reset(new EncryptedPrefixTransform());
+        options.comparator = EncryptedComparator::SINGLETON;
         PANIC(this->db_->CreateColumnFamily(options, table_name, &handle));
 
         // Fill in table metadata.

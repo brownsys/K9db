@@ -127,5 +127,50 @@ std::string EncryptSeek(unsigned char *key, std::string pt) {
 #endif  // PELTON_ENCRYPTION
 }
 
+// EncryptedPrefixTransform
+rocksdb::Slice EncryptedPrefixTransform::Transform(
+    const rocksdb::Slice &key) const {
+#ifdef PELTON_ENCRYPTION
+  const char *data = key.data();
+  size_t offset = key.size() - sizeof(size_t);
+  size_t prefix_len = *reinterpret_cast<size_t *>(data + offset);
+  return rocksdb::Slice(data, prefix_len);
+#else
+  return ExtractColumn(key, 0);
+#endif  // PELTON_ENCRYPTION
+}
+
+int EncryptedComparator::Compare(const Slice& a, const Slice& b) const {
+#ifdef PELTON_ENCRYPTION
+  const char *a_data = a.data();
+  size_t a_offset = a.size() - sizeof(size_t);
+  size_t a_len = *reinterpret_cast<size_t *>(a_data + a_offset);
+  rocksdb::Slice a_user(a_data, a_len);
+  rocksdb::Slice a_pk(a_data + a_len, a_offset - a_len);
+
+  const char *b_data = b.data();
+  size_t b_offset = b.size() - sizeof(size_t);
+  size_t b_len = *reinterpret_cast<size_t *>(b_data + b_offset);
+  rocksdb::Slice b_user(b_data, b_len);
+  rocksdb::Slice b_pk(b_data + b_len, b_offset - b_len);
+
+  int r = this->bytewise_->Compare(a_user, b_user);
+  if (r == 0) {
+    return this->bytewise_->Compare(a_pk, b_pk);
+  }
+  return r;
+#else
+  return this->bytewise_->Compare(a, b);
+#endif  // PELTON_ENCRYPTION
+
+#ifdef PELTON_ENCRYPTION
+rocksdb::Comparator *EncryptedComparator::SINGLETON = new EncryptedComparator();
+#else
+rocksdb::Comparator *EncryptedComparator::SINGLETON =
+    rocksdb::BytewiseComparator();
+#endif  // PELTON_ENCRYPTION
+
+}
+
 }  // namespace sql
 }  // namespace pelton
