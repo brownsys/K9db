@@ -3,8 +3,6 @@ load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 cc_library(
     name = "rocksdb_connection",
     srcs = [
-        "encryption.cc",
-	"encryption.h",
         "rocksdb_connection.cc",
     ],
     hdrs = [
@@ -14,6 +12,7 @@ cc_library(
     deps = [
         ":rocksdb_index",
         ":rocksdb_util",
+        ":encryption",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/shards:upgradable_lock",
@@ -21,7 +20,6 @@ cc_library(
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:status",
-	"@libsodium",
         "@glog",
         "@rocksdb",
     ],
@@ -56,6 +54,22 @@ cc_library(
         "//pelton/dataflow:schema",
         "//pelton/sql:connection",
         "//pelton/sqlast:ast",
+        "@glog",
+        "@rocksdb",
+    ],
+)
+
+cc_library(
+    name = "encryption",
+    srcs = [
+        "encryption.cc",
+    ],
+    hdrs = [
+        "encryption.h",
+    ],
+    deps = [
+        ":rocksdb_util",
+        "@libsodium",
         "@glog",
         "@rocksdb",
     ],

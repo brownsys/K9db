@@ -164,9 +164,10 @@ cc_library(
     ],
 )
 """,
-    # My non-merged change for create_view_stmt QUERY_LITERAL from Dec 10 2022.
+    # My non-merged change for AUTO_INCREMENT from March 7 2022.
+    # Also create_view_stmt QUERY_LITERAL.
     # Add less intrusive OWNER annotation.
-    commit = "112ce675b73b23588a2262f9eb7f85c0abb41428",
+    commit = "4f3583c3d42b04dcac6da41a3fd5a7beeac08f33",
     #remote = "https://github.com/antlr/grammars-v4",
     remote = "https://github.com/KinanBab/grammars-v4.git",
 )
@@ -215,19 +216,21 @@ maven_install(
 # Rust toolchain
 http_archive(
     name = "rules_rust",
-    sha256 = "accb5a89cbe63d55dcdae85938e56ff3aa56f21eb847ed826a28a83db8500ae6",
-    strip_prefix = "rules_rust-9aa49569b2b0dacecc51c05cee52708b7255bd98",
+    sha256 = "7453856d239a004c9e29cde2e45903a068446e4a69501ee7393faf08e1a30403",
     urls = [
-        # Main branch as of 2021-02-19
-        "https://github.com/bazelbuild/rules_rust/archive/9aa49569b2b0dacecc51c05cee52708b7255bd98.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_rust/releases/download/0.1.0/rules_rust-v0.1.0.tar.gz",
+        "https://github.com/bazelbuild/rules_rust/releases/download/0.1.0/rules_rust-v0.1.0.tar.gz",
     ],
 )
 
-load("@rules_rust//rust:repositories.bzl", "rust_repositories", "rust_repository_set")
+load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
 
-# defines default rust repositories.
-rust_repositories(
+rules_rust_dependencies()
+
+# Default rust toolchain.
+rust_register_toolchains(
     edition = "2018",
+    include_rustc_srcs = True,
     version = "1.58.0",
 )
 
@@ -287,6 +290,9 @@ filegroup(
 
 cmake(
     name = "rocksdb",
+    env = {
+      "USE_RTTI": "1",
+    },
     generate_args = [
         "-DROCKSDB_BUILD_SHARED=ON",
         "-DWITH_GFLAGS=OFF",
@@ -305,14 +311,14 @@ cmake(
         "CMAKE_CXX_FLAGS": "-fPIC",
     },
     lib_source = ":all_srcs",
-    out_shared_libs = ["librocksdb.so.6"],
+    out_shared_libs = ["librocksdb.so.7"],
     out_static_libs = [],
     deps = [],
     visibility = ["//visibility:public"],
 )
 """,
-    commit = "e637dca20e06f7347d0fe7aefca8f3619604ebe3",
-    remote = "https://github.com/mulugetam/rocksdb.git",
+    commit = "ce9ac2ce110465d9329c806f4cb57d92f821597e",
+    remote = "https://github.com/KinanBab/rocksdb.git",
 )
 
 # libsodium.
