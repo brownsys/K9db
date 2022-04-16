@@ -13,7 +13,20 @@
 namespace pelton {
 namespace explain {
 
-void PrintTransitivityChain(
+bool IsNullableSharding(const shards::UnshardedTableName &tbl,
+                        const shards::ShardingInformation &info,
+                        const shards::SharderState &state) {
+  const shards::UnshardedTableName &table_name =
+      info.is_varowned() ? info.next_table : tbl;
+  const shards::ColumnName &column_name =
+      info.is_varowned() ? info.next_column : info.shard_by;
+  const auto &schema = state.GetSchema(table_name);
+  const auto &col = schema.GetColumn(column_name);
+  bool ret = !col.HasConstraint(sqlast::ColumnConstraint::Type::NOT_NULL);
+  return ret;
+}
+
+bool PrintTransitivityChain(
     std::ostream &out, const shards::ShardingInformation &info,
     const shards::SharderState &state, int indent,
     std::vector<const shards::UnshardedTableName *> *varshards) {
@@ -21,11 +34,7 @@ void PrintTransitivityChain(
       state.GetShardingInformationFor(info.next_table, info.shard_kind);
   const shards::ShardingInformation *tinfo_ptr = nullptr;
   if (transitive_infos.size() == 0) {
-    for (const auto &info : state.GetShardingInformation(info.next_table)) {
-      std::cout << info << std::endl;
-    }
-    LOG(FATAL) << (transitive_infos.size() == 0 ? "No" : "Too many")
-               << " next shardings for table: " << info.next_table
+    LOG(FATAL) << "No next shardings for table: " << info.next_table
                << ", shard kind: " << info.shard_kind
                << ", column: " << info.next_column << " found.";
   } else if (transitive_infos.size() == 1) {
@@ -53,40 +62,84 @@ void PrintTransitivityChain(
   }
 
   const auto &tinfo = *tinfo_ptr;
+  bool is_nullable = IsNullableSharding(info.next_table, tinfo, state);
   if (tinfo.is_varowned()) varshards->push_back(&tinfo.next_table);
   out << std::setw(indent) << ""
       << "via " << info.next_table << "(" << tinfo.shard_by
       << ") resolved with index " << info.next_index_name << std::endl;
 
   if (tinfo.IsTransitive())
-    PrintTransitivityChain(out, tinfo, state, indent, varshards);
+    is_nullable = is_nullable ||
+                  PrintTransitivityChain(out, tinfo, state, indent, varshards);
+  return is_nullable;
 }
 
-void WarningsFromSchema(std::ostream &out, const sqlast::CreateTable &schema) {
-  
+const std::vector<std::string> SUSPICIOUS_COLUMN_NAME_INDICATORS = {"email",
+                                                                    "username"};
+
+void WarningsFromSchema(std::ostream &out, const sqlast::CreateTable &schema,
+                        const bool is_sharded, const bool is_pii) {
+  if (is_sharded || is_pii) return;
+  std::vector<std::tuple<const std::string *, const std::string::size_type,
+                         const std::string::size_type>>
+      suspicious_column_names{};
+  for (const auto &col : schema.GetColumns()) {
+    for (const auto &indicator : SUSPICIOUS_COLUMN_NAME_INDICATORS) {
+      std::string::size_type match = col.column_name().find(indicator);
+      if (match == std::string::npos) continue;
+      suspicious_column_names.emplace_back(&col.column_name(), match,
+                                           indicator.size());
+    }
+  }
+  if (!suspicious_column_names.empty()) {
+    const bool is_just_one = suspicious_column_names.size() == 1;
+    out << "  [Warning] The column" << (is_just_one ? "" : "s") << " ";
+    bool put_comma = false;
+    for (const auto &[name, from, to] : suspicious_column_names) {
+      out << (put_comma ? ", " : "") << std::quoted(*name);
+      put_comma = true;
+    }
+    out << " sound" << (is_just_one ? "s" : "") << " like "
+        << (is_just_one ? "it" : "they")
+        << " may belong to a data subject, but the table is not sharded. You "
+           "may want to review your annotations."
+        << std::endl;
+  }
 }
 
-using ShardingChainInfo = 
+using ShardingChainInfo =
     std::vector<std::vector<const shards::UnshardedTableName *>>;
 
-ShardingChainInfo GetAndReportShardingInformation(std::ostream &out, const shards::UnshardedTableName table_name, const std::list<shards::ShardingInformation> &sharding_infos, const shards::SharderState &state) {
-  ShardingChainInfo varown_chains {};
+std::pair<ShardingChainInfo, bool> GetAndReportShardingInformation(
+    std::ostream &out, const shards::UnshardedTableName &table_name,
+    const std::list<shards::ShardingInformation> &sharding_infos,
+    const shards::SharderState &state) {
+  ShardingChainInfo varown_chains{};
+  bool is_nullable = true;
   for (const auto &info : sharding_infos) {
+    bool this_sharding_is_nullable =
+        IsNullableSharding(table_name, info, state);
     std::vector<const shards::UnshardedTableName *> varown_chain{};
     if (info.is_varowned()) varown_chain.push_back(&info.next_table);
     out << "  " << info.shard_by << " shards to " << info.shard_kind
         << std::endl;
     if (info.IsTransitive()) {
-      PrintTransitivityChain(out, info, state, 4, &varown_chain);
+      this_sharding_is_nullable =
+          this_sharding_is_nullable ||
+          PrintTransitivityChain(out, info, state, 4, &varown_chain);
       out << "    total transitive distance is " << info.distance_from_shard
           << std::endl;
     }
     if (varown_chain.size() > 0) varown_chains.push_back(varown_chain);
+    is_nullable = is_nullable && this_sharding_is_nullable;
   }
-  return varown_chains;
+  return std::make_pair(varown_chains, is_nullable);
 }
 
-void ClassifyAndWarnAboutSharding(std::ostream &out, const ShardingChainInfo &varown_chains, const std::list<shards::ShardingInformation> &sharding_infos) {
+void ClassifyAndWarnAboutSharding(
+    std::ostream &out, const ShardingChainInfo &varown_chains,
+    const std::list<shards::ShardingInformation> &sharding_infos,
+    const bool is_nullable) {
   const std::vector<const shards::UnshardedTableName *> *longest_varown_chain =
       nullptr;
 
@@ -115,7 +168,7 @@ void ClassifyAndWarnAboutSharding(std::ostream &out, const ShardingChainInfo &va
       out << *varown_table;
     }
     out << " copies of records inserted into this table. This is likely not "
-            "desired behavior, I suggest checking your `OWNS` annotations."
+           "desired behavior, I suggest checking your `OWNS` annotations."
         << std::endl;
   }
   if (varown_chains.size() > 1) {
@@ -135,15 +188,21 @@ void ClassifyAndWarnAboutSharding(std::ostream &out, const ShardingChainInfo &va
   }
   if (longest_varown_chain_size == 1 && regular_shardings > 1) {
     out << "  [Warning] This table is variably owned and also copied an "
-            "additional "
+           "additional "
         << regular_shardings << " times." << std::endl;
   } else if (regular_shardings > 5) {
     out << "  [Warning] This table is sharded " << regular_shardings
         << " times. This seem excessive, you may want to check your `OWNER` "
-            "annotations."
+           "annotations."
         << std::endl;
   } else if (regular_shardings > 2) {
     out << "  [Info] This table is copied " << regular_shardings << " times"
+        << std::endl;
+  }
+  if (is_nullable) {
+    out << "  [Warning] This table is sharded, but all sharding paths are "
+           "nullable. This will lead to records being stored in a global table "
+           "if those columns are NULL and could be a source of non-compliance."
         << std::endl;
   }
 }
@@ -165,20 +224,22 @@ void ExplainPrivacy(const Connection &connection) {
     // table which is non-empty, shich could be a privacy violation
     out << table_name << ": ";
     if (state.IsPII(table_name)) {
-      out << "is PII" << std::endl << std::endl;
-      continue;
+      out << "is PII" << std::endl;
     } else if (!state.IsSharded(table_name)) {
-      out << "unsharded" << std::endl << std::endl;
-      continue;
+      out << "unsharded" << std::endl;
     } else {
       out << "sharded with" << std::endl;
+      const auto &sharding_infos = state.GetShardingInformation(table_name);
+      const auto &[varown_chains, is_nullable] =
+          GetAndReportShardingInformation(out, table_name, sharding_infos,
+                                          state);
+
+      ClassifyAndWarnAboutSharding(out, varown_chains, sharding_infos,
+                                   is_nullable);
     }
 
-    const auto &sharding_infos = state.GetShardingInformation(table_name);
-    const auto &varown_chains = GetAndReportShardingInformation(out, table_name, sharding_infos, state);
-
-    ClassifyAndWarnAboutSharding(out, varown_chains, sharding_infos);
-    WarningsFromSchema(out, schema);
+    WarningsFromSchema(out, schema, state.IsSharded(table_name),
+                       state.IsPII(table_name));
     out << std::endl;
   }
   out << "############# END EXPLAIN PRIVACY #############" << std::endl;
