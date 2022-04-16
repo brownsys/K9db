@@ -80,5 +80,52 @@ std::string Decrypt(unsigned char *key, std::string ct) {
 #endif  // PELTON_ENCRYPTION
 }
 
+// encrypts user_id and id components of keys
+std::string EncryptKey(unsigned char *key, std::string pt) {
+#ifdef PELTON_ENCRYPTION
+  // version 1, no encryption, just prepend user_id length
+  rocksdb::Slice pt_slice = rocksdb::Slice(pt.data(), pt.size());
+  std::string uid = ExtractColumn(pt_slice, 0).ToString();
+  std::string id = ExtractColumn(pt_slice, 1).ToString();
+  size_t uid_len = uid.length();
+
+  std::string key = uid + id + std::string(
+    reinterpret_cast<char *>(&uid_len), sizeof(size_t));
+
+  return key;
+#else
+  return pt;
+#endif  // PELTON_ENCRYPTION
+}
+
+// decrypts user_id and id components of keys
+std::string DecryptKey(unsigned char *key, std::string ct) {
+#ifdef PELTON_ENCRYPTION
+  // version 1, no decryption, just strip user_id length at end
+  const char *ct_str = ct.c_str();
+  size_t uid_len_ptr = ct.size() - sizeof(size_t);
+  size_t uid_len = *reinterpret_cast<size_t *>(ct_str + uid_len_ptr);
+
+  std::string uid = std::string(ct_str, uid_len);
+  std::string id = std::string(ct_str + uid_len, uid_len_ptr - uid_len);
+
+  std::string key = uid + __ROCKSSEP + id + __ROCKSSEP;
+  return key;
+#else
+  return ct;
+#endif  // PELTON_ENCRYPTION
+}
+
+// encrypts user_id and id components of seek
+std::string EncryptSeek(unsigned char *key, std::string pt) {
+#ifdef PELTON_ENCRYPTION
+  // version 1
+  pt.pop_back();
+  return pt;
+#else
+  return pt;
+#endif  // PELTON_ENCRYPTION
+}
+
 }  // namespace sql
 }  // namespace pelton

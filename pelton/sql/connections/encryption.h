@@ -7,6 +7,7 @@
 #include <chrono>
 #include <assert.h>
 
+#include "pelton/sql/connections/rocksdb_util.h"
 #include "sodium.h"
 
 #define PELTON_ENCRYPTION
@@ -25,6 +26,15 @@ std::string Encrypt(unsigned char *key, std::string pt);
 
 // decrypts ct (ciphertext) with key and returns pt (plaintext)
 std::string Decrypt(unsigned char *key, std::string ct);
+
+// encrypts user_id and id components of keys
+std::string EncryptKey(unsigned char *key, std::string pt);
+
+// decrypts user_id and id components of keys
+std::string DecryptKey(unsigned char *key, std::string ct);
+
+// encrypts user_id and id components of seek
+std::string EncryptSeek(unsigned char *key, std::string pt);
 
 }  // namespace sql
 }  // namespace pelton
