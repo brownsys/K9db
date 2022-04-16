@@ -659,9 +659,9 @@ unsigned char* SingletonRocksdbConnection::GetUserKey(
       this->user_keys_.emplace(shard_name, key);
       return key;
     }
-    return it->first;
+    return it->second;
   }
-  return it->first;
+  return it->second;
 }
 
 // Static singleton.
