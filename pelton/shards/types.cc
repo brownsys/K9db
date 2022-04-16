@@ -14,7 +14,8 @@ std::ostream &operator<<(std::ostream &os, const ShardingInformation &info) {
   os << "distance_from_shard = " << info.distance_from_shard << ", ";
   os << "next_table = " << std::quoted(info.next_table) << ", ";
   os << "next_column = " << std::quoted(info.next_column) << ", ";
-  os << "next_index_name = " << std::quoted(info.next_index_name) << " }";
+  os << "next_index_name = " << std::quoted(info.next_index_name) << ", ";
+  os << "is_varowned_ = " << (info.is_varowned_ ? "true" : "false") << " }";
   return os;
 }
 
