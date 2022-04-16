@@ -649,10 +649,11 @@ std::vector<std::string> SingletonRocksdbConnection::Filter(
 unsigned char* SingletonRocksdbConnection::GetUserKey(
     const std::string &shard_name) {
   shards::SharedLock lock(&this->user_keys_mtx_);
-  auto it = this->user_keys_.cfind(shard_name);
+  std::unordered_map<std::string, unsigned char *>::const_iterator it =
+      this->user_keys_.find(shard_name);
   if (it == this->user_keys_.cend()) {
     shards::UniqueLock upgraded(std::move(lock));
-    it = this->user_keys_.cfind(shard_name);
+    it = this->user_keys_.find(shard_name);
     if (it == this->user_keys_.cend()) {
       unsigned char *key = KeyGen();
       this->user_keys_.emplace(shard_name, key);
