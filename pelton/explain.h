@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <iostream>
 #include <vector>
+#include <regex>
 
 #include "glog/logging.h"
 #include "pelton/shards/state.h"
@@ -74,21 +75,24 @@ bool PrintTransitivityChain(
   return is_nullable;
 }
 
-const std::vector<std::string> SUSPICIOUS_COLUMN_NAME_INDICATORS = {"email",
-                                                                    "username"};
+const std::regex SUSPICIOUS_COLUMN_NAME_INDICATORS("email|(first|last|middle|user)[-_]?name", std::regex_constants::ECMAScript | std::regex_constants::icase | std::regex_constants::nosubs | std::regex_constants::optimize);
+
 
 void WarningsFromSchema(std::ostream &out, const sqlast::CreateTable &schema,
                         const bool is_sharded, const bool is_pii) {
+  using col_name_match_size_t = std::string::const_iterator::difference_type;
   if (is_sharded || is_pii) return;
-  std::vector<std::tuple<const std::string *, const std::string::size_type,
-                         const std::string::size_type>>
+  std::vector<std::tuple<const std::string *, const col_name_match_size_t,
+                         const col_name_match_size_t>>
       suspicious_column_names{};
   for (const auto &col : schema.GetColumns()) {
-    for (const auto &indicator : SUSPICIOUS_COLUMN_NAME_INDICATORS) {
-      std::string::size_type match = col.column_name().find(indicator);
-      if (match == std::string::npos) continue;
-      suspicious_column_names.emplace_back(&col.column_name(), match,
-                                           indicator.size());
+    std::smatch match;
+    bool matched = std::regex_search(col.column_name(), match, SUSPICIOUS_COLUMN_NAME_INDICATORS);
+    if (matched) {
+      CHECK(!match.empty());
+      CHECK(match.ready());
+      suspicious_column_names.emplace_back(&col.column_name(), match.position(),
+                                           match.length());
     }
   }
   if (!suspicious_column_names.empty()) {
