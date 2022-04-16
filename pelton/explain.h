@@ -4,8 +4,8 @@
 
 #include <iomanip>
 #include <iostream>
-#include <vector>
 #include <regex>
+#include <vector>
 
 #include "glog/logging.h"
 #include "pelton/shards/state.h"
@@ -75,8 +75,10 @@ bool PrintTransitivityChain(
   return is_nullable;
 }
 
-const std::regex SUSPICIOUS_COLUMN_NAME_INDICATORS("email|(first|last|middle|user)[-_]?name", std::regex_constants::ECMAScript | std::regex_constants::icase | std::regex_constants::nosubs | std::regex_constants::optimize);
-
+const std::regex SUSPICIOUS_COLUMN_NAME_INDICATORS(
+    "email|password|(first|last|middle|user)[-_]?name",
+    std::regex_constants::ECMAScript | std::regex_constants::icase |
+        std::regex_constants::nosubs | std::regex_constants::optimize);
 
 void WarningsFromSchema(std::ostream &out, const sqlast::CreateTable &schema,
                         const bool is_sharded, const bool is_pii) {
@@ -87,7 +89,8 @@ void WarningsFromSchema(std::ostream &out, const sqlast::CreateTable &schema,
       suspicious_column_names{};
   for (const auto &col : schema.GetColumns()) {
     std::smatch match;
-    bool matched = std::regex_search(col.column_name(), match, SUSPICIOUS_COLUMN_NAME_INDICATORS);
+    bool matched = std::regex_search(col.column_name(), match,
+                                     SUSPICIOUS_COLUMN_NAME_INDICATORS);
     if (matched) {
       CHECK(!match.empty());
       CHECK(match.ready());
