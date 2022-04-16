@@ -630,7 +630,6 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
     options.verify_checksums = false;
     auto ptr = this->db_->NewIterator(options, handler);
     std::unique_ptr<rocksdb::Iterator> it(ptr);
-    rocksdb::Slice pslice(shard_id);
     for (it->Seek(EncryptSeek(this->global_key_, shard_id)); it->Valid(); it->Next()) {
       result.push_back(
         Decrypt(this->GetUserKey(shard_name), it->value().ToString()));
