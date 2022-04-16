@@ -8,6 +8,7 @@
 #include <assert.h>
 
 #include "pelton/sql/connections/rocksdb_util.h"
+#include "rocksdb/comparator.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/slice_transform.h"
 #include "sodium.h"
@@ -61,19 +62,19 @@ class EncryptedComparator : public rocksdb::Comparator {
   // Note that Compare(a, b) also compares timestamp if timestamp size is
   // non-zero. For the same user key with different timestamps, larger (newer)
   // timestamp comes first.
-  int Compare(const Slice& a, const Slice& b) const override;
+  int Compare(const rocksdb::Slice& a, const rocksdb::Slice& b) const override;
   const char* Name() const override { return "EncryptedComparator"; }
 
   // Advanced functions: these are used to reduce the space requirements
   // for internal data structures like index blocks.
   void FindShortestSeparator(std::string* start,
-                             const Slice& limit) const override {}
+                             const rocksdb::Slice& limit) const override {}
   void FindShortSuccessor(std::string* key) const override {}
 
   // A singleton comparator.
-  static EncryptedComparator *SINGLETON;
+  static const rocksdb::Comparator *Instance();
  private:
-  rocksdb::Comparator *bytewise_ = rocksdb::BytewiseComparator();
+  const rocksdb::Comparator *bytewise_ = rocksdb::BytewiseComparator();
 };
 
 }  // namespace sql

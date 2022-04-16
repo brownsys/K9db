@@ -80,7 +80,7 @@ SingletonRocksdbConnection::SingletonRocksdbConnection(
   opts.IncreaseParallelism();
   opts.OptimizeLevelStyleCompaction();
   opts.prefix_extractor.reset(new EncryptedPrefixTransform());
-  opts.comparator = EncryptedComparator::SINGLETON;
+  opts.comparator = EncryptedComparator::Instance();
 
   // Open the database.
   rocksdb::DB *db;
@@ -130,7 +130,7 @@ bool SingletonRocksdbConnection::ExecuteStatement(
         rocksdb::ColumnFamilyOptions options;
         options.OptimizeLevelStyleCompaction();
         options.prefix_extractor.reset(new EncryptedPrefixTransform());
-        options.comparator = EncryptedComparator::SINGLETON;
+        options.comparator = EncryptedComparator::Instance();
         PANIC(this->db_->CreateColumnFamily(options, table_name, &handle));
 
         // Fill in table metadata.
@@ -292,7 +292,7 @@ std::pair<int, uint64_t> SingletonRocksdbConnection::ExecuteUpdate(
         // If the PK is unchanged, we do not need to delete, and can replace.
         if (keychanged) {
           PANIC(db_->Delete(rocksdb::WriteOptions(), handler, 
-                            EncryptKey(this->global_key_, okey));
+                            EncryptKey(this->global_key_, okey)));
         }
         PANIC(db_->Put(rocksdb::WriteOptions(), handler, 
                         EncryptKey(this->global_key_, nkey), 
@@ -498,8 +498,8 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQueryAll(
       auto ptr = this->db_->NewIterator(options, handler);
       std::unique_ptr<rocksdb::Iterator> it(ptr);
       for (it->SeekToFirst(); it->Valid(); it->Next()) {
-        std::string keystr = DecryptKey(this->global_key_, it->key().ToString());
-        rocksdb::Slice keyslice(keystr.data(), keystr.size());
+        std::string decrypted_key = DecryptKey(this->global_key_, it->key().ToString());
+        rocksdb::Slice keyslice(decrypted_key.data(), decrypted_key.size());
         rocksdb::Slice aug_value = ExtractColumn(keyslice, 0);
         std::string rowstr = Decrypt(
           this->GetUserKey(aug_value.ToString()), it->value().ToString());

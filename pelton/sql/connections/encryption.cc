@@ -5,6 +5,9 @@
 namespace pelton {
 namespace sql {
 
+#define __ROCKSSEP static_cast<char>(30)
+
+
 #ifdef PELTON_ENCRYPTION
 #define MAX_LEN 10000
 // a global random string that is the same for all keys and users.
@@ -89,10 +92,7 @@ std::string EncryptKey(unsigned char *key, std::string pt) {
   std::string id = ExtractColumn(pt_slice, 1).ToString();
   size_t uid_len = uid.length();
 
-  std::string key = uid + id + std::string(
-    reinterpret_cast<char *>(&uid_len), sizeof(size_t));
-
-  return key;
+  return uid + id + std::string(reinterpret_cast<char *>(&uid_len), sizeof(size_t));
 #else
   return pt;
 #endif  // PELTON_ENCRYPTION
@@ -104,13 +104,12 @@ std::string DecryptKey(unsigned char *key, std::string ct) {
   // version 1, no decryption, just strip user_id length at end
   const char *ct_str = ct.c_str();
   size_t uid_len_ptr = ct.size() - sizeof(size_t);
-  size_t uid_len = *reinterpret_cast<size_t *>(ct_str + uid_len_ptr);
+  size_t uid_len = *reinterpret_cast<const size_t *>(ct_str + uid_len_ptr);
 
   std::string uid = std::string(ct_str, uid_len);
   std::string id = std::string(ct_str + uid_len, uid_len_ptr - uid_len);
 
-  std::string key = uid + __ROCKSSEP + id + __ROCKSSEP;
-  return key;
+  return uid + __ROCKSSEP + id + __ROCKSSEP;
 #else
   return ct;
 #endif  // PELTON_ENCRYPTION
@@ -133,24 +132,24 @@ rocksdb::Slice EncryptedPrefixTransform::Transform(
 #ifdef PELTON_ENCRYPTION
   const char *data = key.data();
   size_t offset = key.size() - sizeof(size_t);
-  size_t prefix_len = *reinterpret_cast<size_t *>(data + offset);
+  size_t prefix_len = *reinterpret_cast<const size_t *>(data + offset);
   return rocksdb::Slice(data, prefix_len);
 #else
   return ExtractColumn(key, 0);
 #endif  // PELTON_ENCRYPTION
 }
 
-int EncryptedComparator::Compare(const Slice& a, const Slice& b) const {
+int EncryptedComparator::Compare(const rocksdb::Slice& a, const rocksdb::Slice& b) const {
 #ifdef PELTON_ENCRYPTION
   const char *a_data = a.data();
   size_t a_offset = a.size() - sizeof(size_t);
-  size_t a_len = *reinterpret_cast<size_t *>(a_data + a_offset);
+  size_t a_len = *reinterpret_cast<const size_t *>(a_data + a_offset);
   rocksdb::Slice a_user(a_data, a_len);
   rocksdb::Slice a_pk(a_data + a_len, a_offset - a_len);
 
   const char *b_data = b.data();
   size_t b_offset = b.size() - sizeof(size_t);
-  size_t b_len = *reinterpret_cast<size_t *>(b_data + b_offset);
+  size_t b_len = *reinterpret_cast<const size_t *>(b_data + b_offset);
   rocksdb::Slice b_user(b_data, b_len);
   rocksdb::Slice b_pk(b_data + b_len, b_offset - b_len);
 
@@ -162,14 +161,14 @@ int EncryptedComparator::Compare(const Slice& a, const Slice& b) const {
 #else
   return this->bytewise_->Compare(a, b);
 #endif  // PELTON_ENCRYPTION
+}
 
+const rocksdb::Comparator *EncryptedComparator::Instance() {
 #ifdef PELTON_ENCRYPTION
-rocksdb::Comparator *EncryptedComparator::SINGLETON = new EncryptedComparator();
+  return new EncryptedComparator();
 #else
-rocksdb::Comparator *EncryptedComparator::SINGLETON =
-    rocksdb::BytewiseComparator();
+  return rocksdb::BytewiseComparator();
 #endif  // PELTON_ENCRYPTION
-
 }
 
 }  // namespace sql
