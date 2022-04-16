@@ -9,6 +9,8 @@
 
 #include "sodium.h"
 
+#define PELTON_ENCRYPTION
+
 namespace pelton {
 namespace sql {
 

@@ -648,6 +648,7 @@ std::vector<std::string> SingletonRocksdbConnection::Filter(
 // Gets key corresponding to input user. Creates key if does not exist.
 unsigned char* SingletonRocksdbConnection::GetUserKey(
     const std::string &shard_name) {
+#ifdef PELTON_ENCRYPTION
   shards::SharedLock lock(&this->user_keys_mtx_);
   std::unordered_map<std::string, unsigned char *>::const_iterator it =
       this->user_keys_.find(shard_name);
@@ -662,6 +663,9 @@ unsigned char* SingletonRocksdbConnection::GetUserKey(
     return it->second;
   }
   return it->second;
+#else
+  return nullptr;
+#endif  // PELTON_ENCRYPTION
 }
 
 // Static singleton.
