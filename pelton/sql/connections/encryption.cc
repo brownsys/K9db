@@ -34,10 +34,12 @@ std::string Encrypt(unsigned char *key, std::string pt) {
   const char *pt_buffer = pt.c_str();
   auto casted_pt_buffer = reinterpret_cast<const unsigned char *>(pt_buffer);
 
-  crypto_aead_aes256gcm_encrypt(ct, &ct_len, 
-                                casted_pt_buffer, pt.size(), 
-                                nullptr, 0, NULL, nonce, key);
- 
+  if (crypto_aead_aes256gcm_encrypt(ct, &ct_len,
+                                casted_pt_buffer, pt.size(),
+                                nullptr, 0, NULL, nonce, key) != 0) {
+    LOG(FATAL) << "Cannot encrypt!";
+  }
+
   std::string ct_str(reinterpret_cast<char const*>(ct), ct_len);
   delete[] ct;
   return ct_str;
@@ -49,11 +51,14 @@ std::string Decrypt(unsigned char *key, std::string ct) {
   long long unsigned pt_len = 0;
   const char *ct_buffer = ct.c_str();
   auto casted_ct_buffer = reinterpret_cast<const unsigned char *>(ct_buffer);
-  
-  crypto_aead_aes256gcm_decrypt(pt, &pt_len, NULL,
-                                casted_ct_buffer, ct.size(), 
-                                nullptr, 0, nonce, key);
-  
+
+  if (ct.size() < crypto_aead_aes256gcm_ABYTES
+      || crypto_aead_aes256gcm_decrypt(pt, &pt_len, NULL,
+                                       casted_ct_buffer, ct.size(),
+                                       nullptr, 0, nonce, key) != 0) {
+    LOG(FATAL) << "Cannot decrypt!";
+  }
+
   std::string pt_str(reinterpret_cast<char const*>(pt), pt_len);
   delete[] pt;
   return pt_str;
