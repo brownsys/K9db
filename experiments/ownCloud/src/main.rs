@@ -118,7 +118,7 @@ fn main() {
   let mut dwrites = Vec::<u128>::new();
   let mut gwrites = Vec::<u128>::new();
   for i in 0..operations {
-    if write_every > 0 && i % write_every == 0 {
+    if write_every > 0 && i > 0 && i % write_every == 0 {
       // Must issue a write.
       if !last_write_direct {
         last_write_direct = true;

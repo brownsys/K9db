@@ -20,5 +20,6 @@ rust_binary(
         "//cargo:clap",
         "//cargo:mysql",
         "//cargo:rand",
+        "//cargo:memcached_rs",
     ],
 )

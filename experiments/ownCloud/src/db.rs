@@ -3,6 +3,11 @@ extern crate mysql;
 use mysql::prelude::Queryable;
 use mysql::{Conn, OptsBuilder};
 
+// Memcached connector.
+extern crate memcached;
+use memcached::client::Client;
+use memcached::proto::ProtoType;
+
 // Connection properties.
 const DB_USER: &'static str = "root";
 const DB_PASSWORD: &'static str = "password";
@@ -37,6 +42,10 @@ pub fn mariadb_connect() -> Conn {
   // Create the schema.
   run_file(&mut connection, MARIADB_SCHEMA);
   connection
+}
+
+pub fn memcached_connect() -> Client {
+  return Client::connect(&[("tcp://localhost:11211", 1)], ProtoType::Binary).unwrap();
 }
 
 fn run_file<Q: Queryable>(conn: &mut Q, file: &str) {

@@ -1,6 +1,6 @@
 extern crate mysql;
 use mysql::prelude::Queryable;
-use mysql::{Conn, OptsBuilder};
+use mysql::{Conn, OptsBuilder, Row};
 
 // src/models.rs
 use super::super::models::{File, Group, Share, ShareType, User};
@@ -10,8 +10,15 @@ fn quoted(s: &str) -> String {
   format!("'{}'", s)
 }
 
+// Helper: gets the results not just the time.
+pub fn reads_with_data<'a>(conn: &mut Conn, sample: &Vec<&'a str>) -> Vec<Row> {
+  let query = format!("SELECT * FROM file_view WHERE share_target IN ({})",
+                      sample.join(","));
+  conn.query(query).unwrap()
+}
+
 // Workload execution.
-pub fn reads<'a>(conn: &mut mysql::Conn, sample: &Vec<&'a User>) -> u128 {
+pub fn reads<'a>(conn: &mut Conn, sample: &Vec<&'a User>) -> u128 {
   let mut sstring = sample.iter().map(|s| quoted(&s.uid)).collect::<Vec<_>>();
   let query = format!("SELECT * FROM file_view WHERE share_target IN ({})",
                       sstring.join(","));
@@ -24,18 +31,18 @@ pub fn reads<'a>(conn: &mut mysql::Conn, sample: &Vec<&'a User>) -> u128 {
   now.elapsed().as_micros()
 }
 
-pub fn direct<'a>(conn: &mut mysql::Conn, share: &Share<'a>) -> u128 {
+pub fn direct<'a>(conn: &mut Conn, share: &Share<'a>) -> u128 {
   let now = std::time::Instant::now();
   insert_share(conn, share);
   now.elapsed().as_micros()
 }
 
-pub fn indirect<'a>(conn: &mut mysql::Conn, share: &Share<'a>) -> u128 {
+pub fn indirect<'a>(conn: &mut Conn, share: &Share<'a>) -> u128 {
   direct(conn, share)
 }
 
 // Inserts.
-pub fn insert_user(conn: &mut mysql::Conn, user: &User) {
+pub fn insert_user(conn: &mut Conn, user: &User) {
   conn.query_drop(&format!("INSERT INTO oc_users VALUES ('{uid}', '{uid}', \
                             '{pw}')",
                            uid = user.uid,
@@ -43,7 +50,7 @@ pub fn insert_user(conn: &mut mysql::Conn, user: &User) {
       .unwrap();
 }
 
-pub fn insert_group<'a>(conn: &mut mysql::Conn, group: &Group<'a>) {
+pub fn insert_group<'a>(conn: &mut Conn, group: &Group<'a>) {
   conn.query_drop(&format!("INSERT INTO oc_groups VALUES ('{}')", &group.gid))
       .unwrap();
   group.users.iter().for_each(|(i, u)| {
@@ -54,13 +61,13 @@ pub fn insert_group<'a>(conn: &mut mysql::Conn, group: &Group<'a>) {
                     });
 }
 
-pub fn insert_file<'a>(conn: &mut mysql::Conn, file: &File<'a>) {
+pub fn insert_file<'a>(conn: &mut Conn, file: &File<'a>) {
   conn.query_drop(&format!("INSERT INTO oc_files VALUES ({}, '{}')",
                            file.id, file.id))
       .unwrap()
 }
 
-pub fn insert_share<'a>(conn: &mut mysql::Conn, share: &Share<'a>) {
+pub fn insert_share<'a>(conn: &mut Conn, share: &Share<'a>) {
   let (share_type, user_target, group_target) = match share.share_with {
     ShareType::Direct(u) => (0, quoted(&u.uid), "NULL".to_string()),
     ShareType::Group(g) => (1, "NULL".to_string(), quoted(&g.gid)),

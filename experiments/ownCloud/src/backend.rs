@@ -1,8 +1,8 @@
+extern crate memcached;
 extern crate mysql;
-use mysql::{Conn, OptsBuilder};
 
 // src/db.rs
-use super::db::{mariadb_connect, pelton_connect};
+use super::db::{mariadb_connect, memcached_connect, pelton_connect};
 // src/models.rs
 use super::models::{File, Group, Share, User};
 // src/workload.rs
@@ -13,11 +13,10 @@ mod hybrid;
 mod sql;
 
 // Backend enum
-#[derive(Debug)]
 pub enum Backend {
   Pelton(mysql::Conn),
   MariaDB(mysql::Conn),
-  Memcached(mysql::Conn),
+  Memcached(mysql::Conn, memcached::client::Client),
 }
 
 // Functions for executing load.
@@ -37,7 +36,7 @@ impl Backend {
   }
   pub fn is_memcached(&self) -> bool {
     match self {
-      Backend::Memcached(_) => true,
+      Backend::Memcached(_, _) => true,
       _ => false,
     }
   }
@@ -46,28 +45,28 @@ impl Backend {
     match self {
       Backend::Pelton(conn) => sql::insert_user(conn, user),
       Backend::MariaDB(conn) => sql::insert_user(conn, user),
-      Backend::Memcached(conn) => sql::insert_user(conn, user),
+      Backend::Memcached(conn, cl) => hybrid::insert_user(conn, cl, user),
     }
   }
   pub fn insert_group<'a>(&mut self, group: &Group<'a>) {
     match self {
       Backend::Pelton(conn) => sql::insert_group(conn, group),
       Backend::MariaDB(conn) => sql::insert_group(conn, group),
-      Backend::Memcached(conn) => sql::insert_group(conn, group),
+      Backend::Memcached(conn, cl) => hybrid::insert_group(conn, cl, group),
     }
   }
   pub fn insert_file<'a>(&mut self, file: &File<'a>) {
     match self {
       Backend::Pelton(conn) => sql::insert_file(conn, file),
       Backend::MariaDB(conn) => sql::insert_file(conn, file),
-      Backend::Memcached(conn) => sql::insert_file(conn, file),
+      Backend::Memcached(conn, cl) => hybrid::insert_file(conn, cl, file),
     }
   }
   pub fn insert_share<'a>(&mut self, share: &Share<'a>) {
     match self {
       Backend::Pelton(conn) => sql::insert_share(conn, share),
       Backend::MariaDB(conn) => sql::insert_share(conn, share),
-      Backend::Memcached(conn) => sql::insert_share(conn, share),
+      Backend::Memcached(conn, cl) => hybrid::insert_share(conn, cl, share),
     }
   }
 
@@ -76,13 +75,15 @@ impl Backend {
     match (self, request) {
       (Backend::Pelton(conn), Request::Read(load)) => sql::reads(conn, load),
       (Backend::MariaDB(conn), Request::Read(load)) => sql::reads(conn, load),
-      (Backend::Memcached(conn), Request::Read(load)) => sql::reads(conn, load),
+      (Backend::Memcached(conn, client), Request::Read(load)) => {
+        hybrid::reads(conn, client, load)
+      }
       (Backend::Pelton(conn), Request::Direct(load)) => sql::direct(conn, load),
       (Backend::MariaDB(conn), Request::Direct(load)) => {
         sql::direct(conn, load)
       }
-      (Backend::Memcached(conn), Request::Direct(load)) => {
-        sql::direct(conn, load)
+      (Backend::Memcached(conn, client), Request::Direct(load)) => {
+        hybrid::direct(conn, client, load)
       }
       (Backend::Pelton(conn), Request::Indirect(load)) => {
         sql::indirect(conn, load)
@@ -90,8 +91,8 @@ impl Backend {
       (Backend::MariaDB(conn), Request::Indirect(load)) => {
         sql::indirect(conn, load)
       }
-      (Backend::Memcached(conn), Request::Indirect(load)) => {
-        sql::indirect(conn, load)
+      (Backend::Memcached(conn, client), Request::Indirect(load)) => {
+        hybrid::indirect(conn, client, load)
       }
     }
   }
@@ -101,7 +102,7 @@ impl Backend {
     match s {
       "pelton" => Backend::Pelton(pelton_connect()),
       "mariadb" => Backend::MariaDB(mariadb_connect()),
-      "memcached" => Backend::Memcached(mariadb_connect()),
+      "memcached" => Backend::Memcached(mariadb_connect(), memcached_connect()),
       _ => panic!("Unknown backend {}", s),
     }
   }
@@ -113,7 +114,7 @@ impl std::fmt::Display for Backend {
     f.write_str(match self {
                   Backend::Pelton(_) => "pelton",
                   Backend::MariaDB(_) => "mariadb",
-                  Backend::Memcached(_) => "memcached",
+                  Backend::Memcached(_, _) => "memcached",
                 })
   }
 }
