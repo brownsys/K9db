@@ -57,6 +57,7 @@ shuup_personcontact: sharded with
   [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
 
 shuup_contact: unsharded
+  [Warning] The column "email" sounds like it may belong to a data subject, but the table is not sharded. You may want to review your annotations.
 
 auth_user: is PII
 ```
@@ -99,6 +100,46 @@ auth_user: sharded with
   [Info] this table is variably owned (via shuup_personcontact)
   [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
 ```
+
+### `auth_user` and `contact` are PII
+
+Schema in `auth-user-and-contact-is-pii.sql`
+
+```
+shuup_shop: sharded with
+  OWNER_owner_id shards to auth_user
+
+shuup_companycontact_members: sharded with
+  OWNER_contact_id shards to shuup_contact
+    total transitive distance is 1
+  OWNER_contact_id shards to auth_user
+    total transitive distance is 1
+  [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
+
+shuup_companycontact: sharded with
+  contact_ptr_id shards to shuup_contact
+
+shuup_gdpr_gdpruserconsent: sharded with
+  OWNER_user_id shards to auth_user
+
+shuup_personcontact: sharded with
+  OWNER_contact_ptr_id shards to shuup_contact
+  OWNER_user_id shards to auth_user
+
+shuup_contact: is PII
+
+auth_user: is PII
+```
+
+After adding a `OWNS` to `personcontact(contact_ptr_id)` we get the error
+
+```
+INVALID_ARGUMENT: Foreign key shuup_companycontact(contact_ptr_id) points to shuup_contact which is a PII and sharded table
+```
+
+when creating `companycontact`. 
+
+It’s a start but we probably want this to fail earlier (e.g. either when installing `personcontact`)
 
 ## ownCloud?
 
