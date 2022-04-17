@@ -108,7 +108,7 @@ absl::StatusOr<std::list<ShardingInformation>> IsShardingBySupported(
   std::list<ShardingInformation> ways_to_shard;
 
   if (foreign_pii && foreign_sharded) {
-    return absl::InvalidArgumentError("Foreign key into a PII + sharded table");
+    return absl::InvalidArgumentError("Foreign key " + original_table_name + "(" + info.shard_by + ") points to " + foreign_table + " which is a PII and sharded table");
   } else if (foreign_pii) {
     ways_to_shard.push_back(info);
   } else if (foreign_sharded) {
@@ -257,8 +257,12 @@ ShardTable(const sqlast::CreateTable &stmt, const SharderState &state) {
 
   // Sharding is implicitly deduced, only works if there is one candidate!
   if (implicit_owners.size() > 1) {
-    return absl::InvalidArgumentError(
-        "Table with several foreign keys to shards or PII!");
+    std::stringstream msg;
+    msg << "Table " << table_name << " has several foreign keys to shards or PII! (";
+    for (const auto &own : implicit_owners) 
+      msg << own.shard_by << ", ";
+    msg << ")";
+    return absl::InvalidArgumentError(msg.str());
   }
   return std::make_pair(implicit_owners, owning_table);
 }
