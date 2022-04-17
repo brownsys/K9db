@@ -80,23 +80,22 @@ CREATE TABLE oc_share (
 -- GROUP BY (oc_share.OWNING_item_source, oc_group_user.uid)"';
 
 
--- -- shoudl also return s.*
-CREATE VIEW file_view AS 
-(SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, s.ACCESSOR_share_with as share_target
-FROM oc_share s
-LEFT JOIN oc_filecache f ON s.file_source = f.fileid
-LEFT JOIN oc_storages st ON f.storage = st.numeric_id
-WHERE (s.share_type = 0) )
-UNION
-(SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, oc_group_user.uid as share_target
-FROM oc_share s
-LEFT JOIN oc_filecache f ON s.file_source = f.fileid
-LEFT JOIN oc_storages st ON f.storage = st.numeric_id
-JOIN oc_group_user ON s.ACCESSOR_share_with_group = oc_group_user.OWNING_gid
-WHERE (s.share_type = 1) 
-   )
-ORDER BY sid ASC
-;
+-- -- should also return s.*
+CREATE VIEW file_view AS (
+  SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, s.ACCESSOR_share_with as share_target
+  FROM oc_share s
+  LEFT JOIN oc_filecache f ON s.file_source = f.fileid
+  LEFT JOIN oc_storages st ON f.storage = st.numeric_id
+  WHERE (s.share_type = 0)
+) UNION (
+  SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, oc_group_user.uid as share_target
+  FROM oc_share s
+  LEFT JOIN oc_filecache f ON s.file_source = f.fileid
+  LEFT JOIN oc_storages st ON f.storage = st.numeric_id
+  JOIN oc_group_user ON s.ACCESSOR_share_with_group = oc_group_user.OWNING_gid
+  WHERE (s.share_type = 1) 
+)
+ORDER BY sid ASC;
 
 -- CREATE VIEW file_view AS 
 -- '"(SELECT s.id as sid, s.OWNING_item_source, s.share_type, s.ACCESSOR_share_with as share_target

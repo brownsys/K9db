@@ -1,32 +1,22 @@
-load("@rules_rust//rust:rust.bzl", "rust_binary", "rust_library")
+load("@rules_rust//rust:rust.bzl", "rust_binary")
 
-rust_library(
-    name = "ownCloud",
+rust_binary(
+    name = "benchmark",
     srcs = [
-        "src/lib.rs",
+        "src/main.rs",
+        "src/backend.rs",
+        "src/db.rs",
+        "src/models.rs",
+        "src/generator.rs",
+        "src/workload.rs",
+        "src/backend/sql.rs",
+        "src/backend/hybrid.rs",
     ],
     compile_data = [
         "data/schema.sql",
         "data/mysql-schema.sql",
     ],
-    rustc_flags = [
-        "-lmariadbcpp",
-    ],
-    visibility = ["//visibility:public"],
     deps = [
-        "//cargo:mysql",
-        "//cargo:rand",
-        "@memcached//rust:memcached_ffi",
-    ],
-)
-
-rust_binary(
-    name = "benchmark",
-    srcs = [
-        "src/benchmark_harness.rs",
-    ],
-    deps = [
-        ":ownCloud",
         "//cargo:clap",
         "//cargo:mysql",
         "//cargo:rand",

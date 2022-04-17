@@ -1,4 +1,0 @@
-exports_files(
-    ["deps.bzl"],
-    visibility = ["//visibility:public"],
-)

@@ -7,13 +7,11 @@ authors = ["Justus Adam <dev@justus.science"]
 mysql = "20.1.0"
 rand = "0.8.4"
 clap = "2.34.0"
-
-[lib]
-path = "src/lib.rs"
+memcached-rs = "0.4.2"
 
 [[bin]]
-name = "benchmark-harness"
-path = "src/benchmark_harness.rs"
+name = "benchmark"
+path = "src/main.rs"
 
 [package.metadata.raze]
 workspace_path = "//cargo"
