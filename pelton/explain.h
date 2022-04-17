@@ -76,7 +76,7 @@ bool PrintTransitivityChain(
 }
 
 const std::regex SUSPICIOUS_COLUMN_NAME_INDICATORS(
-    "email|password|(first|last|middle|user)[-_]?name",
+    "email|password|(first|last|middle|user)[-_]?name|gender",
     std::regex_constants::ECMAScript | std::regex_constants::icase |
         std::regex_constants::nosubs | std::regex_constants::optimize);
 
