@@ -1,5 +1,5 @@
-use rand::Rng;
 use rand::rngs::ThreadRng;
+use rand::Rng;
 
 // src.models.rs
 use super::generator::{EntityType, GeneratorState};
@@ -27,7 +27,11 @@ impl WorkloadGenerator {
   }
 
   // Create a read workloads with given samples.
-  pub fn make_read<'a>(&mut self, num_samples: usize, users: &'a [User]) -> Request<'a> {
+  pub fn make_read<'a>(
+    &mut self,
+    num_samples: usize,
+    users: &'a [User],
+  ) -> Request<'a> {
     let mut rng = rand::thread_rng();
     let ulen = users.len();
     let mut samples: Vec<&'a User> = Vec::with_capacity(num_samples);
@@ -49,31 +53,36 @@ impl WorkloadGenerator {
   }
 
   // Create a write workload with direct shares.
-  pub fn make_direct_share<'a>(&mut self,
-                               users: &'a [User],
-                               files: &'a [File<'a>])
-                               -> Request<'a> {
+  pub fn make_direct_share<'a>(
+    &mut self,
+    users: &'a [User],
+    files: &'a [File<'a>],
+  ) -> Request<'a> {
     let ulen = users.len();
     let flen = files.len();
-    let share = Share { id: self.st.new_id(EntityType::Share),
-                         share_with: ShareType::Direct(&users[self.rng.gen_range(0..ulen)]),
-                         file: &files[self.rng.gen_range(0..flen)] };
+    let share = Share {
+      id: self.st.new_id(EntityType::Share),
+      share_with: ShareType::Direct(&users[self.rng.gen_range(0..ulen)]),
+      file: &files[self.rng.gen_range(0..flen)],
+    };
     self.st.track_share(&share);
     Request::Direct(share)
   }
 
   // Create a write workload with indirect shares.
-  pub fn make_group_share<'a>(&mut self,
-                              groups: &'a [Group<'a>],
-                              files: &'a [File<'a>])
-                              -> Request<'a> {
+  pub fn make_group_share<'a>(
+    &mut self,
+    groups: &'a [Group<'a>],
+    files: &'a [File<'a>],
+  ) -> Request<'a> {
     let glen = groups.len();
     let flen = files.len();
-    let share = Share { id: self.st.new_id(EntityType::Share),
-                        share_with: ShareType::Group(&groups[self.rng.gen_range(0..glen)]),
-                        file: &files[self.rng.gen_range(0..flen)] };
+    let share = Share {
+      id: self.st.new_id(EntityType::Share),
+      share_with: ShareType::Group(&groups[self.rng.gen_range(0..glen)]),
+      file: &files[self.rng.gen_range(0..flen)],
+    };
     self.st.track_share(&share);
     Request::Indirect(share)
   }
-
 }

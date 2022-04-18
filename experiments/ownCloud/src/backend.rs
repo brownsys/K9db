@@ -72,32 +72,19 @@ impl Backend {
 
   // Execute a workload.
   pub fn run(&mut self, request: &Request) -> u128 {
-    match (self, request) {
-      (Backend::Pelton(conn), Request::Read(load, expected)) => {
-          sql::reads(conn, load, expected)
-      }
-      (Backend::MariaDB(conn), Request::Read(load, expected)) => {
-        sql::reads(conn, load, expected)
-      }
-      (Backend::Memcached(conn, client), Request::Read(load, expected)) => {
-        hybrid::reads(conn, client, load, expected)
-      }
-      (Backend::Pelton(conn), Request::Direct(load)) => sql::direct(conn, load),
-      (Backend::MariaDB(conn), Request::Direct(load)) => {
-        sql::direct(conn, load)
-      }
-      (Backend::Memcached(conn, client), Request::Direct(load)) => {
-        hybrid::direct(conn, client, load)
-      }
-      (Backend::Pelton(conn), Request::Indirect(load)) => {
-        sql::indirect(conn, load)
-      }
-      (Backend::MariaDB(conn), Request::Indirect(load)) => {
-        sql::indirect(conn, load)
-      }
-      (Backend::Memcached(conn, client), Request::Indirect(load)) => {
-        hybrid::indirect(conn, client, load)
-      }
+    match self {
+      Backend::Pelton(conn) | Backend::MariaDB(conn) => match request {
+        Request::Read(load, expected) => sql::reads(conn, load, expected),
+        Request::Direct(load) => sql::direct(conn, load),
+        Request::Indirect(load) => sql::indirect(conn, load),
+      },
+      Backend::Memcached(conn, client) => match request {
+        Request::Read(load, expected) => {
+          hybrid::reads(conn, client, load, expected)
+        }
+        Request::Direct(load) => hybrid::direct(conn, client, load),
+        Request::Indirect(load) => hybrid::indirect(conn, client, load),
+      },
     }
   }
 
@@ -116,9 +103,9 @@ impl Backend {
 impl std::fmt::Display for Backend {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     f.write_str(match self {
-                  Backend::Pelton(_) => "pelton",
-                  Backend::MariaDB(_) => "mariadb",
-                  Backend::Memcached(_, _) => "memcached",
-                })
+      Backend::Pelton(_) => "pelton",
+      Backend::MariaDB(_) => "mariadb",
+      Backend::Memcached(_, _) => "memcached",
+    })
   }
 }

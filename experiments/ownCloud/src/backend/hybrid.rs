@@ -21,11 +21,12 @@ fn encode_group(g: &str) -> String {
   format!("g{}", g)
 }
 fn encode_row(row: mysql::Row) -> String {
-  row.unwrap()
-     .iter()
-     .map(|v| v.as_sql(true))
-     .collect::<Vec<String>>()
-     .join(",")
+  row
+    .unwrap()
+    .iter()
+    .map(|v| v.as_sql(true))
+    .collect::<Vec<String>>()
+    .join(",")
 }
 fn concat_rows(l: &str, r: &str) -> String {
   format!("{};{}", l, r)
@@ -43,17 +44,19 @@ fn decode_row(bytes: &[u8]) -> Vec<usize> {
 }
 
 // Workload execution.
-pub fn reads<'a>(conn: &mut Conn,
-                 client: &mut Client,
-                 sample: &Vec<&'a User>,
-                 expected: &Vec<usize>)
-                 -> u128 {
+pub fn reads<'a>(
+  conn: &mut Conn,
+  client: &mut Client,
+  sample: &Vec<&'a User>,
+  expected: &Vec<usize>,
+) -> u128 {
   let now = std::time::Instant::now();
 
   // Look up keys in memcached.
-  let strs = sample.iter()
-                   .map(|u| encode_user(&u.uid))
-                   .collect::<Vec<_>>();
+  let strs = sample
+    .iter()
+    .map(|u| encode_user(&u.uid))
+    .collect::<Vec<_>>();
   let keys = strs.iter().map(|s| s.as_bytes()).collect::<Vec<_>>();
   let result = client.get_multi(&keys).unwrap();
 
@@ -73,7 +76,9 @@ pub fn reads<'a>(conn: &mut Conn,
     // Get result from DB.
     let results = sql::reads_with_data(conn, &misses);
     let mut map: BTreeMap<String, String> = BTreeMap::new();
-    misses.iter().for_each(|uid| { map.insert(encode_user(uid), "".to_string()); });
+    misses.iter().for_each(|uid| {
+      map.insert(encode_user(uid), "".to_string());
+    });
     for row in results {
       // The user id is the last (sixth) column.
       ids.push(row.get::<usize, usize>(0).unwrap());
@@ -92,26 +97,34 @@ pub fn reads<'a>(conn: &mut Conn,
     }
 
     // Store data in memcached.
-    client.set_multi(map.iter()
-                        .map(|(k, v)| (k.as_bytes(), (v.as_bytes(), 0, 0)))
-                        .collect())
-          .unwrap();
+    client
+      .set_multi(
+        map
+          .iter()
+          .map(|(k, v)| (k.as_bytes(), (v.as_bytes(), 0, 0)))
+          .collect(),
+      )
+      .unwrap();
   }
 
   // Validate output.
   let time = now.elapsed().as_micros();
   ids.sort();
   if expected != &ids {
-    panic!("Read returns wrong result. Expected: {:?}, found: {:?}", expected, ids);
+    panic!(
+      "Read returns wrong result. Expected: {:?}, found: {:?}",
+      expected, ids
+    );
   }
-  
+
   time
 }
 
-pub fn direct<'a>(conn: &mut Conn,
-                  client: &mut Client,
-                  share: &Share<'a>)
-                  -> u128 {
+pub fn direct<'a>(
+  conn: &mut Conn,
+  client: &mut Client,
+  share: &Share<'a>,
+) -> u128 {
   let now = std::time::Instant::now();
   // Write to database.
   sql::direct(conn, share);
@@ -129,10 +142,11 @@ pub fn direct<'a>(conn: &mut Conn,
   }
 }
 
-pub fn indirect<'a>(conn: &mut Conn,
-                    client: &mut Client,
-                    share: &Share<'a>)
-                    -> u128 {
+pub fn indirect<'a>(
+  conn: &mut Conn,
+  client: &mut Client,
+  share: &Share<'a>,
+) -> u128 {
   let now = std::time::Instant::now();
   // Write to database.
   sql::indirect(conn, share);
@@ -161,9 +175,11 @@ pub fn insert_user(conn: &mut Conn, client: &mut Client, user: &User) {
   sql::insert_user(conn, user);
 }
 
-pub fn insert_group<'a>(conn: &mut Conn,
-                        client: &mut Client,
-                        group: &Group<'a>) {
+pub fn insert_group<'a>(
+  conn: &mut Conn,
+  client: &mut Client,
+  group: &Group<'a>,
+) {
   // Write to database.
   sql::insert_group(conn, group);
 
@@ -183,8 +199,10 @@ pub fn insert_file<'a>(conn: &mut Conn, client: &mut Client, file: &File<'a>) {
   sql::insert_file(conn, file)
 }
 
-pub fn insert_share<'a>(conn: &mut Conn,
-                        client: &mut Client,
-                        share: &Share<'a>) {
+pub fn insert_share<'a>(
+  conn: &mut Conn,
+  client: &mut Client,
+  share: &Share<'a>,
+) {
   sql::insert_share(conn, share)
 }

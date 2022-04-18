@@ -19,10 +19,11 @@ const MARIADB_SCHEMA: &'static str = include_str!("../data/mysql-schema.sql");
 
 pub fn pelton_connect() -> Conn {
   // Start a connection.
-  let opts = OptsBuilder::new().user(Some(DB_USER))
-                               .pass(Some(DB_PASSWORD))
-                               .tcp_port(10001)
-                               .tcp_nodelay(true);
+  let opts = OptsBuilder::new()
+    .user(Some(DB_USER))
+    .pass(Some(DB_PASSWORD))
+    .tcp_port(10001)
+    .tcp_nodelay(true);
   let mut connection = Conn::new(opts).unwrap();
   // Create the schema.
   run_file(&mut connection, PELTON_SCHEMA);
@@ -31,14 +32,17 @@ pub fn pelton_connect() -> Conn {
 
 pub fn mariadb_connect() -> Conn {
   // Start a connection.
-  let opts = OptsBuilder::new().user(Some(DB_USER))
-                               .pass(Some(DB_PASSWORD));
+  let opts = OptsBuilder::new()
+    .user(Some(DB_USER))
+    .pass(Some(DB_PASSWORD));
   let mut connection = Conn::new(opts).unwrap();
   // Clean up database.
-  connection.query_drop(format!("DROP DATABASE IF EXISTS {};", DB_NAME))
-            .unwrap();
-  connection.query_drop(format!("CREATE DATABASE {};", DB_NAME))
-            .unwrap();
+  connection
+    .query_drop(format!("DROP DATABASE IF EXISTS {};", DB_NAME))
+    .unwrap();
+  connection
+    .query_drop(format!("CREATE DATABASE {};", DB_NAME))
+    .unwrap();
   connection.query_drop(format!("USE {}", DB_NAME)).unwrap();
   // Create the schema.
   run_file(&mut connection, MARIADB_SCHEMA);
@@ -46,7 +50,8 @@ pub fn mariadb_connect() -> Conn {
 }
 
 pub fn memcached_connect() -> Client {
-  return Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+  return Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary)
+    .unwrap();
 }
 
 fn run_file<Q: Queryable>(conn: &mut Q, file: &str) {

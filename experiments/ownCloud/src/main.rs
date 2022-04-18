@@ -49,26 +49,21 @@ fn main() {
         ).get_matches();
 
   // Parse command line arguments.
-  let args =
-    Args { files_per_user:
-             value_t!(matches, "files_per_user", usize).unwrap_or(1),
-           direct_shares_per_file: value_t!(matches,
-                                            "direct_shares_per_file",
-                                            usize).unwrap_or(1),
-           group_shares_per_file: value_t!(matches,
-                                           "group_shares_per_file",
-                                           usize).unwrap_or(1),
-           users_per_group:
-             value_t!(matches, "users_per_group", usize).unwrap_or(1),
-           num_users: value_t_or_exit!(matches, "num_users", usize),
-           backend: matches.value_of("backend")
-                           .map(&str::to_string)
-                           .unwrap(),
-           in_size: value_t!(matches, "in_size", usize).unwrap_or(1),
-           outfile: matches.value_of("outfile").map(&str::to_string),
-           write_every: value_t_or_exit!(matches, "write_every", usize),
-           operations: value_t_or_exit!(matches, "operations", usize),
-           perf: matches.is_present("perf") };
+  let args = Args {
+    files_per_user: value_t!(matches, "files_per_user", usize).unwrap_or(1),
+    direct_shares_per_file: value_t!(matches, "direct_shares_per_file", usize)
+      .unwrap_or(1),
+    group_shares_per_file: value_t!(matches, "group_shares_per_file", usize)
+      .unwrap_or(1),
+    users_per_group: value_t!(matches, "users_per_group", usize).unwrap_or(1),
+    num_users: value_t_or_exit!(matches, "num_users", usize),
+    backend: matches.value_of("backend").map(&str::to_string).unwrap(),
+    in_size: value_t!(matches, "in_size", usize).unwrap_or(1),
+    outfile: matches.value_of("outfile").map(&str::to_string),
+    write_every: value_t_or_exit!(matches, "write_every", usize),
+    operations: value_t_or_exit!(matches, "operations", usize),
+    perf: matches.is_present("perf"),
+  };
 
   // Output file.
   let mut f = if let Some(fname) = &args.outfile {
@@ -101,10 +96,12 @@ fn main() {
   users.iter().for_each(|user| backend.insert_user(user));
   groups.iter().for_each(|group| backend.insert_group(group));
   files.iter().for_each(|file| backend.insert_file(file));
-  direct_shares.iter()
-               .for_each(|share| backend.insert_share(share));
-  group_shares.iter()
-              .for_each(|share| backend.insert_share(share));
+  direct_shares
+    .iter()
+    .for_each(|share| backend.insert_share(share));
+  group_shares
+    .iter()
+    .for_each(|share| backend.insert_share(share));
   eprintln!("--> Priming done in {}ms", instant.elapsed().as_millis());
 
   // Wait for user input.
