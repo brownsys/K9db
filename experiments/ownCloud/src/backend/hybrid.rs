@@ -20,11 +20,23 @@ fn encode_user(u: &str) -> String {
 fn encode_group(g: &str) -> String {
   format!("g{}", g)
 }
+fn encode_value(value: &mysql::Value) -> String {
+  match value {
+    mysql::Value::NULL => "NULL".to_string(),
+    mysql::Value::Int(i) => format!("{:08}", i),
+    mysql::Value::UInt(i) => format!("{:08}", i),
+    mysql::Value::Float(i) => format!("{}", i),
+    mysql::Value::Double(i) => format!("{}", i),
+    mysql::Value::Date(..) => panic!("Unsupported Date type"),
+    mysql::Value::Time(..) => panic!("Unsupported Time type"),
+    mysql::Value::Bytes(b) => std::str::from_utf8(b).unwrap().to_string(),
+  }
+}
 fn encode_row(row: mysql::Row) -> String {
   row
     .unwrap()
     .iter()
-    .map(|v| v.as_sql(true))
+    .map(|v| encode_value(v))
     .collect::<Vec<String>>()
     .join(",")
 }
