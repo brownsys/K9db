@@ -320,3 +320,27 @@ cmake(
     commit = "ce9ac2ce110465d9329c806f4cb57d92f821597e",
     remote = "https://github.com/KinanBab/rocksdb.git",
 )
+
+# libsodium.
+http_archive(
+    name = "libsodium",
+    build_file_content = """
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "configure_make")
+
+filegroup(
+    name = "all_srcs",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"]
+)
+
+configure_make(
+    name = "libsodium",
+    lib_source = ":all_srcs",
+    out_lib_dir = "lib",
+    visibility = ["//visibility:public"],
+)
+""",
+    strip_prefix = "libsodium-1.0.18-RELEASE",
+    type = "zip",
+    url = "https://github.com/jedisct1/libsodium/archive/1.0.18-RELEASE.zip",
+)
