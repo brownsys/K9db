@@ -27,6 +27,7 @@ pub struct Args {
   pub write_every: usize,
   pub operations: usize,
   pub perf: bool,
+  pub warmup: usize,
 }
 
 fn main() {
@@ -46,6 +47,7 @@ fn main() {
                 (@arg write_every: --write_every +takes_value "Issue a direct or group write every x operations")
                 (@arg operations: --operations +takes_value "Number of operations in load")
                 (@arg perf: --perf "Wait for user input before starting workload to attach perf")
+                (@arg warmup: --warmup "# reads to warm up")
         ).get_matches();
 
   // Parse command line arguments.
@@ -63,6 +65,7 @@ fn main() {
     write_every: value_t_or_exit!(matches, "write_every", usize),
     operations: value_t_or_exit!(matches, "operations", usize),
     perf: matches.is_present("perf"),
+    warmup: value_t!(matches, "warmup", usize).unwrap_or(0),
   };
 
   // Output file.
@@ -110,12 +113,20 @@ fn main() {
     std::io::stdin().read_line(&mut String::new());
   }
 
-  // Start workload.
+  // Create a generator workload.
+  let mut workload = WorkloadGenerator::new(st);
+
+  // Warmup.
+  for i in 0..args.warmup {
+    let request = workload.make_read(in_size, &users);
+    backend.run(&request);
+  }
+
+  // Run actual load.
   let mut last_write_direct = false;
   let mut reads = Vec::<u128>::new();
   let mut dwrites = Vec::<u128>::new();
   let mut gwrites = Vec::<u128>::new();
-  let mut workload = WorkloadGenerator::new(st);
   for i in 0..operations {
     if write_every > 0 && i > 0 && i % write_every == 0 {
       // Must issue a write.
