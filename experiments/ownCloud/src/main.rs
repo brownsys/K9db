@@ -47,7 +47,7 @@ fn main() {
                 (@arg write_every: --write_every +takes_value "Issue a direct or group write every x operations")
                 (@arg operations: --operations +takes_value "Number of operations in load")
                 (@arg perf: --perf "Wait for user input before starting workload to attach perf")
-                (@arg warmup: --warmup "# reads to warm up")
+                (@arg warmup: --warmup +takes_value "# reads to warm up")
         ).get_matches();
 
   // Parse command line arguments.
