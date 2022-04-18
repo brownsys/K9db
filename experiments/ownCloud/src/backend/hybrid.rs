@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 // src/models.rs
 use super::super::models::{File, Group, Share, ShareType, User};
 // src/backend/sql.rs
-use super::sql;
+use super::mariadb;
 
 // Encode/decode memcached values.
 fn encode_user(u: &str) -> String {
@@ -73,20 +73,20 @@ pub fn reads<'a>(
   let result = client.get_multi(&keys).unwrap();
 
   // Find out which keys were found and which were invalidated.
-  let mut misses: Vec<&str> = Vec::with_capacity(sample.len());
+  let mut misses: Vec<String> = Vec::with_capacity(sample.len());
   let mut ids = Vec::new();
   for i in 0..keys.len() {
     if let Some((row, _)) = result.get(keys[i]) {
       ids.append(&mut decode_row(row));
     } else {
-      misses.push(&sample[i].uid);
+      misses.push(sample[i].uid.clone());
     }
   }
 
   // Find values for invalidated keys.
   if misses.len() > 0 {
     // Get result from DB.
-    let results = sql::reads_with_data(conn, &misses);
+    let results = mariadb::reads_with_data(conn, &misses);
     let mut map: BTreeMap<String, String> = BTreeMap::new();
     misses.iter().for_each(|uid| {
       map.insert(encode_user(uid), "".to_string());
@@ -139,7 +139,7 @@ pub fn direct<'a>(
 ) -> u128 {
   let now = std::time::Instant::now();
   // Write to database.
-  sql::direct(conn, share);
+  mariadb::direct(conn, share);
 
   // Invalidate.
   if let ShareType::Direct(u) = share.share_with {
@@ -161,7 +161,7 @@ pub fn indirect<'a>(
 ) -> u128 {
   let now = std::time::Instant::now();
   // Write to database.
-  sql::indirect(conn, share);
+  mariadb::indirect(conn, share);
 
   // Invalidate.
   if let ShareType::Group(g) = share.share_with {
@@ -184,7 +184,7 @@ pub fn indirect<'a>(
 
 // Inserts.
 pub fn insert_user(conn: &mut Conn, client: &mut Client, user: &User) {
-  sql::insert_user(conn, user);
+  mariadb::insert_user(conn, user);
 }
 
 pub fn insert_group<'a>(
@@ -193,7 +193,7 @@ pub fn insert_group<'a>(
   group: &Group<'a>,
 ) {
   // Write to database.
-  sql::insert_group(conn, group);
+  mariadb::insert_group(conn, group);
 
   // Write membership to memcached.
   let key = encode_group(&group.gid);
@@ -208,7 +208,7 @@ pub fn insert_group<'a>(
 }
 
 pub fn insert_file<'a>(conn: &mut Conn, client: &mut Client, file: &File<'a>) {
-  sql::insert_file(conn, file)
+  mariadb::insert_file(conn, file)
 }
 
 pub fn insert_share<'a>(
@@ -216,5 +216,5 @@ pub fn insert_share<'a>(
   client: &mut Client,
   share: &Share<'a>,
 ) {
-  sql::insert_share(conn, share)
+  mariadb::insert_share(conn, share)
 }

@@ -10,7 +10,8 @@ use super::workload::Request;
 
 // src/backend/{sql,hybrid}.rs
 mod hybrid;
-mod sql;
+mod mariadb;
+mod pelton;
 
 // Backend enum
 pub enum Backend {
@@ -43,29 +44,29 @@ impl Backend {
   // Insert data (for priming).
   pub fn insert_user(&mut self, user: &User) {
     match self {
-      Backend::Pelton(conn) => sql::insert_user(conn, user),
-      Backend::MariaDB(conn) => sql::insert_user(conn, user),
+      Backend::Pelton(conn) => pelton::insert_user(conn, user),
+      Backend::MariaDB(conn) => mariadb::insert_user(conn, user),
       Backend::Memcached(conn, cl) => hybrid::insert_user(conn, cl, user),
     }
   }
   pub fn insert_group<'a>(&mut self, group: &Group<'a>) {
     match self {
-      Backend::Pelton(conn) => sql::insert_group(conn, group),
-      Backend::MariaDB(conn) => sql::insert_group(conn, group),
+      Backend::Pelton(conn) => pelton::insert_group(conn, group),
+      Backend::MariaDB(conn) => mariadb::insert_group(conn, group),
       Backend::Memcached(conn, cl) => hybrid::insert_group(conn, cl, group),
     }
   }
   pub fn insert_file<'a>(&mut self, file: &File<'a>) {
     match self {
-      Backend::Pelton(conn) => sql::insert_file(conn, file),
-      Backend::MariaDB(conn) => sql::insert_file(conn, file),
+      Backend::Pelton(conn) => pelton::insert_file(conn, file),
+      Backend::MariaDB(conn) => mariadb::insert_file(conn, file),
       Backend::Memcached(conn, cl) => hybrid::insert_file(conn, cl, file),
     }
   }
   pub fn insert_share<'a>(&mut self, share: &Share<'a>) {
     match self {
-      Backend::Pelton(conn) => sql::insert_share(conn, share),
-      Backend::MariaDB(conn) => sql::insert_share(conn, share),
+      Backend::Pelton(conn) => pelton::insert_share(conn, share),
+      Backend::MariaDB(conn) => mariadb::insert_share(conn, share),
       Backend::Memcached(conn, cl) => hybrid::insert_share(conn, cl, share),
     }
   }
@@ -73,10 +74,15 @@ impl Backend {
   // Execute a workload.
   pub fn run(&mut self, request: &Request) -> u128 {
     match self {
-      Backend::Pelton(conn) | Backend::MariaDB(conn) => match request {
-        Request::Read(load, expected) => sql::reads(conn, load, expected),
-        Request::Direct(load) => sql::direct(conn, load),
-        Request::Indirect(load) => sql::indirect(conn, load),
+      Backend::Pelton(conn) => match request {
+        Request::Read(load, expected) => pelton::reads(conn, load, expected),
+        Request::Direct(load) => pelton::direct(conn, load),
+        Request::Indirect(load) => pelton::indirect(conn, load),
+      },
+      Backend::MariaDB(conn) => match request {
+        Request::Read(load, expected) => mariadb::reads(conn, load, expected),
+        Request::Direct(load) => mariadb::direct(conn, load),
+        Request::Indirect(load) => mariadb::indirect(conn, load),
       },
       Backend::Memcached(conn, client) => match request {
         Request::Read(load, expected) => {

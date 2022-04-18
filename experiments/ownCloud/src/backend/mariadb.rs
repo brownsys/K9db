@@ -11,14 +11,23 @@ fn quoted(s: &str) -> String {
 }
 
 // Helper: gets the results not just the time.
-pub fn reads_with_data<'a>(conn: &mut Conn, sample: &Vec<&'a str>) -> Vec<Row> {
-  let questions: Vec<_> = sample.iter().map(|_| "?".to_string()).collect();
+pub fn reads_with_data<'a>(conn: &mut Conn, sample: &Vec<String>) -> Vec<Row> {
   let query = format!(
-    "SELECT * FROM file_view WHERE share_target IN ({})",
-    questions.join(",")
+    "(SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, s.ACCESSOR_share_with as share_target
+      FROM oc_share s
+      LEFT JOIN oc_filecache f ON s.file_source = f.fileid
+      LEFT JOIN oc_storages st ON f.storage = st.numeric_id
+      WHERE (s.share_type = 0) AND s.ACCESSOR_share_with IN ({userids}))
+     UNION 
+      (SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, oc_group_user.uid as share_target
+      FROM oc_share s
+      LEFT JOIN oc_filecache f ON s.file_source = f.fileid
+      LEFT JOIN oc_storages st ON f.storage = st.numeric_id
+      JOIN oc_group_user ON s.ACCESSOR_share_with_group = oc_group_user.OWNING_gid
+      WHERE (s.share_type = 1) AND oc_group_user.uid IN ({userids}))",
+    userids = sample.join(",")
   );
-  let stmt = conn.prep(query).unwrap();
-  conn.exec(stmt, sample).unwrap()
+  conn.query(query).unwrap()
 }
 
 // Workload execution.
@@ -28,32 +37,12 @@ pub fn reads<'a>(
   expected: &Vec<usize>,
 ) -> u128 {
   // Serialize user ids.
-  let userids = sample.iter().map(|s| &s.uid[..]).collect::<Vec<&str>>();
+  let userids = sample.iter().map(|s| quoted(&s.uid)).collect::<Vec<_>>();
 
-  // Use direct statements.
-  let query = format!(
-    "SELECT * FROM file_view WHERE share_target IN ({})",
-    userids.join(",")
-  );
-  let now = std::time::Instant::now();
-  let rows: Vec<Row> = conn.query(&query).unwrap();
-  let prepared_time = now.elapsed().as_micros();
-
-  // Check result correct.
-  let mut results: Vec<_> =
-    rows.iter().map(|r| r.get::<usize, usize>(0).unwrap()).collect();
-  results.sort();
-  if expected != &results {
-    panic!(
-      "Read returns wrong result. Expected: {:?}, found: {:?}",
-      expected, results
-    );
-  }
-
-  // Use prepared queries.
+  // Use a direct query.
   let now = std::time::Instant::now();
   let rows = reads_with_data(conn, &userids);
-  let direct_time = now.elapsed().as_micros();
+  let time = now.elapsed().as_micros();
 
   // Check result correct.
   let mut results: Vec<_> =
@@ -66,7 +55,7 @@ pub fn reads<'a>(
     );
   }
 
-  if prepared_time < direct_time { prepared_time } else { direct_time }
+  time
 }
 
 pub fn direct<'a>(conn: &mut Conn, share: &Share<'a>) -> u128 {

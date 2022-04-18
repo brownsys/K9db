@@ -9,8 +9,9 @@ rust_binary(
         "src/models.rs",
         "src/generator.rs",
         "src/workload.rs",
-        "src/backend/sql.rs",
         "src/backend/hybrid.rs",
+        "src/backend/mariadb.rs",
+        "src/backend/pelton.rs",
     ],
     compile_data = [
         "data/schema.sql",
