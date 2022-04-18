@@ -366,6 +366,7 @@ fn main() {
       // clone log so that each client thread has an owned copy
       let log = log.clone();
       threads.push(std::thread::spawn(move || {
+                     let bufwriter = io::BufWriter::with_capacity(10000000, stream.try_clone().unwrap());
                      info!(log,
                            "Rust Proxy: Successfully connected to mysql \
                             proxy\nStream and address are: {:?}",
@@ -374,7 +375,7 @@ fn main() {
                      let backend = Backend { rust_conn: rust_conn,
                                              log: log };
                      let _ =
-                       MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
+                       MysqlIntermediary::run_on(backend, stream, bufwriter).unwrap();
                    }));
     }
     // wait before checking listener status
