@@ -13,7 +13,7 @@
 #include "rocksdb/slice_transform.h"
 #include "sodium.h"
 
-#define PELTON_ENCRYPTION
+// #define PELTON_ENCRYPTION
 
 namespace pelton {
 namespace sql {
