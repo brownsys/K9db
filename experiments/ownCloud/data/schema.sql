@@ -109,8 +109,7 @@ CREATE VIEW file_view AS '"(
   LEFT JOIN oc_storages st ON f.storage = st.numeric_id
   JOIN oc_group_user ON s.ACCESSOR_share_with_group = oc_group_user.OWNING_gid
   WHERE (s.share_type = 1) AND oc_group_user.uid = ?
-)
-ORDER BY sid ASC"';
+)"';
 
 -- CREATE VIEW file_view AS 
 -- '"(SELECT s.id as sid, s.OWNING_item_source, s.share_type, s.ACCESSOR_share_with as share_target

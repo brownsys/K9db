@@ -9,7 +9,7 @@ use memcached::client::Client;
 use memcached::proto::ProtoType;
 
 // Connection properties.
-const DB_USER: &'static str = "root";
+const DB_USER: &'static str = "pelton";
 const DB_PASSWORD: &'static str = "password";
 const DB_NAME: &'static str = "owncloud";
 
@@ -31,10 +31,15 @@ pub fn pelton_connect() -> Conn {
 }
 
 pub fn mariadb_connect() -> Conn {
+  let db_ip_result = match std::env::var("LOCAL_IP") {
+    Ok(v) => if v == "" { "localhost".to_string() } else { v },
+    Err(_) => "localhost".to_string(),
+  };
   // Start a connection.
   let opts = OptsBuilder::new()
     .user(Some(DB_USER))
-    .pass(Some(DB_PASSWORD));
+    .pass(Some(DB_PASSWORD))
+    .ip_or_hostname(Some(db_ip_result));
   let mut connection = Conn::new(opts).unwrap();
   // Clean up database.
   connection

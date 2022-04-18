@@ -40,8 +40,9 @@ pub fn reads<'a>(
   let prepared_time = now.elapsed().as_micros();
 
   // Check result correct.
-  let results: Vec<_> =
+  let mut results: Vec<_> =
     rows.iter().map(|r| r.get::<usize, usize>(0).unwrap()).collect();
+  results.sort();
   if expected != &results {
     panic!(
       "Read returns wrong result. Expected: {:?}, found: {:?}",
@@ -55,8 +56,9 @@ pub fn reads<'a>(
   let direct_time = now.elapsed().as_micros();
 
   // Check result correct.
-  let results: Vec<_> =
+  let mut results: Vec<_> =
     rows.iter().map(|r| r.get::<usize, usize>(0).unwrap()).collect();
+  results.sort();
   if expected != &results {
     panic!(
       "Read returns wrong result. Expected: {:?}, found: {:?}",
