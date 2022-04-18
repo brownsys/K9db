@@ -27,30 +27,46 @@ pub fn reads<'a>(
   sample: &Vec<&'a User>,
   expected: &Vec<usize>,
 ) -> u128 {
-  let questions: Vec<_> = sample.iter().map(|_| "?".to_string()).collect();
+  // Serialize user ids.
+  let userids = sample.iter().map(|s| &s.uid[..]).collect::<Vec<&str>>();
+
+  // Use prepared statements.
+  let questions: Vec<_> = userids.iter().map(|_| "?".to_string()).collect();
   let query = format!(
     "SELECT * FROM file_view WHERE share_target IN ({})",
     questions.join(",")
   );
   let stmt = conn.prep(query).unwrap();
-  let userids = sample.iter().map(|s| &s.uid).collect::<Vec<_>>();
-
   let now = std::time::Instant::now();
-  let r: Vec<usize> = conn
-    .exec(stmt, userids)
-    .unwrap()
-    .into_iter()
-    .map(|v: Row| v.get::<usize, usize>(0).unwrap())
-    .collect();
-  let time = now.elapsed().as_micros();
+  let rows: Vec<Row> = conn.exec(stmt, &userids).unwrap();
+  let prepared_time = now.elapsed().as_micros();
 
-  if expected != &r {
+  // Check result correct.
+  let results: Vec<_> =
+    rows.iter().map(|r| r.get::<usize, usize>(0).unwrap()).collect();
+  if expected != &results {
     panic!(
       "Read returns wrong result. Expected: {:?}, found: {:?}",
-      expected, r
+      expected, results
     );
   }
-  time
+
+  // Use direct queries.
+  let now = std::time::Instant::now();
+  let rows = reads_with_data(conn, &userids);
+  let direct_time = now.elapsed().as_micros();
+
+  // Check result correct.
+  let results: Vec<_> =
+    rows.iter().map(|r| r.get::<usize, usize>(0).unwrap()).collect();
+  if expected != &results {
+    panic!(
+      "Read returns wrong result. Expected: {:?}, found: {:?}",
+      expected, results
+    );
+  }
+
+  if prepared_time < direct_time { prepared_time } else { direct_time }
 }
 
 pub fn direct<'a>(conn: &mut Conn, share: &Share<'a>) -> u128 {
