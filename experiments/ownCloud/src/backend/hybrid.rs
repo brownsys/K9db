@@ -30,14 +30,23 @@ fn encode_row(row: mysql::Row) -> String {
 fn concat_rows(l: &str, r: &str) -> String {
   format!("{};{}", l, r)
 }
-fn decode_row(bytes: &[u8]) -> &str {
-  std::str::from_utf8(bytes).unwrap()
+fn decode_row(bytes: &[u8]) -> Vec<usize> {
+  let data = std::str::from_utf8(bytes).unwrap();
+  let mut ids = Vec::new();
+  if data.len() > 0 {
+    data.split(";").for_each(|row| {
+      let cols: Vec<_> = row.split(",").collect();
+      ids.push(cols[0].parse::<usize>().unwrap());
+    });
+  }
+  ids
 }
 
 // Workload execution.
 pub fn reads<'a>(conn: &mut Conn,
                  client: &mut Client,
-                 sample: &Vec<&'a User>)
+                 sample: &Vec<&'a User>,
+                 expected: &Vec<usize>)
                  -> u128 {
   let now = std::time::Instant::now();
 
@@ -50,9 +59,10 @@ pub fn reads<'a>(conn: &mut Conn,
 
   // Find out which keys were found and which were invalidated.
   let mut misses: Vec<&str> = Vec::with_capacity(sample.len());
+  let mut ids = Vec::new();
   for i in 0..keys.len() {
     if let Some((row, _)) = result.get(keys[i]) {
-      decode_row(row);
+      ids.append(&mut decode_row(row));
     } else {
       misses.push(&sample[i].uid);
     }
@@ -63,8 +73,10 @@ pub fn reads<'a>(conn: &mut Conn,
     // Get result from DB.
     let results = sql::reads_with_data(conn, &misses);
     let mut map: BTreeMap<String, String> = BTreeMap::new();
+    misses.iter().for_each(|uid| { map.insert(encode_user(uid), "".to_string()); });
     for row in results {
       // The user id is the last (sixth) column.
+      ids.push(row.get::<usize, usize>(0).unwrap());
       let key = encode_user(&row.get::<String, usize>(6).unwrap());
       // The row is encoded as a string.
       let mut value = encode_row(row);
@@ -72,7 +84,9 @@ pub fn reads<'a>(conn: &mut Conn,
       // the same user.
       if map.contains_key(&key) {
         let old = map.get(&key).unwrap();
-        value = concat_rows(old, &value);
+        if old.len() > 0 {
+          value = concat_rows(old, &value);
+        }
       }
       map.insert(key, value);
     }
@@ -84,8 +98,14 @@ pub fn reads<'a>(conn: &mut Conn,
           .unwrap();
   }
 
-  // Done.
-  now.elapsed().as_micros()
+  // Validate output.
+  let time = now.elapsed().as_micros();
+  ids.sort();
+  if expected != &ids {
+    panic!("Read returns wrong result. Expected: {:?}, found: {:?}", expected, ids);
+  }
+  
+  time
 }
 
 pub fn direct<'a>(conn: &mut Conn,

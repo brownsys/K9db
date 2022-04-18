@@ -94,7 +94,9 @@ std::unordered_set<std::string> NO_VIEWS = {
     // Q34.
     "SELECT comments.* FROM comments WHERE comments.short_id = ?",
     // GDPRBench.
-    "SELECT * FROM usertable WHERE YCSB_KEY = ?"};
+    "SELECT * FROM usertable WHERE YCSB_KEY = ?",
+    // Owncloud.
+    "SELECT * FROM file_view WHERE share_target = ?"};
 
 }  // namespace
 
@@ -315,7 +317,13 @@ void FromTables(const CanonicalQuery &query,
   }
   // Look up table schema.
   std::string table_name = sm[1].str();
-  auto schema = dstate.GetTableSchema(table_name);
+  dataflow::SchemaRef schema;
+  if (dstate.HasFlow(table_name)) {
+    const auto &flow = dstate.GetFlow(table_name);
+    schema = flow.output_schema();
+  } else {
+    schema = dstate.GetTableSchema(table_name);
+  }
   // Go over all ? parameters and figure out their types.
   for (size_t i = 0; i < stmt->args_count; i++) {
     const std::string &column_name = stmt->arg_names.at(i);

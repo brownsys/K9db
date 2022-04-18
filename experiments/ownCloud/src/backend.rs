@@ -73,10 +73,14 @@ impl Backend {
   // Execute a workload.
   pub fn run(&mut self, request: &Request) -> u128 {
     match (self, request) {
-      (Backend::Pelton(conn), Request::Read(load)) => sql::reads(conn, load),
-      (Backend::MariaDB(conn), Request::Read(load)) => sql::reads(conn, load),
-      (Backend::Memcached(conn, client), Request::Read(load)) => {
-        hybrid::reads(conn, client, load)
+      (Backend::Pelton(conn), Request::Read(load, expected)) => {
+          sql::reads(conn, load, expected)
+      }
+      (Backend::MariaDB(conn), Request::Read(load, expected)) => {
+        sql::reads(conn, load, expected)
+      }
+      (Backend::Memcached(conn, client), Request::Read(load, expected)) => {
+        hybrid::reads(conn, client, load, expected)
       }
       (Backend::Pelton(conn), Request::Direct(load)) => sql::direct(conn, load),
       (Backend::MariaDB(conn), Request::Direct(load)) => {

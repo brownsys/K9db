@@ -16,11 +16,11 @@ pub enum EntityType {
 
 // A generator needs to keep track of the last id/size of each entity to
 // generate unique ids.
-pub struct GeneratorState(HashMap<EntityType, usize>);
+pub struct GeneratorState(HashMap<EntityType, usize>, HashMap<String, Vec<usize>>);
 
 impl GeneratorState {
   pub fn new() -> Self {
-    GeneratorState(HashMap::new())
+    GeneratorState(HashMap::new(), HashMap::new())
   }
 
   // Generate a new unique id for given entity.
@@ -37,7 +37,9 @@ impl GeneratorState {
 
   // Generate users.
   pub fn generate_users(&mut self, num: usize) -> Vec<User> {
-    std::iter::repeat_with(|| User { uid: self.new_sid(EntityType::User) }).take(num).collect()
+    let users: Vec<User> = std::iter::repeat_with(|| User { uid: self.new_sid(EntityType::User) }).take(num).collect();
+    users.iter().for_each(|u| { self.1.insert(u.uid.clone(), Vec::new()); });
+    users
   }
 
   // Generate groups and add users to them.
@@ -83,7 +85,7 @@ impl GeneratorState {
                                     num: usize)
                                     -> Vec<Share<'b>> {
     let ref mut rng = rand::thread_rng();
-    files.iter()
+    let shares: Vec<_> = files.iter()
             .flat_map(|f| std::iter::repeat(f).take(num))
             .map(|f|
                 Share {
@@ -92,7 +94,9 @@ impl GeneratorState {
                     file: f
                 }
             )
-            .collect()
+            .collect();
+    shares.iter().for_each(|s| self.track_share(s));
+    shares
   }
 
   // generate indirect shares.
@@ -102,7 +106,7 @@ impl GeneratorState {
                                    num: usize)
                                    -> Vec<Share<'b>> {
     let ref mut rng = rand::thread_rng();
-    files.iter()
+    let shares: Vec<_> = files.iter()
             .flat_map(|f| std::iter::repeat(f).take(num))
             .map(|f|
                 Share {
@@ -111,6 +115,23 @@ impl GeneratorState {
                     file: f
                 }
             )
-            .collect()
+            .collect();
+    shares.iter().for_each(|s| self.track_share(s));
+    shares
+  }
+  
+  // Keep track of files shared with all users.
+  pub fn track_share<'b>(&mut self, share: &Share<'b>) {
+    if let ShareType::Direct(u) = share.share_with {
+      self.1.get_mut(&u.uid).unwrap().push(share.id);
+    } else if let ShareType::Group(g) = share.share_with {
+      g.users.iter().for_each(|(_, u)| {
+        self.1.get_mut(&u.uid).unwrap().push(share.id);
+      });
+    }
+  }
+
+  pub fn shared_with(&mut self, uid: &str) -> Vec<usize> {
+    self.1.get(uid).unwrap().clone()
   }
 }

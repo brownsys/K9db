@@ -12,23 +12,36 @@ fn quoted(s: &str) -> String {
 
 // Helper: gets the results not just the time.
 pub fn reads_with_data<'a>(conn: &mut Conn, sample: &Vec<&'a str>) -> Vec<Row> {
+  let questions: Vec<_> = sample.iter().map(|_| "?".to_string()).collect();
   let query = format!("SELECT * FROM file_view WHERE share_target IN ({})",
-                      sample.join(","));
-  conn.query(query).unwrap()
+                      questions.join(","));
+  let stmt = conn.prep(query).unwrap();
+  conn.exec(stmt, sample).unwrap()
 }
 
 // Workload execution.
-pub fn reads<'a>(conn: &mut Conn, sample: &Vec<&'a User>) -> u128 {
-  let mut sstring = sample.iter().map(|s| quoted(&s.uid)).collect::<Vec<_>>();
+pub fn reads<'a>(
+    conn: &mut Conn,
+    sample: &Vec<&'a User>,
+    expected: &Vec<usize>) -> u128 {
+  let questions: Vec<_> = sample.iter().map(|_| "?".to_string()).collect();
   let query = format!("SELECT * FROM file_view WHERE share_target IN ({})",
-                      sstring.join(","));
+                      questions.join(","));
+  let stmt = conn.prep(query).unwrap();
+  let userids = sample.iter().map(|s| &s.uid).collect::<Vec<_>>();
+
   let now = std::time::Instant::now();
-  let r: Vec<Vec<_>> = conn.query(query)
+  let r: Vec<usize> = conn.exec(stmt, userids)
                            .unwrap()
                            .into_iter()
-                           .map(|v: mysql::Row| v.unwrap())
+                           .map(|v: Row| v.get::<usize, usize>(0).unwrap())
                            .collect();
-  now.elapsed().as_micros()
+  let time = now.elapsed().as_micros();
+
+  if expected != &r {
+    panic!("Read returns wrong result. Expected: {:?}, found: {:?}", expected, r);
+  }
+  time
 }
 
 pub fn direct<'a>(conn: &mut Conn, share: &Share<'a>) -> u128 {

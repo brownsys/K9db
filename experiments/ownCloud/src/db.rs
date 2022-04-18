@@ -21,7 +21,8 @@ pub fn pelton_connect() -> Conn {
   // Start a connection.
   let opts = OptsBuilder::new().user(Some(DB_USER))
                                .pass(Some(DB_PASSWORD))
-                               .tcp_port(10001);
+                               .tcp_port(10001)
+                               .tcp_nodelay(true);
   let mut connection = Conn::new(opts).unwrap();
   // Create the schema.
   run_file(&mut connection, PELTON_SCHEMA);
@@ -45,7 +46,7 @@ pub fn mariadb_connect() -> Conn {
 }
 
 pub fn memcached_connect() -> Client {
-  return Client::connect(&[("tcp://localhost:11211", 1)], ProtoType::Binary).unwrap();
+  return Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 }
 
 fn run_file<Q: Queryable>(conn: &mut Q, file: &str) {

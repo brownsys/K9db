@@ -13,6 +13,7 @@ mod models;
 mod workload;
 use backend::Backend;
 use generator::GeneratorState;
+use workload::WorkloadGenerator;
 
 pub struct Args {
   pub num_users: usize,
@@ -77,7 +78,7 @@ fn main() {
   };
 
   // Generate priming data.
-  let ref mut st = GeneratorState::new();
+  let mut st = GeneratorState::new();
   let users = st.generate_users(args.num_users);
   let files = st.generate_files(&users, args.files_per_user);
   let direct_shares =
@@ -117,21 +118,22 @@ fn main() {
   let mut reads = Vec::<u128>::new();
   let mut dwrites = Vec::<u128>::new();
   let mut gwrites = Vec::<u128>::new();
+  let mut workload = WorkloadGenerator::new(st);
   for i in 0..operations {
     if write_every > 0 && i > 0 && i % write_every == 0 {
       // Must issue a write.
       if !last_write_direct {
         last_write_direct = true;
-        let request = workload::make_direct_share(st, &users, &files);
+        let request = workload.make_direct_share(&users, &files);
         dwrites.push(backend.run(&request));
       } else {
         last_write_direct = false;
-        let request = workload::make_group_share(st, &groups, &files);
+        let request = workload.make_group_share(&groups, &files);
         gwrites.push(backend.run(&request));
       }
     } else {
       // Must issue a read.
-      let request = workload::make_read(in_size, &users);
+      let request = workload.make_read(in_size, &users);
       reads.push(backend.run(&request));
     };
   }
