@@ -30,15 +30,13 @@ pub fn reads<'a>(
   // Serialize user ids.
   let userids = sample.iter().map(|s| &s.uid[..]).collect::<Vec<&str>>();
 
-  // Use prepared statements.
-  let questions: Vec<_> = userids.iter().map(|_| "?".to_string()).collect();
+  // Use direct statements.
   let query = format!(
     "SELECT * FROM file_view WHERE share_target IN ({})",
-    questions.join(",")
+    userids.join(",")
   );
-  let stmt = conn.prep(query).unwrap();
   let now = std::time::Instant::now();
-  let rows: Vec<Row> = conn.exec(stmt, &userids).unwrap();
+  let rows: Vec<Row> = conn.query(&query).unwrap();
   let prepared_time = now.elapsed().as_micros();
 
   // Check result correct.
@@ -51,7 +49,7 @@ pub fn reads<'a>(
     );
   }
 
-  // Use direct queries.
+  // Use prepared queries.
   let now = std::time::Instant::now();
   let rows = reads_with_data(conn, &userids);
   let direct_time = now.elapsed().as_micros();
