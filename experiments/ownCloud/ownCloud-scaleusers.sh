@@ -13,7 +13,6 @@ rm -rf /home/pelton/owncloud
 mkdir -p /home/pelton/owncloud
 
 # Go to the pelton root directory.
-cd ~/pelton
 sudo service mariadb stop
 
 echo "Starting pelton..."
@@ -21,10 +20,12 @@ for i in "${!users[@]}"; do
   user=${users[$i]}
   # Run proxy.
   echo "Running proxy $user"
+  cd ~/pelton
   ./run.sh opt > /home/pelton/owncloud/proxy-$user 2>&1 &
   sleep 3
 
   echo "Running pelton harness $user"
+  cd experiments/ownCloud
   bazel run :benchmark -c opt -- \
   --num-users $user \
   --users-per-group $groups \
