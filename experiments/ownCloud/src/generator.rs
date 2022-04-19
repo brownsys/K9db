@@ -31,12 +31,8 @@ impl GeneratorState {
     *self.0.entry(e).and_modify(|i| *i += 1).or_insert(0)
   }
   pub fn new_sid(&mut self, e: EntityType) -> String {
-    self
-      .0
-      .entry(e)
-      .and_modify(|i| *i += 1)
-      .or_insert(0)
-      .to_string()
+    let num = self.0.entry(e).and_modify(|i| *i += 1).or_insert(0);
+    format!("{:06}", num)
   }
 
   // Generate users.

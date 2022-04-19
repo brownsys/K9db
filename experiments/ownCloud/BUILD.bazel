@@ -12,6 +12,7 @@ rust_binary(
         "src/backend/hybrid.rs",
         "src/backend/mariadb.rs",
         "src/backend/pelton.rs",
+        "src/backend/simulate.rs",
     ],
     compile_data = [
         "data/schema.sql",

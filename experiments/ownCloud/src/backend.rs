@@ -12,12 +12,14 @@ use super::workload::Request;
 mod hybrid;
 mod mariadb;
 mod pelton;
+mod simulate;
 
 // Backend enum
 pub enum Backend {
   Pelton(mysql::Conn),
   MariaDB(mysql::Conn),
   Memcached(mysql::Conn, memcached::client::Client),
+  Simulate(simulate::SimulatedState),
 }
 
 // Functions for executing load.
@@ -41,12 +43,19 @@ impl Backend {
       _ => false,
     }
   }
+  pub fn is_simulate(&self) -> bool {
+    match self {
+      Backend::Simulate(_) => true,
+      _ => false,
+    }
+  }
   // Insert data (for priming).
   pub fn insert_user(&mut self, user: &User) {
     match self {
       Backend::Pelton(conn) => pelton::insert_user(conn, user),
       Backend::MariaDB(conn) => mariadb::insert_user(conn, user),
       Backend::Memcached(conn, cl) => hybrid::insert_user(conn, cl, user),
+      Backend::Simulate(conn) => simulate::insert_user(conn, user),
     }
   }
   pub fn insert_group<'a>(&mut self, group: &Group<'a>) {
@@ -54,6 +63,7 @@ impl Backend {
       Backend::Pelton(conn) => pelton::insert_group(conn, group),
       Backend::MariaDB(conn) => mariadb::insert_group(conn, group),
       Backend::Memcached(conn, cl) => hybrid::insert_group(conn, cl, group),
+      Backend::Simulate(conn) => simulate::insert_group(conn, group),
     }
   }
   pub fn insert_file<'a>(&mut self, file: &File<'a>) {
@@ -61,6 +71,7 @@ impl Backend {
       Backend::Pelton(conn) => pelton::insert_file(conn, file),
       Backend::MariaDB(conn) => mariadb::insert_file(conn, file),
       Backend::Memcached(conn, cl) => hybrid::insert_file(conn, cl, file),
+      Backend::Simulate(conn) => simulate::insert_file(conn, file),
     }
   }
   pub fn insert_share<'a>(&mut self, share: &Share<'a>) {
@@ -68,6 +79,7 @@ impl Backend {
       Backend::Pelton(conn) => pelton::insert_share(conn, share),
       Backend::MariaDB(conn) => mariadb::insert_share(conn, share),
       Backend::Memcached(conn, cl) => hybrid::insert_share(conn, cl, share),
+      Backend::Simulate(conn) => simulate::insert_share(conn, share),
     }
   }
 
@@ -91,6 +103,11 @@ impl Backend {
         Request::Direct(load) => hybrid::direct(conn, client, load),
         Request::Indirect(load) => hybrid::indirect(conn, client, load),
       },
+      Backend::Simulate(conn) => match request {
+        Request::Read(load, expected) => simulate::reads(conn, load, expected),
+        Request::Direct(load) => simulate::direct(conn, load),
+        Request::Indirect(load) => simulate::indirect(conn, load),
+      },
     }
   }
 
@@ -100,6 +117,7 @@ impl Backend {
       "pelton" => Backend::Pelton(pelton_connect()),
       "mariadb" => Backend::MariaDB(mariadb_connect()),
       "memcached" => Backend::Memcached(mariadb_connect(), memcached_connect()),
+      "simulate" => Backend::Simulate(simulate::SimulatedState::new()),
       _ => panic!("Unknown backend {}", s),
     }
   }
@@ -112,6 +130,7 @@ impl std::fmt::Display for Backend {
       Backend::Pelton(_) => "pelton",
       Backend::MariaDB(_) => "mariadb",
       Backend::Memcached(_, _) => "memcached",
+      Backend::Simulate(_) => "simulate",
     })
   }
 }
