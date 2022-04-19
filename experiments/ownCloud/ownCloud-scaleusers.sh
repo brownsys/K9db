@@ -25,7 +25,7 @@ for i in "${!users[@]}"; do
   sleep 3
 
   echo "Running pelton harness $user"
-  bazel run :benchmark -c opt --
+  bazel run :benchmark -c opt -- \
   --num-users $user \
   --users-per-group $groups \
   --files-per-user $files \
@@ -33,7 +33,7 @@ for i in "${!users[@]}"; do
   --group-shares-per-file $gshare \
   --write_every $writes \
   --in_size $insize \
-  --operations $ops
+  --operations $ops \
   --backend pelton > /home/pelton/owncloud/pelton-$user 2>&1
   
   # kill Pelton
@@ -50,7 +50,7 @@ for i in "${!users[@]}"; do
 
   # run ownCloud harness
   echo "Running baseline harness $user"
-  bazel run :benchmark -c opt --
+  bazel run :benchmark -c opt -- \
   --num-users $user \
   --users-per-group $groups \
   --files-per-user $files \
@@ -58,7 +58,7 @@ for i in "${!users[@]}"; do
   --group-shares-per-file $gshare \
   --write_every $writes \
   --in_size $insize \
-  --operations $ops
+  --operations $ops \
   --backend mariadb > /home/pelton/owncloud/baseline-$user 2>&1
 
   sleep 3
