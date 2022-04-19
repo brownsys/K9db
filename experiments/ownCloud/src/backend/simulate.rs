@@ -21,7 +21,6 @@ impl SimulatedState {
   }
 
   pub fn insert_user(&mut self, user: &User) {
-    println!("{}", user.uid);
     self.share_map.insert(user.uid.to_string(), Vec::new());
   }
 
