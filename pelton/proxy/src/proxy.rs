@@ -379,7 +379,7 @@ fn main() {
                    }));
     }
     // wait before checking listener status
-    std::thread::sleep(Duration::from_secs(1));
+    std::thread::sleep(Duration::from_millis(1));
   }
 
   // join all client threads
