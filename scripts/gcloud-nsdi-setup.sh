@@ -31,7 +31,7 @@ echo '  eval $(/usr/bin/ssh-agent -k)' >> ~/.bash_logout
 echo 'fi' >> ~/.bash_logout
 
 # Export the local ip as a environment variable
-echo 'LOCAL_IP=$(curl  http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip -H "Metadata-Flavor: Google")' >> ~/.bashrc
+echo 'export LOCAL_IP=$(curl  http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip -H "Metadata-Flavor: Google")' >> ~/.bashrc
 
 
 # Clones to /home/pelton/pelton
