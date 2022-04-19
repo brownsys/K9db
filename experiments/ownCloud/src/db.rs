@@ -23,6 +23,7 @@ pub fn pelton_connect() -> Conn {
     .user(Some(DB_USER))
     .pass(Some(DB_PASSWORD))
     .tcp_port(10001)
+    .ip_or_hostname(Some("127.0.0.1"))
     .tcp_nodelay(true);
   let mut connection = Conn::new(opts).unwrap();
   // Create the schema.
