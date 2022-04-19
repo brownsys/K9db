@@ -1,5 +1,6 @@
 use rand::Rng;
 use std::collections::HashMap;
+use rand::seq::SliceRandom;
 
 // src/models.rs
 use super::models::{File, Group, Share, ShareType, User};
@@ -66,9 +67,12 @@ impl GeneratorState {
     .take(num_groups)
     .collect();
     let grp_len = raw_groups.len();
+    let mut grp_refs = (0..raw_groups.len()).collect::<Vec<_>>();
+    grp_refs.shuffle(rng);
+    let mut grp_iter = grp_refs.iter().cycle();
     if grp_len > 0 {
       users.iter().for_each(|u| {
-        raw_groups[rng.gen_range(0..grp_len)]
+        raw_groups[*grp_iter.next().unwrap()]
           .users
           .push((self.new_id(EntityType::UserGroupAssoc), u))
       });
@@ -100,12 +104,15 @@ impl GeneratorState {
     num: usize,
   ) -> Vec<Share<'b>> {
     let ref mut rng = rand::thread_rng();
+    let mut user_pick_v = users.iter().collect::<Vec<_>>();
+    user_pick_v.shuffle(rng);
+    let mut user_pick = user_pick_v.iter().cycle();
     let shares: Vec<_> = files
       .iter()
       .flat_map(|f| std::iter::repeat(f).take(num))
       .map(|f| Share {
         id: self.new_id(EntityType::Share),
-        share_with: ShareType::Direct(&users[rng.gen_range(0..users.len())]),
+        share_with: ShareType::Direct(user_pick.next().unwrap()),
         file: f,
       })
       .collect();
@@ -121,12 +128,15 @@ impl GeneratorState {
     num: usize,
   ) -> Vec<Share<'b>> {
     let ref mut rng = rand::thread_rng();
+    let ref mut grp_pick_v = groups.iter().collect::<Vec<_>>();
+    grp_pick_v.shuffle(rng);
+    let mut grp_pick = grp_pick_v.iter().cycle();
     let shares: Vec<_> = files
       .iter()
       .flat_map(|f| std::iter::repeat(f).take(num))
       .map(|f| Share {
         id: self.new_id(EntityType::Share),
-        share_with: ShareType::Group(&groups[rng.gen_range(0..groups.len())]),
+        share_with: ShareType::Group(grp_pick.next().unwrap()),
         file: f,
       })
       .collect();
