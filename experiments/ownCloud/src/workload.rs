@@ -50,7 +50,6 @@ impl WorkloadGenerator {
     let distr = Zipf::new(users.len() as u64, self.zipf_f).unwrap();
     while samples.len() != num_samples {
       let s = distr.sample(&mut rng) - 1.0;
-      eprintln!("Sample {}", s);
       let u: &'a User = &users[s as usize];
       if !samples.contains(&u) {
         samples.push(u);
