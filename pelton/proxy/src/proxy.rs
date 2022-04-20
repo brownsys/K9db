@@ -18,6 +18,7 @@ use std::net;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use std::collections::LinkedList;
 
 // Help message.
 const USAGE: &str = "
@@ -90,37 +91,49 @@ fn stringify_parameter(param: msql_srv::ParamValue) -> String {
 fn write_result<W: io::Write>(writer: msql_srv::QueryResultWriter<W>,
                               result: pelton::FFIResult)
                               -> io::Result<()> {
-  let columns = convert_columns(result);
-  let mut rw = writer.start(&columns).unwrap();
-
-  let rows = pelton::result::row_count(result);
-  let cols = columns.len();
-  for r in 0..rows {
-    for c in 0..cols {
-      if pelton::result::null(result, r, c) {
-        rw.write_col(None::<i32>)?;
-        continue;
-      }
-      match pelton::result::column_type(result, c) {
-        pelton::FFIColumnType_UINT => {
-          rw.write_col(pelton::result::uint(result, r, c) as i64)
-        }
-        pelton::FFIColumnType_INT => {
-          rw.write_col(pelton::result::int(result, r, c))
-        }
-        pelton::FFIColumnType_TEXT => {
-          rw.write_col(pelton::result::text(result, r, c))
-        }
-        pelton::FFIColumnType_DATETIME => {
-          rw.write_col(pelton::result::datetime(result, r, c))
-        }
-        _ => unimplemented!("Rust proxy: invalid column type"),
-      }?;
-    }
-    rw.end_row()?;
+  let mut cv: Vec<Vec<msql_srv::Column>> = Vec::new();
+  while pelton::result::next_resultset(result) {
+    cv.push(convert_columns(result));
   }
+
+  let mut writer = writer;
+  let mut i = 0;
+  while pelton::result::next_resultset(result) {
+    i += 1;
+    let columns = &cv[i-1];
+    let mut rw = writer.start(columns).unwrap();
+
+    let rows = pelton::result::row_count(result);
+    let cols = columns.len();
+    for r in 0..rows {
+      for c in 0..cols {
+        if pelton::result::null(result, r, c) {
+          rw.write_col(None::<i32>)?;
+          continue;
+        }
+        match pelton::result::column_type(result, c) {
+          pelton::FFIColumnType_UINT => {
+            rw.write_col(pelton::result::uint(result, r, c) as i64)
+          }
+          pelton::FFIColumnType_INT => {
+            rw.write_col(pelton::result::int(result, r, c))
+          }
+          pelton::FFIColumnType_TEXT => {
+            rw.write_col(pelton::result::text(result, r, c))
+          }
+          pelton::FFIColumnType_DATETIME => {
+            rw.write_col(pelton::result::datetime(result, r, c))
+          }
+          _ => unimplemented!("Rust proxy: invalid column type"),
+        }?;
+      }
+      rw.end_row()?;
+    }
+    writer = rw.finish_one()?;
+  }
+
   pelton::result::destroy(result);
-  return rw.finish();
+  writer.no_more_results()
 }
 
 // msql-srv shim struct.

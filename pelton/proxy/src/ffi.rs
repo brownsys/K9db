@@ -128,6 +128,11 @@ pub mod pelton {
   pub mod result {
     use super::*;
 
+    // Resultset.
+    pub fn next_resultset(c_result: FFIResult) -> bool {
+      unsafe { ffi::FFIResultNextSet(c_result) }
+    }
+
     // Schema.
     pub fn column_count(c_result: FFIResult) -> usize {
       unsafe { ffi::FFIResultColumnCount(c_result) }

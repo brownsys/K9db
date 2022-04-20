@@ -94,11 +94,13 @@ FFIResult FFIExecSelect(FFIConnection c_conn, const char *query) {
   absl::StatusOr<pelton::SqlResult> result = pelton::exec(cpp_conn, query);
   if (result.ok()) {
     pelton::SqlResult *ptr = new pelton::SqlResult(std::move(result.value()));
-    return reinterpret_cast<FFIResult>(ptr);
+    int *idx_ptr = new int();
+    *idx_ptr = -1;
+    return {reinterpret_cast<void *>(ptr), idx_ptr};
   }
 
   LOG(FATAL) << "C-Wrapper: " << result.status();
-  return nullptr;
+  return {nullptr, nullptr};
 }
 
 // Create a prepared statement.
@@ -133,17 +135,19 @@ FFIPreparedResult FFIExecPrepare(FFIConnection c_conn, size_t stmt_id,
     if (sql_result.IsUpdate()) {
       int row_count = sql_result.UpdateCount();
       uint64_t lid = sql_result.LastInsertId();
-      return {false, nullptr, row_count, lid};
+      return {false, {nullptr, nullptr}, row_count, lid};
     } else if (sql_result.IsQuery()) {
       pelton::SqlResult *ptr = new pelton::SqlResult(std::move(result.value()));
-      return {true, reinterpret_cast<FFIResult>(ptr), -1, 0};
+      int *idx_ptr = new int();
+      *idx_ptr = -1;
+      return {true, {reinterpret_cast<void *>(ptr), idx_ptr}, -1, 0};
     } else {
       LOG(FATAL) << "Illegal prepared statement result type";
     }
   }
 
   LOG(FATAL) << "C-Wrapper: " << result.status();
-  return {true, nullptr, -1, 0};
+  return {true, {nullptr, nullptr}, -1, 0};
 }
 
 // Close the connection. Returns true if successful and false otherwise.
@@ -174,58 +178,79 @@ bool FFIShutdown() {
 }
 
 // FFIResult schema handling.
+bool FFIResultNextSet(FFIResult c_result) {
+  (*c_result.index)++;
+  int idx = *c_result.index;
+  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  if (idx < result->ResultSets().size()) {
+    return true;
+  } else {
+    *c_result.index = -1;
+    return false;
+  }
+}
 size_t FFIResultColumnCount(FFIResult c_result) {
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result);
-  const pelton::Schema &schema = result->ResultSets().at(0).schema();
+  int idx = *c_result.index;
+  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  const pelton::Schema &schema = result->ResultSets().at(idx).schema();
   return schema.size();
 }
 const char *FFIResultColumnName(FFIResult c_result, size_t col) {
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result);
-  const pelton::Schema &schema = result->ResultSets().at(0).schema();
+  int idx = *c_result.index;
+  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  const pelton::Schema &schema = result->ResultSets().at(idx).schema();
   return schema.NameOf(col).c_str();
 }
 FFIColumnType FFIResultColumnType(FFIResult c_result, size_t col) {
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result);
-  const pelton::Schema &schema = result->ResultSets().at(0).schema();
+  int idx = *c_result.index;
+  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  const pelton::Schema &schema = result->ResultSets().at(idx).schema();
   return static_cast<FFIColumnType>(schema.TypeOf(col));
 }
 
 // FFIResult data handling.
 size_t FFIResultRowCount(FFIResult c_result) {
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result);
-  const std::vector<pelton::Record> &rows = result->ResultSets().at(0).rows();
+  int idx = *c_result.index;
+  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  const std::vector<pelton::Record> &rows = result->ResultSets().at(idx).rows();
   return rows.size();
 }
 bool FFIResultIsNull(FFIResult c_result, size_t row, size_t col) {
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result);
-  const std::vector<pelton::Record> &rows = result->ResultSets().at(0).rows();
+  int idx = *c_result.index;
+  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  const std::vector<pelton::Record> &rows = result->ResultSets().at(idx).rows();
   return rows.at(row).IsNull(col);
 }
 uint64_t FFIResultGetUInt(FFIResult c_result, size_t row, size_t col) {
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result);
-  const std::vector<pelton::Record> &rows = result->ResultSets().at(0).rows();
+  int idx = *c_result.index;
+  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  const std::vector<pelton::Record> &rows = result->ResultSets().at(idx).rows();
   return rows.at(row).GetUInt(col);
 }
 int64_t FFIResultGetInt(FFIResult c_result, size_t row, size_t col) {
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result);
-  const std::vector<pelton::Record> &rows = result->ResultSets().at(0).rows();
+  int idx = *c_result.index;
+  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  const std::vector<pelton::Record> &rows = result->ResultSets().at(idx).rows();
   return rows.at(row).GetInt(col);
 }
 const char *FFIResultGetString(FFIResult c_result, size_t row, size_t col) {
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result);
-  const std::vector<pelton::Record> &rows = result->ResultSets().at(0).rows();
+  int idx = *c_result.index;
+  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  const std::vector<pelton::Record> &rows = result->ResultSets().at(idx).rows();
   return rows.at(row).GetString(col).c_str();
 }
 const char *FFIResultGetDatetime(FFIResult c_result, size_t row, size_t col) {
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result);
-  const std::vector<pelton::Record> &rows = result->ResultSets().at(0).rows();
+  int idx = *c_result.index;
+  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  const std::vector<pelton::Record> &rows = result->ResultSets().at(idx).rows();
   return rows.at(row).GetDateTime(col).c_str();
 }
 
 // Clean up the memory allocated by an FFIResult.
 void FFIResultDestroy(FFIResult c_result) {
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result);
+  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
   delete result;
+  delete c_result.index;
 }
 
 // FFIPreparedStatement handling.
