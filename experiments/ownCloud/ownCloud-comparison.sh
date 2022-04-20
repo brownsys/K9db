@@ -8,6 +8,7 @@ writes=20
 insize=50
 ops=500
 warmup=500
+zipf=1.6
 
 # Fresh new directory for results
 rm -rf /home/pelton/owncloud-compare
@@ -34,6 +35,7 @@ bazel run :benchmark -c opt -- \
   --write_every $writes \
   --in_size $insize \
   --operations $ops \
+  --zipf $zipf \
   --backend pelton > /home/pelton/owncloud-compare/pelton 2>&1
   
 # kill Pelton
@@ -56,6 +58,7 @@ bazel run :benchmark -c opt -- \
   --write_every $writes \
   --in_size $insize \
   --operations $ops \
+  --zipf $zipf \
   --backend mariadb > /home/pelton/owncloud-compare/baseline 2>&1
 sleep 3
 
@@ -79,6 +82,7 @@ bazel run :benchmark -c opt -- \
   --in_size $insize \
   --operations $ops \
   --warmup $warmup \
+  --zipf $zipf \
   --backend memcached > /home/pelton/owncloud-compare/memcached 2>&1
 
 kill $pid
