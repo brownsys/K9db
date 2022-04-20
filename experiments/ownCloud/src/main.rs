@@ -13,7 +13,7 @@ mod models;
 mod workload;
 use backend::Backend;
 use generator::GeneratorState;
-use workload::WorkloadGenerator;
+use workload::{WorkloadGenerator, ZipfF};
 
 pub struct Args {
   pub num_users: usize,
@@ -28,6 +28,7 @@ pub struct Args {
   pub operations: usize,
   pub perf: bool,
   pub warmup: usize,
+  pub distr: Option<ZipfF>,
 }
 
 fn main() {
@@ -48,6 +49,7 @@ fn main() {
                 (@arg operations: --operations +takes_value "Number of operations in load")
                 (@arg perf: --perf "Wait for user input before starting workload to attach perf")
                 (@arg warmup: --warmup +takes_value "# reads to warm up")
+                (@arg distr: --zipf [s] "Use zipf distribution with a frequency rank exponent of 's' (default to uniform)")
         ).get_matches();
 
   // Parse command line arguments.
@@ -66,6 +68,7 @@ fn main() {
     operations: value_t_or_exit!(matches, "operations", usize),
     perf: matches.is_present("perf"),
     warmup: value_t!(matches, "warmup", usize).unwrap_or(0),
+    distr: value_t!(matches, "distr", ZipfF).ok(),
   };
 
   // Output file.
@@ -114,7 +117,7 @@ fn main() {
   }
 
   // Create a generator workload.
-  let mut workload = WorkloadGenerator::new(st);
+  let mut workload = WorkloadGenerator::new(st, args.distr.unwrap_or(0.0) /* s = 0 is uniform distr */);
 
   // Warmup.
   for i in 0..args.warmup {

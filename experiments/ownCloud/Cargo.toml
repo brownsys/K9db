@@ -6,6 +6,7 @@ authors = ["Justus Adam <dev@justus.science"]
 [dependencies]
 mysql = "20.1.0"
 rand = "0.8.4"
+rand_distr = "0.4.3"
 clap = "2.34.0"
 memcached-rs = "0.4.2"
 
