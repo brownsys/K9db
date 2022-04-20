@@ -14,6 +14,6 @@ for i in range(user_count):
     user_id = i
     
   if sys.argv[1] == 'get':
-    print('GDPR GET users {}'.format(user_id))  
+    print('GDPR GET users {};'.format(user_id))  
   else:
-    print('GDPR FORGET users {}'.format(user_id))
+    print('GDPR FORGET users {};'.format(user_id))
