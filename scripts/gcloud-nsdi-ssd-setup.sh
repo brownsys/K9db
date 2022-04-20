@@ -11,6 +11,4 @@ chown mysql.mysql /mnt/disks/my-ssd/mysql
 
 
 # Configure mariadb to store database in directory
-echo "[mysqld]" >> /etc/mysql/mariadb.cnf
-echo "datadir=/mnt/disks/my-ssd/mysql" >> /etc/mysql/mariadb.cnf
-echo "socket=/mnt/disks/my-ssd/mysql.sock" >> /etc/mysql/mariadb.cnf
+echo "datadir = /mnt/disks/my-ssd/mysql" >> /etc/mysql/mariadb.cnf
