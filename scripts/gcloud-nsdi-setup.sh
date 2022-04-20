@@ -38,11 +38,13 @@ echo 'export LOCAL_IP=$(curl  http://metadata.google.internal/computeMetadata/v1
 ssh-keyscan github.com >> ~/.ssh/known_hosts
 git clone git@github.com:brownsys/pelton.git
 cd pelton
+git checkout nsdi
 
 # Run the setup scripts
 ./scripts/setup-user.sh
 
 # Format and load the ssd.
+sudo service mariadb stop
 sudo ./scripts/gcloud-nsdi-ssd-setup.sh
 
 # Do this on the server only: https://cloud.google.com/architecture/mysql-remote-access

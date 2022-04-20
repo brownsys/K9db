@@ -68,6 +68,7 @@ bazel run @memcached//:memcached -c opt > /home/pelton/owncloud-compare/memlog &
 pid=$!
 
 echo "Running memcached harness"
+cd ../experiments/ownCloud
 bazel run :benchmark -c opt -- \
   --num-users $user \
   --users-per-group $groups \
@@ -78,7 +79,7 @@ bazel run :benchmark -c opt -- \
   --in_size $insize \
   --operations $ops \
   --warmup $warmup \
-  --backend memcached > /home/pelton/owncloud-compare/baseline 2>&1
+  --backend memcached > /home/pelton/owncloud-compare/memcached 2>&1
 
 kill $pid
 sleep 3
