@@ -1,3 +1,8 @@
+extern crate rand_distr;
+
+use rand_distr::Zipf;
+use rand::distributions::Distribution;
+
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
@@ -12,17 +17,21 @@ pub enum Request<'a> {
   Indirect(Share<'a>),
 }
 
+pub type ZipfF = f64;
+
 pub struct WorkloadGenerator {
   rng: rand::rngs::ThreadRng,
   st: GeneratorState,
+  zipf_f: ZipfF,
 }
 
 impl WorkloadGenerator {
   // Create a new request.
-  pub fn new(st: GeneratorState) -> Self {
+  pub fn new(st: GeneratorState, zipf_f: ZipfF) -> Self {
     WorkloadGenerator {
       rng: rand::thread_rng(),
       st: st,
+      zipf_f,
     }
   }
 
@@ -38,8 +47,11 @@ impl WorkloadGenerator {
     if users.len() < num_samples {
       panic!("Too few users, need at least as many as samples");
     }
+    let distr = Zipf::new(users.len() as u64, self.zipf_f).unwrap();
     while samples.len() != num_samples {
-      let u: &'a User = &users[rng.gen_range(0..ulen)];
+      let s = distr.sample(&mut rng) - 1.0;
+      eprintln!("Sample {}", s);
+      let u: &'a User = &users[s as usize];
       if !samples.contains(&u) {
         samples.push(u);
       }
