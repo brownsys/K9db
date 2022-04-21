@@ -1,10 +1,15 @@
 #ifndef PELTON_CONNECTION_H_
 #define PELTON_CONNECTION_H_
 
+#include <algorithm>
+#include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "pelton/dataflow/state.h"
+#include "pelton/perf/perf.h"
 #include "pelton/prepared.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/upgradable_lock.h"
@@ -32,7 +37,11 @@ class State {
 
   // Getters.
   shards::SharderState *sharder_state() { return &this->sharder_state_; }
+  const shards::SharderState &sharder_state() const {
+    return this->sharder_state_;
+  }
   dataflow::DataFlowState *dataflow_state() { return &this->dataflow_state_; }
+  perf::PerfManager &perf() { return this->perf_manager_; }
   std::unordered_map<std::string, prepared::CanonicalDescriptor> &stmts() {
     return this->stmts_;
   }
@@ -50,6 +59,32 @@ class State {
     shards::SharedLock lock = this->sharder_state_.ReaderLock();
     return this->sharder_state_.NumShards();
   }
+  sql::SqlResult PreparedDebug() const {
+    // Acquire reader lock.
+    shards::SharedLock reader_lock = this->ReaderLock();
+    // Create schema.
+    dataflow::SchemaRef schema = dataflow::SchemaFactory::Create(
+        {"Statement"}, {sqlast::ColumnDefinition::Type::TEXT}, {0});
+    // Get all canonicalized statements and sort them.
+    std::vector<std::string> vec;
+    for (const auto &[canonical, _] : this->stmts_) {
+      vec.push_back(canonical);
+    }
+    std::sort(vec.begin(), vec.end());
+    // Create records.
+    std::vector<dataflow::Record> records;
+    for (const auto &canonical : vec) {
+      records.emplace_back(schema, true,
+                           std::make_unique<std::string>(canonical));
+    }
+    // Return result.
+    return sql::SqlResult(sql::SqlResultSet(schema, std::move(records)));
+  }
+  sql::SqlResult PerfList() const {
+    return sql::SqlResult(
+        sql::SqlResultSet(dataflow::SchemaFactory::PERF_LIST_SCHEMA,
+                          this->perf_manager_.ToRecords()));
+  }
 
   // Locks.
   shards::UniqueLock WriterLock() { return shards::UniqueLock(&this->mtx_); }
@@ -63,6 +98,8 @@ class State {
   dataflow::DataFlowState dataflow_state_;
   // Descriptors of queries already encountered in canonical form.
   std::unordered_map<std::string, prepared::CanonicalDescriptor> stmts_;
+  // For tracking perf information.
+  perf::PerfManager perf_manager_;
   // Lock for managing stmts_.
   mutable shards::UpgradableMutex mtx_;
 };
@@ -73,7 +110,9 @@ struct Connection {
   // Connection to the underlying databases.
   sql::PeltonExecutor executor;
   // Prepared statements created by this connection.
-  std::unordered_map<size_t, prepared::PreparedStatementDescriptor> stmts;
+  std::vector<prepared::PreparedStatementDescriptor> stmts;
+  // For tracking perf information about endpoints.
+  perf::EndpointPerf endpoint;
 };
 
 }  // namespace pelton

@@ -9,7 +9,7 @@ bazel run -c opt //:lobsters-harness -- \
   --queries pelton \
   --backend rocks-mariadb \
   --prime \
-  "mysql://root:password@localhost:3306/lobsters"
+  "mysql://pelton:password@localhost:3306/lobsters"
 ```
 
 ## Pelton
@@ -22,5 +22,5 @@ bazel run -c opt //:lobsters-harness -- \
   --backend pelton \
   --prime \
   --in-flight 1 \
-  "mysql://root:password@localhost:10001/lobsters"
+  "mysql://pelton:password@localhost:10001/lobsters"
 ```

@@ -12,7 +12,7 @@ enum ColumnConstraintTypeEnum {
   FOREIGN_KEY,
   AUTOINCREMENT
 };
-enum ColumnDefinitionTypeEnum { UINT, INT, TEXT, DATETIME };
+enum ColumnDefinitionTypeEnum { UINT = 0, INT = 1, TEXT = 2, DATETIME = 3 };
 
 }  // namespace sqlast
 }  // namespace pelton

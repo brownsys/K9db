@@ -48,12 +48,13 @@ absl::StatusOr<std::string> GetFKValueHelper(
     return stmt.GetValue(col.column_name());
   }
   size_t fk_idx = schema.ColumnIndex(col.column_name());
-  if (!info.IsTransitive() && info.shard_by_index < fk_idx) {
-    --fk_idx;
+  if (!info.IsTransitive()) {
+    if (info.shard_by_index < fk_idx) --fk_idx;
     CHECK_EQ(schema.GetColumns().size() - 1, stmt.GetValues().size());
   } else {
     CHECK_EQ(schema.GetColumns().size(), stmt.GetValues().size());
   }
+
   return stmt.GetValue(fk_idx);
 }
 
@@ -78,7 +79,7 @@ absl::Status MaybeHandleOwningColumn(const sqlast::Insert &stmt,
   bool was_moved = false;
   for (auto &col : rel_schema.GetColumns()) {
     if (IsOwning(col)) {
-      VLOG(1) << "Found owning column";
+      VLOG(1) << "Found owning column" << col;
       if (was_moved) {
         return absl::InvalidArgumentError("Two owning columns?");
       } else {

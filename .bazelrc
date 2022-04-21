@@ -38,6 +38,7 @@ run:cachegrind --run_under "valgrind --tool=cachegrind "
 build:opt -c opt  # use bazel default opt config
 build:opt --copt -DPELTON_OPT
 build:opt --host_copt -DPELTON_OPT
+build:opt --copt -O3
 
 # For thread sanitizer
 build:tsan --strip=never

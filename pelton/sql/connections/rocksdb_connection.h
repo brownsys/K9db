@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "pelton/dataflow/record.h"
@@ -35,8 +36,8 @@ class SingletonRocksdbConnection {
   bool ExecuteStatement(const sqlast::AbstractStatement *sql,
                         const std::string &shard_name);
 
-  int ExecuteUpdate(const sqlast::AbstractStatement *sql,
-                    const std::string &shard_name);
+  std::pair<int, uint64_t> ExecuteUpdate(const sqlast::AbstractStatement *sql,
+                                         const std::string &shard_name);
 
   SqlResultSet ExecuteQuery(const sqlast::AbstractStatement *sql,
                             const dataflow::SchemaRef &schema,
@@ -67,7 +68,7 @@ class SingletonRocksdbConnection {
   std::unordered_map<TableID, size_t> primary_keys_;
   std::unordered_map<TableID, std::vector<size_t>> indexed_columns_;
   std::unordered_map<TableID, std::vector<RocksdbIndex>> indices_;
-  std::unordered_map<TableID, std::atomic<int64_t>> auto_increment_counters_;
+  std::unordered_map<TableID, std::atomic<uint64_t>> auto_increment_counters_;
 };
 
 class RocksdbConnection : public PeltonConnection {
@@ -87,8 +88,9 @@ class RocksdbConnection : public PeltonConnection {
                         const std::string &shard_name) override {
     return this->singleton_->ExecuteStatement(sql, shard_name);
   }
-  int ExecuteUpdate(const sqlast::AbstractStatement *sql,
-                    const std::string &shard_name) override {
+  std::pair<int, uint64_t> ExecuteUpdate(
+      const sqlast::AbstractStatement *sql,
+      const std::string &shard_name) override {
     return this->singleton_->ExecuteUpdate(sql, shard_name);
   }
   SqlResultSet ExecuteQuery(const sqlast::AbstractStatement *sql,

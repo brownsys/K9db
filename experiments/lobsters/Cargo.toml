@@ -9,9 +9,10 @@ chrono = { version = "0.4.0", features = ["serde"] }
 clap = "2.25.0"
 futures-util = "0.3.0"
 hdrhistogram = "7"
+lazy_static = "1.0.0"
 mysql_async = "0.23.0"
 tower-service = "0.3.0"
-trawler = { git = "https://github.com/ms705/trawler.git", branch = "master" }
+trawler = { git = "https://github.com/ms705/trawler.git", branch = "kinan-benchmarking" }
 
 [lib]
 path = "src/endpoints/lib.rs"

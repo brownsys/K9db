@@ -3,6 +3,7 @@
 #define PELTON_SQL_CONNECTION_H__
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "pelton/dataflow/record.h"
@@ -34,8 +35,8 @@ class PeltonConnection {
   // Execute statement by type.
   virtual bool ExecuteStatement(const sqlast::AbstractStatement *sql,
                                 const std::string &shard_name) = 0;
-  virtual int ExecuteUpdate(const sqlast::AbstractStatement *sql,
-                            const std::string &shard_name) = 0;
+  virtual std::pair<int, uint64_t> ExecuteUpdate(
+      const sqlast::AbstractStatement *sql, const std::string &shard_name) = 0;
   virtual SqlResultSet ExecuteQuery(const sqlast::AbstractStatement *sql,
                                     const dataflow::SchemaRef &schema,
                                     const std::vector<AugInfo> &augments,

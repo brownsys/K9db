@@ -64,8 +64,7 @@ impl <'a> InsertDB for Share<'a> {
         };
         conn.query_drop(
             format!(
-            "INSERT INTO oc_share 
-             VALUES ({share_id}, {share_type}, {user_target}, {group_target}, '{owner}', '{initiator}', NULL, 'file', {file}, '', '', 24, 0, 0, NULL, '', 1, '', 24, 19);",
+            "INSERT INTO oc_share VALUES ({share_id}, {share_type}, {user_target}, {group_target}, '{owner}', '{initiator}', NULL, 'file', {file}, '', '', 24, 0, 0, NULL, '', 1, '', 24, 19);",
                 share_id = self.id,
                 user_target = user_target,
                 group_target = group_target,
@@ -159,6 +158,7 @@ impl GeneratorState {
     }
 
     fn generate_groups<'b> (&mut self, users: &'b [User], num: usize) -> Vec<Group<'b>> {
+        let num_groups = if num > 0 { users.len() / num } else { 0 };
         let ref mut rng = rand::thread_rng();
         let mut raw_groups : Vec<_> = 
                 std::iter::repeat_with(||
@@ -166,12 +166,14 @@ impl GeneratorState {
                         gid: self.new_id(EntityT::Group).to_string(), 
                         users: vec![] 
                     })
-                .take(users.len() / num)
+                .take(num_groups)
                 .collect();
         let grp_len = raw_groups.len();
-        users.iter().for_each(|u| 
-            raw_groups[rng.gen_range(0..grp_len)].users.push((self.new_id(EntityT::UserGroupAssoc), u))
-        );
+        if grp_len > 0 {
+          users.iter().for_each(|u|
+              raw_groups[rng.gen_range(0..grp_len)].users.push((self.new_id(EntityT::UserGroupAssoc), u))
+          );
+        }
         raw_groups
     }
     fn generate_files<'b>(&mut self, users : &'b [User], num: usize) -> Vec<File<'b>>  {
@@ -384,6 +386,7 @@ pub struct Args {
     pub workloads: Vec<String>,
     pub memcached: bool,
     pub revokes: bool,
+    pub perf: bool,
 }
 
 fn main() {
@@ -407,6 +410,7 @@ fn main() {
                 (@arg workload: --workloads ... +required  +takes_value "Type of workload to run")
                 (@arg memcached: --memcached "Enable memcached")
                 (@arg revokes: --revokes "Also check revokes")
+                (@arg perf: --perf "Wait for user input before starting workload to attach perf")
         ).get_matches();
 
     let ref args = Args {
@@ -424,6 +428,7 @@ fn main() {
         workloads: matches.values_of("workload").unwrap().map(|s| s.to_string()).collect(),
         memcached: matches.is_present("memcached"),
         revokes: matches.is_present("revokes"),
+        perf: matches.is_present("perf"),
     };
 
 
@@ -482,10 +487,6 @@ fn main() {
         }
     ).collect::<Vec<_>>();
 
-
-    writeln!(f, "Run,Backend,Time(ms),Users,Memcached,Workload").unwrap();
-
-
     let mut results : Vec<Vec<Vec<Row>>> = args.backends.iter().map(|backend| {
         let pelton_handle = if spawn_pelton_yourself && backend.is_pelton() {
             let rm_res = std::fs::remove_dir_all("/var/pelton/rocksdb/pelton");
@@ -524,19 +525,22 @@ fn main() {
             group_shares.insert_db(conn, backend);
         }
         let t_ins = i_ins.elapsed();
-        //conn.query_drop("SET echo");
         eprintln!("Inserts done in {}ms", t_ins.as_millis());
 
-        //std::io::stdin().read_line(&mut String::new());
+        // Mark the start of the benchmark
+        if backend.is_pelton() {
+          conn.query_drop("SET START");
+          if args.perf {
+            std::io::stdin().read_line(&mut String::new());
+          }
+        }
 
-
-
+        // Print headers.
+        writeln!(f, "Run,Backend,Time(ms),Users,Memcached,Workload").unwrap();
         // select_files_for_user(conn, &users[0]);
-
         // std::thread::sleep(std::time::Duration::from_millis(300));
 
         // Don't run memcached on pelton
-
         if mcd_quid.is_some()  {
             //eprintln!("{:?}", conn.query("SELECT * FROM file_view").unwrap().into_iter().map(|r:Row| r.unwrap()).collect::<Vec<_>>());
             memcached::MemUpdate("file_view"); 

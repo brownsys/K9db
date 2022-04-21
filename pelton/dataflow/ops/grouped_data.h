@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <limits>
 #include <list>
 #include <set>
 #include <utility>
@@ -159,6 +160,13 @@ class GroupedDataT : public GroupedData<RecordCompare> {
     this->schema_has_pk_ = schema.keys().size() > 0;
   }
   void Initialize(bool use_pk) { this->schema_has_pk_ = false; }
+
+  // TopKOnly.
+  template <typename X = void,
+            typename std::enable_if<!NoCompare::value, X>::type * = nullptr>
+  void TopK(int limit) {
+    this->topk_ = limit;
+  }
 
   // Generic API:
   // Count of elements in the entire map.
@@ -407,11 +415,42 @@ class GroupedDataT : public GroupedData<RecordCompare> {
         its.emplace_back(insert_it);
       }
     }
+    // If we need to store only the top k, and we are beyond that, remove
+    // last elements.
+    if constexpr (!NoCompare::value) {
+      while (bucket->size() > this->topk_) {
+        auto last_it = std::next(bucket->crbegin()).base();  // Last element.
+        if (this->schema_has_pk_) {
+          Key pk = last_it->GetKey();
+          auto pk_it = this->pk_index_.find(pk);
+          if (pk_it == this->pk_index_.end()) {
+            return false;
+          }
+          // Find the same record using PK index.
+          auto &list = pk_it->second;
+          for (auto it = list.begin(); it != list.end(); ++it) {
+            if (last_it == *it) {
+              list.erase(it);
+              break;
+            }
+          }
+          if (list.size() == 0) {
+            this->pk_index_.erase(pk_it);
+          }
+        }
+        bucket->erase(last_it);
+      }
+    }
     return true;
   }
   bool Delete(const Key &k, R &&r) {
     auto it = this->contents_.find(k);
     if (it == this->contents_.end()) {
+      if constexpr (!NoCompare::value) {
+        if (this->topk_ < std::numeric_limits<size_t>::max()) {
+          return true;
+        }
+      }
       return false;
     }
     V &bucket = it->second;
@@ -428,6 +467,11 @@ class GroupedDataT : public GroupedData<RecordCompare> {
         Key pk = r.GetKey();
         auto pk_it = this->pk_index_.find(pk);
         if (pk_it == this->pk_index_.end()) {
+          if constexpr (!NoCompare::value) {
+            if (this->topk_ < std::numeric_limits<size_t>::max()) {
+              return true;
+            }
+          }
           // Should never happen.
           return false;
         }
@@ -458,6 +502,11 @@ class GroupedDataT : public GroupedData<RecordCompare> {
     }
 
     if (erase_it == bucket.end()) {
+      if constexpr (!NoCompare::value) {
+        if (this->topk_ < std::numeric_limits<size_t>::max()) {
+          return true;
+        }
+      }
       // Element not found (should never happen).
       return false;
     } else {
@@ -477,6 +526,7 @@ class GroupedDataT : public GroupedData<RecordCompare> {
  private:
   // Total number of records.
   size_t count_ = 0;
+  size_t topk_ = std::numeric_limits<size_t>::max();
   // Underlying content.
   M contents_;
   // Index V by primary key for fast deletion.
