@@ -17,6 +17,15 @@ filegroup(
 )
 
 filegroup(
+    name = "hours-data",
+    srcs = glob([
+        "hours/*.sql",
+        "hours/*.txt",
+    ]),
+    visibility = ["//tests:__subpackages__"],
+)
+
+filegroup(
     name = "delf-medical-chat-retain-data",
     srcs = glob([
         "delf_medical_retain/*.sql",
