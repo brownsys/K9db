@@ -2,7 +2,7 @@ import sys
 import random
 
 total_number = 5000
-user_count = 100
+user_count = 1000
 users = set()
 for i in range(user_count):
   user_id = None
