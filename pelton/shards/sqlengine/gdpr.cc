@@ -393,9 +393,6 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
 
   sql::SqlResult result(std::vector<sql::SqlResultSet>{});
   for (const auto &table_name : state->TablesInShard(shard_kind)) {
-    if (!state->ShardExists(shard_kind, unquoted_user_id))
-      return absl::InvalidArgumentError("Shard for user " + unquoted_user_id +
-                                        " does not exist");
     dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
 
     sql::SqlResult table_result(schema);
