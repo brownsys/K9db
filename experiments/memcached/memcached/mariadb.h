@@ -3,6 +3,7 @@
 #define EXPERIMENTS_MEMCACHED_MEMORY_MEMCACHED_MARIADB_H_
 
 #include <cassert>
+#include <cstdlib>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -13,10 +14,17 @@
 class MariaDBConnection {
  public:
   MariaDBConnection() {
+    std::string host = "localhost";
+    char *local_ip = std::getenv("LOCAL_IP");
+    if (local_ip != nullptr) {
+      if (local_ip[0] != '\0') {
+        host = std::string(local_ip);
+      }
+    }
     // Connect to mariadb server.
     sql::ConnectOptionsMap props;
-    props["hostName"] = "localhost";
-    props["userName"] = "root";
+    props["hostName"] = host.c_str();
+    props["userName"] = "pelton";
     props["password"] = "password";
 
     sql::Driver *driver = sql::mariadb::get_driver_instance();

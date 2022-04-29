@@ -100,7 +100,7 @@ static std::regex REGEX_HAVING{"(.*) HAVING ([A-Za-z0-9\\._]+) \\= \\?(.*)"};
 static std::regex REGEX_COLUMN{"([A-Za-z_0-9]+\\.)?([A-Za-z0-9_]+)"};
 static std::regex REGEX_LIMIT{"(.*) LIMIT ([0-9]+)"};
 
-#define QUERIES REAL_QUERIES
+#define QUERIES ALL_QUERIES
 
 int main(int argc, char **argv) {
   uint64_t total_size = 0;

@@ -79,24 +79,24 @@ CREATE TABLE oc_share (
 -- WHERE oc_share.OWNING_item_source = ?
 -- GROUP BY (oc_share.OWNING_item_source, oc_group_user.uid)"';
 
+CREATE INDEX oc_share_type_direct ON oc_share(ACCESSOR_share_with, share_type);
+CREATE INDEX oc_share_type_indirect ON oc_share(ACCESSOR_share_with_group, share_type);
+CREATE INDEX oc_group_user_uid ON oc_group_user(uid);
+CREATE INDEX oc_storages_numeric_id ON oc_storages(numeric_id);
 
--- -- shoudl also return s.*
-CREATE VIEW file_view AS 
-(SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, s.ACCESSOR_share_with as share_target
-FROM oc_share s
-LEFT JOIN oc_filecache f ON s.file_source = f.fileid
-LEFT JOIN oc_storages st ON f.storage = st.numeric_id
-WHERE (s.share_type = 0) )
-UNION
-(SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, oc_group_user.uid as share_target
-FROM oc_share s
-LEFT JOIN oc_filecache f ON s.file_source = f.fileid
-LEFT JOIN oc_storages st ON f.storage = st.numeric_id
-JOIN oc_group_user ON s.ACCESSOR_share_with_group = oc_group_user.OWNING_gid
-WHERE (s.share_type = 1) 
-   )
-ORDER BY sid ASC
-;
+-- -- should also return s.*
+-- (SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, s.ACCESSOR_share_with as share_target
+--   FROM oc_share s
+--   LEFT JOIN oc_filecache f ON s.file_source = f.fileid
+--   LEFT JOIN oc_storages st ON f.storage = st.numeric_id
+--   WHERE (s.share_type = 0) AND s.ACCESSOR_share_with = {})
+-- UNION
+--   (SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, oc_group_user.uid as share_target
+--   FROM oc_share s
+--   LEFT JOIN oc_filecache f ON s.file_source = f.fileid
+--   LEFT JOIN oc_storages st ON f.storage = st.numeric_id
+--   JOIN oc_group_user ON s.ACCESSOR_share_with_group = oc_group_user.OWNING_gid
+--   WHERE (s.share_type = 1) AND oc_group_user.uid = {})
 
 -- CREATE VIEW file_view AS 
 -- '"(SELECT s.id as sid, s.OWNING_item_source, s.share_type, s.ACCESSOR_share_with as share_target
@@ -108,5 +108,4 @@ ORDER BY sid ASC
 -- JOIN oc_group_user ON s.ACCESSOR_share_with_group = oc_group_user.OWNING_gid
 -- WHERE (s.share_type = 1) AND oc_group_user.uid = ?
 --    )
--- ORDER BY sid ASC
 -- "';

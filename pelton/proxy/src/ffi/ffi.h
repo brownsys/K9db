@@ -30,7 +30,10 @@ typedef struct {
 typedef enum { UINT = 0, INT = 1, TEXT = 2, DATETIME = 3 } FFIColumnType;
 
 // A pointer to a SqlResult but we use void * to simplify rust handling.
-typedef void *FFIResult;
+typedef struct {
+  void *result;
+  int *index;
+} FFIResult;
 
 // A pointer to PreparedStatementDescriptor but we use void * for rust.
 typedef const void *FFIPreparedStatement;
@@ -84,6 +87,7 @@ void FFIPlannerShutdown();
 bool FFIShutdown();
 
 // FFIResult schema handling.
+bool FFIResultNextSet(FFIResult c_result);
 size_t FFIResultColumnCount(FFIResult c_result);
 const char *FFIResultColumnName(FFIResult c_result, size_t col);
 FFIColumnType FFIResultColumnType(FFIResult c_result, size_t col);

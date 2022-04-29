@@ -23,16 +23,11 @@ jobs:
       run: |
         docker exec pelton-testing sh -c "cd /home/pelton && bazel build ..."
         docker exec pelton-testing sh -c "cd /home/pelton/experiments/lobsters && bazel build ..."
-        docker exec pelton-testing sh -c "cd /home/pelton/experiments/memcached && bazel build ..."
         docker exec pelton-testing sh -c "cd /home/pelton/experiments/ownCloud && bazel build ..."
 
     # bazel test all except memcached
     - name: Test all
       run: docker exec pelton-testing sh -c "cd /home/pelton && bazel test ... --test_output=all"
-
-    # Test memcached baseline
-    - name : Test memcached
-      run: docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/memcached-test.sh"
 
     # prepared statement test.
     - name: Run prepared statement test

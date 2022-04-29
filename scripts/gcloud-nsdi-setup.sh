@@ -30,14 +30,22 @@ echo 'if [[ "$SSH_AGENT_PID" != "" ]]; then' >> ~/.bash_logout
 echo '  eval $(/usr/bin/ssh-agent -k)' >> ~/.bash_logout
 echo 'fi' >> ~/.bash_logout
 
+# Export the local ip as a environment variable
+echo 'export LOCAL_IP=$(curl  http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip -H "Metadata-Flavor: Google")' >> ~/.bashrc
+
 
 # Clones to /home/pelton/pelton
 ssh-keyscan github.com >> ~/.ssh/known_hosts
 git clone git@github.com:brownsys/pelton.git
 cd pelton
+git checkout nsdi
 
 # Run the setup scripts
 ./scripts/setup-user.sh
+
+# Format and load the ssd.
+sudo service mariadb stop
+sudo ./scripts/gcloud-nsdi-ssd-setup.sh
 
 # Do this on the server only: https://cloud.google.com/architecture/mysql-remote-access
 LOCAL_IP=$(curl  http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip -H "Metadata-Flavor: Google")
