@@ -35,48 +35,27 @@ void DataFlowGraph::Initialize(
 
   LOG(INFO) << "Entering Initialize()...";
 
-  if (partition->inputs().size() == 0) {
-    LOG(INFO) << "SINGLE WORKER CASE";
+  // if (partition->inputs().size() == 0) {
+  //   LOG(INFO) << "SINGLE WORKER CASE";
 
-    // Store the input names for this graph (i.e. for any partition).
-    this->output_schema_ = partition->outputs().at(0)->output_schema();
-    this->matview_keys_ = partition->outputs().at(0)->key_cols();
+  //   // Store the input names for this graph (i.e. for any partition).
+  //   this->output_schema_ = partition->outputs().at(0)->output_schema();
+  //   this->matview_keys_ = partition->outputs().at(0)->key_cols();
 
-    // Fill in partition key maps.
-    this->inkeys_ = std::unordered_map<std::string, PartitionKey>();
-    this->outkey_ = std::vector<ColumnID>();
+  //   // Fill in partition key maps.
+  //   this->inkeys_ = std::unordered_map<std::string, PartitionKey>();
+  //   this->outkey_ = std::vector<ColumnID>();
 
-    // // Add in any needed exchanges.
-    // LOG(INFO) << "Adding exchanges";
-    // ProducerMap p;
-    // RequiredMap r;
-    // std::vector<std::tuple<PartitionKey, Operator *, Operator *>> exchanges;
+  //   // Print debugging information.
+  //   LOG(INFO) << "Planned exchanges and partitioning of flow";
+  //   LOG(INFO) << partition->DebugString();
 
-    // for (NodeIndex i = 0; i < partition->Size(); i++) {
-    //   Operator *op = partition->GetNode(i);
-    //   for (Operator *child : op->children()) {
-    //     auto result = ExchangeKey(op, child, p, r);
-    //     if (result) {
-    //       exchanges.emplace_back(std::move(result.value()), op, child);
-    //     }
-    //   }
-    // }
-    // for (const auto &[key, parent, child] : exchanges) {
-    //   auto exchange = std::make_unique<ExchangeOperator>(
-    //       this->flow_name_, this->size_, channels, key);
-    //   partition->InsertNode(std::move(exchange), parent, child);
-    // }
-
-    // Print debugging information.
-    LOG(INFO) << "Planned exchanges and partitioning of flow";
-    LOG(INFO) << partition->DebugString();
-
-    // Make the specified number of partitions.
-    this->partitions_.push_back(std::move(partition));
-    this->matviews_.push_back(this->partitions_.back()->outputs().at(0));
-    LOG(INFO) << "Exiting Initialize()...";
-    return;
-  }
+  //   // Make the specified number of partitions.
+  //   this->partitions_.push_back(std::move(partition));
+  //   this->matviews_.push_back(this->partitions_.back()->outputs().at(0));
+  //   LOG(INFO) << "Exiting Initialize()...";
+  //   return;
+  // }
 
   // Store the input names for this graph (i.e. for any partition).
   this->output_schema_ = partition->outputs().at(0)->output_schema();
@@ -92,6 +71,28 @@ void DataFlowGraph::Initialize(
   ExternalMap e;
   for (const auto &[_, input_operator] : partition->inputs()) {
     DFS(*input_operator, UNDEFINED_NODE_INDEX, Any::UNIT, &p, &r, e);
+  }
+
+  for (const auto &pair : partition->nodes()) {
+    // Iterate through ForwardView operators.
+    if (pair.second->type() == pelton::dataflow::Operator::Type::FORWARD_VIEW) {
+      // Get parent MatView of the ForwardView.
+      pelton::dataflow::Operator *parent_op = pair.second->parents().at(0);
+      pelton::dataflow::MatViewOperator *parent_mat_view =
+        (pelton::dataflow::MatViewOperator *) parent_op;
+
+      LOG(INFO) << "DFS ON FORWARD VIEW";
+      LOG(INFO) << "ForwardView: " << pair.second->DebugString();
+      LOG(INFO) << "Parent MatView: " << parent_mat_view->DebugString();
+      // loop through outkey and log
+      for (const auto &outkey : parent_mat_view->outkey()) {
+        LOG(INFO) << "outkey: " << outkey;
+      }
+
+      // DFS on the ForwardView
+      DFS(*pair.second, UNDEFINED_NODE_INDEX, parent_mat_view->outkey(),
+      &p, &r, e);
+    }
   }
 
   // Check to see that every MatView was assigned a partition key.
@@ -152,7 +153,16 @@ void DataFlowGraph::Initialize(
   // Make the specified number of partitions.
   for (PartitionIndex i = 0; i < this->size_; i++) {
     this->partitions_.push_back(partition->Clone(i));
+    LOG(INFO) << "Making partition " << i;
     this->matviews_.push_back(this->partitions_.back()->outputs().at(0));
+  }
+
+  LOG(INFO) << "Made the specified number of partitions";
+
+  // Save outkey_ in each of the MatViews.
+  for (auto matview : this->matviews_) {
+    matview->outkey(this->outkey_);
+    LOG(INFO) << "SETTING OUTKEY FOR MATVIEW: " << matview->DebugString();
   }
 
   LOG(INFO) << "Exiting Initialize()...";
