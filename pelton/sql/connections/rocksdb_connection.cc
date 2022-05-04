@@ -71,7 +71,7 @@ const std::string &GetTableName(const sqlast::AbstractStatement *stmt) {
 // SingletonRocksdbConnection.
 SingletonRocksdbConnection::SingletonRocksdbConnection(
     const std::string &db_name) {
-  std::string path = "/mnt/disks/my-ssd/pelton/" + db_name;
+  std::string path = "/tmp/pelton/rocksdb/" + db_name;
 
   // Options.
   rocksdb::Options opts;

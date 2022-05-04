@@ -1,6 +1,6 @@
 #!/bin/bash
-rm -rf /mnt/disks/my-ssd/pelton
-mkdir -p /mnt/disks/my-ssd/pelton
+rm -rf /tmp/pelton
+mkdir -p /tmp/pelton
 
 if [[ "$1" == "dbg" ]]; then
   RUST_BACKTRACE=1 bazel run //:pelton -- --logtostderr=1 "${@:2}"
