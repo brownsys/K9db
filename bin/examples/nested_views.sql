@@ -36,6 +36,12 @@ CREATE TABLE chat (
   FOREIGN KEY (doctor_id) REFERENCES doctors(id)
 );
 
+CREATE VIEW v1 AS '"SELECT doctors.PII_name AS doctor, patients.PII_name as patient, chat.message as msg FROM doctors JOIN chat ON doctors.id = chat.doctor_id JOIN patients ON chat.OWNER_patient_id = patients.id"';
+SELECT * FROM v1;
+
+CREATE VIEW v2 AS '"SELECT doctor, msg FROM v1 WHERE patient = 'Dracula'"';
+SELECT * FROM v2;
+
 -- Test view creation after inserts.
 INSERT INTO doctors VALUES (1, 'Alice');
 INSERT INTO doctors(id, PII_name) VALUES (2, 'Bob');
@@ -56,8 +62,8 @@ INSERT INTO chat VALUES (3, 20, 1, 'HELLO');
 INSERT INTO chat VALUES (4, 20, 2, 'HELLO 2');
 INSERT INTO chat VALUES (5, 20, 1, 'HELLO 3');
 
-CREATE VIEW v1 AS '"SELECT doctors.PII_name, patients.PII_name FROM doctors JOIN chat ON doctors.id = chat.doctor_id JOIN patients ON chat.OWNER_patient_id = patients.id"';
 SELECT * FROM v1;
-
-CREATE VIEW v2 AS '"SELECT * FROM v1"';
 SELECT * FROM v2;
+
+CREATE VIEW v3 AS '"SELECT doctor, msg FROM v1 WHERE patient = 'Carl'"';
+SELECT * FROM v3;

@@ -17,6 +17,7 @@ namespace dataflow {
 class Operator;
 class InputOperator;
 class MatViewOperator;
+class ForwardViewOperator;
 
 class DataFlowGraphPartition {
  public:
@@ -41,6 +42,11 @@ class DataFlowGraphPartition {
   inline bool AddInputNode(std::unique_ptr<InputOperator> &&op) {
     return this->AddInputNode(std::move(op), this->nodes_.size());
   }
+  inline bool AddForwardOperator(std::unique_ptr<ForwardViewOperator> &&op,
+                                 const std::vector<Operator *> &parents) {
+    NodeIndex idx = this->nodes_.size();
+    return this->AddForwardOperator(std::move(op), idx, parents);
+  }
   inline bool AddOutputOperator(std::unique_ptr<MatViewOperator> &&op,
                                 Operator *parent) {
     return this->AddOutputOperator(std::move(op), this->nodes_.size(), parent);
@@ -56,6 +62,9 @@ class DataFlowGraphPartition {
   // Accessors.
   const std::unordered_map<std::string, InputOperator *> &inputs() const {
     return this->inputs_;
+  }
+  const std::vector<ForwardViewOperator *> &forwards() const {
+    return this->forwards_;
   }
   const std::vector<MatViewOperator *> &outputs() const {
     return this->outputs_;
@@ -82,7 +91,8 @@ class DataFlowGraphPartition {
 
   // Cloning to create more partitions.
   std::unique_ptr<DataFlowGraphPartition> Clone(
-      PartitionIndex partition_index) const;
+      PartitionIndex partition_index,
+      const std::unordered_map<std::string, std::vector<Operator *>> &ps) const;
 
   // This is only used in tests / micro-benchmarks.
   void _Process(const std::string &input_name, std::vector<Record> &&records);
@@ -92,12 +102,16 @@ class DataFlowGraphPartition {
   bool AddNode(std::unique_ptr<Operator> &&op, NodeIndex idx,
                const std::vector<Operator *> &parents);
   bool AddInputNode(std::unique_ptr<InputOperator> &&op, NodeIndex idx);
+  bool AddForwardOperator(std::unique_ptr<ForwardViewOperator> &&op,
+                          NodeIndex idx,
+                          const std::vector<Operator *> &parents);
   bool AddOutputOperator(std::unique_ptr<MatViewOperator> &&op, NodeIndex idx,
                          Operator *parent);
 
   PartitionIndex id_;
   // Maps input name to associated input operator.
   std::unordered_map<std::string, InputOperator *> inputs_;
+  std::vector<ForwardViewOperator *> forwards_;
   std::vector<MatViewOperator *> outputs_;
 
   // Nodes have doubly edges from parent to children and back stored inside.

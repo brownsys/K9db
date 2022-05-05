@@ -13,6 +13,7 @@
 #include "pelton/dataflow/ops/aggregate.h"
 #include "pelton/dataflow/ops/equijoin.h"
 #include "pelton/dataflow/ops/exchange.h"
+#include "pelton/dataflow/ops/forward_view.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/ops/project.h"
 #include "pelton/dataflow/schema.h"
@@ -31,8 +32,8 @@ namespace dataflow {
 // Initialization given a single partition (to be cloned) and channels.
 void DataFlowGraph::Initialize(
     std::unique_ptr<DataFlowGraphPartition> &&partition,
-    const std::vector<Channel *> &channels) {
-
+    const std::vector<Channel *> &channels,
+    const std::unordered_map<std::string, std::vector<Operator *>> &parents) {
   LOG(INFO) << "Entering Initialize()...";
 
   // if (partition->inputs().size() == 0) {
@@ -72,27 +73,11 @@ void DataFlowGraph::Initialize(
   for (const auto &[_, input_operator] : partition->inputs()) {
     DFS(*input_operator, UNDEFINED_NODE_INDEX, Any::UNIT, &p, &r, e);
   }
-
-  for (const auto &pair : partition->nodes()) {
-    // Iterate through ForwardView operators.
-    if (pair.second->type() == pelton::dataflow::Operator::Type::FORWARD_VIEW) {
-      // Get parent MatView of the ForwardView.
-      pelton::dataflow::Operator *parent_op = pair.second->parents().at(0);
-      pelton::dataflow::MatViewOperator *parent_mat_view =
-        (pelton::dataflow::MatViewOperator *) parent_op;
-
-      LOG(INFO) << "DFS ON FORWARD VIEW";
-      LOG(INFO) << "ForwardView: " << pair.second->DebugString();
-      LOG(INFO) << "Parent MatView: " << parent_mat_view->DebugString();
-      // loop through outkey and log
-      for (const auto &outkey : parent_mat_view->outkey()) {
-        LOG(INFO) << "outkey: " << outkey;
-      }
-
-      // DFS on the ForwardView
-      DFS(*pair.second, UNDEFINED_NODE_INDEX, parent_mat_view->outkey(),
-      &p, &r, e);
-    }
+  for (const auto &forward_operator : partition->forwards()) {
+    Operator *node = parents.at(forward_operator->parent_flow()).front();
+    MatViewOperator *parent = reinterpret_cast<MatViewOperator *>(node);
+    const PartitionKey &outkey = parent->outkey();
+    DFS(*forward_operator, UNDEFINED_NODE_INDEX, outkey, &p, &r, e);
   }
 
   // Check to see that every MatView was assigned a partition key.
@@ -106,6 +91,12 @@ void DataFlowGraph::Initialize(
     for (const auto &[_, input_operator] : partition->inputs()) {
       DFS(*input_operator, UNDEFINED_NODE_INDEX, Any::UNIT, &p, &r, e);
     }
+    for (const auto &forward_operator : partition->forwards()) {
+      Operator *node = parents.at(forward_operator->parent_flow()).front();
+      MatViewOperator *parent = reinterpret_cast<MatViewOperator *>(node);
+      const PartitionKey &outkey = parent->outkey();
+      DFS(*forward_operator, UNDEFINED_NODE_INDEX, outkey, &p, &r, e);
+    }
   }
 
   // Check to see that every input operator was assigned a partition key.
@@ -118,6 +109,12 @@ void DataFlowGraph::Initialize(
     r.clear();
     for (const auto &[_, input_operator] : partition->inputs()) {
       DFS(*input_operator, UNDEFINED_NODE_INDEX, Any::UNIT, &p, &r, e);
+    }
+    for (const auto &forward_operator : partition->forwards()) {
+      Operator *node = parents.at(forward_operator->parent_flow()).front();
+      MatViewOperator *parent = reinterpret_cast<MatViewOperator *>(node);
+      const PartitionKey &outkey = parent->outkey();
+      DFS(*forward_operator, UNDEFINED_NODE_INDEX, outkey, &p, &r, e);
     }
   }
 
@@ -152,8 +149,9 @@ void DataFlowGraph::Initialize(
 
   // Make the specified number of partitions.
   for (PartitionIndex i = 0; i < this->size_; i++) {
-    this->partitions_.push_back(partition->Clone(i));
+    this->partitions_.push_back(partition->Clone(i, parents));
     LOG(INFO) << "Making partition " << i;
+    LOG(INFO) << this->partitions_.back()->DebugString();
     this->matviews_.push_back(this->partitions_.back()->outputs().at(0));
   }
 

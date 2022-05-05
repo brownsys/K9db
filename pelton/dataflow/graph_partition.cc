@@ -10,6 +10,7 @@
 #include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/ops/matview.h"
+#include "pelton/dataflow/ops/forward_view.h"
 
 namespace pelton {
 namespace dataflow {
@@ -30,6 +31,12 @@ bool DataFlowGraphPartition::AddInputNode(std::unique_ptr<InputOperator> &&op,
       << "An operator for this input already exists";
   this->inputs_.emplace(op->input_name(), op.get());
   return this->AddNode(std::move(op), idx, std::vector<Operator *>{});
+}
+bool DataFlowGraphPartition::AddForwardOperator(
+    std::unique_ptr<ForwardViewOperator> &&op, NodeIndex idx,
+    const std::vector<Operator *> &parents) {
+  this->forwards_.emplace_back(op.get());
+  return this->AddNode(std::move(op), idx, parents);
 }
 bool DataFlowGraphPartition::AddOutputOperator(
     std::unique_ptr<MatViewOperator> &&op, NodeIndex idx, Operator *parent) {
@@ -115,7 +122,8 @@ uint64_t DataFlowGraphPartition::SizeInMemory(
 }
 
 std::unique_ptr<DataFlowGraphPartition> DataFlowGraphPartition::Clone(
-    PartitionIndex partition_index) const {
+    PartitionIndex partition_index,
+    const std::unordered_map<std::string, std::vector<Operator *>> &ps) const {
   auto partition = std::make_unique<DataFlowGraphPartition>(partition_index);
 
   // Cloning is a BFS starting from inputs and follows NodeIndex.
@@ -124,6 +132,9 @@ std::unique_ptr<DataFlowGraphPartition> DataFlowGraphPartition::Clone(
   std::queue<Operator *> BFS;
   for (const auto &[_, input] : this->inputs_) {
     BFS.push(input);
+  }
+  for (const auto &forward : this->forwards_) {
+    BFS.push(forward);
   }
 
   // Clone each node.
@@ -165,6 +176,13 @@ std::unique_ptr<DataFlowGraphPartition> DataFlowGraphPartition::Clone(
       case Operator::Type::INPUT: {
         auto input = UniqueCast<InputOperator>(std::move(cloned));
         partition->AddInputNode(std::move(input), idx);
+        break;
+      }
+      case Operator::Type::FORWARD_VIEW: {
+        auto forward = UniqueCast<ForwardViewOperator>(std::move(cloned));
+        const auto &parent_views = ps.at(forward->parent_flow());
+        Operator *parent = parent_views.at(partition_index);
+        partition->AddForwardOperator(std::move(forward), idx, {parent});
         break;
       }
       case Operator::Type::MAT_VIEW: {

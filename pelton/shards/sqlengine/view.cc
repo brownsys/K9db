@@ -15,6 +15,7 @@
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/value.h"
+#include "pelton/dataflow/ops/forward_view.h"
 #include "pelton/planner/planner.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/util/status.h"
@@ -312,24 +313,15 @@ absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection,
   }
 
   // Populate nested view upon creation.
-  pelton::dataflow::DataFlowGraphPartition *partish =
-    dataflow_state->GetFlow(flow_name).GetPartition(0);
-  for (const auto &pair : partish->nodes()) {
-    // ForwardView operator denotes a nested view; we want to populate it.
-    if (pair.second->type() == pelton::dataflow::Operator::Type::FORWARD_VIEW) {
-      LOG(INFO) << "CREATE VIEW: FOUND FORWARD_VIEW...";
-      LOG(INFO) << pair.second->DebugString();
-      // Get parent MatView of the ForwardView.
-      pelton::dataflow::Operator *parent_op = pair.second->parents().at(0);
-      pelton::dataflow::MatViewOperator *parent_mat_view =
-        (pelton::dataflow::MatViewOperator *) parent_op;
-      LOG(INFO) << "CREATE VIEW: PARENT MATVIEW...";
-      LOG(INFO) << parent_mat_view->DebugString();
-
-      // Process and forward the MatView's records through the ForwardView.
-      pair.second->ProcessAndForward(pair.first, parent_mat_view->All(),
-                                     pelton::dataflow::Promise::None.Derive());
-      LOG(INFO) << "CREATE VIEW: PROCESSED AND FORWARDED!";
+  for (size_t p = 0; p < dataflow_state->workers(); p++) {
+    pelton::dataflow::DataFlowGraphPartition *partition =
+        dataflow_state->GetFlow(flow_name).GetPartition(p);  
+    for (auto *forward : partition->forwards()) {
+      dataflow::Operator *node = forward->parents().at(0);
+      dataflow::MatViewOperator *parent =
+          reinterpret_cast<dataflow::MatViewOperator *>(node);
+      forward->ProcessAndForward(parent->index(), parent->All(),
+                                 future.GetPromise());
     }
   }
 

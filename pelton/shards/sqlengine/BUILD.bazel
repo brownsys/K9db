@@ -216,6 +216,7 @@ cc_library(
         "//pelton/dataflow:key",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
+        "//pelton/dataflow/ops:forward_view",
         "//pelton/planner",
         "//pelton/shards:state",
         "//pelton/shards:types",

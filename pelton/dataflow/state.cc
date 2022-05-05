@@ -11,6 +11,7 @@
 #include <utility>
 
 #include "glog/logging.h"
+#include "pelton/dataflow/ops/forward_view.h"
 #include "pelton/util/fs.h"
 
 #define STATE_FILE_NAME ".dataflow.state"
@@ -121,10 +122,25 @@ void DataFlowState::AddFlow(const FlowName &name,
   for (auto &channel : this->channels_) {
     chans.push_back(channel.get());
   }
+  
+  // Provide the partitioned matviews of any parent view.
+  std::unordered_map<std::string, std::vector<Operator *>> parents;
+  for (const auto &forward : flow->forwards()) {
+    const std::string &flow_name = forward->parent_flow();
+    if (parents.count(flow_name) == 0) {
+      std::vector<Operator *> vec;
+      auto &flow = this->flows_.at(flow_name);
+      for (PartitionIndex pid = 0; pid < this->workers_; pid++) {
+        DataFlowGraphPartition *partition = flow->GetPartition(pid);
+        vec.push_back(partition->GetNode(forward->parent_id()));
+      }
+      parents.emplace(flow_name, std::move(vec));
+    }
+  }
 
   // Turn the given partition into a graph with many partitions.
   auto graph = std::make_unique<DataFlowGraph>(name, this->workers_);
-  graph->Initialize(std::move(flow), chans);
+  graph->Initialize(std::move(flow), chans, parents);
   this->flows_.emplace(name, std::move(graph));
 }
 

@@ -217,6 +217,9 @@ Record Operator::DebugRecord() const {
     case Operator::Type::EXCHANGE:
       record.SetString(std::make_unique<std::string>("EXCHANGE"), 1);
       break;
+    case Operator::Type::FORWARD_VIEW:
+      record.SetString(std::make_unique<std::string>("FORWARD_VIEW"), 1);
+      break;
   }
   // Output schema.
   std::stringstream out_buffer;

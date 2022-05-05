@@ -16,6 +16,7 @@ cc_library(
         ":operator",
         ":record",
         ":schema",
+        "//pelton/dataflow/ops:forward_view",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:fs",
@@ -149,6 +150,7 @@ cc_library(
         ":types",
         "//pelton/dataflow/ops:input",
         "//pelton/dataflow/ops:matview",
+        "//pelton/dataflow/ops:forward_view",
         "@glog",
     ],
 )
@@ -174,6 +176,7 @@ cc_library(
         "//pelton/dataflow/ops:aggregate",
         "//pelton/dataflow/ops:equijoin",
         "//pelton/dataflow/ops:exchange",
+        "//pelton/dataflow/ops:forward_view",
         "//pelton/dataflow/ops:input",
         "//pelton/dataflow/ops:matview",
         "//pelton/dataflow/ops:project",
