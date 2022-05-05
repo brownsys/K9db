@@ -458,11 +458,6 @@ fn main() {
                 .help("Set if the backend must be primed with initial stories and comments."),
         )
         .arg(
-            Arg::with_name("prime")
-                .long("prime")
-                .help("Set if the backend must be primed with initial stories and comments."),
-        )
-        .arg(
             Arg::with_name("scale_everything")
                 .long("scale_everything")
                 .help("Set if you want to scale the data per user with the number of users."),
