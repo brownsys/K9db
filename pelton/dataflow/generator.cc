@@ -38,7 +38,9 @@ NodeIndex DataFlowGraphGenerator::AddInputOperator(
     MatViewOperator *matview = partition->outputs().front();
     PCHECK(matview);
     // create an ForwardViewOperator
-    std::unique_ptr<ForwardViewOperator> op = std::make_unique<ForwardViewOperator>(matview->output_schema(), table_name, matview->index());
+    std::unique_ptr<ForwardViewOperator> op =
+      std::make_unique<ForwardViewOperator>(matview->output_schema(),
+      table_name, matview->index());
     CHECK(op);
     // Add the ForwardView operator to the graph, where MAT VIEW is a parent
     CHECK(this->graph_->AddForwardOperator(std::move(op), {}));

@@ -315,7 +315,7 @@ absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection,
   // Populate nested view upon creation.
   for (size_t p = 0; p < dataflow_state->workers(); p++) {
     pelton::dataflow::DataFlowGraphPartition *partition =
-        dataflow_state->GetFlow(flow_name).GetPartition(p);  
+        dataflow_state->GetFlow(flow_name).GetPartition(p);
     for (auto *forward : partition->forwards()) {
       dataflow::Operator *node = forward->parents().at(0);
       dataflow::MatViewOperator *parent =

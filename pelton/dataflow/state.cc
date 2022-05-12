@@ -122,7 +122,7 @@ void DataFlowState::AddFlow(const FlowName &name,
   for (auto &channel : this->channels_) {
     chans.push_back(channel.get());
   }
-  
+
   // Provide the partitioned matviews of any parent view.
   std::unordered_map<std::string, std::vector<Operator *>> parents;
   for (const auto &forward : flow->forwards()) {
