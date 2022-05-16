@@ -1,0 +1,14 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "dp_util",
+    srcs = [
+        "dp_util.cc",
+    ],
+    hdrs = [
+        "dp_util.h",
+    ],
+    deps = [
+    ],
+    visibility = ["//pelton:__subpackages__"],
+)

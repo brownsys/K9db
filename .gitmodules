@@ -4,3 +4,6 @@
 [submodule "experiments/lobsters/noria"]
 	path = experiments/lobsters/noria
 	url = https://github.com/ishanSharma07/noria.git
+[submodule "differential-privacy"]
+	path = differential-privacy
+	url = https://github.com/google/differential-privacy.git

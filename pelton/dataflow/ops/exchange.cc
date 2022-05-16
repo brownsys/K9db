@@ -35,6 +35,12 @@ std::vector<Record> ExchangeOperator::Process(NodeIndex source,
   return std::move(partitioned[this->partition()]);
 }
 
+std::vector<Record> ExchangeOperator::ProcessDP(
+    NodeIndex source, std::vector<Record> &&records, const Promise &promise,
+    pelton::dp::DPOptions *dp_options) {
+  LOG(FATAL) << "ProcessDP should only be called from an AggregateOperator.";
+}
+
 void ExchangeOperator::ComputeOutputSchema() {
   this->output_schema_ = this->input_schemas_.at(0);
 }

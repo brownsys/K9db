@@ -16,8 +16,11 @@
 #include <utility>
 #include <vector>
 
+#include "pelton/dataflow/state.h"
+#include "pelton/dp/dp_util.h"
 #include "pelton/shards/types.h"
 #include "pelton/shards/upgradable_lock.h"
+#include "pelton/sql/executor.h"
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 
@@ -55,6 +58,15 @@ class SharderState {
 
   void AddUnshardedTable(const UnshardedTableName &table,
                          const sqlast::CreateTable &create);
+
+    /*!
+    * Create a new DP tracker table for a given (presumed budgeted) table.
+    * @param table the table to create a budget tracker for
+    * @param exec the PeltonExecutor to use to create the tracker
+    * @param dataflow_state the DataFlowState to which the created tracker should be added
+    */
+  void AddDPTracker(const UnshardedTableName &table, sql::PeltonExecutor &exec,
+                    dataflow::DataFlowState *dataflow_state);
 
   void AddShardedTable(const UnshardedTableName &table,
                        const ShardingInformation &sharding_information,

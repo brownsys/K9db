@@ -344,3 +344,22 @@ configure_make(
     type = "zip",
     url = "https://github.com/jedisct1/libsodium/archive/1.0.18-RELEASE.zip",
 )
+
+# Google DP
+local_repository(
+    name = "com_google_differential_privacy",
+    path = "differential-privacy",
+)
+
+local_repository(
+    name = "com_google_cc_differential_privacy",
+    path = "differential-privacy/cc",
+)
+
+# Load dependencies for the base workspace.
+load("@com_google_differential_privacy//:differential_privacy_deps.bzl", "differential_privacy_deps")
+differential_privacy_deps()
+
+# Load dependencies for the cc workspace.
+load("@com_google_cc_differential_privacy//:cc_differential_privacy_deps.bzl", "cc_differential_privacy_deps")
+cc_differential_privacy_deps()

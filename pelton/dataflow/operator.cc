@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "glog/logging.h"
+#include "pelton/dp/dp_util.h"
 
 namespace pelton {
 namespace dataflow {
@@ -90,11 +91,33 @@ void Operator::ProcessAndForward(NodeIndex source,
       this->Process(source, std::move(records), promise);
 
   // Pass output vector down to children to process.
-  this->BroadcastToChildren(std::move(output), std::move(promise));
+  this->BroadcastToChildren(std::move(output), std::move(promise), nullptr);
 }
 
-void Operator::BroadcastToChildren(std::vector<Record> &&records,
-                                   Promise &&promise) {
+// A variant of ProcessAndForward which allows for the passing of a reference to a
+// DPOptions. If the pointer is not null, then the record will be handled as part
+// of a DP operation.
+void Operator::ProcessAndForward(NodeIndex source,
+                                 std::vector<Record> &&records,
+                                 Promise &&promise,
+                                 pelton::dp::DPOptions *dp_options = nullptr) {
+  // Process the records generating the output vector.
+  std::vector<Record> output;
+  if ((dp_options != nullptr) &&
+      (this->type() == pelton::dataflow::Operator::Type::AGGREGATE)) {
+    // If there are DP options for this view and this is an aggregate operator, then use DP Processing
+    output = this->ProcessDP(source, std::move(records), promise, dp_options);
+  } else {
+    output = this->Process(source, std::move(records), promise);
+  }
+
+  // Pass output vector down to children to process.
+  this->BroadcastToChildren(std::move(output), std::move(promise), dp_options);
+}
+
+void Operator::BroadcastToChildren(
+    std::vector<Record> &&records, Promise &&promise,
+    pelton::dp::DPOptions *dp_options = nullptr) {
   if (this->children_.size() == 0 || records.size() == 0) {
     promise.Resolve();
     return;
@@ -110,11 +133,11 @@ void Operator::BroadcastToChildren(std::vector<Record> &&records,
     }
     // Move the copy to child.
     this->children_.at(i)->ProcessAndForward(this->index_, std::move(copy),
-                                             promise.Derive());
+                                             promise.Derive(), dp_options);
   }
   // Reuse promise for the last child.
   this->children_.back()->ProcessAndForward(this->index_, std::move(records),
-                                            std::move(promise));
+                                            std::move(promise), dp_options);
 }
 
 std::string Operator::DebugString() const {

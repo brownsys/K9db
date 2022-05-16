@@ -138,6 +138,12 @@ std::vector<Record> EquiJoinOperator::Process(NodeIndex source,
   return output;
 }
 
+std::vector<Record> EquiJoinOperator::ProcessDP(
+    NodeIndex source, std::vector<Record> &&records, const Promise &promise,
+    pelton::dp::DPOptions *dp_options) {
+  LOG(FATAL) << "ProcessDP should only be called from an AggregateOperator.";
+}
+
 void EquiJoinOperator::ComputeOutputSchema() {
   // We only have enough information to compute the output schema when
   // both parents are known.

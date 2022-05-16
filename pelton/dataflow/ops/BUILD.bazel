@@ -199,6 +199,10 @@ cc_library(
         "//pelton/sqlast:ast",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_googletest//:gtest_prod",
+        "@com_google_cc_differential_privacy//base:statusor",
+        "@com_google_cc_differential_privacy//algorithms:algorithm",
+        "@com_google_cc_differential_privacy//algorithms:bounded-sum",
+        "@com_google_cc_differential_privacy//algorithms:count",
         "@glog",
     ],
 )

@@ -265,6 +265,13 @@ class MatViewOperatorT : public MatViewOperator {
     }
     return {};
   }
+  std::vector<Record> ProcessDP(NodeIndex source, std::vector<Record> &&records,
+                                const Promise &promise,
+                                pelton::dp::DPOptions *dp_options) {
+    LOG(FATAL) << "Matview Operator should never try to ProcessDP.";
+    std::vector<Record> vec;
+    return vec;
+  }
   void ComputeOutputSchema() override {
     this->output_schema_ = this->input_schemas_.at(0);
     this->contents_.Initialize(this->output_schema_);

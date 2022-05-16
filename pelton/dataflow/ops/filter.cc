@@ -105,6 +105,12 @@ std::vector<Record> FilterOperator::Process(NodeIndex source,
   return output;
 }
 
+std::vector<Record> FilterOperator::ProcessDP(
+    NodeIndex source, std::vector<Record> &&records, const Promise &promise,
+    pelton::dp::DPOptions *dp_options) {
+  LOG(FATAL) << "ProcessDP should only be called from an AggregateOperator.";
+}
+
 bool FilterOperator::Accept(const Record &record) const {
   for (const auto &operation : this->ops_) {
     switch (operation.op()) {

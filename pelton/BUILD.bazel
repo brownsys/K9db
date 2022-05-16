@@ -25,6 +25,7 @@ cc_library(
         "//pelton/shards/sqlengine:util",
         "//pelton/sql:result",
         "//pelton/util:status",
+        "//pelton/dp:dp_util",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
     ],

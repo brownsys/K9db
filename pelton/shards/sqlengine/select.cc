@@ -206,6 +206,28 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::Select &stmt,
   bool ignored;
   return Shard(stmt, connection, synchronize, &ignored);
 }
+
+dataflow::SchemaRef ResultSchemaTracker(const sqlast::Select &stmt,
+                                        dataflow::SchemaRef table_schema) {
+  const std::vector<std::string> &column_names = stmt.GetColumns();
+  if (column_names.at(0) == "*") {
+    return table_schema;
+  }
+
+  std::vector<sqlast::ColumnDefinition::Type> column_types;
+  column_types.reserve(column_names.size());
+  for (const std::string &col : column_names) {
+    if (IsIntLiteral(col)) {
+      column_types.push_back(sqlast::ColumnDefinition::Type::INT);
+    } else if (IsStringLiteral(col)) {
+      column_types.push_back(sqlast::ColumnDefinition::Type::TEXT);
+    } else {
+      column_types.push_back(table_schema.TypeOf(table_schema.IndexOf(col)));
+    }
+  }
+  return dataflow::SchemaFactory::Create(column_names, column_types, {});
+}
+
 }  // namespace select
 }  // namespace sqlengine
 }  // namespace shards

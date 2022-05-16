@@ -12,6 +12,7 @@
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "glog/logging.h"
+#include "pelton/dp/dp_util.h"
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/shards/upgradable_lock.h"
@@ -544,6 +545,7 @@ absl::StatusOr<sql::SqlResult> HandleOwningTable(
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
                                      Connection *connection) {
+
   shards::SharderState *state = connection->state->sharder_state();
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
   UniqueLock lock = state->WriterLock();
@@ -575,6 +577,11 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     ASSIGN_OR_RETURN(std::string pk, GetPK(stmt));
     state->AddShardKind(table_name, pk);
     state->AddUnshardedTable(table_name, stmt);
+
+    // If the table name marks it as budgeted, add a budget tracker for the table
+    if (auto table_budget = pelton::dp::ParseTableForDP(table_name)) {
+      state->AddDPTracker(table_name, exec, dataflow_state);
+    }
     result = exec.Default(&stmt);
 
   } else if (!has_pii && sharding_information.size() > 0) {

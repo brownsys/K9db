@@ -63,6 +63,9 @@ class DataFlowState {
   void AddFlow(const FlowName &name,
                std::unique_ptr<DataFlowGraphPartition> &&flow);
 
+  void RemoveFlow(const FlowName &name,
+                  std::vector<std::string> &flow_input_keys);
+
   const DataFlowGraph &GetFlow(const FlowName &name) const;
 
   bool HasFlow(const FlowName &name) const;

@@ -14,10 +14,13 @@ cc_library(
         ":upgradable_lock",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
+        "//pelton/dataflow:dstate",
         "//pelton/sql:result",
+        "//pelton/sql:executor",
         "//pelton/sqlast:ast",
         "//pelton/sqlast:parser",
         "//pelton/util:fs",
+        "//pelton/dp:dp_util",
     ],
 )
 

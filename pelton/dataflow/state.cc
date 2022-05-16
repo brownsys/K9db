@@ -30,8 +30,13 @@ DataFlowState::Worker::Worker(size_t id, Channel *chan, DataFlowState *state)
         auto &flow = this->state_->flows_.at(msg.flow_name);
         this->state_->mtx_.unlock_shared();
         Operator *op = flow->GetPartition(this->id_)->GetNode(msg.target);
-        op->ProcessAndForward(msg.source, std::move(msg.records),
-                              std::move(msg.promise));
+        if (auto dp_options = pelton::dp::ParseViewForDP(msg.flow_name)) {
+          op->ProcessAndForward(msg.source, std::move(msg.records),
+                                std::move(msg.promise), &dp_options.value());
+        } else {
+          op->ProcessAndForward(msg.source, std::move(msg.records),
+                                std::move(msg.promise), nullptr);
+        }
       }
     }
   });
@@ -123,6 +128,24 @@ void DataFlowState::AddFlow(const FlowName &name,
   auto graph = std::make_unique<DataFlowGraph>(name, this->workers_);
   graph->Initialize(std::move(flow), chans);
   this->flows_.emplace(name, std::move(graph));
+}
+
+void DataFlowState::RemoveFlow(const FlowName &name,
+                               std::vector<std::string> &flow_input_keys) {
+  std::unique_lock lock(this->mtx_);
+  for (auto input_name : flow_input_keys) {
+    std::vector<FlowName> input_flows =
+        this->flows_per_input_table_[input_name];
+    std::vector<FlowName>::iterator it;
+    it = std::find(input_flows.begin(), input_flows.end(), name);
+    if (it != input_flows.end()) {
+      input_flows.erase(it);
+      this->flows_per_input_table_[input_name] = input_flows;
+      if (input_flows.size() == 0) {
+        this->flows_per_input_table_.erase(input_name);
+      }
+    }
+  }
 }
 
 const DataFlowGraph &DataFlowState::GetFlow(const FlowName &name) const {

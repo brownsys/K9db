@@ -23,6 +23,10 @@ class IdentityOperator : public Operator {
   std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records,
                               const Promise &promise) override;
 
+  std::vector<Record> ProcessDP(NodeIndex source, std::vector<Record> &&records,
+                                const Promise &promise,
+                                pelton::dp::DPOptions *dp_options) override;
+
   void ComputeOutputSchema() override;
 
   std::unique_ptr<Operator> Clone() const override;

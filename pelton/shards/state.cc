@@ -11,6 +11,12 @@
 
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
+#include "pelton/dataflow/state.h"
+#include "pelton/dp/dp_util.h"
+#include "pelton/sql/executor.h"
+#include "pelton/sqlast/ast.h"
+#include "pelton/sqlast/parser.h"
+#include "pelton/util/status.h"
 
 namespace pelton {
 namespace shards {
@@ -46,6 +52,26 @@ void SharderState::AddUnshardedTable(const UnshardedTableName &table,
                                      const sqlast::CreateTable &create) {
   this->sharded_schema_.insert({table, create});
 }
+
+void SharderState::AddDPTracker(const UnshardedTableName &table,
+                                pelton::sql::PeltonExecutor &exec,
+                                dataflow::DataFlowState *dataflow_state) {
+  const std::string tracker_name = pelton::dp::tracker_name(table);
+  const std::string tracker_creation_query =
+      pelton::dp::tracker_creation_query(table);
+  sqlast::SQLParser parser;
+  absl::StatusOr<std::unique_ptr<sqlast::AbstractStatement>>
+      tracker_statement_or = parser.Parse(tracker_creation_query);
+  auto *stmt = static_cast<sqlast::CreateTable *>(tracker_statement_or->get());
+  this->AddUnshardedTable(tracker_name, *stmt);
+  exec.Default(stmt);
+
+  // Add table schema and its PK column.
+  const std::string &pk = "id";
+  const auto &stmt_a = *stmt;
+  this->AddSchema(tracker_name, stmt_a, stmt_a.ColumnIndex(pk), pk);
+  dataflow_state->AddTableSchema(stmt_a);
+};
 
 void SharderState::AddShardedTable(
     const UnshardedTableName &table,

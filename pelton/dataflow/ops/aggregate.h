@@ -18,6 +18,7 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
+#include "pelton/dp/dp_util.h"
 
 namespace pelton {
 namespace dataflow {
@@ -61,6 +62,10 @@ class AggregateOperator : public Operator {
  protected:
   std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records,
                               const Promise &promise) override;
+
+  std::vector<Record> ProcessDP(NodeIndex source, std::vector<Record> &&records,
+                                const Promise &promise,
+                                pelton::dp::DPOptions *dp_options) override;
 
   void ComputeOutputSchema() override;
 

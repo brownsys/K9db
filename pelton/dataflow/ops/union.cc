@@ -38,6 +38,12 @@ std::vector<Record> UnionOperator::Process(NodeIndex source,
   return std::move(records);
 }
 
+std::vector<Record> UnionOperator::ProcessDP(
+    NodeIndex source, std::vector<Record> &&records, const Promise &promise,
+    pelton::dp::DPOptions *dp_options) {
+  LOG(FATAL) << "ProcessDP should only be called from an AggregateOperator.";
+}
+
 std::unique_ptr<Operator> UnionOperator::Clone() const {
   return std::make_unique<UnionOperator>();
 }

@@ -380,6 +380,12 @@ std::vector<Record> ProjectOperator::Process(NodeIndex source,
   return output;
 }
 
+std::vector<Record> ProjectOperator::ProcessDP(
+    NodeIndex source, std::vector<Record> &&records, const Promise &promise,
+    pelton::dp::DPOptions *dp_options) {
+  LOG(FATAL) << "ProcessDP should only be called from an AggregateOperator.";
+}
+
 std::unique_ptr<Operator> ProjectOperator::Clone() const {
   auto clone = std::make_unique<ProjectOperator>();
   clone->projections_ = this->projections_;

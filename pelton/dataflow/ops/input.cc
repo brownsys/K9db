@@ -19,6 +19,12 @@ std::vector<Record> InputOperator::Process(NodeIndex source,
   return std::move(records);
 }
 
+std::vector<Record> InputOperator::ProcessDP(
+    NodeIndex source, std::vector<Record> &&records, const Promise &promise,
+    pelton::dp::DPOptions *dp_options) {
+  LOG(FATAL) << "ProcessDP should only be called from an AggregateOperator.";
+}
+
 std::unique_ptr<Operator> InputOperator::Clone() const {
   return std::make_unique<InputOperator>(this->input_name_,
                                          this->input_schemas_.at(0));

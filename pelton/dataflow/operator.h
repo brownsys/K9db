@@ -10,6 +10,7 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
+#include "pelton/dp/dp_util.h"
 
 #ifdef PELTON_BENCHMARK  // shuts up compiler warnings
 #include "pelton/dataflow/ops/benchmark_utils.h"
@@ -52,6 +53,9 @@ class Operator {
   void ProcessAndForward(NodeIndex source, std::vector<Record> &&records,
                          Promise &&promise);
 
+  void ProcessAndForward(NodeIndex source, std::vector<Record> &&records,
+                         Promise &&promise, pelton::dp::DPOptions *dp_options);
+
   // Accessors (read only).
   NodeIndex index() const { return this->index_; }
   Type type() const { return this->type_; }
@@ -86,6 +90,24 @@ class Operator {
   virtual std::vector<Record> Process(NodeIndex source,
                                       std::vector<Record> &&records,
                                       const Promise &promise) = 0;
+
+  /*!
+   * Push a batch of records through the dataflow graph. Order within this batch
+   * does not matter. i.e. an operator can reorder individual records to
+   * optimize processing within a single operator node. The dataflow assumes all
+   * records of this batch arrive at the same time. Records will NOT be pushed
+   * to children. This variant expects a reference to a DPOptions, which will be used
+   * for a DP calculation.
+   * @param source the index of the source operator.
+   * @param records the input vector of records.
+   * @param promise this can be derived from by operators that need sub-promises
+   *                but should not be resolved by the operator.
+   * @return the output vector to broadcast to children operators.
+   */
+  virtual std::vector<Record> ProcessDP(NodeIndex source,
+                                        std::vector<Record> &&records,
+                                        const Promise &promise,
+                                        pelton::dp::DPOptions *dp_options) = 0;
 
   /*!
    * Compute the output_schema of the operator.
@@ -124,7 +146,8 @@ class Operator {
   size_t RemoveParent(Operator *parent);
 
   // Pass the given batch to the children operators (if any) for processing.
-  void BroadcastToChildren(std::vector<Record> &&records, Promise &&promise);
+  void BroadcastToChildren(std::vector<Record> &&records, Promise &&promise,
+                           pelton::dp::DPOptions *dp_options);
 
   NodeIndex index_;
   Type type_;
