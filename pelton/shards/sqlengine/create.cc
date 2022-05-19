@@ -151,6 +151,24 @@ absl::StatusOr<std::list<ShardingInformation>> IsShardingBySupported(
         index = "auth_personcontact";
         LOG(WARNING) << "Hard coded index '" << index << "' triggered.";
 
+        // shuup: shuup_basket to auth_user to shuup_personcontact
+      } else if (foreign_table == "auth_user" &&
+                 original_table_name == "shuup_basket" && other.shard_by == "ptr") {
+        index = "auth_personcontact";
+        LOG(WARNING) << "Hard coded index '" << index << "' triggered.";
+
+        // shuup: shuup_order to auth_user to shuup_personcontact
+      } else if (foreign_table == "auth_user" &&
+                 original_table_name == "shuup_order" && other.shard_by == "ptr") {
+        index = "auth_personcontact";
+        LOG(WARNING) << "Hard coded index '" << index << "' triggered.";
+
+        // shuup: shuup_order to auth_user to shuup_personcontact
+      } else if (foreign_table == "shuup_contact" &&
+                 original_table_name == "shuup_order" && other.shard_by == "ptr") {
+        index = "contact_personcontact";
+        LOG(WARNING) << "Hard coded index '" << index << "' triggered.";
+
       } else if (!state.HasIndexFor(foreign_table, info_c->next_column,
                                     other.shard_by)) {
         return absl::InvalidArgumentError(
