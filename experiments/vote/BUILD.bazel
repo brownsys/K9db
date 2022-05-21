@@ -18,6 +18,8 @@ rust_library(
     srcs = [
         "src/clients/lib.rs",
         "src/clients/mysql.rs",
+        "src/clients/memcached.rs",
+        "src/clients/memcached_hybrid.rs",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -26,6 +28,8 @@ rust_library(
         "//cargo:failure",
         "//cargo:mysql_async",
         "//cargo:tower_service",
+	"//cargo:memcached_rs",
+	"//cargo:tokio",
     ],
 )
 

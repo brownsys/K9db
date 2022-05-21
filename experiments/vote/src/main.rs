@@ -844,7 +844,7 @@ fn main() {
         //("mssql", Some(largs)) => run::<clients::mssql::Conf>(&args, largs),
         ("mysql", Some(largs)) => run::<clients::mysql::Conn>(&args, largs),
         // ("pelton", Some(largs)) => run::<clients::pelton::Conn>(&args, largs),
-        // ("memcached-hybrid", Some(largs)) => run::<clients::memcached_hybrid::Conn>(&args, largs),
+        ("memcached-hybrid", Some(largs)) => run::<clients::memcached_hybrid::Conn>(&args, largs),
         // ("redis-hybrid", Some(largs)) => run::<clients::redis_hybrid::Conn>(&args, largs),
         // ("redis", Some(largs)) => run::<clients::redis::Conn>(&args, largs),
         // ("hybrid", Some(largs)) => run::<clients::hybrid::Conn>(&args, largs),
