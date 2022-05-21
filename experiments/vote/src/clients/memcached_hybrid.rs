@@ -5,13 +5,13 @@ use memcached::{
     proto::{MultiOperation, ProtoType},
 };
 use mysql_async::prelude::*;
+use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tower_service::Service;
-use std::collections::BTreeMap;
-use std::collections::HashMap;
 use tokio::sync::{mpsc, oneshot};
+use tower_service::Service;
 
 enum Req {
     //Populate(Vec<(String, String, String)>),
@@ -22,9 +22,12 @@ enum Req {
     Read(Vec<String>),
 }
 
-pub struct MemcachedConn{
+pub struct MemcachedConn {
     //c: mpsc::Sender<(Req, oneshot::Sender<memcached::proto::MemCachedResult<Hashmap<Vec<u8>, (Vec<u8>, u32)>>)>,
-    c: mpsc::Sender<(Req, oneshot::Sender<memcached::proto::MemCachedResult<HashMap<Vec<u8>, (Vec<u8>, u32)>>>)>,
+    c: mpsc::Sender<(
+        Req,
+        oneshot::Sender<memcached::proto::MemCachedResult<HashMap<Vec<u8>, (Vec<u8>, u32)>>>,
+    )>,
     _jh: std::thread::JoinHandle<()>,
     addr: String,
     fast: bool,
@@ -42,34 +45,36 @@ pub struct Conn {
     mem: MemcachedConn,
 }
 
-impl Clone for Conn{
-    fn clone(&self) -> Self{
+impl Clone for Conn {
+    fn clone(&self) -> Self {
         Conn {
             pool: self.pool.clone(),
             next: None,
             pending: None,
             mem: self.mem.clone(),
-       }
+        }
     }
 }
 
-impl Clone for MemcachedConn{
-     fn clone(&self) -> Self {
+impl Clone for MemcachedConn {
+    fn clone(&self) -> Self {
         // FIXME: this is called once per load _generator_
         // In most cases, we'll have just one generator, and hence only one connection...
         MemcachedConn::new(&self.addr, self.fast).unwrap()
     }
 }
 
-impl MemcachedConn{
-     fn new(addr: &str, fast: bool) -> memcached::proto::MemCachedResult<Self> {
+impl MemcachedConn {
+    fn new(addr: &str, fast: bool) -> memcached::proto::MemCachedResult<Self> {
         eprintln!(
             "OBS OBS OBS: the memcached client is effectively single-threaded -- see src FIXME"
         );
 
         let connstr = format!("tcp://{}", addr);
-        let (reqs, mut rx) =
-            mpsc::channel::<(Req, oneshot::Sender<memcached::proto::MemCachedResult<HashMap<Vec<u8>, (Vec<u8>, u32)>>>)>(1);
+        let (reqs, mut rx) = mpsc::channel::<(
+            Req,
+            oneshot::Sender<memcached::proto::MemCachedResult<HashMap<Vec<u8>, (Vec<u8>, u32)>>>,
+        )>(1);
 
         let jh = std::thread::spawn(move || {
             let mut c = memcached::Client::connect(&[(&connstr, 1)], ProtoType::Binary).unwrap();
@@ -111,7 +116,6 @@ impl MemcachedConn{
         })
     }
 }
-
 
 impl Conn {
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), failure::Error>> {
@@ -203,34 +207,34 @@ impl VoteClient for Conn {
 
             // Prime memcached as well.
             if params.prime {
-            // prepop
-            let mut aid = 1;
-            let bs = 1000;
-            assert_eq!(params.articles % bs, 0);
-            for _ in 0..params.articles / bs {
-                let articles: Vec<_> = (0..bs)
-                    .map(|i| {
-                        let article_id = aid + i;
-                        (
-                            format!("article_{}", article_id),
-                            format!("Article #{}, 0", article_id),
-                        )
-                    })
-                    .collect();
-                //let mut m = BTreeMap::new();
-                //for &(ref k, ref v) in &articles {
-                //    m.insert(k.as_bytes(), (v.as_bytes(), 0, 0));
-                //}
-                let (tx, rx) = oneshot::channel();
-                memcached_conn.c
-                     .send((Req::MultiSet(articles), tx))
-                     .await
-                     .unwrap_or_else(|_| panic!("SendError"));
-                rx.await.unwrap().unwrap();
-                aid += bs;
+                // prepop
+                let mut aid = 1;
+                let bs = 1000;
+                assert_eq!(params.articles % bs, 0);
+                for _ in 0..params.articles / bs {
+                    let articles: Vec<_> = (0..bs)
+                        .map(|i| {
+                            let article_id = aid + i;
+                            (
+                                format!("article_{}", article_id),
+                                format!("Article #{}, 0", article_id),
+                            )
+                        })
+                        .collect();
+                    //let mut m = BTreeMap::new();
+                    //for &(ref k, ref v) in &articles {
+                    //    m.insert(k.as_bytes(), (v.as_bytes(), 0, 0));
+                    //}
+                    let (tx, rx) = oneshot::channel();
+                    memcached_conn
+                        .c
+                        .send((Req::MultiSet(articles), tx))
+                        .await
+                        .unwrap_or_else(|_| panic!("SendError"));
+                    rx.await.unwrap().unwrap();
+                    aid += bs;
                 }
             }
-
 
             // now we connect for real
             let mut opts = mysql_async::OptsBuilder::from_opts(opts);
@@ -240,7 +244,6 @@ impl VoteClient for Conn {
             //    "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
             //]);
             opts.stmt_cache_size(10000);
-
 
             Ok(Conn {
                 pool: mysql_async::Pool::new(opts),
@@ -252,8 +255,7 @@ impl VoteClient for Conn {
     }
 }
 
-
-impl Service<WriteRequest> for Conn{
+impl Service<WriteRequest> for Conn {
     type Response = ();
     type Error = failure::Error;
     type Future = impl Future<Output = Result<(), failure::Error>> + Send;
@@ -267,21 +269,25 @@ impl Service<WriteRequest> for Conn{
         let mut mem_channel = self.mem.c.clone();
         async move {
             let ids = req.0.iter().map(|a| a as &_).collect::<Vec<_>>();
-            if ids.len() == 0{
+            if ids.len() == 0 {
                 println!("WriteRequest with 0 ids supplied...returning from future");
                 return Ok(());
             }
             for article_id in ids.iter() {
-                conn = conn.drop_exec(
-                    "INSERT INTO vt (u, article_id) VALUES (0, ?)",
-                    (article_id,),
-                ).await?;
+                conn = conn
+                    .drop_exec(
+                        "INSERT INTO vt (u, article_id) VALUES (0, ?)",
+                        (article_id,),
+                    )
+                    .await?;
             }
 
             // Invalid keys in memcached synchronously
-            let keys: Vec<_> = req.0.into_iter()
-                    .map(|article_id| format!("article_{}", article_id))
-                    .collect();
+            let keys: Vec<_> = req
+                .0
+                .into_iter()
+                .map(|article_id| format!("article_{}", article_id))
+                .collect();
             let (tx, rx) = oneshot::channel();
             mem_channel
                 .send((Req::Invalidate(keys), tx))
@@ -304,9 +310,9 @@ impl Service<ReadRequest> for Conn {
     }
 
     fn call(&mut self, req: ReadRequest) -> Self::Future {
-            let conn = self.next.take().unwrap();
-            let mut mem_channel = self.mem.c.clone();
-            async move {
+        let conn = self.next.take().unwrap();
+        let mut mem_channel = self.mem.c.clone();
+        async move {
             // first read as much as we can from cache
             let len = req.0.len();
             let ids = req.0.iter().map(|a| a as &_).collect::<Vec<_>>();
@@ -334,22 +340,22 @@ impl Service<ReadRequest> for Conn {
                 }
             }
 
-        if !misses.is_empty() {
-            let ids = misses.iter().map(|a| a as &_).collect::<Vec<_>>();
-            let vals = (0..misses.len()).map(|_| "?").collect::<Vec<_>>().join(",");
-            //let qstring = format!("SELECT art.* FROM art WHERE art.id IN ({})", vals);
-            let qstring = format!("SELECT art.id, art.title, count(*) as votes FROM art JOIN vt ON art.id = vt.article_id GROUP BY vt.article_id HAVING art.id IN ({})", vals);
+            if !misses.is_empty() {
+                let ids = misses.iter().map(|a| a as &_).collect::<Vec<_>>();
+                let vals = (0..misses.len()).map(|_| "?").collect::<Vec<_>>().join(",");
+                //let qstring = format!("SELECT art.* FROM art WHERE art.id IN ({})", vals);
+                let qstring = format!("SELECT art.id, art.title, count(*) as votes FROM art JOIN vt ON art.id = vt.article_id GROUP BY vt.article_id HAVING art.id IN ({})", vals);
 
-            let mut m = Vec::new();
-            let qresult = conn.prep_exec(qstring, &ids).await.unwrap();
-            let result_rows: Vec<mysql_async::Row> = qresult.collect().await.unwrap().1;
-            //while(!mysql_async::QueryResult::is_empty(&qresult)){
-            //    let (qresult, current_set_rows) = qresult.collect().await.unwrap();
-            //    result_rows.extend(current_set_rows);
-            //}
+                let mut m = Vec::new();
+                let qresult = conn.prep_exec(qstring, &ids).await.unwrap();
+                let result_rows: Vec<mysql_async::Row> = qresult.collect().await.unwrap().1;
+                //while(!mysql_async::QueryResult::is_empty(&qresult)){
+                //    let (qresult, current_set_rows) = qresult.collect().await.unwrap();
+                //    result_rows.extend(current_set_rows);
+                //}
 
-            for result_row in result_rows.into_iter(){
-              m.push((
+                for result_row in result_rows.into_iter() {
+                    m.push((
                         format!("article_{}", result_row.get::<i64, _>("id").unwrap()),
                         format!(
                             "{}, {}",
@@ -358,14 +364,14 @@ impl Service<ReadRequest> for Conn {
                         ),
                     ));
                     rows += 1;
+                }
+                let (tx, rx) = oneshot::channel();
+                mem_channel
+                    .send((Req::MultiSet(m), tx))
+                    .await
+                    .unwrap_or_else(|_| panic!("SendError"));
+                rx.await.unwrap().unwrap();
             }
-            let (tx, rx) = oneshot::channel();
-            mem_channel
-                .send((Req::MultiSet(m), tx))
-                .await
-                .unwrap_or_else(|_| panic!("SendError"));
-            rx.await.unwrap().unwrap();
-           }
             // <= because IN() collapses duplicates
             assert!(rows <= len);
             Ok(())

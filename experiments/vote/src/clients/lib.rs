@@ -20,7 +20,7 @@ where
     fn new(params: Parameters, args: clap::ArgMatches) -> <Self as VoteClient>::Future;
 }
 
-pub mod mysql;
 pub mod memcached;
 pub mod memcached_hybrid;
+pub mod mysql;
 pub mod pelton;

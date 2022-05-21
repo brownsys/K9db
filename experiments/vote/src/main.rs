@@ -1,10 +1,10 @@
 //#![feature(type_alias_impl_trait)]
 
 use clap::value_t_or_exit;
+use common::Timeline;
 use failure::ResultExt;
 use futures_util::future::{Either, FutureExt, TryFutureExt};
 use futures_util::stream::futures_unordered::FuturesUnordered;
-use common::Timeline;
 use rand::prelude::*;
 use rand_distr::Exp;
 use std::cell::RefCell;

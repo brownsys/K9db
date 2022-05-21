@@ -1,5 +1,5 @@
-use common::{Parameters, ReadRequest, VoteClient, WriteRequest};
 use clap;
+use common::{Parameters, ReadRequest, VoteClient, WriteRequest};
 use mysql_async::prelude::*;
 use std::future::Future;
 use std::pin::Pin;
@@ -170,14 +170,16 @@ impl Service<WriteRequest> for Conn {
         async move {
             //let len = req.0.len();
             let ids = req.0.iter().map(|a| a as &_).collect::<Vec<_>>();
-            if ids.len() == 0{
+            if ids.len() == 0 {
                 println!("WriteRequest with 0 ids supplied...returning from future.")
             }
             for article_id in ids.iter() {
-                conn = conn.drop_exec(
-                    "INSERT INTO vt (u, article_id) VALUES (0, ?)",
-                    (article_id,),
-                ).await?;
+                conn = conn
+                    .drop_exec(
+                        "INSERT INTO vt (u, article_id) VALUES (0, ?)",
+                        (article_id,),
+                    )
+                    .await?;
             }
             //let vals = (0..len).map(|_| "(0, ?)").collect::<Vec<_>>().join(", ");
             //let vote_qstring = format!("INSERT INTO vt (u, article_id) VALUES {}", vals);

@@ -1,5 +1,5 @@
-use common::{Parameters, ReadRequest, VoteClient, WriteRequest};
 use clap;
+use common::{Parameters, ReadRequest, VoteClient, WriteRequest};
 use failure::{bail, ResultExt};
 use memcached;
 use memcached::proto::{MultiOperation, ProtoType};

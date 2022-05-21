@@ -1,12 +1,12 @@
-use common::{Parameters, ReadRequest, VoteClient, WriteRequest};
 use clap;
+use common::{Parameters, ReadRequest, VoteClient, WriteRequest};
 use mysql_async::prelude::*;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::atomic::AtomicU32;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use tower_service::Service;
-use std::sync::Arc;
-use std::sync::atomic::AtomicU32;
 
 pub struct Conn {
     pool: mysql_async::Pool,
@@ -98,18 +98,20 @@ impl VoteClient for Conn {
                         FROM art \
                         JOIN vt ON art.id = vt.article_id \
                         GROUP BY art.id, art.title \
-                        HAVING art.id = ?;"
+                        HAVING art.id = ?;",
                     )
                     .await
                     .unwrap();
 
                 // prepop
                 // NOTE: Not batching here since pelton does not support it.
-                for aid in 0..params.articles{
-                        conn = conn.drop_exec(
+                for aid in 0..params.articles {
+                    conn = conn
+                        .drop_exec(
                             "INSERT INTO art (id, title) VALUES (?, ?)",
-                            (aid, format!("Article #{}", aid),),
-                        ).await?;
+                            (aid, format!("Article #{}", aid)),
+                        )
+                        .await?;
                 }
                 //let mut aid = 1;
                 //let bs = 1000;
@@ -194,19 +196,21 @@ impl Service<WriteRequest> for Conn {
         async move {
             //let len = req.0.len();
             let ids = req.0.iter().map(|a| a as &_).collect::<Vec<_>>();
-            if ids.len() == 0{
+            if ids.len() == 0 {
                 println!("WriteRequest with 0 ids supplied...returning from future");
                 return Ok(());
             }
             //let vals = (0..len).map(|_| "(0, ?)").collect::<Vec<_>>().join(", ");
             for article_id in ids.iter() {
-                if ids.len() == 0{
+                if ids.len() == 0 {
                     break;
                 }
-                conn = conn.drop_exec(
-                    "INSERT INTO vt (u, article_id) VALUES (0, ?)",
-                    (article_id,),
-                ).await?;
+                conn = conn
+                    .drop_exec(
+                        "INSERT INTO vt (u, article_id) VALUES (0, ?)",
+                        (article_id,),
+                    )
+                    .await?;
             }
             //let vote_qstring = format!("INSERT INTO vt (u, article_id) VALUES {}", vals);
             //conn.drop_exec(vote_qstring, &ids).await.unwrap();
