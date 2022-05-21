@@ -20,6 +20,7 @@ rust_library(
         "src/clients/mysql.rs",
         "src/clients/memcached.rs",
         "src/clients/memcached_hybrid.rs",
+        "src/clients/pelton.rs",
     ],
     visibility = ["//visibility:public"],
     deps = [

@@ -572,30 +572,6 @@ fn main() {
                 .help("Indicates that the client should not set up the database"),
         )
         .subcommand(
-            SubCommand::with_name("netsoup")
-                .arg(
-                    Arg::with_name("zookeeper")
-                        .short("z")
-                        .long("zookeeper")
-                        .takes_value(true)
-                        .required(true)
-                        .default_value("127.0.0.1:2181")
-                        .help("Address of Zookeeper instance"),
-                )
-                .arg(
-                    Arg::with_name("deployment")
-                        .long("deployment")
-                        .required(true)
-                        .takes_value(true)
-                        .help("Soup deployment ID."),
-                )
-                .arg(
-                    Arg::with_name("no-join")
-                        .long("no-join")
-                        .help("Run vote without the article join"),
-                )
-        )
-        .subcommand(
             SubCommand::with_name("memcached")
                 .arg(
                     Arg::with_name("address")
@@ -611,39 +587,6 @@ fn main() {
                         .help("Only fetch vote counts, not titles."),
                 ),
         )
-        .subcommand(
-            SubCommand::with_name("redis")
-                .arg(
-                    Arg::with_name("address")
-                        .long("address")
-                        .takes_value(true)
-                        .required(true)
-                        .default_value("127.0.0.1")
-                        .help("Address of redis server"),
-                )
-        )
-        .subcommand(
-            SubCommand::with_name("mssql")
-                .arg(
-                    Arg::with_name("address")
-                        .long("address")
-                        .takes_value(true)
-                        .required(true)
-                        .default_value(
-                            "server=tcp:127.0.0.1,1433;username=SA;TrustServerCertificate=true;",
-                        )
-                        .help("Address of MsSQL server"),
-                )
-                .arg(
-                    Arg::with_name("database")
-                        .long("database")
-                        .takes_value(true)
-                        .required(true)
-                        .default_value("soup")
-                        .help("MsSQL database to use"),
-                ),
-        )
-        .subcommand(SubCommand::with_name("null"))
         .subcommand(
             SubCommand::with_name("mysql")
                 .arg(
@@ -710,145 +653,13 @@ fn main() {
                         .help("MySQL database to use"),
                 ),
         )
-        .subcommand(
-            SubCommand::with_name("hybrid")
-                .arg(
-                    Arg::with_name("redis-address")
-                        .long("redis-address")
-                        .takes_value(true)
-                        .required(true)
-                        .default_value("127.0.0.1")
-                        .help("Address of redis server"),
-                )
-                .arg(
-                    Arg::with_name("mysql-address")
-                        .long("mysql-address")
-                        .takes_value(true)
-                        .required(true)
-                        .default_value("127.0.0.1:3306")
-                        .help("Address of MySQL server"),
-                )
-                .arg(
-                    /* TODO: remove in favor of giving dbname in db url */
-                    Arg::with_name("database")
-                        .long("database")
-                        .takes_value(true)
-                        .required(true)
-                        .default_value("soup")
-                        .help("MySQL database to use"),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("redis-hybrid")
-                .arg(
-                    Arg::with_name("redis-address")
-                        .long("redis-address")
-                        .takes_value(true)
-                        .required(true)
-                        .default_value("127.0.0.1")
-                        .help("Address of redis server"),
-                )
-                .arg(
-                    Arg::with_name("mysql-address")
-                        .long("mysql-address")
-                        .takes_value(true)
-                        .required(true)
-                        .default_value("127.0.0.1:3306")
-                        .help("Address of MySQL server"),
-                )
-                .arg(
-                    /* TODO: remove in favor of giving dbname in db url */
-                    Arg::with_name("database")
-                        .long("database")
-                        .takes_value(true)
-                        .required(true)
-                        .default_value("soup")
-                        .help("MySQL database to use"),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("localsoup")
-                .arg(
-                    Arg::with_name("shards")
-                        .long("shards")
-                        .takes_value(true)
-                        .default_value("2")
-                        .help("Shard the graph this many ways (0 = disable sharding)."),
-                )
-                .arg(
-                    Arg::with_name("durability")
-                        .long("durability")
-                        .takes_value(false)
-                        .help("Enable durability for Base nodes"),
-                )
-                .arg(
-                    Arg::with_name("fudge-rpcs")
-                        .long("fudge-rpcs")
-                        .help("Send pointers instead of serializing data for writes"),
-                )
-                .arg(
-                    Arg::with_name("purge")
-                        .long("purge")
-                        .takes_value(true)
-                        .possible_values(&["none", "reader", "all"])
-                        .default_value("none")
-                        .help("Choose which views, if any, are placed beyond the materialization_frontier"),
-                )
-                .arg(
-                    Arg::with_name("log-dir")
-                        .long("log-dir")
-                        .takes_value(true)
-                        .help(
-                            "Absolute path to the directory where the log files will be written.",
-                        ),
-                )
-                .arg(
-                    Arg::with_name("retain-logs-on-exit")
-                        .long("retain-logs-on-exit")
-                        .takes_value(false)
-                        .requires("durability")
-                        .help("Do not delete the base node logs on exit."),
-                )
-                .arg(
-                    Arg::with_name("flush-timeout")
-                        .long("flush-timeout")
-                        .takes_value(true)
-                        .default_value("1000000")
-                        .help("Time to wait before processing a merged packet, in nanoseconds."),
-                )
-                .arg(
-                    Arg::with_name("persistence-threads")
-                        .long("persistence-threads")
-                        .takes_value(true)
-                        .default_value("1")
-                        .help("Number of background threads used by PersistentState."),
-                )
-                .arg(
-                    Arg::with_name("stupid")
-                        .long("stupid")
-                        .help("Make the migration stupid")
-                        .requires("migrate"),
-                )
-                .arg(
-                    Arg::with_name("verbose")
-                        .short("v")
-                        .help("Include logging output"),
-                ),
-        )
         .get_matches();
 
     match args.subcommand() {
-        //("localsoup", Some(largs)) => run::<clients::localsoup::LocalNoria>(&args, largs),
-        //("netsoup", Some(largs)) => run::<clients::netsoup::Conn>(&args, largs),
-        ("memcached", Some(largs)) => run::<clients::memcached::Conn>(&args, largs),
-        //("mssql", Some(largs)) => run::<clients::mssql::Conf>(&args, largs),
         ("mysql", Some(largs)) => run::<clients::mysql::Conn>(&args, largs),
-        // ("pelton", Some(largs)) => run::<clients::pelton::Conn>(&args, largs),
+        ("memcached", Some(largs)) => run::<clients::memcached::Conn>(&args, largs),
         ("memcached-hybrid", Some(largs)) => run::<clients::memcached_hybrid::Conn>(&args, largs),
-        // ("redis-hybrid", Some(largs)) => run::<clients::redis_hybrid::Conn>(&args, largs),
-        // ("redis", Some(largs)) => run::<clients::redis::Conn>(&args, largs),
-        // ("hybrid", Some(largs)) => run::<clients::hybrid::Conn>(&args, largs),
-        //("null", Some(largs)) => run::<()>(&args, largs),
+        ("pelton", Some(largs)) => run::<clients::pelton::Conn>(&args, largs),
 
         (name, _) => eprintln!("unrecognized backend type '{}'", name),
     }

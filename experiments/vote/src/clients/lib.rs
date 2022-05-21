@@ -23,3 +23,4 @@ where
 pub mod mysql;
 pub mod memcached;
 pub mod memcached_hybrid;
+pub mod pelton;
