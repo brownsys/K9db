@@ -1,7 +1,5 @@
 use common::{Parameters, ReadRequest, VoteClient, WriteRequest};
-
 use clap;
-use failure::ResultExt;
 use mysql_async::prelude::*;
 use std::future::Future;
 use std::pin::Pin;
@@ -62,10 +60,10 @@ impl VoteClient for Conn {
             if params.prime {
                 let mut opts = mysql_async::OptsBuilder::from_opts(opts.clone());
                 opts.db_name(None::<&str>);
-                opts.init(vec![
-                    "SET max_heap_table_size = 4294967296;",
-                    "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
-                ]);
+                //opts.init(vec![
+                //    "SET max_heap_table_size = 4294967296;",
+                //    "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
+                //]);
                 let mut conn = mysql_async::Conn::new(opts).await.unwrap();
                 let workaround = format!("DROP DATABASE IF EXISTS {}", &db);
                 conn = conn.drop_query(&workaround).await.unwrap();
@@ -77,17 +75,14 @@ impl VoteClient for Conn {
                 conn = conn.drop_query(&workaround).await.unwrap();
                 conn = conn
                     .drop_exec(
-                        "CREATE TABLE art \
-                         (id bigint not null, title varchar(16) not null, votes bigint not null, \
-                         PRIMARY KEY USING HASH (id)) ENGINE = MEMORY;",
+                        "CREATE TABLE art (id int NOT NULL PRIMARY KEY, title varchar(16) NOT NULL) ENGINE = ROCKSDB",
                         (),
                     )
                     .await
                     .unwrap();
                 conn = conn
                     .drop_exec(
-                        "CREATE TABLE vt \
-                         (u bigint not null, id bigint not null, KEY id (id)) ENGINE = MEMORY;",
+                        "CREATE TABLE vt (id int NOT NULL PRIMARY KEY AUTO_INCREMENT, u int NOT NULL, article_id int NOT NULL REFERENCES art(id)) ENGINE = ROCKSDB",
                         (),
                     )
                     .await
@@ -99,14 +94,13 @@ impl VoteClient for Conn {
                 assert_eq!(params.articles % bs, 0);
                 for _ in 0..params.articles / bs {
                     let mut sql = String::new();
-                    sql.push_str("INSERT INTO art (id, title, votes) VALUES ");
+                    sql.push_str("INSERT INTO art (id, title) VALUES ");
                     for i in 0..bs {
                         if i != 0 {
                             sql.push_str(", ");
                         }
                         sql.push_str("(");
-                        sql.push_str(&format!("{}, 'Article #{}'", aid, aid));
-                        sql.push_str(", 0)");
+                        sql.push_str(&format!("{}, 'Article #{}')", aid, aid));
                         aid += 1;
                     }
                     conn = conn.drop_query(sql).await.unwrap();
@@ -116,10 +110,10 @@ impl VoteClient for Conn {
             // now we connect for real
             let mut opts = mysql_async::OptsBuilder::from_opts(opts);
             opts.db_name(Some(db));
-            opts.init(vec![
-                "SET max_heap_table_size = 4294967296;",
-                "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
-            ]);
+            //opts.init(vec![
+            //    "SET max_heap_table_size = 4294967296;",
+            //    "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
+            //]);
             opts.stmt_cache_size(10000);
 
             Ok(Conn {
@@ -146,7 +140,7 @@ impl Service<ReadRequest> for Conn {
             let len = req.0.len();
             let ids = req.0.iter().map(|a| a as &_).collect::<Vec<_>>();
             let vals = (0..len).map(|_| "?").collect::<Vec<_>>().join(",");
-            let qstring = format!("SELECT id, title, votes FROM art WHERE id IN ({})", vals);
+            let qstring = format!("SELECT art.id, art.title, count(*) as votes FROM art JOIN vt ON art.id = vt.article_id GROUP BY vt.article_id HAVING art.id IN ({})", vals);
 
             let qresult = conn.prep_exec(qstring, &ids).await.unwrap();
             let (_, rows) = qresult
@@ -172,19 +166,22 @@ impl Service<WriteRequest> for Conn {
     }
 
     fn call(&mut self, req: WriteRequest) -> Self::Future {
-        let conn = self.next.take().unwrap();
+        let mut conn = self.next.take().unwrap();
         async move {
-            let len = req.0.len();
+            //let len = req.0.len();
             let ids = req.0.iter().map(|a| a as &_).collect::<Vec<_>>();
-            let vals = (0..len).map(|_| "(0, ?)").collect::<Vec<_>>().join(", ");
-            let vote_qstring = format!("INSERT INTO vt (u, id) VALUES {}", vals);
-            let conn = conn.drop_exec(vote_qstring, &ids).await.unwrap();
-
-            let vals = (0..len).map(|_| "?").collect::<Vec<_>>().join(",");
-            // NOTE: this is *not* correct for duplicate ids
-            let vote_qstring = format!("UPDATE art SET votes = votes + 1 WHERE id IN ({})", vals);
-            let _ = conn.drop_exec(vote_qstring, &ids).await.unwrap();
-
+            if ids.len() == 0{
+                println!("WriteRequest with 0 ids supplied...returning from future.")
+            }
+            for article_id in ids.iter() {
+                conn = conn.drop_exec(
+                    "INSERT INTO vt (u, article_id) VALUES (0, ?)",
+                    (article_id,),
+                ).await?;
+            }
+            //let vals = (0..len).map(|_| "(0, ?)").collect::<Vec<_>>().join(", ");
+            //let vote_qstring = format!("INSERT INTO vt (u, article_id) VALUES {}", vals);
+            //conn.drop_exec(vote_qstring, &ids).await.unwrap();
             Ok(())
         }
     }
