@@ -5,7 +5,8 @@ TEST(E2ECorrectnessTest, Shuup) {
 }
 
 int main(int argc, char **argv) {
-  return tests::TestingMain(argc, argv, "shuup", 2,
+  return tests::TestingMain(argc, argv, "shuup", 3,
                             "tests/data/shuup/schema.sql",
+                            "tests/data/shuup/views.sql",
                             "tests/data/shuup/inserts.sql");
 }
