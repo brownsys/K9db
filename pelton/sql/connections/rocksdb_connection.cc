@@ -8,6 +8,7 @@
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/table.h"
+#include "encryption.h"
 
 #define PANIC PANIC_STATUS
 
@@ -78,13 +79,19 @@ SingletonRocksdbConnection::SingletonRocksdbConnection(
   opts.error_if_exists = true;
   opts.IncreaseParallelism();
   opts.OptimizeLevelStyleCompaction();
-  opts.prefix_extractor.reset(new ShardPrefixTransform(1));
-  opts.comparator = rocksdb::BytewiseComparator();
+  opts.prefix_extractor.reset(new EncryptedPrefixTransform());
+  opts.comparator = EncryptedComparator::Instance();
 
   // Open the database.
   rocksdb::DB *db;
   PANIC(rocksdb::DB::Open(opts, path, &db));
   this->db_ = std::unique_ptr<rocksdb::DB>(db);
+
+  // Initialize libsodium.
+  InitializeEncryption();
+  
+  // Generate global key.
+  this->global_key_ = KeyGen();
 }
 
 // Close the connection.
@@ -93,6 +100,12 @@ void SingletonRocksdbConnection::Close() {
     this->indices_.clear();
     this->handlers_.clear();
     this->db_ = nullptr;
+    // delete encryption keys
+    delete[] this->global_key_;
+    for (const auto &[user, user_key] : this->user_keys_) {
+      LOG(INFO) << "Deleting key for: " << user;
+      delete[] user_key;
+    }
   }
 }
 
@@ -116,8 +129,8 @@ bool SingletonRocksdbConnection::ExecuteStatement(
         rocksdb::ColumnFamilyHandle *handle;
         rocksdb::ColumnFamilyOptions options;
         options.OptimizeLevelStyleCompaction();
-        options.prefix_extractor.reset(new ShardPrefixTransform(1));
-        options.comparator = rocksdb::BytewiseComparator();
+        options.prefix_extractor.reset(new EncryptedPrefixTransform());
+        options.comparator = EncryptedComparator::Instance();
         PANIC(this->db_->CreateColumnFamily(options, table_name, &handle));
 
         // Fill in table metadata.
@@ -146,8 +159,8 @@ bool SingletonRocksdbConnection::ExecuteStatement(
             }
           }
           if (has_constraint) {
-            this->indexed_columns_.at(tid).push_back(i);
-            this->indices_.at(tid).emplace_back(this->db_.get(), tid, i);
+             this->indexed_columns_.at(tid).push_back(i);
+             this->indices_.at(tid).emplace_back(this->db_.get(), tid, i);
           }
         }
       }
@@ -166,8 +179,8 @@ bool SingletonRocksdbConnection::ExecuteStatement(
       auto it = std::find(indexed_columns.begin(), indexed_columns.end(), cid);
       if (it == indexed_columns.end()) {
         std::vector<RocksdbIndex> &indices = this->indices_.at(tid);
-        indexed_columns.push_back(cid);
-        indices.emplace_back(this->db_.get(), tid, cid);
+         indexed_columns.push_back(cid);
+         indices.emplace_back(this->db_.get(), tid, cid);
       }
       break;
     }
@@ -177,7 +190,7 @@ bool SingletonRocksdbConnection::ExecuteStatement(
   return true;
 }
 
-int SingletonRocksdbConnection::ExecuteUpdate(
+std::pair<int, uint64_t> SingletonRocksdbConnection::ExecuteUpdate(
     const sqlast::AbstractStatement *sql, const std::string &shard_name) {
   ShardID sid = shard_name + __ROCKSSEP;
   // Read table metadata.
@@ -201,12 +214,13 @@ int SingletonRocksdbConnection::ExecuteUpdate(
         // to update indices correctly, might as well use the returning
         // code.
         this->ExecuteQuery(sql, db_schema, {}, shard_name);
-        return 1;
+        return std::make_pair(1, 0);
       }
       // if we are not replacing, then we will need to update indices for
       // the insert only (nothing is removed).
       // if no indices, then we do not need to know what rows got replaced.
       std::string pk_value = "";
+      uint64_t last_insert_id = 0;
       if (value_mapper.HasAfter(db_schema.NameOf(pk))) {
         if (this->auto_increment_counters_.count(tid) == 1) {
           LOG(FATAL) << "Insert has value for PK but it is auto increment!";
@@ -220,7 +234,8 @@ int SingletonRocksdbConnection::ExecuteUpdate(
         if (this->auto_increment_counters_.count(tid) == 0) {
           LOG(FATAL) << "Insert has no value for PK and not auto increment!";
         }
-        pk_value = std::to_string(++(this->auto_increment_counters_.at(tid)));
+        last_insert_id = ++(this->auto_increment_counters_.at(tid));
+        pk_value = std::to_string(last_insert_id);
       }
 
       // Insert/replace new row.
@@ -228,7 +243,9 @@ int SingletonRocksdbConnection::ExecuteUpdate(
       std::string row = EncodeInsert(*stmt, db_schema, pk_value);
       auto opts = rocksdb::WriteOptions();
       opts.sync = true;
-      PANIC(this->db_->Put(opts, handler, skey, row));
+      PANIC(this->db_->Put(opts, handler, 
+                            EncryptKey(this->global_key_, skey), 
+                            Encrypt(this->GetUserKey(shard_name), row)));
 
       // Update indices.
       rocksdb::Slice pkslice(pk_value.data(), pk_value.size());
@@ -238,7 +255,7 @@ int SingletonRocksdbConnection::ExecuteUpdate(
         size_t indexed_column = indexed_columns.at(i);
         index.Add(shard_name, ExtractColumn(rslice, indexed_column), pkslice);
       }
-      return 1;
+      return std::make_pair(1, last_insert_id);
     }
     case sqlast::AbstractStatement::Type::UPDATE: {
       const sqlast::Update *stmt = static_cast<const sqlast::Update *>(sql);
@@ -274,9 +291,12 @@ int SingletonRocksdbConnection::ExecuteUpdate(
         bool keychanged = !SlicesEq(opk, npk);
         // If the PK is unchanged, we do not need to delete, and can replace.
         if (keychanged) {
-          PANIC(db_->Delete(rocksdb::WriteOptions(), handler, okey));
+          PANIC(db_->Delete(rocksdb::WriteOptions(), handler, 
+                            EncryptKey(this->global_key_, okey)));
         }
-        PANIC(db_->Put(rocksdb::WriteOptions(), handler, nkey, nrow));
+        PANIC(db_->Put(rocksdb::WriteOptions(), handler, 
+                        EncryptKey(this->global_key_, nkey), 
+                        Encrypt(this->GetUserKey(shard_name), nrow)));
         // Update indices.
         for (size_t i = 0; i < indexed_columns.size(); i++) {
           RocksdbIndex &index = indices.at(i);
@@ -290,16 +310,16 @@ int SingletonRocksdbConnection::ExecuteUpdate(
           index.Add(shard_name, nval, npk);
         }
       }
-      return rows.size();
+      return std::make_pair(rows.size(), 0);
     }
     case sqlast::AbstractStatement::Type::DELETE: {
       auto resultset = this->ExecuteQuery(sql, db_schema, {}, shard_name);
-      return resultset.Vec().size();
+      return std::make_pair(resultset.Vec().size(), 0);
     }
     default:
       LOG(FATAL) << "Illegal statement type in ExecuteUpdate";
   }
-  return -1;
+  return std::make_pair(-1, 0);
 }
 
 SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
@@ -365,7 +385,8 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
         records.push_back(DecodeRecord(slice, out_schema, augments, {}));
         // Delete the existing row by key.
         std::string skey = sid + keyslice.ToString() + __ROCKSSEP;
-        PANIC(this->db_->Delete(rocksdb::WriteOptions(), handler, skey));
+        PANIC(this->db_->Delete(rocksdb::WriteOptions(), handler,
+                                EncryptKey(this->global_key_, skey)));
         // Update indices.
         for (size_t i = 0; i < indexed_columns.size(); i++) {
           RocksdbIndex &index = indices.at(i);
@@ -393,10 +414,12 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
       rocksdb::ReadOptions opts;
       opts.total_order_seek = true;
       opts.verify_checksums = false;
-      auto st = this->db_->Get(opts, handler, skey, &orow);
+      auto st = this->db_->Get(opts, handler, 
+                                EncryptKey(this->global_key_, skey), &orow);
       if (st.ok()) {
         // There is a pre-existing row with that PK (that will get replaced).
-        oslice = rocksdb::Slice(orow);
+        orow = Decrypt(this->GetUserKey(shard_name), orow);
+        oslice = rocksdb::Slice(orow.data(), orow.size());
         keys.push_back(pkslice.ToString());
         records.push_back(DecodeRecord(oslice, out_schema, augments, {}));
       } else if (!st.IsNotFound()) {
@@ -409,7 +432,9 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
       if (SlicesEq(oslice, nslice)) {  // No-op.
         break;
       }
-      PANIC(this->db_->Put(rocksdb::WriteOptions(), handler, skey, nrow));
+      PANIC(this->db_->Put(rocksdb::WriteOptions(), handler, 
+                            EncryptKey(this->global_key_, skey), 
+                            Encrypt(this->GetUserKey(shard_name), nrow)));
       // Update indices.
       for (size_t i = 0; i < indexed_columns.size(); i++) {
         RocksdbIndex &index = indices.at(i);
@@ -473,7 +498,12 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQueryAll(
       auto ptr = this->db_->NewIterator(options, handler);
       std::unique_ptr<rocksdb::Iterator> it(ptr);
       for (it->SeekToFirst(); it->Valid(); it->Next()) {
-        rocksdb::Slice rowslice = it->value();
+        std::string decrypted_key = DecryptKey(this->global_key_, it->key().ToString());
+        rocksdb::Slice keyslice(decrypted_key.data(), decrypted_key.size());
+        rocksdb::Slice aug_value = ExtractColumn(keyslice, 0);
+        std::string rowstr = Decrypt(
+          this->GetUserKey(aug_value.ToString()), it->value().ToString());
+        rocksdb::Slice rowslice = rocksdb::Slice(rowstr.data(), rowstr.size());
         // Extract PK.
         rocksdb::Slice pk_value = ExtractColumn(rowslice, pk);
         std::string keystr = pk_value.ToString();
@@ -483,8 +513,6 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQueryAll(
           // Figure out the shard_by column if needed to augment into the
           // result.
           if (must_augment) {
-            rocksdb::Slice keyslice = it->key();
-            rocksdb::Slice aug_value = ExtractColumn(keyslice, 0);
             augments_copy.at(0).value = aug_value.ToString();
           }
           records.push_back(
@@ -548,9 +576,10 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
       opts.total_order_seek = true;
       opts.verify_checksums = false;
       rocksdb::Status status =
-          this->db_->Get(opts, handler, keys.front(), &str);
+          this->db_->Get(opts, handler, 
+                          EncryptKey(this->global_key_, keys.front()), &str);
       if (status.ok()) {
-        result.push_back(std::move(str));
+        result.push_back(std::move(Decrypt(this->GetUserKey(shard_name), str)));
       } else if (!status.IsNotFound()) {
         PANIC(status);
       }
@@ -561,6 +590,7 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
       rocksdb::PinnableSlice *pins = new rocksdb::PinnableSlice[keys.size()];
       rocksdb::Status *statuses = new rocksdb::Status[keys.size()];
       for (size_t i = 0; i < keys.size(); i++) {
+        keys.at(i) = EncryptKey(this->global_key_, keys.at(i));
         slices[i] = rocksdb::Slice(keys.at(i));
         pins[i] = rocksdb::PinnableSlice(tmp + i);
       }
@@ -576,7 +606,8 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
           if (pins[i].IsPinned()) {
             tmp[i].assign(pins[i].data(), pins[i].size());
           }
-          result.push_back(std::move(tmp[i]));
+          result.push_back(std::move(
+            Decrypt(this->GetUserKey(shard_name), tmp[i])));
         } else if (!status.IsNotFound()) {
           PANIC(status);
         }
@@ -599,10 +630,9 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
     options.verify_checksums = false;
     auto ptr = this->db_->NewIterator(options, handler);
     std::unique_ptr<rocksdb::Iterator> it(ptr);
-    rocksdb::Slice pslice(shard_id);
-    for (it->Seek(shard_id); it->Valid(); it->Next()) {
-      rocksdb::Slice keyslice = it->key();
-      result.push_back(it->value().ToString());
+    for (it->Seek(EncryptSeek(this->global_key_, shard_id)); it->Valid(); it->Next()) {
+      result.push_back(
+        Decrypt(this->GetUserKey(shard_name), it->value().ToString()));
     }
   }
   return result;
@@ -621,6 +651,29 @@ std::vector<std::string> SingletonRocksdbConnection::Filter(
     }
   }
   return filtered;
+}
+
+// Gets key corresponding to input user. Creates key if does not exist.
+unsigned char* SingletonRocksdbConnection::GetUserKey(
+    const std::string &shard_name) {
+#ifdef PELTON_ENCRYPTION
+  shards::SharedLock lock(&this->user_keys_mtx_);
+  std::unordered_map<std::string, unsigned char *>::const_iterator it =
+      this->user_keys_.find(shard_name);
+  if (it == this->user_keys_.cend()) {
+    shards::UniqueLock upgraded(std::move(lock));
+    it = this->user_keys_.find(shard_name);
+    if (it == this->user_keys_.cend()) {
+      unsigned char *key = KeyGen();
+      this->user_keys_.emplace(shard_name, key);
+      return key;
+    }
+    return it->second;
+  }
+  return it->second;
+#else
+  return nullptr;
+#endif  // PELTON_ENCRYPTION
 }
 
 // Static singleton.

@@ -163,6 +163,11 @@ class SharderState {
 
   bool HasDefaultTable(const UnshardedTableName &name) const;
 
+  const std::unordered_map<UnshardedTableName, sqlast::CreateTable> &tables()
+      const {
+    return this->schema_;
+  }
+
  private:
   // The logical (unsharded) schema of every table.
   std::unordered_map<UnshardedTableName, sqlast::CreateTable> schema_;

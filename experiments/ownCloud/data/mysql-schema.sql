@@ -5,7 +5,7 @@ CREATE TABLE oc_storages (
   available INT NOT NULL,
   last_checked INT,
   PRIMARY KEY (numeric_id)
-);
+) ENGINE=ROCKSDB;
 CREATE TABLE oc_filecache (
   fileid INTEGER PRIMARY KEY NOT NULL,
   storage INTEGER NOT NULL REFERENCES oc_storages(numeric_id),
@@ -23,31 +23,31 @@ CREATE TABLE oc_filecache (
   checksum VARCHAR(255),
   mtime INT NOT NULL,
   storage_mtime INT NOT NULL
-);
+) ENGINE=ROCKSDB;
 CREATE TABLE oc_files (
   id INTEGER PRIMARY KEY NOT NULL,
   file_name VARCHAR(255)
-);
+) ENGINE=ROCKSDB;
 
 CREATE TABLE  oc_users (
   uid VARCHAR(64) NOT NULL,
   PII_displayname VARCHAR(64),
   password VARCHAR(255) NOT NULL,
   PRIMARY KEY(uid)
-);
+) ENGINE=ROCKSDB;
 
 
 CREATE TABLE oc_groups (
   gid VARCHAR(64) NOT NULL,
   PRIMARY KEY(gid)
-);
+) ENGINE=ROCKSDB;
 
 CREATE TABLE oc_group_user (
   id INT PRIMARY KEY,
   OWNING_gid VARCHAR(64) NOT NULL REFERENCES oc_groups(gid),
   uid VARCHAR(64) NOT NULL REFERENCES oc_users(uid)
   --UNIQUE group_user_uniq(OWNED_gid, uid)
-);
+) ENGINE=ROCKSDB;
 
 CREATE TABLE oc_share (
   id INT NOT NULL,
@@ -70,7 +70,7 @@ CREATE TABLE oc_share (
   share_name VARCHAR(64),
   file_source INT,
   attributes TEXT
-);
+) ENGINE=ROCKSDB;
 
 -- CREATE VIEW users_for_file_via_group AS 
 -- '"SELECT oc_share.OWNING_item_source, oc_group_user.uid, COUNT(*)
@@ -79,24 +79,24 @@ CREATE TABLE oc_share (
 -- WHERE oc_share.OWNING_item_source = ?
 -- GROUP BY (oc_share.OWNING_item_source, oc_group_user.uid)"';
 
+CREATE INDEX oc_share_type_direct ON oc_share(ACCESSOR_share_with, share_type);
+CREATE INDEX oc_share_type_indirect ON oc_share(ACCESSOR_share_with_group, share_type);
+CREATE INDEX oc_group_user_uid ON oc_group_user(uid);
+CREATE INDEX oc_storages_numeric_id ON oc_storages(numeric_id);
 
--- -- shoudl also return s.*
-CREATE VIEW file_view AS 
-(SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, s.ACCESSOR_share_with as share_target
-FROM oc_share s
-LEFT JOIN oc_filecache f ON s.file_source = f.fileid
-LEFT JOIN oc_storages st ON f.storage = st.numeric_id
-WHERE (s.share_type = 0) )
-UNION
-(SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, oc_group_user.uid as share_target
-FROM oc_share s
-LEFT JOIN oc_filecache f ON s.file_source = f.fileid
-LEFT JOIN oc_storages st ON f.storage = st.numeric_id
-JOIN oc_group_user ON s.ACCESSOR_share_with_group = oc_group_user.OWNING_gid
-WHERE (s.share_type = 1) 
-   )
-ORDER BY sid ASC
-;
+-- -- should also return s.*
+-- (SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, s.ACCESSOR_share_with as share_target
+--   FROM oc_share s
+--   LEFT JOIN oc_filecache f ON s.file_source = f.fileid
+--   LEFT JOIN oc_storages st ON f.storage = st.numeric_id
+--   WHERE (s.share_type = 0) AND s.ACCESSOR_share_with = {})
+-- UNION
+--   (SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, oc_group_user.uid as share_target
+--   FROM oc_share s
+--   LEFT JOIN oc_filecache f ON s.file_source = f.fileid
+--   LEFT JOIN oc_storages st ON f.storage = st.numeric_id
+--   JOIN oc_group_user ON s.ACCESSOR_share_with_group = oc_group_user.OWNING_gid
+--   WHERE (s.share_type = 1) AND oc_group_user.uid = {})
 
 -- CREATE VIEW file_view AS 
 -- '"(SELECT s.id as sid, s.OWNING_item_source, s.share_type, s.ACCESSOR_share_with as share_target
@@ -108,5 +108,4 @@ ORDER BY sid ASC
 -- JOIN oc_group_user ON s.ACCESSOR_share_with_group = oc_group_user.OWNING_gid
 -- WHERE (s.share_type = 1) AND oc_group_user.uid = ?
 --    )
--- ORDER BY sid ASC
 -- "';

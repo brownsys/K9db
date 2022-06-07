@@ -18,6 +18,7 @@ use std::net;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use std::collections::LinkedList;
 
 // Help message.
 const USAGE: &str = "
@@ -90,37 +91,49 @@ fn stringify_parameter(param: msql_srv::ParamValue) -> String {
 fn write_result<W: io::Write>(writer: msql_srv::QueryResultWriter<W>,
                               result: pelton::FFIResult)
                               -> io::Result<()> {
-  let columns = convert_columns(result);
-  let mut rw = writer.start(&columns).unwrap();
-
-  let rows = pelton::result::row_count(result);
-  let cols = columns.len();
-  for r in 0..rows {
-    for c in 0..cols {
-      if pelton::result::null(result, r, c) {
-        rw.write_col(None::<i32>)?;
-        continue;
-      }
-      match pelton::result::column_type(result, c) {
-        pelton::FFIColumnType_UINT => {
-          rw.write_col(pelton::result::uint(result, r, c) as i64)
-        }
-        pelton::FFIColumnType_INT => {
-          rw.write_col(pelton::result::int(result, r, c))
-        }
-        pelton::FFIColumnType_TEXT => {
-          rw.write_col(pelton::result::text(result, r, c))
-        }
-        pelton::FFIColumnType_DATETIME => {
-          rw.write_col(pelton::result::datetime(result, r, c))
-        }
-        _ => unimplemented!("Rust proxy: invalid column type"),
-      }?;
-    }
-    rw.end_row()?;
+  let mut cv: Vec<Vec<msql_srv::Column>> = Vec::new();
+  while pelton::result::next_resultset(result) {
+    cv.push(convert_columns(result));
   }
+
+  let mut writer = writer;
+  let mut i = 0;
+  while pelton::result::next_resultset(result) {
+    i += 1;
+    let columns = &cv[i-1];
+    let mut rw = writer.start(columns).unwrap();
+
+    let rows = pelton::result::row_count(result);
+    let cols = columns.len();
+    for r in 0..rows {
+      for c in 0..cols {
+        if pelton::result::null(result, r, c) {
+          rw.write_col(None::<i32>)?;
+          continue;
+        }
+        match pelton::result::column_type(result, c) {
+          pelton::FFIColumnType_UINT => {
+            rw.write_col(pelton::result::uint(result, r, c) as i64)
+          }
+          pelton::FFIColumnType_INT => {
+            rw.write_col(pelton::result::int(result, r, c))
+          }
+          pelton::FFIColumnType_TEXT => {
+            rw.write_col(pelton::result::text(result, r, c))
+          }
+          pelton::FFIColumnType_DATETIME => {
+            rw.write_col(pelton::result::datetime(result, r, c))
+          }
+          _ => unimplemented!("Rust proxy: invalid column type"),
+        }?;
+      }
+      rw.end_row()?;
+    }
+    writer = rw.finish_one()?;
+  }
+
   pelton::result::destroy(result);
-  return rw.finish();
+  writer.no_more_results()
 }
 
 // msql-srv shim struct.
@@ -192,7 +205,8 @@ impl<W: io::Write> MysqlShim<W> for Backend {
       return write_result(results, response.query_result);
     } else {
       if response.update_result > -1 {
-        return results.completed(response.update_result as u64, 0);
+        return results.completed(response.update_result as u64,
+                                 response.last_insert_id);
       }
     }
     return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
@@ -254,6 +268,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("CREATE INDEX")
        || q_string.starts_with("CREATE VIEW")
        || q_string.starts_with("SET")
+       || q_string.starts_with("EXPLAIN PRIVACY")
     {
       let ddl_response = pelton::exec_ddl(self.rust_conn, q_string);
       if ddl_response {
@@ -271,8 +286,9 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("GDPR FORGET")
     {
       let update_response = pelton::exec_update(self.rust_conn, q_string);
-      if update_response != -1 {
-        return results.completed(update_response as u64, 0);
+      if update_response.row_count != -1 {
+        return results.completed(update_response.row_count as u64,
+                                 update_response.last_insert_id);
       }
       error!(self.log, "Rust Proxy: Failed to execute UPDATE: {:?}", q_string);
       return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
@@ -294,6 +310,10 @@ impl<W: io::Write> MysqlShim<W> for Backend {
     if q_string.starts_with("set") {
       info!(self.log, "Ignoring set query {}", q_string);
       return results.completed(0, 0);
+    }
+
+    if q_string.starts_with("STOP") {
+      std::process::exit(0);
     }
 
     error!(self.log, "Rust proxy: unsupported query type {}", q_string);
@@ -359,6 +379,7 @@ fn main() {
       // clone log so that each client thread has an owned copy
       let log = log.clone();
       threads.push(std::thread::spawn(move || {
+                     let bufwriter = io::BufWriter::with_capacity(10000000, stream.try_clone().unwrap());
                      info!(log,
                            "Rust Proxy: Successfully connected to mysql \
                             proxy\nStream and address are: {:?}",
@@ -367,7 +388,7 @@ fn main() {
                      let backend = Backend { rust_conn: rust_conn,
                                              log: log };
                      let _ =
-                       MysqlIntermediary::run_on_tcp(backend, stream).unwrap();
+                       MysqlIntermediary::run_on(backend, stream, bufwriter).unwrap();
                    }));
     }
     // wait before checking listener status

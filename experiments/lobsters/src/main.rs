@@ -458,6 +458,11 @@ fn main() {
                 .help("Set if the backend must be primed with initial stories and comments."),
         )
         .arg(
+            Arg::with_name("scale_everything")
+                .long("scale_everything")
+                .help("Set if you want to scale the data per user with the number of users."),
+        )
+        .arg(
             Arg::with_name("queries")
                 .short("q")
                 .long("queries")
@@ -530,11 +535,19 @@ fn main() {
     // Atomic counter to generate ids for stories. This serves as a replacement for auto
     // increment the id column.
     // Preserve a parent counter so that it does not go out of scope.
-    let stories_counter = Arc::new(AtomicU32::new(0));
-    let taggings_counter = Arc::new(AtomicU32::new(0));
-    let votes_counter = Arc::new(AtomicU32::new(0));
-    let ribbons_counter = Arc::new(AtomicU32::new(0));
-    let comments_counter = Arc::new(AtomicU32::new(0));
+    let scale = value_t_or_exit!(args, "datascale", f64);
+    let prime = args.is_present("prime");
+    let stories_start = if prime { 0 } else { (scale * 50000.0) as u32};
+    let taggings_start = if prime { 0 } else { (scale * 100000.0) as u32};
+    let votes_start = if prime { 0 } else { (scale * 300000.0) as u32};
+    let ribbons_start = if prime { 0 } else { (scale * 10000.0) as u32};
+    let comments_start = if prime { 0 } else { (scale * 300000.0) as u32};
+
+    let stories_counter = Arc::new(AtomicU32::new(stories_start));
+    let taggings_counter = Arc::new(AtomicU32::new(taggings_start));
+    let votes_counter = Arc::new(AtomicU32::new(votes_start));
+    let ribbons_counter = Arc::new(AtomicU32::new(ribbons_start));
+    let comments_counter = Arc::new(AtomicU32::new(comments_start));
 
     let s = MysqlTrawlerBuilder {
         variant,
@@ -547,5 +560,5 @@ fn main() {
         comments_counter: comments_counter,
     };
 
-    wl.run(s, args.is_present("prime"), &WEIGHTS);
+    wl.run(s, args.is_present("prime"), &WEIGHTS, args.is_present("scale_everything"));
 }
