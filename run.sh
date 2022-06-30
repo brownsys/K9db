@@ -1,6 +1,6 @@
 #!/bin/bash
-rm -rf /tmp/pelton
-mkdir -p /tmp/pelton
+rm -rf /tmp/pelton/rocksdb
+mkdir -p /tmp/pelton/rocksdb
 
 if [[ "$1" == "dbg" ]]; then
   RUST_BACKTRACE=1 bazel run //:pelton -- --logtostderr=1 "${@:2}"

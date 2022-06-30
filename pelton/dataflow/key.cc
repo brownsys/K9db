@@ -78,6 +78,10 @@ std::ostream &operator<<(std::ostream &os, const pelton::dataflow::Key &k) {
 size_t Key::Hash() const {
   size_t hash_value = 0;
   for (const Value &val : this->values_) {
+    if (val.IsNull()) {
+      hash_value += std::hash<std::string>{}("NULL");
+      continue;
+    }
     switch (val.type()) {
       case sqlast::ColumnDefinition::Type::UINT:
         hash_value += std::hash<std::uint64_t>{}(val.GetUInt());

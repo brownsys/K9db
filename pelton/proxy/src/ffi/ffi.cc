@@ -181,7 +181,8 @@ bool FFIShutdown() {
 bool FFIResultNextSet(FFIResult c_result) {
   (*c_result.index)++;
   int idx = *c_result.index;
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  pelton::SqlResult *result =
+      reinterpret_cast<pelton::SqlResult *>(c_result.result);
   if (idx < result->ResultSets().size()) {
     return true;
   } else {
@@ -191,19 +192,22 @@ bool FFIResultNextSet(FFIResult c_result) {
 }
 size_t FFIResultColumnCount(FFIResult c_result) {
   int idx = *c_result.index;
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  pelton::SqlResult *result =
+      reinterpret_cast<pelton::SqlResult *>(c_result.result);
   const pelton::Schema &schema = result->ResultSets().at(idx).schema();
   return schema.size();
 }
 const char *FFIResultColumnName(FFIResult c_result, size_t col) {
   int idx = *c_result.index;
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  pelton::SqlResult *result =
+      reinterpret_cast<pelton::SqlResult *>(c_result.result);
   const pelton::Schema &schema = result->ResultSets().at(idx).schema();
   return schema.NameOf(col).c_str();
 }
 FFIColumnType FFIResultColumnType(FFIResult c_result, size_t col) {
   int idx = *c_result.index;
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  pelton::SqlResult *result =
+      reinterpret_cast<pelton::SqlResult *>(c_result.result);
   const pelton::Schema &schema = result->ResultSets().at(idx).schema();
   return static_cast<FFIColumnType>(schema.TypeOf(col));
 }
@@ -211,44 +215,51 @@ FFIColumnType FFIResultColumnType(FFIResult c_result, size_t col) {
 // FFIResult data handling.
 size_t FFIResultRowCount(FFIResult c_result) {
   int idx = *c_result.index;
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  pelton::SqlResult *result =
+      reinterpret_cast<pelton::SqlResult *>(c_result.result);
   const std::vector<pelton::Record> &rows = result->ResultSets().at(idx).rows();
   return rows.size();
 }
 bool FFIResultIsNull(FFIResult c_result, size_t row, size_t col) {
   int idx = *c_result.index;
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  pelton::SqlResult *result =
+      reinterpret_cast<pelton::SqlResult *>(c_result.result);
   const std::vector<pelton::Record> &rows = result->ResultSets().at(idx).rows();
   return rows.at(row).IsNull(col);
 }
 uint64_t FFIResultGetUInt(FFIResult c_result, size_t row, size_t col) {
   int idx = *c_result.index;
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  pelton::SqlResult *result =
+      reinterpret_cast<pelton::SqlResult *>(c_result.result);
   const std::vector<pelton::Record> &rows = result->ResultSets().at(idx).rows();
   return rows.at(row).GetUInt(col);
 }
 int64_t FFIResultGetInt(FFIResult c_result, size_t row, size_t col) {
   int idx = *c_result.index;
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  pelton::SqlResult *result =
+      reinterpret_cast<pelton::SqlResult *>(c_result.result);
   const std::vector<pelton::Record> &rows = result->ResultSets().at(idx).rows();
   return rows.at(row).GetInt(col);
 }
 const char *FFIResultGetString(FFIResult c_result, size_t row, size_t col) {
   int idx = *c_result.index;
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  pelton::SqlResult *result =
+      reinterpret_cast<pelton::SqlResult *>(c_result.result);
   const std::vector<pelton::Record> &rows = result->ResultSets().at(idx).rows();
   return rows.at(row).GetString(col).c_str();
 }
 const char *FFIResultGetDatetime(FFIResult c_result, size_t row, size_t col) {
   int idx = *c_result.index;
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  pelton::SqlResult *result =
+      reinterpret_cast<pelton::SqlResult *>(c_result.result);
   const std::vector<pelton::Record> &rows = result->ResultSets().at(idx).rows();
   return rows.at(row).GetDateTime(col).c_str();
 }
 
 // Clean up the memory allocated by an FFIResult.
 void FFIResultDestroy(FFIResult c_result) {
-  pelton::SqlResult *result = reinterpret_cast<pelton::SqlResult *>(c_result.result);
+  pelton::SqlResult *result =
+      reinterpret_cast<pelton::SqlResult *>(c_result.result);
   delete result;
   delete c_result.index;
 }

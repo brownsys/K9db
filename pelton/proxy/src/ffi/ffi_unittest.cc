@@ -22,6 +22,25 @@ void DropDatabase() {
   std::filesystem::remove_all("/tmp/pelton/rocksdb/" DB_NAME);
 }
 
+// Check that a result has this row (since order can be arbitrary).
+bool HasRow(FFIResult result, int id, const std::string &name) {
+  for (size_t i = 0; i < FFIResultRowCount(result); i++) {
+    if (FFIResultGetInt(result, i, 0) == id && !FFIResultIsNull(result, i, 1) &&
+        std::string(FFIResultGetString(result, i, 1)) == name) {
+      return true;
+    }
+  }
+  return false;
+}
+bool HasRowNull(FFIResult result, int id) {
+  for (size_t i = 0; i < FFIResultRowCount(result); i++) {
+    if (FFIResultGetInt(result, i, 0) == id && FFIResultIsNull(result, i, 1)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 TEST(PROXY, OPEN_TEST) {
   c_conn = FFIOpen(DB_NAME);
   EXPECT_NE(c_conn, nullptr);
@@ -46,7 +65,7 @@ TEST(PROXY, UPDATE_TEST) {
       {"INSERT INTO test3 VALUES (1, 'hello');", 1},
       {"INSERT INTO test3 VALUES (2, 'bye');", 1},
       {"INSERT INTO test3 VALUES (3, 'world');", 1},
-      {"INSERT INTO test3 VALUES (50, 'hi');", 1},
+      {"INSERT INTO test3 VALUES (50, NULL);", 1},
       {"UPDATE test3 SET ID = 10 WHERE ID = 1;", 1},
       {"DELETE FROM test3 WHERE ID = 3;", 1}};
   for (auto &[q, count] : tests) {
@@ -60,6 +79,7 @@ TEST(PROXY, UPDATE_TEST) {
 TEST(PROXY, QUERY_TEST) {
   // Query from table.
   FFIResult response_select = FFIExecSelect(c_conn, "SELECT * FROM test3;");
+  EXPECT_TRUE(FFIResultNextSet(response_select));
   EXPECT_EQ(FFIResultColumnCount(response_select), 2) << "Bad column count";
   EXPECT_EQ(FFIResultRowCount(response_select), 3) << "Bad row count";
   EXPECT_EQ(FFIResultColumnType(response_select, 0), CType::INT) << "Bad types";
@@ -69,20 +89,16 @@ TEST(PROXY, QUERY_TEST) {
       << "Bad schema";
   EXPECT_EQ(std::string(FFIResultColumnName(response_select, 1)), "name")
       << "Bad schema";
-  EXPECT_EQ(FFIResultGetInt(response_select, 0, 0), 10) << "Bad data";
-  EXPECT_EQ(std::string(FFIResultGetString(response_select, 0, 1)), "hello")
-      << "Bad data";
-  EXPECT_EQ(FFIResultGetInt(response_select, 1, 0), 2) << "Bad data";
-  EXPECT_EQ(std::string(FFIResultGetString(response_select, 1, 1)), "bye")
-      << "Bad data";
-  EXPECT_EQ(FFIResultGetInt(response_select, 2, 0), 50) << "Bad data";
-  EXPECT_EQ(std::string(FFIResultGetString(response_select, 2, 1)), "hi")
-      << "Bad data";
+  EXPECT_TRUE(HasRow(response_select, 10, "hello"));
+  EXPECT_TRUE(HasRow(response_select, 2, "bye"));
+  EXPECT_TRUE(HasRowNull(response_select, 50));
+  EXPECT_FALSE(FFIResultNextSet(response_select));
   FFIResultDestroy(response_select);
 
 #ifndef PELTON_VALGRIND_MODE
   // Query from view.
   response_select = FFIExecSelect(c_conn, "SELECT * FROM myview;");
+  EXPECT_TRUE(FFIResultNextSet(response_select));
   EXPECT_EQ(FFIResultColumnCount(response_select), 2) << "Bad column count";
   EXPECT_EQ(FFIResultRowCount(response_select), 2) << "Bad row count";
   EXPECT_EQ(FFIResultColumnType(response_select, 0), CType::INT) << "Bad types";
@@ -93,11 +109,11 @@ TEST(PROXY, QUERY_TEST) {
   EXPECT_EQ(std::string(FFIResultColumnName(response_select, 1)), "name")
       << "Bad schema";
   EXPECT_EQ(FFIResultGetInt(response_select, 0, 0), 50) << "Bad data";
-  EXPECT_EQ(std::string(FFIResultGetString(response_select, 0, 1)), "hi")
-      << "Bad data";
+  EXPECT_EQ(FFIResultIsNull(response_select, 0, 1), true) << "Bad data";
   EXPECT_EQ(FFIResultGetInt(response_select, 1, 0), 10) << "Bad data";
   EXPECT_EQ(std::string(FFIResultGetString(response_select, 1, 1)), "hello")
       << "Bad data";
+  EXPECT_FALSE(FFIResultNextSet(response_select));
   FFIResultDestroy(response_select);
 #endif
 }
@@ -130,6 +146,7 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
   FFIPreparedResult struct1 = FFIExecPrepare(c_conn, 0, 1, args1);
   EXPECT_TRUE(struct1.query);
   FFIResult result1 = struct1.query_result;
+  EXPECT_TRUE(FFIResultNextSet(result1));
   EXPECT_EQ(FFIResultColumnCount(result1), 2) << "Bad column count";
   EXPECT_EQ(FFIResultRowCount(result1), 1) << "Bad row count";
   EXPECT_EQ(std::string(FFIResultColumnName(result1, 0)), "ID") << "Schema";
@@ -139,29 +156,30 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
   EXPECT_EQ(FFIResultGetInt(result1, 0, 0), 10) << "Bad data";
   EXPECT_EQ(std::string(FFIResultGetString(result1, 0, 1)), "hello")
       << "Bad str";
+  EXPECT_FALSE(FFIResultNextSet(result1));
   FFIResultDestroy(result1);
 
   const char *args2[] = {"10", "50"};
   FFIPreparedResult struct2 = FFIExecPrepare(c_conn, 1, 2, args2);
   EXPECT_TRUE(struct2.query);
   FFIResult result2 = struct2.query_result;
+  EXPECT_TRUE(FFIResultNextSet(result2));
   EXPECT_EQ(FFIResultColumnCount(result2), 2) << "Bad column count";
   EXPECT_EQ(FFIResultRowCount(result2), 2) << "Bad row count";
   EXPECT_EQ(std::string(FFIResultColumnName(result2, 0)), "ID") << "Schema";
   EXPECT_EQ(std::string(FFIResultColumnName(result2, 1)), "name") << "Schema";
   EXPECT_EQ(FFIResultColumnType(result2, 0), CType::INT) << "Bad types";
   EXPECT_EQ(FFIResultColumnType(result2, 1), CType::TEXT) << "Bad types";
-  EXPECT_EQ(FFIResultGetInt(result2, 0, 0), 10) << "Bad data";
-  EXPECT_EQ(std::string(FFIResultGetString(result2, 0, 1)), "hello")
-      << "Bad str";
-  EXPECT_EQ(FFIResultGetInt(result2, 1, 0), 50) << "Bad data";
-  EXPECT_EQ(std::string(FFIResultGetString(result2, 1, 1)), "hi") << "Bad str";
+  EXPECT_TRUE(HasRow(result2, 10, "hello"));
+  EXPECT_TRUE(HasRowNull(result2, 50));
+  EXPECT_FALSE(FFIResultNextSet(result2));
   FFIResultDestroy(result2);
 
-  const char *args3[] = {"10", "50", "'hi'"};
+  const char *args3[] = {"10", "50", "NULL"};
   FFIPreparedResult struct3 = FFIExecPrepare(c_conn, 2, 3, args3);
   EXPECT_TRUE(struct3.query);
   FFIResult result3 = struct3.query_result;
+  EXPECT_TRUE(FFIResultNextSet(result3));
   EXPECT_EQ(FFIResultColumnCount(result3), 2) << "Bad column count";
   EXPECT_EQ(FFIResultRowCount(result3), 1) << "Bad row count";
   EXPECT_EQ(std::string(FFIResultColumnName(result3, 0)), "ID") << "Schema";
@@ -169,7 +187,8 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
   EXPECT_EQ(FFIResultColumnType(result3, 0), CType::INT) << "Bad types";
   EXPECT_EQ(FFIResultColumnType(result3, 1), CType::TEXT) << "Bad types";
   EXPECT_EQ(FFIResultGetInt(result3, 0, 0), 50) << "Bad data";
-  EXPECT_EQ(std::string(FFIResultGetString(result3, 0, 1)), "hi") << "Bad str";
+  EXPECT_EQ(FFIResultIsNull(result3, 0, 1), true) << "Bad str";
+  EXPECT_FALSE(FFIResultNextSet(result3));
   FFIResultDestroy(result3);
 }
 #endif

@@ -60,7 +60,7 @@ class SingletonRocksdbConnection {
                                   const sqlast::AbstractStatement *sql,
                                   std::vector<std::string> &&rows);
   // Gets key corresponding to input user. Creates key if does not exist.
-  unsigned char* GetUserKey(const std::string &shard_name);
+  unsigned char *GetUserKey(const std::string &shard_name);
 
   // Members.
   std::unique_ptr<rocksdb::DB> db_;
@@ -72,8 +72,8 @@ class SingletonRocksdbConnection {
   std::unordered_map<TableID, std::vector<size_t>> indexed_columns_;
   std::unordered_map<TableID, std::vector<RocksdbIndex>> indices_;
   std::unordered_map<TableID, std::atomic<uint64_t>> auto_increment_counters_;
-  unsigned char* global_key_;
-  std::unordered_map<std::string, unsigned char*> user_keys_;
+  unsigned char *global_key_;
+  std::unordered_map<std::string, unsigned char *> user_keys_;
   mutable shards::UpgradableMutex user_keys_mtx_;
 };
 
