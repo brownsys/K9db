@@ -4,7 +4,12 @@
 
 #include <iomanip>
 #include <iostream>
+#include <list>
+// NOLINTNEXTLINE
 #include <regex>
+#include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 #include "glog/logging.h"

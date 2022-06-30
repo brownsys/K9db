@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 cc_library(
     name = "rocksdb_connection",
@@ -10,9 +10,9 @@ cc_library(
     ],
     visibility = ["//pelton/sql:__subpackages__"],
     deps = [
+        ":encryption",
         ":rocksdb_index",
         ":rocksdb_util",
-        ":encryption",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/shards:upgradable_lock",
@@ -69,8 +69,8 @@ cc_library(
     ],
     deps = [
         ":rocksdb_util",
-        "@libsodium",
         "@glog",
+        "@libsodium",
         "@rocksdb",
     ],
 )

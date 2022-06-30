@@ -1,6 +1,6 @@
 // Connection to mariadb.
-#ifndef EXPERIMENTS_MEMCACHED_MEMORY_MEMCACHED_MARIADB_H_
-#define EXPERIMENTS_MEMCACHED_MEMORY_MEMCACHED_MARIADB_H_
+#ifndef EXPERIMENTS_MEMCACHED_MEMCACHED_MARIADB_H_
+#define EXPERIMENTS_MEMCACHED_MEMCACHED_MARIADB_H_
 
 #include <cassert>
 #include <cstdlib>
@@ -79,4 +79,4 @@ class MariaDBConnection {
   std::unique_ptr<sql::Statement> stmt_;
 };
 
-#endif  // EXPERIMENTS_MEMCACHED_MEMORY_MEMCACHED_MARIADB_H_
+#endif  // EXPERIMENTS_MEMCACHED_MEMCACHED_MARIADB_H_

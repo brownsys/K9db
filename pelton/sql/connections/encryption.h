@@ -1,17 +1,13 @@
-#ifndef PELTON_SQL_CONNECTIONS_ENCRYPTION_H__
-#define PELTON_SQL_CONNECTIONS_ENCRYPTION_H__
+#ifndef PELTON_SQL_CONNECTIONS_ENCRYPTION_H_
+#define PELTON_SQL_CONNECTIONS_ENCRYPTION_H_
 
 #include <iostream>
 #include <string>
 #include <utility>
-#include <chrono>
-#include <assert.h>
 
-#include "pelton/sql/connections/rocksdb_util.h"
 #include "rocksdb/comparator.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/slice_transform.h"
-#include "sodium.h"
 
 #define PELTON_ENCRYPTION
 
@@ -22,7 +18,7 @@ namespace sql {
 void InitializeEncryption();
 
 // generates random 256-bit key
-unsigned char* KeyGen();
+unsigned char *KeyGen();
 
 // encrypts pt (plaintext) with key and returns ct (ciphertext)
 std::string Encrypt(unsigned char *key, std::string pt);
@@ -42,7 +38,7 @@ std::string EncryptSeek(unsigned char *key, std::string pt);
 // Encrypted prefix transform
 class EncryptedPrefixTransform : public rocksdb::SliceTransform {
  public:
-  explicit EncryptedPrefixTransform() {}
+  EncryptedPrefixTransform() = default;
 
   const char *Name() const override { return "EncryptedPrefix"; }
   bool InDomain(const rocksdb::Slice &key) const override { return true; }
@@ -62,17 +58,18 @@ class EncryptedComparator : public rocksdb::Comparator {
   // Note that Compare(a, b) also compares timestamp if timestamp size is
   // non-zero. For the same user key with different timestamps, larger (newer)
   // timestamp comes first.
-  int Compare(const rocksdb::Slice& a, const rocksdb::Slice& b) const override;
-  const char* Name() const override { return "EncryptedComparator"; }
+  int Compare(const rocksdb::Slice &a, const rocksdb::Slice &b) const override;
+  const char *Name() const override { return "EncryptedComparator"; }
 
   // Advanced functions: these are used to reduce the space requirements
   // for internal data structures like index blocks.
-  void FindShortestSeparator(std::string* start,
-                             const rocksdb::Slice& limit) const override {}
-  void FindShortSuccessor(std::string* key) const override {}
+  void FindShortestSeparator(std::string *start,
+                             const rocksdb::Slice &limit) const override {}
+  void FindShortSuccessor(std::string *key) const override {}
 
   // A singleton comparator.
   static const rocksdb::Comparator *Instance();
+
  private:
   const rocksdb::Comparator *bytewise_ = rocksdb::BytewiseComparator();
 };
@@ -80,5 +77,4 @@ class EncryptedComparator : public rocksdb::Comparator {
 }  // namespace sql
 }  // namespace pelton
 
-#endif  // PELTON_SQL_CONNECTIONS_ROCKSDB_UTIL_H__
-
+#endif  // PELTON_SQL_CONNECTIONS_ENCRYPTION_H_

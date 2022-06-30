@@ -20,6 +20,10 @@ namespace {
 inline void CopyIntoRecord(sqlast::ColumnDefinition::Type datatype,
                            Record *target, const Record &source,
                            size_t target_index, size_t source_index) {
+  if (source.IsNull(source_index)) {
+    target->SetNull(true, target_index);
+    return;
+  }
   switch (datatype) {
     case sqlast::ColumnDefinition::Type::UINT:
       target->SetUInt(source.GetUInt(source_index), target_index);

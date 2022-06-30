@@ -1,6 +1,6 @@
 // Connection to memcached.
-#ifndef EXPERIMENTS_MEMCACHED_MEMORY_MEMCACHED_ENCODE_H_
-#define EXPERIMENTS_MEMCACHED_MEMORY_MEMCACHED_ENCODE_H_
+#ifndef EXPERIMENTS_MEMCACHED_MEMCACHED_ENCODE_H_
+#define EXPERIMENTS_MEMCACHED_MEMCACHED_ENCODE_H_
 
 #include <cassert>
 #include <iostream>
@@ -89,4 +89,4 @@ MemcachedRecord EncodeRow(sql::ResultSet *row, sql::ResultSetMetaData *schema) {
   return record;
 }
 
-#endif  // EXPERIMENTS_MEMCACHED_MEMORY_MEMCACHED_ENCODE_H_
+#endif  // EXPERIMENTS_MEMCACHED_MEMCACHED_ENCODE_H_

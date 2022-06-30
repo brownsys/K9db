@@ -3,16 +3,16 @@ load("@rules_rust//rust:rust.bzl", "rust_binary")
 rust_binary(
     name = "benchmark",
     srcs = [
-        "src/main.rs",
         "src/backend.rs",
-        "src/db.rs",
-        "src/models.rs",
-        "src/generator.rs",
-        "src/workload.rs",
         "src/backend/hybrid.rs",
         "src/backend/mariadb.rs",
         "src/backend/pelton.rs",
         "src/backend/simulate.rs",
+        "src/db.rs",
+        "src/generator.rs",
+        "src/main.rs",
+        "src/models.rs",
+        "src/workload.rs",
     ],
     compile_data = [
         "data/schema.sql",
@@ -20,9 +20,9 @@ rust_binary(
     ],
     deps = [
         "//cargo:clap",
+        "//cargo:memcached_rs",
         "//cargo:mysql",
         "//cargo:rand",
-        "//cargo:memcached_rs",
         "//cargo:rand_distr",
     ],
 )

@@ -18,7 +18,6 @@ use std::net;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use std::collections::LinkedList;
 
 // Help message.
 const USAGE: &str = "
