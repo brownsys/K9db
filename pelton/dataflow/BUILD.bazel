@@ -148,9 +148,9 @@ cc_library(
         ":operator",
         ":record",
         ":types",
+        "//pelton/dataflow/ops:forward_view",
         "//pelton/dataflow/ops:input",
         "//pelton/dataflow/ops:matview",
-        "//pelton/dataflow/ops:forward_view",
         "@glog",
     ],
 )

@@ -2,6 +2,7 @@
 #define PELTON_DATAFLOW_OPS_FORWARD_VIEW_H_
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "pelton/dataflow/operator.h"
@@ -22,7 +23,7 @@ class ForwardViewOperator : public Operator {
       : Operator(Operator::Type::FORWARD_VIEW),
         parent_flow_(parent_flow),
         parent_id_(parent_id) {
-    //this->input_schemas_.push_back(schema);
+    // this->input_schemas_.push_back(schema);
     this->output_schema_ = schema;
   }
 
