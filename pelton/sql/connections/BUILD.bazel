@@ -89,3 +89,17 @@ cc_test(
         "@glog",
     ],
 )
+
+cc_test(
+    name = "rocksdb-index-test",
+    srcs = [
+        "rocksdb_index_tests.cc",
+    ],
+    deps = [
+        ":rocksdb_index",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
+        "@rocksdb",
+    ],
+)
