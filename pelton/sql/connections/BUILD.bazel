@@ -103,3 +103,18 @@ cc_test(
         "@rocksdb",
     ],
 )
+
+cc_test(
+    name = "rocksdb-connection-test",
+    srcs = [
+        "rocksdb_connection_test.cc",
+    ],
+    deps = [
+        ":rocksdb_connection",
+        "//pelton/sqlast:ast",
+        "//pelton/sqlast:parser",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
+    ],
+)

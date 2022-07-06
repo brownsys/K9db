@@ -45,6 +45,10 @@ class SingletonRocksdbConnection {
                             const std::vector<AugInfo> &augments,
                             const std::string &shard_name);
 
+  SqlResultSet ExecuteQueryNoShard(const sqlast::AbstractStatement *sql,
+                                   const dataflow::SchemaRef &schema,
+                                   const std::vector<AugInfo> &augments);
+
   SqlResultSet ExecuteQueryAll(const sqlast::AbstractStatement *sql,
                                const dataflow::SchemaRef &schema,
                                const std::vector<AugInfo> &augments);
@@ -55,6 +59,9 @@ class SingletonRocksdbConnection {
   std::vector<std::string> Get(const sqlast::AbstractStatement *stmt,
                                TableID table_id, const std::string &shard_name,
                                const ValueMapper &value_mapper);
+  std::vector<std::string> Get_all(const sqlast::AbstractStatement *stmt,
+                                   TableID table_id,
+                                   const ValueMapper &value_mapper);
   // Filter records by where clause in abstract statement.
   std::vector<std::string> Filter(const dataflow::SchemaRef &schema,
                                   const sqlast::AbstractStatement *sql,
@@ -104,6 +111,11 @@ class RocksdbConnection : public PeltonConnection {
                             const std::vector<AugInfo> &augments,
                             const std::string &shard_name) override {
     return this->singleton_->ExecuteQuery(sql, schema, augments, shard_name);
+  }
+  SqlResultSet ExecuteQueryNoShard(const sqlast::AbstractStatement *sql,
+                                   const dataflow::SchemaRef &schema,
+                                   const std::vector<AugInfo> &augments) {
+    return this->singleton_->ExecuteQueryNoShard(sql, schema, augments);
   }
   SqlResultSet ExecuteQueryAll(const sqlast::AbstractStatement *sql,
                                const dataflow::SchemaRef &schema,

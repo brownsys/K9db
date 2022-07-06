@@ -346,8 +346,6 @@ TEST(RocksdbConnectionTest, Duplicates) {
   rocksdb::DB *db;
   PANIC(rocksdb::DB::Open(opts, path, &db));
   std::unique_ptr<rocksdb::DB> dbb = std::unique_ptr<rocksdb::DB>(db);
-  // RocksdbIndex test_idx(dbb, 1, 4);
-  // TODOM: tests?
   rocksdb::Slice z("0");
   rocksdb::Slice o("1");
   rocksdb::Slice t("pk2");

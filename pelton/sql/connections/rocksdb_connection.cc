@@ -252,7 +252,7 @@ std::pair<int, uint64_t> SingletonRocksdbConnection::ExecuteUpdate(
       for (size_t i = 0; i < indexed_columns.size(); i++) {
         RocksdbIndex &index = indices.at(i);
         size_t indexed_column = indexed_columns.at(i);
-        index.Add(shard_name, ExtractColumn(rslice, indexed_column), pkslice);
+        index.Add(ExtractColumn(rslice, indexed_column), shard_name, pkslice);
       }
       return std::make_pair(1, last_insert_id);
     }
@@ -305,8 +305,8 @@ std::pair<int, uint64_t> SingletonRocksdbConnection::ExecuteUpdate(
           if (!keychanged && SlicesEq(oval, nval)) {
             continue;
           }
-          index.Delete(shard_name, oval, opk);
-          index.Add(shard_name, nval, npk);
+          index.Delete(oval, shard_name, opk);
+          index.Add(nval, shard_name, npk);
         }
       }
       return std::make_pair(rows.size(), 0);
@@ -390,7 +390,7 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
         for (size_t i = 0; i < indexed_columns.size(); i++) {
           RocksdbIndex &index = indices.at(i);
           size_t indexed_column = indexed_columns.at(i);
-          index.Delete(shard_name, ExtractColumn(slice, indexed_column), skey);
+          index.Delete(ExtractColumn(slice, indexed_column), shard_name, skey);
         }
       }
       break;
@@ -444,12 +444,148 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
           if (SlicesEq(oval, nval)) {
             continue;
           }
-          index.Delete(shard_name, oval, pkslice);
+          index.Delete(oval, shard_name, pkslice);
         }
-        index.Add(shard_name, nval, pkslice);
+        index.Add(nval, shard_name, pkslice);
       }
       break;
     }
+    default:
+      LOG(FATAL) << "Illegal statement type in ExecuteQuery";
+  }
+  return SqlResultSet(out_schema, std::move(records), std::move(keys));
+}
+
+SqlResultSet SingletonRocksdbConnection::ExecuteQueryNoShard(
+    const sqlast::AbstractStatement *sql, const dataflow::SchemaRef &out_schema,
+    const std::vector<AugInfo> &augments) {
+  CHECK_LE(augments.size(), 1u) << "Too many augmentations";
+  // ShardID sid = shard_name + __ROCKSSEP;
+
+  // Read table metadata.
+  const std::string &table_name = GetTableName(sql);
+  TableID tid = this->tables_.at(table_name);
+  rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(tid).get();
+  const dataflow::SchemaRef &db_schema = this->schemas_.at(tid);
+  size_t pk = this->primary_keys_.at(tid);
+  const auto &indexed_columns = this->indexed_columns_.at(tid);
+  std::vector<RocksdbIndex> &indices = this->indices_.at(tid);
+
+  ValueMapper value_mapper(pk, indexed_columns, db_schema);
+  value_mapper.Visit(sql);
+
+  // Result components.
+  std::vector<dataflow::Record> records;
+  std::vector<std::string> keys;
+
+  switch (sql->type()) {
+    case sqlast::AbstractStatement::Type::SELECT: {
+      const sqlast::Select *stmt = static_cast<const sqlast::Select *>(sql);
+
+      // Figure out the projections (including order).
+      bool has_projection = stmt->GetColumns().at(0) != "*";
+      std::vector<int> projections;
+      if (has_projection) {
+        projections = ProjectionSchema(db_schema, out_schema, augments);
+      }
+
+      // Look up all the rows.
+      std::vector<std::string> rows = this->Get_all(sql, tid, value_mapper);
+      rows = this->Filter(db_schema, sql, std::move(rows));
+      for (std::string &row : rows) {
+        rocksdb::Slice slice(row);
+        rocksdb::Slice key = ExtractColumn(row, pk);
+        keys.push_back(key.ToString());
+        records.push_back(
+            DecodeRecord(slice, out_schema, augments, projections));
+      }
+      break;
+    }
+    // case sqlast::AbstractStatement::Type::DELETE: {
+    //   // Look up all the rows.
+    //   std::vector<std::string> rows =
+    //       this->Get_all(sql, tid, value_mapper);
+    //   rows = this->Filter(db_schema, sql, std::move(rows));
+    //   if (rows.size() > 5) {
+    //     LOG(WARNING) << "Perf Warning: " << rows.size()
+    //                  << " rocksdb deletes in a loop" << *sql;
+    //   }
+    //   for (std::string &row : rows) {
+    //     rocksdb::Slice slice(row);
+    //     // Get the key of the existing row.
+    //     rocksdb::Slice keyslice = ExtractColumn(row, pk);
+    //     keys.push_back(keyslice.ToString());
+    //     records.push_back(DecodeRecord(slice, out_schema, augments, {}));
+    //     // Delete the existing row by key.
+    //     std::string skey = sid + keyslice.ToString() + __ROCKSSEP;
+    //     PANIC(this->db_->Delete(rocksdb::WriteOptions(), handler,
+    //                             EncryptKey(this->global_key_, skey)));
+    //     // Update indices.
+    //     for (size_t i = 0; i < indexed_columns.size(); i++) {
+    //       RocksdbIndex &index = indices.at(i);
+    //       size_t indexed_column = indexed_columns.at(i);
+    //       index.Delete(ExtractColumn(slice, indexed_column), shard_name,
+    //       skey);
+    //     }
+    //   }
+    //   break;
+    // }
+    // case sqlast::AbstractStatement::Type::INSERT: {
+    //   const sqlast::Insert *stmt = static_cast<const sqlast::Insert *>(sql);
+
+    //   // A replacing AND returning INSERT.
+    //   // Make sure insert provides a correct PK.
+    //   const auto &vals = value_mapper.After(db_schema.NameOf(pk));
+    //   CHECK_EQ(vals.size(), 1u) << "Insert has no value for PK!";
+    //   const rocksdb::Slice &pkslice = vals.at(0);
+    //   CHECK(!IsNull(pkslice.data(), pkslice.size())) << "Insert has NULL
+    //   PK!";
+
+    //   // Lookup existing row.
+    //   std::string skey = sid + pkslice.ToString() + __ROCKSSEP;
+    //   std::string orow;
+    //   rocksdb::Slice oslice(nullptr, 0);
+
+    //   rocksdb::ReadOptions opts;
+    //   opts.total_order_seek = true;
+    //   opts.verify_checksums = false;
+    //   auto st = this->db_->Get(opts, handler,
+    //                            EncryptKey(this->global_key_, skey), &orow);
+    //   if (st.ok()) {
+    //     // There is a pre-existing row with that PK (that will get replaced).
+    //     orow = Decrypt(this->GetUserKey(shard_name), orow);
+    //     oslice = rocksdb::Slice(orow.data(), orow.size());
+    //     keys.push_back(pkslice.ToString());
+    //     records.push_back(DecodeRecord(oslice, out_schema, augments, {}));
+    //   } else if (!st.IsNotFound()) {
+    //     PANIC(st);
+    //   }
+
+    //   // Insert/replace new row.
+    //   std::string nrow = EncodeInsert(*stmt, db_schema, "");
+    //   rocksdb::Slice nslice(nrow);
+    //   if (SlicesEq(oslice, nslice)) {  // No-op.
+    //     break;
+    //   }
+    //   PANIC(this->db_->Put(rocksdb::WriteOptions(), handler,
+    //                        EncryptKey(this->global_key_, skey),
+    //                        Encrypt(this->GetUserKey(shard_name), nrow)));
+    //   // Update indices.
+    //   for (size_t i = 0; i < indexed_columns.size(); i++) {
+    //     RocksdbIndex &index = indices.at(i);
+    //     size_t indexed_column = indexed_columns.at(i);
+    //     rocksdb::Slice nval = ExtractColumn(nslice, indexed_column);
+    //     if (oslice.data() != nullptr) {
+    //       rocksdb::Slice oval = ExtractColumn(oslice, indexed_column);
+    //       if (SlicesEq(oval, nval)) {
+    //         continue;
+    //       }
+    //       index.Delete(oval, shard_name, pkslice);
+    //     }
+    //     index.Add(nval, shard_name, pkslice);
+    //   }
+    //   break;
+    // }
     default:
       LOG(FATAL) << "Illegal statement type in ExecuteQuery";
   }
@@ -557,7 +693,7 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
       RocksdbIndex &index = indices.at(i);
       const std::string &idxcolumn = schema.NameOf(indexed_columns.at(i));
       if (value_mapper.HasBefore(idxcolumn)) {
-        keys = index.Get(shard_name, value_mapper.Before(idxcolumn));
+        keys = index.Get(value_mapper.Before(idxcolumn), shard_name);
         for (size_t i = 0; i < keys.size(); i++) {
           keys[i] = shard_id + keys[i] + __ROCKSSEP;
         }
@@ -634,6 +770,128 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
       result.push_back(
           Decrypt(this->GetUserKey(shard_name), it->value().ToString()));
     }
+  }
+  return result;
+}
+
+// Get record matching values in a value mapper FROM ALL SHARDS(either by key,
+// index, or it).
+std::vector<std::string> SingletonRocksdbConnection::Get_all(
+    const sqlast::AbstractStatement *stmt, TableID table_id,
+    const ValueMapper &value_mapper) {
+  // ShardID shard_id = shard_name + __ROCKSSEP;
+  // Read Metadata.
+  rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(table_id).get();
+  const dataflow::SchemaRef &schema = this->schemas_.at(table_id);
+  size_t pk = this->primary_keys_.at(table_id);
+  const auto &indexed_columns = this->indexed_columns_.at(table_id);
+  std::vector<RocksdbIndex> &indices = this->indices_.at(table_id);
+  const std::string &pkname = schema.NameOf(pk);
+
+  // Lookup either by PK or index.
+  bool found = false;
+  std::vector<std::pair<std::string, std::string>> keys_raw;
+  std::vector<std::string> keys;
+  if (value_mapper.HasBefore(pkname)) {
+    std::cout << "need an index for the primary key value also" << std::endl;
+    // // Use the PK value(s).
+    // const std::vector<rocksdb::Slice> &slices = value_mapper.Before(pkname);
+    // for (const auto &slice : slices) {
+    //  keys.push_back(shard_id + slice.ToString() + __ROCKSSEP);
+    // }
+    // found = true;
+  } else {
+    // No PK, use any index.
+    for (size_t i = 0; i < indexed_columns.size(); i++) {
+      RocksdbIndex &index = indices.at(i);
+      const std::string &idxcolumn = schema.NameOf(indexed_columns.at(i));
+      if (value_mapper.HasBefore(idxcolumn)) {
+        keys_raw = index.Get_all(value_mapper.Before(idxcolumn));
+        for (auto i : keys_raw) {
+          std::cout << "raw keys: " << i.first << " " << i.second << std::endl;
+        }
+        for (size_t i = 0; i < keys_raw.size(); i++) {
+          keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
+                         __ROCKSSEP);
+        }
+        found = true;
+        break;
+      }
+    }
+  }
+  for (auto i : keys) {
+    std::cout << "keys: " << i << std::endl;
+  }
+  // Look in rocksdb.
+  std::vector<std::string> result;
+  if (found) {
+    if (keys.size() == 1) {
+      std::string str;
+      rocksdb::ReadOptions opts;
+      opts.total_order_seek = true;
+      opts.verify_checksums = false;
+
+      rocksdb::Status status = this->db_->Get(
+          opts, handler, EncryptKey(this->global_key_, keys.front()), &str);
+      if (status.ok()) {
+        result.push_back(
+            std::move(Decrypt(this->GetUserKey(keys_raw[0].first), str)));
+      } else if (!status.IsNotFound()) {
+        PANIC(status);
+      }
+    } else if (keys.size() > 1) {
+      // Make slices for keys.
+      rocksdb::Slice *slices = new rocksdb::Slice[keys.size()];
+      std::string *tmp = new std::string[keys.size()];
+      rocksdb::PinnableSlice *pins = new rocksdb::PinnableSlice[keys.size()];
+      rocksdb::Status *statuses = new rocksdb::Status[keys.size()];
+      for (size_t i = 0; i < keys.size(); i++) {
+        keys.at(i) = EncryptKey(this->global_key_, keys.at(i));
+        slices[i] = rocksdb::Slice(keys.at(i));
+        pins[i] = rocksdb::PinnableSlice(tmp + i);
+      }
+      // Use MultiGet.
+      rocksdb::ReadOptions opts;
+      opts.total_order_seek = true;
+      opts.verify_checksums = false;
+      this->db_->MultiGet(opts, handler, keys.size(), slices, pins, statuses);
+      // Read values that were found.
+      for (size_t i = 0; i < keys.size(); i++) {
+        rocksdb::Status &status = statuses[i];
+        if (status.ok()) {
+          if (pins[i].IsPinned()) {
+            tmp[i].assign(pins[i].data(), pins[i].size());
+          }
+          result.push_back(
+              std::move(Decrypt(this->GetUserKey(keys_raw[i].first), tmp[i])));
+        } else if (!status.IsNotFound()) {
+          PANIC(status);
+        }
+      }
+      // Cleanup memory.
+      delete[] statuses;
+      delete[] pins;
+      delete[] tmp;
+      delete[] slices;
+    }
+  } else {
+    std::cout << "this case should not be reached!" << std::endl;
+    // // Need to lookup all records.
+    // if (HasWhereClause(stmt)) {
+    //   LOG(WARNING) << "Perf Warning: Query has no rocksdb index " << *stmt;
+    // }
+    // rocksdb::ReadOptions options;
+    // options.fill_cache = false;
+    // options.total_order_seek = false;
+    // options.prefix_same_as_start = true;
+    // options.verify_checksums = false;
+    // auto ptr = this->db_->NewIterator(options, handler);
+    // std::unique_ptr<rocksdb::Iterator> it(ptr);
+    // for (it->Seek(EncryptSeek(this->global_key_, shard_id)); it->Valid();
+    //      it->Next()) {
+    //   result.push_back(
+    //       Decrypt(this->GetUserKey(shard_name), it->value().ToString()));
+    // }
   }
   return result;
 }
