@@ -792,36 +792,21 @@ std::vector<std::string> SingletonRocksdbConnection::Get_all(
   bool found = false;
   std::vector<std::pair<std::string, std::string>> keys_raw;
   std::vector<std::string> keys;
-  if (value_mapper.HasBefore(pkname)) {
-    std::cout << "need an index for the primary key value also" << std::endl;
-    // // Use the PK value(s).
-    // const std::vector<rocksdb::Slice> &slices = value_mapper.Before(pkname);
-    // for (const auto &slice : slices) {
-    //  keys.push_back(shard_id + slice.ToString() + __ROCKSSEP);
-    // }
-    // found = true;
-  } else {
-    // No PK, use any index.
-    for (size_t i = 0; i < indexed_columns.size(); i++) {
-      RocksdbIndex &index = indices.at(i);
-      const std::string &idxcolumn = schema.NameOf(indexed_columns.at(i));
-      if (value_mapper.HasBefore(idxcolumn)) {
-        keys_raw = index.Get_all(value_mapper.Before(idxcolumn));
-        for (auto i : keys_raw) {
-          std::cout << "raw keys: " << i.first << " " << i.second << std::endl;
-        }
-        for (size_t i = 0; i < keys_raw.size(); i++) {
-          keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
-                         __ROCKSSEP);
-        }
-        found = true;
-        break;
+
+  for (size_t i = 0; i < indexed_columns.size(); i++) {
+    RocksdbIndex &index = indices.at(i);
+    const std::string &idxcolumn = schema.NameOf(indexed_columns.at(i));
+    if (value_mapper.HasBefore(idxcolumn)) {
+      keys_raw = index.Get_all(value_mapper.Before(idxcolumn));
+      for (size_t i = 0; i < keys_raw.size(); i++) {
+        keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
+                       __ROCKSSEP);
       }
+      found = true;
+      break;
     }
   }
-  for (auto i : keys) {
-    std::cout << "keys: " << i << std::endl;
-  }
+
   // Look in rocksdb.
   std::vector<std::string> result;
   if (found) {
@@ -875,7 +860,8 @@ std::vector<std::string> SingletonRocksdbConnection::Get_all(
       delete[] slices;
     }
   } else {
-    std::cout << "this case should not be reached!" << std::endl;
+    LOG(FATAL) << "this case should not be reached!";
+
     // // Need to lookup all records.
     // if (HasWhereClause(stmt)) {
     //   LOG(WARNING) << "Perf Warning: Query has no rocksdb index " << *stmt;

@@ -39,7 +39,6 @@ std::unique_ptr<sqlast::AbstractStatement> Parse(const std::string &sql) {
 void Print(std::vector<dataflow::Record> &&records,
            const dataflow::SchemaRef &schema) {
   std::cout << schema << std::endl;
-  std::cout << "number of records: " << records.size() << std::endl;
   for (auto &r : records) {
     std::cout << r << std::endl;
   }
@@ -48,11 +47,7 @@ void Print(std::vector<dataflow::Record> &&records,
 void CheckEqual(const std::vector<dataflow::Record> *a,
                 const std::vector<dataflow::Record *> b) {
   assert((*a).size() == b.size());
-  for (int i = 0; i < (*a).size(); i++) {
-    std::cout << "returned cols" << (*a)[i] << std::endl;
-  }
   for (int i = 0; i < b.size(); i++) {
-    std::cout << "ideal cols" << *(b[i]) << std::endl;
     assert(std::count((*a).begin(), (*a).end(), *b[i]));
   }
 }  // namespace
@@ -419,6 +414,105 @@ TEST(RocksdbConnectionTest, IndexOnShardedTable) {
   CheckEqual(&resultset.rows(), ans);
 
   Print(resultset.Vec(), schema1);
+  conn.Close();
+  RocksdbConnection::CloseAll();
+}
+TEST(RocksdbConnectionTest, SelectonShardColumnfromPK) {
+  DropDatabase();
+
+  RocksdbConnection conn(DB_NAME);
+  // Create table.
+  auto parsed =
+      Parse("CREATE TABLE users(PII_id int PRIMARY KEY, name VARCHAR(50));");
+  std::cout << conn.ExecuteStatement(parsed.get(), "") << std::endl;
+  dataflow::SchemaRef schema1 = dataflow::SchemaFactory::Create(
+      *static_cast<sqlast::CreateTable *>(parsed.get()));
+  parsed = Parse(
+      "CREATE TABLE stories(id int PRIMARY KEY, story_name VARCHAR(50), author "
+      "VARCHAR(50), FOREIGN KEY (id) REFERENCES users(id));");
+  std::cout << conn.ExecuteStatement(parsed.get(), "") << std::endl;
+  dataflow::SchemaRef schema2 = dataflow::SchemaFactory::Create(
+      *static_cast<sqlast::CreateTable *>(parsed.get()));
+  parsed = Parse("CREATE INDEX idx ON stories (id);");
+  std::cout << conn.ExecuteStatement(parsed.get(), "") << std::endl;
+  parsed = Parse("INSERT INTO users VALUES(1, 'KINAN');");
+  std::cout << conn.ExecuteUpdate(parsed.get(), "1").first << std::endl;
+  parsed = Parse("INSERT INTO users (PII_id, name) VALUES(2, 'MALTE');");
+  std::cout << conn.ExecuteUpdate(parsed.get(), "2").first << std::endl;
+  parsed = Parse("INSERT INTO users (name, PII_id) VALUES('ISHAN', 3);");
+  std::cout << conn.ExecuteUpdate(parsed.get(), "3").first << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(1, 'K', 'KINAN');");
+  std::cout << conn.ExecuteUpdate(parsed.get(), "1").first << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(2, 'K', 'KINAN');");
+  std::cout << conn.ExecuteUpdate(parsed.get(), "1").first << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(3, 'K', 'MALTE');");
+  std::cout << conn.ExecuteUpdate(parsed.get(), "2").first << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(4, 'Kk', 'MALTE');");
+  std::cout << conn.ExecuteUpdate(parsed.get(), "2").first << std::endl;
+  parsed = Parse("SELECT * FROM stories WHERE id = 1;");
+  auto resultset = conn.ExecuteQueryNoShard(parsed.get(), schema2, {});
+  pelton::dataflow::Record record{schema2};
+  int64_t v0 = 1;
+  std::unique_ptr<std::string> ptr1 = std::make_unique<std::string>("K");
+  std::string *v1 = ptr1.get();  // Does not release ownership.
+  std::unique_ptr<std::string> ptr2 = std::make_unique<std::string>("KINAN");
+  std::string *v2 = ptr2.get();  // Does not release ownership.
+  record.SetData(v0, std::move(ptr1), std::move(ptr2));
+  std::vector<dataflow::Record *> ans = {&record};
+  CheckEqual(&resultset.rows(), ans);
+  conn.Close();
+  RocksdbConnection::CloseAll();
+}
+TEST(RocksdbConnectionTest, SelectonShardColumn) {
+  DropDatabase();
+
+  RocksdbConnection conn(DB_NAME);
+  // Create table.
+  auto parsed =
+      Parse("CREATE TABLE users(PII_id int PRIMARY KEY, name VARCHAR(50));");
+  std::cout << conn.ExecuteStatement(parsed.get(), "") << std::endl;
+  dataflow::SchemaRef schema1 = dataflow::SchemaFactory::Create(
+      *static_cast<sqlast::CreateTable *>(parsed.get()));
+  parsed = Parse(
+      "CREATE TABLE stories(id int , story_name VARCHAR(50), author "
+      "VARCHAR(50) PRIMARY KEY, FOREIGN KEY (id) REFERENCES users(id));");
+  std::cout << conn.ExecuteStatement(parsed.get(), "") << std::endl;
+  dataflow::SchemaRef schema2 = dataflow::SchemaFactory::Create(
+      *static_cast<sqlast::CreateTable *>(parsed.get()));
+  parsed = Parse("CREATE INDEX idx ON stories (id);");
+  std::cout << conn.ExecuteStatement(parsed.get(), "") << std::endl;
+  parsed = Parse("INSERT INTO users VALUES(1, 'KINAN');");
+  std::cout << conn.ExecuteUpdate(parsed.get(), "1").first << std::endl;
+  parsed = Parse("INSERT INTO users (PII_id, name) VALUES(2, 'MALTE');");
+  std::cout << conn.ExecuteUpdate(parsed.get(), "2").first << std::endl;
+  parsed = Parse("INSERT INTO users (name, PII_id) VALUES('ISHAN', 3);");
+  std::cout << conn.ExecuteUpdate(parsed.get(), "3").first << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(1, 'K', 'KINAN');");
+  std::cout << conn.ExecuteUpdate(parsed.get(), "1").first << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(1, 'Kk', 'KINAN1');");
+  std::cout << conn.ExecuteUpdate(parsed.get(), "1").first << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(3, 'K', 'MALTE');");
+  std::cout << conn.ExecuteUpdate(parsed.get(), "2").first << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(4, 'Kk', 'MALTE1');");
+  std::cout << conn.ExecuteUpdate(parsed.get(), "2").first << std::endl;
+  parsed = Parse("SELECT * FROM stories WHERE id = 1;");
+  auto resultset = conn.ExecuteQueryNoShard(parsed.get(), schema2, {});
+  pelton::dataflow::Record record1{schema2};
+  int64_t v0 = 1;
+  std::unique_ptr<std::string> ptr1 = std::make_unique<std::string>("K");
+  std::string *v1 = ptr1.get();  // Does not release ownership.
+  std::unique_ptr<std::string> ptr2 = std::make_unique<std::string>("KINAN");
+  std::string *v2 = ptr2.get();  // Does not release ownership.
+  record1.SetData(v0, std::move(ptr1), std::move(ptr2));
+  pelton::dataflow::Record record2{schema2};
+  v0 = 1;
+  ptr1 = std::make_unique<std::string>("Kk");
+  v1 = ptr1.get();  // Does not release ownership.
+  ptr2 = std::make_unique<std::string>("KINAN1");
+  v2 = ptr2.get();  // Does not release ownership.
+  record2.SetData(v0, std::move(ptr1), std::move(ptr2));
+  std::vector<dataflow::Record *> ans = {&record1, &record2};
+  CheckEqual(&resultset.rows(), ans);
   conn.Close();
   RocksdbConnection::CloseAll();
 }

@@ -118,3 +118,83 @@ cc_test(
         "@glog",
     ],
 )
+
+cc_test(
+    name = "select-speed-test",
+    srcs = [
+        "select-speed-test.cc",
+    ],
+    data = [
+        "pelton-insert.sql",
+        "pelton-load.sql",
+        "pelton-schema.sql",
+    ],
+    deps = [
+        ":rocksdb_connection",
+        "//pelton/sqlast:ast",
+        "//pelton/sqlast:parser",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "select-speed-test-old",
+    srcs = [
+        "select-speed-test-old.cc",
+    ],
+    data = [
+        "pelton-insert.sql",
+        "pelton-load.sql",
+        "pelton-schema.sql",
+    ],
+    deps = [
+        ":rocksdb_connection",
+        "//pelton/sqlast:ast",
+        "//pelton/sqlast:parser",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "select-speed-test-2",
+    srcs = [
+        "select-speed-test-2.cc",
+    ],
+    data = [
+        "pelton-insert.sql",
+        "pelton-load-2.sql",
+        "pelton-schema.sql",
+    ],
+    deps = [
+        ":rocksdb_connection",
+        "//pelton/sqlast:ast",
+        "//pelton/sqlast:parser",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "select-speed-test-old-2",
+    srcs = [
+        "select-speed-test-old-2.cc",
+    ],
+    data = [
+        "pelton-insert.sql",
+        "pelton-load-2.sql",
+        "pelton-schema.sql",
+    ],
+    deps = [
+        ":rocksdb_connection",
+        "//pelton/sqlast:ast",
+        "//pelton/sqlast:parser",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
+    ],
+)
