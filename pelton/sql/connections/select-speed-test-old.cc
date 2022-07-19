@@ -1,11 +1,12 @@
 #include <filesystem>
+#include <chrono>  // NOLINT [build/c++11]
 #include <fstream>
 #include <iostream>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
-#include <chrono> // NOLINT [build/c++11]
+
 
 #include "pelton/sql/connections/rocksdb_connection.h"
 #include "pelton/sqlast/ast.h"

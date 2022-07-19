@@ -470,7 +470,6 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQueryNoShard(
   size_t pk = this->primary_keys_.at(tid);
   const auto &indexed_columns = this->indexed_columns_.at(tid);
   std::vector<RocksdbIndex> &indices = this->indices_.at(tid);
-
   ValueMapper value_mapper(pk, indexed_columns, db_schema);
   value_mapper.Visit(sql);
 

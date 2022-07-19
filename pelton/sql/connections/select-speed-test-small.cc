@@ -4,8 +4,8 @@
 #include <iostream>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <utility>
+
 
 #include "pelton/sql/connections/rocksdb_connection.h"
 #include "pelton/sqlast/ast.h"
@@ -32,23 +32,6 @@ std::string find_shard(std::string query) {
   auto len = query.substr(start).find("'");
   return query.substr(start, len);
 }
-std::string find_pk(std::string query) {
-  auto start = query.find("key");
-  auto len = query.substr(start).find("'");
-  return query.substr(start, len);
-}
-std::set<std::string> find_pks(std::string query) {
-  std::set<std::string> ret;
-  while (true) {
-    auto start = query.find("key");
-    if (start == std::string::npos) {
-      return ret;
-    }
-    auto len = query.substr(start).find("\"");
-    ret.insert(query.substr(start, len));
-    query = query.substr(start + len);
-  }
-}
 
 // Drop the database (if it exists).
 void DropDatabase() { std::filesystem::remove_all(DB_PATH); }
@@ -65,11 +48,12 @@ TEST(RocksdbConnectionTest, SpeedTest) {
   DropDatabase();
   // create tables
   std::fstream s;
-  s.open("pelton/sql/connections/pelton-schema.sql", std::ios::in);
+  s.open("pelton/sql/connections/pelton-schema-small.sql", std::ios::in);
   assert(s.is_open());
   RocksdbConnection conn(DB_NAME);
   std::string cmd;
   std::unique_ptr<sqlast::AbstractStatement> parsed;
+  // dataflow::SchemaRef schema;
   int count = 0;
   dataflow::SchemaRef schema;
   while (getline(s, cmd)) {
@@ -82,48 +66,38 @@ TEST(RocksdbConnectionTest, SpeedTest) {
     }
   }
   s.close();
-
+  // std::cout << "total inserts" << count << std::endl;
   // do insertions
   std::fstream i;
-  i.open("pelton/sql/connections/pelton-insert.sql", std::ios::in);
-  std::unordered_map<std::string, std::string> index;
+  i.open("pelton/sql/connections/pelton-insert-small.sql", std::ios::in);
+  // dataflow::SchemaRef schema;
   while (getline(i, cmd)) {
     count += 1;
     parsed = Parse(cmd);
     conn.ExecuteUpdate(parsed.get(), find_shard(cmd));
-    // update the in memory index
-    auto pk = find_pk(cmd);
-    auto shard = find_shard(cmd);
-    index[pk] = shard;
   }
   i.close();
-
+  // std::cout << "total inserts" << count << std::endl;
   // do selects
   std::fstream l;
-  l.open("pelton/sql/connections/pelton-load-2.sql", std::ios::in);
-  std::vector<std::pair<std::set<std::string>,
-                        std::unique_ptr<sqlast::AbstractStatement>>>
-      selects;
-
+  l.open("pelton/sql/connections/pelton-load-small.sql", std::ios::in);
+  // dataflow::SchemaRef schema;
+  std::vector<std::unique_ptr<sqlast::AbstractStatement>> selects;
   while (getline(l, cmd)) {
     count += 1;
     parsed = Parse(cmd);
-    selects.push_back({find_pks(cmd), std::move(parsed)});
+    selects.push_back(std::move(parsed));
   }
-
   auto start = std::chrono::steady_clock::now();
   for (auto &i : selects) {
-    auto result = SqlResultSet(schema);
-    auto stmt = i.second.get();
-    for (auto pk : i.first) {
-      result.Append(conn.ExecuteQuery(stmt, schema, {}, index[pk]), false);
-    }
+    conn.ExecuteQueryNoShard(i.get(), schema, {});
+    // int j = 1 + 1;
   }
   auto end = std::chrono::steady_clock::now();
   auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
                   .count();
-  assert(count == 20003);
-
+  assert(count == 35003);
+  std::cout << "total inserts" << count << std::endl;
   std::cout << "statements executed sucessfully!" << std::endl;
   std::cout << "total time taken be inserts: " << diff << " ms" << std::endl;
   l.close();
