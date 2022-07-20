@@ -1,8 +1,9 @@
+#include "pelton/sql/rocksdb/index.h"
+
 #include <filesystem>
 #include <iostream>
 #include <string>
 
-#include "pelton/sql/connections/rocksdb_index.h"
 #include "pelton/util/status.h"
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
@@ -48,13 +49,13 @@ TEST(RocksdbConnectionTest, GetAll) {
   test_add.Add(o, "shard100", fi);
 
   std::vector<rocksdb::Slice> vec = {z, o};
-  std::vector<std::string> get_test1 = test_add.Get(vec, "shard10");
+  std::vector<std::string> get_test1 = test_add.GetShard(vec, "shard10");
   std::vector<std::string> r1 = {"pk2", "pk4"};
 
-  std::vector<std::string> get_test2 = test_add.Get(vec, "shard100");
+  std::vector<std::string> get_test2 = test_add.GetShard(vec, "shard100");
   std::vector<std::string> r2 = {"pk3", "pk5"};
   std::vector<std::pair<std::string, std::string>> get_all_test =
-      test_add.Get_all(vec);
+      test_add.Get(vec);
   std::vector<std::pair<std::string, std::string>> r3 = {{"shard10", "pk2"},
                                                          {"shard100", "pk3"},
                                                          {"shard10", "pk4"},
@@ -90,7 +91,7 @@ TEST(RocksdbConnectionTest, GetNonExistentPK) {
   test_add.Add(o, "shard100", fi);
 
   std::vector<rocksdb::Slice> vec = {z};
-  std::vector<std::string> get_test = test_add.Get(vec, "shard1000");
+  std::vector<std::string> get_test = test_add.GetShard(vec, "shard1000");
   std::vector<std::string> r1 = {};
   assert(get_test == r1);
 }
@@ -122,17 +123,17 @@ TEST(RocksdbConnectionTest, NonExistentColumnVals) {
 
   std::vector<rocksdb::Slice> vec1 = {t, tr, fi};
   std::vector<rocksdb::Slice> vec2 = {t, tr, o, fi};
-  std::vector<std::string> get_test1 = test_add.Get(vec1, "shard10");
+  std::vector<std::string> get_test1 = test_add.GetShard(vec1, "shard10");
   std::vector<std::string> r1 = {};
-  std::vector<std::string> get_test2 = test_add.Get(vec1, "shard100");
+  std::vector<std::string> get_test2 = test_add.GetShard(vec1, "shard100");
   std::vector<std::string> r2 = {};
-  std::vector<std::string> get_test3 = test_add.Get(vec2, "shard100");
+  std::vector<std::string> get_test3 = test_add.GetShard(vec2, "shard100");
   std::vector<std::string> r3 = {"pk5"};
   std::vector<std::pair<std::string, std::string>> get_all_test1 =
-      test_add.Get_all(vec1);
+      test_add.Get(vec1);
   std::vector<std::pair<std::string, std::string>> r4 = {};
   std::vector<std::pair<std::string, std::string>> get_all_test2 =
-      test_add.Get_all(vec2);
+      test_add.Get(vec2);
   std::vector<std::pair<std::string, std::string>> r5 = {{"shard10", "pk4"},
                                                          {"shard100", "pk5"}};
 
@@ -165,11 +166,11 @@ TEST(RocksdbConnectionTest, NoData) {
   RocksdbIndex test_add(db, 5, 10);
 
   std::vector<rocksdb::Slice> vec = {t, tr, fi};
-  std::vector<std::string> get_test = test_add.Get(vec, "shard10");
+  std::vector<std::string> get_test = test_add.GetShard(vec, "shard10");
   std::vector<std::string> r1 = {};
 
   std::vector<std::pair<std::string, std::string>> get_all_test =
-      test_add.Get_all(vec);
+      test_add.Get(vec);
   std::vector<std::pair<std::string, std::string>> r2 = {};
 
   assert(get_test == r1);
@@ -204,16 +205,16 @@ TEST(RocksdbConnectionTest, SwappedValues) {
   std::vector<rocksdb::Slice> vec1 = {o};
   std::vector<rocksdb::Slice> vec2 = {t};
   std::vector<rocksdb::Slice> vec3 = {z};
-  std::vector<std::string> get_test1 = test_add.Get(vec3, "0");
+  std::vector<std::string> get_test1 = test_add.GetShard(vec3, "0");
   std::vector<std::string> r1 = {"0"};
-  std::vector<std::string> get_test2 = test_add.Get(vec3, "1");
+  std::vector<std::string> get_test2 = test_add.GetShard(vec3, "1");
   std::vector<std::string> r2 = {"1", "2"};
   std::vector<std::pair<std::string, std::string>> get_all_test1 =
-      test_add.Get_all(vec1);
+      test_add.Get(vec1);
   std::vector<std::pair<std::string, std::string>> r3 = {{"0", "0"},
                                                          {"0", "1"}};
   std::vector<std::pair<std::string, std::string>> get_all_test2 =
-      test_add.Get_all(vec2);
+      test_add.Get(vec2);
   std::vector<std::pair<std::string, std::string>> r4 = {};
   assert(get_test1 == r1);
   assert(get_test2 == r2);
@@ -249,16 +250,16 @@ TEST(RocksdbConnectionTest, GetNonExistent) {
   std::vector<rocksdb::Slice> vec1 = {o};
   std::vector<rocksdb::Slice> vec2 = {t};
   std::vector<rocksdb::Slice> vec3 = {z};
-  std::vector<std::string> get_test1 = test_add.Get(vec3, "0");
+  std::vector<std::string> get_test1 = test_add.GetShard(vec3, "0");
   std::vector<std::string> r1 = {"0"};
-  std::vector<std::string> get_test2 = test_add.Get(vec3, "1");
+  std::vector<std::string> get_test2 = test_add.GetShard(vec3, "1");
   std::vector<std::string> r2 = {"1", "2"};
   std::vector<std::pair<std::string, std::string>> get_all_test1 =
-      test_add.Get_all(vec1);
+      test_add.Get(vec1);
   std::vector<std::pair<std::string, std::string>> r3 = {{"0", "0"},
                                                          {"0", "1"}};
   std::vector<std::pair<std::string, std::string>> get_all_test2 =
-      test_add.Get_all(vec2);
+      test_add.Get(vec2);
   std::vector<std::pair<std::string, std::string>> r4 = {};
   assert(get_test1 == r1);
   assert(get_test2 == r2);
@@ -297,7 +298,7 @@ TEST(RocksdbConnectionTest, GetDeleted) {
   test_add.Delete(z, "shard3", t);
   test_add.Delete(z, "shard10", z);
   std::vector<std::pair<std::string, std::string>> get_all_test1 =
-      test_add.Get_all(vec1);
+      test_add.Get(vec1);
   std::vector<std::pair<std::string, std::string>> r1 = {{"shard10", "pk2"},
                                                          {"shard100", "pk3"},
                                                          {"shard10", "pk4"},
@@ -306,24 +307,24 @@ TEST(RocksdbConnectionTest, GetDeleted) {
   test_add.Delete(z, "shard10", t);
   test_add.Delete(o, "shard100", fi);
   std::vector<std::pair<std::string, std::string>> get_all_test2 =
-      test_add.Get_all(vec1);
+      test_add.Get(vec1);
   std::vector<std::pair<std::string, std::string>> r2 = {
       {"shard100", "pk3"}, {"shard10", "pk4"}, {"shard100", "pk4"}};
-  std::vector<std::string> get_test1 = test_add.Get(vec1, "shard10");
+  std::vector<std::string> get_test1 = test_add.GetShard(vec1, "shard10");
   std::vector<std::string> r3 = {"pk4"};
   test_add.Delete(z, "shard100", tr);  // Deleting all data
   test_add.Delete(o, "shard10", f);
   test_add.Delete(three, "shard100", f);
   std::vector<std::pair<std::string, std::string>> get_all_test3 =
-      test_add.Get_all(vec1);
+      test_add.Get(vec1);
   std::vector<std::pair<std::string, std::string>> r4 = {};
-  std::vector<std::string> get_test2 = test_add.Get(vec1, "shard10");
+  std::vector<std::string> get_test2 = test_add.GetShard(vec1, "shard10");
   std::vector<std::string> r5 = {};
   test_add.Add(z, "shard10", t);  // Reinserting some data
   std::vector<std::pair<std::string, std::string>> get_all_test4 =
-      test_add.Get_all(vec1);
+      test_add.Get(vec1);
   std::vector<std::pair<std::string, std::string>> r6 = {{"shard10", "pk2"}};
-  std::vector<std::string> get_test3 = test_add.Get(vec1, "shard10");
+  std::vector<std::string> get_test3 = test_add.GetShard(vec1, "shard10");
   std::vector<std::string> r7 = {"pk2"};
   assert(get_all_test1 == r1);
   assert(get_all_test2 == r2);
@@ -358,14 +359,14 @@ TEST(RocksdbConnectionTest, Duplicates) {
   test_add.Add(z, "shard10", tr);
   test_add.Add(z, "shard10", tr);
   std::vector<rocksdb::Slice> vec = {z, o};
-  std::vector<std::string> get_test1 = test_add.Get(vec, "shard10");
+  std::vector<std::string> get_test1 = test_add.GetShard(vec, "shard10");
   std::vector<std::string> r1 = {"pk2", "pk3"};
   test_add.Delete(z, "shard10", tr);
-  std::vector<std::string> get_test2 = test_add.Get(vec, "shard10");
+  std::vector<std::string> get_test2 = test_add.GetShard(vec, "shard10");
   std::vector<std::string> r2 = {"pk2"};
   test_add.Add(z, "shard10", t);
   test_add.Add(z, "shard10", tr);
-  std::vector<std::string> get_test3 = test_add.Get(vec, "shard10");
+  std::vector<std::string> get_test3 = test_add.GetShard(vec, "shard10");
   std::vector<std::string> r3 = {"pk2", "pk3"};
   assert(get_test1 == r1);
   assert(get_test2 == r2);

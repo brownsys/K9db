@@ -1,8 +1,8 @@
-#include "pelton/sql/connections/rocksdb_index.h"
+#include "pelton/sql/rocksdb/index.h"
 
 #include <algorithm>
 
-#include "pelton/sql/connections/rocksdb_util.h"
+#include "pelton/sql/rocksdb/util.h"
 #include "pelton/util/status.h"
 
 #define __ROCKSSEP static_cast<char>(30)
@@ -49,7 +49,7 @@ void RocksdbIndex::Delete(const rocksdb::Slice &value,
 }
 
 // Lookup by multiple values.
-std::vector<std::string> RocksdbIndex::Get(
+std::vector<std::string> RocksdbIndex::GetShard(
     const std::vector<rocksdb::Slice> &values, const std::string &shard_name) {
   if (values.size() == 0) {
     return {};
@@ -84,7 +84,7 @@ std::vector<std::string> RocksdbIndex::Get(
   }
   return result;
 }
-std::vector<std::pair<std::string, std::string>> RocksdbIndex::Get_all(
+std::vector<std::pair<std::string, std::string>> RocksdbIndex::Get(
     const std::vector<rocksdb::Slice> &values) {
   if (values.size() == 0) {
     return {};

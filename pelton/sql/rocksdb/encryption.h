@@ -1,5 +1,5 @@
-#ifndef PELTON_SQL_CONNECTIONS_ENCRYPTION_H_
-#define PELTON_SQL_CONNECTIONS_ENCRYPTION_H_
+#ifndef PELTON_SQL_ROCKSDB_ENCRYPTION_H_
+#define PELTON_SQL_ROCKSDB_ENCRYPTION_H_
 
 #include <iostream>
 #include <string>
@@ -9,7 +9,7 @@
 #include "rocksdb/slice.h"
 #include "rocksdb/slice_transform.h"
 
-#define PELTON_ENCRYPTION
+// #define PELTON_ENCRYPTION
 
 namespace pelton {
 namespace sql {
@@ -77,4 +77,4 @@ class EncryptedComparator : public rocksdb::Comparator {
 }  // namespace sql
 }  // namespace pelton
 
-#endif  // PELTON_SQL_CONNECTIONS_ENCRYPTION_H_
+#endif  // PELTON_SQL_ROCKSDB_ENCRYPTION_H_

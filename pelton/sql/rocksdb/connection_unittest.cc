@@ -1,5 +1,4 @@
-
-#include "pelton/sql/connections/rocksdb_connection.h"
+#include "pelton/sql/rocksdb/connection.h"
 
 #include <filesystem>
 #include <iostream>
@@ -47,7 +46,7 @@ void Print(std::vector<dataflow::Record> &&records,
 void CheckEqual(const std::vector<dataflow::Record> *a,
                 const std::vector<dataflow::Record *> b) {
   assert((*a).size() == b.size());
-  for (int i = 0; i < b.size(); i++) {
+  for (size_t i = 0; i < b.size(); i++) {
     assert(std::count((*a).begin(), (*a).end(), *b[i]));
   }
 }  // namespace
@@ -55,7 +54,8 @@ void CheckEqual(const std::vector<dataflow::Record> *a,
 TEST(RocksdbConnectionTest, NoData) {
   DropDatabase();
 
-  RocksdbConnection conn(DB_NAME);
+  RocksdbConnection conn;
+  conn.Open(DB_NAME);
   // Create table.
   auto parsed =
       Parse("CREATE TABLE users(PII_id int PRIMARY KEY, name VARCHAR(50));");
@@ -71,7 +71,7 @@ TEST(RocksdbConnectionTest, NoData) {
   parsed = Parse("CREATE INDEX idx ON stories (story_name);");
   std::cout << conn.ExecuteStatement(parsed.get(), "") << std::endl;
   parsed = Parse("SELECT * FROM stories WHERE story_name = 'test';");
-  auto resultset1 = conn.ExecuteQueryNoShard(parsed.get(), schema2, {});
+  auto resultset1 = conn.ExecuteQuery(parsed.get(), schema2, {});
   Print(resultset1.Vec(), schema2);
   parsed = Parse("INSERT INTO users VALUES(1, 'KINAN');");
   std::cout << conn.ExecuteUpdate(parsed.get(), "1").first << std::endl;
@@ -79,17 +79,17 @@ TEST(RocksdbConnectionTest, NoData) {
   std::cout << conn.ExecuteUpdate(parsed.get(), "1").first << std::endl;
   parsed =
       Parse("SELECT id, author FROM stories WHERE story_name in ('K', 'Kk');");
-  auto resultset2 = conn.ExecuteQueryNoShard(parsed.get(), schema2, {});
+  auto resultset2 = conn.ExecuteQuery(parsed.get(), schema2, {});
   Print(resultset2.Vec(), schema2);
   assert(resultset1.empty());
   assert(resultset2.empty());
   conn.Close();
-  RocksdbConnection::CloseAll();
 }
 TEST(RocksdbConnectionTest, MultipleShardsAndRows) {
   DropDatabase();
 
-  RocksdbConnection conn(DB_NAME);
+  RocksdbConnection conn;
+  conn.Open(DB_NAME);
   // Create table.
   auto parsed =
       Parse("CREATE TABLE users(PII_id int PRIMARY KEY, name VARCHAR(50));");
@@ -119,7 +119,7 @@ TEST(RocksdbConnectionTest, MultipleShardsAndRows) {
   parsed = Parse("INSERT INTO stories VALUES(4, 'Kk', 'MALTE');");
   std::cout << conn.ExecuteUpdate(parsed.get(), "2").first << std::endl;
   parsed = Parse("SELECT * FROM stories WHERE story_name = 'K';");
-  auto resultset = conn.ExecuteQueryNoShard(parsed.get(), schema2, {});
+  auto resultset = conn.ExecuteQuery(parsed.get(), schema2, {});
   Print(resultset.Vec(), schema2);
   pelton::dataflow::Record record1{schema2};
   int64_t v0 = 1;
@@ -147,12 +147,12 @@ TEST(RocksdbConnectionTest, MultipleShardsAndRows) {
   // assert(std::count(resultset.rows().begin(), resultset.rows().end(),
   // record1)); ADD ASSERT STATEMENTS FOR REMAINING TESTS
   conn.Close();
-  RocksdbConnection::CloseAll();
 }
 TEST(RocksdbConnectionTest, MultipleIndexesExist) {
   DropDatabase();
 
-  RocksdbConnection conn(DB_NAME);
+  RocksdbConnection conn;
+  conn.Open(DB_NAME);
   // Create table.
   auto parsed =
       Parse("CREATE TABLE users(PII_id int PRIMARY KEY, name VARCHAR(50));");
@@ -187,7 +187,7 @@ TEST(RocksdbConnectionTest, MultipleIndexesExist) {
   parsed = Parse("INSERT INTO stories VALUES(4, 'Kk', 'MALTE', 4);");
   std::cout << conn.ExecuteUpdate(parsed.get(), "2").first << std::endl;
   parsed = Parse("SELECT * FROM stories WHERE story_name = 'K';");
-  auto resultset = conn.ExecuteQueryNoShard(parsed.get(), schema2, {});
+  auto resultset = conn.ExecuteQuery(parsed.get(), schema2, {});
   Print(resultset.Vec(), schema2);
   pelton::dataflow::Record record1{schema2};
   int64_t v0 = 1;
@@ -215,12 +215,12 @@ TEST(RocksdbConnectionTest, MultipleIndexesExist) {
   // assert(resultset)
   // ADD ASSERT STATEMENTS FOR REMAINING TESTS
   conn.Close();
-  RocksdbConnection::CloseAll();
 }
 TEST(RocksdbConnectionTest, MultipleValues) {
   DropDatabase();
 
-  RocksdbConnection conn(DB_NAME);
+  RocksdbConnection conn;
+  conn.Open(DB_NAME);
   // Create table.
   auto parsed =
       Parse("CREATE TABLE users(PII_id int PRIMARY KEY, name VARCHAR(50));");
@@ -250,7 +250,7 @@ TEST(RocksdbConnectionTest, MultipleValues) {
   parsed = Parse("INSERT INTO stories VALUES(4, 'Kk', 'MALTE');");
   std::cout << conn.ExecuteUpdate(parsed.get(), "2").first << std::endl;
   parsed = Parse("SELECT * FROM stories WHERE story_name in ('K', 'Kk');");
-  auto resultset = conn.ExecuteQueryNoShard(parsed.get(), schema2, {});
+  auto resultset = conn.ExecuteQuery(parsed.get(), schema2, {});
   Print(resultset.Vec(), schema2);
   pelton::dataflow::Record record1{schema2};
   int64_t v0 = 1;
@@ -286,7 +286,6 @@ TEST(RocksdbConnectionTest, MultipleValues) {
   // assert(resultset)
   // ADD ASSERT STATEMENTS FOR REMAINING TESTS
   conn.Close();
-  RocksdbConnection::CloseAll();
 }
 // TEST(RocksdbConnectionTest, ProjectionsAndRearrangements) {
 //   DropDatabase();
@@ -323,7 +322,7 @@ TEST(RocksdbConnectionTest, MultipleValues) {
 //   parsed = Parse("INSERT INTO stories VALUES(4, 'Kk', 'MALTE');");
 //   std::cout << conn.ExecuteUpdate(parsed.get(), "2").first << std::endl;
 //   parsed = Parse("SELECT id, author FROM stories WHERE story_name = 'K';");
-//   auto resultset1 = conn.ExecuteQuery(parsed.get(), schema2, {}, "1");
+//   auto resultset1 = conn.ExecuteQueryShard(parsed.get(), schema2, {}, "1");
 //   Print(resultset1.Vec(), schema2);
 //   //create new schema for projections
 //   std::vector<std::string> names = {"id", "author"};
@@ -347,7 +346,7 @@ TEST(RocksdbConnectionTest, MultipleValues) {
 //   std::vector<dataflow::Record*> ans = {&record1, &record2, &record3};
 //   CheckEqual(&resultset1.rows(), ans);
 //   parsed = Parse("SELECT author, id, story_name FROM stories WHERE story_name
-//   = 'K';"); auto resultset2 = conn.ExecuteQueryNoShard(parsed.get(), schema2,
+//   = 'K';"); auto resultset2 = conn.ExecuteQuery(parsed.get(), schema2,
 //   {}); Print(resultset2.Vec(), schema2); names = {"author", "id",
 //   "story_name"}; types = {CType::TEXT, CType::INT, CType::TEXT}; keys = {1};
 //   out_schema = dataflow::SchemaFactory::Create(names, types, keys);
@@ -381,7 +380,8 @@ TEST(RocksdbConnectionTest, MultipleValues) {
 // }
 TEST(RocksdbConnectionTest, IndexOnShardedTable) {
   DropDatabase();
-  RocksdbConnection conn(DB_NAME);
+  RocksdbConnection conn;
+  conn.Open(DB_NAME);
   // Create table.
   auto parsed =
       Parse("CREATE TABLE users(PII_id int PRIMARY KEY, name VARCHAR(50));");
@@ -397,7 +397,7 @@ TEST(RocksdbConnectionTest, IndexOnShardedTable) {
   parsed = Parse("INSERT INTO users (name, PII_id) VALUES('KINAN', 3);");
   std::cout << conn.ExecuteUpdate(parsed.get(), "3").first << std::endl;
   parsed = Parse("SELECT * FROM users WHERE name = 'KINAN';");
-  auto resultset = conn.ExecuteQueryNoShard(parsed.get(), schema1, {});
+  auto resultset = conn.ExecuteQuery(parsed.get(), schema1, {});
 
   pelton::dataflow::Record record1{schema1};
   int64_t v0 = 1;
@@ -415,12 +415,12 @@ TEST(RocksdbConnectionTest, IndexOnShardedTable) {
 
   Print(resultset.Vec(), schema1);
   conn.Close();
-  RocksdbConnection::CloseAll();
 }
 TEST(RocksdbConnectionTest, SelectonShardColumnfromPK) {
   DropDatabase();
 
-  RocksdbConnection conn(DB_NAME);
+  RocksdbConnection conn;
+  conn.Open(DB_NAME);
   // Create table.
   auto parsed =
       Parse("CREATE TABLE users(PII_id int PRIMARY KEY, name VARCHAR(50));");
@@ -450,7 +450,7 @@ TEST(RocksdbConnectionTest, SelectonShardColumnfromPK) {
   parsed = Parse("INSERT INTO stories VALUES(4, 'Kk', 'MALTE');");
   std::cout << conn.ExecuteUpdate(parsed.get(), "2").first << std::endl;
   parsed = Parse("SELECT * FROM stories WHERE id = 1;");
-  auto resultset = conn.ExecuteQueryNoShard(parsed.get(), schema2, {});
+  auto resultset = conn.ExecuteQuery(parsed.get(), schema2, {});
   pelton::dataflow::Record record{schema2};
   int64_t v0 = 1;
   std::unique_ptr<std::string> ptr1 = std::make_unique<std::string>("K");
@@ -461,12 +461,12 @@ TEST(RocksdbConnectionTest, SelectonShardColumnfromPK) {
   std::vector<dataflow::Record *> ans = {&record};
   CheckEqual(&resultset.rows(), ans);
   conn.Close();
-  RocksdbConnection::CloseAll();
 }
 TEST(RocksdbConnectionTest, SelectonShardColumn) {
   DropDatabase();
 
-  RocksdbConnection conn(DB_NAME);
+  RocksdbConnection conn;
+  conn.Open(DB_NAME);
   // Create table.
   auto parsed =
       Parse("CREATE TABLE users(PII_id int PRIMARY KEY, name VARCHAR(50));");
@@ -496,7 +496,7 @@ TEST(RocksdbConnectionTest, SelectonShardColumn) {
   parsed = Parse("INSERT INTO stories VALUES(4, 'Kk', 'MALTE1');");
   std::cout << conn.ExecuteUpdate(parsed.get(), "2").first << std::endl;
   parsed = Parse("SELECT * FROM stories WHERE id = 1;");
-  auto resultset = conn.ExecuteQueryNoShard(parsed.get(), schema2, {});
+  auto resultset = conn.ExecuteQuery(parsed.get(), schema2, {});
   pelton::dataflow::Record record1{schema2};
   int64_t v0 = 1;
   std::unique_ptr<std::string> ptr1 = std::make_unique<std::string>("K");
@@ -514,7 +514,6 @@ TEST(RocksdbConnectionTest, SelectonShardColumn) {
   std::vector<dataflow::Record *> ans = {&record1, &record2};
   CheckEqual(&resultset.rows(), ans);
   conn.Close();
-  RocksdbConnection::CloseAll();
 }
 }  // namespace
 }  // namespace sql

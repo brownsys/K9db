@@ -1,4 +1,4 @@
-#include "pelton/sql/connections/rocksdb_util.h"
+#include "pelton/sql/rocksdb/util.h"
 
 #include <memory>
 
@@ -166,7 +166,7 @@ dataflow::Record DecodeRecord(const rocksdb::Slice &slice,
       }
     }
     for (size_t i = 0; i < projections.size(); i++) {
-      size_t target = projections.at(i);
+      int target = projections.at(i);
       rocksdb::Slice value;
       if (target == -1) {
         const std::string &aug = augments.front().value;

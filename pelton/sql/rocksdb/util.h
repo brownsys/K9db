@@ -1,6 +1,6 @@
 // Connection to rocksdb.
-#ifndef PELTON_SQL_CONNECTIONS_ROCKSDB_UTIL_H__
-#define PELTON_SQL_CONNECTIONS_ROCKSDB_UTIL_H__
+#ifndef PELTON_SQL_ROCKSDB_UTIL_H__
+#define PELTON_SQL_ROCKSDB_UTIL_H__
 
 #include <string>
 #include <unordered_map>
@@ -9,7 +9,7 @@
 
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
-#include "pelton/sql/connection.h"
+#include "pelton/sql/abstract_connection.h"
 #include "pelton/sqlast/ast.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/slice_transform.h"
@@ -143,4 +143,4 @@ class ShardPrefixTransform : public rocksdb::SliceTransform {
 }  // namespace sql
 }  // namespace pelton
 
-#endif  // PELTON_SQL_CONNECTIONS_ROCKSDB_UTIL_H__
+#endif  // PELTON_SQL_ROCKSDB_UTIL_H__

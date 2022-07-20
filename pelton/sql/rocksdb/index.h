@@ -1,5 +1,5 @@
-#ifndef PELTON_SQL_CONNECTIONS_ROCKSDB_INDEX_H__
-#define PELTON_SQL_CONNECTIONS_ROCKSDB_INDEX_H__
+#ifndef PELTON_SQL_ROCKSDB_INDEX_H__
+#define PELTON_SQL_ROCKSDB_INDEX_H__
 
 #include <memory>
 #include <string>
@@ -30,10 +30,11 @@ class RocksdbIndex {
   // values are values we know the index column (e.g. name) can take.
   // returns a list of PKs (no shard_name prefix) that correspond to rows
   // where the index value is IN values.
-  std::vector<std::string> Get(const std::vector<rocksdb::Slice> &values,
-                               const std::string &shard_name);
+  std::vector<std::string> GetShard(const std::vector<rocksdb::Slice> &values,
+                                    const std::string &shard_name);
+
   // new added method to get from all shards
-  std::vector<std::pair<std::string, std::string>> Get_all(
+  std::vector<std::pair<std::string, std::string>> Get(
       const std::vector<rocksdb::Slice> &values);
 
  private:
@@ -44,4 +45,4 @@ class RocksdbIndex {
 }  // namespace sql
 }  // namespace pelton
 
-#endif  // PELTON_SQL_CONNECTIONS_ROCKSDB_INDEX_H__
+#endif  // PELTON_SQL_ROCKSDB_INDEX_H__

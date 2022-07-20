@@ -1,9 +1,9 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
 cc_library(
-    name = "connection",
+    name = "abstract_connection",
     hdrs = [
-        "connection.h",
+        "abstract_connection.h",
     ],
     visibility = ["//pelton/sql:__subpackages__"],
     deps = [
@@ -15,25 +15,17 @@ cc_library(
 )
 
 cc_library(
-    name = "executor",
+    name = "factory",
     srcs = [
-        "executor.cc",
+        "factory.cc",
     ],
     hdrs = [
-        "executor.h",
+        "factory.h",
     ],
-    visibility = ["//pelton:__subpackages__"],
+    visibility = ["//:__subpackages__"],
     deps = [
-        ":connection",
-        ":result",
-        "//pelton/dataflow:record",
-        "//pelton/dataflow:schema",
-        "//pelton/shards:types",
-        "//pelton/sql/connections:rocksdb_connection",
-        "//pelton/sqlast:ast",
-        "@com_google_absl//absl/status",
-        "@com_google_googletest//:gtest_prod",
-        "@glog",
+        ":abstract_connection",
+        "//pelton/sql/rocksdb:connection",
     ],
 )
 

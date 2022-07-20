@@ -1,9 +1,9 @@
-#include "pelton/sql/connections/encryption.h"
+#include "pelton/sql/rocksdb/encryption.h"
 
 #include <cassert>
 
 #include "glog/logging.h"
-#include "pelton/sql/connections/rocksdb_util.h"
+#include "pelton/sql/rocksdb/util.h"
 // NOLINTNEXTLINE
 #include "sodium.h"
 

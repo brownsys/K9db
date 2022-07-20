@@ -1,10 +1,10 @@
-#include "pelton/sql/connections/rocksdb_connection.h"
+#include "pelton/sql/rocksdb/connection.h"
 
 #include <unordered_set>
 #include <utility>
 
 #include "glog/logging.h"
-#include "pelton/sql/connections/encryption.h"
+#include "pelton/sql/rocksdb/encryption.h"
 #include "pelton/util/status.h"
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
@@ -68,9 +68,8 @@ const std::string &GetTableName(const sqlast::AbstractStatement *stmt) {
 
 }  // namespace
 
-// SingletonRocksdbConnection.
-SingletonRocksdbConnection::SingletonRocksdbConnection(
-    const std::string &db_name) {
+// Open a connection.
+void RocksdbConnection::Open(const std::string &db_name) {
   std::string path = "/tmp/pelton/rocksdb/" + db_name;
 
   // Options.
@@ -95,23 +94,25 @@ SingletonRocksdbConnection::SingletonRocksdbConnection(
 }
 
 // Close the connection.
-void SingletonRocksdbConnection::Close() {
+void RocksdbConnection::Close() {
   if (this->db_ != nullptr) {
     this->indices_.clear();
     this->handlers_.clear();
     this->db_ = nullptr;
+
+#ifdef PELTON_ENCRYPTION
     // delete encryption keys
     delete[] this->global_key_;
     for (const auto &[user, user_key] : this->user_keys_) {
-      LOG(INFO) << "Deleting key for: " << user;
       delete[] user_key;
     }
+#endif  // PELTON_ENCRYPTION
   }
 }
 
 // Execute statement by type.
-bool SingletonRocksdbConnection::ExecuteStatement(
-    const sqlast::AbstractStatement *sql, const std::string &shard_name) {
+bool RocksdbConnection::ExecuteStatement(const sqlast::AbstractStatement *sql,
+                                         const std::string &shard_name) {
   switch (sql->type()) {
     // Create Table.
     case sqlast::AbstractStatement::Type::CREATE_TABLE: {
@@ -190,7 +191,7 @@ bool SingletonRocksdbConnection::ExecuteStatement(
   return true;
 }
 
-std::pair<int, uint64_t> SingletonRocksdbConnection::ExecuteUpdate(
+std::pair<int, uint64_t> RocksdbConnection::ExecuteUpdate(
     const sqlast::AbstractStatement *sql, const std::string &shard_name) {
   ShardID sid = shard_name + __ROCKSSEP;
   // Read table metadata.
@@ -213,7 +214,7 @@ std::pair<int, uint64_t> SingletonRocksdbConnection::ExecuteUpdate(
         // replacing insert with some indices, we need to find existing rows
         // to update indices correctly, might as well use the returning
         // code.
-        this->ExecuteQuery(sql, db_schema, {}, shard_name);
+        this->ExecuteQueryShard(sql, db_schema, {}, shard_name);
         return std::make_pair(1, 0);
       }
       // if we are not replacing, then we will need to update indices for
@@ -269,7 +270,7 @@ std::pair<int, uint64_t> SingletonRocksdbConnection::ExecuteUpdate(
 
       // Look up all affected rows.
       std::vector<std::string> rows =
-          this->Get(sql, tid, shard_name, value_mapper);
+          this->GetShard(sql, tid, shard_name, value_mapper);
       rows = this->Filter(db_schema, sql, std::move(rows));
       if (rows.size() > 5) {
         LOG(WARNING) << "Perf Warning: " << rows.size()
@@ -312,7 +313,7 @@ std::pair<int, uint64_t> SingletonRocksdbConnection::ExecuteUpdate(
       return std::make_pair(rows.size(), 0);
     }
     case sqlast::AbstractStatement::Type::DELETE: {
-      auto resultset = this->ExecuteQuery(sql, db_schema, {}, shard_name);
+      auto resultset = this->ExecuteQueryShard(sql, db_schema, {}, shard_name);
       return std::make_pair(resultset.Vec().size(), 0);
     }
     default:
@@ -321,7 +322,7 @@ std::pair<int, uint64_t> SingletonRocksdbConnection::ExecuteUpdate(
   return std::make_pair(-1, 0);
 }
 
-SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
+SqlResultSet RocksdbConnection::ExecuteQueryShard(
     const sqlast::AbstractStatement *sql, const dataflow::SchemaRef &out_schema,
     const std::vector<AugInfo> &augments, const std::string &shard_name) {
   CHECK_LE(augments.size(), 1u) << "Too many augmentations";
@@ -356,7 +357,7 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
 
       // Look up all the rows.
       std::vector<std::string> rows =
-          this->Get(sql, tid, shard_name, value_mapper);
+          this->GetShard(sql, tid, shard_name, value_mapper);
       rows = this->Filter(db_schema, sql, std::move(rows));
       for (std::string &row : rows) {
         rocksdb::Slice slice(row);
@@ -370,7 +371,7 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
     case sqlast::AbstractStatement::Type::DELETE: {
       // Look up all the rows.
       std::vector<std::string> rows =
-          this->Get(sql, tid, shard_name, value_mapper);
+          this->GetShard(sql, tid, shard_name, value_mapper);
       rows = this->Filter(db_schema, sql, std::move(rows));
       if (rows.size() > 5) {
         LOG(WARNING) << "Perf Warning: " << rows.size()
@@ -456,7 +457,7 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQuery(
   return SqlResultSet(out_schema, std::move(records), std::move(keys));
 }
 
-SqlResultSet SingletonRocksdbConnection::ExecuteQueryNoShard(
+SqlResultSet RocksdbConnection::ExecuteQuery(
     const sqlast::AbstractStatement *sql, const dataflow::SchemaRef &out_schema,
     const std::vector<AugInfo> &augments) {
   CHECK_LE(augments.size(), 1u) << "Too many augmentations";
@@ -489,7 +490,7 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQueryNoShard(
       }
 
       // Look up all the rows.
-      std::vector<std::string> rows = this->Get_all(sql, tid, value_mapper);
+      std::vector<std::string> rows = this->Get(sql, tid, value_mapper);
       rows = this->Filter(db_schema, sql, std::move(rows));
       for (std::string &row : rows) {
         rocksdb::Slice slice(row);
@@ -503,7 +504,7 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQueryNoShard(
     // case sqlast::AbstractStatement::Type::DELETE: {
     //   // Look up all the rows.
     //   std::vector<std::string> rows =
-    //       this->Get_all(sql, tid, value_mapper);
+    //       this->Get(sql, tid, value_mapper);
     //   rows = this->Filter(db_schema, sql, std::move(rows));
     //   if (rows.size() > 5) {
     //     LOG(WARNING) << "Perf Warning: " << rows.size()
@@ -591,7 +592,8 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQueryNoShard(
   return SqlResultSet(out_schema, std::move(records), std::move(keys));
 }
 
-SqlResultSet SingletonRocksdbConnection::ExecuteQueryAll(
+/*
+SqlResultSet RocksdbConnection::ExecuteQueryAll(
     const sqlast::AbstractStatement *sql, const dataflow::SchemaRef &out_schema,
     const std::vector<AugInfo> &augments) {
   CHECK_LE(augments.size(), 1u) << "Too many augmentations";
@@ -661,10 +663,11 @@ SqlResultSet SingletonRocksdbConnection::ExecuteQueryAll(
   }
   return SqlResultSet(out_schema, std::move(records), std::move(keys));
 }
+*/
 
 // Helpers.
 // Get record matching values in a value mapper (either by key, index, or it).
-std::vector<std::string> SingletonRocksdbConnection::Get(
+std::vector<std::string> RocksdbConnection::GetShard(
     const sqlast::AbstractStatement *stmt, TableID table_id,
     const std::string &shard_name, const ValueMapper &value_mapper) {
   ShardID shard_id = shard_name + __ROCKSSEP;
@@ -692,7 +695,7 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
       RocksdbIndex &index = indices.at(i);
       const std::string &idxcolumn = schema.NameOf(indexed_columns.at(i));
       if (value_mapper.HasBefore(idxcolumn)) {
-        keys = index.Get(value_mapper.Before(idxcolumn), shard_name);
+        keys = index.GetShard(value_mapper.Before(idxcolumn), shard_name);
         for (size_t i = 0; i < keys.size(); i++) {
           keys[i] = shard_id + keys[i] + __ROCKSSEP;
         }
@@ -775,7 +778,7 @@ std::vector<std::string> SingletonRocksdbConnection::Get(
 
 // Get record matching values in a value mapper FROM ALL SHARDS(either by key,
 // index, or it).
-std::vector<std::string> SingletonRocksdbConnection::Get_all(
+std::vector<std::string> RocksdbConnection::Get(
     const sqlast::AbstractStatement *stmt, TableID table_id,
     const ValueMapper &value_mapper) {
   // ShardID shard_id = shard_name + __ROCKSSEP;
@@ -796,7 +799,7 @@ std::vector<std::string> SingletonRocksdbConnection::Get_all(
     RocksdbIndex &index = indices.at(i);
     const std::string &idxcolumn = schema.NameOf(indexed_columns.at(i));
     if (value_mapper.HasBefore(idxcolumn)) {
-      keys_raw = index.Get_all(value_mapper.Before(idxcolumn));
+      keys_raw = index.Get(value_mapper.Before(idxcolumn));
       for (size_t i = 0; i < keys_raw.size(); i++) {
         keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
                        __ROCKSSEP);
@@ -882,7 +885,7 @@ std::vector<std::string> SingletonRocksdbConnection::Get_all(
 }
 
 // Filter records by where clause in abstract statement.
-std::vector<std::string> SingletonRocksdbConnection::Filter(
+std::vector<std::string> RocksdbConnection::Filter(
     const dataflow::SchemaRef &schema, const sqlast::AbstractStatement *sql,
     std::vector<std::string> &&rows) {
   std::vector<std::string> filtered;
@@ -897,8 +900,7 @@ std::vector<std::string> SingletonRocksdbConnection::Filter(
 }
 
 // Gets key corresponding to input user. Creates key if does not exist.
-unsigned char *SingletonRocksdbConnection::GetUserKey(
-    const std::string &shard_name) {
+unsigned char *RocksdbConnection::GetUserKey(const std::string &shard_name) {
 #ifdef PELTON_ENCRYPTION
   shards::SharedLock lock(&this->user_keys_mtx_);
   std::unordered_map<std::string, unsigned char *>::const_iterator it =
@@ -918,10 +920,6 @@ unsigned char *SingletonRocksdbConnection::GetUserKey(
   return nullptr;
 #endif  // PELTON_ENCRYPTION
 }
-
-// Static singleton.
-std::unique_ptr<SingletonRocksdbConnection> RocksdbConnection::INSTANCE =
-    nullptr;
 
 }  // namespace sql
 }  // namespace pelton
