@@ -167,7 +167,7 @@ bool RocksdbConnection::ExecuteCreateTable(
 
 // Execute Create Index Statement
 bool RocksdbConnection::ExecuteCreateIndex(
-    const sqlast::AbstractStatement *sqrtl) {
+    const sqlast::AbstractStatement *sql) {
   const sqlast::CreateIndex *stmt =
       static_cast<const sqlast::CreateIndex *>(sql);
 
@@ -557,87 +557,87 @@ SqlResultSet RocksdbConnection::ExecuteSelect(
     rocksdb::Slice slice(row);
     rocksdb::Slice key = ExtractColumn(row, pk);
     keys.push_back(key.ToString());
-    records.push_back(
-        DecodeRecord(slice, out_schema, augments, projections));
+    records.push_back(DecodeRecord(slice, out_schema, augments, projections));
   }
   return SqlResultSet(out_schema, std::move(records), std::move(keys));
 }
 
-// SqlResultSet RocksdbConnection::ExecuteQuery(
-//     const sqlast::AbstractStatement *sql, const dataflow::SchemaRef &out_schema,
-//     const std::vector<AugInfo> &augments) {
-//   CHECK_LE(augments.size(), 1u) << "Too many augmentations";
-//   // ShardID sid = shard_name + __ROCKSSEP;
+SqlResultSet RocksdbConnection::ExecuteQuery(
+    const sqlast::AbstractStatement *sql, const dataflow::SchemaRef &out_schema,
+    const std::vector<AugInfo> &augments) {
+  CHECK_LE(augments.size(), 1u) << "Too many augmentations";
+  // ShardID sid = shard_name + __ROCKSSEP;
 
-//   // Read table metadata.
-//   const std::string &table_name = GetTableName(sql);
-//   TableID tid = this->tables_.at(table_name);
-//   rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(tid).get();
-//   const dataflow::SchemaRef &db_schema = this->schemas_.at(tid);
-//   size_t pk = this->primary_keys_.at(tid);
-//   const auto &indexed_columns = this->indexed_columns_.at(tid);
-//   std::vector<RocksdbIndex> &indices = this->indices_.at(tid);
-//   ValueMapper value_mapper(pk, indexed_columns, db_schema);
-//   value_mapper.Visit(sql);
+  // Read table metadata.
+  const std::string &table_name = GetTableName(sql);
+  TableID tid = this->tables_.at(table_name);
+  rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(tid).get();
+  const dataflow::SchemaRef &db_schema = this->schemas_.at(tid);
+  size_t pk = this->primary_keys_.at(tid);
+  const auto &indexed_columns = this->indexed_columns_.at(tid);
+  std::vector<RocksdbIndex> &indices = this->indices_.at(tid);
+  ValueMapper value_mapper(pk, indexed_columns, db_schema);
+  value_mapper.Visit(sql);
 
-//   // Result components.
-//   std::vector<dataflow::Record> records;
-//   std::vector<std::string> keys;
+  // Result components.
+  std::vector<dataflow::Record> records;
+  std::vector<std::string> keys;
 
-//   switch (sql->type()) {
-//     case sqlast::AbstractStatement::Type::SELECT: {
-//       const sqlast::Select *stmt = static_cast<const sqlast::Select *>(sql);
+  switch (sql->type()) {
+    case sqlast::AbstractStatement::Type::SELECT: {
+      const sqlast::Select *stmt = static_cast<const sqlast::Select *>(sql);
 
-//       // Figure out the projections (including order).
-//       bool has_projection = stmt->GetColumns().at(0) != "*";
-//       std::vector<int> projections;
-//       if (has_projection) {
-//         projections = ProjectionSchema(db_schema, out_schema, augments);
-//       }
+      // Figure out the projections (including order).
+      bool has_projection = stmt->GetColumns().at(0) != "*";
+      std::vector<int> projections;
+      if (has_projection) {
+        projections = ProjectionSchema(db_schema, out_schema, augments);
+      }
 
-//       // Look up all the rows.
-//       std::vector<std::string> rows = this->Get(sql, tid, value_mapper);
-//       rows = this->Filter(db_schema, sql, std::move(rows));
-//       for (std::string &row : rows) {
-//         rocksdb::Slice slice(row);
-//         rocksdb::Slice key = ExtractColumn(row, pk);
-//         keys.push_back(key.ToString());
-//         records.push_back(
-//             DecodeRecord(slice, out_schema, augments, projections));
-//       }
-//       break;
-//     }
-    // case sqlast::AbstractStatement::Type::DELETE: {
-    //   // Look up all the rows.
-    //   std::vector<std::string> rows =
-    //       this->Get(sql, tid, value_mapper);
-    //   rows = this->Filter(db_schema, sql, std::move(rows));
-    //   if (rows.size() > 5) {
-    //     LOG(WARNING) << "Perf Warning: " << rows.size()
-    //                  << " rocksdb deletes in a loop" << *sql;
-    //   }
-    //   for (std::string &row : rows) {
-    //     rocksdb::Slice slice(row);
-    //     // Get the key of the existing row.
-    //     rocksdb::Slice keyslice = ExtractColumn(row, pk);
-    //     keys.push_back(keyslice.ToString());
-    //     records.push_back(DecodeRecord(slice, out_schema, augments, {}));
-    //     // Delete the existing row by key.
-    //     std::string skey = sid + keyslice.ToString() + __ROCKSSEP;
-    //     PANIC(this->db_->Delete(rocksdb::WriteOptions(), handler,
-    //                             EncryptKey(this->global_key_, skey)));
-    //     // Update indices.
-    //     for (size_t i = 0; i < indexed_columns.size(); i++) {
-    //       RocksdbIndex &index = indices.at(i);
-    //       size_t indexed_column = indexed_columns.at(i);
-    //       index.Delete(ExtractColumn(slice, indexed_column), shard_name,
-    //       skey);
-    //     }
-    //   }
-    //   break;
-    // }
-    // case sqlast::AbstractStatement::Type::INSERT: {
-    //   const sqlast::Insert *stmt = static_cast<const sqlast::Insert *>(sql);
+      // Look up all the rows.
+      std::vector<std::string> rows = this->Get(sql, tid, value_mapper);
+      rows = this->Filter(db_schema, sql, std::move(rows));
+      for (std::string &row : rows) {
+        rocksdb::Slice slice(row);
+        rocksdb::Slice key = ExtractColumn(row, pk);
+        keys.push_back(key.ToString());
+        records.push_back(
+            DecodeRecord(slice, out_schema, augments, projections));
+      }
+      break;
+    }
+      // case sqlast::AbstractStatement::Type::DELETE: {
+      //   // Look up all the rows.
+      //   std::vector<std::string> rows =
+      //       this->Get(sql, tid, value_mapper);
+      //   rows = this->Filter(db_schema, sql, std::move(rows));
+      //   if (rows.size() > 5) {
+      //     LOG(WARNING) << "Perf Warning: " << rows.size()
+      //                  << " rocksdb deletes in a loop" << *sql;
+      //   }
+      //   for (std::string &row : rows) {
+      //     rocksdb::Slice slice(row);
+      //     // Get the key of the existing row.
+      //     rocksdb::Slice keyslice = ExtractColumn(row, pk);
+      //     keys.push_back(keyslice.ToString());
+      //     records.push_back(DecodeRecord(slice, out_schema, augments, {}));
+      //     // Delete the existing row by key.
+      //     std::string skey = sid + keyslice.ToString() + __ROCKSSEP;
+      //     PANIC(this->db_->Delete(rocksdb::WriteOptions(), handler,
+      //                             EncryptKey(this->global_key_, skey)));
+      //     // Update indices.
+      //     for (size_t i = 0; i < indexed_columns.size(); i++) {
+      //       RocksdbIndex &index = indices.at(i);
+      //       size_t indexed_column = indexed_columns.at(i);
+      //       index.Delete(ExtractColumn(slice, indexed_column), shard_name,
+      //       skey);
+      //     }
+      //   }
+      //   break;
+      // }
+      // case sqlast::AbstractStatement::Type::INSERT: {
+      //   const sqlast::Insert *stmt = static_cast<const sqlast::Insert
+      //   *>(sql);
 
     //   // A replacing AND returning INSERT.
     //   // Make sure insert provides a correct PK.
@@ -694,12 +694,11 @@ SqlResultSet RocksdbConnection::ExecuteSelect(
     // }
     default:
       LOG(FATAL) << "Illegal statement type in ExecuteQuery";
-  }
+  }  // namespace sql
   return SqlResultSet(out_schema, std::move(records), std::move(keys));
-}
+}  // namespace pelton
 
-/*
-SqlResultSet RocksdbConnection::ExecuteQueryAll(
+/*SqlResultSet RocksdbConnection::ExecuteQueryAll(
 const sqlast::AbstractStatement *sql, const dataflow::SchemaRef &out_schema,
 const std::vector<AugInfo> &augments) {
 CHECK_LE(augments.size(), 1u) << "Too many augmentations";
@@ -740,27 +739,27 @@ options.verify_checksums = false;
 auto ptr = this->db_->NewIterator(options, handler);
 std::unique_ptr<rocksdb::Iterator> it(ptr);
 for (it->SeekToFirst(); it->Valid(); it->Next()) {
-std::string decrypted_key =
-DecryptKey(this->global_key_, it->key().ToString());
-rocksdb::Slice keyslice(decrypted_key.data(), decrypted_key.size());
-rocksdb::Slice aug_value = ExtractColumn(keyslice, 0);
-std::string rowstr = Decrypt(this->GetUserKey(aug_value.ToString()),
-                         it->value().ToString());
-rocksdb::Slice rowslice = rocksdb::Slice(rowstr.data(), rowstr.size());
-// Extract PK.
-rocksdb::Slice pk_value = ExtractColumn(rowslice, pk);
-std::string keystr = pk_value.ToString();
-if (duplicates.count(keystr) == 0) {
-keys.push_back(std::move(keystr));
-duplicates.emplace(pk_value.ToString());
-// Figure out the shard_by column if needed to augment into the
-// result.
-if (must_augment) {
-augments_copy.at(0).value = aug_value.ToString();
-}
-records.push_back(
-  DecodeRecord(rowslice, out_schema, augments_copy, projections));
-}
+  std::string decrypted_key =
+  DecryptKey(this->global_key_, it->key().ToString());
+  rocksdb::Slice keyslice(decrypted_key.data(), decrypted_key.size());
+  rocksdb::Slice aug_value = ExtractColumn(keyslice, 0);
+  std::string rowstr = Decrypt(this->GetUserKey(aug_value.ToString()),
+                          it->value().ToString());
+  rocksdb::Slice rowslice = rocksdb::Slice(rowstr.data(), rowstr.size());
+  // Extract PK.
+  rocksdb::Slice pk_value = ExtractColumn(rowslice, pk);
+  std::string keystr = pk_value.ToString();
+  if (duplicates.count(keystr) == 0) {
+  keys.push_back(std::move(keystr));
+  duplicates.emplace(pk_value.ToString());
+  // Figure out the shard_by column if needed to augment into the
+  // result.
+  if (must_augment) {
+  augments_copy.at(0).value = aug_value.ToString();
+  }
+  records.push_back(
+    DecodeRecord(rowslice, out_schema, augments_copy, projections));
+  }
 }
 break;
 }
@@ -968,10 +967,12 @@ std::vector<std::string> RocksdbConnection::Get(
       delete[] slices;
     }
   } else {
-    //LOG(FATAL) << "this case should not be reached!";
+    // LOG(FATAL) << "this case should not be reached!";
     // Need to lookup all records.
-    //TO-DO: make sure there is no better way to access all shard names, plus are there consistency issues in this method
-    //TO-DO: right now if there is not index, we are always opting for this method. It would be smarter to add cases where the WHERE clause is predicated on shard_name
+    // TO-DO: make sure there is no better way to access all shard names, plus
+    // are there consistency issues in this method TO-DO: right now if there is
+    // not index, we are always opting for this method. It would be smarter to
+    // add cases where the WHERE clause is predicated on shard_name
     if (HasWhereClause(stmt)) {
       LOG(WARNING) << "Perf Warning: Query has no rocksdb index " << *stmt;
     }
@@ -984,10 +985,10 @@ std::vector<std::string> RocksdbConnection::Get(
     std::unique_ptr<rocksdb::Iterator> it(ptr);
     for (auto pair : this->user_keys_) {
       auto shard_name = pair.first;
-      for (it->Seek(EncryptSeek(this->global_key_, shard_id)); it->Valid();
-          it->Next()) {
+      for (it->Seek(EncryptSeek(this->global_key_, shard_name + __ROCKSSEP));
+           it->Valid(); it->Next()) {
         result.push_back(
-          Decrypt(this->GetUserKey(shard_name), it->value().ToString()));
+            Decrypt(this->GetUserKey(shard_name), it->value().ToString()));
       }
     }
   }
@@ -1030,100 +1031,84 @@ unsigned char *RocksdbConnection::GetUserKey(const std::string &shard_name) {
   return nullptr;
 #endif  // PELTON_ENCRYPTION
 }
+bool RocksdbConnection::ExecuteStatement(const sqlast::AbstractStatement *sql,
+                                         const std::string &shard_name) {
+  switch (sql->type()) {
+    // Create Table.
+    case sqlast::AbstractStatement::Type::CREATE_TABLE: {
+      const sqlast::CreateTable *stmt =
+          static_cast<const sqlast::CreateTable *>(sql);
 
+      const std::string &table_name = stmt->table_name();
+      if (this->tables_.count(table_name) == 0) {
+        // Schema and PK.
+        dataflow::SchemaRef schema = dataflow::SchemaFactory::Create(*stmt);
+        const std::vector<dataflow::ColumnID> &keys = schema.keys();
+        CHECK_EQ(keys.size(), 1u) << "BAD PK ROCKSDB TABLE";
+        size_t pk = keys.at(0);
+
+        rocksdb::ColumnFamilyHandle *handle;
+        rocksdb::ColumnFamilyOptions options;
+        options.OptimizeLevelStyleCompaction();
+        options.prefix_extractor.reset(new EncryptedPrefixTransform());
+        options.comparator = EncryptedComparator::Instance();
+        PANIC(this->db_->CreateColumnFamily(options, table_name, &handle));
+
+        // Fill in table metadata.
+        TableID tid = this->tables_.size();
+        this->tables_.emplace(table_name, tid);
+        this->handlers_.emplace(tid, handle);
+        this->schemas_.emplace(tid, schema);
+        this->primary_keys_.emplace(tid, pk);
+        this->indexed_columns_.emplace(tid, std::vector<size_t>{});
+        this->indices_.emplace(tid, std::vector<RocksdbIndex>{});
+        if (stmt->GetColumns().at(pk).auto_increment()) {
+          this->auto_increment_counters_.emplace(tid, 0);
+        }
+
+        // Create indices for table.
+        for (size_t i = 0; i < stmt->GetColumns().size(); i++) {
+          const auto &column = stmt->GetColumns().at(i);
+          bool has_constraint = false;
+          for (const auto &cnstr : column.GetConstraints()) {
+            if (cnstr.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
+              has_constraint = true;
+              break;
+            } else if (cnstr.type() == sqlast::ColumnConstraint::Type::UNIQUE) {
+              has_constraint = true;
+              break;
+            }
+          }
+          if (has_constraint) {
+            this->indexed_columns_.at(tid).push_back(i);
+            this->indices_.at(tid).emplace_back(this->db_.get(), tid, i);
+          }
+        }
+      }
+      break;
+    }
+
+    // Create Index.
+    case sqlast::AbstractStatement::Type::CREATE_INDEX: {
+      const sqlast::CreateIndex *stmt =
+          static_cast<const sqlast::CreateIndex *>(sql);
+
+      const std::string &table_name = stmt->table_name();
+      TableID tid = this->tables_.at(table_name);
+      size_t cid = this->schemas_.at(tid).IndexOf(stmt->column_name());
+      std::vector<size_t> &indexed_columns = this->indexed_columns_.at(tid);
+      auto it = std::find(indexed_columns.begin(), indexed_columns.end(), cid);
+      if (it == indexed_columns.end()) {
+        std::vector<RocksdbIndex> &indices = this->indices_.at(tid);
+        indexed_columns.push_back(cid);
+        indices.emplace_back(this->db_.get(), tid, cid);
+      }
+      break;
+    }
+    default:
+      LOG(FATAL) << "Illegal statement type in ExecuteStatement";
+  }
+  return true;
+}
 }  // namespace sql
 }  // namespace pelton
-
-// bool RocksdbConnection::ExecuteStatement(const sqlast::AbstractStatement
-// *sql,
-//                                          const std::string &shard_name)
-// {
-//   switch (sql->type())
-//   {
-//   // Create Table.
-//   case sqlast::AbstractStatement::Type::CREATE_TABLE:
-//   {
-//     const sqlast::CreateTable *stmt =
-//         static_cast<const sqlast::CreateTable *>(sql);
-
-//     const std::string &table_name = stmt->table_name();
-//     if (this->tables_.count(table_name) == 0)
-//     {
-//       // Schema and PK.
-//       dataflow::SchemaRef schema = dataflow::SchemaFactory::Create(*stmt);
-//       const std::vector<dataflow::ColumnID> &keys = schema.keys();
-//       CHECK_EQ(keys.size(), 1u) << "BAD PK ROCKSDB TABLE";
-//       size_t pk = keys.at(0);
-
-//       rocksdb::ColumnFamilyHandle *handle;
-//       rocksdb::ColumnFamilyOptions options;
-//       options.OptimizeLevelStyleCompaction();
-//       options.prefix_extractor.reset(new EncryptedPrefixTransform());
-//       options.comparator = EncryptedComparator::Instance();
-//       PANIC(this->db_->CreateColumnFamily(options, table_name, &handle));
-
-//       // Fill in table metadata.
-//       TableID tid = this->tables_.size();
-//       this->tables_.emplace(table_name, tid);
-//       this->handlers_.emplace(tid, handle);
-//       this->schemas_.emplace(tid, schema);
-//       this->primary_keys_.emplace(tid, pk);
-//       this->indexed_columns_.emplace(tid, std::vector<size_t>{});
-//       this->indices_.emplace(tid, std::vector<RocksdbIndex>{});
-//       if (stmt->GetColumns().at(pk).auto_increment())
-//       {
-//         this->auto_increment_counters_.emplace(tid, 0);
-//       }
-
-//       // Create indices for table.
-//       for (size_t i = 0; i < stmt->GetColumns().size(); i++)
-//       {
-//         const auto &column = stmt->GetColumns().at(i);
-//         bool has_constraint = false;
-//         for (const auto &cnstr : column.GetConstraints())
-//         {
-//           if (cnstr.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY)
-//           {
-//             has_constraint = true;
-//             break;
-//           }
-//           else if (cnstr.type() == sqlast::ColumnConstraint::Type::UNIQUE)
-//           {
-//             has_constraint = true;
-//             break;
-//           }
-//         }
-//         if (has_constraint)
-//         {
-//           this->indexed_columns_.at(tid).push_back(i);
-//           this->indices_.at(tid).emplace_back(this->db_.get(), tid, i);
-//         }
-//       }
-//     }
-//     break;
-//   }
-
-//   // Create Index.
-//   case sqlast::AbstractStatement::Type::CREATE_INDEX:
-//   {
-//     const sqlast::CreateIndex *stmt =
-//         static_cast<const sqlast::CreateIndex *>(sql);
-
-//     const std::string &table_name = stmt->table_name();
-//     TableID tid = this->tables_.at(table_name);
-//     size_t cid = this->schemas_.at(tid).IndexOf(stmt->column_name());
-//     std::vector<size_t> &indexed_columns = this->indexed_columns_.at(tid);
-//     auto it = std::find(indexed_columns.begin(), indexed_columns.end(), cid);
-//     if (it == indexed_columns.end())
-//     {
-//       std::vector<RocksdbIndex> &indices = this->indices_.at(tid);
-//       indexed_columns.push_back(cid);
-//       indices.emplace_back(this->db_.get(), tid, cid);
-//     }
-//     break;
-//   }
-//   default:
-//     LOG(FATAL) << "Illegal statement type in ExecuteStatement";
-//   }
-//   return true;
-// }

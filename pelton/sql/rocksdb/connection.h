@@ -36,6 +36,15 @@ class RocksdbConnection : public AbstractConnection {
   void Open(const std::string &db_name) override;
   void Close() override;
 
+  // NEW API
+  bool ExecuteCreateTable(const sqlast::AbstractStatement *sql);
+  bool ExecuteCreateIndex(const sqlast::AbstractStatement *sql);
+  std::pair<int, uint64_t> ExecuteInsert(const sqlast::AbstractStatement *sql,
+                                         const std::string &shard_name);
+  SqlResultSet ExecuteSelect(const sqlast::AbstractStatement *sql,
+                             const dataflow::SchemaRef &out_schema,
+                             const std::vector<AugInfo> &augments);
+
   // Execute statement by type.
   bool ExecuteStatement(const sqlast::AbstractStatement *sql,
                         const std::string &shard_name) override;
