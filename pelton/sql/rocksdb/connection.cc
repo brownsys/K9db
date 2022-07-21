@@ -522,11 +522,10 @@ SqlResultSet RocksdbConnection::ExecuteQueryShard(
   return SqlResultSet(out_schema, std::move(records), std::move(keys));
 }
 
-SqlResultSet RocksdbConnection::ExecuteQuery(
+SqlResultSet RocksdbConnection::ExecuteSelect(
     const sqlast::AbstractStatement *sql, const dataflow::SchemaRef &out_schema,
     const std::vector<AugInfo> &augments) {
   CHECK_LE(augments.size(), 1u) << "Too many augmentations";
-  // ShardID sid = shard_name + __ROCKSSEP;
 
   // Read table metadata.
   const std::string &table_name = GetTableName(sql);
@@ -542,30 +541,72 @@ SqlResultSet RocksdbConnection::ExecuteQuery(
   // Result components.
   std::vector<dataflow::Record> records;
   std::vector<std::string> keys;
+  const sqlast::Select *stmt = static_cast<const sqlast::Select *>(sql);
 
-  switch (sql->type()) {
-    case sqlast::AbstractStatement::Type::SELECT: {
-      const sqlast::Select *stmt = static_cast<const sqlast::Select *>(sql);
+  // Figure out the projections (including order).
+  bool has_projection = stmt->GetColumns().at(0) != "*";
+  std::vector<int> projections;
+  if (has_projection) {
+    projections = ProjectionSchema(db_schema, out_schema, augments);
+  }
 
-      // Figure out the projections (including order).
-      bool has_projection = stmt->GetColumns().at(0) != "*";
-      std::vector<int> projections;
-      if (has_projection) {
-        projections = ProjectionSchema(db_schema, out_schema, augments);
-      }
+  // Look up all the rows.
+  std::vector<std::string> rows = this->Get(sql, tid, value_mapper);
+  rows = this->Filter(db_schema, sql, std::move(rows));
+  for (std::string &row : rows) {
+    rocksdb::Slice slice(row);
+    rocksdb::Slice key = ExtractColumn(row, pk);
+    keys.push_back(key.ToString());
+    records.push_back(
+        DecodeRecord(slice, out_schema, augments, projections));
+  }
+  return SqlResultSet(out_schema, std::move(records), std::move(keys));
+}
 
-      // Look up all the rows.
-      std::vector<std::string> rows = this->Get(sql, tid, value_mapper);
-      rows = this->Filter(db_schema, sql, std::move(rows));
-      for (std::string &row : rows) {
-        rocksdb::Slice slice(row);
-        rocksdb::Slice key = ExtractColumn(row, pk);
-        keys.push_back(key.ToString());
-        records.push_back(
-            DecodeRecord(slice, out_schema, augments, projections));
-      }
-      break;
-    }
+// SqlResultSet RocksdbConnection::ExecuteQuery(
+//     const sqlast::AbstractStatement *sql, const dataflow::SchemaRef &out_schema,
+//     const std::vector<AugInfo> &augments) {
+//   CHECK_LE(augments.size(), 1u) << "Too many augmentations";
+//   // ShardID sid = shard_name + __ROCKSSEP;
+
+//   // Read table metadata.
+//   const std::string &table_name = GetTableName(sql);
+//   TableID tid = this->tables_.at(table_name);
+//   rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(tid).get();
+//   const dataflow::SchemaRef &db_schema = this->schemas_.at(tid);
+//   size_t pk = this->primary_keys_.at(tid);
+//   const auto &indexed_columns = this->indexed_columns_.at(tid);
+//   std::vector<RocksdbIndex> &indices = this->indices_.at(tid);
+//   ValueMapper value_mapper(pk, indexed_columns, db_schema);
+//   value_mapper.Visit(sql);
+
+//   // Result components.
+//   std::vector<dataflow::Record> records;
+//   std::vector<std::string> keys;
+
+//   switch (sql->type()) {
+//     case sqlast::AbstractStatement::Type::SELECT: {
+//       const sqlast::Select *stmt = static_cast<const sqlast::Select *>(sql);
+
+//       // Figure out the projections (including order).
+//       bool has_projection = stmt->GetColumns().at(0) != "*";
+//       std::vector<int> projections;
+//       if (has_projection) {
+//         projections = ProjectionSchema(db_schema, out_schema, augments);
+//       }
+
+//       // Look up all the rows.
+//       std::vector<std::string> rows = this->Get(sql, tid, value_mapper);
+//       rows = this->Filter(db_schema, sql, std::move(rows));
+//       for (std::string &row : rows) {
+//         rocksdb::Slice slice(row);
+//         rocksdb::Slice key = ExtractColumn(row, pk);
+//         keys.push_back(key.ToString());
+//         records.push_back(
+//             DecodeRecord(slice, out_schema, augments, projections));
+//       }
+//       break;
+//     }
     // case sqlast::AbstractStatement::Type::DELETE: {
     //   // Look up all the rows.
     //   std::vector<std::string> rows =
@@ -927,24 +968,28 @@ std::vector<std::string> RocksdbConnection::Get(
       delete[] slices;
     }
   } else {
-    LOG(FATAL) << "this case should not be reached!";
-
-    // // Need to lookup all records.
-    // if (HasWhereClause(stmt)) {
-    //   LOG(WARNING) << "Perf Warning: Query has no rocksdb index " << *stmt;
-    // }
-    // rocksdb::ReadOptions options;
-    // options.fill_cache = false;
-    // options.total_order_seek = false;
-    // options.prefix_same_as_start = true;
-    // options.verify_checksums = false;
-    // auto ptr = this->db_->NewIterator(options, handler);
-    // std::unique_ptr<rocksdb::Iterator> it(ptr);
-    // for (it->Seek(EncryptSeek(this->global_key_, shard_id)); it->Valid();
-    //      it->Next()) {
-    //   result.push_back(
-    //       Decrypt(this->GetUserKey(shard_name), it->value().ToString()));
-    // }
+    //LOG(FATAL) << "this case should not be reached!";
+    // Need to lookup all records.
+    //TO-DO: make sure there is no better way to access all shard names, plus are there consistency issues in this method
+    //TO-DO: right now if there is not index, we are always opting for this method. It would be smarter to add cases where the WHERE clause is predicated on shard_name
+    if (HasWhereClause(stmt)) {
+      LOG(WARNING) << "Perf Warning: Query has no rocksdb index " << *stmt;
+    }
+    rocksdb::ReadOptions options;
+    options.fill_cache = false;
+    options.total_order_seek = false;
+    options.prefix_same_as_start = true;
+    options.verify_checksums = false;
+    auto ptr = this->db_->NewIterator(options, handler);
+    std::unique_ptr<rocksdb::Iterator> it(ptr);
+    for (auto pair : this->user_keys_) {
+      auto shard_name = pair.first;
+      for (it->Seek(EncryptSeek(this->global_key_, shard_id)); it->Valid();
+          it->Next()) {
+        result.push_back(
+          Decrypt(this->GetUserKey(shard_name), it->value().ToString()));
+      }
+    }
   }
   return result;
 }
