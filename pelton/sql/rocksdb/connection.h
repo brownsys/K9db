@@ -46,12 +46,14 @@ class RocksdbConnection : public AbstractConnection {
                              const std::vector<AugInfo> &augments);
 
   // Execute statement by type.
-  bool ExecuteStatement(const sqlast::AbstractStatement *sql,
-                        const std::string &shard_name) override;
+  //   bool ExecuteStatement(const sqlast::AbstractStatement *sql,
+  //                         const std::string &shard_name) override;
 
   std::pair<int, uint64_t> ExecuteUpdate(
       const sqlast::AbstractStatement *sql,
       const std::string &shard_name) override;
+  std::pair<int, uint64_t> ExecuteDelete(const sqlast::AbstractStatement *sql,
+                                         const std::string &shard_name);
 
   SqlResultSet ExecuteQueryShard(const sqlast::AbstractStatement *sql,
                                  const dataflow::SchemaRef &schema,
@@ -85,13 +87,13 @@ class RocksdbConnection : public AbstractConnection {
   // Members.
   std::unique_ptr<rocksdb::DB> db_;
   std::unordered_map<std::string, TableID> tables_;
-  std::unordered_map<TableID, std::unique_ptr<rocksdb::ColumnFamilyHandle>>
+  std::unordered_map<TableID, std::unique_ptr<rocksdb::ColumnFamilyHandle> >
       handlers_;
   std::unordered_map<TableID, dataflow::SchemaRef> schemas_;
   std::unordered_map<TableID, size_t> primary_keys_;
-  std::unordered_map<TableID, std::vector<size_t>> indexed_columns_;
-  std::unordered_map<TableID, std::vector<RocksdbIndex>> indices_;
-  std::unordered_map<TableID, std::atomic<uint64_t>> auto_increment_counters_;
+  std::unordered_map<TableID, std::vector<size_t> > indexed_columns_;
+  std::unordered_map<TableID, std::vector<RocksdbIndex> > indices_;
+  std::unordered_map<TableID, std::atomic<uint64_t> > auto_increment_counters_;
 
   // Encryption keys.
   unsigned char *global_key_;

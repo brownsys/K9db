@@ -251,7 +251,14 @@ TEST(RocksdbConnectionTest, MultipleValues) {
   std::cout << conn.ExecuteInsert(parsed.get(), "2").first << std::endl;
   parsed = Parse("SELECT * FROM stories WHERE story_name in ('K', 'Kk');");
   auto resultset = conn.ExecuteSelect(parsed.get(), schema2, {});
+  parsed = Parse("DELETE FROM stories WHERE story_name = 'Kk';");
+  std::cout << conn.ExecuteDelete(parsed.get(), "4").first << std::endl;
   Print(resultset.Vec(), schema2);
+
+  parsed = Parse("SELECT * FROM stories WHERE story_name in ('K', 'Kk');");
+  auto newset = conn.ExecuteSelect(parsed.get(), schema2, {});
+  Print(newset.Vec(), schema2);
+
   pelton::dataflow::Record record1{schema2};
   int64_t v0 = 1;
   std::unique_ptr<std::string> ptr1 = std::make_unique<std::string>("K");
