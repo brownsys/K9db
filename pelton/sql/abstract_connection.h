@@ -34,11 +34,12 @@ class AbstractConnection {
   virtual void Close() = 0;
 
   // Execute statement by type.
-  virtual bool ExecuteStatement(const sqlast::AbstractStatement *sql,
-                                const std::string &shard_name) = 0;
+  // virtual bool ExecuteStatement(const sqlast::AbstractStatement *sql,
+  //                               const std::string &shard_name) = 0;
 
-  virtual std::pair<int, uint64_t> ExecuteUpdate(
-      const sqlast::AbstractStatement *sql, const std::string &shard_name) = 0;
+  // virtual std::pair<int, uint64_t> ExecuteUpdate(
+  //     const sqlast::AbstractStatement *sql, const std::string &shard_name) =
+  //     0;
 
   virtual SqlResultSet ExecuteQueryShard(const sqlast::AbstractStatement *sql,
                                          const dataflow::SchemaRef &schema,
@@ -48,6 +49,18 @@ class AbstractConnection {
   virtual SqlResultSet ExecuteQuery(const sqlast::AbstractStatement *sql,
                                     const dataflow::SchemaRef &schema,
                                     const std::vector<AugInfo> &augs) = 0;
+
+  virtual bool ExecuteCreateTable(const sqlast::AbstractStatement *sql) = 0;
+  virtual bool ExecuteCreateIndex(const sqlast::AbstractStatement *sql) = 0;
+  virtual std::pair<int, uint64_t> ExecuteInsert(
+      const sqlast::AbstractStatement *sql, const std::string &shard_name) = 0;
+  virtual SqlResultSet ExecuteSelect(const sqlast::AbstractStatement *sql,
+                                     const dataflow::SchemaRef &out_schema,
+                                     const std::vector<AugInfo> &augments) = 0;
+  virtual std::pair<int, uint64_t> ExecuteUpdate(
+      const sqlast::AbstractStatement *sql, const std::string &shard_name) = 0;
+  virtual std::pair<int, uint64_t> ExecuteDelete(
+      const sqlast::AbstractStatement *sql, const std::string &shard_name) = 0;
 };
 
 }  // namespace sql
