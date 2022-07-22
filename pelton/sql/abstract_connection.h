@@ -14,14 +14,14 @@
 namespace pelton {
 namespace sql {
 
+struct InsertResult {
+  int status;               // < 0 is error, >= 0 number of affected rows.
+  uint64_t last_insert_id;  // If PK is auto_increment, this has the value.
+};
+
 struct AugInfo {
   size_t index;
   std::string value;
-};
-
-struct RecordKeyVecs {
-  std::vector<dataflow::Record> records;
-  std::vector<std::string> keys;
 };
 
 class AbstractConnection {
@@ -33,34 +33,33 @@ class AbstractConnection {
   virtual void Open(const std::string &db_name) = 0;
   virtual void Close() = 0;
 
-  // Execute statement by type.
-  // virtual bool ExecuteStatement(const sqlast::AbstractStatement *sql,
-  //                               const std::string &shard_name) = 0;
+  // Statements.
+  virtual bool ExecuteCreateTable(const sqlast::CreateTable &sql) = 0;
+  virtual bool ExecuteCreateIndex(const sqlast::CreateIndex &sql) = 0;
 
-  // virtual std::pair<int, uint64_t> ExecuteUpdate(
-  //     const sqlast::AbstractStatement *sql, const std::string &shard_name) =
-  //     0;
+  // Updates.
+  virtual InsertResult ExecuteInsert(const sqlast::Insert &sql,
+                                     const std::string &shard_name) = 0;
 
-  virtual SqlResultSet ExecuteQueryShard(const sqlast::AbstractStatement *sql,
+  virtual int ExecuteUpdate(const sqlast::Update &sql,
+                            const std::string &shard_name) = 0;
+
+  virtual int ExecuteDelete(const sqlast::Delete &sql,
+                            const std::string &shard_name) = 0;
+
+  // Queries / Select.
+  virtual SqlResultSet ExecuteQuery(const sqlast::Select &sql,
+                                    const dataflow::SchemaRef &schema,
+                                    const std::vector<AugInfo> &augs) = 0;
+
+  virtual SqlResultSet ExecuteQueryShard(const sqlast::Select &sql,
                                          const dataflow::SchemaRef &schema,
                                          const std::vector<AugInfo> &augments,
                                          const std::string &shard_name) = 0;
 
-  virtual SqlResultSet ExecuteQuery(const sqlast::AbstractStatement *sql,
-                                    const dataflow::SchemaRef &schema,
-                                    const std::vector<AugInfo> &augs) = 0;
-
-  virtual bool ExecuteCreateTable(const sqlast::AbstractStatement *sql) = 0;
-  virtual bool ExecuteCreateIndex(const sqlast::AbstractStatement *sql) = 0;
-  virtual std::pair<int, uint64_t> ExecuteInsert(
-      const sqlast::AbstractStatement *sql, const std::string &shard_name) = 0;
-  virtual SqlResultSet ExecuteSelect(const sqlast::AbstractStatement *sql,
+  virtual SqlResultSet ExecuteSelect(const sqlast::Select &sql,
                                      const dataflow::SchemaRef &out_schema,
                                      const std::vector<AugInfo> &augments) = 0;
-  virtual std::pair<int, uint64_t> ExecuteUpdate(
-      const sqlast::AbstractStatement *sql, const std::string &shard_name) = 0;
-  virtual std::pair<int, uint64_t> ExecuteDelete(
-      const sqlast::AbstractStatement *sql, const std::string &shard_name) = 0;
 };
 
 }  // namespace sql

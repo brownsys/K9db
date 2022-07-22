@@ -36,31 +36,30 @@ class RocksdbConnection : public AbstractConnection {
   void Open(const std::string &db_name) override;
   void Close() override;
 
-  // NEW API
-  bool ExecuteCreateTable(const sqlast::AbstractStatement *sql);
-  bool ExecuteCreateIndex(const sqlast::AbstractStatement *sql);
-  std::pair<int, uint64_t> ExecuteInsert(const sqlast::AbstractStatement *sql,
-                                         const std::string &shard_name);
-  SqlResultSet ExecuteSelect(const sqlast::AbstractStatement *sql,
+  // Statements.
+  bool ExecuteCreateTable(const sqlast::CreateTable &sql) override;
+  bool ExecuteCreateIndex(const sqlast::CreateIndex &sql) override;
+
+  // Updates.
+  InsertResult ExecuteInsert(const sqlast::Insert &sql,
+                             const std::string &shard_name) override;
+
+  int ExecuteUpdate(const sqlast::Update &sql,
+                    const std::string &shard_name) override;
+  int ExecuteDelete(const sqlast::Delete &sql,
+                    const std::string &shard_name) override;
+
+  // Selects.
+  SqlResultSet ExecuteSelect(const sqlast::Select &sql,
                              const dataflow::SchemaRef &out_schema,
-                             const std::vector<AugInfo> &augments);
+                             const std::vector<AugInfo> &augments) override;
 
-  // Execute statement by type.
-  //   bool ExecuteStatement(const sqlast::AbstractStatement *sql,
-  //                         const std::string &shard_name) override;
-
-  std::pair<int, uint64_t> ExecuteUpdate(
-      const sqlast::AbstractStatement *sql,
-      const std::string &shard_name) override;
-  std::pair<int, uint64_t> ExecuteDelete(const sqlast::AbstractStatement *sql,
-                                         const std::string &shard_name);
-
-  SqlResultSet ExecuteQueryShard(const sqlast::AbstractStatement *sql,
+  SqlResultSet ExecuteQueryShard(const sqlast::Select &sql,
                                  const dataflow::SchemaRef &schema,
                                  const std::vector<AugInfo> &augments,
                                  const std::string &shard_name) override;
 
-  SqlResultSet ExecuteQuery(const sqlast::AbstractStatement *sql,
+  SqlResultSet ExecuteQuery(const sqlast::Select &sql,
                             const dataflow::SchemaRef &schema,
                             const std::vector<AugInfo> &augments) override;
 
