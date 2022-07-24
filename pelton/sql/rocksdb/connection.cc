@@ -84,7 +84,7 @@ void RocksdbConnection::Close() {
  */
 bool RocksdbConnection::ExecuteCreateTable(const sqlast::CreateTable &stmt) {
   const std::string &table_name = stmt.table_name();
-  if (this->tables_.count(table_name) != 0) {
+  if (this->tables_.count(table_name) == 0) {
     // Schema and PK.
     dataflow::SchemaRef schema = dataflow::SchemaFactory::Create(stmt);
     const std::vector<dataflow::ColumnID> &keys = schema.keys();
@@ -307,6 +307,12 @@ int RocksdbConnection::ExecuteDelete(const sqlast::Delete &stmt,
 /*
  * SELECT STATEMENTS.
  */
+
+SqlResultSet RocksdbConnection::ExecuteQuery(
+    const sqlast::Select &sql, const dataflow::SchemaRef &schema,
+    const std::vector<AugInfo> &augments) {
+  LOG(FATAL) << "dummy stub!";
+}
 SqlResultSet RocksdbConnection::ExecuteQueryShard(
     const sqlast::Select &stmt, const dataflow::SchemaRef &out_schema,
     const std::vector<AugInfo> &augments, const std::string &shard_name) {
@@ -383,8 +389,6 @@ SqlResultSet RocksdbConnection::ExecuteSelect(
   for (std::string &row : rows) {
     rocksdb::Slice slice(row);
     rocksdb::Slice key = ExtractColumn(row, pk);
-    std::cout << "Select Key is : " << key.ToString() << std::endl;
-    std::cout << "Select slice is: " << row << std::endl;
     keys.push_back(key.ToString());
     records.push_back(DecodeRecord(slice, out_schema, augments, projections));
   }
