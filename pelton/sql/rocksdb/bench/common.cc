@@ -105,14 +105,14 @@ dataflow::SchemaRef ExtractSchema(const std::string &filename) {
 }
 
 // Parse a file
-std::vector<std::unique_ptr<sqlast::AbstractStatement>> ParseFile(
+std::vector<std::unique_ptr<sqlast::AbstractStatement> > ParseFile(
     const std::string &filename, IndexColumn index_column, MemoryIndex *index) {
   std::fstream s;
   s.open(FILE_PATH + filename + ".sql", std::ios::in);
   assert(s.is_open());
 
   // Read and parse.
-  std::vector<std::unique_ptr<sqlast::AbstractStatement>> statements;
+  std::vector<std::unique_ptr<sqlast::AbstractStatement> > statements;
   std::string cmd;
   while (getline(s, cmd)) {
     if (index_column != NO_INDEX) {
@@ -128,37 +128,40 @@ std::vector<std::unique_ptr<sqlast::AbstractStatement>> ParseFile(
 // Execute and time statements.
 uint64_t ExecuteStatements(
     RocksdbConnection *conn,
-    const std::vector<std::unique_ptr<sqlast::AbstractStatement>> &statements,
+    const std::vector<std::unique_ptr<sqlast::AbstractStatement> > &statements,
     const dataflow::SchemaRef &schema, IndexColumn index_column,
     const MemoryIndex *index) {
   // Execute with timing.
   auto start = std::chrono::steady_clock::now();
-  switch (statements.front()->type()) {
-    case sqlast::AbstractStatement::Type::CREATE_TABLE:
-    case sqlast::AbstractStatement::Type::CREATE_INDEX:
-    case sqlast::AbstractStatement::Type::CREATE_VIEW: {
-      for (const auto &stmt : statements) {
-        conn->ExecuteStatement(stmt.get(), "");
+  for (const auto &stmt : statements) {
+    switch (stmt->type()) {
+      case sqlast::AbstractStatement::Type::CREATE_TABLE: {
+        // const sqlast::CreateTable &create =
+        // *static_cast<pelton::sqlast::CreateTable *>(stmt.get());
+        conn->ExecuteCreateTable(
+            *static_cast<pelton::sqlast::CreateTable *>(stmt.get()));
+
+        break;
       }
-      break;
-    }
-    case sqlast::AbstractStatement::Type::INSERT: {
-      for (const auto &stmt : statements) {
+      case sqlast::AbstractStatement::Type::CREATE_INDEX:
+      case sqlast::AbstractStatement::Type::CREATE_VIEW: {
+        conn->ExecuteCreateIndex(*static_cast<sqlast::CreateIndex *>(
+            stmt.get()));  // Do views go into index too?
+        break;
+      }
+      case sqlast::AbstractStatement::Type::INSERT: {
         const sqlast::Insert *insert =
             reinterpret_cast<const sqlast::Insert *>(stmt.get());
         const std::string &shard = insert->GetValues().at(2);
         std::string dequote = shard.substr(1, shard.size() - 2);
-        conn->ExecuteUpdate(stmt.get(), dequote);
+        conn->ExecuteInsert(*insert, dequote);
+        break;
       }
-      break;
-    }
-    case sqlast::AbstractStatement::Type::SELECT: {
-      if (index_column == NO_INDEX) {
-        for (const auto &stmt : statements) {
-          auto set = conn->ExecuteQuery(stmt.get(), schema, {});
-        }
-      } else {
-        for (const auto &stmt : statements) {
+      case sqlast::AbstractStatement::Type::SELECT: {
+        if (index_column == NO_INDEX) {
+          auto set = conn->ExecuteSelect(
+              *static_cast<sqlast::Select *>(stmt.get()), schema, {});
+        } else {
           SqlResultSet result(schema);
           std::unordered_set<std::string> shards;
           for (const auto &value : GetConditionValues(stmt.get())) {
@@ -168,15 +171,17 @@ uint64_t ExecuteStatements(
             }
           }
           for (const auto &shard : shards) {
-            result.Append(
-                conn->ExecuteQueryShard(stmt.get(), schema, {}, shard), false);
+            result.Append(conn->ExecuteQueryShard(
+                              *static_cast<sqlast::Select *>(stmt.get()),
+                              schema, {}, shard),
+                          false);
           }
         }
+        break;
       }
-      break;
-    }
-    default: {
-      assert(false);
+      default: {
+        assert(false);
+      }
     }
   }
   auto end = std::chrono::steady_clock::now();
