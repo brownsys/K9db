@@ -368,13 +368,12 @@ SqlResultSet RocksdbConnection::ExecuteSelect(
   const dataflow::SchemaRef &db_schema = this->schemas_.at(tid);
   size_t pk = this->primary_keys_.at(tid);
   const auto &indexed_columns = this->indexed_columns_.at(tid);
-  std::vector<RocksdbIndex> &indices = this->indices_.at(tid);
   ValueMapper value_mapper(pk, indexed_columns, db_schema);
   value_mapper.VisitSelect(stmt);
 
   // Result components.
   std::vector<dataflow::Record> records;
-  std::vector<std::string> keys;
+  std::vector<std::string> pkeys;
 
   // Figure out the projections (including order).
   bool has_projection = stmt.GetColumns().at(0) != "*";
@@ -384,15 +383,75 @@ SqlResultSet RocksdbConnection::ExecuteSelect(
   }
 
   // Look up all the rows.
-  std::vector<std::string> rows = this->Get(&stmt, tid, value_mapper);
-  rows = this->Filter(db_schema, &stmt, std::move(rows));
-  for (std::string &row : rows) {
+  auto keys = this->KeyFinder(&stmt, tid, value_mapper);
+  std::vector<std::string> result;
+  if (keys.first) {
+    if (keys.second.size() == 1) {
+      std::string str;
+      rocksdb::ReadOptions opts;
+      opts.total_order_seek = true;
+      opts.verify_checksums = false;
+      rocksdb::Status status = this->db_->Get(
+          opts, handler, EncryptKey(this->global_key_, keys.second.front()),
+          &str);
+      if (status.ok()) {
+        result.push_back(
+            std::move(Decrypt(this->GetUserKey(keys.second[0].substr(
+                                  0, keys.second[0].find(__ROCKSSEP))),
+                              str)));
+      } else if (!status.IsNotFound()) {
+        PANIC(status);
+      }
+    } else if (keys.second.size() > 1) {
+      // Make slices for keys.
+      rocksdb::Slice *slices = new rocksdb::Slice[keys.second.size()];
+      std::string *tmp = new std::string[keys.second.size()];
+      rocksdb::PinnableSlice *pins =
+          new rocksdb::PinnableSlice[keys.second.size()];
+      rocksdb::Status *statuses = new rocksdb::Status[keys.second.size()];
+      for (size_t i = 0; i < keys.second.size(); i++) {
+        keys.second.at(i) = EncryptKey(this->global_key_, keys.second.at(i));
+        slices[i] = rocksdb::Slice(keys.second.at(i));
+        pins[i] = rocksdb::PinnableSlice(tmp + i);
+      }
+      // Use MultiGet.
+      rocksdb::ReadOptions opts;
+      opts.total_order_seek = true;
+      opts.verify_checksums = false;
+      this->db_->MultiGet(opts, handler, keys.second.size(), slices, pins,
+                          statuses);
+      // Read values that were found.
+      for (size_t i = 0; i < keys.second.size(); i++) {
+        rocksdb::Status &status = statuses[i];
+        if (status.ok()) {
+          if (pins[i].IsPinned()) {
+            tmp[i].assign(pins[i].data(), pins[i].size());
+          }
+          result.push_back(
+              std::move(Decrypt(this->GetUserKey(keys.second[i].substr(
+                                    0, keys.second[i].find(__ROCKSSEP))),
+                                tmp[i])));
+        } else if (!status.IsNotFound()) {
+          PANIC(status);
+        }
+      }
+      // Cleanup memory.
+      delete[] statuses;
+      delete[] pins;
+      delete[] tmp;
+      delete[] slices;
+    }
+  } else {
+    LOG(FATAL) << "case not implemented!";
+  }
+  result = this->Filter(db_schema, &stmt, std::move(result));
+  for (std::string &row : result) {
     rocksdb::Slice slice(row);
     rocksdb::Slice key = ExtractColumn(row, pk);
-    keys.push_back(key.ToString());
+    pkeys.push_back(key.ToString());
     records.push_back(DecodeRecord(slice, out_schema, augments, projections));
   }
-  return SqlResultSet(out_schema, std::move(records), std::move(keys));
+  return SqlResultSet(out_schema, std::move(records), std::move(pkeys));
 }
 
 // Helpers.
@@ -521,7 +580,7 @@ std::vector<std::string> RocksdbConnection::Get(
 
   // Lookup either by PK or index.
   bool found = false;
-  std::vector<std::pair<std::string, std::string> > keys_raw;
+  std::vector<std::pair<std::string, std::string>> keys_raw;
   std::vector<std::string> keys;
 
   for (size_t i = 0; i < indexed_columns.size(); i++) {
@@ -632,6 +691,47 @@ std::vector<std::string> RocksdbConnection::Filter(
     }
   }
   return filtered;
+}
+
+std::pair<bool, std::vector<std::string>> RocksdbConnection::KeyFinder(
+    const sqlast::AbstractStatement *stmt, TableID table_id,
+    const ValueMapper &value_mapper) {
+  // Read Metadata.
+  const dataflow::SchemaRef &schema = this->schemas_.at(table_id);
+  size_t pk = this->primary_keys_.at(table_id);
+  const auto &indexed_columns = this->indexed_columns_.at(table_id);
+  std::vector<RocksdbIndex> &indices = this->indices_.at(table_id);
+  const std::string &pkname = schema.NameOf(pk);
+
+  // Lookup either by PK or index.
+  std::vector<std::pair<std::string, std::string>> keys_raw;
+  std::vector<std::string> keys;
+
+  // TO-DO (Vedant) this is expensive, will that effect performance?
+  auto it = std::find(indexed_columns.begin(), indexed_columns.end(), pk);
+  if (it != indexed_columns.end() && value_mapper.HasBefore(pkname)) {
+    auto i = it - indexed_columns.begin();
+    RocksdbIndex &index = indices.at(i);
+    keys_raw = index.Get(value_mapper.Before(pkname));
+    for (size_t i = 0; i < keys_raw.size(); i++) {
+      keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
+                     __ROCKSSEP);
+    }
+    return {true, keys};
+  }
+  for (size_t i = 0; i < indexed_columns.size(); i++) {
+    RocksdbIndex &index = indices.at(i);
+    const std::string &idxcolumn = schema.NameOf(indexed_columns.at(i));
+    if (value_mapper.HasBefore(idxcolumn)) {
+      keys_raw = index.Get(value_mapper.Before(idxcolumn));
+      for (size_t i = 0; i < keys_raw.size(); i++) {
+        keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
+                       __ROCKSSEP);
+      }
+      return {true, keys};
+    }
+  }
+  return {false, {}};
 }
 
 // Gets key corresponding to input user. Creates key if does not exist.

@@ -38,7 +38,6 @@ void BenchmarkNew() {
 
 void BenchmarkOld() {
   DropDatabase(DB_NAME);
-
   dataflow::SchemaRef schema = ExtractSchema(SCHEMA_FILE);
   MemoryIndex index;
 
@@ -63,7 +62,7 @@ void BenchmarkOld() {
 }  // namespace sql
 }  // namespace pelton
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   pelton::sql::BenchmarkNew();
   pelton::sql::BenchmarkOld();
 }
