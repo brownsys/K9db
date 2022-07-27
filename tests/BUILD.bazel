@@ -44,6 +44,19 @@ cc_test(
 )
 
 cc_test(
+    name = "hours",
+    srcs = [
+        "hours.cc",
+    ],
+    data = [
+        "//tests/data:hours-data",
+    ],
+    deps = [
+        ":common",
+    ],
+)
+
+cc_test(
     name = "delf_medical_retain",
     srcs = [
         "delf_medical_retain.cc",
