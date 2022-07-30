@@ -213,9 +213,8 @@ InsertResult RocksdbConnection::ExecuteInsert(const sqlast::Insert &stmt,
 }
 
 // Execute Update statement
-int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt,
-                                     const std::string &shard_name) {
-  ShardID sid = shard_name + __ROCKSSEP;
+int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt) {
+  // ShardID sid = shard_name + __ROCKSSEP;
 
   // Read table metadata.
   const std::string &table_name = stmt.table_name();
@@ -238,13 +237,17 @@ int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt,
   }
 
   // Look up all affected rows.
-  std::vector<std::string> rows =
-      this->GetShard(&stmt, tid, shard_name, value_mapper);
+  std::pair<std::vector<std::string>, std::vector<std::string> > result =
+      this->Get(&stmt, tid, value_mapper);
+  std::vector<std::string> sharding_info = result.first;
+  std::vector<std::string> rows = result.second;
   rows = this->Filter(db_schema, &stmt, std::move(rows));
   if (rows.size() > 5) {
     LOG(WARNING) << "Perf Warning: " << rows.size()
                  << " rocksdb updates in a loop " << stmt;
   }
+  // TODO(Mithi): There is better syntax for this
+  std::string shard = sharding_info.begin();
   for (std::string &row : rows) {
     // Compute updated row.
     std::string nrow = Update(update, db_schema, row);
@@ -255,6 +258,8 @@ int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt,
     rocksdb::Slice nslice(nrow);
     rocksdb::Slice opk = ExtractColumn(oslice, pk);
     rocksdb::Slice npk = ExtractColumn(nslice, pk);
+    std::shard_name = ExtractColumn(shard, 0);
+    ShardID sid = shard_name + __ROCKSSEP;
     std::string okey = sid + opk.ToString() + __ROCKSSEP;
     std::string nkey = sid + npk.ToString() + __ROCKSSEP;
     bool keychanged = !SlicesEq(opk, npk);
@@ -278,6 +283,7 @@ int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt,
       index.Delete(oval, shard_name, opk);
       index.Add(nval, shard_name, npk);
     }
+    sharding_info++;
   }
   // TODO(babman): need to handle returning updates.
   return rows.size();

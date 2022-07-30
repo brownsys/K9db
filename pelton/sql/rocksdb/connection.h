@@ -44,8 +44,7 @@ class RocksdbConnection : public AbstractConnection {
   InsertResult ExecuteInsert(const sqlast::Insert &sql,
                              const std::string &shard_name) override;
 
-  int ExecuteUpdate(const sqlast::Update &sql,
-                    const std::string &shard_name) override;
+  int ExecuteUpdate(const sqlast::Update &sql) override;
   int ExecuteDelete(const sqlast::Delete &sql,
                     const std::string &shard_name) override;
 
