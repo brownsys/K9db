@@ -567,9 +567,9 @@ std::vector<std::string> RocksdbConnection::GetShard(
 
 // Get record matching values in a value mapper FROM ALL SHARDS(either by key,
 // index, or it).
-std::vector<std::string> RocksdbConnection::Get(
-    const sqlast::AbstractStatement *stmt, TableID table_id,
-    const ValueMapper &value_mapper) {
+std::pair<std::vector<std::string>, std::vector<std::string> >
+RocksdbConnection::Get(const sqlast::AbstractStatement *stmt, TableID table_id,
+                       const ValueMapper &value_mapper) {
   // Read Metadata.
   rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(table_id).get();
   const dataflow::SchemaRef &schema = this->schemas_.at(table_id);
@@ -578,24 +578,8 @@ std::vector<std::string> RocksdbConnection::Get(
   std::vector<RocksdbIndex> &indices = this->indices_.at(table_id);
   const std::string &pkname = schema.NameOf(pk);
 
-  // Lookup either by PK or index.
-  bool found = false;
-  std::vector<std::pair<std::string, std::string>> keys_raw;
-  std::vector<std::string> keys;
-
-  for (size_t i = 0; i < indexed_columns.size(); i++) {
-    RocksdbIndex &index = indices.at(i);
-    const std::string &idxcolumn = schema.NameOf(indexed_columns.at(i));
-    if (value_mapper.HasBefore(idxcolumn)) {
-      keys_raw = index.Get(value_mapper.Before(idxcolumn));
-      for (size_t i = 0; i < keys_raw.size(); i++) {
-        keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
-                       __ROCKSSEP);
-      }
-      found = true;
-      break;
-    }
-  }
+  // Calling KeyFinder
+  std::vector<std::string> keys = KeyFinder(stmt, table_id, value_mapper);
 
   // Look in rocksdb.
   std::vector<std::string> result;
@@ -668,6 +652,9 @@ std::vector<std::string> RocksdbConnection::Get(
     std::unique_ptr<rocksdb::Iterator> it(ptr);
     for (auto pair : this->user_keys_) {
       auto shard_name = pair.first;
+      keys.push_back(pair.first);
+      // TODO(Mithi): What is pair.second? How do we make it shard_name + key
+      // for consistency with if case
       for (it->Seek(EncryptSeek(this->global_key_, shard_name + __ROCKSSEP));
            it->Valid(); it->Next()) {
         result.push_back(
@@ -675,7 +662,7 @@ std::vector<std::string> RocksdbConnection::Get(
       }
     }
   }
-  return result;
+  return {keys, result};
 }
 
 // Filter records by where clause in abstract statement.
@@ -693,7 +680,7 @@ std::vector<std::string> RocksdbConnection::Filter(
   return filtered;
 }
 
-std::pair<bool, std::vector<std::string>> RocksdbConnection::KeyFinder(
+std::vector<std::string> RocksdbConnection::KeyFinder(
     const sqlast::AbstractStatement *stmt, TableID table_id,
     const ValueMapper &value_mapper) {
   // Read Metadata.
@@ -704,7 +691,7 @@ std::pair<bool, std::vector<std::string>> RocksdbConnection::KeyFinder(
   const std::string &pkname = schema.NameOf(pk);
 
   // Lookup either by PK or index.
-  std::vector<std::pair<std::string, std::string>> keys_raw;
+  std::vector<std::pair<std::string, std::string> > keys_raw;
   std::vector<std::string> keys;
 
   // TO-DO (Vedant) this is expensive, will that effect performance?
@@ -717,7 +704,7 @@ std::pair<bool, std::vector<std::string>> RocksdbConnection::KeyFinder(
       keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
                      __ROCKSSEP);
     }
-    return {true, keys};
+    return keys;
   }
   for (size_t i = 0; i < indexed_columns.size(); i++) {
     RocksdbIndex &index = indices.at(i);
@@ -728,10 +715,10 @@ std::pair<bool, std::vector<std::string>> RocksdbConnection::KeyFinder(
         keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
                        __ROCKSSEP);
       }
-      return {true, keys};
+      return keys;
     }
   }
-  return {false, {}};
+  return keys;  // empty vector
 }
 
 // Gets key corresponding to input user. Creates key if does not exist.
