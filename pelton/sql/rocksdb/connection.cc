@@ -237,18 +237,18 @@ int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt) {
   }
 
   // Look up all affected rows.
-  std::pair<std::vector<std::string>, std::vector<std::string> > result =
-      this->Get(&stmt, tid, value_mapper);
-  std::vector<std::string> sharding_info = result.first;
-  std::vector<std::string> rows = result.second;
+  std::pair<std::vector<std::string>, std::vector<std::string>> result =
+      this->GetRecords(&stmt, tid, value_mapper, true);
+  std::vector<std::string> shards = result.second;
+  std::vector<std::string> rows = result.first;
   rows = this->Filter(db_schema, &stmt, std::move(rows));
   if (rows.size() > 5) {
     LOG(WARNING) << "Perf Warning: " << rows.size()
                  << " rocksdb updates in a loop " << stmt;
   }
-  // TODO(Mithi): There is better syntax for this
-  std::string shard = sharding_info.begin();
-  for (std::string &row : rows) {
+  for (int i = 0; i < rows.size(); i++) {
+    std::string &row = rows[i];
+    std::string &shard_name = shards[i];
     // Compute updated row.
     std::string nrow = Update(update, db_schema, row);
     if (nrow == row) {  // No-op.
@@ -258,7 +258,7 @@ int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt) {
     rocksdb::Slice nslice(nrow);
     rocksdb::Slice opk = ExtractColumn(oslice, pk);
     rocksdb::Slice npk = ExtractColumn(nslice, pk);
-    std::shard_name = ExtractColumn(shard, 0);
+    // std::shard_name = ExtractColumn(shard, 0);
     ShardID sid = shard_name + __ROCKSSEP;
     std::string okey = sid + opk.ToString() + __ROCKSSEP;
     std::string nkey = sid + npk.ToString() + __ROCKSSEP;
@@ -283,7 +283,6 @@ int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt) {
       index.Delete(oval, shard_name, opk);
       index.Add(nval, shard_name, npk);
     }
-    sharding_info++;
   }
   // TODO(babman): need to handle returning updates.
   return rows.size();
@@ -368,6 +367,7 @@ SqlResultSet RocksdbConnection::ExecuteSelect(
   CHECK_LE(augments.size(), 1u) << "Too many augmentations";
 
   // Read table metadata.
+  // TO-DO: check for redundancy with Get
   const std::string &table_name = stmt.table_name();
   TableID tid = this->tables_.at(table_name);
   rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(tid).get();
@@ -389,67 +389,7 @@ SqlResultSet RocksdbConnection::ExecuteSelect(
   }
 
   // Look up all the rows.
-  auto keys = this->KeyFinder(&stmt, tid, value_mapper);
-  std::vector<std::string> result;
-  if (keys.first) {
-    if (keys.second.size() == 1) {
-      std::string str;
-      rocksdb::ReadOptions opts;
-      opts.total_order_seek = true;
-      opts.verify_checksums = false;
-      rocksdb::Status status = this->db_->Get(
-          opts, handler, EncryptKey(this->global_key_, keys.second.front()),
-          &str);
-      if (status.ok()) {
-        result.push_back(
-            std::move(Decrypt(this->GetUserKey(keys.second[0].substr(
-                                  0, keys.second[0].find(__ROCKSSEP))),
-                              str)));
-      } else if (!status.IsNotFound()) {
-        PANIC(status);
-      }
-    } else if (keys.second.size() > 1) {
-      // Make slices for keys.
-      rocksdb::Slice *slices = new rocksdb::Slice[keys.second.size()];
-      std::string *tmp = new std::string[keys.second.size()];
-      rocksdb::PinnableSlice *pins =
-          new rocksdb::PinnableSlice[keys.second.size()];
-      rocksdb::Status *statuses = new rocksdb::Status[keys.second.size()];
-      for (size_t i = 0; i < keys.second.size(); i++) {
-        keys.second.at(i) = EncryptKey(this->global_key_, keys.second.at(i));
-        slices[i] = rocksdb::Slice(keys.second.at(i));
-        pins[i] = rocksdb::PinnableSlice(tmp + i);
-      }
-      // Use MultiGet.
-      rocksdb::ReadOptions opts;
-      opts.total_order_seek = true;
-      opts.verify_checksums = false;
-      this->db_->MultiGet(opts, handler, keys.second.size(), slices, pins,
-                          statuses);
-      // Read values that were found.
-      for (size_t i = 0; i < keys.second.size(); i++) {
-        rocksdb::Status &status = statuses[i];
-        if (status.ok()) {
-          if (pins[i].IsPinned()) {
-            tmp[i].assign(pins[i].data(), pins[i].size());
-          }
-          result.push_back(
-              std::move(Decrypt(this->GetUserKey(keys.second[i].substr(
-                                    0, keys.second[i].find(__ROCKSSEP))),
-                                tmp[i])));
-        } else if (!status.IsNotFound()) {
-          PANIC(status);
-        }
-      }
-      // Cleanup memory.
-      delete[] statuses;
-      delete[] pins;
-      delete[] tmp;
-      delete[] slices;
-    }
-  } else {
-    LOG(FATAL) << "case not implemented!";
-  }
+  auto result = this->GetRecords(&stmt, tid, value_mapper, false).first;
   result = this->Filter(db_schema, &stmt, std::move(result));
   for (std::string &row : result) {
     rocksdb::Slice slice(row);
@@ -573,9 +513,10 @@ std::vector<std::string> RocksdbConnection::GetShard(
 
 // Get record matching values in a value mapper FROM ALL SHARDS(either by key,
 // index, or it).
-std::pair<std::vector<std::string>, std::vector<std::string> >
-RocksdbConnection::Get(const sqlast::AbstractStatement *stmt, TableID table_id,
-                       const ValueMapper &value_mapper) {
+std::pair<std::vector<std::string>, std::vector<std::string>>
+RocksdbConnection::GetRecords(const sqlast::AbstractStatement *stmt,
+                              TableID table_id, const ValueMapper &value_mapper,
+                              bool return_shards) {
   // Read Metadata.
   rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(table_id).get();
   const dataflow::SchemaRef &schema = this->schemas_.at(table_id);
@@ -585,11 +526,27 @@ RocksdbConnection::Get(const sqlast::AbstractStatement *stmt, TableID table_id,
   const std::string &pkname = schema.NameOf(pk);
 
   // Calling KeyFinder
-  std::vector<std::string> keys = KeyFinder(stmt, table_id, value_mapper);
-
-  // Look in rocksdb.
+  auto key_info = KeyFinder(stmt, table_id, value_mapper);
+  auto keys_raw = key_info.second;
+  std::vector<std::string> keys;
+  std::vector<std::string> shards;
   std::vector<std::string> result;
-  if (found) {
+  if (key_info.first) {
+    if (return_shards) {
+      for (size_t i = 0; i < keys_raw.size(); i++) {
+        // TO-DO: does repeated access slow performance
+        keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
+                       __ROCKSSEP);
+        shards.push_back(keys_raw[i].first);
+      }
+    } else {
+      for (size_t i = 0; i < keys_raw.size(); i++) {
+        keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
+                       __ROCKSSEP);
+      }
+    }
+
+    // Look in rocksdb.
     if (keys.size() == 1) {
       std::string str;
       rocksdb::ReadOptions opts;
@@ -599,8 +556,10 @@ RocksdbConnection::Get(const sqlast::AbstractStatement *stmt, TableID table_id,
       rocksdb::Status status = this->db_->Get(
           opts, handler, EncryptKey(this->global_key_, keys.front()), &str);
       if (status.ok()) {
-        result.push_back(
-            std::move(Decrypt(this->GetUserKey(keys_raw[0].first), str)));
+        // TO-DO - could be optimised
+        result.push_back(std::move(Decrypt(
+            this->GetUserKey(keys[0].substr(0, keys[0].find(__ROCKSSEP))),
+            str)));
       } else if (!status.IsNotFound()) {
         PANIC(status);
       }
@@ -627,8 +586,9 @@ RocksdbConnection::Get(const sqlast::AbstractStatement *stmt, TableID table_id,
           if (pins[i].IsPinned()) {
             tmp[i].assign(pins[i].data(), pins[i].size());
           }
-          result.push_back(
-              std::move(Decrypt(this->GetUserKey(keys_raw[i].first), tmp[i])));
+          result.push_back(std::move(Decrypt(
+              this->GetUserKey(keys[i].substr(0, keys[i].find(__ROCKSSEP))),
+              tmp[i])));
         } else if (!status.IsNotFound()) {
           PANIC(status);
         }
@@ -640,35 +600,10 @@ RocksdbConnection::Get(const sqlast::AbstractStatement *stmt, TableID table_id,
       delete[] slices;
     }
   } else {
-    // LOG(FATAL) << "this case should not be reached!";
-    // Need to lookup all records.
-    // TO-DO: make sure there is no better way to access all shard names, plus
-    // are there consistency issues in this method TO-DO: right now if there is
-    // not index, we are always opting for this method. It would be smarter to
-    // add cases where the WHERE clause is predicated on shard_name
-    if (HasWhereClause(stmt)) {
-      LOG(WARNING) << "Perf Warning: Query has no rocksdb index " << *stmt;
-    }
-    rocksdb::ReadOptions options;
-    options.fill_cache = false;
-    options.total_order_seek = false;
-    options.prefix_same_as_start = true;
-    options.verify_checksums = false;
-    auto ptr = this->db_->NewIterator(options, handler);
-    std::unique_ptr<rocksdb::Iterator> it(ptr);
-    for (auto pair : this->user_keys_) {
-      auto shard_name = pair.first;
-      keys.push_back(pair.first);
-      // TODO(Mithi): What is pair.second? How do we make it shard_name + key
-      // for consistency with if case
-      for (it->Seek(EncryptSeek(this->global_key_, shard_name + __ROCKSSEP));
-           it->Valid(); it->Next()) {
-        result.push_back(
-            Decrypt(this->GetUserKey(shard_name), it->value().ToString()));
-      }
-    }
+    LOG(FATAL) << "case not implemented!";
   }
-  return {keys, result};
+
+  return {result, shards};
 }
 
 // Filter records by where clause in abstract statement.
@@ -686,9 +621,10 @@ std::vector<std::string> RocksdbConnection::Filter(
   return filtered;
 }
 
-std::vector<std::string> RocksdbConnection::KeyFinder(
-    const sqlast::AbstractStatement *stmt, TableID table_id,
-    const ValueMapper &value_mapper) {
+std::pair<bool, std::vector<std::pair<std::string, std::string>>>
+RocksdbConnection::KeyFinder(const sqlast::AbstractStatement *stmt,
+                             TableID table_id,
+                             const ValueMapper &value_mapper) {
   // Read Metadata.
   const dataflow::SchemaRef &schema = this->schemas_.at(table_id);
   size_t pk = this->primary_keys_.at(table_id);
@@ -697,34 +633,34 @@ std::vector<std::string> RocksdbConnection::KeyFinder(
   const std::string &pkname = schema.NameOf(pk);
 
   // Lookup either by PK or index.
-  std::vector<std::pair<std::string, std::string> > keys_raw;
-  std::vector<std::string> keys;
+  std::vector<std::pair<std::string, std::string>> keys;
+  // std::vector<std::string> keys_raw;
 
   // TO-DO (Vedant) this is expensive, will that effect performance?
   auto it = std::find(indexed_columns.begin(), indexed_columns.end(), pk);
   if (it != indexed_columns.end() && value_mapper.HasBefore(pkname)) {
     auto i = it - indexed_columns.begin();
     RocksdbIndex &index = indices.at(i);
-    keys_raw = index.Get(value_mapper.Before(pkname));
-    for (size_t i = 0; i < keys_raw.size(); i++) {
-      keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
-                     __ROCKSSEP);
-    }
-    return keys;
+    keys = index.Get(value_mapper.Before(pkname));
+    // for (size_t i = 0; i < keys_raw.size(); i++) {
+    //   keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
+    //                  __ROCKSSEP);
+    // }
+    return {true, keys};
   }
   for (size_t i = 0; i < indexed_columns.size(); i++) {
     RocksdbIndex &index = indices.at(i);
     const std::string &idxcolumn = schema.NameOf(indexed_columns.at(i));
     if (value_mapper.HasBefore(idxcolumn)) {
-      keys_raw = index.Get(value_mapper.Before(idxcolumn));
-      for (size_t i = 0; i < keys_raw.size(); i++) {
-        keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
-                       __ROCKSSEP);
-      }
-      return keys;
+      keys = index.Get(value_mapper.Before(idxcolumn));
+      // for (size_t i = 0; i < keys_raw.size(); i++) {
+      //   keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
+      //                  __ROCKSSEP);
+      // }
+      return {true, keys};
     }
   }
-  return keys;  // empty vector
+  return {false, {}};
 }
 
 // Gets key corresponding to input user. Creates key if does not exist.
