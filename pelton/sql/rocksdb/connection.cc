@@ -237,7 +237,7 @@ int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt) {
   }
 
   // Look up all affected rows.
-  std::pair<std::vector<std::string>, std::vector<std::string>> result =
+  std::pair<std::vector<std::string>, std::vector<std::string> > result =
       this->GetRecords(&stmt, tid, value_mapper, true);
   std::vector<std::string> shards = result.second;
   std::vector<std::string> rows = result.first;
@@ -291,7 +291,7 @@ int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt) {
 // Execute Delete statements
 int RocksdbConnection::ExecuteDelete(const sqlast::Delete &stmt,
                                      const std::string &shard_name) {
-  ShardID sid = shard_name + __ROCKSSEP;
+  // ShardID sid = shard_name + __ROCKSSEP;
 
   // Read table metadata.
   const std::string &table_name = stmt.table_name();
@@ -304,9 +304,40 @@ int RocksdbConnection::ExecuteDelete(const sqlast::Delete &stmt,
 
   ValueMapper value_mapper(pk, indexed_columns, db_schema);
   value_mapper.VisitDelete(stmt);
+  std::vector<dataflow::Record> records;
+  std::vector<std::string> keys;
   // TODO(babman): can do this better.
   // TODO(babman): need to handle returning deletes.
-  LOG(FATAL) << "Unsupported delete";
+  auto result = this->GetRecords(&stmt, tid, value_mapper, true);
+  auto rows = result.first;
+  auto shards = result.second;
+  rows = this->Filter(db_schema, sql, std::move(rows));
+  if (rows.size() > 5) {
+    LOG(WARNING) << "Perf Warning: " << rows.size()
+                 << " rocksdb deletes in a loop" << *sql;
+  }
+  for (int i = 0; i < rows.size(); i++) {
+    std::string &row = rows[i];
+    std::string &shard_name = shards[i];
+    ShardID sid = shard_name + __ROCKSSEP;
+    rocksdb::Slice slice(row);
+    // Get the key of the existing row.
+    rocksdb::Slice keyslice = ExtractColumn(row, pk);
+    keys.push_back(keyslice.ToString());
+    records.push_back(DecodeRecord(slice, out_schema, augments, {}));
+    // Delete the existing row by key.
+    std::string skey = sid + keyslice.ToString() + __ROCKSSEP;
+    PANIC(this->db_->Delete(rocksdb::WriteOptions(), handler,
+                            EncryptKey(this->global_key_, skey)));
+    // Update indices.
+    for (size_t i = 0; i < indexed_columns.size(); i++) {
+      RocksdbIndex &index = indices.at(i);
+      size_t indexed_column = indexed_columns.at(i);
+      index.Delete(ExtractColumn(slice, indexed_column), shard_name, skey);
+    }
+  }
+  auto resultset = SqlResultSet(db_schema, std::move(records), std::move(keys));
+  return resultset.Vec().size();
 }
 
 /*
@@ -513,7 +544,7 @@ std::vector<std::string> RocksdbConnection::GetShard(
 
 // Get record matching values in a value mapper FROM ALL SHARDS(either by key,
 // index, or it).
-std::pair<std::vector<std::string>, std::vector<std::string>>
+std::pair<std::vector<std::string>, std::vector<std::string> >
 RocksdbConnection::GetRecords(const sqlast::AbstractStatement *stmt,
                               TableID table_id, const ValueMapper &value_mapper,
                               bool return_shards) {
@@ -621,7 +652,7 @@ std::vector<std::string> RocksdbConnection::Filter(
   return filtered;
 }
 
-std::pair<bool, std::vector<std::pair<std::string, std::string>>>
+std::pair<bool, std::vector<std::pair<std::string, std::string> > >
 RocksdbConnection::KeyFinder(const sqlast::AbstractStatement *stmt,
                              TableID table_id,
                              const ValueMapper &value_mapper) {
@@ -633,7 +664,7 @@ RocksdbConnection::KeyFinder(const sqlast::AbstractStatement *stmt,
   const std::string &pkname = schema.NameOf(pk);
 
   // Lookup either by PK or index.
-  std::vector<std::pair<std::string, std::string>> keys;
+  std::vector<std::pair<std::string, std::string> > keys;
   // std::vector<std::string> keys_raw;
 
   // TO-DO (Vedant) this is expensive, will that effect performance?
