@@ -51,6 +51,95 @@ void CheckEqual(const std::vector<dataflow::Record> *a,
   }
 }  // namespace
 
+TEST(RocksdbConnectionTest, BASICUpdateTest) {
+  DropDatabase();
+
+  RocksdbConnection conn;
+  conn.Open(DB_NAME);
+  // Create table.
+  auto parsed =
+      Parse("CREATE TABLE users(PII_id int PRIMARY KEY, name VARCHAR(50));");
+  std::cout << conn.ExecuteCreateTable(
+                   *static_cast<sqlast::CreateTable *>(parsed.get()))
+            << std::endl;
+  dataflow::SchemaRef schema1 = dataflow::SchemaFactory::Create(
+      *static_cast<sqlast::CreateTable *>(parsed.get()));
+  parsed = Parse(
+      "CREATE TABLE stories(id int PRIMARY KEY, story_name VARCHAR(50), author "
+      "VARCHAR(50), FOREIGN KEY (author) REFERENCES users(name));");
+  std::cout << conn.ExecuteCreateTable(
+                   *static_cast<sqlast::CreateTable *>(parsed.get()))
+            << std::endl;
+  dataflow::SchemaRef schema2 = dataflow::SchemaFactory::Create(
+      *static_cast<sqlast::CreateTable *>(parsed.get()));
+  parsed = Parse("CREATE INDEX idx ON stories (story_name);");
+  std::cout << conn.ExecuteCreateIndex(
+                   *static_cast<sqlast::CreateIndex *>(parsed.get()))
+            << std::endl;
+  parsed = Parse("CREATE INDEX idx2 ON stories (id);");
+  std::cout << conn.ExecuteCreateIndex(
+                   *static_cast<sqlast::CreateIndex *>(parsed.get()))
+            << std::endl;
+  parsed = Parse("INSERT INTO users VALUES(1, 'KINAN');");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "1")
+                   .status
+            << std::endl;
+  parsed = Parse("INSERT INTO users (PII_id, name) VALUES(2, 'MALTE');");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "2")
+                   .status
+            << std::endl;
+  parsed = Parse("INSERT INTO users (name, PII_id) VALUES('ISHAN', 3);");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "3")
+                   .status
+            << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(1, 'K', 'KINAN');");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "1")
+                   .status
+            << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(2, 'K', 'KINAN');");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "1")
+                   .status
+            << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(3, 'K', 'MALTE');");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "2")
+                   .status
+            << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(4, 'Kk', 'MALTE');");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "2")
+                   .status
+            << std::endl;
+  parsed = Parse("UPDATE stories SET story_name = 'new name' WHERE id = 3");
+  conn.ExecuteUpdate(*static_cast<sqlast::Update *>(parsed.get()));
+  parsed = Parse("SELECT * FROM stories WHERE story_name = 'new name';");
+  auto resultset = conn.ExecuteSelect(
+      *static_cast<sqlast::Select *>(parsed.get()), schema2, {});
+  Print(resultset.Vec(), schema2);
+  pelton::dataflow::Record record1{schema2};
+  int64_t v0 = 3;
+  std::unique_ptr<std::string> ptr1 = std::make_unique<std::string>("new name");
+  std::string *v1 = ptr1.get();  // Does not release ownership.
+  std::unique_ptr<std::string> ptr2 = std::make_unique<std::string>("MALTE");
+  std::string *v2 = ptr2.get();  // Does not release ownership.
+  record1.SetData(v0, std::move(ptr1), std::move(ptr2));
+  pelton::dataflow::Record record2{schema2};
+
+  std::vector<dataflow::Record *> ans = {&record1};
+  for (int i = 0; i < resultset.rows().size(); i++) {
+    std::cout << "printing record: " << resultset.rows()[i] << std::endl;
+  }
+  CheckEqual(&resultset.rows(), ans);
+  // assert(std::count(resultset.rows().begin(), resultset.rows().end(),
+  // record1)); ADD ASSERT STATEMENTS FOR REMAINING TESTS
+  conn.Close();
+}
+
 TEST(RocksdbConnectionTest, NoData) {
   DropDatabase();
 
