@@ -51,6 +51,78 @@ void CheckEqual(const std::vector<dataflow::Record> *a,
   }
 }  // namespace
 
+TEST(RocksdbConnectionTest, BASICDeleteTest) {
+  DropDatabase();
+
+  RocksdbConnection conn;
+  conn.Open(DB_NAME);
+  // Create table.
+  auto parsed =
+      Parse("CREATE TABLE users(PII_id int PRIMARY KEY, name VARCHAR(50));");
+  std::cout << conn.ExecuteCreateTable(
+                   *static_cast<sqlast::CreateTable *>(parsed.get()))
+            << std::endl;
+  dataflow::SchemaRef schema1 = dataflow::SchemaFactory::Create(
+      *static_cast<sqlast::CreateTable *>(parsed.get()));
+  parsed = Parse(
+      "CREATE TABLE stories(id int PRIMARY KEY, story_name VARCHAR(50), author "
+      "VARCHAR(50), FOREIGN KEY (author) REFERENCES users(name));");
+  std::cout << conn.ExecuteCreateTable(
+                   *static_cast<sqlast::CreateTable *>(parsed.get()))
+            << std::endl;
+  dataflow::SchemaRef schema2 = dataflow::SchemaFactory::Create(
+      *static_cast<sqlast::CreateTable *>(parsed.get()));
+  parsed = Parse("CREATE INDEX idx ON stories (story_name);");
+  std::cout << conn.ExecuteCreateIndex(
+                   *static_cast<sqlast::CreateIndex *>(parsed.get()))
+            << std::endl;
+  parsed = Parse("INSERT INTO users VALUES(1, 'KINAN');");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "1")
+                   .status
+            << std::endl;
+  parsed = Parse("INSERT INTO users (PII_id, name) VALUES(2, 'MALTE');");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "2")
+                   .status
+            << std::endl;
+  parsed = Parse("INSERT INTO users (name, PII_id) VALUES('ISHAN', 3);");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "3")
+                   .status
+            << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(1, 'K', 'KINAN');");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "1")
+                   .status
+            << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(2, 'K', 'KINAN');");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "1")
+                   .status
+            << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(3, 'K', 'MALTE');");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "2")
+                   .status
+            << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(4, 'Kk', 'MALTE');");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "2")
+                   .status
+            << std::endl;
+  parsed = Parse("DELETE FROM stories WHERE story_name = 'K';");
+  conn.ExecuteDelete(*static_cast<sqlast::Delete *>(parsed.get()));
+  parsed = Parse("SELECT * FROM stories WHERE story_name = 'K';");
+  auto resultset = conn.ExecuteSelect(
+      *static_cast<sqlast::Select *>(parsed.get()), schema2, {});
+  Print(resultset.Vec(), schema2);
+  std::vector<dataflow::Record *> ans = {};
+  CheckEqual(&resultset.rows(), ans);
+  // assert(std::count(resultset.rows().begin(), resultset.rows().end(),
+  // record1)); ADD ASSERT STATEMENTS FOR REMAINING TESTS
+  conn.Close();
+}
 TEST(RocksdbConnectionTest, BASICUpdateTest) {
   DropDatabase();
 

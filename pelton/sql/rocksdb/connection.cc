@@ -289,10 +289,7 @@ int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt) {
 }
 
 // Execute Delete statements
-int RocksdbConnection::ExecuteDelete(const sqlast::Delete &stmt,
-                                     const std::string &shard_name) {
-  ShardID sid = shard_name + __ROCKSSEP;
-
+int RocksdbConnection::ExecuteDelete(const sqlast::Delete &stmt) {
   // Read table metadata.
   const std::string &table_name = stmt.table_name();
   TableID tid = this->tables_.at(table_name);
@@ -304,9 +301,39 @@ int RocksdbConnection::ExecuteDelete(const sqlast::Delete &stmt,
 
   ValueMapper value_mapper(pk, indexed_columns, db_schema);
   value_mapper.VisitDelete(stmt);
+  // Look up all affected rows.
+  std::pair<std::vector<std::string>, std::vector<std::string>> result =
+      this->GetRecords(&stmt, tid, value_mapper, true);
+  std::vector<std::string> shards = result.second;
+  std::vector<std::string> rows = result.first;
+  rows = this->Filter(db_schema, &stmt, std::move(rows));
+  auto rsize = rows.size();
+  if (rsize > 5) {
+    LOG(WARNING) << "Perf Warning: " << rsize << " rocksdb deletes in a loop "
+                 << stmt;
+  }
+  for (int i = 0; i < rsize; i++) {
+    std::string &row = rows[i];
+    std::string &shard_name = shards[i];
+
+    rocksdb::Slice slice(row);
+    // Get the key of the existing row.
+    rocksdb::Slice keyslice = ExtractColumn(row, pk);
+    std::string skey =
+        shard_name + __ROCKSSEP + keyslice.ToString() + __ROCKSSEP;
+    PANIC(this->db_->Delete(rocksdb::WriteOptions(), handler,
+                            EncryptKey(this->global_key_, skey)));
+
+    // Update indices.
+    for (size_t i = 0; i < indexed_columns.size(); i++) {
+      RocksdbIndex &index = indices.at(i);
+      size_t indexed_column = indexed_columns.at(i);
+      index.Delete(ExtractColumn(slice, indexed_column), shard_name, keyslice);
+    }
+  }
+  return rsize;
   // TODO(babman): can do this better.
   // TODO(babman): need to handle returning deletes.
-  LOG(FATAL) << "Unsupported delete";
 }
 
 /*

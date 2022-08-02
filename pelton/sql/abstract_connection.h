@@ -43,8 +43,7 @@ class AbstractConnection {
 
   virtual int ExecuteUpdate(const sqlast::Update &sql) = 0;
 
-  virtual int ExecuteDelete(const sqlast::Delete &sql,
-                            const std::string &shard_name) = 0;
+  virtual int ExecuteDelete(const sqlast::Delete &sql) = 0;
 
   // Queries / Select.
   virtual SqlResultSet ExecuteQuery(const sqlast::Select &sql,
