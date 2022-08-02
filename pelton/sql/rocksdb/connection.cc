@@ -237,7 +237,7 @@ int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt) {
   }
 
   // Look up all affected rows.
-  std::pair<std::vector<std::string>, std::vector<std::string>> result =
+  std::pair<std::vector<std::string>, std::vector<std::string> > result =
       this->GetRecords(&stmt, tid, value_mapper, true);
   std::vector<std::string> shards = result.second;
   std::vector<std::string> rows = result.first;
@@ -540,7 +540,7 @@ std::vector<std::string> RocksdbConnection::GetShard(
 
 // Get record matching values in a value mapper FROM ALL SHARDS(either by key,
 // index, or it).
-std::pair<std::vector<std::string>, std::vector<std::string>>
+std::pair<std::vector<std::string>, std::vector<std::string> >
 RocksdbConnection::GetRecords(const sqlast::AbstractStatement *stmt,
                               TableID table_id, const ValueMapper &value_mapper,
                               bool return_shards) {
@@ -648,7 +648,7 @@ std::vector<std::string> RocksdbConnection::Filter(
   return filtered;
 }
 
-std::pair<bool, std::vector<std::pair<std::string, std::string>>>
+std::pair<bool, std::vector<std::pair<std::string, std::string> > >
 RocksdbConnection::KeyFinder(const sqlast::AbstractStatement *stmt,
                              TableID table_id,
                              const ValueMapper &value_mapper) {
@@ -660,7 +660,7 @@ RocksdbConnection::KeyFinder(const sqlast::AbstractStatement *stmt,
   const std::string &pkname = schema.NameOf(pk);
 
   // Lookup either by PK or index.
-  std::vector<std::pair<std::string, std::string>> keys;
+  std::vector<std::pair<std::string, std::string> > keys;
   // std::vector<std::string> keys_raw;
 
   // TO-DO (Vedant) this is expensive, will that effect performance?
