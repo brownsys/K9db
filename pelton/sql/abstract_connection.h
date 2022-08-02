@@ -46,15 +46,6 @@ class AbstractConnection {
   virtual int ExecuteDelete(const sqlast::Delete &sql) = 0;
 
   // Queries / Select.
-  virtual SqlResultSet ExecuteQuery(const sqlast::Select &sql,
-                                    const dataflow::SchemaRef &schema,
-                                    const std::vector<AugInfo> &augs) = 0;
-
-  virtual SqlResultSet ExecuteQueryShard(const sqlast::Select &sql,
-                                         const dataflow::SchemaRef &schema,
-                                         const std::vector<AugInfo> &augments,
-                                         const std::string &shard_name) = 0;
-
   virtual SqlResultSet ExecuteSelect(const sqlast::Select &sql,
                                      const dataflow::SchemaRef &out_schema,
                                      const std::vector<AugInfo> &augments) = 0;

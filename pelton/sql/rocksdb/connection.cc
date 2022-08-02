@@ -241,6 +241,7 @@ int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt) {
       this->GetRecords(&stmt, tid, value_mapper, true);
   std::vector<std::string> shards = result.second;
   std::vector<std::string> rows = result.first;
+  std::vector<std::string> okeys;
   rows = this->Filter(db_schema, &stmt, std::move(rows));
   if (rows.size() > 5) {
     LOG(WARNING) << "Perf Warning: " << rows.size()
@@ -257,6 +258,7 @@ int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt) {
     rocksdb::Slice oslice(row);
     rocksdb::Slice nslice(nrow);
     rocksdb::Slice opk = ExtractColumn(oslice, pk);
+    okeys.push_back(opk.ToString());
     rocksdb::Slice npk = ExtractColumn(nslice, pk);
     // std::shard_name = ExtractColumn(shard, 0);
     ShardID sid = shard_name + __ROCKSSEP;
@@ -285,11 +287,16 @@ int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt) {
     }
   }
   // TODO(babman): need to handle returning updates.
-  return rows.size();
+  if (stmt->returning()) {
+    auto answer = SqlResultSet(db_schema, std::move(rows) std::move(okeys));
+    return SqlResult(answer);
+  } else {
+    return SqlResult(rows.size());
+  }
 }
 
 // Execute Delete statements
-int RocksdbConnection::ExecuteDelete(const sqlast::Delete &stmt) {
+SqlResult RocksdbConnection::ExecuteDelete(const sqlast::Delete &stmt) {
   // Read table metadata.
   const std::string &table_name = stmt.table_name();
   TableID tid = this->tables_.at(table_name);
@@ -302,10 +309,11 @@ int RocksdbConnection::ExecuteDelete(const sqlast::Delete &stmt) {
   ValueMapper value_mapper(pk, indexed_columns, db_schema);
   value_mapper.VisitDelete(stmt);
   // Look up all affected rows.
-  std::pair<std::vector<std::string>, std::vector<std::string>> result =
+  std::pair<std::vector<std::string>, std::vector<std::string> > result =
       this->GetRecords(&stmt, tid, value_mapper, true);
   std::vector<std::string> shards = result.second;
   std::vector<std::string> rows = result.first;
+  std::vector<std::string> keys;
   rows = this->Filter(db_schema, &stmt, std::move(rows));
   auto rsize = rows.size();
   if (rsize > 5) {
@@ -319,6 +327,7 @@ int RocksdbConnection::ExecuteDelete(const sqlast::Delete &stmt) {
     rocksdb::Slice slice(row);
     // Get the key of the existing row.
     rocksdb::Slice keyslice = ExtractColumn(row, pk);
+    keys.push_back(keyslice.ToString());
     std::string skey =
         shard_name + __ROCKSSEP + keyslice.ToString() + __ROCKSSEP;
     PANIC(this->db_->Delete(rocksdb::WriteOptions(), handler,
@@ -331,7 +340,12 @@ int RocksdbConnection::ExecuteDelete(const sqlast::Delete &stmt) {
       index.Delete(ExtractColumn(slice, indexed_column), shard_name, keyslice);
     }
   }
-  return rsize;
+  if (stmt->returning()) {
+    auto answer = SqlResultSet(db_schema, std::move(rows), std::move(keys));
+    return SqlResult(answer);
+  } else {
+    return SqlResult(rsize);
+  }
   // TODO(babman): can do this better.
   // TODO(babman): need to handle returning deletes.
 }
@@ -339,54 +353,6 @@ int RocksdbConnection::ExecuteDelete(const sqlast::Delete &stmt) {
 /*
  * SELECT STATEMENTS.
  */
-
-SqlResultSet RocksdbConnection::ExecuteQuery(
-    const sqlast::Select &sql, const dataflow::SchemaRef &schema,
-    const std::vector<AugInfo> &augments) {
-  LOG(FATAL) << "dummy stub!";
-}
-SqlResultSet RocksdbConnection::ExecuteQueryShard(
-    const sqlast::Select &stmt, const dataflow::SchemaRef &out_schema,
-    const std::vector<AugInfo> &augments, const std::string &shard_name) {
-  CHECK_LE(augments.size(), 1u) << "Too many augmentations";
-  ShardID sid = shard_name + __ROCKSSEP;
-
-  // Read table metadata.
-  const std::string &table_name = stmt.table_name();
-  TableID tid = this->tables_.at(table_name);
-  rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(tid).get();
-  const dataflow::SchemaRef &db_schema = this->schemas_.at(tid);
-  size_t pk = this->primary_keys_.at(tid);
-  const auto &indexed_columns = this->indexed_columns_.at(tid);
-  std::vector<RocksdbIndex> &indices = this->indices_.at(tid);
-
-  ValueMapper value_mapper(pk, indexed_columns, db_schema);
-  value_mapper.VisitSelect(stmt);
-
-  // Result components.
-  std::vector<dataflow::Record> records;
-  std::vector<std::string> keys;
-
-  // Figure out the projections (including order).
-  bool has_projection = stmt.GetColumns().at(0) != "*";
-  std::vector<int> projections;
-  if (has_projection) {
-    projections = ProjectionSchema(db_schema, out_schema, augments);
-  }
-
-  // Look up all the rows.
-  std::vector<std::string> rows =
-      this->GetShard(&stmt, tid, shard_name, value_mapper);
-  rows = this->Filter(db_schema, &stmt, std::move(rows));
-  for (std::string &row : rows) {
-    rocksdb::Slice slice(row);
-    rocksdb::Slice key = ExtractColumn(row, pk);
-    keys.push_back(key.ToString());
-    records.push_back(DecodeRecord(slice, out_schema, augments, projections));
-  }
-
-  return SqlResultSet(out_schema, std::move(records), std::move(keys));
-}
 
 SqlResultSet RocksdbConnection::ExecuteSelect(
     const sqlast::Select &stmt, const dataflow::SchemaRef &out_schema,

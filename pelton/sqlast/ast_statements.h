@@ -153,7 +153,7 @@ class Select : public AbstractStatement {
  private:
   std::string table_name_;
   std::vector<std::string> columns_;
-  std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
+  std::optional<std::unique_ptr<BinaryExpression> > where_clause_;
   size_t offset_;
   int limit_;
 };
@@ -221,21 +221,27 @@ class Delete : public AbstractStatement {
 
  private:
   std::string table_name_;
-  std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
+  std::optional<std::unique_ptr<BinaryExpression> > where_clause_;
   bool returning_;
 };
 
 class Update : public AbstractStatement {
  public:
-  explicit Update(const std::string &table_name)
+  // explicit Update(const std::string &table_name)
+  //     : AbstractStatement(AbstractStatement::Type::UPDATE),
+  //       table_name_(table_name) {}
+
+  explicit Update(const std::string &table_name, bool returning = false)
       : AbstractStatement(AbstractStatement::Type::UPDATE),
-        table_name_(table_name) {}
+        table_name_(table_name),
+        returning_(returning) {}
 
   Update(const Update &update)
       : AbstractStatement(AbstractStatement::Type::UPDATE) {
     this->table_name_ = update.table_name_;
     this->columns_ = update.columns_;
     this->values_ = update.values_;
+    this->returning_ = update.returning_;
     if (update.where_clause_.has_value()) {
       this->where_clause_ = std::optional(
           std::make_unique<BinaryExpression>(*update.where_clause_->get()));
@@ -254,6 +260,7 @@ class Update : public AbstractStatement {
   std::vector<std::string> &GetColumns();
   const std::vector<std::string> &GetValues() const;
   std::vector<std::string> &GetValues();
+  bool returning() const { return this->returning_; }
 
   bool HasWhereClause() const;
   const BinaryExpression *const GetWhereClause() const;
@@ -293,7 +300,8 @@ class Update : public AbstractStatement {
   std::string table_name_;
   std::vector<std::string> columns_;
   std::vector<std::string> values_;
-  std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
+  std::optional<std::unique_ptr<BinaryExpression> > where_clause_;
+  bool returning_;
 };
 
 class CreateView : public AbstractStatement {
