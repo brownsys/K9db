@@ -213,7 +213,7 @@ InsertResult RocksdbConnection::ExecuteInsert(const sqlast::Insert &stmt,
 }
 
 // Execute Update statement
-int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt) {
+SqlResult RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt) {
   // ShardID sid = shard_name + __ROCKSSEP;
 
   // Read table metadata.
@@ -237,10 +237,13 @@ int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt) {
   }
 
   // Look up all affected rows.
-  std::pair<std::vector<std::string>, std::vector<std::string> > result =
+  std::pair<std::vector<std::string>, std::vector<std::string>> result =
       this->GetRecords(&stmt, tid, value_mapper, true);
   std::vector<std::string> shards = result.second;
   std::vector<std::string> rows = result.first;
+
+  // Result components
+  std::vector<dataflow::Record> records;
   std::vector<std::string> okeys;
   rows = this->Filter(db_schema, &stmt, std::move(rows));
   if (rows.size() > 5) {
@@ -259,6 +262,8 @@ int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt) {
     rocksdb::Slice nslice(nrow);
     rocksdb::Slice opk = ExtractColumn(oslice, pk);
     okeys.push_back(opk.ToString());
+    records.push_back(DecodeRecord(oslice, db_schema, {}, {}));
+
     rocksdb::Slice npk = ExtractColumn(nslice, pk);
     // std::shard_name = ExtractColumn(shard, 0);
     ShardID sid = shard_name + __ROCKSSEP;
@@ -287,9 +292,9 @@ int RocksdbConnection::ExecuteUpdate(const sqlast::Update &stmt) {
     }
   }
   // TODO(babman): need to handle returning updates.
-  if (stmt->returning()) {
-    auto answer = SqlResultSet(db_schema, std::move(rows) std::move(okeys));
-    return SqlResult(answer);
+  if (stmt.returning()) {
+    return sql::SqlResult(
+        sql::SqlResultSet(db_schema, std::move(records), std::move(okeys)));
   } else {
     return SqlResult(rows.size());
   }
@@ -309,11 +314,15 @@ SqlResult RocksdbConnection::ExecuteDelete(const sqlast::Delete &stmt) {
   ValueMapper value_mapper(pk, indexed_columns, db_schema);
   value_mapper.VisitDelete(stmt);
   // Look up all affected rows.
-  std::pair<std::vector<std::string>, std::vector<std::string> > result =
+  std::pair<std::vector<std::string>, std::vector<std::string>> result =
       this->GetRecords(&stmt, tid, value_mapper, true);
   std::vector<std::string> shards = result.second;
   std::vector<std::string> rows = result.first;
+
+  // Result components
+  std::vector<dataflow::Record> records;
   std::vector<std::string> keys;
+
   rows = this->Filter(db_schema, &stmt, std::move(rows));
   auto rsize = rows.size();
   if (rsize > 5) {
@@ -328,6 +337,8 @@ SqlResult RocksdbConnection::ExecuteDelete(const sqlast::Delete &stmt) {
     // Get the key of the existing row.
     rocksdb::Slice keyslice = ExtractColumn(row, pk);
     keys.push_back(keyslice.ToString());
+    records.push_back(DecodeRecord(slice, db_schema, {}, {}));
+    // Delete the existing row by key.
     std::string skey =
         shard_name + __ROCKSSEP + keyslice.ToString() + __ROCKSSEP;
     PANIC(this->db_->Delete(rocksdb::WriteOptions(), handler,
@@ -340,9 +351,9 @@ SqlResult RocksdbConnection::ExecuteDelete(const sqlast::Delete &stmt) {
       index.Delete(ExtractColumn(slice, indexed_column), shard_name, keyslice);
     }
   }
-  if (stmt->returning()) {
-    auto answer = SqlResultSet(db_schema, std::move(rows), std::move(keys));
-    return SqlResult(answer);
+  if (stmt.returning()) {
+    return sql::SqlResult(
+        sql::SqlResultSet(db_schema, std::move(records), std::move(keys)));
   } else {
     return SqlResult(rsize);
   }
@@ -506,7 +517,7 @@ std::vector<std::string> RocksdbConnection::GetShard(
 
 // Get record matching values in a value mapper FROM ALL SHARDS(either by key,
 // index, or it).
-std::pair<std::vector<std::string>, std::vector<std::string> >
+std::pair<std::vector<std::string>, std::vector<std::string>>
 RocksdbConnection::GetRecords(const sqlast::AbstractStatement *stmt,
                               TableID table_id, const ValueMapper &value_mapper,
                               bool return_shards) {
@@ -614,7 +625,7 @@ std::vector<std::string> RocksdbConnection::Filter(
   return filtered;
 }
 
-std::pair<bool, std::vector<std::pair<std::string, std::string> > >
+std::pair<bool, std::vector<std::pair<std::string, std::string>>>
 RocksdbConnection::KeyFinder(const sqlast::AbstractStatement *stmt,
                              TableID table_id,
                              const ValueMapper &value_mapper) {
@@ -626,7 +637,7 @@ RocksdbConnection::KeyFinder(const sqlast::AbstractStatement *stmt,
   const std::string &pkname = schema.NameOf(pk);
 
   // Lookup either by PK or index.
-  std::vector<std::pair<std::string, std::string> > keys;
+  std::vector<std::pair<std::string, std::string>> keys;
   // std::vector<std::string> keys_raw;
 
   // TO-DO (Vedant) this is expensive, will that effect performance?

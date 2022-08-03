@@ -44,8 +44,8 @@ class RocksdbConnection : public AbstractConnection {
   InsertResult ExecuteInsert(const sqlast::Insert &sql,
                              const std::string &shard_name) override;
 
-  int ExecuteUpdate(const sqlast::Update &sql) override;
-  int ExecuteDelete(const sqlast::Delete &sql) override;
+  SqlResult ExecuteUpdate(const sqlast::Update &sql) override;
+  SqlResult ExecuteDelete(const sqlast::Delete &sql) override;
 
   // Selects.
   SqlResultSet ExecuteSelect(const sqlast::Select &sql,
@@ -59,7 +59,7 @@ class RocksdbConnection : public AbstractConnection {
                                     TableID table_id,
                                     const std::string &shard_name,
                                     const ValueMapper &value_mapper);
-  std::pair<std::vector<std::string>, std::vector<std::string> > GetRecords(
+  std::pair<std::vector<std::string>, std::vector<std::string>> GetRecords(
       const sqlast::AbstractStatement *stmt, TableID table_id,
       const ValueMapper &value_mapper, bool return_shards);
 
@@ -67,7 +67,7 @@ class RocksdbConnection : public AbstractConnection {
   std::vector<std::string> Filter(const dataflow::SchemaRef &schema,
                                   const sqlast::AbstractStatement *sql,
                                   std::vector<std::string> &&rows);
-  std::pair<bool, std::vector<std::pair<std::string, std::string> > > KeyFinder(
+  std::pair<bool, std::vector<std::pair<std::string, std::string>>> KeyFinder(
       const sqlast::AbstractStatement *stmt, TableID table_id,
       const ValueMapper &value_mapper);
 
@@ -78,13 +78,13 @@ class RocksdbConnection : public AbstractConnection {
   // Members.
   std::unique_ptr<rocksdb::DB> db_;
   std::unordered_map<std::string, TableID> tables_;
-  std::unordered_map<TableID, std::unique_ptr<rocksdb::ColumnFamilyHandle> >
+  std::unordered_map<TableID, std::unique_ptr<rocksdb::ColumnFamilyHandle>>
       handlers_;
   std::unordered_map<TableID, dataflow::SchemaRef> schemas_;
   std::unordered_map<TableID, size_t> primary_keys_;
-  std::unordered_map<TableID, std::vector<size_t> > indexed_columns_;
-  std::unordered_map<TableID, std::vector<RocksdbIndex> > indices_;
-  std::unordered_map<TableID, std::atomic<uint64_t> > auto_increment_counters_;
+  std::unordered_map<TableID, std::vector<size_t>> indexed_columns_;
+  std::unordered_map<TableID, std::vector<RocksdbIndex>> indices_;
+  std::unordered_map<TableID, std::atomic<uint64_t>> auto_increment_counters_;
 
   // Encryption keys.
   unsigned char *global_key_;
