@@ -55,9 +55,6 @@ class EncryptedComparator : public rocksdb::Comparator {
   //   < 0 iff "a" < "b",
   //   == 0 iff "a" == "b",
   //   > 0 iff "a" > "b"
-  // Note that Compare(a, b) also compares timestamp if timestamp size is
-  // non-zero. For the same user key with different timestamps, larger (newer)
-  // timestamp comes first.
   int Compare(const rocksdb::Slice &a, const rocksdb::Slice &b) const override;
   const char *Name() const override { return "EncryptedComparator"; }
 

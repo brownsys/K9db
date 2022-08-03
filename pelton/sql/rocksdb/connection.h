@@ -56,11 +56,6 @@ class RocksdbConnection : public AbstractConnection {
 
  private:
   // Helpers.
-  // Get record matching values in a value mapper (either by key, index, or it).
-  std::vector<std::string> GetShard(const sqlast::AbstractStatement *stmt,
-                                    TableID table_id,
-                                    const std::string &shard_name,
-                                    const ValueMapper &value_mapper);
   std::pair<std::vector<std::string>, std::vector<std::string>> GetRecords(
       TableID table_id, const ValueMapper &value_mapper, bool return_shards);
 
@@ -68,6 +63,7 @@ class RocksdbConnection : public AbstractConnection {
   std::vector<std::string> Filter(const dataflow::SchemaRef &schema,
                                   const sqlast::AbstractStatement *sql,
                                   std::vector<std::string> &&rows);
+
   std::pair<bool, std::vector<std::pair<std::string, std::string>>> KeyFinder(
       TableID table_id, const ValueMapper &value_mapper);
 

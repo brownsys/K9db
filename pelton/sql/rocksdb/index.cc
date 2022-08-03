@@ -2,10 +2,8 @@
 
 #include <algorithm>
 
-#include "pelton/sql/rocksdb/util.h"
+#include "pelton/sql/rocksdb/encode.h"
 #include "pelton/util/status.h"
-
-#define __ROCKSSEP static_cast<char>(30)
 
 namespace pelton {
 namespace sql {
@@ -15,10 +13,11 @@ RocksdbIndex::RocksdbIndex(rocksdb::DB *db, size_t table_id, size_t column)
     : db_(db) {
   // Create a name for the index.
   std::string name = std::to_string(table_id) + "_" + std::to_string(column);
+
   // Create a column family for this index.
   rocksdb::ColumnFamilyHandle *handle;
   rocksdb::ColumnFamilyOptions options;
-  options.prefix_extractor.reset(new ShardPrefixTransform(1));
+  options.prefix_extractor.reset(new PrefixTransform());
   options.comparator = rocksdb::BytewiseComparator();
   PANIC_STATUS(this->db_->CreateColumnFamily(options, name, &handle));
   this->handle_ = std::unique_ptr<rocksdb::ColumnFamilyHandle>(handle);
@@ -27,78 +26,35 @@ RocksdbIndex::RocksdbIndex(rocksdb::DB *db, size_t table_id, size_t column)
 // Adding things to index.
 void RocksdbIndex::Add(const rocksdb::Slice &value,
                        const std::string &shard_name,
-                       const rocksdb::Slice &key) {
-  // key.ToString() << std::endl;
+                       const rocksdb::Slice &pk) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
-  std::string str = value.ToString() + __ROCKSSEP + shard_name + __ROCKSSEP +
-                    key.ToString() + __ROCKSSEP;
-  rocksdb::Slice kslice(str);
-  PANIC_STATUS(this->db_->Put(rocksdb::WriteOptions(), handle, kslice, ""));
+  RocksdbIndexRecord e(value, shard_name, pk);
+  PANIC_STATUS(this->db_->Put(rocksdb::WriteOptions(), handle, e.Key(), ""));
 }
 
 // Deleting things from index.
 void RocksdbIndex::Delete(const rocksdb::Slice &value,
                           const std::string &shard_name,
-                          const rocksdb::Slice &key) {
-  // key.ToString() << std::endl;
+                          const rocksdb::Slice &pk) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
-  std::string str = value.ToString() + __ROCKSSEP + shard_name + __ROCKSSEP +
-                    key.ToString() + __ROCKSSEP;
-  rocksdb::Slice kslice(str);
-  PANIC_STATUS(this->db_->Delete(rocksdb::WriteOptions(), handle, kslice));
+  RocksdbIndexRecord e(value, shard_name, pk);
+  PANIC_STATUS(this->db_->Delete(rocksdb::WriteOptions(), handle, e.Key()));
 }
 
-// Lookup by multiple values.
-std::vector<std::string> RocksdbIndex::GetShard(
-    const std::vector<rocksdb::Slice> &values, const std::string &shard_name) {
-  if (values.size() == 0) {
-    return {};
-  }
-  // Will store result.
-  std::vector<std::string> result;
-  // Open an iterator.
-  rocksdb::ReadOptions options;
-  options.fill_cache = false;
-  options.total_order_seek = false;
-  options.prefix_same_as_start = true;
-  options.verify_checksums = false;
-  auto ptr = this->db_->NewIterator(options, this->handle_.get());
-  std::unique_ptr<rocksdb::Iterator> it(ptr);
-  // Make and sort all prefixes.
-  std::vector<std::string> prefixes;
-  prefixes.reserve(values.size());
-  for (const rocksdb::Slice &slice : values) {
-    prefixes.push_back(slice.ToString() +
-                       __ROCKSSEP);  // + shard_name + __ROCKSSEP);
-  }
-  std::sort(prefixes.begin(), prefixes.end());
-  // Go through prefixes in order.
-  for (const std::string &prefix : prefixes) {
-    rocksdb::Slice pslice(prefix);
-    for (it->Seek(pslice); it->Valid(); it->Next()) {
-      rocksdb::Slice row = it->key();
-      if (ExtractColumn(row, 1) == shard_name) {
-        result.push_back(ExtractColumn(row, 2).ToString());
-      }
-    }
-  }
-  return result;
-}
+// Get by value.
 std::vector<std::pair<std::string, std::string>> RocksdbIndex::Get(
     const std::vector<rocksdb::Slice> &values) {
-  if (values.size() == 0) {
-    return {};
-  }
-  // Will store result.
-  std::vector<std::pair<std::string, std::string>> result;
-  // Open an iterator.
+  // Iterator options.
   rocksdb::ReadOptions options;
   options.fill_cache = false;
   options.total_order_seek = false;
   options.prefix_same_as_start = true;
   options.verify_checksums = false;
-  auto ptr = this->db_->NewIterator(options, this->handle_.get());
+
+  // Open iterator.
+  rocksdb::Iterator *ptr = this->db_->NewIterator(options, this->handle_.get());
   std::unique_ptr<rocksdb::Iterator> it(ptr);
+
   // Make and sort all prefixes.
   std::vector<std::string> prefixes;
   prefixes.reserve(values.size());
@@ -106,16 +62,32 @@ std::vector<std::pair<std::string, std::string>> RocksdbIndex::Get(
     prefixes.push_back(slice.ToString() + __ROCKSSEP);
   }
   std::sort(prefixes.begin(), prefixes.end());
+
+  // Holds the result.
+  std::vector<std::pair<std::string, std::string>> result;
+
   // Go through prefixes in order.
   for (const std::string &prefix : prefixes) {
     rocksdb::Slice pslice(prefix);
     for (it->Seek(pslice); it->Valid(); it->Next()) {
-      rocksdb::Slice row = it->key();
-      result.push_back(
-          {ExtractColumn(row, 1).ToString(), ExtractColumn(row, 2).ToString()});
+      RocksdbIndexRecord entry(it->key());
+      rocksdb::Slice shard = entry.ExtractShardName();
+      rocksdb::Slice pk = entry.ExtractPK();
+      result.push_back({shard.ToString(), pk.ToString()});
     }
   }
   return result;
 }
+
+// PrefixTransform
+rocksdb::Slice PrefixTransform::Transform(const rocksdb::Slice &key) const {
+  for (size_t i = 0; i < key.size(); i++) {
+    if (key.data()[i] == __ROCKSSEP) {
+      return rocksdb::Slice(key.data(), i + 1);
+    }
+  }
+  LOG(FATAL) << "Key is badly formatted " << key.ToString();
+}
+
 }  // namespace sql
 }  // namespace pelton

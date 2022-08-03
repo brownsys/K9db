@@ -7,11 +7,11 @@
 #include <vector>
 
 #include "rocksdb/db.h"
+#include "rocksdb/slice.h"
+#include "rocksdb/slice_transform.h"
 
 namespace pelton {
 namespace sql {
-
-using ShardID = std::string;
 
 class RocksdbIndex {
  public:
@@ -22,24 +22,26 @@ class RocksdbIndex {
   // index_value is the value of 'name'.
   // key is the value of 'id' (the PK) without a shard prefix.
   void Add(const rocksdb::Slice &index_value, const std::string &shard_name,
-           const rocksdb::Slice &key);
+           const rocksdb::Slice &pk);
   void Delete(const rocksdb::Slice &index_value, const std::string &shard_name,
-              const rocksdb::Slice &key);
+              const rocksdb::Slice &pk);
 
-  // shard_name is the shard_name (same as Add/Delete).
-  // values are values we know the index column (e.g. name) can take.
-  // returns a list of PKs (no shard_name prefix) that correspond to rows
-  // where the index value is IN values.
-  std::vector<std::string> GetShard(const std::vector<rocksdb::Slice> &values,
-                                    const std::string &shard_name);
-
-  // new added method to get from all shards
+  // Get the shard and pk of matching records for given values.
   std::vector<std::pair<std::string, std::string>> Get(
       const std::vector<rocksdb::Slice> &values);
 
  private:
   rocksdb::DB *db_;
   std::unique_ptr<rocksdb::ColumnFamilyHandle> handle_;
+};
+
+class PrefixTransform : public rocksdb::SliceTransform {
+ public:
+  PrefixTransform() = default;
+
+  const char *Name() const override { return "ShardPrefix"; }
+  bool InDomain(const rocksdb::Slice &key) const override { return true; }
+  rocksdb::Slice Transform(const rocksdb::Slice &key) const override;
 };
 
 }  // namespace sql
