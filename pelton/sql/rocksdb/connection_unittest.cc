@@ -179,6 +179,14 @@ TEST(RocksdbConnectionTest, PKBasedUpdateDelete) {
   std::cout << conn.ExecuteCreateIndex(
                    *static_cast<sqlast::CreateIndex *>(parsed.get()))
             << std::endl;
+  parsed = Parse("CREATE INDEX idx ON stories (author);");
+  std::cout << conn.ExecuteCreateIndex(
+                   *static_cast<sqlast::CreateIndex *>(parsed.get()))
+            << std::endl;
+  parsed = Parse("CREATE INDEX idx ON stories (id);");
+  std::cout << conn.ExecuteCreateIndex(
+                   *static_cast<sqlast::CreateIndex *>(parsed.get()))
+            << std::endl;
   parsed = Parse("INSERT INTO users VALUES(1, 'KINAN');");
   std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
                                   "1")
@@ -209,7 +217,7 @@ TEST(RocksdbConnectionTest, PKBasedUpdateDelete) {
                                   "2")
                    .status
             << std::endl;
-  parsed = Parse("INSERT INTO stories VALUES(4, 'Kk', 'MALTE');");
+  parsed = Parse("INSERT INTO stories VALUES(4, 'K', 'MALTE');");
   std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
                                   "2")
                    .status
@@ -233,27 +241,11 @@ TEST(RocksdbConnectionTest, PKBasedUpdateDelete) {
   CheckEqual(&resultset1.rows(), ans);
 
   parsed = Parse("DELETE FROM stories WHERE id = 4");
-  conn.ExecuteUpdate(*static_cast<sqlast::Update *>(parsed.get()));
-  parsed = Parse("SELECT * FROM stories;");
+  conn.ExecuteDelete(*static_cast<sqlast::Delete *>(parsed.get()));
+  parsed = Parse("SELECT * FROM stories WHERE author = 'MALTE';");
   auto resultset2 = conn.ExecuteSelect(
       *static_cast<sqlast::Select *>(parsed.get()), schema2, {});
   Print(resultset2.Vec(), schema2);
-
-  pelton::dataflow::Record record1{schema2};
-  v0 = 1;
-  ptr1 = std::make_unique<std::string>("K");
-  v1 = ptr1.get();  // Does not release ownership.
-  ptr2 = std::make_unique<std::string>("KINAN");
-  v2 = ptr2.get();  // Does not release ownership.
-  record1.SetData(v0, std::move(ptr1), std::move(ptr2));
-
-  pelton::dataflow::Record record2{schema2};
-  v0 = 2;
-  ptr1 = std::make_unique<std::string>("K");
-  v1 = ptr1.get();  // Does not release ownership.
-  ptr2 = std::make_unique<std::string>("KINAN");
-  v2 = ptr2.get();  // Does not release ownership.
-  record2.SetData(v0, std::move(ptr1), std::move(ptr2));
 
   pelton::dataflow::Record record3{schema2};
   v0 = 3;
@@ -263,15 +255,7 @@ TEST(RocksdbConnectionTest, PKBasedUpdateDelete) {
   v2 = ptr2.get();  // Does not release ownership.
   record3.SetData(v0, std::move(ptr1), std::move(ptr2));
 
-  pelton::dataflow::Record record4{schema2};
-  v0 = 4;
-  ptr1 = std::make_unique<std::string>("new name");
-  v1 = ptr1.get();  // Does not release ownership.
-  ptr2 = std::make_unique<std::string>("MALTE");
-  v2 = ptr2.get();  // Does not release ownership.
-  record4.SetData(v0, std::move(ptr1), std::move(ptr2));
-
-  ans = {&record1, &record2, &record3, &record4};
+  ans = {&record3};
   CheckEqual(&resultset2.rows(), ans);
   // assert(std::count(resultset.rows().begin(), resultset.rows().end(),
   // record1)); ADD ASSERT STATEMENTS FOR REMAINING TESTS
@@ -308,7 +292,8 @@ TEST(RocksdbConnectionTest, UpdateDeleteNone) {
   std::cout << conn.ExecuteCreateIndex(
                    *static_cast<sqlast::CreateIndex *>(parsed.get()))
             << std::endl;
-  parsed = Parse("UPDATE stories SET story_name = 'new name';");
+  parsed = Parse(
+      "UPDATE stories SET story_name = 'new name' WHERE story_name = 'K';");
   conn.ExecuteUpdate(*static_cast<sqlast::Update *>(parsed.get()));
   parsed = Parse("SELECT * FROM stories WHERE story_name = 'new name';");
   auto resultset1 = conn.ExecuteSelect(
@@ -317,8 +302,9 @@ TEST(RocksdbConnectionTest, UpdateDeleteNone) {
   CheckEqual(&resultset1.rows(), {});
 
   parsed = Parse("DELETE FROM stories WHERE story_name = 'new name';");
-  conn.ExecuteUpdate(*static_cast<sqlast::Update *>(parsed.get()));
-  parsed = Parse("SELECT * FROM stories;");
+  conn.ExecuteDelete(*static_cast<sqlast::Delete *>(parsed.get()));
+  parsed = Parse(
+      "SELECT * FROM stories WHERE story_name in ('new name', 'K', 'rand');");
   auto resultset2 = conn.ExecuteSelect(
       *static_cast<sqlast::Select *>(parsed.get()), schema2, {});
   Print(resultset2.Vec(), schema2);
@@ -368,8 +354,8 @@ TEST(RocksdbConnectionTest, UpdateDeleteNone) {
   CheckEqual(&resultset3.rows(), {});
 
   parsed = Parse("DELETE FROM stories WHERE story_name = 'new name';");
-  conn.ExecuteUpdate(*static_cast<sqlast::Update *>(parsed.get()));
-  parsed = Parse("SELECT * FROM stories;");
+  conn.ExecuteDelete(*static_cast<sqlast::Delete *>(parsed.get()));
+  parsed = Parse("SELECT * FROM stories WHERE id in (1, 2, 3, 4, 5);");
   auto resultset4 = conn.ExecuteSelect(
       *static_cast<sqlast::Select *>(parsed.get()), schema2, {});
   Print(resultset4.Vec(), schema2);
@@ -479,7 +465,7 @@ TEST(RocksdbConnectionTest, UpdateDeleteAll) {
                                   "2")
                    .status
             << std::endl;
-  parsed = Parse("UPDATE stories SET story_name = 'new name';");
+  parsed = Parse("UPDATE stories SET story_name = 'new name' WHERE id = 3;");
   conn.ExecuteUpdate(*static_cast<sqlast::Update *>(parsed.get()));
   parsed = Parse("SELECT * FROM stories WHERE story_name = 'new name';");
   auto resultset1 = conn.ExecuteSelect(
@@ -487,46 +473,19 @@ TEST(RocksdbConnectionTest, UpdateDeleteAll) {
   Print(resultset1.Vec(), schema2);
 
   pelton::dataflow::Record record1{schema2};
-  int64_t v0 = 1;
+  int64_t v0 = 3;
   std::unique_ptr<std::string> ptr1 = std::make_unique<std::string>("new name");
   std::string *v1 = ptr1.get();  // Does not release ownership.
-  std::unique_ptr<std::string> ptr2 = std::make_unique<std::string>("KINAN");
+  std::unique_ptr<std::string> ptr2 = std::make_unique<std::string>("MALTE");
   std::string *v2 = ptr2.get();  // Does not release ownership.
   record1.SetData(v0, std::move(ptr1), std::move(ptr2));
 
-  pelton::dataflow::Record record2{schema2};
-  v0 = 2;
-  ptr1 = std::make_unique<std::string>("new name");
-  v1 = ptr1.get();  // Does not release ownership.
-  ptr2 = std::make_unique<std::string>("KINAN");
-  v2 = ptr2.get();  // Does not release ownership.
-  record2.SetData(v0, std::move(ptr1), std::move(ptr2));
-
-  pelton::dataflow::Record record3{schema2};
-  v0 = 3;
-  ptr1 = std::make_unique<std::string>("new name");
-  v1 = ptr1.get();  // Does not release ownership.
-  ptr2 = std::make_unique<std::string>("MALTE");
-  v2 = ptr2.get();  // Does not release ownership.
-  record3.SetData(v0, std::move(ptr1), std::move(ptr2));
-
-  pelton::dataflow::Record record4{schema2};
-  v0 = 4;
-  ptr1 = std::make_unique<std::string>("new name");
-  v1 = ptr1.get();  // Does not release ownership.
-  ptr2 = std::make_unique<std::string>("MALTE");
-  v2 = ptr2.get();  // Does not release ownership.
-  record4.SetData(v0, std::move(ptr1), std::move(ptr2));
-
-  // All values are updated
-
-  std::vector<dataflow::Record *> ans = {&record1, &record2, &record3,
-                                         &record4};
+  std::vector<dataflow::Record *> ans = {&record1};
   CheckEqual(&resultset1.rows(), ans);
 
-  parsed = Parse("DELETE FROM stories");
-  conn.ExecuteUpdate(*static_cast<sqlast::Update *>(parsed.get()));
-  parsed = Parse("SELECT * FROM stories;");
+  parsed = Parse("DELETE FROM stories WHERE story_name = 'new name';");
+  conn.ExecuteDelete(*static_cast<sqlast::Delete *>(parsed.get()));
+  parsed = Parse("SELECT * FROM stories WHERE story_name = 'new name';");
   auto resultset2 = conn.ExecuteSelect(
       *static_cast<sqlast::Select *>(parsed.get()), schema2, {});
   Print(resultset2.Vec(), schema2);
@@ -536,82 +495,7 @@ TEST(RocksdbConnectionTest, UpdateDeleteAll) {
   conn.Close();
 }
 
-TEST(RocksdbConnectionTest, BASICUpdateTest) {
-  DropDatabase();
-
-  RocksdbConnection conn;
-  conn.Open(DB_NAME);
-  // Create table.
-  auto parsed =
-      Parse("CREATE TABLE users(PII_id int PRIMARY KEY, name VARCHAR(50));");
-  std::cout << conn.ExecuteCreateTable(
-                   *static_cast<sqlast::CreateTable *>(parsed.get()))
-            << std::endl;
-  dataflow::SchemaRef schema1 = dataflow::SchemaFactory::Create(
-      *static_cast<sqlast::CreateTable *>(parsed.get()));
-  parsed = Parse(
-      "CREATE TABLE stories(id int PRIMARY KEY, story_name VARCHAR(50), author "
-      "VARCHAR(50), FOREIGN KEY (author) REFERENCES users(name));");
-  std::cout << conn.ExecuteCreateTable(
-                   *static_cast<sqlast::CreateTable *>(parsed.get()))
-            << std::endl;
-  dataflow::SchemaRef schema2 = dataflow::SchemaFactory::Create(
-      *static_cast<sqlast::CreateTable *>(parsed.get()));
-  parsed = Parse("CREATE INDEX idx ON stories (story_name);");
-  std::cout << conn.ExecuteCreateIndex(
-                   *static_cast<sqlast::CreateIndex *>(parsed.get()))
-            << std::endl;
-  parsed = Parse("INSERT INTO users VALUES(1, 'KINAN');");
-  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
-                                  "1")
-                   .status
-            << std::endl;
-  parsed = Parse("INSERT INTO users (PII_id, name) VALUES(2, 'MALTE');");
-  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
-                                  "2")
-                   .status
-            << std::endl;
-  parsed = Parse("INSERT INTO users (name, PII_id) VALUES('ISHAN', 3);");
-  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
-                                  "3")
-                   .status
-            << std::endl;
-  parsed = Parse("INSERT INTO stories VALUES(1, 'K', 'KINAN');");
-  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
-                                  "1")
-                   .status
-            << std::endl;
-  parsed = Parse("INSERT INTO stories VALUES(2, 'K', 'KINAN');");
-  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
-                                  "1")
-                   .status
-            << std::endl;
-  parsed = Parse("INSERT INTO stories VALUES(3, 'K', 'MALTE');");
-  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
-                                  "2")
-                   .status
-            << std::endl;
-  parsed = Parse("INSERT INTO stories VALUES(4, 'Kk', 'MALTE');");
-  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
-                                  "2")
-                   .status
-            << std::endl;
-  parsed = Parse("UPDATE stories WHERE story_name = 'K';");
-  conn.ExecuteDelete(*static_cast<sqlast::Delete *>(parsed.get()));
-  parsed = Parse("DELETE FROM stories WHERE story_name = 'K';");
-  conn.ExecuteDelete(*static_cast<sqlast::Delete *>(parsed.get()));
-  parsed = Parse("SELECT * FROM stories WHERE story_name = 'K';");
-  auto resultset = conn.ExecuteSelect(
-      *static_cast<sqlast::Select *>(parsed.get()), schema2, {});
-  Print(resultset.Vec(), schema2);
-  std::vector<dataflow::Record *> ans = {};
-  CheckEqual(&resultset.rows(), ans);
-  // assert(std::count(resultset.rows().begin(), resultset.rows().end(),
-  // record1)); ADD ASSERT STATEMENTS FOR REMAINING TESTS
-  conn.Close();
-}
-
-TEST(RocksdbConnectionTest, BASICDeleteTest) {
+TEST(RocksdbConnectionTest, BASICeleteTest) {
   DropDatabase();
 
   RocksdbConnection conn;
