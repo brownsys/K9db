@@ -1118,7 +1118,19 @@ TEST(RocksdbConnectionTest, ExecuteReplace) {
   std::cout << conn.ExecuteCreateIndex(
                    *static_cast<sqlast::CreateIndex *>(parsed.get()))
             << std::endl;
-  parsed = Parse("CREATE INDEX idx2 ON users (PII_id);");
+  parsed = Parse("CREATE INDEX idx3 ON users (PII_id);");
+  std::cout << conn.ExecuteCreateIndex(
+                   *static_cast<sqlast::CreateIndex *>(parsed.get()))
+            << std::endl;
+  parsed = Parse("CREATE INDEX idx4 ON stories (story_name);");
+  std::cout << conn.ExecuteCreateIndex(
+                   *static_cast<sqlast::CreateIndex *>(parsed.get()))
+            << std::endl;
+  parsed = Parse("CREATE INDEX idx5 ON stories (author);");
+  std::cout << conn.ExecuteCreateIndex(
+                   *static_cast<sqlast::CreateIndex *>(parsed.get()))
+            << std::endl;
+  parsed = Parse("CREATE INDEX idx6 ON stories (id);");
   std::cout << conn.ExecuteCreateIndex(
                    *static_cast<sqlast::CreateIndex *>(parsed.get()))
             << std::endl;
@@ -1127,112 +1139,109 @@ TEST(RocksdbConnectionTest, ExecuteReplace) {
                                   "1")
                    .status
             << std::endl;
-  //   parsed = Parse("REPLACE INTO users VALUES(1, 'VEDANT');");
-  //   std::cout << conn.ExecuteReplace(*static_cast<sqlast::Insert
-  //   *>(parsed.get()),
-  //                                   "1")
-  //                    .status
-  //             << std::endl;
-  //   parsed = Parse("SELECT * FROM users WHERE PII_id == 1;");
-  //   auto resultset = conn.ExecuteSelect(
-  //       *static_cast<sqlast::Select *>(parsed.get()), schema1, {});
-  //   parsed = Parse("SELECT * FROM users WHERE name == 'KINAN';");
-  //   auto resultset2 = conn.ExecuteSelect(
-  //       *static_cast<sqlast::Select *>(parsed.get()), schema1, {});
-  //   parsed = Parse("SELECT * FROM users WHERE PII_id == 'VEDANT';");
-  //   auto resultset3 = conn.ExecuteSelect(
-  //       *static_cast<sqlast::Select *>(parsed.get()), schema1, {});
+  parsed = Parse("REPLACE INTO users VALUES(1, 'VEDANT');");
+  std::cout << conn.ExecuteReplace(*static_cast<sqlast::Insert *>(parsed.get()),
+                                   "1")
+                   .status
+            << std::endl;
+  parsed = Parse("SELECT * FROM users WHERE PII_id = 1;");
+  auto resultset = conn.ExecuteSelect(
+      *static_cast<sqlast::Select *>(parsed.get()), schema1, {});
+  parsed = Parse("SELECT * FROM users WHERE name = 'KINAN';");
+  auto resultset2 = conn.ExecuteSelect(
+      *static_cast<sqlast::Select *>(parsed.get()), schema1, {});
+  parsed = Parse("SELECT * FROM users WHERE name = 'VEDANT';");
+  auto resultset3 = conn.ExecuteSelect(
+      *static_cast<sqlast::Select *>(parsed.get()), schema1, {});
 
-  // pelton::dataflow::Record record1{schema1};
-  //   int64_t v0 = 1;
-  //   std::unique_ptr<std::string> ptr1 =
-  //   std::make_unique<std::string>("VEDANT"); std::string *v1 = ptr1.get(); //
-  //   Does not release ownership.
+  pelton::dataflow::Record record1{schema1};
+  int64_t v0 = 1;
+  std::unique_ptr<std::string> ptr1 = std::make_unique<std::string>("VEDANT");
+  std::string *v1 = ptr1.get();  // Does not release ownership.
 
-  //   record1.SetData(v0, std::move(ptr1));
-  //   std::vector<dataflow::Record *> ans = {&record1};
-  //   CheckEqual(&resultset.rows(), ans);
-  //   CheckEqual(&resultset2.rows(), {});
-  //   CheckEqual(&resultset3.rows(), ans);
+  record1.SetData(v0, std::move(ptr1));
+  std::vector<dataflow::Record *> ans = {&record1};
+  CheckEqual(&resultset.rows(), ans);
+  CheckEqual(&resultset2.rows(), {});
+  CheckEqual(&resultset3.rows(), ans);
 
-  //   parsed = Parse("INSERT INTO users (PII_id, name) VALUES(2, 'MALTE');");
-  //   std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert
-  //   *>(parsed.get()),
-  //                                   "2")
-  //                    .status
-  //             << std::endl;
-  //   parsed = Parse("INSERT INTO users (name, PII_id) VALUES('ISHAN', 3);");
-  //   std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert
-  //   *>(parsed.get()),
-  //                                   "3")
-  //                    .status
-  //             << std::endl;
-  //   parsed = Parse("INSERT INTO stories VALUES(1, 'K', 'KINAN');");
-  //   std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert
-  //   *>(parsed.get()),
-  //                                   "1")
-  //                    .status
-  //             << std::endl;
-  //   parsed = Parse("INSERT INTO stories VALUES(2, 'K', 'KINAN');");
-  //   std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert
-  //   *>(parsed.get()),
-  //                                   "1")
-  //                    .status
-  //             << std::endl;
-  //   parsed = Parse("INSERT INTO stories VALUES(3, 'K', 'MALTE');f");
-  //   std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert
-  //   *>(parsed.get()),
-  //                                   "2")
-  //                    .status
-  //             << std::endl;
-  //   parsed = Parse("INSERT INTO stories VALUES(4, 'Kk', 'MALTE');");
-  //   std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert
-  //   *>(parsed.get()),
-  //                                   "2")
-  //                    .status
-  //             << std::endl;
-  //   parsed = Parse("SELECT * FROM stories WHERE story_name in ('K', 'Kk');");
-  //   auto resultset = conn.ExecuteSelect(
-  //       *static_cast<sqlast::Select *>(parsed.get()), schema2, {});
-  //   //   parsed = Parse("DELETE FROM stories WHERE story_name = 'Kk';");
-  //   //   std::cout << conn.ExecuteDelete(*static_cast<sqlast::Delete
-  //   //   *>(parsed.get()), "4") << std::endl;
-  //   Print(resultset.Vec(), schema2);
+  parsed = Parse("INSERT INTO users (PII_id, name) VALUES(2, 'MALTE');");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "2")
+                   .status
+            << std::endl;
+  parsed = Parse("INSERT INTO users (name, PII_id) VALUES('ISHAN', 3);");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "3")
+                   .status
+            << std::endl;
+  parsed = Parse("INSERT INTO stories VALUES(1, 'Kk', 'VEDANT');");
+  std::cout << conn.ExecuteInsert(*static_cast<sqlast::Insert *>(parsed.get()),
+                                  "1")
+                   .status
+            << std::endl;
+  parsed = Parse("REPLACE INTO stories VALUES(2, 'K', 'MALTE');");
+  std::cout << conn.ExecuteReplace(*static_cast<sqlast::Insert *>(parsed.get()),
+                                   "2")
+                   .status
+            << std::endl;
+  parsed = Parse("REPLACE INTO stories VALUES(2, 'new name', 'MALTE');");
+  std::cout << conn.ExecuteReplace(*static_cast<sqlast::Insert *>(parsed.get()),
+                                   "2")
+                   .status
+            << std::endl;
+  parsed = Parse("SELECT * FROM stories WHERE id = 2;");
+  resultset = conn.ExecuteSelect(*static_cast<sqlast::Select *>(parsed.get()),
+                                 schema2, {});
+  parsed = Parse("SELECT * FROM stories WHERE author = 'MALTE';");
+  resultset2 = conn.ExecuteSelect(*static_cast<sqlast::Select *>(parsed.get()),
+                                  schema2, {});
+  parsed = Parse("SELECT * FROM stories WHERE story_name = 'K';");
+  resultset3 = conn.ExecuteSelect(*static_cast<sqlast::Select *>(parsed.get()),
+                                  schema2, {});
+  v0 = 2;
+  ptr1 = std::make_unique<std::string>("new name");
+  v1 = ptr1.get();  // Does not release ownership.
+  std::unique_ptr<std::string> ptr2 = std::make_unique<std::string>("MALTE");
+  std::string *v2 = ptr2.get();  // Does not release ownership.
+  pelton::dataflow::Record record2{schema2};
+  record2.SetData(v0, std::move(ptr1), std::move(ptr2));
+  ans = {&record2};
+  CheckEqual(&resultset.rows(), ans);
+  CheckEqual(&resultset2.rows(), ans);
+  CheckEqual(&resultset3.rows(), {});
 
-  //   parsed = Parse("SELECT * FROM stories WHERE story_name in ('K', 'Kk');");
-  //   auto newset = conn.ExecuteSelect(*static_cast<sqlast::Select
-  //   *>(parsed.get()),
-  //                                    schema2, {});
-  //   Print(newset.Vec(), schema2);
-
-  //   pelton::dataflow::Record record1{schema2};
-  //   int64_t v0 = 1;
-  //   std::unique_ptr<std::string> ptr1 = std::make_unique<std::string>("K");
-  //   std::string *v1 = ptr1.get();  // Does not release ownership.
-  //   std::unique_ptr<std::string> ptr2 =
-  //   std::make_unique<std::string>("KINAN"); std::string *v2 = ptr2.get();  //
-  //   Does not release ownership. record1.SetData(v0, std::move(ptr1),
-  //   std::move(ptr2)); pelton::dataflow::Record record2{schema2}; v0 = 2; ptr1
-  //   = std::make_unique<std::string>("K"); v1 = ptr1.get();  // Does not
-  //   release ownership. ptr2 = std::make_unique<std::string>("KINAN"); v2 =
-  //   ptr2.get();  // Does not release ownership. record2.SetData(v0,
-  //   std::move(ptr1), std::move(ptr2)); pelton::dataflow::Record
-  //   record3{schema2}; v0 = 3; ptr1 = std::make_unique<std::string>("K"); v1 =
-  //   ptr1.get();  // Does not release ownership. ptr2 =
-  //   std::make_unique<std::string>("MALTE"); v2 = ptr2.get();  // Does not
-  //   release ownership. record3.SetData(v0, std::move(ptr1), std::move(ptr2));
-  //   pelton::dataflow::Record record4{schema2};
-  //   v0 = 4;
-  //   ptr1 = std::make_unique<std::string>("Kk");
-  //   v1 = ptr1.get();  // Does not release ownership.
-  //   ptr2 = std::make_unique<std::string>("MALTE");
-  //   v2 = ptr2.get();  // Does not release ownership.
-  //   record4.SetData(v0, std::move(ptr1), std::move(ptr2));
-  //   std::vector<dataflow::Record *> ans = {&record1, &record2, &record3,
-  //                                          &record4};
-  //   CheckEqual(&resultset.rows(), ans);
-  //   // assert(resultset)
-  //   // ADD ASSERT STATEMENTS FOR REMAINING TESTS
+  // replacing into another shard
+  parsed = Parse("REPLACE INTO stories VALUES(2, 'new name 2', 'VEDANT');");
+  std::cout << conn.ExecuteReplace(*static_cast<sqlast::Insert *>(parsed.get()),
+                                   "2")
+                   .status
+            << std::endl;
+  parsed = Parse("SELECT * FROM stories WHERE id = 2;");
+  resultset = conn.ExecuteSelect(*static_cast<sqlast::Select *>(parsed.get()),
+                                 schema2, {});
+  parsed = Parse(
+      "SELECT * FROM stories WHERE author = 'VEDANT' AND story_name = 'new "
+      "name 2';");
+  resultset2 = conn.ExecuteSelect(*static_cast<sqlast::Select *>(parsed.get()),
+                                  schema2, {});
+  parsed = Parse("SELECT * FROM stories WHERE author = 'MALTE';");
+  resultset3 = conn.ExecuteSelect(*static_cast<sqlast::Select *>(parsed.get()),
+                                  schema2, {});
+  parsed = Parse("SELECT * FROM stories WHERE story_name = 'new name';");
+  auto resultset4 = conn.ExecuteSelect(
+      *static_cast<sqlast::Select *>(parsed.get()), schema2, {});
+  v0 = 2;
+  ptr1 = std::make_unique<std::string>("new name 2");
+  v1 = ptr1.get();  // Does not release ownership.
+  ptr2 = std::make_unique<std::string>("VEDANT");
+  v2 = ptr2.get();  // Does not release ownership.
+  record2.SetData(v0, std::move(ptr1), std::move(ptr2));
+  ans = {&record2};
+  CheckEqual(&resultset.rows(), ans);
+  CheckEqual(&resultset2.rows(), ans);
+  CheckEqual(&resultset3.rows(), {});
+  CheckEqual(&resultset4.rows(), {});
   conn.Close();
 }
 TEST(RocksdbConnectionTest, MultipleValues) {

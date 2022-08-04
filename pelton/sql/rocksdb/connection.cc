@@ -336,23 +336,29 @@ InsertResult RocksdbConnection::ExecuteReplace(const sqlast::Insert &stmt,
     pk_value = std::to_string(last_insert_id);
   }
   // Delete old columns with same pk value
-  auto result = this->GetRecords(tid, value_mapper, false);
+  rocksdb::Slice pk_slice(pk_value);
+  const dataflow::SchemaRef &schema = this->schemas_.at(tid);
+  const std::string &pkname = schema.NameOf(pk);
+  value_mapper.SetPK(pkname, pk_slice);
+  auto result = this->GetRecords(tid, value_mapper, true);
   auto rows = result.first;
   auto shards = result.second;
   // TO-DO: senity check, remove this line
-  assert(rows.size() == 1);
-  rocksdb::Slice keyslice = ExtractColumn(rows[0], pk);
-  rocksdb::Slice slice(rows[0]);
-  if (shards[0] != shard_name) {  // need to delete
-    auto skey = shards[0] + __ROCKSSEP + keyslice.ToString() + __ROCKSSEP;
-    PANIC(this->db_->Delete(rocksdb::WriteOptions(), handler,
-                            EncryptKey(this->global_key_, skey)));
-  }
-  // Update Indexes
-  for (size_t i = 0; i < indexed_columns.size(); i++) {
-    RocksdbIndex &index = indices.at(i);
-    size_t indexed_column = indexed_columns.at(i);
-    index.Delete(ExtractColumn(slice, indexed_column), shards[0], keyslice);
+  assert(rows.size() <= 1);
+  if (rows.size()) {
+    rocksdb::Slice keyslice = ExtractColumn(rows[0], pk);
+    rocksdb::Slice slice(rows[0]);
+    if (shards[0] != shard_name) {  // need to delete
+      auto skey = shards[0] + __ROCKSSEP + keyslice.ToString() + __ROCKSSEP;
+      PANIC(this->db_->Delete(rocksdb::WriteOptions(), handler,
+                              EncryptKey(this->global_key_, skey)));
+    }
+    // Update Indexes
+    for (size_t i = 0; i < indexed_columns.size(); i++) {
+      RocksdbIndex &index = indices.at(i);
+      size_t indexed_column = indexed_columns.at(i);
+      index.Delete(ExtractColumn(slice, indexed_column), shards[0], keyslice);
+    }
   }
 
   // Insert new row.
@@ -611,7 +617,6 @@ RocksdbConnection::GetRecords(TableID table_id, const ValueMapper &value_mapper,
   std::vector<std::string> keys;
   std::vector<std::string> shards;
   std::vector<std::string> result;
-  std::cout << "keyinfo: " << key_info.first << std::endl;
   if (key_info.first) {
     if (return_shards) {
       for (size_t i = 0; i < keys_raw.size(); i++) {
@@ -718,7 +723,6 @@ RocksdbConnection::KeyFinder(TableID table_id,
 
   // TO-DO (Vedant) this is expensive, will that effect performance?
   auto it = std::find(indexed_columns.begin(), indexed_columns.end(), pk);
-  std::cout << "hasbefore pk: " << value_mapper.HasBefore(pkname) << std::endl;
   if (it != indexed_columns.end() && value_mapper.HasBefore(pkname)) {
     auto i = it - indexed_columns.begin();
     RocksdbIndex &index = indices.at(i);
@@ -732,8 +736,6 @@ RocksdbConnection::KeyFinder(TableID table_id,
   for (size_t i = 0; i < indexed_columns.size(); i++) {
     RocksdbIndex &index = indices.at(i);
     const std::string &idxcolumn = schema.NameOf(indexed_columns.at(i));
-    std::cout << "hasbefore other: " << value_mapper.HasBefore(idxcolumn)
-              << std::endl;
     if (value_mapper.HasBefore(idxcolumn)) {
       keys = index.Get(value_mapper.Before(idxcolumn));
       // for (size_t i = 0; i < keys_raw.size(); i++) {

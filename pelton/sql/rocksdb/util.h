@@ -74,6 +74,9 @@ class ValueMapper : public sqlast::AbstractVisitor<ValuePair> {
   const std::vector<rocksdb::Slice> &After(const std::string &col) const {
     return this->after_.at(col);
   }
+  void SetPK(std::string pk, rocksdb::Slice value) {
+    this->before_[pk] = {value};
+  }
 
   // Visitors.
   ValuePair VisitCreateTable(const sqlast::CreateTable &ast) override;
