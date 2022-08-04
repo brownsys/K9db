@@ -43,6 +43,8 @@ class RocksdbConnection : public AbstractConnection {
   // Updates.
   InsertResult ExecuteInsert(const sqlast::Insert &sql,
                              const std::string &shard_name) override;
+  InsertResult ExecuteReplace(const sqlast::Insert &sql,
+                              const std::string &shard_name) override;
 
   SqlResult ExecuteUpdate(const sqlast::Update &sql) override;
   SqlResult ExecuteDelete(const sqlast::Delete &sql) override;
@@ -60,16 +62,14 @@ class RocksdbConnection : public AbstractConnection {
                                     const std::string &shard_name,
                                     const ValueMapper &value_mapper);
   std::pair<std::vector<std::string>, std::vector<std::string>> GetRecords(
-      const sqlast::AbstractStatement *stmt, TableID table_id,
-      const ValueMapper &value_mapper, bool return_shards);
+      TableID table_id, const ValueMapper &value_mapper, bool return_shards);
 
   // Filter records by where clause in abstract statement.
   std::vector<std::string> Filter(const dataflow::SchemaRef &schema,
                                   const sqlast::AbstractStatement *sql,
                                   std::vector<std::string> &&rows);
   std::pair<bool, std::vector<std::pair<std::string, std::string>>> KeyFinder(
-      const sqlast::AbstractStatement *stmt, TableID table_id,
-      const ValueMapper &value_mapper);
+      TableID table_id, const ValueMapper &value_mapper);
 
   // Gets encryption key corresponding to input user.
   // Creates key if does not exist.

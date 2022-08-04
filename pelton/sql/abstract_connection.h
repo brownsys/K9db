@@ -40,6 +40,8 @@ class AbstractConnection {
   // Updates.
   virtual InsertResult ExecuteInsert(const sqlast::Insert &sql,
                                      const std::string &shard_name) = 0;
+  virtual InsertResult ExecuteReplace(const sqlast::Insert &sql,
+                                      const std::string &shard_name) = 0;
 
   virtual SqlResult ExecuteUpdate(const sqlast::Update &sql) = 0;
 
