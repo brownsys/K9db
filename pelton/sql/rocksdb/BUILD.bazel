@@ -36,6 +36,24 @@ cc_library(
     deps = [
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@rocksdb",
+    ],
+)
+
+cc_library(
+    name = "project",
+    srcs = [
+        "project.cc",
+    ],
+    hdrs = [
+        "project.h",
+    ],
+    deps = [
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/sqlast:ast",
         "@glog",
         "@rocksdb",
     ],

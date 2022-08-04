@@ -30,6 +30,9 @@ class RocksdbIndex {
   std::vector<std::pair<std::string, std::string>> Get(
       const std::vector<rocksdb::Slice> &values);
 
+  std::vector<std::pair<std::string, std::string>> Get(
+      const std::vector<rocksdb::Slice> &values);
+
  private:
   rocksdb::DB *db_;
   std::unique_ptr<rocksdb::ColumnFamilyHandle> handle_;

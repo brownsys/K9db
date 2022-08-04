@@ -12,64 +12,6 @@ namespace sql {
 #define __ROCKSSEP 30
 #define __ROCKSNULL 0
 
-namespace {
-
-// NOLINTNEXTLINE
-const std::string NULLSTR = "NULL";
-const char NULLBUF[1] = {__ROCKSNULL};
-
-// Encoding values as rocksdb::Slice.
-rocksdb::Slice EncodeValue(sqlast::ColumnDefinition::Type type,
-                           const std::string *val) {
-  if (*val == NULLSTR) {
-    return {NULLBUF, sizeof(NULLBUF)};
-  }
-  switch (type) {
-    case sqlast::ColumnDefinition::Type::INT:
-    case sqlast::ColumnDefinition::Type::UINT:
-      return rocksdb::Slice{val->data(), val->size()};
-    case sqlast::ColumnDefinition::Type::TEXT:
-      return rocksdb::Slice{val->data() + 1, val->size() - 2};
-    case sqlast::ColumnDefinition::Type::DATETIME:
-      if (val->starts_with('"') || val->starts_with('\'')) {
-        return rocksdb::Slice{val->data() + 1, val->size() - 2};
-      }
-      return rocksdb::Slice{val->data(), val->size()};
-    default:
-      LOG(FATAL) << "UNREACHABLE";
-  }
-}
-// Decode value from a slice into a record.
-void DecodeValue(sqlast::ColumnDefinition::Type type,
-                 const rocksdb::Slice &slice, size_t idx,
-                 dataflow::Record *record) {
-  if (slice.size() == 1 && slice.data()[0] == __ROCKSNULL) {
-    record->SetNull(true, idx);
-    return;
-  }
-  std::string value(slice.data(), slice.size());
-  switch (type) {
-    case sqlast::ColumnDefinition::Type::UINT: {
-      record->SetUInt(std::stoul(value), idx);
-      break;
-    }
-    case sqlast::ColumnDefinition::Type::INT: {
-      record->SetInt(std::stol(value), idx);
-      break;
-    }
-    case sqlast::ColumnDefinition::Type::TEXT: {
-      record->SetString(std::make_unique<std::string>(std::move(value)), idx);
-      break;
-    }
-    case sqlast::ColumnDefinition::Type::DATETIME: {
-      record->SetDateTime(std::make_unique<std::string>(std::move(value)), idx);
-      break;
-    }
-  }
-}
-
-}  // namespace
-
 // Comparisons over rocksdb::Slice.
 bool SlicesEq(const rocksdb::Slice &l, const rocksdb::Slice &r) {
   if (l.size() != r.size()) {
@@ -96,108 +38,6 @@ bool SlicesGt(const rocksdb::Slice &l, const rocksdb::Slice &r) {
     }
   }
   return false;
-}
-
-// Returns true if the next value in buff represents a null.
-bool IsNull(const char *buf, size_t size) {
-  return size > 0 && buf[0] == __ROCKSNULL;
-}
-
-// Encode the values inside an Insert statement as a rocksdb value string.
-std::string EncodeInsert(const sqlast::Insert &stmt,
-                         const dataflow::SchemaRef &schema,
-                         const std::string &pk_value) {
-  std::string encoded = "";
-  for (size_t i = 0; i < schema.size(); i++) {
-    int idx = static_cast<size_t>(i);
-    if (stmt.HasColumns()) {
-      idx = stmt.GetColumnIndex(schema.NameOf(i));
-    }
-    const std::string *value = &NULLSTR;
-    if (idx > -1) {
-      value = &stmt.GetValue(idx);
-    } else if (schema.keys().at(0) == i) {
-      value = &pk_value;
-    }
-    rocksdb::Slice slice = EncodeValue(schema.TypeOf(i), value);
-    encoded += std::string(slice.data(), slice.size());
-    encoded += __ROCKSSEP;
-  }
-  return encoded;
-}
-
-// Decode the value from rocksdb to a record.
-dataflow::Record DecodeRecord(const rocksdb::Slice &slice,
-                              const dataflow::SchemaRef &schema,
-                              const std::vector<AugInfo> &augments,
-                              const std::vector<int> &projections) {
-  dataflow::Record record{schema, false};
-  if (projections.size() == 0) {
-    size_t begin = 0;
-    size_t end = 0;
-    const char *data = slice.data();
-    for (size_t i = 0; i < schema.size(); i++) {
-      rocksdb::Slice value;
-      if (augments.size() == 1 && i == augments.front().index) {
-        // Augmented value.
-        const std::string &aug = augments.front().value;
-        value = rocksdb::Slice(aug.data(), aug.size());
-      } else {
-        // Value must be read from input slice.
-        while (data[end] != __ROCKSSEP) {
-          end++;
-        }
-        // We are done with one value.
-        value = rocksdb::Slice(data + begin, end - begin);
-        // Continue to the next value.
-        begin = end + 1;
-        end = begin;
-      }
-      DecodeValue(schema.TypeOf(i), value, i, &record);
-    }
-  } else {
-    // map[i] -> region of slice for column i.
-    std::vector<std::pair<size_t, size_t>> map;
-    size_t begin = 0;
-    for (size_t end = 0; end < slice.size(); end++) {
-      if (slice.data()[end] == __ROCKSSEP) {
-        map.emplace_back(begin, end - begin);
-        begin = end + 1;
-      }
-    }
-    for (size_t i = 0; i < projections.size(); i++) {
-      int target = projections.at(i);
-      rocksdb::Slice value;
-      if (target == -1) {
-        const std::string &aug = augments.front().value;
-        value = rocksdb::Slice(aug.data(), aug.size());
-      } else if (target == -2) {
-        // Literal projection.
-        value = EncodeValue(schema.TypeOf(i), &schema.NameOf(i));
-      } else {
-        auto &pair = map.at(target);
-        value = rocksdb::Slice(slice.data() + pair.first, pair.second);
-      }
-      DecodeValue(schema.TypeOf(i), value, i, &record);
-    }
-  }
-  return record;
-}
-
-rocksdb::Slice ExtractColumn(const rocksdb::Slice &slice, size_t col) {
-  size_t begin = 0;
-  size_t end = 0;
-  const char *data = slice.data();
-  for (size_t i = 0; i <= col; i++) {
-    while (data[end] != __ROCKSSEP) {
-      end++;
-    }
-    if (i < col) {
-      begin = end + 1;
-      end = begin;
-    }
-  }
-  return rocksdb::Slice{data + begin, end - begin};
 }
 
 std::string Update(const std::unordered_map<std::string, std::string> &update,
@@ -228,27 +68,6 @@ std::string Update(const std::unordered_map<std::string, std::string> &update,
     end = begin;
   }
   return replaced;
-}
-
-// Schema Manipulation.
-std::vector<int> ProjectionSchema(const dataflow::SchemaRef &db_schema,
-                                  const dataflow::SchemaRef &out_schema,
-                                  const std::vector<AugInfo> &augments) {
-  std::vector<int> projections;
-  for (size_t i = 0; i < out_schema.size(); i++) {
-    if (augments.size() == 1 && i == augments.front().index) {
-      projections.push_back(-1);
-    } else {
-      const std::string &name = out_schema.NameOf(i);
-      if ((name[0] >= '0' && name[0] <= '9') || name[0] == '\'') {
-        projections.push_back(-2);
-      } else {
-        size_t idx = db_schema.IndexOf(out_schema.NameOf(i));
-        projections.push_back(static_cast<int>(idx));
-      }
-    }
-  }
-  return projections;
 }
 
 // Find all values mapped to any column from a column set.

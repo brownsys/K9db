@@ -7,6 +7,7 @@
 
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
+#include "pelton/sqlast/ast.h"
 #include "rocksdb/slice.h"
 
 #define __ROCKSSEP static_cast<char>(30)
@@ -15,18 +16,31 @@
 namespace pelton {
 namespace sql {
 
+// Helpers.
+std::string EncodeValue(sqlast::ColumnDefinition::Type type,
+                        const std::string &value);
+
+rocksdb::Slice ExtractColumn(const rocksdb::Slice &slice, size_t col);
+
 class RocksdbRecord {
  public:
   // Construct a record when reading from rocksdb.
   RocksdbRecord(const rocksdb::Slice &key, const rocksdb::Slice &value);
+  RocksdbRecord(std::string &&key, std::string &&value)
+      : key_(std::move(key)), value_(std::move(value)) {}
 
   // Construct a record when handling SQL statements.
-  RocksdbRecord(const std::string &shard_name, const std::string &pk,
-                const std::vector<std::string> &values);
+  static RocksdbRecord FromInsert(const sqlast::Insert &stmt,
+                                  const dataflow::SchemaRef &schema,
+                                  const std::string &shard_name);
 
   // For writing/encoding.
   rocksdb::Slice Key() const;
   rocksdb::Slice Value() const;
+
+  // For reading/decoding.
+  dataflow::Record DecodeRecord(const dataflow::SchemaRef &schema) const;
+  rocksdb::Slice GetPK() const;
 
  private:
   std::string key_;
