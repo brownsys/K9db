@@ -60,6 +60,23 @@ cc_library(
 )
 
 cc_library(
+    name = "filter",
+    srcs = [
+        "filter.cc",
+    ],
+    hdrs = [
+        "filter.h",
+    ],
+    deps = [
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/sqlast:ast",
+        "//pelton/sqlast:value_mapper",
+        "@glog",
+    ],
+)
+
+cc_library(
     name = "index",
     srcs = [
         "index.cc",
@@ -70,24 +87,6 @@ cc_library(
     deps = [
         ":encode",
         "//pelton/util:status",
-        "@glog",
-        "@rocksdb",
-    ],
-)
-
-cc_library(
-    name = "util",
-    srcs = [
-        "util.cc",
-    ],
-    hdrs = [
-        "util.h",
-    ],
-    deps = [
-        "//pelton/dataflow:record",
-        "//pelton/dataflow:schema",
-        "//pelton/sql:abstract_connection",
-        "//pelton/sqlast:ast",
         "@glog",
         "@rocksdb",
     ],

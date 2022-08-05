@@ -145,6 +145,44 @@ rocksdb::Slice RocksdbRecord::GetPK() const {
   return ExtractColumn(this->key_, 1);
 }
 
+// For updating.
+RocksdbRecord RocksdbRecord::Update(
+    const std::unordered_map<size_t, std::string> &update,
+    const dataflow::SchemaRef &schema, const std::string &shard_name) const {
+  // Encode key.
+  std::string key = shard_name + __ROCKSSEP;
+  const auto &keys = schema.keys();
+  CHECK_EQ(keys.size(), 1u) << "schema has too many keys " << schema;
+  int idx = keys.at(0);
+  if (update.count(idx) == 1) {
+    CHECK_NE(update.at(idx), "NULL");
+    key += update.at(idx) + __ROCKSSEP;
+  } else {
+    rocksdb::Slice pk = this->GetPK();
+    key.append(pk.data(), pk.size());
+    key.push_back(__ROCKSSEP);
+  }
+  // Encode Value.
+  std::string value;
+  size_t i = 0;
+  for (size_t col = 0; col < schema.size(); col++) {
+    if (update.count(col) == 1) {
+      value += update.at(col) + __ROCKSSEP;
+      while (this->value_[i] != __ROCKSSEP) {
+        i++;
+      }
+      i++;
+    } else {
+      while (this->value_[i] != __ROCKSSEP) {
+        value.push_back(this->value_[i++]);
+      }
+      value.push_back(__ROCKSSEP);
+      i++;
+    }
+  }
+  return RocksdbRecord(std::move(key), std::move(value));
+}
+
 /*
  * RocksdbIndexRecord
  */

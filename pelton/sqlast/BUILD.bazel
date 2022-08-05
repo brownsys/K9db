@@ -81,3 +81,19 @@ cc_library(
         "@com_google_absl//absl/status:statusor",
     ],
 )
+
+cc_library(
+    name = "value_mapper",
+    srcs = [
+        "value_mapper.cc",
+    ],
+    hdrs = [
+        "value_mapper.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":ast",
+        "//pelton/dataflow:schema",
+        "@glog",
+    ],
+)

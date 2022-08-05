@@ -2,6 +2,7 @@
 #define PELTON_SQL_ROCKSDB_ENCODE_H__
 
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -41,6 +42,11 @@ class RocksdbRecord {
   // For reading/decoding.
   dataflow::Record DecodeRecord(const dataflow::SchemaRef &schema) const;
   rocksdb::Slice GetPK() const;
+
+  // For updating.
+  RocksdbRecord Update(const std::unordered_map<size_t, std::string> &update,
+                       const dataflow::SchemaRef &schema,
+                       const std::string &shard_name) const;
 
  private:
   std::string key_;
