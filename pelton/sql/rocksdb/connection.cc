@@ -638,27 +638,5 @@ RocksdbConnection::KeyFinder(TableID table_id,
   return {false, {}};
 }
 
-// Gets key corresponding to input user. Creates key if does not exist.
-unsigned char *RocksdbConnection::GetUserKey(const std::string &shard_name) {
-#ifdef PELTON_ENCRYPTION
-  shards::SharedLock lock(&this->user_keys_mtx_);
-  std::unordered_map<std::string, unsigned char *>::const_iterator it =
-      this->user_keys_.find(shard_name);
-  if (it == this->user_keys_.cend()) {
-    shards::UniqueLock upgraded(std::move(lock));
-    it = this->user_keys_.find(shard_name);
-    if (it == this->user_keys_.cend()) {
-      unsigned char *key = KeyGen();
-      this->user_keys_.emplace(shard_name, key);
-      return key;
-    }
-    return it->second;
-  }
-  return it->second;
-#else
-  return nullptr;
-#endif  // PELTON_ENCRYPTION
-}
-
 }  // namespace sql
 }  // namespace pelton

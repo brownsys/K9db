@@ -26,7 +26,9 @@ rocksdb::Slice ExtractColumn(const rocksdb::Slice &slice, size_t col);
 class RocksdbRecord {
  public:
   // Construct a record when reading from rocksdb.
-  RocksdbRecord(const rocksdb::Slice &key, const rocksdb::Slice &value);
+  RocksdbRecord(const rocksdb::Slice &key, const rocksdb::Slice &value)
+      : key_(key.data(), key.size()), value_(value.data(), value.size()) {}
+
   RocksdbRecord(std::string &&key, std::string &&value)
       : key_(std::move(key)), value_(std::move(value)) {}
 
@@ -36,12 +38,15 @@ class RocksdbRecord {
                                   const std::string &shard_name);
 
   // For writing/encoding.
-  rocksdb::Slice Key() const;
-  rocksdb::Slice Value() const;
+  rocksdb::Slice Key() const { return rocksdb::Slice(this->key_); }
+  rocksdb::Slice Value() const { return rocksdb::Slice(this->value_); }
+  std::string &&ReleaseKey() { return std::move(this->key_); }
+  std::string &&ReleaseValue() { return std::move(this->value_); }
 
   // For reading/decoding.
   dataflow::Record DecodeRecord(const dataflow::SchemaRef &schema) const;
-  rocksdb::Slice GetPK() const;
+  rocksdb::Slice GetShard() const { return ExtractColumn(this->key_, 0); }
+  rocksdb::Slice GetPK() const { return ExtractColumn(this->key_, 1); }
 
   // For updating.
   RocksdbRecord Update(const std::unordered_map<size_t, std::string> &update,

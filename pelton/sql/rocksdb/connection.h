@@ -67,10 +67,6 @@ class RocksdbConnection : public AbstractConnection {
   std::pair<bool, std::vector<std::pair<std::string, std::string>>> KeyFinder(
       TableID table_id, const ValueMapper &value_mapper);
 
-  // Gets encryption key corresponding to input user.
-  // Creates key if does not exist.
-  unsigned char *GetUserKey(const std::string &shard_name);
-
   // Members.
   std::unique_ptr<rocksdb::DB> db_;
   std::unordered_map<std::string, TableID> tables_;
@@ -82,10 +78,8 @@ class RocksdbConnection : public AbstractConnection {
   std::unordered_map<TableID, std::vector<RocksdbIndex>> indices_;
   std::unordered_map<TableID, std::atomic<uint64_t>> auto_increment_counters_;
 
-  // Encryption keys.
-  unsigned char *global_key_;
-  std::unordered_map<std::string, unsigned char *> user_keys_;
-  mutable shards::UpgradableMutex user_keys_mtx_;
+  // Encryption manager
+  EncryptionManager encryption_manager_;
 };
 
 }  // namespace sql

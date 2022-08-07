@@ -53,17 +53,13 @@ rocksdb::Slice ExtractColumn(const rocksdb::Slice &slice, size_t col) {
 /*
  * RocksdbRecord
  */
-// Construct a record when reading from rocksdb.
-RocksdbRecord::RocksdbRecord(const rocksdb::Slice &key,
-                             const rocksdb::Slice &value)
-    : key_(key.ToString()), value_(value.ToString()) {}
-
 // Construct a record when handling SQL statements.
 RocksdbRecord RocksdbRecord::FromInsert(const sqlast::Insert &stmt,
                                         const dataflow::SchemaRef &schema,
                                         const std::string &shard_name) {
   // Encode key.
-  std::string key = shard_name + __ROCKSSEP;
+  std::string key = shard_name;
+  key.push_back(__ROCKSSEP);
   const auto &keys = schema.keys();
   CHECK_EQ(keys.size(), 1u) << "schema has too many keys " << schema;
   int idx = keys.at(0);
@@ -73,7 +69,8 @@ RocksdbRecord RocksdbRecord::FromInsert(const sqlast::Insert &stmt,
   }
   const std::string &pk_value = stmt.GetValue(idx);
   CHECK_NE(pk_value, "NULL");
-  key += EncodeValue(schema.TypeOf(keys.at(0)), pk_value) + __ROCKSSEP;
+  key.append(EncodeValue(schema.TypeOf(keys.at(0)), pk_value));
+  key.push_back(__ROCKSSEP);
 
   // Encode Value.
   std::string value;
@@ -83,15 +80,10 @@ RocksdbRecord RocksdbRecord::FromInsert(const sqlast::Insert &stmt,
       idx = stmt.GetColumnIndex(schema.NameOf(i));
     }
     const std::string &val = stmt.GetValue(idx);
-    value += EncodeValue(schema.TypeOf(i), val) + __ROCKSSEP;
+    value.append(EncodeValue(schema.TypeOf(i), val));
+    value.push_back(__ROCKSSEP);
   }
   return RocksdbRecord(std::move(key), std::move(value));
-}
-
-// Key and value (for writing).
-rocksdb::Slice RocksdbRecord::Key() const { return rocksdb::Slice(this->key_); }
-rocksdb::Slice RocksdbRecord::Value() const {
-  return rocksdb::Slice(this->value_);
 }
 
 // For reading/decoding.
@@ -139,10 +131,6 @@ dataflow::Record RocksdbRecord::DecodeRecord(
   }
 
   return record;
-}
-
-rocksdb::Slice RocksdbRecord::GetPK() const {
-  return ExtractColumn(this->key_, 1);
 }
 
 // For updating.
