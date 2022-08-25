@@ -237,6 +237,7 @@ cc_library(
         "gdpr.h",
     ],
     deps = [
+        ":resubscribe",
         ":delete",
         ":index",
         ":select",
@@ -253,3 +254,30 @@ cc_library(
         "@com_google_absl//absl/strings",
     ],
 )
+
+cc_library(
+    name = "resubscribe",
+    srcs = [
+        "resubscribe.cc",
+    ],
+    hdrs = [
+        "resubscribe.h",
+    ],
+    deps = [
+        ":delete",
+        ":index",
+        ":select",
+        ":update",
+        "//pelton:connection",
+        "//pelton/dataflow:dstate",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/shards:upgradable_lock",
+        "//pelton/shards/sqlengine:util",
+        "//pelton/sqlast:ast",
+        "//pelton/util:status",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+    ],
+)
+

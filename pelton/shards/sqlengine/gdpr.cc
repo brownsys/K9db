@@ -13,10 +13,12 @@
 #include "absl/strings/match.h"
 #include "pelton/shards/sqlengine/delete.h"
 #include "pelton/shards/sqlengine/index.h"
+#include "pelton/shards/sqlengine/insert.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/update.h"
 #include "pelton/shards/sqlengine/util.h"
 #include "pelton/shards/upgradable_lock.h"
+#include "pelton/sqlast/ast_statements.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -25,6 +27,76 @@ namespace sqlengine {
 namespace gdpr {
 
 namespace {
+
+std::vector<std::string> split_record(std::string rec) {
+  std::vector<std::string> ret;
+  rec = rec.substr(1);
+  auto len = rec.length();
+  auto sep = rec.find("|");
+  while (true) {
+    ret.push_back(rec.substr(0, sep));
+    rec = rec.substr(sep + 1);
+    if (rec == "") {
+      break;
+    }
+    sep = rec.find("|");
+  }
+  std::cout << "printing record: " << std::endl;
+  for (auto i : ret) {
+    std::cout << "element: " << i << std::endl;
+  }
+  return ret;
+}
+
+absl::StatusOr<sql::SqlResult> Resubscribe(Connection *connection) {
+  std::string line;
+  std::ifstream user_data("/home/pelton/user_data.txt");
+  // TO-DO assrt that file has content and is in right format
+  getline(user_data, line);
+  // std::string user_id = line
+  size_t rows = 0;
+  std::cout << "cp 1" << std::endl;
+  while (getline(user_data, line)) {
+    std::cout << "cp 2" << std::endl;
+    // TO-DO: assuming table name does not have any spaces
+    auto space_loc = line.find(" ");
+    std::cout << "line: " << line << std::endl;
+    auto table_name = line.substr(0, space_loc);
+    auto num_records = std::stoi(line.substr(space_loc + 1));
+    rows += num_records;
+    std::cout << "cp 3" << std::endl;
+    auto schema =
+        connection->state->dataflow_state()->GetTableSchema(table_name);
+    std::cout << "cp 3+" << std::endl;
+    std::cout << "numrecords: " << num_records << std::endl;
+    for (int i = 0; i < num_records; i++) {
+      std::cout << "cp 4" << std::endl;
+      getline(user_data, line);
+      auto ins = pelton::sqlast::Insert(table_name, false);
+      std::cout << "cp 4a" << std::endl;
+      auto record = split_record(line);
+      std::cout << "cp 4b" << std::endl;
+      auto col_types = schema.column_types();
+      std::cout << "cp 5" << std::endl;
+      for (int j = 0; j < record.size(); j++) {
+        if (col_types[i] == pelton::sqlast::ColumnDefinition::Type::TEXT ||
+            col_types[i] == pelton::sqlast::ColumnDefinition::Type::DATETIME) {
+          record[i] = "'" + record[i] + "'";
+        }
+      }
+      std::cout << "cp 6" << std::endl;
+      ins.SetValues(std::move(record));
+      // TO-DO how to I write the insert statement and spefically where do I get
+      // the lock from?
+      SharedLock lock = connection->state->sharder_state()->ReaderLock();
+      std::cout << "cp 7" << std::endl;
+      // TO-DO - ignore return value?
+      pelton::shards::sqlengine::insert::Shard(ins, connection, &lock, true);
+      std::cout << "loop end reached" << std::endl;
+    }
+    return sql::SqlResult(rows);
+  }
+}
 
 // add to result
 sql::SqlResult GetDataFromShardedTable(const ShardingInformation &info,
@@ -225,6 +297,70 @@ absl::Status GetAccessableData(const std::string &shard_kind,
   return absl::OkStatus();
 }
 
+void File(const sqlast::GDPRStatement &stmt, Connection *connection) {
+  std::cout << "in file" << std::endl;
+  std::cout << "data file is created!" << std::endl;
+  std::ofstream user_file;
+  user_file.open("/home/pelton/user_data.txt");
+  const std::string &shard_kind = stmt.shard_kind();
+  const std::string &user_id = stmt.user_id();
+  const std::string &unquoted_user_id = Dequote(user_id);
+  auto &exec = connection->executor;
+
+  shards::SharderState *state = connection->state->sharder_state();
+  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  std::cout << "before lock" << std::endl;
+  SharedLock lock = state->ReaderLock();
+  std::cout << "after lock" << std::endl;
+  // To-do - vs dequotes version?
+  user_file << user_id << std::endl;
+  for (const auto &table_name : state->TablesInShard(shard_kind)) {
+    dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
+
+    sql::SqlResult table_result(schema);
+    for (const ShardingInformation *info :
+         state->GetShardingInformationFor(table_name, shard_kind)) {
+      // Augment returned results with the user_id.
+      int aug_index = -1;
+      if (!info->IsTransitive()) {
+        aug_index = info->shard_by_index;
+      }
+
+      LOG(INFO) << "Looking up from table " << info->sharded_table_name;
+
+      sqlast::Select tbl_stmt{info->sharded_table_name};
+      tbl_stmt.AddColumn("*");
+      table_result.Append(
+          exec.Shard(&tbl_stmt, unquoted_user_id, schema, aug_index), true);
+    }
+    CHECK_EQ(table_result.ResultSets().size(), 1);
+    LOG(INFO) << "Found a total of " << table_result.ResultSets().front().size()
+              << " rows";
+    auto record_set = table_result.ResultSets().front().Vec();
+    user_file << table_name << " " << record_set.size() << std::endl;
+    for (int j = 0; j < record_set.size(); j++) {
+      auto &record = record_set[j];
+      record.SetPositive(true);
+      user_file << record << std::endl;
+    }
+  }
+  // TO-DO - why do the lines below need to be commented out?
+  // if (state->HasAccessorIndices(shard_kind)) {
+  //   CHECK_STATUS(GetAccessableData(shard_kind, user_id, connection,
+  //   &result));
+  // }
+  // for (int i = 0; i < result.ResultSets().size(); i++) {
+  //   auto record_set = result.ResultSets()[i].Vec();
+  //   for (int j = 0; j < record_set.size(); j++) {
+  //     auto& record = record_set[j];
+  //     record.SetPositive(true);
+  //     user_file << record << std::endl;
+  //   }
+  // }
+  std::cout << "file is closed!" << std::endl;
+  user_file.close();
+}
+
 absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
                                       Connection *connection) {
   const std::string &shard_kind = stmt.shard_kind();
@@ -379,60 +515,8 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
       }
     }
   }
+  std::cout << "calling file" << std::endl;
   return result;
-}
-
-void File(const sqlast::GDPRStatement &stmt, Connection *connection) {
-  std::cout << "data file is created!" << std::endl;
-  std::ofstream user_file;
-  user_file.open("data.txt");
-  const std::string &shard_kind = stmt.shard_kind();
-  const std::string &user_id = stmt.user_id();
-  const std::string &unquoted_user_id = Dequote(user_id);
-  auto &exec = connection->executor;
-
-  shards::SharderState *state = connection->state->sharder_state();
-  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
-  SharedLock lock = state->ReaderLock();
-
-  sql::SqlResult result(std::vector<sql::SqlResultSet>{});
-  for (const auto &table_name : state->TablesInShard(shard_kind)) {
-    dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
-
-    sql::SqlResult table_result(schema);
-    for (const ShardingInformation *info :
-         state->GetShardingInformationFor(table_name, shard_kind)) {
-      // Augment returned results with the user_id.
-      int aug_index = -1;
-      if (!info->IsTransitive()) {
-        aug_index = info->shard_by_index;
-      }
-
-      LOG(INFO) << "Looking up from table " << info->sharded_table_name;
-
-      sqlast::Select tbl_stmt{info->sharded_table_name};
-      tbl_stmt.AddColumn("*");
-      table_result.Append(
-          exec.Shard(&tbl_stmt, unquoted_user_id, schema, aug_index), true);
-    }
-    CHECK_EQ(table_result.ResultSets().size(), 1);
-    LOG(INFO) << "Found a total of " << table_result.ResultSets().front().size()
-              << " rows";
-    result.AddResultSet(std::move(table_result.ResultSets().front()));
-  }
-  // TO-DO - why do the lines below need to be commented out?
-  // if (state->HasAccessorIndices(shard_kind)) {
-  //   CHECK_STATUS(GetAccessableData(shard_kind, user_id, connection,
-  //   &result));
-  // }
-  for (int i = 0; i < result.ResultSets().size(); i++) {
-    for (int j = 0; j < result.ResultSets()[i].Vec().size(); j++) {
-      std::cout << result.ResultSets()[i].Vec()[j] << std::endl;
-      user_file << result.ResultSets()[i].Vec()[j] << std::endl;
-    }
-  }
-  std::cout << "file is closed!" << std::endl;
-  user_file.close();
 }
 
 absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
@@ -484,8 +568,10 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
                                      Connection *connection) {
   if (stmt.operation() == sqlast::GDPRStatement::Operation::FORGET) {
+    File(stmt, connection);
     return Forget(stmt, connection);
   } else {
+    Resubscribe(connection);
     return Get(stmt, connection);
   }
 }

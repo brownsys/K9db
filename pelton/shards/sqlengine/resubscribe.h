@@ -1,7 +1,6 @@
-// GDPR statements handling (FORGET and GET).
 
-#ifndef  PELTON_SHARDS_SQLENGINE_RESUBSCRIBE_H_
-#define  PELTON_SHARDS_SQLENGINE_RESUBSCRIBE_H_
+#ifndef PELTON_SHARDS_SQLENGINE_RESUBSCRIBE_H_
+#define PELTON_SHARDS_SQLENGINE_RESUBSCRIBE_H_
 
 #include "absl/status/statusor.h"
 #include "pelton/connection.h"
@@ -16,8 +15,7 @@ namespace shards {
 namespace sqlengine {
 namespace resubscribe {
 
-// absl::StatusOr<sql::SqlResult> Resubscribe(const sqlast::GDPRStatement &stmt,
-// Connection *connection);
+absl::StatusOr<sql::SqlResult> Resubscribe(Connection *connection);
 
 }  // namespace resubscribe
 }  // namespace sqlengine
