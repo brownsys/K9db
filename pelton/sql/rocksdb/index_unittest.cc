@@ -56,7 +56,7 @@ rocksdb::Slice pk5("pk40");
 rocksdb::Slice pk6("zz");
 
 // Does get and get_all get all data?
-TEST(RocksdbConnectionTest, GetAll) {
+TEST(RocksdbIndexTest, GetAll) {
   std::unique_ptr<rocksdb::DB> db = InitializeDatabase();
 
   RocksdbIndex index(db.get(), 0, 0);
@@ -70,7 +70,7 @@ TEST(RocksdbConnectionTest, GetAll) {
 }
 
 // Does get work with non-existent shard names
-TEST(RocksdbConnectionTest, GetNonExistent) {
+TEST(RocksdbIndexTest, GetNonExistent) {
   std::unique_ptr<rocksdb::DB> db = InitializeDatabase();
 
   RocksdbIndex index(db.get(), 0, 0);
@@ -82,7 +82,7 @@ TEST(RocksdbConnectionTest, GetNonExistent) {
 }
 
 // Some column Values passed to get and get_all are non-existent
-TEST(RocksdbConnectionTest, GetSomeNonExistent) {
+TEST(RocksdbIndexTest, GetSomeNonExistent) {
   std::unique_ptr<rocksdb::DB> db = InitializeDatabase();
 
   RocksdbIndex index(db.get(), 0, 0);
@@ -95,7 +95,7 @@ TEST(RocksdbConnectionTest, GetSomeNonExistent) {
 }
 
 // Do get and get_all work if no data has been inserted yet?
-TEST(RocksdbConnectionTest, NoData) {
+TEST(RocksdbIndexTest, NoData) {
   std::unique_ptr<rocksdb::DB> db = InitializeDatabase();
 
   RocksdbIndex index(db.get(), 0, 0);
@@ -103,7 +103,7 @@ TEST(RocksdbConnectionTest, NoData) {
 }
 
 // Does get and all confuse entries where the values are swapped
-TEST(RocksdbConnectionTest, SimpleGet) {
+TEST(RocksdbIndexTest, SimpleGet) {
   std::unique_ptr<rocksdb::DB> db = InitializeDatabase();
 
   RocksdbIndex index(db.get(), 0, 0);
@@ -144,7 +144,7 @@ TEST(RocksdbConnectionTest, SimpleGet) {
 }
 
 // Does get and get_all work correctly right after delete
-TEST(RocksdbConnectionTest, GetAfterDelete) {
+TEST(RocksdbIndexTest, GetAfterDelete) {
   std::unique_ptr<rocksdb::DB> db = InitializeDatabase();
 
   RocksdbIndex index(db.get(), 0, 0);

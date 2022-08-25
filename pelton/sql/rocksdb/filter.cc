@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "glog/logging.h"
+#include "pelton/sqlast/ast.h"
 
 namespace pelton {
 namespace sql {

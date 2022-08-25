@@ -81,12 +81,7 @@ std::vector<std::pair<std::string, std::string>> RocksdbIndex::Get(
 
 // PrefixTransform
 rocksdb::Slice PrefixTransform::Transform(const rocksdb::Slice &key) const {
-  for (size_t i = 0; i < key.size(); i++) {
-    if (key.data()[i] == __ROCKSSEP) {
-      return rocksdb::Slice(key.data(), i + 1);
-    }
-  }
-  LOG(FATAL) << "Key is badly formatted " << key.ToString();
+  return ExtractColumn(key, 0);
 }
 
 }  // namespace sql

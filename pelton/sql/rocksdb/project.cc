@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "glog/logging.h"
+#include "pelton/sqlast/ast.h"
 
 namespace pelton {
 namespace sql {
@@ -36,7 +37,7 @@ Projection ProjectionSchema(const dataflow::SchemaRef &table_schema,
       uint32_t idx = table_schema.IndexOf(col_name);
       types.push_back(table_schema.TypeOf(idx));
       map.emplace_back(idx);
-      if (idx == keys.at(0)) {
+      if (idx == table_schema.keys().at(0)) {
         keys.push_back(i);
       }
     }

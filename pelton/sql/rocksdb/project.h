@@ -8,7 +8,6 @@
 
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
-#include "pelton/sqlast/ast.h"
 
 namespace pelton {
 namespace sql {

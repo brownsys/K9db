@@ -37,6 +37,14 @@ class ValueMapper : public AbstractVisitor<void> {
   void RemoveBefore(size_t col_idx) { this->before_.erase(col_idx); }
   void RemoveAfter(size_t col_idx) { this->after_.erase(col_idx); }
 
+  // For testing.
+  void AddBefore(size_t col_idx, const std::string &val) {
+    this->before_[col_idx].push_back(val);
+  }
+  void SetAfter(size_t col_idx, const std::string &val) {
+    this->after_[col_idx] = val;
+  }
+
   // Visitors.
   // These are unsupported.
   void VisitCreateTable(const sqlast::CreateTable &ast) override;
