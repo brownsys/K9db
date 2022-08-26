@@ -95,9 +95,18 @@ EncryptedRecord EncryptionManager::EncryptRecord(const std::string &user_id,
     LOG(FATAL) << "Cannot encrypt value!";
   }
 
+  char *encrypted_value = reinterpret_cast<char *>(ct.get());
+  return EncryptedRecord(this->EncryptKey(r.Key()),
+                         std::string(encrypted_value, ct_len));
+}
+
+// Encrypts a fully encoded key with a shardname and a pk.
+std::string EncryptionManager::EncryptKey(rocksdb::Slice key) {
+  const unsigned char *nonce = this->global_nonce_.get();
+
   // Allocate memory for encrypted key.
-  rocksdb::Slice shard = r.GetShard();
-  rocksdb::Slice pk = r.GetPK();
+  rocksdb::Slice shard = ExtractColumn(key, 0);
+  rocksdb::Slice pk = ExtractColumn(key, 1);
   size_t max_key_ct_size =
       shard.size() + pk.size() + 2 * CIPHER_OVERHEAD + sizeof(size_t);
   std::unique_ptr<unsigned char[]> key_ct =
@@ -126,17 +135,17 @@ EncryptedRecord EncryptionManager::EncryptRecord(const std::string &user_id,
   memcpy(key_ct.get() + shard_size + key_ct_size, &shard_size, sizeof(size_t));
 
   char *encrypted_key = reinterpret_cast<char *>(key_ct.get());
-  char *encrypted_value = reinterpret_cast<char *>(ct.get());
-  return EncryptedRecord(
-      std::string(encrypted_key, shard_size + key_ct_size + sizeof(size_t)),
-      std::string(encrypted_value, ct_len));
+  return std::string(encrypted_key, shard_size + key_ct_size + sizeof(size_t));
 }
 
 // Decrypts an encrypted record value.
 RocksdbRecord EncryptionManager::DecryptRecord(const std::string &user_id,
                                                EncryptedRecord &&r) const {
   // Decrypt key!
-  std::string decrypted_key = this->DecryptKey(r.ReleaseKey());
+  std::string decrypted_key = "";
+  if (r.Key().size() > 0) {
+    decrypted_key = this->DecryptKey(r.ReleaseKey());
+  }
 
   // Get encryption key.
   const unsigned char *key = this->GetUserKey(user_id);

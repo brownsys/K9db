@@ -29,6 +29,16 @@ std::string EncodeValue(sqlast::ColumnDefinition::Type type,
   }
 }
 
+std::string EncodeShardName(const std::string &shard_name) {
+  if (shard_name[0] == '\'') {
+    LOG(FATAL) << "Shard name starts with quotes!";
+  }
+  if (shard_name == "NULL") {
+    LOG(FATAL) << "Shard is null!";
+  }
+  return shard_name + __ROCKSSEP;
+}
+
 rocksdb::Slice ExtractColumn(const rocksdb::Slice &slice, size_t col) {
   const char *data = slice.data();
   size_t start = 0;
@@ -180,11 +190,10 @@ RocksdbIndexRecord::RocksdbIndexRecord(const rocksdb::Slice &slice)
 
 // When handling SQL statements.
 RocksdbIndexRecord::RocksdbIndexRecord(const rocksdb::Slice &index_value,
-                                       const std::string &shard_name,
-                                       const rocksdb::Slice &pk)
-    : key_() {
-  this->key_ = index_value.ToString() + __ROCKSSEP + shard_name + __ROCKSSEP +
-               pk.ToString() + __ROCKSSEP;
+                                       const rocksdb::Slice &shard_name,
+                                       const rocksdb::Slice &pk) {
+  this->key_ = index_value.ToString() + __ROCKSSEP + shard_name.ToString() +
+               __ROCKSSEP + pk.ToString() + __ROCKSSEP;
 }
 
 // For writing/encoding.
@@ -198,6 +207,16 @@ rocksdb::Slice RocksdbIndexRecord::ExtractShardName() const {
 }
 rocksdb::Slice RocksdbIndexRecord::ExtractPK() const {
   return ExtractColumn(this->key_, 2);
+}
+// For looking up records corresponding to index entry.
+rocksdb::Slice RocksdbIndexRecord::TargetKey() const {
+  for (size_t i = 0; i < this->key_.size(); i++) {
+    if (this->key_[i] == __ROCKSSEP) {
+      return rocksdb::Slice(this->key_.data() + i + 1,
+                            this->key_.size() - i - 1);
+    }
+  }
+  LOG(FATAL) << "Cannot extract index target key";
 }
 
 }  // namespace sql

@@ -6,14 +6,12 @@
 #include <string>
 #include <utility>
 
-#include "pelton/sqlast/ast.h"
-#include "pelton/sqlast/parser.h"
-
-// Mut be included after parser to avoid duplicating FAIL() definition as macro.
-// NOLINTNEXTLINE
 #include "glog/logging.h"
-// NOLINTNEXTLINE
 #include "gtest/gtest.h"
+#include "pelton/dataflow/record.h"
+#include "pelton/dataflow/schema.h"
+#include "pelton/sql/result.h"
+#include "pelton/sqlast/ast.h"
 
 #define DB_NAME "test"
 #define DB_PATH "/tmp/pelton/rocksdb/test"
@@ -22,17 +20,19 @@ namespace pelton {
 namespace sql {
 
 namespace {
-using CType = sqlast::ColumnDefinition::Type;
-typedef uint32_t ColumnID;
-// Drop the database (if it exists).
-void DropDatabase() { std::filesystem::remove_all(DB_PATH); }
 
-std::unique_ptr<sqlast::AbstractStatement> Parse(const std::string &sql) {
-  sqlast::SQLParser parser;
-  // std::unique_ptr<sqlast::AbstractStatement> statement,
-  auto statusor = parser.Parse(sql);
-  EXPECT_TRUE(statusor.ok()) << statusor.status();
-  return std::move(statusor.value());
+using CType = sqlast::ColumnDefinition::Type;
+using Constraint = sqlast::ColumnConstraint::Type;
+using EType = sqlast::Expression::Type;
+
+std::unique_ptr<RocksdbConnection> InitializeDatabase() {
+  // Drop the database (if it exists).
+  std::filesystem::remove_all(DB_PATH);
+  // Initialize a new connection.
+  std::unique_ptr<RocksdbConnection> conn =
+      std::make_unique<RocksdbConnection>();
+  conn->Open(DB_NAME);
+  return conn;
 }
 
 void Print(std::vector<dataflow::Record> &&records,
@@ -43,14 +43,70 @@ void Print(std::vector<dataflow::Record> &&records,
   }
   std::cout << std::endl;
 }
-void CheckEqual(const std::vector<dataflow::Record> *a,
-                const std::vector<dataflow::Record *> b) {
-  assert((*a).size() == b.size());
+
+void CheckEqual(const std::vector<dataflow::Record> &a,
+                const std::vector<dataflow::Record> &b) {
+  assert(a.size() == b.size());
   for (size_t i = 0; i < b.size(); i++) {
-    assert(std::count((*a).begin(), (*a).end(), *b[i]));
+    assert(std::count(a.begin(), a.end(), b.at(i)) == 1);
   }
+}
+
 }  // namespace
 
+TEST(RocksdbConnectionTest, CreateInsertSelect) {
+  std::unique_ptr<RocksdbConnection> conn = InitializeDatabase();
+
+  // Create Table.
+  sqlast::CreateTable tbl("test_table");
+  tbl.AddColumn("ID", sqlast::ColumnDefinition("ID", CType::INT));
+  tbl.AddColumn("name", sqlast::ColumnDefinition("name", CType::TEXT));
+  tbl.AddColumn("age", sqlast::ColumnDefinition("age", CType::INT));
+  tbl.MutableColumn("ID").AddConstraint(
+      sqlast::ColumnConstraint(Constraint::PRIMARY_KEY));
+  dataflow::SchemaRef schema = dataflow::SchemaFactory::Create(tbl);
+  EXPECT_TRUE(conn->ExecuteCreateTable(tbl));
+
+  // Insert into table.
+  InsertResult expected = {1, 0};
+  sqlast::Insert insert("test_table", false);
+  insert.SetValues({"0", "'user1'", "20"});
+  EXPECT_EQ(conn->ExecuteInsert(insert, "user1"), expected);
+
+  insert.SetValues({"1", "'user2'", "25"});
+  EXPECT_EQ(conn->ExecuteInsert(insert, "user2"), expected);
+
+  insert.SetValues({"2", "'user3'", "30"});
+  EXPECT_EQ(conn->ExecuteInsert(insert, "user3"), expected);
+
+  insert.SetValues({"3", "'user4'", "35"});
+  EXPECT_EQ(conn->ExecuteInsert(insert, "user4"), expected);
+
+  /*
+  // Select from table.
+  sqlast::Select select("test_table");
+  select.AddColumn("*");
+  SqlResultSet result = conn->ExecuteSelect(select);
+  CheckEqual(result.Vec(), {{schema, true, 0_s, STR("user1"), 20_s},
+                            {schema, true, 1_s, STR("user2"), 25_s},
+                            {schema, true, 2_s, STR("user3"), 30_s},
+                            {schema, true, 3_s, STR("user4"), 35_s}});
+  */
+
+  /*
+  select.SetWhereClause(std::make_unique<sqlast::BinaryExpression>(EType::EQ));
+  sqlast::BinaryExpression *where = select.GetWhereClause();
+  where->SetLeft(std::make_unique<sqlast::ColumnExpression>("ID"));
+  where->SetRight(std::make_unique<sqlast::LiteralExpression>("0"));
+  where->SetRight(std::make_unique<sqlast::LiteralExpression>("1"));
+  where->SetRight(std::make_unique<sqlast::LiteralExpression>("1"));
+  where->SetRight(std::make_unique<sqlast::LiteralExpression>("2"));
+  where->SetRight(std::make_unique<sqlast::LiteralExpression>("3"));
+  where->SetRight(std::make_unique<sqlast::LiteralExpression>("4"));
+  */
+}
+
+/*
 TEST(RocksdbConnectionTest, UpdateWithViews) {
   // Create Views
   DropDatabase();
@@ -1659,7 +1715,7 @@ TEST(RocksdbConnectionTest, SelectonShardColumnfromPK) {
   CheckEqual(&resultset.rows(), ans);
   conn.Close();
 }
+*/
 
-}  // namespace
 }  // namespace sql
 }  // namespace pelton

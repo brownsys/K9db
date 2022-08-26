@@ -23,6 +23,9 @@ EncryptedRecord EncryptionManager::EncryptRecord(const std::string &user_id,
   return EncryptedRecord(r.ReleaseKey(), r.ReleaseValue());
 }
 
+// Encrypts a fully encoded key with a shardname and a pk.
+rocksdb::Slice EncryptionManager::EncryptKey(rocksdb::Slice key) { return key; }
+
 // Decrypts an encrypted record (both key and value).
 RocksdbRecord EncryptionManager::DecryptRecord(const std::string &user_id,
                                                EncryptedRecord &&r) const {

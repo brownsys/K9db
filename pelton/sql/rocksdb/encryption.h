@@ -58,6 +58,13 @@ class EncryptionManager {
   RocksdbRecord DecryptRecord(const std::string &user_id,
                               EncryptedRecord &&r) const;
 
+  // Encrypts a fully encoded key with a shardname and a pk.
+#ifdef PELTON_ENCRYPTION
+  std::string EncryptKey(rocksdb::Slice key);
+#else
+  rocksdb::Slice EncryptKey(rocksdb::Slice key);
+#endif  // PELTON_ENCRYPTION
+
   // Only decrypts the key from this given record.
   std::string DecryptKey(std::string &&key) const;
 

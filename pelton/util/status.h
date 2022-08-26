@@ -20,12 +20,12 @@
   if (!__CHECK_STATUS_OR_VAL(__LINE__).ok())      \
   return __CHECK_STATUS_OR_VAL(__LINE__).status()
 
-#define __PANIC_STATUS_VAR_NAME(arg) __PANIC_STATUS_RESULT_##arg
-#define __PANIC_STATUS_VAL(arg) __PANIC_STATUS_VAR_NAME(arg)
-#define PANIC_STATUS(status)                  \
-  auto __PANIC_STATUS_VAL(__LINE__) = status; \
-  if (!__PANIC_STATUS_VAL(__LINE__).ok())     \
-  LOG(FATAL) << __PANIC_STATUS_VAL(__LINE__).getState()
+#define __PANIC_VAR_NAME(arg) __PANIC_RESULT_##arg
+#define __PANIC_VAL(arg) __PANIC_VAR_NAME(arg)
+#define PANIC(status)                  \
+  auto __PANIC_VAL(__LINE__) = status; \
+  if (!__PANIC_VAL(__LINE__).ok())     \
+  LOG(FATAL) << __PANIC_VAL(__LINE__).getState()
 
 #define __ASSIGN_OR_RETURN_VAR_NAME(arg) __ASSIGN_OR_RETURN_RESULT_##arg
 #define __ASSIGN_OR_RETURN_VAL(arg) __ASSIGN_OR_RETURN_VAR_NAME(arg)

@@ -17,11 +17,9 @@ namespace sql {
 struct InsertResult {
   int status;               // < 0 is error, >= 0 number of affected rows.
   uint64_t last_insert_id;  // If PK is auto_increment, this has the value.
-};
-
-struct AugInfo {
-  size_t index;
-  std::string value;
+  bool operator==(const InsertResult &o) const {
+    return status == o.status && last_insert_id == o.last_insert_id;
+  }
 };
 
 class AbstractConnection {
@@ -43,6 +41,7 @@ class AbstractConnection {
   virtual InsertResult ExecuteReplace(const sqlast::Insert &sql,
                                       const std::string &shard_name) = 0;
 
+  /*
   virtual SqlResult ExecuteUpdate(const sqlast::Update &sql) = 0;
 
   virtual SqlResult ExecuteDelete(const sqlast::Delete &sql) = 0;
@@ -51,6 +50,7 @@ class AbstractConnection {
   virtual SqlResultSet ExecuteSelect(const sqlast::Select &sql,
                                      const dataflow::SchemaRef &out_schema,
                                      const std::vector<AugInfo> &augments) = 0;
+  */
 };
 
 }  // namespace sql

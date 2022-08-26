@@ -21,6 +21,8 @@ namespace sql {
 std::string EncodeValue(sqlast::ColumnDefinition::Type type,
                         const std::string &value);
 
+std::string EncodeShardName(const std::string &shard_name);
+
 rocksdb::Slice ExtractColumn(const rocksdb::Slice &slice, size_t col);
 
 class RocksdbRecord {
@@ -53,6 +55,38 @@ class RocksdbRecord {
                        const dataflow::SchemaRef &schema,
                        const std::string &shard_name) const;
 
+  // Iteration over values.
+  class Iterator {
+   public:
+    explicit Iterator(rocksdb::Slice record)
+        : ptr_(record.data()), next_(-1), size_(record.size()) {}
+
+    // Iterates to the next column.
+    bool Next() {
+      this->ptr_ += this->next_ + 1;
+      this->size_ = this->size_ - this->next_ - 1;
+      for (this->next_ = 0; this->next_ < this->size_; this->next_++) {
+        if (this->ptr_[this->next_] == __ROCKSSEP) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // Get the next column.
+    rocksdb::Slice Value() const {
+      return rocksdb::Slice(this->ptr_, this->next_);
+    }
+
+   private:
+    const char *ptr_;
+    int next_;
+    int size_;
+  };
+
+  Iterator Iteratekey() const { return Iterator(this->key_); }
+  Iterator IterateValue() const { return Iterator(this->value_); }
+
  private:
   std::string key_;
   std::string value_;
@@ -65,7 +99,8 @@ class RocksdbIndexRecord {
 
   // When handling SQL statements.
   RocksdbIndexRecord(const rocksdb::Slice &index_value,
-                     const std::string &shard_name, const rocksdb::Slice &pk);
+                     const rocksdb::Slice &shard_name,
+                     const rocksdb::Slice &pk);
 
   // For writing/encoding.
   rocksdb::Slice Key() const;
@@ -73,6 +108,9 @@ class RocksdbIndexRecord {
   // For reading/decoding.
   rocksdb::Slice ExtractShardName() const;
   rocksdb::Slice ExtractPK() const;
+
+  // For looking up records corresponding to index entry.
+  rocksdb::Slice TargetKey() const;
 
  private:
   std::string key_;
