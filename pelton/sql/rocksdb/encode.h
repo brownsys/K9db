@@ -1,7 +1,10 @@
 #ifndef PELTON_SQL_ROCKSDB_ENCODE_H__
 #define PELTON_SQL_ROCKSDB_ENCODE_H__
 
+#include <functional>
 #include <string>
+// NOLINTNEXTLINE
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -96,6 +99,7 @@ class RocksdbIndexRecord {
  public:
   // Construct when reading from rocksdb.
   explicit RocksdbIndexRecord(const rocksdb::Slice &slice);
+  explicit RocksdbIndexRecord(std::string &&str);
 
   // When handling SQL statements.
   RocksdbIndexRecord(const rocksdb::Slice &index_value,
@@ -111,6 +115,56 @@ class RocksdbIndexRecord {
 
   // For looking up records corresponding to index entry.
   rocksdb::Slice TargetKey() const;
+
+  // Allows us to use this type in unordered_set.
+  struct TargetHash {
+    size_t operator()(const RocksdbIndexRecord &r) const {
+      rocksdb::Slice shard_slice = r.TargetKey();
+      std::string_view view(shard_slice.data(), shard_slice.size());
+      return std::hash<std::string_view>()(view);
+    }
+  };
+  struct TargetEqual {
+    bool operator()(const RocksdbIndexRecord &l,
+                    const RocksdbIndexRecord &r) const {
+      return l.TargetKey() == r.TargetKey();
+    }
+  };
+
+ private:
+  std::string key_;
+};
+
+class RocksdbPKIndexRecord {
+ public:
+  // Construct when reading from rocksdb.
+  explicit RocksdbPKIndexRecord(const rocksdb::Slice &slice);
+  explicit RocksdbPKIndexRecord(std::string &&str);
+
+  // When handling SQL statements.
+  RocksdbPKIndexRecord(const rocksdb::Slice &pk_value,
+                       const rocksdb::Slice &shard_name);
+
+  // For writing/encoding.
+  rocksdb::Slice Key() const;
+
+  // For reading/decoding.
+  rocksdb::Slice ExtractShardName() const;
+
+  // Allows us to use this type in unordered_set.
+  struct ShardNameHash {
+    size_t operator()(const RocksdbPKIndexRecord &r) const {
+      rocksdb::Slice shard_slice = r.ExtractShardName();
+      std::string_view view(shard_slice.data(), shard_slice.size());
+      return std::hash<std::string_view>()(view);
+    }
+  };
+  struct ShardNameEqual {
+    bool operator()(const RocksdbPKIndexRecord &l,
+                    const RocksdbPKIndexRecord &r) const {
+      return l.ExtractShardName() == r.ExtractShardName();
+    }
+  };
 
  private:
   std::string key_;

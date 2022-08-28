@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "pelton/sql/rocksdb/encode.h"
@@ -12,6 +13,13 @@
 
 namespace pelton {
 namespace sql {
+
+using IndexSet =
+    std::unordered_set<RocksdbIndexRecord, RocksdbIndexRecord::TargetHash,
+                       RocksdbIndexRecord::TargetEqual>;
+using PKIndexSet = std::unordered_set<RocksdbPKIndexRecord,
+                                      RocksdbPKIndexRecord::ShardNameHash,
+                                      RocksdbPKIndexRecord::ShardNameEqual>;
 
 class RocksdbIndex {
  public:
@@ -27,8 +35,23 @@ class RocksdbIndex {
               const rocksdb::Slice &shard_name, const rocksdb::Slice &pk);
 
   // Get the shard and pk of matching records for given values.
-  std::vector<RocksdbIndexRecord> Get(
-      const std::vector<rocksdb::Slice> &values);
+  IndexSet Get(const std::vector<rocksdb::Slice> &values);
+
+ private:
+  rocksdb::DB *db_;
+  std::unique_ptr<rocksdb::ColumnFamilyHandle> handle_;
+};
+
+class RocksdbPKIndex {
+ public:
+  RocksdbPKIndex(rocksdb::DB *db, const std::string &table_name);
+
+  // Updating.
+  void Add(const rocksdb::Slice &pk, const rocksdb::Slice &shard_name);
+  void Delete(const rocksdb::Slice &pk, const rocksdb::Slice &shard_name);
+
+  // Reading.
+  PKIndexSet Get(const std::vector<rocksdb::Slice> &pk_values);
 
  private:
   rocksdb::DB *db_;

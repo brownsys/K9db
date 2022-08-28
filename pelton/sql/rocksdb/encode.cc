@@ -188,6 +188,9 @@ RocksdbRecord RocksdbRecord::Update(
 RocksdbIndexRecord::RocksdbIndexRecord(const rocksdb::Slice &slice)
     : key_(slice.ToString()) {}
 
+RocksdbIndexRecord::RocksdbIndexRecord(std::string &&str)
+    : key_(std::move(str)) {}
+
 // When handling SQL statements.
 RocksdbIndexRecord::RocksdbIndexRecord(const rocksdb::Slice &index_value,
                                        const rocksdb::Slice &shard_name,
@@ -217,6 +220,31 @@ rocksdb::Slice RocksdbIndexRecord::TargetKey() const {
     }
   }
   LOG(FATAL) << "Cannot extract index target key";
+}
+
+/*
+ * RocksdbPKIndexRecord
+ */
+RocksdbPKIndexRecord::RocksdbPKIndexRecord(const rocksdb::Slice &slice)
+    : key_(slice.ToString()) {}
+
+RocksdbPKIndexRecord::RocksdbPKIndexRecord(std::string &&str)
+    : key_(std::move(str)) {}
+
+RocksdbPKIndexRecord::RocksdbPKIndexRecord(const rocksdb::Slice &pk_value,
+                                           const rocksdb::Slice &shard_name) {
+  this->key_ =
+      pk_value.ToString() + __ROCKSSEP + shard_name.ToString() + __ROCKSSEP;
+}
+
+// For writing/encoding.
+rocksdb::Slice RocksdbPKIndexRecord::Key() const {
+  return rocksdb::Slice(this->key_);
+}
+
+// For reading/decoding.
+rocksdb::Slice RocksdbPKIndexRecord::ExtractShardName() const {
+  return ExtractColumn(this->key_, 1);
 }
 
 }  // namespace sql
