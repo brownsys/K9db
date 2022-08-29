@@ -35,7 +35,7 @@ class RocksdbIndex {
               const rocksdb::Slice &shard_name, const rocksdb::Slice &pk);
 
   // Get the shard and pk of matching records for given values.
-  IndexSet Get(const std::vector<rocksdb::Slice> &values);
+  IndexSet Get(const std::vector<rocksdb::Slice> &values) const;
 
  private:
   rocksdb::DB *db_;
@@ -51,16 +51,16 @@ class RocksdbPKIndex {
   void Delete(const rocksdb::Slice &pk, const rocksdb::Slice &shard_name);
 
   // Reading.
-  PKIndexSet Get(const std::vector<rocksdb::Slice> &pk_values);
+  PKIndexSet Get(const std::vector<rocksdb::Slice> &pk_values) const;
 
  private:
   rocksdb::DB *db_;
   std::unique_ptr<rocksdb::ColumnFamilyHandle> handle_;
 };
 
-class PrefixTransform : public rocksdb::SliceTransform {
+class IndexPrefixTransform : public rocksdb::SliceTransform {
  public:
-  PrefixTransform() = default;
+  IndexPrefixTransform() = default;
 
   const char *Name() const override { return "ShardPrefix"; }
   bool InDomain(const rocksdb::Slice &key) const override { return true; }

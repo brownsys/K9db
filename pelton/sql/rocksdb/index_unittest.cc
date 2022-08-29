@@ -38,8 +38,8 @@ bool Eq(const IndexSet &result,
     return false;
   }
   for (const auto &record : result) {
-    std::pair<rocksdb::Slice, rocksdb::Slice> pair(record.ExtractShardName(),
-                                                   record.ExtractPK());
+    std::pair<rocksdb::Slice, rocksdb::Slice> pair(record.GetShard(),
+                                                   record.GetPK());
     if (std::find(expect.begin(), expect.end(), pair) == expect.end()) {
       return false;
     }
@@ -52,7 +52,7 @@ bool Eq(const PKIndexSet &result, const std::vector<rocksdb::Slice> &expect) {
     return false;
   }
   for (const auto &record : result) {
-    rocksdb::Slice shard = record.ExtractShardName();
+    rocksdb::Slice shard = record.GetShard();
     if (std::find(expect.begin(), expect.end(), shard) == expect.end()) {
       return false;
     }

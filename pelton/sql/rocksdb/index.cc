@@ -20,7 +20,7 @@ RocksdbIndex::RocksdbIndex(rocksdb::DB *db, const std::string &table_name,
   // Create a column family for this index.
   rocksdb::ColumnFamilyHandle *handle;
   rocksdb::ColumnFamilyOptions options;
-  options.prefix_extractor.reset(new PrefixTransform());
+  options.prefix_extractor.reset(new IndexPrefixTransform());
   options.comparator = rocksdb::BytewiseComparator();
   PANIC(this->db_->CreateColumnFamily(options, name, &handle));
   this->handle_ = std::unique_ptr<rocksdb::ColumnFamilyHandle>(handle);
@@ -32,7 +32,7 @@ void RocksdbIndex::Add(const rocksdb::Slice &value,
                        const rocksdb::Slice &pk) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
   RocksdbIndexRecord e(value, shard_name, pk);
-  PANIC(this->db_->Put(rocksdb::WriteOptions(), handle, e.Key(), ""));
+  PANIC(this->db_->Put(rocksdb::WriteOptions(), handle, e.Data(), ""));
 }
 
 // Deleting things from index.
@@ -41,11 +41,11 @@ void RocksdbIndex::Delete(const rocksdb::Slice &value,
                           const rocksdb::Slice &pk) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
   RocksdbIndexRecord e(value, shard_name, pk);
-  PANIC(this->db_->Delete(rocksdb::WriteOptions(), handle, e.Key()));
+  PANIC(this->db_->Delete(rocksdb::WriteOptions(), handle, e.Data()));
 }
 
 // Get by value.
-IndexSet RocksdbIndex::Get(const std::vector<rocksdb::Slice> &values) {
+IndexSet RocksdbIndex::Get(const std::vector<rocksdb::Slice> &values) const {
   // Iterator options.
   rocksdb::ReadOptions options;
   options.fill_cache = false;
@@ -90,7 +90,7 @@ RocksdbPKIndex::RocksdbPKIndex(rocksdb::DB *db, const std::string &table_name)
   // Create a column family for this index.
   rocksdb::ColumnFamilyHandle *handle;
   rocksdb::ColumnFamilyOptions options;
-  options.prefix_extractor.reset(new PrefixTransform());
+  options.prefix_extractor.reset(new IndexPrefixTransform());
   options.comparator = rocksdb::BytewiseComparator();
   PANIC(this->db_->CreateColumnFamily(options, name, &handle));
   this->handle_ = std::unique_ptr<rocksdb::ColumnFamilyHandle>(handle);
@@ -101,7 +101,7 @@ void RocksdbPKIndex::Add(const rocksdb::Slice &pk_value,
                          const rocksdb::Slice &shard_name) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
   RocksdbPKIndexRecord e(pk_value, shard_name);
-  PANIC(this->db_->Put(rocksdb::WriteOptions(), handle, e.Key(), ""));
+  PANIC(this->db_->Put(rocksdb::WriteOptions(), handle, e.Data(), ""));
 }
 
 // Deleting things from index.
@@ -109,11 +109,11 @@ void RocksdbPKIndex::Delete(const rocksdb::Slice &pk_value,
                             const rocksdb::Slice &shard_name) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
   RocksdbPKIndexRecord e(pk_value, shard_name);
-  PANIC(this->db_->Delete(rocksdb::WriteOptions(), handle, e.Key()));
+  PANIC(this->db_->Delete(rocksdb::WriteOptions(), handle, e.Data()));
 }
 
 // Get by value.
-PKIndexSet RocksdbPKIndex::Get(const std::vector<rocksdb::Slice> &values) {
+PKIndexSet RocksdbPKIndex::Get(const std::vector<rocksdb::Slice> &vals) const {
   // Iterator options.
   rocksdb::ReadOptions options;
   options.fill_cache = false;
@@ -127,8 +127,8 @@ PKIndexSet RocksdbPKIndex::Get(const std::vector<rocksdb::Slice> &values) {
 
   // Make and sort all prefixes.
   std::vector<std::string> prefixes;
-  prefixes.reserve(values.size());
-  for (const rocksdb::Slice &slice : values) {
+  prefixes.reserve(vals.size());
+  for (const rocksdb::Slice &slice : vals) {
     prefixes.push_back(slice.ToString() + __ROCKSSEP);
   }
   std::sort(prefixes.begin(), prefixes.end());
@@ -147,7 +147,8 @@ PKIndexSet RocksdbPKIndex::Get(const std::vector<rocksdb::Slice> &values) {
 }
 
 // PrefixTransform
-rocksdb::Slice PrefixTransform::Transform(const rocksdb::Slice &key) const {
+rocksdb::Slice IndexPrefixTransform::Transform(
+    const rocksdb::Slice &key) const {
   return ExtractColumn(key, 0);
 }
 
