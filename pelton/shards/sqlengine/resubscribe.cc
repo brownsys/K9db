@@ -50,7 +50,8 @@ absl::StatusOr<sql::SqlResult> Resubscribe(Connection *connection) {
   std::ifstream user_data("/home/pelton/user_data2.txt");
   // TO-DO assrt that file has content and is in right format
   getline(user_data, line);
-  // std::string user_id = line
+  std::string user_id = line;
+  std::cout << "user id: " << user_id << std::endl;
   size_t rows = 0;
   while (getline(user_data, line)) {
     // TO-DO: assuming table name does not have any spaces
@@ -83,7 +84,11 @@ absl::StatusOr<sql::SqlResult> Resubscribe(Connection *connection) {
       // the lock from?
       SharedLock lock = connection->state->sharder_state()->ReaderLock();
       // TO-DO - ignore return value?
-      pelton::shards::sqlengine::insert::Shard(ins, connection, &lock, true);
+      // pelton::shards::sqlengine::insert::Shard(ins, connection, &lock, true);
+      // trying single shard modification
+      auto &exec = connection->executor;
+      exec.Shard(&ins, user_id);
+      std::cout << "reached here" << std::endl;
     }
   }
   user_data.close();

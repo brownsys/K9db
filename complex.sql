@@ -25,6 +25,7 @@ SELECT * FROM chat;
 GDPR FORGET Users 1;
 GDPR FORGET Users 2;
 SELECT * FROM chat;
+/*calling gdpr get also calls resubscribe*/
 GDPR GET Users 1;
 
 SELECT * FROM chat;
