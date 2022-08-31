@@ -17,61 +17,84 @@
 namespace pelton {
 namespace sql {
 
-class EncryptedRecord {
+// Forward declaration for use in Cipher.
+// class EncryptionManager;
+
+// Our Cipher text type.
+// Basically a wrapper around std::string.
+// Can only be constructed by EncryptionManager.
+class Cipher {
  public:
-  // Only a key.
-  explicit EncryptedRecord(const rocksdb::Slice &key)
-      : key_(key.data(), key.size()) {}
+  Cipher() = delete;
 
-  explicit EncryptedRecord(std::string &&key) : key_(std::move(key)) {}
+  const std::string &Data() const { return this->cipher_; }
+  std::string &&Release() { return std::move(this->cipher_); }
 
-  // Both key and value.
-  EncryptedRecord(const rocksdb::Slice &key, const rocksdb::Slice &value)
-      : key_(key.data(), key.size()), value_(value.data(), value.size()) {}
+ private:
+  std::string cipher_;
 
-  EncryptedRecord(std::string &&key, std::string &&value)
-      : key_(std::move(key)), value_(std::move(value)) {}
+  // Can only be called by friends.
+  explicit Cipher(std::string &&cipher) : cipher_(std::move(cipher)) {}
+
+  // EncryptionManager can construct this.
+  friend class EncryptionManager;
+};
+
+// Encrypted keys are encrypted piece-wise.
+// The shard is encrypted separately from PK value.
+// Their format is <shard_name><pk_value><len of shard: 2 bytes (unsigned)>.
+// This allows encrypted lookup by shard_name and pk_value.
+// If encryption is off, this basically becomes a wrapper around a regular
+// unencrypted RocksdbSequence.
+class EncryptedKey {
+ public:
+  using Offset = uint16_t;
+
+  // Reading from rocksdb.
+  explicit EncryptedKey(std::string &&data) : data_(std::move(data)) {}
+  explicit EncryptedKey(const rocksdb::Slice &data)
+      : data_(data.data(), data.size()) {}
+
+  // Constructed after encrypting.
+  EncryptedKey(Cipher &&shard_cipher, const Cipher &pk_cipher);
 
   // Accessors.
-  rocksdb::Slice Key() const { return this->key_; }
-  rocksdb::Slice Value() const { return this->value_; }
-  std::string &&ReleaseKey() { return std::move(this->key_); }
-  std::string &&ReleaseValue() { return std::move(this->value_); }
+  rocksdb::Slice Data() const { return this->data_; }
+  std::string &&Release() { return std::move(this->data_); }
 
   // For reading/decoding.
   rocksdb::Slice GetShard() const;
   rocksdb::Slice GetPK() const;
 
+  static Offset ShardSize(const rocksdb::Slice &slice);
+
  private:
-  std::string key_;
-  std::string value_;
+  std::string data_;
 };
 
+// An encrypted value/row is just a blackbox cipher with no structure.
+using EncryptedValue = Cipher;
+
+// Encryption manager is responsible for encrypting / decrypting.
+// The functions of encryption manager basically become noops if encryption
+// is turned off.
 class EncryptionManager {
  public:
   EncryptionManager();
 
-  // Encrypts the key and value of a record.
-  EncryptedRecord EncryptRecord(const std::string &user_id, RocksdbRecord &&r);
+  // Encryption of keys and values of records.
+  EncryptedKey EncryptKey(RocksdbSequence &&k) const;
+  EncryptedValue EncryptValue(const std::string &user_id, RocksdbSequence &&v);
 
-  // Decrypts an encrypted record (both key and value).
-  RocksdbRecord DecryptRecord(const std::string &user_id,
-                              EncryptedRecord &&r) const;
-
-  // Encrypts a fully encoded key with a shardname and a pk.
-#ifdef PELTON_ENCRYPTION
-  std::string EncryptKey(rocksdb::Slice key);
-#else
-  rocksdb::Slice EncryptKey(rocksdb::Slice key);
-#endif  // PELTON_ENCRYPTION
-
-  // Only decrypts the key from this given record.
-  std::string DecryptKey(std::string &&key) const;
+  // Decryption of records.
+  RocksdbSequence DecryptKey(EncryptedKey &&k) const;
+  RocksdbSequence DecryptValue(const std::string &user_id,
+                               EncryptedValue &&v) const;
 
   // Encrypts a key for use with rocksdb Seek.
   // Given our PeltonPrefixTransform, the seek prefix is the shard name.
   // (Must be passed to this function without a trailing __ROCKSSEP).
-  std::string EncryptSeek(std::string &&seek_key) const;
+  Cipher EncryptSeek(std::string &&seek_key) const;
 
  private:
 #ifdef PELTON_ENCRYPTION

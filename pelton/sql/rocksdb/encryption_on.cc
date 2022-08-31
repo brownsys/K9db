@@ -16,23 +16,90 @@ namespace sql {
 #define CIPHER_OVERHEAD crypto_aead_aes256gcm_ABYTES
 #define PLAIN_MAX_LEN 10000
 
-// EncryptedRecord.
-rocksdb::Slice EncryptedRecord::GetShard() const {
-  size_t shard_offset = this->key_.size() - sizeof(size_t);
-  const char *offset_ptr = this->key_.data() + shard_offset;
-  size_t shard_size = *reinterpret_cast<const size_t *>(offset_ptr);
-  return rocksdb::Slice(this->key_.data(), shard_size);
+#define ENCRYPT(dst, dsz, src, sz, nonce, key) \
+  crypto_aead_aes256gcm_encrypt(dst, dsz, src, sz, nullptr, 0, NULL, nonce, key)
+#define DECRYPT(dst, dsz, src, sz, nonce, key) \
+  crypto_aead_aes256gcm_decrypt(dst, dsz, NULL, src, sz, nullptr, 0, nonce, key)
+
+namespace {
+
+std::string Encrypt(rocksdb::Slice input, const unsigned char *nonce,
+                    const unsigned char *key) {
+  const unsigned char *input_buf =
+      reinterpret_cast<const unsigned char *>(input.data());
+
+  // Allocate memory.
+  size_t capacity = input.size() + CIPHER_OVERHEAD;
+  std::unique_ptr<unsigned char[]> dst =
+      std::make_unique<unsigned char[]>(capacity);
+
+  // NOLINTNEXTLINE
+  unsigned long long size;
+  if (ENCRYPT(dst.get(), &size, input_buf, input.size(), nonce, key) != 0) {
+    LOG(FATAL) << "Cannot encrypt!";
+  }
+
+  return std::string(reinterpret_cast<const char *>(dst.get()), size);
 }
 
-rocksdb::Slice EncryptedRecord::GetPK() const {
-  size_t shard_offset = this->key_.size() - sizeof(size_t);
-  const char *offset_ptr = this->key_.data() + shard_offset;
-  size_t shard_size = *reinterpret_cast<const size_t *>(offset_ptr);
-  return rocksdb::Slice(this->key_.data() + shard_size,
-                        this->key_.size() - sizeof(size_t) - shard_size);
+std::string Decrypt(rocksdb::Slice input, const unsigned char *nonce,
+                    const unsigned char *key) {
+  if (input.size() < CIPHER_OVERHEAD) {
+    LOG(FATAL) << "Cipher too short to decrypt!";
+  }
+
+  const unsigned char *input_buf =
+      reinterpret_cast<const unsigned char *>(input.data());
+
+  // Allocate memory for plaintext.
+  std::unique_ptr<unsigned char[]> dst =
+      std::make_unique<unsigned char[]>(PLAIN_MAX_LEN);
+
+  // NOLINTNEXTLINE
+  unsigned long long size;
+  if (DECRYPT(dst.get(), &size, input_buf, input.size(), nonce, key) != 0) {
+    LOG(FATAL) << "Cannot decrypt!";
+  }
+
+  return std::string(reinterpret_cast<const char *>(dst.get()), size);
 }
 
-// EncryptionManager.
+}  // namespace
+
+/*
+ * EncryptedKey
+ */
+
+// Constructed after encrypting.
+EncryptedKey::EncryptedKey(Cipher &&shard_cipher, const Cipher &pk_cipher)
+    : data_(shard_cipher.Release()) {
+  Offset sz = this->data_.size();
+  this->data_.append(pk_cipher.Data());
+  char *ptr = reinterpret_cast<char *>(&sz);
+  this->data_.push_back(ptr[0]);
+  this->data_.push_back(ptr[1]);
+}
+
+rocksdb::Slice EncryptedKey::GetShard() const {
+  uint16_t size = EncryptedKey::ShardSize(this->data_);
+  return rocksdb::Slice(this->data_.data(), size);
+}
+
+rocksdb::Slice EncryptedKey::GetPK() const {
+  uint16_t offset = EncryptedKey::ShardSize(this->data_);
+  size_t size = this->data_.size() - offset;
+  return rocksdb::Slice(this->data_.data() + offset, size);
+}
+
+EncryptedKey::Offset EncryptedKey::ShardSize(const rocksdb::Slice &slice) {
+  const char *ptr = slice.data() + (slice.size() - sizeof(Offset));
+  return *reinterpret_cast<const Offset *>(ptr);
+}
+
+/*
+ * EncryptionManager
+ */
+
 // Construct encryption manager.
 EncryptionManager::EncryptionManager()
     : global_key_(std::make_unique<unsigned char[]>(KEY_SIZE)),
@@ -47,8 +114,15 @@ EncryptionManager::EncryptionManager()
   randombytes_buf(this->global_nonce_.get(), NONCE_SIZE);
 }
 
-// Get the key of the given user, create the key for that user if it does not
-// exist.
+// Get the key of the given user.
+const unsigned char *EncryptionManager::GetUserKey(
+    const std::string &user_id) const {
+  shards::SharedLock lock(&this->mtx_);
+  return this->keys_.at(user_id).get();
+}
+
+// Get the key of the given user.
+// Create the key if that user does not yet have one.
 const unsigned char *EncryptionManager::GetOrCreateUserKey(
     const std::string &user_id) {
   shards::SharedLock lock(&this->mtx_);
@@ -68,186 +142,55 @@ const unsigned char *EncryptionManager::GetOrCreateUserKey(
   return it->second.get();
 }
 
-const unsigned char *EncryptionManager::GetUserKey(
-    const std::string &user_id) const {
-  shards::SharedLock lock(&this->mtx_);
-  return this->keys_.at(user_id).get();
+// Encryption of keys and values of records.
+EncryptedKey EncryptionManager::EncryptKey(RocksdbSequence &&k) const {
+  const unsigned char *nonce = this->global_nonce_.get();
+  const unsigned char *key = this->global_key_.get();
+  return EncryptedKey(Cipher(Encrypt(k.At(0), nonce, key)),
+                      Cipher(Encrypt(k.At(1), nonce, key)));
 }
-
-// Encrypts a record and returns the encrypt key and value.
-EncryptedRecord EncryptionManager::EncryptRecord(const std::string &user_id,
-                                                 RocksdbRecord &&r) {
-  // Get user key.
+EncryptedValue EncryptionManager::EncryptValue(const std::string &user_id,
+                                               RocksdbSequence &&v) {
+  const unsigned char *nonce = this->global_nonce_.get();
   const unsigned char *key = this->GetOrCreateUserKey(user_id);
-  const unsigned char *nonce = this->global_nonce_.get();
-
-  // Allocate memory for value cipher.
-  size_t val_size = r.Value().size();
-  std::unique_ptr<unsigned char[]> ct =
-      std::make_unique<unsigned char[]>(val_size + CIPHER_OVERHEAD);
-
-  // Encrypt value.
-  // NOLINTNEXTLINE
-  unsigned long long ct_len = 0;
-  auto val_buf = reinterpret_cast<const unsigned char *>(r.Value().data());
-  if (crypto_aead_aes256gcm_encrypt(ct.get(), &ct_len, val_buf, val_size,
-                                    nullptr, 0, NULL, nonce, key) != 0) {
-    LOG(FATAL) << "Cannot encrypt value!";
-  }
-
-  char *encrypted_value = reinterpret_cast<char *>(ct.get());
-  return EncryptedRecord(this->EncryptKey(r.Key()),
-                         std::string(encrypted_value, ct_len));
+  return Cipher(Encrypt(v.Data(), nonce, key));
 }
 
-// Encrypts a fully encoded key with a shardname and a pk.
-std::string EncryptionManager::EncryptKey(rocksdb::Slice key) {
+// Decryption of records.
+RocksdbSequence EncryptionManager::DecryptKey(EncryptedKey &&k) const {
   const unsigned char *nonce = this->global_nonce_.get();
+  const unsigned char *key = this->global_key_.get();
 
-  // Allocate memory for encrypted key.
-  rocksdb::Slice shard = ExtractColumn(key, 0);
-  rocksdb::Slice pk = ExtractColumn(key, 1);
-  size_t max_key_ct_size =
-      shard.size() + pk.size() + 2 * CIPHER_OVERHEAD + sizeof(size_t);
-  std::unique_ptr<unsigned char[]> key_ct =
-      std::make_unique<unsigned char[]>(max_key_ct_size);
-
-  // Encrypt Shard.
-  // NOLINTNEXTLINE
-  unsigned long long key_ct_size = 0;
-  auto shard_buf = reinterpret_cast<const unsigned char *>(shard.data());
-  if (crypto_aead_aes256gcm_encrypt(key_ct.get(), &key_ct_size, shard_buf,
-                                    shard.size(), nullptr, 0, NULL, nonce,
-                                    this->global_key_.get()) != 0) {
-    LOG(FATAL) << "Cannot encrypt shard!";
-  }
-
-  // Encrypt PK.
-  size_t shard_size = key_ct_size;
-  auto pk_buf = reinterpret_cast<const unsigned char *>(pk.data());
-  if (crypto_aead_aes256gcm_encrypt(key_ct.get() + shard_size, &key_ct_size,
-                                    pk_buf, pk.size(), nullptr, 0, NULL, nonce,
-                                    this->global_key_.get()) != 0) {
-    LOG(FATAL) << "Cannot encrypt pk!";
-  }
-
-  // Add length of cipher shard.
-  memcpy(key_ct.get() + shard_size + key_ct_size, &shard_size, sizeof(size_t));
-
-  char *encrypted_key = reinterpret_cast<char *>(key_ct.get());
-  return std::string(encrypted_key, shard_size + key_ct_size + sizeof(size_t));
+  RocksdbSequence result;
+  result.AppendEncoded(Decrypt(k.GetShard(), nonce, key));
+  result.AppendEncoded(Decrypt(k.GetPK(), nonce, key));
+  return result;
 }
-
-// Decrypts an encrypted record value.
-RocksdbRecord EncryptionManager::DecryptRecord(const std::string &user_id,
-                                               EncryptedRecord &&r) const {
-  // Decrypt key!
-  std::string decrypted_key = "";
-  if (r.Key().size() > 0) {
-    decrypted_key = this->DecryptKey(r.ReleaseKey());
-  }
-
-  // Get encryption key.
+RocksdbSequence EncryptionManager::DecryptValue(const std::string &user_id,
+                                                EncryptedValue &&v) const {
+  const unsigned char *nonce = this->global_nonce_.get();
   const unsigned char *key = this->GetUserKey(user_id);
-  const unsigned char *nonce = this->global_nonce_.get();
-
-  // Allocate memory for plaintext.
-  std::unique_ptr<unsigned char[]> pt =
-      std::make_unique<unsigned char[]>(PLAIN_MAX_LEN);
-
-  // Decrypt value.
-  rocksdb::Slice val = r.Value();
-  // NOLINTNEXTLINE
-  unsigned long long pt_len = 0;
-  auto val_buf = reinterpret_cast<const unsigned char *>(val.data());
-  if (val.size() < CIPHER_OVERHEAD ||
-      crypto_aead_aes256gcm_decrypt(pt.get(), &pt_len, NULL, val_buf,
-                                    val.size(), nullptr, 0, nonce, key) != 0) {
-    LOG(FATAL) << "Cannot decrypt value!";
-  }
-
-  std::string decrypted_value(reinterpret_cast<char const *>(pt.get()), pt_len);
-
-  // Return as a (decrypted) record.
-  return RocksdbRecord(std::move(decrypted_key), std::move(decrypted_value));
+  return RocksdbSequence(Decrypt(v.Data(), nonce, key));
 }
 
-// Decrypts an encrypted record key and returns its components.
-std::string EncryptionManager::DecryptKey(std::string &&cipher) const {
-  // Get key.
+// Encrypts a key for use with rocksdb Seek.
+Cipher EncryptionManager::EncryptSeek(std::string &&seek_key) const {
+  const unsigned char *nonce = this->global_nonce_.get();
   const unsigned char *key = this->global_key_.get();
-  const unsigned char *nonce = this->global_nonce_.get();
-
-  // Allocate memory for plaintext.
-  std::unique_ptr<unsigned char[]> pt =
-      std::make_unique<unsigned char[]>(PLAIN_MAX_LEN);
-
-  // Figure out component offsets.
-  EncryptedRecord record(std::move(cipher));
-  rocksdb::Slice shard = record.GetShard();
-  rocksdb::Slice pk = record.GetPK();
-
-  // Decrypt shard.
-  const unsigned char *shard_buf =
-      reinterpret_cast<const unsigned char *>(shard.data());
-  // NOLINTNEXTLINE
-  unsigned long long shardlen = 0;
-  if (shard.size() < CIPHER_OVERHEAD ||
-      crypto_aead_aes256gcm_decrypt(pt.get(), &shardlen, NULL, shard_buf,
-                                    shard.size(), nullptr, 0, nonce,
-                                    key) != 0) {
-    LOG(FATAL) << "Cannot decrypt shard!";
-  }
-  pt[shardlen] = __ROCKSSEP;
-
-  // Decrypt PK.
-  const unsigned char *pk_buf =
-      reinterpret_cast<const unsigned char *>(pk.data());
-  // NOLINTNEXTLINE
-  unsigned long long pklen = 0;
-  if (pk.size() < CIPHER_OVERHEAD ||
-      crypto_aead_aes256gcm_decrypt(pt.get() + shardlen + 1, &pklen, NULL,
-                                    pk_buf, pk.size(), nullptr, 0, nonce,
-                                    key) != 0) {
-    LOG(FATAL) << "Cannot decrypt PK!";
-  }
-  pt[shardlen + 1 + pklen] = __ROCKSSEP;
-
-  return std::string(reinterpret_cast<char *>(pt.get()), shardlen + pklen + 2);
+  return Cipher(Encrypt(seek_key, nonce, key));
 }
 
-// encrypts user_id and id components of seek.
-std::string EncryptionManager::EncryptSeek(std::string &&seek_key) const {
-  // Get user key.
-  const unsigned char *key = this->global_key_.get();
-  const unsigned char *nonce = this->global_nonce_.get();
-
-  // Allocate memory for value cipher.
-  std::unique_ptr<unsigned char[]> ct =
-      std::make_unique<unsigned char[]>(seek_key.size() + CIPHER_OVERHEAD);
-
-  // Encrypt value.
-  // NOLINTNEXTLINE
-  unsigned long long ct_len = 0;
-  auto pt_buffer = reinterpret_cast<const unsigned char *>(seek_key.data());
-  if (crypto_aead_aes256gcm_encrypt(ct.get(), &ct_len, pt_buffer,
-                                    seek_key.size(), nullptr, 0, NULL, nonce,
-                                    key) != 0) {
-    LOG(FATAL) << "Cannot encrypt!";
-  }
-
-  return std::string(reinterpret_cast<char *>(ct.get()), ct_len);
-}
-
-// PeltonPrefixTransform.
+/*
+ * PeltonPrefixTransform
+ */
 rocksdb::Slice PeltonPrefixTransform::Transform(const rocksdb::Slice &k) const {
-  const char *data = k.data();
-  size_t offset = k.size() - sizeof(size_t);
-  size_t prefix_len = *reinterpret_cast<const size_t *>(data + offset);
-  return rocksdb::Slice(data, prefix_len);
+  return rocksdb::Slice(k.data(), EncryptedKey::ShardSize(k));
 }
 
-// Pelton's Comparator.
+/*
+ * Comparator over ciphers
+ */
+
 namespace {
 
 // Not exposed publicly. Must use PeltonComparator() to expose this.
@@ -269,23 +212,21 @@ class EncryptedComparator : public rocksdb::Comparator {
   //   == 0 iff "a" == "b",
   //   > 0 iff "a" > "b"
   int Compare(const rocksdb::Slice &a, const rocksdb::Slice &b) const override {
-    const char *a_data = a.data();
-    size_t a_offset = a.size() - sizeof(size_t);
-    size_t a_len = *reinterpret_cast<const size_t *>(a_data + a_offset);
-    rocksdb::Slice a_user(a_data, a_len);
-    rocksdb::Slice a_pk(a_data + a_len, a_offset - a_len);
+    EncryptedKey::Offset a_offset = EncryptedKey::ShardSize(a);
+    rocksdb::Slice a_shard(a.data(), a_offset);
 
-    const char *b_data = b.data();
-    size_t b_offset = b.size() - sizeof(size_t);
-    size_t b_len = *reinterpret_cast<const size_t *>(b_data + b_offset);
-    rocksdb::Slice b_user(b_data, b_len);
-    rocksdb::Slice b_pk(b_data + b_len, b_offset - b_len);
-
-    int r = this->bytewise_->Compare(a_user, b_user);
-    if (r == 0) {
-      return this->bytewise_->Compare(a_pk, b_pk);
+    EncryptedKey::Offset b_offset = EncryptedKey::ShardSize(b);
+    rocksdb::Slice b_shard(b.data(), b_offset);
+    int result = this->bytewise_->Compare(a_shard, b_shard);
+    if (result != 0) {
+      return result;
     }
-    return r;
+
+    rocksdb::Slice a_pk(a.data() + a_offset,
+                        a.size() - a_offset - sizeof(EncryptedKey::Offset));
+    rocksdb::Slice b_pk(b.data() + b_offset,
+                        b.size() - b_offset - sizeof(EncryptedKey::Offset));
+    return this->bytewise_->Compare(a_pk, b_pk);
   }
 
  private:

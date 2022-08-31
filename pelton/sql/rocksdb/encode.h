@@ -33,7 +33,7 @@ class RocksdbSequence {
   RocksdbSequence() = default;
 
   // Access underlying data.
-  std::string Release() { return std::move(this->data_); }
+  std::string &&Release() { return std::move(this->data_); }
   rocksdb::Slice Data() const { return rocksdb::Slice(this->data_); }
 
   // Inserting into sequence.

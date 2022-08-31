@@ -2,53 +2,69 @@
 
 #ifndef PELTON_ENCRYPTION
 
+#include "glog/logging.h"
+
 namespace pelton {
 namespace sql {
 
-// EncryptedRecord.
-rocksdb::Slice EncryptedRecord::GetShard() const {
-  return ExtractColumn(this->key_, 0);
+/*
+ * EncryptedKey
+ */
+EncryptedKey::EncryptedKey(Cipher &&shard_cipher, const Cipher &pk_cipher) {
+  LOG(FATAL) << "ENCRYPTION OFF!";
 }
-rocksdb::Slice EncryptedRecord::GetPK() const {
-  return ExtractColumn(this->key_, 1);
+rocksdb::Slice EncryptedKey::GetShard() const {
+  return ExtractColumn(this->data_, 0);
+}
+rocksdb::Slice EncryptedKey::GetPK() const {
+  return ExtractColumn(this->data_, 1);
+}
+EncryptedKey::Offset EncryptedKey::ShardSize(const rocksdb::Slice &slice) {
+  LOG(FATAL) << "ENCRYPTION OFF!";
 }
 
-// EncryptionManager.
+/*
+ * EncryptionManager
+ */
+
 // Construct encryption manager.
 EncryptionManager::EncryptionManager() = default;
 
-// Encrypts a record and returns the encrypt key and value.
-EncryptedRecord EncryptionManager::EncryptRecord(const std::string &user_id,
-                                                 RocksdbRecord &&r) {
-  return EncryptedRecord(r.ReleaseKey(), r.ReleaseValue());
+// Encryption of keys and values of records.
+EncryptedKey EncryptionManager::EncryptKey(RocksdbSequence &&k) const {
+  return EncryptedKey(k.Release());
 }
 
-// Encrypts a fully encoded key with a shardname and a pk.
-rocksdb::Slice EncryptionManager::EncryptKey(rocksdb::Slice key) { return key; }
-
-// Decrypts an encrypted record (both key and value).
-RocksdbRecord EncryptionManager::DecryptRecord(const std::string &user_id,
-                                               EncryptedRecord &&r) const {
-  return RocksdbRecord(r.ReleaseKey(), r.ReleaseValue());
+EncryptedValue EncryptionManager::EncryptValue(const std::string &user_id,
+                                               RocksdbSequence &&v) {
+  return EncryptedValue(v.Release());
 }
 
-// Only decrypts the key from this given record.
-std::string EncryptionManager::DecryptKey(std::string &&key) const {
-  return std::move(key);
+// Decryption of records.
+RocksdbSequence EncryptionManager::DecryptKey(EncryptedKey &&k) const {
+  return RocksdbSequence(k.Release());
 }
 
-// encrypts user_id and id components of seek.
-std::string EncryptionManager::EncryptSeek(std::string &&seek_key) const {
-  seek_key.push_back(__ROCKSSEP);
-  return std::move(seek_key);
+RocksdbSequence EncryptionManager::DecryptValue(const std::string &user_id,
+                                                EncryptedValue &&v) const {
+  return RocksdbSequence(v.Release());
 }
 
-// PeltonPrefixTransform.
+// Encrypts a key for use with rocksdb Seek.
+Cipher EncryptionManager::EncryptSeek(std::string &&seek_key) const {
+  return Cipher(std::move(seek_key));
+}
+
+/*
+ * PeltonPrefixTransform
+ */
 rocksdb::Slice PeltonPrefixTransform::Transform(const rocksdb::Slice &k) const {
   return ExtractColumn(k, 0);
 }
 
-// Plain bytewise comparator.
+/*
+ * PeltonComparator
+ */
 const rocksdb::Comparator *PeltonComparator() {
   return rocksdb::BytewiseComparator();
 }
