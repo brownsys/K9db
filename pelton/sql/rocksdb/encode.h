@@ -25,8 +25,9 @@ rocksdb::Slice ExtractSlice(const rocksdb::Slice &slice, size_t spos,
 class RocksdbSequence {
  public:
   // Constructing a record while reading from db.
-  explicit RocksdbSequence(const rocksdb::Slice &slice);
-  explicit RocksdbSequence(std::string &&str);
+  explicit RocksdbSequence(const rocksdb::Slice &slice)
+      : data_(slice.data(), slice.size()) {}
+  explicit RocksdbSequence(std::string &&str) : data_(std::move(str)) {}
 
   // Constructing a record when handling an SQL statement (to write into DB).
   RocksdbSequence() = default;

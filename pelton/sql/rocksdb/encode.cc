@@ -56,11 +56,6 @@ rocksdb::Slice ExtractSlice(const rocksdb::Slice &slice, size_t spos,
  * RocksdbSequence
  */
 
-// Constructing a record while reading from db.
-RocksdbSequence::RocksdbSequence(const rocksdb::Slice &slice)
-    : data_(slice.data(), slice.size()) {}
-RocksdbSequence::RocksdbSequence(std::string &&str) : data_(std::move(str)) {}
-
 // Writing to sequence.
 void RocksdbSequence::Append(sqlast::ColumnDefinition::Type type,
                              const rocksdb::Slice &slice) {
@@ -117,7 +112,7 @@ dataflow::Record RocksdbSequence::DecodeRecord(
   dataflow::Record record{schema, false};
   size_t idx = 0;
   for (rocksdb::Slice v : *this) {
-    if (v == rocksdb::Slice("NULL", 4)) {
+    if (v.size() == 1 && *v.data() == __ROCKSNULL) {
       record.SetNull(true, idx++);
       continue;
     }
@@ -125,14 +120,14 @@ dataflow::Record RocksdbSequence::DecodeRecord(
       case sqlast::ColumnDefinition::Type::UINT: {
         uint64_t num;
         auto result = std::from_chars(v.data(), v.data() + v.size(), num);
-        CHECK(result.ec != std::errc{});
+        CHECK(result.ec == std::errc{});
         record.SetUInt(num, idx++);
         break;
       }
       case sqlast::ColumnDefinition::Type::INT: {
         int64_t num;
         auto result = std::from_chars(v.data(), v.data() + v.size(), num);
-        CHECK(result.ec != std::errc{});
+        CHECK(result.ec == std::errc{});
         record.SetInt(num, idx++);
         break;
       }
