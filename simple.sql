@@ -38,6 +38,9 @@ INSERT INTO submissions VALUES (7, 3, 2, 7);
 SELECT * FROM submissions;
 
 GDPR FORGET students 1;
+
+SELECT * FROM submissions;
+
 GDPR GET students 1;
 
 SELECT * FROM submissions;

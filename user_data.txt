@@ -1,5 +1,3 @@
-1
-submissions 3
-|1|1|1|1|
-|5|1|2|5|
-|4|1|1|4|
+2
+chat 1
+|1|1|2|HELLO from alice|

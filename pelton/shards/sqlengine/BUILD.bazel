@@ -229,33 +229,6 @@ cc_library(
 )
 
 cc_library(
-    name = "gdpr",
-    srcs = [
-        "gdpr.cc",
-    ],
-    hdrs = [
-        "gdpr.h",
-    ],
-    deps = [
-        ":resubscribe",
-        ":delete",
-        ":index",
-        ":select",
-        ":update",
-        "//pelton:connection",
-        "//pelton/dataflow:dstate",
-        "//pelton/shards:state",
-        "//pelton/shards:types",
-        "//pelton/shards:upgradable_lock",
-        "//pelton/shards/sqlengine:util",
-        "//pelton/sqlast:ast",
-        "//pelton/util:status",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_library(
     name = "resubscribe",
     srcs = [
         "resubscribe.cc",
@@ -281,3 +254,29 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "gdpr",
+    srcs = [
+        "gdpr.cc",
+    ],
+    hdrs = [
+        "gdpr.h",
+    ],
+    deps = [
+        ":delete",
+        ":index",
+        ":resubscribe",
+        ":select",
+        ":update",
+        "//pelton:connection",
+        "//pelton/dataflow:dstate",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/shards:upgradable_lock",
+        "//pelton/shards/sqlengine:util",
+        "//pelton/sqlast:ast",
+        "//pelton/util:status",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+    ],
+)
