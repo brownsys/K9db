@@ -14,8 +14,8 @@
 namespace pelton {
 namespace sql {
 
-#define SEP std::string{__ROCKSSEP};
-#define NUL std::string{__ROCKSNULL};
+#define SEP std::string({__ROCKSSEP})
+#define NUL std::string({__ROCKSNULL})
 
 using CType = sqlast::ColumnDefinition::Type;
 

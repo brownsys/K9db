@@ -27,8 +27,12 @@ class Cipher {
  public:
   Cipher() = delete;
 
-  const std::string &Data() const { return this->cipher_; }
+  rocksdb::Slice Data() const { return rocksdb::Slice(this->cipher_); }
   std::string &&Release() { return std::move(this->cipher_); }
+
+  static Cipher FromDB(std::string &&cipher) {
+    return Cipher(std::move(cipher));
+  }
 
  private:
   std::string cipher_;
@@ -59,7 +63,7 @@ class EncryptedKey {
   EncryptedKey(Cipher &&shard_cipher, const Cipher &pk_cipher);
 
   // Accessors.
-  rocksdb::Slice Data() const { return this->data_; }
+  rocksdb::Slice Data() const { return rocksdb::Slice(this->data_); }
   std::string &&Release() { return std::move(this->data_); }
 
   // For reading/decoding.

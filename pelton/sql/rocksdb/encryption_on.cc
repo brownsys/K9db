@@ -74,7 +74,8 @@ std::string Decrypt(rocksdb::Slice input, const unsigned char *nonce,
 EncryptedKey::EncryptedKey(Cipher &&shard_cipher, const Cipher &pk_cipher)
     : data_(shard_cipher.Release()) {
   Offset sz = this->data_.size();
-  this->data_.append(pk_cipher.Data());
+  rocksdb::Slice pk = pk_cipher.Data();
+  this->data_.append(pk.data(), pk.size());
   char *ptr = reinterpret_cast<char *>(&sz);
   this->data_.push_back(ptr[0]);
   this->data_.push_back(ptr[1]);
