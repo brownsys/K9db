@@ -17,10 +17,8 @@
 namespace pelton {
 namespace sql {
 
-class LazyVector {
+class RocksdbStream {
  public:
-  explicit LazyVector(rocksdb::Iterator *it) : it_(it) {}
-
   // Iterator class.
   class Iterator {
    public:
@@ -44,11 +42,16 @@ class LazyVector {
 
     void EnsureValid();
 
-    friend LazyVector;
+    friend RocksdbStream;
   };
 
-  LazyVector::Iterator begin() const { return Iterator(this->it_.get()); }
-  LazyVector::Iterator end() const { return Iterator(); }
+  explicit RocksdbStream(rocksdb::Iterator *it) : it_(it) {}
+
+  RocksdbStream::Iterator begin() const { return Iterator(this->it_.get()); }
+  RocksdbStream::Iterator end() const { return Iterator(); }
+
+  // To an actual vector. Consumes this vector.
+  std::vector<std::pair<EncryptedKey, EncryptedValue>> ToVector();
 
  private:
   std::unique_ptr<rocksdb::Iterator> it_;
@@ -82,7 +85,12 @@ class RocksdbTable {
       const std::unordered_set<EncryptedKey> &keys) const;
 
   // Read all the data.
-  LazyVector GetAll() const;
+  RocksdbStream GetAll() const;
+
+  // Read all data from shard.
+  RocksdbStream GetShard(const EncryptedPrefix &shard_name) const;
+  std::vector<std::pair<EncryptedKey, EncryptedValue>> DeleteShard(
+      const EncryptedPrefix &shard_name);
 
  private:
   rocksdb::DB *db_;

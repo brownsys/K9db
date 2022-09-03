@@ -103,6 +103,7 @@ std::optional<EncryptedValue> RocksdbTable::Get(const EncryptedKey &key) const {
     return {};
   }
   PANIC(status);
+  return {};
 }
 
 // MultiGet: faster multi key lookup.
@@ -151,29 +152,61 @@ void RocksdbTable::Delete(const EncryptedKey &key) {
   PANIC(this->db_->Delete(opts, this->handle_.get(), key.Data()));
 }
 
-LazyVector RocksdbTable::GetAll() const {
+// Get all data in table.
+RocksdbStream RocksdbTable::GetAll() const {
   rocksdb::ReadOptions options;
   options.fill_cache = false;
   options.verify_checksums = false;
   rocksdb::Iterator *it = this->db_->NewIterator(options, this->handle_.get());
   it->SeekToFirst();
-  return LazyVector(it);
+  return RocksdbStream(it);
+}
+
+// Get all data in shard.
+// Read all data from shard.
+RocksdbStream RocksdbTable::GetShard(const EncryptedPrefix &shard_name) const {
+  // Read options restrict iterations to records with the same prefix.
+  rocksdb::ReadOptions options;
+  options.fill_cache = false;
+  options.total_order_seek = false;
+  options.prefix_same_as_start = true;
+  options.verify_checksums = false;
+  // Iterator that spans the whole shard prefix.
+  rocksdb::Iterator *it = this->db_->NewIterator(options, this->handle_.get());
+  it->Seek(shard_name.Data());
+  return RocksdbStream(it);
+}
+
+// Delete all data in a shard.
+// Return deleted data.
+std::vector<std::pair<EncryptedKey, EncryptedValue>> RocksdbTable::DeleteShard(
+    const EncryptedPrefix &shard_name) {
+  // Get the shard data.
+  std::vector<std::pair<EncryptedKey, EncryptedValue>> data =
+      this->GetShard(shard_name).ToVector();
+  // Delete the shard data.
+  for (const auto &[key, _] : data) {
+    this->Delete(key);
+  }
+  return data;
 }
 
 /*
- * LazyVector
+ * RocksdbStream
  */
 
+using StreamIterator = RocksdbStream::Iterator;
+
 // Construct end iterator.
-LazyVector::Iterator::Iterator() : it_(nullptr) {}
+StreamIterator::Iterator() : it_(nullptr) {}
 
 // Construct iterator given a ready rocksdb iterator (with some seek performed).
-LazyVector::Iterator::Iterator(rocksdb::Iterator *it) : it_(it) {
+StreamIterator::Iterator(rocksdb::Iterator *it) : it_(it) {
   this->EnsureValid();
 }
 
 // Next key/value pair.
-LazyVector::Iterator &LazyVector::Iterator::operator++() {
+StreamIterator &StreamIterator::operator++() {
   if (this->it_ != nullptr) {
     this->it_->Next();
     this->EnsureValid();
@@ -182,24 +215,34 @@ LazyVector::Iterator &LazyVector::Iterator::operator++() {
 }
 
 // Equality of underlying iterator.
-bool LazyVector::Iterator::operator==(const LazyVector::Iterator &o) const {
+bool StreamIterator::operator==(const StreamIterator &o) const {
   return this->it_ == o.it_;
 }
-bool LazyVector::Iterator::operator!=(const LazyVector::Iterator &o) const {
+bool StreamIterator::operator!=(const StreamIterator &o) const {
   return this->it_ != o.it_;
 }
 
 // Get current key/value pair.
-LazyVector::Iterator::value_type LazyVector::Iterator::operator*() const {
-  return LazyVector::Iterator::value_type(
+StreamIterator::value_type StreamIterator::operator*() const {
+  return StreamIterator::value_type(
       this->it_->key(), Cipher::FromDB(this->it_->value().ToString()));
 }
 
 // When the iterator is consumed, set it to nullptr.
-void LazyVector::Iterator::EnsureValid() {
+void StreamIterator::EnsureValid() {
   if (!this->it_->Valid()) {
     this->it_ = nullptr;
   }
+}
+
+// To an actual vector. Consume this stream.
+std::vector<std::pair<EncryptedKey, EncryptedValue>> RocksdbStream::ToVector() {
+  std::vector<std::pair<EncryptedKey, EncryptedValue>> result;
+  for (; this->it_->Valid(); this->it_->Next()) {
+    result.emplace_back(this->it_->key(),
+                        Cipher::FromDB(this->it_->value().ToString()));
+  }
+  return result;
 }
 
 }  // namespace sql

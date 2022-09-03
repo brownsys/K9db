@@ -93,6 +93,7 @@ class EncryptedKey {
 
 // An encrypted value/row is just a blackbox cipher with no structure.
 using EncryptedValue = Cipher;
+using EncryptedPrefix = Cipher;
 
 // Encryption manager is responsible for encrypting / decrypting.
 // The functions of encryption manager basically become noops if encryption
@@ -113,7 +114,7 @@ class EncryptionManager {
   // Encrypts a key for use with rocksdb Seek.
   // Given our PeltonPrefixTransform, the seek prefix is the shard name.
   // (Must be passed to this function without a trailing __ROCKSSEP).
-  Cipher EncryptSeek(std::string &&seek_key) const;
+  EncryptedPrefix EncryptSeek(std::string &&seek_key) const;
 
  private:
 #ifdef PELTON_ENCRYPTION

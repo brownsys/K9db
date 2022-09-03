@@ -175,7 +175,7 @@ RocksdbSequence EncryptionManager::DecryptValue(const std::string &user_id,
 }
 
 // Encrypts a key for use with rocksdb Seek.
-Cipher EncryptionManager::EncryptSeek(std::string &&seek_key) const {
+EncryptedPrefix EncryptionManager::EncryptSeek(std::string &&seek_key) const {
   const unsigned char *nonce = this->global_nonce_.get();
   const unsigned char *key = this->global_key_.get();
   return Cipher(Encrypt(seek_key, nonce, key));
