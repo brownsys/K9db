@@ -1,6 +1,7 @@
 #ifndef PELTON_SQL_ROCKSDB_ENCODE_H__
 #define PELTON_SQL_ROCKSDB_ENCODE_H__
 
+#include <functional>
 #include <iterator>
 #include <string>
 #include <unordered_map>
@@ -53,6 +54,14 @@ class RocksdbSequence {
   // Includes trailing __ROCKSSEP, as well as internal __ROCKSSEP.
   rocksdb::Slice Slice(size_t spos, size_t count) const;
 
+  // Equality is over underlying data.
+  bool operator==(const RocksdbSequence &o) const {
+    return this->data_ == o.data_;
+  }
+  bool operator!=(const RocksdbSequence &o) const {
+    return this->data_ != o.data_;
+  }
+
   // Iterator class.
   class Iterator {
    public:
@@ -92,6 +101,8 @@ class RocksdbSequence {
   // Helper: encode an SQL value.
   std::string EncodeValue(sqlast::ColumnDefinition::Type type,
                           const rocksdb::Slice &value);
+
+  friend class std::hash<RocksdbSequence>;
 };
 
 class RocksdbRecord {
@@ -198,5 +209,17 @@ class RocksdbPKIndexRecord {
 
 }  // namespace sql
 }  // namespace pelton
+
+// Overlead hash function for RocksdbSequence.
+namespace std {
+
+template <>
+struct hash<pelton::sql::RocksdbSequence> {
+  size_t operator()(const pelton::sql::RocksdbSequence &o) const {
+    return hash<std::string>{}(o.data_);
+  }
+};
+
+}  // namespace std
 
 #endif  // PELTON_SQL_ROCKSDB_ENCODE_H__

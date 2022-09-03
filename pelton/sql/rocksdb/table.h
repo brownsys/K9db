@@ -4,6 +4,8 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "pelton/dataflow/schema.h"
@@ -14,6 +16,43 @@
 
 namespace pelton {
 namespace sql {
+
+class LazyVector {
+ public:
+  explicit LazyVector(rocksdb::Iterator *it) : it_(it) {}
+
+  // Iterator class.
+  class Iterator {
+   public:
+    // Iterator traits
+    using value_type = std::pair<EncryptedKey, EncryptedValue>;
+    using iterator_category = std::output_iterator_tag;
+
+    Iterator &operator++();
+
+    bool operator==(const Iterator &o) const;
+    bool operator!=(const Iterator &o) const;
+
+    // Access current element.
+    value_type operator*() const;
+
+   private:
+    rocksdb::Iterator *it_;
+
+    Iterator();
+    explicit Iterator(rocksdb::Iterator *it);
+
+    void EnsureValid();
+
+    friend LazyVector;
+  };
+
+  LazyVector::Iterator begin() const { return Iterator(this->it_.get()); }
+  LazyVector::Iterator end() const { return Iterator(); }
+
+ private:
+  std::unique_ptr<rocksdb::Iterator> it_;
+};
 
 class RocksdbTable {
  public:
@@ -33,10 +72,17 @@ class RocksdbTable {
   // Check if a record with given PK exists.
   bool Exists(const rocksdb::Slice &pk_value) const;
 
-  // Put/Get/Delete API.
+  // Put/Delete API.
   void Put(const EncryptedKey &key, const EncryptedValue &value);
-  std::optional<EncryptedValue> Get(const EncryptedKey &key) const;
   void Delete(const EncryptedKey &key);
+
+  // Get and MultiGet.
+  std::optional<EncryptedValue> Get(const EncryptedKey &key) const;
+  std::vector<EncryptedValue> MultiGet(
+      const std::unordered_set<EncryptedKey> &keys) const;
+
+  // Read all the data.
+  LazyVector GetAll() const;
 
  private:
   rocksdb::DB *db_;

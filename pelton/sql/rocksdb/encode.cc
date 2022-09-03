@@ -2,7 +2,6 @@
 
 // NOLINTNEXTLINE
 #include <charconv>
-#include <functional>
 #include <memory>
 // NOLINTNEXTLINE
 #include <string_view>

@@ -1,6 +1,7 @@
 #ifndef PELTON_SQL_ROCKSDB_ENCRYPTION_H_
 #define PELTON_SQL_ROCKSDB_ENCRYPTION_H_
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -30,6 +31,9 @@ class Cipher {
   rocksdb::Slice Data() const { return rocksdb::Slice(this->cipher_); }
   std::string &&Release() { return std::move(this->cipher_); }
 
+  bool operator==(const Cipher &o) const { return this->cipher_ == o.cipher_; }
+  bool operator!=(const Cipher &o) const { return this->cipher_ != o.cipher_; }
+
   static Cipher FromDB(std::string &&cipher) {
     return Cipher(std::move(cipher));
   }
@@ -42,6 +46,7 @@ class Cipher {
 
   // EncryptionManager can construct this.
   friend class EncryptionManager;
+  friend class std::hash<Cipher>;
 };
 
 // Encrypted keys are encrypted piece-wise.
@@ -66,6 +71,14 @@ class EncryptedKey {
   rocksdb::Slice Data() const { return rocksdb::Slice(this->data_); }
   std::string &&Release() { return std::move(this->data_); }
 
+  // Equality is over underlying string.
+  bool operator==(const EncryptedKey &o) const {
+    return this->data_ == o.data_;
+  }
+  bool operator!=(const EncryptedKey &o) const {
+    return this->data_ != o.data_;
+  }
+
   // For reading/decoding.
   rocksdb::Slice GetShard() const;
   rocksdb::Slice GetPK() const;
@@ -74,6 +87,8 @@ class EncryptedKey {
 
  private:
   std::string data_;
+
+  friend class std::hash<EncryptedKey>;
 };
 
 // An encrypted value/row is just a blackbox cipher with no structure.
@@ -135,5 +150,24 @@ const rocksdb::Comparator *PeltonComparator();
 
 }  // namespace sql
 }  // namespace pelton
+
+// Overlead hash function for encrypted stuff.
+namespace std {
+
+template <>
+struct hash<pelton::sql::Cipher> {
+  size_t operator()(const pelton::sql::Cipher &o) const {
+    return hash<std::string>{}(o.cipher_);
+  }
+};
+
+template <>
+struct hash<pelton::sql::EncryptedKey> {
+  size_t operator()(const pelton::sql::EncryptedKey &o) const {
+    return hash<std::string>{}(o.data_);
+  }
+};
+
+}  // namespace std
 
 #endif  // PELTON_SQL_ROCKSDB_ENCRYPTION_H_

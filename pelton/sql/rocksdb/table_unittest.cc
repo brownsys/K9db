@@ -1,8 +1,8 @@
 #include "pelton/sql/rocksdb/table.h"
 
 #include <filesystem>
-#include <string>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "gtest/gtest.h"
