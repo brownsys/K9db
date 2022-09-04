@@ -14,6 +14,7 @@ namespace sqlast {
 // Transforms Where clauses into a map from variable name to condition values.
 // std::string -> std::vector<std::string>
 // values inside std::vector are basically an OR.
+// TODO(babman): values of strings can be slices.
 class ValueMapper : public AbstractVisitor<void> {
  public:
   explicit ValueMapper(const dataflow::SchemaRef &schema)

@@ -17,9 +17,7 @@ namespace sql {
 using IndexSet =
     std::unordered_set<RocksdbIndexRecord, RocksdbIndexRecord::TargetHash,
                        RocksdbIndexRecord::TargetEqual>;
-using PKIndexSet = std::unordered_set<RocksdbPKIndexRecord,
-                                      RocksdbPKIndexRecord::ShardNameHash,
-                                      RocksdbPKIndexRecord::ShardNameEqual>;
+using PKIndexSet = std::vector<RocksdbPKIndexRecord>;
 
 class RocksdbIndex {
  public:

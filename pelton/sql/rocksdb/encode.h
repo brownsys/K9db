@@ -4,6 +4,8 @@
 #include <functional>
 #include <iterator>
 #include <string>
+// NOLINTNEXTLINE
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 
@@ -95,14 +97,50 @@ class RocksdbSequence {
   // For reading/decoding into dataflow.
   dataflow::Record DecodeRecord(const dataflow::SchemaRef &schema) const;
 
+  // For use in hashing based containers.
+  class Slicer {
+   public:
+    Slicer();  // Everything.
+    explicit Slicer(size_t pos);
+    Slicer(size_t start, size_t count);
+
+    std::string_view Slice(const RocksdbSequence &o) const;
+
+   private:
+    size_t start_;
+    size_t count_;
+    bool all_;
+  };
+
+  class Hash {
+   public:
+    explicit Hash(const Slicer &slicer) : slicer_(slicer) {}
+
+    // Hash function.
+    size_t operator()(const RocksdbSequence &o) const;
+
+   private:
+    Slicer slicer_;
+    std::hash<std::string_view> hash_;
+  };
+
+  class Equal {
+   public:
+    explicit Equal(const Slicer &slicer) : slicer_(slicer) {}
+
+    // Equal function.
+    bool operator()(const RocksdbSequence &l, const RocksdbSequence &r) const;
+
+   private:
+    Slicer slicer_;
+  };
+
  private:
   std::string data_;
 
   // Helper: encode an SQL value.
   std::string EncodeValue(sqlast::ColumnDefinition::Type type,
                           const rocksdb::Slice &value);
-
-  friend class std::hash<RocksdbSequence>;
 };
 
 class RocksdbRecord {
@@ -156,6 +194,7 @@ class RocksdbIndexRecord {
   // For writing/encoding.
   const RocksdbSequence &Sequence() const { return this->data_; }
   rocksdb::Slice Data() const { return this->data_.Data(); }
+  RocksdbSequence &&Release() { return std::move(this->data_); }
 
   // For reading/decoding.
   rocksdb::Slice GetShard() const;
@@ -165,12 +204,22 @@ class RocksdbIndexRecord {
   rocksdb::Slice TargetKey() const;
 
   // Allows us to use this type in unordered_set.
-  struct TargetHash {
+  class TargetHash {
+   public:
+    TargetHash();
     size_t operator()(const RocksdbIndexRecord &r) const;
+
+   private:
+    RocksdbSequence::Hash hash_;
   };
-  struct TargetEqual {
+  class TargetEqual {
+   public:
+    TargetEqual();
     bool operator()(const RocksdbIndexRecord &l,
                     const RocksdbIndexRecord &r) const;
+
+   private:
+    RocksdbSequence::Equal equal_;
   };
 
  private:
@@ -190,17 +239,29 @@ class RocksdbPKIndexRecord {
   // For writing/encoding.
   const RocksdbSequence &Sequence() const { return this->data_; }
   rocksdb::Slice Data() const { return this->data_.Data(); }
+  RocksdbSequence &&Release() { return std::move(this->data_); }
 
   // For reading/decoding.
+  rocksdb::Slice GetPK() const;
   rocksdb::Slice GetShard() const;
 
   // Allows us to use this type in unordered_set.
-  struct ShardNameHash {
+  class ShardNameHash {
+   public:
+    ShardNameHash();
     size_t operator()(const RocksdbPKIndexRecord &r) const;
+
+   private:
+    RocksdbSequence::Hash hash_;
   };
-  struct ShardNameEqual {
+  class ShardNameEqual {
+   public:
+    ShardNameEqual();
     bool operator()(const RocksdbPKIndexRecord &l,
                     const RocksdbPKIndexRecord &r) const;
+
+   private:
+    RocksdbSequence::Equal equal_;
   };
 
  private:
@@ -209,17 +270,5 @@ class RocksdbPKIndexRecord {
 
 }  // namespace sql
 }  // namespace pelton
-
-// Overlead hash function for RocksdbSequence.
-namespace std {
-
-template <>
-struct hash<pelton::sql::RocksdbSequence> {
-  size_t operator()(const pelton::sql::RocksdbSequence &o) const {
-    return hash<std::string>{}(o.data_);
-  }
-};
-
-}  // namespace std
 
 #endif  // PELTON_SQL_ROCKSDB_ENCODE_H__

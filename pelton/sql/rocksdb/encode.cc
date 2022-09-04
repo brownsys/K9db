@@ -3,14 +3,15 @@
 // NOLINTNEXTLINE
 #include <charconv>
 #include <memory>
-// NOLINTNEXTLINE
-#include <string_view>
 
 #include "glog/logging.h"
 
 namespace pelton {
 namespace sql {
 
+/*
+ * Helpers
+ */
 rocksdb::Slice ExtractColumn(const rocksdb::Slice &slice, size_t col) {
   rocksdb::Slice result = ExtractSlice(slice, col, 1);
   return rocksdb::Slice(result.data(), result.size() - 1);
@@ -54,7 +55,6 @@ rocksdb::Slice ExtractSlice(const rocksdb::Slice &slice, size_t spos,
 /*
  * RocksdbSequence
  */
-
 // Writing to sequence.
 void RocksdbSequence::Append(sqlast::ColumnDefinition::Type type,
                              const rocksdb::Slice &slice) {
@@ -176,7 +176,6 @@ std::string RocksdbSequence::EncodeValue(sqlast::ColumnDefinition::Type type,
 /*
  * RocksdbSequence::Iterator
  */
-
 // Constructor.
 RocksdbSequence::Iterator::Iterator(const char *ptr, size_t sz)
     : ptr_(ptr), size_(sz) {
@@ -217,6 +216,38 @@ bool RocksdbSequence::Iterator::operator!=(const Iterator &o) const {
 // Access.
 rocksdb::Slice RocksdbSequence::Iterator::operator*() const {
   return rocksdb::Slice(this->ptr_, this->next_);
+}
+
+/*
+ * RocksdbSequence::{Slicer, Hash, Equal}
+ */
+RocksdbSequence::Slicer::Slicer() : start_(0), count_(0) {}
+RocksdbSequence::Slicer::Slicer(size_t pos) : start_(pos), count_(1) {}
+RocksdbSequence::Slicer::Slicer(size_t start, size_t count)
+    : start_(start), count_(count) {
+  CHECK_GE(count, 1u);
+}
+
+std::string_view RocksdbSequence::Slicer::Slice(
+    const RocksdbSequence &o) const {
+  rocksdb::Slice slice;
+  if (this->count_ == 0) {  // Everything.
+    slice = o.Data();
+  } else if (this->count_ == 1) {  // Single entry.
+    slice = o.At(this->start_);
+  } else {  // A slice.
+    slice = o.Slice(this->start_, this->count_);
+  }
+  return std::string_view(slice.data(), slice.size());
+}
+
+size_t RocksdbSequence::Hash::operator()(const RocksdbSequence &o) const {
+  return this->hash_(this->slicer_.Slice(o));
+}
+
+bool RocksdbSequence::Equal::operator()(const RocksdbSequence &l,
+                                        const RocksdbSequence &r) const {
+  return this->slicer_.Slice(l) == this->slicer_.Slice(r);
 }
 
 /*
@@ -316,16 +347,23 @@ rocksdb::Slice RocksdbIndexRecord::TargetKey() const {
   return this->data_.Slice(1, 2);
 }
 
-// Allows us to use this type in unordered_set.
+/*
+ * RocksdbIndexRecord::{TargetHash, TargetEqual}
+ */
+RocksdbIndexRecord::TargetHash::TargetHash()
+    : hash_(RocksdbSequence::Slicer(1, 2)) {}
+
 size_t RocksdbIndexRecord::TargetHash::operator()(
     const RocksdbIndexRecord &r) const {
-  rocksdb::Slice target = r.TargetKey();
-  std::string_view view(target.data(), target.size());
-  return std::hash<std::string_view>()(view);
+  return this->hash_(r.Sequence());
 }
+
+RocksdbIndexRecord::TargetEqual::TargetEqual()
+    : equal_(RocksdbSequence::Slicer(1, 2)) {}
+
 bool RocksdbIndexRecord::TargetEqual::operator()(
     const RocksdbIndexRecord &l, const RocksdbIndexRecord &r) const {
-  return l.TargetKey() == r.TargetKey();
+  return this->equal_(l.Sequence(), r.Sequence());
 }
 
 /*
@@ -339,20 +377,28 @@ RocksdbPKIndexRecord::RocksdbPKIndexRecord(const rocksdb::Slice &pk_value,
 }
 
 // For reading/decoding.
+rocksdb::Slice RocksdbPKIndexRecord::GetPK() const { return this->data_.At(0); }
 rocksdb::Slice RocksdbPKIndexRecord::GetShard() const {
   return this->data_.At(1);
 }
 
-// Allows us to use this type in unordered_set.
+/*
+ * RocksdbPKIndexRecord::{ShardNameHash, ShardNameEqual}
+ */
+RocksdbPKIndexRecord::ShardNameHash::ShardNameHash()
+    : hash_(RocksdbSequence::Slicer(1)) {}
+
 size_t RocksdbPKIndexRecord::ShardNameHash::operator()(
     const RocksdbPKIndexRecord &r) const {
-  rocksdb::Slice shard = r.GetShard();
-  std::string_view view(shard.data(), shard.size());
-  return std::hash<std::string_view>()(view);
+  return this->hash_(r.Sequence());
 }
+
+RocksdbPKIndexRecord::ShardNameEqual::ShardNameEqual()
+    : equal_(RocksdbSequence::Slicer(1)) {}
+
 bool RocksdbPKIndexRecord::ShardNameEqual::operator()(
     const RocksdbPKIndexRecord &l, const RocksdbPKIndexRecord &r) const {
-  return l.GetShard() == r.GetShard();
+  return this->equal_(l.Sequence(), r.Sequence());
 }
 
 }  // namespace sql

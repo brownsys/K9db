@@ -12,10 +12,14 @@
 #include "pelton/sql/rocksdb/encode.h"
 #include "pelton/sql/rocksdb/encryption.h"
 #include "pelton/sql/rocksdb/index.h"
+#include "pelton/sqlast/value_mapper.h"
 #include "rocksdb/db.h"
 
 namespace pelton {
 namespace sql {
+
+using KeySet = std::unordered_set<RocksdbSequence, RocksdbSequence::Hash,
+                                  RocksdbSequence::Equal>;
 
 class RocksdbStream {
  public:
@@ -71,6 +75,7 @@ class RocksdbTable {
   // Index updating.
   void IndexAdd(const rocksdb::Slice &shard, const RocksdbSequence &row);
   void IndexDelete(const rocksdb::Slice &shard, const RocksdbSequence &row);
+  std::optional<KeySet> IndexLookup(sqlast::ValueMapper *value_mapper) const;
 
   // Check if a record with given PK exists.
   bool Exists(const rocksdb::Slice &pk_value) const;

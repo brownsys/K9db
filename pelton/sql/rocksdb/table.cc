@@ -10,6 +10,19 @@
 namespace pelton {
 namespace sql {
 
+namespace {
+
+std::vector<rocksdb::Slice> Transform(const std::vector<std::string> &v) {
+  std::vector<rocksdb::Slice> res;
+  res.reserve(v.size());
+  for (const std::string &s : v) {
+    res.emplace_back(s);
+  }
+  return res;
+}
+
+}  // namespace
+
 // Constructor.
 RocksdbTable::RocksdbTable(rocksdb::DB *db, const std::string &table_name,
                            const dataflow::SchemaRef &schema)
@@ -75,6 +88,51 @@ void RocksdbTable::IndexDelete(const rocksdb::Slice &shard,
       index->Delete(value, shard, pk);
     }
   }
+}
+
+// Index Lookup.
+std::optional<KeySet> RocksdbTable::IndexLookup(
+    sqlast::ValueMapper *value_mapper) const {
+  // Hash / equality determined by PK.
+  KeySet result(0, RocksdbSequence::Hash(RocksdbSequence::Slicer(1)),
+                RocksdbSequence::Equal(RocksdbSequence::Slicer(1)));
+
+  // Lookup by PK index.
+  if (value_mapper->HasBefore(this->pk_column_)) {
+    // Lookup primary index.
+    PKIndexSet set =
+        this->pk_index_.Get(Transform(value_mapper->Before(this->pk_column_)));
+    value_mapper->RemoveBefore(this->pk_column_);
+
+    // Transform to result.
+    for (const RocksdbPKIndexRecord &ir : set) {
+      RocksdbSequence entry;
+      entry.AppendEncoded(ir.GetShard());
+      entry.AppendEncoded(ir.GetPK());
+      result.insert(std::move(entry));
+    }
+    return result;
+  }
+
+  // Lookup by first available non PK index.
+  for (size_t col = 0; col < this->schema_.size(); col++) {
+    const std::optional<RocksdbIndex> &index = this->indices_.at(col);
+    if (!index.has_value()) {
+      continue;
+    }
+
+    // Lookup col index.
+    IndexSet set = index->Get(Transform(value_mapper->Before(col)));
+    value_mapper->RemoveBefore(col);
+
+    // Transform to result.
+    for (const RocksdbIndexRecord &ir : set) {
+      result.emplace(ir.TargetKey());
+    }
+    return result;
+  }
+
+  return {};
 }
 
 // Check if a record with given PK exists.

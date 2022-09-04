@@ -230,8 +230,8 @@ TEST(RocksdbIndexTest, GetAfterDeletePK) {
   EXPECT_TRUE(Eq(index.Get({pk4, pk5}), {shard2, shard10, shard100}));
 
   // 3 values.
-  EXPECT_TRUE(
-      Eq(index.Get({pk1, pk2, pk4}), {shard2, shard10, shard1, shard100}));
+  EXPECT_TRUE(Eq(index.Get({pk1, pk2, pk4}),
+                 {shard2, shard2, shard10, shard1, shard100}));
 }
 
 }  // namespace sql

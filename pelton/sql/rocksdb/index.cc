@@ -140,7 +140,7 @@ PKIndexSet RocksdbPKIndex::Get(const std::vector<rocksdb::Slice> &vals) const {
   for (const std::string &prefix : prefixes) {
     rocksdb::Slice pslice(prefix);
     for (it->Seek(pslice); it->Valid(); it->Next()) {
-      result.emplace(it->key());
+      result.emplace_back(it->key());
     }
   }
   return result;
