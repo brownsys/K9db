@@ -1,12 +1,7 @@
 #include "pelton/sql/rocksdb/connection.h"
 
-#include <unordered_set>
-
-#include "glog/logging.h"
 #include "pelton/util/status.h"
 #include "rocksdb/options.h"
-#include "rocksdb/slice.h"
-#include "rocksdb/table.h"
 
 namespace pelton {
 namespace sql {
@@ -21,8 +16,6 @@ void RocksdbConnection::Open(const std::string &db_name) {
   opts.error_if_exists = true;
   opts.IncreaseParallelism();
   opts.OptimizeLevelStyleCompaction();
-  opts.prefix_extractor.reset(new PeltonPrefixTransform());
-  opts.comparator = PeltonComparator();
 
   // Open the database.
   rocksdb::DB *db;
@@ -32,9 +25,7 @@ void RocksdbConnection::Open(const std::string &db_name) {
 
 // Close the connection.
 void RocksdbConnection::Close() {
-  this->schemas_.clear();
-  this->handlers_.clear();
-  this->indices_.clear();
+  this->tables_.clear();
   this->db_ = nullptr;
 }
 

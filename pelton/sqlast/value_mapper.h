@@ -46,6 +46,10 @@ class ValueMapper : public AbstractVisitor<void> {
     this->after_[col_idx] = val;
   }
 
+  // Empty?
+  bool EmptyBefore() const { return this->before_.size() == 0; }
+  bool EmptyAfter() const { return this->after_.size() == 0; }
+
   // Visitors.
   // These are unsupported.
   void VisitCreateTable(const sqlast::CreateTable &ast) override;

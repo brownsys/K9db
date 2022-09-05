@@ -1,167 +1,88 @@
-#include "glog/logging.h"
+// clang-format off
+// NOLINTNEXTLINE
 #include "pelton/sql/rocksdb/connection.h"
-#include "pelton/util/status.h"
-#include "rocksdb/options.h"
-#include "rocksdb/slice.h"
-#include "rocksdb/table.h"
+// clang-format on
+
+#include "glog/logging.h"
+#include "pelton/dataflow/schema.h"
+#include "pelton/sql/rocksdb/filter.h"
 
 namespace pelton {
 namespace sql {
 
-/*
- * HELPERS.
- */
-/*
-// Get record matching values in a value mapper FROM ALL SHARDS (either by key,
-// index, or it).
-std::pair<std::vector<std::string>, std::vector<std::string>>
-RocksdbConnection::GetRecords(TableID table_id, const ValueMapper &value_mapper,
-                              bool return_shards) {
-  // Read Metadata.
-  rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(table_id).get();
-  const dataflow::SchemaRef &schema = this->schemas_.at(table_id);
-  size_t pk = this->primary_keys_.at(table_id);
-  const auto &indexed_columns = this->indexed_columns_.at(table_id);
-  std::vector<RocksdbIndex> &indices = this->indices_.at(table_id);
-  const std::string &pkname = schema.NameOf(pk);
+// Get records matching where condition.
+std::vector<dataflow::Record> RocksdbConnection::GetRecords(
+    const std::string &table_name,
+    const sqlast::BinaryExpression &where) const {
+  const RocksdbTable &table = this->tables_.at(table_name);
+  const dataflow::SchemaRef &schema = table.Schema();
 
-  // Calling KeyFinder
-  auto key_info = KeyFinder(table_id, value_mapper);
-  auto keys_raw = key_info.second;
-  std::vector<std::string> keys;
-  std::vector<std::string> shards;
-  std::vector<std::string> result;
-  if (key_info.first) {
-    if (return_shards) {
-      for (size_t i = 0; i < keys_raw.size(); i++) {
-        // TO-DO: does repeated access slow performance
-        keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
-                       __ROCKSSEP);
-        shards.push_back(keys_raw[i].first);
-      }
-    } else {
-      for (size_t i = 0; i < keys_raw.size(); i++) {
-        keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
-                       __ROCKSSEP);
-      }
+  // Turn where condition into a value mapper.
+  sqlast::ValueMapper value_mapper(schema);
+  value_mapper.VisitBinaryExpression(where);
+
+  // Look up existing indices.
+  std::vector<dataflow::Record> records;
+  std::optional<KeySet> lookup = table.IndexLookup(&value_mapper);
+  if (lookup.has_value()) {
+    // Can lookup by index.
+    KeySet &set = *lookup;
+
+    // Encrypt all keys; keep track of corresponding shards for decryption.
+    std::vector<std::string> shards;
+    std::vector<EncryptedKey> keys;
+    for (const RocksdbSequence &key : set) {
+      shards.push_back(key.At(0).ToString());
+      keys.push_back(this->encryption_manager_.EncryptKey(
+          std::move(const_cast<RocksdbSequence &>(key))));
     }
 
-    // Look in rocksdb.
-    if (keys.size() == 1) {
-      std::string str;
-      rocksdb::ReadOptions opts;
-      opts.total_order_seek = true;
-      opts.verify_checksums = false;
+    // Multi Lookup by encrypted keys.
+    std::vector<std::optional<EncryptedValue>> envalues = table.MultiGet(keys);
 
-      rocksdb::Status status = this->db_->Get(
-          opts, handler, EncryptKey(this->global_key_, keys.front()), &str);
-      if (status.ok()) {
-        // TO-DO - could be optimised
-        result.push_back(std::move(Decrypt(
-            this->GetUserKey(keys[0].substr(0, keys[0].find(__ROCKSSEP))),
-            str)));
-      } else if (!status.IsNotFound()) {
-        PANIC(status);
+    // Decrypt all values.
+    for (size_t i = 0; i < envalues.size(); i++) {
+      std::optional<EncryptedValue> &opt = envalues.at(i);
+      if (opt.has_value()) {
+        const std::string &shard = shards.at(i);
+        RocksdbSequence value =
+            this->encryption_manager_.DecryptValue(shard, std::move(*opt));
+        records.push_back(value.DecodeRecord(schema));
       }
-    } else if (keys.size() > 1) {
-      // Make slices for keys.
-      rocksdb::Slice *slices = new rocksdb::Slice[keys.size()];
-      std::string *tmp = new std::string[keys.size()];
-      rocksdb::PinnableSlice *pins = new rocksdb::PinnableSlice[keys.size()];
-      rocksdb::Status *statuses = new rocksdb::Status[keys.size()];
-      for (size_t i = 0; i < keys.size(); i++) {
-        keys.at(i) = EncryptKey(this->global_key_, keys.at(i));
-        slices[i] = rocksdb::Slice(keys.at(i));
-        pins[i] = rocksdb::PinnableSlice(tmp + i);
-      }
-      // Use MultiGet.
-      rocksdb::ReadOptions opts;
-      opts.total_order_seek = true;
-      opts.verify_checksums = false;
-      this->db_->MultiGet(opts, handler, keys.size(), slices, pins, statuses);
-      // Read values that were found.
-      for (size_t i = 0; i < keys.size(); i++) {
-        rocksdb::Status &status = statuses[i];
-        if (status.ok()) {
-          if (pins[i].IsPinned()) {
-            tmp[i].assign(pins[i].data(), pins[i].size());
-          }
-          result.push_back(std::move(Decrypt(
-              this->GetUserKey(keys[i].substr(0, keys[i].find(__ROCKSSEP))),
-              tmp[i])));
-        } else if (!status.IsNotFound()) {
-          PANIC(status);
-        }
-      }
-      // Cleanup memory.
-      delete[] statuses;
-      delete[] pins;
-      delete[] tmp;
-      delete[] slices;
     }
   } else {
-    LOG(FATAL) << "case not implemented!";
-  }
+    // No relevant index; iterate over everything.
+    LOG(WARNING) << "Getting all records from table " << table_name;
 
-  return {result, shards};
-}
+    // Iterate over everything.
+    RocksdbStream all = table.GetAll();
+    for (auto [enkey, enval] : all) {
+      // Decrypt key.
+      RocksdbSequence key =
+          this->encryption_manager_.DecryptKey(std::move(enkey));
 
-// Filter records by where clause in abstract statement.
-std::vector<std::string> RocksdbConnection::Filter(
-    const dataflow::SchemaRef &schema, const sqlast::AbstractStatement *sql,
-    std::vector<std::string> &&rows) {
-  std::vector<std::string> filtered;
-  filtered.reserve(rows.size());
-  for (std::string &row : rows) {
-    FilterVisitor filter(rocksdb::Slice(row), schema);
-    if (filter.Visit(sql)) {
-      filtered.emplace_back(std::move(row));
+      // Use shard from decrypted key to decrypt value.
+      std::string shard = key.At(0).ToString();
+      RocksdbSequence value =
+          this->encryption_manager_.DecryptValue(shard, std::move(enval));
+
+      records.push_back(value.DecodeRecord(schema));
     }
   }
-  return filtered;
-}
 
-std::pair<bool, std::vector<std::pair<std::string, std::string>>>
-RocksdbConnection::KeyFinder(TableID table_id,
-                             const ValueMapper &value_mapper) {
-  // Read Metadata.
-  const dataflow::SchemaRef &schema = this->schemas_.at(table_id);
-  size_t pk = this->primary_keys_.at(table_id);
-  const auto &indexed_columns = this->indexed_columns_.at(table_id);
-  std::vector<RocksdbIndex> &indices = this->indices_.at(table_id);
-  const std::string &pkname = schema.NameOf(pk);
-
-  // Lookup either by PK or index.
-  std::vector<std::pair<std::string, std::string>> keys;
-  // std::vector<std::string> keys_raw;
-
-  // TO-DO (Vedant) this is expensive, will that effect performance?
-  auto it = std::find(indexed_columns.begin(), indexed_columns.end(), pk);
-  if (it != indexed_columns.end() && value_mapper.HasBefore(pkname)) {
-    auto i = it - indexed_columns.begin();
-    RocksdbIndex &index = indices.at(i);
-    keys = index.Get(value_mapper.Before(pkname));
-    // for (size_t i = 0; i < keys_raw.size(); i++) {
-    //   keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
-    //                  __ROCKSSEP);
-    // }
-    return {true, keys};
-  }
-  for (size_t i = 0; i < indexed_columns.size(); i++) {
-    RocksdbIndex &index = indices.at(i);
-    const std::string &idxcolumn = schema.NameOf(indexed_columns.at(i));
-    if (value_mapper.HasBefore(idxcolumn)) {
-      keys = index.Get(value_mapper.Before(idxcolumn));
-      // for (size_t i = 0; i < keys_raw.size(); i++) {
-      //   keys.push_back(keys_raw[i].first + __ROCKSSEP + keys_raw[i].second +
-      //                  __ROCKSSEP);
-      // }
-      return {true, keys};
+  // Apply remaining filters (if any).
+  if (!value_mapper.EmptyBefore()) {
+    std::vector<dataflow::Record> filtered;
+    for (dataflow::Record &record : records) {
+      if (InMemoryFilter(value_mapper, record)) {
+        filtered.push_back(std::move(record));
+      }
     }
+    records = std::move(filtered);
   }
-  return {false, {}};
+
+  return records;
 }
-*/
 
 }  // namespace sql
 }  // namespace pelton

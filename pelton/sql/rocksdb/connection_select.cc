@@ -1,9 +1,9 @@
-#include "glog/logging.h"
+// clang-format off
+// NOLINTNEXTLINE
 #include "pelton/sql/rocksdb/connection.h"
-#include "pelton/util/status.h"
-#include "rocksdb/options.h"
-#include "rocksdb/slice.h"
-#include "rocksdb/table.h"
+// clang-format on
+
+#include "pelton/sql/rocksdb/project.h"
 
 namespace pelton {
 namespace sql {
@@ -11,46 +11,66 @@ namespace sql {
 /*
  * SELECT STATEMENTS.
  */
-/*
-SqlResultSet RocksdbConnection::ExecuteSelect(
-    const sqlast::Select &stmt, const dataflow::SchemaRef &out_schema,
-    const std::vector<AugInfo> &augments) {
-  CHECK_LE(augments.size(), 1u) << "Too many augmentations";
 
-  // Read table metadata.
-  // TO-DO: check for redundancy with Get
-  const std::string &table_name = stmt.table_name();
-  TableID tid = this->tables_.at(table_name);
-  rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(tid).get();
-  const dataflow::SchemaRef &db_schema = this->schemas_.at(tid);
-  size_t pk = this->primary_keys_.at(tid);
-  const auto &indexed_columns = this->indexed_columns_.at(tid);
-  ValueMapper value_mapper(pk, indexed_columns, db_schema);
-  value_mapper.VisitSelect(stmt);
+SqlResultSet RocksdbConnection::ExecuteSelect(const sqlast::Select &sql) const {
+  const std::string &table_name = sql.table_name();
+  const RocksdbTable &table = this->tables_.at(table_name);
+  const dataflow::SchemaRef &schema = table.Schema();
+  const sqlast::BinaryExpression *const where = sql.GetWhereClause();
 
-  // Result components.
+  // Filter by where clause.
   std::vector<dataflow::Record> records;
-  std::vector<std::string> pkeys;
-
-  // Figure out the projections (including order).
-  bool has_projection = stmt.GetColumns().at(0) != "*";
-  std::vector<int> projections;
-  if (has_projection) {
-    projections = ProjectionSchema(db_schema, out_schema, augments);
+  if (where != nullptr) {
+    records = this->GetRecords(sql.table_name(), *where);
+  } else {
+    RocksdbStream stream = table.GetAll();
+    for (auto [enkey, envalue] : stream) {
+      RocksdbSequence key =
+          this->encryption_manager_.DecryptKey(std::move(enkey));
+      std::string shard = key.At(0).ToString();
+      RocksdbSequence value =
+          this->encryption_manager_.DecryptValue(shard, std::move(envalue));
+      records.push_back(value.DecodeRecord(schema));
+    }
   }
 
-  // Look up all the rows.
-  auto result = this->GetRecords(tid, value_mapper, false).first;
-  result = this->Filter(db_schema, &stmt, std::move(result));
-  for (std::string &row : result) {
-    rocksdb::Slice slice(row);
-    rocksdb::Slice key = ExtractColumn(row, pk);
-    pkeys.push_back(key.ToString());
-    records.push_back(DecodeRecord(slice, out_schema, augments, projections));
+  // Apply projection, if any.
+  Projection projection = ProjectionSchema(schema, sql.GetColumns());
+  if (projection.schema != schema) {
+    std::vector<dataflow::Record> projected;
+    for (const dataflow::Record &record : records) {
+      projected.push_back(Project(projection, record));
+    }
+    records = std::move(projected);
   }
-  return SqlResultSet(out_schema, std::move(records), std::move(pkeys));
+
+  return SqlResultSet(projection.schema, std::move(records));
 }
-*/
+
+SqlResultSet RocksdbConnection::GetShard(const std::string &table_name,
+                                         const std::string &shard_name) const {
+  // Get table.
+  const RocksdbTable &table = this->tables_.at(table_name);
+  const dataflow::SchemaRef &schema = table.Schema();
+
+  // Holds the result.
+  std::vector<dataflow::Record> records;
+
+  // Encrypt the shard name.
+  EncryptedPrefix seek =
+      this->encryption_manager_.EncryptSeek(std::string(shard_name));
+  RocksdbStream stream = table.GetShard(seek);
+  for (auto [enkey, envalue] : stream) {
+    RocksdbSequence key =
+        this->encryption_manager_.DecryptKey(std::move(enkey));
+    std::string shard = key.At(0).ToString();
+    RocksdbSequence value =
+        this->encryption_manager_.DecryptValue(shard, std::move(envalue));
+    records.push_back(value.DecodeRecord(schema));
+  }
+
+  return SqlResultSet(schema, std::move(records));
+}
 
 }  // namespace sql
 }  // namespace pelton

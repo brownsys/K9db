@@ -14,6 +14,10 @@ namespace sql {
 
 Projection ProjectionSchema(const dataflow::SchemaRef &table_schema,
                             const std::vector<std::string> &columns) {
+  if (columns.size() == 1 && columns.front() == "*") {
+    return {table_schema, {}, {}};
+  }
+
   CHECK_EQ(table_schema.keys().size(), 1u) << "Illegal keys " << table_schema;
   std::vector<std::string> names;
   std::vector<sqlast::ColumnDefinition::Type> types;

@@ -165,8 +165,8 @@ std::optional<EncryptedValue> RocksdbTable::Get(const EncryptedKey &key) const {
 }
 
 // MultiGet: faster multi key lookup.
-std::vector<EncryptedValue> RocksdbTable::MultiGet(
-    const std::unordered_set<EncryptedKey> &keys) const {
+std::vector<std::optional<EncryptedValue>> RocksdbTable::MultiGet(
+    const std::vector<EncryptedKey> &keys) const {
   rocksdb::ReadOptions opts;
   opts.total_order_seek = true;
   opts.verify_checksums = false;
@@ -190,12 +190,14 @@ std::vector<EncryptedValue> RocksdbTable::MultiGet(
                       pins.get(), statuses.get());
 
   // Read values that were found.
-  std::vector<EncryptedValue> result;
+  std::vector<std::optional<EncryptedValue>> result;
   for (size_t i = 0; i < keys.size(); i++) {
     const rocksdb::Status &status = statuses[i];
     if (status.ok()) {
-      result.push_back(Cipher::FromDB(pins[i].ToString()));
-    } else if (!status.IsNotFound()) {
+      result.emplace_back(Cipher::FromDB(pins[i].ToString()));
+    } else if (status.IsNotFound()) {
+      result.push_back({});
+    } else {
       PANIC(status);
     }
   }

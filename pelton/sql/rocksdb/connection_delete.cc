@@ -1,79 +1,120 @@
-#include "glog/logging.h"
+// clang-format off
+// NOLINTNEXTLINE
 #include "pelton/sql/rocksdb/connection.h"
-#include "pelton/util/status.h"
-#include "rocksdb/options.h"
-#include "rocksdb/slice.h"
-#include "rocksdb/table.h"
+// clang-format on
+
+#include <utility>
+
+#include "glog/logging.h"
+#include "pelton/sql/rocksdb/filter.h"
 
 namespace pelton {
 namespace sql {
 
+namespace {
+
+struct DelElement {
+  std::string shard;
+  EncryptedKey key;
+  RocksdbSequence value;
+  DelElement(std::string &&s, EncryptedKey &&k, RocksdbSequence &&v)
+      : shard(std::move(s)), key(std::move(k)), value(std::move(v)) {}
+};
+
+}  // namespace
+
 /*
  * DELETE STATEMENTS.
  */
-/*
-SqlResult RocksdbConnection::ExecuteDelete(const sqlast::Delete &stmt) {
- // Read table metadata.
- const std::string &table_name = stmt.table_name();
- TableID tid = this->tables_.at(table_name);
- rocksdb::ColumnFamilyHandle *handler = this->handlers_.at(tid).get();
- const dataflow::SchemaRef &db_schema = this->schemas_.at(tid);
- size_t pk = this->primary_keys_.at(tid);
- const auto &indexed_columns = this->indexed_columns_.at(tid);
- std::vector<RocksdbIndex> &indices = this->indices_.at(tid);
 
- ValueMapper value_mapper(pk, indexed_columns, db_schema);
- value_mapper.VisitDelete(stmt);
- // Look up all affected rows.
- std::pair<std::vector<std::string>, std::vector<std::string>> result =
-     this->GetRecords(tid, value_mapper, true);
- std::vector<std::string> shards = result.second;
- std::vector<std::string> rows = result.first;
+SqlResultSet RocksdbConnection::ExecuteDelete(const sqlast::Delete &sql) {
+  const std::string &table_name = sql.table_name();
+  RocksdbTable &table = this->tables_.at(table_name);
+  const dataflow::SchemaRef &schema = table.Schema();
 
- // Result components
- std::vector<dataflow::Record> records;
- std::vector<std::string> keys;
+  const sqlast::BinaryExpression *const where = sql.GetWhereClause();
+  if (where == nullptr) {
+    LOG(FATAL) << "Delete with no where clause";
+  }
 
- rows = this->Filter(db_schema, &stmt, std::move(rows));
- auto rsize = rows.size();
- if (rsize > 5) {
-   LOG(WARNING) << "Perf Warning: " << rsize << " rocksdb deletes in a loop "
-                << stmt;
- }
- for (int i = 0; i < rsize; i++) {
-   std::string &row = rows[i];
-   std::string &shard_name = shards[i];
+  // Turn where condition into a value mapper.
+  sqlast::ValueMapper value_mapper(schema);
+  value_mapper.VisitBinaryExpression(*where);
 
-   rocksdb::Slice slice(row);
-   // Get the key of the existing row.
-   rocksdb::Slice keyslice = ExtractColumn(row, pk);
-   if (stmt.returning()) {
-     keys.push_back(keyslice.ToString());
-     records.push_back(DecodeRecord(slice, db_schema, {}, {}));
-   }
-   // Delete the existing row by key.
-   std::string skey =
-       shard_name + __ROCKSSEP + keyslice.ToString() + __ROCKSSEP;
-   PANIC(this->db_->Delete(rocksdb::WriteOptions(), handler,
-                           EncryptKey(this->global_key_, skey)));
+  // Look up existing indices.
+  std::vector<DelElement> records;
+  std::optional<KeySet> lookup = table.IndexLookup(&value_mapper);
+  if (lookup.has_value()) {
+    // Can lookup by index.
+    KeySet &set = *lookup;
 
-   // Update indices.
-   for (size_t i = 0; i < indexed_columns.size(); i++) {
-     RocksdbIndex &index = indices.at(i);
-     size_t indexed_column = indexed_columns.at(i);
-     index.Delete(ExtractColumn(slice, indexed_column), shard_name, keyslice);
-   }
- }
- if (stmt.returning()) {
-   return sql::SqlResult(
-       sql::SqlResultSet(db_schema, std::move(records), std::move(keys)));
- } else {
-   return SqlResult(rsize);
- }
- // TODO(babman): can do this better.
- // TODO(babman): need to handle returning deletes.
+    // Encrypt all keys; keep track of corresponding shards for decryption.
+    std::vector<std::string> shards;
+    std::vector<EncryptedKey> keys;
+    for (const RocksdbSequence &key : set) {
+      shards.push_back(key.At(0).ToString());
+      keys.push_back(this->encryption_manager_.EncryptKey(
+          std::move(const_cast<RocksdbSequence &>(key))));
+    }
+
+    // Multi Lookup by encrypted keys.
+    std::vector<std::optional<EncryptedValue>> envalues = table.MultiGet(keys);
+
+    // Decrypt all values.
+    for (size_t i = 0; i < envalues.size(); i++) {
+      std::optional<EncryptedValue> &envalue = envalues.at(i);
+      if (envalue.has_value()) {
+        std::string &shard = shards.at(i);
+        RocksdbSequence val =
+            this->encryption_manager_.DecryptValue(shard, std::move(*envalue));
+
+        records.emplace_back(std::move(shard), std::move(keys.at(i)),
+                             std::move(val));
+      }
+    }
+  } else {
+    // No relevant index; iterate over everything.
+    LOG(WARNING) << "Getting all records from table " << table_name;
+
+    // Iterate over everything.
+    RocksdbStream all = table.GetAll();
+    for (auto [enkey, enval] : all) {
+      // Decrypt key.
+      EncryptedKey copy = enkey;
+      RocksdbSequence key =
+          this->encryption_manager_.DecryptKey(std::move(enkey));
+
+      // Use shard from decrypted key to decrypt value.
+      std::string shard = key.At(0).ToString();
+      RocksdbSequence value =
+          this->encryption_manager_.DecryptValue(shard, std::move(enval));
+
+      records.emplace_back(std::move(shard), std::move(copy), std::move(value));
+    }
+  }
+
+  // Iterate over records to be deleted and delete them.
+  std::vector<dataflow::Record> result;
+  const bool filter = !value_mapper.EmptyBefore();
+  for (DelElement &element : records) {
+    // If any filters remain check them.
+    dataflow::Record record = element.value.DecodeRecord(schema);
+    if (filter && !InMemoryFilter(value_mapper, record)) {
+      continue;
+    }
+
+    // Update indices.
+    table.IndexDelete(element.shard, element.value);
+
+    // Delete record.
+    table.Delete(element.key);
+
+    // Append record to result.
+    result.push_back(std::move(record));
+  }
+
+  return SqlResultSet(schema, std::move(result));
 }
-*/
 
 }  // namespace sql
 }  // namespace pelton

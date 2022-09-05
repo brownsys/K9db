@@ -66,6 +66,9 @@ class RocksdbTable {
   RocksdbTable(rocksdb::DB *db, const std::string &table_name,
                const dataflow::SchemaRef &schema);
 
+  // Get the schema.
+  const dataflow::SchemaRef &Schema() const { return this->schema_; }
+
   // Index creation.
   void CreateIndex(size_t column_index);
   void CreateIndex(const std::string &column_name) {
@@ -86,8 +89,8 @@ class RocksdbTable {
 
   // Get and MultiGet.
   std::optional<EncryptedValue> Get(const EncryptedKey &key) const;
-  std::vector<EncryptedValue> MultiGet(
-      const std::unordered_set<EncryptedKey> &keys) const;
+  std::vector<std::optional<EncryptedValue>> MultiGet(
+      const std::vector<EncryptedKey> &keys) const;
 
   // Read all the data.
   RocksdbStream GetAll() const;

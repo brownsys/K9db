@@ -82,13 +82,13 @@ EncryptedKey::EncryptedKey(Cipher &&shard_cipher, const Cipher &pk_cipher)
 }
 
 rocksdb::Slice EncryptedKey::GetShard() const {
-  uint16_t size = EncryptedKey::ShardSize(this->data_);
+  Offset size = EncryptedKey::ShardSize(this->data_);
   return rocksdb::Slice(this->data_.data(), size);
 }
 
 rocksdb::Slice EncryptedKey::GetPK() const {
-  uint16_t offset = EncryptedKey::ShardSize(this->data_);
-  size_t size = this->data_.size() - offset;
+  Offset offset = EncryptedKey::ShardSize(this->data_);
+  size_t size = this->data_.size() - offset - sizeof(Offset);
   return rocksdb::Slice(this->data_.data() + offset, size);
 }
 

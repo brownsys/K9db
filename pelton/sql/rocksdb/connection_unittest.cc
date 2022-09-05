@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "glog/logging.h"
 #include "gtest/gtest.h"
@@ -12,9 +13,11 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/ints.h"
 
 #define DB_NAME "test"
 #define DB_PATH "/tmp/pelton/rocksdb/test"
+#define STR(s) std::make_unique<std::string>(s)
 
 namespace pelton {
 namespace sql {
@@ -68,30 +71,30 @@ TEST(RocksdbConnectionTest, CreateInsertSelect) {
   EXPECT_TRUE(conn->ExecuteCreateTable(tbl));
 
   // Insert into table.
-  InsertResult expected = {1, 0};
   sqlast::Insert insert("test_table", false);
   insert.SetValues({"0", "'user1'", "20"});
-  EXPECT_EQ(conn->ExecuteInsert(insert, "user1"), expected);
+  EXPECT_EQ(conn->ExecuteInsert(insert, "user1"), 1);
 
   insert.SetValues({"1", "'user2'", "25"});
-  EXPECT_EQ(conn->ExecuteInsert(insert, "user2"), expected);
+  EXPECT_EQ(conn->ExecuteInsert(insert, "user2"), 1);
 
   insert.SetValues({"2", "'user3'", "30"});
-  EXPECT_EQ(conn->ExecuteInsert(insert, "user3"), expected);
+  EXPECT_EQ(conn->ExecuteInsert(insert, "user3"), 1);
 
   insert.SetValues({"3", "'user4'", "35"});
-  EXPECT_EQ(conn->ExecuteInsert(insert, "user4"), expected);
+  EXPECT_EQ(conn->ExecuteInsert(insert, "user4"), 1);
 
-  /*
+  std::vector<dataflow::Record> expected;
+  expected.emplace_back(schema, true, 0_s, STR("user1"), 20_s);
+  expected.emplace_back(schema, true, 1_s, STR("user2"), 25_s);
+  expected.emplace_back(schema, true, 2_s, STR("user3"), 30_s);
+  expected.emplace_back(schema, true, 3_s, STR("user4"), 35_s);
+
   // Select from table.
   sqlast::Select select("test_table");
   select.AddColumn("*");
   SqlResultSet result = conn->ExecuteSelect(select);
-  CheckEqual(result.Vec(), {{schema, true, 0_s, STR("user1"), 20_s},
-                            {schema, true, 1_s, STR("user2"), 25_s},
-                            {schema, true, 2_s, STR("user3"), 30_s},
-                            {schema, true, 3_s, STR("user4"), 35_s}});
-  */
+  CheckEqual(result.Vec(), expected);
 
   /*
   select.SetWhereClause(std::make_unique<sqlast::BinaryExpression>(EType::EQ));
