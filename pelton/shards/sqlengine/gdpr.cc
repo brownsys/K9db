@@ -241,6 +241,7 @@ void File(const sqlast::GDPRStatement &stmt, Connection *connection) {
   SharedLock lock = state->ReaderLock();
   // To-do - vs dequotes version?
   user_file << user_id << std::endl;
+  std::string sharded_table_name;
   for (const auto &table_name : state->TablesInShard(shard_kind)) {
     dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
 
@@ -257,14 +258,19 @@ void File(const sqlast::GDPRStatement &stmt, Connection *connection) {
 
       sqlast::Select tbl_stmt{info->sharded_table_name};
       tbl_stmt.AddColumn("*");
-      table_result.Append(
-          exec.Shard(&tbl_stmt, unquoted_user_id, schema, aug_index), true);
+      pelton::sql::SqlResult result =
+          exec.Shard(&tbl_stmt, unquoted_user_id, schema, aug_index);
+      table_result.Append(std::move(result), true);
+      if (result.ResultSets().size() == 1) {
+        sharded_table_name = info->sharded_table_name;
+      }
     }
     CHECK_EQ(table_result.ResultSets().size(), 1);
     LOG(INFO) << "Found a total of " << table_result.ResultSets().front().size()
               << " rows";
     auto record_set = table_result.ResultSets().front().Vec();
-    user_file << table_name << " " << record_set.size() << std::endl;
+    user_file << table_name << " " << sharded_table_name << " "
+              << record_set.size() << std::endl;
     for (int j = 0; j < record_set.size(); j++) {
       auto &record = record_set[j];
       record.SetPositive(true);

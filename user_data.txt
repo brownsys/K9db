@@ -1,3 +1,3 @@
 2
-chat 1
-|1|1|2|HELLO from alice|
+chat chat_OWNER_receiver_id 1
+|1|1|2|hacked|
