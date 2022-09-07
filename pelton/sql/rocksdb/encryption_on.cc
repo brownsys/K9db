@@ -1,6 +1,7 @@
+// clang-format off
+// NOLINTNEXTLINE
 #include "pelton/sql/rocksdb/encryption.h"
-
-#ifdef PELTON_ENCRYPTION
+// clang-format on
 
 #include <cassert>
 
@@ -244,5 +245,3 @@ const rocksdb::Comparator *PeltonComparator() {
 
 }  // namespace sql
 }  // namespace pelton
-
-#endif  // PELTON_ENCRYPTION

@@ -75,7 +75,15 @@ To run all tests, run `bazel test ...`.
 Pelton's main entry point is its mysql proxy, which you can run using `bazel run //:pelton`.
 You can run this in various mode using `./run.sh [dbg, opt, valgrind, asan, tsan]`.
 
-## TSAN and ASAN:
+## Disabling Encryption
+Encryption is on by default. It can be turned off by passing `--encryption=off`
+to any bazel command. For example:
+```
+bazel test ... --encryption=off
+bazel run //:pelton --encryption=off
+```
+
+## TSAN and ASAN
 The JVM introduces a variety of things that look like various leaks and races. These are
 all JVM internals we have no control over and are likely correct. We suppress them when
 running the JVM.

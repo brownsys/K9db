@@ -1,6 +1,7 @@
+// clang-format off
+// NOLINTNEXTLINE
 #include "pelton/sql/rocksdb/encryption.h"
-
-#ifndef PELTON_ENCRYPTION
+// clang-format on
 
 #include "glog/logging.h"
 
@@ -55,6 +56,18 @@ EncryptedPrefix EncryptionManager::EncryptSeek(std::string &&seek_key) const {
   return Cipher(std::move(seek_key));
 }
 
+// Helpers are unused.
+const unsigned char *EncryptionManager::GetOrCreateUserKey(
+    const std::string &user_id) {
+  LOG(FATAL) << "ENCRYPTION OFF!";
+  return nullptr;
+}
+const unsigned char *EncryptionManager::GetUserKey(
+    const std::string &user_id) const {
+  LOG(FATAL) << "ENCRYPTION OFF!";
+  return nullptr;
+}
+
 /*
  * PeltonPrefixTransform
  */
@@ -71,5 +84,3 @@ const rocksdb::Comparator *PeltonComparator() {
 
 }  // namespace sql
 }  // namespace pelton
-
-#endif  // PELTON_ENCRYPTION

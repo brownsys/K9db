@@ -13,8 +13,6 @@
 #include "rocksdb/slice.h"
 #include "rocksdb/slice_transform.h"
 
-// #define PELTON_ENCRYPTION
-
 namespace pelton {
 namespace sql {
 
@@ -117,7 +115,6 @@ class EncryptionManager {
   EncryptedPrefix EncryptSeek(std::string &&seek_key) const;
 
  private:
-#ifdef PELTON_ENCRYPTION
   std::unique_ptr<unsigned char[]> global_key_;
   std::unique_ptr<unsigned char[]> global_nonce_;
   std::unordered_map<std::string, std::unique_ptr<unsigned char[]>> keys_;
@@ -127,7 +124,6 @@ class EncryptionManager {
   // exist.
   const unsigned char *GetOrCreateUserKey(const std::string &user_id);
   const unsigned char *GetUserKey(const std::string &user_id) const;
-#endif  // PELTON_ENCRYPTION
 };
 
 // Extract the shard prefix from keys according to our rocksdb key format.

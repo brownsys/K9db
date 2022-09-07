@@ -25,9 +25,13 @@ jobs:
         docker exec pelton-testing sh -c "cd /home/pelton/experiments/lobsters && bazel build ..."
         docker exec pelton-testing sh -c "cd /home/pelton/experiments/ownCloud && bazel build ..."
 
-    # bazel test all except memcached
+    # bazel test all (with encryption; on by default)
     - name: Test all
       run: docker exec pelton-testing sh -c "cd /home/pelton && bazel test ... --test_output=all"
+
+    # bazel test all without encryption
+    - name: Test all no encryption
+      run: docker exec pelton-testing sh -c "cd /home/pelton && bazel test ... --encryption=off --test_output=all"
 
     # prepared statement test.
     - name: Run prepared statement test

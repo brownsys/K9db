@@ -1,4 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 
 cc_library(
     name = "connection",
@@ -120,12 +121,29 @@ cc_library(
     ],
 )
 
+# Disable/enable encryption using bazel command line args.
+# .bazelrc defines an alias to shortcut this
+# e.g. bazel build ... --encryption=on    [default]
+#      bazel build ... --encryption=off
+string_flag(
+    name = "configure_encryption",
+    values = ["on", "off"],
+    build_setting_default = "on",
+)
+
+config_setting(
+    name = "disable_encryption",
+    flag_values = {
+        ":configure_encryption": "off",
+    }
+)
+
 cc_library(
     name = "encryption",
-    srcs = [
-        "encryption_off.cc",
-        "encryption_on.cc",
-    ],
+    srcs = select({
+        ":disable_encryption": ["encryption_off.cc"],
+        "//conditions:default": ["encryption_on.cc"],
+    }),
     hdrs = [
         "encryption.h",
     ],
@@ -138,6 +156,8 @@ cc_library(
     ],
 )
 
+
+# Tests.
 cc_test(
     name = "connection-test",
     srcs = [
