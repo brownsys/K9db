@@ -74,7 +74,7 @@ SqlResultSet RocksdbConnection::ExecuteDelete(const sqlast::Delete &sql) {
     }
   } else {
     // No relevant index; iterate over everything.
-    LOG(WARNING) << "Getting all records from table " << table_name;
+    LOG(WARNING) << "Deleting by scan in table " << table_name;
 
     // Iterate over everything.
     RocksdbStream all = table.GetAll();

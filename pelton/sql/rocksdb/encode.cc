@@ -52,13 +52,70 @@ rocksdb::Slice ExtractSlice(const rocksdb::Slice &slice, size_t spos,
              << slice.ToString() << "'";
 }
 
+// Helper: encoding an SQL value.
+std::string EncodeValue(sqlast::ColumnDefinition::Type type,
+                        const rocksdb::Slice &value) {
+  if (value == rocksdb::Slice("NULL", 4)) {
+    std::string result;
+    result.push_back(__ROCKSNULL);
+    return result;
+  }
+  switch (type) {
+    case sqlast::ColumnDefinition::Type::INT:
+    case sqlast::ColumnDefinition::Type::UINT:
+      return std::string(value.data(), value.size());
+    case sqlast::ColumnDefinition::Type::TEXT:
+      return std::string(value.data() + 1, value.size() - 2);
+    case sqlast::ColumnDefinition::Type::DATETIME:
+      if (value.size() > 0) {
+        if (value.data()[0] == '\'' || value.data()[0] == '"') {
+          return std::string(value.data() + 1, value.size() - 2);
+        }
+      }
+      return std::string(value.data(), value.size());
+    default:
+      LOG(FATAL) << "UNREACHABLE";
+  }
+}
+
+void EncodeValues(sqlast::ColumnDefinition::Type type,
+                  std::vector<std::string> *values) {
+  for (size_t i = 0; i < values->size(); i++) {
+    std::string &value = values->at(i);
+    if (value == "NULL") {
+      value.clear();
+      value.push_back(__ROCKSNULL);
+      continue;
+    }
+    switch (type) {
+      case sqlast::ColumnDefinition::Type::INT:
+      case sqlast::ColumnDefinition::Type::UINT:
+        continue;
+      case sqlast::ColumnDefinition::Type::TEXT:
+        value.pop_back();
+        value.erase(value.begin());
+        continue;
+      case sqlast::ColumnDefinition::Type::DATETIME:
+        if (value.size() > 0) {
+          if (value.data()[0] == '\'' || value.data()[0] == '"') {
+            value.pop_back();
+            value.erase(0);
+          }
+        }
+        continue;
+      default:
+        LOG(FATAL) << "UNREACHABLE";
+    }
+  }
+}
+
 /*
  * RocksdbSequence
  */
 // Writing to sequence.
 void RocksdbSequence::Append(sqlast::ColumnDefinition::Type type,
                              const rocksdb::Slice &slice) {
-  this->data_.append(this->EncodeValue(type, slice));
+  this->data_.append(EncodeValue(type, slice));
   this->data_.push_back(__ROCKSSEP);
 }
 void RocksdbSequence::AppendEncoded(const rocksdb::Slice &slice) {
@@ -75,7 +132,7 @@ void RocksdbSequence::AppendShardname(const std::string &shard_name) {
 void RocksdbSequence::Replace(size_t pos, sqlast::ColumnDefinition::Type type,
                               const rocksdb::Slice &slice) {
   // Encode value.
-  std::string value = this->EncodeValue(type, slice);
+  std::string value = EncodeValue(type, slice);
   // Find replace location.
   rocksdb::Slice replace = this->At(pos);
   size_t start = replace.data() - this->data_.data();
@@ -145,32 +202,6 @@ dataflow::Record RocksdbSequence::DecodeRecord(
     }
   }
   return record;
-}
-
-// Helper: encoding an SQL value.
-std::string RocksdbSequence::EncodeValue(sqlast::ColumnDefinition::Type type,
-                                         const rocksdb::Slice &value) {
-  if (value == rocksdb::Slice("NULL", 4)) {
-    std::string result;
-    result.push_back(__ROCKSNULL);
-    return result;
-  }
-  switch (type) {
-    case sqlast::ColumnDefinition::Type::INT:
-    case sqlast::ColumnDefinition::Type::UINT:
-      return std::string(value.data(), value.size());
-    case sqlast::ColumnDefinition::Type::TEXT:
-      return std::string(value.data() + 1, value.size() - 2);
-    case sqlast::ColumnDefinition::Type::DATETIME:
-      if (value.size() > 0) {
-        if (value.data()[0] == '\'' || value.data()[0] == '"') {
-          return std::string(value.data() + 1, value.size() - 2);
-        }
-      }
-      return std::string(value.data(), value.size());
-    default:
-      LOG(FATAL) << "UNREACHABLE";
-  }
 }
 
 /*

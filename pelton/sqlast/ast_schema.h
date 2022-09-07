@@ -208,9 +208,8 @@ class CreateTable : public AbstractStatement {
 
 class CreateIndex : public AbstractStatement {
  public:
-  explicit CreateIndex(const std::string &index_name,
-                       const std::string &table_name,
-                       const std::string &column_name)
+  CreateIndex(const std::string &index_name, const std::string &table_name,
+              const std::string &column_name)
       : AbstractStatement(AbstractStatement::Type::CREATE_INDEX),
         index_name_(index_name),
         table_name_(table_name),

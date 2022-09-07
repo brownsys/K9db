@@ -11,6 +11,7 @@
 #include "pelton/util/ints.h"
 
 #define STR(s) std::make_unique<std::string>(s)
+#define ADD_CONDITION(v, col, val) v.Before()[col].push_back(val)
 
 namespace pelton {
 namespace sql {
@@ -41,7 +42,7 @@ TEST(FilterTest, IdentityFilter) {
 // Simple filters.
 TEST(FilterTest, SimpleFilters) {
   sqlast::ValueMapper cond(schema);
-  cond.AddBefore(0, "0");
+  ADD_CONDITION(cond, 0, "0");
   EXPECT_TRUE(InMemoryFilter(cond, r1));
   EXPECT_FALSE(InMemoryFilter(cond, r2));
   EXPECT_FALSE(InMemoryFilter(cond, r3));
@@ -49,7 +50,7 @@ TEST(FilterTest, SimpleFilters) {
   EXPECT_FALSE(InMemoryFilter(cond, r5));
 
   cond = sqlast::ValueMapper(schema);
-  cond.AddBefore(2, "20");
+  ADD_CONDITION(cond, 2, "20");
   EXPECT_TRUE(InMemoryFilter(cond, r1));
   EXPECT_FALSE(InMemoryFilter(cond, r2));
   EXPECT_TRUE(InMemoryFilter(cond, r3));
@@ -57,7 +58,7 @@ TEST(FilterTest, SimpleFilters) {
   EXPECT_FALSE(InMemoryFilter(cond, r5));
 
   cond = sqlast::ValueMapper(schema);
-  cond.AddBefore(1, "'user2'");
+  ADD_CONDITION(cond, 1, "'user2'");
   EXPECT_FALSE(InMemoryFilter(cond, r1));
   EXPECT_TRUE(InMemoryFilter(cond, r2));
   EXPECT_TRUE(InMemoryFilter(cond, r3));
@@ -65,7 +66,7 @@ TEST(FilterTest, SimpleFilters) {
   EXPECT_FALSE(InMemoryFilter(cond, r5));
 
   cond = sqlast::ValueMapper(schema);
-  cond.AddBefore(2, "NULL");
+  ADD_CONDITION(cond, 2, "NULL");
   EXPECT_FALSE(InMemoryFilter(cond, r1));
   EXPECT_TRUE(InMemoryFilter(cond, r2));
   EXPECT_FALSE(InMemoryFilter(cond, r3));
@@ -73,7 +74,7 @@ TEST(FilterTest, SimpleFilters) {
   EXPECT_FALSE(InMemoryFilter(cond, r5));
 
   cond = sqlast::ValueMapper(schema);
-  cond.AddBefore(1, "NULL");
+  ADD_CONDITION(cond, 1, "NULL");
   EXPECT_FALSE(InMemoryFilter(cond, r1));
   EXPECT_FALSE(InMemoryFilter(cond, r2));
   EXPECT_FALSE(InMemoryFilter(cond, r3));
@@ -84,9 +85,9 @@ TEST(FilterTest, SimpleFilters) {
 // OR filters.
 TEST(FilterTest, OrFilters) {
   sqlast::ValueMapper cond(schema);
-  cond.AddBefore(0, "0");
-  cond.AddBefore(0, "2");
-  cond.AddBefore(0, "10");
+  ADD_CONDITION(cond, 0, "0");
+  ADD_CONDITION(cond, 0, "2");
+  ADD_CONDITION(cond, 0, "10");
   EXPECT_TRUE(InMemoryFilter(cond, r1));
   EXPECT_FALSE(InMemoryFilter(cond, r2));
   EXPECT_TRUE(InMemoryFilter(cond, r3));
@@ -94,8 +95,8 @@ TEST(FilterTest, OrFilters) {
   EXPECT_FALSE(InMemoryFilter(cond, r5));
 
   cond = sqlast::ValueMapper(schema);
-  cond.AddBefore(2, "20");
-  cond.AddBefore(2, "NULL");
+  ADD_CONDITION(cond, 2, "20");
+  ADD_CONDITION(cond, 2, "NULL");
   EXPECT_TRUE(InMemoryFilter(cond, r1));
   EXPECT_TRUE(InMemoryFilter(cond, r2));
   EXPECT_TRUE(InMemoryFilter(cond, r3));
@@ -103,10 +104,10 @@ TEST(FilterTest, OrFilters) {
   EXPECT_FALSE(InMemoryFilter(cond, r5));
 
   cond = sqlast::ValueMapper(schema);
-  cond.AddBefore(1, "'user1'");
-  cond.AddBefore(1, "'user20'");
-  cond.AddBefore(1, "NULL");
-  cond.AddBefore(1, "'user4'");
+  ADD_CONDITION(cond, 1, "'user1'");
+  ADD_CONDITION(cond, 1, "'user20'");
+  ADD_CONDITION(cond, 1, "NULL");
+  ADD_CONDITION(cond, 1, "'user4'");
   EXPECT_TRUE(InMemoryFilter(cond, r1));
   EXPECT_FALSE(InMemoryFilter(cond, r2));
   EXPECT_FALSE(InMemoryFilter(cond, r3));
@@ -117,8 +118,8 @@ TEST(FilterTest, OrFilters) {
 // And filters.
 TEST(FilterTest, AndFilters) {
   sqlast::ValueMapper cond(schema);
-  cond.AddBefore(0, "0");
-  cond.AddBefore(1, "'user2'");
+  ADD_CONDITION(cond, 0, "0");
+  ADD_CONDITION(cond, 1, "'user2'");
   EXPECT_FALSE(InMemoryFilter(cond, r1));
   EXPECT_FALSE(InMemoryFilter(cond, r2));
   EXPECT_FALSE(InMemoryFilter(cond, r3));
@@ -126,8 +127,8 @@ TEST(FilterTest, AndFilters) {
   EXPECT_FALSE(InMemoryFilter(cond, r5));
 
   cond = sqlast::ValueMapper(schema);
-  cond.AddBefore(1, "'user2'");
-  cond.AddBefore(2, "NULL");
+  ADD_CONDITION(cond, 1, "'user2'");
+  ADD_CONDITION(cond, 2, "NULL");
   EXPECT_FALSE(InMemoryFilter(cond, r1));
   EXPECT_TRUE(InMemoryFilter(cond, r2));
   EXPECT_FALSE(InMemoryFilter(cond, r3));
@@ -135,8 +136,8 @@ TEST(FilterTest, AndFilters) {
   EXPECT_FALSE(InMemoryFilter(cond, r5));
 
   cond = sqlast::ValueMapper(schema);
-  cond.AddBefore(1, "'user2'");
-  cond.AddBefore(2, "20");
+  ADD_CONDITION(cond, 1, "'user2'");
+  ADD_CONDITION(cond, 2, "20");
   EXPECT_FALSE(InMemoryFilter(cond, r1));
   EXPECT_FALSE(InMemoryFilter(cond, r2));
   EXPECT_TRUE(InMemoryFilter(cond, r3));
@@ -147,9 +148,9 @@ TEST(FilterTest, AndFilters) {
 // Combined filters.
 TEST(FilterTest, Combined) {
   sqlast::ValueMapper cond(schema);
-  cond.AddBefore(0, "0");
-  cond.AddBefore(0, "1");
-  cond.AddBefore(1, "'user2'");
+  ADD_CONDITION(cond, 0, "0");
+  ADD_CONDITION(cond, 0, "1");
+  ADD_CONDITION(cond, 1, "'user2'");
   EXPECT_FALSE(InMemoryFilter(cond, r1));
   EXPECT_TRUE(InMemoryFilter(cond, r2));
   EXPECT_FALSE(InMemoryFilter(cond, r3));
@@ -157,10 +158,10 @@ TEST(FilterTest, Combined) {
   EXPECT_FALSE(InMemoryFilter(cond, r5));
 
   cond = sqlast::ValueMapper(schema);
-  cond.AddBefore(1, "'user2'");
-  cond.AddBefore(1, "NULL");
-  cond.AddBefore(2, "0");
-  cond.AddBefore(2, "NULL");
+  ADD_CONDITION(cond, 1, "'user2'");
+  ADD_CONDITION(cond, 1, "NULL");
+  ADD_CONDITION(cond, 2, "0");
+  ADD_CONDITION(cond, 2, "NULL");
   EXPECT_FALSE(InMemoryFilter(cond, r1));
   EXPECT_TRUE(InMemoryFilter(cond, r2));
   EXPECT_FALSE(InMemoryFilter(cond, r3));
@@ -168,12 +169,12 @@ TEST(FilterTest, Combined) {
   EXPECT_TRUE(InMemoryFilter(cond, r5));
 
   cond = sqlast::ValueMapper(schema);
-  cond.AddBefore(1, "'user2'");
-  cond.AddBefore(1, "0");
-  cond.AddBefore(1, "100");
-  cond.AddBefore(2, "0");
-  cond.AddBefore(2, "NULL");
-  cond.AddBefore(2, "100");
+  ADD_CONDITION(cond, 1, "'user2'");
+  ADD_CONDITION(cond, 1, "0");
+  ADD_CONDITION(cond, 1, "100");
+  ADD_CONDITION(cond, 2, "0");
+  ADD_CONDITION(cond, 2, "NULL");
+  ADD_CONDITION(cond, 2, "100");
   EXPECT_FALSE(InMemoryFilter(cond, r1));
   EXPECT_TRUE(InMemoryFilter(cond, r2));
   EXPECT_FALSE(InMemoryFilter(cond, r3));

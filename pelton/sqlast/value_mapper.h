@@ -3,6 +3,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "pelton/dataflow/schema.h"
@@ -27,23 +28,27 @@ class ValueMapper : public AbstractVisitor<void> {
   bool HasAfter(size_t col_idx) const {
     return this->after_.count(col_idx) == 1;
   }
-  const std::vector<std::string> &Before(size_t col_idx) const {
-    return this->before_.at(col_idx);
+  std::vector<std::string> ReleaseBefore(size_t col_idx) {
+    auto node = this->before_.extract(col_idx);
+    std::vector<std::string> res = std::move(node.mapped());
+    return res;
   }
-  const std::string &After(size_t col_idx) const {
-    return this->after_.at(col_idx);
+  std::string ReleaseAfter(size_t col_idx) {
+    auto node = this->after_.extract(col_idx);
+    std::string res = std::move(node.mapped());
+    return res;
   }
 
-  // Remove conditions (if they have been consumed).
-  void RemoveBefore(size_t col_idx) { this->before_.erase(col_idx); }
-  void RemoveAfter(size_t col_idx) { this->after_.erase(col_idx); }
-
-  // For testing.
-  void AddBefore(size_t col_idx, const std::string &val) {
-    this->before_[col_idx].push_back(val);
+  // Access before and after.
+  std::unordered_map<size_t, std::vector<std::string>> &Before() {
+    return this->before_;
   }
-  void SetAfter(size_t col_idx, const std::string &val) {
-    this->after_[col_idx] = val;
+  std::unordered_map<size_t, std::string> &After() { return this->after_; }
+  const std::unordered_map<size_t, std::vector<std::string>> &Before() const {
+    return this->before_;
+  }
+  const std::unordered_map<size_t, std::string> &After() const {
+    return this->after_;
   }
 
   // Empty?

@@ -6,7 +6,6 @@ cc_library(
     srcs = [
         "connection.cc",
         "connection_delete.cc",
-        "connection_helpers.cc",
         "connection_insert.cc",
         "connection_schema.cc",
         "connection_select.cc",
@@ -127,15 +126,18 @@ cc_library(
 #      bazel build ... --encryption=off
 string_flag(
     name = "configure_encryption",
-    values = ["on", "off"],
     build_setting_default = "on",
+    values = [
+        "on",
+        "off",
+    ],
 )
 
 config_setting(
     name = "disable_encryption",
     flag_values = {
         ":configure_encryption": "off",
-    }
+    },
 )
 
 cc_library(
@@ -155,7 +157,6 @@ cc_library(
         "@rocksdb",
     ],
 )
-
 
 # Tests.
 cc_test(

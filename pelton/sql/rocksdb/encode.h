@@ -8,6 +8,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
@@ -24,6 +25,11 @@ rocksdb::Slice ExtractColumn(const rocksdb::Slice &slice, size_t col);
 
 rocksdb::Slice ExtractSlice(const rocksdb::Slice &slice, size_t spos,
                             size_t count);
+
+std::string EncodeValue(sqlast::ColumnDefinition::Type type,
+                        const rocksdb::Slice &value);
+void EncodeValues(sqlast::ColumnDefinition::Type type,
+                  std::vector<std::string> *values);
 
 class RocksdbSequence {
  public:
@@ -137,10 +143,6 @@ class RocksdbSequence {
 
  private:
   std::string data_;
-
-  // Helper: encode an SQL value.
-  std::string EncodeValue(sqlast::ColumnDefinition::Type type,
-                          const rocksdb::Slice &value);
 };
 
 class RocksdbRecord {

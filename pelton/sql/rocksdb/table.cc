@@ -100,9 +100,10 @@ std::optional<KeySet> RocksdbTable::IndexLookup(
   // Lookup by PK index.
   if (value_mapper->HasBefore(this->pk_column_)) {
     // Lookup primary index.
-    PKIndexSet set =
-        this->pk_index_.Get(Transform(value_mapper->Before(this->pk_column_)));
-    value_mapper->RemoveBefore(this->pk_column_);
+    std::vector<std::string> vals =
+        value_mapper->ReleaseBefore(this->pk_column_);
+    EncodeValues(this->schema_.TypeOf(this->pk_column_), &vals);
+    PKIndexSet set = this->pk_index_.Get(Transform(vals));
 
     // Transform to result.
     for (const RocksdbPKIndexRecord &ir : set) {
@@ -117,13 +118,14 @@ std::optional<KeySet> RocksdbTable::IndexLookup(
   // Lookup by first available non PK index.
   for (size_t col = 0; col < this->schema_.size(); col++) {
     const std::optional<RocksdbIndex> &index = this->indices_.at(col);
-    if (!index.has_value()) {
+    if (!index.has_value() || !value_mapper->HasBefore(col)) {
       continue;
     }
 
     // Lookup col index.
-    IndexSet set = index->Get(Transform(value_mapper->Before(col)));
-    value_mapper->RemoveBefore(col);
+    std::vector<std::string> vals = value_mapper->ReleaseBefore(col);
+    EncodeValues(this->schema_.TypeOf(col), &vals);
+    IndexSet set = index->Get(Transform(vals));
 
     // Transform to result.
     for (const RocksdbIndexRecord &ir : set) {
@@ -182,7 +184,7 @@ std::vector<std::optional<EncryptedValue>> RocksdbTable::MultiGet(
   // Fill rocksdb C-arrays.
   size_t i = 0;
   for (const EncryptedKey &key : keys) {
-    slices[i] = key.Data();
+    slices[i++] = key.Data();
   }
 
   // Use MultiGet.
