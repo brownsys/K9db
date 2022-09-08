@@ -119,7 +119,7 @@ EncryptionManager::EncryptionManager()
 // Get the key of the given user.
 const unsigned char *EncryptionManager::GetUserKey(
     const std::string &user_id) const {
-  shards::SharedLock lock(&this->mtx_);
+  util::SharedLock lock(&this->mtx_);
   return this->keys_.at(user_id).get();
 }
 
@@ -127,21 +127,17 @@ const unsigned char *EncryptionManager::GetUserKey(
 // Create the key if that user does not yet have one.
 const unsigned char *EncryptionManager::GetOrCreateUserKey(
     const std::string &user_id) {
-  shards::SharedLock lock(&this->mtx_);
-  auto it = this->keys_.find(user_id);
-  if (it == this->keys_.end()) {
-    shards::UniqueLock upgraded(std::move(lock));
-    it = this->keys_.find(user_id);
-    if (it == this->keys_.end()) {
-      std::unique_ptr<unsigned char[]> key =
-          std::make_unique<unsigned char[]>(KEY_SIZE);
-      crypto_aead_aes256gcm_keygen(key.get());
-      auto [eit, _] = this->keys_.emplace(user_id, std::move(key));
-      return eit->second.get();
-    }
-    return it->second.get();
+  util::SharedLock lock(&this->mtx_);
+  auto &&[upgraded, condition] =
+      lock.UpgradeIf([&]() { return this->keys_.count(user_id) == 0; });
+  if (condition) {
+    std::unique_ptr<unsigned char[]> key =
+        std::make_unique<unsigned char[]>(KEY_SIZE);
+    crypto_aead_aes256gcm_keygen(key.get());
+    auto [eit, _] = this->keys_.emplace(user_id, std::move(key));
+    return eit->second.get();
   }
-  return it->second.get();
+  return this->keys_.at(user_id).get();
 }
 
 // Encryption of keys and values of records.

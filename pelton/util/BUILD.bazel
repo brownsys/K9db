@@ -65,3 +65,15 @@ cc_library(
     visibility = ["//:__subpackages__"],
     deps = [],
 )
+
+cc_library(
+    name = "upgradable_lock",
+    srcs = [
+        "upgradable_lock.cc",
+    ],
+    hdrs = [
+        "upgradable_lock.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [],
+)

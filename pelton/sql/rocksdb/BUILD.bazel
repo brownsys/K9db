@@ -13,7 +13,7 @@ cc_library(
     hdrs = [
         "connection.h",
     ],
-    visibility = ["//pelton/sql:__subpackages__"],
+    visibility = ["//pelton:__subpackages__"],
     deps = [
         ":encode",
         ":encryption",
@@ -151,7 +151,7 @@ cc_library(
     ],
     deps = [
         ":encode",
-        "//pelton/shards:upgradable_lock",
+        "//pelton/util:upgradable_lock",
         "@glog",
         "@libsodium",
         "@rocksdb",

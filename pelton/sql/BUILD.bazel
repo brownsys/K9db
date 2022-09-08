@@ -5,7 +5,7 @@ cc_library(
     hdrs = [
         "abstract_connection.h",
     ],
-    visibility = ["//pelton/sql:__subpackages__"],
+    visibility = ["//pelton:__subpackages__"],
     deps = [
         ":result",
         "//pelton/sqlast:ast",

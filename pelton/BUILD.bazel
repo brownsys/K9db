@@ -32,16 +32,17 @@ cc_library(
 
 cc_library(
     name = "connection",
+    srcs = ["connection.cc"],
     hdrs = ["connection.h"],
     visibility = ["//:__subpackages__"],
     deps = [
         ":prepared",
         "//pelton/dataflow:dstate",
-        "//pelton/perf",
         "//pelton/shards:state",
-        "//pelton/shards:upgradable_lock",
-        "//pelton/sql:executor",
+        "//pelton/sql:abstract_connection",
         "//pelton/sql:result",
+        "//pelton/sql/rocksdb:connection",
+        "//pelton/util:upgradable_lock",
     ],
 )
 

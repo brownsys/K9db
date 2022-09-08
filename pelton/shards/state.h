@@ -17,9 +17,9 @@
 #include <vector>
 
 #include "pelton/shards/types.h"
-#include "pelton/shards/upgradable_lock.h"
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/upgradable_lock.h"
 
 namespace pelton {
 namespace shards {
@@ -133,7 +133,7 @@ class SharderState {
                    const FlowName &flow_name,
                    const sqlast::CreateIndex &create_index_stmt, bool unique);
 
-  inline std::string GenerateUniqueIndexName(UniqueLock *lock) {
+  inline std::string GenerateUniqueIndexName(util::UniqueLock *lock) {
     this->_unique_index_ctr += 1;
     return "_unq_indx_" + std::to_string(this->_unique_index_ctr);
   }
@@ -156,8 +156,8 @@ class SharderState {
   }
 
   // Synchronization.
-  UniqueLock WriterLock();
-  SharedLock ReaderLock() const;
+  util::UniqueLock WriterLock();
+  util::SharedLock ReaderLock() const;
 
   // For testing
 
@@ -227,7 +227,7 @@ class SharderState {
       index_to_flow_;
 
   // Our implementation of an upgradable shared mutex.
-  mutable UpgradableMutex mtx_;
+  mutable util::UpgradableMutex mtx_;
 
   unsigned int _unique_index_ctr = 0;
 };

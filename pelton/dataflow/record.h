@@ -258,7 +258,7 @@ class Record {
           } else {
             LOG(FATAL) << "Type mismatch in SetData at index " << index
                        << ", expected " << this->schema_.TypeOf(index)
-                       << ", got " << TypeNameFor(t);
+                       << ", got " << util::TypeNameFor(t);
           }
           break;
         case sqlast::ColumnDefinition::Type::INT:
@@ -268,7 +268,7 @@ class Record {
           } else {
             LOG(FATAL) << "Type mismatch in SetData at index " << index
                        << ", expected " << this->schema_.TypeOf(index)
-                       << ", got " << TypeNameFor(t);
+                       << ", got " << util::TypeNameFor(t);
           }
           break;
         case sqlast::ColumnDefinition::Type::TEXT:
@@ -278,7 +278,7 @@ class Record {
           } else {
             LOG(FATAL) << "Type mismatch in SetData at index " << index
                        << ", expected " << this->schema_.TypeOf(index)
-                       << ", got " << TypeNameFor(t);
+                       << ", got " << util::TypeNameFor(t);
           }
           break;
         case sqlast::ColumnDefinition::Type::DATETIME:
@@ -288,7 +288,7 @@ class Record {
           } else {
             LOG(FATAL) << "Type mismatch in SetData at index " << index
                        << ", expected " << this->schema_.TypeOf(index)
-                       << ", got " << TypeNameFor(t);
+                       << ", got " << util::TypeNameFor(t);
           }
           break;
         default:

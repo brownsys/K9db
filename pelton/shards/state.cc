@@ -245,8 +245,12 @@ sql::SqlResult SharderState::NumShards() const {
 }
 
 // Synchronization.
-UniqueLock SharderState::WriterLock() { return UniqueLock(&this->mtx_); }
-SharedLock SharderState::ReaderLock() const { return SharedLock(&this->mtx_); }
+util::UniqueLock SharderState::WriterLock() {
+  return util::UniqueLock(&this->mtx_);
+}
+util::SharedLock SharderState::ReaderLock() const {
+  return util::SharedLock(&this->mtx_);
+}
 
 bool SharderState::HasDefaultTable(const UnshardedTableName &name) const {
   return this->sharded_schema_.contains(name);

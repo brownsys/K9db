@@ -11,27 +11,13 @@ cc_library(
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":types",
-        ":upgradable_lock",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/sqlast:parser",
         "//pelton/util:fs",
-    ],
-)
-
-cc_library(
-    name = "upgradable_lock",
-    srcs = [
-        "upgradable_lock.cc",
-    ],
-    hdrs = [
-        "upgradable_lock.h",
-    ],
-    visibility = ["//pelton:__subpackages__"],
-    deps = [
-        "@glog",
+        "//pelton/util:upgradable_lock",
     ],
 )
 

@@ -7,8 +7,8 @@
 #include <unordered_map>
 #include <utility>
 
-#include "pelton/shards/upgradable_lock.h"
 #include "pelton/sql/rocksdb/encode.h"
+#include "pelton/util/upgradable_lock.h"
 #include "rocksdb/comparator.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/slice_transform.h"
@@ -118,7 +118,7 @@ class EncryptionManager {
   std::unique_ptr<unsigned char[]> global_key_;
   std::unique_ptr<unsigned char[]> global_nonce_;
   std::unordered_map<std::string, std::unique_ptr<unsigned char[]>> keys_;
-  mutable shards::UpgradableMutex mtx_;
+  mutable util::UpgradableMutex mtx_;
 
   // Get the key of the given user, create the key for that user if it does not
   // exist.

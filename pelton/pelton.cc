@@ -105,15 +105,12 @@ bool initialize(size_t workers, bool consistent) {
 
 bool open(Connection *connection, const std::string &db_name) {
   // set global state in local connection struct
+  PELTON_STATE->Initialize(db_name);
   connection->state = PELTON_STATE;
-  connection->executor.Initialize(db_name);
   return true;
 }
 
-bool close(Connection *connection) {
-  connection->executor.Close();
-  return true;
-}
+bool close(Connection *connection) { return true; }
 
 absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
   // Trim statement, removing whitespace
