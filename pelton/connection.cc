@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <utility>
 
+#include "pelton/dataflow/record.h"
+#include "pelton/dataflow/schema.h"
 #include "pelton/sql/rocksdb/connection.h"
 
 namespace pelton {
@@ -46,8 +48,14 @@ sql::SqlResult State::SizeInMemory() const {
   return this->dstate_.SizeInMemory();
 }
 sql::SqlResult State::NumShards() const {
+  std::vector<dataflow::Record> records;
   util::SharedLock lock = this->ReaderLock();
-  return this->sstate_.NumShards();
+  for (auto &&[kind, num] : this->sstate_.NumShards()) {
+    records.emplace_back(dataflow::SchemaFactory::NUM_SHARDS_SCHEMA, true,
+                         std::make_unique<std::string>(std::move(kind)), num);
+  }
+  return sql::SqlResult(sql::SqlResultSet(
+      dataflow::SchemaFactory::NUM_SHARDS_SCHEMA, std::move(records)));
 }
 sql::SqlResult State::PreparedDebug() const {
   // Acquire reader lock.
