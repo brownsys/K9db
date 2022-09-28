@@ -23,13 +23,13 @@ std::ostream &operator<<(std::ostream &os, const VariableInfo &o) {
 std::ostream &operator<<(std::ostream &os, const ShardDescriptor &o) {
   os << "{`" << o.shard_kind << "`: ";
   switch (o.type) {
-    case DIRECT:
+    case InfoType::DIRECT:
       os << std::get<DirectInfo>(o.info);
       break;
-    case TRANSITIVE:
+    case InfoType::TRANSITIVE:
       os << std::get<TransitiveInfo>(o.info);
       break;
-    case VARIABLE:
+    case InfoType::VARIABLE:
       os << std::get<VariableInfo>(o.info);
       break;
   }
@@ -43,14 +43,14 @@ std::ostream &operator<<(std::ostream &os, const Table &o) {
     if (i > 0) {
       os << ", ";
     }
-    os << o.owners.at(i);
+    os << *o.owners.at(i);
   }
   os << "], accessors [";
   for (size_t i = 0; i < o.accessors.size(); i++) {
     if (i > 0) {
       os << ", ";
     }
-    os << o.accessors.at(i);
+    os << *o.accessors.at(i);
   }
   os << "]";
   return os;

@@ -15,7 +15,6 @@
 namespace pelton {
 namespace sql {
 
-#define DB_NAME "test"
 #define DB_PATH "/tmp/pelton/rocksdb/index_test"
 
 // Drop the database (if it exists), and intialize a fresh rocksdb instance.

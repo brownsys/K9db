@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "pelton/shards/types.h"
 #include "pelton/sqlast/ast.h"
 
@@ -45,11 +46,21 @@ class SharderState {
   SharderState &operator=(const SharderState &&) = delete;
 
   // Table creation.
-  void AddTable(const Table &table);
+  void AddTable(Table &&table);
+
+  // Only for use when handling OWNS/ACCESSES.
+  absl::Status AddTableOwner(
+      const TableName &table_name,
+      std::vector<std::unique_ptr<ShardDescriptor>> &&owner);
+
+  absl::Status AddTableAccessor(
+      const TableName &table_name,
+      std::vector<std::unique_ptr<ShardDescriptor>> &&access);
 
   // Table lookup.
   bool TableExists(const TableName &table_name) const;
-  bool IsSharded(const TableName &table_name) const;
+  bool IsOwned(const TableName &table_name) const;
+  bool IsAccessed(const TableName &table_name) const;
   Table &GetTable(const TableName &table_name);
   const Table &GetTable(const TableName &table_name) const;
 
@@ -76,6 +87,11 @@ class SharderState {
 
   // All the tables defined by the schema.
   std::unordered_map<TableName, Table> tables_;
+
+  // Mark whether we encountered tables that depend on each given table or not.
+  // Checking this, we can guarantee that all OWNS into a table are created
+  // before any OWNED BY / ACCESSED BY annotations refer to it.
+  std::unordered_map<TableName, bool> dependencies_;
 
   // Counts of users currently in the system.
   std::unordered_map<ShardKind, std::atomic<uint64_t>> users_;

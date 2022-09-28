@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "pelton/shards/sqlengine/create.h"
+/*
 #include "pelton/shards/sqlengine/delete.h"
 #include "pelton/shards/sqlengine/gdpr.h"
 #include "pelton/shards/sqlengine/index.h"
@@ -13,8 +14,8 @@
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/update.h"
 #include "pelton/shards/sqlengine/view.h"
+*/
 #include "pelton/shards/state.h"
-#include "pelton/shards/upgradable_lock.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/sqlast/parser.h"
 #include "pelton/util/status.h"
@@ -24,9 +25,7 @@ namespace shards {
 namespace sqlengine {
 
 absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
-                                     Connection *connection,
-                                     std::string *shard_kind,
-                                     std::string *user_id) {
+                                     Connection *connection) {
   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
 
   // Parse with ANTLR into our AST.
@@ -47,6 +46,7 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       return create::Shard(*stmt, connection);
     }
 
+    /*
     // Case 2: Insert statement.
     case sqlast::AbstractStatement::Type::INSERT: {
       auto *stmt = static_cast<sqlast::Insert *>(statement.get());
@@ -96,6 +96,7 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       auto *stmt = static_cast<sqlast::GDPRStatement *>(statement.get());
       return gdpr::Shard(*stmt, connection);
     }
+    */
 
     // Unsupported (this should not be reachable).
     default:

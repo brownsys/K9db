@@ -167,7 +167,7 @@ cc_library(
     # My non-merged change for AUTO_INCREMENT from March 7 2022.
     # Also create_view_stmt QUERY_LITERAL.
     # Add less intrusive OWNER annotation.
-    commit = "4f3583c3d42b04dcac6da41a3fd5a7beeac08f33",
+    commit = "65c56a9ded55064a83df3ca3383eed0ee556d132",
     #remote = "https://github.com/antlr/grammars-v4",
     remote = "https://github.com/KinanBab/grammars-v4.git",
 )

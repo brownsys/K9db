@@ -12,16 +12,67 @@ namespace shards {
 /*
  * Table creation.
  */
-void SharderState::AddTable(const Table &table) {
-  this->tables_.emplace(table.table_name, table);
+void SharderState::AddTable(Table &&table) {
   for (const auto &descriptor : table.owners) {
-    Shard &shard = this->shards_.at(descriptor.shard_kind);
+    Shard &shard = this->shards_.at(descriptor->shard_kind);
     shard.owned_tables.insert(table.table_name);
+    if (descriptor->type == InfoType::DIRECT) {
+      if (descriptor->shard_kind != table.table_name) {
+        this->dependencies_.at(descriptor->shard_kind) = true;
+      }
+    }
+    if (descriptor->type == InfoType::TRANSITIVE) {
+      auto &next_table = std::get<TransitiveInfo>(descriptor->info).next_table;
+      this->dependencies_.at(next_table) = true;
+    }
   }
   for (const auto &descriptor : table.accessors) {
-    Shard &shard = this->shards_.at(descriptor.shard_kind);
+    Shard &shard = this->shards_.at(descriptor->shard_kind);
     shard.accessor_tables.insert(table.table_name);
+    if (descriptor->type == InfoType::DIRECT) {
+      if (descriptor->shard_kind != table.table_name) {
+        this->dependencies_.at(descriptor->shard_kind) = true;
+      }
+    }
+    if (descriptor->type == InfoType::TRANSITIVE) {
+      auto &next_table = std::get<TransitiveInfo>(descriptor->info).next_table;
+      this->dependencies_.at(next_table) = true;
+    }
   }
+  this->dependencies_.emplace(table.table_name, false);
+  this->tables_.emplace(table.table_name, std::move(table));
+}
+
+/*
+ * Only for use when handling OWNS/ACCESSES.
+ */
+absl::Status SharderState::AddTableOwner(
+    const TableName &table_name,
+    std::vector<std::unique_ptr<ShardDescriptor>> &&owner) {
+  if (this->dependencies_.at(table_name)) {
+    return absl::InvalidArgumentError("OWNS into table with dependencies");
+  }
+  for (std::unique_ptr<ShardDescriptor> &desc : owner) {
+    Shard &shard = this->shards_.at(desc->shard_kind);
+    shard.owned_tables.insert(table_name);
+    Table &tbl = this->tables_.at(table_name);
+    tbl.owners.push_back(std::move(desc));
+  }
+  return absl::OkStatus();
+}
+absl::Status SharderState::AddTableAccessor(
+    const TableName &table_name,
+    std::vector<std::unique_ptr<ShardDescriptor>> &&access) {
+  if (this->dependencies_.at(table_name)) {
+    return absl::InvalidArgumentError("ACCESSES into table with dependencies");
+  }
+  for (std::unique_ptr<ShardDescriptor> &desc : access) {
+    Shard &shard = this->shards_.at(desc->shard_kind);
+    shard.accessor_tables.insert(table_name);
+    Table &tbl = this->tables_.at(table_name);
+    tbl.accessors.push_back(std::move(desc));
+  }
+  return absl::OkStatus();
 }
 
 /*
@@ -30,8 +81,12 @@ void SharderState::AddTable(const Table &table) {
 bool SharderState::TableExists(const TableName &table_name) const {
   return this->tables_.count(table_name) == 1;
 }
-bool SharderState::IsSharded(const TableName &table_name) const {
+bool SharderState::IsOwned(const TableName &table_name) const {
   return this->tables_.at(table_name).owners.size() > 0;
+}
+bool SharderState::IsAccessed(const TableName &table_name) const {
+  const Table &table = this->tables_.at(table_name);
+  return table.owners.size() > 0 || table.accessors.size() > 0;
 }
 Table &SharderState::GetTable(const TableName &table_name) {
   return this->tables_.at(table_name);

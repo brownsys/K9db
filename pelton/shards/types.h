@@ -2,8 +2,10 @@
 #define PELTON_SHARDS_TYPES_H_
 
 #include <functional>
+#include <memory>
 #include <ostream>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 // NOLINTNEXTLINE
 #include <variant>
@@ -33,11 +35,14 @@ using ColumnName = std::string;
 
 using ColumnIndex = size_t;
 
+// Forward declaration.
+struct ShardDescriptor;
+
 // Types of a sharded table.
 // We also use these to describe accessorship as well.
 // For accessors, indices are fliped: they data subject ID to
 // the row in the table being described.
-enum InfoType { DIRECT, TRANSITIVE, VARIABLE };
+enum class InfoType { DIRECT, TRANSITIVE, VARIABLE };
 struct DirectInfo {
   // The FK column with OWNER/ACCESSOR annotation.
   // For data subject tables, this is the PK.
@@ -56,12 +61,13 @@ struct TransitiveInfo {
   // data subject. Following next hops recursively until transitivity is
   // consumed (plus on more step for the direct table) must lead to the data
   // subject table.
+  ShardDescriptor *next;
   TableName next_table;
   ColumnName next_column;
   ColumnIndex next_column_index;
   // The index for dealing with transitivity. It implicitly joins over
   // transitive hops.
-  // The index maps values of <shard_by> to data subject IDs (for ownership).
+  // The index maps values of <column> to data subject IDs (for ownership).
   // The index maps data subject IDs to <Primary Key> (for accessors).
   FlowName index;
 };
@@ -72,12 +78,13 @@ struct VariableInfo {
   ColumnIndex column_index;
   sqlast::ColumnDefinition::Type column_type;
   // The variable ownership/accessorship table, and the FK column it has that
-  // points to this table and specifically the <shard_by> column.
+  // points to this table (to <column> specifically).
+  ShardDescriptor *next;
   TableName origin_relation;
   ColumnName origin_column;
   ColumnIndex origin_column_index;
   // The index for dealing with variability.
-  // The index maps values of <shard_by> to data subject IDs (for ownership).
+  // The index maps values of <column> to data subject IDs (for ownership).
   // The index maps data subject IDs to <Primary Key> (for accessors).
   FlowName index;
 };
@@ -95,8 +102,10 @@ struct ShardDescriptor {
 struct Table {
   TableName table_name;
   dataflow::SchemaRef schema;
-  std::vector<ShardDescriptor> owners;  // size() > 0 <==> sharded table.
-  std::vector<ShardDescriptor> accessors;
+  // owners.size() > 0 <=> sharded table.
+  std::vector<std::unique_ptr<ShardDescriptor>> owners;
+  std::vector<std::unique_ptr<ShardDescriptor>> accessors;
+  std::unordered_map<ColumnIndex, FlowName> inmemory_indices;
 };
 
 // Metadata about a shard.

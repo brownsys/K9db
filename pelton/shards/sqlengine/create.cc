@@ -1,20 +1,14 @@
 // CREATE TABLE statements sharding and rewriting.
-
 #include "pelton/shards/sqlengine/create.h"
 
-#include <list>
-#include <optional>
+#include <iterator>
+#include <memory>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
-#include "absl/status/status.h"
-#include "absl/strings/match.h"
-#include "glog/logging.h"
-#include "pelton/shards/sqlengine/index.h"
+#include "pelton/dataflow/schema.h"
 #include "pelton/shards/sqlengine/util.h"
-#include "pelton/shards/upgradable_lock.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -24,624 +18,253 @@ namespace create {
 
 namespace {
 
-// Describes whether a foreign key is internal to a shard (between two tables
-// of the same shard kind) or external (the two tables belong to different
-// shard kinds).
-enum ForeignKeyType {
-  // External: the column is kept, but the foreign key constraint is removed.
-  FK_EXTERNAL,
-  // Internal: column and constraint are unchanged.
-  FK_INTERNAL,
-  // A foreign key to the PII table that is the shard_by column:
-  // both column and constraint are removed, since column value is redundant.
-  FK_REMOVED
+#define M(it) std::make_move_iterator(it)
+
+struct Annotations {
+  std::vector<size_t> accessors;
+  std::vector<size_t> explicit_owners;
+  std::vector<size_t> implicit_owners;
+  std::vector<size_t> owns;
+  std::vector<size_t> accesses;
 };
 
-// Describes what should happen to every foreign key in a given table.
-using ForeignKeyShards = std::unordered_map<ColumnName, ForeignKeyType>;
-
-// Checks if the create table statement specifies any PII columns.
-bool HasPII(const sqlast::CreateTable &stmt) {
-  for (const sqlast::ColumnDefinition &column : stmt.GetColumns()) {
-    if (absl::StartsWith(column.column_name(), "PII_")) {
-      return true;
+absl::StatusOr<Annotations> Discover(const sqlast::CreateTable &stmt,
+                                     Connection *connection) {
+  SharderState &sstate = connection->state->SharderState();
+  // Make sure owners are not ambigious.
+  Annotations annotations;
+  for (size_t i = 0; i < stmt.GetColumns().size(); i++) {
+    const sqlast::ColumnDefinition &col = stmt.GetColumns().at(i);
+    if (!col.HasConstraint(sqlast::ColumnConstraint::Type::FOREIGN_KEY)) {
+      continue;
     }
-  }
-  return false;
-}
 
-// Return the name of the PK column of the given table.
-absl::StatusOr<std::string> GetPK(const sqlast::CreateTable &stmt) {
-  bool found = false;
-  std::string pk;
-  // Inline PK constraint.
-  for (const auto &col : stmt.GetColumns()) {
-    for (const auto &constraint : col.GetConstraints()) {
-      if (constraint.type() == sqlast::ColumnConstraint::Type::PRIMARY_KEY) {
-        if (found) {
-          return absl::InvalidArgumentError(
-              "Multi-column Primary Keys are not supported!");
-        }
-        found = true;
-        pk = col.column_name();
+    // Make sure all FK point to existing tables.
+    const sqlast::ColumnConstraint &fk = col.GetForeignKeyConstraint();
+    if (!sstate.TableExists(fk.foreign_table())) {
+      return absl::InvalidArgumentError("FK points to nonexisting table");
+    }
+    const Table &target = sstate.GetTable(fk.foreign_table());
+    if (!target.schema.HasColumn(fk.foreign_column())) {
+      return absl::InvalidArgumentError("FK points to nonexisting column");
+    }
+
+    // Handle various annotations.
+    bool foreign_owned = sstate.IsOwned(fk.foreign_table());
+    bool foreign_accessed = sstate.IsAccessed(fk.foreign_table());
+    if (IsOwner(col)) {
+      if (!foreign_owned) {
+        return absl::InvalidArgumentError("OWNER not linked to data subject");
       }
-    }
-  }
-  if (!found) {
-    return absl::InvalidArgumentError("Table has no Primary Key!");
-  }
-  return pk;
-}
-
-// Figures out whether or not there is a potential sharding relationship
-// along the given foreign key. Even if this function discovers such a relation,
-// it may not be used if the user overrides with OWNER annotation, or because
-// of various unsupported scenarios that are checked later (see
-// IsShardingBySupported(...)).
-std::optional<ShardKind> ShouldShardBy(
-    const sqlast::ColumnConstraint &foreign_key, const SharderState &state) {
-  // First, determine if the foreign table is in a shard or has PII.
-  const std::string &foreign_table = foreign_key.foreign_table();
-  bool foreign_sharded = state.IsSharded(foreign_table);
-  bool foreign_pii = state.IsPII(foreign_table);
-
-  // FK links to a shard, add it as either an explicit or implicit owner.
-  if (foreign_pii || foreign_sharded) {
-    return foreign_table;
-  }
-
-  return std::optional<ShardKind>{};
-}
-
-// Determine whether and how to shard by the given information.
-// Particularly, this resolves transitive shards.
-//
-// I changed the signature here, because this can now have more than one result.
-// We can find a more efficient implementation later.
-absl::StatusOr<std::list<ShardingInformation>> IsShardingBySupported(
-    const ShardingInformation &info, const SharderState &state,
-    const UnshardedTableName &original_table_name) {
-  const std::string &foreign_table = info.shard_kind;
-  bool foreign_sharded = state.IsSharded(foreign_table);
-  bool foreign_pii = state.IsPII(foreign_table);
-
-  std::list<ShardingInformation> ways_to_shard;
-
-  if (foreign_pii && foreign_sharded) {
-    return absl::InvalidArgumentError(
-        "Foreign key " + original_table_name + "(" + info.shard_by +
-        ") points to " + foreign_table + " which is a PII and sharded table");
-  } else if (foreign_pii) {
-    ways_to_shard.push_back(info);
-  } else if (foreign_sharded) {
-    for (const ShardingInformation &other :
-         state.GetShardingInformation(foreign_table)) {
-      ways_to_shard.emplace_back(info);
-      ShardingInformation *info_c = &ways_to_shard.back();
-      FlowName index;
-      if (foreign_table == "oc_share" && original_table_name == "oc_files" &&
-          other.shard_by == "OWNER_share_with_group") {
-        index = "users_for_file_via_group";
-        LOG(WARNING) << "Hard coded index '" << index << "' triggered.";
-      } else if (foreign_table == "oc_groups" &&
-                 original_table_name == "oc_share" && other.shard_by == "gid") {
-        index = "users_for_group";
-        LOG(WARNING) << "Hard coded index '" << index << "' triggered.";
-      } else if (!state.HasIndexFor(foreign_table, info_c->next_column,
-                                    other.shard_by)) {
+      annotations.explicit_owners.push_back(i);
+    } else if (IsAccessor(col)) {
+      if (!foreign_accessed) {
         return absl::InvalidArgumentError(
-            "Cannot have a transitive FK pointing to non-index column "
-            "(table_name: " +
-            original_table_name + ", shard_by: " + info_c->shard_by +
-            ", foreign_table: " + foreign_table + ", next_column: " +
-            info_c->next_column + ", other.shard_by: " + other.shard_by + ")");
-      } else {
-        index =
-            state.IndexFlow(foreign_table, info_c->next_column, other.shard_by);
+            "ACCESSOR not linked to data subject");
       }
-      if (!info_c->MakeTransitive(other, index, original_table_name)) {
-        return absl::InvalidArgumentError("Transitive FK is too deep");
-      }
+      annotations.accessors.push_back(i);
+    } else if (IsOwns(col)) {
+      annotations.owns.push_back(i);
+    } else if (IsAccesses(col)) {
+      annotations.accesses.push_back(i);
+    } else if (foreign_owned) {
+      annotations.implicit_owners.push_back(i);
     }
   }
 
-  return ways_to_shard;
+  // Ambiguity: need to explicitly specify which columns are owners.
+  if (annotations.implicit_owners.size() > 1 &&
+      annotations.explicit_owners.size() == 0) {
+    return absl::InvalidArgumentError("Many potential OWNERs, be explicit");
+  }
+
+  return std::move(annotations);
 }
 
-struct OwningTable {
-  sqlast::ColumnDefinition column;
-  sqlast::ColumnConstraint fk_constraint;
-  OwningT owning_type;
+// Create a shard descriptor for this table corresponding to each shard
+// descriptor that current exists for the given foreign table.
+std::vector<std::unique_ptr<ShardDescriptor>> MakeDescriptors(
+    bool owners, const sqlast::ColumnDefinition &fk_col, size_t fk_column_index,
+    sqlast::ColumnDefinition::Type fk_column_type, Connection *connection) {
+  SharderState &sstate = connection->state->SharderState();
 
-  OwningTable(const sqlast::ColumnDefinition &col, OwningT owning_type,
-              const sqlast::ColumnConstraint &fcon)
-      : column(col), fk_constraint(fcon), owning_type(owning_type) {}
-};
+  // Identify foreign table and column.
+  const std::string &fk_colname = fk_col.column_name();
+  const sqlast::ColumnConstraint &fk = fk_col.GetForeignKeyConstraint();
+  const std::string &next_table = fk.foreign_table();
+  const std::string &next_col = fk.foreign_column();
+  const Table &tbl = sstate.GetTable(next_table);
+  size_t next_col_index = tbl.schema.IndexOf(next_col);
+  const std::vector<std::unique_ptr<ShardDescriptor>> &vec =
+      owners ? tbl.owners : tbl.accessors;
 
-// Figures out which shard kind this table should belong to.
-// Currently, we expect one of two solutions:
-// 1) a foreign key column is explicitly specified to be the column to shard by
-//    via OWNER annotation.
-// 2) if no OWNER is specified, we can deduce automatically what to shard by (if
-//    at all). Currently, we support only a single foreign key to be linked
-//    to a PII table or to another table in some shard. This table is assigned
-//    to the shard defined by that PII table, or to the same shard that the
-//    target table is in. Having multiple such foreign keys results in a runtime
-//    error.
-absl::StatusOr<
-    std::pair<std::list<ShardingInformation>, std::optional<OwningTable>>>
-ShardTable(const sqlast::CreateTable &stmt, const SharderState &state) {
-  // Result is empty by default.
-  std::list<ShardingInformation> explicit_owners;
-  std::list<ShardingInformation> implicit_owners;
-  std::unordered_map<ColumnName, ColumnIndex> index_map;
-  std::optional<OwningTable> owning_table;
-
-  // get table name from ast representation of sql statement
-  const std::string &table_name = stmt.table_name();
-  // Check column definitions for inlined foreign key constraints.
-  const auto &columns = stmt.GetColumns();
-  for (size_t index = 0; index < columns.size(); index++) {
-    // Record index of column for later constraint processing.
-    const sqlast::ColumnDefinition &col = columns[index];
-    const std::string &column_name = col.column_name();
-    index_map.insert({column_name, index});
-    // Find foreign key constraint (if exists).
-    // check if column starts with OWNER_ (has an owner annotation)
-    bool explicit_owner =
-        absl::StartsWith(column_name, "OWNER_") || columns[index].owner();
-    // check if column starts with ACCESSOR_ (has an accessor annotation)
-    bool explicit_accessor = absl::StartsWith(column_name, "ACCESSOR_");
-    // check if column has a foreign key constraint
-    const sqlast::ColumnConstraint *fk_constraint = nullptr;
-    for (const auto &constraint : col.GetConstraints()) {
-      if (constraint.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
-        fk_constraint = &constraint;
-        break;
-      }
+  // Loop over foreign table descriptors and transform them into descriptors
+  // for this table.
+  std::vector<std::unique_ptr<ShardDescriptor>> result;
+  for (const std::unique_ptr<ShardDescriptor> &next : vec) {
+    ShardDescriptor descriptor;
+    descriptor.shard_kind = next->shard_kind;
+    if (next->shard_kind == next_table) {  // Direct sharding.
+      descriptor.type = InfoType::DIRECT;
+      descriptor.info = DirectInfo{fk_colname, fk_column_index, fk_column_type};
+    } else {  // Transitive sharding.
+      descriptor.type = InfoType::TRANSITIVE;
+      // TODO(babman): Need to create an index!
+      std::string index_name = "";
+      descriptor.info = TransitiveInfo{
+          fk_colname, fk_column_index, fk_column_type, next.get(),
+          next_table, next_col,        next_col_index, index_name};
     }
-
-    // Use fk_constraint and owner annotation (explicit_owner)
-    // to determine whether and how to shard by this column.
-    if (fk_constraint != nullptr) {
-      // We have a foreign key constraint, check if we should shard by it.
-      // pass ShouldShardBy the fk_constraint (linking to the other, foreign
-      // table, and the current table state. Assign return to shard_kind
-      std::optional<ShardKind> shard_kind =
-          ShouldShardBy(*fk_constraint, state);
-      if (!shard_kind.has_value() && (explicit_owner || explicit_accessor)) {
-        return absl::InvalidArgumentError("non-sharding fk as OWNER|ACCESSOR");
-      }
-      if (shard_kind.has_value()) {
-        const std::string &foreign_column = fk_constraint->foreign_column();
-        std::string sharded_table_name =
-            NameShardedTable(table_name, column_name);
-        // FK links to a shard, add it as either an explicit or implicit owner.
-        if (explicit_owner) {
-          explicit_owners.emplace_back(shard_kind.value(), sharded_table_name,
-                                       column_name, index, foreign_column);
-        } else {
-          if (!explicit_accessor) {
-            implicit_owners.emplace_back(shard_kind.value(), sharded_table_name,
-                                         column_name, index, foreign_column);
-          }
-        }
-      }
-      auto is_owning = IsOwning(col);
-      if (is_owning) {
-        // This table also denotes a relationship to another (via explicit
-        // annotation)
-        if (fk_constraint != nullptr) {
-          if (owning_table) {
-            return absl::InvalidArgumentError("Duplicate 'OWNING' column");
-          }
-          owning_table.emplace(col, *is_owning, *fk_constraint);
-        } else {
-          return absl::InvalidArgumentError(
-              "Non fk-column specified as 'OWNING'");
-        }
-      }
-    } else if (explicit_owner) {
-      // Not a foreign key but should be sharded explicitly.
-      std::string sharded_table_name =
-          NameShardedTable(table_name, column_name);
-      explicit_owners.emplace_back(table_name, sharded_table_name, column_name,
-                                   index, "");
-    } else if (explicit_accessor) {
-      return absl::InvalidArgumentError("Accessor on no foreign key");
-    }
+    result.push_back(std::make_unique<ShardDescriptor>(descriptor));
   }
-
-  // If sharding is explicitly specified via OWNER, we are done.
-  if (explicit_owners.size() > 0) {
-    return std::make_pair(explicit_owners, owning_table);
-  }
-
-  // Sharding is implicitly deduced, only works if there is one candidate!
-  if (implicit_owners.size() > 1) {
-    std::stringstream msg;
-    msg << "Table " << table_name
-        << " has several foreign keys to shards or PII! (";
-    for (const auto &own : implicit_owners) msg << own.shard_by << ", ";
-    msg << ")";
-    return absl::InvalidArgumentError(msg.str());
-  }
-  return std::make_pair(implicit_owners, owning_table);
-}
-
-const std::string &GetShardFor(const UnshardedTableName &table,
-                               const shards::SharderState &state) {
-  if (state.IsSharded(table)) {
-    const std::list<ShardingInformation> &sinfo =
-        state.GetShardingInformation(table);
-    if (sinfo.size() != 1) {
-      LOG(FATAL) << "Expected only one sharding information, got "
-                 << sinfo.size();
-    }
-    return sinfo.front().shard_kind;
-  } else if (state.IsPII(table)) {
-    return table;
-  }
-  LOG(FATAL) << "Expected " << table << " to be sharded or PII";
-}
-
-// Factored out version of the acessor creation. This makes the `target_table`,
-// specifically the version in `shard_string` accessible via `column_name`.
-absl::Status MakeAccessible(
-    Connection *connection, const UnshardedTableName &foreign_table,
-    const UnshardedTableName &table_name, const ColumnName &column_name,
-    const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
-        &anon_cols,
-    UniqueLock *lock) {
-  shards::SharderState *state = connection->state->sharder_state();
-  bool is_sharded = state->IsSharded(table_name);
-  const std::string &shard_string = GetShardFor(foreign_table, *state);
-  if (table_name == "oc_share" && foreign_table == "oc_groups" &&
-      column_name == "ACCESSOR_share_with_group") {
-    const auto &info = state->GetShardingInformation(table_name).front();
-    const std::string &table_key = info.shard_by;
-    const auto &index_name = "users_for_share_via_group";
-    LOG(WARNING) << "Hard coded accessor index '" << index_name
-                 << "' triggered";
-    state->AddAccessorIndex(shard_string, table_name, column_name,
-                            foreign_table, table_key, index_name, anon_cols,
-                            is_sharded);
-  } else if (is_sharded) {
-    const auto &info = state->GetShardingInformation(table_name).front();
-    const std::string &table_key = info.shard_by;
-
-    size_t counter = 0;
-    if (state->HasAccessorIndices(shard_string)) {
-      counter = state->GetAccessorIndices(shard_string).size();
-    }
-    std::string index_prefix = "ref_" + shard_string + std::to_string(counter);
-    sqlast::CreateIndex create_index_stmt{index_prefix, table_name,
-                                          column_name};
-
-    auto status =
-        pelton::shards::sqlengine::index::CreateIndexStateIsAlreadyLocked(
-            create_index_stmt, connection, lock);
-    if (!status.ok()) return status.status();
-    const IndexName index_name = index_prefix + "_" + table_key;
-    state->AddAccessorIndex(shard_string, table_name, column_name, table_key,
-                            index_name, anon_cols, is_sharded);
-  } else {
-    state->AddAccessorIndex("", table_name, column_name, "", "", anon_cols,
-                            is_sharded);
-  }
-  return absl::OkStatus();
-}
-
-std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type> GetAnonCols(
-    const sqlast::ColumnDefinition &column,
-    const std::vector<sqlast::ColumnDefinition> &columns) {
-  const auto &column_name = column.column_name();
-  std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type> anon_cols;
-  if (absl::StartsWith(column_name, "ACCESSOR_ANONYMIZE")) {
-    anon_cols[column_name] = column.column_type();
-    for (const auto &acces_col_check : columns) {
-      const std::string &access_col_name = acces_col_check.column_name();
-      if (absl::StartsWith(access_col_name, "ANONYMIZE_")) {
-        anon_cols[access_col_name] = acces_col_check.column_type();
-      }
-    }
-  }
-  return anon_cols;
-}
-
-absl::Status IndexAccessor(const sqlast::CreateTable &stmt,
-                           Connection *connection, UniqueLock *lock) {
-  // Result is empty by default.
-  std::unordered_map<ColumnName, ColumnIndex> index_map;
-
-  // get table name from ast representation of sql statement
-  const std::string &table_name = stmt.table_name();
-  // Check column definitions for inlined foreign key constraints.
-  const auto &columns = stmt.GetColumns();
-
-  for (size_t index = 0; index < columns.size(); index++) {
-    // Record index of column for later constraint processing.
-    const std::string &column_name = columns[index].column_name();
-    // check if column starts with ACCESSOR_ (has an accessor annotation)
-    if (absl::StartsWith(column_name, "ACCESSOR_")) {
-      const sqlast::ColumnConstraint *fk_constraint = nullptr;
-      for (const auto &constraint : columns[index].GetConstraints()) {
-        // if type of constraint is a foreign key, assign value to fk_constraint
-        if (constraint.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
-          fk_constraint = &constraint;
-          break;
-        }
-      }
-      // Find anonymized columns.
-
-      const auto anon_cols = GetAnonCols(columns[index], stmt.GetColumns());
-
-      CHECK_STATUS(MakeAccessible(connection, fk_constraint->foreign_table(),
-                                  table_name, column_name, anon_cols, lock));
-    }
-  }
-  return absl::OkStatus();
-}
-
-// Determine what should be done about a single foreign key in some
-// sharded table.
-absl::StatusOr<ForeignKeyType> ShardForeignKey(
-    const std::string &foreign_key_column_name,
-    const sqlast::ColumnConstraint &foreign_key,
-    const ShardingInformation &sharding_information,
-    const SharderState &state) {
-  const std::string &foreign_table = foreign_key.foreign_table();
-
-  // Options:
-  // 1. Foreign key is what we are sharding by:
-  //    FK is removed if the sharding is direct (points to a PII table).
-  //    FK is internal if the sharding is indirect.
-  if (foreign_key_column_name == sharding_information.shard_by) {
-    if (state.IsSharded(foreign_table)) {
-      return FK_INTERNAL;
-    } else {
-      return FK_REMOVED;
-    }
-  }
-  // 2. Foreign key is to an unsharded table.
-  //    FK is external, column is kept but constraint dropped.
-  // 3. Foreign key is to a sharded table.
-  //    We have no guarantees if this table belongs to the same shard,
-  //    or a different shard but is non-owning. We have no choice but to
-  //    consider the FK external. Column is kept but constraint is dropped.
-  return FK_EXTERNAL;
-}
-
-// Determine what should be done about all foreign keys in a sharded table.
-absl::StatusOr<ForeignKeyShards> ShardForeignKeys(
-    const sqlast::CreateTable &stmt, const ShardingInformation &info,
-    const SharderState &state) {
-  // Store the sharded resolution for every foreign key.
-  ForeignKeyShards result;
-  // Check column definitions for inlined foreign key constraints.
-  for (const auto &column : stmt.GetColumns()) {
-    const std::string &colname = column.column_name();
-    const sqlast::ColumnConstraint *fk_constraint = nullptr;
-    for (const auto &constraint : column.GetConstraints()) {
-      if (constraint.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
-        fk_constraint = &constraint;
-        break;
-      }
-    }
-    if (fk_constraint != nullptr) {
-      ASSIGN_OR_RETURN(ForeignKeyType fk_type,
-                       ShardForeignKey(colname, *fk_constraint, info, state));
-      result.emplace(colname, fk_type);
-    } else if ((absl::StartsWith(colname, "OWNER_") || column.owner()) &&
-               colname == info.shard_by) {
-      result.emplace(colname, FK_REMOVED);
-    }
-  }
-  // Remove shard_by column and its constraints.
   return result;
 }
 
-// Updates the create table statement to reflect the sharding information in
-// fk_shards. Specifically, all out of shard foreign key constraints are removed
-// (but the columns are kept), and the column being sharded by is entirely
-// remove.
-sqlast::CreateTable UpdateTableSchema(sqlast::CreateTable stmt,
-                                      const ForeignKeyShards &fk_shards,
-                                      const std::string &sharded_table_name) {
-  stmt.table_name() = sharded_table_name;
-  // Drop columns marked with FK_REMOVED, and fk constraints of columns marked
-  // with FK_EXTERNAL.
-  for (const auto &[col, type] : fk_shards) {
-    switch (type) {
-      case FK_REMOVED:
-        stmt.RemoveColumn(col);
-        break;
-      /*
-      case FK_EXTERNAL:
-        stmt.MutableColumn(col).RemoveConstraint(
-            sqlast::ColumnConstraint::Type::FOREIGN_KEY);
-        break;
-      */
-      default:
-        continue;
-    }
-  }
-  return stmt;
-}
+// Similar to MakeDescriptors but for opposite direction annotations,
+// i.e. OWNS and ACCESSES.
+std::vector<std::unique_ptr<ShardDescriptor>> MakeReverseDescriptors(
+    bool owners, const Table &origin,
+    const sqlast::ColumnDefinition &origin_col, size_t origin_index,
+    Connection *connection) {
+  SharderState &sstate = connection->state->SharderState();
 
-const sqlast::CreateTable ResolveTableSchema(
-    const SharderState &state, const UnshardedTableName &table_name) {
-  // if (state.IsSharded(target_table_name))
-  //   return absl::UnimplementedError("Owning tables should not be sharded
-  //   yet");
-  return state.GetSchema(table_name);
-}
+  // Find column information about the origin table.
+  const std::string &origin_table_name = origin.table_name;
+  const std::string &origin_column_name = origin_col.column_name();
+  sqlast::ColumnDefinition::Type type = origin.schema.TypeOf(origin_index);
+  const std::vector<std::unique_ptr<ShardDescriptor>> &vec =
+      owners ? origin.owners : origin.accessors;
 
-absl::StatusOr<sql::SqlResult> HandleOwningTable(
-    const sqlast::CreateTable &stmt, const OwningTable &owning_table,
-    Connection *connection, UniqueLock *lock) {
-  sql::SqlResult result(true);
-  SharderState *state = connection->state->sharder_state();
-  const UnshardedTableName &relationship_table_name = stmt.table_name();
-  const ShardedTableName &target_table_name =
-      owning_table.fk_constraint.foreign_table();
-  // If this table owns a different table, we need to shard that table now too.
-  // It was probably installed without any sharding before
-  if (!state->Exists(target_table_name))
-    return absl::InvalidArgumentError(
-        "Foreign key violation: Target table " + target_table_name +
-        " of foreign key " + relationship_table_name + "(" +
-        owning_table.column.column_name() + ") does not exist.");
+  // Find information about the target owned table.
+  const sqlast::ColumnConstraint &fk = origin_col.GetForeignKeyConstraint();
+  const std::string &target_table_name = fk.foreign_table();
+  const std::string &target_column_name = fk.foreign_column();
+  const Table &target = sstate.GetTable(target_table_name);
+  size_t target_column_index = target.schema.IndexOf(target_column_name);
 
-  const sqlast::CreateTable &target_table_schema =
-      ResolveTableSchema(*state, target_table_name);
-  const ColumnName &my_col_name = owning_table.column.column_name();
-  const ColumnName &other_col_name =
-      owning_table.fk_constraint.foreign_column();
-  int sharded_by_index = target_table_schema.ColumnIndex(other_col_name);
-
-  for (auto &prev_sharding_info :
-       state->GetShardingInformation(relationship_table_name)) {
-    if (state->HasIndexFor(relationship_table_name, my_col_name,
-                           prev_sharding_info.shard_by)) {
-    } else {
-      const std::string &index_name = state->GenerateUniqueIndexName(lock);
-      const sqlast::CreateIndex create_index(
-          index_name, relationship_table_name, my_col_name);
-
-      auto res = index::CreateIndexStateIsAlreadyLocked(create_index,
-                                                        connection, lock);
-
-      if (res.ok())
-        result.Append(std::move(*res), false);
-      else
-        return res.status();
-    }
-  }
-
-  ShardingInformation sharding_info(
-      relationship_table_name /* shard kind */,
-      NameShardedTable(target_table_name, my_col_name), other_col_name,
-      sharded_by_index,
-      // the 'next column' in this case is our column
-      my_col_name);
-  sharding_info.MakeVarowned();
-  ASSIGN_OR_RETURN(
-      auto &ways_to_shard,
-      IsShardingBySupported(sharding_info, *state, target_table_name));
-  for (auto &info : ways_to_shard) {
-    const ShardedTableName &sharded_table = info.sharded_table_name;
-    ASSIGN_OR_RETURN(const ForeignKeyShards fk_shards,
-                     ShardForeignKeys(target_table_schema, info, *state));
-    state->AddShardedTable(
-        target_table_name, info,
-        UpdateTableSchema(target_table_schema, fk_shards, sharded_table));
+  // Loop over origin table descriptors and transform them into descriptors
+  // for target foreign table.
+  std::vector<std::unique_ptr<ShardDescriptor>> result;
+  for (const std::unique_ptr<ShardDescriptor> &descriptor : vec) {
+    ShardDescriptor next;
+    next.shard_kind = descriptor->shard_kind;
+    next.type = InfoType::VARIABLE;
+    // TODO(babman): create index.
+    std::string index_name = "";
+    next.info = VariableInfo{
+        target_column_name, target_column_index, type,         descriptor.get(),
+        origin_table_name,  origin_column_name,  origin_index, index_name};
+    result.push_back(std::make_unique<ShardDescriptor>(next));
   }
   return result;
 }
 
 }  // namespace
 
+// Determine the ways the table is sharded.
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
                                      Connection *connection) {
-  shards::SharderState *state = connection->state->sharder_state();
-  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
-  UniqueLock lock = state->WriterLock();
+  SharderState &sstate = connection->state->SharderState();
 
-  // extract table_name from the parsed sqlast CreateTable statement
+  // Make sure table does not exist.
   const std::string &table_name = stmt.table_name();
-  // if table already exists, raise error
-  if (state->Exists(table_name)) {
+  if (sstate.TableExists(table_name)) {
     return absl::InvalidArgumentError("Table already exists!");
   }
 
-  // Determine if this table is special: maybe it has PII fields, or maybe it
-  // is linked to an existing shard via a foreign key.
+  // Get the schema of this table.
+  dataflow::SchemaRef schema = dataflow::SchemaFactory::Create(stmt);
 
-  // check if column name starts with PII_
-  bool has_pii = HasPII(stmt);
-  std::list<ShardingInformation> sharding_information;
-  std::optional<OwningTable> owning_table;
-  ASSIGN_OR_RETURN(std::tie(sharding_information, owning_table),
-                   ShardTable(stmt, *state));
-
-  sql::SqlResult result(true);
-  // Sharding scenarios.
-  auto &exec = connection->executor;
-  if (has_pii && sharding_information.size() == 0) {
-    // Case 1: has pii but not linked to shards.
-    // This means that this table define a type of user for which shards must be
-    // created! Hence, it is a shard kind!
-    ASSIGN_OR_RETURN(std::string pk, GetPK(stmt));
-    state->AddShardKind(table_name, pk);
-    state->AddUnshardedTable(table_name, stmt);
-    result = exec.Default(&stmt);
-
-  } else if (!has_pii && sharding_information.size() > 0) {
-    for (auto &info_0 : sharding_information) {
-      ASSIGN_OR_RETURN(auto &ways_to_shard,
-                       IsShardingBySupported(info_0, *state, table_name));
-      for (auto &info : ways_to_shard) {
-        // Case 2: no pii but is linked to shards.
-        // This means that this table should be created inside shards of the
-        // kind it is linked to. We must also drop the foreign key column(s)
-        // that link it to the shard.
-        if (info.shard_kind == table_name) {
-          ASSIGN_OR_RETURN(std::string pk, GetPK(stmt));
-          state->AddShardKind(table_name, pk);
-        }
-
-        // Determine what to do to each column that is a foreign key.
-        ASSIGN_OR_RETURN(ForeignKeyShards fk_shards,
-                         ShardForeignKeys(stmt, info, *state));
-        // Apply sharding and come up with new schema.
-        sqlast::CreateTable sharded_stmt =
-            UpdateTableSchema(stmt, fk_shards, info.sharded_table_name);
-        // Add the sharding information to state.
-        state->AddShardedTable(table_name, info, sharded_stmt);
-      }
-    }
-
-  } else if (!has_pii && sharding_information.size() == 0) {
-    // Case 3: neither pii nor linked.
-    // The table does not belong to a shard and needs no further modification!
-    state->AddUnshardedTable(table_name, stmt);
-    result = exec.Default(&stmt);
-  } else {
-    // Has pii and linked to a shard is a logical schema error.
-    return absl::UnimplementedError("Sharded Table cannot have PII fields!");
+  // Make sure PK is valid.
+  if (schema.keys().size() != 1) {
+    return absl::InvalidArgumentError("Invalid PK column");
   }
+  size_t pk_index = schema.keys().front();
+  const std::string &pk_col = stmt.GetColumns().at(pk_index).column_name();
 
-  // Add table schema and its PK column.
-  auto pk_result = GetPK(stmt);
-  if (pk_result.ok()) {
-    const std::string &pk = pk_result.value();
-    state->AddSchema(table_name, stmt, stmt.ColumnIndex(pk), pk);
-  } else {
-    state->AddSchema(table_name, stmt, -1, "");
+  // Discover annotations and handle any errors.
+  MOVE_OR_RETURN(Annotations annotations, Discover(stmt, connection));
+
+  // All errors are handled by this point.
+  // This struct will hold all sharding info about the table being created.
+  Table table;
+  table.table_name = table_name;
+  table.schema = schema;
+
+  /* Check to see if this table is a data subject. */
+  if (IsADataSubject(stmt)) {
+    // We have a new shard kind.
+    sstate.AddShardKind(table_name, pk_col, pk_index);
+
+    // This table is also sharded by itself.
+    ShardDescriptor descriptor;
+    descriptor.shard_kind = table_name;
+    descriptor.type = InfoType::DIRECT;
+    descriptor.info = DirectInfo{pk_col, pk_index, schema.TypeOf(pk_index)};
+    table.owners.push_back(std::make_unique<ShardDescriptor>(descriptor));
   }
-  dataflow_state->AddTableSchema(stmt);
-  CHECK_STATUS(IndexAccessor(stmt, connection, &lock));
+  /* End of data subject. */
 
-  if (owning_table) {
-    if (has_pii)
-      return absl::UnimplementedError(
-          "'OWNING' tables cannot be data subject tables!");
-
-    if (owning_table->owning_type == OwningT::OWNING) {
-      CHECK_STATUS(HandleOwningTable(stmt, *owning_table, connection, &lock));
-    } else if (owning_table->owning_type == OwningT::ACCESSING) {
-      const auto anon_cols =
-          GetAnonCols(owning_table->column, stmt.GetColumns());
-      CHECK_STATUS(MakeAccessible(
-          connection, owning_table->fk_constraint.foreign_table(), table_name,
-          owning_table->column.column_name(), anon_cols, &lock));
-    } else {
-      LOG(FATAL) << "Weird `OwningT` value";
-    }
+  /* Check to see if this table has direct or transitive OWNERS. */
+  std::vector<size_t> &eowners = annotations.explicit_owners;
+  std::vector<size_t> &iowners = annotations.implicit_owners;
+  for (size_t idx : eowners.size() > 0 ? eowners : iowners) {
+    const sqlast::ColumnDefinition &col = stmt.GetColumns().at(idx);
+    sqlast::ColumnDefinition::Type fk_col_type = schema.TypeOf(idx);
+    // Transform foreign table descriptors to descriptors of this table.
+    auto vec = MakeDescriptors(true, col, idx, fk_col_type, connection);
+    table.owners.insert(table.owners.end(), M(vec.begin()), M(vec.end()));
+    // Access lattice: if U accesses table A, and our table B is owned by A,
+    // then U accesses B.
+    vec = MakeDescriptors(false, col, idx, fk_col_type, connection);
+    table.accessors.insert(table.accessors.end(), M(vec.begin()), M(vec.end()));
   }
+  /* End of direct and transitive OWNERS. */
 
-  return result;
+  /* Check to see if this table has direct or transitive ACCESSORS. */
+  for (size_t idx : annotations.accessors) {
+    const sqlast::ColumnDefinition &col = stmt.GetColumns().at(idx);
+    sqlast::ColumnDefinition::Type fk_col_type = schema.TypeOf(idx);
+    // Transform foreign accessor descriptors to descriptors of this table.
+    // Both owners and accessors of foreign table get access of this table.
+    auto vec = MakeDescriptors(true, col, idx, fk_col_type, connection);
+    table.accessors.insert(table.accessors.end(), M(vec.begin()), M(vec.end()));
+    vec = MakeDescriptors(false, col, idx, fk_col_type, connection);
+    table.accessors.insert(table.accessors.end(), M(vec.begin()), M(vec.end()));
+  }
+  /* End of direct and transitive ACCESSORS. */
+
+  /* Look for OWNS annotations: target table becomes owned by this table! */
+  for (size_t origin_index : annotations.owns) {
+    const sqlast::ColumnDefinition &col = stmt.GetColumns().at(origin_index);
+    const sqlast::ColumnConstraint &fk = col.GetForeignKeyConstraint();
+    const std::string &target_table = fk.foreign_table();
+    // Every way of owning this table becomes a way of owning the target table.
+    auto v = MakeReverseDescriptors(true, table, col, origin_index, connection);
+    CHECK_STATUS(sstate.AddTableOwner(target_table, std::move(v)));
+    // Every way of accessing this table becomes a way of accessing target.
+    v = MakeReverseDescriptors(false, table, col, origin_index, connection);
+    CHECK_STATUS(sstate.AddTableAccessor(target_table, std::move(v)));
+  }
+  /* End of OWNS. */
+
+  /* Look for ACCESSES annotations: target becomes accessible by this table! */
+  for (size_t origin_index : annotations.accesses) {
+    const sqlast::ColumnDefinition &col = stmt.GetColumns().at(origin_index);
+    const sqlast::ColumnConstraint &fk = col.GetForeignKeyConstraint();
+    const std::string &target_table = fk.foreign_table();
+    // Every way of owning this table becomes a way of accessing the target.
+    auto v = MakeReverseDescriptors(true, table, col, origin_index, connection);
+    CHECK_STATUS(sstate.AddTableAccessor(target_table, std::move(v)));
+    // Every way of accessing this table becomes a way of accessing target.
+    v = MakeReverseDescriptors(false, table, col, origin_index, connection);
+    CHECK_STATUS(sstate.AddTableAccessor(target_table, std::move(v)));
+  }
+  /* End of ACCESSES. */
+
+  sstate.AddTable(std::move(table));
+
+  return sql::SqlResult(true);
 }
 
 }  // namespace create

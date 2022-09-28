@@ -70,6 +70,7 @@ class SchemaRef {
 
   // Accessor by column name.
   size_t IndexOf(const std::string &column_name) const;
+  bool HasColumn(const std::string &column_name) const;
 
   // For logging and printing...
   friend std::ostream &operator<<(std::ostream &os, const SchemaRef &r);

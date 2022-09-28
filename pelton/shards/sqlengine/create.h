@@ -5,9 +5,6 @@
 
 #include "absl/status/statusor.h"
 #include "pelton/connection.h"
-#include "pelton/dataflow/state.h"
-#include "pelton/shards/state.h"
-#include "pelton/shards/types.h"
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 
