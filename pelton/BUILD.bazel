@@ -12,6 +12,7 @@ cc_library(
     visibility = ["//:__subpackages__"],
     deps = [
         ":connection",
+        ":explain",
         ":prepared",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:graph",
@@ -20,13 +21,27 @@ cc_library(
         "//pelton/planner",
         "//pelton/shards:state",
         "//pelton/shards:types",
-        "//pelton/shards:upgradable_lock",
         "//pelton/shards/sqlengine:engine",
-        "//pelton/shards/sqlengine:util",
         "//pelton/sql:result",
         "//pelton/util:status",
+        "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "explain",
+    srcs = [
+        "explain.cc",
+    ],
+    hdrs = [
+        "explain.h",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        ":connection",
+        "//pelton/shards:state",
     ],
 )
 

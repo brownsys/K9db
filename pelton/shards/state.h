@@ -77,6 +77,9 @@ class SharderState {
 
   // Debugging information / statistics.
   std::vector<std::pair<ShardKind, uint64_t>> NumShards() const;
+  const std::unordered_map<TableName, Table> &AllTables() const {
+    return this->tables_;
+  }
 
  private:
   // All the different shard kinds that currently exist in the system.

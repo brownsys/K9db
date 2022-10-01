@@ -12,6 +12,7 @@
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/sqlast/parser.h"
+#include "pelton/util/upgradable_lock.h"
 
 // Has to be included after parser to avoid FAIL symbol redefinition with ANTLR.
 // clang-format off
@@ -25,36 +26,18 @@ namespace pelton {
 namespace shards {
 namespace sqlengine {
 
-using CType = sqlast::ColumnDefinition::Type;
-
 /*
- * Pelton State/Connection.
+ * MACROS to simplify/reduce redundancy when writing CREATE TABLE statements.
  */
 
-namespace {
+#define I " int "
+#define STR " text "
+#define PK " PRIMARY KEY "
+#define FK " REFERENCES "
 
-static std::unique_ptr<State> PELTON_STATE;
-
-Connection CreateConnection() {
-  if (PELTON_STATE == nullptr) {
-    google::InitGoogleLogging("create-test");
-  }
-
-  // Clean up.
-  PELTON_STATE = nullptr;
-  std::filesystem::remove_all(DB_PATH);
-
-  // Create new state.
-  PELTON_STATE = std::make_unique<State>(3, true);
-  PELTON_STATE->Initialize("shards-create-test");
-
-  // Create connection based on new state.
-  Connection connection;
-  connection.state = PELTON_STATE.get();
-  return connection;
-}
-
-}  // namespace
+using CType = sqlast::ColumnDefinition::Type;
+#define INT CType::INT
+#define TEXT CType::TEXT
 
 /*
  * Parsing.
@@ -90,7 +73,8 @@ sqlast::CreateTable MakeCreate(const std::string &tbl_name,
 namespace {
 
 void Handle(const sqlast::CreateTable &stmt, Connection *conn) {
-  auto status = create::Shard(stmt, conn);
+  util::UniqueLock lock = conn->state->WriterLock();
+  auto status = create::Shard(stmt, conn, &lock);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(status->Success());
 }
@@ -138,14 +122,14 @@ namespace {
 // Ensure Table in state is corret.
 void EXPECT_TABLE(Connection *conn, const std::string &table_name,
                   const std::vector<std::string> &cols,
-                  const std::vector<CType> &coltypes, unsigned PK,
+                  const std::vector<CType> &coltypes, unsigned pk,
                   size_t owner_count, size_t accessor_count) {
   const SharderState &state = conn->state->SharderState();
   const Table &tbl = state.GetTable(table_name);
   EXPECT_EQ(tbl.table_name, table_name) << "Table: " << table_name;
   EXPECT_EQ(tbl.schema.column_names(), cols) << "Table: " << table_name;
   EXPECT_EQ(tbl.schema.column_types(), coltypes) << "Table: " << table_name;
-  EXPECT_EQ(tbl.schema.keys(), std::vector<unsigned>{PK})
+  EXPECT_EQ(tbl.schema.keys(), std::vector<unsigned>{pk})
       << "Table: " << table_name;
   EXPECT_EQ(tbl.owners.size(), owner_count) << "Table: " << table_name;
   EXPECT_EQ(tbl.accessors.size(), accessor_count) << "Table: " << table_name;
@@ -224,15 +208,39 @@ void EXPECT_VARIABLE(Connection *conn, const std::string &table_name,
 
 }  // namespace
 
-#define I " int "
-#define STR " text "
-#define PK " PRIMARY KEY "
-#define FK " REFERENCES "
+/*
+ * google test fixture class, allows us to manage the pelton state and
+ * initialize / destruct it for every test.
+ */
+class CreateTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    std::filesystem::remove_all(DB_PATH);
+    this->pelton_state_ = std::make_unique<State>(3, true);
+    this->pelton_state_->Initialize("shards-create-test");
+  }
 
-#define INT CType::INT
-#define TEXT CType::TEXT
+  void TearDown() override {
+    this->pelton_state_ = nullptr;
+    std::filesystem::remove_all(DB_PATH);
+  }
 
-TEST(CreateTest, Direct) {
+  // Create a connection.
+  Connection CreateConnection() {
+    Connection connection;
+    connection.state = this->pelton_state_.get();
+    return connection;
+  }
+
+ private:
+  std::unique_ptr<State> pelton_state_;
+};
+
+/*
+ * The tests!
+ */
+
+TEST_F(CreateTest, Direct) {
   // Parse create table statements.
   sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
   sqlast::CreateTable addr =
@@ -258,7 +266,7 @@ TEST(CreateTest, Direct) {
   EXPECT_DIRECT(&conn, "addr", true, "user", "uid", 1, INT);
 }
 
-TEST(CreateTest, Transitive) {
+TEST_F(CreateTest, Transitive) {
   // Parse create table statements.
   sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
   sqlast::CreateTable addr =
@@ -291,7 +299,7 @@ TEST(CreateTest, Transitive) {
                     0);
 }
 
-TEST(CreateTest, OwnerAndNothing) {
+TEST_F(CreateTest, OwnerAndNothing) {
   // Parse create table statements.
   sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
   sqlast::CreateTable msg = MakeCreate(
@@ -319,7 +327,7 @@ TEST(CreateTest, OwnerAndNothing) {
   EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_sender", 1, INT);
 }
 
-TEST(CreateTest, OwnerAccessor) {
+TEST_F(CreateTest, OwnerAccessor) {
   // Parse create table statements.
   sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
   sqlast::CreateTable msg =
@@ -348,7 +356,7 @@ TEST(CreateTest, OwnerAccessor) {
   EXPECT_DIRECT(&conn, "msg", false, "user", "ACCESSOR_receiver", 2, INT);
 }
 
-TEST(CreateTest, OwnerLattice) {
+TEST_F(CreateTest, OwnerLattice) {
   // Parse create table statements.
   sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
   sqlast::CreateTable msg =
@@ -386,7 +394,7 @@ TEST(CreateTest, OwnerLattice) {
                     "msg", "id", 0);
 }
 
-TEST(CreateTest, AccessorLattice) {
+TEST_F(CreateTest, AccessorLattice) {
   // Parse create table statements.
   sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
   sqlast::CreateTable msg =
@@ -424,7 +432,7 @@ TEST(CreateTest, AccessorLattice) {
                     "msg", "id", 0);
 }
 
-TEST(CreateTest, TwoOwners) {
+TEST_F(CreateTest, TwoOwners) {
   // Parse create table statements.
   sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
   sqlast::CreateTable msg =
@@ -453,7 +461,7 @@ TEST(CreateTest, TwoOwners) {
   EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_receiver", 2, INT);
 }
 
-TEST(CreateTest, TwoOwnersTransitive) {
+TEST_F(CreateTest, TwoOwnersTransitive) {
   // Parse create table statements.
   sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
   sqlast::CreateTable msg =
@@ -500,7 +508,7 @@ TEST(CreateTest, TwoOwnersTransitive) {
                     "msg", "id", 0);
 }
 
-TEST(CreateTest, ShardedDataSubject) {
+TEST_F(CreateTest, ShardedDataSubject) {
   // Parse create table statements.
   sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
   sqlast::CreateTable invited =
@@ -533,7 +541,7 @@ TEST(CreateTest, ShardedDataSubject) {
   EXPECT_DIRECT(&conn, "invited_user", true, "user", "inviting_user", 2, INT);
 }
 
-TEST(CreateTest, VariableOwner) {
+TEST_F(CreateTest, VariableOwner) {
   // Parse create table statements.
   sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
   sqlast::CreateTable grps = MakeCreate("grps", {"gid" I PK});
@@ -567,7 +575,7 @@ TEST(CreateTest, VariableOwner) {
   EXPECT_DIRECT(&conn, "association", true, "user", "OWNER_user", 2, INT);
 }
 
-TEST(CreateTest, TransitiveVariableOwner) {
+TEST_F(CreateTest, TransitiveVariableOwner) {
   // Parse create table statements.
   sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
   sqlast::CreateTable grps = MakeCreate("grps", {"gid" I PK});
@@ -617,7 +625,7 @@ TEST(CreateTest, TransitiveVariableOwner) {
                     "grps", "gid", 0);
 }
 
-TEST(CreateTest, VariableAccessor) {
+TEST_F(CreateTest, VariableAccessor) {
   // Parse create table statements.
   sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
   sqlast::CreateTable grps = MakeCreate("grps", {"gid" I PK});
@@ -651,7 +659,7 @@ TEST(CreateTest, VariableAccessor) {
   EXPECT_DIRECT(&conn, "association", true, "user", "OWNER_user", 2, INT);
 }
 
-TEST(CreateTest, TransitiveVariableAccessor) {
+TEST_F(CreateTest, TransitiveVariableAccessor) {
   // Parse create table statements.
   sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
   sqlast::CreateTable grps = MakeCreate("grps", {"gid" I PK});
@@ -701,7 +709,7 @@ TEST(CreateTest, TransitiveVariableAccessor) {
                     INT, "grps", "gid", 0);
 }
 
-TEST(CreateTest, VariableAccessorLattice) {
+TEST_F(CreateTest, VariableAccessorLattice) {
   // Parse create table statements.
   sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
   sqlast::CreateTable admin = MakeCreate("admin", {"aid" I PK, "PII_name" STR});
@@ -770,3 +778,12 @@ TEST(CreateTest, VariableAccessorLattice) {
 }  // namespace sqlengine
 }  // namespace shards
 }  // namespace pelton
+
+int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+
+  ::gflags::ParseCommandLineFlags(&argc, &argv, true);
+  ::google::InitGoogleLogging(argv[0]);
+
+  return RUN_ALL_TESTS();
+}

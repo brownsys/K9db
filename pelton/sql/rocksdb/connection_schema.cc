@@ -48,6 +48,7 @@ bool RocksdbConnection::ExecuteCreateTable(const sqlast::CreateTable &stmt) {
 
 // Execute Create Index Statement
 bool RocksdbConnection::ExecuteCreateIndex(const sqlast::CreateIndex &stmt) {
+  CHECK(stmt.ondisk()) << "Creating a rocksdb index for a non-disk statement";
   const std::string &table_name = stmt.table_name();
   RocksdbTable &table = this->tables_.at(table_name);
   table.CreateIndex(stmt.column_name());

@@ -69,12 +69,14 @@ cc_test(
     ],
 )
 
+'''
 cc_test(
     name = "varown_basic",
     srcs = ["varown.cc"],
     data = ["//tests/data:varown"],
     deps = [":common"],
 )
+'''
 
 cc_test(
     name = "ownCloud",

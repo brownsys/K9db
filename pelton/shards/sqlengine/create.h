@@ -7,6 +7,7 @@
 #include "pelton/connection.h"
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/upgradable_lock.h"
 
 namespace pelton {
 namespace shards {
@@ -14,7 +15,8 @@ namespace sqlengine {
 namespace create {
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
-                                     Connection *connection);
+                                     Connection *connection,
+                                     util::UniqueLock *lock);
 
 }  // namespace create
 }  // namespace sqlengine

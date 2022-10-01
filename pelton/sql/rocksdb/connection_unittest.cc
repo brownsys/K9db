@@ -104,7 +104,7 @@ void CreateTable() {
 
 void CreateNameIndex() {
   // Create Table.
-  sqlast::CreateIndex idx("name_index", "test_table", "name");
+  sqlast::CreateIndex idx(true, "name_index", "test_table", "name");
   EXPECT_TRUE(CONN->ExecuteCreateIndex(idx));
 }
 

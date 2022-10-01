@@ -1,5 +1,4 @@
 // Entry point for our sql rewriting engine.
-
 #include "pelton/shards/sqlengine/engine.h"
 
 #include <memory>
@@ -15,10 +14,11 @@
 #include "pelton/shards/sqlengine/update.h"
 #include "pelton/shards/sqlengine/view.h"
 */
-#include "pelton/shards/state.h"
+#include "pelton/shards/types.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/sqlast/parser.h"
 #include "pelton/util/status.h"
+#include "pelton/util/upgradable_lock.h"
 
 namespace pelton {
 namespace shards {
@@ -26,7 +26,7 @@ namespace sqlengine {
 
 absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
                                      Connection *connection) {
-  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
+  dataflow::DataFlowState &dataflow_state = connection->state->DataflowState();
 
   // Parse with ANTLR into our AST.
   sqlast::SQLParser parser;
@@ -43,7 +43,8 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
     // Case 1: CREATE TABLE statement.
     case sqlast::AbstractStatement::Type::CREATE_TABLE: {
       auto *stmt = static_cast<sqlast::CreateTable *>(statement.get());
-      return create::Shard(*stmt, connection);
+      util::UniqueLock lock = connection->state->WriterLock();
+      return create::Shard(*stmt, connection, &lock);
     }
 
     /*

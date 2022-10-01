@@ -9,6 +9,8 @@
 
 #include "pelton/dataflow/schema.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/shards/state.h"
+#include "pelton/shards/types.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -163,7 +165,8 @@ std::vector<std::unique_ptr<ShardDescriptor>> MakeReverseDescriptors(
 
 // Determine the ways the table is sharded.
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
-                                     Connection *connection) {
+                                     Connection *connection,
+                                     util::UniqueLock *lock) {
   SharderState &sstate = connection->state->SharderState();
 
   // Make sure table does not exist.

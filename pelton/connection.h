@@ -32,8 +32,11 @@ class State {
   // Accessors for underlying components states.
   shards::SharderState &SharderState() { return this->sstate_; }
   const shards::SharderState &SharderState() const { return this->sstate_; }
-  dataflow::DataFlowState &Dataflow() { return this->dstate_; }
-  const dataflow::DataFlowState &Dataflow() const { return this->dstate_; }
+  dataflow::DataFlowState &DataflowState() { return this->dstate_; }
+  const dataflow::DataFlowState &DataflowState() const { return this->dstate_; }
+
+  // Accessors for the underlying database.
+  sql::AbstractConnection *Database() { return this->database_.get(); }
 
   // Manage cannonical prepared statements.
   bool HasCanonicalStatement(const std::string &canonical) const;
