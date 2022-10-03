@@ -3,6 +3,7 @@
 
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -131,9 +132,9 @@ absl::StatusOr<IndexDescriptor> MakeIndex(const std::string &indexed_table,
       const TransitiveInfo &transitive = std::get<TransitiveInfo>(next.info);
       const std::string &shard_column =
           std::visit([](const auto &arg) { return arg.shard_column; },
-                     transitive.index.info);
-      JoinedIndexInfo info = {transitive.index.index_name, transitive.column,
-                              transitive.next_column, shard_column};
+                     transitive.index->info);
+      JoinedIndexInfo info = {transitive.index->index_name, transitive.column,
+                              transitive.index->indexed_column, shard_column};
       IndexDescriptor descriptor = {index_name, indexed_table, indexed_column,
                                     IndexType::JOINED, info};
       MOVE_OR_RETURN(sql::SqlResult result,
@@ -145,7 +146,7 @@ absl::StatusOr<IndexDescriptor> MakeIndex(const std::string &indexed_table,
     }
     case InfoType::VARIABLE: {
       // Can re-use the variable index as is!
-      return std::get<VariableInfo>(next.info).index;
+      return std::get<VariableInfo>(next.info).index.value();
     }
   }
   return absl::InternalError("Unreachable code in MakeIndex()!");
@@ -179,9 +180,9 @@ absl::StatusOr<IndexDescriptor> MakeVariableIndex(
       const TransitiveInfo &transitive = std::get<TransitiveInfo>(origin.info);
       const std::string &shard_column =
           std::visit([](const auto &arg) { return arg.shard_column; },
-                     transitive.index.info);
-      JoinedIndexInfo info = {transitive.index.index_name, transitive.column,
-                              transitive.next_column, shard_column};
+                     transitive.index->info);
+      JoinedIndexInfo info = {transitive.index->index_name, transitive.column,
+                              transitive.index->indexed_column, shard_column};
       IndexDescriptor descriptor = {index_name, indexed_table, indexed_column,
                                     IndexType::JOINED, info};
       MOVE_OR_RETURN(sql::SqlResult result,
@@ -196,9 +197,9 @@ absl::StatusOr<IndexDescriptor> MakeVariableIndex(
       const VariableInfo &variable = std::get<VariableInfo>(origin.info);
       const std::string &shard_column =
           std::visit([](const auto &arg) { return arg.shard_column; },
-                     variable.index.info);
-      JoinedIndexInfo info = {variable.index.index_name, variable.column,
-                              variable.origin_column, shard_column};
+                     variable.index->info);
+      JoinedIndexInfo info = {variable.index->index_name, variable.column,
+                              variable.index->indexed_column, shard_column};
       IndexDescriptor descriptor = {index_name, indexed_table, indexed_column,
                                     IndexType::JOINED, info};
       MOVE_OR_RETURN(sql::SqlResult result,
@@ -215,9 +216,9 @@ absl::StatusOr<IndexDescriptor> MakeVariableIndex(
 // Create a shard descriptor for this table corresponding to each shard
 // descriptor that current exists for the given foreign table.
 std::vector<std::unique_ptr<ShardDescriptor>> MakeDescriptors(
-    bool owners, const sqlast::ColumnDefinition &fk_col, size_t fk_column_index,
-    sqlast::ColumnDefinition::Type fk_column_type, Connection *connection,
-    util::UniqueLock *lock) {
+    bool owners, bool create_indices, const sqlast::ColumnDefinition &fk_col,
+    size_t fk_column_index, sqlast::ColumnDefinition::Type fk_column_type,
+    Connection *connection, util::UniqueLock *lock) {
   SharderState &sstate = connection->state->SharderState();
 
   // Identify foreign table and column.
@@ -241,8 +242,11 @@ std::vector<std::unique_ptr<ShardDescriptor>> MakeDescriptors(
       descriptor.info = DirectInfo{fk_colname, fk_column_index, fk_column_type};
     } else {  // Transitive sharding.
       descriptor.type = InfoType::TRANSITIVE;
-      MOVE_OR_PANIC(IndexDescriptor idx,
-                    MakeIndex(next_table, next_col, *next, connection, lock));
+      std::optional<IndexDescriptor> idx;
+      if (create_indices) {
+        MOVE_OR_PANIC(idx,
+                      MakeIndex(next_table, next_col, *next, connection, lock));
+      }
       descriptor.info = TransitiveInfo{
           fk_colname, fk_column_index, fk_column_type, next.get(),
           next_table, next_col,        next_col_index, idx};
@@ -255,7 +259,7 @@ std::vector<std::unique_ptr<ShardDescriptor>> MakeDescriptors(
 // Similar to MakeDescriptors but for opposite direction annotations,
 // i.e. OWNS and ACCESSES.
 std::vector<std::unique_ptr<ShardDescriptor>> MakeReverseDescriptors(
-    bool owners, const Table &origin,
+    bool owners, bool create_indices, const Table &origin,
     const sqlast::ColumnDefinition &origin_col, size_t origin_index,
     Connection *connection, util::UniqueLock *lock) {
   SharderState &sstate = connection->state->SharderState();
@@ -281,9 +285,12 @@ std::vector<std::unique_ptr<ShardDescriptor>> MakeReverseDescriptors(
     ShardDescriptor next;
     next.shard_kind = descriptor->shard_kind;
     next.type = InfoType::VARIABLE;
-    MOVE_OR_PANIC(IndexDescriptor index,
-                  MakeVariableIndex(origin_table_name, origin_column_name,
-                                    *descriptor, connection, lock));
+    std::optional<IndexDescriptor> index;
+    if (create_indices) {
+      MOVE_OR_PANIC(index,
+                    MakeVariableIndex(origin_table_name, origin_column_name,
+                                      *descriptor, connection, lock));
+    }
     next.info = VariableInfo{
         target_column_name, target_column_index, type,         descriptor.get(),
         origin_table_name,  origin_column_name,  origin_index, index};
@@ -346,29 +353,36 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
   std::vector<size_t> &iowners = annotations.implicit_owners;
   for (size_t idx : eowners.size() > 0 ? eowners : iowners) {
     const sqlast::ColumnDefinition &col = stmt.GetColumns().at(idx);
-    sqlast::ColumnDefinition::Type fk_col_type = schema.TypeOf(idx);
+    sqlast::ColumnDefinition::Type fk_ctype = schema.TypeOf(idx);
     // Transform foreign table descriptors to descriptors of this table.
-    auto vec = MakeDescriptors(true, col, idx, fk_col_type, connection, lock);
-    table.owners.insert(table.owners.end(), M(vec.begin()), M(vec.end()));
+    auto v = MakeDescriptors(true, true, col, idx, fk_ctype, connection, lock);
+    table.owners.insert(table.owners.end(), M(v.begin()), M(v.end()));
     // Access lattice: if U accesses table A, and our table B is owned by A,
     // then U accesses B.
-    vec = MakeDescriptors(false, col, idx, fk_col_type, connection, lock);
-    table.accessors.insert(table.accessors.end(), M(vec.begin()), M(vec.end()));
+    v = MakeDescriptors(false, false, col, idx, fk_ctype, connection, lock);
+    table.accessors.insert(table.accessors.end(), M(v.begin()), M(v.end()));
   }
   /* End of direct and transitive OWNERS. */
 
   /* Check to see if this table has direct or transitive ACCESSORS. */
   for (size_t idx : annotations.accessors) {
     const sqlast::ColumnDefinition &col = stmt.GetColumns().at(idx);
-    sqlast::ColumnDefinition::Type fk_col_type = schema.TypeOf(idx);
+    sqlast::ColumnDefinition::Type fk_ctype = schema.TypeOf(idx);
     // Transform foreign accessor descriptors to descriptors of this table.
     // Both owners and accessors of foreign table get access of this table.
-    auto vec = MakeDescriptors(true, col, idx, fk_col_type, connection, lock);
-    table.accessors.insert(table.accessors.end(), M(vec.begin()), M(vec.end()));
-    vec = MakeDescriptors(false, col, idx, fk_col_type, connection, lock);
-    table.accessors.insert(table.accessors.end(), M(vec.begin()), M(vec.end()));
+    auto v = MakeDescriptors(true, false, col, idx, fk_ctype, connection, lock);
+    table.accessors.insert(table.accessors.end(), M(v.begin()), M(v.end()));
+    v = MakeDescriptors(false, false, col, idx, fk_ctype, connection, lock);
+    table.accessors.insert(table.accessors.end(), M(v.begin()), M(v.end()));
   }
   /* End of direct and transitive ACCESSORS. */
+
+  /* Now we create this table and add its information to our state. */
+  const Table &table_ref = sstate.AddTable(std::move(table));
+  dstate.AddTableSchema(table_name, schema);
+  sql::SqlResult result = sql::SqlResult(db->ExecuteCreateTable(stmt));
+  /* End of table creation - now we need to make sure any effects this table
+     has on previously created table is handled. */
 
   /* Look for OWNS annotations: target table becomes owned by this table! */
   for (size_t origin_index : annotations.owns) {
@@ -376,12 +390,12 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     const sqlast::ColumnConstraint &fk = col.GetForeignKeyConstraint();
     const std::string &target_table = fk.foreign_table();
     // Every way of owning this table becomes a way of owning the target table.
-    auto v = MakeReverseDescriptors(true, table, col, origin_index, connection,
-                                    lock);
+    auto v = MakeReverseDescriptors(true, true, table_ref, col, origin_index,
+                                    connection, lock);
     CHECK_STATUS(sstate.AddTableOwner(target_table, std::move(v)));
     // Every way of accessing this table becomes a way of accessing target.
-    v = MakeReverseDescriptors(false, table, col, origin_index, connection,
-                               lock);
+    v = MakeReverseDescriptors(false, false, table_ref, col, origin_index,
+                               connection, lock);
     CHECK_STATUS(sstate.AddTableAccessor(target_table, std::move(v)));
   }
   /* End of OWNS. */
@@ -392,20 +406,17 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     const sqlast::ColumnConstraint &fk = col.GetForeignKeyConstraint();
     const std::string &target_table = fk.foreign_table();
     // Every way of owning this table becomes a way of accessing the target.
-    auto v = MakeReverseDescriptors(true, table, col, origin_index, connection,
-                                    lock);
+    auto v = MakeReverseDescriptors(true, false, table_ref, col, origin_index,
+                                    connection, lock);
     CHECK_STATUS(sstate.AddTableAccessor(target_table, std::move(v)));
     // Every way of accessing this table becomes a way of accessing target.
-    v = MakeReverseDescriptors(false, table, col, origin_index, connection,
-                               lock);
+    v = MakeReverseDescriptors(false, false, table_ref, col, origin_index,
+                               connection, lock);
     CHECK_STATUS(sstate.AddTableAccessor(target_table, std::move(v)));
   }
   /* End of ACCESSES. */
 
-  // Add table to metadata and create it in rocksdb.
-  sstate.AddTable(std::move(table));
-  dstate.AddTableSchema(table_name, schema);
-  return sql::SqlResult(db->ExecuteCreateTable(stmt));
+  return result;
 }
 
 }  // namespace create

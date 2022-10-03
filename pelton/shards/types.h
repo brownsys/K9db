@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <unordered_map>
@@ -90,8 +91,8 @@ struct TransitiveInfo {
   // The index for dealing with transitivity. It implicitly joins over
   // transitive hops.
   // The index maps values of <column> to data subject IDs (for ownership).
-  // The index maps data subject IDs to <Primary Key> (for accessors).
-  IndexDescriptor index;
+  // No index for accessors: this is empty.
+  std::optional<IndexDescriptor> index;
 };
 struct VariableInfo {
   // The column in this table that the variable ownership/accessorship table
@@ -107,8 +108,8 @@ struct VariableInfo {
   ColumnIndex origin_column_index;
   // The index for dealing with variability.
   // The index maps values of <column> to data subject IDs (for ownership).
-  // The index maps data subject IDs to <Primary Key> (for accessors).
-  IndexDescriptor index;
+  // No index for accessors: this is empty.
+  std::optional<IndexDescriptor> index;
 };
 
 // Specifies one way a table is sharded.

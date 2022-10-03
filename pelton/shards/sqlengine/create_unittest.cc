@@ -171,7 +171,8 @@ void EXPECT_TRANSITIVE(Connection *conn, const std::string &table_name,
       if (info.column == column_name && info.column_index == column_index &&
           info.column_type == column_type && info.next_table == next_table &&
           info.next_column == next_column &&
-          info.next_column_index == next_column_index) {
+          info.next_column_index == next_column_index &&
+          owner == info.index.has_value()) {
         found = true;
         break;
       }
@@ -197,7 +198,8 @@ void EXPECT_VARIABLE(Connection *conn, const std::string &table_name,
           info.column_type == column_type &&
           info.origin_relation == origin_relation &&
           info.origin_column == origin_column &&
-          info.origin_column_index == origin_column_index) {
+          info.origin_column_index == origin_column_index &&
+          owner == info.index.has_value()) {
         found = true;
         break;
       }
@@ -320,7 +322,7 @@ TEST_F(CreateTest, DeepTransitive) {
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
-  EXPECT_SHARD_OWNS(&conn, "user", {"user", "addr", "phones", "avaible"});
+  EXPECT_SHARD_OWNS(&conn, "user", {"user", "addr", "phones", "available"});
   EXPECT_SHARD_ACCESSES(&conn, "user", {});
 
   // Check tables.
