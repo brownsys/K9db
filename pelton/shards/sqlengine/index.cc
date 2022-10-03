@@ -10,36 +10,38 @@ namespace shards {
 namespace sqlengine {
 namespace index {
 
-std::string EncodeSql(const SimpleIndexSpec &s) {
+std::string EncodeSql(const IndexDescriptor &descriptor) {
   std::string sql = "";
-  sql += "SELECT " + s.indexed_column + ", " + s.shard_column + ", COUNT(*) ";
-  sql += "FROM " + s.indexed_table + " ";
-  sql += "GROUP BY " + s.indexed_column + ", " + s.shard_column + " ";
-  sql += "HAVING " + s.indexed_column + " = ?";
+  const std::string &indexed_table = descriptor.indexed_table;
+  std::string indexed_column = indexed_table + "." + descriptor.indexed_column;
+  switch (descriptor.type) {
+    case IndexType::SIMPLE: {
+      const SimpleIndexInfo &info = std::get<SimpleIndexInfo>(descriptor.info);
+      std::string shard_column = indexed_table + "." + info.shard_column;
+      sql += "SELECT " + indexed_column + ", " + shard_column + ", COUNT(*) ";
+      sql += "FROM " + indexed_table + " ";
+      sql += "GROUP BY " + indexed_column + ", " + shard_column + " ";
+      sql += "HAVING " + indexed_column + " = ?";
+      break;
+    }
+    case IndexType::JOINED: {
+      const JoinedIndexInfo &info = std::get<JoinedIndexInfo>(descriptor.info);
+      const std::string &join_table = info.join_table;
+      std::string join_column1 = indexed_table + "." + info.join_column1;
+      std::string join_column2 = join_table + "." + info.join_column2;
+      std::string shard_column = join_table + "." + info.shard_column;
+      sql += "SELECT " + indexed_column + ", " + shard_column + ", COUNT(*) ";
+      sql += "FROM " + indexed_table + " JOIN " + join_table + " ";
+      sql += "ON " + join_column1 + " = " + join_column2 + " ";
+      sql += "GROUP BY " + indexed_column + ", " + shard_column + " ";
+      sql += "HAVING " + indexed_column + " = ?";
+      break;
+    }
+  }
   return sql;
 }
 
-std::string EncodeSql(const JoinedIndexSpec &s) {
-  std::string indexed_column = s.indexed_table + "." + s.indexed_column;
-  std::string shard_column = s.shard_table + "." + s.shard_column;
-  std::string join_column = s.shard_table + "." + s.join_column;
-  std::string sql = "";
-  sql += "SELECT " + indexed_column + ", " + shard_column + ", COUNT(*) ";
-  sql += "FROM " + s.indexed_table + " JOIN " + s.shard_table + " ";
-  sql += "ON " + indexed_column + " = " + join_column + " ";
-  sql += "GROUP BY " + indexed_column + ", " + shard_column + " ";
-  sql += "HAVING " + indexed_column + " = ?";
-  return sql;
-}
-
-absl::StatusOr<sql::SqlResult> CreateIndex(const SimpleIndexSpec &index,
-                                           Connection *connection,
-                                           util::UniqueLock *lock) {
-  sqlast::CreateView create_stmt(index.index_name, EncodeSql(index));
-  return view::CreateView(create_stmt, connection, lock);
-}
-
-absl::StatusOr<sql::SqlResult> CreateIndex(const JoinedIndexSpec &index,
+absl::StatusOr<sql::SqlResult> CreateIndex(const IndexDescriptor &index,
                                            Connection *connection,
                                            util::UniqueLock *lock) {
   sqlast::CreateView create_stmt(index.index_name, EncodeSql(index));

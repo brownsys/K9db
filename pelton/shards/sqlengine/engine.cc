@@ -8,12 +8,14 @@
 /*
 #include "pelton/shards/sqlengine/delete.h"
 #include "pelton/shards/sqlengine/gdpr.h"
+*/
 #include "pelton/shards/sqlengine/index.h"
+/*
 #include "pelton/shards/sqlengine/insert.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/update.h"
-#include "pelton/shards/sqlengine/view.h"
 */
+#include "pelton/shards/sqlengine/view.h"
 #include "pelton/shards/types.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/sqlast/parser.h"
@@ -77,15 +79,17 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       auto *stmt = static_cast<sqlast::Delete *>(statement.get());
       return delete_::Shard(*stmt, connection, true, true);
     }
+    */
 
     // Case 6: CREATE VIEW statement (e.g. dataflow).
     case sqlast::AbstractStatement::Type::CREATE_VIEW: {
       auto *stmt = static_cast<sqlast::CreateView *>(statement.get());
-      UniqueLock lock = connection->state->sharder_state()->WriterLock();
+      util::UniqueLock lock = connection->state->WriterLock();
       CHECK_STATUS(view::CreateView(*stmt, connection, &lock));
       return sql::SqlResult(true);
     }
 
+    /*
     // Case 7: CREATE INDEX statement.
     case sqlast::AbstractStatement::Type::CREATE_INDEX: {
       auto *stmt = static_cast<sqlast::CreateIndex *>(statement.get());

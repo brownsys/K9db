@@ -14,36 +14,7 @@ namespace shards {
 namespace sqlengine {
 namespace index {
 
-// SELECT indexed_column, shard_column, COUNT(*)
-// FROM indexed_table
-// GROUP BY indexed_column, shard_column
-// HAVING indexed_column = ?
-struct SimpleIndexSpec {
-  std::string index_name;
-  std::string indexed_table;
-  std::string indexed_column;
-  std::string shard_column;
-};
-
-// SELECT indexed_table.indexed_column, shard_table.shard_column, COUNT(*)
-// FROM indexed_table JOIN shard_table
-// ON indexed_table.indexed_column = shard_table.join_column
-// GROUP BY indexed_table.indexed_column, shard_table.shard_column
-// HAVING indexed_table.indexed_column = ?
-struct JoinedIndexSpec {
-  std::string index_name;
-  std::string indexed_table;
-  std::string indexed_column;
-  std::string shard_table;
-  std::string join_column;
-  std::string shard_column;
-};
-
-absl::StatusOr<sql::SqlResult> CreateIndex(const SimpleIndexSpec &index,
-                                           Connection *connection,
-                                           util::UniqueLock *lock);
-
-absl::StatusOr<sql::SqlResult> CreateIndex(const JoinedIndexSpec &index,
+absl::StatusOr<sql::SqlResult> CreateIndex(const IndexDescriptor &index,
                                            Connection *connection,
                                            util::UniqueLock *lock);
 

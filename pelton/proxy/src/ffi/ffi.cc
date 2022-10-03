@@ -183,7 +183,7 @@ bool FFIResultNextSet(FFIResult c_result) {
   int idx = *c_result.index;
   pelton::SqlResult *result =
       reinterpret_cast<pelton::SqlResult *>(c_result.result);
-  if (idx < result->ResultSets().size()) {
+  if (idx >= 0 && static_cast<unsigned>(idx) < result->ResultSets().size()) {
     return true;
   } else {
     *c_result.index = -1;

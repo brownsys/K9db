@@ -75,6 +75,9 @@ class SharderState {
   void IncrementUsers(const ShardKind &kind);
   void DecrementUsers(const ShardKind &kind);
 
+  // To create unique index names.
+  uint64_t IncrementIndexCount() { return this->index_count_++; }
+
   // Debugging information / statistics.
   std::vector<std::pair<ShardKind, uint64_t>> NumShards() const;
   const std::unordered_map<TableName, Table> &AllTables() const {
@@ -98,6 +101,7 @@ class SharderState {
 
   // Counts of users currently in the system.
   std::unordered_map<ShardKind, std::atomic<uint64_t>> users_;
+  std::atomic<uint64_t> index_count_;
 };
 
 }  // namespace shards

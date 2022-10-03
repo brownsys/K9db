@@ -35,6 +35,28 @@ using ColumnName = std::string;
 
 using ColumnIndex = size_t;
 
+// Index information.
+enum class IndexType { SIMPLE, JOINED };
+struct SimpleIndexInfo {
+  ColumnName shard_column;
+};
+struct JoinedIndexInfo {
+  TableName join_table;     // could also be another index/flow.
+  ColumnName join_column1;  // column in indexed table.
+  ColumnName join_column2;  // column in join table.
+  ColumnName shard_column;  // Final shard column, in join table.
+};
+
+// An index is either simple (over a single table) or joined (with another table
+// or index).
+struct IndexDescriptor {
+  FlowName index_name;
+  TableName indexed_table;
+  ColumnName indexed_column;
+  IndexType type;
+  std::variant<SimpleIndexInfo, JoinedIndexInfo> info;
+};
+
 // Forward declaration.
 struct ShardDescriptor;
 
@@ -69,7 +91,7 @@ struct TransitiveInfo {
   // transitive hops.
   // The index maps values of <column> to data subject IDs (for ownership).
   // The index maps data subject IDs to <Primary Key> (for accessors).
-  FlowName index;
+  IndexDescriptor index;
 };
 struct VariableInfo {
   // The column in this table that the variable ownership/accessorship table
@@ -86,7 +108,7 @@ struct VariableInfo {
   // The index for dealing with variability.
   // The index maps values of <column> to data subject IDs (for ownership).
   // The index maps data subject IDs to <Primary Key> (for accessors).
-  FlowName index;
+  IndexDescriptor index;
 };
 
 // Specifies one way a table is sharded.
@@ -105,7 +127,6 @@ struct Table {
   // owners.size() > 0 <=> sharded table.
   std::vector<std::unique_ptr<ShardDescriptor>> owners;
   std::vector<std::unique_ptr<ShardDescriptor>> accessors;
-  std::unordered_map<ColumnIndex, FlowName> inmemory_indices;
 };
 
 // Metadata about a shard.
@@ -121,6 +142,10 @@ struct Shard {
   std::unordered_set<TableName> accessor_tables;
 };
 
+// For debugging / printing.
+std::ostream &operator<<(std::ostream &os, const SimpleIndexInfo &o);
+std::ostream &operator<<(std::ostream &os, const JoinedIndexInfo &o);
+std::ostream &operator<<(std::ostream &os, const IndexDescriptor &o);
 std::ostream &operator<<(std::ostream &os, const DirectInfo &o);
 std::ostream &operator<<(std::ostream &os, const TransitiveInfo &o);
 std::ostream &operator<<(std::ostream &os, const VariableInfo &o);

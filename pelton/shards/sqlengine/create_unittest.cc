@@ -299,6 +299,46 @@ TEST_F(CreateTest, Transitive) {
                     0);
 }
 
+TEST_F(CreateTest, DeepTransitive) {
+  // Parse create table statements.
+  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  sqlast::CreateTable addr =
+      MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
+  sqlast::CreateTable nums =
+      MakeCreate("phones", {"id" I PK, "aid" I FK "addr(id)"});
+  sqlast::CreateTable available =
+      MakeCreate("available", {"id" I PK, "pid" I FK "phones(id)"});
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+
+  // Create the tables.
+  Handle(usr, &conn);
+  Handle(addr, &conn);
+  Handle(nums, &conn);
+  Handle(available, &conn);
+
+  // Check shards.
+  EXPECT_SHARD(&conn, "user", "id", 0);
+  EXPECT_SHARD_OWNS(&conn, "user", {"user", "addr", "phones", "avaible"});
+  EXPECT_SHARD_ACCESSES(&conn, "user", {});
+
+  // Check tables.
+  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+
+  EXPECT_TABLE(&conn, "addr", {"id", "uid"}, {INT, INT}, 0, 1, 0);
+  EXPECT_DIRECT(&conn, "addr", true, "user", "uid", 1, INT);
+
+  EXPECT_TABLE(&conn, "phones", {"id", "aid"}, {INT, INT}, 0, 1, 0);
+  EXPECT_TRANSITIVE(&conn, "phones", true, "user", "aid", 1, INT, "addr", "id",
+                    0);
+
+  EXPECT_TABLE(&conn, "available", {"id", "pid"}, {INT, INT}, 0, 1, 0);
+  EXPECT_TRANSITIVE(&conn, "available", true, "user", "pid", 1, INT, "phones",
+                    "id", 0);
+}
+
 TEST_F(CreateTest, OwnerAndNothing) {
   // Parse create table statements.
   sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
