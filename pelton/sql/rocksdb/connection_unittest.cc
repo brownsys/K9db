@@ -188,8 +188,6 @@ SqlResultSet DeleteBy(
 
 // Shorthands.
 SqlResultSet SelectAll() { return SelectBy({}); }
-SqlResultSet DeleteAll() { return DeleteBy({}); }
-
 SqlResultSet SelectBy(const std::string &col, const std::string &value) {
   return SelectBy({{col, {value}}});
 }

@@ -54,7 +54,6 @@ absl::StatusOr<std::string> GetFKValueHelper(
   } else {
     CHECK_EQ(schema.GetColumns().size(), stmt.GetValues().size());
   }
-
   return stmt.GetValue(fk_idx);
 }
 

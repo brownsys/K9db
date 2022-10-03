@@ -65,6 +65,8 @@ class DataFlowState {
 
   const DataFlowGraph &GetFlow(const FlowName &name) const;
 
+  std::vector<std::string> GetFlows() const;
+
   bool HasFlow(const FlowName &name) const;
 
   bool HasFlowsFor(const TableName &table_name) const;

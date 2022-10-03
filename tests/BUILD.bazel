@@ -44,6 +44,19 @@ cc_test(
 )
 
 cc_test(
+    name = "medical_nested_views",
+    srcs = [
+        "medical_nested_views.cc",
+    ],
+    data = [
+        "//tests/data:medical-chat-nested-views-data",
+    ],
+    deps = [
+        ":common",
+    ],
+)
+
+cc_test(
     name = "delf_medical_retain",
     srcs = [
         "delf_medical_retain.cc",

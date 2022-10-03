@@ -26,6 +26,7 @@ class Operator {
     INPUT,
     IDENTITY,
     MAT_VIEW,
+    FORWARD_VIEW,
     FILTER,
     UNION,
     EQUIJOIN,

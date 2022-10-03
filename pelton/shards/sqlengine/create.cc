@@ -148,6 +148,7 @@ absl::StatusOr<IndexDescriptor> MakeIndex(const std::string &indexed_table,
       return std::get<VariableInfo>(next.info).index;
     }
   }
+  return absl::InternalError("Unreachable code in MakeIndex()!");
 }
 
 // origin = the many-2-many table pointing towards the table under consideration
@@ -208,6 +209,7 @@ absl::StatusOr<IndexDescriptor> MakeVariableIndex(
       return descriptor;
     }
   }
+  return absl::InternalError("Unreachable code in MakeIndex()!");
 }
 
 // Create a shard descriptor for this table corresponding to each shard

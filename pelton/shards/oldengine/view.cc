@@ -13,6 +13,7 @@
 
 #include "glog/logging.h"
 #include "pelton/dataflow/key.h"
+#include "pelton/dataflow/ops/forward_view.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/value.h"
 #include "pelton/planner/planner.h"
@@ -310,6 +311,20 @@ absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection,
     dataflow_state->ProcessRecordsByFlowName(
         flow_name, table_name, std::move(records), future.GetPromise());
   }
+
+  // Populate nested view upon creation.
+  for (size_t p = 0; p < dataflow_state->workers(); p++) {
+    pelton::dataflow::DataFlowGraphPartition *partition =
+        dataflow_state->GetFlow(flow_name).GetPartition(p);
+    for (auto *forward : partition->forwards()) {
+      dataflow::Operator *node = forward->parents().at(0);
+      dataflow::MatViewOperator *parent =
+          reinterpret_cast<dataflow::MatViewOperator *>(node);
+      forward->ProcessAndForward(parent->index(), parent->All(),
+                                 future.GetPromise());
+    }
+  }
+
   future.Wait();
 
   return absl::OkStatus();

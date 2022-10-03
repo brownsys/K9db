@@ -86,6 +86,8 @@ cc_library(
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:record",
+        "//pelton/dataflow/ops:forward_view",
+        "//pelton/dataflow/ops:input",
         "//pelton/planner",
         "//pelton/sql:abstract_connection",
         "//pelton/sql:result",

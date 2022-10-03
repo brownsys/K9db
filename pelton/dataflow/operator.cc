@@ -129,6 +129,9 @@ std::string Operator::DebugString() const {
     case Operator::Type::MAT_VIEW:
       type_str = "MAT_VIEW";
       break;
+    case Operator::Type::FORWARD_VIEW:
+      type_str = "FORWARD_VIEW";
+      break;
     case Operator::Type::FILTER:
       type_str = "FILTER";
       break;
@@ -213,6 +216,9 @@ Record Operator::DebugRecord() const {
       break;
     case Operator::Type::EXCHANGE:
       record.SetString(std::make_unique<std::string>("EXCHANGE"), 1);
+      break;
+    case Operator::Type::FORWARD_VIEW:
+      record.SetString(std::make_unique<std::string>("FORWARD_VIEW"), 1);
       break;
   }
   // Output schema.

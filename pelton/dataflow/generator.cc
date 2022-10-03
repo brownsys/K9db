@@ -9,6 +9,7 @@
 #include "pelton/dataflow/ops/aggregate.h"
 #include "pelton/dataflow/ops/equijoin.h"
 #include "pelton/dataflow/ops/filter.h"
+#include "pelton/dataflow/ops/forward_view.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/ops/project.h"
@@ -30,12 +31,27 @@ DataFlowGraphGenerator::DataFlowGraphGenerator(
 // Adding operators.
 NodeIndex DataFlowGraphGenerator::AddInputOperator(
     const std::string &table_name) {
-  // Create input operator
-  SchemaRef table_schema = this->state_->GetTableSchema(table_name);
-  std::unique_ptr<InputOperator> input =
-      std::make_unique<InputOperator>(table_name, table_schema);
-  // Add the operator to the graph.
-  CHECK(this->graph_->AddInputNode(std::move(input)));
+  // Check if table_name is a view name.
+  if (this->state_->HasFlow(table_name)) {
+    // get MAT VIEW operator from dataflow
+    const auto partition = this->state_->GetFlow(table_name).GetPartition(0);
+    MatViewOperator *matview = partition->outputs().front();
+    PCHECK(matview);
+    // create an ForwardViewOperator
+    std::unique_ptr<ForwardViewOperator> op =
+        std::make_unique<ForwardViewOperator>(matview->output_schema(),
+                                              table_name, matview->index());
+    CHECK(op);
+    // Add the ForwardView operator to the graph, where MAT VIEW is a parent
+    CHECK(this->graph_->AddForwardOperator(std::move(op), {}));
+  } else {
+    // Doesn't correspond to view, create input operator as normal
+    SchemaRef table_schema = this->state_->GetTableSchema(table_name);
+    std::unique_ptr<InputOperator> input =
+        std::make_unique<InputOperator>(table_name, table_schema);
+    // Add the input operator (table) to the graph.
+    CHECK(this->graph_->AddInputNode(std::move(input)));
+  }
   return this->graph_->LastOperatorIndex();
 }
 NodeIndex DataFlowGraphGenerator::AddUnionOperator(
@@ -227,7 +243,20 @@ void DataFlowGraphGenerator::AddProjectionArithmeticColumns(
 
 // Reading schema.
 std::vector<std::string> DataFlowGraphGenerator::GetTables() const {
-  return this->state_->GetTables();
+  std::vector<std::string> tables;
+  std::vector<std::string> views;
+  std::vector<std::string> tables_and_views;
+
+  // return names of both tables and views
+  tables = this->state_->GetTables();
+  views = this->state_->GetFlows();
+
+  // concatenate names
+  tables_and_views.reserve(tables.size() + views.size());
+  tables_and_views.insert(tables_and_views.end(), tables.begin(), tables.end());
+  tables_and_views.insert(tables_and_views.end(), views.begin(), views.end());
+
+  return tables_and_views;
 }
 size_t DataFlowGraphGenerator::GetTableColumnCount(
     const std::string &table_name) const {

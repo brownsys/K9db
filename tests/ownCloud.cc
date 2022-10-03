@@ -1,4 +1,3 @@
-
 #include "glog/logging.h"
 #include "tests/common.h"
 
