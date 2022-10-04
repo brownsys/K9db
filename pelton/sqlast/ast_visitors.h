@@ -20,6 +20,9 @@
 namespace pelton {
 namespace sqlast {
 
+// Remove leading and trailing quotes if any.
+std::string Dequote(const std::string &st);
+
 // Visit without modification.
 template <class T>
 class AbstractVisitor {

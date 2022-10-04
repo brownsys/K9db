@@ -18,6 +18,9 @@
 namespace pelton {
 namespace shards {
 
+#define EXTRACT_VARIANT(prop, info) \
+  visit([](const auto &arg) { return arg.prop; }, info)
+
 // The name of a dataflow.
 using FlowName = std::string;
 

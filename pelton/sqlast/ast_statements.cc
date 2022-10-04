@@ -89,6 +89,15 @@ const std::string &Insert::GetValue(size_t index) const {
   return this->values_.at(index);
 }
 
+const std::string &Insert::GetByColumnOrIndex(const std::string &colname,
+                                              size_t index) const {
+  if (this->HasColumns()) {
+    return this->GetValue(this->GetColumnIndex(colname));
+  } else {
+    return this->GetValue(index);
+  }
+}
+
 // Update.
 const std::string &Update::table_name() const { return this->table_name_; }
 std::string &Update::table_name() { return this->table_name_; }

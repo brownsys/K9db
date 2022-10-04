@@ -59,4 +59,7 @@
     LOG(FATAL) << __MOVE_OR_PANIC_VAL(__LINE__).status(); \
   lexpr = std::move(__MOVE_OR_PANIC_VAL(__LINE__).value())
 
+#define ASSERT_RET(expr, err, msg) \
+  if (!(expr)) return absl::err##Error(msg)
+
 #endif  // PELTON_UTIL_STATUS_H_

@@ -17,6 +17,10 @@ absl::StatusOr<sql::SqlResult> CreateView(const sqlast::CreateView &stmt,
                                           Connection *connection,
                                           util::UniqueLock *lock);
 
+absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
+                                          Connection *connection,
+                                          util::SharedLock *lock);
+
 }  // namespace view
 }  // namespace sqlengine
 }  // namespace shards

@@ -1,6 +1,10 @@
 // Creation and management of secondary indices.
 #include "pelton/shards/sqlengine/index.h"
 
+#include <utility>
+
+#include "pelton/dataflow/graph.h"
+#include "pelton/dataflow/key.h"
 #include "pelton/shards/sqlengine/view.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/status.h"
@@ -9,6 +13,12 @@ namespace pelton {
 namespace shards {
 namespace sqlengine {
 namespace index {
+
+/*
+ * Index creation.
+ */
+
+namespace {
 
 std::string EncodeSql(const IndexDescriptor &descriptor) {
   std::string sql = "";
@@ -41,11 +51,29 @@ std::string EncodeSql(const IndexDescriptor &descriptor) {
   return sql;
 }
 
+}  // namespace
+
 absl::StatusOr<sql::SqlResult> CreateIndex(const IndexDescriptor &index,
                                            Connection *connection,
                                            util::UniqueLock *lock) {
   sqlast::CreateView create_stmt(index.index_name, EncodeSql(index));
   return view::CreateView(create_stmt, connection, lock);
+}
+
+/*
+ * Index querying.
+ */
+
+std::vector<dataflow::Record> LookupIndex(const IndexDescriptor &index,
+                                          dataflow::Value &&value,
+                                          Connection *connection,
+                                          util::SharedLock *lock) {
+  const dataflow::DataFlowState &dstate = connection->state->DataflowState();
+  const dataflow::DataFlowGraph &flow = dstate.GetFlow(index.index_name);
+  // Lookup by given value as key.
+  dataflow::Key key(1);
+  key.AddValue(std::move(value));
+  return flow.Lookup(key, -1, 0);
 }
 
 }  // namespace index

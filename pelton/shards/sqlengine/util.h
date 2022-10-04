@@ -17,8 +17,6 @@ namespace sqlengine {
 
 bool IsADataSubject(const sqlast::CreateTable &stmt);
 
-std::string Dequote(const std::string &st);
-
 bool IsOwner(const sqlast::ColumnDefinition &col);
 bool IsAccessor(const sqlast::ColumnDefinition &col);
 bool IsOwns(const sqlast::ColumnDefinition &col);

@@ -10,16 +10,17 @@
 namespace pelton {
 namespace sqlast {
 
-namespace {
-
 std::string Dequote(const std::string &st) {
-  std::string s(st);
-  s.erase(remove(s.begin(), s.end(), '\"'), s.end());
-  s.erase(remove(s.begin(), s.end(), '\''), s.end());
-  return s;
+  if (st.size() >= 2) {
+    if (st.at(0) == '\"' && st.at(st.size() - 1) == '\"') {
+      return st.substr(1, st.size() - 2);
+    }
+    if (st.at(0) == '\'' && st.at(st.size() - 1) == '\'') {
+      return st.substr(1, st.size() - 2);
+    }
+  }
+  return st;
 }
-
-}  // namespace
 
 // Stringifier.
 std::string Stringifier::VisitCreateTable(const CreateTable &ast) {

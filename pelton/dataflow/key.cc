@@ -1,5 +1,7 @@
 #include "pelton/dataflow/key.h"
 
+#include <utility>
+
 namespace pelton {
 namespace dataflow {
 
@@ -63,6 +65,10 @@ void Key::AddValue(std::string &&v) {
 void Key::AddNull(sqlast::ColumnDefinition::Type type) {
   this->CheckSize();
   this->values_.emplace_back(type);
+}
+void Key::AddValue(Value &&value) {
+  this->CheckSize();
+  this->values_.emplace_back(std::move(value));
 }
 
 // Printing a record to an output stream (e.g. std::cout).

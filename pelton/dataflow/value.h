@@ -17,7 +17,6 @@ class NullValue {
 
 class Value {
  public:
-  static std::string Dequote(const std::string &st);
   // Actual value constructors.
   explicit Value(uint64_t v)
       : type_(sqlast::ColumnDefinition::Type::UINT), uint_(v) {}
@@ -36,22 +35,26 @@ class Value {
 
   explicit Value(sqlast::ColumnDefinition::Type type, const std::string &v)
       : type_(type) {
-    switch (type) {
-      case sqlast::ColumnDefinition::Type::UINT:
-        this->uint_ = static_cast<uint64_t>(std::stoull(v));
-        break;
-      case sqlast::ColumnDefinition::Type::INT:
-        this->sint_ = static_cast<int64_t>(std::stoll(v));
-        break;
-      case sqlast::ColumnDefinition::Type::TEXT: {
-        this->str_ = Dequote(v);
-        break;
+    if (v == "NULL") {
+      this->is_null_ = true;
+    } else {
+      switch (type) {
+        case sqlast::ColumnDefinition::Type::UINT:
+          this->uint_ = static_cast<uint64_t>(std::stoull(v));
+          break;
+        case sqlast::ColumnDefinition::Type::INT:
+          this->sint_ = static_cast<int64_t>(std::stoll(v));
+          break;
+        case sqlast::ColumnDefinition::Type::TEXT: {
+          this->str_ = sqlast::Dequote(v);
+          break;
+        }
+        case sqlast::ColumnDefinition::Type::DATETIME:
+          this->str_ = v;
+          break;
+        default:
+          LOG(FATAL) << "Unsupported data type in LookupIndex: " << type;
       }
-      case sqlast::ColumnDefinition::Type::DATETIME:
-        this->str_ = v;
-        break;
-      default:
-        LOG(FATAL) << "Unsupported data type in LookupIndex: " << type;
     }
   }
 
@@ -105,6 +108,7 @@ class Value {
   const std::string &GetString() const;
   bool IsNull() const { return this->is_null_; }
 
+  std::string AsUnquotedString() const;
   std::string GetSqlString() const {
     if (this->is_null_) return "NULL";
     switch (this->type_) {

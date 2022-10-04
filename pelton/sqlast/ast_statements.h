@@ -52,6 +52,10 @@ class Insert : public AbstractStatement {
   absl::StatusOr<std::string> GetValue(const std::string &colname) const;
   const std::string &GetValue(size_t index) const;
 
+  // Get by index or by column name, if stmt HasColumns.
+  const std::string &GetByColumnOrIndex(const std::string &colname,
+                                        size_t index) const;
+
   // Visitor pattern.
   template <class T>
   T Visit(AbstractVisitor<T> *visitor) const {

@@ -48,13 +48,11 @@ absl::StatusOr<Annotations> Discover(const sqlast::CreateTable &stmt,
 
     // Make sure all FK point to existing tables.
     const sqlast::ColumnConstraint &fk = col.GetForeignKeyConstraint();
-    if (!sstate.TableExists(fk.foreign_table())) {
-      return absl::InvalidArgumentError("FK points to nonexisting table");
-    }
+    ASSERT_RET(sstate.TableExists(fk.foreign_table()), InvalidArgument,
+               "FK points to nonexisting table");
     const Table &target = sstate.GetTable(fk.foreign_table());
-    if (!target.schema.HasColumn(fk.foreign_column())) {
-      return absl::InvalidArgumentError("FK points to nonexisting column");
-    }
+    ASSERT_RET(target.schema.HasColumn(fk.foreign_column()), InvalidArgument,
+               "FK points to nonexisting column");
 
     // Check if this points to the PK.
     size_t index = target.schema.IndexOf(fk.foreign_column());
@@ -64,44 +62,32 @@ absl::StatusOr<Annotations> Discover(const sqlast::CreateTable &stmt,
     bool foreign_owned = sstate.IsOwned(fk.foreign_table());
     bool foreign_accessed = sstate.IsAccessed(fk.foreign_table());
     if (IsOwner(col)) {
-      if (!foreign_owned) {
-        return absl::InvalidArgumentError("OWNER to a non data subject");
-      }
-      if (!points_to_pk) {
-        return absl::InvalidArgumentError("OWNER doesn't point to PK");
-      }
+      ASSERT_RET(foreign_owned, InvalidArgument, "OWNER to a non data subject");
+      ASSERT_RET(points_to_pk, InvalidArgument, "OWNER doesn't point to PK");
       annotations.explicit_owners.push_back(i);
     } else if (IsAccessor(col)) {
-      if (!foreign_accessed) {
-        return absl::InvalidArgumentError("ACCESSOR to a non data subject");
-      }
-      if (!points_to_pk) {
-        return absl::InvalidArgumentError("ACCESSOR doesn't point to PK");
-      }
+      ASSERT_RET(foreign_accessed, InvalidArgument,
+                 "ACCESSOR to a non data subject");
+      ASSERT_RET(points_to_pk, InvalidArgument, "ACCESSOR doesn't point to PK");
       annotations.accessors.push_back(i);
     } else if (IsOwns(col)) {
-      if (!points_to_pk) {
-        return absl::InvalidArgumentError("OWNS doesn't point to PK");
-      }
+      ASSERT_RET(points_to_pk, InvalidArgument, "OWNS doesn't point to PK");
       annotations.owns.push_back(i);
     } else if (IsAccesses(col)) {
-      if (!points_to_pk) {
-        return absl::InvalidArgumentError("ACCESSES doesn't point to PK");
-      }
+      ASSERT_RET(points_to_pk, InvalidArgument, "ACCESSES doesn't point to PK");
       annotations.accesses.push_back(i);
     } else if (foreign_owned) {
-      if (!points_to_pk) {
-        return absl::InvalidArgumentError("implicit OWNER doesn't point to PK");
-      }
+      ASSERT_RET(points_to_pk, InvalidArgument,
+                 "implicit OWNER doesn't point to PK");
       annotations.implicit_owners.push_back(i);
     }
   }
 
   // Ambiguity: need to explicitly specify which columns are owners.
-  if (annotations.implicit_owners.size() > 1 &&
-      annotations.explicit_owners.size() == 0) {
-    return absl::InvalidArgumentError("Many potential OWNERs, be explicit");
-  }
+  bool many_impl = annotations.implicit_owners.size() > 1;
+  bool has_expl = annotations.explicit_owners.size() > 0;
+  ASSERT_RET(has_expl || !many_impl, InvalidArgument,
+             "Many potential OWNERs, be explicit");
 
   return std::move(annotations);
 }
@@ -123,25 +109,20 @@ absl::StatusOr<IndexDescriptor> MakeIndex(const std::string &indexed_table,
                                     IndexType::SIMPLE, info};
       MOVE_OR_RETURN(sql::SqlResult result,
                      index::CreateIndex(descriptor, connection, lock));
-      if (!result.Success()) {
-        return absl::InternalError("Cannot create required index");
-      }
+      ASSERT_RET(result.Success(), Internal, "Error D index");
       return descriptor;
     }
     case InfoType::TRANSITIVE: {
       const TransitiveInfo &transitive = std::get<TransitiveInfo>(next.info);
       const std::string &shard_column =
-          std::visit([](const auto &arg) { return arg.shard_column; },
-                     transitive.index->info);
+          EXTRACT_VARIANT(shard_column, transitive.index->info);
       JoinedIndexInfo info = {transitive.index->index_name, transitive.column,
                               transitive.index->indexed_column, shard_column};
       IndexDescriptor descriptor = {index_name, indexed_table, indexed_column,
                                     IndexType::JOINED, info};
       MOVE_OR_RETURN(sql::SqlResult result,
                      index::CreateIndex(descriptor, connection, lock));
-      if (!result.Success()) {
-        return absl::InternalError("Cannot create required index");
-      }
+      ASSERT_RET(result.Success(), Internal, "Error T index");
       return descriptor;
     }
     case InfoType::VARIABLE: {
@@ -171,42 +152,34 @@ absl::StatusOr<IndexDescriptor> MakeVariableIndex(
                                     IndexType::SIMPLE, info};
       MOVE_OR_RETURN(sql::SqlResult result,
                      index::CreateIndex(descriptor, connection, lock));
-      if (!result.Success()) {
-        return absl::InternalError("Cannot create required index");
-      }
+      ASSERT_RET(result.Success(), Internal, "Error VD index");
       return descriptor;
     }
     case InfoType::TRANSITIVE: {
       const TransitiveInfo &transitive = std::get<TransitiveInfo>(origin.info);
       const std::string &shard_column =
-          std::visit([](const auto &arg) { return arg.shard_column; },
-                     transitive.index->info);
+          EXTRACT_VARIANT(shard_column, transitive.index->info);
       JoinedIndexInfo info = {transitive.index->index_name, transitive.column,
                               transitive.index->indexed_column, shard_column};
       IndexDescriptor descriptor = {index_name, indexed_table, indexed_column,
                                     IndexType::JOINED, info};
       MOVE_OR_RETURN(sql::SqlResult result,
                      index::CreateIndex(descriptor, connection, lock));
-      if (!result.Success()) {
-        return absl::InternalError("Cannot create required index");
-      }
+      ASSERT_RET(result.Success(), Internal, "Error VT index");
       return descriptor;
     }
     case InfoType::VARIABLE: {
       // Join with variable index.
       const VariableInfo &variable = std::get<VariableInfo>(origin.info);
       const std::string &shard_column =
-          std::visit([](const auto &arg) { return arg.shard_column; },
-                     variable.index->info);
+          EXTRACT_VARIANT(shard_column, variable.index->info);
       JoinedIndexInfo info = {variable.index->index_name, variable.column,
                               variable.index->indexed_column, shard_column};
       IndexDescriptor descriptor = {index_name, indexed_table, indexed_column,
                                     IndexType::JOINED, info};
       MOVE_OR_RETURN(sql::SqlResult result,
                      index::CreateIndex(descriptor, connection, lock));
-      if (!result.Success()) {
-        return absl::InternalError("Cannot create required index");
-      }
+      ASSERT_RET(result.Success(), Internal, "Error VV index");
       return descriptor;
     }
   }
@@ -311,17 +284,13 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
 
   // Make sure table does not exist.
   const std::string &table_name = stmt.table_name();
-  if (sstate.TableExists(table_name)) {
-    return absl::InvalidArgumentError("Table already exists!");
-  }
+  ASSERT_RET(!sstate.TableExists(table_name), InvalidArgument, "Table exists!");
 
   // Get the schema of this table.
   dataflow::SchemaRef schema = dataflow::SchemaFactory::Create(stmt);
 
   // Make sure PK is valid.
-  if (schema.keys().size() != 1) {
-    return absl::InvalidArgumentError("Invalid PK column");
-  }
+  ASSERT_RET(schema.keys().size() == 1, InvalidArgument, "Invalid PK column");
   size_t pk_index = schema.keys().front();
   const std::string &pk_col = stmt.GetColumns().at(pk_index).column_name();
 

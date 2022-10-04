@@ -10,8 +10,8 @@
 #include "pelton/shards/sqlengine/gdpr.h"
 */
 #include "pelton/shards/sqlengine/index.h"
-/*
 #include "pelton/shards/sqlengine/insert.h"
+/*
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/update.h"
 */
@@ -28,7 +28,7 @@ namespace sqlengine {
 
 absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
                                      Connection *connection) {
-  dataflow::DataFlowState &dataflow_state = connection->state->DataflowState();
+  dataflow::DataFlowState &dstate = connection->state->DataflowState();
 
   // Parse with ANTLR into our AST.
   sqlast::SQLParser parser;
@@ -49,31 +49,34 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       return create::Shard(*stmt, connection, &lock);
     }
 
-    /*
     // Case 2: Insert statement.
     case sqlast::AbstractStatement::Type::INSERT: {
       auto *stmt = static_cast<sqlast::Insert *>(statement.get());
-      SharedLock lock = connection->state->sharder_state()->ReaderLock();
-      return insert::Shard(*stmt, connection, &lock, true);
+      util::SharedLock lock = connection->state->ReaderLock();
+      return insert::Shard(*stmt, connection, &lock);
     }
 
+    /*
     // Case 3: Update statement.
     case sqlast::AbstractStatement::Type::UPDATE: {
       auto *stmt = static_cast<sqlast::Update *>(statement.get());
       return update::Shard(*stmt, connection, true);
     }
+    */
 
     // Case 4: Select statement.
     // Might be a select from a matview or a table.
     case sqlast::AbstractStatement::Type::SELECT: {
       auto *stmt = static_cast<sqlast::Select *>(statement.get());
-      if (dataflow_state->HasFlow(stmt->table_name())) {
-        return view::SelectView(*stmt, connection);
+      util::SharedLock lock = connection->state->ReaderLock();
+      if (dstate.HasFlow(stmt->table_name())) {
+        return view::SelectView(*stmt, connection, &lock);
       } else {
-        return select::Shard(*stmt, connection, true);
+        // return select::Shard(*stmt, connection, true);
       }
     }
 
+    /*
     // Case 5: Delete statement.
     case sqlast::AbstractStatement::Type::DELETE: {
       auto *stmt = static_cast<sqlast::Delete *>(statement.get());

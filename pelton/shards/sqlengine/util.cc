@@ -18,13 +18,6 @@ bool IsADataSubject(const sqlast::CreateTable &stmt) {
   return false;
 }
 
-std::string Dequote(const std::string &st) {
-  std::string s(st);
-  s.erase(std::remove(s.begin(), s.end(), '\"'), s.end());
-  s.erase(std::remove(s.begin(), s.end(), '\''), s.end());
-  return s;
-}
-
 bool IsOwner(const sqlast::ColumnDefinition &col) {
   return absl::StartsWith(col.column_name(), "OWNER_");
 }
