@@ -330,9 +330,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
 
   // All errors are handled by this point.
   // This struct will hold all sharding info about the table being created.
-  Table table;
-  table.table_name = table_name;
-  table.schema = schema;
+  Table table{table_name, schema, stmt};
 
   /* Check to see if this table is a data subject. */
   if (IsADataSubject(stmt)) {
@@ -379,8 +377,9 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
 
   /* Now we create this table and add its information to our state. */
   const Table &table_ref = sstate.AddTable(std::move(table));
+  size_t copies = table_ref.owners.size();
   dstate.AddTableSchema(table_name, schema);
-  sql::SqlResult result = sql::SqlResult(db->ExecuteCreateTable(stmt));
+  sql::SqlResult result(db->ExecuteCreateTable(stmt, copies > 0 ? copies : 1));
   /* End of table creation - now we need to make sure any effects this table
      has on previously created table is handled. */
 
@@ -389,10 +388,15 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
     const sqlast::ColumnDefinition &col = stmt.GetColumns().at(origin_index);
     const sqlast::ColumnConstraint &fk = col.GetForeignKeyConstraint();
     const std::string &target_table = fk.foreign_table();
+    const Table &target_table_ref = sstate.GetTable(target_table);
     // Every way of owning this table becomes a way of owning the target table.
     auto v = MakeReverseDescriptors(true, true, table_ref, col, origin_index,
                                     connection, lock);
+    if (!db->ExecuteCreateTable(target_table_ref.create_stmt, v.size())) {
+      return absl::InternalError("Cannot create copies of " + target_table);
+    }
     CHECK_STATUS(sstate.AddTableOwner(target_table, std::move(v)));
+
     // Every way of accessing this table becomes a way of accessing target.
     v = MakeReverseDescriptors(false, false, table_ref, col, origin_index,
                                connection, lock);

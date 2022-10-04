@@ -125,6 +125,7 @@ struct ShardDescriptor {
 struct Table {
   TableName table_name;
   dataflow::SchemaRef schema;
+  sqlast::CreateTable create_stmt;
   // owners.size() > 0 <=> sharded table.
   std::vector<std::unique_ptr<ShardDescriptor>> owners;
   std::vector<std::unique_ptr<ShardDescriptor>> accessors;

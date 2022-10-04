@@ -8,6 +8,8 @@
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 
+#define DEFAULT_SHARD "__default"
+
 namespace pelton {
 namespace sql {
 
@@ -21,13 +23,14 @@ class AbstractConnection {
   virtual void Close() = 0;
 
   // Statements.
-  virtual bool ExecuteCreateTable(const sqlast::CreateTable &sql) = 0;
+  virtual bool ExecuteCreateTable(const sqlast::CreateTable &sql,
+                                  size_t copies) = 0;
+
   virtual bool ExecuteCreateIndex(const sqlast::CreateIndex &sql) = 0;
 
   // Insert.
   virtual int ExecuteInsert(const sqlast::Insert &sql,
-                            const std::string &shard_name,
-                            bool check_unique = false) = 0;
+                            const std::string &shard_name, size_t copy) = 0;
 
   // Delete.
   virtual SqlResultSet ExecuteDelete(const sqlast::Delete &sql) = 0;
@@ -36,6 +39,11 @@ class AbstractConnection {
   virtual SqlResultSet ExecuteSelect(const sqlast::Select &sql) const = 0;
   virtual SqlResultSet GetShard(const std::string &table_name,
                                 const std::string &shard_name) const = 0;
+
+  // Everything in a table.
+  virtual SqlResultSet GetAll(const std::string &table_name) const = 0;
+  virtual SqlResultSet GetAll(const std::string &table_name,
+                              size_t copy) const = 0;
 };
 
 }  // namespace sql

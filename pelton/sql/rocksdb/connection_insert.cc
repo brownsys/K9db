@@ -19,19 +19,17 @@ namespace sql {
 
 int RocksdbConnection::ExecuteInsert(const sqlast::Insert &stmt,
                                      const std::string &shard_name,
-                                     bool check_unique) {
+                                     size_t copy) {
   // Read table metadata.
   const std::string &table_name = stmt.table_name();
-  RocksdbTable &table = this->tables_.at(table_name);
+  RocksdbTable &table = this->tables_.at(table_name).at(copy);
   const dataflow::SchemaRef &schema = table.Schema();
 
   // Encode row.
   RocksdbRecord record = RocksdbRecord::FromInsert(stmt, schema, shard_name);
 
   // Ensure PK is unique.
-  if (check_unique) {
-    CHECK(!table.Exists(record.GetPK())) << "Integrity error: PK exists";
-  }
+  CHECK(!table.Exists(record.GetPK())) << "Integrity error: PK exists";
 
   // Update indices.
   table.IndexAdd(shard_name, record.Value());

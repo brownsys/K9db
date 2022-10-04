@@ -99,7 +99,7 @@ void CreateTable() {
   tbl.AddColumn("age", sqlast::ColumnDefinition("age", CType::INT));
   tbl.MutableColumn("ID").AddConstraint(
       sqlast::ColumnConstraint(Constraint::PRIMARY_KEY));
-  EXPECT_TRUE(CONN->ExecuteCreateTable(tbl));
+  EXPECT_TRUE(CONN->ExecuteCreateTable(tbl, 2));
 }
 
 void CreateNameIndex() {
@@ -112,16 +112,19 @@ void InsertData() {
   // Insert into table.
   sqlast::Insert insert("test_table", false);
   insert.SetValues({"0", "'user1'", "20"});
-  EXPECT_EQ(CONN->ExecuteInsert(insert, "user1"), 1);
+  EXPECT_EQ(CONN->ExecuteInsert(insert, "user1", 0), 1);
 
   insert.SetValues({"1", "'user2'", "25"});
-  EXPECT_EQ(CONN->ExecuteInsert(insert, "user2"), 1);
+  EXPECT_EQ(CONN->ExecuteInsert(insert, "user2", 1), 1);
 
   insert.SetValues({"2", "'user3'", "30"});
-  EXPECT_EQ(CONN->ExecuteInsert(insert, "user3"), 1);
+  EXPECT_EQ(CONN->ExecuteInsert(insert, "user3", 0), 1);
 
   insert.SetValues({"3", "'user3'", "35"});
-  EXPECT_EQ(CONN->ExecuteInsert(insert, "user3"), 1);
+  EXPECT_EQ(CONN->ExecuteInsert(insert, "user3", 0), 1);
+
+  insert.SetValues({"3", "'user3'", "35"});
+  EXPECT_EQ(CONN->ExecuteInsert(insert, "user3", 1), 1);
 }
 
 void CleanUpDatabase() { CONN = nullptr; }

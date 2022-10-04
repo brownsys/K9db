@@ -29,12 +29,13 @@ class RocksdbConnection : public AbstractConnection {
   void Close() override;
 
   // Statements.
-  bool ExecuteCreateTable(const sqlast::CreateTable &sql) override;
+  bool ExecuteCreateTable(const sqlast::CreateTable &sql,
+                          size_t copies) override;
   bool ExecuteCreateIndex(const sqlast::CreateIndex &sql) override;
 
   // Insert.
   int ExecuteInsert(const sqlast::Insert &sql, const std::string &shard_name,
-                    bool check_unique = false) override;
+                    size_t copy) override;
 
   // Delete.
   SqlResultSet ExecuteDelete(const sqlast::Delete &sql) override;
@@ -44,9 +45,14 @@ class RocksdbConnection : public AbstractConnection {
   SqlResultSet GetShard(const std::string &table_name,
                         const std::string &shard_name) const override;
 
+  // Everything in a table.
+  SqlResultSet GetAll(const std::string &table_name) const override;
+  SqlResultSet GetAll(const std::string &table_name,
+                      size_t copy) const override;
+
  private:
   std::unique_ptr<rocksdb::DB> db_;
-  std::unordered_map<std::string, RocksdbTable> tables_;
+  std::unordered_map<std::string, std::vector<RocksdbTable>> tables_;
   EncryptionManager encryption_manager_;
 
   // Get records matching where condition.
