@@ -89,8 +89,8 @@ const std::string &Insert::GetValue(size_t index) const {
   return this->values_.at(index);
 }
 
-const std::string &Insert::GetByColumnOrIndex(const std::string &colname,
-                                              size_t index) const {
+const std::string &Insert::GetValue(const std::string &colname,
+                                    size_t index) const {
   if (this->HasColumns()) {
     return this->GetValue(this->GetColumnIndex(colname));
   } else {

@@ -16,30 +16,51 @@ const Table &SharderState::AddTable(Table &&table) {
   for (const auto &descriptor : table.owners) {
     Shard &shard = this->shards_.at(descriptor->shard_kind);
     shard.owned_tables.insert(table.table_name);
-    if (descriptor->type == InfoType::DIRECT) {
-      if (descriptor->shard_kind != table.table_name) {
-        this->dependencies_.at(descriptor->shard_kind) = true;
+    Table *parent = nullptr;
+    switch (descriptor->type) {
+      case InfoType::DIRECT: {
+        if (descriptor->shard_kind != table.table_name) {
+          parent = &this->tables_.at(descriptor->shard_kind);
+        }
+        break;
+      }
+      case InfoType::TRANSITIVE: {
+        const TransitiveInfo &info = std::get<TransitiveInfo>(descriptor->info);
+        parent = &this->tables_.at(info.next_table);
+        break;
+      }
+      case InfoType::VARIABLE: {
+        const VariableInfo &info = std::get<VariableInfo>(descriptor->info);
+        parent = &this->tables_.at(info.origin_relation);
+        break;
       }
     }
-    if (descriptor->type == InfoType::TRANSITIVE) {
-      auto &next_table = std::get<TransitiveInfo>(descriptor->info).next_table;
-      this->dependencies_.at(next_table) = true;
+    if (parent != nullptr) {
+      parent->dependents.emplace_back(table.table_name, descriptor.get());
     }
   }
   for (const auto &descriptor : table.accessors) {
     Shard &shard = this->shards_.at(descriptor->shard_kind);
     shard.accessor_tables.insert(table.table_name);
-    if (descriptor->type == InfoType::DIRECT) {
-      if (descriptor->shard_kind != table.table_name) {
-        this->dependencies_.at(descriptor->shard_kind) = true;
+    Table *parent = nullptr;
+    switch (descriptor->type) {
+      case InfoType::DIRECT: {
+        parent = &this->tables_.at(descriptor->shard_kind);
+        break;
+      }
+      case InfoType::TRANSITIVE: {
+        const TransitiveInfo &info = std::get<TransitiveInfo>(descriptor->info);
+        parent = &this->tables_.at(info.next_table);
+        break;
+      }
+      case InfoType::VARIABLE: {
+        const VariableInfo &info = std::get<VariableInfo>(descriptor->info);
+        parent = &this->tables_.at(info.origin_relation);
+        break;
       }
     }
-    if (descriptor->type == InfoType::TRANSITIVE) {
-      auto &next_table = std::get<TransitiveInfo>(descriptor->info).next_table;
-      this->dependencies_.at(next_table) = true;
-    }
+    parent->access_dependents.emplace_back(table.table_name, descriptor.get());
   }
-  this->dependencies_.emplace(table.table_name, false);
   auto pair = this->tables_.emplace(table.table_name, std::move(table));
   return pair.first->second;
 }
@@ -50,13 +71,13 @@ const Table &SharderState::AddTable(Table &&table) {
 absl::Status SharderState::AddTableOwner(
     const TableName &table_name,
     std::vector<std::unique_ptr<ShardDescriptor>> &&owner) {
-  if (this->dependencies_.at(table_name)) {
+  Table &tbl = this->tables_.at(table_name);
+  if (tbl.dependents.size() > 0 || tbl.access_dependents.size() > 0) {
     return absl::InvalidArgumentError("OWNS into table with dependencies");
   }
   for (std::unique_ptr<ShardDescriptor> &desc : owner) {
     Shard &shard = this->shards_.at(desc->shard_kind);
     shard.owned_tables.insert(table_name);
-    Table &tbl = this->tables_.at(table_name);
     tbl.owners.push_back(std::move(desc));
   }
   return absl::OkStatus();
@@ -64,13 +85,13 @@ absl::Status SharderState::AddTableOwner(
 absl::Status SharderState::AddTableAccessor(
     const TableName &table_name,
     std::vector<std::unique_ptr<ShardDescriptor>> &&access) {
-  if (this->dependencies_.at(table_name)) {
+  Table &tbl = this->tables_.at(table_name);
+  if (tbl.dependents.size() > 0 || tbl.access_dependents.size() > 0) {
     return absl::InvalidArgumentError("ACCESSES into table with dependencies");
   }
   for (std::unique_ptr<ShardDescriptor> &desc : access) {
     Shard &shard = this->shards_.at(desc->shard_kind);
     shard.accessor_tables.insert(table_name);
-    Table &tbl = this->tables_.at(table_name);
     tbl.accessors.push_back(std::move(desc));
   }
   return absl::OkStatus();

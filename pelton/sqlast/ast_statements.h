@@ -53,8 +53,7 @@ class Insert : public AbstractStatement {
   const std::string &GetValue(size_t index) const;
 
   // Get by index or by column name, if stmt HasColumns.
-  const std::string &GetByColumnOrIndex(const std::string &colname,
-                                        size_t index) const;
+  const std::string &GetValue(const std::string &colname, size_t index) const;
 
   // Visitor pattern.
   template <class T>

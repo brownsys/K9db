@@ -94,11 +94,6 @@ class SharderState {
   // All the tables defined by the schema.
   std::unordered_map<TableName, Table> tables_;
 
-  // Mark whether we encountered tables that depend on each given table or not.
-  // Checking this, we can guarantee that all OWNS into a table are created
-  // before any OWNED BY / ACCESSED BY annotations refer to it.
-  std::unordered_map<TableName, bool> dependencies_;
-
   // Counts of users currently in the system.
   std::unordered_map<ShardKind, std::atomic<uint64_t>> users_;
   std::atomic<uint64_t> index_count_;

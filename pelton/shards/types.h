@@ -8,6 +8,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 // NOLINTNEXTLINE
 #include <variant>
 #include <vector>
@@ -132,6 +133,10 @@ struct Table {
   // owners.size() > 0 <=> sharded table.
   std::vector<std::unique_ptr<ShardDescriptor>> owners;
   std::vector<std::unique_ptr<ShardDescriptor>> accessors;
+  // Dependent tables: the placement of rows in these tables depend
+  // on rows in this table (e.g. owned by a transitive FK into this table).
+  std::vector<std::pair<TableName, ShardDescriptor *>> dependents;
+  std::vector<std::pair<TableName, ShardDescriptor *>> access_dependents;
 };
 
 // Metadata about a shard.

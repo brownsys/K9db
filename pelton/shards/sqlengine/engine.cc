@@ -53,7 +53,8 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
     case sqlast::AbstractStatement::Type::INSERT: {
       auto *stmt = static_cast<sqlast::Insert *>(statement.get());
       util::SharedLock lock = connection->state->ReaderLock();
-      return insert::Shard(*stmt, connection, &lock);
+      InsertContext context(*stmt, connection, &lock);
+      return context.Shard();
     }
 
     /*
