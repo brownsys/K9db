@@ -46,7 +46,8 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
     case sqlast::AbstractStatement::Type::CREATE_TABLE: {
       auto *stmt = static_cast<sqlast::CreateTable *>(statement.get());
       util::UniqueLock lock = connection->state->WriterLock();
-      return create::Shard(*stmt, connection, &lock);
+      CreateContext context(*stmt, connection, &lock);
+      return context.Exec();
     }
 
     // Case 2: Insert statement.
@@ -54,7 +55,7 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       auto *stmt = static_cast<sqlast::Insert *>(statement.get());
       util::SharedLock lock = connection->state->ReaderLock();
       InsertContext context(*stmt, connection, &lock);
-      return context.Shard();
+      return context.Exec();
     }
 
     /*

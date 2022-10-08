@@ -125,7 +125,7 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
 /*
  * Main entry point for insert: Executes the statement against the shards.
  */
-absl::StatusOr<sql::SqlResult> InsertContext::Shard() {
+absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
   // Make sure table exists in the schema first.
   ASSERT_RET(this->sstate_.TableExists(this->table_name_), InvalidArgument,
              "Table does not exist");

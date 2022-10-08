@@ -2,55 +2,40 @@
 #include "pelton/shards/sqlengine/create.h"
 
 #include <iterator>
-#include <memory>
 #include <optional>
-#include <string>
 #include <utility>
-#include <vector>
 
 #include "glog/logging.h"
-#include "pelton/dataflow/schema.h"
-#include "pelton/dataflow/state.h"
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/util.h"
-#include "pelton/shards/state.h"
-#include "pelton/shards/types.h"
-#include "pelton/sql/abstract_connection.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
 namespace shards {
 namespace sqlengine {
-namespace create {
 
-namespace {
+// Helper macro for appending src vector at the end of dst vector by move.
+#define APPEND_MOVE(dst, src)                                 \
+  dst.insert(dst.end(), std::make_move_iterator(src.begin()), \
+             std::make_move_iterator(src.end()))
 
-#define M(it) std::make_move_iterator(it)
-
-struct Annotations {
-  std::vector<size_t> accessors;
-  std::vector<size_t> explicit_owners;
-  std::vector<size_t> implicit_owners;
-  std::vector<size_t> owns;
-  std::vector<size_t> accesses;
-};
-
-absl::StatusOr<Annotations> Discover(const sqlast::CreateTable &stmt,
-                                     Connection *connection) {
-  SharderState &sstate = connection->state->SharderState();
+/*
+ * Helpers for finding annotations in the create table statement.
+ */
+absl::StatusOr<CreateContext::Annotations> CreateContext::DiscoverValidate() {
   // Make sure owners are not ambigious.
-  Annotations annotations;
-  for (size_t i = 0; i < stmt.GetColumns().size(); i++) {
-    const sqlast::ColumnDefinition &col = stmt.GetColumns().at(i);
+  CreateContext::Annotations annotations;
+  for (size_t i = 0; i < this->stmt_.GetColumns().size(); i++) {
+    const sqlast::ColumnDefinition &col = this->stmt_.GetColumns().at(i);
     if (!col.HasConstraint(sqlast::ColumnConstraint::Type::FOREIGN_KEY)) {
       continue;
     }
 
     // Make sure all FK point to existing tables.
     const sqlast::ColumnConstraint &fk = col.GetForeignKeyConstraint();
-    ASSERT_RET(sstate.TableExists(fk.foreign_table()), InvalidArgument,
+    ASSERT_RET(this->sstate_.TableExists(fk.foreign_table()), InvalidArgument,
                "FK points to nonexisting table");
-    const Table &target = sstate.GetTable(fk.foreign_table());
+    const Table &target = this->sstate_.GetTable(fk.foreign_table());
     ASSERT_RET(target.schema.HasColumn(fk.foreign_column()), InvalidArgument,
                "FK points to nonexisting column");
 
@@ -59,8 +44,8 @@ absl::StatusOr<Annotations> Discover(const sqlast::CreateTable &stmt,
     bool points_to_pk = target.schema.keys().at(0) == index;
 
     // Handle various annotations.
-    bool foreign_owned = sstate.IsOwned(fk.foreign_table());
-    bool foreign_accessed = sstate.IsAccessed(fk.foreign_table());
+    bool foreign_owned = this->sstate_.IsOwned(fk.foreign_table());
+    bool foreign_accessed = this->sstate_.IsAccessed(fk.foreign_table());
     if (IsOwner(col)) {
       ASSERT_RET(foreign_owned, InvalidArgument, "OWNER to a non data subject");
       ASSERT_RET(points_to_pk, InvalidArgument, "OWNER doesn't point to PK");
@@ -92,13 +77,15 @@ absl::StatusOr<Annotations> Discover(const sqlast::CreateTable &stmt,
   return std::move(annotations);
 }
 
-absl::StatusOr<IndexDescriptor> MakeIndex(const std::string &indexed_table,
-                                          const std::string &indexed_column,
-                                          const ShardDescriptor &next,
-                                          Connection *connection,
-                                          util::UniqueLock *lock) {
+/*
+ * Helpers for creating indices for transitive and variable ownership.
+ */
+
+absl::StatusOr<IndexDescriptor> CreateContext::MakeIndex(
+    const std::string &indexed_table, const std::string &indexed_column,
+    const ShardDescriptor &next) {
   // Create a new unique name for the index.
-  uint64_t idx = connection->state->SharderState().IncrementIndexCount();
+  uint64_t idx = this->sstate_.IncrementIndexCount();
   std::string index_name = "_index_" + std::to_string(idx);
   // Check the sharding type of next.
   switch (next.type) {
@@ -108,7 +95,7 @@ absl::StatusOr<IndexDescriptor> MakeIndex(const std::string &indexed_table,
       IndexDescriptor descriptor = {index_name, indexed_table, indexed_column,
                                     IndexType::SIMPLE, info};
       MOVE_OR_RETURN(sql::SqlResult result,
-                     index::CreateIndex(descriptor, connection, lock));
+                     index::CreateIndex(descriptor, this->conn_, this->lock_));
       ASSERT_RET(result.Success(), Internal, "Error D index");
       return descriptor;
     }
@@ -121,7 +108,7 @@ absl::StatusOr<IndexDescriptor> MakeIndex(const std::string &indexed_table,
       IndexDescriptor descriptor = {index_name, indexed_table, indexed_column,
                                     IndexType::JOINED, info};
       MOVE_OR_RETURN(sql::SqlResult result,
-                     index::CreateIndex(descriptor, connection, lock));
+                     index::CreateIndex(descriptor, this->conn_, this->lock_));
       ASSERT_RET(result.Success(), Internal, "Error T index");
       return descriptor;
     }
@@ -136,12 +123,11 @@ absl::StatusOr<IndexDescriptor> MakeIndex(const std::string &indexed_table,
 // origin = the many-2-many table pointing towards the table under consideration
 // with an OWNS fk.
 // indexed_table is the name of that table, indexed_column is the OWNS fk.
-absl::StatusOr<IndexDescriptor> MakeVariableIndex(
+absl::StatusOr<IndexDescriptor> CreateContext::MakeVariableIndex(
     const std::string &indexed_table, const std::string &indexed_column,
-    const ShardDescriptor &origin, Connection *connection,
-    util::UniqueLock *lock) {
+    const ShardDescriptor &origin) {
   // Create a new unique name for the index.
-  uint64_t idx = connection->state->SharderState().IncrementIndexCount();
+  uint64_t idx = this->sstate_.IncrementIndexCount();
   std::string index_name = "_index_" + std::to_string(idx);
   // Check the sharding type of next.
   switch (origin.type) {
@@ -151,7 +137,7 @@ absl::StatusOr<IndexDescriptor> MakeVariableIndex(
       IndexDescriptor descriptor = {index_name, indexed_table, indexed_column,
                                     IndexType::SIMPLE, info};
       MOVE_OR_RETURN(sql::SqlResult result,
-                     index::CreateIndex(descriptor, connection, lock));
+                     index::CreateIndex(descriptor, this->conn_, this->lock_));
       ASSERT_RET(result.Success(), Internal, "Error VD index");
       return descriptor;
     }
@@ -164,7 +150,7 @@ absl::StatusOr<IndexDescriptor> MakeVariableIndex(
       IndexDescriptor descriptor = {index_name, indexed_table, indexed_column,
                                     IndexType::JOINED, info};
       MOVE_OR_RETURN(sql::SqlResult result,
-                     index::CreateIndex(descriptor, connection, lock));
+                     index::CreateIndex(descriptor, this->conn_, this->lock_));
       ASSERT_RET(result.Success(), Internal, "Error VT index");
       return descriptor;
     }
@@ -178,7 +164,7 @@ absl::StatusOr<IndexDescriptor> MakeVariableIndex(
       IndexDescriptor descriptor = {index_name, indexed_table, indexed_column,
                                     IndexType::JOINED, info};
       MOVE_OR_RETURN(sql::SqlResult result,
-                     index::CreateIndex(descriptor, connection, lock));
+                     index::CreateIndex(descriptor, this->conn_, this->lock_));
       ASSERT_RET(result.Success(), Internal, "Error VV index");
       return descriptor;
     }
@@ -186,20 +172,21 @@ absl::StatusOr<IndexDescriptor> MakeVariableIndex(
   return absl::InternalError("Unreachable code in MakeIndex()!");
 }
 
+/*
+ * Helpers for creating ShardingDescriptor for ownership or accessorships.
+ */
+
 // Create a shard descriptor for this table corresponding to each shard
 // descriptor that current exists for the given foreign table.
-std::vector<std::unique_ptr<ShardDescriptor>> MakeDescriptors(
+std::vector<std::unique_ptr<ShardDescriptor>> CreateContext::MakeFDescriptors(
     bool owners, bool create_indices, const sqlast::ColumnDefinition &fk_col,
-    size_t fk_column_index, sqlast::ColumnDefinition::Type fk_column_type,
-    Connection *connection, util::UniqueLock *lock) {
-  SharderState &sstate = connection->state->SharderState();
-
+    size_t fk_column_index, sqlast::ColumnDefinition::Type fk_column_type) {
   // Identify foreign table and column.
   const std::string &fk_colname = fk_col.column_name();
   const sqlast::ColumnConstraint &fk = fk_col.GetForeignKeyConstraint();
   const std::string &next_table = fk.foreign_table();
   const std::string &next_col = fk.foreign_column();
-  const Table &tbl = sstate.GetTable(next_table);
+  const Table &tbl = this->sstate_.GetTable(next_table);
   size_t next_col_index = tbl.schema.IndexOf(next_col);
   const std::vector<std::unique_ptr<ShardDescriptor>> &vec =
       owners ? tbl.owners : tbl.accessors;
@@ -217,8 +204,7 @@ std::vector<std::unique_ptr<ShardDescriptor>> MakeDescriptors(
       descriptor.type = InfoType::TRANSITIVE;
       std::optional<IndexDescriptor> idx;
       if (create_indices) {
-        MOVE_OR_PANIC(idx,
-                      MakeIndex(next_table, next_col, *next, connection, lock));
+        MOVE_OR_PANIC(idx, this->MakeIndex(next_table, next_col, *next));
       }
       descriptor.info = TransitiveInfo{
           fk_colname, fk_column_index, fk_column_type, next.get(),
@@ -231,15 +217,12 @@ std::vector<std::unique_ptr<ShardDescriptor>> MakeDescriptors(
 
 // Similar to MakeDescriptors but for opposite direction annotations,
 // i.e. OWNS and ACCESSES.
-std::vector<std::unique_ptr<ShardDescriptor>> MakeReverseDescriptors(
+std::vector<std::unique_ptr<ShardDescriptor>> CreateContext::MakeBDescriptors(
     bool owners, bool create_indices, const Table &origin,
-    const sqlast::ColumnDefinition &origin_col, size_t origin_index,
-    Connection *connection, util::UniqueLock *lock) {
-  SharderState &sstate = connection->state->SharderState();
-
+    const sqlast::ColumnDefinition &origin_col, size_t origin_index) {
   // Find column information about the origin table.
-  const std::string &origin_table_name = origin.table_name;
-  const std::string &origin_column_name = origin_col.column_name();
+  const std::string &origin_table = origin.table_name;
+  const std::string &origin_col = origin_col.column_name();
   sqlast::ColumnDefinition::Type type = origin.schema.TypeOf(origin_index);
   const std::vector<std::unique_ptr<ShardDescriptor>> &vec =
       owners ? origin.owners : origin.accessors;
@@ -248,70 +231,63 @@ std::vector<std::unique_ptr<ShardDescriptor>> MakeReverseDescriptors(
   const sqlast::ColumnConstraint &fk = origin_col.GetForeignKeyConstraint();
   const std::string &target_table_name = fk.foreign_table();
   const std::string &target_column_name = fk.foreign_column();
-  const Table &target = sstate.GetTable(target_table_name);
+  const Table &target = this->sstate_.GetTable(target_table_name);
   size_t target_column_index = target.schema.IndexOf(target_column_name);
 
   // Loop over origin table descriptors and transform them into descriptors
   // for target foreign table.
   std::vector<std::unique_ptr<ShardDescriptor>> result;
-  for (const std::unique_ptr<ShardDescriptor> &descriptor : vec) {
+  for (const std::unique_ptr<ShardDescriptor> &desc : vec) {
     ShardDescriptor next;
-    next.shard_kind = descriptor->shard_kind;
+    next.shard_kind = desc->shard_kind;
     next.type = InfoType::VARIABLE;
     std::optional<IndexDescriptor> index;
     if (create_indices) {
-      MOVE_OR_PANIC(index,
-                    MakeVariableIndex(origin_table_name, origin_column_name,
-                                      *descriptor, connection, lock));
+      MOVE_OR_PANIC(index, this->MakeVIndex(origin_table, origin_col, *desc));
     }
     next.info = VariableInfo{
-        target_column_name, target_column_index, type,         descriptor.get(),
-        origin_table_name,  origin_column_name,  origin_index, index};
+        target_column_name, target_column_index, type,         desc.get(),
+        origin_table,       origin_col,          origin_index, index};
     result.push_back(std::make_unique<ShardDescriptor>(next));
   }
   return result;
 }
 
-}  // namespace
+/*
+ * Handling create: Resolves sharding and creates the physical table.
+ */
 
 // Determine the ways the table is sharded.
-absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
-                                     Connection *connection,
-                                     util::UniqueLock *lock) {
-  SharderState &sstate = connection->state->SharderState();
-  dataflow::DataFlowState &dstate = connection->state->DataflowState();
-  sql::AbstractConnection *db = connection->state->Database();
-
+absl::StatusOr<sql::SqlResult> CreateContext::Exec() {
   // Make sure table does not exist.
-  const std::string &table_name = stmt.table_name();
-  ASSERT_RET(!sstate.TableExists(table_name), InvalidArgument, "Table exists!");
+  ASSERT_RET(!this->sstate_.TableExists(this->table_name_), InvalidArgument,
+             "Table exists!");
 
   // Get the schema of this table.
-  dataflow::SchemaRef schema = dataflow::SchemaFactory::Create(stmt);
+  this->schema_ = dataflow::SchemaFactory::Create(this->stmt_);
+  this->table_.schema = this->schema_;
 
   // Make sure PK is valid.
-  ASSERT_RET(schema.keys().size() == 1, InvalidArgument, "Invalid PK column");
-  size_t pk_index = schema.keys().front();
-  const std::string &pk_col = stmt.GetColumns().at(pk_index).column_name();
+  ASSERT_RET(this->schema_.keys().size() == 1, InvalidArgument, "Invalid PK");
+  size_t pk_index = this->schema_.keys().front();
+  const std::string &pk_col =
+      this->stmt_.GetColumns().at(pk_index).column_name();
 
   // Discover annotations and handle any errors.
-  MOVE_OR_RETURN(Annotations annotations, Discover(stmt, connection));
+  MOVE_OR_RETURN(Annotations annotations, this->DiscoverValidate());
 
   // All errors are handled by this point.
-  // This struct will hold all sharding info about the table being created.
-  Table table{table_name, schema, stmt};
-
   /* Check to see if this table is a data subject. */
-  if (IsADataSubject(stmt)) {
+  if (IsADataSubject(this->stmt_)) {
     // We have a new shard kind.
-    sstate.AddShardKind(table_name, pk_col, pk_index);
+    this->sstate_.AddShardKind(this->table_name_, pk_col, pk_index);
 
     // This table is also sharded by itself.
-    ShardDescriptor descriptor;
-    descriptor.shard_kind = table_name;
-    descriptor.type = InfoType::DIRECT;
-    descriptor.info = DirectInfo{pk_col, pk_index, schema.TypeOf(pk_index)};
-    table.owners.push_back(std::make_unique<ShardDescriptor>(descriptor));
+    ShardDescriptor desc;
+    desc.shard_kind = this->table_name_;
+    desc.type = InfoType::DIRECT;
+    desc.info = DirectInfo{pk_col, pk_index, this->schema_.TypeOf(pk_index)};
+    this->table_.owners.push_back(std::make_unique<ShardDescriptor>(desc));
   }
   /* End of data subject. */
 
@@ -319,75 +295,70 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::CreateTable &stmt,
   std::vector<size_t> &eowners = annotations.explicit_owners;
   std::vector<size_t> &iowners = annotations.implicit_owners;
   for (size_t idx : eowners.size() > 0 ? eowners : iowners) {
-    const sqlast::ColumnDefinition &col = stmt.GetColumns().at(idx);
-    sqlast::ColumnDefinition::Type fk_ctype = schema.TypeOf(idx);
+    const sqlast::ColumnDefinition &col = this->stmt_.GetColumns().at(idx);
+    sqlast::ColumnDefinition::Type fk_ctype = this->schema_.TypeOf(idx);
     // Transform foreign table descriptors to descriptors of this table.
-    auto v = MakeDescriptors(true, true, col, idx, fk_ctype, connection, lock);
-    table.owners.insert(table.owners.end(), M(v.begin()), M(v.end()));
+    auto v = this->MakeFDescriptors(true, true, col, idx, fk_ctype);
+    APPEND_MOVE(this->table_.owners, v);
     // Access lattice: if U accesses table A, and our table B is owned by A,
     // then U accesses B.
-    v = MakeDescriptors(false, false, col, idx, fk_ctype, connection, lock);
-    table.accessors.insert(table.accessors.end(), M(v.begin()), M(v.end()));
+    v = this->MakeFDescriptors(false, false, col, idx, fk_ctype);
+    APPEND_MOVE(this->table_.accessors, v);
   }
   /* End of direct and transitive OWNERS. */
 
   /* Check to see if this table has direct or transitive ACCESSORS. */
   for (size_t idx : annotations.accessors) {
-    const sqlast::ColumnDefinition &col = stmt.GetColumns().at(idx);
-    sqlast::ColumnDefinition::Type fk_ctype = schema.TypeOf(idx);
+    const sqlast::ColumnDefinition &col = this->stmt_.GetColumns().at(idx);
+    sqlast::ColumnDefinition::Type fk_ctype = this->schema_.TypeOf(idx);
     // Transform foreign accessor descriptors to descriptors of this table.
     // Both owners and accessors of foreign table get access of this table.
-    auto v = MakeDescriptors(true, false, col, idx, fk_ctype, connection, lock);
-    table.accessors.insert(table.accessors.end(), M(v.begin()), M(v.end()));
-    v = MakeDescriptors(false, false, col, idx, fk_ctype, connection, lock);
-    table.accessors.insert(table.accessors.end(), M(v.begin()), M(v.end()));
+    auto v = this->MakeFDescriptors(true, false, col, idx, fk_ctype);
+    APPEND_MOVE(this->table_.accessors, v);
+    v = this->MakeFDescriptors(false, false, col, idx, fk_ctype);
+    APPEND_MOVE(this->table_.accessors, v);
   }
   /* End of direct and transitive ACCESSORS. */
 
   /* Now we create this table and add its information to our state. */
-  const Table &table_ref = sstate.AddTable(std::move(table));
-  dstate.AddTableSchema(table_name, schema);
-  sql::SqlResult result(db->ExecuteCreateTable(stmt));
+  const Table &table_ref = this->sstate_.AddTable(std::move(this->table_));
+  this->dstate_.AddTableSchema(this->table_name_, this->schema_);
+  sql::SqlResult result(this->db_->ExecuteCreateTable(this->stmt_));
   /* End of table creation - now we need to make sure any effects this table
      has on previously created table is handled. */
 
   /* Look for OWNS annotations: target table becomes owned by this table! */
-  for (size_t origin_index : annotations.owns) {
-    const sqlast::ColumnDefinition &col = stmt.GetColumns().at(origin_index);
+  for (size_t idx : annotations.owns) {
+    const sqlast::ColumnDefinition &col = this->stmt_.GetColumns().at(idx);
     const sqlast::ColumnConstraint &fk = col.GetForeignKeyConstraint();
     const std::string &target_table = fk.foreign_table();
     // Every way of owning this table becomes a way of owning the target table.
-    auto v = MakeReverseDescriptors(true, true, table_ref, col, origin_index,
-                                    connection, lock);
-    CHECK_STATUS(sstate.AddTableOwner(target_table, std::move(v)));
+    auto v = this->MakeBDescriptors(true, true, table_ref, col, idx);
+    CHECK_STATUS(this->sstate_.AddTableOwner(target_table, std::move(v)));
 
     // Every way of accessing this table becomes a way of accessing target.
-    v = MakeReverseDescriptors(false, false, table_ref, col, origin_index,
-                               connection, lock);
-    CHECK_STATUS(sstate.AddTableAccessor(target_table, std::move(v)));
+    v = this->MakeBDescriptors(false, false, table_ref, col, idx);
+    CHECK_STATUS(this->sstate_.AddTableAccessor(target_table, std::move(v)));
   }
   /* End of OWNS. */
 
   /* Look for ACCESSES annotations: target becomes accessible by this table! */
-  for (size_t origin_index : annotations.accesses) {
-    const sqlast::ColumnDefinition &col = stmt.GetColumns().at(origin_index);
+  for (size_t idx : annotations.accesses) {
+    const sqlast::ColumnDefinition &col = this->stmt_.GetColumns().at(idx);
     const sqlast::ColumnConstraint &fk = col.GetForeignKeyConstraint();
     const std::string &target_table = fk.foreign_table();
     // Every way of owning this table becomes a way of accessing the target.
-    auto v = MakeReverseDescriptors(true, false, table_ref, col, origin_index,
-                                    connection, lock);
-    CHECK_STATUS(sstate.AddTableAccessor(target_table, std::move(v)));
+    auto v = this->MakeBDescriptors(true, false, table_ref, col, idx);
+    CHECK_STATUS(this->sstate_.AddTableAccessor(target_table, std::move(v)));
     // Every way of accessing this table becomes a way of accessing target.
-    v = MakeReverseDescriptors(false, false, table_ref, col, origin_index,
-                               connection, lock);
-    CHECK_STATUS(sstate.AddTableAccessor(target_table, std::move(v)));
+    v = this->MakeBDescriptors(false, false, table_ref, col, idx);
+    CHECK_STATUS(this->sstate_.AddTableAccessor(target_table, std::move(v)));
   }
   /* End of ACCESSES. */
 
   return result;
 }
 
-}  // namespace create
 }  // namespace sqlengine
 }  // namespace shards
 }  // namespace pelton

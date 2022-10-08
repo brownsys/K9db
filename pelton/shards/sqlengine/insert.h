@@ -35,7 +35,7 @@ class InsertContext {
         lock_(lock) {}
 
   /* Main entry point for insert: Executes the statement against the shards. */
-  absl::StatusOr<sql::SqlResult> Shard();
+  absl::StatusOr<sql::SqlResult> Exec();
 
  private:
   /* Helpers for inserting statement into the database by sharding type. */

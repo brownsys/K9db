@@ -74,7 +74,8 @@ namespace {
 
 void Handle(const sqlast::CreateTable &stmt, Connection *conn) {
   util::UniqueLock lock = conn->state->WriterLock();
-  auto status = create::Shard(stmt, conn, &lock);
+  CreateContext context(stmt, conn, &lock);
+  auto status = context.Exec();
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(status->Success());
 }
