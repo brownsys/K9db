@@ -76,9 +76,19 @@ absl::Status SharderState::AddTableOwner(
     return absl::InvalidArgumentError("OWNS into table with dependencies");
   }
   for (std::unique_ptr<ShardDescriptor> &desc : owner) {
+    if (desc->type != InfoType::VARIABLE) {
+      return absl::InvalidArgumentError("AddTableOwner bad annotation");
+    }
+    // Look up origin table.
+    const VariableInfo &info = std::get<VariableInfo>(desc->info);
+    Table &origin = this->tables_.at(info.origin_relation);
+    // Update shard and this table.
     Shard &shard = this->shards_.at(desc->shard_kind);
     shard.owned_tables.insert(table_name);
     tbl.owners.push_back(std::move(desc));
+    // Update origin table.
+    ShardDescriptor *ptr = tbl.owners.back().get();
+    origin.dependents.emplace_back(table_name, ptr);
   }
   return absl::OkStatus();
 }
@@ -90,9 +100,19 @@ absl::Status SharderState::AddTableAccessor(
     return absl::InvalidArgumentError("ACCESSES into table with dependencies");
   }
   for (std::unique_ptr<ShardDescriptor> &desc : access) {
+    if (desc->type != InfoType::VARIABLE) {
+      return absl::InvalidArgumentError("AddTableAccessor bad annotation");
+    }
+    // Look up origin table.
+    const VariableInfo &info = std::get<VariableInfo>(desc->info);
+    Table &origin = this->tables_.at(info.origin_relation);
+    // Update shard and this table.
     Shard &shard = this->shards_.at(desc->shard_kind);
     shard.accessor_tables.insert(table_name);
     tbl.accessors.push_back(std::move(desc));
+    // Update origin table.
+    ShardDescriptor *ptr = tbl.accessors.back().get();
+    origin.access_dependents.emplace_back(table_name, ptr);
   }
   return absl::OkStatus();
 }

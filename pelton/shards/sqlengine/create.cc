@@ -123,7 +123,7 @@ absl::StatusOr<IndexDescriptor> CreateContext::MakeIndex(
 // origin = the many-2-many table pointing towards the table under consideration
 // with an OWNS fk.
 // indexed_table is the name of that table, indexed_column is the OWNS fk.
-absl::StatusOr<IndexDescriptor> CreateContext::MakeVariableIndex(
+absl::StatusOr<IndexDescriptor> CreateContext::MakeVIndex(
     const std::string &indexed_table, const std::string &indexed_column,
     const ShardDescriptor &origin) {
   // Create a new unique name for the index.
@@ -222,7 +222,7 @@ std::vector<std::unique_ptr<ShardDescriptor>> CreateContext::MakeBDescriptors(
     const sqlast::ColumnDefinition &origin_col, size_t origin_index) {
   // Find column information about the origin table.
   const std::string &origin_table = origin.table_name;
-  const std::string &origin_col = origin_col.column_name();
+  const std::string &col_name = origin_col.column_name();
   sqlast::ColumnDefinition::Type type = origin.schema.TypeOf(origin_index);
   const std::vector<std::unique_ptr<ShardDescriptor>> &vec =
       owners ? origin.owners : origin.accessors;
@@ -243,11 +243,11 @@ std::vector<std::unique_ptr<ShardDescriptor>> CreateContext::MakeBDescriptors(
     next.type = InfoType::VARIABLE;
     std::optional<IndexDescriptor> index;
     if (create_indices) {
-      MOVE_OR_PANIC(index, this->MakeVIndex(origin_table, origin_col, *desc));
+      MOVE_OR_PANIC(index, this->MakeVIndex(origin_table, col_name, *desc));
     }
     next.info = VariableInfo{
-        target_column_name, target_column_index, type,         desc.get(),
-        origin_table,       origin_col,          origin_index, index};
+        target_column_name, target_column_index, type, desc.get(), origin_table,
+        col_name,           origin_index,        index};
     result.push_back(std::make_unique<ShardDescriptor>(next));
   }
   return result;

@@ -40,6 +40,26 @@ using CType = sqlast::ColumnDefinition::Type;
 #define TEXT CType::TEXT
 
 /*
+ * Debug logging.
+ */
+
+namespace {
+
+std::string ToString(const std::vector<std::string> &v) {
+  std::string str = "[";
+  for (size_t i = 0; i < v.size(); i++) {
+    if (i > 0) {
+      str += ", ";
+    }
+    str += v.at(i);
+  }
+  str += "]";
+  return str;
+}
+
+}  // namespace
+
+/*
  * Parsing.
  */
 
@@ -209,6 +229,27 @@ void EXPECT_VARIABLE(Connection *conn, const std::string &table_name,
   EXPECT_TRUE(found) << "VARIABLE Table: " << table_name;
 }
 
+void EXPECT_DEPENDENTS(Connection *conn, const std::string &table_name,
+                       bool owner, std::vector<std::string> dependents,
+                       std::vector<std::string> access_dependents) {
+  const SharderState &state = conn->state->SharderState();
+  const Table &tbl = state.GetTable(table_name);
+  for (const auto &[t, desc] : tbl.dependents) {
+    auto it = std::find(dependents.begin(), dependents.end(), t);
+    EXPECT_NE(it, dependents.end())
+        << "Did not find owner dependent " << t << " in table " << table_name;
+    dependents.erase(it);
+  }
+  EXPECT_EQ(dependents.size(), 0u) << ToString(dependents);
+  for (const auto &[t, desc] : tbl.access_dependents) {
+    auto it = std::find(access_dependents.begin(), access_dependents.end(), t);
+    EXPECT_NE(it, access_dependents.end())
+        << "Did not find access dependent " << t << " in table " << table_name;
+    access_dependents.erase(it);
+  }
+  EXPECT_EQ(access_dependents.size(), 0u) << ToString(access_dependents);
+}
+
 }  // namespace
 
 /*
@@ -264,9 +305,11 @@ TEST_F(CreateTest, Direct) {
   // Check tables.
   EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "user", true, {"addr"}, {});
 
   EXPECT_TABLE(&conn, "addr", {"id", "uid"}, {INT, INT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "addr", true, "user", "uid", 1, INT);
+  EXPECT_DEPENDENTS(&conn, "addr", true, {}, {});
 }
 
 TEST_F(CreateTest, Transitive) {
@@ -293,13 +336,16 @@ TEST_F(CreateTest, Transitive) {
   // Check tables.
   EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "user", true, {"addr"}, {});
 
   EXPECT_TABLE(&conn, "addr", {"id", "uid"}, {INT, INT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "addr", true, "user", "uid", 1, INT);
+  EXPECT_DEPENDENTS(&conn, "addr", true, {"phones"}, {});
 
   EXPECT_TABLE(&conn, "phones", {"id", "aid"}, {INT, INT}, 0, 1, 0);
   EXPECT_TRANSITIVE(&conn, "phones", true, "user", "aid", 1, INT, "addr", "id",
                     0);
+  EXPECT_DEPENDENTS(&conn, "phones", true, {}, {});
 }
 
 TEST_F(CreateTest, DeepTransitive) {
@@ -329,17 +375,21 @@ TEST_F(CreateTest, DeepTransitive) {
   // Check tables.
   EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "user", true, {"addr"}, {});
 
   EXPECT_TABLE(&conn, "addr", {"id", "uid"}, {INT, INT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "addr", true, "user", "uid", 1, INT);
+  EXPECT_DEPENDENTS(&conn, "addr", true, {"phones"}, {});
 
   EXPECT_TABLE(&conn, "phones", {"id", "aid"}, {INT, INT}, 0, 1, 0);
   EXPECT_TRANSITIVE(&conn, "phones", true, "user", "aid", 1, INT, "addr", "id",
                     0);
+  EXPECT_DEPENDENTS(&conn, "phones", true, {"available"}, {});
 
   EXPECT_TABLE(&conn, "available", {"id", "pid"}, {INT, INT}, 0, 1, 0);
   EXPECT_TRANSITIVE(&conn, "available", true, "user", "pid", 1, INT, "phones",
                     "id", 0);
+  EXPECT_DEPENDENTS(&conn, "available", true, {}, {});
 }
 
 TEST_F(CreateTest, OwnerAndNothing) {
@@ -364,10 +414,12 @@ TEST_F(CreateTest, OwnerAndNothing) {
   // Check tables.
   EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "user", true, {"msg"}, {});
 
   EXPECT_TABLE(&conn, "msg", {"id", "OWNER_sender", "receiver"},
                {INT, INT, INT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_sender", 1, INT);
+  EXPECT_DEPENDENTS(&conn, "msg", true, {}, {});
 }
 
 TEST_F(CreateTest, OwnerAccessor) {
@@ -392,11 +444,13 @@ TEST_F(CreateTest, OwnerAccessor) {
   // Check tables.
   EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "user", true, {"msg"}, {"msg"});
 
   EXPECT_TABLE(&conn, "msg", {"id", "OWNER_sender", "ACCESSOR_receiver"},
                {INT, INT, INT}, 0, 1, 1);
   EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_sender", 1, INT);
   EXPECT_DIRECT(&conn, "msg", false, "user", "ACCESSOR_receiver", 2, INT);
+  EXPECT_DEPENDENTS(&conn, "msg", true, {}, {});
 }
 
 TEST_F(CreateTest, OwnerLattice) {
@@ -424,17 +478,20 @@ TEST_F(CreateTest, OwnerLattice) {
   // Check tables.
   EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "user", true, {"msg"}, {"msg"});
 
   EXPECT_TABLE(&conn, "msg", {"id", "OWNER_sender", "ACCESSOR_receiver"},
                {INT, INT, INT}, 0, 1, 1);
   EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_sender", 1, INT);
   EXPECT_DIRECT(&conn, "msg", false, "user", "ACCESSOR_receiver", 2, INT);
+  EXPECT_DEPENDENTS(&conn, "msg", true, {"metadata"}, {"metadata"});
 
   EXPECT_TABLE(&conn, "metadata", {"id", "OWNER_msg"}, {INT, INT}, 0, 1, 1);
   EXPECT_TRANSITIVE(&conn, "metadata", true, "user", "OWNER_msg", 1, INT, "msg",
                     "id", 0);
   EXPECT_TRANSITIVE(&conn, "metadata", false, "user", "OWNER_msg", 1, INT,
                     "msg", "id", 0);
+  EXPECT_DEPENDENTS(&conn, "metadata", true, {}, {});
 }
 
 TEST_F(CreateTest, AccessorLattice) {
@@ -462,17 +519,20 @@ TEST_F(CreateTest, AccessorLattice) {
   // Check tables.
   EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "user", true, {"msg"}, {"msg"});
 
   EXPECT_TABLE(&conn, "msg", {"id", "OWNER_sender", "ACCESSOR_receiver"},
                {INT, INT, INT}, 0, 1, 1);
   EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_sender", 1, INT);
   EXPECT_DIRECT(&conn, "msg", false, "user", "ACCESSOR_receiver", 2, INT);
+  EXPECT_DEPENDENTS(&conn, "msg", true, {}, {"metadata", "metadata"});
 
   EXPECT_TABLE(&conn, "metadata", {"id", "ACCESSOR_msg"}, {INT, INT}, 0, 0, 2);
   EXPECT_TRANSITIVE(&conn, "metadata", false, "user", "ACCESSOR_msg", 1, INT,
                     "msg", "id", 0);
   EXPECT_TRANSITIVE(&conn, "metadata", false, "user", "ACCESSOR_msg", 1, INT,
                     "msg", "id", 0);
+  EXPECT_DEPENDENTS(&conn, "metadata", true, {}, {});
 }
 
 TEST_F(CreateTest, TwoOwners) {
@@ -497,11 +557,13 @@ TEST_F(CreateTest, TwoOwners) {
   // Check tables.
   EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "user", true, {"msg", "msg"}, {});
 
   EXPECT_TABLE(&conn, "msg", {"id", "OWNER_sender", "OWNER_receiver"},
                {INT, INT, INT}, 0, 2, 0);
   EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_sender", 1, INT);
   EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_receiver", 2, INT);
+  EXPECT_DEPENDENTS(&conn, "msg", true, {}, {});
 }
 
 TEST_F(CreateTest, TwoOwnersTransitive) {
@@ -532,23 +594,28 @@ TEST_F(CreateTest, TwoOwnersTransitive) {
   // Check tables.
   EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "user", true, {"msg", "msg"}, {});
 
   EXPECT_TABLE(&conn, "msg", {"id", "OWNER_sender", "OWNER_receiver"},
                {INT, INT, INT}, 0, 2, 0);
   EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_sender", 1, INT);
   EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_receiver", 2, INT);
+  EXPECT_DEPENDENTS(&conn, "msg", true, {"delivered", "delivered"},
+                    {"error", "error"});
 
   EXPECT_TABLE(&conn, "delivered", {"id", "OWNER_msg"}, {INT, INT}, 0, 2, 0);
   EXPECT_TRANSITIVE(&conn, "delivered", true, "user", "OWNER_msg", 1, INT,
                     "msg", "id", 0);
   EXPECT_TRANSITIVE(&conn, "delivered", true, "user", "OWNER_msg", 1, INT,
                     "msg", "id", 0);
+  EXPECT_DEPENDENTS(&conn, "delivered", true, {}, {});
 
   EXPECT_TABLE(&conn, "error", {"id", "ACCESSOR_msg"}, {INT, INT}, 0, 0, 2);
   EXPECT_TRANSITIVE(&conn, "error", false, "user", "ACCESSOR_msg", 1, INT,
                     "msg", "id", 0);
   EXPECT_TRANSITIVE(&conn, "error", false, "user", "ACCESSOR_msg", 1, INT,
                     "msg", "id", 0);
+  EXPECT_DEPENDENTS(&conn, "error", true, {}, {});
 }
 
 TEST_F(CreateTest, ShardedDataSubject) {
@@ -577,11 +644,13 @@ TEST_F(CreateTest, ShardedDataSubject) {
   // Check tables.
   EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "user", true, {"invited_user"}, {});
 
   EXPECT_TABLE(&conn, "invited_user", {"id", "PII_name", "inviting_user"},
                {INT, TEXT, INT}, 0, 2, 0);
   EXPECT_DIRECT(&conn, "invited_user", true, "invited_user", "id", 0, INT);
   EXPECT_DIRECT(&conn, "invited_user", true, "user", "inviting_user", 2, INT);
+  EXPECT_DEPENDENTS(&conn, "invited_user", true, {}, {});
 }
 
 TEST_F(CreateTest, VariableOwner) {
@@ -608,14 +677,17 @@ TEST_F(CreateTest, VariableOwner) {
   // Check tables.
   EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "user", true, {"association"}, {});
 
   EXPECT_TABLE(&conn, "grps", {"gid"}, {INT}, 0, 1, 0);
   EXPECT_VARIABLE(&conn, "grps", true, "user", "gid", 0, INT, "association",
                   "OWNING_group", 1);
+  EXPECT_DEPENDENTS(&conn, "grps", true, {}, {});
 
   EXPECT_TABLE(&conn, "association", {"id", "OWNING_group", "OWNER_user"},
                {INT, INT, INT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "association", true, "user", "OWNER_user", 2, INT);
+  EXPECT_DEPENDENTS(&conn, "association", true, {"grps"}, {});
 }
 
 TEST_F(CreateTest, TransitiveVariableOwner) {
@@ -649,23 +721,28 @@ TEST_F(CreateTest, TransitiveVariableOwner) {
   // Check tables.
   EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "user", true, {"association"}, {});
 
   EXPECT_TABLE(&conn, "grps", {"gid"}, {INT}, 0, 1, 0);
   EXPECT_VARIABLE(&conn, "grps", true, "user", "gid", 0, INT, "association",
                   "OWNING_group", 1);
+  EXPECT_DEPENDENTS(&conn, "grps", true, {"fassociation"}, {});
 
   EXPECT_TABLE(&conn, "association", {"id", "OWNING_group", "OWNER_user"},
                {INT, INT, INT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "association", true, "user", "OWNER_user", 2, INT);
+  EXPECT_DEPENDENTS(&conn, "association", true, {"grps"}, {});
 
   EXPECT_TABLE(&conn, "files", {"fid"}, {INT}, 0, 1, 0);
   EXPECT_VARIABLE(&conn, "files", true, "user", "fid", 0, INT, "fassociation",
                   "OWNING_file", 1);
+  EXPECT_DEPENDENTS(&conn, "files", true, {}, {});
 
   EXPECT_TABLE(&conn, "fassociation", {"id", "OWNING_file", "OWNER_group"},
                {INT, INT, INT}, 0, 1, 0);
   EXPECT_TRANSITIVE(&conn, "fassociation", true, "user", "OWNER_group", 2, INT,
                     "grps", "gid", 0);
+  EXPECT_DEPENDENTS(&conn, "fassociation", true, {"files"}, {});
 }
 
 TEST_F(CreateTest, VariableAccessor) {
@@ -692,14 +769,17 @@ TEST_F(CreateTest, VariableAccessor) {
   // Check tables.
   EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "user", true, {"association"}, {});
 
   EXPECT_TABLE(&conn, "grps", {"gid"}, {INT}, 0, 0, 1);
   EXPECT_VARIABLE(&conn, "grps", false, "user", "gid", 0, INT, "association",
                   "ACCESSING_group", 1);
+  EXPECT_DEPENDENTS(&conn, "grps", true, {}, {});
 
   EXPECT_TABLE(&conn, "association", {"id", "ACCESSING_group", "OWNER_user"},
                {INT, INT, INT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "association", true, "user", "OWNER_user", 2, INT);
+  EXPECT_DEPENDENTS(&conn, "association", true, {}, {"grps"});
 }
 
 TEST_F(CreateTest, TransitiveVariableAccessor) {
@@ -732,24 +812,29 @@ TEST_F(CreateTest, TransitiveVariableAccessor) {
   // Check tables.
   EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "user", true, {"association"}, {});
 
   EXPECT_TABLE(&conn, "grps", {"gid"}, {INT}, 0, 0, 1);
   EXPECT_VARIABLE(&conn, "grps", false, "user", "gid", 0, INT, "association",
                   "ACCESSING_group", 1);
+  EXPECT_DEPENDENTS(&conn, "grps", true, {}, {"fassociation"});
 
   EXPECT_TABLE(&conn, "association", {"id", "ACCESSING_group", "OWNER_user"},
                {INT, INT, INT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "association", true, "user", "OWNER_user", 2, INT);
+  EXPECT_DEPENDENTS(&conn, "association", true, {}, {"grps"});
 
   EXPECT_TABLE(&conn, "files", {"fid"}, {INT}, 0, 0, 1);
   EXPECT_VARIABLE(&conn, "files", false, "user", "fid", 0, INT, "fassociation",
                   "ACCESSING_file", 1);
+  EXPECT_DEPENDENTS(&conn, "files", true, {}, {});
 
   EXPECT_TABLE(&conn, "fassociation",
                {"id", "ACCESSING_file", "ACCESSOR_group"}, {INT, INT, INT}, 0,
                0, 1);
   EXPECT_TRANSITIVE(&conn, "fassociation", false, "user", "ACCESSOR_group", 2,
                     INT, "grps", "gid", 0);
+  EXPECT_DEPENDENTS(&conn, "fassociation", true, {}, {"files"});
 }
 
 TEST_F(CreateTest, VariableAccessorLattice) {
@@ -790,18 +875,22 @@ TEST_F(CreateTest, VariableAccessorLattice) {
   // Check tables.
   EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "user", true, {"association", "files"}, {});
 
   EXPECT_TABLE(&conn, "admin", {"aid", "PII_name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "admin", true, "admin", "aid", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "admin", true, {"grps"}, {});
 
   EXPECT_TABLE(&conn, "grps", {"gid", "OWNER_admin"}, {INT, INT}, 0, 1, 1);
   EXPECT_DIRECT(&conn, "grps", true, "admin", "OWNER_admin", 1, INT);
   EXPECT_VARIABLE(&conn, "grps", false, "user", "gid", 0, INT, "association",
                   "ACCESSING_group", 1);
+  EXPECT_DEPENDENTS(&conn, "grps", true, {"fassociation"}, {"fassociation"});
 
   EXPECT_TABLE(&conn, "association", {"sid", "ACCESSING_group", "OWNER_user"},
                {INT, INT, INT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "association", true, "user", "OWNER_user", 2, INT);
+  EXPECT_DEPENDENTS(&conn, "association", true, {}, {"grps"});
 
   EXPECT_TABLE(&conn, "files", {"fid", "OWNER_creator"}, {INT, INT}, 0, 2, 1);
   EXPECT_DIRECT(&conn, "files", true, "user", "OWNER_creator", 1, INT);
@@ -809,6 +898,7 @@ TEST_F(CreateTest, VariableAccessorLattice) {
                   "OWNING_file", 1);
   EXPECT_VARIABLE(&conn, "files", false, "user", "fid", 0, INT, "fassociation",
                   "OWNING_file", 1);
+  EXPECT_DEPENDENTS(&conn, "files", true, {}, {});
 
   EXPECT_TABLE(&conn, "fassociation", {"fsid", "OWNING_file", "OWNER_group"},
                {INT, INT, INT}, 0, 1, 1);
@@ -816,6 +906,80 @@ TEST_F(CreateTest, VariableAccessorLattice) {
                     "grps", "gid", 0);
   EXPECT_TRANSITIVE(&conn, "fassociation", false, "user", "OWNER_group", 2, INT,
                     "grps", "gid", 0);
+  EXPECT_DEPENDENTS(&conn, "fassociation", true, {"files"}, {"files"});
+}
+
+TEST_F(CreateTest, VariableLatticeAllOwners) {
+  // Parse create table statements.
+  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  sqlast::CreateTable admin = MakeCreate("admin", {"aid" I PK, "PII_name" STR});
+  sqlast::CreateTable grps =
+      MakeCreate("grps", {"gid" I PK, "OWNER_admin" I FK "admin(aid)"});
+  sqlast::CreateTable assoc =
+      MakeCreate("association", {"sid" I PK, "OWNING_group" I FK "grps(gid)",
+                                 "OWNER_user" I FK "user(id)"});
+  sqlast::CreateTable files =
+      MakeCreate("files", {"fid" I PK, "OWNER_creator" I FK "user(id)"});
+  sqlast::CreateTable fassoc =
+      MakeCreate("fassociation", {"fsid" I PK, "OWNING_file" I FK "files(fid)",
+                                  "OWNER_group" I FK "grps(gid)"});
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+
+  // Create the tables.
+  Handle(usr, &conn);
+  Handle(admin, &conn);
+  Handle(grps, &conn);
+  Handle(assoc, &conn);
+  Handle(files, &conn);
+  Handle(fassoc, &conn);
+
+  // Check shards.
+  EXPECT_SHARD(&conn, "user", "id", 0);
+  EXPECT_SHARD_OWNS(&conn, "user",
+                    {"user", "association", "files", "grps", "fassociation"});
+  EXPECT_SHARD_ACCESSES(&conn, "user", {});
+
+  EXPECT_SHARD(&conn, "admin", "aid", 0);
+  EXPECT_SHARD_OWNS(&conn, "admin", {"admin", "grps", "fassociation", "files"});
+  EXPECT_SHARD_ACCESSES(&conn, "admin", {});
+
+  // Check tables.
+  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "user", true, {"association", "files"}, {});
+
+  EXPECT_TABLE(&conn, "admin", {"aid", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_DIRECT(&conn, "admin", true, "admin", "aid", 0, INT);
+  EXPECT_DEPENDENTS(&conn, "admin", true, {"grps"}, {});
+
+  EXPECT_TABLE(&conn, "grps", {"gid", "OWNER_admin"}, {INT, INT}, 0, 2, 0);
+  EXPECT_DIRECT(&conn, "grps", true, "admin", "OWNER_admin", 1, INT);
+  EXPECT_VARIABLE(&conn, "grps", true, "user", "gid", 0, INT, "association",
+                  "OWNING_group", 1);
+  EXPECT_DEPENDENTS(&conn, "grps", true, {"fassociation", "fassociation"}, {});
+
+  EXPECT_TABLE(&conn, "association", {"sid", "OWNING_group", "OWNER_user"},
+               {INT, INT, INT}, 0, 1, 0);
+  EXPECT_DIRECT(&conn, "association", true, "user", "OWNER_user", 2, INT);
+  EXPECT_DEPENDENTS(&conn, "association", true, {"grps"}, {});
+
+  EXPECT_TABLE(&conn, "files", {"fid", "OWNER_creator"}, {INT, INT}, 0, 3, 0);
+  EXPECT_DIRECT(&conn, "files", true, "user", "OWNER_creator", 1, INT);
+  EXPECT_VARIABLE(&conn, "files", true, "admin", "fid", 0, INT, "fassociation",
+                  "OWNING_file", 1);
+  EXPECT_VARIABLE(&conn, "files", true, "user", "fid", 0, INT, "fassociation",
+                  "OWNING_file", 1);
+  EXPECT_DEPENDENTS(&conn, "files", true, {}, {});
+
+  EXPECT_TABLE(&conn, "fassociation", {"fsid", "OWNING_file", "OWNER_group"},
+               {INT, INT, INT}, 0, 2, 0);
+  EXPECT_TRANSITIVE(&conn, "fassociation", true, "admin", "OWNER_group", 2, INT,
+                    "grps", "gid", 0);
+  EXPECT_TRANSITIVE(&conn, "fassociation", true, "user", "OWNER_group", 2, INT,
+                    "grps", "gid", 0);
+  EXPECT_DEPENDENTS(&conn, "fassociation", true, {"files", "files"}, {});
 }
 
 }  // namespace sqlengine
