@@ -3,6 +3,7 @@
 
 #include <iterator>
 #include <optional>
+#include <unordered_set>
 #include <utility>
 
 #include "glog/logging.h"
@@ -78,106 +79,18 @@ absl::StatusOr<CreateContext::Annotations> CreateContext::DiscoverValidate() {
 }
 
 /*
- * Helpers for creating indices for transitive and variable ownership.
- */
-
-absl::StatusOr<IndexDescriptor> CreateContext::MakeIndex(
-    const std::string &indexed_table, const std::string &indexed_column,
-    const ShardDescriptor &next) {
-  // Create a new unique name for the index.
-  uint64_t idx = this->sstate_.IncrementIndexCount();
-  std::string index_name = "_index_" + std::to_string(idx);
-  // Check the sharding type of next.
-  switch (next.type) {
-    case InfoType::DIRECT: {
-      const DirectInfo &direct = std::get<DirectInfo>(next.info);
-      SimpleIndexInfo info = {direct.column};
-      IndexDescriptor descriptor = {index_name, indexed_table, indexed_column,
-                                    IndexType::SIMPLE, info};
-      MOVE_OR_RETURN(sql::SqlResult result,
-                     index::CreateIndex(descriptor, this->conn_, this->lock_));
-      ASSERT_RET(result.Success(), Internal, "Error D index");
-      return descriptor;
-    }
-    case InfoType::TRANSITIVE: {
-      const TransitiveInfo &transitive = std::get<TransitiveInfo>(next.info);
-      const std::string &shard_column =
-          EXTRACT_VARIANT(shard_column, transitive.index->info);
-      JoinedIndexInfo info = {transitive.index->index_name, transitive.column,
-                              transitive.index->indexed_column, shard_column};
-      IndexDescriptor descriptor = {index_name, indexed_table, indexed_column,
-                                    IndexType::JOINED, info};
-      MOVE_OR_RETURN(sql::SqlResult result,
-                     index::CreateIndex(descriptor, this->conn_, this->lock_));
-      ASSERT_RET(result.Success(), Internal, "Error T index");
-      return descriptor;
-    }
-    case InfoType::VARIABLE: {
-      // Can re-use the variable index as is!
-      return std::get<VariableInfo>(next.info).index.value();
-    }
-  }
-  return absl::InternalError("Unreachable code in MakeIndex()!");
-}
-
-// origin = the many-2-many table pointing towards the table under consideration
-// with an OWNS fk.
-// indexed_table is the name of that table, indexed_column is the OWNS fk.
-absl::StatusOr<IndexDescriptor> CreateContext::MakeVIndex(
-    const std::string &indexed_table, const std::string &indexed_column,
-    const ShardDescriptor &origin) {
-  // Create a new unique name for the index.
-  uint64_t idx = this->sstate_.IncrementIndexCount();
-  std::string index_name = "_index_" + std::to_string(idx);
-  // Check the sharding type of next.
-  switch (origin.type) {
-    case InfoType::DIRECT: {
-      const DirectInfo &direct = std::get<DirectInfo>(origin.info);
-      SimpleIndexInfo info = {direct.column};
-      IndexDescriptor descriptor = {index_name, indexed_table, indexed_column,
-                                    IndexType::SIMPLE, info};
-      MOVE_OR_RETURN(sql::SqlResult result,
-                     index::CreateIndex(descriptor, this->conn_, this->lock_));
-      ASSERT_RET(result.Success(), Internal, "Error VD index");
-      return descriptor;
-    }
-    case InfoType::TRANSITIVE: {
-      const TransitiveInfo &transitive = std::get<TransitiveInfo>(origin.info);
-      const std::string &shard_column =
-          EXTRACT_VARIANT(shard_column, transitive.index->info);
-      JoinedIndexInfo info = {transitive.index->index_name, transitive.column,
-                              transitive.index->indexed_column, shard_column};
-      IndexDescriptor descriptor = {index_name, indexed_table, indexed_column,
-                                    IndexType::JOINED, info};
-      MOVE_OR_RETURN(sql::SqlResult result,
-                     index::CreateIndex(descriptor, this->conn_, this->lock_));
-      ASSERT_RET(result.Success(), Internal, "Error VT index");
-      return descriptor;
-    }
-    case InfoType::VARIABLE: {
-      // Join with variable index.
-      const VariableInfo &variable = std::get<VariableInfo>(origin.info);
-      const std::string &shard_column =
-          EXTRACT_VARIANT(shard_column, variable.index->info);
-      JoinedIndexInfo info = {variable.index->index_name, variable.column,
-                              variable.index->indexed_column, shard_column};
-      IndexDescriptor descriptor = {index_name, indexed_table, indexed_column,
-                                    IndexType::JOINED, info};
-      MOVE_OR_RETURN(sql::SqlResult result,
-                     index::CreateIndex(descriptor, this->conn_, this->lock_));
-      ASSERT_RET(result.Success(), Internal, "Error VV index");
-      return descriptor;
-    }
-  }
-  return absl::InternalError("Unreachable code in MakeIndex()!");
-}
-
-/*
  * Helpers for creating ShardingDescriptor for ownership or accessorships.
  */
 
-// Create a shard descriptor for this table corresponding to each shard
-// descriptor that current exists for the given foreign table.
+// This creates shard descriptor(s) for this table corresponding to the
+// given foreign key.
+// This looks at the foreign table, and identifies which shard kinds it belongs
+// to, and returns sharding desciptors based on those.
+// This returns a single shard descriptor for each shard kind the foreign table
+// belongs to. Even when the foreign table is owned by a shard kind in different
+// ways (i.e. it has two OWNER columns pointing to the same shard kind), we will
+// only return a single shard descriptor encapsulating all these ways, and use
+// an index when neceassry to abstract them.
 std::vector<std::unique_ptr<ShardDescriptor>> CreateContext::MakeFDescriptors(
     bool owners, bool create_indices, const sqlast::ColumnDefinition &fk_col,
     size_t fk_column_index, sqlast::ColumnDefinition::Type fk_column_type) {
@@ -186,29 +99,45 @@ std::vector<std::unique_ptr<ShardDescriptor>> CreateContext::MakeFDescriptors(
   const sqlast::ColumnConstraint &fk = fk_col.GetForeignKeyConstraint();
   const std::string &next_table = fk.foreign_table();
   const std::string &next_col = fk.foreign_column();
-  const Table &tbl = this->sstate_.GetTable(next_table);
+  Table &tbl = this->sstate_.GetTable(next_table);
   size_t next_col_index = tbl.schema.IndexOf(next_col);
   const std::vector<std::unique_ptr<ShardDescriptor>> &vec =
       owners ? tbl.owners : tbl.accessors;
 
   // Loop over foreign table descriptors and transform them into descriptors
   // for this table.
+  std::unordered_set<std::string> shard_kinds;
   std::vector<std::unique_ptr<ShardDescriptor>> result;
   for (const std::unique_ptr<ShardDescriptor> &next : vec) {
+    const std::string &shard_kind = next->shard_kind;
+    if (!shard_kinds.insert(shard_kind).second) {
+      continue;
+    }
+
+    // First time we see this shard_kind.
     ShardDescriptor descriptor;
-    descriptor.shard_kind = next->shard_kind;
-    if (next->shard_kind == next_table) {  // Direct sharding.
+    descriptor.shard_kind = shard_kind;
+    if (shard_kind == next_table) {  // Direct sharding.
       descriptor.type = InfoType::DIRECT;
       descriptor.info = DirectInfo{fk_colname, fk_column_index, fk_column_type};
     } else {  // Transitive sharding.
       descriptor.type = InfoType::TRANSITIVE;
-      std::optional<IndexDescriptor> idx;
+      IndexDescriptor *index = nullptr;
       if (create_indices) {
-        MOVE_OR_PANIC(idx, this->MakeIndex(next_table, next_col, *next));
+        // We need an index for next_table[next_col] and shard_kind.
+        auto &col_indices = tbl.indices[next_col];
+        if (col_indices.count(shard_kind) == 0) {
+          MOVE_OR_PANIC(IndexDescriptor tmp,
+                        index::Create(next_table, shard_kind, next_col,
+                                      this->conn_, this->lock_));
+          col_indices.emplace(
+              shard_kind, std::make_unique<IndexDescriptor>(std::move(tmp)));
+        }
+        index = col_indices.at(shard_kind).get();
       }
       descriptor.info = TransitiveInfo{
-          fk_colname, fk_column_index, fk_column_type, next.get(),
-          next_table, next_col,        next_col_index, idx};
+          fk_colname, fk_column_index, fk_column_type, next_table,
+          next_col,   next_col_index,  index};
     }
     result.push_back(std::make_unique<ShardDescriptor>(descriptor));
   }
@@ -218,14 +147,14 @@ std::vector<std::unique_ptr<ShardDescriptor>> CreateContext::MakeFDescriptors(
 // Similar to MakeDescriptors but for opposite direction annotations,
 // i.e. OWNS and ACCESSES.
 std::vector<std::unique_ptr<ShardDescriptor>> CreateContext::MakeBDescriptors(
-    bool owners, bool create_indices, const Table &origin,
+    bool owners, bool create_indices, Table *origin,
     const sqlast::ColumnDefinition &origin_col, size_t origin_index) {
   // Find column information about the origin table.
-  const std::string &origin_table = origin.table_name;
+  const std::string &origin_table = origin->table_name;
   const std::string &col_name = origin_col.column_name();
-  sqlast::ColumnDefinition::Type type = origin.schema.TypeOf(origin_index);
+  sqlast::ColumnDefinition::Type type = origin->schema.TypeOf(origin_index);
   const std::vector<std::unique_ptr<ShardDescriptor>> &vec =
-      owners ? origin.owners : origin.accessors;
+      owners ? origin->owners : origin->accessors;
 
   // Find information about the target owned table.
   const sqlast::ColumnConstraint &fk = origin_col.GetForeignKeyConstraint();
@@ -236,17 +165,32 @@ std::vector<std::unique_ptr<ShardDescriptor>> CreateContext::MakeBDescriptors(
 
   // Loop over origin table descriptors and transform them into descriptors
   // for target foreign table.
+  std::unordered_set<std::string> shard_kinds;
   std::vector<std::unique_ptr<ShardDescriptor>> result;
   for (const std::unique_ptr<ShardDescriptor> &desc : vec) {
+    const std::string &shard_kind = desc->shard_kind;
+    if (!shard_kinds.insert(shard_kind).second) {
+      continue;
+    }
+
     ShardDescriptor next;
-    next.shard_kind = desc->shard_kind;
+    next.shard_kind = shard_kind;
     next.type = InfoType::VARIABLE;
-    std::optional<IndexDescriptor> index;
+    IndexDescriptor *index = nullptr;
     if (create_indices) {
-      MOVE_OR_PANIC(index, this->MakeVIndex(origin_table, col_name, *desc));
+      // We need an index for this table[col_name/origin_column] and shard_kind.
+      auto &col_indices = origin->indices[col_name];
+      if (col_indices.count(shard_kind) == 0) {
+        MOVE_OR_PANIC(IndexDescriptor tmp,
+                      index::Create(origin_table, shard_kind, col_name,
+                                    this->conn_, this->lock_));
+        col_indices.emplace(shard_kind,
+                            std::make_unique<IndexDescriptor>(std::move(tmp)));
+      }
+      index = col_indices.at(shard_kind).get();
     }
     next.info = VariableInfo{
-        target_column_name, target_column_index, type, desc.get(), origin_table,
+        target_column_name, target_column_index, type, origin_table,
         col_name,           origin_index,        index};
     result.push_back(std::make_unique<ShardDescriptor>(next));
   }
@@ -321,7 +265,7 @@ absl::StatusOr<sql::SqlResult> CreateContext::Exec() {
   /* End of direct and transitive ACCESSORS. */
 
   /* Now we create this table and add its information to our state. */
-  const Table &table_ref = this->sstate_.AddTable(std::move(this->table_));
+  Table *table_ptr = this->sstate_.AddTable(std::move(this->table_));
   this->dstate_.AddTableSchema(this->table_name_, this->schema_);
   sql::SqlResult result(this->db_->ExecuteCreateTable(this->stmt_));
   /* End of table creation - now we need to make sure any effects this table
@@ -333,11 +277,11 @@ absl::StatusOr<sql::SqlResult> CreateContext::Exec() {
     const sqlast::ColumnConstraint &fk = col.GetForeignKeyConstraint();
     const std::string &target_table = fk.foreign_table();
     // Every way of owning this table becomes a way of owning the target table.
-    auto v = this->MakeBDescriptors(true, true, table_ref, col, idx);
+    auto v = this->MakeBDescriptors(true, true, table_ptr, col, idx);
     CHECK_STATUS(this->sstate_.AddTableOwner(target_table, std::move(v)));
 
     // Every way of accessing this table becomes a way of accessing target.
-    v = this->MakeBDescriptors(false, false, table_ref, col, idx);
+    v = this->MakeBDescriptors(false, false, table_ptr, col, idx);
     CHECK_STATUS(this->sstate_.AddTableAccessor(target_table, std::move(v)));
   }
   /* End of OWNS. */
@@ -348,10 +292,10 @@ absl::StatusOr<sql::SqlResult> CreateContext::Exec() {
     const sqlast::ColumnConstraint &fk = col.GetForeignKeyConstraint();
     const std::string &target_table = fk.foreign_table();
     // Every way of owning this table becomes a way of accessing the target.
-    auto v = this->MakeBDescriptors(true, false, table_ref, col, idx);
+    auto v = this->MakeBDescriptors(true, false, table_ptr, col, idx);
     CHECK_STATUS(this->sstate_.AddTableAccessor(target_table, std::move(v)));
     // Every way of accessing this table becomes a way of accessing target.
-    v = this->MakeBDescriptors(false, false, table_ref, col, idx);
+    v = this->MakeBDescriptors(false, false, table_ptr, col, idx);
     CHECK_STATUS(this->sstate_.AddTableAccessor(target_table, std::move(v)));
   }
   /* End of ACCESSES. */

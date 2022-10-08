@@ -12,7 +12,7 @@ namespace shards {
 /*
  * Table creation.
  */
-const Table &SharderState::AddTable(Table &&table) {
+Table *SharderState::AddTable(Table &&table) {
   for (const auto &descriptor : table.owners) {
     Shard &shard = this->shards_.at(descriptor->shard_kind);
     shard.owned_tables.insert(table.table_name);
@@ -62,7 +62,7 @@ const Table &SharderState::AddTable(Table &&table) {
     parent->access_dependents.emplace_back(table.table_name, descriptor.get());
   }
   auto pair = this->tables_.emplace(table.table_name, std::move(table));
-  return pair.first->second;
+  return &pair.first->second;
 }
 
 /*

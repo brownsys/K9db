@@ -10,7 +10,6 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/value.h"
 #include "pelton/shards/types.h"
-#include "pelton/sql/result.h"
 #include "pelton/util/upgradable_lock.h"
 
 namespace pelton {
@@ -18,15 +17,18 @@ namespace shards {
 namespace sqlengine {
 namespace index {
 
-absl::StatusOr<sql::SqlResult> CreateIndex(const IndexDescriptor &index,
-                                           Connection *connection,
-                                           util::UniqueLock *lock);
-
-// value must be unparsed: i.e. surrounded by quotes etc.
+// Index lookup: value must be unparsed: i.e. surrounded by quotes etc.
 std::vector<dataflow::Record> LookupIndex(const IndexDescriptor &index,
                                           dataflow::Value &&value,
                                           Connection *connection,
                                           util::SharedLock *lock);
+
+// Index creation.
+absl::StatusOr<IndexDescriptor> Create(const std::string &table_name,
+                                       const std::string &shard_kind,
+                                       const std::string &column_name,
+                                       Connection *connection,
+                                       util::UniqueLock *lock);
 
 }  // namespace index
 }  // namespace sqlengine

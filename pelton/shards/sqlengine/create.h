@@ -49,14 +49,6 @@ class CreateContext {
   };
   absl::StatusOr<Annotations> DiscoverValidate();
 
-  /* Helpers for creating indices for transitive and variable ownership. */
-  absl::StatusOr<IndexDescriptor> MakeIndex(const std::string &indexed_table,
-                                            const std::string &indexed_column,
-                                            const ShardDescriptor &next);
-  absl::StatusOr<IndexDescriptor> MakeVIndex(const std::string &indexed_table,
-                                             const std::string &indexed_column,
-                                             const ShardDescriptor &origin);
-
   /* Helpers for creating ShardingDescriptor for ownership or accessorships. */
   // Direct / transitive ownership (along a forward-looking foreign key).
   std::vector<std::unique_ptr<ShardDescriptor>> MakeFDescriptors(
@@ -65,7 +57,7 @@ class CreateContext {
 
   // OWNS/ACCESSES (backwards-looking foreign key).
   std::vector<std::unique_ptr<ShardDescriptor>> MakeBDescriptors(
-      bool owners, bool create_indices, const Table &origin,
+      bool owners, bool create_indices, Table *origin,
       const sqlast::ColumnDefinition &origin_col, size_t origin_index);
 
   /* Members. */

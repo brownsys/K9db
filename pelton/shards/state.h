@@ -46,7 +46,7 @@ class SharderState {
   SharderState &operator=(const SharderState &&) = delete;
 
   // Table creation.
-  const Table &AddTable(Table &&table);
+  Table *AddTable(Table &&table);
 
   // Only for use when handling OWNS/ACCESSES.
   absl::Status AddTableOwner(

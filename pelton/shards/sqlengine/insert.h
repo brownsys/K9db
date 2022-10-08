@@ -3,6 +3,8 @@
 #define PELTON_SHARDS_SQLENGINE_INSERT_H_
 
 #include <string>
+#include <unordered_set>
+#include <vector>
 
 #include "absl/status/statusor.h"
 #include "pelton/connection.h"
@@ -45,8 +47,11 @@ class InsertContext {
   absl::StatusOr<int> VariableInsert(dataflow::Value &&fkval,
                                      const ShardDescriptor &desc);
 
-  /* Entry point for inserting into the database. */
+  /* Inserting the statement into the database. */
   absl::StatusOr<int> InsertIntoBaseTable();
+
+  /* Recursively moving/copying records in dependent tables into the affected
+     shard. */
 
   /* Members. */
   // Statement being inserted.
@@ -65,6 +70,9 @@ class InsertContext {
 
   // Shared Lock so we can read from the states safetly.
   util::SharedLock *lock_;
+
+  // This vector will store the shardname for each insert.
+  std::vector<std::unordered_set<std::string>> shard_names_;
 };
 
 }  // namespace sqlengine

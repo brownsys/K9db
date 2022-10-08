@@ -30,7 +30,10 @@ namespace sqlengine {
  * Helpers for inserting statement into the database by sharding type.
  */
 int InsertContext::DirectInsert(dataflow::Value &&fkval) {
-  return this->db_->ExecuteInsert(this->stmt_, fkval.AsUnquotedString());
+  std::string shard_name = fkval.AsUnquotedString();
+  int res = this->db_->ExecuteInsert(this->stmt_, shard_name);
+  this->shard_names_.push_back({std::move(shard_name)});
+  return res;
 }
 absl::StatusOr<int> InsertContext::TransitiveInsert(
     dataflow::Value &&fkval, const ShardDescriptor &desc) {
@@ -42,10 +45,13 @@ absl::StatusOr<int> InsertContext::TransitiveInsert(
 
   // We know we dont have duplicates because index does group by.
   int res = 0;
+  this->shard_names_.emplace_back();
   for (dataflow::Record &r : indexed) {
     ASSERT_RET(r.GetUInt(2) > 0, Internal, "Index count 0");
     ASSERT_RET(!r.IsNull(1), Internal, "T Index gives NULL owner");
-    ACCUM(this->db_->ExecuteInsert(this->stmt_, r.GetValueString(1)), res);
+    std::string shard_name = r.GetValueString(1);
+    ACCUM(this->db_->ExecuteInsert(this->stmt_, shard_name), res);
+    this->shard_names_.back().insert(std::move(shard_name));
   }
 
   // Inserting this row before inserting the transitive row pointing to
@@ -62,16 +68,20 @@ absl::StatusOr<int> InsertContext::VariableInsert(dataflow::Value &&fkval,
 
   // We know we dont have duplicates because index does group by.
   int res = 0;
+  this->shard_names_.emplace_back();
   for (dataflow::Record &r : indexed) {
     ASSERT_RET(r.GetUInt(2) > 0, Internal, "Index count 0");
     ASSERT_RET(!r.IsNull(1), Internal, "T Index gives NULL owner");
-    ACCUM(this->db_->ExecuteInsert(this->stmt_, r.GetValueString(1)), res);
+    std::string shard_name = r.GetValueString(1);
+    ACCUM(this->db_->ExecuteInsert(this->stmt_, shard_name), res);
+    this->shard_names_.back().insert(std::move(shard_name));
   }
 
   // This row may be inserted before the corresponding many-to-many
   // rows are inserted into the variable ownership assocation table.
   if (indexed.size() == 0) {
     ACCUM(this->db_->ExecuteInsert(this->stmt_, DEFAULT_SHARD), res);
+    this->shard_names_.back().insert(DEFAULT_SHARD);
   }
   return res;
 }
@@ -80,6 +90,8 @@ absl::StatusOr<int> InsertContext::VariableInsert(dataflow::Value &&fkval,
  * Entry point for inserting into the database.
  */
 absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
+  this->shard_names_ = {};
+
   // Need to insert a copy for each way of sharding the table.
   int res = 0;
   for (const std::unique_ptr<ShardDescriptor> &desc : this->table_.owners) {
@@ -145,11 +157,16 @@ absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
 
   // The insert into this table may affect the sharding of data in dependent
   // tables. Figure this out.
-  for (const auto &[dependent_table, desc] : this->table_.dependents) {
+  for (size_t i = 0; i < this->table_.dependents.size(); i++) {
+    const auto &[dependent_table, desc] = this->table_.dependents.at(i);
+    std::unordered_set<std::string> &shard_names = this->shard_names_.at(i);
     // Only dependent tables for which this table acts as the variable ownership
     // association table can have their data affected by this insert.
     if (desc->type == InfoType::VARIABLE) {
       // TODO(babman): do the recursive copy/move.
+      // Need to copy records in dependent_table that the inserted record points
+      // to into the shard_names.
+      // Select or delete the record, then insert it into shard.
     }
   }
 

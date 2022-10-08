@@ -193,7 +193,7 @@ void EXPECT_TRANSITIVE(Connection *conn, const std::string &table_name,
           info.column_type == column_type && info.next_table == next_table &&
           info.next_column == next_column &&
           info.next_column_index == next_column_index &&
-          owner == info.index.has_value()) {
+          owner == (info.index != nullptr)) {
         found = true;
         break;
       }
@@ -220,7 +220,7 @@ void EXPECT_VARIABLE(Connection *conn, const std::string &table_name,
           info.origin_relation == origin_relation &&
           info.origin_column == origin_column &&
           info.origin_column_index == origin_column_index &&
-          owner == info.index.has_value()) {
+          owner == (info.index != nullptr)) {
         found = true;
         break;
       }
@@ -600,19 +600,14 @@ TEST_F(CreateTest, TwoOwnersTransitive) {
                {INT, INT, INT}, 0, 2, 0);
   EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_sender", 1, INT);
   EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_receiver", 2, INT);
-  EXPECT_DEPENDENTS(&conn, "msg", true, {"delivered", "delivered"},
-                    {"error", "error"});
+  EXPECT_DEPENDENTS(&conn, "msg", true, {"delivered"}, {"error"});
 
-  EXPECT_TABLE(&conn, "delivered", {"id", "OWNER_msg"}, {INT, INT}, 0, 2, 0);
-  EXPECT_TRANSITIVE(&conn, "delivered", true, "user", "OWNER_msg", 1, INT,
-                    "msg", "id", 0);
+  EXPECT_TABLE(&conn, "delivered", {"id", "OWNER_msg"}, {INT, INT}, 0, 1, 0);
   EXPECT_TRANSITIVE(&conn, "delivered", true, "user", "OWNER_msg", 1, INT,
                     "msg", "id", 0);
   EXPECT_DEPENDENTS(&conn, "delivered", true, {}, {});
 
-  EXPECT_TABLE(&conn, "error", {"id", "ACCESSOR_msg"}, {INT, INT}, 0, 0, 2);
-  EXPECT_TRANSITIVE(&conn, "error", false, "user", "ACCESSOR_msg", 1, INT,
-                    "msg", "id", 0);
+  EXPECT_TABLE(&conn, "error", {"id", "ACCESSOR_msg"}, {INT, INT}, 0, 0, 1);
   EXPECT_TRANSITIVE(&conn, "error", false, "user", "ACCESSOR_msg", 1, INT,
                     "msg", "id", 0);
   EXPECT_DEPENDENTS(&conn, "error", true, {}, {});

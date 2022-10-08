@@ -3,32 +3,6 @@
 namespace pelton {
 namespace shards {
 
-std::ostream &operator<<(std::ostream &os, const SimpleIndexInfo &o) {
-  os << o.shard_column;
-  return os;
-}
-
-std::ostream &operator<<(std::ostream &os, const JoinedIndexInfo &o) {
-  os << o.join_table << "." << o.shard_column << " join on " << o.join_column1
-     << " = " << o.join_table << "." << o.join_column2;
-  return os;
-}
-
-std::ostream &operator<<(std::ostream &os, const IndexDescriptor &o) {
-  os << o.index_name << ": { " << o.indexed_table << "." << o.indexed_column
-     << " -> ";
-  switch (o.type) {
-    case IndexType::SIMPLE:
-      os << std::get<SimpleIndexInfo>(o.info);
-      break;
-    case IndexType::JOINED:
-      os << std::get<JoinedIndexInfo>(o.info);
-      break;
-  }
-  os << " }";
-  return os;
-}
-
 std::ostream &operator<<(std::ostream &os, const DirectInfo &o) {
   os << "`" << o.column << "`";
   return os;

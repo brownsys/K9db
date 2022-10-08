@@ -40,30 +40,16 @@ using ColumnName = std::string;
 
 using ColumnIndex = size_t;
 
-// Index information.
-enum class IndexType { SIMPLE, JOINED };
-struct SimpleIndexInfo {
-  ColumnName shard_column;
-};
-struct JoinedIndexInfo {
-  TableName join_table;     // could also be another index/flow.
-  ColumnName join_column1;  // column in indexed table.
-  ColumnName join_column2;  // column in join table.
-  ColumnName shard_column;  // Final shard column, in join table.
-};
-
-// An index is either simple (over a single table) or joined (with another table
-// or index).
+// Index descriptor.
+// An in-memory secondary index over a given table.
+// The index maps values of the specified columns to a list of owners from a
+// particular user/shard kind that own any record in this table with that value.
 struct IndexDescriptor {
   FlowName index_name;
-  TableName indexed_table;
-  ColumnName indexed_column;
-  IndexType type;
-  std::variant<SimpleIndexInfo, JoinedIndexInfo> info;
+  TableName table_name;
+  ShardKind shard_kind;
+  ColumnName column_name;
 };
-
-// Forward declaration.
-struct ShardDescriptor;
 
 // Types of a sharded table.
 // We also use these to describe accessorship as well.
@@ -88,7 +74,6 @@ struct TransitiveInfo {
   // data subject. Following next hops recursively until transitivity is
   // consumed (plus on more step for the direct table) must lead to the data
   // subject table.
-  ShardDescriptor *next;
   TableName next_table;
   ColumnName next_column;
   ColumnIndex next_column_index;
@@ -96,7 +81,7 @@ struct TransitiveInfo {
   // transitive hops.
   // The index maps values of <column> to data subject IDs (for ownership).
   // No index for accessors: this is empty.
-  std::optional<IndexDescriptor> index;
+  IndexDescriptor *index;
 };
 struct VariableInfo {
   // The column in this table that the variable ownership/accessorship table
@@ -106,14 +91,13 @@ struct VariableInfo {
   sqlast::ColumnDefinition::Type column_type;
   // The variable ownership/accessorship table, and the FK column it has that
   // points to this table (to <column> specifically).
-  ShardDescriptor *next;
   TableName origin_relation;
   ColumnName origin_column;
   ColumnIndex origin_column_index;
   // The index for dealing with variability.
   // The index maps values of <column> to data subject IDs (for ownership).
   // No index for accessors: this is empty.
-  std::optional<IndexDescriptor> index;
+  IndexDescriptor *index;
 };
 
 // Specifies one way a table is sharded.
@@ -137,6 +121,11 @@ struct Table {
   // on rows in this table (e.g. owned by a transitive FK into this table).
   std::vector<std::pair<TableName, ShardDescriptor *>> dependents;
   std::vector<std::pair<TableName, ShardDescriptor *>> access_dependents;
+  // All indices created for this table.
+  std::unordered_map<
+      ColumnName,
+      std::unordered_map<ShardKind, std::unique_ptr<IndexDescriptor>>>
+      indices;
 };
 
 // Metadata about a shard.
@@ -153,9 +142,6 @@ struct Shard {
 };
 
 // For debugging / printing.
-std::ostream &operator<<(std::ostream &os, const SimpleIndexInfo &o);
-std::ostream &operator<<(std::ostream &os, const JoinedIndexInfo &o);
-std::ostream &operator<<(std::ostream &os, const IndexDescriptor &o);
 std::ostream &operator<<(std::ostream &os, const DirectInfo &o);
 std::ostream &operator<<(std::ostream &os, const TransitiveInfo &o);
 std::ostream &operator<<(std::ostream &os, const VariableInfo &o);
