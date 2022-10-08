@@ -31,38 +31,46 @@ std::unique_ptr<rocksdb::DB> InitializeDatabase() {
   return std::unique_ptr<rocksdb::DB>(ptr);
 }
 
-bool Eq(const IndexSet &result,
-        const std::vector<std::pair<rocksdb::Slice, rocksdb::Slice>> &expect) {
-  if (result.size() != expect.size()) {
-    return false;
-  }
+void EXPECT_REQ(
+    const IndexSet &result,
+    const std::vector<std::pair<rocksdb::Slice, rocksdb::Slice>> &expect) {
+  EXPECT_EQ(result.size(), expect.size());
   for (const auto &record : result) {
     std::pair<rocksdb::Slice, rocksdb::Slice> pair(record.GetShard(),
                                                    record.GetPK());
-    if (std::find(expect.begin(), expect.end(), pair) == expect.end()) {
-      return false;
-    }
+    EXPECT_NE(std::find(expect.begin(), expect.end(), pair), expect.end());
   }
-  return true;
 }
 
-bool Eq(const PKIndexSet &result, const std::vector<rocksdb::Slice> &expect) {
-  if (result.size() != expect.size()) {
-    return false;
-  }
+void EXPECT_DEQ(
+    const DedupIndexSet &result,
+    const std::vector<std::pair<std::vector<rocksdb::Slice>, rocksdb::Slice>>
+        &expect) {
+  EXPECT_EQ(result.size(), expect.size());
   for (const auto &record : result) {
-    rocksdb::Slice shard = record.GetShard();
-    if (std::find(expect.begin(), expect.end(), shard) == expect.end()) {
-      return false;
+    auto shard = record.GetShard();
+    auto pk = record.GetPK();
+    bool found = false;
+    for (auto &[v, epk] : expect) {
+      if (pk != epk) {
+        continue;
+      }
+      for (auto &eshard : v) {
+        if (shard == eshard) {
+          found = true;
+          break;
+        }
+      }
     }
+    EXPECT_TRUE(found);
   }
-  return true;
 }
 
 // Values for tests.
 rocksdb::Slice z("0");
 rocksdb::Slice o("1");
 rocksdb::Slice t("2");
+rocksdb::Slice h("3");
 rocksdb::Slice pk1("pk1");
 rocksdb::Slice pk2("pk10");
 rocksdb::Slice pk3("pk3");
@@ -83,8 +91,8 @@ TEST(RocksdbIndexTest, GetAll) {
   index.Add(z, shard100, pk2);
   index.Add(o, shard10, pk3);
 
-  EXPECT_TRUE(
-      Eq(index.Get({z, o}), {{shard10, pk1}, {shard100, pk2}, {shard10, pk3}}));
+  EXPECT_REQ(index.Get({z, o}),
+             {{shard10, pk1}, {shard100, pk2}, {shard10, pk3}});
 }
 
 // Does get work with non-existent shard names
@@ -96,7 +104,7 @@ TEST(RocksdbIndexTest, GetNonExistent) {
   index.Add(z, shard100, pk2);
   index.Add(o, shard10, pk3);
 
-  EXPECT_TRUE(Eq(index.Get({t}), {}));
+  EXPECT_REQ(index.Get({t}), {});
 }
 
 // Some column Values passed to get and get_all are non-existent
@@ -108,7 +116,7 @@ TEST(RocksdbIndexTest, GetSomeNonExistent) {
   index.Add(z, shard100, pk2);
   index.Add(o, shard10, pk3);
 
-  EXPECT_TRUE(Eq(index.Get({t, z}), {{shard10, pk1}, {shard100, pk2}}));
+  EXPECT_REQ(index.Get({t, z}), {{shard10, pk1}, {shard100, pk2}});
 }
 
 // Do get and get_all work if no data has been inserted yet?
@@ -116,7 +124,7 @@ TEST(RocksdbIndexTest, NoData) {
   std::unique_ptr<rocksdb::DB> db = InitializeDatabase();
 
   RocksdbIndex index(db.get(), "", 0);
-  EXPECT_TRUE(Eq(index.Get({z, o, t}), {}));
+  EXPECT_REQ(index.Get({z, o, t}), {});
 }
 
 // Does get and all confuse entries where the values are swapped
@@ -126,38 +134,36 @@ TEST(RocksdbIndexTest, SimpleGet) {
   RocksdbIndex index(db.get(), "", 0);
   index.Add(t, shard1, pk1);  // value, shard name, key
   index.Add(z, shard1, pk2);
-  index.Add(z, shard1, pk3);
+  index.Add(z, shard2, pk2);
   index.Add(o, shard2, pk4);
   index.Add(o, shard10, pk5);
   index.Add(z, shard10, pk6);
+  index.Add(h, shard2, pk2);
 
   // 1 value at a time.
-  EXPECT_TRUE(Eq(index.Get({o}), {{shard2, pk4}, {shard10, pk5}}));
-  EXPECT_TRUE(Eq(index.Get({t}), {{shard1, pk1}}));
-  EXPECT_TRUE(
-      Eq(index.Get({z}), {{shard1, pk2}, {shard1, pk3}, {shard10, pk6}}));
+  EXPECT_REQ(index.Get({o}), {{shard2, pk4}, {shard10, pk5}});
+  EXPECT_REQ(index.Get({t, t}), {{shard1, pk1}});
+  EXPECT_REQ(index.Get({z}), {{shard1, pk2}, {shard2, pk2}, {shard10, pk6}});
+  EXPECT_REQ(index.Get({h}), {{shard2, pk2}});
 
   // 2 values at a time.
-  EXPECT_TRUE(
-      Eq(index.Get({t, z}),
-         {{shard1, pk1}, {shard1, pk2}, {shard1, pk3}, {shard10, pk6}}));
-
-  EXPECT_TRUE(
-      Eq(index.Get({o, t}), {{shard2, pk4}, {shard10, pk5}, {shard1, pk1}}));
-
-  EXPECT_TRUE(Eq(index.Get({o, z}), {{shard2, pk4},
-                                     {shard10, pk5},
-                                     {shard1, pk2},
-                                     {shard1, pk3},
-                                     {shard10, pk6}}));
+  EXPECT_REQ(index.Get({h, z}), {{shard1, pk2}, {shard2, pk2}, {shard10, pk6}});
+  EXPECT_REQ(index.Get({t, z}),
+             {{shard1, pk1}, {shard1, pk2}, {shard2, pk2}, {shard10, pk6}});
+  EXPECT_REQ(index.Get({o, t}), {{shard2, pk4}, {shard10, pk5}, {shard1, pk1}});
+  EXPECT_REQ(index.Get({o, z}), {{shard2, pk4},
+                                 {shard10, pk5},
+                                 {shard1, pk2},
+                                 {shard2, pk2},
+                                 {shard10, pk6}});
 
   // All values.
-  EXPECT_TRUE(Eq(index.Get({t, z, o}), {{shard1, pk1},
-                                        {shard1, pk2},
-                                        {shard1, pk3},
-                                        {shard10, pk6},
-                                        {shard2, pk4},
-                                        {shard10, pk5}}));
+  EXPECT_REQ(index.Get({t, z, o, h}), {{shard1, pk1},
+                                       {shard1, pk2},
+                                       {shard2, pk2},
+                                       {shard10, pk6},
+                                       {shard2, pk4},
+                                       {shard10, pk5}});
 }
 
 // Does get and get_all work correctly right after delete
@@ -177,27 +183,56 @@ TEST(RocksdbIndexTest, GetAfterDelete) {
   index.Delete(z, shard1, pk3);
 
   // 1 value at a time.
-  EXPECT_TRUE(Eq(index.Get({o}), {{shard2, pk4}, {shard10, pk5}}));
-  EXPECT_TRUE(Eq(index.Get({t}), {}));
-  EXPECT_TRUE(Eq(index.Get({z}), {{shard1, pk2}, {shard10, pk6}}));
+  EXPECT_REQ(index.Get({o}), {{shard2, pk4}, {shard10, pk5}});
+  EXPECT_REQ(index.Get({t}), {});
+  EXPECT_REQ(index.Get({z, z}), {{shard1, pk2}, {shard10, pk6}});
 
   // 2 values at a time.
-  EXPECT_TRUE(Eq(index.Get({t, z}), {{shard1, pk2}, {shard10, pk6}}));
-
-  EXPECT_TRUE(Eq(index.Get({o, t}), {{shard2, pk4}, {shard10, pk5}}));
-
-  EXPECT_TRUE(
-      Eq(index.Get({o, z}),
-         {{shard2, pk4}, {shard10, pk5}, {shard1, pk2}, {shard10, pk6}}));
+  EXPECT_REQ(index.Get({t, z}), {{shard1, pk2}, {shard10, pk6}});
+  EXPECT_REQ(index.Get({o, t}), {{shard2, pk4}, {shard10, pk5}});
+  EXPECT_REQ(index.Get({o, z}),
+             {{shard2, pk4}, {shard10, pk5}, {shard1, pk2}, {shard10, pk6}});
 
   // All values.
-  EXPECT_TRUE(
-      Eq(index.Get({t, z, o}),
-         {{shard1, pk2}, {shard10, pk6}, {shard2, pk4}, {shard10, pk5}}));
+  EXPECT_REQ(index.Get({t, z, o}),
+             {{shard1, pk2}, {shard10, pk6}, {shard2, pk4}, {shard10, pk5}});
+}
+
+// Get deduplicate truly deduplicates
+TEST(RocksdbIndexTest, GetDedup) {
+  std::unique_ptr<rocksdb::DB> db = InitializeDatabase();
+
+  RocksdbIndex index(db.get(), "", 0);
+  index.Add(t, shard1, pk1);
+  index.Add(z, shard1, pk2);
+  index.Add(z, shard2, pk2);
+  index.Add(z, shard10, pk5);
+  index.Add(o, shard1, pk2);
+  index.Add(o, shard2, pk2);
+  index.Add(o, shard1, pk4);
+
+  // 1 value at a time.
+  EXPECT_DEQ(index.GetDedup({t}), {{{shard1}, pk1}});
+  EXPECT_DEQ(index.GetDedup({z}), {{{shard1, shard2}, pk2}, {{shard10}, pk5}});
+  EXPECT_DEQ(index.GetDedup({o}), {{{shard1, shard2}, pk2}, {{shard1}, pk4}});
+
+  // 2 values at a time.
+  EXPECT_DEQ(index.GetDedup({t, z}),
+             {{{shard1}, pk1}, {{shard1, shard2}, pk2}, {{shard10}, pk5}});
+  EXPECT_DEQ(index.GetDedup({o, t}),
+             {{{shard1}, pk1}, {{shard1, shard2}, pk2}, {{shard1}, pk4}});
+  EXPECT_DEQ(index.GetDedup({o, z}),
+             {{{shard1, shard2}, pk2}, {{shard10}, pk5}, {{shard1}, pk4}});
+
+  // All values.
+  EXPECT_DEQ(index.GetDedup({t, z, o}), {{{shard1}, pk1},
+                                         {{shard1, shard2}, pk2},
+                                         {{shard10}, pk5},
+                                         {{shard1}, pk4}});
 }
 
 // For PK indices.
-TEST(RocksdbIndexTest, GetAfterDeletePK) {
+TEST(RocksdbPKIndex, GetAfterDelete) {
   std::unique_ptr<rocksdb::DB> db = InitializeDatabase();
 
   RocksdbPKIndex index(db.get(), "");
@@ -215,22 +250,56 @@ TEST(RocksdbIndexTest, GetAfterDeletePK) {
   index.Delete(pk3, shard1);
 
   // 1 value at a time.
-  EXPECT_TRUE(Eq(index.Get({pk1}), {shard2, shard10}));
-  EXPECT_TRUE(Eq(index.Get({pk2}), {shard1}));
-  EXPECT_TRUE(Eq(index.Get({pk3}), {}));
-  EXPECT_TRUE(Eq(index.Get({pk4}), {shard2, shard100}));
-  EXPECT_TRUE(Eq(index.Get({pk5}), {shard10}));
-  EXPECT_TRUE(Eq(index.Get({pk6}), {}));
+  EXPECT_REQ(index.Get({pk1}), {{shard2, pk1}, {shard10, pk1}});
+  EXPECT_REQ(index.Get({pk2}), {{shard1, pk2}});
+  EXPECT_REQ(index.Get({pk3}), {});
+  EXPECT_REQ(index.Get({pk4, pk4}), {{shard2, pk4}, {shard100, pk4}});
+  EXPECT_REQ(index.Get({pk5}), {{shard10, pk5}});
+  EXPECT_REQ(index.Get({pk6}), {});
 
   // 2 values at a time.
-  EXPECT_TRUE(Eq(index.Get({pk1, pk2}), {shard2, shard10, shard1}));
-  EXPECT_TRUE(Eq(index.Get({pk1, pk3}), {shard2, shard10}));
-  EXPECT_TRUE(Eq(index.Get({pk3, pk6}), {}));
-  EXPECT_TRUE(Eq(index.Get({pk4, pk5}), {shard2, shard10, shard100}));
+  EXPECT_REQ(index.Get({pk1, pk2}),
+             {{shard2, pk1}, {shard10, pk1}, {shard1, pk2}});
+  EXPECT_REQ(index.Get({pk1, pk3}), {{shard2, pk1}, {shard10, pk1}});
+  EXPECT_REQ(index.Get({pk3, pk6}), {});
+  EXPECT_REQ(index.Get({pk4, pk5}),
+             {{shard2, pk4}, {shard10, pk5}, {shard100, pk4}});
 
   // 3 values.
-  EXPECT_TRUE(Eq(index.Get({pk1, pk2, pk4}),
-                 {shard2, shard2, shard10, shard1, shard100}));
+  EXPECT_REQ(index.Get({pk1, pk2, pk4}), {{shard2, pk1},
+                                          {shard2, pk4},
+                                          {shard10, pk1},
+                                          {shard1, pk2},
+                                          {shard100, pk4}});
+}
+
+TEST(RocksdbPKIndex, GetDedup) {
+  std::unique_ptr<rocksdb::DB> db = InitializeDatabase();
+
+  RocksdbPKIndex index(db.get(), "");
+  index.Add(pk1, shard1);
+  index.Add(pk1, shard2);
+  index.Add(pk2, shard1);
+  index.Add(pk3, shard10);
+  index.Add(pk3, shard2);
+
+  // 1 value at a time.
+  EXPECT_DEQ(index.GetDedup({pk1}), {{{shard1, shard2}, pk1}});
+  EXPECT_DEQ(index.GetDedup({pk2}), {{{shard1}, pk2}});
+  EXPECT_DEQ(index.GetDedup({pk3}), {{{shard10, shard2}, pk3}});
+
+  // 2 values at a time.
+  EXPECT_DEQ(index.GetDedup({pk1, pk2}),
+             {{{shard1, shard2}, pk1}, {{shard1}, pk2}});
+  EXPECT_DEQ(index.GetDedup({pk1, pk3}),
+             {{{shard1, shard2}, pk1}, {{shard10, shard2}, pk3}});
+  EXPECT_DEQ(index.GetDedup({pk2, pk3}),
+             {{{shard1}, pk2}, {{shard10, shard2}, pk3}});
+
+  // 3 values.
+  EXPECT_DEQ(
+      index.GetDedup({pk1, pk2, pk3}),
+      {{{shard1, shard2}, pk1}, {{shard1}, pk2}, {{shard10, shard2}, pk3}});
 }
 
 }  // namespace sql

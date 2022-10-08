@@ -18,9 +18,6 @@
 namespace pelton {
 namespace sql {
 
-using KeySet = std::unordered_set<RocksdbSequence, RocksdbSequence::Hash,
-                                  RocksdbSequence::Equal>;
-
 class RocksdbStream {
  public:
   // Iterator class.
@@ -78,7 +75,8 @@ class RocksdbTable {
   // Index updating.
   void IndexAdd(const rocksdb::Slice &shard, const RocksdbSequence &row);
   void IndexDelete(const rocksdb::Slice &shard, const RocksdbSequence &row);
-  std::optional<KeySet> IndexLookup(sqlast::ValueMapper *value_mapper) const;
+  std::optional<IndexSet> IndexLookup(sqlast::ValueMapper *vm) const;
+  std::optional<DedupIndexSet> IndexLookupDedup(sqlast::ValueMapper *vm) const;
 
   // Check if a record with given PK exists.
   bool Exists(const rocksdb::Slice &pk_value) const;
@@ -97,8 +95,6 @@ class RocksdbTable {
 
   // Read all data from shard.
   RocksdbStream GetShard(const EncryptedPrefix &shard_name) const;
-  std::vector<std::pair<EncryptedKey, EncryptedValue>> DeleteShard(
-      const EncryptedPrefix &shard_name);
 
  private:
   rocksdb::DB *db_;

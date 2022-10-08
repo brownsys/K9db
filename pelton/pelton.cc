@@ -36,7 +36,7 @@ static inline void Trim(std::string &s) {
 }
 
 // Special statements we added to SQL.
-bool echo = true;
+bool echo = false;
 
 std::optional<SqlResult> SpecialStatements(const std::string &sql,
                                            Connection *connection) {

@@ -91,47 +91,52 @@ void RocksdbTable::IndexDelete(const rocksdb::Slice &shard,
 }
 
 // Index Lookup.
-std::optional<KeySet> RocksdbTable::IndexLookup(
+std::optional<IndexSet> RocksdbTable::IndexLookup(
     sqlast::ValueMapper *value_mapper) const {
-  // Hash / equality determined by PK.
-  KeySet result(0, RocksdbSequence::Hash(RocksdbSequence::Slicer(1)),
-                RocksdbSequence::Equal(RocksdbSequence::Slicer(1)));
-
-  // Lookup by PK index.
+  // Find an index to lookup with.
+  std::optional<IndexSet> set;
   if (value_mapper->HasBefore(this->pk_column_)) {
     // Lookup primary index.
     std::vector<std::string> vals =
         value_mapper->ReleaseBefore(this->pk_column_);
     EncodeValues(this->schema_.TypeOf(this->pk_column_), &vals);
-    PKIndexSet set = this->pk_index_.Get(Transform(vals));
-
-    // Transform to result.
-    for (const RocksdbPKIndexRecord &ir : set) {
-      RocksdbSequence entry;
-      entry.AppendEncoded(ir.GetShard());
-      entry.AppendEncoded(ir.GetPK());
-      result.insert(std::move(entry));
-    }
-    return result;
+    return this->pk_index_.Get(Transform(vals));
   }
 
   // Lookup by first available non PK index.
   for (size_t col = 0; col < this->schema_.size(); col++) {
     const std::optional<RocksdbIndex> &index = this->indices_.at(col);
-    if (!index.has_value() || !value_mapper->HasBefore(col)) {
-      continue;
+    if (index.has_value() && value_mapper->HasBefore(col)) {
+      // Lookup col index.
+      std::vector<std::string> vals = value_mapper->ReleaseBefore(col);
+      EncodeValues(this->schema_.TypeOf(col), &vals);
+      return index->Get(Transform(vals));
     }
+  }
 
-    // Lookup col index.
-    std::vector<std::string> vals = value_mapper->ReleaseBefore(col);
-    EncodeValues(this->schema_.TypeOf(col), &vals);
-    IndexSet set = index->Get(Transform(vals));
+  return {};
+}
+std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
+    sqlast::ValueMapper *value_mapper) const {
+  // Find an index to lookup with.
+  std::optional<IndexSet> set;
+  if (value_mapper->HasBefore(this->pk_column_)) {
+    // Lookup primary index.
+    std::vector<std::string> vals =
+        value_mapper->ReleaseBefore(this->pk_column_);
+    EncodeValues(this->schema_.TypeOf(this->pk_column_), &vals);
+    return this->pk_index_.GetDedup(Transform(vals));
+  }
 
-    // Transform to result.
-    for (const RocksdbIndexRecord &ir : set) {
-      result.emplace(ir.TargetKey());
+  // Lookup by first available non PK index.
+  for (size_t col = 0; col < this->schema_.size(); col++) {
+    const std::optional<RocksdbIndex> &index = this->indices_.at(col);
+    if (index.has_value() && value_mapper->HasBefore(col)) {
+      // Lookup col index.
+      std::vector<std::string> vals = value_mapper->ReleaseBefore(col);
+      EncodeValues(this->schema_.TypeOf(col), &vals);
+      return index->GetDedup(Transform(vals));
     }
-    return result;
   }
 
   return {};
@@ -237,20 +242,6 @@ RocksdbStream RocksdbTable::GetShard(const EncryptedPrefix &shard_name) const {
   rocksdb::Iterator *it = this->db_->NewIterator(options, this->handle_.get());
   it->Seek(shard_name.Data());
   return RocksdbStream(it);
-}
-
-// Delete all data in a shard.
-// Return deleted data.
-std::vector<std::pair<EncryptedKey, EncryptedValue>> RocksdbTable::DeleteShard(
-    const EncryptedPrefix &shard_name) {
-  // Get the shard data.
-  std::vector<std::pair<EncryptedKey, EncryptedValue>> data =
-      this->GetShard(shard_name).ToVector();
-  // Delete the shard data.
-  for (const auto &[key, _] : data) {
-    this->Delete(key);
-  }
-  return data;
 }
 
 /*

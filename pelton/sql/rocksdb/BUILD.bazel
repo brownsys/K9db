@@ -9,12 +9,15 @@ cc_library(
         "connection_insert.cc",
         "connection_schema.cc",
         "connection_select.cc",
+        "connection_shard.cc",
     ],
     hdrs = [
         "connection.h",
+        "connection_helpers.cc",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
+        ":dedup",
         ":encode",
         ":encryption",
         ":filter",
@@ -29,6 +32,18 @@ cc_library(
         "//pelton/util:status",
         "@glog",
         "@rocksdb",
+    ],
+)
+
+cc_library(
+    name = "dedup",
+    srcs = [],
+    hdrs = [
+        "dedup.h",
+    ],
+    visibility = ["//pelton/sql:__subpackages__"],
+    deps = [
+        ":encode",
     ],
 )
 
@@ -113,6 +128,7 @@ cc_library(
         "index.h",
     ],
     deps = [
+        ":dedup",
         ":encode",
         "//pelton/util:status",
         "@glog",

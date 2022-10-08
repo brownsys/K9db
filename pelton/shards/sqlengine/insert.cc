@@ -29,12 +29,11 @@ namespace sqlengine {
 /*
  * Helpers for inserting statement into the database by sharding type.
  */
-int InsertContext::DirectInsert(dataflow::Value &&fkval, size_t cpy) {
-  return this->db_->ExecuteInsert(this->stmt_, fkval.AsUnquotedString(), cpy);
+int InsertContext::DirectInsert(dataflow::Value &&fkval) {
+  return this->db_->ExecuteInsert(this->stmt_, fkval.AsUnquotedString());
 }
-absl::StatusOr<int> InsertContext::TransitiveInsert(dataflow::Value &&fkval,
-                                                    const ShardDescriptor &desc,
-                                                    size_t cpy) {
+absl::StatusOr<int> InsertContext::TransitiveInsert(
+    dataflow::Value &&fkval, const ShardDescriptor &desc) {
   // Insert into shards of users as determined via transitive index.
   const TransitiveInfo &info = std::get<TransitiveInfo>(desc.info);
   const IndexDescriptor &index = *info.index;
@@ -46,7 +45,7 @@ absl::StatusOr<int> InsertContext::TransitiveInsert(dataflow::Value &&fkval,
   for (dataflow::Record &r : indexed) {
     ASSERT_RET(r.GetUInt(2) > 0, Internal, "Index count 0");
     ASSERT_RET(!r.IsNull(1), Internal, "T Index gives NULL owner");
-    ACCUM(this->db_->ExecuteInsert(this->stmt_, r.GetValueString(1), cpy), res);
+    ACCUM(this->db_->ExecuteInsert(this->stmt_, r.GetValueString(1)), res);
   }
 
   // Inserting this row before inserting the transitive row pointing to
@@ -55,8 +54,7 @@ absl::StatusOr<int> InsertContext::TransitiveInsert(dataflow::Value &&fkval,
   return res;
 }
 absl::StatusOr<int> InsertContext::VariableInsert(dataflow::Value &&fkval,
-                                                  const ShardDescriptor &desc,
-                                                  size_t cpy) {
+                                                  const ShardDescriptor &desc) {
   const VariableInfo &info = std::get<VariableInfo>(desc.info);
   const IndexDescriptor &index = *info.index;
   std::vector<dataflow::Record> indexed =
@@ -67,13 +65,13 @@ absl::StatusOr<int> InsertContext::VariableInsert(dataflow::Value &&fkval,
   for (dataflow::Record &r : indexed) {
     ASSERT_RET(r.GetUInt(2) > 0, Internal, "Index count 0");
     ASSERT_RET(!r.IsNull(1), Internal, "T Index gives NULL owner");
-    ACCUM(this->db_->ExecuteInsert(this->stmt_, r.GetValueString(1), cpy), res);
+    ACCUM(this->db_->ExecuteInsert(this->stmt_, r.GetValueString(1)), res);
   }
 
   // This row may be inserted before the corresponding many-to-many
   // rows are inserted into the variable ownership assocation table.
   if (indexed.size() == 0) {
-    ACCUM(this->db_->ExecuteInsert(this->stmt_, DEFAULT_SHARD, cpy), res);
+    ACCUM(this->db_->ExecuteInsert(this->stmt_, DEFAULT_SHARD), res);
   }
   return res;
 }
@@ -84,9 +82,7 @@ absl::StatusOr<int> InsertContext::VariableInsert(dataflow::Value &&fkval,
 absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
   // Need to insert a copy for each way of sharding the table.
   int res = 0;
-  for (size_t cpy = 0; cpy < this->table_.owners.size(); cpy++) {
-    const std::unique_ptr<ShardDescriptor> &desc = this->table_.owners.at(cpy);
-
+  for (const std::unique_ptr<ShardDescriptor> &desc : this->table_.owners) {
     // Identify value of the column along which we are sharding.
     size_t colidx = EXTRACT_VARIANT(column_index, desc->info);
     const std::string &colname = EXTRACT_VARIANT(column, desc->info);
@@ -97,15 +93,15 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
     // Handle according to sharding type.
     switch (desc->type) {
       case InfoType::DIRECT: {
-        ACCUM(this->DirectInsert(std::move(val), cpy), res);
+        ACCUM(this->DirectInsert(std::move(val)), res);
         break;
       }
       case InfoType::TRANSITIVE: {
-        ACCUM_STATUS(this->TransitiveInsert(std::move(val), *desc, cpy), res);
+        ACCUM_STATUS(this->TransitiveInsert(std::move(val), *desc), res);
         break;
       }
       case InfoType::VARIABLE: {
-        ACCUM_STATUS(this->VariableInsert(std::move(val), *desc, cpy), res);
+        ACCUM_STATUS(this->VariableInsert(std::move(val), *desc), res);
         break;
       }
       default:
@@ -120,7 +116,7 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
 
   // If no OWNERs detected, we insert into global/default shard.
   if (this->table_.owners.size() == 0) {
-    ACCUM(this->db_->ExecuteInsert(this->stmt_, DEFAULT_SHARD, 0), res);
+    ACCUM(this->db_->ExecuteInsert(this->stmt_, DEFAULT_SHARD), res);
   }
 
   return res;

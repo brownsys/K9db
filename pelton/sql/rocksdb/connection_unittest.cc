@@ -91,6 +91,14 @@ void InitializeDatabase() {
   CONN->Open(DB_NAME);
 }
 
+// Clear the database.
+void CleanDatabase() {
+  CONN->Close();
+  CONN = nullptr;
+  // Drop the database (if it exists).
+  std::filesystem::remove_all(DB_PATH);
+}
+
 void CreateTable() {
   // Create Table.
   sqlast::CreateTable tbl("test_table");
@@ -99,7 +107,7 @@ void CreateTable() {
   tbl.AddColumn("age", sqlast::ColumnDefinition("age", CType::INT));
   tbl.MutableColumn("ID").AddConstraint(
       sqlast::ColumnConstraint(Constraint::PRIMARY_KEY));
-  EXPECT_TRUE(CONN->ExecuteCreateTable(tbl, 2));
+  EXPECT_TRUE(CONN->ExecuteCreateTable(tbl));
 }
 
 void CreateNameIndex() {
@@ -112,22 +120,20 @@ void InsertData() {
   // Insert into table.
   sqlast::Insert insert("test_table", false);
   insert.SetValues({"0", "'user1'", "20"});
-  EXPECT_EQ(CONN->ExecuteInsert(insert, "user1", 0), 1);
+  EXPECT_EQ(CONN->ExecuteInsert(insert, "user1"), 1);
 
   insert.SetValues({"1", "'user2'", "25"});
-  EXPECT_EQ(CONN->ExecuteInsert(insert, "user2", 1), 1);
+  EXPECT_EQ(CONN->ExecuteInsert(insert, "user2"), 1);
 
   insert.SetValues({"2", "'user3'", "30"});
-  EXPECT_EQ(CONN->ExecuteInsert(insert, "user3", 0), 1);
+  EXPECT_EQ(CONN->ExecuteInsert(insert, "user3"), 1);
 
   insert.SetValues({"3", "'user3'", "35"});
-  EXPECT_EQ(CONN->ExecuteInsert(insert, "user3", 0), 1);
+  EXPECT_EQ(CONN->ExecuteInsert(insert, "user3"), 1);
 
   insert.SetValues({"3", "'user3'", "35"});
-  EXPECT_EQ(CONN->ExecuteInsert(insert, "user3", 1), 1);
+  EXPECT_EQ(CONN->ExecuteInsert(insert, "user2"), 1);
 }
-
-void CleanUpDatabase() { CONN = nullptr; }
 
 }  // namespace
 
@@ -247,27 +253,33 @@ std::ostream &operator<<(std::ostream &o, const SqlResultSet &v) {
  */
 
 /*
+ * google test fixture class, allows us to manage the connection and
+ * initialize / destruct it for every test.
+ */
+class RocksdbConnectionTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    InitializeDatabase();
+    CreateTable();
+    CreateNameIndex();
+    InsertData();
+  }
+
+  void TearDown() override { CleanDatabase(); }
+};
+
+/*
  * Simple test.
  */
-TEST(RocksdbConnectionTest, CreateInsertSelect) {
-  InitializeDatabase();
-  CreateTable();
-  InsertData();
-
+TEST_F(RocksdbConnectionTest, CreateInsertSelect) {
   // Select all records.
   EXPECT_EQ(SelectAll(), GetRecords({0, 1, 2, 3}));
-
-  CleanUpDatabase();
 }
 
 /*
  * Simple select with project.
  */
-TEST(RocksdbConnectionTest, SelectAllProject) {
-  InitializeDatabase();
-  CreateTable();
-  InsertData();
-
+TEST_F(RocksdbConnectionTest, SelectAllProject) {
   // Select all records with projection.
   sqlast::Select select("test_table");
   select.AddColumn("1");
@@ -285,31 +297,19 @@ TEST(RocksdbConnectionTest, SelectAllProject) {
   expected.emplace_back(projected, true, 1_s, STR("ID"), STR("user3"));
 
   EXPECT_EQ(result, expected);
-
-  CleanUpDatabase();
 }
 
 /*
  * Select / Delete by primary key.
  */
-TEST(RocksdbConnectionTest, SelectByPK) {
-  InitializeDatabase();
-  CreateTable();
-  InsertData();
-
+TEST_F(RocksdbConnectionTest, SelectByPK) {
   EXPECT_EQ(SelectBy("ID", "0"), GetRecords({0}));
   EXPECT_EQ(SelectBy("ID", "1"), GetRecords({1}));
   EXPECT_EQ(SelectBy("ID", "2"), GetRecords({2}));
   EXPECT_EQ(SelectBy("ID", "3"), GetRecords({3}));
   EXPECT_EQ(SelectBy("ID", "4"), EMPTY);
-
-  CleanUpDatabase();
 }
-TEST(RocksdbConnectionTest, DeleteByPK) {
-  InitializeDatabase();
-  CreateTable();
-  InsertData();
-
+TEST_F(RocksdbConnectionTest, DeleteByPK) {
   EXPECT_EQ(DeleteBy("ID", "0"), GetRecords({0}));
   EXPECT_EQ(SelectBy("ID", "0"), EMPTY);
   EXPECT_EQ(SelectAll(), GetRecords({1, 2, 3}));
@@ -318,30 +318,22 @@ TEST(RocksdbConnectionTest, DeleteByPK) {
   EXPECT_EQ(SelectBy("ID", "2"), EMPTY);
   EXPECT_EQ(SelectAll(), GetRecords({1, 3}));
 
-  CleanUpDatabase();
+  EXPECT_EQ(DeleteBy("ID", "3"), GetRecords({3}));
+  EXPECT_EQ(SelectBy("ID", "3"), EMPTY);
+  EXPECT_EQ(SelectAll(), GetRecords({1}));
 }
 
 /*
  * Select / Delete by primary key and filter.
  */
-TEST(RocksdbConnectionTest, SelectByPKAndFilter) {
-  InitializeDatabase();
-  CreateTable();
-  InsertData();
-
+TEST_F(RocksdbConnectionTest, SelectByPKAndFilter) {
   EXPECT_EQ(SelectBy({{"ID", {"0"}}, {"name", {"'user1'"}}}), GetRecords({0}));
   EXPECT_EQ(SelectBy({{"ID", {"0"}}, {"name", {"'user2'"}}}), EMPTY);
   EXPECT_EQ(SelectBy({{"ID", {"1"}}, {"name", {"'user2'"}}}), GetRecords({1}));
   EXPECT_EQ(SelectBy({{"ID", {"10"}}, {"name", {"'user2'"}}}), EMPTY);
-
-  CleanUpDatabase();
 }
 
-TEST(RocksdbConnectionTest, DeleteByPKAndFilter) {
-  InitializeDatabase();
-  CreateTable();
-  InsertData();
-
+TEST_F(RocksdbConnectionTest, DeleteByPKAndFilter) {
   EXPECT_EQ(DeleteBy({{"ID", {"0"}}, {"name", {"'user1'"}}}), GetRecords({0}));
   EXPECT_EQ(SelectBy("ID", "0"), EMPTY);
   EXPECT_EQ(SelectAll(), GetRecords({1, 2, 3}));
@@ -356,29 +348,19 @@ TEST(RocksdbConnectionTest, DeleteByPKAndFilter) {
 
   EXPECT_EQ(DeleteBy({{"ID", {"10"}}, {"name", {"'user2'"}}}), EMPTY);
   EXPECT_EQ(SelectAll(), GetRecords({2, 3}));
-
-  CleanUpDatabase();
 }
 
 /*
  * Select / Delete by non-indexed column
  */
-TEST(RocksdbConnectionTest, SelectByNonIndex) {
-  InitializeDatabase();
-  CreateTable();
-  InsertData();
-
+TEST_F(RocksdbConnectionTest, SelectByNonIndex) {
   EXPECT_EQ(SelectBy("name", "'user0'"), EMPTY);
   EXPECT_EQ(SelectBy("name", "'user1'"), GetRecords({0}));
   EXPECT_EQ(SelectBy("name", "'user2'"), GetRecords({1}));
   EXPECT_EQ(SelectBy("name", "'user3'"), GetRecords({2, 3}));
 }
 
-TEST(RocksdbConnectionTest, DeleteByNonIndex) {
-  InitializeDatabase();
-  CreateTable();
-  InsertData();
-
+TEST_F(RocksdbConnectionTest, DeleteByNonIndex) {
   EXPECT_EQ(DeleteBy("name", "'user0'"), EMPTY);
   EXPECT_EQ(SelectBy("name", "'user0'"), EMPTY);
   EXPECT_EQ(SelectAll(), GetRecords({0, 1, 2, 3}));
@@ -390,33 +372,19 @@ TEST(RocksdbConnectionTest, DeleteByNonIndex) {
   EXPECT_EQ(DeleteBy("name", "'user3'"), GetRecords({2, 3}));
   EXPECT_EQ(SelectBy("name", "'user3'"), EMPTY);
   EXPECT_EQ(SelectAll(), GetRecords({1}));
-
-  CleanUpDatabase();
 }
 
 /*
  * Select / Delete by indexed column
  */
-TEST(RocksdbConnectionTest, SelectByIndex) {
-  InitializeDatabase();
-  CreateTable();
-  CreateNameIndex();
-  InsertData();
-
+TEST_F(RocksdbConnectionTest, SelectByIndex) {
   EXPECT_EQ(SelectBy("name", "'user0'"), EMPTY);
   EXPECT_EQ(SelectBy("name", "'user1'"), GetRecords({0}));
   EXPECT_EQ(SelectBy("name", "'user2'"), GetRecords({1}));
   EXPECT_EQ(SelectBy("name", "'user3'"), GetRecords({2, 3}));
-
-  CleanUpDatabase();
 }
 
-TEST(RocksdbConnectionTest, DeleteByIndex) {
-  InitializeDatabase();
-  CreateTable();
-  CreateNameIndex();
-  InsertData();
-
+TEST_F(RocksdbConnectionTest, DeleteByIndex) {
   EXPECT_EQ(DeleteBy("name", "'user0'"), EMPTY);
   EXPECT_EQ(SelectBy("name", "'user0'"), EMPTY);
   EXPECT_EQ(SelectAll(), GetRecords({0, 1, 2, 3}));
@@ -428,26 +396,19 @@ TEST(RocksdbConnectionTest, DeleteByIndex) {
   EXPECT_EQ(DeleteBy("name", "'user3'"), GetRecords({2, 3}));
   EXPECT_EQ(SelectBy("name", "'user3'"), EMPTY);
   EXPECT_EQ(SelectAll(), GetRecords({1}));
-
-  CleanUpDatabase();
 }
 
 /*
  * Select / Delete by in
  */
-TEST(RocksdbConnectionTest, SelectByIn) {
-  InitializeDatabase();
-  CreateTable();
-  CreateNameIndex();
-  InsertData();
-
+TEST_F(RocksdbConnectionTest, SelectByIn) {
   EXPECT_EQ(SelectBy({{"ID", {"0", "1", "3"}}}), GetRecords({0, 1, 3}));
   EXPECT_EQ(SelectBy({{"name", {"'user0'", "'user1'", "'user3'"}}}),
             GetRecords({0, 2, 3}));
   EXPECT_EQ(SelectBy({{"age", {"25", "30"}}}), GetRecords({1, 2}));
 }
 
-TEST(RocksdbConnectionTest, DeleteByIn) {
+TEST_F(RocksdbConnectionTest, DeleteByIn) {
   InitializeDatabase();
   CreateTable();
   CreateNameIndex();
@@ -471,8 +432,61 @@ TEST(RocksdbConnectionTest, DeleteByIn) {
   EXPECT_EQ(DeleteBy({{"age", {"25", "30"}}}), GetRecords({1, 2}));
   EXPECT_EQ(SelectBy({{"name", {"'user0'", "'user1'", "'user3'"}}}),
             GetRecords({0, 3}));
+}
 
-  CleanUpDatabase();
+TEST_F(RocksdbConnectionTest, GetShard) {
+  EXPECT_EQ(CONN->GetShard("test_table", "user1"), GetRecords({0}));
+  EXPECT_EQ(CONN->GetShard("test_table", "user2"), GetRecords({1, 3}));
+  EXPECT_EQ(CONN->GetShard("test_table", "user3"), GetRecords({2, 3}));
+  EXPECT_EQ(CONN->GetShard("test_table", "user4"), EMPTY);
+}
+
+TEST_F(RocksdbConnectionTest, DeleteShard) {
+  // Ensure records exist.
+  EXPECT_EQ(SelectBy("ID", "0"), GetRecords({0}));
+  EXPECT_EQ(SelectBy("ID", "1"), GetRecords({1}));
+  EXPECT_EQ(SelectBy("ID", "2"), GetRecords({2}));
+  EXPECT_EQ(SelectBy("ID", "3"), GetRecords({3}));
+
+  // Delete user2, shared row stays with user3.
+  EXPECT_EQ(CONN->DeleteShard("test_table", "user2"), GetRecords({1, 3}));
+  EXPECT_EQ(CONN->GetShard("test_table", "user2"), EMPTY);
+  EXPECT_EQ(SelectBy("ID", "0"), GetRecords({0}));
+  EXPECT_EQ(SelectBy("ID", "1"), EMPTY);
+  EXPECT_EQ(SelectBy("ID", "2"), GetRecords({2}));
+  EXPECT_EQ(SelectBy("ID", "3"), GetRecords({3}));
+
+  EXPECT_EQ(CONN->DeleteShard("test_table", "user3"), GetRecords({2, 3}));
+  EXPECT_EQ(CONN->GetShard("test_table", "user3"), EMPTY);
+  EXPECT_EQ(SelectBy("ID", "0"), GetRecords({0}));
+  EXPECT_EQ(SelectBy("ID", "1"), EMPTY);
+  EXPECT_EQ(SelectBy("ID", "2"), EMPTY);
+  EXPECT_EQ(SelectBy("ID", "3"), EMPTY);
+
+  EXPECT_EQ(CONN->DeleteShard("test_table", "user1"), GetRecords({0}));
+  EXPECT_EQ(CONN->GetShard("test_table", "user1"), EMPTY);
+
+  // Table is now empty!
+  sqlast::Select select("test_table");
+  select.AddColumn("*");
+  EXPECT_EQ(CONN->ExecuteSelect(select), EMPTY);
+  EXPECT_EQ(CONN->GetAll("test_table"), EMPTY);
+}
+
+TEST_F(RocksdbConnectionTest, GetAllDeleteAll) {
+  // Get all records in table: shared record appears only once!
+  sqlast::Select select("test_table");
+  select.AddColumn("*");
+  EXPECT_EQ(CONN->ExecuteSelect(select), GetRecords({0, 1, 2, 3}));
+  EXPECT_EQ(CONN->GetAll("test_table"), GetRecords({0, 1, 2, 3}));
+
+  // Delete all records in table!
+  sqlast::Delete delete_("test_table");
+  EXPECT_EQ(CONN->ExecuteDelete(delete_), GetRecords({0, 1, 2, 3}));
+
+  // Table is now empty!
+  EXPECT_EQ(CONN->ExecuteSelect(select), EMPTY);
+  EXPECT_EQ(CONN->GetAll("test_table"), EMPTY);
 }
 
 }  // namespace sql

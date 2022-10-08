@@ -250,38 +250,6 @@ rocksdb::Slice RocksdbSequence::Iterator::operator*() const {
 }
 
 /*
- * RocksdbSequence::{Slicer, Hash, Equal}
- */
-RocksdbSequence::Slicer::Slicer() : start_(0), count_(0) {}
-RocksdbSequence::Slicer::Slicer(size_t pos) : start_(pos), count_(1) {}
-RocksdbSequence::Slicer::Slicer(size_t start, size_t count)
-    : start_(start), count_(count) {
-  CHECK_GE(count, 1u);
-}
-
-std::string_view RocksdbSequence::Slicer::Slice(
-    const RocksdbSequence &o) const {
-  rocksdb::Slice slice;
-  if (this->count_ == 0) {  // Everything.
-    slice = o.Data();
-  } else if (this->count_ == 1) {  // Single entry.
-    slice = o.At(this->start_);
-  } else {  // A slice.
-    slice = o.Slice(this->start_, this->count_);
-  }
-  return std::string_view(slice.data(), slice.size());
-}
-
-size_t RocksdbSequence::Hash::operator()(const RocksdbSequence &o) const {
-  return this->hash_(this->slicer_.Slice(o));
-}
-
-bool RocksdbSequence::Equal::operator()(const RocksdbSequence &l,
-                                        const RocksdbSequence &r) const {
-  return this->slicer_.Slice(l) == this->slicer_.Slice(r);
-}
-
-/*
  * RocksdbRecord
  */
 // Construct a record when handling SQL statements.
@@ -356,12 +324,11 @@ RocksdbRecord RocksdbRecord::Update(
 }
 
 /*
- * RocksdbIndexRecord
+ * RocksdbIndexInternalRecord.
  */
-// When handling SQL statements.
-RocksdbIndexRecord::RocksdbIndexRecord(const rocksdb::Slice &index_value,
-                                       const rocksdb::Slice &shard_name,
-                                       const rocksdb::Slice &pk)
+RocksdbIndexInternalRecord::RocksdbIndexInternalRecord(
+    const rocksdb::Slice &index_value, const rocksdb::Slice &shard_name,
+    const rocksdb::Slice &pk)
     : data_() {
   this->data_.AppendEncoded(index_value);
   this->data_.AppendEncoded(shard_name);
@@ -369,68 +336,49 @@ RocksdbIndexRecord::RocksdbIndexRecord(const rocksdb::Slice &index_value,
 }
 
 // For reading/decoding.
-rocksdb::Slice RocksdbIndexRecord::GetShard() const {
+rocksdb::Slice RocksdbIndexInternalRecord::GetShard() const {
   return this->data_.At(1);
 }
-rocksdb::Slice RocksdbIndexRecord::GetPK() const { return this->data_.At(2); }
+rocksdb::Slice RocksdbIndexInternalRecord::GetPK() const {
+  return this->data_.At(2);
+}
+
 // For looking up records corresponding to index entry.
-rocksdb::Slice RocksdbIndexRecord::TargetKey() const {
-  return this->data_.Slice(1, 2);
+RocksdbIndexRecord RocksdbIndexInternalRecord::TargetKey() const {
+  return RocksdbIndexRecord(this->data_.Slice(1, 2));
 }
 
 /*
- * RocksdbIndexRecord::{TargetHash, TargetEqual}
+ * RocksdbPKIndexInternalRecord.
  */
-RocksdbIndexRecord::TargetHash::TargetHash()
-    : hash_(RocksdbSequence::Slicer(1, 2)) {}
-
-size_t RocksdbIndexRecord::TargetHash::operator()(
-    const RocksdbIndexRecord &r) const {
-  return this->hash_(r.Sequence());
-}
-
-RocksdbIndexRecord::TargetEqual::TargetEqual()
-    : equal_(RocksdbSequence::Slicer(1, 2)) {}
-
-bool RocksdbIndexRecord::TargetEqual::operator()(
-    const RocksdbIndexRecord &l, const RocksdbIndexRecord &r) const {
-  return this->equal_(l.Sequence(), r.Sequence());
-}
-
-/*
- * RocksdbPKIndexRecord
- */
-RocksdbPKIndexRecord::RocksdbPKIndexRecord(const rocksdb::Slice &pk_value,
-                                           const rocksdb::Slice &shard_name)
+RocksdbPKIndexInternalRecord::RocksdbPKIndexInternalRecord(
+    const rocksdb::Slice &pk_val, const rocksdb::Slice &shard_name)
     : data_() {
-  this->data_.AppendEncoded(pk_value);
+  this->data_.AppendEncoded(pk_val);
   this->data_.AppendEncoded(shard_name);
 }
 
 // For reading/decoding.
-rocksdb::Slice RocksdbPKIndexRecord::GetPK() const { return this->data_.At(0); }
-rocksdb::Slice RocksdbPKIndexRecord::GetShard() const {
+rocksdb::Slice RocksdbPKIndexInternalRecord::GetPK() const {
+  return this->data_.At(0);
+}
+rocksdb::Slice RocksdbPKIndexInternalRecord::GetShard() const {
   return this->data_.At(1);
 }
 
+// For looking up records corresponding to index entry.
+RocksdbIndexRecord RocksdbPKIndexInternalRecord::TargetKey() const {
+  RocksdbSequence output;
+  output.AppendEncoded(this->GetShard());
+  output.AppendEncoded(this->GetPK());
+  return RocksdbIndexRecord(std::move(output));
+}
+
 /*
- * RocksdbPKIndexRecord::{ShardNameHash, ShardNameEqual}
+ * RocksdbIndexRecord.
  */
-RocksdbPKIndexRecord::ShardNameHash::ShardNameHash()
-    : hash_(RocksdbSequence::Slicer(1)) {}
-
-size_t RocksdbPKIndexRecord::ShardNameHash::operator()(
-    const RocksdbPKIndexRecord &r) const {
-  return this->hash_(r.Sequence());
-}
-
-RocksdbPKIndexRecord::ShardNameEqual::ShardNameEqual()
-    : equal_(RocksdbSequence::Slicer(1)) {}
-
-bool RocksdbPKIndexRecord::ShardNameEqual::operator()(
-    const RocksdbPKIndexRecord &l, const RocksdbPKIndexRecord &r) const {
-  return this->equal_(l.Sequence(), r.Sequence());
-}
+rocksdb::Slice RocksdbIndexRecord::GetShard() const { return data_.At(0); }
+rocksdb::Slice RocksdbIndexRecord::GetPK() const { return data_.At(1); }
 
 }  // namespace sql
 }  // namespace pelton

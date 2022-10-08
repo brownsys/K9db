@@ -23,17 +23,18 @@ class AbstractConnection {
   virtual void Close() = 0;
 
   // Statements.
-  virtual bool ExecuteCreateTable(const sqlast::CreateTable &sql,
-                                  size_t copies) = 0;
+  virtual bool ExecuteCreateTable(const sqlast::CreateTable &sql) = 0;
 
   virtual bool ExecuteCreateIndex(const sqlast::CreateIndex &sql) = 0;
 
   // Insert.
   virtual int ExecuteInsert(const sqlast::Insert &sql,
-                            const std::string &shard_name, size_t copy) = 0;
+                            const std::string &shard_name) = 0;
 
   // Delete.
   virtual SqlResultSet ExecuteDelete(const sqlast::Delete &sql) = 0;
+  virtual SqlResultSet DeleteShard(const std::string &table_name,
+                                   const std::string &shard_name) = 0;
 
   // Selects.
   virtual SqlResultSet ExecuteSelect(const sqlast::Select &sql) const = 0;
@@ -42,8 +43,6 @@ class AbstractConnection {
 
   // Everything in a table.
   virtual SqlResultSet GetAll(const std::string &table_name) const = 0;
-  virtual SqlResultSet GetAll(const std::string &table_name,
-                              size_t copy) const = 0;
 };
 
 }  // namespace sql

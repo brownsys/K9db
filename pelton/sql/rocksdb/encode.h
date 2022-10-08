@@ -103,44 +103,6 @@ class RocksdbSequence {
   // For reading/decoding into dataflow.
   dataflow::Record DecodeRecord(const dataflow::SchemaRef &schema) const;
 
-  // For use in hashing based containers.
-  class Slicer {
-   public:
-    Slicer();  // Everything.
-    explicit Slicer(size_t pos);
-    Slicer(size_t start, size_t count);
-
-    std::string_view Slice(const RocksdbSequence &o) const;
-
-   private:
-    size_t start_;
-    size_t count_;
-    bool all_;
-  };
-
-  class Hash {
-   public:
-    explicit Hash(const Slicer &slicer) : slicer_(slicer) {}
-
-    // Hash function.
-    size_t operator()(const RocksdbSequence &o) const;
-
-   private:
-    Slicer slicer_;
-    std::hash<std::string_view> hash_;
-  };
-
-  class Equal {
-   public:
-    explicit Equal(const Slicer &slicer) : slicer_(slicer) {}
-
-    // Equal function.
-    bool operator()(const RocksdbSequence &l, const RocksdbSequence &r) const;
-
-   private:
-    Slicer slicer_;
-  };
-
  private:
   std::string data_;
 };
@@ -182,16 +144,75 @@ class RocksdbRecord {
   RocksdbSequence value_;
 };
 
+// The output/lookup records returned by both RocksdbIndex and RocksdbPKIndex.
 class RocksdbIndexRecord {
  public:
   // Construct when reading from rocksdb.
   explicit RocksdbIndexRecord(const rocksdb::Slice &slice) : data_(slice) {}
-  explicit RocksdbIndexRecord(std::string &&str) : data_(std::move(str)) {}
+  explicit RocksdbIndexRecord(RocksdbSequence &&data)
+      : data_(std::move(data)) {}
+
+  // For writing/encoding.
+  const RocksdbSequence &Sequence() const { return this->data_; }
+  rocksdb::Slice Data() const { return this->data_.Data(); }
+  RocksdbSequence &&Release() { return std::move(this->data_); }
+
+  // For reading/decoding.
+  rocksdb::Slice GetShard() const;
+  rocksdb::Slice GetPK() const;
+
+ private:
+  RocksdbSequence data_;
+
+  // For use in hashing based containers.
+  enum class Target { PK, SHARD_AND_PK };
+  template <Target T>
+  struct EqualT {
+    // Equal function.
+    bool operator()(const RocksdbIndexRecord &l,
+                    const RocksdbIndexRecord &r) const {
+      if constexpr (T == Target::PK) {
+        return l.GetPK() == r.GetPK();
+      } else {
+        return l.Data() == r.Data();
+      }
+    }
+  };
+  template <Target T>
+  struct HashT {
+    size_t operator()(const RocksdbIndexRecord &o) const {
+      rocksdb::Slice slice;
+      if constexpr (T == Target::PK) {
+        slice = o.GetPK();
+      } else {
+        slice = o.Data();
+      }
+      return this->hash(std::string_view(slice.data(), slice.size()));
+    }
+    std::hash<std::string_view> hash;
+  };
+
+ public:
+  // Aliases.
+  using DedupHash = HashT<Target::PK>;
+  using DedupEqual = EqualT<Target::PK>;
+  using Hash = HashT<Target::SHARD_AND_PK>;
+  using Equal = EqualT<Target::SHARD_AND_PK>;
+};
+
+// The internal record format physically stored inside RocksdbIndex.
+class RocksdbIndexInternalRecord {
+ public:
+  // Construct when reading from rocksdb.
+  explicit RocksdbIndexInternalRecord(const rocksdb::Slice &slice)
+      : data_(slice) {}
+  explicit RocksdbIndexInternalRecord(std::string &&str)
+      : data_(std::move(str)) {}
 
   // When handling SQL statements.
-  RocksdbIndexRecord(const rocksdb::Slice &index_value,
-                     const rocksdb::Slice &shard_name,
-                     const rocksdb::Slice &pk);
+  RocksdbIndexInternalRecord(const rocksdb::Slice &index_value,
+                             const rocksdb::Slice &shard_name,
+                             const rocksdb::Slice &pk);
 
   // For writing/encoding.
   const RocksdbSequence &Sequence() const { return this->data_; }
@@ -203,40 +224,24 @@ class RocksdbIndexRecord {
   rocksdb::Slice GetPK() const;
 
   // For looking up records corresponding to index entry.
-  rocksdb::Slice TargetKey() const;
-
-  // Allows us to use this type in unordered_set.
-  class TargetHash {
-   public:
-    TargetHash();
-    size_t operator()(const RocksdbIndexRecord &r) const;
-
-   private:
-    RocksdbSequence::Hash hash_;
-  };
-  class TargetEqual {
-   public:
-    TargetEqual();
-    bool operator()(const RocksdbIndexRecord &l,
-                    const RocksdbIndexRecord &r) const;
-
-   private:
-    RocksdbSequence::Equal equal_;
-  };
+  RocksdbIndexRecord TargetKey() const;
 
  private:
   RocksdbSequence data_;
 };
 
-class RocksdbPKIndexRecord {
+// The internal record format physically stored inside RocksdbPKIndex.
+class RocksdbPKIndexInternalRecord {
  public:
   // Construct when reading from rocksdb.
-  explicit RocksdbPKIndexRecord(const rocksdb::Slice &slice) : data_(slice) {}
-  explicit RocksdbPKIndexRecord(std::string &&str) : data_(std::move(str)) {}
+  explicit RocksdbPKIndexInternalRecord(const rocksdb::Slice &slice)
+      : data_(slice) {}
+  explicit RocksdbPKIndexInternalRecord(std::string &&str)
+      : data_(std::move(str)) {}
 
   // When handling SQL statements.
-  RocksdbPKIndexRecord(const rocksdb::Slice &pk_value,
-                       const rocksdb::Slice &shard_name);
+  RocksdbPKIndexInternalRecord(const rocksdb::Slice &pk_value,
+                               const rocksdb::Slice &shard_name);
 
   // For writing/encoding.
   const RocksdbSequence &Sequence() const { return this->data_; }
@@ -247,24 +252,8 @@ class RocksdbPKIndexRecord {
   rocksdb::Slice GetPK() const;
   rocksdb::Slice GetShard() const;
 
-  // Allows us to use this type in unordered_set.
-  class ShardNameHash {
-   public:
-    ShardNameHash();
-    size_t operator()(const RocksdbPKIndexRecord &r) const;
-
-   private:
-    RocksdbSequence::Hash hash_;
-  };
-  class ShardNameEqual {
-   public:
-    ShardNameEqual();
-    bool operator()(const RocksdbPKIndexRecord &l,
-                    const RocksdbPKIndexRecord &r) const;
-
-   private:
-    RocksdbSequence::Equal equal_;
-  };
+  // For looking up records corresponding to index entry.
+  RocksdbIndexRecord TargetKey() const;
 
  private:
   RocksdbSequence data_;

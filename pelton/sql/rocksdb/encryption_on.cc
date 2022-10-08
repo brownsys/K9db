@@ -175,7 +175,12 @@ RocksdbSequence EncryptionManager::DecryptValue(const std::string &user_id,
 EncryptedPrefix EncryptionManager::EncryptSeek(std::string &&seek_key) const {
   const unsigned char *nonce = this->global_nonce_.get();
   const unsigned char *key = this->global_key_.get();
-  return Cipher(Encrypt(seek_key, nonce, key));
+  std::string cipher = Encrypt(seek_key, nonce, key);
+  EncryptedKey::Offset size = cipher.size();
+  const char *ptr = reinterpret_cast<char *>(&size);
+  cipher.push_back(ptr[0]);
+  cipher.push_back(ptr[1]);
+  return Cipher(std::move(cipher));
 }
 
 /*

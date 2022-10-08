@@ -6,6 +6,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "pelton/sql/rocksdb/dedup.h"
 #include "pelton/sql/rocksdb/encode.h"
 #include "rocksdb/db.h"
 #include "rocksdb/slice.h"
@@ -13,11 +14,6 @@
 
 namespace pelton {
 namespace sql {
-
-using IndexSet =
-    std::unordered_set<RocksdbIndexRecord, RocksdbIndexRecord::TargetHash,
-                       RocksdbIndexRecord::TargetEqual>;
-using PKIndexSet = std::vector<RocksdbPKIndexRecord>;
 
 class RocksdbIndex {
  public:
@@ -34,10 +30,13 @@ class RocksdbIndex {
 
   // Get the shard and pk of matching records for given values.
   IndexSet Get(const std::vector<rocksdb::Slice> &values) const;
+  DedupIndexSet GetDedup(const std::vector<rocksdb::Slice> &values) const;
 
  private:
   rocksdb::DB *db_;
   std::unique_ptr<rocksdb::ColumnFamilyHandle> handle_;
+
+  using IRecord = RocksdbIndexInternalRecord;
 };
 
 class RocksdbPKIndex {
@@ -49,20 +48,14 @@ class RocksdbPKIndex {
   void Delete(const rocksdb::Slice &pk, const rocksdb::Slice &shard_name);
 
   // Reading.
-  PKIndexSet Get(const std::vector<rocksdb::Slice> &pk_values) const;
+  IndexSet Get(const std::vector<rocksdb::Slice> &pk_values) const;
+  DedupIndexSet GetDedup(const std::vector<rocksdb::Slice> &values) const;
 
  private:
   rocksdb::DB *db_;
   std::unique_ptr<rocksdb::ColumnFamilyHandle> handle_;
-};
 
-class IndexPrefixTransform : public rocksdb::SliceTransform {
- public:
-  IndexPrefixTransform() = default;
-
-  const char *Name() const override { return "ShardPrefix"; }
-  bool InDomain(const rocksdb::Slice &key) const override { return true; }
-  rocksdb::Slice Transform(const rocksdb::Slice &key) const override;
+  using IRecord = RocksdbPKIndexInternalRecord;
 };
 
 }  // namespace sql
