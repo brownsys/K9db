@@ -92,6 +92,8 @@ class AggregateOperator : public Operator {
   FRIEND_TEST(AggregateOperatorTest, SumPositiveNegativeSingleBatch);
   FRIEND_TEST(AggregateOperatorTest, OutputSchemaPrimaryKeyTest);
   FRIEND_TEST(AggregateOperatorTest, OutputSchemaCompositeKeyTest);
+  FRIEND_TEST(AggregateOperatorTest, SumGoesAwayWithFilter);
+  FRIEND_TEST(AggregateOperatorTest, CountGoesAwayOnDelete);
 };
 
 }  // namespace dataflow

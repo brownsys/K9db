@@ -25,38 +25,47 @@ namespace {
 std::string MakeIndexPiece(const std::string &table_name,
                            const std::string &column_name,
                            const DirectInfo &info) {
-  std::string qual_col = table_name + "." + column_name;
-  std::string qual_shard = table_name + "." + info.column;
-  return "SELECT " + qual_col + " AS _col, " + qual_shard + " AS _shard " +
+  std::string col = table_name + "." + column_name;
+  std::string sh = table_name + "." + info.column;
+  return "SELECT " + col + " AS _col, " + sh + " AS _shard, 1 AS _c " +
          "FROM " + table_name;
 }
 
 std::string MakeIndexPiece(const std::string &table_name,
                            const std::string &column_name,
                            const TransitiveInfo &info) {
-  std::string qual_col = table_name + "." + column_name;
-  std::string qual_shard = info.index->index_name + "._shard";
-  std::string qual_join1 = table_name + "." + info.column;
-  std::string qual_join2 = info.index->index_name + "._col";
-  return "SELECT " + qual_col + " AS _col, " + qual_shard + " AS _shard " +
+  std::string col = table_name + "." + column_name;
+  std::string sh = info.index->index_name + "._shard";
+  std::string j1 = table_name + "." + info.column;
+  std::string j2 = info.index->index_name + "._col";
+  std::string c = info.index->index_name + "._c";
+  return "SELECT " + col + " AS _col, " + sh + " AS _shard, " + c + " AS _c " +
          "FROM " + table_name + " JOIN " + info.index->index_name + " " +
-         "ON " + qual_join1 + " = " + qual_join2;
+         "ON " + j1 + " = " + j2;
 }
 
 std::string MakeIndexPiece(const std::string &table_name,
                            const std::string &column_name,
                            const VariableInfo &info) {
-  std::string qual_col = table_name + "." + column_name;
-  std::string qual_shard = info.index->index_name + "._shard";
-  std::string qual_join1 = table_name + "." + info.column;
-  std::string qual_join2 = info.index->index_name + "._col";
-  return "SELECT " + qual_col + " AS _col, " + qual_shard + " AS _shard " +
+  std::string col = table_name + "." + column_name;
+  std::string sh = info.index->index_name + "._shard";
+  std::string j1 = table_name + "." + info.column;
+  std::string j2 = info.index->index_name + "._col";
+  std::string c = info.index->index_name + "._c";
+  // Reuse optimization; saves a join. This is used if a new view is still
+  // needed for the index due to other ways of owning (i.e. to feed into UNION).
+  if (info.column == column_name) {
+    return "SELECT " + j2 + " AS _col, " + sh + " AS _shard, " + c + " AS _c " +
+           "FROM " + info.index->index_name;
+  }
+  // No reuse optimization.
+  return "SELECT " + col + " AS _col, " + sh + " AS _shard, " + c + " AS _c " +
          "FROM " + table_name + " JOIN " + info.index->index_name + " " +
-         "ON " + qual_join1 + " = " + qual_join2;
+         "ON " + j1 + " = " + j2;
 }
 
 std::string UnionCount(const std::vector<std::string> &pieces) {
-  std::string sql = "SELECT _col, _shard, COUNT(*) FROM ";
+  std::string sql = "SELECT _col, _shard, SUM(_c) as _c FROM (";
   for (size_t i = 0; i < pieces.size(); i++) {
     const std::string &piece = pieces.at(i);
     sql += "(" + piece + ")";
@@ -64,7 +73,7 @@ std::string UnionCount(const std::vector<std::string> &pieces) {
       sql += " UNION ";
     }
   }
-  sql += " GROUP BY _col, _shard HAVING _col = ?";
+  sql += ") GROUP BY _col, _shard HAVING _col = ? AND _c > 0";
   return sql;
 }
 
@@ -86,18 +95,50 @@ absl::StatusOr<IndexDescriptor> Create(const std::string &table_name,
 
   // Construct part of the index for each way of owning the table.
   std::vector<std::string> pieces;
+  std::vector<IndexDescriptor *> reuse;
+  bool can_be_reused = true;
   Table &table = sstate.GetTable(table_name);
   for (const std::unique_ptr<ShardDescriptor> &desc : table.owners) {
     if (desc->shard_kind == shard_kind) {
-      pieces.push_back(visit(
-          [&](const auto &info) {
-            return MakeIndexPiece(table_name, column_name, info);
-          },
-          desc->info));
+      switch (desc->type) {
+        case InfoType::DIRECT: {
+          const DirectInfo &info = std::get<DirectInfo>(desc->info);
+          pieces.push_back(MakeIndexPiece(table_name, column_name, info));
+          can_be_reused = false;
+          break;
+        }
+        case InfoType::TRANSITIVE: {
+          const TransitiveInfo &info = std::get<TransitiveInfo>(desc->info);
+          pieces.push_back(MakeIndexPiece(table_name, column_name, info));
+          can_be_reused = false;
+          break;
+        }
+        case InfoType::VARIABLE: {
+          const VariableInfo &info = std::get<VariableInfo>(desc->info);
+          // Usually, an index already exists over the origin (i.e. association)
+          // table. Because of the inverse directionality of an OWNS FK, that
+          // index may be used directly without a join! We check if this is the
+          // case below.
+          pieces.push_back(MakeIndexPiece(table_name, column_name, info));
+          if (info.column == column_name) {
+            reuse.push_back(info.index);
+          } else {
+            can_be_reused = false;
+          }
+          break;
+        }
+      }
     }
   }
 
+  // Try to reuse an existing index and avoid creating an index if possible.
+  if (can_be_reused && reuse.size() == 1) {
+    const std::string &reused_index = reuse.front()->index_name;
+    return IndexDescriptor{reused_index, table_name, shard_kind, column_name};
+  }
+
   // Combine pieces into one index.
+  ASSERT_RET(pieces.size() > 0, InvalidArgument, "Index over unsharded table!");
   sqlast::CreateView create_stmt(index_name, UnionCount(pieces));
 
   // Plan and create the flow for the index.

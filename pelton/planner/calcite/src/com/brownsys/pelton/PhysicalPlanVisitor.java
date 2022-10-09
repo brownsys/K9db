@@ -112,7 +112,7 @@ public class PhysicalPlanVisitor extends RelShuttleImpl {
     PlanningContext context = pair.right;
 
     ProjectOperatorFactory projectFactory = new ProjectOperatorFactory(context);
-    if (projectFactory.isIdentity(project)) {
+    if (projectFactory.isIdentity(project) && !projectFactory.hasAliases(project)) {
       return new Pair<>(children, context);
     } else {
       ArrayList<Integer> result = new ArrayList<Integer>();

@@ -270,6 +270,11 @@ void ProjectOperator::ComputeOutputSchema() {
       SchemaFactory::Create(out_column_names, out_column_types, out_keys);
 }
 
+// TODO(babman): In order to preserve the projected names, we may create a
+//               project operator that is purely an aliasing project.
+//               As optimization, we should introduce an O(1) schema swap
+//               operation into dataflow::Record, and use it here when aliasing
+//               instead of copying/reconstructing the record.
 std::vector<Record> ProjectOperator::Process(NodeIndex source,
                                              std::vector<Record> &&records,
                                              const Promise &promise) {
