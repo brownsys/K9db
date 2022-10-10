@@ -3,6 +3,8 @@
 #include "pelton/sql/rocksdb/connection.h"
 // clang-format on
 
+#include <utility>
+
 #include "pelton/dataflow/schema.h"
 
 namespace pelton {
@@ -12,7 +14,8 @@ namespace sql {
  * Shard-based operations for GDPR GET/FORGET.
  */
 SqlResultSet RocksdbConnection::GetShard(const std::string &table_name,
-                                         const std::string &shard_name) const {
+                                         const std::string &shard_kind,
+                                         const std::string &user_id) const {
   const RocksdbTable &table = this->tables_.at(table_name);
   const dataflow::SchemaRef &schema = table.Schema();
 
@@ -20,8 +23,9 @@ SqlResultSet RocksdbConnection::GetShard(const std::string &table_name,
   std::vector<dataflow::Record> records;
 
   // Encrypt the shard name.
+  std::string shard_name = shard_kind + "__" + user_id;
   EncryptedPrefix seek =
-      this->encryption_manager_.EncryptSeek(std::string(shard_name));
+      this->encryption_manager_.EncryptSeek(std::move(shard_name));
 
   // Get all content of shard.
   RocksdbStream stream = table.GetShard(seek);
@@ -38,7 +42,8 @@ SqlResultSet RocksdbConnection::GetShard(const std::string &table_name,
 }
 
 SqlResultSet RocksdbConnection::DeleteShard(const std::string &table_name,
-                                            const std::string &shard_name) {
+                                            const std::string &shard_kind,
+                                            const std::string &user_id) {
   RocksdbTable &table = this->tables_.at(table_name);
   const dataflow::SchemaRef &schema = table.Schema();
 
@@ -46,8 +51,9 @@ SqlResultSet RocksdbConnection::DeleteShard(const std::string &table_name,
   std::vector<dataflow::Record> records;
 
   // Encrypt the shard name.
+  std::string shard_name = shard_kind + "__" + user_id;
   EncryptedPrefix seek =
-      this->encryption_manager_.EncryptSeek(std::string(shard_name));
+      this->encryption_manager_.EncryptSeek(std::move(shard_name));
 
   // Get all content of shard.
   RocksdbStream stream = table.GetShard(seek);

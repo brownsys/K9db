@@ -33,8 +33,8 @@ class RocksdbConnection : public AbstractConnection {
   bool ExecuteCreateIndex(const sqlast::CreateIndex &sql) override;
 
   // Insert.
-  int ExecuteInsert(const sqlast::Insert &sql,
-                    const std::string &shard_name) override;
+  int ExecuteInsert(const sqlast::Insert &sql, const std::string &shard_kind,
+                    const std::string &user_id) override;
 
   // Delete.
   SqlResultSet ExecuteDelete(const sqlast::Delete &sql) override;
@@ -47,9 +47,11 @@ class RocksdbConnection : public AbstractConnection {
 
   // Shard-based operations for GDPR GET/FORGEt.
   SqlResultSet DeleteShard(const std::string &table_name,
-                           const std::string &shard_name) override;
+                           const std::string &shard_kind,
+                           const std::string &user_id) override;
   SqlResultSet GetShard(const std::string &table_name,
-                        const std::string &shard_name) const override;
+                        const std::string &shard_kind,
+                        const std::string &user_id) const override;
 
  private:
   std::unique_ptr<rocksdb::DB> db_;

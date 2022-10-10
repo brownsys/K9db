@@ -41,7 +41,7 @@ class InsertContext {
 
  private:
   /* Helpers for inserting statement into the database by sharding type. */
-  int DirectInsert(dataflow::Value &&fkval);
+  int DirectInsert(dataflow::Value &&fkval, const ShardDescriptor &desc);
   absl::StatusOr<int> TransitiveInsert(dataflow::Value &&fkval,
                                        const ShardDescriptor &desc);
   absl::StatusOr<int> VariableInsert(dataflow::Value &&fkval,

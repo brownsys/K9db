@@ -18,13 +18,15 @@ namespace sql {
  */
 
 int RocksdbConnection::ExecuteInsert(const sqlast::Insert &stmt,
-                                     const std::string &shard_name) {
+                                     const std::string &shard_kind,
+                                     const std::string &user_id) {
   // Read table metadata.
   const std::string &table_name = stmt.table_name();
   RocksdbTable &table = this->tables_.at(table_name);
   const dataflow::SchemaRef &schema = table.Schema();
 
   // Encode row.
+  std::string shard_name = shard_kind + "__" + user_id;
   RocksdbRecord record = RocksdbRecord::FromInsert(stmt, schema, shard_name);
 
   // Ensure PK is unique.

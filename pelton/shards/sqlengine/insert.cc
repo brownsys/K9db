@@ -29,9 +29,10 @@ namespace sqlengine {
 /*
  * Helpers for inserting statement into the database by sharding type.
  */
-int InsertContext::DirectInsert(dataflow::Value &&fkval) {
+int InsertContext::DirectInsert(dataflow::Value &&fkval,
+                                const ShardDescriptor &desc) {
   std::string shard_name = fkval.AsUnquotedString();
-  int res = this->db_->ExecuteInsert(this->stmt_, shard_name);
+  int res = this->db_->ExecuteInsert(this->stmt_, desc.shard_kind, shard_name);
   this->shard_names_.push_back({std::move(shard_name)});
   return res;
 }
@@ -47,10 +48,11 @@ absl::StatusOr<int> InsertContext::TransitiveInsert(
   int res = 0;
   this->shard_names_.emplace_back();
   for (dataflow::Record &r : indexed) {
-    ASSERT_RET(r.GetUInt(2) > 0, Internal, "Index count 0");
+    ASSERT_RET(r.GetInt(2) > 0, Internal, "Index count 0");
     ASSERT_RET(!r.IsNull(1), Internal, "T Index gives NULL owner");
     std::string shard_name = r.GetValueString(1);
-    ACCUM(this->db_->ExecuteInsert(this->stmt_, shard_name), res);
+    ACCUM(this->db_->ExecuteInsert(this->stmt_, desc.shard_kind, shard_name),
+          res);
     this->shard_names_.back().insert(std::move(shard_name));
   }
 
@@ -70,17 +72,19 @@ absl::StatusOr<int> InsertContext::VariableInsert(dataflow::Value &&fkval,
   int res = 0;
   this->shard_names_.emplace_back();
   for (dataflow::Record &r : indexed) {
-    ASSERT_RET(r.GetUInt(2) > 0, Internal, "Index count 0");
+    ASSERT_RET(r.GetInt(2) > 0, Internal, "Index count 0");
     ASSERT_RET(!r.IsNull(1), Internal, "T Index gives NULL owner");
     std::string shard_name = r.GetValueString(1);
-    ACCUM(this->db_->ExecuteInsert(this->stmt_, shard_name), res);
+    ACCUM(this->db_->ExecuteInsert(this->stmt_, desc.shard_kind, shard_name),
+          res);
     this->shard_names_.back().insert(std::move(shard_name));
   }
 
   // This row may be inserted before the corresponding many-to-many
   // rows are inserted into the variable ownership assocation table.
   if (indexed.size() == 0) {
-    ACCUM(this->db_->ExecuteInsert(this->stmt_, DEFAULT_SHARD), res);
+    ACCUM(this->db_->ExecuteInsert(this->stmt_, desc.shard_kind, DEFAULT_SHARD),
+          res);
     this->shard_names_.back().insert(DEFAULT_SHARD);
   }
   return res;
@@ -105,7 +109,7 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
     // Handle according to sharding type.
     switch (desc->type) {
       case InfoType::DIRECT: {
-        ACCUM(this->DirectInsert(std::move(val)), res);
+        ACCUM(this->DirectInsert(std::move(val), *desc), res);
         break;
       }
       case InfoType::TRANSITIVE: {
@@ -128,7 +132,8 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
 
   // If no OWNERs detected, we insert into global/default shard.
   if (this->table_.owners.size() == 0) {
-    ACCUM(this->db_->ExecuteInsert(this->stmt_, DEFAULT_SHARD), res);
+    ACCUM(this->db_->ExecuteInsert(this->stmt_, DEFAULT_SHARD, DEFAULT_SHARD),
+          res);
   }
 
   return res;
@@ -159,7 +164,7 @@ absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
   // tables. Figure this out.
   for (size_t i = 0; i < this->table_.dependents.size(); i++) {
     const auto &[dependent_table, desc] = this->table_.dependents.at(i);
-    std::unordered_set<std::string> &shard_names = this->shard_names_.at(i);
+    // std::unordered_set<std::string> &shard_names = this->shard_names_.at(i);
     // Only dependent tables for which this table acts as the variable ownership
     // association table can have their data affected by this insert.
     if (desc->type == InfoType::VARIABLE) {

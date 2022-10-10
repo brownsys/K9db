@@ -29,16 +29,19 @@ class AbstractConnection {
 
   // Insert.
   virtual int ExecuteInsert(const sqlast::Insert &sql,
+                            const std::string &shard_kind,
                             const std::string &shard_name) = 0;
 
   // Delete.
   virtual SqlResultSet ExecuteDelete(const sqlast::Delete &sql) = 0;
   virtual SqlResultSet DeleteShard(const std::string &table_name,
+                                   const std::string &shard_kind,
                                    const std::string &shard_name) = 0;
 
   // Selects.
   virtual SqlResultSet ExecuteSelect(const sqlast::Select &sql) const = 0;
   virtual SqlResultSet GetShard(const std::string &table_name,
+                                const std::string &shard_kind,
                                 const std::string &shard_name) const = 0;
 
   // Everything in a table.
