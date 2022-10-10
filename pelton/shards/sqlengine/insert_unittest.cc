@@ -287,6 +287,41 @@ TEST_F(InsertTest, OwnerAccessor) {
   EXPECT_EQ(db->GetShard("msg", "user", DEFAULT_SHARD), (V{}));
 }
 
+TEST_F(InsertTest, ShardedDataSubject) {
+  // Parse create table statements.
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string invited = MakeCreate(
+      "invited", {"id" I PK, "PII_name" STR, "inviting_user" I FK "user(id)"});
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+  sql::AbstractConnection *db = conn.state->Database();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(invited, &conn));
+
+  // Perform some inserts.
+  auto &&[usr1, u_] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr2, u__] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[inv1, row1] = MakeInsert("invited", {"0", "'i1'", "5"});
+  auto &&[inv2, row2] = MakeInsert("invited", {"1", "'i10'", "0"});
+  auto &&[inv3, row3] = MakeInsert("invited", {"5", "'i100'", "0"});
+
+  EXPECT_UPDATE(Execute(usr1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr2, &conn), 1);
+  EXPECT_UPDATE(Execute(inv1, &conn), 2);
+  EXPECT_UPDATE(Execute(inv2, &conn), 2);
+  EXPECT_UPDATE(Execute(inv3, &conn), 2);
+
+  // Validate insertions.
+  EXPECT_EQ(db->GetShard("invited", "user", "0"), (V{row2, row3}));
+  EXPECT_EQ(db->GetShard("invited", "user", "5"), (V{row1}));
+  EXPECT_EQ(db->GetShard("invited", "invited", "0"), (V{row1}));
+  EXPECT_EQ(db->GetShard("invited", "invited", "1"), (V{row2}));
+  EXPECT_EQ(db->GetShard("invited", "invited", "5"), (V{row3}));
+}
+
 }  // namespace sqlengine
 }  // namespace shards
 }  // namespace pelton
