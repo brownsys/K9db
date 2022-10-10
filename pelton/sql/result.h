@@ -117,10 +117,6 @@ class SqlResult {
     return this->sets_;
   }
 
-  // NOTE(justus): This function is only safe to call if `IsQuery()` returns
-  // true.
-  bool empty() const;
-
   // Internal API: do not use outside of pelton code.
   // Appends the provided SqlResult to this SqlResult, appeneded
   // result is moved and becomes empty after append.

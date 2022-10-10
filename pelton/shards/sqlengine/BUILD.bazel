@@ -156,20 +156,46 @@ cc_library(
 )
 
 # Tests.
+cc_library(
+    name = "tests_helpers",
+    srcs = [
+        "tests_helpers.cc",
+    ],
+    hdrs = [
+        "tests_helpers.h",
+    ],
+    deps = [
+        ":engine",
+        "//pelton:connection",
+        "//pelton/dataflow:record",
+        "//pelton/sql:result",
+        "//pelton/util:status",
+        "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/status",
+        "@com_google_googletest//:gtest",
+    ],
+)
+
 cc_test(
     name = "create-test",
     srcs = [
         "create_unittest.cc",
     ],
     deps = [
-        ":create",
+        ":tests_helpers",
         "//pelton/shards:state",
         "//pelton/shards:types",
-        "//pelton/sql:result",
-        "//pelton/sqlast:ast",
-        "//pelton/sqlast:parser",
-        "//pelton/util:upgradable_lock",
-        "@com_google_googletest//:gtest",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "insert-test",
+    srcs = [
+        "insert_unittest.cc",
+    ],
+    deps = [
+        ":tests_helpers",
         "@glog",
     ],
 )

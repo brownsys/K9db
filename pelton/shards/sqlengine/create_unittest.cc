@@ -1,106 +1,17 @@
 #include "pelton/shards/sqlengine/create.h"
 
-#include <filesystem>
-#include <memory>
 #include <string>
 #include <unordered_set>
 #include <vector>
 
-#include "absl/status/statusor.h"
 #include "glog/logging.h"
-#include "pelton/connection.h"
-#include "pelton/sql/result.h"
-#include "pelton/sqlast/ast.h"
-#include "pelton/sqlast/parser.h"
-#include "pelton/util/upgradable_lock.h"
-
-// Has to be included after parser to avoid FAIL symbol redefinition with ANTLR.
-// clang-format off
-// NOLINTNEXTLINE
-#include "gtest/gtest.h"
-// clang-format on
-
-#define DB_PATH "/tmp/pelton/rocksdb/shards-create-test"
+#include "pelton/shards/sqlengine/tests_helpers.h"
 
 namespace pelton {
 namespace shards {
 namespace sqlengine {
 
-/*
- * MACROS to simplify/reduce redundancy when writing CREATE TABLE statements.
- */
-
-#define I " int "
-#define STR " text "
-#define PK " PRIMARY KEY "
-#define FK " REFERENCES "
-
 using CType = sqlast::ColumnDefinition::Type;
-#define INT CType::INT
-#define TEXT CType::TEXT
-
-/*
- * Debug logging.
- */
-
-namespace {
-
-std::string ToString(const std::vector<std::string> &v) {
-  std::string str = "[";
-  for (size_t i = 0; i < v.size(); i++) {
-    if (i > 0) {
-      str += ", ";
-    }
-    str += v.at(i);
-  }
-  str += "]";
-  return str;
-}
-
-}  // namespace
-
-/*
- * Parsing.
- */
-
-namespace {
-
-sqlast::CreateTable MakeCreate(const std::string &tbl_name,
-                               std::vector<std::string> cols) {
-  std::string sql = "CREATE TABLE " + tbl_name + "(";
-  for (size_t i = 0; i < cols.size(); i++) {
-    sql += cols.at(i);
-    if (i < cols.size() - 1) {
-      sql += ",";
-    }
-  }
-  sql += ");";
-
-  sqlast::SQLParser parser;
-  auto status = parser.Parse(sql);
-
-  sqlast::CreateTable stmt =
-      *reinterpret_cast<sqlast::CreateTable *>(status->get());
-  return stmt;
-}
-
-}  // namespace
-
-/*
- * Execute a parsed create statement.
- */
-
-namespace {
-
-void Handle(const sqlast::CreateTable &stmt, Connection *conn) {
-  util::UniqueLock lock = conn->state->WriterLock();
-  CreateContext context(stmt, conn, &lock);
-  auto status = context.Exec();
-  EXPECT_TRUE(status.ok());
-  EXPECT_TRUE(status->Success());
-}
-
-}  // namespace
 
 /*
  * Ensure Shard in state is correct.
@@ -240,62 +151,36 @@ void EXPECT_DEPENDENTS(Connection *conn, const std::string &table_name,
         << "Did not find owner dependent " << t << " in table " << table_name;
     dependents.erase(it);
   }
-  EXPECT_EQ(dependents.size(), 0u) << ToString(dependents);
+  EXPECT_EQ(dependents.size(), 0u) << dependents;
   for (const auto &[t, desc] : tbl.access_dependents) {
     auto it = std::find(access_dependents.begin(), access_dependents.end(), t);
     EXPECT_NE(it, access_dependents.end())
         << "Did not find access dependent " << t << " in table " << table_name;
     access_dependents.erase(it);
   }
-  EXPECT_EQ(access_dependents.size(), 0u) << ToString(access_dependents);
+  EXPECT_EQ(access_dependents.size(), 0u) << access_dependents;
 }
 
 }  // namespace
 
 /*
- * google test fixture class, allows us to manage the pelton state and
- * initialize / destruct it for every test.
- */
-class CreateTest : public ::testing::Test {
- protected:
-  void SetUp() override {
-    std::filesystem::remove_all(DB_PATH);
-    this->pelton_state_ = std::make_unique<State>(3, true);
-    this->pelton_state_->Initialize("shards-create-test");
-  }
-
-  void TearDown() override {
-    this->pelton_state_ = nullptr;
-    std::filesystem::remove_all(DB_PATH);
-  }
-
-  // Create a connection.
-  Connection CreateConnection() {
-    Connection connection;
-    connection.state = this->pelton_state_.get();
-    return connection;
-  }
-
- private:
-  std::unique_ptr<State> pelton_state_;
-};
-
-/*
  * The tests!
  */
 
+// Define a fixture that manages a pelton connection.
+PELTON_FIXTURE(CreateTest);
+
 TEST_F(CreateTest, Direct) {
   // Parse create table statements.
-  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  sqlast::CreateTable addr =
-      MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
 
   // Create the tables.
-  Handle(usr, &conn);
-  Handle(addr, &conn);
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(addr, &conn));
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
@@ -314,19 +199,17 @@ TEST_F(CreateTest, Direct) {
 
 TEST_F(CreateTest, Transitive) {
   // Parse create table statements.
-  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  sqlast::CreateTable addr =
-      MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
-  sqlast::CreateTable nums =
-      MakeCreate("phones", {"id" I PK, "aid" I FK "addr(id)"});
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
+  std::string nums = MakeCreate("phones", {"id" I PK, "aid" I FK "addr(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
 
   // Create the tables.
-  Handle(usr, &conn);
-  Handle(addr, &conn);
-  Handle(nums, &conn);
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(addr, &conn));
+  EXPECT_SUCCESS(Execute(nums, &conn));
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
@@ -350,22 +233,20 @@ TEST_F(CreateTest, Transitive) {
 
 TEST_F(CreateTest, DeepTransitive) {
   // Parse create table statements.
-  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  sqlast::CreateTable addr =
-      MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
-  sqlast::CreateTable nums =
-      MakeCreate("phones", {"id" I PK, "aid" I FK "addr(id)"});
-  sqlast::CreateTable available =
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
+  std::string nums = MakeCreate("phones", {"id" I PK, "aid" I FK "addr(id)"});
+  std::string available =
       MakeCreate("available", {"id" I PK, "pid" I FK "phones(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
 
   // Create the tables.
-  Handle(usr, &conn);
-  Handle(addr, &conn);
-  Handle(nums, &conn);
-  Handle(available, &conn);
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(addr, &conn));
+  EXPECT_SUCCESS(Execute(nums, &conn));
+  EXPECT_SUCCESS(Execute(available, &conn));
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
@@ -394,8 +275,8 @@ TEST_F(CreateTest, DeepTransitive) {
 
 TEST_F(CreateTest, OwnerAndNothing) {
   // Parse create table statements.
-  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  sqlast::CreateTable msg = MakeCreate(
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string msg = MakeCreate(
       "msg",
       {"id" I PK, "OWNER_sender" I FK "user(id)", "receiver" I FK "user(id)"});
 
@@ -403,8 +284,8 @@ TEST_F(CreateTest, OwnerAndNothing) {
   Connection conn = CreateConnection();
 
   // Create the tables.
-  Handle(usr, &conn);
-  Handle(msg, &conn);
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(msg, &conn));
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
@@ -424,8 +305,8 @@ TEST_F(CreateTest, OwnerAndNothing) {
 
 TEST_F(CreateTest, OwnerAccessor) {
   // Parse create table statements.
-  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  sqlast::CreateTable msg =
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string msg =
       MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
                          "ACCESSOR_receiver" I FK "user(id)"});
 
@@ -433,8 +314,8 @@ TEST_F(CreateTest, OwnerAccessor) {
   Connection conn = CreateConnection();
 
   // Create the tables.
-  Handle(usr, &conn);
-  Handle(msg, &conn);
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(msg, &conn));
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
@@ -455,20 +336,20 @@ TEST_F(CreateTest, OwnerAccessor) {
 
 TEST_F(CreateTest, OwnerLattice) {
   // Parse create table statements.
-  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  sqlast::CreateTable msg =
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string msg =
       MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
                          "ACCESSOR_receiver" I FK "user(id)"});
-  sqlast::CreateTable meta =
+  std::string meta =
       MakeCreate("metadata", {"id" I PK, "OWNER_msg" I FK "msg(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
 
   // Create the tables.
-  Handle(usr, &conn);
-  Handle(msg, &conn);
-  Handle(meta, &conn);
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(msg, &conn));
+  EXPECT_SUCCESS(Execute(meta, &conn));
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
@@ -496,20 +377,20 @@ TEST_F(CreateTest, OwnerLattice) {
 
 TEST_F(CreateTest, AccessorLattice) {
   // Parse create table statements.
-  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  sqlast::CreateTable msg =
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string msg =
       MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
                          "ACCESSOR_receiver" I FK "user(id)"});
-  sqlast::CreateTable meta =
+  std::string meta =
       MakeCreate("metadata", {"id" I PK, "ACCESSOR_msg" I FK "msg(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
 
   // Create the tables.
-  Handle(usr, &conn);
-  Handle(msg, &conn);
-  Handle(meta, &conn);
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(msg, &conn));
+  EXPECT_SUCCESS(Execute(meta, &conn));
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
@@ -537,8 +418,8 @@ TEST_F(CreateTest, AccessorLattice) {
 
 TEST_F(CreateTest, TwoOwners) {
   // Parse create table statements.
-  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  sqlast::CreateTable msg =
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string msg =
       MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
                          "OWNER_receiver" I FK "user(id)"});
 
@@ -546,8 +427,8 @@ TEST_F(CreateTest, TwoOwners) {
   Connection conn = CreateConnection();
 
   // Create the tables.
-  Handle(usr, &conn);
-  Handle(msg, &conn);
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(msg, &conn));
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
@@ -568,23 +449,23 @@ TEST_F(CreateTest, TwoOwners) {
 
 TEST_F(CreateTest, TwoOwnersTransitive) {
   // Parse create table statements.
-  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  sqlast::CreateTable msg =
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string msg =
       MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
                          "OWNER_receiver" I FK "user(id)"});
-  sqlast::CreateTable delivered =
+  std::string delivered =
       MakeCreate("delivered", {"id" I PK, "OWNER_msg" I FK "msg(id)"});
-  sqlast::CreateTable error =
+  std::string error =
       MakeCreate("error", {"id" I PK, "ACCESSOR_msg" I FK "msg(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
 
   // Create the tables.
-  Handle(usr, &conn);
-  Handle(msg, &conn);
-  Handle(delivered, &conn);
-  Handle(error, &conn);
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(msg, &conn));
+  EXPECT_SUCCESS(Execute(delivered, &conn));
+  EXPECT_SUCCESS(Execute(error, &conn));
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
@@ -615,8 +496,8 @@ TEST_F(CreateTest, TwoOwnersTransitive) {
 
 TEST_F(CreateTest, ShardedDataSubject) {
   // Parse create table statements.
-  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  sqlast::CreateTable invited =
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string invited =
       MakeCreate("invited_user",
                  {"id" I PK, "PII_name" STR, "inviting_user" I FK "user(id)"});
 
@@ -624,8 +505,8 @@ TEST_F(CreateTest, ShardedDataSubject) {
   Connection conn = CreateConnection();
 
   // Create the tables.
-  Handle(usr, &conn);
-  Handle(invited, &conn);
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(invited, &conn));
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
@@ -650,9 +531,9 @@ TEST_F(CreateTest, ShardedDataSubject) {
 
 TEST_F(CreateTest, VariableOwner) {
   // Parse create table statements.
-  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  sqlast::CreateTable grps = MakeCreate("grps", {"gid" I PK});
-  sqlast::CreateTable assoc =
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string grps = MakeCreate("grps", {"gid" I PK});
+  std::string assoc =
       MakeCreate("association", {"id" I PK, "OWNING_group" I FK "grps(gid)",
                                  "OWNER_user" I FK "user(id)"});
 
@@ -660,9 +541,9 @@ TEST_F(CreateTest, VariableOwner) {
   Connection conn = CreateConnection();
 
   // Create the tables.
-  Handle(usr, &conn);
-  Handle(grps, &conn);
-  Handle(assoc, &conn);
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(grps, &conn));
+  EXPECT_SUCCESS(Execute(assoc, &conn));
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
@@ -687,13 +568,13 @@ TEST_F(CreateTest, VariableOwner) {
 
 TEST_F(CreateTest, TransitiveVariableOwner) {
   // Parse create table statements.
-  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  sqlast::CreateTable grps = MakeCreate("grps", {"gid" I PK});
-  sqlast::CreateTable assoc =
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string grps = MakeCreate("grps", {"gid" I PK});
+  std::string assoc =
       MakeCreate("association", {"id" I PK, "OWNING_group" I FK "grps(gid)",
                                  "OWNER_user" I FK "user(id)"});
-  sqlast::CreateTable files = MakeCreate("files", {"fid" I PK});
-  sqlast::CreateTable fassoc =
+  std::string files = MakeCreate("files", {"fid" I PK});
+  std::string fassoc =
       MakeCreate("fassociation", {"id" I PK, "OWNING_file" I FK "files(fid)",
                                   "OWNER_group" I FK "grps(gid)"});
 
@@ -701,11 +582,11 @@ TEST_F(CreateTest, TransitiveVariableOwner) {
   Connection conn = CreateConnection();
 
   // Create the tables.
-  Handle(usr, &conn);
-  Handle(grps, &conn);
-  Handle(assoc, &conn);
-  Handle(files, &conn);
-  Handle(fassoc, &conn);
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(grps, &conn));
+  EXPECT_SUCCESS(Execute(assoc, &conn));
+  EXPECT_SUCCESS(Execute(files, &conn));
+  EXPECT_SUCCESS(Execute(fassoc, &conn));
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
@@ -742,9 +623,9 @@ TEST_F(CreateTest, TransitiveVariableOwner) {
 
 TEST_F(CreateTest, VariableAccessor) {
   // Parse create table statements.
-  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  sqlast::CreateTable grps = MakeCreate("grps", {"gid" I PK});
-  sqlast::CreateTable assoc =
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string grps = MakeCreate("grps", {"gid" I PK});
+  std::string assoc =
       MakeCreate("association", {"id" I PK, "ACCESSING_group" I FK "grps(gid)",
                                  "OWNER_user" I FK "user(id)"});
 
@@ -752,9 +633,9 @@ TEST_F(CreateTest, VariableAccessor) {
   Connection conn = CreateConnection();
 
   // Create the tables.
-  Handle(usr, &conn);
-  Handle(grps, &conn);
-  Handle(assoc, &conn);
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(grps, &conn));
+  EXPECT_SUCCESS(Execute(assoc, &conn));
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
@@ -779,13 +660,13 @@ TEST_F(CreateTest, VariableAccessor) {
 
 TEST_F(CreateTest, TransitiveVariableAccessor) {
   // Parse create table statements.
-  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  sqlast::CreateTable grps = MakeCreate("grps", {"gid" I PK});
-  sqlast::CreateTable assoc =
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string grps = MakeCreate("grps", {"gid" I PK});
+  std::string assoc =
       MakeCreate("association", {"id" I PK, "ACCESSING_group" I FK "grps(gid)",
                                  "OWNER_user" I FK "user(id)"});
-  sqlast::CreateTable files = MakeCreate("files", {"fid" I PK});
-  sqlast::CreateTable fassoc =
+  std::string files = MakeCreate("files", {"fid" I PK});
+  std::string fassoc =
       MakeCreate("fassociation", {"id" I PK, "ACCESSING_file" I FK "files(fid)",
                                   "ACCESSOR_group" I FK "grps(gid)"});
 
@@ -793,11 +674,11 @@ TEST_F(CreateTest, TransitiveVariableAccessor) {
   Connection conn = CreateConnection();
 
   // Create the tables.
-  Handle(usr, &conn);
-  Handle(grps, &conn);
-  Handle(assoc, &conn);
-  Handle(files, &conn);
-  Handle(fassoc, &conn);
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(grps, &conn));
+  EXPECT_SUCCESS(Execute(assoc, &conn));
+  EXPECT_SUCCESS(Execute(files, &conn));
+  EXPECT_SUCCESS(Execute(fassoc, &conn));
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
@@ -834,16 +715,16 @@ TEST_F(CreateTest, TransitiveVariableAccessor) {
 
 TEST_F(CreateTest, VariableAccessorLattice) {
   // Parse create table statements.
-  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  sqlast::CreateTable admin = MakeCreate("admin", {"aid" I PK, "PII_name" STR});
-  sqlast::CreateTable grps =
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string admin = MakeCreate("admin", {"aid" I PK, "PII_name" STR});
+  std::string grps =
       MakeCreate("grps", {"gid" I PK, "OWNER_admin" I FK "admin(aid)"});
-  sqlast::CreateTable assoc =
+  std::string assoc =
       MakeCreate("association", {"sid" I PK, "ACCESSING_group" I FK "grps(gid)",
                                  "OWNER_user" I FK "user(id)"});
-  sqlast::CreateTable files =
+  std::string files =
       MakeCreate("files", {"fid" I PK, "OWNER_creator" I FK "user(id)"});
-  sqlast::CreateTable fassoc =
+  std::string fassoc =
       MakeCreate("fassociation", {"fsid" I PK, "OWNING_file" I FK "files(fid)",
                                   "OWNER_group" I FK "grps(gid)"});
 
@@ -851,12 +732,12 @@ TEST_F(CreateTest, VariableAccessorLattice) {
   Connection conn = CreateConnection();
 
   // Create the tables.
-  Handle(usr, &conn);
-  Handle(admin, &conn);
-  Handle(grps, &conn);
-  Handle(assoc, &conn);
-  Handle(files, &conn);
-  Handle(fassoc, &conn);
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(admin, &conn));
+  EXPECT_SUCCESS(Execute(grps, &conn));
+  EXPECT_SUCCESS(Execute(assoc, &conn));
+  EXPECT_SUCCESS(Execute(files, &conn));
+  EXPECT_SUCCESS(Execute(fassoc, &conn));
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
@@ -906,16 +787,16 @@ TEST_F(CreateTest, VariableAccessorLattice) {
 
 TEST_F(CreateTest, VariableLatticeAllOwners) {
   // Parse create table statements.
-  sqlast::CreateTable usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  sqlast::CreateTable admin = MakeCreate("admin", {"aid" I PK, "PII_name" STR});
-  sqlast::CreateTable grps =
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string admin = MakeCreate("admin", {"aid" I PK, "PII_name" STR});
+  std::string grps =
       MakeCreate("grps", {"gid" I PK, "OWNER_admin" I FK "admin(aid)"});
-  sqlast::CreateTable assoc =
+  std::string assoc =
       MakeCreate("association", {"sid" I PK, "OWNING_group" I FK "grps(gid)",
                                  "OWNER_user" I FK "user(id)"});
-  sqlast::CreateTable files =
+  std::string files =
       MakeCreate("files", {"fid" I PK, "OWNER_creator" I FK "user(id)"});
-  sqlast::CreateTable fassoc =
+  std::string fassoc =
       MakeCreate("fassociation", {"fsid" I PK, "OWNING_file" I FK "files(fid)",
                                   "OWNER_group" I FK "grps(gid)"});
 
@@ -923,12 +804,12 @@ TEST_F(CreateTest, VariableLatticeAllOwners) {
   Connection conn = CreateConnection();
 
   // Create the tables.
-  Handle(usr, &conn);
-  Handle(admin, &conn);
-  Handle(grps, &conn);
-  Handle(assoc, &conn);
-  Handle(files, &conn);
-  Handle(fassoc, &conn);
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(admin, &conn));
+  EXPECT_SUCCESS(Execute(grps, &conn));
+  EXPECT_SUCCESS(Execute(assoc, &conn));
+  EXPECT_SUCCESS(Execute(files, &conn));
+  EXPECT_SUCCESS(Execute(fassoc, &conn));
 
   // Check shards.
   EXPECT_SHARD(&conn, "user", "id", 0);
@@ -980,12 +861,3 @@ TEST_F(CreateTest, VariableLatticeAllOwners) {
 }  // namespace sqlengine
 }  // namespace shards
 }  // namespace pelton
-
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-
-  ::gflags::ParseCommandLineFlags(&argc, &argv, true);
-  ::google::InitGoogleLogging(argv[0]);
-
-  return RUN_ALL_TESTS();
-}
