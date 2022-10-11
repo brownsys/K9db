@@ -17,6 +17,7 @@
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/ints.h"
+#include "pelton/util/shard_name.h"
 
 namespace pelton {
 namespace sql {
@@ -120,19 +121,19 @@ void InsertData() {
   // Insert into table.
   sqlast::Insert insert("test_table", false);
   insert.SetValues({"0", "'user1'", "20"});
-  EXPECT_EQ(CONN->ExecuteInsert(insert, "user", "1"), 1);
+  EXPECT_EQ(CONN->ExecuteInsert(insert, util::ShardName("user", "1")), 1);
 
   insert.SetValues({"1", "'user2'", "25"});
-  EXPECT_EQ(CONN->ExecuteInsert(insert, "user", "2"), 1);
+  EXPECT_EQ(CONN->ExecuteInsert(insert, util::ShardName("user", "2")), 1);
 
   insert.SetValues({"2", "'user3'", "30"});
-  EXPECT_EQ(CONN->ExecuteInsert(insert, "user", "3"), 1);
+  EXPECT_EQ(CONN->ExecuteInsert(insert, util::ShardName("user", "3")), 1);
 
   insert.SetValues({"3", "'user3'", "35"});
-  EXPECT_EQ(CONN->ExecuteInsert(insert, "user", "3"), 1);
+  EXPECT_EQ(CONN->ExecuteInsert(insert, util::ShardName("user", "3")), 1);
 
   insert.SetValues({"3", "'user3'", "35"});
-  EXPECT_EQ(CONN->ExecuteInsert(insert, "user", "2"), 1);
+  EXPECT_EQ(CONN->ExecuteInsert(insert, util::ShardName("user", "2")), 1);
 }
 
 }  // namespace
@@ -435,10 +436,13 @@ TEST_F(RocksdbConnectionTest, DeleteByIn) {
 }
 
 TEST_F(RocksdbConnectionTest, GetShard) {
-  EXPECT_EQ(CONN->GetShard("test_table", "user", "1"), GetRecords({0}));
-  EXPECT_EQ(CONN->GetShard("test_table", "user", "2"), GetRecords({1, 3}));
-  EXPECT_EQ(CONN->GetShard("test_table", "user", "3"), GetRecords({2, 3}));
-  EXPECT_EQ(CONN->GetShard("test_table", "user", "4"), EMPTY);
+  EXPECT_EQ(CONN->GetShard("test_table", util::ShardName("user", "1")),
+            GetRecords({0}));
+  EXPECT_EQ(CONN->GetShard("test_table", util::ShardName("user", "2")),
+            GetRecords({1, 3}));
+  EXPECT_EQ(CONN->GetShard("test_table", util::ShardName("user", "3")),
+            GetRecords({2, 3}));
+  EXPECT_EQ(CONN->GetShard("test_table", util::ShardName("user", "4")), EMPTY);
 }
 
 TEST_F(RocksdbConnectionTest, DeleteShard) {
@@ -449,22 +453,25 @@ TEST_F(RocksdbConnectionTest, DeleteShard) {
   EXPECT_EQ(SelectBy("ID", "3"), GetRecords({3}));
 
   // Delete user2, shared row stays with user3.
-  EXPECT_EQ(CONN->DeleteShard("test_table", "user", "2"), GetRecords({1, 3}));
-  EXPECT_EQ(CONN->GetShard("test_table", "user", "2"), EMPTY);
+  EXPECT_EQ(CONN->DeleteShard("test_table", util::ShardName("user", "2")),
+            GetRecords({1, 3}));
+  EXPECT_EQ(CONN->GetShard("test_table", util::ShardName("user", "2")), EMPTY);
   EXPECT_EQ(SelectBy("ID", "0"), GetRecords({0}));
   EXPECT_EQ(SelectBy("ID", "1"), EMPTY);
   EXPECT_EQ(SelectBy("ID", "2"), GetRecords({2}));
   EXPECT_EQ(SelectBy("ID", "3"), GetRecords({3}));
 
-  EXPECT_EQ(CONN->DeleteShard("test_table", "user", "3"), GetRecords({2, 3}));
-  EXPECT_EQ(CONN->GetShard("test_table", "user", "3"), EMPTY);
+  EXPECT_EQ(CONN->DeleteShard("test_table", util::ShardName("user", "3")),
+            GetRecords({2, 3}));
+  EXPECT_EQ(CONN->GetShard("test_table", util::ShardName("user", "3")), EMPTY);
   EXPECT_EQ(SelectBy("ID", "0"), GetRecords({0}));
   EXPECT_EQ(SelectBy("ID", "1"), EMPTY);
   EXPECT_EQ(SelectBy("ID", "2"), EMPTY);
   EXPECT_EQ(SelectBy("ID", "3"), EMPTY);
 
-  EXPECT_EQ(CONN->DeleteShard("test_table", "user", "1"), GetRecords({0}));
-  EXPECT_EQ(CONN->GetShard("test_table", "user", "1"), EMPTY);
+  EXPECT_EQ(CONN->DeleteShard("test_table", util::ShardName("user", "1")),
+            GetRecords({0}));
+  EXPECT_EQ(CONN->GetShard("test_table", util::ShardName("user", "1")), EMPTY);
 
   // Table is now empty!
   sqlast::Select select("test_table");

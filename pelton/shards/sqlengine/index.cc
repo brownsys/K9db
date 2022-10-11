@@ -165,6 +165,39 @@ std::vector<dataflow::Record> LookupIndex(const IndexDescriptor &index,
   return flow.Lookup(key, -1, 0);
 }
 
+/*
+ * Determine any shard that the given record resides in.
+ * Returns an arbitrary one of the shards that the record is in for shared data.
+ */
+std::unordered_set<util::ShardName> LocateAll(const std::string &table_name,
+                                              const dataflow::Value &pkval,
+                                              Connection *conn,
+                                              util::SharedLock *lock) {
+  // Get table information.
+  const SharderState &sstate = conn->state->SharderState();
+  const Table &dependent = sstate.GetTable(table_name);
+  size_t pk_index = dependent.schema.keys().at(0);
+  const std::string &pk_name = dependent.schema.NameOf(pk_index);
+
+  // Check that table has indices for PK.
+  if (dependent.indices.count(pk_name) == 1) {
+    std::unordered_set<util::ShardName> result;
+    const auto &indices = dependent.indices.at(pk_name);
+    for (const auto &[shard_kind, index] : indices) {
+      std::vector<dataflow::Record> indexed =
+          LookupIndex(*index, dataflow::Value(pkval), conn, lock);
+      for (const dataflow::Record &record : indexed) {
+        result.emplace(shard_kind, record.GetValueString(1));
+      }
+    }
+    if (result.size() == 0) {
+      result.emplace(DEFAULT_SHARD, DEFAULT_SHARD);
+    }
+    return result;
+  }
+  return {};
+}
+
 }  // namespace index
 }  // namespace sqlengine
 }  // namespace shards

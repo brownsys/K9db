@@ -6,12 +6,14 @@
 
 #include "glog/logging.h"
 #include "pelton/shards/sqlengine/tests_helpers.h"
+#include "pelton/util/shard_name.h"
 
 namespace pelton {
 namespace shards {
 namespace sqlengine {
 
 using V = std::vector<std::string>;
+using SN = util::ShardName;
 
 /*
  * The tests!
@@ -43,8 +45,8 @@ TEST_F(InsertTest, UnshardedTable) {
   EXPECT_UPDATE(Execute(stmt4, &conn), 1);
 
   // Validate insertions.
-  sql::SqlResultSet result = db->GetShard("user", DEFAULT_SHARD, DEFAULT_SHARD);
-  EXPECT_EQ(result, (V{row1, row2, row3, row4}));
+  sql::SqlResultSet r = db->GetShard("user", SN(DEFAULT_SHARD, DEFAULT_SHARD));
+  EXPECT_EQ(r, (V{row1, row2, row3, row4}));
 }
 
 TEST_F(InsertTest, Datasubject) {
@@ -70,12 +72,12 @@ TEST_F(InsertTest, Datasubject) {
   EXPECT_UPDATE(Execute(stmt4, &conn), 1);
 
   // Validate insertions.
-  EXPECT_EQ(db->GetShard("user", "user", "0"), (V{row1}));
-  EXPECT_EQ(db->GetShard("user", "user", "1"), (V{row2}));
-  EXPECT_EQ(db->GetShard("user", "user", "2"), (V{row3}));
-  EXPECT_EQ(db->GetShard("user", "user", "5"), (V{row4}));
-  EXPECT_EQ(db->GetShard("user", "user", "10"), (V{}));
-  EXPECT_EQ(db->GetShard("user", "user", DEFAULT_SHARD), (V{}));
+  EXPECT_EQ(db->GetShard("user", SN("user", "0")), (V{row1}));
+  EXPECT_EQ(db->GetShard("user", SN("user", "1")), (V{row2}));
+  EXPECT_EQ(db->GetShard("user", SN("user", "2")), (V{row3}));
+  EXPECT_EQ(db->GetShard("user", SN("user", "5")), (V{row4}));
+  EXPECT_EQ(db->GetShard("user", SN("user", "10")), (V{}));
+  EXPECT_EQ(db->GetShard("user", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
 }
 
 TEST_F(InsertTest, DirectTable) {
@@ -105,10 +107,10 @@ TEST_F(InsertTest, DirectTable) {
   EXPECT_UPDATE(Execute(addr3, &conn), 1);
 
   // Validate insertions.
-  EXPECT_EQ(db->GetShard("addr", "user", "0"), (V{row1, row2}));
-  EXPECT_EQ(db->GetShard("addr", "user", "5"), (V{row3}));
-  EXPECT_EQ(db->GetShard("addr", "user", "10"), (V{}));
-  EXPECT_EQ(db->GetShard("addr", "user", DEFAULT_SHARD), (V{}));
+  EXPECT_EQ(db->GetShard("addr", SN("user", "0")), (V{row1, row2}));
+  EXPECT_EQ(db->GetShard("addr", SN("user", "5")), (V{row3}));
+  EXPECT_EQ(db->GetShard("addr", SN("user", "10")), (V{}));
+  EXPECT_EQ(db->GetShard("addr", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
 }
 
 TEST_F(InsertTest, TransitiveTable) {
@@ -148,10 +150,10 @@ TEST_F(InsertTest, TransitiveTable) {
   EXPECT_UPDATE(Execute(num4, &conn), 1);
 
   // Validate insertions.
-  EXPECT_EQ(db->GetShard("phones", "user", "0"), (V{row2, row3, row4}));
-  EXPECT_EQ(db->GetShard("phones", "user", "5"), (V{row1}));
-  EXPECT_EQ(db->GetShard("phones", "user", "10"), (V{}));
-  EXPECT_EQ(db->GetShard("phones", "user", DEFAULT_SHARD), (V{}));
+  EXPECT_EQ(db->GetShard("phones", SN("user", "0")), (V{row2, row3, row4}));
+  EXPECT_EQ(db->GetShard("phones", SN("user", "5")), (V{row1}));
+  EXPECT_EQ(db->GetShard("phones", SN("user", "10")), (V{}));
+  EXPECT_EQ(db->GetShard("phones", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
 }
 
 TEST_F(InsertTest, DeepTransitiveTable) {
@@ -203,10 +205,10 @@ TEST_F(InsertTest, DeepTransitiveTable) {
   EXPECT_UPDATE(Execute(deep5, &conn), 1);
 
   // Validate insertions.
-  EXPECT_EQ(db->GetShard("deep", "user", "0"), (V{row1, row2, row4, row5}));
-  EXPECT_EQ(db->GetShard("deep", "user", "5"), (V{row3}));
-  EXPECT_EQ(db->GetShard("deep", "user", "10"), (V{}));
-  EXPECT_EQ(db->GetShard("deep", "user", DEFAULT_SHARD), (V{}));
+  EXPECT_EQ(db->GetShard("deep", SN("user", "0")), (V{row1, row2, row4, row5}));
+  EXPECT_EQ(db->GetShard("deep", SN("user", "5")), (V{row3}));
+  EXPECT_EQ(db->GetShard("deep", SN("user", "10")), (V{}));
+  EXPECT_EQ(db->GetShard("deep", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
 }
 
 TEST_F(InsertTest, TwoOwners) {
@@ -237,15 +239,15 @@ TEST_F(InsertTest, TwoOwners) {
   EXPECT_UPDATE(Execute(usr2, &conn), 1);
   EXPECT_UPDATE(Execute(usr3, &conn), 1);
   EXPECT_UPDATE(Execute(msg1, &conn), 2);
-  EXPECT_UPDATE(Execute(msg2, &conn), 2);
+  EXPECT_UPDATE(Execute(msg2, &conn), 1);  // Inserted only once for u1.
   EXPECT_UPDATE(Execute(msg3, &conn), 2);
   EXPECT_UPDATE(Execute(msg4, &conn), 2);
 
   // Validate insertions.
-  EXPECT_EQ(db->GetShard("msg", "user", "0"), (V{row1, row2, row4}));
-  EXPECT_EQ(db->GetShard("msg", "user", "5"), (V{row3, row4}));
-  EXPECT_EQ(db->GetShard("msg", "user", "10"), (V{row1, row3}));
-  EXPECT_EQ(db->GetShard("msg", "user", DEFAULT_SHARD), (V{}));
+  EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{row1, row2, row4}));
+  EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4}));
+  EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{row1, row3}));
+  EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
 }
 
 TEST_F(InsertTest, OwnerAccessor) {
@@ -281,10 +283,10 @@ TEST_F(InsertTest, OwnerAccessor) {
   EXPECT_UPDATE(Execute(msg4, &conn), 1);
 
   // Validate insertions.
-  EXPECT_EQ(db->GetShard("msg", "user", "0"), (V{row1, row2}));
-  EXPECT_EQ(db->GetShard("msg", "user", "5"), (V{row3, row4}));
-  EXPECT_EQ(db->GetShard("msg", "user", "10"), (V{}));
-  EXPECT_EQ(db->GetShard("msg", "user", DEFAULT_SHARD), (V{}));
+  EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{row1, row2}));
+  EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4}));
+  EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{}));
+  EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
 }
 
 TEST_F(InsertTest, ShardedDataSubject) {
@@ -315,11 +317,143 @@ TEST_F(InsertTest, ShardedDataSubject) {
   EXPECT_UPDATE(Execute(inv3, &conn), 2);
 
   // Validate insertions.
-  EXPECT_EQ(db->GetShard("invited", "user", "0"), (V{row2, row3}));
-  EXPECT_EQ(db->GetShard("invited", "user", "5"), (V{row1}));
-  EXPECT_EQ(db->GetShard("invited", "invited", "0"), (V{row1}));
-  EXPECT_EQ(db->GetShard("invited", "invited", "1"), (V{row2}));
-  EXPECT_EQ(db->GetShard("invited", "invited", "5"), (V{row3}));
+  EXPECT_EQ(db->GetShard("invited", SN("user", "0")), (V{row2, row3}));
+  EXPECT_EQ(db->GetShard("invited", SN("user", "5")), (V{row1}));
+  EXPECT_EQ(db->GetShard("invited", SN("invited", "0")), (V{row1}));
+  EXPECT_EQ(db->GetShard("invited", SN("invited", "1")), (V{row2}));
+  EXPECT_EQ(db->GetShard("invited", SN("invited", "5")), (V{row3}));
+}
+
+TEST_F(InsertTest, VariableOwnership) {
+  // Parse create table statements.
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string grps = MakeCreate("grps", {"gid" I PK});
+  std::string assoc =
+      MakeCreate("association", {"id" I PK, "OWNING_group" I FK "grps(gid)",
+                                 "OWNER_user" I FK "user(id)"});
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+  sql::AbstractConnection *db = conn.state->Database();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(grps, &conn));
+  EXPECT_SUCCESS(Execute(assoc, &conn));
+
+  // Perform some inserts.
+  auto &&[usr1, u_] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr2, u__] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[grps1, row1] = MakeInsert("grps", {"0"});
+  auto &&[grps2, row2] = MakeInsert("grps", {"1"});
+
+  EXPECT_UPDATE(Execute(usr1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr2, &conn), 1);
+  EXPECT_UPDATE(Execute(grps1, &conn), 1);
+  EXPECT_UPDATE(Execute(grps2, &conn), 1);
+
+  // Validate insertions.
+  EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "1")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)),
+            (V{row1, row2}));
+
+  // Associate groups with some users.
+  auto &&[assoc1, a_] = MakeInsert("association", {"0", "0", "0"});
+  auto &&[assoc2, a__] = MakeInsert("association", {"1", "1", "0"});
+  auto &&[assoc3, a___] = MakeInsert("association", {"1", "1", "1"});
+  auto &&[assoc4, a____] = MakeInsert("association", {"2", "1", "1"});
+
+  EXPECT_UPDATE(Execute(assoc1, &conn), 3);
+  EXPECT_UPDATE(Execute(assoc2, &conn), 3);
+  EXPECT_UPDATE(Execute(assoc3, &conn), 2);
+  EXPECT_UPDATE(Execute(assoc4, &conn), 1);
+
+  // Validate move after insertion
+  EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{row1, row2}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "1")), (V{row2}));
+  EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+}
+
+TEST_F(InsertTest, ComplexVariableOwnership) {
+  // Parse create table statements.
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string admin = MakeCreate("admin", {"aid" I PK, "PII_name" STR});
+  std::string grps =
+      MakeCreate("grps", {"gid" I PK, "OWNER_admin" I FK "admin(aid)"});
+  std::string assoc =
+      MakeCreate("association", {"sid" I PK, "OWNING_group" I FK "grps(gid)",
+                                 "OWNER_user" I FK "user(id)"});
+  std::string files =
+      MakeCreate("files", {"fid" I PK, "OWNER_creator" I FK "user(id)"});
+  std::string fassoc =
+      MakeCreate("fassoc", {"fsid" I PK, "OWNING_file" I FK "files(fid)",
+                            "OWNER_group" I FK "grps(gid)"});
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+  sql::AbstractConnection *db = conn.state->Database();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(admin, &conn));
+  EXPECT_SUCCESS(Execute(grps, &conn));
+  EXPECT_SUCCESS(Execute(assoc, &conn));
+  EXPECT_SUCCESS(Execute(files, &conn));
+  EXPECT_SUCCESS(Execute(fassoc, &conn));
+
+  // Perform some inserts.
+  auto &&[usr1, u_] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr2, u__] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[adm1, d_] = MakeInsert("admin", {"0", "'a1'"});
+  auto &&[grps1, grow1] = MakeInsert("grps", {"0", "0"});
+  auto &&[grps2, grow2] = MakeInsert("grps", {"1", "0"});
+
+  EXPECT_UPDATE(Execute(usr1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr2, &conn), 1);
+  EXPECT_UPDATE(Execute(adm1, &conn), 1);
+  EXPECT_UPDATE(Execute(grps1, &conn), 1);
+  EXPECT_UPDATE(Execute(grps2, &conn), 1);
+
+  // Validate insertions.
+  EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{grow1, grow2}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+
+  // Insert files and fassocs but not associated to any users.
+  auto &&[f1, frow1] = MakeInsert("files", {"0", "0"});
+  auto &&[f2, frow2] = MakeInsert("files", {"1", "0"});
+  auto &&[fa1, farow1] = MakeInsert("fassoc", {"0", "0", "1"});
+  auto &&[fa2, farow2] = MakeInsert("fassoc", {"1", "1", "1"});
+
+  EXPECT_UPDATE(Execute(f1, &conn), 1);
+  EXPECT_UPDATE(Execute(f2, &conn), 1);
+  EXPECT_UPDATE(Execute(fa1, &conn), 2);
+  EXPECT_UPDATE(Execute(fa2, &conn), 2);
+
+  EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{frow1, frow2}));
+  EXPECT_EQ(db->GetShard("files", SN("user", "0")), (V{frow1, frow2}));
+  EXPECT_EQ(db->GetShard("files", SN("user", "5")), (V{}));
+  EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+
+  // Associate everything with a user.
+  auto &&[assoc1, a_] = MakeInsert("association", {"0", "1", "5"});
+
+  EXPECT_UPDATE(Execute(assoc1, &conn), 6);
+
+  // Validate move after insertion
+  EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{grow1, grow2}));
+  EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{frow1, frow2}));
+  EXPECT_EQ(db->GetShard("fassoc", SN("admin", "5")), (V{farow1, farow2}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{grow2}));
+  EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  EXPECT_EQ(db->GetShard("files", SN("user", "0")), (V{frow1, frow2}));
+  EXPECT_EQ(db->GetShard("files", SN("user", "5")), (V{frow1, frow2}));
+  EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  EXPECT_EQ(db->GetShard("fassoc", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("fassoc", SN("user", "5")), (V{farow1, farow2}));
 }
 
 }  // namespace sqlengine

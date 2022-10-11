@@ -36,7 +36,7 @@ EncryptedKey EncryptionManager::EncryptKey(RocksdbSequence &&k) const {
   return EncryptedKey(k.Release());
 }
 
-EncryptedValue EncryptionManager::EncryptValue(const std::string &user_id,
+EncryptedValue EncryptionManager::EncryptValue(const std::string &shard_name,
                                                RocksdbSequence &&v) {
   return EncryptedValue(v.Release());
 }
@@ -46,25 +46,26 @@ RocksdbSequence EncryptionManager::DecryptKey(EncryptedKey &&k) const {
   return RocksdbSequence(k.Release());
 }
 
-RocksdbSequence EncryptionManager::DecryptValue(const std::string &user_id,
+RocksdbSequence EncryptionManager::DecryptValue(const std::string &shard_name,
                                                 EncryptedValue &&v) const {
   return RocksdbSequence(v.Release());
 }
 
 // Encrypts a key for use with rocksdb Seek.
-EncryptedPrefix EncryptionManager::EncryptSeek(std::string &&seek_key) const {
+EncryptedPrefix EncryptionManager::EncryptSeek(util::ShardName &&seek) const {
+  std::string seek_key = seek.Release();
   seek_key.push_back(__ROCKSSEP);
   return Cipher(std::move(seek_key));
 }
 
 // Helpers are unused.
 const unsigned char *EncryptionManager::GetOrCreateUserKey(
-    const std::string &user_id) {
+    const std::string &shard_name) {
   LOG(FATAL) << "ENCRYPTION OFF!";
   return nullptr;
 }
 const unsigned char *EncryptionManager::GetUserKey(
-    const std::string &user_id) const {
+    const std::string &shard_name) const {
   LOG(FATAL) << "ENCRYPTION OFF!";
   return nullptr;
 }

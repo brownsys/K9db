@@ -77,3 +77,18 @@ cc_library(
     visibility = ["//pelton:__subpackages__"],
     deps = [],
 )
+
+cc_library(
+    name = "shard_name",
+    srcs = [
+        "shard_name.cc",
+    ],
+    hdrs = [
+        "shard_name.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "@glog",
+        "@rocksdb",
+    ],
+)

@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "pelton/sql/rocksdb/encode.h"
+#include "pelton/util/shard_name.h"
 #include "pelton/util/upgradable_lock.h"
 #include "rocksdb/comparator.h"
 #include "rocksdb/slice.h"
@@ -102,17 +103,18 @@ class EncryptionManager {
 
   // Encryption of keys and values of records.
   EncryptedKey EncryptKey(RocksdbSequence &&k) const;
-  EncryptedValue EncryptValue(const std::string &user_id, RocksdbSequence &&v);
+  EncryptedValue EncryptValue(const std::string &shard_name,
+                              RocksdbSequence &&v);
 
   // Decryption of records.
   RocksdbSequence DecryptKey(EncryptedKey &&k) const;
-  RocksdbSequence DecryptValue(const std::string &user_id,
+  RocksdbSequence DecryptValue(const std::string &shard_name,
                                EncryptedValue &&v) const;
 
   // Encrypts a key for use with rocksdb Seek.
   // Given our PeltonPrefixTransform, the seek prefix is the shard name.
   // (Must be passed to this function without a trailing __ROCKSSEP).
-  EncryptedPrefix EncryptSeek(std::string &&seek_key) const;
+  EncryptedPrefix EncryptSeek(util::ShardName &&seek_key) const;
 
  private:
   std::unique_ptr<unsigned char[]> global_key_;
@@ -122,8 +124,8 @@ class EncryptionManager {
 
   // Get the key of the given user, create the key for that user if it does not
   // exist.
-  const unsigned char *GetOrCreateUserKey(const std::string &user_id);
-  const unsigned char *GetUserKey(const std::string &user_id) const;
+  const unsigned char *GetOrCreateUserKey(const std::string &shard_name);
+  const unsigned char *GetUserKey(const std::string &shard_name) const;
 };
 
 // Extract the shard prefix from keys according to our rocksdb key format.

@@ -78,6 +78,9 @@ class RocksdbTable {
   std::optional<IndexSet> IndexLookup(sqlast::ValueMapper *vm) const;
   std::optional<DedupIndexSet> IndexLookupDedup(sqlast::ValueMapper *vm) const;
 
+  // Get an index.
+  const RocksdbPKIndex &GetPKIndex() const { return this->pk_index_; }
+
   // Check if a record with given PK exists.
   bool Exists(const rocksdb::Slice &pk_value) const;
 
