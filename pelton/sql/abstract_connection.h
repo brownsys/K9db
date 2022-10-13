@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 #include "pelton/dataflow/value.h"
 #include "pelton/sql/result.h"
@@ -52,17 +53,10 @@ class AbstractConnection {
                                    util::ShardName &&shard_name) = 0;
 
   // Shard operations.
-  virtual std::pair<std::optional<dataflow::Record>, int> AssignToShards(
-      const std::string &table_name, const dataflow::Value &pk,
+  virtual std::pair<sql::SqlResultSet, int> AssignToShards(
+      const std::string &table_name, size_t column_index,
+      const std::vector<dataflow::Value> &values,
       const std::unordered_set<util::ShardName> &targets) = 0;
-  virtual std::pair<std::optional<dataflow::Record>, int> AssignToShards(
-      const std::string &table_name, const util::ShardName &source,
-      const dataflow::Value &pk,
-      const std::unordered_set<util::ShardName> &targets) = 0;
-
-  virtual std::pair<std::optional<dataflow::Record>, int> DeleteFromShard(
-      const std::string &table_name, const util::ShardName &source,
-      const dataflow::Value &pk) = 0;
 };
 
 }  // namespace sql

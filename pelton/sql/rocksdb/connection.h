@@ -56,17 +56,10 @@ class RocksdbConnection : public AbstractConnection {
                         util::ShardName &&shard_name) const override;
 
   // Shard-based operations for copying/moving/deleting records.
-  std::pair<std::optional<dataflow::Record>, int> AssignToShards(
-      const std::string &table_name, const dataflow::Value &pk,
+  std::pair<sql::SqlResultSet, int> AssignToShards(
+      const std::string &table_name, size_t column_index,
+      const std::vector<dataflow::Value> &values,
       const std::unordered_set<util::ShardName> &targets) override;
-  std::pair<std::optional<dataflow::Record>, int> AssignToShards(
-      const std::string &table_name, const util::ShardName &source,
-      const dataflow::Value &pk,
-      const std::unordered_set<util::ShardName> &targets) override;
-
-  std::pair<std::optional<dataflow::Record>, int> DeleteFromShard(
-      const std::string &table_name, const util::ShardName &source,
-      const dataflow::Value &pk) override;
 
  private:
   std::unique_ptr<rocksdb::DB> db_;

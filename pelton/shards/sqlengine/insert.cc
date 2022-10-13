@@ -30,7 +30,7 @@ namespace sqlengine {
 /* Have we inserted the record into this shard yet? */
 bool InsertContext::InsertedInto(const std::string &shard_kind,
                                  const std::string &user_id) {
-  return !this->user_ids_[shard_kind].insert(user_id).second;
+  return !this->shards_[shard_kind].emplace(shard_kind, user_id).second;
 }
 
 /*
@@ -145,6 +145,76 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
   return res;
 }
 
+absl::StatusOr<int> InsertContext::AssignDependentsToShard(
+    const Table &table, const std::vector<dataflow::Record> &records) {
+  int result = 0;
+  // The insert into this table may affect the sharding of data in dependent
+  // tables. Figure this out.
+  for (const auto &[next_table, desc] : table.dependents) {
+    // Get the user ids that we need to copy records in the dependent table to.
+    const auto &targets = this->shards_[desc->shard_kind];
+    if (targets.size() == 0) {
+      continue;
+    }
+
+    // Dependent tables for which this table acts as the variable ownership
+    // association table can have their data affected by this insert.
+    if (desc->type == InfoType::VARIABLE) {
+      const VariableInfo &info = std::get<VariableInfo>(desc->info);
+      const Table &next = this->sstate_.GetTable(next_table);
+
+      // Get the corresponding FK columns in this table and dependent table.
+      size_t colidx = info.origin_column_index;
+      size_t nextidx = info.column_index;
+      ASSERT_RET(nextidx == next.schema.keys().at(0), Internal,
+                 "Variable OWNS FK points to nonPK");
+
+      // The value of the column that is a foreign key.
+      std::vector<dataflow::Value> vals;
+      for (const dataflow::Record &record : records) {
+        vals.emplace_back(record.GetValue(colidx));
+      }
+
+      // Ask database to assign all the records in the next table, whose id =
+      // the FK value to the owners of the record that was just inserted.
+      // This also removes any copies of the data in the default shard.
+      auto &&[records, status] =
+          this->db_->AssignToShards(next_table, nextidx, vals, targets);
+      ACCUM(status, result);
+
+      // Do it recursively for dependent of copied records.
+      ACCUM_STATUS(this->AssignDependentsToShard(next, records.rows()), result);
+    }
+
+    // Similar but for transitive dependencies.
+    if (desc->type == InfoType::TRANSITIVE) {
+      const TransitiveInfo &info = std::get<TransitiveInfo>(desc->info);
+      const Table &next = this->sstate_.GetTable(next_table);
+
+      // Get the corresponding FK columns in this table and dependent table.
+      size_t colidx = info.next_column_index;
+      size_t nextidx = info.column_index;
+
+      // The value of the column that is a foreign key.
+      std::vector<dataflow::Value> vals;
+      for (const dataflow::Record &record : records) {
+        vals.emplace_back(record.GetValue(colidx));
+      }
+
+      // Ask database to assign all the records in the next table, whose id =
+      // the FK value to the owners of the record that was just inserted.
+      // This also removes any copies of the data in the default shard.
+      auto &&[records, status] =
+          this->db_->AssignToShards(next_table, nextidx, vals, targets);
+      ACCUM(status, result);
+
+      // Do it recursively for dependent of copied records.
+      ACCUM_STATUS(this->AssignDependentsToShard(next, records.rows()), result);
+    }
+  }
+  return result;
+}
+
 /*
  * Main entry point for insert: Executes the statement against the shards.
  */
@@ -165,76 +235,23 @@ absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
 
   // Insert the data into the physical shards.
   ASSIGN_OR_RETURN(int result, this->InsertIntoBaseTable());
+  if (result < 0) {
+    return sql::SqlResult(0);
+  }
 
-  // The insert into this table may affect the sharding of data in dependent
-  // tables. Figure this out.
-  for (size_t i = 0; i < this->table_.dependents.size(); i++) {
-    const auto &[dependent_table, desc] = this->table_.dependents.at(i);
-
-    // Get the user ids that we need to copy records in the dependent table to.
-    const std::unordered_set<std::string> &user_ids =
-        this->user_ids_[desc->shard_kind];
-    if (user_ids.size() == 0) {
-      continue;
-    }
-
-    // Only dependent tables for which this table acts as the variable ownership
-    // association table can have their data affected by this insert.
-    if (desc->type == InfoType::VARIABLE) {
-      const VariableInfo &info = std::get<VariableInfo>(desc->info);
-      const Table &dependent = this->sstate_.GetTable(dependent_table);
-
-      // Get the corresponding FK columns in this table and dependent table.
-      const std::string &column = info.origin_column;
-      size_t column_index = info.origin_column_index;
-      auto column_type = info.column_type;
-      const std::string &dependent_column = info.column;
-      ASSERT_RET(info.column_index == dependent.schema.keys().at(0), Internal,
-                 "Variable OWNS FK points to nonPK");
-
-      // The value of the column that is a foreign key.
-      dataflow::Value val(column_type,
-                          this->stmt_.GetValue(column, column_index));
-
-      // Determine in which shard the record is
-      std::unordered_set<util::ShardName> shards =
-          index::LocateAll(dependent_table, val, this->conn_, this->lock_);
-
-      // Ignore targets that already posses a copy of the record somehow.
-      std::unordered_set<util::ShardName> targets;
-      for (const std::string &user_id : user_ids) {
-        util::ShardName target(desc->shard_kind, user_id);
-        if (shards.count(target) == 0) {
-          targets.insert(std::move(target));
-        }
-      }
-
-      if (shards.size() > 0) {
-        // Able to determine via index.
-        const util::ShardName &source = *shards.cbegin();
-        auto &&[record, status] =
-            this->db_->AssignToShards(dependent_table, source, val, targets);
-        if (status < 0) {
-          return sql::SqlResult(status);
-        }
-        result += status;
-      } else {
-        // Not able to determine via index.
-        auto &&[record, status] =
-            this->db_->AssignToShards(dependent_table, val, targets);
-        if (status < 0) {
-          return sql::SqlResult(status);
-        }
-        result += status;
-      }
-    }
+  // Copy/move any dependent records in dependent table to the shards of
+  // users that own the just inserted record.
+  ASSIGN_OR_RETURN(int status,
+                   this->AssignDependentsToShard(this->table_, records));
+  if (status < 0) {
+    return sql::SqlResult(0);
   }
 
   // Everything has been inserted; feed to dataflows.
   this->dstate_.ProcessRecords(this->table_name_, std::move(records));
 
   // Return number of copies inserted.
-  return sql::SqlResult(result);
+  return sql::SqlResult(result + status);
 }
 
 }  // namespace sqlengine

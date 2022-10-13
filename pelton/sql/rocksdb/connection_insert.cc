@@ -25,20 +25,19 @@ int RocksdbConnection::ExecuteInsert(const sqlast::Insert &stmt,
   const dataflow::SchemaRef &schema = table.Schema();
 
   // Encode row.
-  std::string shard = shard_name.String();
   RocksdbRecord record = RocksdbRecord::FromInsert(stmt, schema, shard_name);
 
   // Ensure PK is unique.
   // CHECK(!table.Exists(record.GetPK())) << "Integrity error: PK exists";
 
   // Update indices.
-  table.IndexAdd(shard, record.Value());
+  table.IndexAdd(shard_name.AsSlice(), record.Value());
 
   // Encrypt key and record value.
   EncryptedKey key =
       this->encryption_manager_.EncryptKey(std::move(record.Key()));
-  EncryptedValue value =
-      this->encryption_manager_.EncryptValue(shard, std::move(record.Value()));
+  EncryptedValue value = this->encryption_manager_.EncryptValue(
+      shard_name.ByRef(), std::move(record.Value()));
 
   // Write to DB.
   table.Put(key, value);

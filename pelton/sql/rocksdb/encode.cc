@@ -97,6 +97,15 @@ std::string EncodeValue(sqlast::ColumnDefinition::Type type,
   }
 }
 
+// Encoding vectors of values.
+std::vector<std::string> EncodeValues(
+    const std::vector<dataflow::Value> &vals) {
+  std::vector<std::string> result;
+  for (const dataflow::Value &v : vals) {
+    result.push_back(EncodeValue(v));
+  }
+  return result;
+}
 void EncodeValues(sqlast::ColumnDefinition::Type type,
                   std::vector<std::string> *values) {
   for (size_t i = 0; i < values->size(); i++) {
@@ -143,7 +152,7 @@ void RocksdbSequence::Append(const dataflow::Value &val) {
   this->data_.push_back(__ROCKSSEP);
 }
 void RocksdbSequence::Append(const util::ShardName &shard_name) {
-  this->data_.append(shard_name.String());
+  this->data_.append(shard_name.AsView());
   this->data_.push_back(__ROCKSSEP);
 }
 void RocksdbSequence::AppendEncoded(const rocksdb::Slice &slice) {

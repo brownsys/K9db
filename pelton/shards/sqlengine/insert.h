@@ -56,6 +56,8 @@ class InsertContext {
 
   /* Recursively moving/copying records in dependent tables into the affected
      shard. */
+  absl::StatusOr<int> AssignDependentsToShard(
+      const Table &table, const std::vector<dataflow::Record> &records);
 
   /* Members. */
   // Statement being inserted.
@@ -76,7 +78,7 @@ class InsertContext {
   util::SharedLock *lock_;
 
   // This vector will store the shardname assigned to this insert.
-  std::unordered_map<ShardKind, std::unordered_set<std::string>> user_ids_;
+  std::unordered_map<ShardKind, std::unordered_set<util::ShardName>> shards_;
 };
 
 }  // namespace sqlengine

@@ -31,6 +31,8 @@ rocksdb::Slice ExtractSlice(const rocksdb::Slice &slice, size_t spos,
 std::string EncodeValue(const dataflow::Value &val);
 std::string EncodeValue(sqlast::ColumnDefinition::Type type,
                         const rocksdb::Slice &value);
+
+std::vector<std::string> EncodeValues(const std::vector<dataflow::Value> &vals);
 void EncodeValues(sqlast::ColumnDefinition::Type type,
                   std::vector<std::string> *values);
 

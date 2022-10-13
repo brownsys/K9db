@@ -53,7 +53,7 @@ RocksdbSequence EncryptionManager::DecryptValue(const std::string &shard_name,
 
 // Encrypts a key for use with rocksdb Seek.
 EncryptedPrefix EncryptionManager::EncryptSeek(util::ShardName &&seek) const {
-  std::string seek_key = seek.Release();
+  std::string seek_key = seek.ByMove();
   seek_key.push_back(__ROCKSSEP);
   return Cipher(std::move(seek_key));
 }

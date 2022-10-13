@@ -354,15 +354,15 @@ TEST_F(InsertTest, VariableOwnership) {
 
   // Validate insertions.
   EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
-  EXPECT_EQ(db->GetShard("grps", SN("user", "1")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{}));
   EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)),
             (V{row1, row2}));
 
   // Associate groups with some users.
   auto &&[assoc1, a_] = MakeInsert("association", {"0", "0", "0"});
   auto &&[assoc2, a__] = MakeInsert("association", {"1", "1", "0"});
-  auto &&[assoc3, a___] = MakeInsert("association", {"1", "1", "1"});
-  auto &&[assoc4, a____] = MakeInsert("association", {"2", "1", "1"});
+  auto &&[assoc3, a___] = MakeInsert("association", {"1", "1", "5"});
+  auto &&[assoc4, a____] = MakeInsert("association", {"2", "1", "5"});
 
   EXPECT_UPDATE(Execute(assoc1, &conn), 3);
   EXPECT_UPDATE(Execute(assoc2, &conn), 3);
@@ -371,7 +371,7 @@ TEST_F(InsertTest, VariableOwnership) {
 
   // Validate move after insertion
   EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{row1, row2}));
-  EXPECT_EQ(db->GetShard("grps", SN("user", "1")), (V{row2}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{row2}));
   EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
 }
 
@@ -445,7 +445,7 @@ TEST_F(InsertTest, ComplexVariableOwnership) {
   // Validate move after insertion
   EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{grow1, grow2}));
   EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{frow1, frow2}));
-  EXPECT_EQ(db->GetShard("fassoc", SN("admin", "5")), (V{farow1, farow2}));
+  EXPECT_EQ(db->GetShard("fassoc", SN("admin", "0")), (V{farow1, farow2}));
   EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{grow2}));
   EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));

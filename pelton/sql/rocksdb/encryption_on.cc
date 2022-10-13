@@ -175,7 +175,7 @@ RocksdbSequence EncryptionManager::DecryptValue(const std::string &shard_name,
 EncryptedPrefix EncryptionManager::EncryptSeek(util::ShardName &&seek) const {
   const unsigned char *nonce = this->global_nonce_.get();
   const unsigned char *key = this->global_key_.get();
-  std::string cipher = Encrypt(seek.String(), nonce, key);
+  std::string cipher = Encrypt(seek.AsSlice(), nonce, key);
   EncryptedKey::Offset size = cipher.size();
   const char *ptr = reinterpret_cast<char *>(&size);
   cipher.push_back(ptr[0]);
