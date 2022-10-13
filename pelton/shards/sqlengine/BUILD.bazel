@@ -67,6 +67,7 @@ cc_library(
         "//pelton/sql:abstract_connection",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
+        "//pelton/util:shard_name",
         "//pelton/util:status",
         "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/status",
@@ -149,6 +150,7 @@ cc_library(
         "//pelton/sql:abstract_connection",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
+        "//pelton/util:shard_name",
         "//pelton/util:status",
         "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/status",
@@ -196,6 +198,7 @@ cc_test(
     ],
     deps = [
         ":tests_helpers",
+        "//pelton/util:shard_name",
         "@glog",
     ],
 )

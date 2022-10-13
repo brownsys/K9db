@@ -3,6 +3,7 @@
 #define PELTON_SHARDS_SQLENGINE_INDEX_H_
 
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "absl/status/statusor.h"
@@ -10,6 +11,7 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/value.h"
 #include "pelton/shards/types.h"
+#include "pelton/util/shard_name.h"
 #include "pelton/util/upgradable_lock.h"
 
 namespace pelton {
@@ -29,6 +31,13 @@ absl::StatusOr<IndexDescriptor> Create(const std::string &table_name,
                                        const std::string &column_name,
                                        Connection *connection,
                                        util::UniqueLock *lock);
+
+// Determine any shard that the given record resides in.
+// Returns an arbitrary one of the shards that the record is in for shared data.
+std::unordered_set<util::ShardName> LocateAll(const std::string &table_name,
+                                              const dataflow::Value &pk,
+                                              Connection *conn,
+                                              util::SharedLock *lock);
 
 }  // namespace index
 }  // namespace sqlengine

@@ -118,26 +118,26 @@ EncryptionManager::EncryptionManager()
 
 // Get the key of the given user.
 const unsigned char *EncryptionManager::GetUserKey(
-    const std::string &user_id) const {
+    const std::string &shard_name) const {
   util::SharedLock lock(&this->mtx_);
-  return this->keys_.at(user_id).get();
+  return this->keys_.at(shard_name).get();
 }
 
 // Get the key of the given user.
 // Create the key if that user does not yet have one.
 const unsigned char *EncryptionManager::GetOrCreateUserKey(
-    const std::string &user_id) {
+    const std::string &shard_name) {
   util::SharedLock lock(&this->mtx_);
   auto &&[upgraded, condition] =
-      lock.UpgradeIf([&]() { return this->keys_.count(user_id) == 0; });
+      lock.UpgradeIf([&]() { return this->keys_.count(shard_name) == 0; });
   if (condition) {
     std::unique_ptr<unsigned char[]> key =
         std::make_unique<unsigned char[]>(KEY_SIZE);
     crypto_aead_aes256gcm_keygen(key.get());
-    auto [eit, _] = this->keys_.emplace(user_id, std::move(key));
+    auto [eit, _] = this->keys_.emplace(shard_name, std::move(key));
     return eit->second.get();
   }
-  return this->keys_.at(user_id).get();
+  return this->keys_.at(shard_name).get();
 }
 
 // Encryption of keys and values of records.
@@ -147,10 +147,10 @@ EncryptedKey EncryptionManager::EncryptKey(RocksdbSequence &&k) const {
   return EncryptedKey(Cipher(Encrypt(k.At(0), nonce, key)),
                       Cipher(Encrypt(k.At(1), nonce, key)));
 }
-EncryptedValue EncryptionManager::EncryptValue(const std::string &user_id,
+EncryptedValue EncryptionManager::EncryptValue(const std::string &shard_name,
                                                RocksdbSequence &&v) {
   const unsigned char *nonce = this->global_nonce_.get();
-  const unsigned char *key = this->GetOrCreateUserKey(user_id);
+  const unsigned char *key = this->GetOrCreateUserKey(shard_name);
   return Cipher(Encrypt(v.Data(), nonce, key));
 }
 
@@ -164,18 +164,18 @@ RocksdbSequence EncryptionManager::DecryptKey(EncryptedKey &&k) const {
   result.AppendEncoded(Decrypt(k.GetPK(), nonce, key));
   return result;
 }
-RocksdbSequence EncryptionManager::DecryptValue(const std::string &user_id,
+RocksdbSequence EncryptionManager::DecryptValue(const std::string &shard_name,
                                                 EncryptedValue &&v) const {
   const unsigned char *nonce = this->global_nonce_.get();
-  const unsigned char *key = this->GetUserKey(user_id);
+  const unsigned char *key = this->GetUserKey(shard_name);
   return RocksdbSequence(Decrypt(v.Data(), nonce, key));
 }
 
 // Encrypts a key for use with rocksdb Seek.
-EncryptedPrefix EncryptionManager::EncryptSeek(std::string &&seek_key) const {
+EncryptedPrefix EncryptionManager::EncryptSeek(util::ShardName &&seek) const {
   const unsigned char *nonce = this->global_nonce_.get();
   const unsigned char *key = this->global_key_.get();
-  std::string cipher = Encrypt(seek_key, nonce, key);
+  std::string cipher = Encrypt(seek.AsSlice(), nonce, key);
   EncryptedKey::Offset size = cipher.size();
   const char *ptr = reinterpret_cast<char *>(&size);
   cipher.push_back(ptr[0]);

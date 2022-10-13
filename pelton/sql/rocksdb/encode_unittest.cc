@@ -87,11 +87,12 @@ TEST(RocksdbEncodeTest, RocksdbRecord) {
   stmt.AddValue("'2022-09-01 00:00:00'");
 
   // Test from insert.
-  RocksdbRecord record = RocksdbRecord::FromInsert(stmt, schema, "shard0");
+  RocksdbRecord record =
+      RocksdbRecord::FromInsert(stmt, schema, util::ShardName("shard", "0"));
 
   // Test key.
-  EXPECT_EQ(record.Key().Data(), "shard0" + SEP + "0" + SEP);
-  EXPECT_EQ(record.GetShard(), "shard0");
+  EXPECT_EQ(record.Key().Data(), "shard__0" + SEP + "0" + SEP);
+  EXPECT_EQ(record.GetShard(), "shard__0");
   EXPECT_EQ(record.GetPK(), "0");
 
   // Test value.
@@ -106,9 +107,9 @@ TEST(RocksdbEncodeTest, RocksdbRecord) {
   update.emplace(0, "10");
   update.emplace(2, "NULL");
   update.emplace(3, "'email@gmail.com'");
-  read = read.Update(update, schema, "shard2");
+  read = read.Update(update, schema, util::ShardName("shard", "2"));
 
-  EXPECT_EQ(read.Key().Data(), "shard2" + SEP + "10" + SEP);
+  EXPECT_EQ(read.Key().Data(), "shard__2" + SEP + "10" + SEP);
   EXPECT_EQ(read.Value().Data(), "10" + SEP + "user" + SEP + NUL + SEP +
                                      "email@gmail.com" + SEP +
                                      "2022-09-01 00:00:00" + SEP);
@@ -117,9 +118,9 @@ TEST(RocksdbEncodeTest, RocksdbRecord) {
 // RocksdbIndexInternalRecord
 TEST(RocksdbEncodeTest, RocksdbIndexInternalRecord) {
   // Test piece-wise constructor.
-  RocksdbIndexInternalRecord r1("10", "shard0", "5");
-  RocksdbIndexInternalRecord r2("20", "shard0", "5");
-  RocksdbIndexInternalRecord r3("20", "shard1", "5");
+  RocksdbIndexInternalRecord r1("10", "shard__0", "5");
+  RocksdbIndexInternalRecord r2("20", "shard__0", "5");
+  RocksdbIndexInternalRecord r3("20", "shard__1", "5");
 
   // Test read constructor.
   r1 = RocksdbIndexInternalRecord(r1.Data());
@@ -127,42 +128,30 @@ TEST(RocksdbEncodeTest, RocksdbIndexInternalRecord) {
   r3 = RocksdbIndexInternalRecord(r3.Data());
 
   // Test data.
-  EXPECT_EQ(r1.Data(), "10" + SEP + "shard0" + SEP + "5" + SEP);
-  EXPECT_EQ(r2.Data(), "20" + SEP + "shard0" + SEP + "5" + SEP);
-  EXPECT_EQ(r3.Data(), "20" + SEP + "shard1" + SEP + "5" + SEP);
+  EXPECT_EQ(r1.Data(), "10" + SEP + "shard__0" + SEP + "5" + SEP);
+  EXPECT_EQ(r2.Data(), "20" + SEP + "shard__0" + SEP + "5" + SEP);
+  EXPECT_EQ(r3.Data(), "20" + SEP + "shard__1" + SEP + "5" + SEP);
 
   // Test getters.
-  EXPECT_EQ(r1.GetShard(), "shard0");
-  EXPECT_EQ(r2.GetShard(), "shard0");
-  EXPECT_EQ(r3.GetShard(), "shard1");
+  EXPECT_EQ(r1.GetShard(), "shard__0");
+  EXPECT_EQ(r2.GetShard(), "shard__0");
+  EXPECT_EQ(r3.GetShard(), "shard__1");
   EXPECT_EQ(r1.GetPK(), "5");
   EXPECT_EQ(r2.GetPK(), "5");
   EXPECT_EQ(r3.GetPK(), "5");
 
   // Test target keys.
-  EXPECT_EQ(r1.TargetKey().Data().ToString(), "shard0" + SEP + "5" + SEP);
-  EXPECT_EQ(r2.TargetKey().Data().ToString(), "shard0" + SEP + "5" + SEP);
-  EXPECT_EQ(r3.TargetKey().Data().ToString(), "shard1" + SEP + "5" + SEP);
-
-  /*
-  // Test hashing / equality.
-  EXPECT_EQ(RocksdbIndexInternalRecord::TargetHash()(r1),
-            RocksdbIndexInternalRecord::TargetHash()(r2));
-  EXPECT_NE(RocksdbIndexInternalRecord::TargetHash()(r2),
-            RocksdbIndexInternalRecord::TargetHash()(r3));
-
-  EXPECT_TRUE(RocksdbIndexInternalRecord::TargetEqual()(r1, r2));
-  EXPECT_FALSE(RocksdbIndexInternalRecord::TargetEqual()(r2, r3));
-  EXPECT_FALSE(RocksdbIndexInternalRecord::TargetEqual()(r1, r3));
-  */
+  EXPECT_EQ(r1.TargetKey().Data().ToString(), "shard__0" + SEP + "5" + SEP);
+  EXPECT_EQ(r2.TargetKey().Data().ToString(), "shard__0" + SEP + "5" + SEP);
+  EXPECT_EQ(r3.TargetKey().Data().ToString(), "shard__1" + SEP + "5" + SEP);
 }
 
 // RocksdbPKIndexInternalRecord
 TEST(RocksdbEncodeTest, RocksdbPKIndexInternalRecord) {
   // Test piece-wise constructor.
-  RocksdbPKIndexInternalRecord r1("5", "shard0");
-  RocksdbPKIndexInternalRecord r2("5", "shard0");
-  RocksdbPKIndexInternalRecord r3("10", "shard1");
+  RocksdbPKIndexInternalRecord r1("5", "shard__0");
+  RocksdbPKIndexInternalRecord r2("5", "shard__0");
+  RocksdbPKIndexInternalRecord r3("10", "shard__1");
 
   // Test read constructor.
   r1 = RocksdbPKIndexInternalRecord(r1.Data());
@@ -170,26 +159,14 @@ TEST(RocksdbEncodeTest, RocksdbPKIndexInternalRecord) {
   r3 = RocksdbPKIndexInternalRecord(r3.Data());
 
   // Test data.
-  EXPECT_EQ(r1.Data(), "5" + SEP + "shard0" + SEP);
-  EXPECT_EQ(r2.Data(), "5" + SEP + "shard0" + SEP);
-  EXPECT_EQ(r3.Data(), "10" + SEP + "shard1" + SEP);
+  EXPECT_EQ(r1.Data(), "5" + SEP + "shard__0" + SEP);
+  EXPECT_EQ(r2.Data(), "5" + SEP + "shard__0" + SEP);
+  EXPECT_EQ(r3.Data(), "10" + SEP + "shard__1" + SEP);
 
   // Test getters.
-  EXPECT_EQ(r1.GetShard(), "shard0");
-  EXPECT_EQ(r2.GetShard(), "shard0");
-  EXPECT_EQ(r3.GetShard(), "shard1");
-
-  /*
-  // Test hashing / equality.
-  EXPECT_EQ(RocksdbPKIndexInternalRecord::ShardNameHash()(r1),
-            RocksdbPKIndexInternalRecord::ShardNameHash()(r2));
-  EXPECT_NE(RocksdbPKIndexInternalRecord::ShardNameHash()(r2),
-            RocksdbPKIndexInternalRecord::ShardNameHash()(r3));
-
-  EXPECT_TRUE(RocksdbPKIndexInternalRecord::ShardNameEqual()(r1, r2));
-  EXPECT_FALSE(RocksdbPKIndexInternalRecord::ShardNameEqual()(r2, r3));
-  EXPECT_FALSE(RocksdbPKIndexInternalRecord::ShardNameEqual()(r1, r3));
-  */
+  EXPECT_EQ(r1.GetShard(), "shard__0");
+  EXPECT_EQ(r2.GetShard(), "shard__0");
+  EXPECT_EQ(r3.GetShard(), "shard__1");
 }
 
 }  // namespace sql

@@ -12,7 +12,9 @@
 
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
+#include "pelton/dataflow/value.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/shard_name.h"
 #include "rocksdb/slice.h"
 
 #define __ROCKSSEP static_cast<char>(30)
@@ -26,8 +28,11 @@ rocksdb::Slice ExtractColumn(const rocksdb::Slice &slice, size_t col);
 rocksdb::Slice ExtractSlice(const rocksdb::Slice &slice, size_t spos,
                             size_t count);
 
+std::string EncodeValue(const dataflow::Value &val);
 std::string EncodeValue(sqlast::ColumnDefinition::Type type,
                         const rocksdb::Slice &value);
+
+std::vector<std::string> EncodeValues(const std::vector<dataflow::Value> &vals);
 void EncodeValues(sqlast::ColumnDefinition::Type type,
                   std::vector<std::string> *values);
 
@@ -47,9 +52,9 @@ class RocksdbSequence {
 
   // Inserting into sequence.
   void Append(sqlast::ColumnDefinition::Type type, const rocksdb::Slice &slice);
+  void Append(const dataflow::Value &val);
+  void Append(const util::ShardName &shard_name);
   void AppendEncoded(const rocksdb::Slice &slice);
-  // TODO(babman): need to handle the type of shard name too!
-  void AppendShardname(const std::string &shard_name);
 
   // Replacing inside the sequence.
   void Replace(size_t pos, sqlast::ColumnDefinition::Type type,
@@ -122,7 +127,7 @@ class RocksdbRecord {
   // Construct a record when handling SQL statements.
   static RocksdbRecord FromInsert(const sqlast::Insert &stmt,
                                   const dataflow::SchemaRef &schema,
-                                  const std::string &shard_name);
+                                  const util::ShardName &shard_name);
 
   // For writing/encoding.
   RocksdbSequence &Key() { return this->key_; }
@@ -137,7 +142,7 @@ class RocksdbRecord {
   // For updating.
   RocksdbRecord Update(const std::unordered_map<size_t, std::string> &update,
                        const dataflow::SchemaRef &schema,
-                       const std::string &shard_name) const;
+                       const util::ShardName &shard_name) const;
 
  private:
   RocksdbSequence key_;

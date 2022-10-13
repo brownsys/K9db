@@ -53,6 +53,25 @@ rocksdb::Slice ExtractSlice(const rocksdb::Slice &slice, size_t spos,
 }
 
 // Helper: encoding an SQL value.
+std::string EncodeValue(const dataflow::Value &val) {
+  if (val.IsNull()) {
+    std::string result;
+    result.push_back(__ROCKSNULL);
+    return result;
+  }
+  switch (val.type()) {
+    case sqlast::ColumnDefinition::Type::INT:
+      return std::to_string(val.GetInt());
+    case sqlast::ColumnDefinition::Type::UINT:
+      return std::to_string(val.GetUInt());
+    case sqlast::ColumnDefinition::Type::TEXT:
+    case sqlast::ColumnDefinition::Type::DATETIME:
+      return val.GetString();
+    default:
+      LOG(FATAL) << "UNREACHABLE";
+  }
+}
+
 std::string EncodeValue(sqlast::ColumnDefinition::Type type,
                         const rocksdb::Slice &value) {
   if (value == rocksdb::Slice("NULL", 4)) {
@@ -78,6 +97,15 @@ std::string EncodeValue(sqlast::ColumnDefinition::Type type,
   }
 }
 
+// Encoding vectors of values.
+std::vector<std::string> EncodeValues(
+    const std::vector<dataflow::Value> &vals) {
+  std::vector<std::string> result;
+  for (const dataflow::Value &v : vals) {
+    result.push_back(EncodeValue(v));
+  }
+  return result;
+}
 void EncodeValues(sqlast::ColumnDefinition::Type type,
                   std::vector<std::string> *values) {
   for (size_t i = 0; i < values->size(); i++) {
@@ -118,14 +146,17 @@ void RocksdbSequence::Append(sqlast::ColumnDefinition::Type type,
   this->data_.append(EncodeValue(type, slice));
   this->data_.push_back(__ROCKSSEP);
 }
-void RocksdbSequence::AppendEncoded(const rocksdb::Slice &slice) {
-  this->data_.append(slice.data(), slice.size());
+
+void RocksdbSequence::Append(const dataflow::Value &val) {
+  this->data_.append(EncodeValue(val));
   this->data_.push_back(__ROCKSSEP);
 }
-
-// TODO(babman): need to handle the type of shard name too!
-void RocksdbSequence::AppendShardname(const std::string &shard_name) {
-  this->data_.append(shard_name);
+void RocksdbSequence::Append(const util::ShardName &shard_name) {
+  this->data_.append(shard_name.AsView());
+  this->data_.push_back(__ROCKSSEP);
+}
+void RocksdbSequence::AppendEncoded(const rocksdb::Slice &slice) {
+  this->data_.append(slice.data(), slice.size());
   this->data_.push_back(__ROCKSSEP);
 }
 
@@ -255,7 +286,7 @@ rocksdb::Slice RocksdbSequence::Iterator::operator*() const {
 // Construct a record when handling SQL statements.
 RocksdbRecord RocksdbRecord::FromInsert(const sqlast::Insert &stmt,
                                         const dataflow::SchemaRef &schema,
-                                        const std::string &shard_name) {
+                                        const util::ShardName &shard_name) {
   // Encode key.
   RocksdbSequence key;
 
@@ -271,7 +302,7 @@ RocksdbRecord RocksdbRecord::FromInsert(const sqlast::Insert &stmt,
   CHECK_NE(pk_value, "NULL");
 
   // Append shardname and PK to key.
-  key.AppendShardname(shard_name);
+  key.Append(shard_name);
   key.Append(schema.TypeOf(keys.at(0)), pk_value);
 
   // Encode value.
@@ -292,10 +323,11 @@ RocksdbRecord RocksdbRecord::FromInsert(const sqlast::Insert &stmt,
 // For updating.
 RocksdbRecord RocksdbRecord::Update(
     const std::unordered_map<size_t, std::string> &update,
-    const dataflow::SchemaRef &schema, const std::string &shard_name) const {
+    const dataflow::SchemaRef &schema,
+    const util::ShardName &shard_name) const {
   // Encode key.
   RocksdbSequence key;
-  key.AppendShardname(shard_name);
+  key.Append(shard_name);
 
   // Ensure PK is valid.
   const auto &keys = schema.keys();

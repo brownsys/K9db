@@ -75,8 +75,17 @@ class RocksdbTable {
   // Index updating.
   void IndexAdd(const rocksdb::Slice &shard, const RocksdbSequence &row);
   void IndexDelete(const rocksdb::Slice &shard, const RocksdbSequence &row);
+
+  // Index lookups.
   std::optional<IndexSet> IndexLookup(sqlast::ValueMapper *vm) const;
   std::optional<DedupIndexSet> IndexLookupDedup(sqlast::ValueMapper *vm) const;
+  std::optional<IndexSet> IndexLookup(
+      size_t column_index, const std::vector<std::string> &values) const;
+  std::optional<DedupIndexSet> IndexLookupDedup(
+      size_t column_index, const std::vector<std::string> &values) const;
+
+  // Get an index.
+  const RocksdbPKIndex &GetPKIndex() const { return this->pk_index_; }
 
   // Check if a record with given PK exists.
   bool Exists(const rocksdb::Slice &pk_value) const;

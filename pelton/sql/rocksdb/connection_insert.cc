@@ -18,7 +18,7 @@ namespace sql {
  */
 
 int RocksdbConnection::ExecuteInsert(const sqlast::Insert &stmt,
-                                     const std::string &shard_name) {
+                                     const util::ShardName &shard_name) {
   // Read table metadata.
   const std::string &table_name = stmt.table_name();
   RocksdbTable &table = this->tables_.at(table_name);
@@ -31,13 +31,13 @@ int RocksdbConnection::ExecuteInsert(const sqlast::Insert &stmt,
   // CHECK(!table.Exists(record.GetPK())) << "Integrity error: PK exists";
 
   // Update indices.
-  table.IndexAdd(shard_name, record.Value());
+  table.IndexAdd(shard_name.AsSlice(), record.Value());
 
   // Encrypt key and record value.
   EncryptedKey key =
       this->encryption_manager_.EncryptKey(std::move(record.Key()));
   EncryptedValue value = this->encryption_manager_.EncryptValue(
-      shard_name, std::move(record.Value()));
+      shard_name.ByRef(), std::move(record.Value()));
 
   // Write to DB.
   table.Put(key, value);

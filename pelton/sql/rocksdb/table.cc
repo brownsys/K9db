@@ -142,6 +142,32 @@ std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
   return {};
 }
 
+std::optional<IndexSet> RocksdbTable::IndexLookup(
+    size_t column_index, const std::vector<std::string> &values) const {
+  if (column_index == this->pk_column_) {
+    return this->pk_index_.Get(Transform(values));
+  }
+  const std::optional<RocksdbIndex> &index = this->indices_.at(column_index);
+  if (index.has_value()) {
+    // Lookup col index.
+    return index->Get(Transform(values));
+  }
+  return {};
+}
+
+std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
+    size_t column_index, const std::vector<std::string> &values) const {
+  if (column_index == this->pk_column_) {
+    return this->pk_index_.GetDedup(Transform(values));
+  }
+  const std::optional<RocksdbIndex> &index = this->indices_.at(column_index);
+  if (index.has_value()) {
+    // Lookup col index.
+    return index->GetDedup(Transform(values));
+  }
+  return {};
+}
+
 // Check if a record with given PK exists.
 bool RocksdbTable::Exists(const rocksdb::Slice &pk_value) const {
   return this->pk_index_.Get({pk_value}).size() > 0;

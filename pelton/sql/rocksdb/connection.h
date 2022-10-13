@@ -5,14 +5,18 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "pelton/dataflow/record.h"
+#include "pelton/dataflow/value.h"
 #include "pelton/sql/abstract_connection.h"
 #include "pelton/sql/result.h"
 #include "pelton/sql/rocksdb/encryption.h"
 #include "pelton/sql/rocksdb/table.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/shard_name.h"
 #include "rocksdb/db.h"
 
 namespace pelton {
@@ -34,7 +38,7 @@ class RocksdbConnection : public AbstractConnection {
 
   // Insert.
   int ExecuteInsert(const sqlast::Insert &sql,
-                    const std::string &shard_name) override;
+                    const util::ShardName &shard_name) override;
 
   // Delete.
   SqlResultSet ExecuteDelete(const sqlast::Delete &sql) override;
@@ -45,11 +49,17 @@ class RocksdbConnection : public AbstractConnection {
   // Everything in a table.
   SqlResultSet GetAll(const std::string &table_name) const override;
 
-  // Shard-based operations for GDPR GET/FORGEt.
+  // Shard-based operations for GDPR GET/FORGET.
   SqlResultSet DeleteShard(const std::string &table_name,
-                           const std::string &shard_name) override;
+                           util::ShardName &&shard_name) override;
   SqlResultSet GetShard(const std::string &table_name,
-                        const std::string &shard_name) const override;
+                        util::ShardName &&shard_name) const override;
+
+  // Shard-based operations for copying/moving/deleting records.
+  std::pair<sql::SqlResultSet, int> AssignToShards(
+      const std::string &table_name, size_t column_index,
+      const std::vector<dataflow::Value> &values,
+      const std::unordered_set<util::ShardName> &targets) override;
 
  private:
   std::unique_ptr<rocksdb::DB> db_;
@@ -72,6 +82,12 @@ class RocksdbConnection : public AbstractConnection {
   template <typename T, bool DEDUP>
   std::vector<T> GetRecords(const std::string &table_name,
                             const sqlast::BinaryExpression *const where) const;
+
+  // Combine shard kind and user id to get a qualified shard name.
+  std::string CombineShardName(const std::string &shard_kind,
+                               const std::string &user_id) const;
+  std::pair<std::string, std::string> SplitShardName(
+      const std::string &shard_name) const;
 };
 
 }  // namespace sql

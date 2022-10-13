@@ -3,12 +3,18 @@
 #define PELTON_SQL_ABSTRACT_CONNECTION_H_
 
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
+#include "pelton/dataflow/value.h"
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/util/shard_name.h"
 
-#define DEFAULT_SHARD "__default"
+#define DEFAULT_SHARD "#default"
 
 namespace pelton {
 namespace sql {
@@ -29,20 +35,28 @@ class AbstractConnection {
 
   // Insert.
   virtual int ExecuteInsert(const sqlast::Insert &sql,
-                            const std::string &shard_name) = 0;
+                            const util::ShardName &shard_name) = 0;
 
   // Delete.
   virtual SqlResultSet ExecuteDelete(const sqlast::Delete &sql) = 0;
-  virtual SqlResultSet DeleteShard(const std::string &table_name,
-                                   const std::string &shard_name) = 0;
 
   // Selects.
   virtual SqlResultSet ExecuteSelect(const sqlast::Select &sql) const = 0;
-  virtual SqlResultSet GetShard(const std::string &table_name,
-                                const std::string &shard_name) const = 0;
 
   // Everything in a table.
   virtual SqlResultSet GetAll(const std::string &table_name) const = 0;
+
+  // GDPR operations
+  virtual SqlResultSet GetShard(const std::string &table_name,
+                                util::ShardName &&shard_name) const = 0;
+  virtual SqlResultSet DeleteShard(const std::string &table_name,
+                                   util::ShardName &&shard_name) = 0;
+
+  // Shard operations.
+  virtual std::pair<sql::SqlResultSet, int> AssignToShards(
+      const std::string &table_name, size_t column_index,
+      const std::vector<dataflow::Value> &values,
+      const std::unordered_set<util::ShardName> &targets) = 0;
 };
 
 }  // namespace sql

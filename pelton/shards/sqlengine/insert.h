@@ -3,6 +3,7 @@
 #define PELTON_SHARDS_SQLENGINE_INSERT_H_
 
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -40,8 +41,11 @@ class InsertContext {
   absl::StatusOr<sql::SqlResult> Exec();
 
  private:
+  /* Have we inserted the record into this shard yet? */
+  bool InsertedInto(const std::string &shard_kind, const std::string &user_id);
+
   /* Helpers for inserting statement into the database by sharding type. */
-  int DirectInsert(dataflow::Value &&fkval);
+  int DirectInsert(dataflow::Value &&fkval, const ShardDescriptor &desc);
   absl::StatusOr<int> TransitiveInsert(dataflow::Value &&fkval,
                                        const ShardDescriptor &desc);
   absl::StatusOr<int> VariableInsert(dataflow::Value &&fkval,
@@ -52,6 +56,8 @@ class InsertContext {
 
   /* Recursively moving/copying records in dependent tables into the affected
      shard. */
+  absl::StatusOr<int> AssignDependentsToShard(
+      const Table &table, const std::vector<dataflow::Record> &records);
 
   /* Members. */
   // Statement being inserted.
@@ -71,8 +77,8 @@ class InsertContext {
   // Shared Lock so we can read from the states safetly.
   util::SharedLock *lock_;
 
-  // This vector will store the shardname for each insert.
-  std::vector<std::unordered_set<std::string>> shard_names_;
+  // This vector will store the shardname assigned to this insert.
+  std::unordered_map<ShardKind, std::unordered_set<util::ShardName>> shards_;
 };
 
 }  // namespace sqlengine
