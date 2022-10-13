@@ -41,7 +41,7 @@ class RocksdbConnection : public AbstractConnection {
                     const util::ShardName &shard_name) override;
 
   // Delete.
-  SqlResultSet ExecuteDelete(const sqlast::Delete &sql) override;
+  ResultSetAndStatus ExecuteDelete(const sqlast::Delete &sql) override;
 
   // Select.
   SqlResultSet ExecuteSelect(const sqlast::Select &sql) const override;
@@ -56,7 +56,7 @@ class RocksdbConnection : public AbstractConnection {
                         util::ShardName &&shard_name) const override;
 
   // Shard-based operations for copying/moving/deleting records.
-  std::pair<sql::SqlResultSet, int> AssignToShards(
+  ResultSetAndStatus AssignToShards(
       const std::string &table_name, size_t column_index,
       const std::vector<dataflow::Value> &values,
       const std::unordered_set<util::ShardName> &targets) override;

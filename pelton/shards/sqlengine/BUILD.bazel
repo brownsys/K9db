@@ -157,6 +157,33 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "delete",
+    srcs = [
+        "delete.cc",
+    ],
+    hdrs = [
+        "delete.h",
+    ],
+    deps = [
+        ":index",
+        "//pelton:connection",
+        "//pelton/dataflow:dstate",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:value",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/sql:abstract_connection",
+        "//pelton/sql:result",
+        "//pelton/sqlast:ast",
+        "//pelton/util:shard_name",
+        "//pelton/util:status",
+        "//pelton/util:upgradable_lock",
+        "@com_google_absl//absl/status",
+    ],
+)
+
 # Tests.
 cc_library(
     name = "tests_helpers",

@@ -19,6 +19,8 @@
 namespace pelton {
 namespace sql {
 
+using ResultSetAndStatus = std::pair<SqlResultSet, int>;
+
 class AbstractConnection {
  public:
   AbstractConnection() = default;
@@ -38,7 +40,7 @@ class AbstractConnection {
                             const util::ShardName &shard_name) = 0;
 
   // Delete.
-  virtual SqlResultSet ExecuteDelete(const sqlast::Delete &sql) = 0;
+  virtual ResultSetAndStatus ExecuteDelete(const sqlast::Delete &sql) = 0;
 
   // Selects.
   virtual SqlResultSet ExecuteSelect(const sqlast::Select &sql) const = 0;
@@ -53,7 +55,7 @@ class AbstractConnection {
                                    util::ShardName &&shard_name) = 0;
 
   // Shard operations.
-  virtual std::pair<sql::SqlResultSet, int> AssignToShards(
+  virtual ResultSetAndStatus AssignToShards(
       const std::string &table_name, size_t column_index,
       const std::vector<dataflow::Value> &values,
       const std::unordered_set<util::ShardName> &targets) = 0;

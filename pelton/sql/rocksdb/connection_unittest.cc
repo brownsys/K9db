@@ -193,7 +193,7 @@ SqlResultSet DeleteBy(
   sqlast::Delete del("test_table");
   del.SetWhereClause(MakeWhere(map));
 
-  return CONN->ExecuteDelete(del);
+  return CONN->ExecuteDelete(del).first;
 }
 
 // Shorthands.
@@ -489,7 +489,7 @@ TEST_F(RocksdbConnectionTest, GetAllDeleteAll) {
 
   // Delete all records in table!
   sqlast::Delete delete_("test_table");
-  EXPECT_EQ(CONN->ExecuteDelete(delete_), GetRecords({0, 1, 2, 3}));
+  EXPECT_EQ(CONN->ExecuteDelete(delete_).first, GetRecords({0, 1, 2, 3}));
 
   // Table is now empty!
   EXPECT_EQ(CONN->ExecuteSelect(select), EMPTY);

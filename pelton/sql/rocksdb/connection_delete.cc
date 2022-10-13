@@ -24,7 +24,7 @@ RocksdbConnection::DeleteRecord::DeleteRecord(std::string &&s, EncryptedKey &&k,
  * DELETE STATEMENTS.
  */
 
-SqlResultSet RocksdbConnection::ExecuteDelete(const sqlast::Delete &sql) {
+ResultSetAndStatus RocksdbConnection::ExecuteDelete(const sqlast::Delete &sql) {
   const std::string &table_name = sql.table_name();
   const sqlast::BinaryExpression *const where = sql.GetWhereClause();
 
@@ -52,7 +52,8 @@ SqlResultSet RocksdbConnection::ExecuteDelete(const sqlast::Delete &sql) {
     }
   }
 
-  return SqlResultSet(schema, std::move(result));
+  return ResultSetAndStatus(SqlResultSet(schema, std::move(result)),
+                            records.size());
 }
 
 }  // namespace sql

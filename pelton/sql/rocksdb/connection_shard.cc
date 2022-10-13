@@ -20,7 +20,7 @@ struct KeyData {
 };
 
 // Shard-based operations for copying/moving/deleting records.
-std::pair<sql::SqlResultSet, int> RocksdbConnection::AssignToShards(
+ResultSetAndStatus RocksdbConnection::AssignToShards(
     const std::string &table_name, size_t column_index,
     const std::vector<dataflow::Value> &values,
     const std::unordered_set<util::ShardName> &targets) {
