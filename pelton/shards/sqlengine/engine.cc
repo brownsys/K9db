@@ -7,8 +7,8 @@
 #include "pelton/shards/sqlengine/create.h"
 /*
 #include "pelton/shards/sqlengine/delete.h"
-#include "pelton/shards/sqlengine/gdpr.h"
 */
+#include "pelton/shards/sqlengine/gdpr.h"
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/insert.h"
 /*
@@ -100,13 +100,14 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       auto *stmt = static_cast<sqlast::CreateIndex *>(statement.get());
       return index::CreateIndex(*stmt, connection);
     }
+    */
 
     // Case 8: GDPR (GET | FORGET) statements.
     case sqlast::AbstractStatement::Type::GDPR: {
       auto *stmt = static_cast<sqlast::GDPRStatement *>(statement.get());
       return gdpr::Shard(*stmt, connection);
     }
-    */
+    
 
     // Unsupported (this should not be reachable).
     default:
