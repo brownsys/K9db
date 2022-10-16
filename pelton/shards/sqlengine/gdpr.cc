@@ -231,19 +231,19 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
   const std::string &user_id = stmt.user_id();
 
   shards::SharderState &state = connection->state->SharderState();
-  dataflow::DataFlowState &dataflow_state = connection->state->DataflowState();
+  // dataflow::DataFlowState &dataflow_state = connection->state->DataflowState();
   // UniqueLock lock = state->WriterLock();
 
   shards::Shard current_shard = state.GetShard(shard_kind);
   sql::SqlResult result(static_cast<int>(0));
 
   for (const auto &table_name : current_shard.owned_tables) {
-    bool update_flows = dataflow_state.HasFlowsFor(table_name);
-    dataflow::SchemaRef schema = dataflow_state.GetTableSchema(table_name);
+    // bool update_flows = dataflow_state.HasFlowsFor(table_name);
+    // dataflow::SchemaRef schema = dataflow_state.GetTableSchema(table_name);
     sql::SqlResult table_result(static_cast<int>(0));
-    if (update_flows) {
-      table_result = sql::SqlResult(schema);
-    }
+    // if (update_flows) {
+    //   table_result = sql::SqlResult(schema);
+    // }
 
     shards::Table &table = state.GetTable(table_name);
     // TODO: also make sure body executed on unique owner shard_kinds
@@ -252,14 +252,24 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
         continue;
       }
 
-      sql:: SqlResultSet del = connection->state->Database()->DeleteShard(
-        table_name, util::ShardName(shard_kind, user_id));
-      // TODO: print out del contents
-      for (const auto &out : del.rows()) {
-        std::cout << out << std::endl;
+      sql::SqlResultSet del_set = 
+        connection->state->Database()->DeleteShard(table_name, util::ShardName(shard_kind, user_id));
+
+      // Why does this version work while storing the result in a variable doesn't?
+      // table_result.AddResultSet(std::move(connection->state->Database()->DeleteShard(
+      //   table_name, util::ShardName(shard_kind, user_id))));
+
+      // TODO: print out del_set contents
+      for (const auto &row : del_set.rows()) {
+        std::cout << row << std::endl;
       }
+      sql::SqlResult del(static_cast<int>(del_set.size()));
+      del.AddResultSet(std::move(del_set));
+
+      table_result.Append(std::move(del), true);
     }
 
+    result.Append(std::move(table_result), true);
     // // Delete was successful, time to update dataflows.
     // if (update_flows) {
     //   /* TODO: if single owner, delete from dataflows, else if shared: 
