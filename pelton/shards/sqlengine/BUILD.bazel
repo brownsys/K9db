@@ -241,3 +241,15 @@ cc_test(
         "@glog",
     ],
 )
+
+cc_test(
+    name = "gdpr-test",
+    srcs = [
+        "gdpr_unittest.cc",
+    ],
+    deps = [
+        ":tests_helpers",
+        "//pelton/util:shard_name",
+        "@glog",
+    ],
+)

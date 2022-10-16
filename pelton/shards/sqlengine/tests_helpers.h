@@ -54,6 +54,12 @@ std::pair<std::string, std::string> MakeInsert(
     const std::string &tbl_name, const std::vector<std::string> &vals);
 
 /*
+ * Easy creation of sqlast::Statements.
+ */
+std::string MakeGDPRForget(const std::string &tbl_name,
+                           const std::string &user_id);
+
+/*
  * Execute a statement.
  */
 sql::SqlResult Execute(const std::string &sql, Connection *conn);
