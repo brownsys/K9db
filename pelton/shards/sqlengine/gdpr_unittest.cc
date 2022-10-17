@@ -414,56 +414,72 @@ TEST_F(GDPRTest, ShardedDataSubject) {
   EXPECT_EQ(db->GetShard("invited", SN("invited", "5")), (V{row3}));
 }
 
-// TEST_F(InsertTest, VariableOwnership) {
-//   // Parse create table statements.
-//   std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-//   std::string grps = MakeCreate("grps", {"gid" I PK});
-//   std::string assoc =
-//       MakeCreate("association", {"id" I PK, "OWNING_group" I FK "grps(gid)",
-//                                  "OWNER_user" I FK "user(id)"});
+TEST_F(GDPRTest, VariableOwnership) {
+  // Parse create table statements.
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string grps = MakeCreate("grps", {"gid" I PK});
+  std::string assoc =
+      MakeCreate("association", {"id" I PK, "OWNING_group" I FK "grps(gid)",
+                                 "OWNER_user" I FK "user(id)"});
 
-//   // Make a pelton connection.
-//   Connection conn = CreateConnection();
-//   sql::AbstractConnection *db = conn.state->Database();
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+  sql::AbstractConnection *db = conn.state->Database();
 
-//   // Create the tables.
-//   EXPECT_SUCCESS(Execute(usr, &conn));
-//   EXPECT_SUCCESS(Execute(grps, &conn));
-//   EXPECT_SUCCESS(Execute(assoc, &conn));
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(grps, &conn));
+  EXPECT_SUCCESS(Execute(assoc, &conn));
 
-//   // Perform some inserts.
-//   auto &&[usr1, u_] = MakeInsert("user", {"0", "'u1'"});
-//   auto &&[usr2, u__] = MakeInsert("user", {"5", "'u10'"});
-//   auto &&[grps1, row1] = MakeInsert("grps", {"0"});
-//   auto &&[grps2, row2] = MakeInsert("grps", {"1"});
+  // Perform some inserts.
+  auto &&[usr1, u_] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr2, u__] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[grps1, row1] = MakeInsert("grps", {"0"});
+  auto &&[grps2, row2] = MakeInsert("grps", {"1"});
 
-//   EXPECT_UPDATE(Execute(usr1, &conn), 1);
-//   EXPECT_UPDATE(Execute(usr2, &conn), 1);
-//   EXPECT_UPDATE(Execute(grps1, &conn), 1);
-//   EXPECT_UPDATE(Execute(grps2, &conn), 1);
+  EXPECT_UPDATE(Execute(usr1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr2, &conn), 1);
+  EXPECT_UPDATE(Execute(grps1, &conn), 1);
+  EXPECT_UPDATE(Execute(grps2, &conn), 1);
 
-//   // Validate insertions.
-//   EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
-//   EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{}));
-//   EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)),
-//             (V{row1, row2}));
+  // Validate insertions.
+  EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)),
+            (V{row1, row2}));
 
-//   // Associate groups with some users.
-//   auto &&[assoc1, a_] = MakeInsert("association", {"0", "0", "0"});
-//   auto &&[assoc2, a__] = MakeInsert("association", {"1", "1", "0"});
-//   auto &&[assoc3, a___] = MakeInsert("association", {"1", "1", "5"});
-//   auto &&[assoc4, a____] = MakeInsert("association", {"2", "1", "5"});
+  // Associate groups with some users.
+  auto &&[assoc1, a_] = MakeInsert("association", {"0", "0", "0"});
+  auto &&[assoc2, a__] = MakeInsert("association", {"1", "1", "0"});
+  auto &&[assoc3, a___] = MakeInsert("association", {"1", "1", "5"});
+  auto &&[assoc4, a____] = MakeInsert("association", {"2", "1", "5"});
 
-//   EXPECT_UPDATE(Execute(assoc1, &conn), 3);
-//   EXPECT_UPDATE(Execute(assoc2, &conn), 3);
-//   EXPECT_UPDATE(Execute(assoc3, &conn), 2);
-//   EXPECT_UPDATE(Execute(assoc4, &conn), 1);
+  EXPECT_UPDATE(Execute(assoc1, &conn), 3);
+  EXPECT_UPDATE(Execute(assoc2, &conn), 3);
+  EXPECT_UPDATE(Execute(assoc3, &conn), 2);
+  EXPECT_UPDATE(Execute(assoc4, &conn), 1);
 
-//   // Validate move after insertion
-//   EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{row1, row2}));
-//   EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{row2}));
-//   EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
-// }
+  // Validate move after insertion.
+  EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{row1, row2}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{row2}));
+  EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+
+  std::string forget1 = MakeGDPRForget("user", "0");
+  EXPECT_UPDATE(Execute(forget1, &conn), 5);
+
+  // Validate forget after the first forget.
+  EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{row2}));
+  EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+
+  std::string forget2 = MakeGDPRForget("user", "5");
+  EXPECT_UPDATE(Execute(forget2, &conn), 4);
+
+  // Validate forget after the second forget.
+  EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+}
 
 // TEST_F(InsertTest, ComplexVariableOwnership) {
 //   // Parse create table statements.
