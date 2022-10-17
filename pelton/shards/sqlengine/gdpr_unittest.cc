@@ -349,10 +349,13 @@ TEST_F(GDPRTest, OwnerAccessor) {
   EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
 
-  std::string forget = MakeGDPRForget("user", "0");
-  EXPECT_UPDATE(Execute(forget, &conn), 3);
+  std::string forget1 = MakeGDPRForget("user", "0");
+  EXPECT_UPDATE(Execute(forget1, &conn), 3);
 
-  // Validate forget.
+  std::string forget2 = MakeGDPRForget("user", "10");
+  EXPECT_UPDATE(Execute(forget2, &conn), 1);
+
+  // Validate forgets.
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{}));
