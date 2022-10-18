@@ -22,7 +22,7 @@ absl::StatusOr<sql::SqlDeleteSet> DeleteContext::DeleteFromBaseTable() {
 }
 
 /*
- * Main entry point for insert: Executes the statement against the shards.
+ * Main entry point for delete: Executes the statement against the shards.
  */
 absl::StatusOr<sql::SqlResult> DeleteContext::Exec() {
   // Make sure table exists in the schema first.

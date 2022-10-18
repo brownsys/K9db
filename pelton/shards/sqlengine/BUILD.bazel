@@ -15,7 +15,7 @@ cc_library(
         #":gdpr",
         ":index",
         ":insert",
-        #":select",
+        ":select",
         #":update",
         ":view",
         "//pelton/dataflow:dstate",
@@ -178,6 +178,29 @@ cc_library(
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:shard_name",
+        "//pelton/util:status",
+        "//pelton/util:upgradable_lock",
+        "@com_google_absl//absl/status",
+    ],
+)
+
+cc_library(
+    name = "select",
+    srcs = [
+        "select.cc",
+    ],
+    hdrs = [
+        "select.h",
+    ],
+    deps = [
+        "//pelton:connection",
+        "//pelton/dataflow:dstate",
+        "//pelton/dataflow:schema",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/sql:abstract_connection",
+        "//pelton/sql:result",
+        "//pelton/sqlast:ast",
         "//pelton/util:status",
         "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/status",

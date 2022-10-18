@@ -11,8 +11,8 @@
 */
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/insert.h"
-/*
 #include "pelton/shards/sqlengine/select.h"
+/*
 #include "pelton/shards/sqlengine/update.h"
 */
 #include "pelton/shards/sqlengine/view.h"
@@ -74,7 +74,9 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       if (dstate.HasFlow(stmt->table_name())) {
         return view::SelectView(*stmt, connection, &lock);
       } else {
-        // return select::Shard(*stmt, connection, true);
+        util::SharedLock lock = connection->state->ReaderLock();
+        SelectContext context(*stmt, connection, &lock);
+        return context.Exec();
       }
     }
 
