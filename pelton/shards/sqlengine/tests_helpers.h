@@ -42,6 +42,17 @@ namespace sqlengine {
 #define STR " text "
 #define PK " PRIMARY KEY "
 #define FK " REFERENCES "
+
+#define ON_GET " ON GET "
+#define ON_DEL " ON DEL "
+#define ANON " ANON "
+
+#define NO " ONLY "
+#define OB " OWNED_BY "
+#define OW " OWNS "
+#define AB " ACCESSED_BY "
+#define AC " ACCESSES "
+
 #define INT sqlast::ColumnDefinition::Type::INT
 #define TEXT sqlast::ColumnDefinition::Type::TEXT
 
@@ -49,7 +60,8 @@ namespace sqlengine {
  * Easy creation of sqlast::Statements.
  */
 std::string MakeCreate(const std::string &tbl_name,
-                       const std::vector<std::string> &cols);
+                       const std::vector<std::string> &cols,
+                       bool data_subject = false);
 
 std::pair<std::string, std::string> MakeInsert(
     const std::string &tbl_name, const std::vector<std::string> &vals);

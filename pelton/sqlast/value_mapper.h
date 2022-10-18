@@ -40,6 +40,7 @@ class ValueMapper : public AbstractVisitor<void> {
   void VisitCreateTable(const CreateTable &ast) override;
   void VisitColumnDefinition(const ColumnDefinition &ast) override;
   void VisitColumnConstraint(const ColumnConstraint &ast) override;
+  void VisitAnonymizationRule(const AnonymizationRule &ast) override;
   void VisitCreateIndex(const CreateIndex &ast) override;
   void VisitCreateView(const CreateView &ast) override;
 

@@ -1,5 +1,5 @@
 INSERT INTO doctors VALUES (1, 'Alice');
-INSERT INTO doctors(id, PII_name) VALUES (2, 'Bob');
+INSERT INTO doctors(id, name) VALUES (2, 'Bob');
 
 INSERT INTO patients VALUES (10, 'Carl');
 INSERT INTO patients VALUES (20, 'Dracula');

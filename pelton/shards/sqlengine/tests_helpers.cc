@@ -40,12 +40,18 @@ namespace sqlengine {
 
 // sqlast::CreateTable
 std::string MakeCreate(const std::string &tbl_name,
-                       const std::vector<std::string> &cols) {
-  std::string sql = "CREATE TABLE " + tbl_name + "(";
+                       const std::vector<std::string> &cols,
+                       bool data_subject) {
+  std::string sql;
+  if (data_subject) {
+    sql = "CREATE DATA_SUBJECT TABLE " + tbl_name + "(";
+  } else {
+    sql = "CREATE TABLE " + tbl_name + "(";
+  }
   for (size_t i = 0; i < cols.size(); i++) {
     sql += cols.at(i);
     if (i < cols.size() - 1) {
-      sql += ",";
+      sql += ", ";
     }
   }
   sql += ");";

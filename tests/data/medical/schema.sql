@@ -1,11 +1,11 @@
-CREATE TABLE doctors ( \
+CREATE DATA_SUBJECT TABLE doctors ( \
   id int, \
-  PII_name text, \
+  name text, \
   PRIMARY KEY(id) \
 );
-CREATE TABLE patients ( \
+CREATE DATA_SUBJECT TABLE patients ( \
   id int, \
-  PII_name text, \
+  name text, \
   PRIMARY KEY(id) \
 );
 CREATE TABLE address_doctors ( \
@@ -22,10 +22,10 @@ CREATE TABLE address_patients ( \
 );
 CREATE TABLE chat ( \
   id int, \
-  OWNER_patient_id int, \
+  patient_id int, \
   doctor_id int, \
   message text, \
   PRIMARY KEY(id), \
-  FOREIGN KEY (OWNER_patient_id) REFERENCES patients(id), \
+  FOREIGN KEY (patient_id) OWNED_BY patients(id), \
   FOREIGN KEY (doctor_id) REFERENCES doctors(id) \
 );

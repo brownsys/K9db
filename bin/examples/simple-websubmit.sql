@@ -1,8 +1,8 @@
 SET echo;
 
-CREATE TABLE students ( \
+CREATE DATA_SUBJECT TABLE students ( \
   ID int, \
-  PII_Name text, \
+  name text, \
   PRIMARY KEY(ID) \
 );
 
@@ -32,7 +32,7 @@ CREATE TABLE grades ( \
   PRIMARY KEY(ID) \
 );
 
-CREATE VIEW v1 AS '"SELECT students.PII_Name, assignments.Name, submissions.ts FROM students JOIN submissions ON students.ID = submissions.student_id JOIN assignments ON submissions.assignment_id = assignments.ID"';
+CREATE VIEW v1 AS '"SELECT students.name, assignments.Name, submissions.ts FROM students JOIN submissions ON students.ID = submissions.student_id JOIN assignments ON submissions.assignment_id = assignments.ID"';
 
 INSERT INTO assignments VALUES (1, 'assignment 1');
 INSERT INTO assignments VALUES (2, 'assignment 2');

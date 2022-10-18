@@ -7,6 +7,8 @@
 #include <utility>
 #include <vector>
 
+#include "glog/logging.h"
+
 namespace pelton {
 namespace sqlast {
 
@@ -32,14 +34,67 @@ std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
 std::string Stringifier::VisitColumnDefinition(const ColumnDefinition &ast) {
   std::string result = ast.column_name() + " " +
                        ColumnDefinition::TypeToString(ast.column_type());
-  for (const std::string &col : ast.VisitChildren(this)) {
-    result += " " + col;
+  for (const std::string &cons : ast.VisitChildren(this)) {
+    result += " " + cons;
   }
   return result;
 }
 
 std::string Stringifier::VisitColumnConstraint(const ColumnConstraint &ast) {
-  return ColumnConstraint::TypeToString(ast.type());
+  switch (ast.type()) {
+    case ColumnConstraint::Type::PRIMARY_KEY:
+      return "PRIMARY KEY";
+    case ColumnConstraint::Type::UNIQUE:
+      return "UNIQUE";
+    case ColumnConstraint::Type::FOREIGN_KEY: {
+      std::string str;
+      const auto &[tbl, col, type] = ast.ForeignKey();
+      switch (type) {
+        case ColumnConstraint::FKType::OWNED_BY:
+          str = "OWNED_BY ";
+          break;
+        case ColumnConstraint::FKType::OWNS:
+          str = "OWNS ";
+          break;
+        case ColumnConstraint::FKType::ACCESSED_BY:
+          str = "ACCESSED_BY ";
+          break;
+        case ColumnConstraint::FKType::ACCESSES:
+          str = "ACCESSES ";
+          break;
+        case ColumnConstraint::FKType::AUTO:
+          str = "REFERENCES ";
+          break;
+        case ColumnConstraint::FKType::PLAIN:
+          str = "REFERENCES ONLY ";
+          break;
+      }
+      return str + tbl + "(" + col + ")";
+    }
+    default:
+      LOG(FATAL) << "UNSUPPORTED COLUMN CONSTRAINT TYPE";
+  }
+}
+std::string Stringifier::VisitAnonymizationRule(const AnonymizationRule &ast) {
+  std::string str = "ON ";
+  switch (ast.GetType()) {
+    case AnonymizationRule::Type::GET:
+      str += "GET ";
+      break;
+    case AnonymizationRule::Type::DEL:
+      str += "DEL ";
+      break;
+    default:
+      LOG(FATAL) << "Unsupported anonymization type";
+  }
+  str += ast.GetDataSubject() + " ANONYMIZE (";
+  for (const std::string &column : ast.GetAnonymizeColumns()) {
+    str += column + ", ";
+  }
+  str.pop_back();
+  str.pop_back();
+  str += ")";
+  return str;
 }
 
 /*

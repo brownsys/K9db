@@ -6,6 +6,7 @@
 
 #include "glog/logging.h"
 #include "pelton/shards/sqlengine/tests_helpers.h"
+#include "pelton/sqlast/ast_schema.h"
 
 namespace pelton {
 namespace shards {
@@ -51,7 +52,7 @@ void EXPECT_SHARD_ACCESSES(Connection *conn, const std::string &shard_name,
 
 namespace {
 
-// Ensure Table in state is corret.
+// Ensure Table in state is correct.
 void EXPECT_TABLE(Connection *conn, const std::string &table_name,
                   const std::vector<std::string> &cols,
                   const std::vector<CType> &coltypes, unsigned pk,
@@ -163,6 +164,20 @@ void EXPECT_DEPENDENTS(Connection *conn, const std::string &table_name,
   EXPECT_EQ(access_dependents.size(), 0u) << access_dependents;
 }
 
+// Ensure Table in state is correct and anonymization rules work as expected.
+void EXPECT_ANON(Connection *conn, const std::string &table_name,
+                 std::vector<sqlast::AnonymizationRule> anon_rules) {
+  const SharderState &state = conn->state->SharderState();
+  const Table &tbl = state.GetTable(table_name);
+
+  // test anonymization rules.
+  for (const auto &rule : tbl.create_stmt.GetAnonymizationRules()) {
+    auto it = std::find(anon_rules.begin(), anon_rules.end(), rule);
+    EXPECT_NE(it, anon_rules.end());
+    anon_rules.erase(it);
+  }
+}
+
 }  // namespace
 
 /*
@@ -172,9 +187,36 @@ void EXPECT_DEPENDENTS(Connection *conn, const std::string &table_name,
 // Define a fixture that manages a pelton connection.
 PELTON_FIXTURE(CreateTest);
 
+TEST_F(CreateTest, Anon) {
+  // Parse create table statements.
+  std::string usr_get =
+      MakeCreate("g", {"id" I PK, "name" STR, ON_GET "id" ANON "(name)"}, true);
+  std::string usr_del =
+      MakeCreate("d", {"id" I PK, "name" STR, ON_DEL "id" ANON "(name)"}, true);
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr_get, &conn));
+  EXPECT_SUCCESS(Execute(usr_del, &conn));
+
+  // Expected parsed metadata.
+  std::vector<sqlast::AnonymizationRule> get_rules;
+  get_rules.emplace_back(sqlast::AnonymizationRule::Type::GET, "id");
+  get_rules.front().AddAnonymizeColumn("name");
+
+  std::vector<sqlast::AnonymizationRule> del_rules;
+  del_rules.emplace_back(sqlast::AnonymizationRule::Type::DEL, "id");
+  del_rules.front().AddAnonymizeColumn("name");
+
+  EXPECT_ANON(&conn, "g", get_rules);
+  EXPECT_ANON(&conn, "d", del_rules);
+}
+
 TEST_F(CreateTest, Direct) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
 
   // Make a pelton connection.
@@ -190,7 +232,7 @@ TEST_F(CreateTest, Direct) {
   EXPECT_SHARD_ACCESSES(&conn, "user", {});
 
   // Check tables.
-  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "user", true, {"addr"}, {});
 
@@ -199,9 +241,35 @@ TEST_F(CreateTest, Direct) {
   EXPECT_DEPENDENTS(&conn, "addr", true, {}, {});
 }
 
+TEST_F(CreateTest, DirectPlain) {
+  // Parse create table statements.
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK NO "user(id)"});
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(addr, &conn));
+
+  // Check shards.
+  EXPECT_SHARD(&conn, "user", "id", 0);
+  EXPECT_SHARD_OWNS(&conn, "user", {"user"});
+  EXPECT_SHARD_ACCESSES(&conn, "user", {});
+
+  // Check tables.
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
+  EXPECT_DEPENDENTS(&conn, "user", true, {}, {});
+
+  EXPECT_TABLE(&conn, "addr", {"id", "uid"}, {INT, INT}, 0, 0, 0);
+  EXPECT_DEPENDENTS(&conn, "addr", true, {}, {});
+}
+
 TEST_F(CreateTest, Transitive) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
   std::string nums = MakeCreate("phones", {"id" I PK, "aid" I FK "addr(id)"});
 
@@ -219,7 +287,7 @@ TEST_F(CreateTest, Transitive) {
   EXPECT_SHARD_ACCESSES(&conn, "user", {});
 
   // Check tables.
-  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "user", true, {"addr"}, {});
 
@@ -235,7 +303,7 @@ TEST_F(CreateTest, Transitive) {
 
 TEST_F(CreateTest, DeepTransitive) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
   std::string nums = MakeCreate("phones", {"id" I PK, "aid" I FK "addr(id)"});
   std::string available =
@@ -256,7 +324,7 @@ TEST_F(CreateTest, DeepTransitive) {
   EXPECT_SHARD_ACCESSES(&conn, "user", {});
 
   // Check tables.
-  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "user", true, {"addr"}, {});
 
@@ -277,10 +345,11 @@ TEST_F(CreateTest, DeepTransitive) {
 
 TEST_F(CreateTest, OwnerAndNothing) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string msg = MakeCreate(
-      "msg",
-      {"id" I PK, "OWNER_sender" I FK "user(id)", "receiver" I FK "user(id)"});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  // Test disabling implicit ownership with `ONLY`, instead of explicitly
+  // enabling ownership with `OWNED BY`.
+  std::string msg = MakeCreate("msg", {"id" I PK, "sender" I FK "user(id)",
+                                       "receiver" I FK NO "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -295,22 +364,21 @@ TEST_F(CreateTest, OwnerAndNothing) {
   EXPECT_SHARD_ACCESSES(&conn, "user", {});
 
   // Check tables.
-  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "user", true, {"msg"}, {});
 
-  EXPECT_TABLE(&conn, "msg", {"id", "OWNER_sender", "receiver"},
-               {INT, INT, INT}, 0, 1, 0);
-  EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_sender", 1, INT, "id", 0);
+  EXPECT_TABLE(&conn, "msg", {"id", "sender", "receiver"}, {INT, INT, INT}, 0,
+               1, 0);
+  EXPECT_DIRECT(&conn, "msg", true, "user", "sender", 1, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "msg", true, {}, {});
 }
 
 TEST_F(CreateTest, OwnerAccessor) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
-                         "ACCESSOR_receiver" I FK "user(id)"});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I AB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -325,26 +393,23 @@ TEST_F(CreateTest, OwnerAccessor) {
   EXPECT_SHARD_ACCESSES(&conn, "user", {"msg"});
 
   // Check tables.
-  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "user", true, {"msg"}, {"msg"});
 
-  EXPECT_TABLE(&conn, "msg", {"id", "OWNER_sender", "ACCESSOR_receiver"},
-               {INT, INT, INT}, 0, 1, 1);
-  EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_sender", 1, INT, "id", 0);
-  EXPECT_DIRECT(&conn, "msg", false, "user", "ACCESSOR_receiver", 2, INT, "id",
-                0);
+  EXPECT_TABLE(&conn, "msg", {"id", "sender", "receiver"}, {INT, INT, INT}, 0,
+               1, 1);
+  EXPECT_DIRECT(&conn, "msg", true, "user", "sender", 1, INT, "id", 0);
+  EXPECT_DIRECT(&conn, "msg", false, "user", "receiver", 2, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "msg", true, {}, {});
 }
 
 TEST_F(CreateTest, OwnerLattice) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
-                         "ACCESSOR_receiver" I FK "user(id)"});
-  std::string meta =
-      MakeCreate("metadata", {"id" I PK, "OWNER_msg" I FK "msg(id)"});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I AB "user(id)"});
+  std::string meta = MakeCreate("metadata", {"id" I PK, "msg" I OB "msg(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -360,33 +425,30 @@ TEST_F(CreateTest, OwnerLattice) {
   EXPECT_SHARD_ACCESSES(&conn, "user", {"msg", "metadata"});
 
   // Check tables.
-  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "user", true, {"msg"}, {"msg"});
 
-  EXPECT_TABLE(&conn, "msg", {"id", "OWNER_sender", "ACCESSOR_receiver"},
-               {INT, INT, INT}, 0, 1, 1);
-  EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_sender", 1, INT, "id", 0);
-  EXPECT_DIRECT(&conn, "msg", false, "user", "ACCESSOR_receiver", 2, INT, "id",
-                0);
+  EXPECT_TABLE(&conn, "msg", {"id", "sender", "receiver"}, {INT, INT, INT}, 0,
+               1, 1);
+  EXPECT_DIRECT(&conn, "msg", true, "user", "sender", 1, INT, "id", 0);
+  EXPECT_DIRECT(&conn, "msg", false, "user", "receiver", 2, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "msg", true, {"metadata"}, {"metadata"});
 
-  EXPECT_TABLE(&conn, "metadata", {"id", "OWNER_msg"}, {INT, INT}, 0, 1, 1);
-  EXPECT_TRANSITIVE(&conn, "metadata", true, "user", "OWNER_msg", 1, INT, "msg",
+  EXPECT_TABLE(&conn, "metadata", {"id", "msg"}, {INT, INT}, 0, 1, 1);
+  EXPECT_TRANSITIVE(&conn, "metadata", true, "user", "msg", 1, INT, "msg", "id",
+                    0);
+  EXPECT_TRANSITIVE(&conn, "metadata", false, "user", "msg", 1, INT, "msg",
                     "id", 0);
-  EXPECT_TRANSITIVE(&conn, "metadata", false, "user", "OWNER_msg", 1, INT,
-                    "msg", "id", 0);
   EXPECT_DEPENDENTS(&conn, "metadata", true, {}, {});
 }
 
 TEST_F(CreateTest, AccessorLattice) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
-                         "ACCESSOR_receiver" I FK "user(id)"});
-  std::string meta =
-      MakeCreate("metadata", {"id" I PK, "ACCESSOR_msg" I FK "msg(id)"});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I AB "user(id)"});
+  std::string meta = MakeCreate("metadata", {"id" I PK, "msg" I AB "msg(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -402,31 +464,29 @@ TEST_F(CreateTest, AccessorLattice) {
   EXPECT_SHARD_ACCESSES(&conn, "user", {"msg", "metadata"});
 
   // Check tables.
-  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "user", true, {"msg"}, {"msg"});
 
-  EXPECT_TABLE(&conn, "msg", {"id", "OWNER_sender", "ACCESSOR_receiver"},
-               {INT, INT, INT}, 0, 1, 1);
-  EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_sender", 1, INT, "id", 0);
-  EXPECT_DIRECT(&conn, "msg", false, "user", "ACCESSOR_receiver", 2, INT, "id",
-                0);
+  EXPECT_TABLE(&conn, "msg", {"id", "sender", "receiver"}, {INT, INT, INT}, 0,
+               1, 1);
+  EXPECT_DIRECT(&conn, "msg", true, "user", "sender", 1, INT, "id", 0);
+  EXPECT_DIRECT(&conn, "msg", false, "user", "receiver", 2, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "msg", true, {}, {"metadata", "metadata"});
 
-  EXPECT_TABLE(&conn, "metadata", {"id", "ACCESSOR_msg"}, {INT, INT}, 0, 0, 2);
-  EXPECT_TRANSITIVE(&conn, "metadata", false, "user", "ACCESSOR_msg", 1, INT,
-                    "msg", "id", 0);
-  EXPECT_TRANSITIVE(&conn, "metadata", false, "user", "ACCESSOR_msg", 1, INT,
-                    "msg", "id", 0);
+  EXPECT_TABLE(&conn, "metadata", {"id", "msg"}, {INT, INT}, 0, 0, 2);
+  EXPECT_TRANSITIVE(&conn, "metadata", false, "user", "msg", 1, INT, "msg",
+                    "id", 0);
+  EXPECT_TRANSITIVE(&conn, "metadata", false, "user", "msg", 1, INT, "msg",
+                    "id", 0);
   EXPECT_DEPENDENTS(&conn, "metadata", true, {}, {});
 }
 
 TEST_F(CreateTest, TwoOwners) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
-                         "OWNER_receiver" I FK "user(id)"});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I OB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -441,27 +501,25 @@ TEST_F(CreateTest, TwoOwners) {
   EXPECT_SHARD_ACCESSES(&conn, "user", {});
 
   // Check tables.
-  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "user", true, {"msg", "msg"}, {});
 
-  EXPECT_TABLE(&conn, "msg", {"id", "OWNER_sender", "OWNER_receiver"},
-               {INT, INT, INT}, 0, 2, 0);
-  EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_sender", 1, INT, "id", 0);
-  EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_receiver", 2, INT, "id", 0);
+  EXPECT_TABLE(&conn, "msg", {"id", "sender", "receiver"}, {INT, INT, INT}, 0,
+               2, 0);
+  EXPECT_DIRECT(&conn, "msg", true, "user", "sender", 1, INT, "id", 0);
+  EXPECT_DIRECT(&conn, "msg", true, "user", "receiver", 2, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "msg", true, {}, {});
 }
 
 TEST_F(CreateTest, TwoOwnersTransitive) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
-                         "OWNER_receiver" I FK "user(id)"});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I OB "user(id)"});
   std::string delivered =
-      MakeCreate("delivered", {"id" I PK, "OWNER_msg" I FK "msg(id)"});
-  std::string error =
-      MakeCreate("error", {"id" I PK, "ACCESSOR_msg" I FK "msg(id)"});
+      MakeCreate("delivered", {"id" I PK, "msg" I OB "msg(id)"});
+  std::string error = MakeCreate("error", {"id" I PK, "msg" I AB "msg(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -478,33 +536,33 @@ TEST_F(CreateTest, TwoOwnersTransitive) {
   EXPECT_SHARD_ACCESSES(&conn, "user", {"error"});
 
   // Check tables.
-  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "user", true, {"msg", "msg"}, {});
 
-  EXPECT_TABLE(&conn, "msg", {"id", "OWNER_sender", "OWNER_receiver"},
-               {INT, INT, INT}, 0, 2, 0);
-  EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_sender", 1, INT, "id", 0);
-  EXPECT_DIRECT(&conn, "msg", true, "user", "OWNER_receiver", 2, INT, "id", 0);
+  EXPECT_TABLE(&conn, "msg", {"id", "sender", "receiver"}, {INT, INT, INT}, 0,
+               2, 0);
+  EXPECT_DIRECT(&conn, "msg", true, "user", "sender", 1, INT, "id", 0);
+  EXPECT_DIRECT(&conn, "msg", true, "user", "receiver", 2, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "msg", true, {"delivered"}, {"error"});
 
-  EXPECT_TABLE(&conn, "delivered", {"id", "OWNER_msg"}, {INT, INT}, 0, 1, 0);
-  EXPECT_TRANSITIVE(&conn, "delivered", true, "user", "OWNER_msg", 1, INT,
-                    "msg", "id", 0);
+  EXPECT_TABLE(&conn, "delivered", {"id", "msg"}, {INT, INT}, 0, 1, 0);
+  EXPECT_TRANSITIVE(&conn, "delivered", true, "user", "msg", 1, INT, "msg",
+                    "id", 0);
   EXPECT_DEPENDENTS(&conn, "delivered", true, {}, {});
 
-  EXPECT_TABLE(&conn, "error", {"id", "ACCESSOR_msg"}, {INT, INT}, 0, 0, 1);
-  EXPECT_TRANSITIVE(&conn, "error", false, "user", "ACCESSOR_msg", 1, INT,
-                    "msg", "id", 0);
+  EXPECT_TABLE(&conn, "error", {"id", "msg"}, {INT, INT}, 0, 0, 1);
+  EXPECT_TRANSITIVE(&conn, "error", false, "user", "msg", 1, INT, "msg", "id",
+                    0);
   EXPECT_DEPENDENTS(&conn, "error", true, {}, {});
 }
 
 TEST_F(CreateTest, ShardedDataSubject) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string invited =
-      MakeCreate("invited_user",
-                 {"id" I PK, "PII_name" STR, "inviting_user" I FK "user(id)"});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string invited = MakeCreate(
+      "invited_user", {"id" I PK, "name" STR, "inviting_user" I FK "user(id)"},
+      true);
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -523,11 +581,11 @@ TEST_F(CreateTest, ShardedDataSubject) {
   EXPECT_SHARD_ACCESSES(&conn, "invited_user", {});
 
   // Check tables.
-  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "user", true, {"invited_user"}, {});
 
-  EXPECT_TABLE(&conn, "invited_user", {"id", "PII_name", "inviting_user"},
+  EXPECT_TABLE(&conn, "invited_user", {"id", "name", "inviting_user"},
                {INT, TEXT, INT}, 0, 2, 0);
   EXPECT_DIRECT(&conn, "invited_user", true, "invited_user", "id", 0, INT, "id",
                 0);
@@ -538,11 +596,11 @@ TEST_F(CreateTest, ShardedDataSubject) {
 
 TEST_F(CreateTest, VariableOwner) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string grps = MakeCreate("grps", {"gid" I PK});
-  std::string assoc =
-      MakeCreate("association", {"id" I PK, "OWNING_group" I FK "grps(gid)",
-                                 "OWNER_user" I FK "user(id)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"id" I PK, "group_id" I OW "grps(gid)", "user_id" I OB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -558,33 +616,32 @@ TEST_F(CreateTest, VariableOwner) {
   EXPECT_SHARD_ACCESSES(&conn, "user", {});
 
   // Check tables.
-  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "user", true, {"association"}, {});
 
   EXPECT_TABLE(&conn, "grps", {"gid"}, {INT}, 0, 1, 0);
   EXPECT_VARIABLE(&conn, "grps", true, "user", "gid", 0, INT, "association",
-                  "OWNING_group", 1);
+                  "group_id", 1);
   EXPECT_DEPENDENTS(&conn, "grps", true, {}, {});
 
-  EXPECT_TABLE(&conn, "association", {"id", "OWNING_group", "OWNER_user"},
+  EXPECT_TABLE(&conn, "association", {"id", "group_id", "user_id"},
                {INT, INT, INT}, 0, 1, 0);
-  EXPECT_DIRECT(&conn, "association", true, "user", "OWNER_user", 2, INT, "id",
-                0);
+  EXPECT_DIRECT(&conn, "association", true, "user", "user_id", 2, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "association", true, {"grps"}, {});
 }
 
 TEST_F(CreateTest, TransitiveVariableOwner) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string grps = MakeCreate("grps", {"gid" I PK});
-  std::string assoc =
-      MakeCreate("association", {"id" I PK, "OWNING_group" I FK "grps(gid)",
-                                 "OWNER_user" I FK "user(id)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"id" I PK, "group_id" I OW "grps(gid)", "user_id" I OB "user(id)"});
   std::string files = MakeCreate("files", {"fid" I PK});
-  std::string fassoc =
-      MakeCreate("fassociation", {"id" I PK, "OWNING_file" I FK "files(fid)",
-                                  "OWNER_group" I FK "grps(gid)"});
+  std::string fassoc = MakeCreate(
+      "fassociation",
+      {"id" I PK, "file" I OW "files(fid)", "group_id" I OB "grps(gid)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -603,40 +660,39 @@ TEST_F(CreateTest, TransitiveVariableOwner) {
   EXPECT_SHARD_ACCESSES(&conn, "user", {});
 
   // Check tables.
-  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "user", true, {"association"}, {});
 
   EXPECT_TABLE(&conn, "grps", {"gid"}, {INT}, 0, 1, 0);
   EXPECT_VARIABLE(&conn, "grps", true, "user", "gid", 0, INT, "association",
-                  "OWNING_group", 1);
+                  "group_id", 1);
   EXPECT_DEPENDENTS(&conn, "grps", true, {"fassociation"}, {});
 
-  EXPECT_TABLE(&conn, "association", {"id", "OWNING_group", "OWNER_user"},
+  EXPECT_TABLE(&conn, "association", {"id", "group_id", "user_id"},
                {INT, INT, INT}, 0, 1, 0);
-  EXPECT_DIRECT(&conn, "association", true, "user", "OWNER_user", 2, INT, "id",
-                0);
+  EXPECT_DIRECT(&conn, "association", true, "user", "user_id", 2, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "association", true, {"grps"}, {});
 
   EXPECT_TABLE(&conn, "files", {"fid"}, {INT}, 0, 1, 0);
   EXPECT_VARIABLE(&conn, "files", true, "user", "fid", 0, INT, "fassociation",
-                  "OWNING_file", 1);
+                  "file", 1);
   EXPECT_DEPENDENTS(&conn, "files", true, {}, {});
 
-  EXPECT_TABLE(&conn, "fassociation", {"id", "OWNING_file", "OWNER_group"},
+  EXPECT_TABLE(&conn, "fassociation", {"id", "file", "group_id"},
                {INT, INT, INT}, 0, 1, 0);
-  EXPECT_TRANSITIVE(&conn, "fassociation", true, "user", "OWNER_group", 2, INT,
+  EXPECT_TRANSITIVE(&conn, "fassociation", true, "user", "group_id", 2, INT,
                     "grps", "gid", 0);
   EXPECT_DEPENDENTS(&conn, "fassociation", true, {"files"}, {});
 }
 
 TEST_F(CreateTest, VariableAccessor) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string grps = MakeCreate("grps", {"gid" I PK});
-  std::string assoc =
-      MakeCreate("association", {"id" I PK, "ACCESSING_group" I FK "grps(gid)",
-                                 "OWNER_user" I FK "user(id)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"id" I PK, "group_id" I AC "grps(gid)", "user_id" I OB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -652,33 +708,32 @@ TEST_F(CreateTest, VariableAccessor) {
   EXPECT_SHARD_ACCESSES(&conn, "user", {"grps"});
 
   // Check tables.
-  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "user", true, {"association"}, {});
 
   EXPECT_TABLE(&conn, "grps", {"gid"}, {INT}, 0, 0, 1);
   EXPECT_VARIABLE(&conn, "grps", false, "user", "gid", 0, INT, "association",
-                  "ACCESSING_group", 1);
+                  "group_id", 1);
   EXPECT_DEPENDENTS(&conn, "grps", true, {}, {});
 
-  EXPECT_TABLE(&conn, "association", {"id", "ACCESSING_group", "OWNER_user"},
+  EXPECT_TABLE(&conn, "association", {"id", "group_id", "user_id"},
                {INT, INT, INT}, 0, 1, 0);
-  EXPECT_DIRECT(&conn, "association", true, "user", "OWNER_user", 2, INT, "id",
-                0);
+  EXPECT_DIRECT(&conn, "association", true, "user", "user_id", 2, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "association", true, {}, {"grps"});
 }
 
 TEST_F(CreateTest, TransitiveVariableAccessor) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string grps = MakeCreate("grps", {"gid" I PK});
-  std::string assoc =
-      MakeCreate("association", {"id" I PK, "ACCESSING_group" I FK "grps(gid)",
-                                 "OWNER_user" I FK "user(id)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"id" I PK, "group_id" I AC "grps(gid)", "user_id" I OB "user(id)"});
   std::string files = MakeCreate("files", {"fid" I PK});
-  std::string fassoc =
-      MakeCreate("fassociation", {"id" I PK, "ACCESSING_file" I FK "files(fid)",
-                                  "ACCESSOR_group" I FK "grps(gid)"});
+  std::string fassoc = MakeCreate(
+      "fassociation",
+      {"id" I PK, "file" I AC "files(fid)", "group_id" I AB "grps(gid)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -696,48 +751,46 @@ TEST_F(CreateTest, TransitiveVariableAccessor) {
   EXPECT_SHARD_ACCESSES(&conn, "user", {"grps", "files", "fassociation"});
 
   // Check tables.
-  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "user", true, {"association"}, {});
 
   EXPECT_TABLE(&conn, "grps", {"gid"}, {INT}, 0, 0, 1);
   EXPECT_VARIABLE(&conn, "grps", false, "user", "gid", 0, INT, "association",
-                  "ACCESSING_group", 1);
+                  "group_id", 1);
   EXPECT_DEPENDENTS(&conn, "grps", true, {}, {"fassociation"});
 
-  EXPECT_TABLE(&conn, "association", {"id", "ACCESSING_group", "OWNER_user"},
+  EXPECT_TABLE(&conn, "association", {"id", "group_id", "user_id"},
                {INT, INT, INT}, 0, 1, 0);
-  EXPECT_DIRECT(&conn, "association", true, "user", "OWNER_user", 2, INT, "id",
-                0);
+  EXPECT_DIRECT(&conn, "association", true, "user", "user_id", 2, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "association", true, {}, {"grps"});
 
   EXPECT_TABLE(&conn, "files", {"fid"}, {INT}, 0, 0, 1);
   EXPECT_VARIABLE(&conn, "files", false, "user", "fid", 0, INT, "fassociation",
-                  "ACCESSING_file", 1);
+                  "file", 1);
   EXPECT_DEPENDENTS(&conn, "files", true, {}, {});
 
-  EXPECT_TABLE(&conn, "fassociation",
-               {"id", "ACCESSING_file", "ACCESSOR_group"}, {INT, INT, INT}, 0,
-               0, 1);
-  EXPECT_TRANSITIVE(&conn, "fassociation", false, "user", "ACCESSOR_group", 2,
-                    INT, "grps", "gid", 0);
+  EXPECT_TABLE(&conn, "fassociation", {"id", "file", "group_id"},
+               {INT, INT, INT}, 0, 0, 1);
+  EXPECT_TRANSITIVE(&conn, "fassociation", false, "user", "group_id", 2, INT,
+                    "grps", "gid", 0);
   EXPECT_DEPENDENTS(&conn, "fassociation", true, {}, {"files"});
 }
 
 TEST_F(CreateTest, VariableAccessorLattice) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string admin = MakeCreate("admin", {"aid" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string admin = MakeCreate("admin", {"aid" I PK, "name" STR}, true);
   std::string grps =
-      MakeCreate("grps", {"gid" I PK, "OWNER_admin" I FK "admin(aid)"});
-  std::string assoc =
-      MakeCreate("association", {"sid" I PK, "ACCESSING_group" I FK "grps(gid)",
-                                 "OWNER_user" I FK "user(id)"});
+      MakeCreate("grps", {"gid" I PK, "admin" I OB "admin(aid)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"sid" I PK, "group_id" I AC "grps(gid)", "user_id" I OB "user(id)"});
   std::string files =
-      MakeCreate("files", {"fid" I PK, "OWNER_creator" I FK "user(id)"});
-  std::string fassoc =
-      MakeCreate("fassociation", {"fsid" I PK, "OWNING_file" I FK "files(fid)",
-                                  "OWNER_group" I FK "grps(gid)"});
+      MakeCreate("files", {"fid" I PK, "creator" I OB "user(id)"});
+  std::string fassoc = MakeCreate(
+      "fassociation",
+      {"fsid" I PK, "file" I OW "files(fid)", "group_id" I OB "grps(gid)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -760,57 +813,56 @@ TEST_F(CreateTest, VariableAccessorLattice) {
   EXPECT_SHARD_ACCESSES(&conn, "admin", {});
 
   // Check tables.
-  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "user", true, {"association", "files"}, {});
 
-  EXPECT_TABLE(&conn, "admin", {"aid", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "admin", {"aid", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "admin", true, "admin", "aid", 0, INT, "aid", 0);
   EXPECT_DEPENDENTS(&conn, "admin", true, {"grps"}, {});
 
-  EXPECT_TABLE(&conn, "grps", {"gid", "OWNER_admin"}, {INT, INT}, 0, 1, 1);
-  EXPECT_DIRECT(&conn, "grps", true, "admin", "OWNER_admin", 1, INT, "aid", 0);
+  EXPECT_TABLE(&conn, "grps", {"gid", "admin"}, {INT, INT}, 0, 1, 1);
+  EXPECT_DIRECT(&conn, "grps", true, "admin", "admin", 1, INT, "aid", 0);
   EXPECT_VARIABLE(&conn, "grps", false, "user", "gid", 0, INT, "association",
-                  "ACCESSING_group", 1);
+                  "group_id", 1);
   EXPECT_DEPENDENTS(&conn, "grps", true, {"fassociation"}, {"fassociation"});
 
-  EXPECT_TABLE(&conn, "association", {"sid", "ACCESSING_group", "OWNER_user"},
+  EXPECT_TABLE(&conn, "association", {"sid", "group_id", "user_id"},
                {INT, INT, INT}, 0, 1, 0);
-  EXPECT_DIRECT(&conn, "association", true, "user", "OWNER_user", 2, INT, "id",
-                0);
+  EXPECT_DIRECT(&conn, "association", true, "user", "user_id", 2, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "association", true, {}, {"grps"});
 
-  EXPECT_TABLE(&conn, "files", {"fid", "OWNER_creator"}, {INT, INT}, 0, 2, 1);
-  EXPECT_DIRECT(&conn, "files", true, "user", "OWNER_creator", 1, INT, "id", 0);
+  EXPECT_TABLE(&conn, "files", {"fid", "creator"}, {INT, INT}, 0, 2, 1);
+  EXPECT_DIRECT(&conn, "files", true, "user", "creator", 1, INT, "id", 0);
   EXPECT_VARIABLE(&conn, "files", true, "admin", "fid", 0, INT, "fassociation",
-                  "OWNING_file", 1);
+                  "file", 1);
   EXPECT_VARIABLE(&conn, "files", false, "user", "fid", 0, INT, "fassociation",
-                  "OWNING_file", 1);
+                  "file", 1);
   EXPECT_DEPENDENTS(&conn, "files", true, {}, {});
 
-  EXPECT_TABLE(&conn, "fassociation", {"fsid", "OWNING_file", "OWNER_group"},
+  EXPECT_TABLE(&conn, "fassociation", {"fsid", "file", "group_id"},
                {INT, INT, INT}, 0, 1, 1);
-  EXPECT_TRANSITIVE(&conn, "fassociation", true, "admin", "OWNER_group", 2, INT,
+  EXPECT_TRANSITIVE(&conn, "fassociation", true, "admin", "group_id", 2, INT,
                     "grps", "gid", 0);
-  EXPECT_TRANSITIVE(&conn, "fassociation", false, "user", "OWNER_group", 2, INT,
+  EXPECT_TRANSITIVE(&conn, "fassociation", false, "user", "group_id", 2, INT,
                     "grps", "gid", 0);
   EXPECT_DEPENDENTS(&conn, "fassociation", true, {"files"}, {"files"});
 }
 
 TEST_F(CreateTest, VariableLatticeAllOwners) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string admin = MakeCreate("admin", {"aid" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string admin = MakeCreate("admin", {"aid" I PK, "name" STR}, true);
   std::string grps =
-      MakeCreate("grps", {"gid" I PK, "OWNER_admin" I FK "admin(aid)"});
-  std::string assoc =
-      MakeCreate("association", {"sid" I PK, "OWNING_group" I FK "grps(gid)",
-                                 "OWNER_user" I FK "user(id)"});
+      MakeCreate("grps", {"gid" I PK, "admin" I OB "admin(aid)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"sid" I PK, "group_id" I OW "grps(gid)", "user_id" I OB "user(id)"});
   std::string files =
-      MakeCreate("files", {"fid" I PK, "OWNER_creator" I FK "user(id)"});
-  std::string fassoc =
-      MakeCreate("fassociation", {"fsid" I PK, "OWNING_file" I FK "files(fid)",
-                                  "OWNER_group" I FK "grps(gid)"});
+      MakeCreate("files", {"fid" I PK, "creator" I OB "user(id)"});
+  std::string fassoc = MakeCreate(
+      "fassociation",
+      {"fsid" I PK, "file" I OW "files(fid)", "group_id" I OB "grps(gid)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -834,39 +886,38 @@ TEST_F(CreateTest, VariableLatticeAllOwners) {
   EXPECT_SHARD_ACCESSES(&conn, "admin", {});
 
   // Check tables.
-  EXPECT_TABLE(&conn, "user", {"id", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "user", {"id", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "user", true, "user", "id", 0, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "user", true, {"association", "files"}, {});
 
-  EXPECT_TABLE(&conn, "admin", {"aid", "PII_name"}, {INT, TEXT}, 0, 1, 0);
+  EXPECT_TABLE(&conn, "admin", {"aid", "name"}, {INT, TEXT}, 0, 1, 0);
   EXPECT_DIRECT(&conn, "admin", true, "admin", "aid", 0, INT, "aid", 0);
   EXPECT_DEPENDENTS(&conn, "admin", true, {"grps"}, {});
 
-  EXPECT_TABLE(&conn, "grps", {"gid", "OWNER_admin"}, {INT, INT}, 0, 2, 0);
-  EXPECT_DIRECT(&conn, "grps", true, "admin", "OWNER_admin", 1, INT, "aid", 0);
+  EXPECT_TABLE(&conn, "grps", {"gid", "admin"}, {INT, INT}, 0, 2, 0);
+  EXPECT_DIRECT(&conn, "grps", true, "admin", "admin", 1, INT, "aid", 0);
   EXPECT_VARIABLE(&conn, "grps", true, "user", "gid", 0, INT, "association",
-                  "OWNING_group", 1);
+                  "group_id", 1);
   EXPECT_DEPENDENTS(&conn, "grps", true, {"fassociation", "fassociation"}, {});
 
-  EXPECT_TABLE(&conn, "association", {"sid", "OWNING_group", "OWNER_user"},
+  EXPECT_TABLE(&conn, "association", {"sid", "group_id", "user_id"},
                {INT, INT, INT}, 0, 1, 0);
-  EXPECT_DIRECT(&conn, "association", true, "user", "OWNER_user", 2, INT, "id",
-                0);
+  EXPECT_DIRECT(&conn, "association", true, "user", "user_id", 2, INT, "id", 0);
   EXPECT_DEPENDENTS(&conn, "association", true, {"grps"}, {});
 
-  EXPECT_TABLE(&conn, "files", {"fid", "OWNER_creator"}, {INT, INT}, 0, 3, 0);
-  EXPECT_DIRECT(&conn, "files", true, "user", "OWNER_creator", 1, INT, "id", 0);
+  EXPECT_TABLE(&conn, "files", {"fid", "creator"}, {INT, INT}, 0, 3, 0);
+  EXPECT_DIRECT(&conn, "files", true, "user", "creator", 1, INT, "id", 0);
   EXPECT_VARIABLE(&conn, "files", true, "admin", "fid", 0, INT, "fassociation",
-                  "OWNING_file", 1);
+                  "file", 1);
   EXPECT_VARIABLE(&conn, "files", true, "user", "fid", 0, INT, "fassociation",
-                  "OWNING_file", 1);
+                  "file", 1);
   EXPECT_DEPENDENTS(&conn, "files", true, {}, {});
 
-  EXPECT_TABLE(&conn, "fassociation", {"fsid", "OWNING_file", "OWNER_group"},
+  EXPECT_TABLE(&conn, "fassociation", {"fsid", "file", "group_id"},
                {INT, INT, INT}, 0, 2, 0);
-  EXPECT_TRANSITIVE(&conn, "fassociation", true, "admin", "OWNER_group", 2, INT,
+  EXPECT_TRANSITIVE(&conn, "fassociation", true, "admin", "group_id", 2, INT,
                     "grps", "gid", 0);
-  EXPECT_TRANSITIVE(&conn, "fassociation", true, "user", "OWNER_group", 2, INT,
+  EXPECT_TRANSITIVE(&conn, "fassociation", true, "user", "group_id", 2, INT,
                     "grps", "gid", 0);
   EXPECT_DEPENDENTS(&conn, "fassociation", true, {"files", "files"}, {});
 }

@@ -263,6 +263,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 
     // CREATE statements.
     if q_string.starts_with("CREATE TABLE")
+       || q_string.starts_with("CREATE DATA_SUBJECT TABLE")
        || q_string.starts_with("CREATE INDEX")
        || q_string.starts_with("CREATE VIEW")
        || q_string.starts_with("SET")

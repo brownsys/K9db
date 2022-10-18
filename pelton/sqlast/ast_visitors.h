@@ -28,6 +28,7 @@ class AbstractVisitor {
   virtual T VisitCreateTable(const CreateTable &ast) = 0;
   virtual T VisitColumnDefinition(const ColumnDefinition &ast) = 0;
   virtual T VisitColumnConstraint(const ColumnConstraint &ast) = 0;
+  virtual T VisitAnonymizationRule(const AnonymizationRule &ast) = 0;
   virtual T VisitCreateIndex(const CreateIndex &ast) = 0;
   virtual T VisitCreateView(const CreateView &ast) = 0;
   virtual T VisitInsert(const Insert &ast) = 0;
@@ -75,6 +76,7 @@ class MutableVisitor {
   virtual T VisitCreateTable(CreateTable *ast) = 0;
   virtual T VisitColumnDefinition(ColumnDefinition *ast) = 0;
   virtual T VisitColumnConstraint(ColumnConstraint *ast) = 0;
+  virtual T VisitAnonymizationRule(AnonymizationRule *ast) = 0;
   virtual T VisitCreateIndex(CreateIndex *ast) = 0;
   virtual T VisitCreateView(CreateView *ast) = 0;
   virtual T VisitInsert(Insert *ast) = 0;
@@ -122,6 +124,7 @@ class Stringifier : public AbstractVisitor<std::string> {
   std::string VisitCreateTable(const CreateTable &ast) override;
   std::string VisitColumnDefinition(const ColumnDefinition &ast) override;
   std::string VisitColumnConstraint(const ColumnConstraint &ast) override;
+  std::string VisitAnonymizationRule(const AnonymizationRule &ast) override;
   std::string VisitCreateIndex(const CreateIndex &ast) override;
   std::string VisitCreateView(const CreateView &ast) override;
   std::string VisitInsert(const Insert &ast) override;

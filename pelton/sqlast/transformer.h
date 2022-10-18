@@ -61,6 +61,8 @@ class AstTransformer : public sqlparser::SQLiteParserBaseVisitor {
       sqlparser::SQLiteParser::Signed_numberContext *context) override;
   antlrcpp::Any visitTable_constraint(
       sqlparser::SQLiteParser::Table_constraintContext *context) override;
+  antlrcpp::Any visitAnonymize_constraint(
+      sqlparser::SQLiteParser::Anonymize_constraintContext *context) override;
   antlrcpp::Any visitForeign_key_clause(
       sqlparser::SQLiteParser::Foreign_key_clauseContext *context) override;
   antlrcpp::Any visitConflict_clause(

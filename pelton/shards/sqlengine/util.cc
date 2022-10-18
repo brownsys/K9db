@@ -15,31 +15,6 @@ namespace pelton {
 namespace shards {
 namespace sqlengine {
 
-bool IsADataSubject(const sqlast::CreateTable &stmt) {
-  for (const sqlast::ColumnDefinition &column : stmt.GetColumns()) {
-    if (absl::StartsWith(column.column_name(), "PII_")) {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool IsOwner(const sqlast::ColumnDefinition &col) {
-  return absl::StartsWith(col.column_name(), "OWNER_");
-}
-
-bool IsAccessor(const sqlast::ColumnDefinition &col) {
-  return absl::StartsWith(col.column_name(), "ACCESSOR_");
-}
-
-bool IsOwns(const sqlast::ColumnDefinition &col) {
-  return absl::StartsWith(col.column_name(), "OWNING_");
-}
-
-bool IsAccesses(const sqlast::ColumnDefinition &col) {
-  return absl::StartsWith(col.column_name(), "ACCESSING_");
-}
-
 // Determine which shards the given record reside in.
 std::vector<ShardLocation> Locate(const std::string &table_name,
                                   const util::ShardName &shard_name,

@@ -51,7 +51,7 @@ std::unordered_set<std::string> NO_VIEWS = {
     // Q4.
     "SELECT keystores.* FROM keystores WHERE keystores.keyX = ?",
     // Q5.
-    "SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND "
+    "SELECT votes.* FROM votes WHERE votes.user_id = ? AND "
     "votes.story_id = ? AND votes.comment_id IS NULL",
     // Q7.
     "SELECT stories.* FROM stories WHERE stories.short_id = ?",
@@ -61,7 +61,7 @@ std::unordered_set<std::string> NO_VIEWS = {
     "SELECT 1 AS `one`, comments.short_id FROM comments WHERE "
     "comments.short_id = ?",
     // Q10.
-    "SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND "
+    "SELECT votes.* FROM votes WHERE votes.user_id = ? AND "
     "votes.story_id = ? AND votes.comment_id = ?",
     // Q14.
     "SELECT comments.* FROM comments WHERE comments.story_id = ? AND "
@@ -88,7 +88,7 @@ std::unordered_set<std::string> NO_VIEWS = {
     "SELECT 1, user_id, story_id FROM hidden_stories WHERE "
     "hidden_stories.user_id = ? AND hidden_stories.story_id = ?",
     // Q33.
-    "SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND "
+    "SELECT votes.* FROM votes WHERE votes.user_id = ? AND "
     "votes.comment_id = ?",
     // Q34.
     "SELECT comments.* FROM comments WHERE comments.short_id = ?",

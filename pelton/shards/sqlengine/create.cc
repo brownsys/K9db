@@ -8,7 +8,6 @@
 
 #include "glog/logging.h"
 #include "pelton/shards/sqlengine/index.h"
-#include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -34,7 +33,7 @@ absl::StatusOr<CreateContext::Annotations> CreateContext::DiscoverValidate() {
 
     // Make sure all FK point to existing tables.
     const sqlast::ColumnConstraint &fk = col.GetForeignKeyConstraint();
-    const auto &[foreign_table, foreign_column] = fk.ForeignKey();
+    const auto &[foreign_table, foreign_column, fk_type] = fk.ForeignKey();
     ASSERT_RET(this->sstate_.TableExists(foreign_table), InvalidArgument,
                "FK points to nonexisting table");
     const Table &target = this->sstate_.GetTable(foreign_table);
@@ -48,25 +47,27 @@ absl::StatusOr<CreateContext::Annotations> CreateContext::DiscoverValidate() {
     // Handle various annotations.
     bool foreign_owned = this->sstate_.IsOwned(foreign_table);
     bool foreign_accessed = this->sstate_.IsAccessed(foreign_table);
-    if (IsOwner(col)) {
+    if (fk_type == sqlast::ColumnConstraint::FKType::OWNED_BY) {
       ASSERT_RET(foreign_owned, InvalidArgument, "OWNER to a non data subject");
       ASSERT_RET(points_to_pk, InvalidArgument, "OWNER doesn't point to PK");
       annotations.explicit_owners.push_back(i);
-    } else if (IsAccessor(col)) {
+    } else if (fk_type == sqlast::ColumnConstraint::FKType::ACCESSED_BY) {
       ASSERT_RET(foreign_accessed, InvalidArgument,
                  "ACCESSOR to a non data subject");
       ASSERT_RET(points_to_pk, InvalidArgument, "ACCESSOR doesn't point to PK");
       annotations.accessors.push_back(i);
-    } else if (IsOwns(col)) {
+    } else if (fk_type == sqlast::ColumnConstraint::FKType::OWNS) {
       ASSERT_RET(points_to_pk, InvalidArgument, "OWNS doesn't point to PK");
       annotations.owns.push_back(i);
-    } else if (IsAccesses(col)) {
+    } else if (fk_type == sqlast::ColumnConstraint::FKType::ACCESSES) {
       ASSERT_RET(points_to_pk, InvalidArgument, "ACCESSES doesn't point to PK");
       annotations.accesses.push_back(i);
     } else if (foreign_owned) {
-      ASSERT_RET(points_to_pk, InvalidArgument,
-                 "implicit OWNER doesn't point to PK");
-      annotations.implicit_owners.push_back(i);
+      if (fk_type == sqlast::ColumnConstraint::FKType::AUTO) {
+        ASSERT_RET(points_to_pk, InvalidArgument,
+                   "implicit OWNER doesn't point to PK");
+        annotations.implicit_owners.push_back(i);
+      }
     }
   }
 
@@ -98,7 +99,7 @@ std::vector<std::unique_ptr<ShardDescriptor>> CreateContext::MakeFDescriptors(
   // Identify foreign table and column.
   const std::string &fk_colname = fk_col.column_name();
   const sqlast::ColumnConstraint &fk = fk_col.GetForeignKeyConstraint();
-  const auto &[next_table, next_col] = fk.ForeignKey();
+  const auto &[next_table, next_col, _] = fk.ForeignKey();
   Table &tbl = this->sstate_.GetTable(next_table);
   size_t next_col_index = tbl.schema.IndexOf(next_col);
   const std::vector<std::unique_ptr<ShardDescriptor>> &vec =
@@ -159,7 +160,7 @@ std::vector<std::unique_ptr<ShardDescriptor>> CreateContext::MakeBDescriptors(
 
   // Find information about the target owned table.
   const sqlast::ColumnConstraint &fk = origin_col.GetForeignKeyConstraint();
-  const auto &[target_table_name, target_column_name] = fk.ForeignKey();
+  const auto &[target_table_name, target_column_name, _] = fk.ForeignKey();
   const Table &target = this->sstate_.GetTable(target_table_name);
   size_t target_column_index = target.schema.IndexOf(target_column_name);
 
@@ -222,7 +223,7 @@ absl::StatusOr<sql::SqlResult> CreateContext::Exec() {
 
   // All errors are handled by this point.
   /* Check to see if this table is a data subject. */
-  if (IsADataSubject(this->stmt_)) {
+  if (this->stmt_.IsDataSubject()) {
     // We have a new shard kind.
     this->sstate_.AddShardKind(this->table_name_, pk_col, pk_index);
 
@@ -275,27 +276,27 @@ absl::StatusOr<sql::SqlResult> CreateContext::Exec() {
   /* Look for OWNS annotations: target table becomes owned by this table! */
   for (size_t idx : annotations.owns) {
     const sqlast::ColumnDefinition &col = this->stmt_.GetColumns().at(idx);
-    const auto &[target_table, _] = col.GetForeignKeyConstraint().ForeignKey();
+    const auto &[fk_table, _, __] = col.GetForeignKeyConstraint().ForeignKey();
     // Every way of owning this table becomes a way of owning the target table.
     auto v = this->MakeBDescriptors(true, true, table_ptr, col, idx);
-    CHECK_STATUS(this->sstate_.AddTableOwner(target_table, std::move(v)));
+    CHECK_STATUS(this->sstate_.AddTableOwner(fk_table, std::move(v)));
 
     // Every way of accessing this table becomes a way of accessing target.
     v = this->MakeBDescriptors(false, false, table_ptr, col, idx);
-    CHECK_STATUS(this->sstate_.AddTableAccessor(target_table, std::move(v)));
+    CHECK_STATUS(this->sstate_.AddTableAccessor(fk_table, std::move(v)));
   }
   /* End of OWNS. */
 
   /* Look for ACCESSES annotations: target becomes accessible by this table! */
   for (size_t idx : annotations.accesses) {
     const sqlast::ColumnDefinition &col = this->stmt_.GetColumns().at(idx);
-    const auto &[target_table, _] = col.GetForeignKeyConstraint().ForeignKey();
+    const auto &[fk_table, _, __] = col.GetForeignKeyConstraint().ForeignKey();
     // Every way of owning this table becomes a way of accessing the target.
     auto v = this->MakeBDescriptors(true, false, table_ptr, col, idx);
-    CHECK_STATUS(this->sstate_.AddTableAccessor(target_table, std::move(v)));
+    CHECK_STATUS(this->sstate_.AddTableAccessor(fk_table, std::move(v)));
     // Every way of accessing this table becomes a way of accessing target.
     v = this->MakeBDescriptors(false, false, table_ptr, col, idx);
-    CHECK_STATUS(this->sstate_.AddTableAccessor(target_table, std::move(v)));
+    CHECK_STATUS(this->sstate_.AddTableAccessor(fk_table, std::move(v)));
   }
   /* End of ACCESSES. */
 

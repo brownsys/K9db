@@ -108,13 +108,14 @@ void CleanDatabase() {
 }
 
 void CreateTable() {
+  using C = sqlast::ColumnConstraint::Type;
   // Create Table.
   sqlast::CreateTable tbl("test_table");
   tbl.AddColumn("ID", sqlast::ColumnDefinition("ID", CType::INT));
   tbl.AddColumn("name", sqlast::ColumnDefinition("name", CType::TEXT));
   tbl.AddColumn("age", sqlast::ColumnDefinition("age", CType::INT));
   tbl.MutableColumn("ID").AddConstraint(
-      sqlast::ColumnConstraint::MakePrimaryKey());
+      sqlast::ColumnConstraint::Make(C::PRIMARY_KEY));
   EXPECT_TRUE(CONN->ExecuteCreateTable(tbl));
 }
 

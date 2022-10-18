@@ -22,7 +22,7 @@ namespace sqlast {
   antlrcpp::Any __CAST_REF_VAL(__LINE__) = rexpr;  \
   if (__CAST_REF_VAL(__LINE__).is<absl::Status>()) \
     return __CAST_REF_VAL(__LINE__);               \
-  type &var = __CAST_REF_VAL(__LINE__).as<type &>()
+  type &var = __CAST_REF_VAL(__LINE__).as<type>()
 
 absl::StatusOr<std::unique_ptr<AbstractStatement>>
 AstTransformer::TransformStatement(
@@ -101,10 +101,17 @@ antlrcpp::Any AstTransformer::visitCreate_table_stmt(
   // Parse into our AST.
   std::unique_ptr<CreateTable> table =
       std::make_unique<CreateTable>(table_name);
+  if (ctx->DATA_SUBJECT() != nullptr) {
+    table->SetDataSubject();
+  }
+
+  // Prase column definitions (incl. column-level constraints).
   for (auto *column : ctx->column_def()) {
     CAST_REF(ColumnDefinition, col, column->accept(this));
     table->AddColumn(col.column_name(), col);
   }
+
+  // Parse table-level constraints.
   for (auto *constraint : ctx->table_constraint()) {
     CAST_REF(std::pair<std::string _COMMA ColumnConstraint>, pair,
              constraint->accept(this));
@@ -116,6 +123,12 @@ antlrcpp::Any AstTransformer::visitCreate_table_stmt(
     table->MutableColumn(col_name).AddConstraint(ast_constraint);
   }
 
+  // Parse anonymization constraints.
+  for (auto *anon_constraint : ctx->anonymize_constraint()) {
+    CAST_REF(AnonymizationRule, anon_rule, anon_constraint->accept(this));
+    table->AddAnonymizeRule(std::move(anon_rule));
+  }
+
   // Upcast to an abstract statement.
   return static_cast<std::unique_ptr<AbstractStatement>>(std::move(table));
 }
@@ -124,6 +137,7 @@ antlrcpp::Any AstTransformer::visitColumn_def(
     sqlparser::SQLiteParser::Column_defContext *ctx) {
   // Visit column name.
   CAST_REF(std::string, column_name, ctx->column_name()->accept(this));
+
   // Visit type (if exists).
   std::string column_type = "";
   if (ctx->type_name() != nullptr) {
@@ -135,11 +149,9 @@ antlrcpp::Any AstTransformer::visitColumn_def(
   ColumnDefinition column(column_name, column_type);
   for (auto *constraint : ctx->column_constraint()) {
     antlrcpp::Any ret = constraint->accept(this);
-    if (ret.isNull()) {
-      continue;
+    if (!ret.isNull()) {
+      column.AddConstraint(ret.as<ColumnConstraint>());
     }
-    CAST_REF(ColumnConstraint, constr, constraint->accept(this));
-    column.AddConstraint(constr);
   }
   return column;
 }
@@ -158,12 +170,16 @@ antlrcpp::Any AstTransformer::visitColumn_constraint(
   }
 
   if (ctx->PRIMARY() != nullptr) {
-    return ColumnConstraint::MakePrimaryKey();
+    return ColumnConstraint::Make(ColumnConstraint::Type::PRIMARY_KEY);
   }
   if (ctx->UNIQUE() != nullptr) {
-    return ColumnConstraint::MakeUnique();
+    return ColumnConstraint::Make(ColumnConstraint::Type::UNIQUE);
   }
-  return ctx->foreign_key_clause()->accept(this);
+  if (ctx->foreign_key_clause() != nullptr) {
+    CAST_REF(ColumnConstraint, fk, ctx->foreign_key_clause()->accept(this));
+    return fk;
+  }
+  return absl::InvalidArgumentError("Unrecognized column constraint");
 }
 
 antlrcpp::Any AstTransformer::visitTable_constraint(
@@ -174,19 +190,21 @@ antlrcpp::Any AstTransformer::visitTable_constraint(
     return absl::InvalidArgumentError("Invalid table constraint");
   }
 
+  using Cons = ColumnConstraint::Type;
   if (ctx->PRIMARY() != nullptr) {
-    CAST_REF(std::string, col_name, ctx->indexed_column(0)->accept(this));
-    return std::make_pair(col_name, ColumnConstraint::MakePrimaryKey());
+    CAST_REF(std::string, col, ctx->indexed_column(0)->accept(this));
+    return std::make_pair(col, ColumnConstraint::Make(Cons::PRIMARY_KEY));
   }
   if (ctx->UNIQUE() != nullptr) {
-    CAST_REF(std::string, col_name, ctx->indexed_column(0)->accept(this));
-    return std::make_pair(col_name, ColumnConstraint::MakeUnique());
+    CAST_REF(std::string, col, ctx->indexed_column(0)->accept(this));
+    return std::make_pair(col, ColumnConstraint::Make(Cons::UNIQUE));
   }
-  // Can only be a foreign key.
-  CAST_REF(std::string, col_name, ctx->column_name(0)->accept(this));
-  CAST_REF(ColumnConstraint, fk_constraint,
-           ctx->foreign_key_clause()->accept(this));
-  return std::make_pair(col_name, fk_constraint);
+  if (ctx->foreign_key_clause() != nullptr) {
+    CAST_REF(std::string, col, ctx->column_name(0)->accept(this));
+    CAST_REF(ColumnConstraint, fk, ctx->foreign_key_clause()->accept(this));
+    return std::make_pair(col, fk);
+  }
+  return absl::InvalidArgumentError("Unrecognized column constraint");
 }
 
 antlrcpp::Any AstTransformer::visitForeign_key_clause(
@@ -196,9 +214,47 @@ antlrcpp::Any AstTransformer::visitForeign_key_clause(
     return absl::InvalidArgumentError("Invalid foreign key constraint");
   }
 
+  // Is this a regular foreign key or does it also have ownership information?
+  ColumnConstraint::FKType own = ColumnConstraint::FKType::AUTO;
+  if (ctx->OWNED_BY() != nullptr) {
+    own = ColumnConstraint::FKType::OWNED_BY;
+  } else if (ctx->OWNS() != nullptr) {
+    own = ColumnConstraint::FKType::OWNS;
+  } else if (ctx->ACCESSED_BY() != nullptr) {
+    own = ColumnConstraint::FKType::ACCESSED_BY;
+  } else if (ctx->ACCESSES() != nullptr) {
+    own = ColumnConstraint::FKType::ACCESSES;
+  } else if (ctx->ONLY() != nullptr) {
+    own = ColumnConstraint::FKType::PLAIN;
+  }
+
   CAST_REF(std::string, foreign_table, ctx->foreign_table()->accept(this));
   CAST_REF(std::string, foreign_column, ctx->column_name(0)->accept(this));
-  return ColumnConstraint::MakeForeignKey(foreign_table, foreign_column);
+  return ColumnConstraint::MakeForeignKey(foreign_table, foreign_column, own);
+}
+
+antlrcpp::Any AstTransformer::visitAnonymize_constraint(
+    sqlparser::SQLiteParser::Anonymize_constraintContext *ctx) {
+  // Which operation are we anonymizing over?
+  AnonymizationRule::Type anon_type;
+  if (ctx->GET() != nullptr) {
+    anon_type = AnonymizationRule::Type::GET;
+  } else if (ctx->DEL() != nullptr) {
+    anon_type = AnonymizationRule::Type::DEL;
+  } else {
+    return absl::InvalidArgumentError("Invalid anonymization operation");
+  }
+
+  // Which foreign key data subject initiates this anonymization?
+  CAST_REF(std::string, data_subject_column, ctx->column_name(0)->accept(this));
+  AnonymizationRule rule(anon_type, data_subject_column);
+
+  // Columns to anonymize.
+  for (size_t i = 1; i < ctx->column_name().size(); i++) {
+    CAST_REF(std::string, anon_col, ctx->column_name().at(i)->accept(this));
+    rule.AddAnonymizeColumn(anon_col);
+  }
+  return rule;
 }
 
 // Create Index constructs.

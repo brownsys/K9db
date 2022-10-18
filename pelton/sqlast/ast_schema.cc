@@ -12,7 +12,9 @@
 namespace pelton {
 namespace sqlast {
 
-// ColumnConstraint.
+/*
+ * ColumnConstraint.
+ */
 std::string ColumnConstraint::TypeToString(Type type) {
   switch (type) {
     case Type::PRIMARY_KEY:
@@ -26,7 +28,22 @@ std::string ColumnConstraint::TypeToString(Type type) {
   }
 }
 
-// ColumnDefinition
+// Constructor is private: use these functions to create.
+ColumnConstraint ColumnConstraint::Make(Type type) {
+  CHECK(type != Type::FOREIGN_KEY);
+  return ColumnConstraint(type);
+}
+ColumnConstraint ColumnConstraint::MakeForeignKey(
+    const std::string &foreign_table, const std::string &foreign_column,
+    FKType type) {
+  ColumnConstraint constraint(Type::FOREIGN_KEY);
+  constraint.data_ = ForeignKeyData(foreign_table, foreign_column, type);
+  return constraint;
+}
+
+/*
+ * ColumnDefinition.
+ */
 ColumnDefinition::Type ColumnDefinition::StringToType(
     const std::string &column_type) {
   if (absl::EqualsIgnoreCase(column_type, "INT") ||
@@ -69,6 +86,16 @@ bool ColumnDefinition::HasConstraint(ColumnConstraint::Type type) const {
   }
   return false;
 }
+bool ColumnDefinition::HasFKType(ColumnConstraint::FKType type) const {
+  for (const auto &constraint : this->constraints_) {
+    if (constraint.type() == ColumnConstraint::Type::FOREIGN_KEY) {
+      if (std::get<2>(constraint.ForeignKey()) == type) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 const ColumnConstraint &ColumnDefinition::GetConstraintOfType(
     ColumnConstraint::Type type) const {
@@ -84,7 +111,9 @@ const ColumnConstraint &ColumnDefinition::GetForeignKeyConstraint() const {
   return this->GetConstraintOfType(ColumnConstraintTypeEnum::FOREIGN_KEY);
 }
 
-// CreateTable
+/*
+ * CreateTable.
+ */
 void CreateTable::AddColumn(const std::string &column_name,
                             const ColumnDefinition &def) {
   this->columns_map_.insert({column_name, this->columns_.size()});
@@ -101,30 +130,21 @@ bool CreateTable::HasColumn(const std::string &column_name) const {
   return this->columns_map_.count(column_name) == 1;
 }
 
-/*
-const ColumnDefinition &CreateTable::GetColumn(
-    const std::string &column_name) const {
-  size_t column_index = this->columns_map_.at(column_name);
-  return this->columns_.at(column_index);
+void CreateTable::AddAnonymizeRule(AnonymizationRule &&anon_rule) {
+  this->anon_rules_.push_back(std::move(anon_rule));
 }
-size_t CreateTable::ColumnIndex(const std::string &column_name) const {
-  return this->columns_map_.at(column_name);
+const std::vector<AnonymizationRule> &CreateTable::GetAnonymizationRules()
+    const {
+  return this->anon_rules_;
 }
-void CreateTable::RemoveColumn(const std::string &column_name) {
-  size_t column_index = this->columns_map_.at(column_name);
-  this->columns_.erase(this->columns_.begin() + column_index);
-  this->columns_map_.erase(column_name);
-  for (size_t i = column_index; i < this->columns_.size(); i++) {
-    this->columns_map_.at(this->columns_.at(i).column_name()) = i;
-  }
-}
-*/
 
+/*
+ * Printing / logging
+ */
 std::ostream &operator<<(std::ostream &os, const ColumnConstraint::Type &r) {
   os << ColumnConstraint::TypeToString(r);
   return os;
 }
-
 std::ostream &operator<<(std::ostream &os, const ColumnDefinition::Type &r) {
   if (r == ColumnDefinition::Type::UINT) {
     os << "UINT";

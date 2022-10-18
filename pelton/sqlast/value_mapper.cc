@@ -23,6 +23,9 @@ void ValueMapper::VisitColumnDefinition(const ColumnDefinition &ast) {
 void ValueMapper::VisitColumnConstraint(const ColumnConstraint &ast) {
   LOG(FATAL) << "UNSUPPORTED";
 }
+void ValueMapper::VisitAnonymizationRule(const AnonymizationRule &ast) {
+  LOG(FATAL) << "UNSUPPORTED";
+}
 void ValueMapper::VisitCreateIndex(const CreateIndex &ast) {
   LOG(FATAL) << "UNSUPPORTED";
 }

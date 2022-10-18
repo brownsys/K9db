@@ -46,7 +46,6 @@ cc_library(
         "//pelton:connection",
         "//pelton/shards:state",
         "//pelton/shards:types",
-        "//pelton/sqlast:ast",
         "//pelton/util:shard_name",
         "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/strings",
@@ -63,7 +62,6 @@ cc_library(
     ],
     deps = [
         ":index",
-        ":util",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:schema",
