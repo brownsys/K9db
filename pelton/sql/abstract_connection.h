@@ -40,7 +40,7 @@ class AbstractConnection {
                             const util::ShardName &shard_name) = 0;
 
   // Delete.
-  virtual ResultSetAndStatus ExecuteDelete(const sqlast::Delete &sql) = 0;
+  virtual SqlDeleteSet ExecuteDelete(const sqlast::Delete &sql) = 0;
 
   // Selects.
   virtual SqlResultSet ExecuteSelect(const sqlast::Select &sql) const = 0;

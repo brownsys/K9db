@@ -88,8 +88,11 @@ class RocksdbSequence {
     rocksdb::Slice operator*() const;
 
     // Iterator traits
+    using difference_type = int64_t;
     using value_type = rocksdb::Slice;
-    using iterator_category = std::output_iterator_tag;
+    using reference = rocksdb::Slice &;
+    using pointer = rocksdb::Slice *;
+    using iterator_category = std::input_iterator_tag;
 
    private:
     Iterator(const char *ptr, size_t sz);

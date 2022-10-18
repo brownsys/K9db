@@ -1,5 +1,7 @@
 #include "pelton/sql/rocksdb/table.h"
 
+#include <algorithm>
+// NOLINTNEXTLINE
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -53,6 +55,18 @@ RocksdbSequence FromVector(const std::vector<std::string> &vec) {
     sequence.AppendEncoded(val);
   }
   return sequence;
+}
+
+std::vector<RocksdbSequence> DecryptStream(const EncryptionManager &enc,
+                                           RocksdbStream &&s) {
+  std::vector<std::pair<EncryptedKey, EncryptedValue>> all(s.begin(), s.end());
+  std::vector<RocksdbSequence> rows;
+  for (auto &&[enkey, envalue] : all) {
+    RocksdbSequence key = enc.DecryptKey(std::move(enkey));
+    std::string shard = key.At(0).ToString();
+    rows.push_back(enc.DecryptValue(shard, std::move(envalue)));
+  }
+  return rows;
 }
 
 // Put then Get some records.
@@ -117,6 +131,13 @@ TEST(TableTest, PutExistsGetDelete) {
   EXPECT_FALSE(tbl.Get(e5).has_value());
   EXPECT_FALSE(tbl.Get(e6).has_value());
 
+  // Check that stream gives us correct data.
+  std::vector<RocksdbSequence> rows = DecryptStream(enc, tbl.GetAll());
+  EXPECT_NE(std::find(rows.begin(), rows.end(), v1), rows.end());
+  EXPECT_NE(std::find(rows.begin(), rows.end(), v2), rows.end());
+  EXPECT_NE(std::find(rows.begin(), rows.end(), v3), rows.end());
+  EXPECT_NE(std::find(rows.begin(), rows.end(), v4), rows.end());
+
   // Delete.
   tbl.IndexDelete("shard1", v2);
   tbl.IndexDelete("shard2", v3);
@@ -142,6 +163,13 @@ TEST(TableTest, PutExistsGetDelete) {
   EXPECT_EQ(v4.Data(), d4.Data());
   EXPECT_FALSE(tbl.Get(e5).has_value());
   EXPECT_FALSE(tbl.Get(e6).has_value());
+
+  // Check that stream gives us correct data.
+  rows = DecryptStream(enc, tbl.GetAll());
+  EXPECT_NE(std::find(rows.begin(), rows.end(), v1), rows.end());
+  EXPECT_EQ(std::find(rows.begin(), rows.end(), v2), rows.end());
+  EXPECT_EQ(std::find(rows.begin(), rows.end(), v3), rows.end());
+  EXPECT_NE(std::find(rows.begin(), rows.end(), v4), rows.end());
 }
 
 }  // namespace sql

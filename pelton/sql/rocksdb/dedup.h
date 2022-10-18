@@ -2,6 +2,7 @@
 #ifndef PELTON_SQL_ROCKSDB_DEDUP_H_
 #define PELTON_SQL_ROCKSDB_DEDUP_H_
 
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 
@@ -19,6 +20,23 @@ class DedupSet {
 
  private:
   std::unordered_set<T> set_;
+};
+
+template <typename K>
+class DedupMap {
+ public:
+  DedupMap() = default;
+
+  bool Exists(K &&t) {
+    this->ptr_ = &this->set_[t];
+    return *this->ptr_ != 0;
+  }
+  size_t Value() const { return *this->ptr_ - 1; }
+  void Assign(size_t val) { *this->ptr_ = val + 1; }
+
+ private:
+  std::unordered_map<K, size_t> set_;
+  size_t *ptr_;
 };
 
 using IndexSet =

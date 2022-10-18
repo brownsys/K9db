@@ -41,16 +41,8 @@ class DeleteContext {
   absl::StatusOr<sql::SqlResult> Exec();
 
  private:
-  // The records we delete plus their sharding association.
-  struct DeletedRecords {
-    int status;
-    std::vector<dataflow::Record> records;
-    // pointers into records.
-    std::unordered_map<util::ShardName, std::vector<dataflow::Record *>> shards;
-  };
-
   /* Deleting the record from the database. */
-  absl::StatusOr<DeletedRecords> DeleteFromBaseTable();
+  absl::StatusOr<sql::SqlDeleteSet> DeleteFromBaseTable();
 
   /* Recursively deleting records in dependent tables from the affected
      shard.

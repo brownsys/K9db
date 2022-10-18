@@ -188,12 +188,12 @@ SqlResultSet SelectBy(
 
   return CONN->ExecuteSelect(select);
 }
-SqlResultSet DeleteBy(
+SqlDeleteSet DeleteBy(
     const std::unordered_map<std::string, std::vector<std::string>> &map) {
   sqlast::Delete del("test_table");
   del.SetWhereClause(MakeWhere(map));
 
-  return CONN->ExecuteDelete(del).first;
+  return CONN->ExecuteDelete(del);
 }
 
 // Shorthands.
@@ -201,7 +201,7 @@ SqlResultSet SelectAll() { return SelectBy({}); }
 SqlResultSet SelectBy(const std::string &col, const std::string &value) {
   return SelectBy({{col, {value}}});
 }
-SqlResultSet DeleteBy(const std::string &col, const std::string &value) {
+SqlDeleteSet DeleteBy(const std::string &col, const std::string &value) {
   return DeleteBy({{col, {value}}});
 }
 
@@ -214,6 +214,37 @@ SqlResultSet DeleteBy(const std::string &col, const std::string &value) {
 bool operator==(const SqlResultSet &set,
                 const std::vector<dataflow::Record> &v2) {
   const std::vector<dataflow::Record> &v1 = set.rows();
+  if (v1.size() != v2.size()) {
+    return false;
+  }
+
+  for (size_t i = 0; i < v1.size(); i++) {
+    if (std::count(v1.begin(), v1.end(), v1.at(i)) !=
+        std::count(v2.begin(), v2.end(), v1.at(i))) {
+      return false;
+    }
+    if (std::count(v1.begin(), v1.end(), v2.at(i)) !=
+        std::count(v2.begin(), v2.end(), v2.at(i))) {
+      return false;
+    }
+  }
+  return true;
+}
+bool operator==(const SqlDeleteSet &set,
+                const std::vector<dataflow::Record> &v2) {
+  util::Iterable<SqlDeleteSet::RecordsIt> iterable = set.IterateRecords();
+  struct CopyRecord {
+    CopyRecord() = default;
+    dataflow::Record Map(const SqlDeleteSet::RecordsIt *it) const {
+      return (*it)->Copy();
+    }
+  };
+  using CopyIt = util::MapIt<SqlDeleteSet::RecordsIt, CopyRecord>;
+  CopyIt b(iterable.begin());
+  CopyIt e(iterable.end());
+
+  std::vector<dataflow::Record> v1;
+  v1.insert(v1.end(), b, e);
   if (v1.size() != v2.size()) {
     return false;
   }
@@ -489,7 +520,7 @@ TEST_F(RocksdbConnectionTest, GetAllDeleteAll) {
 
   // Delete all records in table!
   sqlast::Delete delete_("test_table");
-  EXPECT_EQ(CONN->ExecuteDelete(delete_).first, GetRecords({0, 1, 2, 3}));
+  EXPECT_EQ(CONN->ExecuteDelete(delete_), GetRecords({0, 1, 2, 3}));
 
   // Table is now empty!
   EXPECT_EQ(CONN->ExecuteSelect(select), EMPTY);

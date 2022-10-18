@@ -8,6 +8,38 @@
 namespace pelton {
 namespace sql {
 
+// SqlDeleteSet.
+size_t SqlDeleteSet::AddRecord(dataflow::Record &&record) {
+  this->records_.push_back(std::move(record));
+  return this->records_.size() - 1;
+}
+void SqlDeleteSet::AssignToShard(size_t idx, std::string &&shard) {
+  auto [it, _] = this->shards_.emplace(std::move(shard), 0);
+  it->second.push_back(idx);
+}
+
+const dataflow::Record &SqlDeleteSet::Map(const VecIt *it) const {
+  return this->records_.at(**it);
+}
+const util::ShardName &SqlDeleteSet::Map(const MapIt *it) const {
+  return (*it)->first;
+}
+
+util::Iterable<SqlDeleteSet::RecordsIt> SqlDeleteSet::IterateRecords() const {
+  return util::Iterable<RecordsIt>(this->records_.cbegin(),
+                                   this->records_.cend());
+}
+util::Iterable<SqlDeleteSet::ShardsIt> SqlDeleteSet::IterateShards() const {
+  return util::Iterable<ShardsIt>(ShardsIt(this->shards_.cbegin(), *this),
+                                  ShardsIt(this->shards_.cend(), *this));
+}
+util::Iterable<SqlDeleteSet::ShardRecordsIt> SqlDeleteSet::Iterate(
+    const util::ShardName &shard) const {
+  const std::vector<size_t> &vec = this->shards_.at(shard);
+  return util::Iterable<ShardRecordsIt>(ShardRecordsIt(vec.begin(), *this),
+                                        ShardRecordsIt(vec.end(), *this));
+}
+
 // SqlResultSet.
 void SqlResultSet::Append(SqlResultSet &&other, bool deduplicate) {
   if (this->schema_ != other.schema_) {

@@ -24,7 +24,7 @@ RocksdbConnection::DeleteRecord::DeleteRecord(std::string &&s, EncryptedKey &&k,
  * DELETE STATEMENTS.
  */
 
-ResultSetAndStatus RocksdbConnection::ExecuteDelete(const sqlast::Delete &sql) {
+SqlDeleteSet RocksdbConnection::ExecuteDelete(const sqlast::Delete &sql) {
   const std::string &table_name = sql.table_name();
   const sqlast::BinaryExpression *const where = sql.GetWhereClause();
 
@@ -37,8 +37,8 @@ ResultSetAndStatus RocksdbConnection::ExecuteDelete(const sqlast::Delete &sql) {
 
   // Iterate over records to be deleted and delete them.
   size_t pk_col = schema.keys().at(0);
-  std::vector<dataflow::Record> result;
-  DedupSet<std::string> dedup_keys;
+  SqlDeleteSet result;
+  DedupMap<std::string> dedup_keys;
   for (DeleteRecord &element : records) {
     // Update indices.
     table.IndexDelete(element.shard, element.value);
@@ -47,13 +47,13 @@ ResultSetAndStatus RocksdbConnection::ExecuteDelete(const sqlast::Delete &sql) {
     table.Delete(element.key);
 
     // Append record to result.
-    if (!dedup_keys.Duplicate(element.value.At(pk_col).ToString())) {
-      result.push_back(std::move(element.record));
+    if (!dedup_keys.Exists(element.value.At(pk_col).ToString())) {
+      dedup_keys.Assign(result.AddRecord(std::move(element.record)));
     }
+    result.AssignToShard(dedup_keys.Value(), std::move(element.shard));
   }
 
-  return ResultSetAndStatus(SqlResultSet(schema, std::move(result)),
-                            records.size());
+  return result;
 }
 
 }  // namespace sql

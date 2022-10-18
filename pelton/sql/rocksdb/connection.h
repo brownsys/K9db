@@ -41,7 +41,7 @@ class RocksdbConnection : public AbstractConnection {
                     const util::ShardName &shard_name) override;
 
   // Delete.
-  ResultSetAndStatus ExecuteDelete(const sqlast::Delete &sql) override;
+  SqlDeleteSet ExecuteDelete(const sqlast::Delete &sql) override;
 
   // Select.
   SqlResultSet ExecuteSelect(const sqlast::Select &sql) const override;

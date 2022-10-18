@@ -17,11 +17,8 @@ namespace sqlengine {
 /*
  * Deleting the record from the database.
  */
-absl::StatusOr<DeleteContext::DeletedRecords>
-DeleteContext::DeleteFromBaseTable() {
-  auto &&[set, status] = this->db_->ExecuteDelete(this->stmt_);
-  // TODO(babman): need to find shards of records.
-  return DeletedRecords{status, set.Vec()};
+absl::StatusOr<sql::SqlDeleteSet> DeleteContext::DeleteFromBaseTable() {
+  return this->db_->ExecuteDelete(this->stmt_);
 }
 
 /*
@@ -33,16 +30,20 @@ absl::StatusOr<sql::SqlResult> DeleteContext::Exec() {
              "Table does not exist");
 
   // Insert the data into the physical shards.
-  MOVE_OR_RETURN(DeletedRecords result, this->DeleteFromBaseTable());
-  if (result.status < 0) {
-    return sql::SqlResult(result.status);
+  MOVE_OR_RETURN(sql::SqlDeleteSet result, this->DeleteFromBaseTable());
+
+  size_t total_count = 0;
+  for (const util::ShardName &shard_name : result.IterateShards()) {
+    for (const dataflow::Record &record : result.Iterate(shard_name)) {
+      total_count++;
+    }
   }
 
   // Everything has been inserted; feed to dataflows.
-  this->dstate_.ProcessRecords(this->table_name_, std::move(result.records));
+  this->dstate_.ProcessRecords(this->table_name_, result.Vec());
 
   // Return number of copies inserted.
-  return sql::SqlResult(result.status);
+  return sql::SqlResult(total_count);
 }
 
 }  // namespace sqlengine
