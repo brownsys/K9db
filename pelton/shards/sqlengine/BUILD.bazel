@@ -11,7 +11,7 @@ cc_library(
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":create",
-        #":delete",
+        ":delete",
         #":gdpr",
         ":index",
         ":insert",
@@ -211,6 +211,7 @@ cc_test(
         "create_unittest.cc",
     ],
     deps = [
+        ":create",
         ":tests_helpers",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -224,6 +225,20 @@ cc_test(
         "insert_unittest.cc",
     ],
     deps = [
+        ":insert",
+        ":tests_helpers",
+        "//pelton/util:shard_name",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "delete-test",
+    srcs = [
+        "delete_unittest.cc",
+    ],
+    deps = [
+        ":delete",
         ":tests_helpers",
         "//pelton/util:shard_name",
         "@glog",

@@ -5,8 +5,8 @@
 #include <utility>
 
 #include "pelton/shards/sqlengine/create.h"
-/*
 #include "pelton/shards/sqlengine/delete.h"
+/*
 #include "pelton/shards/sqlengine/gdpr.h"
 */
 #include "pelton/shards/sqlengine/index.h"
@@ -78,13 +78,13 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       }
     }
 
-    /*
     // Case 5: Delete statement.
     case sqlast::AbstractStatement::Type::DELETE: {
       auto *stmt = static_cast<sqlast::Delete *>(statement.get());
-      return delete_::Shard(*stmt, connection, true, true);
+      util::SharedLock lock = connection->state->ReaderLock();
+      DeleteContext context(*stmt, connection, &lock);
+      return context.Exec();
     }
-    */
 
     // Case 6: CREATE VIEW statement (e.g. dataflow).
     case sqlast::AbstractStatement::Type::CREATE_VIEW: {

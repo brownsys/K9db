@@ -63,6 +63,9 @@ struct DirectInfo {
   ColumnName column;
   ColumnIndex column_index;
   sqlast::ColumnDefinition::Type column_type;
+  // The referenced column in the data subject table.
+  ColumnName next_column;
+  ColumnIndex next_column_index;
 };
 struct TransitiveInfo {
   // The FK column with OWNER/ACCESSOR annotation that transitively leads to the
