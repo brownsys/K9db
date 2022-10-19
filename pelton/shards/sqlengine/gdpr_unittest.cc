@@ -597,6 +597,103 @@ TEST_F(GDPRTest, ComplexVariableOwnership) {
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "5")), (V{}));
 }
 
+TEST_F(GDPRTest, ComplexVariableOwnershipAdminDelete) {
+  // Parse create table statements.
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string admin = MakeCreate("admin", {"aid" I PK, "PII_name" STR});
+  std::string grps =
+      MakeCreate("grps", {"gid" I PK, "OWNER_admin" I FK "admin(aid)"});
+  std::string assoc =
+      MakeCreate("association", {"sid" I PK, "OWNING_group" I FK "grps(gid)",
+                                 "OWNER_user" I FK "user(id)"});
+  std::string files =
+      MakeCreate("files", {"fid" I PK, "OWNER_creator" I FK "user(id)"});
+  std::string fassoc =
+      MakeCreate("fassoc", {"fsid" I PK, "OWNING_file" I FK "files(fid)",
+                            "OWNER_group" I FK "grps(gid)"});
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+  sql::AbstractConnection *db = conn.state->Database();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(admin, &conn));
+  EXPECT_SUCCESS(Execute(grps, &conn));
+  EXPECT_SUCCESS(Execute(assoc, &conn));
+  EXPECT_SUCCESS(Execute(files, &conn));
+  EXPECT_SUCCESS(Execute(fassoc, &conn));
+
+  // Perform some inserts.
+  auto &&[usr1, u_] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr2, u__] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[adm1, d_] = MakeInsert("admin", {"0", "'a1'"});
+  auto &&[grps1, grow1] = MakeInsert("grps", {"0", "0"});
+  auto &&[grps2, grow2] = MakeInsert("grps", {"1", "0"});
+
+  EXPECT_UPDATE(Execute(usr1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr2, &conn), 1);
+  EXPECT_UPDATE(Execute(adm1, &conn), 1);
+  EXPECT_UPDATE(Execute(grps1, &conn), 1);
+  EXPECT_UPDATE(Execute(grps2, &conn), 1);
+
+  // Validate insertions.
+  EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{grow1, grow2}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+
+  // Insert files and fassocs but not associated to any users.
+  auto &&[f1, frow1] = MakeInsert("files", {"0", "0"});
+  auto &&[f2, frow2] = MakeInsert("files", {"1", "0"});
+  auto &&[fa1, farow1] = MakeInsert("fassoc", {"0", "0", "1"});
+  auto &&[fa2, farow2] = MakeInsert("fassoc", {"1", "1", "1"});
+
+  EXPECT_UPDATE(Execute(f1, &conn), 1);
+  EXPECT_UPDATE(Execute(f2, &conn), 1);
+  EXPECT_UPDATE(Execute(fa1, &conn), 2);
+  EXPECT_UPDATE(Execute(fa2, &conn), 2);
+
+  EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{frow1, frow2}));
+  EXPECT_EQ(db->GetShard("files", SN("user", "0")), (V{frow1, frow2}));
+  EXPECT_EQ(db->GetShard("files", SN("user", "5")), (V{}));
+  EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+
+  // Associate everything with a user.
+  auto &&[assoc1, a_] = MakeInsert("association", {"0", "1", "5"});
+
+  EXPECT_UPDATE(Execute(assoc1, &conn), 6);
+
+  // Validate move after insertion
+  EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{grow1, grow2}));
+  EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{frow1, frow2}));
+  EXPECT_EQ(db->GetShard("fassoc", SN("admin", "0")), (V{farow1, farow2}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{grow2}));
+  EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  EXPECT_EQ(db->GetShard("files", SN("user", "0")), (V{frow1, frow2}));
+  EXPECT_EQ(db->GetShard("files", SN("user", "5")), (V{frow1, frow2}));
+  EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  EXPECT_EQ(db->GetShard("fassoc", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("fassoc", SN("user", "5")), (V{farow1, farow2}));
+
+  std::string forget = MakeGDPRForget("admin", "0");
+  EXPECT_UPDATE(Execute(forget, &conn), 7);
+
+  // Validate second forget
+  EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("fassoc", SN("admin", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{grow2}));
+  EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  EXPECT_EQ(db->GetShard("files", SN("user", "0")), (V{frow1, frow2}));
+  EXPECT_EQ(db->GetShard("files", SN("user", "5")), (V{frow1, frow2}));
+  EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  EXPECT_EQ(db->GetShard("fassoc", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("fassoc", SN("user", "5")), (V{farow1, farow2}));
+}
+
 }  // namespace sqlengine
 }  // namespace shards
 }  // namespace pelton
