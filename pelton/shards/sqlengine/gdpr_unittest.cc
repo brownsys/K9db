@@ -23,37 +23,6 @@ using SN = util::ShardName;
 // Define a fixture that manages a pelton connection.
 PELTON_FIXTURE(GDPRTest);
 
-// TEST_F(GDPRTest, UnshardedTable) {
-//   // Parse create table statements.
-//   std::string usr = MakeCreate("user", {"id" I PK, "name" STR});
-
-//   // Make a pelton connection.
-//   Connection conn = CreateConnection();
-//   sql::AbstractConnection *db = conn.state->Database();
-
-//   // Create the tables.
-//   EXPECT_SUCCESS(Execute(usr, &conn));
-
-//   // Perform some inserts.
-//   auto &&[stmt1, row1] = MakeInsert("user", {"0", "'u1'"});
-//   auto &&[stmt2, row2] = MakeInsert("user", {"1", "'u2'"});
-//   auto &&[stmt3, row3] = MakeInsert("user", {"2", "'u3'"});
-//   auto &&[stmt4, row4] = MakeInsert("user", {"5", "'u10'"});
-
-//   EXPECT_UPDATE(Execute(stmt1, &conn), 1);
-//   EXPECT_UPDATE(Execute(stmt2, &conn), 1);
-//   EXPECT_UPDATE(Execute(stmt3, &conn), 1);
-//   EXPECT_UPDATE(Execute(stmt4, &conn), 1);
-
-//   std::string stmt5 = MakeGDPRForget("user", "0");
-//   Execute(stmt5, &conn);
-//   // EXPECT_UPDATE(Execute(stmt5, &conn), 1);
-
-//   // Validate insertions.
-//   sql::SqlResultSet r = db->GetShard("user", SN(DEFAULT_SHARD, DEFAULT_SHARD));
-//   EXPECT_EQ(r, (V{row2, row3, row4}));
-// }
-
 TEST_F(GDPRTest, Datasubject) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
@@ -136,6 +105,56 @@ TEST_F(GDPRTest, DirectTable) {
   EXPECT_EQ(db->GetShard("addr", SN("user", "5")), (V{row3}));
   EXPECT_EQ(db->GetShard("addr", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("addr", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+}
+
+TEST_F(GDPRTest, UnshardedTable) {
+  // Parse create table statements.
+  std::string unsharded = MakeCreate("unsharded", {"id" I PK, "name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+  sql::AbstractConnection *db = conn.state->Database();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(addr, &conn));
+  EXPECT_SUCCESS(Execute(unsharded, &conn));
+
+  // Perform some inserts.
+  auto &&[usr1, _] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr2, __] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[addr1, row1] = MakeInsert("addr", {"0", "0"});
+  auto &&[addr2, row2] = MakeInsert("addr", {"1", "0"});
+  auto &&[addr3, row3] = MakeInsert("addr", {"2", "5"});
+  auto &&[stmt1, row4] = MakeInsert("unsharded", {"0", "'u1'"});
+  auto &&[stmt2, row5] = MakeInsert("unsharded", {"1", "'u2'"});
+
+  EXPECT_UPDATE(Execute(usr1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr2, &conn), 1);
+  EXPECT_UPDATE(Execute(addr1, &conn), 1);
+  EXPECT_UPDATE(Execute(addr2, &conn), 1);
+  EXPECT_UPDATE(Execute(addr3, &conn), 1);
+  EXPECT_UPDATE(Execute(stmt1, &conn), 1);
+  EXPECT_UPDATE(Execute(stmt2, &conn), 1);
+
+  // Validate insertions.
+  EXPECT_EQ(db->GetShard("addr", SN("user", "0")), (V{row1, row2}));
+  EXPECT_EQ(db->GetShard("addr", SN("user", "5")), (V{row3}));
+  EXPECT_EQ(db->GetShard("addr", SN("user", "10")), (V{}));
+  EXPECT_EQ(db->GetShard("addr", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  EXPECT_EQ(db->GetShard("unsharded", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{row4, row5}));
+
+  std::string forget = MakeGDPRForget("user", "0");
+  EXPECT_UPDATE(Execute(forget, &conn), 3);
+
+  // Validate forget.
+  EXPECT_EQ(db->GetShard("addr", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("addr", SN("user", "5")), (V{row3}));
+  EXPECT_EQ(db->GetShard("addr", SN("user", "10")), (V{}));
+  EXPECT_EQ(db->GetShard("addr", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  EXPECT_EQ(db->GetShard("unsharded", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{row4, row5}));
 }
 
 TEST_F(GDPRTest, TransitiveTable) {
