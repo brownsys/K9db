@@ -61,6 +61,10 @@ class RocksdbConnection : public AbstractConnection {
       const std::vector<dataflow::Value> &values,
       const std::unordered_set<util::ShardName> &targets) override;
 
+  std::vector<size_t> CountShards(
+      const std::string &table_name,
+      const std::vector<dataflow::Value> &pk_values) const override;
+
  private:
   std::unique_ptr<rocksdb::DB> db_;
   std::unordered_map<std::string, RocksdbTable> tables_;

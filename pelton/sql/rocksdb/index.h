@@ -49,7 +49,11 @@ class RocksdbPKIndex {
 
   // Reading.
   IndexSet Get(const std::vector<rocksdb::Slice> &pk_values) const;
-  DedupIndexSet GetDedup(const std::vector<rocksdb::Slice> &values) const;
+  DedupIndexSet GetDedup(const std::vector<rocksdb::Slice> &pk_values) const;
+
+  // Count how many shard each pk value is in.
+  std::vector<size_t> CountShards(
+      const std::vector<rocksdb::Slice> &pk_values) const;
 
  private:
   rocksdb::DB *db_;

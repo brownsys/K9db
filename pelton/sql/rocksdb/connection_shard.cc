@@ -144,6 +144,18 @@ ResultSetAndStatus RocksdbConnection::AssignToShards(
   return std::pair(sql::SqlResultSet(schema, std::move(records)), count);
 }
 
+// Count the number of shards each record with a given PK value is in.
+std::vector<size_t> RocksdbConnection::CountShards(
+    const std::string &table_name,
+    const std::vector<dataflow::Value> &pk_values) const {
+  // Look up table info.
+  const RocksdbTable &table = this->tables_.at(table_name);
+
+  // Lookup counts.
+  std::vector<std::string> encoded_values = EncodeValues(pk_values);
+  return table.GetPKIndex().CountShards(Transform(encoded_values));
+}
+
 /*
 std::pair<ORecord, int> RocksdbConnection::AssignToShards(
     const std::string &table_name, const util::ShardName &source,

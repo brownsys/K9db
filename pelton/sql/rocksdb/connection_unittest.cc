@@ -1,5 +1,7 @@
 #include "pelton/sql/rocksdb/connection.h"
 
+#include <algorithm>
+// NOLINTNEXTLINE
 #include <filesystem>
 #include <iostream>
 #include <iterator>
@@ -525,6 +527,26 @@ TEST_F(RocksdbConnectionTest, GetAllDeleteAll) {
   // Table is now empty!
   EXPECT_EQ(CONN->ExecuteSelect(select), EMPTY);
   EXPECT_EQ(CONN->GetAll("test_table"), EMPTY);
+}
+
+TEST_F(RocksdbConnectionTest, CountShards) {
+  // 3 -> 2, 0, 1, 2, -> 1
+  std::vector<dataflow::Value> pk_values;
+  pk_values.emplace_back(0_s);
+  pk_values.emplace_back(1_s);
+  pk_values.emplace_back(2_s);
+  pk_values.emplace_back(3_s);
+  pk_values.emplace_back(4_s);
+
+  EXPECT_EQ(CONN->CountShards("test_table", pk_values),
+            (std::vector<size_t>{1, 1, 1, 2, 0}));
+
+  std::swap(pk_values.at(0), pk_values.at(4));
+  std::swap(pk_values.at(2), pk_values.at(3));
+  pk_values.pop_back();
+
+  EXPECT_EQ(CONN->CountShards("test_table", pk_values),
+            (std::vector<size_t>{0, 1, 2, 1}));
 }
 
 }  // namespace sql

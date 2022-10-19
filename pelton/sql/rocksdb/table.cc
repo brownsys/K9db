@@ -10,19 +10,6 @@
 namespace pelton {
 namespace sql {
 
-namespace {
-
-std::vector<rocksdb::Slice> Transform(const std::vector<std::string> &v) {
-  std::vector<rocksdb::Slice> res;
-  res.reserve(v.size());
-  for (const std::string &s : v) {
-    res.emplace_back(s);
-  }
-  return res;
-}
-
-}  // namespace
-
 // Constructor.
 RocksdbTable::RocksdbTable(rocksdb::DB *db, const std::string &table_name,
                            const dataflow::SchemaRef &schema)

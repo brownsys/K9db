@@ -59,6 +59,10 @@ class AbstractConnection {
       const std::string &table_name, size_t column_index,
       const std::vector<dataflow::Value> &values,
       const std::unordered_set<util::ShardName> &targets) = 0;
+
+  virtual std::vector<size_t> CountShards(
+      const std::string &table_name,
+      const std::vector<dataflow::Value> &pk_values) const = 0;
 };
 
 }  // namespace sql

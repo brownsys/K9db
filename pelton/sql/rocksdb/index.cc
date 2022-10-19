@@ -1,6 +1,7 @@
 #include "pelton/sql/rocksdb/index.h"
 
 #include <algorithm>
+#include <utility>
 
 #include "pelton/util/status.h"
 
@@ -153,6 +154,42 @@ IndexSet RocksdbPKIndex::Get(const std::vector<rocksdb::Slice> &v) const {
 DedupIndexSet RocksdbPKIndex::GetDedup(
     const std::vector<rocksdb::Slice> &v) const {
   return GetHelper<DedupIndexSet, IRecord>(this->db_, this->handle_.get(), v);
+}
+
+// Count how many shard each pk value is in.
+std::vector<size_t> RocksdbPKIndex::CountShards(
+    const std::vector<rocksdb::Slice> &pk_values) const {
+  // Iterator options.
+  rocksdb::ReadOptions options;
+  options.fill_cache = false;
+  options.total_order_seek = false;
+  options.prefix_same_as_start = true;
+  options.verify_checksums = false;
+
+  // Open iterator.
+  rocksdb::Iterator *ptr = this->db_->NewIterator(options, this->handle_.get());
+  std::unique_ptr<rocksdb::Iterator> it(ptr);
+
+  // Make and sort all prefixes.
+  std::vector<std::pair<std::string, size_t>> prefixes;
+  prefixes.reserve(pk_values.size());
+  for (size_t idx = 0; idx < pk_values.size(); idx++) {
+    const rocksdb::Slice &slice = pk_values.at(idx);
+    prefixes.emplace_back(slice.ToString() + __ROCKSSEP, idx);
+  }
+  std::sort(prefixes.begin(), prefixes.end());
+
+  // Holds the result.
+  std::vector<size_t> result(pk_values.size(), 0);
+
+  // Go through prefixes in order.
+  for (const auto &[prefix, idx] : prefixes) {
+    rocksdb::Slice pslice(prefix);
+    for (it->Seek(pslice); it->Valid(); it->Next()) {
+      result[idx]++;
+    }
+  }
+  return result;
 }
 
 }  // namespace sql
