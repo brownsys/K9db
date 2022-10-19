@@ -240,13 +240,11 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
   for (const auto &table_name : current_shard.owned_tables) {
     // bool update_flows = dataflow_state.HasFlowsFor(table_name);
     // dataflow::SchemaRef schema = dataflow_state.GetTableSchema(table_name);
-    sql::SqlResult table_result(static_cast<int>(0));
     // if (update_flows) {
     //   table_result = sql::SqlResult(schema);
     // }
 
     shards::Table &table = state.GetTable(table_name);
-    // TODO: also make sure body executed on unique owner shard_kinds
     for (const auto &owner : table.owners) {
       if (owner->shard_kind != shard_kind) {
         continue;
@@ -255,21 +253,13 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
       sql::SqlResultSet del_set = 
         connection->state->Database()->DeleteShard(table_name, util::ShardName(shard_kind, user_id));
 
-      // Why does this version work while storing the result in a variable doesn't?
-      // table_result.AddResultSet(std::move(connection->state->Database()->DeleteShard(
-      //   table_name, util::ShardName(shard_kind, user_id))));
-
-      // TODO: print out del_set contents
       for (const auto &row : del_set.rows()) {
         std::cout << row << std::endl;
       }
-      sql::SqlResult del(static_cast<int>(del_set.size()));
-      del.AddResultSet(std::move(del_set));
 
-      table_result.Append(std::move(del), true);
+      result.Append(sql::SqlResult(static_cast<int>(del_set.size())), true);
     }
 
-    result.Append(std::move(table_result), true);
     // // Delete was successful, time to update dataflows.
     // if (update_flows) {
     //   /* TODO: if single owner, delete from dataflows, else if shared: 
