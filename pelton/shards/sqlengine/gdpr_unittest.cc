@@ -330,6 +330,78 @@ TEST_F(GDPRTest, TwoOwners) {
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
 }
 
+TEST_F(GDPRTest, TwoOwnersDataflowUpdate) {
+  // Parse create table statements.
+  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string msg =
+      MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
+                         "OWNER_receiver" I FK "user(id)"});
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+  sql::AbstractConnection *db = conn.state->Database();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(msg, &conn));
+
+  // Perform some inserts.
+  auto &&[usr1, u_] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr2, u__] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[usr3, u___] = MakeInsert("user", {"10", "'u100'"});
+  auto &&[msg1, row1] = MakeInsert("msg", {"1", "0", "10"});
+  auto &&[msg2, row2] = MakeInsert("msg", {"2", "0", "0"});
+  auto &&[msg3, row3] = MakeInsert("msg", {"3", "5", "10"});
+  auto &&[msg4, row4] = MakeInsert("msg", {"4", "5", "0"});
+
+  EXPECT_UPDATE(Execute(usr1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr2, &conn), 1);
+  EXPECT_UPDATE(Execute(usr3, &conn), 1);
+  EXPECT_UPDATE(Execute(msg1, &conn), 2);
+  EXPECT_UPDATE(Execute(msg2, &conn), 1);  // Inserted only once for u1.
+  EXPECT_UPDATE(Execute(msg3, &conn), 2);
+  EXPECT_UPDATE(Execute(msg4, &conn), 2);
+
+  // Validate insertions.
+  EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{row1, row2, row4}));
+  EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4}));
+  EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{row1, row3}));
+  EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+
+  // Create dataflow.
+  EXPECT_SUCCESS(Execute("CREATE VIEW v1 AS '\"SELECT * FROM msg\"';", &conn));
+
+  // Validate initial dataflow state.
+  EXPECT_EQ(Execute("SELECT * FROM v1;", &conn).ResultSets().at(0), 
+            (V{row1, row2, row3, row4}));
+
+  std::string forget1 = MakeGDPRForget("user", "0");
+  EXPECT_UPDATE(Execute(forget1, &conn), 4);
+
+  // Validate forget for user with id 0.
+  EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4}));
+  EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{row1, row3}));
+  EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+
+  // Validate dataflow state after forget for user with id 0.
+  EXPECT_EQ(Execute("SELECT * FROM v1;", &conn).ResultSets().at(0), 
+            (V{row1, row3, row4}));
+
+  std::string forget2 = MakeGDPRForget("user", "10");
+  EXPECT_UPDATE(Execute(forget2, &conn), 3);
+
+  // Validate forget for user with id 10.
+  EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4}));
+  EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{}));
+  EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+
+  // Validate dataflow state after forget for user with id 10.
+  EXPECT_EQ(Execute("SELECT * FROM v1;", &conn).ResultSets().at(0), 
+            (V{row3, row4}));
+}
+
 TEST_F(GDPRTest, OwnerAccessor) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});

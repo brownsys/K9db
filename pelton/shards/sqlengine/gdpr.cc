@@ -279,21 +279,8 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
         }
       }
     }
-
+    // Update dataflow with deletions from table.
     dataflow_state.ProcessRecords(table_name, std::move(dataflow_updates));
-
-    // if (update_flows) {
-    //   /* TODO: if single owner, delete from dataflows, else if shared: 
-    //     make sure last copy of data before deleting in a loop over all 
-    //     potential users, use primary key and id of potential other owner 
-    //     and check to see if data exists elsewhere*/
-    //   std::vector<dataflow::Record> records =
-    //       table_result.ResultSets().at(0).Vec();
-    //   result.Append(sql::SqlResult(records.size()), true);
-    //   dataflow_state->ProcessRecords(table_name, std::move(records));
-    // } else {
-    //   result.Append(std::move(table_result), true);
-    // }
   }
 
   // // Anonymize when accessor deletes their data
