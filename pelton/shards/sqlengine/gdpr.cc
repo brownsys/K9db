@@ -243,8 +243,9 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
     // if (update_flows) {
     //   table_result = sql::SqlResult(schema);
     // }
-
     shards::Table &table = state.GetTable(table_name);
+    std::vector<dataflow::Record> dataflow_updates;
+
     for (const auto &owner : table.owners) {
       if (owner->shard_kind != shard_kind) {
         continue;
@@ -262,8 +263,24 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
       // Delete was successful, time to update dataflows.
       if (update_flows) {
         std::vector<dataflow::Record> vec = del_set.Vec();
+        std::vector<dataflow::Value> pks;
+        for (const auto &r : vec) {
+          size_t pk_col_index = r.schema().keys().at(0);
+          pks.push_back(r.GetValue(pk_col_index));
+        }
+
+        // Count how many owners each record has.
+        std::vector<size_t> counts = connection->state->Database()->CountShards(table_name, pks);
+        assert(vec.size() == counts.size());
+        for (size_t i=0; i < vec.size(); i++) {
+          if (!counts.at(i)) {
+            dataflow_updates.push_back(std::move(vec.at(i)));
+          }
+        }
       }
     }
+
+    dataflow_state.ProcessRecords(table_name, std::move(dataflow_updates));
 
     // if (update_flows) {
     //   /* TODO: if single owner, delete from dataflows, else if shared: 
