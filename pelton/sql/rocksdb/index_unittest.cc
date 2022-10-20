@@ -302,5 +302,27 @@ TEST(RocksdbPKIndex, GetDedup) {
       {{{shard1, shard2}, pk1}, {{shard1}, pk2}, {{shard10, shard2}, pk3}});
 }
 
+TEST(RocksdbPKIndex, CountShards) {
+  std::unique_ptr<rocksdb::DB> db = InitializeDatabase();
+
+  RocksdbPKIndex index(db.get(), "");
+  index.Add(pk1, shard1);
+  index.Add(pk1, shard2);
+  index.Add(pk2, shard1);
+  index.Add(pk3, shard10);
+  index.Add(pk3, shard2);
+
+  EXPECT_EQ(index.CountShards({pk1}), (std::vector<size_t>{2}));
+  EXPECT_EQ(index.CountShards({pk2}), (std::vector<size_t>{1}));
+  EXPECT_EQ(index.CountShards({pk3}), (std::vector<size_t>{2}));
+  EXPECT_EQ(index.CountShards({pk1, pk2}), (std::vector<size_t>{2, 1}));
+  EXPECT_EQ(index.CountShards({pk3, pk2}), (std::vector<size_t>{2, 1}));
+  EXPECT_EQ(index.CountShards({pk3, pk1}), (std::vector<size_t>{2, 2}));
+  EXPECT_EQ(index.CountShards({pk1, pk2, pk3, pk6}),
+            (std::vector<size_t>{2, 1, 2, 0}));
+  EXPECT_EQ(index.CountShards({pk3, pk1, pk6, pk2}),
+            (std::vector<size_t>{2, 2, 0, 1}));
+}
+
 }  // namespace sql
 }  // namespace pelton

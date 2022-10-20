@@ -36,6 +36,8 @@ std::vector<std::string> EncodeValues(const std::vector<dataflow::Value> &vals);
 void EncodeValues(sqlast::ColumnDefinition::Type type,
                   std::vector<std::string> *values);
 
+std::vector<rocksdb::Slice> Transform(const std::vector<std::string> &v);
+
 class RocksdbSequence {
  public:
   // Constructing a record while reading from db.
@@ -88,8 +90,11 @@ class RocksdbSequence {
     rocksdb::Slice operator*() const;
 
     // Iterator traits
+    using difference_type = int64_t;
     using value_type = rocksdb::Slice;
-    using iterator_category = std::output_iterator_tag;
+    using reference = rocksdb::Slice &;
+    using pointer = rocksdb::Slice *;
+    using iterator_category = std::input_iterator_tag;
 
    private:
     Iterator(const char *ptr, size_t sz);

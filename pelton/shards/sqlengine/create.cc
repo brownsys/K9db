@@ -119,7 +119,8 @@ std::vector<std::unique_ptr<ShardDescriptor>> CreateContext::MakeFDescriptors(
     descriptor.shard_kind = shard_kind;
     if (shard_kind == next_table) {  // Direct sharding.
       descriptor.type = InfoType::DIRECT;
-      descriptor.info = DirectInfo{fk_colname, fk_column_index, fk_column_type};
+      descriptor.info = DirectInfo{fk_colname, fk_column_index, fk_column_type,
+                                   next_col, next_col_index};
     } else {  // Transitive sharding.
       descriptor.type = InfoType::TRANSITIVE;
       IndexDescriptor *index = nullptr;
@@ -230,7 +231,8 @@ absl::StatusOr<sql::SqlResult> CreateContext::Exec() {
     ShardDescriptor desc;
     desc.shard_kind = this->table_name_;
     desc.type = InfoType::DIRECT;
-    desc.info = DirectInfo{pk_col, pk_index, this->schema_.TypeOf(pk_index)};
+    desc.info = DirectInfo{pk_col, pk_index, this->schema_.TypeOf(pk_index),
+                           pk_col, pk_index};
     this->table_.owners.push_back(std::make_unique<ShardDescriptor>(desc));
   }
   /* End of data subject. */

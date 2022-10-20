@@ -1,5 +1,7 @@
 #include "pelton/sql/rocksdb/connection.h"
 
+#include <algorithm>
+// NOLINTNEXTLINE
 #include <filesystem>
 #include <iostream>
 #include <iterator>
@@ -188,7 +190,7 @@ SqlResultSet SelectBy(
 
   return CONN->ExecuteSelect(select);
 }
-SqlResultSet DeleteBy(
+SqlDeleteSet DeleteBy(
     const std::unordered_map<std::string, std::vector<std::string>> &map) {
   sqlast::Delete del("test_table");
   del.SetWhereClause(MakeWhere(map));
@@ -201,7 +203,7 @@ SqlResultSet SelectAll() { return SelectBy({}); }
 SqlResultSet SelectBy(const std::string &col, const std::string &value) {
   return SelectBy({{col, {value}}});
 }
-SqlResultSet DeleteBy(const std::string &col, const std::string &value) {
+SqlDeleteSet DeleteBy(const std::string &col, const std::string &value) {
   return DeleteBy({{col, {value}}});
 }
 
@@ -214,6 +216,37 @@ SqlResultSet DeleteBy(const std::string &col, const std::string &value) {
 bool operator==(const SqlResultSet &set,
                 const std::vector<dataflow::Record> &v2) {
   const std::vector<dataflow::Record> &v1 = set.rows();
+  if (v1.size() != v2.size()) {
+    return false;
+  }
+
+  for (size_t i = 0; i < v1.size(); i++) {
+    if (std::count(v1.begin(), v1.end(), v1.at(i)) !=
+        std::count(v2.begin(), v2.end(), v1.at(i))) {
+      return false;
+    }
+    if (std::count(v1.begin(), v1.end(), v2.at(i)) !=
+        std::count(v2.begin(), v2.end(), v2.at(i))) {
+      return false;
+    }
+  }
+  return true;
+}
+bool operator==(const SqlDeleteSet &set,
+                const std::vector<dataflow::Record> &v2) {
+  util::Iterable<SqlDeleteSet::RecordsIt> iterable = set.IterateRecords();
+  struct CopyRecord {
+    CopyRecord() = default;
+    dataflow::Record Map(const SqlDeleteSet::RecordsIt *it) const {
+      return (*it)->Copy();
+    }
+  };
+  using CopyIt = util::MapIt<SqlDeleteSet::RecordsIt, CopyRecord>;
+  CopyIt b(iterable.begin());
+  CopyIt e(iterable.end());
+
+  std::vector<dataflow::Record> v1;
+  v1.insert(v1.end(), b, e);
   if (v1.size() != v2.size()) {
     return false;
   }
@@ -494,6 +527,26 @@ TEST_F(RocksdbConnectionTest, GetAllDeleteAll) {
   // Table is now empty!
   EXPECT_EQ(CONN->ExecuteSelect(select), EMPTY);
   EXPECT_EQ(CONN->GetAll("test_table"), EMPTY);
+}
+
+TEST_F(RocksdbConnectionTest, CountShards) {
+  // 3 -> 2, 0, 1, 2, -> 1
+  std::vector<dataflow::Value> pk_values;
+  pk_values.emplace_back(0_s);
+  pk_values.emplace_back(1_s);
+  pk_values.emplace_back(2_s);
+  pk_values.emplace_back(3_s);
+  pk_values.emplace_back(4_s);
+
+  EXPECT_EQ(CONN->CountShards("test_table", pk_values),
+            (std::vector<size_t>{1, 1, 1, 2, 0}));
+
+  std::swap(pk_values.at(0), pk_values.at(4));
+  std::swap(pk_values.at(2), pk_values.at(3));
+  pk_values.pop_back();
+
+  EXPECT_EQ(CONN->CountShards("test_table", pk_values),
+            (std::vector<size_t>{0, 1, 2, 1}));
 }
 
 }  // namespace sql

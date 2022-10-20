@@ -231,14 +231,14 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
   const std::string &user_id = stmt.user_id();
 
   shards::SharderState &state = connection->state->SharderState();
-  // dataflow::DataFlowState &dataflow_state = connection->state->DataflowState();
+  dataflow::DataFlowState &dataflow_state = connection->state->DataflowState();
   // UniqueLock lock = state->WriterLock();
 
   shards::Shard current_shard = state.GetShard(shard_kind);
   sql::SqlResult result(static_cast<int>(0));
 
   for (const auto &table_name : current_shard.owned_tables) {
-    // bool update_flows = dataflow_state.HasFlowsFor(table_name);
+    bool update_flows = dataflow_state.HasFlowsFor(table_name);
     // dataflow::SchemaRef schema = dataflow_state.GetTableSchema(table_name);
     // if (update_flows) {
     //   table_result = sql::SqlResult(schema);
@@ -258,9 +258,13 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
       }
 
       result.Append(sql::SqlResult(static_cast<int>(del_set.size())), true);
+
+      // Delete was successful, time to update dataflows.
+      if (update_flows) {
+        std::vector<dataflow::Record> vec = del_set.Vec();
+      }
     }
 
-    // // Delete was successful, time to update dataflows.
     // if (update_flows) {
     //   /* TODO: if single owner, delete from dataflows, else if shared: 
     //     make sure last copy of data before deleting in a loop over all 

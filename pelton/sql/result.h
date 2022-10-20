@@ -1,16 +1,58 @@
 #ifndef PELTON_SQL_RESULT_H_
 #define PELTON_SQL_RESULT_H_
 
+#include <iterator>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "glog/logging.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
+#include "pelton/util/iterator.h"
+#include "pelton/util/shard_name.h"
 
 namespace pelton {
 namespace sql {
+
+// A SqlDeleteSet represents the results of a delete operations.
+// It contains the records that were deleted, in addition to the shard each
+// was deleted from.
+class SqlDeleteSet {
+ public:
+  SqlDeleteSet() = default;
+
+  size_t AddRecord(dataflow::Record &&record);
+  void AssignToShard(size_t idx, std::string &&shard);
+
+  const std::vector<dataflow::Record> &Rows() const { return this->records_; }
+  std::vector<dataflow::Record> &&Vec() { return std::move(this->records_); }
+
+ private:
+  std::vector<dataflow::Record> records_;
+  std::unordered_map<util::ShardName, std::vector<size_t>> shards_;
+
+  using MapIt = decltype(shards_)::const_iterator;
+  using VecIt = std::vector<size_t>::const_iterator;
+
+ public:
+  // Iterator interface.
+  using RecordsIt = decltype(records_)::const_iterator;
+  using ShardsIt = util::MapIt<MapIt, const SqlDeleteSet &>;
+  using ShardRecordsIt = util::MapIt<VecIt, const SqlDeleteSet &>;
+  friend ShardsIt;
+  friend ShardRecordsIt;
+
+ private:
+  const util::ShardName &Map(const MapIt *it) const;
+  const dataflow::Record &Map(const VecIt *it) const;
+
+ public:
+  util::Iterable<RecordsIt> IterateRecords() const;
+  util::Iterable<ShardsIt> IterateShards() const;
+  util::Iterable<ShardRecordsIt> Iterate(const util::ShardName &shard) const;
+};
 
 // An SqlResultSet represents the content of a single table.
 // An SqlResult may include multiple results when it reads from multiple tables!

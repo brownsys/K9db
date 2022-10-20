@@ -50,8 +50,12 @@ namespace sqlengine {
  */
 std::string MakeCreate(const std::string &tbl_name,
                        const std::vector<std::string> &cols);
+
 std::pair<std::string, std::string> MakeInsert(
     const std::string &tbl_name, const std::vector<std::string> &vals);
+
+std::string MakeDelete(const std::string &tbl_name,
+                       const std::vector<std::string> &conds);
 
 /*
  * Easy creation of sqlast::Statements.

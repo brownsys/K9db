@@ -77,10 +77,24 @@ std::pair<std::string, std::string> MakeInsert(
   return std::pair(sql, row);
 }
 
+// sqlast::Forget.
 std::string MakeGDPRForget(const std::string &tbl_name,
                            const std::string &user_id) {
   std::string sql = "GDPR FORGET " + tbl_name + " " + user_id + ";";
   return sql;
+}
+
+// sqlast::Delete.
+std::string MakeDelete(const std::string &tbl_name,
+                       const std::vector<std::string> &conds) {
+  std::string sql = "DELETE FROM " + tbl_name;
+  if (conds.size() > 0) {
+    sql += " WHERE " + conds.front();
+    for (size_t i = 1; i < conds.size(); i++) {
+      sql += " AND " + conds.at(i);
+    }
+  }
+  return sql + ";";
 }
 
 /*

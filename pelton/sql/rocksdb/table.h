@@ -24,8 +24,11 @@ class RocksdbStream {
   class Iterator {
    public:
     // Iterator traits
+    using difference_type = int64_t;
     using value_type = std::pair<EncryptedKey, EncryptedValue>;
-    using iterator_category = std::output_iterator_tag;
+    using reference = std::pair<EncryptedKey, EncryptedValue> &;
+    using pointer = std::pair<EncryptedKey, EncryptedValue> *;
+    using iterator_category = std::input_iterator_tag;
 
     Iterator &operator++();
 

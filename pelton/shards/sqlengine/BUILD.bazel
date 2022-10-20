@@ -11,11 +11,11 @@ cc_library(
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":create",
-        #":delete",
         ":gdpr",
+        ":delete",
         ":index",
         ":insert",
-        #":select",
+        ":select",
         #":update",
         ":view",
         "//pelton/dataflow:dstate",
@@ -166,20 +166,8 @@ cc_library(
         "gdpr.h",
     ],
     deps = [
-        # ":delete",
         ":index",
-        # ":select",
-        # ":update",
         "//pelton:connection",
-        # "//pelton/dataflow:dstate",
-        # "//pelton/shards:state",
-        # "//pelton/shards:types",
-        # # "//pelton/shards:upgradable_lock",
-        # "//pelton/shards/sqlengine:util",
-        # "//pelton/sqlast:ast",
-        # "//pelton/util:status",
-        # "@com_google_absl//absl/status",
-        # "@com_google_absl//absl/strings",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
@@ -190,6 +178,56 @@ cc_library(
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:shard_name",
+        "//pelton/util:status",
+        "//pelton/util:upgradable_lock",
+        "@com_google_absl//absl/status",
+    ],
+)
+
+cc_library(
+    name = "delete",
+    srcs = [
+        "delete.cc",
+    ],
+    hdrs = [
+        "delete.h",
+    ],
+    deps = [
+        ":index",
+        "//pelton:connection",
+        "//pelton/dataflow:dstate",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:value",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/sql:abstract_connection",
+        "//pelton/sql:result",
+        "//pelton/sqlast:ast",
+        "//pelton/util:shard_name",
+        "//pelton/util:status",
+        "//pelton/util:upgradable_lock",
+        "@com_google_absl//absl/status",
+    ],
+)
+
+cc_library(
+    name = "select",
+    srcs = [
+        "select.cc",
+    ],
+    hdrs = [
+        "select.h",
+    ],
+    deps = [
+        "//pelton:connection",
+        "//pelton/dataflow:dstate",
+        "//pelton/dataflow:schema",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/sql:abstract_connection",
+        "//pelton/sql:result",
+        "//pelton/sqlast:ast",
         "//pelton/util:status",
         "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/status",
@@ -223,6 +261,7 @@ cc_test(
         "create_unittest.cc",
     ],
     deps = [
+        ":create",
         ":tests_helpers",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -236,6 +275,20 @@ cc_test(
         "insert_unittest.cc",
     ],
     deps = [
+        ":insert",
+        ":tests_helpers",
+        "//pelton/util:shard_name",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "delete-test",
+    srcs = [
+        "delete_unittest.cc",
+    ],
+    deps = [
+        ":delete",
         ":tests_helpers",
         "//pelton/util:shard_name",
         "@glog",
