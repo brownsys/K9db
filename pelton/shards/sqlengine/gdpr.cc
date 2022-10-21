@@ -239,46 +239,36 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
 
   for (const auto &table_name : current_shard.owned_tables) {
     bool update_flows = dataflow_state.HasFlowsFor(table_name);
-    // dataflow::SchemaRef schema = dataflow_state.GetTableSchema(table_name);
-    // if (update_flows) {
-    //   table_result = sql::SqlResult(schema);
-    // }
-    shards::Table &table = state.GetTable(table_name);
     std::vector<dataflow::Record> dataflow_updates;
 
-    for (const auto &owner : table.owners) {
-      if (owner->shard_kind != shard_kind) {
-        continue;
+    sql::SqlResultSet del_set = 
+      connection->state->Database()->DeleteShard(table_name, util::ShardName(shard_kind, user_id));
+
+    for (const auto &row : del_set.rows()) {
+      std::cout << row << std::endl;
+    }
+
+    result.Append(sql::SqlResult(static_cast<int>(del_set.size())), true);
+
+    // Delete was successful, time to update dataflows.
+    if (update_flows) {
+      std::vector<dataflow::Record> vec = del_set.Vec();
+      std::vector<dataflow::Value> pks;
+      for (const auto &r : vec) {
+        size_t pk_col_index = r.schema().keys().at(0);
+        pks.push_back(r.GetValue(pk_col_index));
       }
 
-      sql::SqlResultSet del_set = 
-        connection->state->Database()->DeleteShard(table_name, util::ShardName(shard_kind, user_id));
-
-      for (const auto &row : del_set.rows()) {
-        std::cout << row << std::endl;
-      }
-
-      result.Append(sql::SqlResult(static_cast<int>(del_set.size())), true);
-
-      // Delete was successful, time to update dataflows.
-      if (update_flows) {
-        std::vector<dataflow::Record> vec = del_set.Vec();
-        std::vector<dataflow::Value> pks;
-        for (const auto &r : vec) {
-          size_t pk_col_index = r.schema().keys().at(0);
-          pks.push_back(r.GetValue(pk_col_index));
-        }
-
-        // Count how many owners each record has.
-        std::vector<size_t> counts = connection->state->Database()->CountShards(table_name, pks);
-        assert(vec.size() == counts.size());
-        for (size_t i=0; i < vec.size(); i++) {
-          if (!counts.at(i)) {
-            dataflow_updates.push_back(std::move(vec.at(i)));
-          }
+      // Count how many owners each record has.
+      std::vector<size_t> counts = connection->state->Database()->CountShards(table_name, pks);
+      assert(vec.size() == counts.size());
+      for (size_t i=0; i < vec.size(); i++) {
+        if (!counts.at(i)) {
+          dataflow_updates.push_back(std::move(vec.at(i)));
         }
       }
     }
+    
     // Update dataflow with deletions from table.
     dataflow_state.ProcessRecords(table_name, std::move(dataflow_updates));
   }
