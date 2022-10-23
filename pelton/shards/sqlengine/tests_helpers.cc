@@ -27,6 +27,19 @@ bool operator==(const sql::SqlResultSet &set,
   return v.size() == 0;
 }
 
+bool operator==(const std::vector<sql::SqlResultSet> &left,
+                const std::vector<std::vector<std::string>> &right) {
+  std::vector<std::vector<std::string>> right_copy = right;
+  for (const sql::SqlResultSet &item : left) {
+    auto it = std::find(right_copy.begin(), right_copy.end(), item);
+    if (it == right_copy.end()) {
+      return false;
+    }
+    right_copy.erase(it);
+  }
+  return right_copy.size() == 0;
+}
+
 }  // namespace sql
 }  // namespace pelton
 

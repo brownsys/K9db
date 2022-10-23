@@ -14,6 +14,7 @@ namespace shards {
 namespace sqlengine {
 
 using V = std::vector<std::string>;
+using VV = std::vector<std::vector<std::string>>;
 using SN = util::ShardName;
 
 /*
@@ -55,7 +56,7 @@ TEST_F(GDPRTest, Datasubject) {
 
   // Validate get.
   std::string get = MakeGDPRGet("user", "0");
-  EXPECT_EQ(Execute(get, &conn).ResultSets().at(0), (V{row1}));
+  EXPECT_EQ(Execute(get, &conn).ResultSets(), (VV{(V{row1})}));
 
   // Validate forget.
   std::string forget = MakeGDPRForget("user", "0");
@@ -103,10 +104,7 @@ TEST_F(GDPRTest, DirectTable) {
 
   // Validate get.
   std::string get = MakeGDPRGet("user", "0");
-  auto get_res = Execute(get, &conn);
-  EXPECT_EQ(get_res.ResultSets().size(), 2);
-  EXPECT_EQ(get_res.ResultSets().at(0), (V{row1, row2}));
-  EXPECT_EQ(get_res.ResultSets().at(1), (V{row0}));
+  EXPECT_EQ(Execute(get, &conn).ResultSets(), (VV{(V{row0}), (V{row1, row2})}));
 
   // Validate forget.
   std::string forget = MakeGDPRForget("user", "0");
@@ -159,10 +157,7 @@ TEST_F(GDPRTest, UnshardedTable) {
 
   // Validate get.
   std::string get = MakeGDPRGet("user", "0");
-  auto get_res = Execute(get, &conn);
-  EXPECT_EQ(get_res.ResultSets().size(), 2);
-  EXPECT_EQ(get_res.ResultSets().at(0), (V{row1, row2}));
-  EXPECT_EQ(get_res.ResultSets().at(1), (V{row0}));
+  EXPECT_EQ(Execute(get, &conn).ResultSets(), (VV{(V{row0}), (V{row1, row2})}));
 
   // Validate forget.
   std::string forget = MakeGDPRForget("user", "0");
@@ -220,10 +215,7 @@ TEST_F(GDPRTest, TransitiveTable) {
   // Validate get.
   std::string get = MakeGDPRGet("user", "0");
   auto get_res = Execute(get, &conn);
-  EXPECT_EQ(get_res.ResultSets().size(), 3);
-  EXPECT_EQ(get_res.ResultSets().at(0), (V{row5, row6, row7}));
-  EXPECT_EQ(get_res.ResultSets().at(1), (V{row1, row2}));
-  EXPECT_EQ(get_res.ResultSets().at(2), (V{row0}));
+  EXPECT_EQ(Execute(get, &conn).ResultSets(), (VV{(V{row1, row2}), (V{row5, row6, row7}), (V{row0})}));
 
   // Validate forget.
   std::string forget = MakeGDPRForget("user", "0");

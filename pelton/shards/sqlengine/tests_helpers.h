@@ -27,6 +27,9 @@ namespace sql {
 bool operator==(const sql::SqlResultSet &set,
                 const std::vector<std::string> &vec);
 
+bool operator==(const std::vector<sql::SqlResultSet> &left,
+                const std::vector<std::vector<std::string>> &right);
+
 }  // namespace sql
 }  // namespace pelton
 
