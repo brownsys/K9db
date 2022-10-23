@@ -389,7 +389,7 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
   // UniqueLock lock = state->WriterLock();
 
   shards::Shard current_shard = state.GetShard(shard_kind);
-  sql::SqlResult result(std::vector<sql::SqlResultSet>{});
+  std::vector<sql::SqlResultSet> result;
 
   for (const auto &table_name : current_shard.owned_tables) {
     sql::SqlResultSet get_set = 
@@ -398,23 +398,22 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
     for (const auto &row : get_set.rows()) {
       std::cout << row << std::endl;
     }
-
-    result.Append(sql::SqlResult(std::move(get_set)), true);
+    
+    result.push_back(std::move(get_set));
   }
 
-  return result;
+  return sql::SqlResult(std::move(result));
 }
 
 }  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::GDPRStatement &stmt,
                                      Connection *connection) {
-  // if (stmt.operation() == sqlast::GDPRStatement::Operation::FORGET) {
-  //   return Forget(stmt, connection);
-  // } else {
-  //   return Get(stmt, connection);
-  // }
-  return Forget(stmt, connection);
+  if (stmt.operation() == sqlast::GDPRStatement::Operation::FORGET) {
+    return Forget(stmt, connection);
+  } else {
+    return Get(stmt, connection);
+  }
 }
 
 }  // namespace gdpr
