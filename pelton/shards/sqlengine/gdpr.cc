@@ -380,48 +380,30 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
   return result;
 }
 
-// absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
-//                                    Connection *connection) {
-//   const std::string &shard_kind = stmt.shard_kind();
-//   const std::string &user_id = stmt.user_id();
-//   const std::string &unquoted_user_id = Dequote(user_id);
-//   auto &exec = connection->executor;
+absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
+                                   Connection *connection) {
+  const std::string &shard_kind = stmt.shard_kind();
+  const std::string &user_id = stmt.user_id();
 
-//   shards::SharderState *state = connection->state->sharder_state();
-//   dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
-//   SharedLock lock = state->ReaderLock();
+  shards::SharderState &state = connection->state->SharderState();
+  // UniqueLock lock = state->WriterLock();
 
-//   sql::SqlResult result(std::vector<sql::SqlResultSet>{});
-//   for (const auto &table_name : state->TablesInShard(shard_kind)) {
-//     dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
+  shards::Shard current_shard = state.GetShard(shard_kind);
+  sql::SqlResult result(std::vector<sql::SqlResultSet>{});
 
-//     sql::SqlResult table_result(schema);
-//     for (const ShardingInformation *info :
-//          state->GetShardingInformationFor(table_name, shard_kind)) {
-//       // Augment returned results with the user_id.
-//       int aug_index = -1;
-//       if (!info->IsTransitive()) {
-//         aug_index = info->shard_by_index;
-//       }
+  for (const auto &table_name : current_shard.owned_tables) {
+    sql::SqlResultSet get_set = 
+      connection->state->Database()->GetShard(table_name, util::ShardName(shard_kind, user_id));
 
-//       LOG(INFO) << "Looking up from table " << info->sharded_table_name;
+    for (const auto &row : get_set.rows()) {
+      std::cout << row << std::endl;
+    }
 
-//       sqlast::Select tbl_stmt{info->sharded_table_name};
-//       tbl_stmt.AddColumn("*");
-//       table_result.Append(
-//           exec.Shard(&tbl_stmt, unquoted_user_id, schema, aug_index), true);
-//     }
-//     CHECK_EQ(table_result.ResultSets().size(), 1);
-//     LOG(INFO) << "Found a total of " << table_result.ResultSets().front().size()
-//               << " rows";
-//     result.AddResultSet(std::move(table_result.ResultSets().front()));
-//   }
+    result.Append(sql::SqlResult(std::move(get_set)), true);
+  }
 
-//   if (state->HasAccessorIndices(shard_kind)) {
-//     CHECK_STATUS(GetAccessableData(shard_kind, user_id, connection, &result));
-//   }
-//   return result;
-// }
+  return result;
+}
 
 }  // namespace
 

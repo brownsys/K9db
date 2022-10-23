@@ -60,6 +60,12 @@ std::string MakeDelete(const std::string &tbl_name,
 /*
  * Easy creation of sqlast::Statements.
  */
+std::string MakeGDPRGet(const std::string &tbl_name,
+                           const std::string &user_id);
+
+/*
+ * Easy creation of sqlast::Statements.
+ */
 std::string MakeGDPRForget(const std::string &tbl_name,
                            const std::string &user_id);
 

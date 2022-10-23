@@ -77,6 +77,13 @@ std::pair<std::string, std::string> MakeInsert(
   return std::pair(sql, row);
 }
 
+// sqlast::Get.
+std::string MakeGDPRGet(const std::string &tbl_name,
+                           const std::string &user_id) {
+  std::string sql = "GDPR GET " + tbl_name + " " + user_id + ";";
+  return sql;
+}
+
 // sqlast::Forget.
 std::string MakeGDPRForget(const std::string &tbl_name,
                            const std::string &user_id) {
