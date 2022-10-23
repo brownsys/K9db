@@ -58,6 +58,18 @@ cc_library(
     deps = [],
 )
 
+cc_test(
+    name = "iterator-test",
+    srcs = [
+        "iterator_unittest.cc",
+    ],
+    deps = [
+        ":iterator",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
 cc_library(
     name = "type_utils",
     hdrs = [
