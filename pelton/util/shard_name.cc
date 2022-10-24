@@ -15,8 +15,16 @@ namespace util {
   std::visit([&](const auto &s) { return expr; }, this->shard_name_)
 
 // Owned shard name.
-ShardName::ShardName(const std::string &shard_kind, const std::string &user_id)
-    : shard_name_(shard_kind + "__" + user_id), split_(shard_kind.size()) {}
+ShardName::ShardName(const std::string_view &shard_kind,
+                     const std::string_view &user_id)
+    : shard_name_(std::string("")), split_(shard_kind.size()) {
+  std::string &shard_name = std::get<std::string>(this->shard_name_);
+  shard_name.reserve(shard_kind.size() + 2 + user_id.size());
+  shard_name.append(shard_kind);
+  shard_name.push_back('_');
+  shard_name.push_back('_');
+  shard_name.append(user_id);
+}
 
 ShardName::ShardName(std::string &&shard_name)
     : shard_name_(std::move(shard_name)), split_(-1) {}

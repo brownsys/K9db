@@ -5,12 +5,74 @@
 
 #include <optional>
 
+#include "pelton/sql/rocksdb/dedup.h"
 #include "glog/logging.h"
 
 namespace pelton {
 namespace sql {
 
-using ORecord = std::optional<dataflow::Record>;
+// Get records by shard + PK.
+std::vector<dataflow::Record> RocksdbConnection::GetDirect(
+    const std::string &table_name, size_t column_index,
+    const std::vector<KeyPair> &keys) const {
+  const RocksdbTable &table = this->tables_.at(table_name);
+  const dataflow::SchemaRef &schema = table.Schema();
+
+  // Encrypt keys for lookup.
+  std::vector<std::string> decr;
+  std::vector<EncryptedKey> en_keys;
+  bool by_pk = (column_index == table.PKColumn());
+  if (by_pk) {
+    // Lookup by PK.
+    for (const auto &[shard, value] : keys) {
+      RocksdbSequence key;
+      key.Append(shard);
+      key.Append(value);
+      en_keys.push_back(this->encryption_manager_.EncryptKey(std::move(key)));
+    }
+  } else if (table.HasIndexOn(column_index)) {
+    // Lookup by secondary index.
+    std::vector<std::string> shard_names;
+    std::vector<std::string> values;
+    for (const auto &[shard_name, value] : keys) {
+      shard_names.emplace_back(shard_name.AsView());
+      values.push_back(EncodeValue(value));
+    }
+
+    // Find index and lookup.
+    const RocksdbIndex &index = table.GetIndex(column_index);
+    IndexSet s = index.GetWithShards(std::move(shard_names), std::move(values));
+    for (auto it = s.begin(); it != s.end();) {
+      auto node = s.extract(it++);
+      RocksdbIndexRecord &record = node.value();
+      decr.push_back(record.GetShard().ToString());
+      en_keys.push_back(this->encryption_manager_.EncryptKey(record.Release()));
+    }
+  } else {
+    LOG(FATAL) << "Get Direct on non-indexed column";
+  }
+
+  // Lookup using multiget.
+  std::vector<std::optional<EncryptedValue>> en_rows = table.MultiGet(en_keys);
+
+  // Decrypt result.
+  std::vector<dataflow::Record> result;
+  DedupSet<std::string> dedup;
+  result.reserve(en_rows.size());
+  for (size_t i = 0; i < en_rows.size(); i++) {
+    std::optional<EncryptedValue> &en_row = en_rows.at(i);
+    if (en_row.has_value()) {
+      const std::string &shard = by_pk ? keys.at(i).first.ByRef() : decr.at(i);
+      RocksdbSequence row =
+          this->encryption_manager_.DecryptValue(shard, std::move(*en_row));
+      if (!dedup.Duplicate(row.At(table.PKColumn()).ToString())) {
+        result.push_back(row.DecodeRecord(schema));
+      }
+    }
+  }
+
+  return result;
+}
 
 struct KeyData {
   RocksdbSequence key;
@@ -30,9 +92,8 @@ ResultSetAndStatus RocksdbConnection::AssignToShards(
   const dataflow::SchemaRef &schema = table.Schema();
 
   // Find source then use the other API.
-  std::vector<std::string> encoded_values = EncodeValues(values);
   std::optional<IndexSet> sources =
-      table.IndexLookup(column_index, encoded_values);
+      table.IndexLookup(column_index, EncodeValues(values));
   CHECK(sources.has_value()) << "Assign to shards with no index";
   if (sources->size() == 0) {
     return std::pair(sql::SqlResultSet(schema), 0);
@@ -152,98 +213,57 @@ std::vector<size_t> RocksdbConnection::CountShards(
   const RocksdbTable &table = this->tables_.at(table_name);
 
   // Lookup counts.
-  std::vector<std::string> encoded_values = EncodeValues(pk_values);
-  return table.GetPKIndex().CountShards(Transform(encoded_values));
+  return table.GetPKIndex().CountShards(EncodeValues(pk_values));
 }
 
-/*
-std::pair<ORecord, int> RocksdbConnection::AssignToShards(
-    const std::string &table_name, const util::ShardName &source,
-    size_t column_index, const std::vector<dataflow::Value> &values,
-    const std::unordered_set<util::ShardName> &targets) {
-  const std::string &shard = source.String();
+// Delete records from shard, moving indicated ones to default shard.
+int RocksdbConnection::DeleteFromShard(
+    const std::string &table_name, const util::ShardName &shard_name,
+    const std::vector<dataflow::Record> &records,
+    const std::vector<bool> &move_to_default) {
+  util::ShardName default_shard(DEFAULT_SHARD, DEFAULT_SHARD);
 
   // Look up table info.
   RocksdbTable &table = this->tables_.at(table_name);
-  const dataflow::SchemaRef &schema = table.Schema();
+  size_t pk_index = table.PKColumn();
 
   // Construct and encrypt key.
-  RocksdbSequence key;
-  key.Append(source);
-  key.Append(pk);
-  EncryptedKey enkey = this->encryption_manager_.EncryptKey(std::move(key));
-
-  // Get the record to copy/move.
-  std::optional<EncryptedValue> envalue = table.Get(enkey);
-  if (envalue.has_value()) {
-    RocksdbSequence row =
-        this->encryption_manager_.DecryptValue(shard, std::move(*envalue));
-
-    // Now, we insert a copy of the record into each target.
-    int count = 0;
-    for (const util::ShardName &target : targets) {
-      const std::string &tstr = target.String();
-      // Update indices.
-      table.IndexAdd(tstr, row);
-
-      // Encrypt key and record value.
-      RocksdbSequence target_key;
-      target_key.Append(target);
-      target_key.Append(pk);
-      EncryptedKey target_enkey =
-          this->encryption_manager_.EncryptKey(std::move(target_key));
-      EncryptedValue target_envalue =
-          this->encryption_manager_.EncryptValue(tstr, RocksdbSequence(row));
-
-      // Write to DB.
-      table.Put(target_enkey, target_envalue);
-      count++;
-    }
-
-    // If record was in default shard, we need to delete it from there.
-    if (source.ShardKind() == DEFAULT_SHARD &&
-        source.UserID() == DEFAULT_SHARD) {
-      // Delete.
-      table.IndexDelete(shard, row);
-      table.Delete(enkey);
-      count++;
-    }
-
-    return std::make_pair(row.DecodeRecord(schema), count);
+  std::vector<EncryptedKey> en_keys;
+  std::vector<RocksdbSequence> rows;
+  for (const dataflow::Record &record : records) {
+    RocksdbSequence key;
+    key.Append(shard_name);
+    key.Append(record.GetValue(pk_index));
+    en_keys.push_back(this->encryption_manager_.EncryptKey(std::move(key)));
+    rows.push_back(RocksdbSequence::FromRecord(record));
   }
 
-  return std::pair<ORecord, int>(ORecord(), 0);
-}
+  // Delete all keys.
+  int count = 0;
+  for (size_t i = 0; i < records.size(); i++) {
+    table.IndexDelete(shard_name.AsSlice(), rows.at(i));
+    table.Delete(en_keys.at(i));
+    count++;
 
-std::pair<ORecord, int> RocksdbConnection::DeleteFromShard(
-    const std::string &table_name, const util::ShardName &source,
-    size_t column_index, const std::vector<dataflow::Value> &values) {
-  const std::string &shard = source.String();
+    // Move to default shard if appropriate.
+    if (move_to_default.at(i)) {
+      table.IndexAdd(default_shard.AsSlice(), rows.at(i));
 
-  // Look up table info.
-  RocksdbTable &table = this->tables_.at(table_name);
-  const dataflow::SchemaRef &schema = table.Schema();
+      // Encrypt record.
+      RocksdbSequence key;
+      key.Append(default_shard);
+      key.Append(records.at(i).GetValue(pk_index));
 
-  // Construct and encrypt key.
-  RocksdbSequence key;
-  key.Append(source);
-  key.Append(pk);
-  EncryptedKey enkey = this->encryption_manager_.EncryptKey(std::move(key));
-
-  std::optional<EncryptedValue> envalue = table.Get(enkey);
-  if (envalue.has_value()) {
-    RocksdbSequence value =
-        this->encryption_manager_.DecryptValue(shard, std::move(*envalue));
-
-    // Delete.
-    table.IndexDelete(shard, value);
-    table.Delete(enkey);
-
-    return std::make_pair(value.DecodeRecord(schema), 1);
+      // Add to table with default shard.
+      table.Put(this->encryption_manager_.EncryptKey(std::move(key)),
+                this->encryption_manager_.EncryptValue(default_shard.ByRef(),
+                                                       std::move(rows.at(i))));
+      count++;
+    }
   }
-  return std::pair<ORecord, int>(ORecord(), 0);
+
+  return count;
 }
-*/
 
 }  // namespace sql
 }  // namespace pelton

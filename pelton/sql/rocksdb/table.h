@@ -68,6 +68,7 @@ class RocksdbTable {
 
   // Get the schema.
   const dataflow::SchemaRef &Schema() const { return this->schema_; }
+  size_t PKColumn() const { return this->pk_column_; }
 
   // Index creation.
   void CreateIndex(size_t column_index);
@@ -82,13 +83,19 @@ class RocksdbTable {
   // Index lookups.
   std::optional<IndexSet> IndexLookup(sqlast::ValueMapper *vm) const;
   std::optional<DedupIndexSet> IndexLookupDedup(sqlast::ValueMapper *vm) const;
-  std::optional<IndexSet> IndexLookup(
-      size_t column_index, const std::vector<std::string> &values) const;
+  std::optional<IndexSet> IndexLookup(size_t column_index,
+                                      std::vector<std::string> &&values) const;
   std::optional<DedupIndexSet> IndexLookupDedup(
-      size_t column_index, const std::vector<std::string> &values) const;
+      size_t column_index, std::vector<std::string> &&values) const;
 
   // Get an index.
   const RocksdbPKIndex &GetPKIndex() const { return this->pk_index_; }
+  bool HasIndexOn(size_t column) const {
+    return this->indices_.at(column).has_value();
+  }
+  const RocksdbIndex &GetIndex(size_t column) const {
+    return *this->indices_.at(column);
+  }
 
   // Check if a record with given PK exists.
   bool Exists(const rocksdb::Slice &pk_value) const;

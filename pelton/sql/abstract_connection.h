@@ -3,12 +3,12 @@
 #define PELTON_SQL_ABSTRACT_CONNECTION_H_
 
 #include <cstdint>
-#include <optional>
 #include <string>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
+#include "pelton/dataflow/record.h"
 #include "pelton/dataflow/value.h"
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
@@ -20,6 +20,7 @@ namespace pelton {
 namespace sql {
 
 using ResultSetAndStatus = std::pair<SqlResultSet, int>;
+using KeyPair = std::pair<util::ShardName, dataflow::Value>;
 
 class AbstractConnection {
  public:
@@ -55,10 +56,19 @@ class AbstractConnection {
                                    util::ShardName &&shard_name) = 0;
 
   // Shard operations.
+  virtual std::vector<dataflow::Record> GetDirect(
+      const std::string &table_name, size_t column_index,
+      const std::vector<KeyPair> &keys) const = 0;
+
   virtual ResultSetAndStatus AssignToShards(
       const std::string &table_name, size_t column_index,
       const std::vector<dataflow::Value> &values,
       const std::unordered_set<util::ShardName> &targets) = 0;
+
+  virtual int DeleteFromShard(const std::string &table_name,
+                              const util::ShardName &shard_name,
+                              const std::vector<dataflow::Record> &records,
+                              const std::vector<bool> &move_to_default) = 0;
 
   virtual std::vector<size_t> CountShards(
       const std::string &table_name,

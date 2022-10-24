@@ -135,6 +135,7 @@ cc_library(
     deps = [
         ":dedup",
         ":encode",
+        "//pelton/util:iterator",
         "//pelton/util:status",
         "@glog",
         "@rocksdb",
@@ -193,6 +194,7 @@ cc_test(
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/util:ints",
+        "//pelton/util:iterator",
         "//pelton/util:shard_name",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",

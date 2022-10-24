@@ -87,7 +87,7 @@ std::optional<IndexSet> RocksdbTable::IndexLookup(
     std::vector<std::string> vals =
         value_mapper->ReleaseBefore(this->pk_column_);
     EncodeValues(this->schema_.TypeOf(this->pk_column_), &vals);
-    return this->pk_index_.Get(Transform(vals));
+    return this->pk_index_.Get(std::move(vals));
   }
 
   // Lookup by first available non PK index.
@@ -97,7 +97,7 @@ std::optional<IndexSet> RocksdbTable::IndexLookup(
       // Lookup col index.
       std::vector<std::string> vals = value_mapper->ReleaseBefore(col);
       EncodeValues(this->schema_.TypeOf(col), &vals);
-      return index->Get(Transform(vals));
+      return index->Get(std::move(vals));
     }
   }
 
@@ -112,7 +112,7 @@ std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
     std::vector<std::string> vals =
         value_mapper->ReleaseBefore(this->pk_column_);
     EncodeValues(this->schema_.TypeOf(this->pk_column_), &vals);
-    return this->pk_index_.GetDedup(Transform(vals));
+    return this->pk_index_.GetDedup(std::move(vals));
   }
 
   // Lookup by first available non PK index.
@@ -122,7 +122,7 @@ std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
       // Lookup col index.
       std::vector<std::string> vals = value_mapper->ReleaseBefore(col);
       EncodeValues(this->schema_.TypeOf(col), &vals);
-      return index->GetDedup(Transform(vals));
+      return index->GetDedup(std::move(vals));
     }
   }
 
@@ -130,34 +130,34 @@ std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
 }
 
 std::optional<IndexSet> RocksdbTable::IndexLookup(
-    size_t column_index, const std::vector<std::string> &values) const {
+    size_t column_index, std::vector<std::string> &&values) const {
   if (column_index == this->pk_column_) {
-    return this->pk_index_.Get(Transform(values));
+    return this->pk_index_.Get(std::move(values));
   }
   const std::optional<RocksdbIndex> &index = this->indices_.at(column_index);
   if (index.has_value()) {
     // Lookup col index.
-    return index->Get(Transform(values));
+    return index->Get(std::move(values));
   }
   return {};
 }
 
 std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
-    size_t column_index, const std::vector<std::string> &values) const {
+    size_t column_index, std::vector<std::string> &&values) const {
   if (column_index == this->pk_column_) {
-    return this->pk_index_.GetDedup(Transform(values));
+    return this->pk_index_.GetDedup(std::move(values));
   }
   const std::optional<RocksdbIndex> &index = this->indices_.at(column_index);
   if (index.has_value()) {
     // Lookup col index.
-    return index->GetDedup(Transform(values));
+    return index->GetDedup(std::move(values));
   }
   return {};
 }
 
 // Check if a record with given PK exists.
 bool RocksdbTable::Exists(const rocksdb::Slice &pk_value) const {
-  return this->pk_index_.Get({pk_value}).size() > 0;
+  return this->pk_index_.Get({pk_value.ToString()}).size() > 0;
 }
 
 // Write to database.

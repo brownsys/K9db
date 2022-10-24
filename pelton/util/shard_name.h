@@ -17,7 +17,8 @@ namespace util {
 class ShardName {
  public:
   // Result in owned shard name.
-  ShardName(const std::string &shard_kind, const std::string &user_id);
+  ShardName(const std::string_view &shard_kind,
+            const std::string_view &user_id);
   explicit ShardName(std::string &&shard_name);
 
   // REsult in an unowned slice (whose lifetime matches the slice).
@@ -40,6 +41,10 @@ class ShardName {
   bool operator==(const ShardName &o) const;
   bool operator==(const std::string &o) const;
   bool operator==(const rocksdb::Slice &o) const;
+
+  ShardName Copy() const {
+    return ShardName(this->ShardKind(), this->UserID());
+  }
 
  private:
   // The shard name may be owned or unowned.

@@ -29,8 +29,11 @@ class RocksdbIndex {
               const rocksdb::Slice &shard_name, const rocksdb::Slice &pk);
 
   // Get the shard and pk of matching records for given values.
-  IndexSet Get(const std::vector<rocksdb::Slice> &values) const;
-  DedupIndexSet GetDedup(const std::vector<rocksdb::Slice> &values) const;
+  IndexSet Get(std::vector<std::string> &&values) const;
+  DedupIndexSet GetDedup(std::vector<std::string> &&values) const;
+
+  IndexSet GetWithShards(std::vector<std::string> &&shards,
+                         std::vector<std::string> &&values) const;
 
  private:
   rocksdb::DB *db_;
@@ -48,12 +51,11 @@ class RocksdbPKIndex {
   void Delete(const rocksdb::Slice &pk, const rocksdb::Slice &shard_name);
 
   // Reading.
-  IndexSet Get(const std::vector<rocksdb::Slice> &pk_values) const;
-  DedupIndexSet GetDedup(const std::vector<rocksdb::Slice> &pk_values) const;
+  IndexSet Get(std::vector<std::string> &&pk_values) const;
+  DedupIndexSet GetDedup(std::vector<std::string> &&pk_values) const;
 
   // Count how many shard each pk value is in.
-  std::vector<size_t> CountShards(
-      const std::vector<rocksdb::Slice> &pk_values) const;
+  std::vector<size_t> CountShards(std::vector<std::string> &&pk_values) const;
 
  private:
   rocksdb::DB *db_;

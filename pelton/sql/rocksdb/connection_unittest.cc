@@ -19,6 +19,7 @@
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/ints.h"
+#include "pelton/util/iterator.h"
 #include "pelton/util/shard_name.h"
 
 namespace pelton {
@@ -234,16 +235,9 @@ bool operator==(const SqlResultSet &set,
 }
 bool operator==(const SqlDeleteSet &set,
                 const std::vector<dataflow::Record> &v2) {
-  util::Iterable<SqlDeleteSet::RecordsIt> iterable = set.IterateRecords();
-  struct CopyRecord {
-    CopyRecord() = default;
-    dataflow::Record Map(const SqlDeleteSet::RecordsIt *it) const {
-      return (*it)->Copy();
-    }
-  };
-  using CopyIt = util::MapIt<SqlDeleteSet::RecordsIt, CopyRecord>;
-  CopyIt b(iterable.begin());
-  CopyIt e(iterable.end());
+  auto iterable = set.IterateRecords();
+  auto [b, e] =
+      util::Map(&iterable, [](const dataflow::Record &r) { return r.Copy(); });
 
   std::vector<dataflow::Record> v1;
   v1.insert(v1.end(), b, e);

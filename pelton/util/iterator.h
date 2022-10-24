@@ -23,6 +23,9 @@ class Iterable {
   Iterable(const I &b, const I &e) : begin_(b), end_(e) {}
   Iterable(I &&b, I &&e) : begin_(std::move(b)), end_(std::move(e)) {}
 
+  template <typename C>
+  explicit Iterable(C *c) : Iterable(c->begin(), c->end()) {}
+
   iterator begin() { return this->begin_; }
   iterator end() { return this->end_; }
 
@@ -37,6 +40,9 @@ class Iterable {
   I begin_;
   I end_;
 };
+
+template <typename C, typename I = decltype(std::declval<C>().begin())>
+Iterable(C *c) -> Iterable<I>;
 
 /*
  * Mapping iterator: Takes an input iterator that derefences to V, and a
@@ -98,7 +104,7 @@ class MapIt {
   using difference_type = int64_t;
   using value_type = decltype(std::declval<F>().Map(std::declval<V>()));
   using reference = value_type;
-  using pointer = value_type *;
+  using pointer = std::add_pointer_t<value_type>;
   using iterator_category = std::input_iterator_tag;
 
   MapIt &operator++() {
@@ -133,6 +139,10 @@ class MapIt {
   I it_;
   F functor_;
 };
+
+template <typename I, typename R,
+          typename V = typename std::iterator_traits<I>::reference>
+using MapItT = MapIt<I, MapFunctor<V, R>>;
 
 // Additional deduction guidance for lambda constructor.
 template <typename I, typename R,
@@ -225,7 +235,7 @@ Iterable<MapIt<I, MapFunctor<V, R>>> Map(C *c, A &&lam) {
  * will be RandomAccess, but if one is not, this iterator wont be.
  */
 
-#define OP(op, p, T1, T2)                                   \
+#define _ITERATOR_OP(op, p, T1, T2)                         \
   bool operator op(const p<T1, T2> &o) const {              \
     auto r = static_cast<const std::pair<T1, T2> &>(*this); \
     auto l = static_cast<const std::pair<T1, T2> &>(o);     \
@@ -248,10 +258,10 @@ class ValPair : public std::pair<T1, T2> {
       : std::pair<T1, T2>(std::forward<T1>(v1), std::forward<T2>(v2)) {}
 
   // Comparators.
-  OP(<, ValPair, T1, T2)
-  OP(<=, ValPair, T1, T2)
-  OP(>, ValPair, T1, T2)
-  OP(>=, ValPair, T1, T2)
+  _ITERATOR_OP(<, ValPair, T1, T2)
+  _ITERATOR_OP(<=, ValPair, T1, T2)
+  _ITERATOR_OP(>, ValPair, T1, T2)
+  _ITERATOR_OP(>=, ValPair, T1, T2)
 };
 
 // R1, R2 are references, they may be const references as well!
@@ -283,12 +293,12 @@ class RefPair : public std::pair<R1, R2> {
   }
 
   // Comparators.
-  OP(==, RefPair, R1, R2)
-  OP(!=, RefPair, R1, R2)
-  OP(<, RefPair, R1, R2)
-  OP(<=, RefPair, R1, R2)
-  OP(>, RefPair, R1, R2)
-  OP(>=, RefPair, R1, R2)
+  _ITERATOR_OP(==, RefPair, R1, R2)
+  _ITERATOR_OP(!=, RefPair, R1, R2)
+  _ITERATOR_OP(<, RefPair, R1, R2)
+  _ITERATOR_OP(<=, RefPair, R1, R2)
+  _ITERATOR_OP(>, RefPair, R1, R2)
+  _ITERATOR_OP(>=, RefPair, R1, R2)
 
   // Transform into a value by copying.
   operator ValPair<T1, T2>() const {
@@ -317,7 +327,7 @@ class ZipIt {
   // Deduce iterator traits from I1 and I2.
   using value_type = ValPair<Val1, Val2>;
   using reference = RefPair<Ref1, Ref2>;
-  using pointer = value_type *;
+  using pointer = std::add_pointer_t<reference>;
   using difference_type = Traits1::difference_type;
   using iterator_category = Traits1::iterator_category;
 

@@ -150,10 +150,8 @@ TEST(ZipIt, SortZip) {
   std::vector<std::string> v2 = {"A", "B", "C", "D", "E"};
 
   auto [b, e] = Zip(&v1, &v2);
-  RefPair<int &, std::string &> r = b[0];
-  ValPair<int, std::string> v = b[1];
-
   std::sort(b, e);
+
   EXPECT_EQ(v1, (std::vector<int>{0, 3, 10, 20, 25}));
   EXPECT_EQ(v2, (std::vector<std::string>{"B", "E", "A", "C", "D"}));
 }
