@@ -16,7 +16,7 @@ cc_library(
         ":index",
         ":insert",
         ":select",
-        #":update",
+        ":update",
         ":view",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
@@ -27,9 +27,7 @@ cc_library(
         "//pelton/sqlast:parser",
         "//pelton/util:status",
         "//pelton/util:upgradable_lock",
-        #"@antlr4_runtimes//:cpp",
         "@com_google_absl//absl/status",
-        #"@grammars-v4//:sqlparser",
     ],
 )
 
@@ -146,6 +144,34 @@ cc_library(
     ],
     deps = [
         ":index",
+        "//pelton:connection",
+        "//pelton/dataflow:dstate",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:value",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/sql:abstract_connection",
+        "//pelton/sql:result",
+        "//pelton/sqlast:ast",
+        "//pelton/util:shard_name",
+        "//pelton/util:status",
+        "//pelton/util:upgradable_lock",
+        "@com_google_absl//absl/status",
+    ],
+)
+
+cc_library(
+    name = "update",
+    srcs = [
+        "update.cc",
+    ],
+    hdrs = [
+        "update.h",
+    ],
+    deps = [
+        ":delete",
+        ":insert",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:record",

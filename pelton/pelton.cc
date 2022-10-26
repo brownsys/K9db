@@ -133,7 +133,7 @@ absl::StatusOr<const PreparedStatement *> prepare(Connection *connection,
                                                   const std::string &query) {
   // Acquire a reader shared lock.
   State *state = connection->state;
-  util::SharedLock lock = state->ReaderLock();
+  util::SharedLock lock = state->CanonicalReaderLock();
 
   // Canonicalize the query.
   auto pair = prepared::Canonicalize(query);
@@ -143,8 +143,8 @@ absl::StatusOr<const PreparedStatement *> prepare(Connection *connection,
   // Upgrade lock to a writer lock if this is the first time we encounter the
   // canonical statement, as we will need to modify the global state prepared
   // statement mapping.
-  auto &&[upgraded, condition] =
-      lock.UpgradeIf([&]() { return state->HasCanonicalStatement(canonical); });
+  auto &&[upgraded, condition] = lock.UpgradeIf(
+      [&]() { return !state->HasCanonicalStatement(canonical); });
   if (condition) {
     // We upgraded to a writer lock, we also know that the canonical statement
     // was never encountered.
@@ -192,6 +192,7 @@ absl::StatusOr<const PreparedStatement *> prepare(Connection *connection,
       prepared::MakeStmt(query, ptr, std::move(arg_value_count));
   stmt.stmt_id = connection->stmts.size();
   connection->stmts.push_back(std::move(stmt));
+
   return &connection->stmts.back();
 }
 

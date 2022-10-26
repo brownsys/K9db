@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "absl/status/statusor.h"
@@ -39,6 +40,7 @@ class DeleteContext {
 
   /* Main entry point for insert: Executes the statement against the shards. */
   absl::StatusOr<sql::SqlResult> Exec();
+  absl::StatusOr<std::pair<std::vector<dataflow::Record>, int>> ExecReturning();
 
  private:
   using RecordsIterable = util::Iterable<sql::SqlDeleteSet::ShardRecordsIt>;

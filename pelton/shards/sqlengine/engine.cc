@@ -12,9 +12,7 @@
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/insert.h"
 #include "pelton/shards/sqlengine/select.h"
-/*
 #include "pelton/shards/sqlengine/update.h"
-*/
 #include "pelton/shards/sqlengine/view.h"
 #include "pelton/shards/types.h"
 #include "pelton/sqlast/ast.h"
@@ -58,13 +56,13 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       return context.Exec();
     }
 
-    /*
     // Case 3: Update statement.
     case sqlast::AbstractStatement::Type::UPDATE: {
       auto *stmt = static_cast<sqlast::Update *>(statement.get());
-      return update::Shard(*stmt, connection, true);
+      util::SharedLock lock = connection->state->ReaderLock();
+      UpdateContext context(*stmt, connection, &lock);
+      return context.Exec();
     }
-    */
 
     // Case 4: Select statement.
     // Might be a select from a matview or a table.
@@ -96,13 +94,13 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       return sql::SqlResult(true);
     }
 
-    /*
     // Case 7: CREATE INDEX statement.
     case sqlast::AbstractStatement::Type::CREATE_INDEX: {
-      auto *stmt = static_cast<sqlast::CreateIndex *>(statement.get());
-      return index::CreateIndex(*stmt, connection);
+      std::cout << "CREATE INDEX CALLED" << std::endl;
+      return sql::SqlResult(true);
     }
 
+    /*
     // Case 8: GDPR (GET | FORGET) statements.
     case sqlast::AbstractStatement::Type::GDPR: {
       auto *stmt = static_cast<sqlast::GDPRStatement *>(statement.get());

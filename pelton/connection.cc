@@ -84,5 +84,8 @@ util::UniqueLock State::WriterLock() { return util::UniqueLock(&this->mtx_); }
 util::SharedLock State::ReaderLock() const {
   return util::SharedLock(&this->mtx_);
 }
+util::SharedLock State::CanonicalReaderLock() const {
+  return util::SharedLock(&this->canonical_mtx_);
+}
 
 }  // namespace pelton

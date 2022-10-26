@@ -66,7 +66,7 @@ TEST(PROXY, UPDATE_TEST) {
       {"INSERT INTO test3 VALUES (2, 'bye');", 1},
       {"INSERT INTO test3 VALUES (3, 'world');", 1},
       {"INSERT INTO test3 VALUES (50, NULL);", 1},
-      {"UPDATE test3 SET ID = 10 WHERE ID = 1;", 1},
+      {"UPDATE test3 SET ID = 10 WHERE ID = 1;", 2},
       {"DELETE FROM test3 WHERE ID = 3;", 1}};
   for (auto &[q, count] : tests) {
     VLOG(1) << "Running query: " << q;
@@ -124,6 +124,7 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
   // Query from table.
   FFIPreparedStatement stmt1 =
       FFIPrepare(c_conn, "SELECT * FROM test3 where ID = ?;");
+
   EXPECT_EQ(FFIPreparedStatementID(stmt1), 0) << "Bad statement id";
   EXPECT_EQ(FFIPreparedStatementArgCount(stmt1), 1) << "Bad arg count";
   EXPECT_EQ(FFIPreparedStatementArgType(stmt1, 0), CType::INT) << "Arg type";

@@ -2,9 +2,6 @@
 #include "pelton/shards/sqlengine/delete.h"
 
 #include <memory>
-#include <unordered_set>
-#include <utility>
-#include <vector>
 
 #include "pelton/dataflow/record.h"
 #include "pelton/shards/sqlengine/util.h"
@@ -174,6 +171,40 @@ absl::StatusOr<sql::SqlResult> DeleteContext::Exec() {
 
   // Return number of copies inserted.
   return sql::SqlResult(total_count);
+}
+
+// Similar to exec but returns deleted records.
+absl::StatusOr<std::pair<std::vector<dataflow::Record>, int>>
+DeleteContext::ExecReturning() {
+  // Make sure table exists in the schema first.
+  ASSERT_RET(this->sstate_.TableExists(this->table_name_), InvalidArgument,
+             "Table does not exist");
+
+  // Execute the delete in the DB.
+  sql::SqlDeleteSet result = this->db_->ExecuteDelete(this->stmt_);
+
+  // Update dataflow.
+  std::vector<dataflow::Record> updates;
+  updates.reserve(result.Rows().size());
+  for (const dataflow::Record &record : result.Rows()) {
+    updates.push_back(record.Copy());
+  }
+  this->dstate_.ProcessRecords(this->table_name_, std::move(updates));
+
+  // Recursively remove dependent records in dependent tables from the shard
+  // when needed.
+  int total_count = result.Count();
+  for (const util::ShardName &shard : result.IterateShards()) {
+    ASSIGN_OR_RETURN(int status, this->DeleteDependents(this->table_, shard,
+                                                        result.Iterate(shard)));
+    if (status < 0) {
+      return std::pair(std::vector<dataflow::Record>(), status);
+    }
+    total_count += status;
+  }
+
+  // Return number of copies inserted.
+  return std::pair(result.Vec(), total_count);
 }
 
 }  // namespace sqlengine
