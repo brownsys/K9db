@@ -3,6 +3,7 @@ rm -rf /tmp/pelton/rocksdb
 mkdir -p /tmp/pelton/rocksdb
 
 # E2E test for concurrent creates
+bazel build --config valgrind //:pelton
 bazel run --config valgrind //:pelton -- -logtostderr=1 &
 sleep 20
 proxy_pid=$!
