@@ -208,15 +208,16 @@ class CreateTable : public AbstractStatement {
 
 class CreateIndex : public AbstractStatement {
  public:
-  explicit CreateIndex(const std::string &index_name,
-                       const std::string &table_name,
-                       const std::string &column_name)
+  CreateIndex(bool ondisk, const std::string &index_name,
+              const std::string &table_name, const std::string &column_name)
       : AbstractStatement(AbstractStatement::Type::CREATE_INDEX),
+        ondisk_(ondisk),
         index_name_(index_name),
         table_name_(table_name),
         column_name_(column_name) {}
 
   // Accessors.
+  bool ondisk() const { return this->ondisk_; }
   const std::string &table_name() const { return this->table_name_; }
   const std::string &index_name() const { return this->index_name_; }
   const std::string &column_name() const { return this->column_name_; }
@@ -241,6 +242,7 @@ class CreateIndex : public AbstractStatement {
   }
 
  private:
+  bool ondisk_;
   std::string index_name_;
   std::string table_name_;
   std::string column_name_;

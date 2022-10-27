@@ -8,9 +8,9 @@
 
 #include "glog/logging.h"
 #include "pelton/dataflow/operator.h"
+#include "pelton/dataflow/ops/forward_view.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/ops/matview.h"
-#include "pelton/dataflow/ops/forward_view.h"
 
 namespace pelton {
 namespace dataflow {

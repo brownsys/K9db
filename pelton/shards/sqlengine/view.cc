@@ -1,29 +1,94 @@
 // Creation and management of dataflows.
 #include "pelton/shards/sqlengine/view.h"
 
-#include <cstring>
 #include <iterator>
-#include <list>
 #include <memory>
 #include <optional>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "glog/logging.h"
+#include "pelton/dataflow/future.h"
+#include "pelton/dataflow/graph.h"
+#include "pelton/dataflow/graph_partition.h"
 #include "pelton/dataflow/key.h"
-#include "pelton/dataflow/record.h"
-#include "pelton/dataflow/value.h"
+#include "pelton/dataflow/operator.h"
 #include "pelton/dataflow/ops/forward_view.h"
+#include "pelton/dataflow/ops/matview.h"
+#include "pelton/dataflow/record.h"
+#include "pelton/dataflow/schema.h"
+#include "pelton/dataflow/state.h"
 #include "pelton/planner/planner.h"
-#include "pelton/shards/sqlengine/select.h"
-#include "pelton/util/status.h"
+#include "pelton/sql/abstract_connection.h"
 
 namespace pelton {
 namespace shards {
 namespace sqlengine {
 namespace view {
+
+/*
+ * View creation.
+ */
+
+absl::StatusOr<sql::SqlResult> CreateView(const sqlast::CreateView &stmt,
+                                          Connection *connection,
+                                          util::UniqueLock *lock) {
+  dataflow::DataFlowState &dataflow_state = connection->state->DataflowState();
+  sql::AbstractConnection *db = connection->state->Database();
+
+  // Plan the query using calcite and generate a concrete graph for it.
+  std::unique_ptr<dataflow::DataFlowGraphPartition> graph =
+      planner::PlanGraph(&dataflow_state, stmt.query());
+
+  // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
+  std::string flow_name = stmt.view_name();
+  dataflow_state.AddFlow(flow_name, std::move(graph));
+
+  // Update new View with existing data in tables.
+  std::vector<std::pair<std::string, std::vector<dataflow::Record>>> data;
+
+  // Iterate through each table in the new View's flow.
+  dataflow::Future future(true);
+  for (const auto &table_name : dataflow_state.GetFlow(flow_name).Inputs()) {
+    // Generate and execute select * query for current table
+    pelton::sqlast::Select select{table_name};
+    select.AddColumn("*");
+    sql::SqlResultSet result = db->ExecuteSelect(select);
+
+    // Vectorize and store records.
+    std::vector<pelton::dataflow::Record> records = std::move(result.Vec());
+
+    // Records will be negative here, need to turn them to positive records.
+    for (auto &record : records) {
+      record.SetPositive(true);
+    }
+
+    dataflow_state.ProcessRecordsByFlowName(
+        flow_name, table_name, std::move(records), future.GetPromise());
+  }
+
+  // Populate nested view upon creation.
+  for (size_t p = 0; p < dataflow_state.workers(); p++) {
+    pelton::dataflow::DataFlowGraphPartition *partition =
+        dataflow_state.GetFlow(flow_name).GetPartition(p);
+    for (auto *forward : partition->forwards()) {
+      dataflow::Operator *node = forward->parents().at(0);
+      dataflow::MatViewOperator *parent =
+          reinterpret_cast<dataflow::MatViewOperator *>(node);
+      forward->ProcessAndForward(parent->index(), parent->All(),
+                                 future.GetPromise());
+    }
+  }
+
+  future.Wait();
+
+  return sql::SqlResult(true);
+}
+
+/*
+ * View querying.
+ */
 
 namespace {
 
@@ -105,7 +170,7 @@ dataflow::Key MakeKey(const Constraint &constraint,
           break;
         case sqlast::ColumnDefinition::Type::TEXT:
         case sqlast::ColumnDefinition::Type::DATETIME:
-          key.AddValue(dataflow::Value::Dequote(value));
+          key.AddValue(sqlast::Dequote(value));
           break;
         default:
           LOG(FATAL) << "Unsupported type in view read";
@@ -275,72 +340,16 @@ LookupCondition ConstraintKeys(const dataflow::DataFlowGraph &flow,
 
 }  // namespace
 
-absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection,
-                        UniqueLock *lock) {
-  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
-
-  // Plan the query using calcite and generate a concrete graph for it.
-  std::unique_ptr<dataflow::DataFlowGraphPartition> graph =
-      planner::PlanGraph(dataflow_state, stmt.query());
-
-  // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
-  std::string flow_name = stmt.view_name();
-  dataflow_state->AddFlow(flow_name, std::move(graph));
-
-  // Update new View with existing data in tables.
-  std::vector<std::pair<std::string, std::vector<dataflow::Record>>> data;
-
-  // Iterate through each table in the new View's flow.
-  dataflow::Future future(true);
-  for (const auto &table_name : dataflow_state->GetFlow(flow_name).Inputs()) {
-    // Generate and execute select * query for current table
-    pelton::sqlast::Select select{table_name};
-    select.AddColumn("*");
-    MOVE_OR_RETURN(sql::SqlResult result,
-                   select::Shard(select, connection, false));
-
-    // Vectorize and store records.
-    std::vector<pelton::dataflow::Record> records =
-        result.ResultSets().at(0).Vec();
-
-    // Records will be negative here, need to turn them to positive records.
-    for (auto &record : records) {
-      record.SetPositive(true);
-    }
-
-    dataflow_state->ProcessRecordsByFlowName(
-        flow_name, table_name, std::move(records), future.GetPromise());
-  }
-
-  // Populate nested view upon creation.
-  for (size_t p = 0; p < dataflow_state->workers(); p++) {
-    pelton::dataflow::DataFlowGraphPartition *partition =
-        dataflow_state->GetFlow(flow_name).GetPartition(p);
-    for (auto *forward : partition->forwards()) {
-      dataflow::Operator *node = forward->parents().at(0);
-      dataflow::MatViewOperator *parent =
-          reinterpret_cast<dataflow::MatViewOperator *>(node);
-      forward->ProcessAndForward(parent->index(), parent->All(),
-                                 future.GetPromise());
-    }
-  }
-
-  future.Wait();
-
-  return absl::OkStatus();
-}
-
 absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
-                                          Connection *connection) {
+                                          Connection *connection,
+                                          util::SharedLock *lock) {
   sqlast::ListCountVisitor listcount;
   std::string count = std::to_string(listcount.Visit(&stmt));
-  SharderState *state = connection->state->sharder_state();
-  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
-  SharedLock lock = state->ReaderLock();
+  const dataflow::DataFlowState &dstate = connection->state->DataflowState();
 
   // Get the corresponding flow.
   const std::string &view_name = stmt.table_name();
-  const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(view_name);
+  const dataflow::DataFlowGraph &flow = dstate.GetFlow(view_name);
 
   // Transform WHERE statement to conditions on matview keys.
   LookupCondition condition = ConstraintKeys(flow, stmt.GetWhereClause());

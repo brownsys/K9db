@@ -7,6 +7,8 @@
 #include <vector>
 
 #include "gtest/gtest.h"
+#include "pelton/dataflow/ops/filter.h"
+#include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
@@ -424,6 +426,110 @@ TEST(AggregateOperatorTest, OutputSchemaCompositeKeyTest) {
   EXPECT_EQ(aggregate2.output_schema_.column_names(), expected_names);
   EXPECT_EQ(aggregate2.output_schema_.column_types(), expected_types);
   EXPECT_EQ(aggregate2.output_schema_.keys(), (std::vector<ColumnID>{0, 1}));
+}
+
+TEST(AggregateOperatorTest, SumGoesAwayWithFilter) {
+  SchemaRef schema = CreateSchemaPrimaryKey();
+  std::vector<ColumnID> group_columns = {1};
+  ColumnID aggregate_column = 2;
+  AggregateOperator::Function aggregate_function =
+      AggregateOperator::Function::SUM;
+  // create aggregate operator..
+  AggregateOperator aggregate =
+      AggregateOperator(group_columns, aggregate_function, aggregate_column);
+  aggregate.input_schemas_.push_back(schema);
+  aggregate.ComputeOutputSchema();
+  // Filter operator..
+  FilterOperator filter;
+  filter.AddOperation(0_s, 1, FilterOperator::Operation::GREATER_THAN);
+  filter.AddParent(&aggregate);
+  // create a chained matview operator.
+  UnorderedMatViewOperator matview(group_columns);
+  matview.AddParent(&filter);
+
+  // Description: The test consists of two stages:
+  // STAGE1: records are fed for two groups.
+  // STAGE2: negative records are fed for one group (to empty it) while
+  // a records to sum to zero are fed to the other.
+
+  // Records to be fed
+  std::vector<Record> records1;
+  records1.emplace_back(schema, true, 1_s, 2_s, 9_s);
+  records1.emplace_back(schema, true, 2_s, 2_s, 7_s);
+  records1.emplace_back(schema, true, 3_s, 5_s, 5_s);
+  records1.emplace_back(schema, true, 4_s, 5_s, 6_s);
+
+  // STAGE1
+  aggregate.ProcessAndForward(UNDEFINED_NODE_INDEX, std::move(records1),
+                              Promise::None.Derive());
+
+  // Records to be fed
+  std::vector<Record> records2;
+  records2.emplace_back(schema, false, 1_s, 2_s, 9_s);
+  records2.emplace_back(schema, false, 2_s, 2_s, 7_s);
+  records2.emplace_back(schema, true, 5_s, 5_s, 1_s);
+  records2.emplace_back(schema, true, 6_s, 5_s, -12_s);
+
+  // STAGE2
+  aggregate.ProcessAndForward(UNDEFINED_NODE_INDEX, std::move(records2),
+                              Promise::None.Derive());
+
+  // Validate.
+  std::vector<Record> outputs = matview.All();
+  EXPECT_EQ(outputs.size(), 0);
+}
+
+TEST(AggregateOperatorTest, CountGoesAwayOnDelete) {
+  SchemaRef schema = CreateSchemaPrimaryKey();
+  std::vector<ColumnID> group_columns = {1};
+  ColumnID aggregate_column = -1;
+  AggregateOperator::Function aggregate_function =
+      AggregateOperator::Function::COUNT;
+  // create aggregate operator..
+  AggregateOperator aggregate =
+      AggregateOperator(group_columns, aggregate_function, aggregate_column);
+  aggregate.input_schemas_.push_back(schema);
+  aggregate.ComputeOutputSchema();
+  // create a chained matview operator.
+  UnorderedMatViewOperator matview(group_columns);
+  matview.AddParent(&aggregate);
+
+  // Description: The test consists of two stages:
+  // STAGE1: records are fed for two groups.
+  // STAGE2: negative records are fed for one group (to empty it).
+
+  // Records to be fed
+  std::vector<Record> records1;
+  records1.emplace_back(schema, true, 1_s, 2_s, 9_s);
+  records1.emplace_back(schema, true, 2_s, 2_s, 7_s);
+  records1.emplace_back(schema, true, 3_s, 5_s, 5_s);
+  records1.emplace_back(schema, true, 4_s, 5_s, 6_s);
+
+  // STAGE1
+  aggregate.ProcessAndForward(UNDEFINED_NODE_INDEX, std::move(records1),
+                              Promise::None.Derive());
+
+  // Validate.
+  std::vector<Record> output1 = matview.All();
+  std::vector<Record> expected_records1;
+  expected_records1.emplace_back(aggregate.output_schema_, true, 2_s, 2_u);
+  expected_records1.emplace_back(aggregate.output_schema_, true, 5_s, 2_u);
+  compareRecordStreams(&output1, &expected_records1);
+
+  // Records to be fed
+  std::vector<Record> records2;
+  records2.emplace_back(schema, false, 1_s, 2_s, 9_s);
+  records2.emplace_back(schema, false, 2_s, 2_s, 7_s);
+
+  // STAGE2
+  aggregate.ProcessAndForward(UNDEFINED_NODE_INDEX, std::move(records2),
+                              Promise::None.Derive());
+
+  // Validate.
+  std::vector<Record> output2 = matview.All();
+  std::vector<Record> expected_records2;
+  expected_records2.emplace_back(aggregate.output_schema_, true, 5_s, 2_u);
+  compareRecordStreams(&output2, &expected_records2);
 }
 
 }  // namespace dataflow

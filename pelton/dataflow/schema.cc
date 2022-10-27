@@ -42,13 +42,19 @@ const std::string &SchemaRef::NameOf(size_t i) const {
 
 // Accessor by column name.
 size_t SchemaRef::IndexOf(const std::string &column_name) const {
-  auto it = find(this->ptr_->column_names.cbegin(),
-                 this->ptr_->column_names.cend(), column_name);
+  auto it = std::find(this->ptr_->column_names.cbegin(),
+                      this->ptr_->column_names.cend(), column_name);
   if (it == this->ptr_->column_names.cend()) {
     LOG(FATAL) << "Schema " << *this << ": column does not exist "
                << column_name;
   }
   return it - this->ptr_->column_names.cbegin();
+}
+
+bool SchemaRef::HasColumn(const std::string &column_name) const {
+  auto it = std::find(this->ptr_->column_names.cbegin(),
+                      this->ptr_->column_names.cend(), column_name);
+  return it != this->ptr_->column_names.cend();
 }
 
 // Printing a record to an output stream (e.g. std::cout).

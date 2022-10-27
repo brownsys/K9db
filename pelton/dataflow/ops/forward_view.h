@@ -27,12 +27,8 @@ class ForwardViewOperator : public Operator {
     this->output_schema_ = schema;
   }
 
-  NodeIndex parent_id() const {
-    return this->parent_id_;
-  }
-  const std::string &parent_flow() const {
-    return this->parent_flow_;
-  }
+  NodeIndex parent_id() const { return this->parent_id_; }
+  const std::string &parent_flow() const { return this->parent_flow_; }
 
  protected:
   std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records,

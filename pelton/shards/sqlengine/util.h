@@ -1,40 +1,39 @@
 // This file contains utility functions, mostly for standarizing
 // name (suffixes etc) of things.
+//
+// TODO(babman): All these functions should be gone and we should make them
+// part of the AST by improving annotations and making AST typed.
 
 #ifndef PELTON_SHARDS_SQLENGINE_UTIL_H_
 #define PELTON_SHARDS_SQLENGINE_UTIL_H_
 
 #include <string>
+#include <vector>
 
-#include "absl/strings/match.h"
-#include "absl/strings/str_cat.h"
-#include "pelton/shards/types.h"
-#include "pelton/sqlast/ast_schema.h"
+#include "pelton/connection.h"
+#include "pelton/dataflow/record.h"
+#include "pelton/sqlast/ast.h"
+#include "pelton/util/shard_name.h"
+#include "pelton/util/upgradable_lock.h"
 
 namespace pelton {
 namespace shards {
 namespace sqlengine {
 
-enum OwningT {
-  OWNING,
-  ACCESSING,
-};
+bool IsADataSubject(const sqlast::CreateTable &stmt);
 
-inline ShardedTableName NameShardedTable(const UnshardedTableName &table_name,
-                                         const ColumnName &shard_by_column) {
-  return absl::StrCat(table_name, "_", shard_by_column);
-}
+bool IsOwner(const sqlast::ColumnDefinition &col);
+bool IsAccessor(const sqlast::ColumnDefinition &col);
+bool IsOwns(const sqlast::ColumnDefinition &col);
+bool IsAccesses(const sqlast::ColumnDefinition &col);
 
-inline std::optional<OwningT> IsOwning(const sqlast::ColumnDefinition &column) {
-  if (absl::StartsWith(column.column_name(), "OWNING_"))
-    return OwningT::OWNING;
-  else if (absl::StartsWith(column.column_name(), "ACCESSING_"))
-    return OwningT::ACCESSING;
-  else
-    return std::optional<OwningT>{};
-}
+// Determine which shards the given record reside in.
+enum class ShardLocation { NO_SHARD, NOT_IN_GIVEN_SHARD, IN_GIVEN_SHARD };
 
-std::string Dequote(const std::string &st);
+std::vector<ShardLocation> Locate(const std::string &table_name,
+                                  const util::ShardName &shard_name,
+                                  const std::vector<dataflow::Record> &records,
+                                  Connection *conn, util::SharedLock *lock);
 
 }  // namespace sqlengine
 }  // namespace shards

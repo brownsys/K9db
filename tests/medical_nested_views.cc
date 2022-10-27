@@ -5,9 +5,8 @@ TEST(E2ECorrectnessTest, MedicalChatNestedViews) {
 }
 
 int main(int argc, char **argv) {
-  return tests::TestingMain(
-      argc, argv, "medical_nested_views", 3,
-      "tests/data/medical_nested_views/schema.sql",
-      "tests/data/medical_nested_views/inserts.sql",
-      "tests/data/medical_nested_views/views.sql");
+  return tests::TestingMain(argc, argv, "medical_nested_views", 3,
+                            "tests/data/medical_nested_views/schema.sql",
+                            "tests/data/medical_nested_views/inserts.sql",
+                            "tests/data/medical_nested_views/views.sql");
 }

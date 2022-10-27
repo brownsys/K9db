@@ -70,7 +70,7 @@ class DataFlowGraphPartition {
     return this->outputs_;
   }
   const std::unordered_map<NodeIndex, std::unique_ptr<Operator>> &nodes()
-    const {
+      const {
     return this->nodes_;
   }
 

@@ -39,8 +39,8 @@ NodeIndex DataFlowGraphGenerator::AddInputOperator(
     PCHECK(matview);
     // create an ForwardViewOperator
     std::unique_ptr<ForwardViewOperator> op =
-      std::make_unique<ForwardViewOperator>(matview->output_schema(),
-      table_name, matview->index());
+        std::make_unique<ForwardViewOperator>(matview->output_schema(),
+                                              table_name, matview->index());
     CHECK(op);
     // Add the ForwardView operator to the graph, where MAT VIEW is a parent
     CHECK(this->graph_->AddForwardOperator(std::move(op), {}));
@@ -48,7 +48,7 @@ NodeIndex DataFlowGraphGenerator::AddInputOperator(
     // Doesn't correspond to view, create input operator as normal
     SchemaRef table_schema = this->state_->GetTableSchema(table_name);
     std::unique_ptr<InputOperator> input =
-    std::make_unique<InputOperator>(table_name, table_schema);
+        std::make_unique<InputOperator>(table_name, table_schema);
     // Add the input operator (table) to the graph.
     CHECK(this->graph_->AddInputNode(std::move(input)));
   }

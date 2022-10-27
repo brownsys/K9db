@@ -306,6 +306,8 @@ cc_test(
     ],
     deps = [
         ":aggregate",
+        ":filter",
+        ":matview",
         "//pelton/dataflow:key",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",

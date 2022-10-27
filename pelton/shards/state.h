@@ -7,18 +7,17 @@
 #ifndef PELTON_SHARDS_STATE_H_
 #define PELTON_SHARDS_STATE_H_
 
+#include <atomic>
 #include <list>
 #include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "pelton/shards/types.h"
-#include "pelton/shards/upgradable_lock.h"
-#include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
@@ -46,190 +45,58 @@ class SharderState {
   SharderState(const SharderState &&) = delete;
   SharderState &operator=(const SharderState &&) = delete;
 
-  // Schema manipulations.
-  void AddSchema(const UnshardedTableName &table_name,
-                 const sqlast::CreateTable &table_schema, int pk_index,
-                 const std::string &pk);
+  // Table creation.
+  Table *AddTable(Table &&table);
 
-  void AddShardKind(const ShardKind &kind, const ColumnName &pk);
+  // Only for use when handling OWNS/ACCESSES.
+  absl::Status AddTableOwner(
+      const TableName &table_name,
+      std::vector<std::unique_ptr<ShardDescriptor>> &&owner);
 
-  void AddUnshardedTable(const UnshardedTableName &table,
-                         const sqlast::CreateTable &create);
+  absl::Status AddTableAccessor(
+      const TableName &table_name,
+      std::vector<std::unique_ptr<ShardDescriptor>> &&access);
 
-  void AddShardedTable(const UnshardedTableName &table,
-                       const ShardingInformation &sharding_information,
-                       const sqlast::CreateTable &sharded_create_statement);
+  // Table lookup.
+  bool TableExists(const TableName &table_name) const;
+  bool IsOwned(const TableName &table_name) const;
+  bool IsAccessed(const TableName &table_name) const;
+  Table &GetTable(const TableName &table_name);
+  const Table &GetTable(const TableName &table_name) const;
 
-  void AddAccessorIndex(
-      const ShardKind &kind, const UnshardedTableName &table,
-      const ColumnName &accessor_column, const ColumnName &shard_by_column,
-      const IndexName &index_name,
-      const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
-          &anonymize,
-      const bool is_sharded);
+  // Shard / shardkind lookups.
+  void AddShardKind(const ShardKind &shard_kind, const ColumnName &id_column,
+                    ColumnIndex id_column_index);
+  bool ShardKindExists(const ShardKind &shard_kind) const;
+  Shard &GetShard(const ShardKind &shard_kind);
+  const Shard &GetShard(const ShardKind &shard_kind) const;
 
-  void AddAccessorIndex(
-      const ShardKind &kind, const UnshardedTableName &table,
-      const ColumnName &accessor_column,
-      const UnshardedTableName &foreign_table,
-      const ColumnName &shard_by_column, const IndexName &index_name,
-      const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
-          &anonymize,
-      const bool is_sharded);
+  // Track users.
+  void IncrementUsers(const ShardKind &kind);
+  void DecrementUsers(const ShardKind &kind);
 
-  std::list<const sqlast::AbstractStatement *> CreateShard(
-      const ShardKind &shard_kind, const UserId &user);
+  // To create unique index names.
+  uint64_t IncrementIndexCount() { return this->index_count_++; }
 
-  void RemoveUserFromShard(const ShardKind &kind, const UserId &user_id);
-
-  std::optional<sqlast::CreateTable> RemoveSchema(
-      const UnshardedTableName &table_name);
-
-  // Schema lookups.
-  const sqlast::CreateTable &GetSchema(
-      const UnshardedTableName &table_name) const;
-
-  const std::pair<int, std::string> &GetPk(
-      const UnshardedTableName &table_name) const;
-
-  bool Exists(const UnshardedTableName &table) const;
-
-  bool IsSharded(const UnshardedTableName &table) const;
-
-  const std::list<ShardingInformation> &GetShardingInformation(
-      const UnshardedTableName &table) const;
-
-  std::vector<const ShardingInformation *> GetShardingInformationFor(
-      const UnshardedTableName &table, const std::string &shard_kind) const;
-
-  bool IsPII(const UnshardedTableName &table) const;
-
-  const ColumnName &PkOfPII(const UnshardedTableName &table) const;
-
-  bool ShardExists(const ShardKind &shard_kind, const UserId &user) const;
-
-  const std::unordered_set<UserId> &UsersOfShard(const ShardKind &kind) const;
-
-  const std::unordered_set<UnshardedTableName> &TablesInShard(
-      const ShardKind &kind) const;
-
-  // Manage secondary indices.
-  bool HasIndexFor(const UnshardedTableName &table_name,
-                   const ColumnName &column_name,
-                   const ColumnName &shard_by) const;
-
-  bool HasIndicesFor(const UnshardedTableName &table_name) const;
-
-  const std::unordered_set<ColumnName> &IndicesFor(
-      const UnshardedTableName &table_name) const;
-
-  const FlowName &IndexFlow(const UnshardedTableName &table_name,
-                            const ColumnName &column_name,
-                            const ColumnName &shard_by) const;
-
-  void CreateIndex(const ShardKind &shard_kind,
-                   const UnshardedTableName &table_name,
-                   const ColumnName &column_name, const ColumnName &shard_by,
-                   const FlowName &flow_name,
-                   const sqlast::CreateIndex &create_index_stmt, bool unique);
-
-  inline std::string GenerateUniqueIndexName(UniqueLock *lock) {
-    this->_unique_index_ctr += 1;
-    return "_unq_indx_" + std::to_string(this->_unique_index_ctr);
-  }
-
-  sql::SqlResult NumShards() const;
-
-  // Returns all accessor indices associated with a given shard
-  bool HasAccessorIndices(const ShardKind &kind) const;
-  const std::vector<AccessorIndexInformation> &GetAccessorIndices(
-      const ShardKind &kind) const;
-  std::vector<const AccessorIndexInformation *> GetAccessorInformationFor(
-      const ShardKind &kind, const UnshardedTableName &table_name) const;
-
-  size_t NumShards() {
-    size_t count = 0;
-    for (auto &s : shards_) {
-      count += s.second.size();
-    }
-    return count;
-  }
-
-  // Synchronization.
-  UniqueLock WriterLock();
-  SharedLock ReaderLock() const;
-
-  // For testing
-
-  bool HasDefaultTable(const UnshardedTableName &name) const;
-
-  const std::unordered_map<UnshardedTableName, sqlast::CreateTable> &tables()
-      const {
-    return this->schema_;
+  // Debugging information / statistics.
+  std::vector<std::pair<ShardKind, uint64_t>> NumShards() const;
+  const std::unordered_map<TableName, Table> &AllTables() const {
+    return this->tables_;
   }
 
  private:
-  // The logical (unsharded) schema of every table.
-  std::unordered_map<UnshardedTableName, sqlast::CreateTable> schema_;
-  std::unordered_map<UnshardedTableName, std::pair<int, std::string>> pks_;
+  // All the different shard kinds that currently exist in the system.
+  // Does not contain any information about instances of these shards, instead
+  // merely contains schematic information about included tables and their
+  // ownership and accessorship.
+  std::unordered_map<ShardKind, Shard> shards_;
 
-  // All shard kinds as determined from the schema.
-  // Maps a shard kind (e.g. a table name with PII) to the primary key of that
-  // table.
-  std::unordered_map<ShardKind, ColumnName> kinds_;
+  // All the tables defined by the schema.
+  std::unordered_map<TableName, Table> tables_;
 
-  // Maps a shard kind into the names of all contained tables.
-  // Invariant: a table can at most belong to one shard kind.
-  std::unordered_map<ShardKind, std::list<ShardedTableName>> kind_to_tables_;
-  std::unordered_map<ShardKind, std::unordered_set<UnshardedTableName>>
-      kind_to_names_;
-
-  // Maps a table to the its sharding information.
-  // If a table is unmapped by this map, then it is not sharded.
-  // A table mapped by this map is sharded (by one or more columns).
-  // Each entry in the mapped list specifies one such shard, including
-  // the name of the table when sharded that way, as well as the column it is
-  // sharded by.
-  // When a table is sharded in several ways, it means that multiple foreign
-  // keys were specified as OWNER, and data inserted into that table is
-  // duplicated along the shards.
-  // The shard by column is removed from the actual sharded table as it can be
-  // deduced from the shard.
-  std::unordered_map<UnshardedTableName, std::list<ShardingInformation>>
-      sharded_by_;
-
-  // Stores all the users identifiers which already have had shards
-  // created for them.
-  std::unordered_map<ShardKind, std::unordered_set<UserId>> shards_;
-
-  // Maps every (sharded) table in the overall schema to its sharded schema.
-  // This can be used to create that table in a new shard.
-  // The schema matches what is stored physically in the DB after
-  // sharding and other transformations.
-  std::unordered_map<ShardedTableName, sqlast::CreateTable> sharded_schema_;
-
-  // Secondary indices.
-  std::unordered_map<ShardKind, std::vector<sqlast::CreateIndex>> create_index_;
-
-  // Map to store accessor indices
-  std::unordered_map<ShardKind, std::vector<AccessorIndexInformation>>
-      accessor_index_;
-
-  // All columns in a table that have an index.
-  std::unordered_map<UnshardedTableName, std::unordered_set<ColumnName>>
-      indices_;
-
-  // table-name -> column with an index name -> shard by column for which
-  //    the index provide values -> the corresponding flow name of the index.
-  std::unordered_map<
-      UnshardedTableName,
-      std::unordered_map<ColumnName, std::unordered_map<ColumnName, FlowName>>>
-      index_to_flow_;
-
-  // Our implementation of an upgradable shared mutex.
-  mutable UpgradableMutex mtx_;
-
-  unsigned int _unique_index_ctr = 0;
+  // Counts of users currently in the system.
+  std::unordered_map<ShardKind, std::atomic<uint64_t>> users_;
+  std::atomic<uint64_t> index_count_;
 };
 
 }  // namespace shards

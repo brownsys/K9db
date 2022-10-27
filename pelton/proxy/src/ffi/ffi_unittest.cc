@@ -66,7 +66,7 @@ TEST(PROXY, UPDATE_TEST) {
       {"INSERT INTO test3 VALUES (2, 'bye');", 1},
       {"INSERT INTO test3 VALUES (3, 'world');", 1},
       {"INSERT INTO test3 VALUES (50, NULL);", 1},
-      {"UPDATE test3 SET ID = 10 WHERE ID = 1;", 1},
+      {"UPDATE test3 SET ID = 10 WHERE ID = 1;", 2},
       {"DELETE FROM test3 WHERE ID = 3;", 1}};
   for (auto &[q, count] : tests) {
     VLOG(1) << "Running query: " << q;
@@ -124,6 +124,7 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
   // Query from table.
   FFIPreparedStatement stmt1 =
       FFIPrepare(c_conn, "SELECT * FROM test3 where ID = ?;");
+
   EXPECT_EQ(FFIPreparedStatementID(stmt1), 0) << "Bad statement id";
   EXPECT_EQ(FFIPreparedStatementArgCount(stmt1), 1) << "Bad arg count";
   EXPECT_EQ(FFIPreparedStatementArgType(stmt1, 0), CType::INT) << "Arg type";
@@ -202,6 +203,10 @@ TEST(PROXY, CLOSE_TEST) {
 int main(int argc, char **argv) {
   // Command line arugments and help message.
   FFIArgs cmd_args = FFIGflags(argc, argv, "ffi_unittest.cc");
+  EXPECT_EQ(cmd_args.workers, 3);
+  EXPECT_EQ(cmd_args.consistent, true);
+  EXPECT_EQ(cmd_args.db_name, std::string("pelton"));
+  EXPECT_EQ(cmd_args.hostname, std::string("127.0.0.1:10001"));
 
   // Drop the database (in case it existed before because of some tests).
   DropDatabase();

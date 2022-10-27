@@ -50,13 +50,8 @@ class MatViewOperator : public Operator {
   int limit() const { return this->limit_; }
   size_t offset() const { return this->offset_; }
 
-  void outkey(const PartitionKey &outkey) {
-    this->outkey_ = outkey;
-  }
-  PartitionKey &outkey() {
-    return this->outkey_;
-  }
-
+  void outkey(const PartitionKey &outkey) { this->outkey_ = outkey; }
+  PartitionKey &outkey() { return this->outkey_; }
 
  protected:
   // We do not know if we are ordered or unordered, this type is revealed

@@ -236,8 +236,9 @@ antlrcpp::Any AstTransformer::visitCreate_index_stmt(
                  std::string);
   CAST_OR_RETURN(std::string column_name, ctx->indexed_column(0)->accept(this),
                  std::string);
+  bool disk = (ctx->INMEMORY() == nullptr);
   return static_cast<std::unique_ptr<AbstractStatement>>(
-      std::make_unique<CreateIndex>(index_name, table_name, column_name));
+      std::make_unique<CreateIndex>(disk, index_name, table_name, column_name));
 }
 
 // Insert constructs.
@@ -314,7 +315,10 @@ antlrcpp::Any AstTransformer::visitUpdate_stmt(
                     ctx->expr(ctx->column_name().size())->accept(this),
                     std::unique_ptr<Expression>);
     if (expr->type() != Expression::Type::EQ &&
-        expr->type() != Expression::Type::AND) {
+        expr->type() != Expression::Type::AND &&
+        expr->type() != Expression::Type::GREATER_THAN &&
+        expr->type() != Expression::Type::IN &&
+        expr->type() != Expression::Type::IS) {
       return absl::InvalidArgumentError("Where clause must be boolean");
     }
     std::unique_ptr<BinaryExpression> bexpr(
@@ -378,7 +382,8 @@ antlrcpp::Any AstTransformer::visitSelect_core(
     if (expr->type() != Expression::Type::EQ &&
         expr->type() != Expression::Type::AND &&
         expr->type() != Expression::Type::GREATER_THAN &&
-        expr->type() != Expression::Type::IN) {
+        expr->type() != Expression::Type::IN &&
+        expr->type() != Expression::Type::IS) {
       return absl::InvalidArgumentError("Where clause must be boolean");
     }
 
@@ -439,7 +444,10 @@ antlrcpp::Any AstTransformer::visitDelete_stmt(
     MCAST_OR_RETURN(std::unique_ptr<Expression> expr, ctx->expr()->accept(this),
                     std::unique_ptr<Expression>);
     if (expr->type() != Expression::Type::EQ &&
-        expr->type() != Expression::Type::AND) {
+        expr->type() != Expression::Type::AND &&
+        expr->type() != Expression::Type::GREATER_THAN &&
+        expr->type() != Expression::Type::IN &&
+        expr->type() != Expression::Type::IS) {
       return absl::InvalidArgumentError("Where clause must be boolean");
     }
 

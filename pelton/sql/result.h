@@ -1,16 +1,55 @@
 #ifndef PELTON_SQL_RESULT_H_
 #define PELTON_SQL_RESULT_H_
 
+#include <iterator>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "glog/logging.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
+#include "pelton/util/iterator.h"
+#include "pelton/util/shard_name.h"
 
 namespace pelton {
 namespace sql {
+
+// A SqlDeleteSet represents the results of a delete operations.
+// It contains the records that were deleted, in addition to the shard each
+// was deleted from.
+class SqlDeleteSet {
+ public:
+  SqlDeleteSet() = default;
+
+  size_t AddRecord(dataflow::Record &&record);
+  void AssignToShard(size_t idx, std::string &&shard);
+
+  const std::vector<dataflow::Record> &Rows() const { return this->records_; }
+  std::vector<dataflow::Record> &&Vec() { return std::move(this->records_); }
+
+  size_t Count() const { return this->count_; }
+
+ private:
+  size_t count_ = 0;
+  std::vector<dataflow::Record> records_;
+  std::unordered_map<util::ShardName, std::vector<size_t>> shards_;
+
+  using MapIt = decltype(shards_)::const_iterator;
+  using VecIt = std::vector<size_t>::const_iterator;
+
+ public:
+  // Iterator interface.
+  using RecordsIt = decltype(records_)::const_iterator;
+  using ShardsIt = util::MapItT<MapIt, const util::ShardName &>;
+  using ShardRecordsIt = util::MapItT<VecIt, const dataflow::Record &>;
+
+ public:
+  util::Iterable<RecordsIt> IterateRecords() const;
+  util::Iterable<ShardsIt> IterateShards() const;
+  util::Iterable<ShardRecordsIt> Iterate(const util::ShardName &shard) const;
+};
 
 // An SqlResultSet represents the content of a single table.
 // An SqlResult may include multiple results when it reads from multiple tables!
@@ -116,10 +155,6 @@ class SqlResult {
     }
     return this->sets_;
   }
-
-  // NOTE(justus): This function is only safe to call if `IsQuery()` returns
-  // true.
-  bool empty() const;
 
   // Internal API: do not use outside of pelton code.
   // Appends the provided SqlResult to this SqlResult, appeneded

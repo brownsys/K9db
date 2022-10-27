@@ -218,7 +218,8 @@ void Record::SetValue(const std::string &value, size_t i) {
     // a timestamp since the epoch
     case sqlast::ColumnDefinition::Type::DATETIME:
     case sqlast::ColumnDefinition::Type::TEXT: {
-      this->data_[i].str = std::make_unique<std::string>(Value::Dequote(value));
+      this->data_[i].str =
+          std::make_unique<std::string>(sqlast::Dequote(value));
       break;
     }
     default:

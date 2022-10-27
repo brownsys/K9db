@@ -3,13 +3,6 @@
 namespace pelton {
 namespace dataflow {
 
-std::string Value::Dequote(const std::string &st) {
-  std::string s(st);
-  s.erase(remove(s.begin(), s.end(), '\"'), s.end());
-  s.erase(remove(s.begin(), s.end(), '\''), s.end());
-  return s;
-}
-
 // Copy underlying string.
 Value::Value(const Value &o) : type_(o.type_), str_() {
   this->is_null_ = o.is_null_;
@@ -168,6 +161,21 @@ const std::string &Value::GetString() const {
   CheckType(sqlast::ColumnDefinition::Type::TEXT);
   CHECK(!this->is_null_);
   return this->str_;
+}
+
+std::string Value::AsUnquotedString() const {
+  CHECK(!this->is_null_) << "Cannot unquote NULL value";
+  switch (this->type_) {
+    case sqlast::ColumnDefinition::Type::UINT:
+      return std::to_string(this->uint_);
+    case sqlast::ColumnDefinition::Type::INT:
+      return std::to_string(this->sint_);
+    case sqlast::ColumnDefinition::Type::TEXT:
+    case sqlast::ColumnDefinition::Type::DATETIME:
+      return this->str_;
+    default:
+      LOG(FATAL) << "unimplemented unquoted for Value";
+  }
 }
 
 // Printing a record to an output stream (e.g. std::cout).

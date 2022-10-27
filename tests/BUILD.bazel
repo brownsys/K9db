@@ -16,6 +16,7 @@ cc_library(
     ],
 )
 
+# lobsters.
 cc_test(
     name = "lobsters",
     timeout = "long",
@@ -30,6 +31,7 @@ cc_test(
     ],
 )
 
+# Medical chat
 cc_test(
     name = "medical",
     srcs = [
@@ -56,56 +58,22 @@ cc_test(
     ],
 )
 
+# Variable ownership/accessorship
 cc_test(
-    name = "delf_medical_retain",
-    srcs = [
-        "delf_medical_retain.cc",
-    ],
-    data = [
-        "//tests/data:delf-medical-chat-retain-data",
-    ],
-    deps = [
-        ":common",
-    ],
-)
-
-cc_test(
-    name = "delf_medical_anonymize",
-    srcs = [
-        "delf_medical_anonymize.cc",
-    ],
-    data = [
-        "//tests/data:delf-medical-chat-anonymize-data",
-    ],
-    deps = [
-        ":common",
-    ],
-)
-
-cc_test(
-    name = "varown_basic",
+    name = "varown",
     srcs = ["varown.cc"],
     data = ["//tests/data:varown"],
     deps = [":common"],
 )
 
 cc_test(
-    name = "ownCloud",
-    srcs = ["ownCloud.cc"],
-    data = ["//tests/data:ownCloud"],
-    deps = [":common"],
-)
-
-'''
-cc_test(
-    name = "varacc_basic",
+    name = "varacc",
     srcs = ["varacc.cc"],
     data = ["//tests/data:varacc"],
     deps = [":common"],
 )
-'''
 
-# TODO: uncomment when testing harness supports multi-result sets with different schemas
+# TODO: uncomment when GDPR GET/FORGET support is restored.
 # cc_test(
 #     name = "delf_ecommerce",
 #     srcs = [
@@ -113,6 +81,32 @@ cc_test(
 #     ],
 #     data = [
 #         "//tests/data:delf-ecommerce-data",
+#     ],
+#     deps = [
+#         ":common",
+#     ],
+# )
+#
+# cc_test(
+#     name = "delf_medical_retain",
+#     srcs = [
+#         "delf_medical_retain.cc",
+#     ],
+#     data = [
+#         "//tests/data:delf-medical-chat-retain-data",
+#     ],
+#     deps = [
+#         ":common",
+#     ],
+# )
+#
+# cc_test(
+#     name = "delf_medical_anonymize",
+#     srcs = [
+#         "delf_medical_anonymize.cc",
+#     ],
+#     data = [
+#         "//tests/data:delf-medical-chat-anonymize-data",
 #     ],
 #     deps = [
 #         ":common",

@@ -15,9 +15,6 @@ install the following via your package manager:
    to install for [ubuntu](https://dev.mysql.com/doc/mysql-apt-repo-quick-guide/en/).
    Make sure to afterwards run `apt-get install libmysqlcppconn8-2 libmysqlcppconn-dev` (the
    exact version is not important as long as it is 8).
- * OpenSSL (for md5 hashing) (libssl on ubuntu), works on version 1.1 but should work
-   on other versions. Install on ubuntu via `apt-get install libssl-dev openssl`
-   (specifically, we need `-lcrypto, -lssl`).
  * The memcached baseline relies on these packages `flex bison libevent-dev`.
 
 Check out [.github/workflows/ubuntutest.yml](.github/workflows/ubuntutest.yml),
@@ -75,7 +72,15 @@ To run all tests, run `bazel test ...`.
 Pelton's main entry point is its mysql proxy, which you can run using `bazel run //:pelton`.
 You can run this in various mode using `./run.sh [dbg, opt, valgrind, asan, tsan]`.
 
-## TSAN and ASAN:
+## Disabling Encryption
+Encryption is on by default. It can be turned off by passing `--encryption=off`
+to any bazel command. For example:
+```
+bazel test ... --encryption=off
+bazel run //:pelton --encryption=off
+```
+
+## TSAN and ASAN
 The JVM introduces a variety of things that look like various leaks and races. These are
 all JVM internals we have no control over and are likely correct. We suppress them when
 running the JVM.
