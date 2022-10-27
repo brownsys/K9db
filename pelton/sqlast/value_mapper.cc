@@ -106,7 +106,7 @@ void ValueMapper::VisitBinaryExpression(const sqlast::BinaryExpression &ast) {
     }
     case sqlast::Expression::Type::IS: {
       CHECK(IS_COLUMN(ast.GetLeft())) << "IS";
-      CHECK(IS_LITERAL(ast.GetLeft())) << "IS";
+      CHECK(IS_LITERAL(ast.GetRight())) << "IS";
 
       const sqlast::ColumnExpression *col = TO_COLUMN(ast.GetLeft());
       const sqlast::LiteralExpression *val = TO_LITERAL(ast.GetRight());
