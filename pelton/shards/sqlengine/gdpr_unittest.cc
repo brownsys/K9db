@@ -281,6 +281,11 @@ TEST_F(GDPRTest, DeepTransitiveTable) {
   EXPECT_EQ(db->GetShard("deep", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("deep", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
 
+  // Validate get.
+  std::string get = MakeGDPRGet("user", "0");
+  EXPECT_EQ(Execute(get, &conn).ResultSets(), 
+            (VV{(V{u_}), (V{a_, a__}), (V{p__, p___, p____}), (V{row1, row2, row4, row5})}));
+
   // Validate forget.
   std::string forget = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget, &conn), 10);
@@ -328,6 +333,14 @@ TEST_F(GDPRTest, TwoOwners) {
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{row1, row3}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+
+  // Validate get for user with id 0.
+  std::string get_u0 = MakeGDPRGet("user", "0");
+  EXPECT_EQ(Execute(get_u0, &conn).ResultSets(), (VV{(V{u_}), (V{row1, row2, row4})}));
+
+  // Validate get for user with id 10.
+  std::string get_u10 = MakeGDPRGet("user", "10");
+  EXPECT_EQ(Execute(get_u10, &conn).ResultSets(), (VV{(V{u___}), (V{row1, row3})}));
 
   // Validate forget for user with id 0.
   std::string forget1 = MakeGDPRForget("user", "0");
