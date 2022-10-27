@@ -40,7 +40,6 @@ static std::regex CANONICAL_PARAM_REGEX{TABLE_COLUMN_NAME OP Q};
 std::unordered_set<std::string> NO_VIEWS = {
     // PreparedTest.java.
     "SELECT * FROM tbl WHERE id = ?",
-    "SELECT * FROM tbl WHERE id = ? AND age > ?",
     // Lobsters.
     // Q1.
     "SELECT 1 AS `one` FROM users WHERE users.PII_username = ?",

@@ -57,7 +57,7 @@ class PreparedTest {
     PreparedStatement prepUpdate = connection.prepareStatement(PREP_UPDATE);
     prepUpdate.setInt(1, 1);
     prepUpdate.setInt(2, 10);
-    assert prepUpdate.executeUpdate() == 1;
+    assert prepUpdate.executeUpdate() == 2;
 
     prepSelect = connection.prepareStatement(PREP_SELECT[0]);
     prepSelect.setInt(1, 25);
