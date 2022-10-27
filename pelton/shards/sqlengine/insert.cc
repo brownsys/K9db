@@ -3,7 +3,6 @@
 
 #include <memory>
 #include <utility>
-#include <vector>
 
 #include "pelton/dataflow/record.h"
 #include "pelton/shards/sqlengine/index.h"
@@ -236,7 +235,7 @@ absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
   // Insert the data into the physical shards.
   ASSIGN_OR_RETURN(int result, this->InsertIntoBaseTable());
   if (result < 0) {
-    return sql::SqlResult(0);
+    return sql::SqlResult(result);
   }
 
   // Copy/move any dependent records in dependent table to the shards of
@@ -244,7 +243,7 @@ absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
   ASSIGN_OR_RETURN(int status,
                    this->AssignDependentsToShard(this->table_, records));
   if (status < 0) {
-    return sql::SqlResult(0);
+    return sql::SqlResult(status);
   }
 
   // Everything has been inserted; feed to dataflows.

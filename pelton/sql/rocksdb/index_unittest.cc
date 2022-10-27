@@ -17,6 +17,15 @@ namespace sql {
 
 #define DB_PATH "/tmp/pelton/rocksdb/index_test"
 
+std::vector<std::string> V(const std::vector<rocksdb::Slice> &v) {
+  std::vector<std::string> result;
+  result.reserve(v.size());
+  for (const auto &s : v) {
+    result.push_back(s.ToString());
+  }
+  return result;
+}
+
 // Drop the database (if it exists), and intialize a fresh rocksdb instance.
 std::unique_ptr<rocksdb::DB> InitializeDatabase() {
   std::filesystem::remove_all(DB_PATH);
@@ -91,7 +100,7 @@ TEST(RocksdbIndexTest, GetAll) {
   index.Add(z, shard100, pk2);
   index.Add(o, shard10, pk3);
 
-  EXPECT_REQ(index.Get({z, o}),
+  EXPECT_REQ(index.Get(V({z, o})),
              {{shard10, pk1}, {shard100, pk2}, {shard10, pk3}});
 }
 
@@ -104,7 +113,7 @@ TEST(RocksdbIndexTest, GetNonExistent) {
   index.Add(z, shard100, pk2);
   index.Add(o, shard10, pk3);
 
-  EXPECT_REQ(index.Get({t}), {});
+  EXPECT_REQ(index.Get(V({t})), {});
 }
 
 // Some column Values passed to get and get_all are non-existent
@@ -116,7 +125,7 @@ TEST(RocksdbIndexTest, GetSomeNonExistent) {
   index.Add(z, shard100, pk2);
   index.Add(o, shard10, pk3);
 
-  EXPECT_REQ(index.Get({t, z}), {{shard10, pk1}, {shard100, pk2}});
+  EXPECT_REQ(index.Get(V({t, z})), {{shard10, pk1}, {shard100, pk2}});
 }
 
 // Do get and get_all work if no data has been inserted yet?
@@ -124,7 +133,7 @@ TEST(RocksdbIndexTest, NoData) {
   std::unique_ptr<rocksdb::DB> db = InitializeDatabase();
 
   RocksdbIndex index(db.get(), "", 0);
-  EXPECT_REQ(index.Get({z, o, t}), {});
+  EXPECT_REQ(index.Get(V({z, o, t})), {});
 }
 
 // Does get and all confuse entries where the values are swapped
@@ -141,29 +150,31 @@ TEST(RocksdbIndexTest, SimpleGet) {
   index.Add(h, shard2, pk2);
 
   // 1 value at a time.
-  EXPECT_REQ(index.Get({o}), {{shard2, pk4}, {shard10, pk5}});
-  EXPECT_REQ(index.Get({t, t}), {{shard1, pk1}});
-  EXPECT_REQ(index.Get({z}), {{shard1, pk2}, {shard2, pk2}, {shard10, pk6}});
-  EXPECT_REQ(index.Get({h}), {{shard2, pk2}});
+  EXPECT_REQ(index.Get(V({o})), {{shard2, pk4}, {shard10, pk5}});
+  EXPECT_REQ(index.Get(V({t, t})), {{shard1, pk1}});
+  EXPECT_REQ(index.Get(V({z})), {{shard1, pk2}, {shard2, pk2}, {shard10, pk6}});
+  EXPECT_REQ(index.Get(V({h})), {{shard2, pk2}});
 
   // 2 values at a time.
-  EXPECT_REQ(index.Get({h, z}), {{shard1, pk2}, {shard2, pk2}, {shard10, pk6}});
-  EXPECT_REQ(index.Get({t, z}),
+  EXPECT_REQ(index.Get(V({h, z})),
+             {{shard1, pk2}, {shard2, pk2}, {shard10, pk6}});
+  EXPECT_REQ(index.Get(V({t, z})),
              {{shard1, pk1}, {shard1, pk2}, {shard2, pk2}, {shard10, pk6}});
-  EXPECT_REQ(index.Get({o, t}), {{shard2, pk4}, {shard10, pk5}, {shard1, pk1}});
-  EXPECT_REQ(index.Get({o, z}), {{shard2, pk4},
-                                 {shard10, pk5},
-                                 {shard1, pk2},
-                                 {shard2, pk2},
-                                 {shard10, pk6}});
+  EXPECT_REQ(index.Get(V({o, t})),
+             {{shard2, pk4}, {shard10, pk5}, {shard1, pk1}});
+  EXPECT_REQ(index.Get(V({o, z})), {{shard2, pk4},
+                                    {shard10, pk5},
+                                    {shard1, pk2},
+                                    {shard2, pk2},
+                                    {shard10, pk6}});
 
   // All values.
-  EXPECT_REQ(index.Get({t, z, o, h}), {{shard1, pk1},
-                                       {shard1, pk2},
-                                       {shard2, pk2},
-                                       {shard10, pk6},
-                                       {shard2, pk4},
-                                       {shard10, pk5}});
+  EXPECT_REQ(index.Get(V({t, z, o, h})), {{shard1, pk1},
+                                          {shard1, pk2},
+                                          {shard2, pk2},
+                                          {shard10, pk6},
+                                          {shard2, pk4},
+                                          {shard10, pk5}});
 }
 
 // Does get and get_all work correctly right after delete
@@ -183,18 +194,18 @@ TEST(RocksdbIndexTest, GetAfterDelete) {
   index.Delete(z, shard1, pk3);
 
   // 1 value at a time.
-  EXPECT_REQ(index.Get({o}), {{shard2, pk4}, {shard10, pk5}});
-  EXPECT_REQ(index.Get({t}), {});
-  EXPECT_REQ(index.Get({z, z}), {{shard1, pk2}, {shard10, pk6}});
+  EXPECT_REQ(index.Get(V({o})), {{shard2, pk4}, {shard10, pk5}});
+  EXPECT_REQ(index.Get(V({t})), {});
+  EXPECT_REQ(index.Get(V({z, z})), {{shard1, pk2}, {shard10, pk6}});
 
   // 2 values at a time.
-  EXPECT_REQ(index.Get({t, z}), {{shard1, pk2}, {shard10, pk6}});
-  EXPECT_REQ(index.Get({o, t}), {{shard2, pk4}, {shard10, pk5}});
-  EXPECT_REQ(index.Get({o, z}),
+  EXPECT_REQ(index.Get(V({t, z})), {{shard1, pk2}, {shard10, pk6}});
+  EXPECT_REQ(index.Get(V({o, t})), {{shard2, pk4}, {shard10, pk5}});
+  EXPECT_REQ(index.Get(V({o, z})),
              {{shard2, pk4}, {shard10, pk5}, {shard1, pk2}, {shard10, pk6}});
 
   // All values.
-  EXPECT_REQ(index.Get({t, z, o}),
+  EXPECT_REQ(index.Get(V({t, z, o})),
              {{shard1, pk2}, {shard10, pk6}, {shard2, pk4}, {shard10, pk5}});
 }
 
@@ -212,23 +223,25 @@ TEST(RocksdbIndexTest, GetDedup) {
   index.Add(o, shard1, pk4);
 
   // 1 value at a time.
-  EXPECT_DEQ(index.GetDedup({t}), {{{shard1}, pk1}});
-  EXPECT_DEQ(index.GetDedup({z}), {{{shard1, shard2}, pk2}, {{shard10}, pk5}});
-  EXPECT_DEQ(index.GetDedup({o}), {{{shard1, shard2}, pk2}, {{shard1}, pk4}});
+  EXPECT_DEQ(index.GetDedup(V({t})), {{{shard1}, pk1}});
+  EXPECT_DEQ(index.GetDedup(V({z})),
+             {{{shard1, shard2}, pk2}, {{shard10}, pk5}});
+  EXPECT_DEQ(index.GetDedup(V({o})),
+             {{{shard1, shard2}, pk2}, {{shard1}, pk4}});
 
   // 2 values at a time.
-  EXPECT_DEQ(index.GetDedup({t, z}),
+  EXPECT_DEQ(index.GetDedup(V({t, z})),
              {{{shard1}, pk1}, {{shard1, shard2}, pk2}, {{shard10}, pk5}});
-  EXPECT_DEQ(index.GetDedup({o, t}),
+  EXPECT_DEQ(index.GetDedup(V({o, t})),
              {{{shard1}, pk1}, {{shard1, shard2}, pk2}, {{shard1}, pk4}});
-  EXPECT_DEQ(index.GetDedup({o, z}),
+  EXPECT_DEQ(index.GetDedup(V({o, z})),
              {{{shard1, shard2}, pk2}, {{shard10}, pk5}, {{shard1}, pk4}});
 
   // All values.
-  EXPECT_DEQ(index.GetDedup({t, z, o}), {{{shard1}, pk1},
-                                         {{shard1, shard2}, pk2},
-                                         {{shard10}, pk5},
-                                         {{shard1}, pk4}});
+  EXPECT_DEQ(index.GetDedup(V({t, z, o})), {{{shard1}, pk1},
+                                            {{shard1, shard2}, pk2},
+                                            {{shard10}, pk5},
+                                            {{shard1}, pk4}});
 }
 
 // For PK indices.
@@ -250,27 +263,27 @@ TEST(RocksdbPKIndex, GetAfterDelete) {
   index.Delete(pk3, shard1);
 
   // 1 value at a time.
-  EXPECT_REQ(index.Get({pk1}), {{shard2, pk1}, {shard10, pk1}});
-  EXPECT_REQ(index.Get({pk2}), {{shard1, pk2}});
-  EXPECT_REQ(index.Get({pk3}), {});
-  EXPECT_REQ(index.Get({pk4, pk4}), {{shard2, pk4}, {shard100, pk4}});
-  EXPECT_REQ(index.Get({pk5}), {{shard10, pk5}});
-  EXPECT_REQ(index.Get({pk6}), {});
+  EXPECT_REQ(index.Get(V({pk1})), {{shard2, pk1}, {shard10, pk1}});
+  EXPECT_REQ(index.Get(V({pk2})), {{shard1, pk2}});
+  EXPECT_REQ(index.Get(V({pk3})), {});
+  EXPECT_REQ(index.Get(V({pk4, pk4})), {{shard2, pk4}, {shard100, pk4}});
+  EXPECT_REQ(index.Get(V({pk5})), {{shard10, pk5}});
+  EXPECT_REQ(index.Get(V({pk6})), {});
 
   // 2 values at a time.
-  EXPECT_REQ(index.Get({pk1, pk2}),
+  EXPECT_REQ(index.Get(V({pk1, pk2})),
              {{shard2, pk1}, {shard10, pk1}, {shard1, pk2}});
-  EXPECT_REQ(index.Get({pk1, pk3}), {{shard2, pk1}, {shard10, pk1}});
-  EXPECT_REQ(index.Get({pk3, pk6}), {});
-  EXPECT_REQ(index.Get({pk4, pk5}),
+  EXPECT_REQ(index.Get(V({pk1, pk3})), {{shard2, pk1}, {shard10, pk1}});
+  EXPECT_REQ(index.Get(V({pk3, pk6})), {});
+  EXPECT_REQ(index.Get(V({pk4, pk5})),
              {{shard2, pk4}, {shard10, pk5}, {shard100, pk4}});
 
   // 3 values.
-  EXPECT_REQ(index.Get({pk1, pk2, pk4}), {{shard2, pk1},
-                                          {shard2, pk4},
-                                          {shard10, pk1},
-                                          {shard1, pk2},
-                                          {shard100, pk4}});
+  EXPECT_REQ(index.Get(V({pk1, pk2, pk4})), {{shard2, pk1},
+                                             {shard2, pk4},
+                                             {shard10, pk1},
+                                             {shard1, pk2},
+                                             {shard100, pk4}});
 }
 
 TEST(RocksdbPKIndex, GetDedup) {
@@ -284,21 +297,21 @@ TEST(RocksdbPKIndex, GetDedup) {
   index.Add(pk3, shard2);
 
   // 1 value at a time.
-  EXPECT_DEQ(index.GetDedup({pk1}), {{{shard1, shard2}, pk1}});
-  EXPECT_DEQ(index.GetDedup({pk2}), {{{shard1}, pk2}});
-  EXPECT_DEQ(index.GetDedup({pk3}), {{{shard10, shard2}, pk3}});
+  EXPECT_DEQ(index.GetDedup(V({pk1})), {{{shard1, shard2}, pk1}});
+  EXPECT_DEQ(index.GetDedup(V({pk2})), {{{shard1}, pk2}});
+  EXPECT_DEQ(index.GetDedup(V({pk3})), {{{shard10, shard2}, pk3}});
 
   // 2 values at a time.
-  EXPECT_DEQ(index.GetDedup({pk1, pk2}),
+  EXPECT_DEQ(index.GetDedup(V({pk1, pk2})),
              {{{shard1, shard2}, pk1}, {{shard1}, pk2}});
-  EXPECT_DEQ(index.GetDedup({pk1, pk3}),
+  EXPECT_DEQ(index.GetDedup(V({pk1, pk3})),
              {{{shard1, shard2}, pk1}, {{shard10, shard2}, pk3}});
-  EXPECT_DEQ(index.GetDedup({pk2, pk3}),
+  EXPECT_DEQ(index.GetDedup(V({pk2, pk3})),
              {{{shard1}, pk2}, {{shard10, shard2}, pk3}});
 
   // 3 values.
   EXPECT_DEQ(
-      index.GetDedup({pk1, pk2, pk3}),
+      index.GetDedup(V({pk1, pk2, pk3})),
       {{{shard1, shard2}, pk1}, {{shard1}, pk2}, {{shard10, shard2}, pk3}});
 }
 
@@ -312,15 +325,15 @@ TEST(RocksdbPKIndex, CountShards) {
   index.Add(pk3, shard10);
   index.Add(pk3, shard2);
 
-  EXPECT_EQ(index.CountShards({pk1}), (std::vector<size_t>{2}));
-  EXPECT_EQ(index.CountShards({pk2}), (std::vector<size_t>{1}));
-  EXPECT_EQ(index.CountShards({pk3}), (std::vector<size_t>{2}));
-  EXPECT_EQ(index.CountShards({pk1, pk2}), (std::vector<size_t>{2, 1}));
-  EXPECT_EQ(index.CountShards({pk3, pk2}), (std::vector<size_t>{2, 1}));
-  EXPECT_EQ(index.CountShards({pk3, pk1}), (std::vector<size_t>{2, 2}));
-  EXPECT_EQ(index.CountShards({pk1, pk2, pk3, pk6}),
+  EXPECT_EQ(index.CountShards(V({pk1})), (std::vector<size_t>{2}));
+  EXPECT_EQ(index.CountShards(V({pk2})), (std::vector<size_t>{1}));
+  EXPECT_EQ(index.CountShards(V({pk3})), (std::vector<size_t>{2}));
+  EXPECT_EQ(index.CountShards(V({pk1, pk2})), (std::vector<size_t>{2, 1}));
+  EXPECT_EQ(index.CountShards(V({pk3, pk2})), (std::vector<size_t>{2, 1}));
+  EXPECT_EQ(index.CountShards(V({pk3, pk1})), (std::vector<size_t>{2, 2}));
+  EXPECT_EQ(index.CountShards(V({pk1, pk2, pk3, pk6})),
             (std::vector<size_t>{2, 1, 2, 0}));
-  EXPECT_EQ(index.CountShards({pk3, pk1, pk6, pk2}),
+  EXPECT_EQ(index.CountShards(V({pk3, pk1, pk6, pk2})),
             (std::vector<size_t>{2, 2, 0, 1}));
 }
 

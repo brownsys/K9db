@@ -315,7 +315,10 @@ antlrcpp::Any AstTransformer::visitUpdate_stmt(
                     ctx->expr(ctx->column_name().size())->accept(this),
                     std::unique_ptr<Expression>);
     if (expr->type() != Expression::Type::EQ &&
-        expr->type() != Expression::Type::AND) {
+        expr->type() != Expression::Type::AND &&
+        expr->type() != Expression::Type::GREATER_THAN &&
+        expr->type() != Expression::Type::IN &&
+        expr->type() != Expression::Type::IS) {
       return absl::InvalidArgumentError("Where clause must be boolean");
     }
     std::unique_ptr<BinaryExpression> bexpr(
@@ -379,7 +382,8 @@ antlrcpp::Any AstTransformer::visitSelect_core(
     if (expr->type() != Expression::Type::EQ &&
         expr->type() != Expression::Type::AND &&
         expr->type() != Expression::Type::GREATER_THAN &&
-        expr->type() != Expression::Type::IN) {
+        expr->type() != Expression::Type::IN &&
+        expr->type() != Expression::Type::IS) {
       return absl::InvalidArgumentError("Where clause must be boolean");
     }
 
@@ -440,7 +444,10 @@ antlrcpp::Any AstTransformer::visitDelete_stmt(
     MCAST_OR_RETURN(std::unique_ptr<Expression> expr, ctx->expr()->accept(this),
                     std::unique_ptr<Expression>);
     if (expr->type() != Expression::Type::EQ &&
-        expr->type() != Expression::Type::AND) {
+        expr->type() != Expression::Type::AND &&
+        expr->type() != Expression::Type::GREATER_THAN &&
+        expr->type() != Expression::Type::IN &&
+        expr->type() != Expression::Type::IS) {
       return absl::InvalidArgumentError("Where clause must be boolean");
     }
 

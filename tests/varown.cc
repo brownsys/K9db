@@ -1,4 +1,3 @@
-
 #include "glog/logging.h"
 #include "pelton/shards/state.h"
 #include "tests/common.h"
@@ -9,30 +8,19 @@ std::string data_file(const std::string &s) { return "tests/data/varown/" + s; }
 
 class Varown : public tests::CleanDatabaseFixture {};
 
+std::vector<pelton::dataflow::Record> SelectTFromDefaultDB(int64_t id) {
+  auto *instance = tests::GetPeltonInstance();
+  auto *db = instance->state->Database();
+  std::vector<pelton::sql::KeyPair> vec;
+  vec.emplace_back(pelton::util::ShardName(DEFAULT_SHARD, DEFAULT_SHARD),
+                   pelton::dataflow::Value(id));
+  return db->GetDirect("t", 0, vec);
+}
+
 // ================= OWNS =================
 
-// A simple test that ensures a default table has been isntalled for the
-// pointed-to table in a varown scenario
-TEST_F(Varown, InstallDefaultTable) {
-  EXPECT_TRUE(
-      tests::GetPeltonInstance()->state->sharder_state()->HasDefaultTable("t"));
-}
-
-// Storage: A resource that is variably shared shows up a users muDB's
-TEST_F(Varown, Storage1) {
-  // FIXME: In the test files it says "update # = 0" for the insertion of the
-  // pointed-to resource, however that should be 1, obviously. Aka the update
-  // count for sharded insertion of variable owner resourecs is incorrect at the
-  // moment. EDIT: Actually, in "storage2" this works correctly and the update
-  // count for inserting the reosurce is 2. No idea why it doesn't show
-  // correctly here.
-  tests::RunTest(data_file("storage1"));
-}
-// Storage 2: A resource that has multiple owners shows up in both users muDB's
-TEST_F(Varown, Storage2) { tests::RunTest(data_file("storage2")); }
-
-// [Delayed] Movement: A resource that already exists is moved to the target
-// user shard
+// Storage: A resource that shows up in owning user(s) shard.
+TEST_F(Varown, Storage2) { tests::RunTest(data_file("storage")); }
 
 // Point Lookup: A variably owned resource can be looked up normally
 TEST_F(Varown, Lookup) { tests::RunTest(data_file("lookup")); }
@@ -55,44 +43,29 @@ TEST_F(Varown, DeleteRel2) { tests::RunTest(data_file("delete_rel2")); }
 // Selecting all records from the target table does not return duplicates.
 TEST_F(Varown, SelectStar) { tests::RunTest(data_file("select_star")); }
 
-TEST_F(Varown, MoveFromNonDefaultOrderedColumn) {
-  tests::RunTest(data_file("move_from_non_default_ordered_column"));
-}
-
+// Insert resource then association: resource moves from default shard to user.
 TEST_F(Varown, NaturalInsertOrder) {
   tests::RunTest(data_file("natural_insert_order"));
+  EXPECT_EQ(SelectTFromDefaultDB(2000).size(), 0);
 }
 
-pelton::sql::SqlResult SelectTFromDefaultDB(const std::string &id) {
-  pelton::sqlast::Select select("t");
-  select.AddColumn("*");
-  auto binexp = std::make_unique<pelton::sqlast::BinaryExpression>(
-      pelton::sqlast::Expression::Type::EQ);
-  binexp->SetLeft(std::make_unique<pelton::sqlast::ColumnExpression>("id"));
-  binexp->SetRight(std::make_unique<pelton::sqlast::LiteralExpression>(id));
-  select.SetWhereClause(std::move(binexp));
-  auto *instance = tests::GetPeltonInstance();
-  return instance->executor.Default(&select);
+// Insert another association for an owned resource: resource copied from
+// previous user to new user.
+TEST_F(Varown, CopyFromNonDefault) {
+  tests::RunTest(data_file("copy_from_non_default"));
 }
 
-TEST_F(Varown, DeleteFromDefaultDb) {
-  tests::RunTest(data_file("delete_from_default_db"));
-  EXPECT_TRUE(SelectTFromDefaultDB("2000").empty());
+// Deleting last association moves owned resource to default shard.
+TEST_F(Varown, DeleteMove) {
+  tests::RunTest(data_file("delete_move"));
+  EXPECT_EQ(SelectTFromDefaultDB(2000).size(), 1);
 }
 
-TEST_F(Varown, MoveToDefaultDB) {
-  tests::RunTest(data_file("move_to_default_db_after_delete"));
-  EXPECT_TRUE(!SelectTFromDefaultDB("2000").empty());
+// Deleting association keeps resource unmoved if other associations exists.
+TEST_F(Varown, DeleteNoMove) {
+  tests::RunTest(data_file("delete_no_move"));
+  EXPECT_EQ(SelectTFromDefaultDB(1005).size(), 0);
 }
-
-TEST_F(Varown, MovesWithRelDuplicates) {
-  tests::RunTest(data_file("no_move_to_default_db_on_duplicate_rel"));
-  EXPECT_TRUE(SelectTFromDefaultDB("1005").empty());
-}
-
-// ================= ACCESSES =================
-
-// An accesible resource shows up in a GDPR GET for the user
 
 int main(int argc, char **argv) {
   try {

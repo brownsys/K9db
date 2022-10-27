@@ -7,6 +7,8 @@
 
 #include "glog/logging.h"
 
+#define __COMMA ,
+
 #define __CHECK_STATUS_VAR_NAME(arg) __CHECK_STATUS_RESULT_##arg
 #define __CHECK_STATUS_VAL(arg) __CHECK_STATUS_VAR_NAME(arg)
 #define CHECK_STATUS(status)                  \

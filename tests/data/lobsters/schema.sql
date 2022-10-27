@@ -22,11 +22,30 @@ CREATE TABLE users ( \
   disabled_invite_at datetime, \
   disabled_invite_by_user_id int, \
   disabled_invite_reason varchar(200), \
-  settings text, \
-  FOREIGN KEY (banned_by_user_id) REFERENCES users(id), \
-  FOREIGN KEY (invited_by_user_id) REFERENCES users(id), \
-  FOREIGN KEY (disabled_invite_by_user_id) REFERENCES users(id) \
+  settings text \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
+CREATE TABLE stories ( \
+  id int NOT NULL PRIMARY KEY, \
+  created_at datetime, \
+  user_id int, \
+  url varchar(250), \
+  title varchar(150) NOT NULL, \
+  description text, \
+  short_id varchar(6) NOT NULL UNIQUE, \
+  is_expired int NOT NULL, \
+  upvotes int NOT NULL, \
+  downvotes int NOT NULL, \
+  is_moderated int NOT NULL, \
+  hotness int NOT NULL, \
+  markeddown_description text, \
+  story_cache text, \
+  comments_count int NOT NULL, \
+  merged_story_id int, \
+  unavailable_at datetime, \
+  twitter_id varchar(20), \
+  user_is_author int, \
+  FOREIGN KEY (user_id) REFERENCES users(id) \
+) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE comments ( \
   id int NOT NULL PRIMARY KEY, \
   created_at datetime NOT NULL, \
@@ -73,9 +92,9 @@ CREATE TABLE hats ( \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE TABLE hidden_stories ( \
   id int NOT NULL PRIMARY KEY, \
-  OWNER user_id int, \
+  OWNER_user_id int, \
   story_id int, \
-  FOREIGN KEY (user_id) REFERENCES users(id), \
+  FOREIGN KEY (OWNER_user_id) REFERENCES users(id), \
   FOREIGN KEY (story_id) REFERENCES stories(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE TABLE invitation_requests ( \
@@ -136,42 +155,20 @@ CREATE TABLE read_ribbons ( \
   is_following int, \
   created_at datetime NOT NULL, \
   updated_at datetime NOT NULL, \
-  OWNER user_id int, \
+  OWNER_user_id int, \
   story_id int, \
-  FOREIGN KEY (user_id) REFERENCES users(id), \
+  FOREIGN KEY (OWNER_user_id) REFERENCES users(id), \
   FOREIGN KEY (story_id) REFERENCES stories(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE saved_stories ( \
   id int NOT NULL PRIMARY KEY, \
   created_at datetime NOT NULL, \
   updated_at datetime NOT NULL, \
-  OWNER user_id int, \
+  OWNER_user_id int, \
   story_id int, \
-  FOREIGN KEY (user_id) REFERENCES users(id), \
+  FOREIGN KEY (OWNER_user_id) REFERENCES users(id), \
   FOREIGN KEY (story_id) REFERENCES stories(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
-CREATE TABLE stories ( \
-  id int NOT NULL PRIMARY KEY, \
-  created_at datetime, \
-  user_id int, \
-  url varchar(250), \
-  title varchar(150) NOT NULL, \
-  description text, \
-  short_id varchar(6) NOT NULL UNIQUE, \
-  is_expired int NOT NULL, \
-  upvotes int NOT NULL, \
-  downvotes int NOT NULL, \
-  is_moderated int NOT NULL, \
-  hotness int NOT NULL, \
-  markeddown_description text, \
-  story_cache text, \
-  comments_count int NOT NULL, \
-  merged_story_id int, \
-  unavailable_at datetime, \
-  twitter_id varchar(20), \
-  user_is_author int, \
-  FOREIGN KEY (user_id) REFERENCES users(id) \
-) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
 -- Need this index for transitive sharding.
 CREATE INDEX storiespk ON stories(id);
 CREATE INDEX stories_short_index ON stories(short_id);

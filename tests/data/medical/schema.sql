@@ -21,7 +21,7 @@ CREATE TABLE address_patients ( \
   PRIMARY KEY(id) \
 );
 CREATE TABLE chat ( \
-  id int AUTO_INCREMENT, \
+  id int, \
   OWNER_patient_id int, \
   doctor_id int, \
   message text, \

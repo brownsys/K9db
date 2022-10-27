@@ -32,13 +32,6 @@ absl::StatusOr<IndexDescriptor> Create(const std::string &table_name,
                                        Connection *connection,
                                        util::UniqueLock *lock);
 
-// Determine any shard that the given record resides in.
-// Returns an arbitrary one of the shards that the record is in for shared data.
-std::unordered_set<util::ShardName> LocateAll(const std::string &table_name,
-                                              const dataflow::Value &pk,
-                                              Connection *conn,
-                                              util::SharedLock *lock);
-
 }  // namespace index
 }  // namespace sqlengine
 }  // namespace shards

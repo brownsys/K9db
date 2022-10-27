@@ -1,12 +1,12 @@
-INSERT INTO user VALUES (3, "b");
-INSERT INTO user VALUES (4, "c")
+INSERT INTO user VALUES (3, 'b');
+INSERT INTO user VALUES (4, 'c')
 
 INSERT INTO rel VALUES (103, 3, 1002);
 INSERT INTO rel VALUES (104, 4, 1002);
 
-INSERT INTO t VALUES (1002, "target");
+INSERT INTO t VALUES (1002, 'target');
 
 DELETE FROM t WHERE id = 1002;
 
-GDPR GET user 3;
-GDPR GET user 4;
+#GDPR GET user 3;
+#GDPR GET user 4;

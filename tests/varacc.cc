@@ -11,13 +11,9 @@ class Varacc : public tests::CleanDatabaseFixture {};
 // ================= ACCESSES =================
 
 // An accesible resource shows up in a GDPR GET for the user
-
-// TEST_F(Varacc, Access) {
-//   tests::RunTest(data_file("access"));
-// }
+TEST_F(Varacc, Access) { tests::RunTest(data_file("access")); }
 
 // An accessible resource is not deleted if the accessor forgets their data
-
 TEST_F(Varacc, GDPRForget) { tests::RunTest(data_file("forget")); }
 
 int main(int argc, char **argv) {

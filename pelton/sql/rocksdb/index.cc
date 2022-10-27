@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <utility>
 
+#include "pelton/util/iterator.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -29,9 +30,10 @@ class IndexPrefixTransform : public rocksdb::SliceTransform {
 };
 
 // Helper: avoids writing the Get code twice for regular and dedup lookups.
-template <typename T, typename R>
+template <typename T, typename R, bool shards_specified = false>
 T GetHelper(rocksdb::DB *db, rocksdb::ColumnFamilyHandle *handle,
-            const std::vector<rocksdb::Slice> &values) {
+            std::vector<std::string> &&values,
+            std::vector<std::string> &&shards = {}) {
   // Iterator options.
   rocksdb::ReadOptions options;
   options.fill_cache = false;
@@ -44,22 +46,37 @@ T GetHelper(rocksdb::DB *db, rocksdb::ColumnFamilyHandle *handle,
   std::unique_ptr<rocksdb::Iterator> it(ptr);
 
   // Make and sort all prefixes.
-  std::vector<std::string> prefixes;
-  prefixes.reserve(values.size());
-  for (const rocksdb::Slice &slice : values) {
-    prefixes.push_back(slice.ToString() + __ROCKSSEP);
+  for (std::string &val : values) {
+    val.push_back(__ROCKSSEP);
   }
-  std::sort(prefixes.begin(), prefixes.end());
+
+  if constexpr (shards_specified) {
+    if (shards.size() == values.size()) {
+      auto [b, e] = util::Zip(&values, &shards);
+      std::sort(b, e);
+    } else {
+      LOG(FATAL) << "Lookup with shards has bad number of shards";
+    }
+  } else {
+    std::sort(values.begin(), values.end());
+  }
 
   // Holds the result.
   T result;
 
   // Go through prefixes in order.
-  for (const std::string &prefix : prefixes) {
-    rocksdb::Slice pslice(prefix);
+  for (size_t i = 0; i < values.size(); i++) {
+    const std::string &value = values.at(i);
+    rocksdb::Slice pslice(value);
     for (it->Seek(pslice); it->Valid(); it->Next()) {
       R record(it->key());
-      result.emplace(record.TargetKey());
+      if constexpr (shards_specified) {
+        if (record.GetShard() == shards.at(i)) {
+          result.emplace(record.TargetKey());
+        }
+      } else {
+        result.emplace(record.TargetKey());
+      }
     }
   }
   return result;
@@ -105,12 +122,19 @@ void RocksdbIndex::Delete(const rocksdb::Slice &value,
 }
 
 // Get by value.
-IndexSet RocksdbIndex::Get(const std::vector<rocksdb::Slice> &v) const {
-  return GetHelper<IndexSet, IRecord>(this->db_, this->handle_.get(), v);
+IndexSet RocksdbIndex::Get(std::vector<std::string> &&v) const {
+  return GetHelper<IndexSet, IRecord>(this->db_, this->handle_.get(),
+                                      std::move(v));
 }
-DedupIndexSet RocksdbIndex::GetDedup(
-    const std::vector<rocksdb::Slice> &v) const {
-  return GetHelper<DedupIndexSet, IRecord>(this->db_, this->handle_.get(), v);
+DedupIndexSet RocksdbIndex::GetDedup(std::vector<std::string> &&v) const {
+  return GetHelper<DedupIndexSet, IRecord>(this->db_, this->handle_.get(),
+                                           std::move(v));
+}
+
+IndexSet RocksdbIndex::GetWithShards(std::vector<std::string> &&shards,
+                                     std::vector<std::string> &&values) const {
+  return GetHelper<IndexSet, IRecord, true>(
+      this->db_, this->handle_.get(), std::move(values), std::move(shards));
 }
 
 /*
@@ -148,17 +172,18 @@ void RocksdbPKIndex::Delete(const rocksdb::Slice &pk_value,
 }
 
 // Get by value.
-IndexSet RocksdbPKIndex::Get(const std::vector<rocksdb::Slice> &v) const {
-  return GetHelper<IndexSet, IRecord>(this->db_, this->handle_.get(), v);
+IndexSet RocksdbPKIndex::Get(std::vector<std::string> &&v) const {
+  return GetHelper<IndexSet, IRecord>(this->db_, this->handle_.get(),
+                                      std::move(v));
 }
-DedupIndexSet RocksdbPKIndex::GetDedup(
-    const std::vector<rocksdb::Slice> &v) const {
-  return GetHelper<DedupIndexSet, IRecord>(this->db_, this->handle_.get(), v);
+DedupIndexSet RocksdbPKIndex::GetDedup(std::vector<std::string> &&v) const {
+  return GetHelper<DedupIndexSet, IRecord>(this->db_, this->handle_.get(),
+                                           std::move(v));
 }
 
 // Count how many shard each pk value is in.
 std::vector<size_t> RocksdbPKIndex::CountShards(
-    const std::vector<rocksdb::Slice> &pk_values) const {
+    std::vector<std::string> &&pk_values) const {
   // Iterator options.
   rocksdb::ReadOptions options;
   options.fill_cache = false;
@@ -171,20 +196,22 @@ std::vector<size_t> RocksdbPKIndex::CountShards(
   std::unique_ptr<rocksdb::Iterator> it(ptr);
 
   // Make and sort all prefixes.
-  std::vector<std::pair<std::string, size_t>> prefixes;
-  prefixes.reserve(pk_values.size());
-  for (size_t idx = 0; idx < pk_values.size(); idx++) {
-    const rocksdb::Slice &slice = pk_values.at(idx);
-    prefixes.emplace_back(slice.ToString() + __ROCKSSEP, idx);
+  std::vector<size_t> indices;
+  indices.reserve(pk_values.size());
+  for (std::string &pk : pk_values) {
+    indices.push_back(indices.size());
+    pk.push_back(__ROCKSSEP);
   }
-  std::sort(prefixes.begin(), prefixes.end());
+
+  auto [b, e] = util::Zip(&pk_values, &indices);
+  std::sort(b, e);
 
   // Holds the result.
   std::vector<size_t> result(pk_values.size(), 0);
 
   // Go through prefixes in order.
-  for (const auto &[prefix, idx] : prefixes) {
-    rocksdb::Slice pslice(prefix);
+  for (const auto &[pk_value, idx] : util::Zip(&pk_values, &indices)) {
+    rocksdb::Slice pslice(pk_value);
     for (it->Seek(pslice); it->Valid(); it->Next()) {
       result[idx]++;
     }

@@ -16,13 +16,7 @@ size_t SqlDeleteSet::AddRecord(dataflow::Record &&record) {
 void SqlDeleteSet::AssignToShard(size_t idx, std::string &&shard) {
   auto [it, _] = this->shards_.emplace(std::move(shard), 0);
   it->second.push_back(idx);
-}
-
-const dataflow::Record &SqlDeleteSet::Map(const VecIt *it) const {
-  return this->records_.at(**it);
-}
-const util::ShardName &SqlDeleteSet::Map(const MapIt *it) const {
-  return (*it)->first;
+  this->count_++;
 }
 
 util::Iterable<SqlDeleteSet::RecordsIt> SqlDeleteSet::IterateRecords() const {
@@ -30,14 +24,17 @@ util::Iterable<SqlDeleteSet::RecordsIt> SqlDeleteSet::IterateRecords() const {
                                    this->records_.cend());
 }
 util::Iterable<SqlDeleteSet::ShardsIt> SqlDeleteSet::IterateShards() const {
-  return util::Iterable<ShardsIt>(ShardsIt(this->shards_.cbegin(), *this),
-                                  ShardsIt(this->shards_.cend(), *this));
+  return util::Map(&this->shards_,
+                   [](MapIt::reference ref) -> const util::ShardName & {
+                     return ref.first;
+                   });
 }
 util::Iterable<SqlDeleteSet::ShardRecordsIt> SqlDeleteSet::Iterate(
     const util::ShardName &shard) const {
   const std::vector<size_t> &vec = this->shards_.at(shard);
-  return util::Iterable<ShardRecordsIt>(ShardRecordsIt(vec.begin(), *this),
-                                        ShardRecordsIt(vec.end(), *this));
+  return util::Map(&vec, [&](VecIt::reference ref) -> const dataflow::Record & {
+    return this->records_.at(ref);
+  });
 }
 
 // SqlResultSet.

@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "absl/status/statusor.h"
@@ -39,16 +40,17 @@ class DeleteContext {
 
   /* Main entry point for insert: Executes the statement against the shards. */
   absl::StatusOr<sql::SqlResult> Exec();
+  absl::StatusOr<std::pair<std::vector<dataflow::Record>, int>> ExecReturning();
 
  private:
-  /* Deleting the record from the database. */
-  absl::StatusOr<sql::SqlDeleteSet> DeleteFromBaseTable();
+  using RecordsIterable = util::Iterable<sql::SqlDeleteSet::ShardRecordsIt>;
 
   /* Recursively deleting records in dependent tables from the affected
-     shard.
-  absl::StatusOr<int> DeleteDependentsFromShard(
-      const Table &table, const std::vector<dataflow::Record> &records);
-  */
+     shard. */
+  template <typename Iterable>
+  absl::StatusOr<int> DeleteDependents(const Table &table,
+                                       const util::ShardName &shard_name,
+                                       Iterable &&records);
 
   /* Members. */
   const sqlast::Delete &stmt_;
@@ -66,6 +68,10 @@ class DeleteContext {
 
   // Shared Lock so we can read from the states safetly.
   util::SharedLock *lock_;
+
+  // Records that have already been moved to default (to avoid double moving).
+  // TableName -> { PKs of records that were moved }
+  std::unordered_map<std::string, std::unordered_set<std::string>> moved_;
 };
 
 }  // namespace sqlengine

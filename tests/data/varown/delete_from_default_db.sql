@@ -1,2 +1,0 @@
-INSERT INTO t VALUES (2000, "I must be gone");
-INSERT INTO rel VALUES (200, 0, 2000);

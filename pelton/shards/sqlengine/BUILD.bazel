@@ -16,8 +16,9 @@ cc_library(
         ":index",
         ":insert",
         ":select",
-        #":update",
+        ":update",
         ":view",
+        "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
@@ -26,9 +27,7 @@ cc_library(
         "//pelton/sqlast:parser",
         "//pelton/util:status",
         "//pelton/util:upgradable_lock",
-        #"@antlr4_runtimes//:cpp",
         "@com_google_absl//absl/status",
-        #"@grammars-v4//:sqlparser",
     ],
 )
 
@@ -42,8 +41,13 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
+        ":index",
+        "//pelton:connection",
+        "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sqlast:ast",
+        "//pelton/util:shard_name",
+        "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -158,6 +162,34 @@ cc_library(
 )
 
 cc_library(
+    name = "update",
+    srcs = [
+        "update.cc",
+    ],
+    hdrs = [
+        "update.h",
+    ],
+    deps = [
+        ":delete",
+        ":insert",
+        "//pelton:connection",
+        "//pelton/dataflow:dstate",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/dataflow:value",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/sql:abstract_connection",
+        "//pelton/sql:result",
+        "//pelton/sqlast:ast",
+        "//pelton/util:shard_name",
+        "//pelton/util:status",
+        "//pelton/util:upgradable_lock",
+        "@com_google_absl//absl/status",
+    ],
+)
+
+cc_library(
     name = "gdpr",
     srcs = [
         "gdpr.cc",
@@ -193,7 +225,7 @@ cc_library(
         "delete.h",
     ],
     deps = [
-        ":index",
+        ":util",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:record",
@@ -204,6 +236,7 @@ cc_library(
         "//pelton/sql:abstract_connection",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
+        "//pelton/util:iterator",
         "//pelton/util:shard_name",
         "//pelton/util:status",
         "//pelton/util:upgradable_lock",

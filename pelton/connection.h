@@ -55,6 +55,7 @@ class State {
   // Locks.
   util::UniqueLock WriterLock();
   util::SharedLock ReaderLock() const;
+  util::SharedLock CanonicalReaderLock() const;
 
  private:
   // Component states.
@@ -66,6 +67,7 @@ class State {
   std::unordered_map<std::string, prepared::CanonicalDescriptor> stmts_;
   // Lock for managing stmts_.
   mutable util::UpgradableMutex mtx_;
+  mutable util::UpgradableMutex canonical_mtx_;
 };
 
 struct Connection {
