@@ -329,9 +329,21 @@ cc_test(
 )
 
 cc_test(
-    name = "gdpr-test",
+    name = "gdpr-get-test",
     srcs = [
-        "gdpr_unittest.cc",
+        "gdpr_get_unittest.cc",
+    ],
+    deps = [
+        ":tests_helpers",
+        "//pelton/util:shard_name",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "gdpr-forget-test",
+    srcs = [
+        "gdpr_forget_unittest.cc",
     ],
     deps = [
         ":tests_helpers",

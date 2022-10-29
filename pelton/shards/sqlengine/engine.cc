@@ -97,9 +97,7 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       std::cout << "CREATE INDEX CALLED" << std::endl;
       return sql::SqlResult(true);
     }
-    */
 
-    /*
     // Case 8: GDPR (GET | FORGET) statements.
     case sqlast::AbstractStatement::Type::GDPR: {
       auto *stmt = static_cast<sqlast::GDPRStatement *>(statement.get());
