@@ -12,7 +12,7 @@
 #include "pelton/shards/types.h"
 // #include "pelton/shards/sqlengine/delete.h"
 #include "pelton/shards/sqlengine/index.h"
-// #include "pelton/shards/sqlengine/select.h"
+#include "pelton/shards/sqlengine/select.h"
 // #include "pelton/shards/sqlengine/update.h"
 // #include "pelton/shards/sqlengine/util.h"
 #include "pelton/util/shard_name.h"
@@ -400,6 +400,61 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
     }
     
     result.push_back(std::move(get_set));
+  }
+
+  // Taking care of accessors
+
+  for (const shards::TableName &table_name : current_shard.accessor_tables) {
+    std::cout << "[Accessor Table]: " << table_name << std::endl;
+    const shards::Table &accessor_table = state.GetTable(table_name);
+    for (const auto &accessor : accessor_table.accessors) {
+      std::cout << "[Accessor ShardDescriptor]:" << *accessor << std::endl;
+      if (accessor->type == shards::InfoType::DIRECT) {
+        // Something like SELECT * FROM [table_name] WHERE [accessor_column] = [user_id];
+        // However, we might also query *wrong* data using that, 
+        //          should check that [accessor] relates to [shard_kind] ???
+        if (accessor->shard_kind != shard_kind) { // ???
+          continue;
+        }
+        DirectInfo info = std::get<DirectInfo>(accessor->info);
+        std::cout << "[Accessor DirectInfo]" << info << std::endl;
+        ColumnName accessor_column = info.column;
+        std::string query = "SELECT * FROM " + table_name + " WHERE " + accessor_column + " = " + user_id + ";";
+        // execute  ^^^^^ this query
+        std::cout << query << std::endl;
+
+        sqlast::Select accessor_stmt{table_name};
+        // SELECT *
+        accessor_stmt.AddColumn("*");
+
+        // [accessor_column] = [user_id]
+        std::unique_ptr<sqlast::BinaryExpression> accessor_equality =
+            std::make_unique<sqlast::BinaryExpression>(
+                sqlast::Expression::Type::EQ);
+        accessor_equality->SetLeft(
+            std::make_unique<sqlast::ColumnExpression>(accessor_column));
+        accessor_equality->SetRight(
+            std::make_unique<sqlast::LiteralExpression>(user_id));
+
+        // set where condition in select statement
+        accessor_stmt.SetWhereClause(std::move(accessor_equality));
+
+        std::cout << "[CONSTRUCTED STATEMENT]: " << accessor_stmt << std::endl;
+
+        util::SharedLock lock = connection->state->ReaderLock();
+        SelectContext context(accessor_stmt, connection, &lock);
+
+        MOVE_OR_RETURN(sql::SqlResult accessor_result, context.Exec());
+        
+        std::vector<sql::SqlResultSet> &accessor_result_sets = accessor_result.ResultSets();
+
+        for (sql::SqlResultSet &accessor_result_set : accessor_result_sets) {
+          if (!accessor_result_set.empty()) {
+            result.push_back(std::move(accessor_result_set));
+          }
+        }
+      }
+    }
   }
 
   return sql::SqlResult(std::move(result));
