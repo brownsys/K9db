@@ -35,7 +35,6 @@ rust_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":ffi",
-        "//pelton/proxy/cargo:ctrlc",
         "//pelton/proxy/cargo:gflags",
         "//pelton/proxy/cargo:lazy_static",
         "//pelton/proxy/cargo:msql_srv",

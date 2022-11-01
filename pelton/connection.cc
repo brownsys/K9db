@@ -18,6 +18,7 @@ State::~State() {
 
 // Initialize when db name is known.
 void State::Initialize(const std::string &db_name) {
+  auto lock = this->WriterLock();
   if (this->database_ == nullptr) {
     this->database_ = std::make_unique<sql::RocksdbConnection>();
     this->database_->Open(db_name);

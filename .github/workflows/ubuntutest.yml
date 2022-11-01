@@ -60,6 +60,7 @@ jobs:
         TEST_RECORD: bazel test //pelton/dataflow:record-test --config=valgrind --test_output=all
         TEST_SCHEMA: bazel test //pelton/dataflow:schema-test --config=valgrind --test_output=all
         TEST_VALUE: bazel test //pelton/dataflow:value-test --config=valgrind --test_output=all
+        TEST_ROCKSDB: bazel test //pelton/sql/... --config=valgrind --test_output=all
       run: |
         docker exec pelton-testing sh -c "cd /home/pelton && $TEST_OPS"
         docker exec pelton-testing sh -c "cd /home/pelton && $TEST_GRAPH_PARTITION"
@@ -67,3 +68,4 @@ jobs:
         docker exec pelton-testing sh -c "cd /home/pelton && $TEST_RECORD"
         docker exec pelton-testing sh -c "cd /home/pelton && $TEST_SCHEMA"
         docker exec pelton-testing sh -c "cd /home/pelton && $TEST_VALUE"
+        docker exec pelton-testing sh -c "cd /home/pelton && $TEST_ROCKSDB"

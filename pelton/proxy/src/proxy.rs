@@ -4,7 +4,6 @@
 
 #[macro_use]
 extern crate slog;
-extern crate ctrlc;
 extern crate ffi;
 extern crate lazy_static;
 extern crate msql_srv;
@@ -14,9 +13,9 @@ use ffi::pelton;
 use msql_srv::*;
 use slog::Drain;
 use std::io;
+use std::io::Write;
 use std::net;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use std::time::Duration;
 
 // Help message.
@@ -332,6 +331,16 @@ impl Drop for Backend {
   }
 }
 
+// Signals when the proxy should stop accepting new connections.
+static stop: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn proxy_terminate(sig: i32) {
+  println!("Rust Proxy: Signal {}. Terminating after connections close..", sig);
+  io::stdout().flush().unwrap();
+  stop.store(true, Ordering::Relaxed);
+}
+
 fn main() {
   // initialize rust logging
   let plain = slog_term::PlainSyncDecorator::new(std::io::stdout());
@@ -356,19 +365,10 @@ fn main() {
   info!(log, "Rust Proxy: Listening at: {:?}", listener);
   listener.set_nonblocking(true)
           .expect("Cannot set non-blocking");
-  let stop = Arc::new(AtomicBool::new(false));
+
 
   // store client thread handles
   let mut threads = Vec::new();
-
-  // Detect stop via ctrl+c.
-  let log_ctrlc = log.clone();
-  let stop_ctrlc = stop.clone();
-  ctrlc::set_handler(move || {
-    info!(log_ctrlc,
-          "Rust Proxy: SIGTERM! Terminating after connections close...");
-    stop_ctrlc.store(true, Ordering::Relaxed);
-  }).expect("Error setting Ctrl-C handler");
 
   // run listener until terminated with SIGTERM
   while !stop.load(Ordering::Relaxed) {
