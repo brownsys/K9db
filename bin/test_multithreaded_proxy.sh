@@ -32,7 +32,7 @@ echo "==================================================="
 echo "[test_multithreaded_proxy.sh]: Killing proxy..."
 echo "==================================================="
 echo "==================================================="
-kill -SIGTERM $proxy_pid
+kill -s SIGTERM $proxy_pid
 wait $proxy_pid
 code_proxy=$?
 
@@ -104,7 +104,7 @@ echo "==================================================="
 echo "[test_multithreaded_proxy.sh]: Killing proxy..."
 echo "==================================================="
 echo "==================================================="
-kill -SIGTERM $proxy_pid
+kill -s SIGTERM $proxy_pid
 wait $proxy_pid
 code_proxy=$?
 
