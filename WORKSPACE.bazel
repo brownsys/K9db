@@ -290,10 +290,8 @@ filegroup(
 
 cmake(
     name = "rocksdb",
-    env = {
-      "USE_RTTI": "1",
-    },
     generate_args = [
+        "-DUSE_RTTI=ON",
         "-DROCKSDB_BUILD_SHARED=ON",
         "-DWITH_GFLAGS=OFF",
         "-DWITH_BZ2=1",
