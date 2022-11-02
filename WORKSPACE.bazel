@@ -317,8 +317,8 @@ cmake(
     visibility = ["//visibility:public"],
 )
 """,
-    commit = "ce9ac2ce110465d9329c806f4cb57d92f821597e",
-    remote = "https://github.com/KinanBab/rocksdb.git",
+    commit = "eb9a80fe1f18017b4d7f4084e8f2554f12234822",
+    remote = "https://github.com/facebook/rocksdb.git",
 )
 
 # libsodium.
