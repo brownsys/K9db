@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "pelton/sqlast/ast_abstract.h"
+#include "pelton/sqlast/ast_value.h"
 
 namespace pelton {
 namespace sqlast {
@@ -34,17 +35,11 @@ class ColumnExpression : public Expression {
   explicit ColumnExpression(const std::string &column)
       : Expression(Expression::Type::COLUMN), column_(column) {}
 
-  ColumnExpression(const ColumnExpression &expr)
-      : Expression(Expression::Type::COLUMN) {
-    this->column_ = expr.column_;
-  }
-
   std::unique_ptr<Expression> Clone() const override {
     return std::make_unique<ColumnExpression>(*this);
   }
 
   const std::string &column() const;
-  std::string &column();
 
   template <class T>
   T Visit(AbstractVisitor<T> *visitor) const {
@@ -69,20 +64,14 @@ class ColumnExpression : public Expression {
 
 class LiteralExpression : public Expression {
  public:
-  explicit LiteralExpression(const std::string &value)
+  explicit LiteralExpression(const Value &value)
       : Expression(Expression::Type::LITERAL), value_(value) {}
 
-  LiteralExpression(const LiteralExpression &expr)
-      : Expression(Expression::Type::LITERAL) {
-    this->value_ = expr.value_;
-  }
+  const Value &value() const;
 
   std::unique_ptr<Expression> Clone() const override {
     return std::make_unique<LiteralExpression>(*this);
   }
-
-  const std::string &value() const;
-  std::string &value();
 
   template <class T>
   T Visit(AbstractVisitor<T> *visitor) const {
@@ -102,25 +91,19 @@ class LiteralExpression : public Expression {
   }
 
  private:
-  std::string value_;
+  Value value_;
 };
 
 class LiteralListExpression : public Expression {
  public:
-  explicit LiteralListExpression(const std::vector<std::string> &values)
+  explicit LiteralListExpression(const std::vector<Value> &values)
       : Expression(Expression::Type::LIST), values_(values) {}
 
-  LiteralListExpression(const LiteralListExpression &expr)
-      : Expression(Expression::Type::LIST) {
-    this->values_ = expr.values_;
-  }
+  const std::vector<Value> &values() const;
 
   std::unique_ptr<Expression> Clone() const override {
     return std::make_unique<LiteralListExpression>(*this);
   }
-
-  const std::vector<std::string> &values() const;
-  std::vector<std::string> &values();
 
   template <class T>
   T Visit(AbstractVisitor<T> *visitor) const {
@@ -140,7 +123,7 @@ class LiteralListExpression : public Expression {
   }
 
  private:
-  std::vector<std::string> values_;
+  std::vector<Value> values_;
 };
 
 class BinaryExpression : public Expression {
@@ -157,9 +140,7 @@ class BinaryExpression : public Expression {
   }
 
   const Expression *const GetLeft() const;
-  Expression *const GetLeft();
   const Expression *const GetRight() const;
-  Expression *const GetRight();
 
   void SetLeft(std::unique_ptr<Expression> &&left);
   void SetRight(std::unique_ptr<Expression> &&right);

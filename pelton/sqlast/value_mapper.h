@@ -22,38 +22,18 @@ class ValueMapper : public AbstractVisitor<void> {
       : AbstractVisitor(), schema_(schema) {}
 
   // Get the value(s) of a column.
-  bool HasBefore(size_t col_idx) const {
-    return this->before_.count(col_idx) == 1;
+  bool HasValues(size_t col_idx) const {
+    return this->values_.count(col_idx) == 1;
   }
-  bool HasAfter(size_t col_idx) const {
-    return this->after_.count(col_idx) == 1;
-  }
-  std::vector<std::string> ReleaseBefore(size_t col_idx) {
-    auto node = this->before_.extract(col_idx);
-    std::vector<std::string> res = std::move(node.mapped());
+  std::vector<Value> ReleaseValues(size_t col_idx) {
+    auto node = this->values_.extract(col_idx);
+    std::vector<Value> res = std::move(node.mapped());
     return res;
   }
-  std::string ReleaseAfter(size_t col_idx) {
-    auto node = this->after_.extract(col_idx);
-    std::string res = std::move(node.mapped());
-    return res;
+  const std::unordered_map<size_t, std::vector<Value>> &Values() const {
+    return this->values_;
   }
-
-  // Access before and after.
-  std::unordered_map<size_t, std::vector<std::string>> &Before() {
-    return this->before_;
-  }
-  std::unordered_map<size_t, std::string> &After() { return this->after_; }
-  const std::unordered_map<size_t, std::vector<std::string>> &Before() const {
-    return this->before_;
-  }
-  const std::unordered_map<size_t, std::string> &After() const {
-    return this->after_;
-  }
-
-  // Empty?
-  bool EmptyBefore() const { return this->before_.size() == 0; }
-  bool EmptyAfter() const { return this->after_.size() == 0; }
+  bool Empty() const { return this->values_.size() == 0; }
 
   // Visitors.
   // These are unsupported.
@@ -77,8 +57,15 @@ class ValueMapper : public AbstractVisitor<void> {
 
  private:
   dataflow::SchemaRef schema_;
-  std::unordered_map<size_t, std::vector<std::string>> before_;
-  std::unordered_map<size_t, std::string> after_;
+  std::unordered_map<size_t, std::vector<Value>> values_;
+
+ public:
+#ifdef PELTON_FILTER_UNITTEST
+  // To allow unittests to add values for testing.
+  void AddValue(size_t i, const Value &value) {
+    this->values_[i].push_back(value);
+  }
+#endif  // PELTON_FILTER_UNITTEST
 };
 
 }  // namespace sqlast

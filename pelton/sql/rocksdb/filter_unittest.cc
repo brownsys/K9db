@@ -1,3 +1,5 @@
+#define PELTON_FILTER_UNITTEST
+
 #include "pelton/sql/rocksdb/filter.h"
 
 #include <memory>
@@ -11,7 +13,8 @@
 #include "pelton/util/ints.h"
 
 #define STR(s) std::make_unique<std::string>(s)
-#define ADD_CONDITION(v, col, val) v.Before()[col].push_back(val)
+#define ADD_CONDITION(v, col, val) \
+  v.AddValue(col, sqlast::Value::FromSQLString(val))
 
 namespace pelton {
 namespace sql {

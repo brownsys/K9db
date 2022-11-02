@@ -81,7 +81,8 @@ absl::StatusOr<int> DeleteContext::DeleteDependents(
     std::vector<sql::KeyPair> vals;
     std::unordered_set<std::string> duplicates;
     for (const dataflow::Record &record : records) {
-      if (duplicates.insert(record.GetValueString(colidx)).second) {
+      std::string fkstr = record.GetValue(colidx).AsUnquotedString();
+      if (duplicates.insert(std::move(fkstr)).second) {
         vals.emplace_back(shard_name.Copy(), record.GetValue(colidx));
       }
     }
@@ -113,7 +114,8 @@ absl::StatusOr<int> DeleteContext::DeleteDependents(
         }
         case ShardLocation::NO_SHARD: {
           dataflow::Record &record = next_records.at(i);
-          def.push_back(moved_set.insert(record.GetValueString(pk)).second);
+          std::string pkstr = record.GetValue(pk).AsUnquotedString();
+          def.push_back(moved_set.insert(std::move(pkstr)).second);
           rm.push_back(std::move(record));
           break;
         }

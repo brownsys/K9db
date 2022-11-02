@@ -1,4 +1,4 @@
-#include "pelton/dataflow/value.h"
+#include "pelton/sqlast/ast_value.h"
 
 #include <cstdint>
 #include <iostream>
@@ -8,26 +8,17 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "pelton/sqlast/ast.h"
 #include "pelton/util/ints.h"
 
 namespace pelton {
-namespace dataflow {
+namespace sqlast {
 
-using CType = sqlast::ColumnDefinition::Type;
+using CType = Value::Type;
 
 // Test value size.
 TEST(ValueTest, Size) {
-  // should be 48 bytes, unless std::string has a different size on the machine.
-  if (sizeof(Value) != 48) {
-    size_t max = sizeof(std::string) > 8 ? sizeof(std::string) : 8;
-    size_t machine_size = sizeof(CType) + max;
-    // Align with 8 bytes for x64.
-    while (machine_size % 8 != 0) {
-      machine_size++;
-    }
-    EXPECT_EQ(sizeof(Value), machine_size);
-  }
+  // should be 40 bytes, unless std::string has a different size on the machine.
+  EXPECT_EQ(sizeof(Value), sizeof(std::string) + sizeof(size_t));
 }
 
 // Test constructing and retrieving data from value.
@@ -41,15 +32,18 @@ TEST(ValueTest, DataRep) {
   Value k0(v0);
   Value k1(v1);
   Value k2(v2);
+  Value k3;
 
   // Retrieve data and type.
   EXPECT_EQ(k0.GetInt(), v0);
   EXPECT_EQ(k1.GetUInt(), v1);
   EXPECT_EQ(k2.GetString(), v2);
+  EXPECT_TRUE(k3.IsNull());
 
   EXPECT_EQ(k0.type(), CType::INT);
   EXPECT_EQ(k1.type(), CType::UINT);
   EXPECT_EQ(k2.type(), CType::TEXT);
+  EXPECT_EQ(k3.type(), CType::_NULL);
 }
 
 // Tests value equality check.
@@ -78,19 +72,17 @@ TEST(ValueTest, Comparisons) {
   EXPECT_EQ(ivalues[0], ivalues[2]);
   EXPECT_EQ(svalues[0], svalues[2]);
 
-#ifndef PELTON_VALGRIND_MODE
   // Checking values of different types fails.
   for (size_t i = 0; i < 3; i++) {
     for (size_t j = 0; j < 3; j++) {
-      ASSERT_DEATH({ uvalues[i] == ivalues[j]; }, "Type mismatch");
-      ASSERT_DEATH({ uvalues[i] == svalues[j]; }, "Type mismatch");
-      ASSERT_DEATH({ ivalues[i] == uvalues[j]; }, "Type mismatch");
-      ASSERT_DEATH({ ivalues[i] == svalues[j]; }, "Type mismatch");
-      ASSERT_DEATH({ svalues[i] == uvalues[j]; }, "Type mismatch");
-      ASSERT_DEATH({ svalues[i] == ivalues[j]; }, "Type mismatch");
+      EXPECT_NE(uvalues[i], ivalues[j]);
+      EXPECT_NE(uvalues[i], svalues[j]);
+      EXPECT_NE(ivalues[i], uvalues[j]);
+      EXPECT_NE(ivalues[i], svalues[j]);
+      EXPECT_NE(svalues[i], uvalues[j]);
+      EXPECT_NE(svalues[i], ivalues[j]);
     }
   }
-#endif
 }
 
 // Test getting data with wrong types from value.
@@ -165,11 +157,14 @@ TEST(ValueTest, ValueMoveAssignment) {
   // With valgrind we can check that the string initially in value3m was freed
   // during move!
 
-#ifndef PELTON_VALGRIND_MODE
-  // Test illegal moves.
-  ASSERT_DEATH({ value2m = std::move(value3m); }, "Bad move assign value type");
-  ASSERT_DEATH({ value4m = std::move(value1m); }, "Bad move assign value type");
-#endif
+  // Move values into values of other types.
+  value2m = std::move(value3m);
+  value4m = std::move(value1m);
+  EXPECT_EQ(value2m.GetString(), "hello and welcome to this long string!");
+  EXPECT_EQ(&value2m.GetString()[0], ptr);  // same pointer.
+  EXPECT_EQ(value4m.GetInt(), -10);
+  EXPECT_EQ(value4m.GetInt(), -10);
+  EXPECT_EQ(value4m.type(), value1m.type());
 }
 
 // Test copy constructor and assignments.
@@ -222,15 +217,28 @@ TEST(ValueTest, ValueCopyAssignment) {
   EXPECT_EQ(&value2.GetString()[0], ptr);   // same pointer.
   EXPECT_NE(&value3c.GetString()[0], ptr);  // different pointer.
   EXPECT_EQ(value2.type(), value3c.type());
-  // With valgrind we can check that the string initially in value3c was freed
-  // during copy!
+  // With valgrind we can check that the initial string and copy are both freed!
 
-#ifndef PELTON_VALGRIND_MODE
-  // Test illegal copies.
-  ASSERT_DEATH({ value2c = value2; }, "Bad copy assign value type");
-  ASSERT_DEATH({ value4c = value1; }, "Bad copy assign value type");
-#endif
+  // Move values into values of other types.
+  value2c = value2;
+  value4c = value1;
+
+  EXPECT_EQ(value2.GetString(), "hello and welcome to this long string!");
+  EXPECT_EQ(value2c.GetString(), "hello and welcome to this long string!");
+  EXPECT_EQ(value3c.GetString(), "hello and welcome to this long string!");
+  EXPECT_EQ(&value2.GetString()[0], ptr);   // same pointer.
+  EXPECT_NE(&value2c.GetString()[0], ptr);  // different pointers.
+  EXPECT_NE(&value3c.GetString()[0], ptr);
+  EXPECT_NE(&value2c.GetString()[0], &value3c.GetString()[0]);
+  EXPECT_EQ(value2.type(), value3c.type());
+  EXPECT_EQ(value2.type(), value2c.type());
+
+  EXPECT_EQ(value1.GetInt(), -10);
+  EXPECT_EQ(value1c.GetInt(), -10);
+  EXPECT_EQ(value4c.GetInt(), -10);
+  EXPECT_EQ(value1.type(), value1c.type());
+  EXPECT_EQ(value1.type(), value4c.type());
 }
 
-}  // namespace dataflow
+}  // namespace sqlast
 }  // namespace pelton

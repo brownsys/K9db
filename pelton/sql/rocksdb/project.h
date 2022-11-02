@@ -14,12 +14,12 @@ namespace sql {
 
 struct Projection {
   dataflow::SchemaRef schema;
-  std::vector<bool> literals;
-  std::vector<std::variant<uint32_t, int64_t, std::string>> map;
+  std::vector<std::variant<uint32_t, sqlast::Value>> projections;
 };
 
-Projection ProjectionSchema(const dataflow::SchemaRef &table_schema,
-                            const std::vector<std::string> &columns);
+Projection ProjectionSchema(
+    const dataflow::SchemaRef &table_schema,
+    const std::vector<sqlast::Select::ResultColumn> &columns);
 
 dataflow::Record Project(const Projection &project,
                          const dataflow::Record &record);

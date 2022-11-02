@@ -175,22 +175,11 @@ Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
   this->mtx_.lock_shared();
   SchemaRef schema = this->schema_.at(table_name);
   this->mtx_.unlock_shared();
-  Record record{schema, true};
 
   // Fill in record with data.
-  bool has_cols = insert_stmt.HasColumns();
-  const std::vector<std::string> &cols = insert_stmt.GetColumns();
-  const std::vector<std::string> &vals = insert_stmt.GetValues();
-  for (size_t i = 0; i < vals.size(); i++) {
-    size_t schema_index = i;
-    if (has_cols) {
-      schema_index = schema.IndexOf(cols.at(i));
-    }
-    if (vals.at(i) == "NULL") {
-      record.SetNull(true, schema_index);
-    } else {
-      record.SetValue(vals.at(i), schema_index);
-    }
+  Record record{schema, true};
+  for (size_t i = 0; i < schema.size(); i++) {
+    record.SetValue(insert_stmt.GetValue(schema.NameOf(i), i), i);
   }
 
   return record;

@@ -2,6 +2,7 @@
 #include "pelton/shards/sqlengine/update.h"
 
 #include <memory>
+#include <utility>
 
 #include "pelton/shards/sqlengine/delete.h"
 #include "pelton/shards/sqlengine/insert.h"
@@ -16,7 +17,7 @@ absl::StatusOr<std::vector<sqlast::Insert>> UpdateContext::UpdateRecords(
     const std::vector<dataflow::Record> &records) {
   // What is being updated.
   const std::vector<std::string> &updated_cols = this->stmt_.GetColumns();
-  const std::vector<std::string> &updated_vals = this->stmt_.GetValues();
+  const std::vector<sqlast::Value> &updated_vals = this->stmt_.GetValues();
   std::vector<bool> should_update(this->schema_.size(), false);
   for (const std::string &col_name : updated_cols) {
     int col_index = this->schema_.IndexOf(col_name);
@@ -31,27 +32,16 @@ absl::StatusOr<std::vector<sqlast::Insert>> UpdateContext::UpdateRecords(
   result.reserve(records.size());
   for (const dataflow::Record &record : records) {
     size_t update_count = 0;
-    result.emplace_back(this->table_name_, false);
+    result.emplace_back(this->table_name_);
+    std::vector<sqlast::Value> values;
     for (size_t i = 0; i < this->schema_.size(); i++) {
       if (should_update.at(i)) {
-        result.back().AddValue(updated_vals.at(update_count++));
+        values.push_back(updated_vals.at(update_count++));
       } else {
-        if (record.IsNull(i)) {
-          result.back().AddValue("NULL");
-          continue;
-        }
-        switch (this->schema_.TypeOf(i)) {
-          case sqlast::ColumnDefinition::Type::UINT:
-          case sqlast::ColumnDefinition::Type::INT:
-            result.back().AddValue(record.GetValueString(i));
-            break;
-          case sqlast::ColumnDefinition::Type::TEXT:
-          case sqlast::ColumnDefinition::Type::DATETIME:
-            result.back().AddValue("\'" + record.GetString(i) + "\'");
-            break;
-        }
+        values.push_back(record.GetValue(i));
       }
     }
+    result.back().SetValues(std::move(values));
   }
 
   return result;

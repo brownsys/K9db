@@ -11,7 +11,7 @@ echo "[test_multithreaded_proxy.sh]: Test: parallel_create"
 echo "[test_multithreaded_proxy.sh]: Running proxy..."
 echo "==================================================="
 echo "==================================================="
-bazel run --config valgrind //:pelton -- -logtostderr=1 &
+bazel run --config valgrind //:pelton -- --logtostderr=1 &
 proxy_pid=$!
 sleep 15
 
@@ -63,7 +63,7 @@ echo "[test_multithreaded_proxy.sh]: Test: parallel operations"
 echo "[test_multithreaded_proxy.sh]: Running proxy..."
 echo "==================================================="
 echo "==================================================="
-bazel run --config valgrind //:pelton -- -logtostderr=1 &
+bazel run --config valgrind //:pelton -- --logtostderr=1 &
 proxy_pid=$!
 sleep 15
 

@@ -338,21 +338,20 @@ void FromTables(const CanonicalQuery &query,
 absl::StatusOr<CanonicalDescriptor> MakeInsertCanonical(
     const std::string &insert, const dataflow::DataFlowState &dstate) {
   // Parse the statement using the hacky parser.
-  MOVE_OR_RETURN(std::unique_ptr<sqlast::AbstractStatement> parsed,
-                 sqlast::HackyInsert(insert.data(), insert.size()));
-  sqlast::Insert *stmt = static_cast<sqlast::Insert *>(parsed.get());
+  ASSIGN_OR_RETURN(sqlast::InsertOrReplace & components,
+                   sqlast::HackyInsertOrReplace(insert.data(), insert.size()));
   // Find table schema.
-  auto schema = dstate.GetTableSchema(stmt->table_name());
+  auto schema = dstate.GetTableSchema(components.table_name);
   // Begin constructing the descriptor.
   CanonicalDescriptor descriptor;
   descriptor.canonical_query = insert;
   descriptor.args_count = 0;
   // Build initial stem.
-  std::string stem = stmt->replace() ? "REPLACE " : "INSERT ";
-  stem += "INTO " + stmt->table_name();
-  if (stmt->HasColumns()) {
+  std::string stem = components.replace ? "REPLACE " : "INSERT ";
+  stem += "INTO " + components.table_name;
+  if (components.columns.size() > 0) {
     stem.push_back('(');
-    for (const std::string &column : stmt->GetColumns()) {
+    for (const std::string &column : components.columns) {
       stem += column + ", ";
     }
     stem.pop_back();
@@ -361,25 +360,25 @@ absl::StatusOr<CanonicalDescriptor> MakeInsertCanonical(
   }
   stem += " VALUES (";
   // Go over the values.
-  const std::vector<std::string> &values = stmt->GetValues();
-  for (size_t i = 0; i < values.size(); i++) {
-    if (values.at(i) != "?") {
+  for (size_t i = 0; i < components.values.size(); i++) {
+    const std::string &value = components.values.at(i);
+    if (value != "?") {
       // Not a ? arg, append it to stem.
-      stem += values.at(i) + (i < values.size() - 1 ? ", " : ");");
+      stem += value + (i < components.values.size() - 1 ? ", " : ");");
       continue;
     } else {
       // Is a ? arg, need to add it to the descriptor.
       descriptor.args_count++;
       descriptor.stems.push_back(std::move(stem));
-      stem = i < values.size() - 1 ? ", " : ");";
+      stem = i < components.values.size() - 1 ? ", " : ");";
       // Population for insert is simpler, need only to insert , between values.
       descriptor.arg_tables.push_back("");
       descriptor.arg_names.push_back("");
       descriptor.arg_ops.push_back("");
       // Get type of argument.
       sqlast::ColumnDefinition::Type type;
-      if (stmt->HasColumns()) {
-        const std::string &column_name = stmt->GetColumns().at(i);
+      if (components.columns.size() > 0) {
+        const std::string &column_name = components.columns.at(i);
         type = schema.TypeOf(schema.IndexOf(column_name));
       } else {
         type = schema.TypeOf(i);

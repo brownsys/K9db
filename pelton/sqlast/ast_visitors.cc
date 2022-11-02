@@ -10,18 +10,6 @@
 namespace pelton {
 namespace sqlast {
 
-std::string Dequote(const std::string &st) {
-  if (st.size() >= 2) {
-    if (st.at(0) == '\"' && st.at(st.size() - 1) == '\"') {
-      return st.substr(1, st.size() - 2);
-    }
-    if (st.at(0) == '\'' && st.at(st.size() - 1) == '\'') {
-      return st.substr(1, st.size() - 2);
-    }
-  }
-  return st;
-}
-
 // Stringifier.
 std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
   std::string result = "CREATE TABLE " + ast.table_name() + " (";
@@ -70,30 +58,27 @@ std::string Stringifier::VisitCreateIndex(const CreateIndex &ast) {
 }
 
 std::string Stringifier::VisitInsert(const Insert &ast) {
-  std::string result = ast.replace() ? "REPLACE" : "INSERT";
-  result += " INTO " + ast.table_name();
+  std::string result = "INSERT INTO " + ast.table_name();
   // Columns if explicitly specified.
-  if (ast.GetColumns().size() > 0) {
+  if (ast.HasColumns()) {
+    const std::vector<std::string> &columns = ast.GetColumns();
     result += "(";
-    bool first = true;
-    for (const std::string &col : ast.GetColumns()) {
-      if (!first) {
+    for (size_t i = 0; i < columns.size(); i++) {
+      if (i > 0) {
         result += ", ";
       }
-      first = false;
-      result += col;
+      result += columns.at(i);
     }
     result += ")";
   }
   // Comma separated values.
+  const std::vector<Value> &values = ast.GetValues();
   result += " VALUES (";
-  bool first = true;
-  for (const std::string &val : ast.GetValues()) {
-    if (!first) {
+  for (size_t i = 0; i < values.size(); i++) {
+    if (i > 0) {
       result += ", ";
     }
-    first = false;
-    result += val;
+    result += values.at(i).AsSQLString();
   }
   result += ")";
   return result;
@@ -102,9 +87,9 @@ std::string Stringifier::VisitUpdate(const Update &ast) {
   std::string result = "UPDATE " + ast.table_name() + " SET ";
   // Columns and values.
   const std::vector<std::string> &cols = ast.GetColumns();
-  const std::vector<std::string> &vals = ast.GetValues();
+  const std::vector<Value> &vals = ast.GetValues();
   for (size_t i = 0; i < cols.size(); i++) {
-    result += cols.at(i) + " = " + vals.at(i);
+    result += cols.at(i) + " = " + vals.at(i).AsSQLString();
     if (i < cols.size() - 1) {
       result += ", ";
     }
@@ -117,12 +102,12 @@ std::string Stringifier::VisitUpdate(const Update &ast) {
 std::string Stringifier::VisitSelect(const Select &ast) {
   std::string result = "SELECT ";
   bool first = true;
-  for (const std::string &col : ast.GetColumns()) {
+  for (const Select::ResultColumn &col : ast.GetColumns()) {
     if (!first) {
       result += ", ";
     }
     first = false;
-    result += col;
+    result += col.ToString();
   }
   result += " FROM " + ast.table_name();
   if (ast.HasWhereClause()) {
@@ -135,9 +120,6 @@ std::string Stringifier::VisitDelete(const Delete &ast) {
   if (ast.HasWhereClause()) {
     result += " WHERE " + ast.VisitChildren(this).at(0);
   }
-  if (ast.returning()) {
-    result += " RETURNING *";
-  }
   return result;
 }
 
@@ -145,13 +127,13 @@ std::string Stringifier::VisitColumnExpression(const ColumnExpression &ast) {
   return ast.column();
 }
 std::string Stringifier::VisitLiteralExpression(const LiteralExpression &ast) {
-  return ast.value();
+  return ast.value().AsSQLString();
 }
 std::string Stringifier::VisitLiteralListExpression(
     const LiteralListExpression &ast) {
   std::string list = "(";
-  for (const std::string &val : ast.values()) {
-    list += list.size() == 1 ? val : (", " + val);
+  for (const Value &val : ast.values()) {
+    list += (list.size() == 1 ? "" : ", ") + val.AsSQLString();
   }
   list += ")";
   return list;
@@ -179,228 +161,6 @@ std::string Stringifier::VisitBinaryExpression(const BinaryExpression &ast) {
   }
   std::vector<std::string> children = ast.VisitChildren(this);
   return children.at(0) + op + children.at(1);
-}
-
-// ValueFinder.
-std::pair<bool, std::string> ValueFinder::VisitCreateTable(
-    const CreateTable &ast) {
-  assert(false);
-}
-std::pair<bool, std::string> ValueFinder::VisitColumnDefinition(
-    const ColumnDefinition &ast) {
-  assert(false);
-}
-std::pair<bool, std::string> ValueFinder::VisitColumnConstraint(
-    const ColumnConstraint &ast) {
-  assert(false);
-}
-std::pair<bool, std::string> ValueFinder::VisitCreateIndex(
-    const CreateIndex &ast) {
-  assert(false);
-}
-std::pair<bool, std::string> ValueFinder::VisitInsert(const Insert &ast) {
-  assert(false);
-}
-
-std::pair<bool, std::string> ValueFinder::VisitUpdate(const Update &ast) {
-  auto result = ast.VisitChildren(this);
-  if (result.size() == 1) {
-    return result.at(0);
-  }
-  return std::make_pair(false, "");
-}
-std::pair<bool, std::string> ValueFinder::VisitSelect(const Select &ast) {
-  auto result = ast.VisitChildren(this);
-  if (result.size() == 1) {
-    return result.at(0);
-  }
-  return std::make_pair(false, "");
-}
-std::pair<bool, std::string> ValueFinder::VisitDelete(const Delete &ast) {
-  auto result = ast.VisitChildren(this);
-  if (result.size() == 1) {
-    return result.at(0);
-  }
-  return std::make_pair(false, "");
-}
-
-std::pair<bool, std::string> ValueFinder::VisitColumnExpression(
-    const ColumnExpression &ast) {
-  return std::make_pair(ast.column() == this->colname_, "");
-}
-std::pair<bool, std::string> ValueFinder::VisitLiteralExpression(
-    const LiteralExpression &ast) {
-  return std::make_pair(false, Dequote(ast.value()));
-}
-std::pair<bool, std::string> ValueFinder::VisitLiteralListExpression(
-    const LiteralListExpression &ast) {
-  if (ast.values().size() == 1) {
-    return std::make_pair(true, Dequote(ast.values().at(0)));
-  }
-  return std::make_pair(false, "");
-}
-std::pair<bool, std::string> ValueFinder::VisitBinaryExpression(
-    const BinaryExpression &ast) {
-  auto result = ast.VisitChildren(this);
-  switch (ast.type()) {
-    case Expression::Type::EQ:
-      if (ast.GetLeft()->type() == Expression::Type::COLUMN) {
-        return std::make_pair(result.at(0).first, result.at(1).second);
-      }
-      if (ast.GetRight()->type() == Expression::Type::COLUMN) {
-        return std::make_pair(result.at(1).first, result.at(0).second);
-      }
-      return std::make_pair(false, "");
-
-    case Expression::Type::IS:
-      // IS cannot be used on a shard by column since it is not nullable.
-      if (result.at(0).first) {
-        assert(false);
-      }
-      return std::make_pair(false, "");
-
-    case Expression::Type::IN:
-      // IN can be used on a shard by column when the value list is a singleton.
-      if (result.at(0).first && !result.at(1).first) {
-        assert(false);
-      }
-      return std::make_pair(result.at(0).first, result.at(1).second);
-
-    case Expression::Type::AND:
-      if (result.at(0).first) {
-        return result.at(0);
-      }
-      if (result.at(1).first) {
-        return result.at(1);
-      }
-      return std::make_pair(false, "");
-
-    case Expression::Type::GREATER_THAN:
-      // GREATER_THAN cannot be used on a shard by column.
-      if (result.at(0).first) {
-        assert(false);
-      } else if (result.at(1).first) {
-        assert(false);
-      }
-      return std::make_pair(false, "");
-
-    default:
-      assert(false);
-  }
-}
-
-// ExpressionRemover.
-std::unique_ptr<Expression> ExpressionRemover::VisitCreateTable(
-    CreateTable *ast) {
-  assert(false);
-}
-std::unique_ptr<Expression> ExpressionRemover::VisitColumnDefinition(
-    ColumnDefinition *ast) {
-  assert(false);
-}
-std::unique_ptr<Expression> ExpressionRemover::VisitColumnConstraint(
-    ColumnConstraint *ast) {
-  assert(false);
-}
-std::unique_ptr<Expression> ExpressionRemover::VisitCreateIndex(
-    CreateIndex *ast) {
-  assert(false);
-}
-std::unique_ptr<Expression> ExpressionRemover::VisitInsert(Insert *ast) {
-  assert(false);
-}
-
-std::unique_ptr<Expression> ExpressionRemover::VisitUpdate(Update *ast) {
-  auto result = ast->VisitChildren(this);
-  if (result.size() == 1) {
-    if (result.at(0).get() == nullptr) {
-      ast->RemoveWhereClause();
-    } else {
-      std::unique_ptr<BinaryExpression> cast =
-          std::unique_ptr<BinaryExpression>(
-              static_cast<BinaryExpression *>(result.at(0).release()));
-      ast->SetWhereClause(std::move(cast));
-    }
-  }
-  return nullptr;
-}
-std::unique_ptr<Expression> ExpressionRemover::VisitSelect(Select *ast) {
-  auto result = ast->VisitChildren(this);
-  if (result.size() == 1) {
-    if (result.at(0).get() == nullptr) {
-      ast->RemoveWhereClause();
-    } else {
-      std::unique_ptr<BinaryExpression> cast =
-          std::unique_ptr<BinaryExpression>(
-              static_cast<BinaryExpression *>(result.at(0).release()));
-      ast->SetWhereClause(std::move(cast));
-    }
-  }
-  return nullptr;
-}
-std::unique_ptr<Expression> ExpressionRemover::VisitDelete(Delete *ast) {
-  auto result = ast->VisitChildren(this);
-  if (result.size() == 1) {
-    if (result.at(0).get() == nullptr) {
-      ast->RemoveWhereClause();
-    } else {
-      std::unique_ptr<BinaryExpression> cast =
-          std::unique_ptr<BinaryExpression>(
-              static_cast<BinaryExpression *>(result.at(0).release()));
-      ast->SetWhereClause(std::move(cast));
-    }
-  }
-  return nullptr;
-}
-
-std::unique_ptr<Expression> ExpressionRemover::VisitColumnExpression(
-    ColumnExpression *ast) {
-  if (ast->column() == this->colname_) {
-    return nullptr;
-  }
-  return ast->Clone();
-}
-std::unique_ptr<Expression> ExpressionRemover::VisitLiteralExpression(
-    LiteralExpression *ast) {
-  return ast->Clone();
-}
-std::unique_ptr<Expression> ExpressionRemover::VisitLiteralListExpression(
-    LiteralListExpression *ast) {
-  return ast->Clone();
-}
-std::unique_ptr<Expression> ExpressionRemover::VisitBinaryExpression(
-    BinaryExpression *ast) {
-  auto result = ast->VisitChildren(this);
-  switch (ast->type()) {
-    case Expression::Type::EQ:
-    case Expression::Type::IS:
-    case Expression::Type::IN:
-      if (result.at(0).get() == nullptr || result.at(1).get() == nullptr) {
-        return nullptr;
-      }
-      return ast->Clone();
-    case Expression::Type::AND: {
-      std::unique_ptr<Expression> &left = result.at(0);
-      std::unique_ptr<Expression> &right = result.at(1);
-      if (left.get() == nullptr && right.get() == nullptr) {
-        return nullptr;
-      }
-      if (left.get() == nullptr) {
-        return std::move(right);
-      }
-      if (right.get() == nullptr) {
-        return std::move(left);
-      }
-
-      std::unique_ptr<BinaryExpression> binary =
-          std::make_unique<BinaryExpression>(Expression::Type::AND);
-      binary->SetLeft(std::move(left));
-      binary->SetRight(std::move(right));
-      return std::move(binary);
-    }
-    default:
-      assert(false);
-  }
 }
 
 std::ostream &operator<<(std::ostream &os, const AbstractStatement &r) {

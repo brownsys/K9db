@@ -82,22 +82,24 @@ std::optional<IndexSet> RocksdbTable::IndexLookup(
     sqlast::ValueMapper *value_mapper) const {
   // Find an index to lookup with.
   std::optional<IndexSet> set;
-  if (value_mapper->HasBefore(this->pk_column_)) {
+  if (value_mapper->HasValues(this->pk_column_)) {
     // Lookup primary index.
-    std::vector<std::string> vals =
-        value_mapper->ReleaseBefore(this->pk_column_);
-    EncodeValues(this->schema_.TypeOf(this->pk_column_), &vals);
-    return this->pk_index_.Get(std::move(vals));
+    std::vector<sqlast::Value> vals =
+        value_mapper->ReleaseValues(this->pk_column_);
+    std::vector<std::string> encoded =
+        EncodeValues(this->schema_.TypeOf(this->pk_column_), vals);
+    return this->pk_index_.Get(std::move(encoded));
   }
 
   // Lookup by first available non PK index.
   for (size_t col = 0; col < this->schema_.size(); col++) {
     const std::optional<RocksdbIndex> &index = this->indices_.at(col);
-    if (index.has_value() && value_mapper->HasBefore(col)) {
+    if (index.has_value() && value_mapper->HasValues(col)) {
       // Lookup col index.
-      std::vector<std::string> vals = value_mapper->ReleaseBefore(col);
-      EncodeValues(this->schema_.TypeOf(col), &vals);
-      return index->Get(std::move(vals));
+      std::vector<sqlast::Value> vals = value_mapper->ReleaseValues(col);
+      std::vector<std::string> encoded =
+          EncodeValues(this->schema_.TypeOf(col), vals);
+      return index->Get(std::move(encoded));
     }
   }
 
@@ -107,22 +109,24 @@ std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
     sqlast::ValueMapper *value_mapper) const {
   // Find an index to lookup with.
   std::optional<IndexSet> set;
-  if (value_mapper->HasBefore(this->pk_column_)) {
+  if (value_mapper->HasValues(this->pk_column_)) {
     // Lookup primary index.
-    std::vector<std::string> vals =
-        value_mapper->ReleaseBefore(this->pk_column_);
-    EncodeValues(this->schema_.TypeOf(this->pk_column_), &vals);
-    return this->pk_index_.GetDedup(std::move(vals));
+    std::vector<sqlast::Value> vals =
+        value_mapper->ReleaseValues(this->pk_column_);
+    std::vector<std::string> encoded =
+        EncodeValues(this->schema_.TypeOf(this->pk_column_), vals);
+    return this->pk_index_.GetDedup(std::move(encoded));
   }
 
   // Lookup by first available non PK index.
   for (size_t col = 0; col < this->schema_.size(); col++) {
     const std::optional<RocksdbIndex> &index = this->indices_.at(col);
-    if (index.has_value() && value_mapper->HasBefore(col)) {
+    if (index.has_value() && value_mapper->HasValues(col)) {
       // Lookup col index.
-      std::vector<std::string> vals = value_mapper->ReleaseBefore(col);
-      EncodeValues(this->schema_.TypeOf(col), &vals);
-      return index->GetDedup(std::move(vals));
+      std::vector<sqlast::Value> vals = value_mapper->ReleaseValues(col);
+      std::vector<std::string> encoded =
+          EncodeValues(this->schema_.TypeOf(col), vals);
+      return index->GetDedup(std::move(encoded));
     }
   }
 

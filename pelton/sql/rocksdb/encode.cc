@@ -10,12 +10,9 @@ namespace pelton {
 namespace sql {
 
 /*
- * Helpers
+ * Helpers.
  */
-rocksdb::Slice ExtractColumn(const rocksdb::Slice &slice, size_t col) {
-  rocksdb::Slice result = ExtractSlice(slice, col, 1);
-  return rocksdb::Slice(result.data(), result.size() - 1);
-}
+namespace {
 
 rocksdb::Slice ExtractSlice(const rocksdb::Slice &slice, size_t spos,
                             size_t count) {
@@ -52,102 +49,49 @@ rocksdb::Slice ExtractSlice(const rocksdb::Slice &slice, size_t spos,
              << slice.ToString() << "'";
 }
 
-// Helper: encoding an SQL value.
-std::string EncodeValue(const dataflow::Value &val) {
-  if (val.IsNull()) {
-    std::string result;
-    result.push_back(__ROCKSNULL);
-    return result;
-  }
+std::string EncodeValue(const sqlast::Value &val) {
   switch (val.type()) {
-    case sqlast::ColumnDefinition::Type::INT:
+    case sqlast::Value::Type::_NULL: {
+      std::string result;
+      result.push_back(__ROCKSNULL);
+      return result;
+    }
+    case sqlast::Value::Type::INT:
       return std::to_string(val.GetInt());
-    case sqlast::ColumnDefinition::Type::UINT:
+    case sqlast::Value::Type::UINT:
       return std::to_string(val.GetUInt());
-    case sqlast::ColumnDefinition::Type::TEXT:
-    case sqlast::ColumnDefinition::Type::DATETIME:
+    case sqlast::Value::Type::TEXT:
       return val.GetString();
     default:
       LOG(FATAL) << "UNREACHABLE";
   }
 }
 
-std::string EncodeValue(sqlast::ColumnDefinition::Type type,
-                        const rocksdb::Slice &value) {
-  if (value == rocksdb::Slice("NULL", 4)) {
-    std::string result;
-    result.push_back(__ROCKSNULL);
-    return result;
-  }
-  switch (type) {
-    case sqlast::ColumnDefinition::Type::INT:
-    case sqlast::ColumnDefinition::Type::UINT:
-      return std::string(value.data(), value.size());
-    case sqlast::ColumnDefinition::Type::TEXT:
-      return std::string(value.data() + 1, value.size() - 2);
-    case sqlast::ColumnDefinition::Type::DATETIME:
-      if (value.size() > 0) {
-        if (value.data()[0] == '\'' || value.data()[0] == '"') {
-          return std::string(value.data() + 1, value.size() - 2);
-        }
-      }
-      return std::string(value.data(), value.size());
-    default:
-      LOG(FATAL) << "UNREACHABLE";
-  }
+}  // namespace
+
+/*
+ * Free functions.
+ */
+rocksdb::Slice ExtractColumn(const rocksdb::Slice &slice, size_t col) {
+  rocksdb::Slice result = ExtractSlice(slice, col, 1);
+  return rocksdb::Slice(result.data(), result.size() - 1);
 }
 
-// Encoding vectors of values.
-std::vector<std::string> EncodeValues(
-    const std::vector<dataflow::Value> &vals) {
+std::vector<std::string> EncodeValues(sqlast::ColumnDefinition::Type type,
+                                      const std::vector<sqlast::Value> &vals) {
   std::vector<std::string> result;
-  for (const dataflow::Value &v : vals) {
+  for (const sqlast::Value &v : vals) {
+    CHECK(v.TypeCompatible(type));
     result.push_back(EncodeValue(v));
   }
   return result;
-}
-void EncodeValues(sqlast::ColumnDefinition::Type type,
-                  std::vector<std::string> *values) {
-  for (size_t i = 0; i < values->size(); i++) {
-    std::string &value = values->at(i);
-    if (value == "NULL") {
-      value.clear();
-      value.push_back(__ROCKSNULL);
-      continue;
-    }
-    switch (type) {
-      case sqlast::ColumnDefinition::Type::INT:
-      case sqlast::ColumnDefinition::Type::UINT:
-        continue;
-      case sqlast::ColumnDefinition::Type::TEXT:
-        value.pop_back();
-        value.erase(value.begin());
-        continue;
-      case sqlast::ColumnDefinition::Type::DATETIME:
-        if (value.size() > 0) {
-          if (value.data()[0] == '\'' || value.data()[0] == '"') {
-            value.pop_back();
-            value.erase(0);
-          }
-        }
-        continue;
-      default:
-        LOG(FATAL) << "UNREACHABLE";
-    }
-  }
 }
 
 /*
  * RocksdbSequence
  */
 // Writing to sequence.
-void RocksdbSequence::Append(sqlast::ColumnDefinition::Type type,
-                             const rocksdb::Slice &slice) {
-  this->data_.append(EncodeValue(type, slice));
-  this->data_.push_back(__ROCKSSEP);
-}
-
-void RocksdbSequence::Append(const dataflow::Value &val) {
+void RocksdbSequence::Append(const sqlast::Value &val) {
   this->data_.append(EncodeValue(val));
   this->data_.push_back(__ROCKSSEP);
 }
@@ -158,23 +102,6 @@ void RocksdbSequence::Append(const util::ShardName &shard_name) {
 void RocksdbSequence::AppendEncoded(const rocksdb::Slice &slice) {
   this->data_.append(slice.data(), slice.size());
   this->data_.push_back(__ROCKSSEP);
-}
-
-void RocksdbSequence::Replace(size_t pos, sqlast::ColumnDefinition::Type type,
-                              const rocksdb::Slice &slice) {
-  // Encode value.
-  std::string value = EncodeValue(type, slice);
-  // Find replace location.
-  rocksdb::Slice replace = this->At(pos);
-  size_t start = replace.data() - this->data_.data();
-  size_t end = start + replace.size();
-  // Create new data with replaced value.
-  std::string data;
-  data.reserve(start + (this->data_.size() - end) + value.size());
-  data.append(this->data_.data(), start);
-  data.append(value.data(), value.size());
-  data.append(this->data_.data() + end, this->data_.size() - end);
-  this->data_ = std::move(data);
 }
 
 // Reading from sequence.
@@ -303,62 +230,20 @@ RocksdbRecord RocksdbRecord::FromInsert(const sqlast::Insert &stmt,
   const auto &keys = schema.keys();
   CHECK_EQ(keys.size(), 1u) << "schema has too many keys " << schema;
   int idx = keys.at(0);
-  if (stmt.HasColumns()) {
-    idx = stmt.GetColumnIndex(schema.NameOf(idx));
-    CHECK_GE(idx, 0) << "Insert does not specify PK";
-  }
-  const std::string &pk_value = stmt.GetValue(idx);
-  CHECK_NE(pk_value, "NULL");
+  const sqlast::Value &pk_value = stmt.GetValue(schema.NameOf(idx), idx);
+  CHECK(!pk_value.IsNull());
+  CHECK(pk_value.TypeCompatible(schema.TypeOf(keys.at(0))));
 
   // Append shardname and PK to key.
   key.Append(shard_name);
-  key.Append(schema.TypeOf(keys.at(0)), pk_value);
+  key.Append(pk_value);
 
   // Encode value.
   RocksdbSequence value;
   for (size_t i = 0; i < schema.size(); i++) {
-    int idx = i;
-    if (stmt.HasColumns()) {
-      idx = stmt.GetColumnIndex(schema.NameOf(i));
-      CHECK_GE(idx, 0) << "Insert does not specify " << schema.NameOf(i);
-    }
-    const std::string &val = stmt.GetValue(idx);
-    value.Append(schema.TypeOf(i), val);
-  }
-
-  return RocksdbRecord(std::move(key), std::move(value));
-}
-
-// For updating.
-RocksdbRecord RocksdbRecord::Update(
-    const std::unordered_map<size_t, std::string> &update,
-    const dataflow::SchemaRef &schema,
-    const util::ShardName &shard_name) const {
-  // Encode key.
-  RocksdbSequence key;
-  key.Append(shard_name);
-
-  // Ensure PK is valid.
-  const auto &keys = schema.keys();
-  CHECK_EQ(keys.size(), 1u) << "schema has too many keys " << schema;
-  size_t pk_idx = keys.at(0);
-  if (update.count(pk_idx) == 1) {
-    CHECK_NE(update.at(pk_idx), "NULL");
-    key.Append(schema.TypeOf(pk_idx), rocksdb::Slice(update.at(pk_idx)));
-  } else {
-    key.AppendEncoded(this->GetPK());
-  }
-
-  // Encode Value.
-  RocksdbSequence value;
-  size_t idx = 0;
-  for (rocksdb::Slice v : this->Value()) {
-    if (update.count(idx) == 1) {
-      value.Append(schema.TypeOf(idx), rocksdb::Slice(update.at(idx)));
-    } else {
-      value.AppendEncoded(v);
-    }
-    idx++;
+    const sqlast::Value &val = stmt.GetValue(schema.NameOf(i), i);
+    CHECK(val.TypeCompatible(schema.TypeOf(i)));
+    value.Append(val);
   }
 
   return RocksdbRecord(std::move(key), std::move(value));

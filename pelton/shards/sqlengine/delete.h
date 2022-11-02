@@ -12,7 +12,6 @@
 #include "pelton/connection.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/state.h"
-#include "pelton/dataflow/value.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
 #include "pelton/sql/abstract_connection.h"

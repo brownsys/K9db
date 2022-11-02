@@ -147,6 +147,12 @@ public class ProjectOperatorFactory {
             .getGenerator()
             .AddProjectionLiteralInt(projectOperator, name, RexLiteral.intValue(literal));
         break;
+      case VARCHAR:
+      case CHAR:
+        this.context
+            .getGenerator()
+            .AddProjectionLiteralString(projectOperator, name, RexLiteral.stringValue(literal));
+        break;
       default:
         throw new IllegalArgumentException("Unsupported value type in literal projection");
     }
@@ -191,7 +197,7 @@ public class ProjectOperatorFactory {
     this.context
         .getGenerator()
         .AddProjectionArithmeticColumns(
-            projectOperator, name, leftSourcePeltonId, rightSourcePeltonId, arithmeticEnum);
+            projectOperator, name, arithmeticEnum, leftSourcePeltonId, rightSourcePeltonId);
   }
 
   private void addArithmeticProjectionLiteral(
@@ -205,12 +211,12 @@ public class ProjectOperatorFactory {
         this.calciteToPeltonTarget.put(this.targetCalciteIndex, targetPeltonIndex);
         this.context
             .getGenerator()
-            .AddProjectionArithmeticLiteralLeft(
+            .AddProjectionArithmeticLiteralRight(
                 projectOperator,
                 name,
+                arithmeticEnum,
                 leftSourcePeltonId,
-                RexLiteral.intValue(right),
-                arithmeticEnum);
+                RexLiteral.intValue(right));
         break;
       default:
         throw new IllegalArgumentException("Unsupported value type in literal projection");
@@ -228,12 +234,12 @@ public class ProjectOperatorFactory {
         this.calciteToPeltonTarget.put(this.targetCalciteIndex, targetPeltonIndex);
         this.context
             .getGenerator()
-            .AddProjectionArithmeticLiteralRight(
+            .AddProjectionArithmeticLiteralLeft(
                 projectOperator,
                 name,
+                arithmeticEnum,
                 RexLiteral.intValue(left),
-                rightSourcePeltonId,
-                arithmeticEnum);
+                rightSourcePeltonId);
         break;
       default:
         throw new IllegalArgumentException("Unsupported value type in literal projection");

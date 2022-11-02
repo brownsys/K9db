@@ -20,9 +20,6 @@
 namespace pelton {
 namespace sqlast {
 
-// Remove leading and trailing quotes if any.
-std::string Dequote(const std::string &st);
-
 // Visit without modification.
 template <class T>
 class AbstractVisitor {
@@ -119,121 +116,6 @@ class Stringifier : public AbstractVisitor<std::string> {
       const LiteralListExpression &ast) override;
   std::string VisitBinaryExpression(const BinaryExpression &ast) override;
   std::string VisitDelete(const Delete &ast) override;
-};
-
-// Finds the value assigned to a specified column anywhere in this expression.
-class ValueFinder : public AbstractVisitor<std::pair<bool, std::string>> {
- public:
-  explicit ValueFinder(const std::string &colname)
-      : AbstractVisitor(), colname_(colname) {}
-
-  std::pair<bool, std::string> VisitCreateTable(
-      const CreateTable &ast) override;
-  std::pair<bool, std::string> VisitColumnDefinition(
-      const ColumnDefinition &ast) override;
-  std::pair<bool, std::string> VisitColumnConstraint(
-      const ColumnConstraint &ast) override;
-  std::pair<bool, std::string> VisitCreateIndex(
-      const CreateIndex &ast) override;
-  std::pair<bool, std::string> VisitInsert(const Insert &ast) override;
-  std::pair<bool, std::string> VisitUpdate(const Update &ast) override;
-  std::pair<bool, std::string> VisitSelect(const Select &ast) override;
-  std::pair<bool, std::string> VisitDelete(const Delete &ast) override;
-  std::pair<bool, std::string> VisitColumnExpression(
-      const ColumnExpression &ast) override;
-  std::pair<bool, std::string> VisitLiteralExpression(
-      const LiteralExpression &ast) override;
-  std::pair<bool, std::string> VisitLiteralListExpression(
-      const LiteralListExpression &ast) override;
-  std::pair<bool, std::string> VisitBinaryExpression(
-      const BinaryExpression &ast) override;
-
- private:
-  std::string colname_;
-};
-
-// Removes any expression/subexpression that assigns a value to the specified
-// columns.
-class ExpressionRemover : public MutableVisitor<std::unique_ptr<Expression>> {
- public:
-  explicit ExpressionRemover(const std::string &colname)
-      : MutableVisitor(), colname_(colname) {}
-
-  std::unique_ptr<Expression> VisitCreateTable(CreateTable *ast) override;
-  std::unique_ptr<Expression> VisitColumnDefinition(
-      ColumnDefinition *ast) override;
-  std::unique_ptr<Expression> VisitColumnConstraint(
-      ColumnConstraint *ast) override;
-  std::unique_ptr<Expression> VisitCreateIndex(CreateIndex *ast) override;
-  std::unique_ptr<Expression> VisitInsert(Insert *ast) override;
-  std::unique_ptr<Expression> VisitUpdate(Update *ast) override;
-  std::unique_ptr<Expression> VisitSelect(Select *ast) override;
-  std::unique_ptr<Expression> VisitDelete(Delete *ast) override;
-  std::unique_ptr<Expression> VisitColumnExpression(
-      ColumnExpression *ast) override;
-  std::unique_ptr<Expression> VisitLiteralExpression(
-      LiteralExpression *ast) override;
-  std::unique_ptr<Expression> VisitLiteralListExpression(
-      LiteralListExpression *ast) override;
-  std::unique_ptr<Expression> VisitBinaryExpression(
-      BinaryExpression *ast) override;
-
- private:
-  std::string colname_;
-};
-
-class ListCountVisitor : public AbstractVisitor<size_t> {
- public:
-  ListCountVisitor() = default;
-
-  size_t VisitCreateTable(const CreateTable &ast) override { return 0; }
-  size_t VisitColumnDefinition(const ColumnDefinition &ast) override {
-    return 0;
-  }
-  size_t VisitColumnConstraint(const ColumnConstraint &ast) override {
-    return 0;
-  }
-  size_t VisitCreateIndex(const CreateIndex &ast) override { return 0; }
-  size_t VisitInsert(const Insert &ast) override { return 0; }
-  size_t VisitUpdate(const Update &ast) override {
-    if (ast.HasWhereClause()) {
-      return ast.GetWhereClause()->Visit(this);
-    }
-    return 0;
-  }
-  size_t VisitSelect(const Select &ast) override {
-    if (ast.HasWhereClause()) {
-      return ast.GetWhereClause()->Visit(this);
-    }
-    return 0;
-  }
-  size_t VisitDelete(const Delete &ast) override {
-    if (ast.HasWhereClause()) {
-      return ast.GetWhereClause()->Visit(this);
-    }
-    return 0;
-  }
-  size_t VisitColumnExpression(const ColumnExpression &ast) override {
-    return 0;
-  }
-  size_t VisitLiteralExpression(const LiteralExpression &ast) override {
-    return 0;
-  }
-  size_t VisitLiteralListExpression(const LiteralListExpression &ast) override {
-    return ast.values().size();
-  }
-  size_t VisitBinaryExpression(const BinaryExpression &ast) override {
-    auto v = ast.VisitChildren(this);
-    size_t sum = 0;
-    for (size_t i : v) {
-      sum += i;
-    }
-    return sum;
-  }
-
- private:
-  std::string shard_prefix_;
-  bool supports_foreign_keys_;
 };
 
 }  // namespace sqlast

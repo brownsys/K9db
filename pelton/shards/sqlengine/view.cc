@@ -52,9 +52,7 @@ absl::StatusOr<sql::SqlResult> CreateView(const sqlast::CreateView &stmt,
   dataflow::Future future(true);
   for (const auto &table_name : dataflow_state.GetFlow(flow_name).Inputs()) {
     // Generate and execute select * query for current table
-    pelton::sqlast::Select select{table_name};
-    select.AddColumn("*");
-    sql::SqlResultSet result = db->ExecuteSelect(select);
+    sql::SqlResultSet result = db->GetAll(table_name);
 
     // Vectorize and store records.
     std::vector<pelton::dataflow::Record> records = std::move(result.Vec());
@@ -92,7 +90,7 @@ absl::StatusOr<sql::SqlResult> CreateView(const sqlast::CreateView &stmt,
 
 namespace {
 
-using Constraint = std::vector<std::pair<size_t, std::string>>;
+using Constraint = std::vector<std::pair<size_t, sqlast::Value>>;
 
 bool SetEqual(const std::vector<uint32_t> &cols, const Constraint &constraint) {
   for (const auto &[col1, _] : constraint) {
@@ -158,24 +156,7 @@ dataflow::Key MakeKey(const Constraint &constraint,
                       const dataflow::SchemaRef &schema) {
   dataflow::Key key(key_cols.size());
   for (const auto &[index, value] : constraint) {
-    if (value == "NULL") {
-      key.AddNull(schema.TypeOf(index));
-    } else {
-      switch (schema.TypeOf(index)) {
-        case sqlast::ColumnDefinition::Type::UINT:
-          key.AddValue(static_cast<uint64_t>(std::stoull(value)));
-          break;
-        case sqlast::ColumnDefinition::Type::INT:
-          key.AddValue(static_cast<int64_t>(std::stoll(value)));
-          break;
-        case sqlast::ColumnDefinition::Type::TEXT:
-        case sqlast::ColumnDefinition::Type::DATETIME:
-          key.AddValue(sqlast::Dequote(value));
-          break;
-        default:
-          LOG(FATAL) << "Unsupported type in view read";
-      }
-    }
+    key.AddValue(value);
   }
   return key;
 }
@@ -220,7 +201,7 @@ Constraint FindGreaterThanConstraints(const dataflow::DataFlowGraph &flow,
       }
       const auto &column = ExtractColumnFromConstraint(expr)->column();
       size_t col = flow.output_schema().IndexOf(column);
-      const std::string &val = ExtractLiteralFromConstraint(expr)->value();
+      const sqlast::Value &val = ExtractLiteralFromConstraint(expr)->value();
       result.emplace_back(col, val);
       break;
     }
@@ -256,7 +237,7 @@ std::vector<Constraint> FindEqualityConstraints(
     case sqlast::Expression::Type::EQ: {
       const auto &column = ExtractColumnFromConstraint(expr)->column();
       size_t col = flow.output_schema().IndexOf(column);
-      const std::string &val = ExtractLiteralFromConstraint(expr)->value();
+      const sqlast::Value &val = ExtractLiteralFromConstraint(expr)->value();
       result.push_back({std::make_pair(col, val)});
       break;
     }
@@ -266,7 +247,7 @@ std::vector<Constraint> FindEqualityConstraints(
       size_t col = flow.output_schema().IndexOf(column);
       auto l =
           static_cast<const sqlast::LiteralListExpression *>(expr->GetRight());
-      for (const std::string &val : l->values()) {
+      for (const sqlast::Value &val : l->values()) {
         result.push_back({std::make_pair(col, val)});
       }
       break;
@@ -343,8 +324,6 @@ LookupCondition ConstraintKeys(const dataflow::DataFlowGraph &flow,
 absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
                                           Connection *connection,
                                           util::SharedLock *lock) {
-  sqlast::ListCountVisitor listcount;
-  std::string count = std::to_string(listcount.Visit(&stmt));
   const dataflow::DataFlowState &dstate = connection->state->DataflowState();
 
   // Get the corresponding flow.

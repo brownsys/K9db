@@ -15,19 +15,13 @@ namespace sqlast {
 
 #define _COMMA ,
 
-#define __CAST_OR_RETURN_VAR_NAME(arg) __CAST_OR_RETURN_RESULT_##arg
-#define __CAST_OR_RETURN_VAL(arg) __CAST_OR_RETURN_VAR_NAME(arg)
-#define CAST_OR_RETURN(lexpr, rexpr, type)               \
-  antlrcpp::Any __CAST_OR_RETURN_VAL(__LINE__) = rexpr;  \
-  if (__CAST_OR_RETURN_VAL(__LINE__).is<absl::Status>()) \
-    return __CAST_OR_RETURN_VAL(__LINE__);               \
-  lexpr = __CAST_OR_RETURN_VAL(__LINE__).as<type>()
-
-#define MCAST_OR_RETURN(lexpr, rexpr, type)                        \
-  antlrcpp::Any __CAST_OR_RETURN_VAL(__LINE__) = std::move(rexpr); \
-  if (__CAST_OR_RETURN_VAL(__LINE__).is<absl::Status>())           \
-    return __CAST_OR_RETURN_VAL(__LINE__);                         \
-  lexpr = std::move(__CAST_OR_RETURN_VAL(__LINE__).as<type>())
+#define __CAST_REF_VAR_NAME(arg) __CAST_REF_RESULT_##arg
+#define __CAST_REF_VAL(arg) __CAST_REF_VAR_NAME(arg)
+#define CAST_REF(type, var, rexpr)                 \
+  antlrcpp::Any __CAST_REF_VAL(__LINE__) = rexpr;  \
+  if (__CAST_REF_VAL(__LINE__).is<absl::Status>()) \
+    return __CAST_REF_VAL(__LINE__);               \
+  type &var = __CAST_REF_VAL(__LINE__).as<type &>()
 
 absl::StatusOr<std::unique_ptr<AbstractStatement>>
 AstTransformer::TransformStatement(
@@ -79,8 +73,7 @@ antlrcpp::Any AstTransformer::visitCreate_view_stmt(
   }
 
   // Parse view name.
-  CAST_OR_RETURN(std::string view_name, ctx->view_name()->accept(this),
-                 std::string);
+  CAST_REF(std::string, view_name, ctx->view_name()->accept(this));
 
   // Select statement is not parsed and treated as a literal, the planner
   // will parse and handle it.
@@ -102,21 +95,19 @@ antlrcpp::Any AstTransformer::visitCreate_table_stmt(
   }
 
   // Parse table name.
-  CAST_OR_RETURN(std::string table_name, ctx->table_name()->accept(this),
-                 std::string);
+  CAST_REF(std::string, table_name, ctx->table_name()->accept(this));
 
   // Parse into our AST.
   std::unique_ptr<CreateTable> table =
       std::make_unique<CreateTable>(table_name);
   for (auto *column : ctx->column_def()) {
-    CAST_OR_RETURN(ColumnDefinition col, column->accept(this),
-                   ColumnDefinition);
+    CAST_REF(ColumnDefinition, col, column->accept(this));
     table->AddColumn(col.column_name(), col);
   }
   for (auto *constraint : ctx->table_constraint()) {
-    CAST_OR_RETURN(const auto &[col_name _COMMA ast_constraint],
-                   constraint->accept(this),
-                   std::pair<std::string _COMMA ColumnConstraint>);
+    CAST_REF(std::pair<std::string _COMMA ColumnConstraint>, pair,
+             constraint->accept(this));
+    const auto &[col_name, ast_constraint] = pair;
     if (!table->HasColumn(col_name)) {
       return absl::InvalidArgumentError("Constraint over non-existing column " +
                                         col_name);
@@ -131,19 +122,18 @@ antlrcpp::Any AstTransformer::visitCreate_table_stmt(
 antlrcpp::Any AstTransformer::visitColumn_def(
     sqlparser::SQLiteParser::Column_defContext *ctx) {
   // Visit column name.
-  CAST_OR_RETURN(std::string column_name, ctx->column_name()->accept(this),
-                 std::string);
+  CAST_REF(std::string, column_name, ctx->column_name()->accept(this));
   // Visit type (if exists).
   std::string column_type = "";
   if (ctx->type_name() != nullptr) {
-    CAST_OR_RETURN(column_type, ctx->type_name()->accept(this), std::string);
+    CAST_REF(std::string, parsed, ctx->type_name()->accept(this));
+    column_type = std::move(parsed);
   }
 
   // Visit inlined constraints.
   ColumnDefinition column(column_name, column_type);
   for (auto *constraint : ctx->column_constraint()) {
-    CAST_OR_RETURN(ColumnConstraint constr, constraint->accept(this),
-                   ColumnConstraint);
+    CAST_REF(ColumnConstraint, constr, constraint->accept(this));
     column.AddConstraint(constr);
   }
   if (ctx->OWNER() != nullptr) {
@@ -185,22 +175,19 @@ antlrcpp::Any AstTransformer::visitTable_constraint(
   }
 
   if (ctx->PRIMARY() != nullptr) {
-    CAST_OR_RETURN(std::string col_name, ctx->indexed_column(0)->accept(this),
-                   std::string);
+    CAST_REF(std::string, col_name, ctx->indexed_column(0)->accept(this));
     return std::make_pair(
         col_name, ColumnConstraint(ColumnConstraint::Type::PRIMARY_KEY));
   }
   if (ctx->UNIQUE() != nullptr) {
-    CAST_OR_RETURN(std::string col_name, ctx->indexed_column(0)->accept(this),
-                   std::string);
+    CAST_REF(std::string, col_name, ctx->indexed_column(0)->accept(this));
     return std::make_pair(col_name,
                           ColumnConstraint(ColumnConstraint::Type::UNIQUE));
   }
   // Can only be a foreign key.
-  CAST_OR_RETURN(std::string col_name, ctx->column_name(0)->accept(this),
-                 std::string);
-  CAST_OR_RETURN(ColumnConstraint fk_constraint,
-                 ctx->foreign_key_clause()->accept(this), ColumnConstraint);
+  CAST_REF(std::string, col_name, ctx->column_name(0)->accept(this));
+  CAST_REF(ColumnConstraint, fk_constraint,
+           ctx->foreign_key_clause()->accept(this));
   return std::make_pair(col_name, fk_constraint);
 }
 
@@ -212,10 +199,10 @@ antlrcpp::Any AstTransformer::visitForeign_key_clause(
   }
 
   ColumnConstraint constrn(ColumnConstraint::Type::FOREIGN_KEY);
-  CAST_OR_RETURN(constrn.foreign_table(), ctx->foreign_table()->accept(this),
-                 std::string);
-  CAST_OR_RETURN(constrn.foreign_column(), ctx->column_name(0)->accept(this),
-                 std::string);
+  CAST_REF(std::string, foreign_table, ctx->foreign_table()->accept(this));
+  CAST_REF(std::string, foreign_column, ctx->column_name(0)->accept(this));
+  constrn.foreign_table() = std::move(foreign_table);
+  constrn.foreign_column() = std::move(foreign_column);
   return constrn;
 }
 
@@ -230,12 +217,9 @@ antlrcpp::Any AstTransformer::visitCreate_index_stmt(
     return absl::InvalidArgumentError("Multi-column index are not supported!");
   }
 
-  CAST_OR_RETURN(std::string index_name, ctx->index_name()->accept(this),
-                 std::string);
-  CAST_OR_RETURN(std::string table_name, ctx->table_name()->accept(this),
-                 std::string);
-  CAST_OR_RETURN(std::string column_name, ctx->indexed_column(0)->accept(this),
-                 std::string);
+  CAST_REF(std::string, index_name, ctx->index_name()->accept(this));
+  CAST_REF(std::string, table_name, ctx->table_name()->accept(this));
+  CAST_REF(std::string, column_name, ctx->indexed_column(0)->accept(this));
   bool disk = (ctx->INMEMORY() == nullptr);
   return static_cast<std::unique_ptr<AbstractStatement>>(
       std::make_unique<CreateIndex>(disk, index_name, table_name, column_name));
@@ -254,32 +238,37 @@ antlrcpp::Any AstTransformer::visitInsert_stmt(
   }
 
   // Table name and explicitly specified columns.
-  CAST_OR_RETURN(std::string table_name, ctx->table_name()->accept(this),
-                 std::string);
-  bool rep = ctx->REPLACE() != nullptr;
-  std::unique_ptr<Insert> insert = std::make_unique<Insert>(table_name, rep);
+  CAST_REF(std::string, table_name, ctx->table_name()->accept(this));
+
+  // Inlined columns (if any).
+  std::vector<std::string> columns;
   for (auto column_name_ctx : ctx->column_name()) {
-    CAST_OR_RETURN(std::string column_name, column_name_ctx->accept(this),
-                   std::string);
-    insert->AddColumn(column_name);
+    CAST_REF(std::string, column_name, column_name_ctx->accept(this));
+    columns.push_back(std::move(column_name));
   }
 
   // Inserted values.
-  CAST_OR_RETURN(std::vector<std::string> values,
-                 ctx->expr_list(0)->accept(this), std::vector<std::string>);
-  insert->SetValues(std::move(values));
-  return static_cast<std::unique_ptr<AbstractStatement>>(std::move(insert));
+  CAST_REF(std::vector<Value>, values, ctx->expr_list(0)->accept(this));
+
+  // Either return a REPLACE or an INSERT statement.
+  if (ctx->REPLACE() != nullptr) {  // REPLACE.
+    return absl::InvalidArgumentError("Replace not yet supported");
+  } else {
+    std::unique_ptr<Insert> insert = std::make_unique<Insert>(table_name);
+    insert->SetColumns(std::move(columns));
+    insert->SetValues(std::move(values));
+    return static_cast<std::unique_ptr<AbstractStatement>>(std::move(insert));
+  }
 }
 antlrcpp::Any AstTransformer::visitExpr_list(
     sqlparser::SQLiteParser::Expr_listContext *ctx) {
-  std::vector<std::string> values;
+  std::vector<Value> values;
   for (auto expr_ctx : ctx->expr()) {
     if (expr_ctx->literal_value() == nullptr) {
       return absl::InvalidArgumentError("Non-literal value in insert");
     }
-    CAST_OR_RETURN(std::string val, expr_ctx->literal_value()->accept(this),
-                   std::string);
-    values.push_back(val);
+    CAST_REF(Value, val, expr_ctx->literal_value()->accept(this));
+    values.push_back(std::move(val));
   }
   return values;
 }
@@ -294,15 +283,13 @@ antlrcpp::Any AstTransformer::visitUpdate_stmt(
   }
 
   // Table name.
-  CAST_OR_RETURN(std::string table_name,
-                 ctx->qualified_table_name()->accept(this), std::string);
+  CAST_REF(std::string, table_name, ctx->qualified_table_name()->accept(this));
   std::unique_ptr<Update> update = std::make_unique<Update>(table_name);
   // Column = Value pairs.
   for (size_t i = 0; i < ctx->column_name().size(); i++) {
-    CAST_OR_RETURN(std::string column, ctx->column_name(i)->accept(this),
-                   std::string);
-    MCAST_OR_RETURN(std::unique_ptr<Expression> value_expr,
-                    ctx->expr(i)->accept(this), std::unique_ptr<Expression>);
+    CAST_REF(std::string, column, ctx->column_name(i)->accept(this));
+    CAST_REF(std::unique_ptr<Expression>, value_expr,
+             ctx->expr(i)->accept(this));
     if (value_expr->type() != Expression::Type::LITERAL) {
       return absl::InvalidArgumentError("Update value must be a literal");
     }
@@ -311,9 +298,8 @@ antlrcpp::Any AstTransformer::visitUpdate_stmt(
   }
   // Where clause.
   if (ctx->WHERE() != nullptr) {
-    MCAST_OR_RETURN(std::unique_ptr<Expression> expr,
-                    ctx->expr(ctx->column_name().size())->accept(this),
-                    std::unique_ptr<Expression>);
+    CAST_REF(std::unique_ptr<Expression>, expr,
+             ctx->expr(ctx->column_name().size())->accept(this));
     if (expr->type() != Expression::Type::EQ &&
         expr->type() != Expression::Type::AND &&
         expr->type() != Expression::Type::GREATER_THAN &&
@@ -340,15 +326,14 @@ antlrcpp::Any AstTransformer::visitSelect_stmt(
   }
 
   // Parse select_core.
-  MCAST_OR_RETURN(std::unique_ptr<AbstractStatement> select_stmt,
-                  ctx->select_core(0)->accept(this),
-                  std::unique_ptr<AbstractStatement>);
+  CAST_REF(std::unique_ptr<AbstractStatement>, select_stmt,
+           ctx->select_core(0)->accept(this));
 
   // Parse OFFSET and LIMIT if they exist.
   if (ctx->limit_stmt() != nullptr) {
-    CAST_OR_RETURN(auto [offset _COMMA limit], ctx->limit_stmt()->accept(this),
-                   std::pair<size_t _COMMA int>);
-
+    CAST_REF(std::pair<size_t _COMMA int>, pair,
+             ctx->limit_stmt()->accept(this));
+    auto [offset, limit] = pair;
     Select *select = static_cast<Select *>(select_stmt.get());
     select->limit() = limit;
     select->offset() = offset;
@@ -366,19 +351,16 @@ antlrcpp::Any AstTransformer::visitSelect_core(
   }
 
   // Find the table name.
-  CAST_OR_RETURN(std::string table_name,
-                 ctx->table_or_subquery(0)->accept(this), std::string);
+  CAST_REF(std::string, table_name, ctx->table_or_subquery(0)->accept(this));
   std::unique_ptr<Select> select = std::make_unique<Select>(table_name);
 
   for (auto *result_column_ctx : ctx->result_column()) {
-    CAST_OR_RETURN(std::string column, result_column_ctx->accept(this),
-                   std::string);
+    CAST_REF(Select::ResultColumn, column, result_column_ctx->accept(this));
     select->AddColumn(column);
   }
 
   if (ctx->WHERE() != nullptr) {
-    MCAST_OR_RETURN(std::unique_ptr<Expression> expr,
-                    ctx->expr(0)->accept(this), std::unique_ptr<Expression>);
+    CAST_REF(std::unique_ptr<Expression>, expr, ctx->expr(0)->accept(this));
     if (expr->type() != Expression::Type::EQ &&
         expr->type() != Expression::Type::AND &&
         expr->type() != Expression::Type::GREATER_THAN &&
@@ -397,10 +379,12 @@ antlrcpp::Any AstTransformer::visitResult_column(
     sqlparser::SQLiteParser::Result_columnContext *ctx) {
   if (ctx->expr() != nullptr) {
     if (ctx->expr()->column_name() != nullptr) {
-      return ctx->expr()->column_name()->accept(this);
+      CAST_REF(std::string, column, ctx->expr()->column_name()->accept(this));
+      return Select::ResultColumn(column);
     }
     if (ctx->expr()->literal_value() != nullptr) {
-      return ctx->expr()->literal_value()->accept(this);
+      CAST_REF(Value, literal, ctx->expr()->literal_value()->accept(this));
+      return Select::ResultColumn(literal);
     }
     return absl::InvalidArgumentError("Bad column expression in SELECT");
   }
@@ -436,13 +420,11 @@ antlrcpp::Any AstTransformer::visitDelete_stmt(
   }
 
   // Find table name.
-  CAST_OR_RETURN(std::string table_name,
-                 ctx->qualified_table_name()->accept(this), std::string);
+  CAST_REF(std::string, table_name, ctx->qualified_table_name()->accept(this));
   std::unique_ptr<Delete> delete_ = std::make_unique<Delete>(table_name);
   // Where clause if exists.
   if (ctx->WHERE() != nullptr) {
-    MCAST_OR_RETURN(std::unique_ptr<Expression> expr, ctx->expr()->accept(this),
-                    std::unique_ptr<Expression>);
+    CAST_REF(std::unique_ptr<Expression>, expr, ctx->expr()->accept(this));
     if (expr->type() != Expression::Type::EQ &&
         expr->type() != Expression::Type::AND &&
         expr->type() != Expression::Type::GREATER_THAN &&
@@ -488,15 +470,13 @@ antlrcpp::Any AstTransformer::visitExpr(
   }
 
   if (ctx->literal_value() != nullptr) {
-    CAST_OR_RETURN(std::string value, ctx->literal_value()->accept(this),
-                   std::string);
+    CAST_REF(Value, value, ctx->literal_value()->accept(this));
     std::unique_ptr<Expression> result =
         std::make_unique<LiteralExpression>(value);
     return result;
   }
   if (ctx->column_name() != nullptr) {
-    CAST_OR_RETURN(std::string column, ctx->column_name()->accept(this),
-                   std::string);
+    CAST_REF(std::string, column, ctx->column_name()->accept(this));
     std::unique_ptr<Expression> result =
         std::make_unique<ColumnExpression>(column);
     return result;
@@ -509,18 +489,16 @@ antlrcpp::Any AstTransformer::visitExpr(
       return absl::InvalidArgumentError(
           "only support WHERE IN with column on left");
     }
-    CAST_OR_RETURN(std::string column,
-                   ctx->expr(0)->column_name()->accept(this), std::string);
+    CAST_REF(std::string, column, ctx->expr(0)->column_name()->accept(this));
     std::unique_ptr<Expression> expr0 =
         std::make_unique<ColumnExpression>(column);
-    std::vector<std::string> values;
+    std::vector<Value> values;
     for (auto &v : ctx->expr(1)->expr()) {
       if (v->literal_value() == nullptr) {
         return absl::InvalidArgumentError(
             "only support literal list value with IN on right");
       }
-      CAST_OR_RETURN(std::string value, v->literal_value()->accept(this),
-                     std::string);
+      CAST_REF(Value, value, v->literal_value()->accept(this));
       values.push_back(value);
     }
     result->SetLeft(std::move(expr0));
@@ -543,17 +521,15 @@ antlrcpp::Any AstTransformer::visitExpr(
     result = std::make_unique<BinaryExpression>(Expression::Type::GREATER_THAN);
   }
 
-  MCAST_OR_RETURN(std::unique_ptr<Expression> expr0, ctx->expr(0)->accept(this),
-                  std::unique_ptr<Expression>);
-  MCAST_OR_RETURN(std::unique_ptr<Expression> expr1, ctx->expr(1)->accept(this),
-                  std::unique_ptr<Expression>);
+  CAST_REF(std::unique_ptr<Expression>, expr0, ctx->expr(0)->accept(this));
+  CAST_REF(std::unique_ptr<Expression>, expr1, ctx->expr(1)->accept(this));
   result->SetLeft(std::move(expr0));
   result->SetRight(std::move(expr1));
   return static_cast<std::unique_ptr<Expression>>(std::move(result));
 }
 antlrcpp::Any AstTransformer::visitLiteral_value(
     sqlparser::SQLiteParser::Literal_valueContext *ctx) {
-  return ctx->getText();
+  return Value::FromSQLString(ctx->getText());
 }
 
 // Names of entities (columns, tables, etc).

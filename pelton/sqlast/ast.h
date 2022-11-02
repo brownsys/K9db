@@ -6,6 +6,7 @@
 #include "pelton/sqlast/ast_expressions.h"
 #include "pelton/sqlast/ast_schema.h"
 #include "pelton/sqlast/ast_statements.h"
+#include "pelton/sqlast/ast_value.h"
 #include "pelton/sqlast/ast_visitors.h"
 
 #endif  // PELTON_SQLAST_AST_H_

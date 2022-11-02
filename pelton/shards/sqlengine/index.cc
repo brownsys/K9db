@@ -9,7 +9,6 @@
 #include "pelton/dataflow/state.h"
 #include "pelton/shards/sqlengine/view.h"
 #include "pelton/shards/state.h"
-#include "pelton/sqlast/ast.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -160,7 +159,7 @@ absl::StatusOr<IndexDescriptor> Create(const std::string &table_name,
  * Index querying.
  */
 std::vector<dataflow::Record> LookupIndex(const IndexDescriptor &index,
-                                          dataflow::Value &&value,
+                                          sqlast::Value &&value,
                                           Connection *connection,
                                           util::SharedLock *lock) {
   const dataflow::DataFlowState &dstate = connection->state->DataflowState();

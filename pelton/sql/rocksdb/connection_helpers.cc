@@ -112,7 +112,7 @@ std::vector<T> RocksdbConnection::GetRecords(
   }
 
   // Apply remaining filters (if any).
-  if (!value_mapper.EmptyBefore()) {
+  if (!value_mapper.Empty()) {
     std::vector<T> filtered;
     for (size_t i = 0; i < records.size(); i++) {
       T &record = records.at(i);

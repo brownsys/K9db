@@ -17,7 +17,9 @@ namespace dataflow {
 using CType = sqlast::ColumnDefinition::Type;
 
 // Test key size.
-TEST(KeyTest, Size) { EXPECT_EQ(sizeof(Key), sizeof(std::vector<Value>)); }
+TEST(KeyTest, Size) {
+  EXPECT_EQ(sizeof(Key), sizeof(std::vector<sqlast::Value>));
+}
 
 // Test constructing and retrieving data from key.
 TEST(KeyTest, DataRep) {

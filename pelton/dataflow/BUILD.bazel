@@ -57,21 +57,6 @@ cc_library(
 )
 
 cc_library(
-    name = "value",
-    srcs = [
-        "value.cc",
-    ],
-    hdrs = [
-        "value.h",
-    ],
-    visibility = ["//pelton:__subpackages__"],
-    deps = [
-        "//pelton/sqlast:ast",
-        "@glog",
-    ],
-)
-
-cc_library(
     name = "key",
     srcs = [
         "key.cc",
@@ -83,7 +68,7 @@ cc_library(
     deps = [
         ":schema",
         ":types",
-        ":value",
+        "//pelton/sqlast:ast",
     ],
 )
 
@@ -100,7 +85,6 @@ cc_library(
         ":key",
         ":schema",
         ":types",
-        ":value",
         "//pelton/sqlast:ast",
         "//pelton/util:type_utils",
         "@glog",
@@ -209,21 +193,6 @@ cc_test(
     ],
     deps = [
         ":future",
-        "@com_google_googletest//:gtest",
-        "@com_google_googletest//:gtest_main",
-        "@glog",
-    ],
-)
-
-cc_test(
-    name = "value-test",
-    srcs = [
-        "value_unittest.cc",
-    ],
-    deps = [
-        ":value",
-        "//pelton/sqlast:ast",
-        "//pelton/util:ints",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
         "@glog",

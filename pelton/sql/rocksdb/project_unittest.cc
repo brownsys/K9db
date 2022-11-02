@@ -11,6 +11,9 @@
 
 #define STR(s) std::make_unique<std::string>(s)
 
+#define COL(s) sqlast::Select::ResultColumn(s)
+#define SQL(s) sqlast::Select::ResultColumn(sqlast::Value::FromSQLString(s))
+
 namespace pelton {
 namespace sql {
 
@@ -24,8 +27,8 @@ dataflow::Record record{schema, true, 0_u, STR("user1"), 20_s, STR("email1")};
 
 // A no-op project.
 TEST(ProjectTest, IdentityProject) {
-  Projection projection =
-      ProjectionSchema(schema, {"ID", "name", "age", "email"});
+  Projection projection = ProjectionSchema(
+      schema, {COL("ID"), COL("name"), COL("age"), COL("email")});
 
   dataflow::Record result = Project(projection, record);
   EXPECT_EQ(result.schema(), schema);
@@ -34,8 +37,8 @@ TEST(ProjectTest, IdentityProject) {
 
 // A re-ordering project.
 TEST(ProjectTest, ReorderProject) {
-  Projection projection =
-      ProjectionSchema(schema, {"name", "email", "age", "ID"});
+  Projection projection = ProjectionSchema(
+      schema, {COL("name"), COL("email"), COL("age"), COL("ID")});
 
   dataflow::Record result = Project(projection, record);
 
@@ -54,7 +57,8 @@ TEST(ProjectTest, ReorderProject) {
 
 // A dropping project.
 TEST(ProjectTest, DroppingProject) {
-  Projection projection = ProjectionSchema(schema, {"ID", "age", "email"});
+  Projection projection =
+      ProjectionSchema(schema, {COL("ID"), COL("age"), COL("email")});
 
   dataflow::Record result = Project(projection, record);
 
@@ -72,7 +76,8 @@ TEST(ProjectTest, DroppingProject) {
 // A literal project.
 TEST(ProjectTest, LiteralProject) {
   Projection projection =
-      ProjectionSchema(schema, {"ID", "name", "age", "email", "10", "'kinan'"});
+      ProjectionSchema(schema, {COL("ID"), COL("name"), COL("age"),
+                                COL("email"), SQL("10"), SQL("'kinan'")});
 
   dataflow::Record result = Project(projection, record);
 
@@ -95,8 +100,9 @@ TEST(ProjectTest, LiteralProject) {
 
 // All combined.
 TEST(ProjectTest, CombinedProject) {
-  Projection projection =
-      ProjectionSchema(schema, {"email", "10", "name", "age", "'kinan'"});
+  Projection projection = ProjectionSchema(
+      schema,
+      {COL("email"), SQL("10"), COL("name"), COL("age"), SQL("'kinan'")});
 
   dataflow::Record result = Project(projection, record);
 

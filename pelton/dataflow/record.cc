@@ -7,22 +7,6 @@
 namespace pelton {
 namespace dataflow {
 
-// Helper for Record::DataVariant.
-sqlast::ColumnDefinition::Type Record::TypeOfVariant(const DataVariant &v) {
-  switch (v.index()) {
-    case 0:
-      return sqlast::ColumnDefinition::Type::TEXT;
-    case 1:
-      return sqlast::ColumnDefinition::Type::UINT;
-    case 2:
-      return sqlast::ColumnDefinition::Type::INT;
-    case 3:
-      LOG(FATAL) << "NULL value variant can't be converted to a type!";
-    default:
-      LOG(FATAL) << "Unsupported variant type!";
-  }
-}
-
 // Explicit deep copying.
 Record Record::Copy() const {
   // Create a copy.
@@ -139,7 +123,7 @@ Key Record::GetValues(const std::vector<ColumnID> &cols) const {
   Key key{cols.size()};
   for (ColumnID col : cols) {
     if (this->IsNull(col)) {
-      key.AddNull(this->schema_.TypeOf(col));
+      key.AddNull();
       continue;
     }
     switch (this->schema_.TypeOf(col)) {
@@ -152,7 +136,7 @@ Key Record::GetValues(const std::vector<ColumnID> &cols) const {
       case sqlast::ColumnDefinition::Type::TEXT:
       case sqlast::ColumnDefinition::Type::DATETIME:
         if (this->data_[col].str) {
-          key.AddValue(*(this->data_[col].str));
+          key.AddValue(*this->data_[col].str);
         } else {
           key.AddValue("");
         }
@@ -163,75 +147,32 @@ Key Record::GetValues(const std::vector<ColumnID> &cols) const {
   }
   return key;
 }
-Value Record::GetValue(ColumnID col) const {
+sqlast::Value Record::GetValue(ColumnID col) const {
   CHECK_NE(this->data_, nullptr) << "Cannot get value for moved record";
   if (this->IsNull(col)) {
-    return Value(this->schema_.TypeOf(col));
+    return sqlast::Value();
   }
   switch (this->schema_.TypeOf(col)) {
     case sqlast::ColumnDefinition::Type::UINT:
-      return Value(this->data_[col].uint);
+      return sqlast::Value(this->data_[col].uint);
     case sqlast::ColumnDefinition::Type::INT:
-      return Value(this->data_[col].sint);
+      return sqlast::Value(this->data_[col].sint);
     case sqlast::ColumnDefinition::Type::TEXT:
     case sqlast::ColumnDefinition::Type::DATETIME:
-      return Value(*this->data_[col].str);
-    default:
-      LOG(FATAL) << "Unsupported data type in value extraction!";
-  }
-}
-
-std::string Record::GetValueString(ColumnID col) const {
-  CHECK_NE(this->data_, nullptr) << "Cannot get value for moved record";
-  if (this->IsNull(col)) {
-    return "NULL";
-  }
-  switch (this->schema_.TypeOf(col)) {
-    case sqlast::ColumnDefinition::Type::UINT:
-      return std::to_string(this->data_[col].uint);
-    case sqlast::ColumnDefinition::Type::INT:
-      return std::to_string(this->data_[col].sint);
-    case sqlast::ColumnDefinition::Type::TEXT:
-    case sqlast::ColumnDefinition::Type::DATETIME:
-      return *this->data_[col].str;
+      return sqlast::Value(*this->data_[col].str);
     default:
       LOG(FATAL) << "Unsupported data type in value extraction!";
   }
 }
 
 // Data type transformation.
-void Record::SetValue(const std::string &value, size_t i) {
+void Record::SetValue(const sqlast::Value &value, size_t i) {
   CHECK_NOTNULL(this->data_);
-  CHECK(!IsNull(i));
-  if (value == "NULL") {
-    this->SetNull(true, i);
-    return;
-  }
-  switch (this->schema_.TypeOf(i)) {
-    case sqlast::ColumnDefinition::Type::UINT:
-      this->data_[i].uint = std::stoull(value);
-      break;
-    case sqlast::ColumnDefinition::Type::INT:
-      this->data_[i].sint = std::stoll(value);
-      break;
-    // TODO(malte): DATETIME shouldn't be stored as a string, but as
-    // a timestamp since the epoch
-    case sqlast::ColumnDefinition::Type::DATETIME:
-    case sqlast::ColumnDefinition::Type::TEXT: {
-      this->data_[i].str =
-          std::make_unique<std::string>(sqlast::Dequote(value));
-      break;
-    }
-    default:
-      LOG(FATAL) << "Unsupported data type in setvalue: "
-                 << this->schema_.TypeOf(i);
-  }
-}
-void Record::SetValue(const Value &value, size_t i) {
   if (value.IsNull()) {
     this->SetNull(true, i);
     return;
   }
+  this->SetNull(false, i);
   switch (this->schema_.TypeOf(i)) {
     case sqlast::ColumnDefinition::Type::UINT:
       this->SetUInt(value.GetUInt(), i);

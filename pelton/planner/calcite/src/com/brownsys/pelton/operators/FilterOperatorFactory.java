@@ -360,7 +360,7 @@ public class FilterOperatorFactory {
         this.context
             .getGenerator()
             .AddFilterOperationInt(
-                filterOperator, RexLiteral.intValue(right), leftColumnId, operationEnum);
+                filterOperator, leftColumnId, RexLiteral.intValue(right), operationEnum);
         break;
 
       case VARCHAR:
@@ -368,7 +368,7 @@ public class FilterOperatorFactory {
         this.context
             .getGenerator()
             .AddFilterOperationString(
-                filterOperator, RexLiteral.stringValue(right), leftColumnId, operationEnum);
+                filterOperator, leftColumnId, RexLiteral.stringValue(right), operationEnum);
         break;
 
       case NULL:

@@ -11,7 +11,6 @@
 #include "pelton/connection.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/state.h"
-#include "pelton/dataflow/value.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
 #include "pelton/sql/abstract_connection.h"
@@ -45,10 +44,10 @@ class InsertContext {
   bool InsertedInto(const std::string &shard_kind, const std::string &user_id);
 
   /* Helpers for inserting statement into the database by sharding type. */
-  int DirectInsert(dataflow::Value &&fkval, const ShardDescriptor &desc);
-  absl::StatusOr<int> TransitiveInsert(dataflow::Value &&fkval,
+  int DirectInsert(sqlast::Value &&fkval, const ShardDescriptor &desc);
+  absl::StatusOr<int> TransitiveInsert(sqlast::Value &&fkval,
                                        const ShardDescriptor &desc);
-  absl::StatusOr<int> VariableInsert(dataflow::Value &&fkval,
+  absl::StatusOr<int> VariableInsert(sqlast::Value &&fkval,
                                      const ShardDescriptor &desc);
 
   /* Inserting the statement into the database. */

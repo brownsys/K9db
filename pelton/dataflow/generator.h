@@ -60,35 +60,36 @@ class DataFlowGraphGenerator {
 
   // Setting properties on existing operators.
   // Filter.
-  void AddFilterOperationString(NodeIndex filter_operator,
-                                const std::string &value, ColumnID column,
-                                FilterOperationEnum fop);
-  void AddFilterOperationInt(NodeIndex filter_operator, int64_t value,
-                             ColumnID column, FilterOperationEnum fop);
-  void AddFilterOperationNull(NodeIndex filter_operator, ColumnID column,
-                              FilterOperationEnum fop);
-  void AddFilterOperationColumn(NodeIndex filter_operator, ColumnID left_column,
-                                ColumnID right_column, FilterOperationEnum fop);
+  void AddFilterOperationString(NodeIndex filter, ColumnID column,
+                                const std::string &value,
+                                FilterOperationEnum op);
+  void AddFilterOperationInt(NodeIndex filter, ColumnID column, int64_t value,
+                             FilterOperationEnum op);
+  void AddFilterOperationNull(NodeIndex filter, ColumnID column,
+                              FilterOperationEnum op);
+  void AddFilterOperationColumn(NodeIndex filter, ColumnID left, ColumnID right,
+                                FilterOperationEnum op);
   // Projection.
-  void AddProjectionColumn(NodeIndex project_operator,
-                           const std::string &column_name, ColumnID cid);
-  void AddProjectionLiteralInt(NodeIndex project_operator,
-                               const std::string &column_name, int64_t value);
+  void AddProjectionColumn(NodeIndex project, const std::string &name,
+                           ColumnID cid);
 
-  void AddProjectionArithmeticLiteralLeft(NodeIndex project_operator,
-                                          const std::string &column_name,
-                                          ColumnID left_column,
-                                          int64_t right_literal,
-                                          ProjectOperationEnum operation);
-  void AddProjectionArithmeticLiteralRight(NodeIndex project_operator,
-                                           const std::string &column_name,
-                                           int64_t left_literal,
-                                           ColumnID right_column,
-                                           ProjectOperationEnum operation);
-  void AddProjectionArithmeticColumns(NodeIndex project_operator,
-                                      const std::string &column_name,
-                                      ColumnID left, ColumnID right,
-                                      ProjectOperationEnum operation);
+  void AddProjectionLiteralInt(NodeIndex project, const std::string &name,
+                               int64_t value);
+  void AddProjectionLiteralString(NodeIndex project, const std::string &name,
+                                  const std::string &value);
+
+  void AddProjectionArithmeticColumns(NodeIndex project,
+                                      const std::string &name,
+                                      ProjectOperationEnum op, ColumnID left,
+                                      ColumnID right);
+  void AddProjectionArithmeticLiteralLeft(NodeIndex project,
+                                          const std::string &name,
+                                          ProjectOperationEnum op, int64_t left,
+                                          ColumnID right);
+  void AddProjectionArithmeticLiteralRight(NodeIndex project,
+                                           const std::string &name,
+                                           ProjectOperationEnum op,
+                                           ColumnID left, int64_t right);
 
   // Reading schema.
   std::vector<std::string> GetTables() const;

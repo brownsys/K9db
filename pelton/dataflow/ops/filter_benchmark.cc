@@ -15,7 +15,7 @@ namespace dataflow {
 static void FilterPasses(benchmark::State &state) {
   SchemaRef schema = MakeSchema(false, true);
   FilterOperator filter;
-  filter.AddOperation(5_u, 0, FilterOperator::Operation::LESS_THAN);
+  filter.AddLiteralOperation(0, 5_u, FilterOperator::Operation::LESS_THAN);
 
   // Generator function: generates batches of records for benchmarking.
   RecordGenFunc gen = [schema] {
@@ -36,7 +36,7 @@ static void FilterPasses(benchmark::State &state) {
 static void FilterDiscards(benchmark::State &state) {
   SchemaRef schema = MakeSchema(false, true);
   FilterOperator filter;
-  filter.AddOperation(5_u, 0, FilterOperator::Operation::LESS_THAN);
+  filter.AddLiteralOperation(0, 5_u, FilterOperator::Operation::LESS_THAN);
 
   // Generator function: generates batches of records for benchmarking.
   RecordGenFunc gen = [schema] {

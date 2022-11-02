@@ -8,7 +8,6 @@ cc_library(
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":result",
-        "//pelton/dataflow:value",
         "//pelton/sqlast:ast",
         "//pelton/util:shard_name",
     ],

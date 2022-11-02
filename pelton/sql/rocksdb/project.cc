@@ -9,93 +9,67 @@
 namespace pelton {
 namespace sql {
 
-#define IS_LITERAL(col_name) \
-  (col_name.at(0) >= '0' && col_name.at(0) <= '9') || col_name.at(0) == '\''
-
-Projection ProjectionSchema(const dataflow::SchemaRef &table_schema,
-                            const std::vector<std::string> &columns) {
-  if (columns.size() == 1 && columns.front() == "*") {
-    return {table_schema, {}, {}};
+Projection ProjectionSchema(
+    const dataflow::SchemaRef &table_schema,
+    const std::vector<sqlast::Select::ResultColumn> &columns) {
+  // Special case: SELECT * can be handled quickly.
+  if (columns.size() == 1) {
+    if (columns.front().IsColumn() && columns.front().GetColumn() == "*") {
+      return {table_schema, {}};
+    }
   }
 
   CHECK_EQ(table_schema.keys().size(), 1u) << "Illegal keys " << table_schema;
   std::vector<std::string> names;
   std::vector<sqlast::ColumnDefinition::Type> types;
   std::vector<uint32_t> keys;
-  std::vector<bool> literals;
-  std::vector<std::variant<uint32_t, int64_t, std::string>> map;
+  std::vector<std::variant<uint32_t, sqlast::Value>> projections;
   for (size_t i = 0; i < columns.size(); i++) {
-    const std::string &col_name = columns.at(i);
-    names.push_back(col_name);
-    if (IS_LITERAL(col_name)) {
-      literals.push_back(true);
-      if (col_name.at(0) == '\'') {
-        types.push_back(sqlast::ColumnDefinition::Type::TEXT);
-        map.emplace_back(col_name.substr(1, col_name.size() - 2));
-      } else {
-        types.push_back(sqlast::ColumnDefinition::Type::INT);
-        map.emplace_back(std::stoll(col_name));
-      }
-    } else {
-      literals.push_back(false);
-      uint32_t idx = table_schema.IndexOf(col_name);
+    const sqlast::Select::ResultColumn &result_column = columns.at(i);
+    names.push_back(result_column.ToString());
+    if (result_column.IsColumn()) {
+      uint32_t idx = table_schema.IndexOf(result_column.GetColumn());
       types.push_back(table_schema.TypeOf(idx));
-      map.emplace_back(idx);
+      projections.emplace_back(idx);
       if (idx == table_schema.keys().at(0)) {
         keys.push_back(i);
       }
+    } else {
+      const sqlast::Value &literal = result_column.GetLiteral();
+      types.push_back(literal.ConvertType());
+      projections.emplace_back(literal);
     }
   }
   return {dataflow::SchemaFactory::Create(names, types, keys),
-          std::move(literals), std::move(map)};
+          std::move(projections)};
 }
 
 dataflow::Record Project(const Projection &project,
                          const dataflow::Record &record) {
   dataflow::Record output{project.schema, false};
   for (size_t i = 0; i < project.schema.size(); i++) {
-    if (project.literals.at(i)) {
-      // Project literal.
-      const auto &literal = project.map.at(i);
-      if (literal.index() == 1) {
-        output.SetInt(std::get<int64_t>(literal), i);
-      } else if (literal.index() == 2) {
-        const std::string &str = std::get<std::string>(literal);
-        output.SetString(std::make_unique<std::string>(str), i);
-      } else {
-        LOG(FATAL) << "UNREACHABLE";
-      }
-    } else {
+    const std::variant<uint32_t, sqlast::Value> &v = project.projections.at(i);
+    if (v.index() == 0) {
       // Project column.
-      CHECK_EQ(project.map.at(i).index(), 0u);
-      uint32_t idx = std::get<uint32_t>(project.map.at(i));
-      if (record.IsNull(idx)) {
-        output.SetNull(true, i);
-        continue;
-      }
-      switch (project.schema.TypeOf(i)) {
-        case sqlast::ColumnDefinition::Type::UINT: {
-          output.SetUInt(record.GetUInt(idx), i);
+      uint32_t idx = std::get<uint32_t>(v);
+      output.SetValue(record.GetValue(idx), i);
+    } else {
+      // Project literal.
+      const sqlast::Value &l = std::get<sqlast::Value>(v);
+      switch (l.type()) {
+        case sqlast::Value::INT: {
+          output.SetInt(l.GetInt(), i);
           break;
         }
-        case sqlast::ColumnDefinition::Type::INT: {
-          output.SetInt(record.GetInt(idx), i);
+        case sqlast::Value::TEXT: {
+          output.SetString(std::make_unique<std::string>(l.GetString()), i);
           break;
         }
-        case sqlast::ColumnDefinition::Type::TEXT: {
-          const std::string &str = record.GetString(idx);
-          output.SetString(std::make_unique<std::string>(str), i);
-          break;
-        }
-        case sqlast::ColumnDefinition::Type::DATETIME: {
-          const std::string &str = record.GetDateTime(idx);
-          output.SetDateTime(std::make_unique<std::string>(str), i);
-          break;
-        }
+        default:
+          LOG(FATAL) << "Unsupported literal projection type";
       }
     }
   }
-
   return output;
 }
 

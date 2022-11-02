@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "pelton/dataflow/record.h"
-#include "pelton/dataflow/value.h"
 #include "pelton/sql/abstract_connection.h"
 #include "pelton/sql/result.h"
 #include "pelton/sql/rocksdb/encryption.h"
@@ -62,7 +61,7 @@ class RocksdbConnection : public AbstractConnection {
 
   ResultSetAndStatus AssignToShards(
       const std::string &table_name, size_t column_index,
-      const std::vector<dataflow::Value> &values,
+      const std::vector<sqlast::Value> &values,
       const std::unordered_set<util::ShardName> &targets) override;
 
   int DeleteFromShard(const std::string &table_name,
@@ -72,7 +71,7 @@ class RocksdbConnection : public AbstractConnection {
 
   std::vector<size_t> CountShards(
       const std::string &table_name,
-      const std::vector<dataflow::Value> &pk_values) const override;
+      const std::vector<sqlast::Value> &pk_values) const override;
 
  private:
   std::unique_ptr<rocksdb::DB> db_;

@@ -47,11 +47,10 @@ std::vector<ShardLocation> Locate(const std::string &table_name,
                                   Connection *conn, util::SharedLock *lock) {
   std::string_view shard_kind = shard_name.ShardKind();
   std::string_view user_id = shard_name.UserID();
+
   // Get table information.
   const SharderState &sstate = conn->state->SharderState();
   const Table &table = sstate.GetTable(table_name);
-  size_t pk = table.schema.keys().at(0);
-  const std::string &pk_name = table.schema.NameOf(pk);
 
   // Store result here.
   std::vector<ShardLocation> result(records.size(), ShardLocation::NO_SHARD);
@@ -67,7 +66,8 @@ std::vector<ShardLocation> Locate(const std::string &table_name,
       if (desc->type == InfoType::DIRECT) {
         const DirectInfo &info = std::get<DirectInfo>(desc->info);
         if (kind_match) {
-          if (record.GetValueString(info.column_index) == user_id) {
+          if (record.GetValue(info.column_index).AsUnquotedString() ==
+              user_id) {
             result.at(i) = ShardLocation::IN_GIVEN_SHARD;
             continue;
           }
@@ -99,7 +99,7 @@ std::vector<ShardLocation> Locate(const std::string &table_name,
       if (kind_match) {
         bool found = false;
         for (const dataflow::Record &irecord : shards) {
-          if (irecord.GetValueString(1) == user_id) {
+          if (irecord.GetValue(1).AsUnquotedString() == user_id) {
             found = true;
             break;
           }

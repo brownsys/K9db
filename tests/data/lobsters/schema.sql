@@ -66,7 +66,7 @@ CREATE TABLE comments ( \
   hat_id int, \
   FOREIGN KEY (user_id) REFERENCES users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX comments_short_index ON comments(short_id);
+--CREATE INDEX comments_short_index ON comments(short_id);
 CREATE TABLE hat_requests ( \
   id int NOT NULL PRIMARY KEY, \
   created_at datetime, \
@@ -170,8 +170,8 @@ CREATE TABLE saved_stories ( \
   FOREIGN KEY (story_id) REFERENCES stories(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 -- Need this index for transitive sharding.
-CREATE INDEX storiespk ON stories(id);
-CREATE INDEX stories_short_index ON stories(short_id);
+--CREATE INDEX storiespk ON stories(id);
+--CREATE INDEX stories_short_index ON stories(short_id);
 CREATE TABLE tags ( \
   id int NOT NULL PRIMARY KEY, \
   tag varchar(25) NOT NULL UNIQUE, \
