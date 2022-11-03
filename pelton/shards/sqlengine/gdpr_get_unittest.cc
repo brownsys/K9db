@@ -284,8 +284,7 @@ TEST_F(GDPRGetTest, OwnerAccessor) {
 
   // Validate get.
   std::string get = MakeGDPRGet("user", "10");
-  EXPECT_EQ(Execute(get, &conn).ResultSets(), (VV{(V{}), (V{row1, row3}), (V{u2})}));
-  // TODO: this is an interesting behavior, because the result contains an empty entity for the msg table
+  EXPECT_EQ(Execute(get, &conn).ResultSets(), (VV{(V{row1, row3}), (V{u2})}));
 }
 
 TEST_F(GDPRGetTest, ShardedDataSubject) {
@@ -476,6 +475,8 @@ TEST_F(GDPRGetTest, ComplexVariableOwnership) {
 //   EXPECT_EQ(Execute(get, &conn).ResultSets(), (VV{(V{}), (V{}), (V{row1, row3}), (V{u2}), (V{row5})}));
 //   // NB! Two empty sets since no owned entities in meta and msg
 // }
+
+
 
 }  // namespace sqlengine
 }  // namespace shards
