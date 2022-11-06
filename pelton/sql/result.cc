@@ -58,7 +58,7 @@ void SqlResultSet::Append(SqlResultSet &&other, bool deduplicate) {
   for (size_t i = 0; i < other.records_.size(); i++) {
     if (!deduplicate || duplicates.count(other.keys_.at(i)) == 0) {
       this->records_.push_back(std::move(other.records_.at(i)));
-      this->keys_.push_back(std::move(other.keys_.at(i)));
+      //this->keys_.push_back(std::move(other.keys_.at(i)));
     }
   }
 }
