@@ -199,7 +199,7 @@ std::pair<ColumnName, ColumnIndex> GetAccessorNameAccessedIndex(
   return std::make_pair(accessor_column, accessed_column_index);
 }
 
-auto GetAccessedData(auto accessed_queue, Connection *connection) {
+auto GetAccessedData(auto accessed_queue, Connection *connection, const std::string &shard_kind) {
   std::unordered_map<shards::TableName, std::vector<sql::SqlResultSet>> result_map;
   shards::SharderState &state = connection->state->SharderState();
 
@@ -210,6 +210,10 @@ auto GetAccessedData(auto accessed_queue, Connection *connection) {
     std::pair<shards::TableName, shards::ShardDescriptor *> accessed_table = next_accessed.first;
     std::vector<std::string> accessor_table_ids = next_accessed.second;
     accessed_queue.pop();
+
+    if (accessed_table.second->shard_kind != shard_kind) {
+      continue;
+    }
 
     auto accessor_name_accessed_idx = GetAccessorNameAccessedIndex(accessed_table.second);
     ColumnName accessor_column = accessor_name_accessed_idx.first;
@@ -302,7 +306,7 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
     result_map[table_name].push_back(std::move(get_set));
 
     // Collect accessed data in result_map.
-    auto accessed_result_map = GetAccessedData(accessed_queue, connection);
+    auto accessed_result_map = GetAccessedData(accessed_queue, connection, shard_kind);
     for (auto &[table_name, sets] : accessed_result_map) {
       for (sql::SqlResultSet &rs : sets) {
         result_map[table_name].push_back(std::move(rs));
