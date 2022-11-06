@@ -22,205 +22,6 @@ namespace gdpr {
 
 namespace {
 
-// add to result
-// sql::SqlResult GetDataFromShardedTable(const ShardingInformation &info,
-//                                        const std::string &unquoted_user_id,
-//                                        const dataflow::SchemaRef &schema,
-//                                        sql::PeltonExecutor *exec) {
-//   int aug_index = -1;
-//   if (!info.IsTransitive()) {
-//     aug_index = info.shard_by_index;
-//   }
-
-//   sqlast::Select tbl_stmt{info.sharded_table_name};
-//   tbl_stmt.AddColumn("*");
-//   return exec->Shard(&tbl_stmt, unquoted_user_id, schema, aug_index);
-// }
-
-// absl::Status GetAccessableDataForAccessor(
-//     const AccessorIndexInformation &accessor_index, const std::string &user_id,
-//     Connection *connection, sql::SqlResult *result);
-
-// absl::StatusOr<sql::SqlResult> GetAllMyValuesFromTable(
-//     const std::string &shard_kind, const std::string &user_id,
-//     const UnshardedTableName &table_name, Connection *connection) {
-//   sql::SqlResult result(std::vector<sql::SqlResultSet>{});
-//   const auto *state = connection->state->sharder_state();
-//   if (state->HasAccessorIndices(shard_kind)) {
-//     const std::vector<const AccessorIndexInformation *> acc_info =
-//         state->GetAccessorInformationFor(shard_kind, table_name);
-//     if (acc_info.size() > 0) {
-//       for (const auto *info : acc_info) {
-//         CHECK_STATUS(
-//             GetAccessableDataForAccessor(*info, user_id, connection, &result));
-//       }
-//     }
-//   }
-//   if (state->IsSharded(table_name)) {
-//     const std::vector<const ShardingInformation *> shard_info =
-//         state->GetShardingInformationFor(table_name, shard_kind);
-//     if (shard_info.size() > 0) {
-//       for (const auto *info : shard_info) {
-//         dataflow::SchemaRef schema =
-//             connection->state->dataflow_state()->GetTableSchema(table_name);
-//         result.AddResultSet(
-//             std::move(GetDataFromShardedTable(*info, Dequote(user_id), schema,
-//                                               &connection->executor)
-//                           .ResultSets()
-//                           .front()));
-//       }
-//     }
-//   }
-//   return result;
-// }
-
-// absl::StatusOr<std::vector<std::string>> GetLookupValues(
-//     const std::string shard_kind, const std::string &user_id,
-//     const std::optional<UnshardedTableName> &table_name,
-//     Connection *connection) {
-//   std::vector<std::string> lookup_values;
-//   if (!table_name) {
-//     lookup_values.push_back(user_id);
-//   } else {
-//     MOVE_OR_RETURN(
-//         sql::SqlResult result,
-//         GetAllMyValuesFromTable(shard_kind, user_id, *table_name, connection));
-//     if (result.IsQuery() && result.Success()) {
-//       auto &resultsets = result.ResultSets();
-//       const auto &schema = resultsets.front().schema();
-//       const auto &keys = schema.keys();
-//       if (keys.size() != 1)
-//         LOG(FATAL) << "Too many keys for " << shard_kind << " " << user_id
-//                    << " " << (table_name ? *table_name : "self") << std::endl
-//                    << schema;
-//       const auto &key = keys.front();
-//       for (auto &rset : resultsets) {
-//         auto v = rset.Vec();
-//         for (const auto &record : v) {
-//           lookup_values.push_back(record.GetValue(key).GetSqlString());
-//         }
-//       }
-//     }
-//   }
-//   return lookup_values;
-// }
-
-// absl::Status GetAccessableDataForAccessor(
-//     const AccessorIndexInformation &accessor_index, const std::string &user_id,
-//     Connection *connection, sql::SqlResult *result) {
-//   std::string accessor_table_name = accessor_index.table_name;
-//   std::string index_col = accessor_index.accessor_column_name;
-//   std::string index_name = accessor_index.index_name;
-//   std::string shard_by_access = accessor_index.shard_by_column_name;
-//   bool is_sharded = accessor_index.is_sharded;
-
-//   LOG(INFO) << "Handling accessor for " << accessor_table_name;
-
-//   MOVE_OR_RETURN(const std::vector<std::string> lookup_values,
-//                  GetLookupValues(accessor_index.shard_kind, user_id,
-//                                  accessor_index.foreign_table, connection));
-//   for (const auto &v : lookup_values) {
-//     LOG(INFO) << v;
-//   }
-//   if (is_sharded) {
-//     MOVE_OR_RETURN(std::unordered_set<UserId> ids_set,
-//                    index::LookupIndex(index_name, user_id, connection));
-
-//     // create select statement with equality check for each id
-
-//     for (const auto &id : ids_set) {
-//       for (const auto &val : lookup_values) {
-//         sqlast::Select accessor_stmt{accessor_table_name};
-//         // SELECT *
-//         accessor_stmt.AddColumn("*");
-
-//         // LHS: ACCESSOR_col = user_id
-//         std::unique_ptr<sqlast::BinaryExpression> doctor_equality =
-//             std::make_unique<sqlast::BinaryExpression>(
-//                 sqlast::Expression::Type::EQ);
-//         doctor_equality->SetLeft(
-//             std::make_unique<sqlast::ColumnExpression>(index_col));
-//         doctor_equality->SetRight(
-//             std::make_unique<sqlast::LiteralExpression>(val));
-
-//         // RHS: OWNER_col in (index.value, ...)
-//         // OWNER_col == index.value
-//         std::unique_ptr<sqlast::BinaryExpression> patient_equality =
-//             std::make_unique<sqlast::BinaryExpression>(
-//                 sqlast::Expression::Type::EQ);
-//         patient_equality->SetLeft(
-//             std::make_unique<sqlast::ColumnExpression>(shard_by_access));
-//         patient_equality->SetRight(
-//             std::make_unique<sqlast::LiteralExpression>(id));
-
-//         // combine both conditions into overall where condition of type
-//         // AND
-//         std::unique_ptr<sqlast::BinaryExpression> where_condition =
-//             std::make_unique<sqlast::BinaryExpression>(
-//                 sqlast::Expression::Type::AND);
-//         where_condition->SetLeft(
-//             std::move(static_cast<std::unique_ptr<sqlast::Expression>>(
-//                 std::move(doctor_equality))));
-//         where_condition->SetRight(
-//             std::move(static_cast<std::unique_ptr<sqlast::Expression>>(
-//                 std::move(patient_equality))));
-
-//         // set where condition in select statement
-//         accessor_stmt.SetWhereClause(std::move(where_condition));
-
-//         // execute select
-//         MOVE_OR_RETURN(sql::SqlResult res,
-//                        select::Shard(accessor_stmt, connection, false));
-
-//         CHECK_EQ(res.ResultSets().size(), 1);
-//         result->AddResultSet(std::move(res.ResultSets().front()));
-//       }
-//     }
-//   } else {
-//     for (const auto &val : lookup_values) {
-//       sqlast::Select accessor_stmt{accessor_table_name};
-//       // SELECT *
-//       accessor_stmt.AddColumn("*");
-
-//       // LHS: ACCESSOR_col = user_id
-//       std::unique_ptr<sqlast::BinaryExpression> doctor_equality =
-//           std::make_unique<sqlast::BinaryExpression>(
-//               sqlast::Expression::Type::EQ);
-//       doctor_equality->SetLeft(
-//           std::make_unique<sqlast::ColumnExpression>(index_col));
-//       doctor_equality->SetRight(
-//           std::make_unique<sqlast::LiteralExpression>(val));
-
-//       // set where condition in select statement
-//       accessor_stmt.SetWhereClause(std::move(doctor_equality));
-
-//       // execute select
-//       MOVE_OR_RETURN(sql::SqlResult res,
-//                      select::Shard(accessor_stmt, connection, false));
-
-//       // add to result
-//       result->AddResultSet(std::move(res.ResultSets().at(0)));
-//     }
-//   }
-//   LOG(INFO) << "GetAccessableData done ";
-//   return absl::OkStatus();
-// }
-
-// absl::Status GetAccessableData(const std::string &shard_kind,
-//                                const std::string &user_id,
-//                                Connection *connection, sql::SqlResult *result) {
-//   // Get all accessor indices that belong to this shard type
-//   const std::vector<AccessorIndexInformation> &accessor_indices =
-//       connection->state->sharder_state()->GetAccessorIndices(shard_kind);
-
-//   for (auto &accessor_index : accessor_indices) {
-//     // loop through every single accesor index type
-//     CHECK_STATUS(GetAccessableDataForAccessor(accessor_index, user_id,
-//                                               connection, result));
-//   }
-//   return absl::OkStatus();
-// }
-
 absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
                                       Connection *connection) {
   const std::string &shard_kind = stmt.shard_kind();
@@ -376,6 +177,28 @@ absl::StatusOr<sql::SqlResult> Forget(const sqlast::GDPRStatement &stmt,
   return result;
 }
 
+std::pair<ColumnName, ColumnIndex> GetAccessorNameAccessedIndex(
+                                    shards::ShardDescriptor *accessed) {
+  ColumnName accessor_column;
+  ColumnIndex accessed_column_index;
+
+  if (accessed->type == shards::InfoType::DIRECT) {
+    DirectInfo info = std::get<DirectInfo>(accessed->info);
+    accessor_column = info.column;
+    accessed_column_index = info.next_column_index;
+  } else if (accessed->type == shards::InfoType::TRANSITIVE) {
+    TransitiveInfo info = std::get<TransitiveInfo>(accessed->info);
+    accessor_column = info.column;
+    accessed_column_index = info.next_column_index;
+  } else if (accessed->type == shards::InfoType::VARIABLE) {
+    VariableInfo info = std::get<VariableInfo>(accessed->info);
+    accessor_column = info.column;
+    accessed_column_index = info.origin_column_index;
+  }
+
+  return std::make_pair(accessor_column, accessed_column_index);
+}
+
 absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
                                    Connection *connection) {
   const std::string &shard_kind = stmt.shard_kind();
@@ -383,7 +206,6 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
 
   shards::SharderState &state = connection->state->SharderState();
   // UniqueLock lock = state->WriterLock();
-
   shards::Shard current_shard = state.GetShard(shard_kind);
 
   std::vector<sql::SqlResultSet> result;
@@ -397,26 +219,12 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
     std::queue<std::pair<std::pair<shards::TableName, shards::ShardDescriptor *>, 
                std::vector<std::string>>> accessed_queue;
 
-    // push first layer of access dependents into the queue
+    // Push first layer of access dependents into the accessed_queue.
     for (const auto &accessed_table : state.GetTable(table_name).access_dependents) {
       std::vector<std::string> accessor_table_ids;
-
-      // TODO: refactor this
-      ColumnName accessor_column;
-      ColumnIndex accessed_column_index;
-      if (accessed_table.second->type == shards::InfoType::DIRECT) {
-        DirectInfo info = std::get<DirectInfo>(accessed_table.second->info);
-        accessor_column = info.column;
-        accessed_column_index = info.next_column_index;
-      } else if (accessed_table.second->type == shards::InfoType::TRANSITIVE) {
-        TransitiveInfo info = std::get<TransitiveInfo>(accessed_table.second->info);
-        accessor_column = info.column;
-        accessed_column_index = info.next_column_index;
-      } else if (accessed_table.second->type == shards::InfoType::VARIABLE) {
-        VariableInfo info = std::get<VariableInfo>(accessed_table.second->info);
-        accessor_column = info.column;
-        accessed_column_index = info.origin_column_index;
-      }
+      auto accessor_name_accessed_idx = GetAccessorNameAccessedIndex(accessed_table.second);
+      ColumnName accessor_column = accessor_name_accessed_idx.first;
+      ColumnIndex accessed_column_index =  accessor_name_accessed_idx.second;
 
       for (const auto &row : get_set.rows()) {
         accessor_table_ids.push_back(row.GetValue(accessed_column_index).GetSqlString());
@@ -425,9 +233,10 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
       accessed_queue.push(std::make_pair(accessed_table, accessor_table_ids));
     }
 
+    // Collect owned data in result_map.
     result_map[table_name].push_back(std::move(get_set));
 
-    // iterate over all access dependents via BFS
+    // Iterate over all access dependents via BFS.
     while (!accessed_queue.empty()) {
       std::pair<std::pair<shards::TableName, shards::ShardDescriptor *>, 
                 std::vector<std::string>> next_accessed = accessed_queue.front();
@@ -435,18 +244,8 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
       std::vector<std::string> accessor_table_ids = next_accessed.second;
       accessed_queue.pop();
 
-      // TODO: refactor this
-      ColumnName accessor_column;
-      if (accessed_table.second->type == shards::InfoType::DIRECT) {
-        DirectInfo info = std::get<DirectInfo>(accessed_table.second->info);
-        accessor_column = info.column;
-      } else if (accessed_table.second->type == shards::InfoType::TRANSITIVE) {
-        TransitiveInfo info = std::get<TransitiveInfo>(accessed_table.second->info);
-        accessor_column = info.column;
-      } else if (accessed_table.second->type == shards::InfoType::VARIABLE) {
-        VariableInfo info = std::get<VariableInfo>(accessed_table.second->info);
-        accessor_column = info.column;
-      }
+      auto accessor_name_accessed_idx = GetAccessorNameAccessedIndex(accessed_table.second);
+      ColumnName accessor_column = accessor_name_accessed_idx.first;
 
       sqlast::Select accessor_stmt{accessed_table.first};
       
@@ -462,10 +261,10 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
       accessor_equality->SetRight(
           std::make_unique<sqlast::LiteralListExpression>(accessor_table_ids));
 
-      // set where condition in select statement
+      // Set where condition in select statement.
       accessor_stmt.SetWhereClause(std::move(accessor_equality));
 
-      // print the SELECT statement before executing
+      // Print the SELECT statement before executing.
       std::cout << "[CONSTRUCTED STATEMENT]: " << accessor_stmt << std::endl;
 
       util::SharedLock lock = connection->state->ReaderLock();
@@ -473,22 +272,12 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
 
       MOVE_OR_RETURN(sql::SqlResult accessor_result, context.Exec());
 
-      // push next layer of access_dependents into the queue
+      // Push next layer of access_dependents into the queue.
       for (const auto &next_accessed_table : state.GetTable(accessed_table.first).access_dependents) {
         std::vector<std::string> next_accessor_table_ids;
 
-        // TODO: refactor this
-        ColumnIndex next_accessed_column_index;
-        if (next_accessed_table.second->type == shards::InfoType::DIRECT) {
-          DirectInfo info = std::get<DirectInfo>(next_accessed_table.second->info);
-          next_accessed_column_index = info.next_column_index;
-        } else if (next_accessed_table.second->type == shards::InfoType::TRANSITIVE) {
-          TransitiveInfo info = std::get<TransitiveInfo>(next_accessed_table.second->info);
-          next_accessed_column_index = info.next_column_index;
-        } else if (next_accessed_table.second->type == shards::InfoType::VARIABLE) {
-          VariableInfo info = std::get<VariableInfo>(next_accessed_table.second->info);
-          next_accessed_column_index = info.origin_column_index;
-        }
+        auto accessor_name_accessed_idx = GetAccessorNameAccessedIndex(next_accessed_table.second);
+        ColumnIndex next_accessed_column_index =  accessor_name_accessed_idx.second;
 
         for (auto &rs : accessor_result.ResultSets()) {
           for (const auto &row : rs.rows()) {
@@ -499,6 +288,7 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
         accessed_queue.push(std::make_pair(next_accessed_table, next_accessor_table_ids));
       }
 
+      // Collect accessed data in result_map.
       for (auto &rs : accessor_result.ResultSets()) {
         result_map[accessed_table.first].push_back(std::move(rs));
       }
