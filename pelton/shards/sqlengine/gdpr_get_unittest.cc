@@ -477,6 +477,55 @@ TEST_F(GDPRGetTest, ComplexVariableOwnership) {
 //   // NB! Two empty sets since no owned entities in meta and msg
 // }
 
+// TEST_F(GDPRGetTest, VariableAccessor) {
+//   // Parse create table statements.
+//   std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+//   std::string grps = MakeCreate("grps", {"gid" I PK, "creator" I FK "user(id)"});
+//   std::string assoc =
+//       MakeCreate("association", {"id" I PK, "ACCESSING_group" I FK "grps(gid)",
+//                                  "OWNER_user" I FK "user(id)"});
+
+//   // Make a pelton connection.
+//   Connection conn = CreateConnection();
+
+//   // Create the tables.
+//   EXPECT_SUCCESS(Execute(usr, &conn));
+//   EXPECT_SUCCESS(Execute(grps, &conn));
+//   EXPECT_SUCCESS(Execute(assoc, &conn));
+
+//   // Perform some inserts.
+//   auto &&[usr1, u0] = MakeInsert("user", {"0", "'u1'"});
+//   auto &&[usr2, u1] = MakeInsert("user", {"5", "'u10'"});
+//   auto &&[usr3, u2] = MakeInsert("user", {"10", "'u100'"});
+//   auto &&[grps1, row1] = MakeInsert("grps", {"0", "0"});
+//   auto &&[grps2, row2] = MakeInsert("grps", {"1", "0"});
+
+//   EXPECT_UPDATE(Execute(usr1, &conn), 1);
+//   EXPECT_UPDATE(Execute(usr2, &conn), 1);
+//   EXPECT_UPDATE(Execute(usr3, &conn), 1);
+//   EXPECT_UPDATE(Execute(grps1, &conn), 1);
+//   EXPECT_UPDATE(Execute(grps2, &conn), 1);
+
+//   // Associate groups with some users.
+//   auto &&[assoc1, a0] = MakeInsert("association", {"1", "1", "5"});
+//   auto &&[assoc2, a1] = MakeInsert("association", {"2", "1", "5"});
+//   auto &&[assoc3, a2] = MakeInsert("association", {"2", "1", "10"});
+
+//   EXPECT_UPDATE(Execute(assoc1, &conn), 1);
+//   EXPECT_UPDATE(Execute(assoc2, &conn), 1);
+//   EXPECT_UPDATE(Execute(assoc3, &conn), 1);
+
+//   // Validate get for user with id 5.
+//   std::string get1 = MakeGDPRGet("user", "5");
+//   EXPECT_EQ(Execute(get1, &conn).ResultSets(), 
+//             (VV{(V{row1, row2}), (V{a0, a1}), (V{u1})}));
+
+//   // Validate get for user with id 10.
+//   std::string get2 = MakeGDPRGet("user", "10");
+//   EXPECT_EQ(Execute(get2, &conn).ResultSets(), 
+//             (VV{(V{row2}), (V{a2}), (V{u2})}));
+// }
+
 }  // namespace sqlengine
 }  // namespace shards
 }  // namespace pelton
