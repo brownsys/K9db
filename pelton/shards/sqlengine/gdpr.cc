@@ -199,6 +199,71 @@ std::pair<ColumnName, ColumnIndex> GetAccessorNameAccessedIndex(
   return std::make_pair(accessor_column, accessed_column_index);
 }
 
+auto GetAccessedData(auto accessed_queue, Connection *connection) {
+  std::unordered_map<shards::TableName, std::vector<sql::SqlResultSet>> result_map;
+  shards::SharderState &state = connection->state->SharderState();
+
+  // Iterate over all access dependents via BFS.
+  while (!accessed_queue.empty()) {
+    std::pair<std::pair<shards::TableName, shards::ShardDescriptor *>, 
+              std::vector<std::string>> next_accessed = accessed_queue.front();
+    std::pair<shards::TableName, shards::ShardDescriptor *> accessed_table = next_accessed.first;
+    std::vector<std::string> accessor_table_ids = next_accessed.second;
+    accessed_queue.pop();
+
+    auto accessor_name_accessed_idx = GetAccessorNameAccessedIndex(accessed_table.second);
+    ColumnName accessor_column = accessor_name_accessed_idx.first;
+
+    sqlast::Select accessor_stmt{accessed_table.first};
+    
+    // SELECT *
+    accessor_stmt.AddColumn("*");
+
+    // [accessor_column] IN (accessor_table_ids)
+    std::unique_ptr<sqlast::BinaryExpression> accessor_equality =
+        std::make_unique<sqlast::BinaryExpression>(
+            sqlast::Expression::Type::IN);
+    accessor_equality->SetLeft(
+        std::make_unique<sqlast::ColumnExpression>(accessor_column));
+    accessor_equality->SetRight(
+        std::make_unique<sqlast::LiteralListExpression>(accessor_table_ids));
+
+    // Set where condition in select statement.
+    accessor_stmt.SetWhereClause(std::move(accessor_equality));
+
+    // Print the SELECT statement before executing.
+    std::cout << "[CONSTRUCTED STATEMENT]: " << accessor_stmt << std::endl;
+
+    util::SharedLock lock = connection->state->ReaderLock();
+    SelectContext context(accessor_stmt, connection, &lock);
+
+    MOVE_OR_PANIC(sql::SqlResult accessor_result, context.Exec());
+
+    // Push next layer of access_dependents into the queue.
+    for (const auto &next_accessed_table : state.GetTable(accessed_table.first).access_dependents) {
+      std::vector<std::string> next_accessor_table_ids;
+
+      auto accessor_name_accessed_idx = GetAccessorNameAccessedIndex(next_accessed_table.second);
+      ColumnIndex next_accessed_column_index =  accessor_name_accessed_idx.second;
+
+      for (auto &rs : accessor_result.ResultSets()) {
+        for (const auto &row : rs.rows()) {
+          next_accessor_table_ids.push_back(row.GetValue(next_accessed_column_index).GetSqlString());
+        }
+      }
+
+      accessed_queue.push(std::make_pair(next_accessed_table, next_accessor_table_ids));
+    }
+
+    // Collect accessed data in result_map.
+    for (auto &rs : accessor_result.ResultSets()) {
+      result_map[accessed_table.first].push_back(std::move(rs));
+    }
+  }
+
+  return result_map;
+}
+
 absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
                                    Connection *connection) {
   const std::string &shard_kind = stmt.shard_kind();
@@ -236,61 +301,11 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
     // Collect owned data in result_map.
     result_map[table_name].push_back(std::move(get_set));
 
-    // Iterate over all access dependents via BFS.
-    while (!accessed_queue.empty()) {
-      std::pair<std::pair<shards::TableName, shards::ShardDescriptor *>, 
-                std::vector<std::string>> next_accessed = accessed_queue.front();
-      std::pair<shards::TableName, shards::ShardDescriptor *> accessed_table = next_accessed.first;
-      std::vector<std::string> accessor_table_ids = next_accessed.second;
-      accessed_queue.pop();
-
-      auto accessor_name_accessed_idx = GetAccessorNameAccessedIndex(accessed_table.second);
-      ColumnName accessor_column = accessor_name_accessed_idx.first;
-
-      sqlast::Select accessor_stmt{accessed_table.first};
-      
-      // SELECT *
-      accessor_stmt.AddColumn("*");
-
-      // [accessor_column] IN (accessor_table_ids)
-      std::unique_ptr<sqlast::BinaryExpression> accessor_equality =
-          std::make_unique<sqlast::BinaryExpression>(
-              sqlast::Expression::Type::IN);
-      accessor_equality->SetLeft(
-          std::make_unique<sqlast::ColumnExpression>(accessor_column));
-      accessor_equality->SetRight(
-          std::make_unique<sqlast::LiteralListExpression>(accessor_table_ids));
-
-      // Set where condition in select statement.
-      accessor_stmt.SetWhereClause(std::move(accessor_equality));
-
-      // Print the SELECT statement before executing.
-      std::cout << "[CONSTRUCTED STATEMENT]: " << accessor_stmt << std::endl;
-
-      util::SharedLock lock = connection->state->ReaderLock();
-      SelectContext context(accessor_stmt, connection, &lock);
-
-      MOVE_OR_RETURN(sql::SqlResult accessor_result, context.Exec());
-
-      // Push next layer of access_dependents into the queue.
-      for (const auto &next_accessed_table : state.GetTable(accessed_table.first).access_dependents) {
-        std::vector<std::string> next_accessor_table_ids;
-
-        auto accessor_name_accessed_idx = GetAccessorNameAccessedIndex(next_accessed_table.second);
-        ColumnIndex next_accessed_column_index =  accessor_name_accessed_idx.second;
-
-        for (auto &rs : accessor_result.ResultSets()) {
-          for (const auto &row : rs.rows()) {
-            next_accessor_table_ids.push_back(row.GetValue(next_accessed_column_index).GetSqlString());
-          }
-        }
-
-        accessed_queue.push(std::make_pair(next_accessed_table, next_accessor_table_ids));
-      }
-
-      // Collect accessed data in result_map.
-      for (auto &rs : accessor_result.ResultSets()) {
-        result_map[accessed_table.first].push_back(std::move(rs));
+    // Collect accessed data in result_map.
+    auto accessed_result_map = GetAccessedData(accessed_queue, connection);
+    for (auto &[table_name, sets] : accessed_result_map) {
+      for (sql::SqlResultSet &rs : sets) {
+        result_map[table_name].push_back(std::move(rs));
       }
     }
   }
