@@ -385,6 +385,7 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
   // UniqueLock lock = state->WriterLock();
 
   shards::Shard current_shard = state.GetShard(shard_kind);
+
   std::vector<sql::SqlResultSet> result;
   std::unordered_map<shards::TableName, std::vector<sql::SqlResultSet>> result_map;
 
@@ -393,13 +394,48 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
     sql::SqlResultSet get_set = 
       connection->state->Database()->GetShard(table_name, util::ShardName(shard_kind, user_id));
 
-    for (const auto &row : get_set.rows()) {
-      std::cout << row << std::endl;
+    std::queue<std::pair<std::pair<shards::TableName, shards::ShardDescriptor *>, 
+               std::vector<std::string>>> accessed_queue;
+
+    // push first layer of access dependents into the queue
+    for (const auto &accessed_table : state.GetTable(table_name).access_dependents) {
+      std::vector<std::string> accessor_table_ids;
+
+      // TODO: refactor this
+      ColumnName accessor_column;
+      ColumnIndex accessed_column_index;
+      if (accessed_table.second->type == shards::InfoType::DIRECT) {
+        DirectInfo info = std::get<DirectInfo>(accessed_table.second->info);
+        accessor_column = info.column;
+        accessed_column_index = info.next_column_index;
+      } else if (accessed_table.second->type == shards::InfoType::TRANSITIVE) {
+        TransitiveInfo info = std::get<TransitiveInfo>(accessed_table.second->info);
+        accessor_column = info.column;
+        accessed_column_index = info.next_column_index;
+      } else if (accessed_table.second->type == shards::InfoType::VARIABLE) {
+        VariableInfo info = std::get<VariableInfo>(accessed_table.second->info);
+        accessor_column = info.column;
+        accessed_column_index = info.origin_column_index;
+      }
+
+      for (const auto &row : get_set.rows()) {
+        accessor_table_ids.push_back(row.GetValue(accessed_column_index).GetSqlString());
+      }
+
+      accessed_queue.push(std::make_pair(accessed_table, accessor_table_ids));
     }
+
     result_map[table_name].push_back(std::move(get_set));
 
-    // Get data from tables accessed by user.
-    for (const auto &accessed_table : state.GetTable(table_name).access_dependents) {
+    // iterate over all access dependents via BFS
+    while (!accessed_queue.empty()) {
+      std::pair<std::pair<shards::TableName, shards::ShardDescriptor *>, 
+                std::vector<std::string>> next_accessed = accessed_queue.front();
+      std::pair<shards::TableName, shards::ShardDescriptor *> accessed_table = next_accessed.first;
+      std::vector<std::string> accessor_table_ids = next_accessed.second;
+      accessed_queue.pop();
+
+      // TODO: refactor this
       ColumnName accessor_column;
       if (accessed_table.second->type == shards::InfoType::DIRECT) {
         DirectInfo info = std::get<DirectInfo>(accessed_table.second->info);
@@ -413,31 +449,57 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
       }
 
       sqlast::Select accessor_stmt{accessed_table.first};
+      
       // SELECT *
       accessor_stmt.AddColumn("*");
 
-      // [accessor_column] = [user_id]
+      // [accessor_column] IN (accessor_table_ids)
       std::unique_ptr<sqlast::BinaryExpression> accessor_equality =
           std::make_unique<sqlast::BinaryExpression>(
-              sqlast::Expression::Type::EQ);
+              sqlast::Expression::Type::IN);
       accessor_equality->SetLeft(
           std::make_unique<sqlast::ColumnExpression>(accessor_column));
       accessor_equality->SetRight(
-          std::make_unique<sqlast::LiteralExpression>(user_id));
+          std::make_unique<sqlast::LiteralListExpression>(accessor_table_ids));
 
       // set where condition in select statement
       accessor_stmt.SetWhereClause(std::move(accessor_equality));
 
+      // print the SELECT statement before executing
       std::cout << "[CONSTRUCTED STATEMENT]: " << accessor_stmt << std::endl;
 
       util::SharedLock lock = connection->state->ReaderLock();
       SelectContext context(accessor_stmt, connection, &lock);
 
       MOVE_OR_RETURN(sql::SqlResult accessor_result, context.Exec());
-      for (auto &rs : accessor_result.ResultSets()) {
-        for (const auto &row : rs.rows()) {
-          std::cout << row << std::endl;
+
+      // push next layer of access_dependents into the queue
+      for (const auto &next_accessed_table : state.GetTable(accessed_table.first).access_dependents) {
+        std::vector<std::string> next_accessor_table_ids;
+
+        // TODO: refactor this
+        ColumnIndex next_accessed_column_index;
+        if (next_accessed_table.second->type == shards::InfoType::DIRECT) {
+          DirectInfo info = std::get<DirectInfo>(next_accessed_table.second->info);
+          next_accessed_column_index = info.next_column_index;
+        } else if (next_accessed_table.second->type == shards::InfoType::TRANSITIVE) {
+          TransitiveInfo info = std::get<TransitiveInfo>(next_accessed_table.second->info);
+          next_accessed_column_index = info.next_column_index;
+        } else if (next_accessed_table.second->type == shards::InfoType::VARIABLE) {
+          VariableInfo info = std::get<VariableInfo>(next_accessed_table.second->info);
+          next_accessed_column_index = info.origin_column_index;
         }
+
+        for (auto &rs : accessor_result.ResultSets()) {
+          for (const auto &row : rs.rows()) {
+            next_accessor_table_ids.push_back(row.GetValue(next_accessed_column_index).GetSqlString());
+          }
+        }
+
+        accessed_queue.push(std::make_pair(next_accessed_table, next_accessor_table_ids));
+      }
+
+      for (auto &rs : accessor_result.ResultSets()) {
         result_map[accessed_table.first].push_back(std::move(rs));
       }
     }
