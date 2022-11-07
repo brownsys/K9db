@@ -142,21 +142,28 @@ std::vector<dataflow::Record> LookupRecords(const dataflow::DataFlowGraph &flow,
 }
 
 // Constructing a comparator record from values.
-dataflow::Record MakeRecord(const Constraint &constraint,
+dataflow::Record MakeRecord(Constraint *constraint,
                             const dataflow::SchemaRef &schema) {
   dataflow::Record record{schema, true};
-  for (const auto &[index, value] : constraint) {
+  for (auto &[index, value] : *constraint) {
+    value.ConvertTo(schema.TypeOf(index));
     record.SetValue(value, index);
   }
   return record;
 }
 // Constructing keys from values.
-dataflow::Key MakeKey(const Constraint &constraint,
+dataflow::Key MakeKey(Constraint *constraint,
                       const std::vector<uint32_t> &key_cols,
                       const dataflow::SchemaRef &schema) {
   dataflow::Key key(key_cols.size());
-  for (const auto &[index, value] : constraint) {
-    key.AddValue(value);
+  for (uint32_t column_id : key_cols) {
+    for (auto &[index, value] : *constraint) {
+      if (index == column_id) {
+        value.ConvertTo(schema.TypeOf(index));
+        key.AddValue(value);
+        break;
+      }
+    }
   }
   return key;
 }
@@ -297,17 +304,18 @@ LookupCondition ConstraintKeys(const dataflow::DataFlowGraph &flow,
   Constraint greater = FindGreaterThanConstraints(flow, where);
   if (greater.size() > 0) {
     if (SetEqual(key_cols, greater)) {
-      condition.greater_key = MakeKey(greater, key_cols, schema);
+      condition.greater_key = MakeKey(&greater, key_cols, schema);
     } else {
-      condition.greater_record = MakeRecord(greater, schema);
+      condition.greater_record = MakeRecord(&greater, schema);
     }
   }
 
   std::vector<Constraint> equality = FindEqualityConstraints(flow, where);
   if (equality.size() > 0) {
     condition.equality_keys = std::vector<dataflow::Key>();
-    for (const Constraint &constraint : equality) {
-      condition.equality_keys->push_back(MakeKey(constraint, key_cols, schema));
+    for (Constraint &constraint : equality) {
+      condition.equality_keys->push_back(
+          MakeKey(&constraint, key_cols, schema));
     }
   }
 

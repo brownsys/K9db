@@ -264,6 +264,7 @@ std::string PopulateStatement(const PreparedStatementDescriptor &stmt,
       query.push_back(')');
     }
     // Next stem.
+    query.push_back(' ');
     query.append(stems.at(i + 1));
   }
   return query;
@@ -370,7 +371,7 @@ absl::StatusOr<CanonicalDescriptor> MakeInsertCanonical(
       // Is a ? arg, need to add it to the descriptor.
       descriptor.args_count++;
       descriptor.stems.push_back(std::move(stem));
-      stem = i < components.values.size() - 1 ? ", " : ");";
+      stem = i < components.values.size() - 1 ? "," : ");";
       // Population for insert is simpler, need only to insert , between values.
       descriptor.arg_tables.push_back("");
       descriptor.arg_names.push_back("");

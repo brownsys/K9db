@@ -69,6 +69,7 @@ class Value {
   // Type conversions.
   bool TypeCompatible(ColumnDefinitionTypeEnum type) const;
   ColumnDefinitionTypeEnum ConvertType() const;
+  void ConvertTo(ColumnDefinitionTypeEnum target);
 
   // For logging and printing...
   friend std::ostream &operator<<(std::ostream &os, const Value &k);

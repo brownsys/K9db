@@ -137,6 +137,37 @@ ColumnDefinitionTypeEnum Value::ConvertType() const {
   }
 }
 
+void Value::ConvertTo(ColumnDefinitionTypeEnum target) {
+  switch (this->type()) {
+    case Type::_NULL:
+      return;
+    case Type::UINT: {
+      if (target != ColumnDefinitionTypeEnum::UINT) {
+        LOG(FATAL) << "Parsed type incompatible with schema type";
+      }
+      return;
+    }
+    case Type::INT: {
+      if (target == ColumnDefinitionTypeEnum::UINT) {
+        int64_t v = std::get<int64_t>(this->data_);
+        CHECK_GE(v, 0) << "Parsed value is negative, expected unsigned";
+        this->data_ = static_cast<uint64_t>(v);
+      } else if (target != ColumnDefinitionTypeEnum::INT) {
+        LOG(FATAL) << "Parsed type incompatible with schema type";
+      }
+      return;
+    }
+    case Type::TEXT:
+      if (target != ColumnDefinitionTypeEnum::TEXT &&
+          target != ColumnDefinitionTypeEnum::DATETIME) {
+        LOG(FATAL) << "Parsed type incompatible with schema type";
+      }
+      return;
+    default:
+      LOG(FATAL) << "Unsupported type in ConvertTo";
+  }
+}
+
 // The size in memory.
 size_t Value::SizeInMemory() const {
   switch (this->data_.index()) {
