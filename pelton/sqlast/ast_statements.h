@@ -66,6 +66,25 @@ class Insert : public AbstractStatement {
   std::vector<Value> values_;
 };
 
+class Replace : public Insert {
+ public:
+  explicit Replace(const std::string &table_name) : Insert(table_name) {
+    this->type_ = AbstractStatement::Type::REPLACE;
+  }
+
+  /* Inherits all the functions of insert. */
+
+  // Visitor pattern.
+  template <class T>
+  T Visit(AbstractVisitor<T> *visitor) const {
+    return visitor->VisitReplace(*this);
+  }
+  template <class T>
+  T Visit(MutableVisitor<T> *visitor) {
+    return visitor->VisitReplace(this);
+  }
+};
+
 class Select : public AbstractStatement {
  public:
   // An entry in the projection list could either be a column name or a literal.
@@ -243,22 +262,6 @@ class Update : public AbstractStatement {
   std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
 };
 
-class CreateView : public AbstractStatement {
- public:
-  CreateView(const std::string &view_name, const std::string &query)
-      : AbstractStatement(AbstractStatement::Type::CREATE_VIEW),
-        view_name_(view_name),
-        query_(query) {}
-
-  // Accessors.
-  const std::string &view_name() const { return this->view_name_; }
-  const std::string &query() const { return this->query_; }
-
- private:
-  std::string view_name_;
-  std::string query_;
-};
-
 class GDPRStatement : public AbstractStatement {
  public:
   enum class Operation { GET, FORGET };
@@ -274,6 +277,23 @@ class GDPRStatement : public AbstractStatement {
   const Operation &operation() const { return this->operation_; }
   const std::string &shard_kind() const { return this->shard_kind_; }
   const Value &user_id() const { return this->user_id_; }
+
+  template <class T>
+  T Visit(AbstractVisitor<T> *visitor) const {
+    return visitor->VisitGDPRStatement(*this);
+  }
+  template <class T>
+  T Visit(MutableVisitor<T> *visitor) {
+    return visitor->VisitGDPRStatement(this);
+  }
+  template <class T>
+  std::vector<T> VisitChildren(AbstractVisitor<T> *visitor) const {
+    return {};
+  }
+  template <class T>
+  std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
+    return {};
+  }
 
  private:
   Operation operation_;

@@ -3,6 +3,7 @@
 
 #include "pelton/sqlast/transformer.h"
 
+#include <iostream>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -133,11 +134,12 @@ antlrcpp::Any AstTransformer::visitColumn_def(
   // Visit inlined constraints.
   ColumnDefinition column(column_name, column_type);
   for (auto *constraint : ctx->column_constraint()) {
+    antlrcpp::Any ret = constraint->accept(this);
+    if (ret.isNull()) {
+      continue;
+    }
     CAST_REF(ColumnConstraint, constr, constraint->accept(this));
     column.AddConstraint(constr);
-  }
-  if (ctx->OWNER() != nullptr) {
-    column.owner() = true;
   }
   return column;
 }
@@ -147,21 +149,19 @@ antlrcpp::Any AstTransformer::visitColumn_constraint(
   if (ctx->asc_desc() != nullptr || ctx->conflict_clause() != nullptr ||
       ctx->CHECK() != nullptr || ctx->DEFAULT() != nullptr ||
       ctx->COLLATE() != nullptr || ctx->AS() != nullptr ||
-      ctx->CONSTRAINT() != nullptr) {
+      ctx->CONSTRAINT() != nullptr || ctx->AUTOINCREMENT() != nullptr) {
     return absl::InvalidArgumentError("Invalid inline constraint");
+  }
+  if (ctx->NOT() != nullptr) {
+    std::cout << "Warning: NOT NULL constraint not enforced" << std::endl;
+    return {};
   }
 
   if (ctx->PRIMARY() != nullptr) {
-    return ColumnConstraint(ColumnConstraint::Type::PRIMARY_KEY);
-  }
-  if (ctx->NOT() != nullptr) {
-    return ColumnConstraint(ColumnConstraint::Type::NOT_NULL);
+    return ColumnConstraint::MakePrimaryKey();
   }
   if (ctx->UNIQUE() != nullptr) {
-    return ColumnConstraint(ColumnConstraint::Type::UNIQUE);
-  }
-  if (ctx->AUTOINCREMENT() != nullptr) {
-    return ColumnConstraint(ColumnConstraint::Type::AUTOINCREMENT);
+    return ColumnConstraint::MakeUnique();
   }
   return ctx->foreign_key_clause()->accept(this);
 }
@@ -176,13 +176,11 @@ antlrcpp::Any AstTransformer::visitTable_constraint(
 
   if (ctx->PRIMARY() != nullptr) {
     CAST_REF(std::string, col_name, ctx->indexed_column(0)->accept(this));
-    return std::make_pair(
-        col_name, ColumnConstraint(ColumnConstraint::Type::PRIMARY_KEY));
+    return std::make_pair(col_name, ColumnConstraint::MakePrimaryKey());
   }
   if (ctx->UNIQUE() != nullptr) {
     CAST_REF(std::string, col_name, ctx->indexed_column(0)->accept(this));
-    return std::make_pair(col_name,
-                          ColumnConstraint(ColumnConstraint::Type::UNIQUE));
+    return std::make_pair(col_name, ColumnConstraint::MakeUnique());
   }
   // Can only be a foreign key.
   CAST_REF(std::string, col_name, ctx->column_name(0)->accept(this));
@@ -198,12 +196,9 @@ antlrcpp::Any AstTransformer::visitForeign_key_clause(
     return absl::InvalidArgumentError("Invalid foreign key constraint");
   }
 
-  ColumnConstraint constrn(ColumnConstraint::Type::FOREIGN_KEY);
   CAST_REF(std::string, foreign_table, ctx->foreign_table()->accept(this));
   CAST_REF(std::string, foreign_column, ctx->column_name(0)->accept(this));
-  constrn.foreign_table() = std::move(foreign_table);
-  constrn.foreign_column() = std::move(foreign_column);
-  return constrn;
+  return ColumnConstraint::MakeForeignKey(foreign_table, foreign_column);
 }
 
 // Create Index constructs.
@@ -252,7 +247,10 @@ antlrcpp::Any AstTransformer::visitInsert_stmt(
 
   // Either return a REPLACE or an INSERT statement.
   if (ctx->REPLACE() != nullptr) {  // REPLACE.
-    return absl::InvalidArgumentError("Replace not yet supported");
+    std::unique_ptr<Replace> replace = std::make_unique<Replace>(table_name);
+    replace->SetColumns(std::move(columns));
+    replace->SetValues(std::move(values));
+    return static_cast<std::unique_ptr<AbstractStatement>>(std::move(replace));
   } else {
     std::unique_ptr<Insert> insert = std::make_unique<Insert>(table_name);
     insert->SetColumns(std::move(columns));

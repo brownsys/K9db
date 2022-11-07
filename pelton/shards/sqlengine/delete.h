@@ -37,7 +37,7 @@ class DeleteContext {
         db_(conn->state->Database()),
         lock_(lock) {}
 
-  /* Main entry point for insert: Executes the statement against the shards. */
+  /* Main entry point for delete: Executes the statement against the shards. */
   absl::StatusOr<sql::SqlResult> Exec();
   absl::StatusOr<std::pair<std::vector<dataflow::Record>, int>> ExecReturning();
 

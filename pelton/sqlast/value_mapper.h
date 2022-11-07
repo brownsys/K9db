@@ -37,23 +37,26 @@ class ValueMapper : public AbstractVisitor<void> {
 
   // Visitors.
   // These are unsupported.
-  void VisitCreateTable(const sqlast::CreateTable &ast) override;
-  void VisitColumnDefinition(const sqlast::ColumnDefinition &ast) override;
-  void VisitColumnConstraint(const sqlast::ColumnConstraint &ast) override;
-  void VisitCreateIndex(const sqlast::CreateIndex &ast) override;
+  void VisitCreateTable(const CreateTable &ast) override;
+  void VisitColumnDefinition(const ColumnDefinition &ast) override;
+  void VisitColumnConstraint(const ColumnConstraint &ast) override;
+  void VisitCreateIndex(const CreateIndex &ast) override;
+  void VisitCreateView(const CreateView &ast) override;
+
+  void VisitInsert(const Insert &ast) override;
+  void VisitReplace(const Replace &ast) override;
+  void VisitUpdate(const Update &ast) override;
+  void VisitGDPRStatement(const GDPRStatement &ast) override;
 
   // These are important.
-  void VisitInsert(const sqlast::Insert &ast) override;
-  void VisitUpdate(const sqlast::Update &ast) override;
-  void VisitSelect(const sqlast::Select &ast) override;
-  void VisitDelete(const sqlast::Delete &ast) override;
-  void VisitBinaryExpression(const sqlast::BinaryExpression &ast) override;
+  void VisitSelect(const Select &ast) override;
+  void VisitDelete(const Delete &ast) override;
+  void VisitBinaryExpression(const BinaryExpression &ast) override;
 
   // These will never be invoked.
-  void VisitColumnExpression(const sqlast::ColumnExpression &ast) override;
-  void VisitLiteralExpression(const sqlast::LiteralExpression &ast) override;
-  void VisitLiteralListExpression(
-      const sqlast::LiteralListExpression &ast) override;
+  void VisitColumnExpression(const ColumnExpression &ast) override;
+  void VisitLiteralExpression(const LiteralExpression &ast) override;
+  void VisitLiteralListExpression(const LiteralListExpression &ast) override;
 
  private:
   dataflow::SchemaRef schema_;

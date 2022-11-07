@@ -15,6 +15,7 @@ cc_library(
         #":gdpr",
         ":index",
         ":insert",
+        ":replace",
         ":select",
         ":update",
         ":view",
@@ -156,6 +157,28 @@ cc_library(
         "//pelton/util:status",
         "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/status",
+    ],
+)
+
+cc_library(
+    name = "replace",
+    srcs = [
+        "replace.cc",
+    ],
+    hdrs = [
+        "replace.h",
+    ],
+    deps = [
+        ":delete",
+        ":insert",
+        "//pelton:connection",
+        "//pelton/dataflow:schema",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/sql:result",
+        "//pelton/sqlast:ast",
+        "//pelton/util:status",
+        "//pelton/util:upgradable_lock",
     ],
 )
 

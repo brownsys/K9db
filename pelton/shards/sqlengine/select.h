@@ -36,7 +36,7 @@ class SelectContext {
         db_(conn->state->Database()),
         lock_(lock) {}
 
-  /* Main entry point for insert: Executes the statement against the shards. */
+  /* Main entry point for select: Executes the statement against the shards. */
   absl::StatusOr<sql::SqlResult> Exec();
 
  private:

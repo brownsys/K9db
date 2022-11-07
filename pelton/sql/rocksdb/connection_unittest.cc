@@ -114,7 +114,7 @@ void CreateTable() {
   tbl.AddColumn("name", sqlast::ColumnDefinition("name", CType::TEXT));
   tbl.AddColumn("age", sqlast::ColumnDefinition("age", CType::INT));
   tbl.MutableColumn("ID").AddConstraint(
-      sqlast::ColumnConstraint(Constraint::PRIMARY_KEY));
+      sqlast::ColumnConstraint::MakePrimaryKey());
   EXPECT_TRUE(CONN->ExecuteCreateTable(tbl));
 }
 

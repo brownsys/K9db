@@ -8,6 +8,7 @@ exports_files(
 cc_library(
     name = "ast",
     srcs = [
+        "ast_abstract.cc",
         "ast_expressions.cc",
         "ast_schema.cc",
         "ast_statements.cc",
