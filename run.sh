@@ -6,6 +6,8 @@ if [[ "$1" == "dbg" ]]; then
   RUST_BACKTRACE=1 bazel run //:pelton -- --logtostderr=1 "${@:2}"
 
 elif [[ "$1" == "opt" ]]; then
+  rm -rf /mnt/disks/my-ssd/pelton/
+  mkdir -p /mnt/disks/my-ssd/pelton/
   bazel run //:pelton --config opt -- "${@:2}"
 
 elif [[ "$1" == "valgrind" ]]; then

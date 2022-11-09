@@ -104,7 +104,7 @@ where
             .drop_exec(
                 &format!(
                     "SELECT votes.* FROM votes \
-                     WHERE votes.OWNER_user_id = ? \
+                     WHERE votes.user_id = ? \
                      AND votes.comment_id IN ({})",
                     params
                 ),

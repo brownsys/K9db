@@ -8,7 +8,7 @@ chown mysql.mysql /mnt/disks/my-ssd
 chmod 777 /mnt/disks/my-ssd
 cp /var/lib/mysql /mnt/disks/my-ssd/ -r
 chown mysql.mysql -R /mnt/disks/my-ssd/mysql
-
+mkdir -p /mnt/disks/my-ssd/pelton
 
 # Configure mariadb to store database in directory
 echo "datadir = /mnt/disks/my-ssd/mysql" >> /etc/mysql/mariadb.cnf

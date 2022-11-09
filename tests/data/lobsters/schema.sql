@@ -66,7 +66,8 @@ CREATE TABLE comments ( \
   hat_id int, \
   FOREIGN KEY (user_id) OWNED_BY users(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
---CREATE INDEX comments_short_index ON comments(short_id);
+-- CREATE INDEX commentspk ON comments(id);
+-- CREATE INDEX comments_short_index ON comments(short_id);
 CREATE TABLE hat_requests ( \
   id int NOT NULL PRIMARY KEY, \
   created_at datetime, \

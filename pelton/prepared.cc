@@ -42,7 +42,7 @@ std::unordered_set<std::string> NO_VIEWS = {
     "SELECT * FROM tbl WHERE id = ?",
     // Lobsters.
     // Q1.
-    "SELECT 1 AS `one` FROM users WHERE users.PII_username = ?",
+    "SELECT 1 AS `one` FROM users WHERE users.username = ?",
     // Q2.
     "SELECT 1 AS `one`, stories.short_id FROM stories WHERE stories.short_id = "
     "?",
@@ -73,7 +73,7 @@ std::unordered_set<std::string> NO_VIEWS = {
     "SELECT hidden_stories.story_id FROM hidden_stories WHERE "
     "hidden_stories.user_id = ?",
     // Q19.
-    "SELECT users.* FROM users WHERE users.PII_username = ?",
+    "SELECT users.* FROM users WHERE users.username = ?",
     // Q20.
     "SELECT hidden_stories.* FROM hidden_stories WHERE hidden_stories.user_id "
     "= ? AND hidden_stories.story_id = ?",

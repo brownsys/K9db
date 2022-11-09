@@ -35,7 +35,7 @@ where
         .drop_exec(
             "SELECT votes.* \
              FROM votes \
-             WHERE votes.OWNER_user_id = ? \
+             WHERE votes.user_id = ? \
              AND votes.story_id = ? \
              AND votes.comment_id = ?",
             (user, sid, comment),
@@ -50,7 +50,7 @@ where
     c = c
         .drop_exec(
             "INSERT INTO votes \
-             (id, OWNER_user_id, story_id, comment_id, vote, reason) \
+             (id, user_id, story_id, comment_id, vote, reason) \
              VALUES \
              (?, ?, ?, ?, ?, NULL)",
             (
