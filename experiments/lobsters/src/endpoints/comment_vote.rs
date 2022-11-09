@@ -66,6 +66,7 @@ where
         )
         .await?;
 
+    /*
     c = c
         .drop_exec(
             &format!(
@@ -80,6 +81,7 @@ where
             (author,),
         )
         .await?;
+    */
 
     // approximate Comment::calculate_hotness
     let confidence = (upvotes as f64 / (upvotes as f64 + downvotes as f64)).ceil();
@@ -154,6 +156,7 @@ where
     // frontpage, but we're okay with using a more basic
     // upvote/downvote ratio thingy. See Story::calculated_hotness
     // in the lobsters source for details.
+    /*
     c = c
         .drop_exec(
             &format!(
@@ -181,6 +184,7 @@ where
             ),
         )
         .await?;
+    */
 
     Ok((c, false))
 }

@@ -63,6 +63,7 @@ where
         )
         .await?;
 
+    /*
     c = c
         .drop_exec(
             &format!(
@@ -77,6 +78,7 @@ where
             (author,),
         )
         .await?;
+    */
 
     // get all the stuff needed to compute updated hotness
     c = c
@@ -117,6 +119,7 @@ where
     // frontpage, but we're okay with using a more basic
     // upvote/downvote ratio thingy. See Story::calculated_hotness
     // in the lobsters source for details.
+    /*
     c = c
         .drop_exec(
             &format!(
@@ -144,6 +147,7 @@ where
             ),
         )
         .await?;
+    */
 
     Ok((c, false))
 }

@@ -187,12 +187,12 @@ where
         .reduce_and_drop(0, |rows, _| rows + 1)
         .await?;
 
-    c = c
+    /*c = c
         .drop_exec(
             "UPDATE stories SET comments_count = ? WHERE stories.id = ?",
             (count, story),
         )
-        .await?;
+        .await?;*/
 
     if !priming {
         // get all the stuff needed to compute updated hotness
@@ -231,6 +231,7 @@ where
     }
 
     // why oh why is story hotness *updated* here?!
+    /*
     c = c
         .drop_exec(
             "UPDATE stories \
@@ -239,6 +240,7 @@ where
             (hotness - 1, story),
         )
         .await?;
+    */
 
     let key = format!("user:{}:comments_posted", user);
     c = c
