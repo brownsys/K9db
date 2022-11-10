@@ -319,7 +319,7 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
     if (sets.size() > 0) {
       sql::SqlResultSet result_set(sets.at(0).schema());
       for (sql::SqlResultSet &rs : sets) {
-        result_set.Append(std::move(rs), false);
+        result_set.Append(std::move(rs), true);
       }
       result.push_back(std::move(result_set));
     }

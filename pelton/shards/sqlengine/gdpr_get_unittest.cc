@@ -282,9 +282,13 @@ TEST_F(GDPRGetTest, OwnerAccessor) {
   EXPECT_UPDATE(Execute(msg3, &conn), 1);
   EXPECT_UPDATE(Execute(msg4, &conn), 1);
 
-  // Validate get.
-  std::string get = MakeGDPRGet("user", "10");
-  EXPECT_EQ(Execute(get, &conn).ResultSets(), (VV{(V{row1, row3}), (V{u2})}));
+  // Validate get for user with id 0.
+  std::string get0 = MakeGDPRGet("user", "0");
+  EXPECT_EQ(Execute(get0, &conn).ResultSets(), (VV{(V{row1, row2, row4}), (V{u0})}));
+
+  // Validate get for user with id 10.
+  std::string get1 = MakeGDPRGet("user", "10");
+  EXPECT_EQ(Execute(get1, &conn).ResultSets(), (VV{(V{row1, row3}), (V{u2})}));
 }
 
 TEST_F(GDPRGetTest, ShardedDataSubject) {
