@@ -256,7 +256,9 @@ auto GetAccessedData(auto accessed_queue, Connection *connection, const std::str
         }
       }
 
-      accessed_queue.push(std::make_pair(next_accessed_table, next_accessor_table_ids));
+      if (!next_accessor_table_ids.empty()) {
+        accessed_queue.push(std::make_pair(next_accessed_table, next_accessor_table_ids));
+      }
     }
 
     // Collect accessed data in result_map.
@@ -298,8 +300,9 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
       for (const auto &row : get_set.rows()) {
         accessor_table_ids.push_back(row.GetValue(accessed_column_index).GetSqlString());
       }
-
-      accessed_queue.push(std::make_pair(accessed_table, accessor_table_ids));
+      if (!accessor_table_ids.empty()) {
+        accessed_queue.push(std::make_pair(accessed_table, accessor_table_ids));
+      }
     }
 
     // Collect owned data in result_map.
@@ -321,7 +324,9 @@ absl::StatusOr<sql::SqlResult> Get(const sqlast::GDPRStatement &stmt,
       for (sql::SqlResultSet &rs : sets) {
         result_set.Append(std::move(rs), true);
       }
-      result.push_back(std::move(result_set));
+      if (!result_set.empty()) {
+        result.push_back(std::move(result_set));
+      }
     }
   }
 
