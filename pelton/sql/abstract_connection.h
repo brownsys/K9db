@@ -39,6 +39,9 @@ class AbstractConnection {
   virtual int ExecuteInsert(const sqlast::Insert &sql,
                             const util::ShardName &shard_name) = 0;
 
+  // Update.
+  virtual ResultSetAndStatus ExecuteUpdate(const sqlast::Update &sql) = 0;
+
   // Delete.
   virtual SqlDeleteSet ExecuteDelete(const sqlast::Delete &sql) = 0;
 

@@ -53,7 +53,8 @@ TEST(RocksdbEncodeTest, RocksdbSequence) {
   RocksdbSequence read = RocksdbSequence(row.Release());
 
   // Test record decoding.
-  dataflow::Record record = read.DecodeRecord(schema);
+  dataflow::Record record = read.DecodeRecord(schema, true);
+  EXPECT_EQ(record.IsPositive(), true);
   EXPECT_EQ(record.GetUInt(0), 0_u);
   EXPECT_EQ(record.GetString(1), "kinan");
   EXPECT_EQ(record.GetInt(2), -10_s);

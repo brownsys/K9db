@@ -54,7 +54,7 @@ class DeleteContext {
   /* Members. */
   const sqlast::Delete &stmt_;
   const std::string &table_name_;
-  Table &table_;
+  const Table &table_;
   const dataflow::SchemaRef &schema_;
 
   // Pelton connection.

@@ -68,7 +68,7 @@ std::vector<T> RocksdbConnection::GetRecords(
         RocksdbSequence value =
             this->encryption_manager_.DecryptValue(shard, std::move(*opt));
 
-        dataflow::Record record = value.DecodeRecord(schema);
+        dataflow::Record record = value.DecodeRecord(schema, Tselect);
         if constexpr (Tselect) {
           records.push_back(std::move(record));
         } else if constexpr (Tdelete) {
@@ -99,7 +99,7 @@ std::vector<T> RocksdbConnection::GetRecords(
         std::string shard = key.At(0).ToString();
         RocksdbSequence value =
             this->encryption_manager_.DecryptValue(shard, std::move(enval));
-        dataflow::Record record = value.DecodeRecord(schema);
+        dataflow::Record record = value.DecodeRecord(schema, Tselect);
 
         if constexpr (Tselect) {
           records.push_back(std::move(record));

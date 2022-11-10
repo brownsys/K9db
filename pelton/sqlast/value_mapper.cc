@@ -38,15 +38,17 @@ void ValueMapper::VisitInsert(const Insert &ast) {
 void ValueMapper::VisitReplace(const Replace &ast) {
   LOG(FATAL) << "UNSUPPORTED";
 }
-void ValueMapper::VisitUpdate(const Update &ast) {
-  LOG(FATAL) << "UNSUPPORTED";
-}
 void ValueMapper::VisitGDPRStatement(const GDPRStatement &ast) {
   LOG(FATAL) << "UNSUPPORTED";
 }
 
 // These are important.
 void ValueMapper::VisitSelect(const Select &ast) {
+  if (ast.HasWhereClause()) {
+    ast.GetWhereClause()->Visit(this);
+  }
+}
+void ValueMapper::VisitUpdate(const Update &ast) {
   if (ast.HasWhereClause()) {
     ast.GetWhereClause()->Visit(this);
   }

@@ -45,6 +45,9 @@ class RocksdbConnection : public AbstractConnection {
   // Select.
   SqlResultSet ExecuteSelect(const sqlast::Select &sql) const override;
 
+  // Update.
+  ResultSetAndStatus ExecuteUpdate(const sqlast::Update &sql) override;
+
   // Everything in a table.
   SqlResultSet GetAll(const std::string &table_name) const override;
 

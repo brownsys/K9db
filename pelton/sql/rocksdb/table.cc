@@ -76,6 +76,29 @@ void RocksdbTable::IndexDelete(const rocksdb::Slice &shard,
     }
   }
 }
+void RocksdbTable::IndexUpdate(const rocksdb::Slice &shard,
+                               const RocksdbSequence &old,
+                               const RocksdbSequence &updated) {
+  rocksdb::Slice pk = old.At(this->pk_column_);
+  CHECK(pk == updated.At(this->pk_column_)) << "Update cannot change PK";
+
+  size_t i = 0;
+  auto oit = old.begin();
+  auto uit = updated.begin();
+  while (oit != old.end()) {
+    std::optional<RocksdbIndex> &index = this->indices_.at(i++);
+    if (index.has_value()) {
+      rocksdb::Slice oslice = *oit;
+      rocksdb::Slice uslice = *uit;
+      if (oslice != uslice) {
+        index->Delete(oslice, shard, pk);
+        index->Add(uslice, shard, pk);
+      }
+    }
+    ++oit;
+    ++uit;
+  }
+}
 
 // Index Lookup.
 std::optional<IndexSet> RocksdbTable::IndexLookup(

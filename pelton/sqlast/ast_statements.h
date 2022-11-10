@@ -225,6 +225,7 @@ class Update : public AbstractStatement {
 
   bool HasWhereClause() const { return this->where_clause_.has_value(); }
   void SetWhereClause(std::unique_ptr<BinaryExpression> &&where);
+  const BinaryExpression *GetWhereClause() const;
 
   // Construct a delete statement over the same table and with the same WHERE
   // clause.

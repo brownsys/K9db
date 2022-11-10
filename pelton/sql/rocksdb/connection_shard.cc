@@ -68,7 +68,7 @@ std::vector<dataflow::Record> RocksdbConnection::GetDirect(
       RocksdbSequence row =
           this->encryption_manager_.DecryptValue(shard, std::move(*en_row));
       if (!dedup.Duplicate(row.At(table.PKColumn()).ToString())) {
-        result.push_back(row.DecodeRecord(schema));
+        result.push_back(row.DecodeRecord(schema, true));
       }
     }
   }
@@ -201,7 +201,7 @@ ResultSetAndStatus RocksdbConnection::AssignToShards(
       }
     }
 
-    records.push_back(row.DecodeRecord(schema));
+    records.push_back(row.DecodeRecord(schema, true));
   }
 
   return std::pair(sql::SqlResultSet(schema, std::move(records)), count);

@@ -47,6 +47,12 @@ void Update::AddColumnValue(const std::string &column, const Value &value) {
 void Update::SetWhereClause(std::unique_ptr<BinaryExpression> &&where) {
   this->where_clause_ = std::optional(std::move(where));
 }
+const BinaryExpression *Update::GetWhereClause() const {
+  if (this->where_clause_.has_value()) {
+    return this->where_clause_->get();
+  }
+  return nullptr;
+}
 Delete Update::DeleteDomain() const {
   Delete del{this->table_name()};
   if (this->where_clause_.has_value()) {
