@@ -445,6 +445,8 @@ TEST_F(GDPRGetTest, TransitiveAccessorship) {
                          "ACCESSOR_receiver" I FK "user(id)"});
   std::string meta =
       MakeCreate("meta", {"id" I PK, "OWNER_message" I FK "msg(id)"});
+  std::string deep =
+      MakeCreate("deep", {"id" I PK, "ACCESSOR_meta" I FK "meta(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -453,6 +455,7 @@ TEST_F(GDPRGetTest, TransitiveAccessorship) {
   EXPECT_SUCCESS(Execute(usr, &conn));
   EXPECT_SUCCESS(Execute(msg, &conn));
   EXPECT_SUCCESS(Execute(meta, &conn));
+  EXPECT_SUCCESS(Execute(deep, &conn));
 
   // Perform some inserts.
   auto &&[usr1, u0] = MakeInsert("user", {"0", "'u1'"});
@@ -462,7 +465,8 @@ TEST_F(GDPRGetTest, TransitiveAccessorship) {
   auto &&[msg2, row2] = MakeInsert("msg", {"2", "0", "0"});
   auto &&[msg3, row3] = MakeInsert("msg", {"3", "5", "10"});
   auto &&[msg4, row4] = MakeInsert("msg", {"4", "5", "0"});
-  auto &&[meta1, row5] = MakeInsert("meta", {"1", "1"});
+  auto &&[meta1, row5] = MakeInsert("meta", {"2", "1"});
+  auto &&[deep1, row6] = MakeInsert("deep", {"3", "2"});
 
   EXPECT_UPDATE(Execute(usr1, &conn), 1);
   EXPECT_UPDATE(Execute(usr2, &conn), 1);
@@ -472,10 +476,19 @@ TEST_F(GDPRGetTest, TransitiveAccessorship) {
   EXPECT_UPDATE(Execute(msg3, &conn), 1);
   EXPECT_UPDATE(Execute(msg4, &conn), 1);
   EXPECT_UPDATE(Execute(meta1, &conn), 1);
+  EXPECT_UPDATE(Execute(deep1, &conn), 1);
 
-  // Validate get.
-  std::string get = MakeGDPRGet("user", "10");
-  EXPECT_EQ(Execute(get, &conn).ResultSets(), (VV{(V{row1, row3}), (V{u2}), (V{row5})}));
+  // Validate get for user with id 0.
+  std::string get0 = MakeGDPRGet("user", "0");
+  EXPECT_EQ(Execute(get0, &conn).ResultSets(), (VV{(V{row1, row2, row4}), (V{u0}), (V{row5}), (V{row6})}));
+
+  // Validate get for user with id 5.
+  std::string get1 = MakeGDPRGet("user", "5");
+  EXPECT_EQ(Execute(get1, &conn).ResultSets(), (VV{(V{row4, row3}), (V{u1})}));
+
+  // Validate get for user with id 10.
+  std::string get2 = MakeGDPRGet("user", "10");
+  EXPECT_EQ(Execute(get2, &conn).ResultSets(), (VV{(V{row1, row3}), (V{u2}), (V{row5}), (V{row6})}));
 }
 
 TEST_F(GDPRGetTest, VariableAccessorship) {
@@ -515,6 +528,11 @@ TEST_F(GDPRGetTest, VariableAccessorship) {
   EXPECT_UPDATE(Execute(assoc1, &conn), 1);
   EXPECT_UPDATE(Execute(assoc2, &conn), 1);
   EXPECT_UPDATE(Execute(assoc3, &conn), 1);
+
+  // Validate get for user with id 0.
+  std::string get0 = MakeGDPRGet("user", "0");
+  EXPECT_EQ(Execute(get0, &conn).ResultSets(), 
+            (VV{(V{row1, row2}), (V{u0})}));
 
   // Validate get for user with id 5.
   std::string get1 = MakeGDPRGet("user", "5");
