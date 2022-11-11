@@ -14,3 +14,4 @@ cargo install cargo-raze
 cd pelton/proxy && cargo raze && cd -
 cd experiments/lobsters && cargo raze && cd -
 cd experiments/ownCloud && cargo raze && cd -
+cd experiments/vote && cargo raze && cd -

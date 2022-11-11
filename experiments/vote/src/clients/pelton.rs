@@ -4,15 +4,16 @@ use mysql_async::prelude::*;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::AtomicU32;
-use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::task::{Context, Poll};
 use tower_service::Service;
+
+static VT_COUNTER: AtomicU32 = AtomicU32::new(0);
 
 pub struct Conn {
     pool: mysql_async::Pool,
     next: Option<mysql_async::Conn>,
     pending: Option<mysql_async::futures::GetConn>,
-    vt_counter: Arc<AtomicU32>,
 }
 
 impl Clone for Conn {
@@ -21,7 +22,6 @@ impl Clone for Conn {
             pool: self.pool.clone(),
             next: None,
             pending: None,
-            vt_counter: self.vt_counter.clone(),
         }
     }
 }
@@ -82,13 +82,13 @@ impl VoteClient for Conn {
 
                 conn = conn
                     .drop_query(
-                        "CREATE TABLE art (id int NOT NULL PRIMARY KEY, title varchar(16) NOT NULL) ENGINE = ROCKSDB",
+                        "CREATE TABLE art (id int PRIMARY KEY, title varchar(16)) ENGINE = ROCKSDB",
                     )
                     .await
                     .unwrap();
                 conn = conn
                     .drop_query(
-                        "CREATE TABLE vt (id int NOT NULL PRIMARY KEY AUTO_INCREMENT, u int NOT NULL, article_id int NOT NULL) ENGINE = ROCKSDB",
+                        "CREATE TABLE vt (id int PRIMARY KEY, u int, article_id int) ENGINE = ROCKSDB",
                     )
                     .await
                     .unwrap();
@@ -145,7 +145,6 @@ impl VoteClient for Conn {
                 pool: mysql_async::Pool::new(opts),
                 next: None,
                 pending: None,
-                vt_counter: Arc::new(AtomicU32::new(0)),
             })
         }
     }
@@ -207,8 +206,8 @@ impl Service<WriteRequest> for Conn {
                 }
                 conn = conn
                     .drop_exec(
-                        "INSERT INTO vt (u, article_id) VALUES (0, ?)",
-                        (article_id,),
+                        "INSERT INTO vt (id, u, article_id) VALUES (?, 0, ?)",
+                        (VT_COUNTER.fetch_add(1, Ordering::SeqCst), article_id,),
                     )
                     .await?;
             }

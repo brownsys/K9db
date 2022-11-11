@@ -9,7 +9,7 @@ use memcached::client::Client;
 use memcached::proto::ProtoType;
 
 // Connection properties.
-const DB_USER: &'static str = "root";
+const DB_USER: &'static str = "pelton";
 const DB_PASSWORD: &'static str = "password";
 const DB_NAME: &'static str = "owncloud";
 

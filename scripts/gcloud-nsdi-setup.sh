@@ -58,6 +58,10 @@ sudo service mariadb stop
 cd ~/pelton/experiments/ownCloud
 bazel build ... -c opt
 
+# Build vote harness
+cd ~/pelton/experiments/vote
+bazel build ... -c opt
+
 # Build pelton
 cd ~/pelton
 if [[ "$ROLE" == "db" ]]; then

@@ -18,7 +18,7 @@ load("@rules_rust//rust:repositories.bzl", "rust_repositories")
 # use nightly.
 rust_repositories(
     edition = "2018",
-    iso_date = "2021-06-16",
+    iso_date = "2022-07-24",
     version = "nightly",
 )
 

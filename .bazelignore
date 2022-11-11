@@ -1,5 +1,5 @@
 pelton/planner/calcite/.bin/
 experiments/lobsters
 experiments/memcached
-experiments/memcached-memory
+experiments/vote
 experiments/ownCloud
