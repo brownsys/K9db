@@ -13,17 +13,17 @@ fn quoted(s: &str) -> String {
 // Helper: gets the results not just the time.
 pub fn reads_with_data<'a>(conn: &mut Conn, sample: &Vec<String>) -> Vec<Row> {
   let query = format!(
-    "(SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, s.ACCESSOR_share_with as share_target
+    "(SELECT s.id as sid, s.item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, s.share_with as share_target
       FROM oc_share s
       LEFT JOIN oc_filecache f ON s.file_source = f.fileid
       LEFT JOIN oc_storages st ON f.storage = st.numeric_id
-      WHERE (s.share_type = 0) AND s.ACCESSOR_share_with IN ({userids}))
+      WHERE (s.share_type = 0) AND s.share_with IN ({userids}))
      UNION 
-      (SELECT s.id as sid, s.OWNING_item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, oc_group_user.uid as share_target
+      (SELECT s.id as sid, s.item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, oc_group_user.uid as share_target
       FROM oc_share s
       LEFT JOIN oc_filecache f ON s.file_source = f.fileid
       LEFT JOIN oc_storages st ON f.storage = st.numeric_id
-      JOIN oc_group_user ON s.ACCESSOR_share_with_group = oc_group_user.OWNING_gid
+      JOIN oc_group_user ON s.share_with_group = oc_group_user.gid
       WHERE (s.share_type = 1) AND oc_group_user.uid IN ({userids}))",
     userids = sample.join(",")
   );
@@ -114,7 +114,7 @@ pub fn insert_share<'a>(conn: &mut Conn, share: &Share<'a>) {
       "INSERT INTO oc_share VALUES ({share_id}, \
                            {share_type}, {user_target}, {group_target}, \
                            '{owner}', '{initiator}', NULL, 'file', {file}, \
-                           '', '', 24, 0, 0, NULL, '', 1, '', 24, 19);",
+                           '', '', 24, 0, 0, NULL, '', 1, '', 24, '19');",
       share_id = share.id,
       user_target = user_target,
       group_target = group_target,
