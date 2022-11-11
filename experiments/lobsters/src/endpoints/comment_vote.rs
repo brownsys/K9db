@@ -66,7 +66,6 @@ where
         )
         .await?;
 
-    /*
     c = c
         .drop_exec(
             &format!(
@@ -81,7 +80,6 @@ where
             (author,),
         )
         .await?;
-    */
 
     // approximate Comment::calculate_hotness
     let confidence = (upvotes as f64 / (upvotes as f64 + downvotes as f64)).ceil();

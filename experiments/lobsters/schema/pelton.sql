@@ -109,7 +109,7 @@ CREATE DATA_SUBJECT TABLE invitation_requests (
   created_at datetime NOT NULL,
   updated_at datetime NOT NULL
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
-CREATE TABLE invitations (
+CREATE DATA_SUBJECT TABLE invitations (
   id int NOT NULL PRIMARY KEY,
   user_id int,
   email varchar(255),

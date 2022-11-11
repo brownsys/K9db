@@ -63,7 +63,6 @@ where
         )
         .await?;
 
-    /*
     c = c
         .drop_exec(
             &format!(
@@ -78,7 +77,6 @@ where
             (author,),
         )
         .await?;
-    */
 
     // get all the stuff needed to compute updated hotness
     c = c

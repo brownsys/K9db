@@ -187,12 +187,12 @@ where
         .reduce_and_drop(0, |rows, _| rows + 1)
         .await?;
 
-    /*c = c
+    c = c
         .drop_exec(
             "UPDATE stories SET comments_count = ? WHERE stories.id = ?",
             (count, story),
         )
-        .await?;*/
+        .await?;
 
     if !priming {
         // get all the stuff needed to compute updated hotness

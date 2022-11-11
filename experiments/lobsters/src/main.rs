@@ -27,19 +27,19 @@ lazy_static! {
   // Sum should be 100000 or less (excluding -1s).
   // Comment out entry to use default weight.
   static ref WEIGHTS: HashMap<String, isize> = HashMap::from([
-    ("story".into(), 10000),
-    ("frontpage".into(), 10000),
-    ("user".into(), 10000),
-    ("comments".into(), 10000),
-    ("recent".into(), 10000),
-    ("commentvoteup".into(), 5000),
-    ("commentvotedown".into(), 5000),
-    ("storyvoteup".into(), 5000),
-    ("storyvotedown".into(), 5000),
-    ("comment".into(), 7000),
-    ("subcomment".into(), 3000),
-    ("login".into(), 10000),
-    ("submit".into(), 10000),
+    //("story".into(), 10000),
+    //("frontpage".into(), 10000),
+    //("user".into(), 10000),
+    //("comments".into(), 10000),
+    //("recent".into(), 10000),
+    //("commentvoteup".into(), 5000),
+    //("commentvotedown".into(), 5000),
+    //("storyvoteup".into(), 5000),
+    //("storyvotedown".into(), 5000),
+    //("comment".into(), 7000),
+    //("subcomment".into(), 3000),
+    //("login".into(), 10000),
+    //("submit".into(), 10000),
   ]);
 }
 

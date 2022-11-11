@@ -152,7 +152,6 @@ where
             .await?;
 
         // why oh why is story hotness *updated* here?!
-        /*
         c = c
             .drop_exec(
                 "UPDATE stories \
@@ -161,7 +160,6 @@ where
                 (19217, story),
             )
             .await?;
-        */
     }
 
     Ok((c, false))
