@@ -8,6 +8,35 @@
 namespace pelton {
 namespace sql {
 
+// SqlDeleteSet.
+size_t SqlDeleteSet::AddRecord(dataflow::Record &&record) {
+  this->records_.push_back(std::move(record));
+  return this->records_.size() - 1;
+}
+void SqlDeleteSet::AssignToShard(size_t idx, std::string &&shard) {
+  auto [it, _] = this->shards_.emplace(std::move(shard), 0);
+  it->second.push_back(idx);
+  this->count_++;
+}
+
+util::Iterable<SqlDeleteSet::RecordsIt> SqlDeleteSet::IterateRecords() const {
+  return util::Iterable<RecordsIt>(this->records_.cbegin(),
+                                   this->records_.cend());
+}
+util::Iterable<SqlDeleteSet::ShardsIt> SqlDeleteSet::IterateShards() const {
+  return util::Map(&this->shards_,
+                   [](MapIt::reference ref) -> const util::ShardName & {
+                     return ref.first;
+                   });
+}
+util::Iterable<SqlDeleteSet::ShardRecordsIt> SqlDeleteSet::Iterate(
+    const util::ShardName &shard) const {
+  const std::vector<size_t> &vec = this->shards_.at(shard);
+  return util::Map(&vec, [&](VecIt::reference ref) -> const dataflow::Record & {
+    return this->records_.at(ref);
+  });
+}
+
 // SqlResultSet.
 void SqlResultSet::Append(SqlResultSet &&other, bool deduplicate) {
   if (this->schema_ != other.schema_) {
@@ -50,6 +79,12 @@ void SqlResult::Append(SqlResult &&other, bool deduplicate) {
       } else if (this->status_ >= 0) {
         this->status_ += other.status_;
       }
+      if (this->lid_ != 0 && other.lid_ != 0) {
+        LOG(FATAL) << "Appending results with different last insert id!";
+      }
+      if (this->lid_ == 0) {
+        this->lid_ = other.lid_;
+      }
       break;
     }
     case Type::QUERY: {
@@ -77,14 +112,6 @@ std::ostream &operator<<(std::ostream &s, const SqlResult::Type &res) {
       s << "Impossible! SqlResult::Type enum has invalid value.";
   }
   return s;
-}
-
-bool SqlResult::empty() const {
-  bool empty = true;
-  for (const auto &s : this->ResultSets()) {
-    empty = empty && s.empty();
-  }
-  return empty;
 }
 
 }  // namespace sql

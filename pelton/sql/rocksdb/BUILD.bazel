@@ -1,0 +1,282 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+
+cc_library(
+    name = "connection",
+    srcs = [
+        "connection.cc",
+        "connection_delete.cc",
+        "connection_gdpr.cc",
+        "connection_insert.cc",
+        "connection_schema.cc",
+        "connection_select.cc",
+        "connection_shard.cc",
+        "connection_update.cc",
+    ],
+    hdrs = [
+        "connection.h",
+        "connection_helpers.cc",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        ":dedup",
+        ":encode",
+        ":encryption",
+        ":filter",
+        ":project",
+        ":table",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/sql:abstract_connection",
+        "//pelton/sql:result",
+        "//pelton/sqlast:ast",
+        "//pelton/sqlast:value_mapper",
+        "//pelton/util:shard_name",
+        "//pelton/util:status",
+        "@glog",
+        "@rocksdb",
+    ],
+)
+
+cc_library(
+    name = "dedup",
+    srcs = [],
+    hdrs = [
+        "dedup.h",
+    ],
+    visibility = ["//pelton/sql:__subpackages__"],
+    deps = [
+        ":encode",
+    ],
+)
+
+cc_library(
+    name = "table",
+    srcs = [
+        "table.cc",
+    ],
+    hdrs = [
+        "table.h",
+    ],
+    visibility = ["//pelton/sql:__subpackages__"],
+    deps = [
+        ":encode",
+        ":encryption",
+        ":index",
+        "//pelton/dataflow:schema",
+        "//pelton/sqlast:value_mapper",
+        "//pelton/util:status",
+        "@glog",
+        "@rocksdb",
+    ],
+)
+
+cc_library(
+    name = "encode",
+    srcs = [
+        "encode.cc",
+    ],
+    hdrs = [
+        "encode.h",
+    ],
+    deps = [
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/sqlast:ast",
+        "//pelton/util:shard_name",
+        "@glog",
+        "@rocksdb",
+    ],
+)
+
+cc_library(
+    name = "project",
+    srcs = [
+        "project.cc",
+    ],
+    hdrs = [
+        "project.h",
+    ],
+    deps = [
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/sqlast:ast",
+        "@glog",
+        "@rocksdb",
+    ],
+)
+
+cc_library(
+    name = "filter",
+    srcs = [
+        "filter.cc",
+    ],
+    hdrs = [
+        "filter.h",
+    ],
+    deps = [
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/sqlast:ast",
+        "//pelton/sqlast:value_mapper",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "index",
+    srcs = [
+        "index.cc",
+    ],
+    hdrs = [
+        "index.h",
+    ],
+    deps = [
+        ":dedup",
+        ":encode",
+        "//pelton/util:iterator",
+        "//pelton/util:status",
+        "@glog",
+        "@rocksdb",
+    ],
+)
+
+# Disable/enable encryption using bazel command line args.
+# .bazelrc defines an alias to shortcut this
+# e.g. bazel build ... --encryption=on    [default]
+#      bazel build ... --encryption=off
+string_flag(
+    name = "configure_encryption",
+    build_setting_default = "on",
+    values = [
+        "on",
+        "off",
+    ],
+)
+
+config_setting(
+    name = "disable_encryption",
+    flag_values = {
+        ":configure_encryption": "off",
+    },
+)
+
+cc_library(
+    name = "encryption",
+    srcs = select({
+        ":disable_encryption": ["encryption_off.cc"],
+        "//conditions:default": ["encryption_on.cc"],
+    }),
+    hdrs = [
+        "encryption.h",
+    ],
+    deps = [
+        ":encode",
+        "//pelton/util:shard_name",
+        "//pelton/util:upgradable_lock",
+        "@glog",
+        "@libsodium",
+        "@rocksdb",
+    ],
+)
+
+# Tests.
+cc_test(
+    name = "connection-test",
+    srcs = [
+        "connection_unittest.cc",
+    ],
+    deps = [
+        ":connection",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/sql:result",
+        "//pelton/sqlast:ast",
+        "//pelton/util:ints",
+        "//pelton/util:iterator",
+        "//pelton/util:shard_name",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "index-test",
+    srcs = [
+        "index_unittest.cc",
+    ],
+    deps = [
+        ":index",
+        "//pelton/util:status",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@rocksdb",
+    ],
+)
+
+cc_test(
+    name = "project-test",
+    srcs = [
+        "project_unittest.cc",
+    ],
+    deps = [
+        ":project",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "filter-test",
+    srcs = [
+        "filter_unittest.cc",
+    ],
+    deps = [
+        ":filter",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/sqlast:value_mapper",
+        "//pelton/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "encode-test",
+    srcs = [
+        "encode_unittest.cc",
+    ],
+    deps = [
+        ":encode",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/sqlast:ast",
+        "//pelton/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@rocksdb",
+    ],
+)
+
+cc_test(
+    name = "table-test",
+    srcs = [
+        "table_unittest.cc",
+    ],
+    deps = [
+        ":encode",
+        ":encryption",
+        ":table",
+        "//pelton/dataflow:schema",
+        "//pelton/sqlast:ast",
+        "//pelton/util:status",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@rocksdb",
+    ],
+)

@@ -24,8 +24,10 @@ class DataFlowGraph {
   DataFlowGraph(const std::string &flow_name, PartitionIndex partitions)
       : flow_name_(flow_name), size_(partitions) {}
 
-  void Initialize(std::unique_ptr<DataFlowGraphPartition> &&partition,
-                  const std::vector<Channel *> &channels);
+  void Initialize(
+      std::unique_ptr<DataFlowGraphPartition> &&partition,
+      const std::vector<Channel *> &channels,
+      const std::unordered_map<std::string, std::vector<Operator *>> &parents);
 
   // Not copyable or movable.
   DataFlowGraph(const DataFlowGraph &) = delete;

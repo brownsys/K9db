@@ -50,6 +50,9 @@ class MatViewOperator : public Operator {
   int limit() const { return this->limit_; }
   size_t offset() const { return this->offset_; }
 
+  void outkey(const PartitionKey &outkey) { this->outkey_ = outkey; }
+  PartitionKey &outkey() { return this->outkey_; }
+
  protected:
   // We do not know if we are ordered or unordered, this type is revealed
   // to us by the derived class as an argument.
@@ -64,6 +67,7 @@ class MatViewOperator : public Operator {
   std::vector<ColumnID> key_cols_;
   int limit_;
   size_t offset_;
+  PartitionKey outkey_;
 
   // Allow tests to set input_schemas_ directly.
   FRIEND_TEST(MatViewOperatorTest, EmptyMatView);
@@ -254,16 +258,16 @@ class MatViewOperatorT : public MatViewOperator {
     for (Record &r : records) {
       Key key = r.GetValues(this->key_cols_);
       if (r.IsPositive()) {
-        if (!this->contents_.Insert(key, std::move(r))) {
+        if (!this->contents_.Insert(key, r.Copy())) {
           LOG(FATAL) << "Failed to insert record in matview";
         }
       } else {
-        if (!this->contents_.Delete(key, std::move(r))) {
+        if (!this->contents_.Delete(key, r.Copy())) {
           LOG(FATAL) << "Failed to delete record in matview";
         }
       }
     }
-    return {};
+    return std::move(records);
   }
   void ComputeOutputSchema() override {
     this->output_schema_ = this->input_schemas_.at(0);

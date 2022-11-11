@@ -6,251 +6,178 @@
 
 #include "pelton/shards/state.h"
 
-#include <stdlib.h>
-#include <string.h>
-
-#include "pelton/dataflow/record.h"
-#include "pelton/dataflow/schema.h"
-
 namespace pelton {
 namespace shards {
 
-// Schema manipulations.
-void SharderState::AddSchema(const UnshardedTableName &table_name,
-                             const sqlast::CreateTable &table_schema,
-                             int pk_index, const std::string &pk_name) {
-  this->schema_.insert({table_name, table_schema});
-  this->pks_.emplace(table_name,
-                     std::pair<int, std::string>(pk_index, pk_name));
-}
-
-std::optional<sqlast::CreateTable> SharderState::RemoveSchema(
-    const UnshardedTableName &table_name) {
-  std::optional<sqlast::CreateTable> ret;
-  const auto ct = this->schema_.find(table_name);
-  if (ct != this->schema_.end()) {
-    ret = ct->second;
-    this->schema_.erase(ct);
+/*
+ * Table creation.
+ */
+Table *SharderState::AddTable(Table &&table) {
+  for (const auto &descriptor : table.owners) {
+    Shard &shard = this->shards_.at(descriptor->shard_kind);
+    shard.owned_tables.insert(table.table_name);
+    Table *parent = nullptr;
+    switch (descriptor->type) {
+      case InfoType::DIRECT: {
+        if (descriptor->shard_kind != table.table_name) {
+          parent = &this->tables_.at(descriptor->shard_kind);
+        }
+        break;
+      }
+      case InfoType::TRANSITIVE: {
+        const TransitiveInfo &info = std::get<TransitiveInfo>(descriptor->info);
+        parent = &this->tables_.at(info.next_table);
+        break;
+      }
+      case InfoType::VARIABLE: {
+        const VariableInfo &info = std::get<VariableInfo>(descriptor->info);
+        parent = &this->tables_.at(info.origin_relation);
+        break;
+      }
+    }
+    if (parent != nullptr) {
+      parent->dependents.emplace_back(table.table_name, descriptor.get());
+    }
   }
-  return ret;
-}
-
-void SharderState::AddShardKind(const ShardKind &kind, const ColumnName &pk) {
-  this->kinds_.insert({kind, pk});
-  this->kind_to_tables_.insert({kind, {}});
-  this->kind_to_names_.insert({kind, {}});
-  this->shards_.insert({kind, {}});
-}
-
-void SharderState::AddUnshardedTable(const UnshardedTableName &table,
-                                     const sqlast::CreateTable &create) {
-  this->sharded_schema_.insert({table, create});
-}
-
-void SharderState::AddShardedTable(
-    const UnshardedTableName &table,
-    const ShardingInformation &sharding_information,
-    const sqlast::CreateTable &sharded_create_statement) {
-  // Record that the shard kind contains this sharded table.
-  this->kind_to_tables_.at(sharding_information.shard_kind)
-      .push_back(sharding_information.sharded_table_name);
-  this->kind_to_names_.at(sharding_information.shard_kind).insert(table);
-  // Map the unsharded name to its sharding information.
-  this->sharded_by_[table].push_back(sharding_information);
-  // Store the sharded schema.
-  this->sharded_schema_.insert(
-      {sharding_information.sharded_table_name, sharded_create_statement});
-}
-
-// Used to add an AccessorIndexInformation struct to sharder state
-void SharderState::AddAccessorIndex(
-    const ShardKind &kind, const UnshardedTableName &table,
-    const ColumnName &accessor_column, const ColumnName &shard_by_column,
-    const IndexName &index_name,
-    const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
-        &anonymize,
-    const bool is_sharded) {
-  // Create an AccessorIndexInformation
-  AccessorIndexInformation accessor_information{
-      kind,       table,     accessor_column, shard_by_column,
-      index_name, anonymize, is_sharded};
-  this->accessor_index_[kind].push_back(accessor_information);
-}
-
-void SharderState::AddAccessorIndex(
-    const ShardKind &kind, const UnshardedTableName &table,
-    const ColumnName &accessor_column, const UnshardedTableName &foreign_table,
-    const ColumnName &shard_by_column, const IndexName &index_name,
-    const std::unordered_map<ColumnName, sqlast::ColumnDefinition::Type>
-        &anonymize,
-    const bool is_sharded) {
-  // Create an AccessorIndexInformation
-  AccessorIndexInformation accessor_information{
-      kind,       table,     accessor_column, foreign_table, shard_by_column,
-      index_name, anonymize, is_sharded};
-  this->accessor_index_[kind].push_back(accessor_information);
-}
-
-std::list<const sqlast::AbstractStatement *> SharderState::CreateShard(
-    const ShardKind &shard_kind, const UserId &user) {
-  // Mark shard for this user as created!
-  this->shards_.at(shard_kind).insert(user);
-  // Return the create table statements.
-  std::list<const sqlast::AbstractStatement *> result;
-  for (const ShardedTableName &table : this->kind_to_tables_.at(shard_kind)) {
-    result.push_back(&this->sharded_schema_.at(table));
+  for (const auto &descriptor : table.accessors) {
+    Shard &shard = this->shards_.at(descriptor->shard_kind);
+    shard.accessor_tables.insert(table.table_name);
+    Table *parent = nullptr;
+    switch (descriptor->type) {
+      case InfoType::DIRECT: {
+        parent = &this->tables_.at(descriptor->shard_kind);
+        break;
+      }
+      case InfoType::TRANSITIVE: {
+        const TransitiveInfo &info = std::get<TransitiveInfo>(descriptor->info);
+        parent = &this->tables_.at(info.next_table);
+        break;
+      }
+      case InfoType::VARIABLE: {
+        const VariableInfo &info = std::get<VariableInfo>(descriptor->info);
+        parent = &this->tables_.at(info.origin_relation);
+        break;
+      }
+    }
+    parent->access_dependents.emplace_back(table.table_name, descriptor.get());
   }
-  // if shard_kind exists as key in create_index_, add to result
-  const auto &indices = this->create_index_[shard_kind];
-  for (const sqlast::CreateIndex &create_index : indices) {
-    result.push_back(&create_index);
+  auto pair = this->tables_.emplace(table.table_name, std::move(table));
+  return &pair.first->second;
+}
+
+/*
+ * Only for use when handling OWNS/ACCESSES.
+ */
+absl::Status SharderState::AddTableOwner(
+    const TableName &table_name,
+    std::vector<std::unique_ptr<ShardDescriptor>> &&owner) {
+  Table &tbl = this->tables_.at(table_name);
+  if (tbl.dependents.size() > 0 || tbl.access_dependents.size() > 0) {
+    return absl::InvalidArgumentError("OWNS into table with dependencies");
+  }
+  for (std::unique_ptr<ShardDescriptor> &desc : owner) {
+    if (desc->type != InfoType::VARIABLE) {
+      return absl::InvalidArgumentError("AddTableOwner bad annotation");
+    }
+    // Look up origin table.
+    const VariableInfo &info = std::get<VariableInfo>(desc->info);
+    Table &origin = this->tables_.at(info.origin_relation);
+    // Update shard and this table.
+    Shard &shard = this->shards_.at(desc->shard_kind);
+    shard.owned_tables.insert(table_name);
+    tbl.owners.push_back(std::move(desc));
+    // Update origin table.
+    ShardDescriptor *ptr = tbl.owners.back().get();
+    origin.dependents.emplace_back(table_name, ptr);
+  }
+  return absl::OkStatus();
+}
+absl::Status SharderState::AddTableAccessor(
+    const TableName &table_name,
+    std::vector<std::unique_ptr<ShardDescriptor>> &&access) {
+  Table &tbl = this->tables_.at(table_name);
+  if (tbl.dependents.size() > 0 || tbl.access_dependents.size() > 0) {
+    return absl::InvalidArgumentError("ACCESSES into table with dependencies");
+  }
+  for (std::unique_ptr<ShardDescriptor> &desc : access) {
+    if (desc->type != InfoType::VARIABLE) {
+      return absl::InvalidArgumentError("AddTableAccessor bad annotation");
+    }
+    // Look up origin table.
+    const VariableInfo &info = std::get<VariableInfo>(desc->info);
+    Table &origin = this->tables_.at(info.origin_relation);
+    // Update shard and this table.
+    Shard &shard = this->shards_.at(desc->shard_kind);
+    shard.accessor_tables.insert(table_name);
+    tbl.accessors.push_back(std::move(desc));
+    // Update origin table.
+    ShardDescriptor *ptr = tbl.accessors.back().get();
+    origin.access_dependents.emplace_back(table_name, ptr);
+  }
+  return absl::OkStatus();
+}
+
+/*
+ * Table lookup.
+ */
+bool SharderState::TableExists(const TableName &table_name) const {
+  return this->tables_.count(table_name) == 1;
+}
+bool SharderState::IsOwned(const TableName &table_name) const {
+  return this->tables_.at(table_name).owners.size() > 0;
+}
+bool SharderState::IsAccessed(const TableName &table_name) const {
+  const Table &table = this->tables_.at(table_name);
+  return table.owners.size() > 0 || table.accessors.size() > 0;
+}
+Table &SharderState::GetTable(const TableName &table_name) {
+  return this->tables_.at(table_name);
+}
+const Table &SharderState::GetTable(const TableName &table_name) const {
+  return this->tables_.at(table_name);
+}
+
+/*
+ * Shard / shardkind lookups.
+ */
+void SharderState::AddShardKind(const ShardKind &shard_kind,
+                                const ColumnName &id_column,
+                                ColumnIndex id_column_index) {
+  Shard &shard = this->shards_[shard_kind];
+  shard.shard_kind = shard_kind;
+  shard.id_column = id_column;
+  shard.id_column_index = id_column_index;
+  this->users_.try_emplace(shard_kind);
+}
+bool SharderState::ShardKindExists(const ShardKind &shard_kind) const {
+  return this->shards_.count(shard_kind) == 1;
+}
+Shard &SharderState::GetShard(const ShardKind &shard_kind) {
+  return this->shards_.at(shard_kind);
+}
+const Shard &SharderState::GetShard(const ShardKind &shard_kind) const {
+  return this->shards_.at(shard_kind);
+}
+
+/*
+ * Track users.
+ */
+void SharderState::IncrementUsers(const ShardKind &kind) {
+  this->users_.at(kind)++;
+}
+void SharderState::DecrementUsers(const ShardKind &kind) {
+  this->users_.at(kind)--;
+}
+
+/*
+ * Debugging information / statistics.
+ */
+std::vector<std::pair<ShardKind, uint64_t>> SharderState::NumShards() const {
+  std::vector<std::pair<ShardKind, uint64_t>> result;
+  for (const auto &[kind, count] : this->users_) {
+    result.emplace_back(kind, count);
   }
   return result;
-}
-
-void SharderState::RemoveUserFromShard(const ShardKind &kind,
-                                       const UserId &user_id) {
-  this->shards_.at(kind).erase(user_id);
-}
-
-// Schema lookups.
-const sqlast::CreateTable &SharderState::GetSchema(
-    const UnshardedTableName &table_name) const {
-  return this->schema_.at(table_name);
-}
-
-const std::pair<int, std::string> &SharderState::GetPk(
-    const UnshardedTableName &table_name) const {
-  return this->pks_.at(table_name);
-}
-
-bool SharderState::Exists(const UnshardedTableName &table) const {
-  return this->sharded_schema_.contains(table) ||
-         this->sharded_by_.contains(table);
-}
-
-bool SharderState::IsSharded(const UnshardedTableName &table) const {
-  return this->sharded_by_.contains(table);
-}
-
-// reads from sharded_by_ (r3)
-const std::list<ShardingInformation> &SharderState::GetShardingInformation(
-    const UnshardedTableName &table) const {
-  return this->sharded_by_.at(table);
-}
-
-std::vector<const ShardingInformation *>
-SharderState::GetShardingInformationFor(const UnshardedTableName &table,
-                                        const std::string &shard_kind) const {
-  std::vector<const ShardingInformation *> result;
-  for (const auto &info : this->GetShardingInformation(table)) {
-    LOG(INFO) << "Found info " << info.sharded_table_name;
-    if (info.shard_kind == shard_kind) result.push_back(&info);
-  }
-  return result;
-}
-
-bool SharderState::IsPII(const UnshardedTableName &table) const {
-  return this->kinds_.contains(table);
-}
-
-const ColumnName &SharderState::PkOfPII(const UnshardedTableName &table) const {
-  return this->kinds_.at(table);
-}
-
-bool SharderState::ShardExists(const ShardKind &shard_kind,
-                               const UserId &user) const {
-  return this->shards_.at(shard_kind).contains(user);
-}
-
-const std::unordered_set<UserId> &SharderState::UsersOfShard(
-    const ShardKind &kind) const {
-  return this->shards_.at(kind);
-}
-
-bool SharderState::HasAccessorIndices(const ShardKind &kind) const {
-  return this->accessor_index_.contains(kind);
-}
-const std::vector<AccessorIndexInformation> &SharderState::GetAccessorIndices(
-    const ShardKind &kind) const {
-  return this->accessor_index_.at(kind);
-}
-std::vector<const AccessorIndexInformation *>
-SharderState::GetAccessorInformationFor(
-    const ShardKind &kind, const UnshardedTableName &table_name) const {
-  std::vector<const AccessorIndexInformation *> result;
-  for (const auto &info : this->GetAccessorIndices(kind)) {
-    if (info.table_name == table_name) result.push_back(&info);
-  }
-  return result;
-}
-
-const std::unordered_set<UnshardedTableName> &SharderState::TablesInShard(
-    const ShardKind &kind) const {
-  return this->kind_to_names_.at(kind);
-}
-
-// Manage secondary indices.
-bool SharderState::HasIndexFor(const UnshardedTableName &table_name,
-                               const ColumnName &column_name,
-                               const ColumnName &shard_by) const {
-  if (!this->index_to_flow_.contains(table_name)) {
-    return false;
-  }
-
-  auto &tbl = this->index_to_flow_.at(table_name);
-  if (!this->index_to_flow_.at(table_name).contains(column_name)) {
-    return false;
-  }
-
-  auto &col = tbl.at(column_name);
-  return col.count(shard_by) > 0;
-}
-
-bool SharderState::HasIndicesFor(const UnshardedTableName &table_name) const {
-  return this->indices_.contains(table_name);
-}
-
-const std::unordered_set<ColumnName> &SharderState::IndicesFor(
-    const UnshardedTableName &table_name) const {
-  return this->indices_.at(table_name);
-}
-
-const FlowName &SharderState::IndexFlow(const UnshardedTableName &table_name,
-                                        const ColumnName &column_name,
-                                        const ColumnName &shard_by) const {
-  return this->index_to_flow_.at(table_name).at(column_name).at(shard_by);
-}
-
-void SharderState::CreateIndex(const ShardKind &shard_kind,
-                               const UnshardedTableName &table_name,
-                               const ColumnName &column_name,
-                               const ColumnName &shard_by,
-                               const FlowName &flow_name,
-                               const sqlast::CreateIndex &create_index_stmt,
-                               bool unique) {
-  this->indices_[table_name].insert(column_name);
-  this->index_to_flow_[table_name][column_name][shard_by] = flow_name;
-  this->create_index_[shard_kind].push_back(create_index_stmt);
-}
-
-sql::SqlResult SharderState::NumShards() const {
-  std::vector<dataflow::Record> records;
-  for (const auto &[kind, set] : this->shards_) {
-    records.emplace_back(dataflow::SchemaFactory::NUM_SHARDS_SCHEMA, true,
-                         std::make_unique<std::string>(kind),
-                         static_cast<uint64_t>(set.size()));
-  }
-  return sql::SqlResult(sql::SqlResultSet(
-      dataflow::SchemaFactory::NUM_SHARDS_SCHEMA, std::move(records)));
-}
-
-// Synchronization.
-UniqueLock SharderState::WriterLock() { return UniqueLock(&this->mtx_); }
-SharedLock SharderState::ReaderLock() const { return SharedLock(&this->mtx_); }
-
-bool SharderState::HasDefaultTable(const UnshardedTableName &name) const {
-  return this->sharded_schema_.contains(name);
 }
 
 }  // namespace shards

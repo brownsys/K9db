@@ -8,7 +8,7 @@ CREATE VIEW q17 AS '"SELECT votes.* FROM votes WHERE votes.comment_id = ?"';
 CREATE VIEW q22 AS '"SELECT tags.id, stories.user_id, count(*) AS `count` FROM taggings INNER JOIN tags ON taggings.tag_id = tags.id INNER JOIN stories ON taggings.story_id = stories.id WHERE tags.inactive = 0 AND stories.user_id = ? GROUP BY tags.id, stories.user_id ORDER BY `count` DESC LIMIT 1"';
 CREATE VIEW q25 AS '"SELECT suggested_titles.* FROM suggested_titles WHERE suggested_titles.story_id = ?"';
 CREATE VIEW q26 AS '"SELECT taggings.* FROM taggings WHERE taggings.story_id = ?"';
-CREATE VIEW q27 AS '"SELECT 1 AS `one`, hats.OWNER_user_id FROM hats WHERE hats.OWNER_user_id = ? LIMIT 1"';
+CREATE VIEW q27 AS '"SELECT 1 AS `one`, hats.user_id FROM hats WHERE hats.user_id = ? LIMIT 1"';
 CREATE VIEW q28 AS '"SELECT suggested_taggings.* FROM suggested_taggings WHERE suggested_taggings.story_id = ?"';
 CREATE VIEW q29 AS '"SELECT tags.* FROM tags WHERE tags.id = ?"';
 CREATE VIEW q30 AS '"SELECT comments.* FROM comments WHERE comments.is_deleted = 0 AND comments.is_moderated = 0 ORDER BY id DESC LIMIT 40"';

@@ -1,36 +1,36 @@
-CREATE TABLE admins ( \
+CREATE DATA_SUBJECT TABLE admins ( \
   id int, \
-  PII_name text, \
+  name text, \
   PRIMARY KEY(id) \
 );
 
-CREATE TABLE customers ( \
+CREATE DATA_SUBJECT TABLE customers ( \
   id int, \
-  PII_name text, \
+  name text, \
   PRIMARY KEY(id) \
 );
 
 CREATE TABLE spi /* sensitive payment info */ ( \
   id int, \
-  OWNER_customer_id int, \
-  ACCESSOR_admin_id int, \
+  customer_id int, \
+  admin_id int, \
   message text, \
   PRIMARY KEY(id), \
-  FOREIGN KEY (OWNER_customer_id) REFERENCES customers(id), \
-  FOREIGN KEY (ACCESSOR_admin_id) REFERENCES admins(id) \
+  FOREIGN KEY (customer_id) OWNED_BY customers(id), \
+  FOREIGN KEY (admin_id) ACCESSED_BY admins(id) \
 );
 
 CREATE TABLE ppi /* preserved payment info */ ( \
   id int, \
-  OWNER_admin_id int, \
-  ACCESSOR_customer_id int, \
+  admin_id int, \
+  customer_id int, \
   message text, \
   PRIMARY KEY(id), \
-  FOREIGN KEY (OWNER_admin_id) REFERENCES admins(id), \
-  FOREIGN KEY (ACCESSOR_customer_id) REFERENCES customers(id) \
+  FOREIGN KEY (admin_id) OWNED_BY admins(id), \
+  FOREIGN KEY (customer_id) ACCESSED_BY customers(id) \
 );
 
-INSERT INTO admins(id, PII_name) VALUES (1, 'Alice');
+INSERT INTO admins(id, name) VALUES (1, 'Alice');
 
 INSERT INTO customers VALUES (10, 'Barb');
 INSERT INTO customers VALUES (20, 'Chris');

@@ -23,16 +23,15 @@ jobs:
       run: |
         docker exec pelton-testing sh -c "cd /home/pelton && bazel build ..."
         docker exec pelton-testing sh -c "cd /home/pelton/experiments/lobsters && bazel build ..."
-        docker exec pelton-testing sh -c "cd /home/pelton/experiments/memcached && bazel build ..."
         docker exec pelton-testing sh -c "cd /home/pelton/experiments/ownCloud && bazel build ..."
 
-    # bazel test all except memcached
+    # bazel test all (with encryption; on by default)
     - name: Test all
       run: docker exec pelton-testing sh -c "cd /home/pelton && bazel test ... --test_output=all"
 
-    # Test memcached baseline
-    - name : Test memcached
-      run: docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/memcached-test.sh"
+    # bazel test all without encryption
+    - name: Test all no encryption
+      run: docker exec pelton-testing sh -c "cd /home/pelton && bazel test ... --encryption=off --test_output=all"
 
     # prepared statement test.
     - name: Run prepared statement test
@@ -49,8 +48,8 @@ jobs:
         docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/test.sh bin/examples/social_chat.sql bin/examples/social_chat.cntd.sql"
 
     # bin/test_multithreaded_proxy
-    - name: Run multi-threaded tests via mysql proxy
-      run: docker exec pelton-testing sh -c "cd /home/pelton/ && ./bin/test_multithreaded_proxy.sh"
+    #- name: Run multi-threaded tests via mysql proxy
+    #  run: docker exec pelton-testing sh -c "cd /home/pelton/ && ./bin/test_multithreaded_proxy.sh"
 
     # valgrind
     - name: Test dataflow with valgrind
@@ -60,7 +59,7 @@ jobs:
         TEST_KEY: bazel test //pelton/dataflow:key-test --config=valgrind --test_output=all
         TEST_RECORD: bazel test //pelton/dataflow:record-test --config=valgrind --test_output=all
         TEST_SCHEMA: bazel test //pelton/dataflow:schema-test --config=valgrind --test_output=all
-        TEST_VALUE: bazel test //pelton/dataflow:value-test --config=valgrind --test_output=all
+        TEST_VALUE: bazel test //pelton/sqlast:ast_value-test --config=valgrind --test_output=all
       run: |
         docker exec pelton-testing sh -c "cd /home/pelton && $TEST_OPS"
         docker exec pelton-testing sh -c "cd /home/pelton && $TEST_GRAPH_PARTITION"

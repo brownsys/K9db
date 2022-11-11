@@ -1,29 +1,29 @@
 SET echo;
 
-CREATE TABLE doctors ( \
+CREATE DATA_SUBJECT TABLE doctors ( \
   id int, \
-  PII_name text, \
+  name text, \
   PRIMARY KEY(id) \
 );
 
-CREATE TABLE patients ( \
+CREATE DATA_SUBJECT TABLE patients ( \
   id int, \
-  PII_name text, \
+  name text, \
   PRIMARY KEY(id) \
 );
 
 CREATE TABLE chat ( \
   id int, \
   patient_id int, \
-  ACCESSOR_ANONYMIZE_doctor_id int, \
-  ANONYMIZE_doctor_name text, \
+  doctor_id int, \
+  doctor_name text, \
   message text, \
   PRIMARY KEY(id), \
-  FOREIGN KEY (ACCESSOR_ANONYMIZE_doctor_id) REFERENCES doctors(id) \
+  FOREIGN KEY (doctor_id) ACCESSED_BY doctors(id) \
 );
 
 INSERT INTO doctors VALUES (1, 'Alice');
-INSERT INTO doctors(id, PII_name) VALUES (2, 'Bob');
+INSERT INTO doctors(id, name) VALUES (2, 'Bob');
 
 INSERT INTO patients VALUES (10, 'Carl');
 INSERT INTO patients VALUES (20, 'Dracula');

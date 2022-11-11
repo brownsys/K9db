@@ -6,11 +6,14 @@
 #include <optional>
 #include <string>
 #include <utility>
+// NOLINTNEXTLINE
+#include <variant>
 #include <vector>
 
 #include "absl/status/statusor.h"
 #include "pelton/sqlast/ast_abstract.h"
 #include "pelton/sqlast/ast_expressions.h"
+#include "pelton/sqlast/ast_value.h"
 
 namespace pelton {
 namespace sqlast {
@@ -18,39 +21,26 @@ namespace sqlast {
 // Insert statement.
 class Insert : public AbstractStatement {
  public:
-  Insert(const std::string &table_name, bool replace)
+  explicit Insert(const std::string &table_name)
       : AbstractStatement(AbstractStatement::Type::INSERT),
-        table_name_(table_name),
-        replace_(replace),
-        returning_(false) {}
+        table_name_(table_name) {}
 
   // Accessors.
-  const std::string &table_name() const;
-  std::string &table_name();
-  bool replace() const;
-  bool &replace();
-  bool returning() const { return this->returning_; }
-  Insert MakeReturning() const {
-    Insert stmt = *this;
-    stmt.returning_ = true;
-    return stmt;
-  }
+  const std::string &table_name() const { return this->table_name_; }
+  std::string &table_name() { return this->table_name_; }
 
   // Columns and Values.
   bool HasColumns() const;
-  void AddColumn(const std::string &colname);
-  const std::vector<std::string> &GetColumns() const;
-  void SetValues(std::vector<std::string> &&values);
-  const std::vector<std::string> &GetValues() const;
 
-  void AddValue(const std::string &val);
-  void AddValue(std::string &&val);
+  // Columns and values.
+  void SetColumns(std::vector<std::string> &&colname);
+  void SetValues(std::vector<Value> &&values);
 
-  absl::StatusOr<std::string> RemoveValue(const std::string &colname);
-  std::string RemoveValue(size_t index);
-  int GetColumnIndex(const std::string &colname) const;
-  absl::StatusOr<std::string> GetValue(const std::string &colname) const;
-  const std::string &GetValue(size_t index) const;
+  const std::vector<std::string> &GetColumns() const { return this->columns_; }
+  const std::vector<Value> &GetValues() const { return this->values_; }
+
+  // Get by index or by column name, if stmt HasColumns.
+  const Value &GetValue(const std::string &colname, size_t index) const;
 
   // Visitor pattern.
   template <class T>
@@ -73,13 +63,54 @@ class Insert : public AbstractStatement {
  private:
   std::string table_name_;
   std::vector<std::string> columns_;
-  std::vector<std::string> values_;
-  bool replace_;
-  bool returning_;
+  std::vector<Value> values_;
+};
+
+class Replace : public Insert {
+ public:
+  explicit Replace(const std::string &table_name) : Insert(table_name) {
+    this->type_ = AbstractStatement::Type::REPLACE;
+  }
+
+  /* Inherits all the functions of insert. */
+
+  // Visitor pattern.
+  template <class T>
+  T Visit(AbstractVisitor<T> *visitor) const {
+    return visitor->VisitReplace(*this);
+  }
+  template <class T>
+  T Visit(MutableVisitor<T> *visitor) {
+    return visitor->VisitReplace(this);
+  }
 };
 
 class Select : public AbstractStatement {
  public:
+  // An entry in the projection list could either be a column name or a literal.
+  class ResultColumn {
+   public:
+    explicit ResultColumn(const std::string &column) : data_(column) {}
+    explicit ResultColumn(const Value &literal) : data_(literal) {}
+
+    bool IsColumn() const { return this->data_.index() == 0; }
+    const Value &GetLiteral() const { return std::get<Value>(this->data_); }
+    const std::string &GetColumn() const {
+      return std::get<std::string>(this->data_);
+    }
+
+    std::string ToString() const {
+      if (this->IsColumn()) {
+        return this->GetColumn();
+      } else {
+        return this->GetLiteral().AsSQLString();
+      }
+    }
+
+   private:
+    std::variant<std::string, Value> data_;
+  };
+
   explicit Select(const std::string &table_name)
       : AbstractStatement(AbstractStatement::Type::SELECT),
         table_name_(table_name) {
@@ -87,43 +118,20 @@ class Select : public AbstractStatement {
     this->limit_ = -1;
   }
 
-  Select(const Select &sel)
-      : AbstractStatement(AbstractStatement::Type::SELECT) {
-    this->table_name_ = sel.table_name_;
-    this->columns_ = sel.columns_;
-    if (sel.where_clause_.has_value()) {
-      this->where_clause_ = std::optional(
-          std::make_unique<BinaryExpression>(*sel.where_clause_->get()));
-    }
-  }
-
-  const std::string &table_name() const;
-  std::string &table_name();
+  const std::string &table_name() const { return this->table_name_; }
+  std::string &table_name() { return this->table_name_; }
 
   const size_t &offset() const { return this->offset_; }
   size_t &offset() { return this->offset_; }
   const int &limit() const { return this->limit_; }
   int &limit() { return this->limit_; }
 
-  void AddColumn(const std::string &column);
-  const std::vector<std::string> &GetColumns() const;
-  std::vector<std::string> &GetColumns();
-  int RemoveColumn(const std::string &column);
+  void AddColumn(const ResultColumn &column);
+  const std::vector<ResultColumn> &GetColumns() const { return this->columns_; }
 
-  bool HasWhereClause() const;
-  const BinaryExpression *const GetWhereClause() const;
-  BinaryExpression *const GetWhereClause();
+  bool HasWhereClause() const { return this->where_clause_.has_value(); }
   void SetWhereClause(std::unique_ptr<BinaryExpression> &&where);
-  void RemoveWhereClause();
-
-  // We use Select to represent queries selecting data from flows, as well
-  // as those selecting data from underlying sharded tables. Not all fetures
-  // all support when accessing underlying sharded tables. This function
-  // checks whether all of the contents of this query are supported for shard
-  // access.
-  bool SupportedByShards() const {
-    return this->offset_ == 0 && this->limit_ == -1;
-  }
+  const BinaryExpression *GetWhereClause() const;
 
   template <class T>
   T Visit(AbstractVisitor<T> *visitor) const {
@@ -137,7 +145,7 @@ class Select : public AbstractStatement {
   std::vector<T> VisitChildren(AbstractVisitor<T> *visitor) const {
     std::vector<T> result;
     if (this->where_clause_.has_value()) {
-      result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
+      result.push_back(this->where_clause_->get()->Visit(visitor));
     }
     return result;
   }
@@ -145,14 +153,15 @@ class Select : public AbstractStatement {
   std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
     std::vector<T> result;
     if (this->where_clause_.has_value()) {
-      result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
+      result.push_back(this->where_clause_->get()->Visit(visitor));
     }
     return result;
   }
 
  private:
   std::string table_name_;
-  std::vector<std::string> columns_;
+  // Either column name or literal.
+  std::vector<ResultColumn> columns_;
   std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
   size_t offset_;
   int limit_;
@@ -160,39 +169,16 @@ class Select : public AbstractStatement {
 
 class Delete : public AbstractStatement {
  public:
-  explicit Delete(const std::string &table_name, bool returning = false)
+  explicit Delete(const std::string &table_name)
       : AbstractStatement(AbstractStatement::Type::DELETE),
-        table_name_(table_name),
-        returning_(returning) {}
+        table_name_(table_name) {}
 
-  Delete(const Delete &del)
-      : AbstractStatement(AbstractStatement::Type::DELETE) {
-    this->table_name_ = del.table_name_;
-    this->returning_ = del.returning_;
-    if (del.where_clause_.has_value()) {
-      this->where_clause_ = std::optional(
-          std::make_unique<BinaryExpression>(*del.where_clause_->get()));
-    }
-  }
+  const std::string &table_name() const { return this->table_name_; }
+  std::string &table_name() { return this->table_name_; }
 
-  const std::string &table_name() const;
-  std::string &table_name();
-
-  bool HasWhereClause() const;
-  const BinaryExpression *const GetWhereClause() const;
-  BinaryExpression *const GetWhereClause();
+  bool HasWhereClause() const { return this->where_clause_.has_value(); }
   void SetWhereClause(std::unique_ptr<BinaryExpression> &&where);
-  void RemoveWhereClause();
-
-  Select SelectDomain() const;
-
-  // Whether the delete statement is also a returning query.
-  bool returning() const { return this->returning_; }
-  Delete MakeReturning() const {
-    Delete stmt = *this;
-    stmt.returning_ = true;
-    return stmt;
-  }
+  const BinaryExpression *GetWhereClause() const;
 
   template <class T>
   T Visit(AbstractVisitor<T> *visitor) const {
@@ -206,7 +192,7 @@ class Delete : public AbstractStatement {
   std::vector<T> VisitChildren(AbstractVisitor<T> *visitor) const {
     std::vector<T> result;
     if (this->where_clause_.has_value()) {
-      result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
+      result.push_back(this->where_clause_->get()->Visit(visitor));
     }
     return result;
   }
@@ -214,7 +200,7 @@ class Delete : public AbstractStatement {
   std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
     std::vector<T> result;
     if (this->where_clause_.has_value()) {
-      result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
+      result.push_back(this->where_clause_->get()->Visit(visitor));
     }
     return result;
   }
@@ -222,7 +208,6 @@ class Delete : public AbstractStatement {
  private:
   std::string table_name_;
   std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
-  bool returning_;
 };
 
 class Update : public AbstractStatement {
@@ -231,37 +216,23 @@ class Update : public AbstractStatement {
       : AbstractStatement(AbstractStatement::Type::UPDATE),
         table_name_(table_name) {}
 
-  Update(const Update &update)
-      : AbstractStatement(AbstractStatement::Type::UPDATE) {
-    this->table_name_ = update.table_name_;
-    this->columns_ = update.columns_;
-    this->values_ = update.values_;
-    if (update.where_clause_.has_value()) {
-      this->where_clause_ = std::optional(
-          std::make_unique<BinaryExpression>(*update.where_clause_->get()));
-    }
+  const std::string &table_name() const { return this->table_name_; }
+  std::string &table_name() { return this->table_name_; }
+
+  void AddColumnValue(const std::string &column,
+                      std::unique_ptr<Expression> &&value);
+
+  const std::vector<std::string> &GetColumns() const { return this->columns_; }
+  const std::vector<std::unique_ptr<Expression>> &GetValues() const {
+    return this->values_;
   }
 
-  const std::string &table_name() const;
-  std::string &table_name();
-
-  void AddColumnValue(const std::string &column, const std::string &value);
-  absl::StatusOr<std::string> RemoveColumnValue(const std::string &column);
-  bool AssignsTo(const std::string &column) const;
-  int ValueIndex(const std::string &column) const;
-
-  const std::vector<std::string> &GetColumns() const;
-  std::vector<std::string> &GetColumns();
-  const std::vector<std::string> &GetValues() const;
-  std::vector<std::string> &GetValues();
-
-  bool HasWhereClause() const;
-  const BinaryExpression *const GetWhereClause() const;
-  BinaryExpression *const GetWhereClause();
+  bool HasWhereClause() const { return this->where_clause_.has_value(); }
   void SetWhereClause(std::unique_ptr<BinaryExpression> &&where);
-  void RemoveWhereClause();
+  const BinaryExpression *GetWhereClause() const;
 
-  Select SelectDomain() const;
+  // Construct a delete statement over the same table and with the same WHERE
+  // clause.
   Delete DeleteDomain() const;
 
   template <class T>
@@ -275,16 +246,22 @@ class Update : public AbstractStatement {
   template <class T>
   std::vector<T> VisitChildren(AbstractVisitor<T> *visitor) const {
     std::vector<T> result;
+    for (const std::unique_ptr<Expression> &value : this->values_) {
+      result.push_back(value->Visit(visitor));
+    }
     if (this->where_clause_.has_value()) {
-      result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
+      result.push_back(this->where_clause_->get()->Visit(visitor));
     }
     return result;
   }
   template <class T>
   std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
     std::vector<T> result;
+    for (std::unique_ptr<Expression> &value : this->values_) {
+      result.push_back(value->Visit(visitor));
+    }
     if (this->where_clause_.has_value()) {
-      result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
+      result.push_back(this->where_clause_->get()->Visit(visitor));
     }
     return result;
   }
@@ -292,24 +269,8 @@ class Update : public AbstractStatement {
  private:
   std::string table_name_;
   std::vector<std::string> columns_;
-  std::vector<std::string> values_;
+  std::vector<std::unique_ptr<Expression>> values_;
   std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
-};
-
-class CreateView : public AbstractStatement {
- public:
-  CreateView(const std::string &view_name, const std::string &query)
-      : AbstractStatement(AbstractStatement::Type::CREATE_VIEW),
-        view_name_(view_name),
-        query_(query) {}
-
-  // Accessors.
-  const std::string &view_name() const { return this->view_name_; }
-  const std::string &query() const { return this->query_; }
-
- private:
-  std::string view_name_;
-  std::string query_;
 };
 
 class GDPRStatement : public AbstractStatement {
@@ -317,7 +278,7 @@ class GDPRStatement : public AbstractStatement {
   enum class Operation { GET, FORGET };
 
   GDPRStatement(Operation operation, const std::string &shard_kind,
-                const std::string &user_id)
+                const Value &user_id)
       : AbstractStatement(AbstractStatement::Type::GDPR),
         operation_(operation),
         shard_kind_(shard_kind),
@@ -326,12 +287,29 @@ class GDPRStatement : public AbstractStatement {
   // Accessors.
   const Operation &operation() const { return this->operation_; }
   const std::string &shard_kind() const { return this->shard_kind_; }
-  const std::string &user_id() const { return this->user_id_; }
+  const Value &user_id() const { return this->user_id_; }
+
+  template <class T>
+  T Visit(AbstractVisitor<T> *visitor) const {
+    return visitor->VisitGDPRStatement(*this);
+  }
+  template <class T>
+  T Visit(MutableVisitor<T> *visitor) {
+    return visitor->VisitGDPRStatement(this);
+  }
+  template <class T>
+  std::vector<T> VisitChildren(AbstractVisitor<T> *visitor) const {
+    return {};
+  }
+  template <class T>
+  std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
+    return {};
+  }
 
  private:
   Operation operation_;
   std::string shard_kind_;
-  std::string user_id_;
+  Value user_id_;
 };
 
 }  // namespace sqlast

@@ -6,6 +6,7 @@
 #include <tuple>
 #include <vector>
 
+#include "gtest/gtest_prod.h"
 #include "pelton/dataflow/future.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
@@ -26,6 +27,7 @@ class Operator {
     INPUT,
     IDENTITY,
     MAT_VIEW,
+    FORWARD_VIEW,
     FILTER,
     UNION,
     EQUIJOIN,
@@ -129,6 +131,10 @@ class Operator {
   NodeIndex index_;
   Type type_;
   PartitionIndex partition_;
+
+  // These tests need to use AddParent().
+  FRIEND_TEST(AggregateOperatorTest, SumGoesAwayWithFilter);
+  FRIEND_TEST(AggregateOperatorTest, CountGoesAwayOnDelete);
 
 #ifdef PELTON_BENCHMARK  // shuts up compiler warnings
   friend void ProcessBenchmark(Operator *op, NodeIndex src, RecordGenFunc gen);

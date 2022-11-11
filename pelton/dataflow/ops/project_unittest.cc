@@ -9,7 +9,6 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
-#include "pelton/dataflow/value.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/ints.h"
 
@@ -75,6 +74,8 @@ TEST(ProjectOperatorTest, BatchTestLiteral) {
   project.input_schemas_.push_back(schema);
   project.AddColumnProjection(schema.NameOf(0), 0);
   project.AddLiteralProjection("One", 1_u);
+  project.AddLiteralProjection("Two", 2_s);
+  project.AddLiteralProjection("Str", "hello");
   project.ComputeOutputSchema();
 
   // Records to be fed
@@ -88,9 +89,12 @@ TEST(ProjectOperatorTest, BatchTestLiteral) {
 
   // expected output
   std::vector<Record> expected_records;
-  expected_records.emplace_back(project.output_schema_, true, 0_u, 1_u);
-  expected_records.emplace_back(project.output_schema_, true, 5_u, 1_u);
-  expected_records.emplace_back(project.output_schema_, true, 6_u, 1_u);
+  expected_records.emplace_back(project.output_schema_, true, 0_u, 1_u, 2_s,
+                                std::make_unique<std::string>("hello"));
+  expected_records.emplace_back(project.output_schema_, true, 5_u, 1_u, 2_s,
+                                std::make_unique<std::string>("hello"));
+  expected_records.emplace_back(project.output_schema_, true, 6_u, 1_u, 2_s,
+                                std::make_unique<std::string>("hello"));
 
   // Feed records and test
   std::vector<Record> outputs =
@@ -104,9 +108,12 @@ TEST(ProjectOperatorTest, BatchTestOperationRightColumn) {
   ProjectOperator project = ProjectOperator();
   project.input_schemas_.push_back(schema);
   project.AddColumnProjection(schema.NameOf(0), 0);
-  project.AddArithmeticRightProjection("Delta", 8_s, 4,
-                                       ProjectOperator::Operation::MINUS);
+  project.AddArithmeticProjectionLiteralLeft(
+      "Delta", ProjectOperator::Operation::MINUS, 8_s, 4);
   project.ComputeOutputSchema();
+  // int - int -> int
+  EXPECT_EQ(project.output_schema_.TypeOf(1),
+            sqlast::ColumnDefinition::Type::INT);
 
   // Records to be fed
   std::vector<Record> records;
@@ -136,12 +143,12 @@ TEST(ProjectOperatorTest, BatchTestOperationRightLiteral) {
   ProjectOperator project = ProjectOperator();
   project.input_schemas_.push_back(schema);
   project.AddColumnProjection(schema.NameOf(0), 0);
-  project.AddArithmeticLeftProjection("Delta", 0, 5_u,
-                                      ProjectOperator::Operation::PLUS);
+  project.AddArithmeticProjectionLiteralRight(
+      "Delta", ProjectOperator::Operation::PLUS, 0, 5_s);
   project.ComputeOutputSchema();
-  // uint MINUS uint would result in int
+  // uint + int -> int.
   EXPECT_EQ(project.output_schema_.TypeOf(1),
-            sqlast::ColumnDefinition::Type::UINT);
+            sqlast::ColumnDefinition::Type::INT);
 
   // Records to be fed
   std::vector<Record> records;
@@ -155,9 +162,9 @@ TEST(ProjectOperatorTest, BatchTestOperationRightLiteral) {
 
   // expected output
   std::vector<Record> expected_records;
-  expected_records.emplace_back(project.output_schema_, true, 0_u, 5_u);
-  expected_records.emplace_back(project.output_schema_, true, 5_u, 10_u);
-  expected_records.emplace_back(project.output_schema_, true, 6_u, 11_u);
+  expected_records.emplace_back(project.output_schema_, true, 0_u, 5_s);
+  expected_records.emplace_back(project.output_schema_, true, 5_u, 10_s);
+  expected_records.emplace_back(project.output_schema_, true, 6_u, 11_s);
 
   // Feed records and test
   std::vector<Record> outputs =
@@ -275,12 +282,18 @@ TEST(ProjectOperatorTest, ArithmeticAndNullValueTest) {
   ProjectOperator project = ProjectOperator();
   project.AddColumnProjection(schema.NameOf(1), 1);
   project.AddColumnProjection(schema.NameOf(0), 0);
-  project.AddArithmeticLeftProjection("Ten", 0, 10_u,
-                                      ProjectOperator::Operation::MINUS);
-  project.AddArithmeticColumnsProjection("Delta", 0, 2,
-                                         ProjectOperator::Operation::MINUS);
+  project.AddArithmeticProjectionLiteralRight(
+      "Ten", ProjectOperator::Operation::MINUS, 0, 10_u);
+  project.AddArithmeticProjectionColumns(
+      "Delta", ProjectOperator::Operation::MINUS, 0, 2);
   project.input_schemas_.push_back(schema);
   project.ComputeOutputSchema();
+  // uint - uint -> int.
+  EXPECT_EQ(project.output_schema_.TypeOf(2),
+            sqlast::ColumnDefinition::Type::INT);
+  // uint - int -> int.
+  EXPECT_EQ(project.output_schema_.TypeOf(3),
+            sqlast::ColumnDefinition::Type::INT);
 
   // Records to be fed
   std::vector<Record> records;
@@ -289,6 +302,8 @@ TEST(ProjectOperatorTest, ArithmeticAndNullValueTest) {
   records.emplace_back(schema, true, 5_u, NullValue(), 7_u);
   records.emplace_back(schema, true, NullValue(),
                        std::make_unique<std::string>("hello!"), 10_u);
+  records.emplace_back(schema, true, NullValue(),
+                       std::make_unique<std::string>("bye!"), NullValue());
 
   // expected output
   std::vector<Record> expected_records;
@@ -300,6 +315,9 @@ TEST(ProjectOperatorTest, ArithmeticAndNullValueTest) {
   expected_records.emplace_back(project.output_schema_, true,
                                 std::make_unique<std::string>("hello!"),
                                 NullValue(), -10_s, -10_s);
+  expected_records.emplace_back(project.output_schema_, true,
+                                std::make_unique<std::string>("bye!"),
+                                NullValue(), -10_s, NullValue());
 
   // Feed records and test
   std::vector<Record> outputs =

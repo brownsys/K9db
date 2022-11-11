@@ -1,0 +1,14 @@
+brace_style = "SameLineWhere"
+control_brace_style = "AlwaysSameLine"
+empty_item_single_line = true
+comment_width = 80
+wrap_comments = true
+tab_spaces = 2
+max_width = 80
+error_on_line_overflow = true
+error_on_unformatted = true
+fn_call_width = 80
+format_strings = true
+imports_indent = "Visual"
+indent_style = "Visual"
+reorder_imports = true

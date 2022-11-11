@@ -15,7 +15,7 @@ where
     let (mut c, user) = c
         .first_exec::<_, _, my::Row>(
             "SELECT users.* FROM users \
-             WHERE users.PII_username = ?",
+             WHERE users.username = ?",
             (format!("user{}", uid),),
         )
         .await?;
@@ -58,8 +58,8 @@ where
 
     c = c
         .drop_exec(
-            "SELECT 1 AS `one`, hats.OWNER_user_id FROM hats \
-             WHERE hats.OWNER_user_id = ? LIMIT 1",
+            "SELECT 1 AS `one`, hats.user_id FROM hats \
+             WHERE hats.user_id = ? LIMIT 1",
             (uid,),
         )
         .await?;

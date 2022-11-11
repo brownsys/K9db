@@ -2,12 +2,14 @@
 #ifndef PELTON_SQLAST_AST_EXPRESSIONS_H_
 #define PELTON_SQLAST_AST_EXPRESSIONS_H_
 
+#include <cassert>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "pelton/sqlast/ast_abstract.h"
+#include "pelton/sqlast/ast_value.h"
 
 namespace pelton {
 namespace sqlast {
@@ -15,7 +17,18 @@ namespace sqlast {
 // Select and delete statements.
 class Expression {
  public:
-  enum class Type { LITERAL, COLUMN, EQ, AND, GREATER_THAN, IN, LIST, IS };
+  enum class Type {
+    LITERAL,
+    COLUMN,
+    EQ,
+    AND,
+    GREATER_THAN,
+    IN,
+    LIST,
+    IS,
+    PLUS,
+    MINUS
+  };
 
   explicit Expression(Type type) : type_(type) {}
 
@@ -24,6 +37,12 @@ class Expression {
   const Type &type() const { return this->type_; }
 
   virtual std::unique_ptr<Expression> Clone() const = 0;
+
+  template <class T>
+  T Visit(AbstractVisitor<T> *visitor) const;
+
+  template <class T>
+  T Visit(MutableVisitor<T> *visitor);
 
  private:
   Type type_;
@@ -34,17 +53,11 @@ class ColumnExpression : public Expression {
   explicit ColumnExpression(const std::string &column)
       : Expression(Expression::Type::COLUMN), column_(column) {}
 
-  ColumnExpression(const ColumnExpression &expr)
-      : Expression(Expression::Type::COLUMN) {
-    this->column_ = expr.column_;
-  }
-
   std::unique_ptr<Expression> Clone() const override {
     return std::make_unique<ColumnExpression>(*this);
   }
 
   const std::string &column() const;
-  std::string &column();
 
   template <class T>
   T Visit(AbstractVisitor<T> *visitor) const {
@@ -69,20 +82,14 @@ class ColumnExpression : public Expression {
 
 class LiteralExpression : public Expression {
  public:
-  explicit LiteralExpression(const std::string &value)
+  explicit LiteralExpression(const Value &value)
       : Expression(Expression::Type::LITERAL), value_(value) {}
 
-  LiteralExpression(const LiteralExpression &expr)
-      : Expression(Expression::Type::LITERAL) {
-    this->value_ = expr.value_;
-  }
+  const Value &value() const;
 
   std::unique_ptr<Expression> Clone() const override {
     return std::make_unique<LiteralExpression>(*this);
   }
-
-  const std::string &value() const;
-  std::string &value();
 
   template <class T>
   T Visit(AbstractVisitor<T> *visitor) const {
@@ -102,25 +109,19 @@ class LiteralExpression : public Expression {
   }
 
  private:
-  std::string value_;
+  Value value_;
 };
 
 class LiteralListExpression : public Expression {
  public:
-  explicit LiteralListExpression(const std::vector<std::string> &values)
+  explicit LiteralListExpression(const std::vector<Value> &values)
       : Expression(Expression::Type::LIST), values_(values) {}
 
-  LiteralListExpression(const LiteralListExpression &expr)
-      : Expression(Expression::Type::LIST) {
-    this->values_ = expr.values_;
-  }
+  const std::vector<Value> &values() const;
 
   std::unique_ptr<Expression> Clone() const override {
     return std::make_unique<LiteralListExpression>(*this);
   }
-
-  const std::vector<std::string> &values() const;
-  std::vector<std::string> &values();
 
   template <class T>
   T Visit(AbstractVisitor<T> *visitor) const {
@@ -140,7 +141,7 @@ class LiteralListExpression : public Expression {
   }
 
  private:
-  std::vector<std::string> values_;
+  std::vector<Value> values_;
 };
 
 class BinaryExpression : public Expression {
@@ -157,9 +158,7 @@ class BinaryExpression : public Expression {
   }
 
   const Expression *const GetLeft() const;
-  Expression *const GetLeft();
   const Expression *const GetRight() const;
-  Expression *const GetRight();
 
   void SetLeft(std::unique_ptr<Expression> &&left);
   void SetRight(std::unique_ptr<Expression> &&right);
@@ -177,96 +176,16 @@ class BinaryExpression : public Expression {
   template <class T>
   std::vector<T> VisitChildren(AbstractVisitor<T> *visitor) const {
     std::vector<T> result;
-    switch (this->left_->type()) {
-      case Expression::Type::COLUMN:
-        result.push_back(
-            std::move(static_cast<ColumnExpression *>(this->left_.get())
-                          ->Visit(visitor)));
-        break;
-      case Expression::Type::LITERAL:
-        result.push_back(
-            std::move(static_cast<LiteralExpression *>(this->left_.get())
-                          ->Visit(visitor)));
-        break;
-      case Expression::Type::LIST:
-        result.push_back(
-            std::move(static_cast<LiteralListExpression *>(this->left_.get())
-                          ->Visit(visitor)));
-        break;
-      default:
-        result.push_back(
-            std::move(static_cast<BinaryExpression *>(this->left_.get())
-                          ->Visit(visitor)));
-    }
-    switch (this->right_->type()) {
-      case Expression::Type::COLUMN:
-        result.push_back(
-            std::move(static_cast<ColumnExpression *>(this->right_.get())
-                          ->Visit(visitor)));
-        break;
-      case Expression::Type::LITERAL:
-        result.push_back(
-            std::move(static_cast<LiteralExpression *>(this->right_.get())
-                          ->Visit(visitor)));
-        break;
-      case Expression::Type::LIST:
-        result.push_back(
-            std::move(static_cast<LiteralListExpression *>(this->right_.get())
-                          ->Visit(visitor)));
-        break;
-      default:
-        result.push_back(
-            std::move(static_cast<BinaryExpression *>(this->right_.get())
-                          ->Visit(visitor)));
-    }
+    result.push_back(this->left_->Visit(visitor));
+    result.push_back(this->right_->Visit(visitor));
     return result;
   }
 
   template <class T>
   std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
     std::vector<T> result;
-    switch (this->left_->type()) {
-      case Expression::Type::COLUMN:
-        result.push_back(
-            std::move(static_cast<ColumnExpression *>(this->left_.get())
-                          ->Visit(visitor)));
-        break;
-      case Expression::Type::LITERAL:
-        result.push_back(
-            std::move(static_cast<LiteralExpression *>(this->left_.get())
-                          ->Visit(visitor)));
-        break;
-      case Expression::Type::LIST:
-        result.push_back(
-            std::move(static_cast<LiteralListExpression *>(this->left_.get())
-                          ->Visit(visitor)));
-        break;
-      default:
-        result.push_back(
-            std::move(static_cast<BinaryExpression *>(this->left_.get())
-                          ->Visit(visitor)));
-    }
-    switch (this->right_->type()) {
-      case Expression::Type::COLUMN:
-        result.push_back(
-            std::move(static_cast<ColumnExpression *>(this->right_.get())
-                          ->Visit(visitor)));
-        break;
-      case Expression::Type::LITERAL:
-        result.push_back(
-            std::move(static_cast<LiteralExpression *>(this->right_.get())
-                          ->Visit(visitor)));
-        break;
-      case Expression::Type::LIST:
-        result.push_back(
-            std::move(static_cast<LiteralListExpression *>(this->right_.get())
-                          ->Visit(visitor)));
-        break;
-      default:
-        result.push_back(
-            std::move(static_cast<BinaryExpression *>(this->right_.get())
-                          ->Visit(visitor)));
-    }
+    result.push_back(this->left_->Visit(visitor));
+    result.push_back(this->right_->Visit(visitor));
     return result;
   }
 
@@ -274,6 +193,49 @@ class BinaryExpression : public Expression {
   std::unique_ptr<Expression> left_;
   std::unique_ptr<Expression> right_;
 };
+
+// Implemented here so that expression classes are defined.
+template <class T>
+T Expression::Visit(AbstractVisitor<T> *visitor) const {
+  switch (this->type_) {
+    case Expression::Type::COLUMN:
+      return static_cast<const ColumnExpression *>(this)->Visit(visitor);
+    case Expression::Type::LITERAL:
+      return static_cast<const LiteralExpression *>(this)->Visit(visitor);
+    case Expression::Type::LIST:
+      return static_cast<const LiteralListExpression *>(this)->Visit(visitor);
+    case Expression::Type::EQ:
+    case Expression::Type::AND:
+    case Expression::Type::GREATER_THAN:
+    case Expression::Type::IN:
+    case Expression::Type::IS:
+    case Expression::Type::PLUS:
+      return static_cast<const BinaryExpression *>(this)->Visit(visitor);
+    default:
+      assert(false);
+  }
+}
+
+template <class T>
+T Expression::Visit(MutableVisitor<T> *visitor) {
+  switch (this->type_) {
+    case Expression::Type::COLUMN:
+      return static_cast<ColumnExpression *>(this)->Visit(visitor);
+    case Expression::Type::LITERAL:
+      return static_cast<LiteralExpression *>(this)->Visit(visitor);
+    case Expression::Type::LIST:
+      return static_cast<LiteralListExpression *>(this)->Visit(visitor);
+    case Expression::Type::EQ:
+    case Expression::Type::AND:
+    case Expression::Type::GREATER_THAN:
+    case Expression::Type::IN:
+    case Expression::Type::IS:
+    case Expression::Type::PLUS:
+      return static_cast<BinaryExpression *>(this)->Visit(visitor);
+    default:
+      assert(false);
+  }
+}
 
 }  // namespace sqlast
 }  // namespace pelton

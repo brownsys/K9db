@@ -13,7 +13,7 @@
 #include "pelton/dataflow/ops/filter_enum.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/types.h"
-#include "pelton/dataflow/value.h"
+#include "pelton/sqlast/ast.h"
 
 namespace pelton {
 namespace dataflow {
@@ -30,27 +30,31 @@ class FilterOperator : public Operator {
   FilterOperator() : Operator(Operator::Type::FILTER) {}
 
   // Add filter conditions/operations.
-  void AddOperation(const std::string &value, ColumnID column, Operation op) {
-    this->ops_.emplace_back(column, value, op);
-  }
-  void AddOperation(uint64_t value, ColumnID column, Operation op) {
-    this->ops_.emplace_back(column, value, op);
-  }
-  void AddOperation(int64_t value, ColumnID column, Operation op) {
-    if (this->input_schemas_.size() > 0 &&
-        this->input_schemas_.at(0).TypeOf(column) ==
-            sqlast::ColumnDefinition::Type::UINT) {
-      CHECK_GE(value, 0);
-      this->AddOperation(static_cast<uint64_t>(value), column, op);
-    } else {
-      this->ops_.emplace_back(column, value, op);
-    }
-  }
-  void AddOperation(ColumnID column, Operation op) {
+  void AddNullOperation(ColumnID column, Operation op) {
     this->ops_.emplace_back(column, op);
   }
-  void AddOperation(ColumnID left_column, Operation op, ColumnID right_column) {
-    this->ops_.emplace_back(left_column, op, right_column);
+  void AddLiteralOperation(ColumnID column, uint64_t value, Operation op) {
+    this->ops_.emplace_back(column, sqlast::Value(value), op);
+  }
+  void AddLiteralOperation(ColumnID column, int64_t value, Operation op) {
+    // Everything gets parsed in the ast and calcite as a *signed* int.
+    // However, we may be comparing against an unsigned column.
+    // We change the value to unsigned in that case.
+    if (this->input_schemas_.at(0).TypeOf(column) ==
+        sqlast::ColumnDefinition::Type::UINT) {
+      CHECK_GE(value, 0) << "Cannot implicitly convert int to uint in filter";
+      uint64_t cast = static_cast<uint64_t>(value);
+      this->ops_.emplace_back(column, sqlast::Value(cast), op);
+    } else {
+      this->ops_.emplace_back(column, sqlast::Value(value), op);
+    }
+  }
+  void AddLiteralOperation(ColumnID column, const std::string &value,
+                           Operation op) {
+    this->ops_.emplace_back(column, sqlast::Value(value), op);
+  }
+  void AddColumnOperation(ColumnID left, ColumnID right, Operation op) {
+    this->ops_.emplace_back(left, right, op);
   }
 
  protected:
@@ -66,27 +70,26 @@ class FilterOperator : public Operator {
 
   class FilterOperation {
    public:
-    // Use this for unary operation with null.
-    FilterOperation(ColumnID col, Operation op)
-        : left_(col), right_(NullValue()), op_(op), col_(false) {
+    // Use this for filter column with null.
+    FilterOperation(ColumnID l, Operation op)
+        : left_(l), right_(), op_(op), col_(false) {
       CHECK(op == Operation::IS_NULL || op == Operation::IS_NOT_NULL);
     }
 
     // Use this for filter column with literal (excluding null).
-    FilterOperation(ColumnID l, Record::DataVariant r, Operation op)
+    FilterOperation(ColumnID l, sqlast::Value &&r, Operation op)
         : left_(l), right_(r), op_(op), col_(false) {}
 
     // Use this for filter column with another column.
-    FilterOperation(ColumnID l, Operation op, ColumnID r)
+    FilterOperation(ColumnID l, ColumnID r, Operation op)
         : left_(l), right_(static_cast<uint64_t>(r)), op_(op), col_(true) {}
 
     // Accessors.
     ColumnID left() const { return this->left_; }
     ColumnID right_column() const {
-      uint64_t col_id = std::get<uint64_t>(this->right_);
-      return static_cast<ColumnID>(col_id);
+      return static_cast<ColumnID>(this->right_->GetUInt());
     }
-    const Record::DataVariant &right() const { return this->right_; }
+    const sqlast::Value &right_value() const { return *this->right_; }
     Operation op() const { return this->op_; }
     bool is_column() const { return this->col_; }
 
@@ -96,7 +99,7 @@ class FilterOperator : public Operator {
     ColumnID left_;
     // The right operand, might be a literal (including null), or another
     // column.
-    Record::DataVariant right_;
+    std::optional<sqlast::Value> right_;
     // Filter operation (e.g. <, ==, etc).
     Operation op_;
     // Whether the right operand is a column or not.
@@ -112,6 +115,7 @@ class FilterOperator : public Operator {
   FRIEND_TEST(FilterOperatorTest, BatchTest);
   FRIEND_TEST(FilterOperatorTest, ColOps);
   FRIEND_TEST(FilterOperatorTest, TypeMistmatch);
+  FRIEND_TEST(FilterOperatorTest, ImplicitTypeConversion);
   FRIEND_TEST(FilterOperatorTest, IsNullAccept);
 };
 

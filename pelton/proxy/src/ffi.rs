@@ -13,7 +13,7 @@ pub mod pelton {
   pub use ffi::FFIConnection;
   pub use ffi::FFIPreparedResult;
   pub use ffi::FFIPreparedStatement;
-  pub use ffi::FFIResult;
+  pub use ffi::{FFIResult, FFIUpdateResult};
   pub use ffi::{FFIColumnType_DATETIME, FFIColumnType_INT, FFIColumnType_TEXT,
                 FFIColumnType_UINT};
 
@@ -82,7 +82,7 @@ pub mod pelton {
     return unsafe { ffi::FFIExecDDL(rust_conn, char_query) };
   }
 
-  pub fn exec_update(rust_conn: FFIConnection, query: &str) -> i32 {
+  pub fn exec_update(rust_conn: FFIConnection, query: &str) -> FFIUpdateResult {
     let c_query = CString::new(query).unwrap();
     let char_query: *const c_char = c_query.as_ptr();
     return unsafe { ffi::FFIExecUpdate(rust_conn, char_query) };
@@ -127,6 +127,11 @@ pub mod pelton {
   // Functions to interact with FFIResult.
   pub mod result {
     use super::*;
+
+    // Resultset.
+    pub fn next_resultset(c_result: FFIResult) -> bool {
+      unsafe { ffi::FFIResultNextSet(c_result) }
+    }
 
     // Schema.
     pub fn column_count(c_result: FFIResult) -> usize {

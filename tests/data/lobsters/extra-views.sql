@@ -1,21 +1,21 @@
-CREATE VIEW q1 AS '"SELECT 1 AS `one`, PII_username FROM users WHERE users.PII_username = ?"';
+CREATE VIEW q1 AS '"SELECT 1 AS `one`, username FROM users WHERE users.username = ?"';
 CREATE VIEW q2 AS '"SELECT 1 AS `one`, short_id FROM stories WHERE stories.short_id = ?"';
 CREATE VIEW q3 AS '"SELECT tags.* FROM tags WHERE tags.inactive = 0 AND tags.tag = ?"';
 -- needs support for `key` column names (backticks to escape keywords)
 CREATE VIEW q4 AS '"SELECT keystores.* FROM keystores WHERE keystores.keyX = ?"';
-CREATE VIEW q5 AS '"SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND votes.story_id = ? AND votes.comment_id IS NULL"';
+CREATE VIEW q5 AS '"SELECT votes.* FROM votes WHERE votes.user_id = ? AND votes.story_id = ? AND votes.comment_id IS NULL"';
 CREATE VIEW q7 AS '"SELECT stories.* FROM stories WHERE stories.short_id = ?"';
 CREATE VIEW q8 AS '"SELECT users.* FROM users WHERE users.id = ?"';
 CREATE VIEW q9 AS '"SELECT 1 AS `one`, short_id FROM comments WHERE comments.short_id = ?"';
-CREATE VIEW q10 AS '"SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND votes.story_id = ? AND votes.comment_id = ?"';
+CREATE VIEW q10 AS '"SELECT votes.* FROM votes WHERE votes.user_id = ? AND votes.story_id = ? AND votes.comment_id = ?"';
 CREATE VIEW q14 AS '"SELECT comments.* FROM comments WHERE comments.story_id = ? AND comments.short_id = ?"';
 CREATE VIEW q15 AS '"SELECT read_ribbons.* FROM read_ribbons WHERE read_ribbons.user_id = ? AND read_ribbons.story_id = ?"';
 CREATE VIEW q18 AS '"SELECT hidden_stories.story_id, hidden_stories.user_id FROM hidden_stories WHERE hidden_stories.user_id = ?"';
-CREATE VIEW q19 AS '"SELECT users.* FROM users WHERE users.PII_username = ?"';
+CREATE VIEW q19 AS '"SELECT users.* FROM users WHERE users.username = ?"';
 CREATE VIEW q20 AS '"SELECT hidden_stories.* FROM hidden_stories WHERE hidden_stories.user_id = ? AND hidden_stories.story_id = ?"';
 CREATE VIEW q21 AS '"SELECT tag_filters.* FROM tag_filters WHERE tag_filters.user_id = ?"';
 CREATE VIEW q23 AS '"SELECT taggings.story_id FROM taggings WHERE taggings.story_id = ?"';
 CREATE VIEW q24 AS '"SELECT saved_stories.* FROM saved_stories WHERE saved_stories.user_id = ? AND saved_stories.story_id = ?"';
 CREATE VIEW q31 AS '"SELECT 1, user_id, story_id FROM hidden_stories WHERE user_id = ? AND hidden_stories.story_id = ?"';
-CREATE VIEW q33 AS '"SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND votes.comment_id = ?"';
+CREATE VIEW q33 AS '"SELECT votes.* FROM votes WHERE votes.user_id = ? AND votes.comment_id = ?"';
 CREATE VIEW q34 AS '"SELECT comments.* FROM comments WHERE comments.short_id = ?"';

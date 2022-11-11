@@ -13,6 +13,7 @@
 #include "pelton/dataflow/ops/aggregate.h"
 #include "pelton/dataflow/ops/equijoin.h"
 #include "pelton/dataflow/ops/exchange.h"
+#include "pelton/dataflow/ops/forward_view.h"
 #include "pelton/dataflow/ops/input.h"
 #include "pelton/dataflow/ops/project.h"
 #include "pelton/dataflow/schema.h"
@@ -31,7 +32,32 @@ namespace dataflow {
 // Initialization given a single partition (to be cloned) and channels.
 void DataFlowGraph::Initialize(
     std::unique_ptr<DataFlowGraphPartition> &&partition,
-    const std::vector<Channel *> &channels) {
+    const std::vector<Channel *> &channels,
+    const std::unordered_map<std::string, std::vector<Operator *>> &parents) {
+  LOG(INFO) << "Entering Initialize()...";
+
+  // if (partition->inputs().size() == 0) {
+  //   LOG(INFO) << "SINGLE WORKER CASE";
+
+  //   // Store the input names for this graph (i.e. for any partition).
+  //   this->output_schema_ = partition->outputs().at(0)->output_schema();
+  //   this->matview_keys_ = partition->outputs().at(0)->key_cols();
+
+  //   // Fill in partition key maps.
+  //   this->inkeys_ = std::unordered_map<std::string, PartitionKey>();
+  //   this->outkey_ = std::vector<ColumnID>();
+
+  //   // Print debugging information.
+  //   LOG(INFO) << "Planned exchanges and partitioning of flow";
+  //   LOG(INFO) << partition->DebugString();
+
+  //   // Make the specified number of partitions.
+  //   this->partitions_.push_back(std::move(partition));
+  //   this->matviews_.push_back(this->partitions_.back()->outputs().at(0));
+  //   LOG(INFO) << "Exiting Initialize()...";
+  //   return;
+  // }
+
   // Store the input names for this graph (i.e. for any partition).
   this->output_schema_ = partition->outputs().at(0)->output_schema();
   this->matview_keys_ = partition->outputs().at(0)->key_cols();
@@ -47,6 +73,12 @@ void DataFlowGraph::Initialize(
   for (const auto &[_, input_operator] : partition->inputs()) {
     DFS(*input_operator, UNDEFINED_NODE_INDEX, Any::UNIT, &p, &r, e);
   }
+  for (const auto &forward_operator : partition->forwards()) {
+    Operator *node = parents.at(forward_operator->parent_flow()).front();
+    MatViewOperator *parent = reinterpret_cast<MatViewOperator *>(node);
+    const PartitionKey &outkey = parent->outkey();
+    DFS(*forward_operator, UNDEFINED_NODE_INDEX, outkey, &p, &r, e);
+  }
 
   // Check to see that every MatView was assigned a partition key.
   // If some were not, assign them one externally.
@@ -58,6 +90,12 @@ void DataFlowGraph::Initialize(
     r.clear();
     for (const auto &[_, input_operator] : partition->inputs()) {
       DFS(*input_operator, UNDEFINED_NODE_INDEX, Any::UNIT, &p, &r, e);
+    }
+    for (const auto &forward_operator : partition->forwards()) {
+      Operator *node = parents.at(forward_operator->parent_flow()).front();
+      MatViewOperator *parent = reinterpret_cast<MatViewOperator *>(node);
+      const PartitionKey &outkey = parent->outkey();
+      DFS(*forward_operator, UNDEFINED_NODE_INDEX, outkey, &p, &r, e);
     }
   }
 
@@ -71,6 +109,12 @@ void DataFlowGraph::Initialize(
     r.clear();
     for (const auto &[_, input_operator] : partition->inputs()) {
       DFS(*input_operator, UNDEFINED_NODE_INDEX, Any::UNIT, &p, &r, e);
+    }
+    for (const auto &forward_operator : partition->forwards()) {
+      Operator *node = parents.at(forward_operator->parent_flow()).front();
+      MatViewOperator *parent = reinterpret_cast<MatViewOperator *>(node);
+      const PartitionKey &outkey = parent->outkey();
+      DFS(*forward_operator, UNDEFINED_NODE_INDEX, outkey, &p, &r, e);
     }
   }
 
@@ -105,9 +149,21 @@ void DataFlowGraph::Initialize(
 
   // Make the specified number of partitions.
   for (PartitionIndex i = 0; i < this->size_; i++) {
-    this->partitions_.push_back(partition->Clone(i));
+    this->partitions_.push_back(partition->Clone(i, parents));
+    LOG(INFO) << "Making partition " << i;
+    LOG(INFO) << this->partitions_.back()->DebugString();
     this->matviews_.push_back(this->partitions_.back()->outputs().at(0));
   }
+
+  LOG(INFO) << "Made the specified number of partitions";
+
+  // Save outkey_ in each of the MatViews.
+  for (auto matview : this->matviews_) {
+    matview->outkey(this->outkey_);
+    LOG(INFO) << "SETTING OUTKEY FOR MATVIEW: " << matview->DebugString();
+  }
+
+  LOG(INFO) << "Exiting Initialize()...";
 }
 
 // Processing records: records are hash-partitioning and fed to the input

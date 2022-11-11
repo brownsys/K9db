@@ -6,181 +6,105 @@
 
 #include "glog/logging.h"
 #include "pelton/dataflow/schema.h"
-#include "pelton/sqlast/ast.h"
 
-#define HANDLE_NULL_MACRO_COLUMN(col, other_col, OP)            \
-  if (record.IsNull(col)) {                                     \
-    if (record.IsNull(other_col)) {                             \
-      out_record.SetNull(true, i);                              \
-      continue;                                                 \
-    }                                                           \
-    switch (this->output_schema_.TypeOf(i)) {                   \
-      case sqlast::ColumnDefinition::Type::UINT:                \
-        out_record.SetUInt(record.GetUInt(other_col), i);       \
-        break;                                                  \
-      case sqlast::ColumnDefinition::Type::INT: {               \
-        bool is_int = record.schema().TypeOf(other_col) ==      \
-                      sqlast::ColumnDefinition::Type::INT;      \
-        if (is_int) {                                           \
-          out_record.SetInt(OP record.GetInt(other_col), i);    \
-        } else {                                                \
-          out_record.SetInt(OP record.GetUInt(other_col), i);   \
-        }                                                       \
-        break;                                                  \
-      }                                                         \
-      default:                                                  \
-        LOG(FATAL) << "Unsupported arithmetic type in project"; \
-    }                                                           \
+#define ARITHMETIC_WITH_RIGHT_LITERAL_MACRO(OP)                     \
+  switch (this->output_schema_.TypeOf(i)) {                         \
+    case sqlast::ColumnDefinition::Type::UINT: {                    \
+      uint64_t lv = record.IsNull(left) ? 0 : record.GetUInt(left); \
+      out_record.SetUInt(lv OP right.GetUInt(), i);                 \
+      break;                                                        \
+    }                                                               \
+    case sqlast::ColumnDefinition::Type::INT: {                     \
+      using CType = sqlast::ColumnDefinition::Type;                 \
+      int64_t lv, rv;                                               \
+      if (record.schema().TypeOf(left) == CType::INT) {             \
+        lv = record.IsNull(left) ? 0 : record.GetInt(left);         \
+      } else {                                                      \
+        lv = record.IsNull(left) ? 0 : record.GetUInt(left);        \
+      }                                                             \
+      if (right.type() == sqlast::Value::Type::INT) {               \
+        rv = right.GetInt();                                        \
+      } else {                                                      \
+        rv = right.GetUInt();                                       \
+      }                                                             \
+      out_record.SetInt(lv OP rv, i);                               \
+      break;                                                        \
+    }                                                               \
+    default:                                                        \
+      LOG(FATAL) << "Unsupported arithmetic type in project";       \
   }
+// ARITHMETIC_WITH_RIGHT_LITERAL_MACRO
 
-#define HANDLE_NULL_MACRO_LITERAL(col, literal, OP)                         \
-  if (record.IsNull(col)) {                                                 \
-    switch (this->output_schema_.TypeOf(i)) {                               \
-      case sqlast::ColumnDefinition::Type::UINT:                            \
-        out_record.SetUInt(std::get<uint64_t>(literal), i);                 \
-        break;                                                              \
-      case sqlast::ColumnDefinition::Type::INT: {                           \
-        bool is_int =                                                       \
-            GetLiteralType(literal) == sqlast::ColumnDefinition::Type::INT; \
-        if (is_int) {                                                       \
-          out_record.SetInt(OP std::get<int64_t>(literal), i);              \
-        } else {                                                            \
-          out_record.SetInt(OP std::get<uint64_t>(literal), i);             \
-        }                                                                   \
-        break;                                                              \
-      }                                                                     \
-      default:                                                              \
-        LOG(FATAL) << "Unsupported arithmetic type in project";             \
-    }                                                                       \
+#define ARITHMETIC_WITH_LEFT_LITERAL_MACRO(OP)                        \
+  switch (this->output_schema_.TypeOf(i)) {                           \
+    case sqlast::ColumnDefinition::Type::UINT: {                      \
+      uint64_t rv = record.IsNull(right) ? 0 : record.GetUInt(right); \
+      out_record.SetUInt(left.GetUInt() OP rv, i);                    \
+      break;                                                          \
+    }                                                                 \
+    case sqlast::ColumnDefinition::Type::INT: {                       \
+      using CType = sqlast::ColumnDefinition::Type;                   \
+      int64_t lv, rv;                                                 \
+      if (left.type() == sqlast::Value::Type::INT) {                  \
+        lv = left.GetInt();                                           \
+      } else {                                                        \
+        lv = left.GetUInt();                                          \
+      }                                                               \
+      if (record.schema().TypeOf(right) == CType::INT) {              \
+        rv = record.IsNull(right) ? 0 : record.GetInt(right);         \
+      } else {                                                        \
+        rv = record.IsNull(right) ? 0 : record.GetUInt(right);        \
+      }                                                               \
+      out_record.SetInt(lv OP rv, i);                                 \
+      break;                                                          \
+    }                                                                 \
+    default:                                                          \
+      LOG(FATAL) << "Unsupported arithmetic type in project";         \
   }
+// ARITHMETIC_WITH_LEFT_LITERAL_MACRO
 
-#define LEFT_ARITHMETIC_WITH_LITERAL_MACRO(OP)                                \
-  HANDLE_NULL_MACRO_LITERAL(left, right, OP)                                  \
-  /* NOLINTNEXTLINE */                                                        \
-  else {                                                                      \
-    switch (this->output_schema_.TypeOf(i)) {                                 \
-      case sqlast::ColumnDefinition::Type::UINT:                              \
-        out_record.SetUInt(record.GetUInt(left) OP std::get<uint64_t>(right), \
-                           i);                                                \
-        break;                                                                \
-      case sqlast::ColumnDefinition::Type::INT: {                             \
-        int64_t result;                                                       \
-        bool lint = record.schema().TypeOf(left) ==                           \
-                    sqlast::ColumnDefinition::Type::INT;                      \
-        bool rint =                                                           \
-            GetLiteralType(right) == sqlast::ColumnDefinition::Type::INT;     \
-        if (lint && rint) {                                                   \
-          result = record.GetInt(left) OP std::get<int64_t>(right);           \
-        } else if (lint) {                                                    \
-          result = record.GetInt(left) OP std::get<uint64_t>(right);          \
-        } else if (rint) {                                                    \
-          result = record.GetUInt(left) OP std::get<int64_t>(right);          \
-        } else {                                                              \
-          result = record.GetUInt(left) OP std::get<uint64_t>(right);         \
-        }                                                                     \
-        out_record.SetInt(result, i);                                         \
-        break;                                                                \
-      }                                                                       \
-      default:                                                                \
-        LOG(FATAL) << "Unsupported arithmetic type in project";               \
-    }                                                                         \
+#define ARITHMETIC_WITH_COLUMN_MACRO(OP)                                \
+  if (record.IsNull(left) && record.IsNull(right)) {                    \
+    out_record.SetNull(true, i);                                        \
+  } else {                                                              \
+    switch (this->output_schema_.TypeOf(i)) {                           \
+      case sqlast::ColumnDefinition::Type::UINT: {                      \
+        uint64_t lv = record.IsNull(left) ? 0 : record.GetUInt(left);   \
+        uint64_t rv = record.IsNull(right) ? 0 : record.GetUInt(right); \
+        out_record.SetUInt(lv OP rv, i);                                \
+        break;                                                          \
+      }                                                                 \
+      case sqlast::ColumnDefinition::Type::INT: {                       \
+        using CType = sqlast::ColumnDefinition::Type;                   \
+        int64_t lv, rv;                                                 \
+        if (record.schema().TypeOf(left) == CType::INT) {               \
+          lv = record.IsNull(left) ? 0 : record.GetInt(left);           \
+        } else {                                                        \
+          lv = record.IsNull(left) ? 0 : record.GetUInt(left);          \
+        }                                                               \
+        if (record.schema().TypeOf(right) == CType::INT) {              \
+          rv = record.IsNull(right) ? 0 : record.GetInt(right);         \
+        } else {                                                        \
+          rv = record.IsNull(right) ? 0 : record.GetUInt(right);        \
+        }                                                               \
+        out_record.SetInt(lv OP rv, i);                                 \
+        break;                                                          \
+      }                                                                 \
+      default:                                                          \
+        LOG(FATAL) << "Unsupported arithmetic type in project";         \
+    }                                                                   \
   }
-
-// In above macro an edge case is being handled for (uint MINUS uint)
-// LEFT_ARITHMETIC_WITH_LITERAL_MACRO
-
-#define RIGHT_ARITHMETIC_WITH_LITERAL_MACRO(OP)                               \
-  HANDLE_NULL_MACRO_LITERAL(right, left, +)                                   \
-  /* NOLINTNEXTLINE */                                                        \
-  else {                                                                      \
-    switch (this->output_schema_.TypeOf(i)) {                                 \
-      case sqlast::ColumnDefinition::Type::UINT:                              \
-        out_record.SetUInt(std::get<uint64_t>(left) OP record.GetUInt(right), \
-                           i);                                                \
-        break;                                                                \
-      case sqlast::ColumnDefinition::Type::INT: {                             \
-        int64_t result;                                                       \
-        bool lint =                                                           \
-            GetLiteralType(left) == sqlast::ColumnDefinition::Type::INT;      \
-        bool rint = record.schema().TypeOf(right) ==                          \
-                    sqlast::ColumnDefinition::Type::INT;                      \
-        if (lint && rint) {                                                   \
-          result = std::get<int64_t>(left) OP record.GetInt(right);           \
-        } else if (lint) {                                                    \
-          result = std::get<int64_t>(left) OP record.GetUInt(right);          \
-        } else if (rint) {                                                    \
-          result = std::get<uint64_t>(left) OP record.GetInt(right);          \
-        } else {                                                              \
-          result = std::get<uint64_t>(left) OP record.GetUInt(right);         \
-        }                                                                     \
-        out_record.SetInt(result, i);                                         \
-        break;                                                                \
-      }                                                                       \
-      default:                                                                \
-        LOG(FATAL) << "Unsupported arithmetic type in project";               \
-    }                                                                         \
-  }
-// In above macro an edge case is being handled for (uint MINUS uint)
-// RIGHT_ARITHMETIC_WITH_LITERAL_MACRO
-
-#define ARITHMETIC_WITH_COLUMN_MACRO(OP)                                      \
-  HANDLE_NULL_MACRO_COLUMN(left, right, OP)                                   \
-  /* NOLINTNEXTLINE */                                                        \
-  else HANDLE_NULL_MACRO_COLUMN(right, left, +) /* NOLINTNEXTLINE */          \
-      else {                                                                  \
-    switch (this->output_schema_.TypeOf(i)) {                                 \
-      case sqlast::ColumnDefinition::Type::UINT:                              \
-        out_record.SetUInt(record.GetUInt(left) OP record.GetUInt(right), i); \
-        break;                                                                \
-      case sqlast::ColumnDefinition::Type::INT: {                             \
-        int64_t result;                                                       \
-        bool lint = record.schema().TypeOf(left) ==                           \
-                    sqlast::ColumnDefinition::Type::INT;                      \
-        bool rint = record.schema().TypeOf(right) ==                          \
-                    sqlast::ColumnDefinition::Type::INT;                      \
-        if (lint && rint) {                                                   \
-          result = record.GetInt(left) OP record.GetInt(right);               \
-        } else if (lint) {                                                    \
-          result = record.GetInt(left) OP record.GetUInt(right);              \
-        } else if (rint) {                                                    \
-          result = record.GetUInt(left) OP record.GetInt(right);              \
-        } else {                                                              \
-          result = record.GetUInt(left) OP record.GetUInt(right);             \
-        }                                                                     \
-        out_record.SetInt(result, i);                                         \
-        break;                                                                \
-      }                                                                       \
-      default:                                                                \
-        LOG(FATAL) << "Unsupported arithmetic type in project";               \
-    }                                                                         \
-  }
-// In above macro an edge case is being handled for (uint MINUS uint)
+// In above macro an edge case is being handled for (uint MINUS uint) -> int
 // ARITHMETIC_WITH_COLUMN_MACRO
 
 namespace pelton {
 namespace dataflow {
 
-namespace {
-
-inline sqlast::ColumnDefinition::Type GetLiteralType(
-    const Record::DataVariant &literal) {
-  switch (literal.index()) {
-    case 1:
-      return sqlast::ColumnDefinition::Type::UINT;
-    case 2:
-      return sqlast::ColumnDefinition::Type::INT;
-    default:
-      LOG(FATAL) << "Unsupported literal type in project";
-  }
-}
-
-}  // namespace
-
 std::optional<ColumnID> ProjectOperator::ProjectColumn(ColumnID col) const {
   for (size_t i = 0; i < this->projections_.size(); i++) {
     const auto &projection = this->projections_.at(i);
     if (projection.column()) {
-      ColumnID column = projection.getColumn();
+      ColumnID column = projection.getLeftColumn();
       if (column == col) {
         return i;
       }
@@ -191,7 +115,7 @@ std::optional<ColumnID> ProjectOperator::ProjectColumn(ColumnID col) const {
 std::optional<ColumnID> ProjectOperator::UnprojectColumn(ColumnID col) const {
   const auto &projection = this->projections_.at(col);
   if (projection.column()) {
-    return projection.getColumn();
+    return projection.getLeftColumn();
   }
   return {};
 }
@@ -204,7 +128,7 @@ void ProjectOperator::ComputeOutputSchema() {
     bool found_key = false;
     for (size_t i = 0; i < this->projections_.size(); i++) {
       const auto &projection = this->projections_.at(i);
-      if (projection.column() && projection.getColumn() == key) {
+      if (projection.column() && projection.getLeftColumn() == key) {
         out_keys.push_back(i);
         found_key = true;
         break;
@@ -224,7 +148,7 @@ void ProjectOperator::ComputeOutputSchema() {
     // Obtain types and simultaneously sanity check for type compatibility
     // in case of airthmetic operations
     if (projection.column()) {
-      ColumnID column = projection.getColumn();
+      ColumnID column = projection.getLeftColumn();
       const std::string &column_name = projection.getName();
       if (column_name.size() == 0) {
         out_column_names.push_back(input.NameOf(column));
@@ -235,34 +159,34 @@ void ProjectOperator::ComputeOutputSchema() {
 
     } else if (projection.literal()) {
       out_column_names.push_back(projection.getName());
-      out_column_types.push_back(GetLiteralType(projection.getLiteral()));
+      out_column_types.push_back(projection.getLeftLiteral().ConvertType());
 
     } else {
       out_column_names.push_back(projection.getName());
-
-      sqlast::ColumnDefinition::Type result_type;
+      sqlast::ColumnDefinition::Type ltype, rtype;
       if (projection.left_column() && projection.right_column()) {
-        CHECK_EQ(input.TypeOf(projection.getLeftColumn()),
-                 input.TypeOf(projection.getRightColumn()));
-        result_type = input.TypeOf(projection.getLeftColumn());
+        ltype = input.TypeOf(projection.getLeftColumn());
+        rtype = input.TypeOf(projection.getRightColumn());
       } else if (projection.left_column()) {
-        Record::DataVariant literal = projection.getRightLiteral();
-        CHECK_EQ(input.TypeOf(projection.getLeftColumn()),
-                 GetLiteralType(literal));
-        result_type = input.TypeOf(projection.getLeftColumn());
+        ltype = input.TypeOf(projection.getLeftColumn());
+        rtype = projection.getRightLiteral().ConvertType();
       } else {
-        Record::DataVariant literal = projection.getLeftLiteral();
-        CHECK_EQ(GetLiteralType(literal),
-                 input.TypeOf(projection.getRightColumn()));
-        result_type = input.TypeOf(projection.getRightColumn());
+        ltype = projection.getLeftLiteral().ConvertType();
+        rtype = input.TypeOf(projection.getRightColumn());
       }
 
-      // uint - uint -> int.
-      if (projection.getOperation() == Operation::MINUS) {
-        result_type = sqlast::ColumnDefinition::Type::INT;
-      }
+      // Cannot perform arithmetic operations over strings.
+      CHECK_NE(ltype, sqlast::ColumnDefinition::Type::TEXT);
+      CHECK_NE(ltype, sqlast::ColumnDefinition::Type::DATETIME);
+      CHECK_NE(rtype, sqlast::ColumnDefinition::Type::TEXT);
+      CHECK_NE(rtype, sqlast::ColumnDefinition::Type::DATETIME);
 
-      out_column_types.push_back(result_type);
+      // Output is INT, except if both inputs are unsigned and the op is +.
+      if (ltype == rtype && projection.getOperation() == Operation::PLUS) {
+        out_column_types.push_back(ltype);
+      } else {
+        out_column_types.push_back(sqlast::ColumnDefinition::Type::INT);
+      }
     }
   }
 
@@ -270,6 +194,11 @@ void ProjectOperator::ComputeOutputSchema() {
       SchemaFactory::Create(out_column_names, out_column_types, out_keys);
 }
 
+// TODO(babman): In order to preserve the projected names, we may create a
+//               project operator that is purely an aliasing project.
+//               As optimization, we should introduce an O(1) schema swap
+//               operation into dataflow::Record, and use it here when aliasing
+//               instead of copying/reconstructing the record.
 std::vector<Record> ProjectOperator::Process(NodeIndex source,
                                              std::vector<Record> &&records,
                                              const Promise &promise) {
@@ -282,7 +211,7 @@ std::vector<Record> ProjectOperator::Process(NodeIndex source,
 
       if (projection.column()) {
         // Project an existing column.
-        ColumnID column = projection.getColumn();
+        ColumnID column = projection.getLeftColumn();
         if (record.IsNull(column)) {
           out_record.SetNull(true, i);
           continue;
@@ -312,13 +241,17 @@ std::vector<Record> ProjectOperator::Process(NodeIndex source,
 
       } else if (projection.literal()) {
         // Project a literal.
-        Record::DataVariant literal = projection.getLiteral();
+        const sqlast::Value &literal = projection.getLeftLiteral();
         switch (this->output_schema_.TypeOf(i)) {
           case sqlast::ColumnDefinition::Type::UINT:
-            out_record.SetUInt(std::get<uint64_t>(literal), i);
+            out_record.SetUInt(literal.GetUInt(), i);
             break;
           case sqlast::ColumnDefinition::Type::INT:
-            out_record.SetInt(std::get<int64_t>(literal), i);
+            out_record.SetInt(literal.GetInt(), i);
+            break;
+          case sqlast::ColumnDefinition::Type::TEXT:
+            out_record.SetString(
+                std::make_unique<std::string>(literal.GetString()), i);
             break;
           default:
             LOG(FATAL) << "Unsupported literal type in project";
@@ -343,14 +276,14 @@ std::vector<Record> ProjectOperator::Process(NodeIndex source,
 
         } else if (projection.left_column()) {
           ColumnID left = projection.getLeftColumn();
-          Record::DataVariant right = projection.getRightLiteral();
+          const sqlast::Value &right = projection.getRightLiteral();
           switch (projection.getOperation()) {
             case Operation::MINUS: {
-              LEFT_ARITHMETIC_WITH_LITERAL_MACRO(-)
+              ARITHMETIC_WITH_RIGHT_LITERAL_MACRO(-)
               break;
             }
             case Operation::PLUS: {
-              LEFT_ARITHMETIC_WITH_LITERAL_MACRO(+)
+              ARITHMETIC_WITH_RIGHT_LITERAL_MACRO(+)
               break;
             }
             default:
@@ -358,15 +291,15 @@ std::vector<Record> ProjectOperator::Process(NodeIndex source,
           }
 
         } else {
-          Record::DataVariant left = projection.getLeftLiteral();
+          const sqlast::Value &left = projection.getLeftLiteral();
           ColumnID right = projection.getRightColumn();
           switch (projection.getOperation()) {
             case Operation::MINUS: {
-              RIGHT_ARITHMETIC_WITH_LITERAL_MACRO(-)
+              ARITHMETIC_WITH_LEFT_LITERAL_MACRO(-)
               break;
             }
             case Operation::PLUS: {
-              RIGHT_ARITHMETIC_WITH_LITERAL_MACRO(+)
+              ARITHMETIC_WITH_LEFT_LITERAL_MACRO(+)
               break;
             }
             default:

@@ -1,32 +1,96 @@
 // Creation and management of dataflows.
 #include "pelton/shards/sqlengine/view.h"
 
-#include <cstring>
 #include <iterator>
-#include <list>
 #include <memory>
 #include <optional>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "glog/logging.h"
+#include "pelton/dataflow/future.h"
+#include "pelton/dataflow/graph.h"
+#include "pelton/dataflow/graph_partition.h"
 #include "pelton/dataflow/key.h"
+#include "pelton/dataflow/operator.h"
+#include "pelton/dataflow/ops/forward_view.h"
+#include "pelton/dataflow/ops/matview.h"
 #include "pelton/dataflow/record.h"
-#include "pelton/dataflow/value.h"
+#include "pelton/dataflow/schema.h"
+#include "pelton/dataflow/state.h"
 #include "pelton/planner/planner.h"
-#include "pelton/shards/sqlengine/select.h"
-#include "pelton/util/status.h"
+#include "pelton/sql/abstract_connection.h"
 
 namespace pelton {
 namespace shards {
 namespace sqlengine {
 namespace view {
 
+/*
+ * View creation.
+ */
+
+absl::StatusOr<sql::SqlResult> CreateView(const sqlast::CreateView &stmt,
+                                          Connection *connection,
+                                          util::UniqueLock *lock) {
+  dataflow::DataFlowState &dataflow_state = connection->state->DataflowState();
+  sql::AbstractConnection *db = connection->state->Database();
+
+  // Plan the query using calcite and generate a concrete graph for it.
+  std::unique_ptr<dataflow::DataFlowGraphPartition> graph =
+      planner::PlanGraph(&dataflow_state, stmt.query());
+
+  // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
+  std::string flow_name = stmt.view_name();
+  dataflow_state.AddFlow(flow_name, std::move(graph));
+
+  // Update new View with existing data in tables.
+  std::vector<std::pair<std::string, std::vector<dataflow::Record>>> data;
+
+  // Iterate through each table in the new View's flow.
+  dataflow::Future future(true);
+  for (const auto &table_name : dataflow_state.GetFlow(flow_name).Inputs()) {
+    // Generate and execute select * query for current table
+    sql::SqlResultSet result = db->GetAll(table_name);
+
+    // Vectorize and store records.
+    std::vector<pelton::dataflow::Record> records = std::move(result.Vec());
+
+    // Records will be negative here, need to turn them to positive records.
+    for (auto &record : records) {
+      record.SetPositive(true);
+    }
+
+    dataflow_state.ProcessRecordsByFlowName(
+        flow_name, table_name, std::move(records), future.GetPromise());
+  }
+
+  // Populate nested view upon creation.
+  for (size_t p = 0; p < dataflow_state.workers(); p++) {
+    pelton::dataflow::DataFlowGraphPartition *partition =
+        dataflow_state.GetFlow(flow_name).GetPartition(p);
+    for (auto *forward : partition->forwards()) {
+      dataflow::Operator *node = forward->parents().at(0);
+      dataflow::MatViewOperator *parent =
+          reinterpret_cast<dataflow::MatViewOperator *>(node);
+      forward->ProcessAndForward(parent->index(), parent->All(),
+                                 future.GetPromise());
+    }
+  }
+
+  future.Wait();
+
+  return sql::SqlResult(true);
+}
+
+/*
+ * View querying.
+ */
+
 namespace {
 
-using Constraint = std::vector<std::pair<size_t, std::string>>;
+using Constraint = std::vector<std::pair<size_t, sqlast::Value>>;
 
 bool SetEqual(const std::vector<uint32_t> &cols, const Constraint &constraint) {
   for (const auto &[col1, _] : constraint) {
@@ -78,36 +142,26 @@ std::vector<dataflow::Record> LookupRecords(const dataflow::DataFlowGraph &flow,
 }
 
 // Constructing a comparator record from values.
-dataflow::Record MakeRecord(const Constraint &constraint,
+dataflow::Record MakeRecord(Constraint *constraint,
                             const dataflow::SchemaRef &schema) {
   dataflow::Record record{schema, true};
-  for (const auto &[index, value] : constraint) {
+  for (auto &[index, value] : *constraint) {
+    value.ConvertTo(schema.TypeOf(index));
     record.SetValue(value, index);
   }
   return record;
 }
 // Constructing keys from values.
-dataflow::Key MakeKey(const Constraint &constraint,
+dataflow::Key MakeKey(Constraint *constraint,
                       const std::vector<uint32_t> &key_cols,
                       const dataflow::SchemaRef &schema) {
   dataflow::Key key(key_cols.size());
-  for (const auto &[index, value] : constraint) {
-    if (value == "NULL") {
-      key.AddNull(schema.TypeOf(index));
-    } else {
-      switch (schema.TypeOf(index)) {
-        case sqlast::ColumnDefinition::Type::UINT:
-          key.AddValue(static_cast<uint64_t>(std::stoull(value)));
-          break;
-        case sqlast::ColumnDefinition::Type::INT:
-          key.AddValue(static_cast<int64_t>(std::stoll(value)));
-          break;
-        case sqlast::ColumnDefinition::Type::TEXT:
-        case sqlast::ColumnDefinition::Type::DATETIME:
-          key.AddValue(dataflow::Value::Dequote(value));
-          break;
-        default:
-          LOG(FATAL) << "Unsupported type in view read";
+  for (uint32_t column_id : key_cols) {
+    for (auto &[index, value] : *constraint) {
+      if (index == column_id) {
+        value.ConvertTo(schema.TypeOf(index));
+        key.AddValue(value);
+        break;
       }
     }
   }
@@ -154,7 +208,7 @@ Constraint FindGreaterThanConstraints(const dataflow::DataFlowGraph &flow,
       }
       const auto &column = ExtractColumnFromConstraint(expr)->column();
       size_t col = flow.output_schema().IndexOf(column);
-      const std::string &val = ExtractLiteralFromConstraint(expr)->value();
+      const sqlast::Value &val = ExtractLiteralFromConstraint(expr)->value();
       result.emplace_back(col, val);
       break;
     }
@@ -190,7 +244,7 @@ std::vector<Constraint> FindEqualityConstraints(
     case sqlast::Expression::Type::EQ: {
       const auto &column = ExtractColumnFromConstraint(expr)->column();
       size_t col = flow.output_schema().IndexOf(column);
-      const std::string &val = ExtractLiteralFromConstraint(expr)->value();
+      const sqlast::Value &val = ExtractLiteralFromConstraint(expr)->value();
       result.push_back({std::make_pair(col, val)});
       break;
     }
@@ -200,7 +254,7 @@ std::vector<Constraint> FindEqualityConstraints(
       size_t col = flow.output_schema().IndexOf(column);
       auto l =
           static_cast<const sqlast::LiteralListExpression *>(expr->GetRight());
-      for (const std::string &val : l->values()) {
+      for (const sqlast::Value &val : l->values()) {
         result.push_back({std::make_pair(col, val)});
       }
       break;
@@ -250,17 +304,18 @@ LookupCondition ConstraintKeys(const dataflow::DataFlowGraph &flow,
   Constraint greater = FindGreaterThanConstraints(flow, where);
   if (greater.size() > 0) {
     if (SetEqual(key_cols, greater)) {
-      condition.greater_key = MakeKey(greater, key_cols, schema);
+      condition.greater_key = MakeKey(&greater, key_cols, schema);
     } else {
-      condition.greater_record = MakeRecord(greater, schema);
+      condition.greater_record = MakeRecord(&greater, schema);
     }
   }
 
   std::vector<Constraint> equality = FindEqualityConstraints(flow, where);
   if (equality.size() > 0) {
     condition.equality_keys = std::vector<dataflow::Key>();
-    for (const Constraint &constraint : equality) {
-      condition.equality_keys->push_back(MakeKey(constraint, key_cols, schema));
+    for (Constraint &constraint : equality) {
+      condition.equality_keys->push_back(
+          MakeKey(&constraint, key_cols, schema));
     }
   }
 
@@ -274,58 +329,14 @@ LookupCondition ConstraintKeys(const dataflow::DataFlowGraph &flow,
 
 }  // namespace
 
-absl::Status CreateView(const sqlast::CreateView &stmt, Connection *connection,
-                        UniqueLock *lock) {
-  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
-
-  // Plan the query using calcite and generate a concrete graph for it.
-  std::unique_ptr<dataflow::DataFlowGraphPartition> graph =
-      planner::PlanGraph(dataflow_state, stmt.query());
-
-  // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
-  std::string flow_name = stmt.view_name();
-  dataflow_state->AddFlow(flow_name, std::move(graph));
-
-  // Update new View with existing data in tables.
-  std::vector<std::pair<std::string, std::vector<dataflow::Record>>> data;
-
-  // Iterate through each table in the new View's flow.
-  dataflow::Future future(true);
-  for (const auto &table_name : dataflow_state->GetFlow(flow_name).Inputs()) {
-    // Generate and execute select * query for current table
-    pelton::sqlast::Select select{table_name};
-    select.AddColumn("*");
-    MOVE_OR_RETURN(sql::SqlResult result,
-                   select::Shard(select, connection, false));
-
-    // Vectorize and store records.
-    std::vector<pelton::dataflow::Record> records =
-        result.ResultSets().at(0).Vec();
-
-    // Records will be negative here, need to turn them to positive records.
-    for (auto &record : records) {
-      record.SetPositive(true);
-    }
-
-    dataflow_state->ProcessRecordsByFlowName(
-        flow_name, table_name, std::move(records), future.GetPromise());
-  }
-  future.Wait();
-
-  return absl::OkStatus();
-}
-
 absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
-                                          Connection *connection) {
-  sqlast::ListCountVisitor listcount;
-  std::string count = std::to_string(listcount.Visit(&stmt));
-  SharderState *state = connection->state->sharder_state();
-  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
-  SharedLock lock = state->ReaderLock();
+                                          Connection *connection,
+                                          util::SharedLock *lock) {
+  const dataflow::DataFlowState &dstate = connection->state->DataflowState();
 
   // Get the corresponding flow.
   const std::string &view_name = stmt.table_name();
-  const dataflow::DataFlowGraph &flow = dataflow_state->GetFlow(view_name);
+  const dataflow::DataFlowGraph &flow = dstate.GetFlow(view_name);
 
   // Transform WHERE statement to conditions on matview keys.
   LookupCondition condition = ConstraintKeys(flow, stmt.GetWhereClause());

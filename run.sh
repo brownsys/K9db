@@ -6,10 +6,12 @@ if [[ "$1" == "dbg" ]]; then
   RUST_BACKTRACE=1 bazel run //:pelton -- --logtostderr=1 "${@:2}"
 
 elif [[ "$1" == "opt" ]]; then
+  rm -rf /mnt/disks/my-ssd/pelton/
+  mkdir -p /mnt/disks/my-ssd/pelton/
   bazel run //:pelton --config opt -- "${@:2}"
 
 elif [[ "$1" == "valgrind" ]]; then
-  bazel run --run_under "valgrind --error-exitcode=1 --errors-for-leak-kinds=definite --leak-check=full --show-leak-kinds=definite" //:pelton
+  bazel run //:pelton --config valgrind -- --logtostderr=1 "${@:2}"
 
 elif [[ "$1" == "asan" ]]; then
   LSAN_OPTIONS=suppressions=/home/bab/Documents/research/pelton/.lsan_jvm_suppress.txt \

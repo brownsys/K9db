@@ -1,14 +1,14 @@
 SET echo;
 
-CREATE TABLE students ( \
+CREATE DATA_SUBJECT TABLE students ( \
   ID int, \
-  PII_Name text, \
+  name text, \
   PRIMARY KEY(ID) \
 );
 
-CREATE TABLE assignments ( \
+CREATE DATA_SUBJECT TABLE assignments ( \
   ID int, \
-  Name text, \
+  name text, \
   PRIMARY KEY(ID) \
 );
 

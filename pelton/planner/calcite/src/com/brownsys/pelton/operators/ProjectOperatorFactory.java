@@ -5,6 +5,7 @@ import com.brownsys.pelton.nativelib.DataFlowGraphLibrary;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
@@ -48,6 +49,22 @@ public class ProjectOperatorFactory {
       }
     }
 
+    return false;
+  }
+
+  // Only called if this.isIdentity(project) returns true.
+  public boolean hasAliases(LogicalProject project) {
+    List<Pair<RexNode, String>> namedProjections = project.getNamedProjects();
+    // Look at the type of each parent, check if the input field names are
+    // identical to the projected name.
+    for (RelNode parent : project.getInputs()) {
+      List<String> names = parent.getRowType().getFieldNames();
+      for (int i = 0; i < namedProjections.size(); i++) {
+        if (!namedProjections.get(i).getValue().equals(names.get(i))) {
+          return true;
+        }
+      }
+    }
     return false;
   }
 
@@ -130,6 +147,12 @@ public class ProjectOperatorFactory {
             .getGenerator()
             .AddProjectionLiteralInt(projectOperator, name, RexLiteral.intValue(literal));
         break;
+      case VARCHAR:
+      case CHAR:
+        this.context
+            .getGenerator()
+            .AddProjectionLiteralString(projectOperator, name, RexLiteral.stringValue(literal));
+        break;
       default:
         throw new IllegalArgumentException("Unsupported value type in literal projection");
     }
@@ -174,7 +197,7 @@ public class ProjectOperatorFactory {
     this.context
         .getGenerator()
         .AddProjectionArithmeticColumns(
-            projectOperator, name, leftSourcePeltonId, rightSourcePeltonId, arithmeticEnum);
+            projectOperator, name, arithmeticEnum, leftSourcePeltonId, rightSourcePeltonId);
   }
 
   private void addArithmeticProjectionLiteral(
@@ -188,12 +211,12 @@ public class ProjectOperatorFactory {
         this.calciteToPeltonTarget.put(this.targetCalciteIndex, targetPeltonIndex);
         this.context
             .getGenerator()
-            .AddProjectionArithmeticLiteralLeft(
+            .AddProjectionArithmeticLiteralRight(
                 projectOperator,
                 name,
+                arithmeticEnum,
                 leftSourcePeltonId,
-                RexLiteral.intValue(right),
-                arithmeticEnum);
+                RexLiteral.intValue(right));
         break;
       default:
         throw new IllegalArgumentException("Unsupported value type in literal projection");
@@ -211,12 +234,12 @@ public class ProjectOperatorFactory {
         this.calciteToPeltonTarget.put(this.targetCalciteIndex, targetPeltonIndex);
         this.context
             .getGenerator()
-            .AddProjectionArithmeticLiteralRight(
+            .AddProjectionArithmeticLiteralLeft(
                 projectOperator,
                 name,
+                arithmeticEnum,
                 RexLiteral.intValue(left),
-                rightSourcePeltonId,
-                arithmeticEnum);
+                rightSourcePeltonId);
         break;
       default:
         throw new IllegalArgumentException("Unsupported value type in literal projection");

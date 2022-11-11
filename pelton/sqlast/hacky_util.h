@@ -149,16 +149,16 @@ std::unique_ptr<BinaryExpression> HackyCondition(const char **ptr,
     // Value.
     std::unique_ptr<Expression> right;
     if (gt) {
-      std::string value = ExtractValue(ptr, size);
-      if (value.size() == 0) {
+      std::string val = ExtractValue(ptr, size);
+      if (val.size() == 0) {
         return nullptr;
       }
-      right = std::make_unique<LiteralExpression>(value);
+      right = std::make_unique<LiteralExpression>(Value::FromSQLString(val));
     } else if (eq || is) {
       // value or column
-      std::string value = ExtractValue(ptr, size);
-      if (value.size() > 0) {
-        right = std::make_unique<LiteralExpression>(value);
+      std::string val = ExtractValue(ptr, size);
+      if (val.size() > 0) {
+        right = std::make_unique<LiteralExpression>(Value::FromSQLString(val));
       } else {
         std::string column = ExtractIdentifier(ptr, size);
         if (column.size() == 0) {
@@ -173,13 +173,13 @@ std::unique_ptr<BinaryExpression> HackyCondition(const char **ptr,
       }
       ConsumeWhiteSpace(ptr, size);
 
-      std::vector<std::string> values;
+      std::vector<Value> values;
       while (true) {
-        std::string value = ExtractValue(ptr, size);
-        if (value.size() == 0) {
+        std::string val = ExtractValue(ptr, size);
+        if (val.size() == 0) {
           break;
         }
-        values.push_back(std::move(value));
+        values.push_back(Value::FromSQLString(val));
         ConsumeWhiteSpace(ptr, size);
         if (!StartsWith(ptr, size, ",", 1)) {
           break;

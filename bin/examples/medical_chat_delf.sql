@@ -1,29 +1,29 @@
 SET echo;
 
-CREATE TABLE doctors ( \
+CREATE DATA_SUBJECT TABLE doctors ( \
   id int, \
-  PII_name text, \
+  name text, \
   PRIMARY KEY(id) \
 );
 
-CREATE TABLE patients ( \
+CREATE DATA_SUBJECT TABLE patients ( \
   id int, \
-  PII_name text, \
+  name text, \
   PRIMARY KEY(id) \
 );
 
 CREATE TABLE chat ( \
   id int, \
-  OWNER_patient_id int, \
-  ACCESSOR_ANONYMIZE_doctor_id int, \
+  patient_id int, \
+  doctor_id int, \
   message text, \
   PRIMARY KEY(id), \
-  FOREIGN KEY (OWNER_patient_id) REFERENCES patients(id), \
-  FOREIGN KEY (ACCESSOR_ANONYMIZE_doctor_id) REFERENCES doctors(id) \
+  FOREIGN KEY (patient_id) OWNED_BY patients(id), \
+  FOREIGN KEY (doctor_id) ACCESSED_BY doctors(id) \
 );
 
 INSERT INTO doctors VALUES (1, 'Alice');
-INSERT INTO doctors(id, PII_name) VALUES (2, 'Bob');
+INSERT INTO doctors(id, name) VALUES (2, 'Bob');
 
 INSERT INTO patients VALUES (10, 'Carl');
 INSERT INTO patients VALUES (20, 'Dracula');
@@ -41,14 +41,12 @@ INSERT INTO chat VALUES (7, 40, 1, 'HELLO 2');
 INSERT INTO chat VALUES (8, 50, 1, 'HELLO 3');
 
 SELECT * FROM chat;
-SELECT * FROM chat WHERE ACCESSOR_doctor_id = 2;
-SELECT * FROM chat WHERE OWNER_patient_id = 10;
+SELECT * FROM chat WHERE doctor_id = 2;
+SELECT * FROM chat WHERE patient_id = 10;
 GDPR GET patients 10;
 GDPR GET doctors 2;
-ref_doctors0_OWNER_patient_id
 SELECT * FROM chat;
 
 -- GDPR FORGET patients 10;
 SELECT * FROM patients;
 SELECT * FROM chat;
--- SELECT * FROM ref_doctors_OWNER_patient_id;

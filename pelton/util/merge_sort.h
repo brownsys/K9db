@@ -1,4 +1,4 @@
-// Performance profiling.
+// Merging of K sorted arrays.
 #ifndef PELTON_UTIL_MERGE_SORT_H_
 #define PELTON_UTIL_MERGE_SORT_H_
 

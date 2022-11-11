@@ -40,10 +40,9 @@ static std::regex CANONICAL_PARAM_REGEX{TABLE_COLUMN_NAME OP Q};
 std::unordered_set<std::string> NO_VIEWS = {
     // PreparedTest.java.
     "SELECT * FROM tbl WHERE id = ?",
-    "SELECT * FROM tbl WHERE id = ? AND age > ?",
     // Lobsters.
     // Q1.
-    "SELECT 1 AS `one` FROM users WHERE users.PII_username = ?",
+    "SELECT 1 AS `one` FROM users WHERE users.username = ?",
     // Q2.
     "SELECT 1 AS `one`, stories.short_id FROM stories WHERE stories.short_id = "
     "?",
@@ -52,7 +51,7 @@ std::unordered_set<std::string> NO_VIEWS = {
     // Q4.
     "SELECT keystores.* FROM keystores WHERE keystores.keyX = ?",
     // Q5.
-    "SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND "
+    "SELECT votes.* FROM votes WHERE votes.user_id = ? AND "
     "votes.story_id = ? AND votes.comment_id IS NULL",
     // Q7.
     "SELECT stories.* FROM stories WHERE stories.short_id = ?",
@@ -62,7 +61,7 @@ std::unordered_set<std::string> NO_VIEWS = {
     "SELECT 1 AS `one`, comments.short_id FROM comments WHERE "
     "comments.short_id = ?",
     // Q10.
-    "SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND "
+    "SELECT votes.* FROM votes WHERE votes.user_id = ? AND "
     "votes.story_id = ? AND votes.comment_id = ?",
     // Q14.
     "SELECT comments.* FROM comments WHERE comments.story_id = ? AND "
@@ -74,7 +73,7 @@ std::unordered_set<std::string> NO_VIEWS = {
     "SELECT hidden_stories.story_id FROM hidden_stories WHERE "
     "hidden_stories.user_id = ?",
     // Q19.
-    "SELECT users.* FROM users WHERE users.PII_username = ?",
+    "SELECT users.* FROM users WHERE users.username = ?",
     // Q20.
     "SELECT hidden_stories.* FROM hidden_stories WHERE hidden_stories.user_id "
     "= ? AND hidden_stories.story_id = ?",
@@ -89,12 +88,14 @@ std::unordered_set<std::string> NO_VIEWS = {
     "SELECT 1, user_id, story_id FROM hidden_stories WHERE "
     "hidden_stories.user_id = ? AND hidden_stories.story_id = ?",
     // Q33.
-    "SELECT votes.* FROM votes WHERE votes.OWNER_user_id = ? AND "
+    "SELECT votes.* FROM votes WHERE votes.user_id = ? AND "
     "votes.comment_id = ?",
     // Q34.
     "SELECT comments.* FROM comments WHERE comments.short_id = ?",
     // GDPRBench.
-    "SELECT * FROM usertable WHERE YCSB_KEY = ?"};
+    "SELECT * FROM usertable WHERE YCSB_KEY = ?",
+    // Owncloud.
+    "SELECT * FROM file_view WHERE share_target = ?"};
 
 }  // namespace
 
@@ -263,6 +264,7 @@ std::string PopulateStatement(const PreparedStatementDescriptor &stmt,
       query.push_back(')');
     }
     // Next stem.
+    query.push_back(' ');
     query.append(stems.at(i + 1));
   }
   return query;
@@ -315,7 +317,13 @@ void FromTables(const CanonicalQuery &query,
   }
   // Look up table schema.
   std::string table_name = sm[1].str();
-  auto schema = dstate.GetTableSchema(table_name);
+  dataflow::SchemaRef schema;
+  if (dstate.HasFlow(table_name)) {
+    const auto &flow = dstate.GetFlow(table_name);
+    schema = flow.output_schema();
+  } else {
+    schema = dstate.GetTableSchema(table_name);
+  }
   // Go over all ? parameters and figure out their types.
   for (size_t i = 0; i < stmt->args_count; i++) {
     const std::string &column_name = stmt->arg_names.at(i);
@@ -331,21 +339,20 @@ void FromTables(const CanonicalQuery &query,
 absl::StatusOr<CanonicalDescriptor> MakeInsertCanonical(
     const std::string &insert, const dataflow::DataFlowState &dstate) {
   // Parse the statement using the hacky parser.
-  MOVE_OR_RETURN(std::unique_ptr<sqlast::AbstractStatement> parsed,
-                 sqlast::HackyInsert(insert.data(), insert.size()));
-  sqlast::Insert *stmt = static_cast<sqlast::Insert *>(parsed.get());
+  ASSIGN_OR_RETURN(sqlast::InsertOrReplace & components,
+                   sqlast::HackyInsertOrReplace(insert.data(), insert.size()));
   // Find table schema.
-  auto schema = dstate.GetTableSchema(stmt->table_name());
+  auto schema = dstate.GetTableSchema(components.table_name);
   // Begin constructing the descriptor.
   CanonicalDescriptor descriptor;
   descriptor.canonical_query = insert;
   descriptor.args_count = 0;
   // Build initial stem.
-  std::string stem = stmt->replace() ? "REPLACE " : "INSERT ";
-  stem += "INTO " + stmt->table_name();
-  if (stmt->HasColumns()) {
+  std::string stem = components.replace ? "REPLACE " : "INSERT ";
+  stem += "INTO " + components.table_name;
+  if (components.columns.size() > 0) {
     stem.push_back('(');
-    for (const std::string &column : stmt->GetColumns()) {
+    for (const std::string &column : components.columns) {
       stem += column + ", ";
     }
     stem.pop_back();
@@ -354,25 +361,25 @@ absl::StatusOr<CanonicalDescriptor> MakeInsertCanonical(
   }
   stem += " VALUES (";
   // Go over the values.
-  const std::vector<std::string> &values = stmt->GetValues();
-  for (size_t i = 0; i < values.size(); i++) {
-    if (values.at(i) != "?") {
+  for (size_t i = 0; i < components.values.size(); i++) {
+    const std::string &value = components.values.at(i);
+    if (value != "?") {
       // Not a ? arg, append it to stem.
-      stem += values.at(i) + (i < values.size() - 1 ? ", " : ");");
+      stem += value + (i < components.values.size() - 1 ? ", " : ");");
       continue;
     } else {
       // Is a ? arg, need to add it to the descriptor.
       descriptor.args_count++;
       descriptor.stems.push_back(std::move(stem));
-      stem = i < values.size() - 1 ? ", " : ");";
+      stem = i < components.values.size() - 1 ? "," : ");";
       // Population for insert is simpler, need only to insert , between values.
       descriptor.arg_tables.push_back("");
       descriptor.arg_names.push_back("");
       descriptor.arg_ops.push_back("");
       // Get type of argument.
       sqlast::ColumnDefinition::Type type;
-      if (stmt->HasColumns()) {
-        const std::string &column_name = stmt->GetColumns().at(i);
+      if (components.columns.size() > 0) {
+        const std::string &column_name = components.columns.at(i);
         type = schema.TypeOf(schema.IndexOf(column_name));
       } else {
         type = schema.TypeOf(i);

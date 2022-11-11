@@ -1,263 +1,214 @@
-// Delete statements sharding and rewriting.
-
+// DELETE statements sharding and rewriting.
 #include "pelton/shards/sqlengine/delete.h"
 
 #include <memory>
-#include <string>
-#include <unordered_set>
-#include <utility>
-#include <vector>
 
-#include "absl/strings/str_cat.h"
-#include "pelton/shards/sqlengine/index.h"
+#include "pelton/dataflow/record.h"
 #include "pelton/shards/sqlengine/util.h"
+#include "pelton/util/iterator.h"
+#include "pelton/util/shard_name.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
 namespace shards {
 namespace sqlengine {
-namespace delete_ {
 
-namespace {
+#define __ACCUM_VAR_NAME(arg) __ACCUM_STATUS##arg
+#define __ACCUM_VAL(arg) __ACCUM_VAR_NAME(arg)
+#define ACCUM(expr, acc)                                       \
+  auto __ACCUM_VAL(__LINE__) = expr;                           \
+  if (__ACCUM_VAL(__LINE__) < 0) return __ACCUM_VAL(__LINE__); \
+  acc += __ACCUM_VAL(__LINE__)
+#define ACCUM_STATUS(expr, acc)                                \
+  ASSIGN_OR_RETURN(auto __ACCUM_VAL(__LINE__), expr);          \
+  if (__ACCUM_VAL(__LINE__) < 0) return __ACCUM_VAL(__LINE__); \
+  acc += __ACCUM_VAL(__LINE__)
 
-sql::SqlResult HandleOWNINGColumn(const UnshardedTableName &table_name,
-                                  const UnshardedTableName &sharded_table_name,
-                                  const std::string &user_id,
-                                  const std::string &shard_kind,
-                                  const dataflow::Record &delete_result,
-                                  Connection *connection) {
-  const auto &state = *connection->state->sharder_state();
-  auto &exec = connection->executor;
-  const auto &dataflow_state = *connection->state->dataflow_state();
+/*
+ * Delete dependent records from the shard.
+ */
+template <typename Iterable>
+absl::StatusOr<int> DeleteContext::DeleteDependents(
+    const Table &table, const util::ShardName &shard_name, Iterable &&records) {
+  int result = 0;
+  // The insert into this table may affect the sharding of data in dependent
+  // tables. Figure this out.
+  for (const auto &[next_table, desc] : table.dependents) {
+    bool direct = false;
+    const Table &next = this->sstate_.GetTable(next_table);
+    if (desc->shard_kind != shard_name.ShardKind()) {
+      continue;
+    }
 
-  sql::SqlResult result(static_cast<int>(0));
-  for (const auto &col : state.GetSchema(table_name).GetColumns()) {
-    if (IsOwning(col)) {
-      const sqlast::ColumnConstraint *fk_constr;
-      for (const auto &constr : col.GetConstraints()) {
-        if (constr.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY) {
-          fk_constr = &constr;
-        }
+    size_t colidx;
+    size_t nextidx;
+    switch (desc->type) {
+      case InfoType::VARIABLE: {
+        // Dependent tables for which this table acts as the variable ownership
+        // association table can have their data affected by this insert.
+        const VariableInfo &info = std::get<VariableInfo>(desc->info);
+
+        // Get the corresponding FK columns in this table and dependent table.
+        colidx = info.origin_column_index;
+        nextidx = info.column_index;
+        ASSERT_RET(nextidx == next.schema.keys().at(0), Internal,
+                   "Variable OWNS FK points to nonPK");
+        break;
       }
-      if (!fk_constr) {
-        LOG(FATAL) << "Expected foreign key constraint";
+      case InfoType::TRANSITIVE: {
+        // Similar but for transitive dependencies.
+        const TransitiveInfo &info = std::get<TransitiveInfo>(desc->info);
+
+        // Get the corresponding FK columns in this table and dependent table.
+        colidx = info.next_column_index;
+        nextidx = info.column_index;
+        ASSERT_RET(colidx == table.schema.keys().at(0), Internal,
+                   "Transitive OWNER points to nonPK");
+        break;
       }
-      const auto &foreign_table = fk_constr->foreign_table();
-      const auto &infos =
-          state.GetShardingInformationFor(foreign_table, shard_kind);
-      dataflow::SchemaRef schema = dataflow_state.GetTableSchema(foreign_table);
-      for (const auto info : infos) {
-        if (info->next_table != table_name) {
-          continue;
+      case InfoType::DIRECT: {
+        const DirectInfo &info = std::get<DirectInfo>(desc->info);
+        colidx = info.next_column_index;
+        nextidx = info.column_index;
+        ASSERT_RET(desc->shard_kind == table.table_name, Internal,
+                   "Direct but to a different shard kind");
+        direct = true;
+        break;
+      }
+    }
+
+    // The value of the column that is a foreign key.
+    std::vector<sql::KeyPair> vals;
+    std::unordered_set<std::string> duplicates;
+    for (const dataflow::Record &record : records) {
+      std::string fkstr = record.GetValue(colidx).AsUnquotedString();
+      if (duplicates.insert(std::move(fkstr)).second) {
+        vals.emplace_back(shard_name.Copy(), record.GetValue(colidx));
+      }
+    }
+
+    // We want to delete next[nextidx] if they are no longer owned by this
+    // user due to deletion.
+    std::vector<dataflow::Record> rm;
+    std::vector<bool> def;
+
+    // Get records.
+    std::vector<dataflow::Record> next_records =
+        this->db_->GetDirect(next_table, nextidx, vals);
+    ASSERT_RET(!direct || next_records.size() == 0, Internal,
+               "Cannot delete data subject with data. use GDPR FORGET");
+
+    // Find whether or not they are owned by this user.
+    std::vector<ShardLocation> locations =
+        Locate(next_table, shard_name, next_records, this->conn_, this->lock_);
+    size_t pk = next.schema.keys().front();
+    std::unordered_set<std::string> &moved_set = this->moved_[next_table];
+    for (size_t i = 0; i < next_records.size(); i++) {
+      switch (locations.at(i)) {
+        case ShardLocation::IN_GIVEN_SHARD:
+          break;
+        case ShardLocation::NOT_IN_GIVEN_SHARD: {
+          rm.push_back(std::move(next_records.at(i)));
+          def.push_back(false);
+          break;
         }
-        const auto &key =
-            delete_result
-                .GetValue(delete_result.schema().IndexOf(col.column_name()))
-                .GetSqlString();
-        const auto index_lookup_res_s = index::RecordStatusForUser(
-            info->next_index_name, key, user_id, connection);
-
-        if (!index_lookup_res_s.ok()) {
-          LOG(WARNING) << index_lookup_res_s.status();
-          continue;
-        }
-        index::RecordStatus index_lookup_res = index_lookup_res_s.value();
-        if (index_lookup_res == index::RecordStatus::MISSING ||
-            index_lookup_res == index::RecordStatus::MULTI_COPY)
-          continue;
-        bool needs_move_to_default_db =
-            index_lookup_res == index::RecordStatus::OWNS_LAST_COPY;
-
-        auto where = std::make_unique<sqlast::BinaryExpression>(
-            sqlast::Expression::Type::EQ);
-        where->SetLeft(std::make_unique<sqlast::ColumnExpression>(
-            fk_constr->foreign_column()));
-        where->SetRight(std::make_unique<sqlast::LiteralExpression>(key));
-
-        sqlast::Delete del(info->sharded_table_name, needs_move_to_default_db);
-        del.SetWhereClause(std::move(where));
-
-        auto move_delete_result = exec.Shard(&del, user_id, schema);
-        if (needs_move_to_default_db) {
-          CHECK_EQ(move_delete_result.ResultSets().size(), 1);
-          std::vector<dataflow::Record> move_delete_result_vec =
-              move_delete_result.ResultSets().front().Vec();
-          CHECK_EQ(move_delete_result_vec.size(), 1);
-          const dataflow::Record &rec = move_delete_result_vec.front();
-          sqlast::Insert insert(foreign_table, false);
-          CHECK_GT(rec.schema().size(), 0);
-          for (uint64_t i = 0; i < rec.schema().size(); i++) {
-            insert.AddValue(rec.GetValue(i).GetSqlString());
-          }
-          exec.Default(&insert);
-        } else {
-          result.Append(std::move(move_delete_result), true);
+        case ShardLocation::NO_SHARD: {
+          dataflow::Record &record = next_records.at(i);
+          std::string pkstr = record.GetValue(pk).AsUnquotedString();
+          def.push_back(moved_set.insert(std::move(pkstr)).second);
+          rm.push_back(std::move(record));
+          break;
         }
       }
     }
+    if (rm.size() == 0) {
+      continue;
+    }
+
+    // Delete appropriate records, and move free floating ones to default shard.
+    ACCUM(this->db_->DeleteFromShard(next_table, shard_name, rm, def), result);
+
+    // Continue recursively.
+    ACCUM_STATUS(this->DeleteDependents(next, shard_name, util::Iterable(&rm)),
+                 result);
   }
+
   return result;
 }
 
-}  // namespace
+/*
+ * Main entry point for delete: Executes the statement against the shards.
+ */
+absl::StatusOr<sql::SqlResult> DeleteContext::Exec() {
+  // Make sure table exists in the schema first.
+  ASSERT_RET(this->sstate_.TableExists(this->table_name_), InvalidArgument,
+             "Table does not exist");
 
-absl::StatusOr<sql::SqlResult> Shard(const sqlast::Delete &stmt,
-                                     Connection *connection, bool synchronize,
-                                     bool update_flows) {
-  const std::string &table_name = stmt.table_name();
-  LOG(INFO) << "Delete statement started";
+  // Execute the delete in the DB.
+  sql::SqlDeleteSet result = this->db_->ExecuteDelete(this->stmt_);
 
-  // We only read from state.
-  shards::SharderState *state = connection->state->sharder_state();
-  dataflow::DataFlowState *dataflow_state = connection->state->dataflow_state();
-
-  std::vector<dataflow::Record> records;
-
-  SharedLock lock;
-  if (synchronize) {
-    lock = state->ReaderLock();
-  }
-
-  // If no flows read from this table, we do not need to do anything
-  // to update them.
-  if (!dataflow_state->HasFlowsFor(table_name)) {
-    update_flows = false;
-  }
-
-  // Get the rows that are going to be deleted prior to deletion to use them
-  // to update the dataflows.
-  dataflow::SchemaRef schema = dataflow_state->GetTableSchema(table_name);
-
-  // Must transform the delete statement into one that is compatible with
-  // the sharded schema.
-  sql::SqlResult result(static_cast<int>(0));
-
-  // Sharding scenarios.
-  auto &exec = connection->executor;
-  bool is_sharded = state->IsSharded(table_name);
-  if (is_sharded) {  // is_shared == true
-    // Case 3: Table is sharded!
-    // The table might be sharded according to different column/owners.
-    // We must delete from all these different duplicates.
-    for (const auto &info : state->GetShardingInformation(table_name)) {
-      // Rename the table to match the sharded name.
-      sqlast::Delete cloned = stmt.MakeReturning();
-      cloned.table_name() = info.sharded_table_name;
-
-      // Figure out if we need to augment the (returning) result set with the
-      // shard_by column.
-      const std::string &shard_kind = info.shard_kind;
-      int aug_index = -1;
-      if (!info.IsTransitive()) {
-        aug_index = info.shard_by_index;
-      }
-
-      // Find the value assigned to shard_by column in the where clause, and
-      // remove it from the where clause.
-      sqlast::ValueFinder value_finder(info.shard_by);
-      auto [found, user_id] = cloned.Visit(&value_finder);
-      if (found) {
-        if (info.IsTransitive()) {
-          // Transitive sharding: look up via index.
-          ASSIGN_OR_RETURN(
-              auto &lookup,
-              index::LookupIndex(info.next_index_name, user_id, connection));
-          for (auto &uid : lookup) {
-            // Execute statement directly against shard.
-            auto res = exec.Shard(&cloned, uid, schema, aug_index);
-            CHECK_EQ(res.ResultSets().size(), 1);
-            auto these_records = res.ResultSets().front().Vec();
-            result.Append(sql::SqlResult(these_records.size()), true);
-            for (auto &rec : these_records) {
-              result.Append(
-                  HandleOWNINGColumn(table_name, info.sharded_table_name, uid,
-                                     shard_kind, rec, connection),
-                  true);
-              records.push_back(std::move(rec));
-            }
-          }
-        } else if (state->ShardExists(info.shard_kind, user_id)) {
-          // Remove where condition on the shard by column, since it does not
-          // exist in the sharded table.
-          sqlast::ExpressionRemover expression_remover(info.shard_by);
-          cloned.Visit(&expression_remover);
-          // Execute statement directly against shard.
-          auto res = exec.Shard(&cloned, user_id, schema, aug_index);
-          CHECK_EQ(res.ResultSets().size(), 1);
-          auto these_records = res.ResultSets().front().Vec();
-          result.Append(sql::SqlResult(these_records.size()), true);
-          for (auto &rec : these_records) {
-            result.Append(
-                HandleOWNINGColumn(table_name, info.sharded_table_name, user_id,
-                                   shard_kind, rec, connection),
-                true);
-            records.push_back(std::move(rec));
-          }
-        }
-
-      } else {
-        // The delete statement by itself does not obviously constraint a
-        // shard. Try finding the shard(s) via secondary indices.
-        ASSIGN_OR_RETURN(const auto &pair,
-                         index::LookupIndex(table_name, info.shard_by,
-                                            stmt.GetWhereClause(), connection));
-        if (pair.first) {
-          // Secondary index available for some constrainted column in stmt.
-          auto res = exec.Shards(&cloned, pair.second, schema, aug_index);
-          CHECK_EQ(res.ResultSets().size(), 1);
-          auto these_records = res.ResultSets().front().Vec();
-          result.Append(sql::SqlResult(these_records.size()), true);
-          for (auto &rec : these_records) {
-            result.Append(
-                HandleOWNINGColumn(table_name, info.sharded_table_name, user_id,
-                                   shard_kind, rec, connection),
-                true);
-            records.push_back(std::move(rec));
-          }
-        } else {
-          // Secondary index unhelpful.
-          // Execute statement against all shards of this kind.
-          const auto &user_ids = state->UsersOfShard(shard_kind);
-          auto res = exec.Shards(&cloned, user_ids, schema, aug_index);
-          if (user_ids.size() > 0) {
-            LOG(WARNING) << "Perf Warning: Delete over all shards " << stmt;
-          }
-          CHECK_EQ(res.ResultSets().size(), 1);
-          auto these_records = res.ResultSets().front().Vec();
-          result.Append(sql::SqlResult(these_records.size()), true);
-          for (auto &rec : these_records) {
-            auto id = rec.GetValueString(rec.schema().IndexOf(info.shard_by));
-            result.Append(
-                HandleOWNINGColumn(table_name, info.sharded_table_name, id,
-                                   shard_kind, rec, connection),
-                true);
-            records.push_back(std::move(rec));
-          }
-        }
-      }
-    }
+  // Update dataflow.
+  std::vector<dataflow::Record> updates;
+  if (this->table_.dependents.size() == 0) {
+    updates = result.Vec();
   } else {
-    // Case 2: Table is not sharded.
-    if (update_flows) {
-      sqlast::Delete cloned = stmt.MakeReturning();
-      auto res = exec.Default(&cloned, schema);
-      CHECK_EQ(res.ResultSets().size(), 1);
-      records = res.ResultSets().front().Vec();
-      result.Append(sql::SqlResult(records.size()), true);
-    } else {
-      result = exec.Default(&stmt);
+    updates.reserve(result.Rows().size());
+    for (const dataflow::Record &record : result.Rows()) {
+      updates.push_back(record.Copy());
     }
   }
+  this->dstate_.ProcessRecords(this->table_name_, std::move(updates));
 
-  // Delete was successful, time to update dataflows.
-  if (update_flows) {
-    dataflow_state->ProcessRecords(table_name, std::move(records));
+  // Recursively remove dependent records in dependent tables from the shard
+  // when needed.
+  int total_count = result.Count();
+  for (const util::ShardName &shard : result.IterateShards()) {
+    ASSIGN_OR_RETURN(int status, this->DeleteDependents(this->table_, shard,
+                                                        result.Iterate(shard)));
+    if (status < 0) {
+      return sql::SqlResult(status);
+    }
+    total_count += status;
   }
 
-  return result;
+  // Return number of copies inserted.
+  return sql::SqlResult(total_count);
 }
 
-}  // namespace delete_
+// Similar to exec but returns deleted records.
+absl::StatusOr<std::pair<std::vector<dataflow::Record>, int>>
+DeleteContext::ExecReturning() {
+  // Make sure table exists in the schema first.
+  ASSERT_RET(this->sstate_.TableExists(this->table_name_), InvalidArgument,
+             "Table does not exist");
+
+  // Execute the delete in the DB.
+  sql::SqlDeleteSet result = this->db_->ExecuteDelete(this->stmt_);
+
+  // Update dataflow.
+  std::vector<dataflow::Record> updates;
+  updates.reserve(result.Rows().size());
+  for (const dataflow::Record &record : result.Rows()) {
+    updates.push_back(record.Copy());
+  }
+  this->dstate_.ProcessRecords(this->table_name_, std::move(updates));
+
+  // Recursively remove dependent records in dependent tables from the shard
+  // when needed.
+  int total_count = result.Count();
+  for (const util::ShardName &shard : result.IterateShards()) {
+    ASSIGN_OR_RETURN(int status, this->DeleteDependents(this->table_, shard,
+                                                        result.Iterate(shard)));
+    if (status < 0) {
+      return std::pair(std::vector<dataflow::Record>(), status);
+    }
+    total_count += status;
+  }
+
+  // Return number of copies inserted.
+  return std::pair(result.Vec(), total_count);
+}
+
 }  // namespace sqlengine
 }  // namespace shards
 }  // namespace pelton

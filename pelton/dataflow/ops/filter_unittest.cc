@@ -40,10 +40,13 @@ TEST(FilterOperatorTest, SingleAccept) {
   FilterOperator filter1;
   FilterOperator filter2;
   FilterOperator filter3;
-  filter1.AddOperation(5_u, 0, FilterOperator::Operation::LESS_THAN);
-  filter2.AddOperation("Hello!", 1, FilterOperator::Operation::EQUAL);
-  filter3.AddOperation(7_s, 2,
-                       FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
+  filter1.input_schemas_.push_back(schema);
+  filter2.input_schemas_.push_back(schema);
+  filter3.input_schemas_.push_back(schema);
+  filter1.AddLiteralOperation(0, 5_u, FilterOperator::Operation::LESS_THAN);
+  filter2.AddLiteralOperation(1, "Hello!", FilterOperator::Operation::EQUAL);
+  filter3.AddLiteralOperation(2, 7_s,
+                              FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
 
   // Create some records.
   std::vector<Record> records;
@@ -77,9 +80,11 @@ TEST(FilterOperatorTest, AndAccept) {
 
   // Create some filter operators.
   FilterOperator filter;
-  filter.AddOperation(5_u, 0, FilterOperator::Operation::LESS_THAN);
-  filter.AddOperation("Hello!", 1, FilterOperator::Operation::EQUAL);
-  filter.AddOperation(7_s, 2, FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
+  filter.input_schemas_.push_back(schema);
+  filter.AddLiteralOperation(0, 5_u, FilterOperator::Operation::LESS_THAN);
+  filter.AddLiteralOperation(1, "Hello!", FilterOperator::Operation::EQUAL);
+  filter.AddLiteralOperation(2, 7_s,
+                             FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
 
   // Create some records.
   std::vector<Record> records;
@@ -107,9 +112,12 @@ TEST(FilterOperatorTest, SeveralOpsPerColumn) {
 
   // Create some filter operators.
   FilterOperator filter;
-  filter.AddOperation("Hello!", 1, FilterOperator::Operation::EQUAL);
-  filter.AddOperation(7_s, 2, FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
-  filter.AddOperation(10_s, 2, FilterOperator::Operation::LESS_THAN_OR_EQUAL);
+  filter.input_schemas_.push_back(schema);
+  filter.AddLiteralOperation(1, "Hello!", FilterOperator::Operation::EQUAL);
+  filter.AddLiteralOperation(2, 7_s,
+                             FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
+  filter.AddLiteralOperation(2, 10_s,
+                             FilterOperator::Operation::LESS_THAN_OR_EQUAL);
 
   // Create some records.
   std::vector<Record> records;
@@ -137,9 +145,10 @@ TEST(FilterOperatorTest, BatchTest) {
 
   // Create some filter operators.
   FilterOperator filter;
-  filter.AddOperation("Hello!", 1, FilterOperator::Operation::NOT_EQUAL);
-  filter.AddOperation(5_s, 2, FilterOperator::Operation::GREATER_THAN);
-  filter.AddOperation(10_s, 2, FilterOperator::Operation::LESS_THAN);
+  filter.input_schemas_.push_back(schema);
+  filter.AddLiteralOperation(1, "Hello!", FilterOperator::Operation::NOT_EQUAL);
+  filter.AddLiteralOperation(2, 5_s, FilterOperator::Operation::GREATER_THAN);
+  filter.AddLiteralOperation(2, 10_s, FilterOperator::Operation::LESS_THAN);
 
   // Create some records.
   std::vector<Record> records;
@@ -176,7 +185,8 @@ TEST(FilterOperatorTest, ColOps) {
 
   // Create some filter operator.
   FilterOperator filter;
-  filter.AddOperation(0_u, FilterOperator::Operation::GREATER_THAN, 2_u);
+  filter.input_schemas_.push_back(schema);
+  filter.AddColumnOperation(0_u, 2_u, FilterOperator::Operation::GREATER_THAN);
 
   // Create some records.
   std::vector<Record> records;
@@ -204,10 +214,13 @@ TEST(FilterOperatorTest, TypeMistmatch) {
   FilterOperator filter1;
   FilterOperator filter2;
   FilterOperator filter3;
-  filter1.AddOperation(5_u, 2, FilterOperator::Operation::LESS_THAN);
-  filter2.AddOperation("Hello!", 0, FilterOperator::Operation::EQUAL);
-  filter3.AddOperation(7_s, 1,
-                       FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
+  filter1.input_schemas_.push_back(schema);
+  filter2.input_schemas_.push_back(schema);
+  filter3.input_schemas_.push_back(schema);
+  filter1.AddLiteralOperation(2, 5_u, FilterOperator::Operation::LESS_THAN);
+  filter2.AddLiteralOperation(0, "Hello!", FilterOperator::Operation::EQUAL);
+  filter3.AddLiteralOperation(1, 7_s,
+                              FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
 
   // Create some records.
   Record record{schema};
@@ -216,11 +229,53 @@ TEST(FilterOperatorTest, TypeMistmatch) {
   record.SetInt(-5, 2);
 
   // Test filtering out records.
-  ASSERT_DEATH({ filter1.Accept(record); }, "Type mistmatch");
-  ASSERT_DEATH({ filter2.Accept(record); }, "Type mistmatch");
-  ASSERT_DEATH({ filter3.Accept(record); }, "Type mistmatch");
+  ASSERT_DEATH({ filter1.Accept(record); }, "Type mismatch");
+  ASSERT_DEATH({ filter2.Accept(record); }, "Type mismatch");
+  ASSERT_DEATH({ filter3.Accept(record); }, "Type mismatch");
 }
 #endif
+
+TEST(FilterOperatorTest, ImplicitTypeConversion) {
+  SchemaRef schema = CreateSchema();
+
+  // Create some filter operators.
+  FilterOperator filter1;
+  FilterOperator filter2;
+  FilterOperator filter3;
+  filter1.input_schemas_.push_back(schema);
+  filter2.input_schemas_.push_back(schema);
+  filter3.input_schemas_.push_back(schema);
+  filter1.AddLiteralOperation(0, 5_s, FilterOperator::Operation::LESS_THAN);
+  filter2.AddLiteralOperation(0, 5_s, FilterOperator::Operation::EQUAL);
+  filter3.AddLiteralOperation(0, 5_s,
+                              FilterOperator::Operation::GREATER_THAN_OR_EQUAL);
+
+  // Create some records.
+  std::vector<Record> records;
+  records.emplace_back(schema);
+  records.at(0).SetUInt(0, 0);
+  records.at(0).SetString(std::make_unique<std::string>("Hello!"), 1);
+  records.at(0).SetInt(-5, 2);
+  records.emplace_back(schema);
+  records.at(1).SetUInt(5, 0);
+  records.at(1).SetString(std::make_unique<std::string>("Bye!"), 1);
+  records.at(1).SetInt(7, 2);
+  records.emplace_back(schema);
+  records.at(2).SetUInt(6, 0);
+  records.at(2).SetString(std::make_unique<std::string>("hello!"), 1);
+  records.at(2).SetInt(10, 2);
+
+  // Test filtering out records.
+  EXPECT_TRUE(filter1.Accept(records.at(0)));
+  EXPECT_FALSE(filter2.Accept(records.at(0)));
+  EXPECT_FALSE(filter3.Accept(records.at(0)));
+  EXPECT_FALSE(filter1.Accept(records.at(1)));
+  EXPECT_TRUE(filter2.Accept(records.at(1)));
+  EXPECT_TRUE(filter3.Accept(records.at(1)));
+  EXPECT_FALSE(filter1.Accept(records.at(2)));
+  EXPECT_FALSE(filter2.Accept(records.at(2)));
+  EXPECT_TRUE(filter3.Accept(records.at(2)));
+}
 
 TEST(FilterOperatorTest, IsNullAccept) {
   SchemaRef schema = CreateSchema();
@@ -228,8 +283,10 @@ TEST(FilterOperatorTest, IsNullAccept) {
   // Create some filter operators.
   FilterOperator filter1;
   FilterOperator filter2;
-  filter1.AddOperation(0, FilterOperator::Operation::IS_NULL);
-  filter2.AddOperation(1, FilterOperator::Operation::IS_NOT_NULL);
+  filter1.input_schemas_.push_back(schema);
+  filter2.input_schemas_.push_back(schema);
+  filter1.AddNullOperation(0, FilterOperator::Operation::IS_NULL);
+  filter2.AddNullOperation(1, FilterOperator::Operation::IS_NOT_NULL);
 
   // Create some records.
   std::vector<Record> records;

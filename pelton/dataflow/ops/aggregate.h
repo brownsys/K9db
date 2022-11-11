@@ -18,6 +18,7 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
+#include "pelton/sqlast/ast.h"
 
 namespace pelton {
 namespace dataflow {
@@ -25,8 +26,9 @@ namespace dataflow {
 class AggregateOperator : public Operator {
  public:
   using Function = AggregateFunctionEnum;
-  using State = GroupedDataT<absl::flat_hash_map<Key, std::list<Value>>,
-                             std::list<Value>, std::nullptr_t, Value>;
+  using State =
+      GroupedDataT<absl::flat_hash_map<Key, std::list<sqlast::Value>>,
+                   std::list<sqlast::Value>, std::nullptr_t, sqlast::Value>;
 
   AggregateOperator() = delete;
   // Cannot copy an operator.
@@ -80,7 +82,7 @@ class AggregateOperator : public Operator {
   // The first n-1 columns are assigned values from the given key corresponding
   // to group by columns.
   // The last column is assigned value from the aggregate value.
-  Record EmitRecord(const Key &key, const Value &aggregate,
+  Record EmitRecord(const Key &key, const sqlast::Value &aggregate,
                     bool positive) const;
 
   // Allow tests to use .Process(...) directly.
@@ -92,6 +94,8 @@ class AggregateOperator : public Operator {
   FRIEND_TEST(AggregateOperatorTest, SumPositiveNegativeSingleBatch);
   FRIEND_TEST(AggregateOperatorTest, OutputSchemaPrimaryKeyTest);
   FRIEND_TEST(AggregateOperatorTest, OutputSchemaCompositeKeyTest);
+  FRIEND_TEST(AggregateOperatorTest, SumGoesAwayWithFilter);
+  FRIEND_TEST(AggregateOperatorTest, CountGoesAwayOnDelete);
 };
 
 }  // namespace dataflow

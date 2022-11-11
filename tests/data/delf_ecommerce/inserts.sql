@@ -1,4 +1,4 @@
-INSERT INTO admins(id, PII_name) VALUES (1, 'Alice');
+INSERT INTO admins(id, name) VALUES (1, 'Alice');
 
 INSERT INTO customers VALUES (10, 'Barb');
 INSERT INTO customers VALUES (20, 'Chris');

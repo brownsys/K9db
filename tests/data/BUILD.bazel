@@ -17,6 +17,15 @@ filegroup(
 )
 
 filegroup(
+    name = "medical-chat-nested-views-data",
+    srcs = glob([
+        "medical_nested_views/*.sql",
+        "medical_nested_views/*.txt",
+    ]),
+    visibility = ["//tests:__subpackages__"],
+)
+
+filegroup(
     name = "delf-medical-chat-retain-data",
     srcs = glob([
         "delf_medical_retain/*.sql",

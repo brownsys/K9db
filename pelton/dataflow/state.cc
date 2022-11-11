@@ -11,6 +11,7 @@
 #include <utility>
 
 #include "glog/logging.h"
+#include "pelton/dataflow/ops/forward_view.h"
 #include "pelton/util/fs.h"
 
 #define STATE_FILE_NAME ".dataflow.state"
@@ -99,8 +100,11 @@ SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
   std::shared_lock lock(this->mtx_);
   if (this->schema_.count(table_name) > 0) {
     return this->schema_.at(table_name);
+  } else if (this->flows_.count(table_name) > 0) {
+    return this->flows_.at(table_name)->output_schema();
   } else {
-    LOG(FATAL) << "Tried to get schema for non-existent table " << table_name;
+    LOG(FATAL) << "Tried to get schema for non-existent table or view"
+               << table_name;
   }
 }
 
@@ -119,15 +123,40 @@ void DataFlowState::AddFlow(const FlowName &name,
     chans.push_back(channel.get());
   }
 
+  // Provide the partitioned matviews of any parent view.
+  std::unordered_map<std::string, std::vector<Operator *>> parents;
+  for (const auto &forward : flow->forwards()) {
+    const std::string &flow_name = forward->parent_flow();
+    if (parents.count(flow_name) == 0) {
+      std::vector<Operator *> vec;
+      auto &flow = this->flows_.at(flow_name);
+      for (PartitionIndex pid = 0; pid < this->workers_; pid++) {
+        DataFlowGraphPartition *partition = flow->GetPartition(pid);
+        vec.push_back(partition->GetNode(forward->parent_id()));
+      }
+      parents.emplace(flow_name, std::move(vec));
+    }
+  }
+
   // Turn the given partition into a graph with many partitions.
   auto graph = std::make_unique<DataFlowGraph>(name, this->workers_);
-  graph->Initialize(std::move(flow), chans);
+  graph->Initialize(std::move(flow), chans, parents);
   this->flows_.emplace(name, std::move(graph));
 }
 
 const DataFlowGraph &DataFlowState::GetFlow(const FlowName &name) const {
   std::shared_lock lock(this->mtx_);
   return *this->flows_.at(name);
+}
+
+std::vector<std::string> DataFlowState::GetFlows() const {
+  std::shared_lock lock(this->mtx_);
+  std::vector<std::string> result;
+  result.reserve(this->flows_.size());
+  for (const auto &[flow_name, _] : this->flows_) {
+    result.push_back(flow_name);
+  }
+  return result;
 }
 
 bool DataFlowState::HasFlow(const FlowName &name) const {
@@ -146,22 +175,11 @@ Record DataFlowState::CreateRecord(const sqlast::Insert &insert_stmt) const {
   this->mtx_.lock_shared();
   SchemaRef schema = this->schema_.at(table_name);
   this->mtx_.unlock_shared();
-  Record record{schema, true};
 
   // Fill in record with data.
-  bool has_cols = insert_stmt.HasColumns();
-  const std::vector<std::string> &cols = insert_stmt.GetColumns();
-  const std::vector<std::string> &vals = insert_stmt.GetValues();
-  for (size_t i = 0; i < vals.size(); i++) {
-    size_t schema_index = i;
-    if (has_cols) {
-      schema_index = schema.IndexOf(cols.at(i));
-    }
-    if (vals.at(i) == "NULL") {
-      record.SetNull(true, schema_index);
-    } else {
-      record.SetValue(vals.at(i), schema_index);
-    }
+  Record record{schema, true};
+  for (size_t i = 0; i < schema.size(); i++) {
+    record.SetValue(insert_stmt.GetValue(schema.NameOf(i), i), i);
   }
 
   return record;

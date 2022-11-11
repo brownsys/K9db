@@ -6,12 +6,22 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "absl/status/statusor.h"
 #include "pelton/sqlast/ast.h"
 
 namespace pelton {
 namespace sqlast {
+
+struct InsertOrReplace {
+  bool replace;  // true -> REPLACE, otherwise INSERT.
+  std::string table_name;
+  std::vector<std::string> columns;
+  std::vector<std::string> values;
+};
+absl::StatusOr<InsertOrReplace> HackyInsertOrReplace(const char *str,
+                                                     size_t size);
 
 absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
                                                                size_t size);

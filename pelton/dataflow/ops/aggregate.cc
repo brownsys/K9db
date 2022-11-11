@@ -3,7 +3,6 @@
 #include <utility>
 
 #include "glog/logging.h"
-#include "pelton/sqlast/ast.h"
 
 namespace pelton {
 namespace dataflow {
@@ -59,7 +58,8 @@ void AggregateOperator::ComputeOutputSchema() {
 // The first n-1 columns are assigned values from the given key corresponding
 // to group by columns.
 // The last column is assigned value from the aggregate value.
-Record AggregateOperator::EmitRecord(const Key &key, const Value &aggregate,
+Record AggregateOperator::EmitRecord(const Key &key,
+                                     const sqlast::Value &aggregate,
                                      bool positive) const {
   // Create record and add the group by field values to it.
   Record result{this->output_schema_, positive};
@@ -79,7 +79,7 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
   // to the key prior to processing records.
   // This information is used to determine what records to emit to children
   // operators.
-  absl::flat_hash_map<Key, Value> old_values;
+  absl::flat_hash_map<Key, sqlast::Value> old_values;
 
   // Go over records, updating the aggregate state for each record, as well as
   // old_values. The records to emit will be computed afterwards.
@@ -93,11 +93,11 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
             LOG(FATAL) << "Negative record not seen before in aggregate";
           }
           // Save old value and update the state.
-          Value &value = this->state_.Get(group_key).front();
+          sqlast::Value &value = this->state_.Get(group_key).front();
           if (old_values.count(group_key) == 0) {
             old_values.emplace(group_key, value);
           }
-          value = Value(value.GetUInt() - 1);
+          value = sqlast::Value(value.GetUInt() - 1);
           if (value.GetUInt() == 0) {
             this->state_.Erase(group_key);
           }
@@ -105,40 +105,40 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
           // Positive record: increment value in state by +1.
           if (this->state_.Contains(group_key)) {
             // Increment state by +1 and track old value.
-            Value &value = this->state_.Get(group_key).front();
+            sqlast::Value &value = this->state_.Get(group_key).front();
             if (old_values.count(group_key) == 0) {
               old_values.emplace(group_key, value);
             }
-            value = Value(value.GetUInt() + 1);
+            value = sqlast::Value(value.GetUInt() + 1);
           } else {
             if (old_values.count(group_key) == 0) {
               // Put in null value.
-              old_values.emplace(group_key,
-                                 Value(sqlast::ColumnDefinition::Type::UINT));
+              old_values.emplace(group_key, sqlast::Value());
             }
-            this->state_.Insert(group_key, Value(static_cast<uint64_t>(1)));
+            this->state_.Insert(group_key,
+                                sqlast::Value(static_cast<uint64_t>(1)));
           }
         }
         break;
       }
       case Function::SUM: {
-        Value record_value = record.GetValue(this->aggregate_column_index_);
+        auto record_value = record.GetValue(this->aggregate_column_index_);
         if (!record.IsPositive()) {
           // Negative record: decrement value in state by the value in record.
           if (!this->state_.Contains(group_key)) {
             LOG(FATAL) << "Negative record not seen before in aggregate";
           }
           // Save old value and update the state.
-          Value &value = this->state_.Get(group_key).front();
+          sqlast::Value &value = this->state_.Get(group_key).front();
           if (old_values.count(group_key) == 0) {
             old_values.emplace(group_key, value);
           }
           switch (this->aggregate_column_type_) {
             case sqlast::ColumnDefinition::Type::UINT:
-              value = Value(value.GetUInt() - record_value.GetUInt());
+              value = sqlast::Value(value.GetUInt() - record_value.GetUInt());
               break;
             case sqlast::ColumnDefinition::Type::INT:
-              value = Value(value.GetInt() - record_value.GetInt());
+              value = sqlast::Value(value.GetInt() - record_value.GetInt());
               break;
             default:
               LOG(FATAL) << "Unsupported type";
@@ -146,16 +146,16 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
         } else {
           // Positive record: increment value in state by the value in record.
           if (this->state_.Contains(group_key)) {
-            Value &value = this->state_.Get(group_key).front();
+            sqlast::Value &value = this->state_.Get(group_key).front();
             if (old_values.count(group_key) == 0) {
               old_values.emplace(group_key, value);
             }
             switch (this->aggregate_column_type_) {
               case sqlast::ColumnDefinition::Type::UINT:
-                value = Value(value.GetUInt() + record_value.GetUInt());
+                value = sqlast::Value(value.GetUInt() + record_value.GetUInt());
                 break;
               case sqlast::ColumnDefinition::Type::INT:
-                value = Value(value.GetInt() + record_value.GetInt());
+                value = sqlast::Value(value.GetInt() + record_value.GetInt());
                 break;
               default:
                 LOG(FATAL) << "Unsupported type";
@@ -163,8 +163,7 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
           } else {
             if (old_values.count(group_key) == 0) {
               // Put in null value.
-              old_values.emplace(group_key,
-                                 Value(this->aggregate_column_type_));
+              old_values.emplace(group_key, sqlast::Value());
             }
             this->state_.Insert(group_key, std::move(record_value));
           }
@@ -182,7 +181,7 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
         output.push_back(this->EmitRecord(group_key, old_value, false));
       }
     } else {
-      const Value &new_value = this->state_.Get(group_key).front();
+      const sqlast::Value &new_value = this->state_.Get(group_key).front();
       if (old_value != new_value) {
         if (!old_value.IsNull()) {
           output.push_back(this->EmitRecord(group_key, old_value, false));

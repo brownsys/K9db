@@ -6,6 +6,9 @@
 
 #include "glog/logging.h"
 
+namespace pelton {
+namespace util {
+
 template <typename Arg>
 std::string TypeNameFor(Arg &&t) {
   if constexpr (std::is_same<std::remove_reference_t<Arg>, uint64_t>::value) {
@@ -26,5 +29,8 @@ std::string TypeNameFor(Arg &&t) {
     LOG(FATAL) << "Unrecognized type";
   }
 }
+
+}  // namespace util
+}  // namespace pelton
 
 #endif  // PELTON_UTIL_TYPE_UTILS_H_

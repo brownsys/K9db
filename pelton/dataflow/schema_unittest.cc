@@ -50,9 +50,10 @@ TEST(SchemaTest, ConstructSchema) {
   CheckSchema(schema);
 }
 TEST(SchemaTest, ConstructSchemaFromCreateTable) {
+  using C = sqlast::ColumnConstraint::Type;
   // Make a CreateTable statement.
   sqlast::CreateTable table("table1");
-  sqlast::ColumnConstraint pk(sqlast::ColumnConstraint::Type::PRIMARY_KEY);
+  sqlast::ColumnConstraint pk = sqlast::ColumnConstraint::Make(C::PRIMARY_KEY);
   sqlast::ColumnDefinition col1("Col1", CType::UINT);
   col1.AddConstraint(pk);
   table.AddColumn("Col1", col1);

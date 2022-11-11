@@ -3,26 +3,30 @@
 #include "pelton/sqlast/hacky.h"
 
 #include <utility>
-#include <vector>
 
 #include "pelton/sqlast/hacky_util.h"
+#include "pelton/util/status.h"
 
 namespace pelton {
 namespace sqlast {
 
-absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
-                                                               size_t size) {
-  // INSERT INTO <tablename> VALUES(<val>, <val>, <val>, ...)
-  // INSERT.
-  const char *replace_buf = str;
-  size_t replace_size = size;
-  bool insert = StartsWith(&str, &size, "INSERT", 6);
-  bool replace = StartsWith(&replace_buf, &replace_size, "REPLACE", 7);
-  if (!insert && !replace) {
+// Helper for parsing inserts and replaces.
+absl::StatusOr<InsertOrReplace> HackyInsertOrReplace(const char *str,
+                                                     size_t size) {
+  // (INSERT|REPLACE) INTO <tablename> VALUES(<val>, <val>, <val>, ...)
+  InsertOrReplace components;
+
+  // (INSERT|REPLACE).
+  const char *tmp_str = str;
+  size_t tmp_size = size;
+  if (StartsWith(&tmp_str, &tmp_size, "INSERT", 6)) {
+    components.replace = false;
+    str = tmp_str;
+    size = tmp_size;
+  } else if (StartsWith(&str, &size, "REPLACE", 7)) {
+    components.replace = true;
+  } else {
     return absl::InvalidArgumentError("Hacky insert: INSERT | REPLACE");
-  } else if (replace) {
-    str = replace_buf;
-    size = replace_size;
   }
   ConsumeWhiteSpace(&str, &size);
 
@@ -33,20 +37,17 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
   ConsumeWhiteSpace(&str, &size);
 
   // <tablename>.
-  std::string table_name = ExtractIdentifier(&str, &size);
-  if (table_name.size() == 0) {
+  components.table_name = ExtractIdentifier(&str, &size);
+  if (components.table_name.size() == 0) {
     return absl::InvalidArgumentError("Hacky insert: table name");
   }
   ConsumeWhiteSpace(&str, &size);
-
-  // Create the insert statement.
-  std::unique_ptr<Insert> stmt = std::make_unique<Insert>(table_name, replace);
 
   // Has columns inlined.
   if (StartsWith(&str, &size, "(", 1)) {
     ConsumeWhiteSpace(&str, &size);
     while (true) {
-      stmt->AddColumn(ExtractIdentifier(&str, &size));
+      components.columns.push_back(ExtractIdentifier(&str, &size));
       ConsumeWhiteSpace(&str, &size);
       if (!StartsWith(&str, &size, ",", 1)) {
         break;
@@ -72,7 +73,7 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
   ConsumeWhiteSpace(&str, &size);
 
   do {
-    stmt->AddValue(ExtractValue(&str, &size));
+    components.values.push_back(ExtractValue(&str, &size));
     ConsumeWhiteSpace(&str, &size);
   } while (StartsWith(&str, &size, ",", 1));
 
@@ -86,6 +87,31 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
   if (size != 0 && !StartsWith(&str, &size, ";", 1)) {
     return absl::InvalidArgumentError("Hacky insert: ;");
   }
+  return components;
+}
+
+absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
+                                                               size_t size) {
+  ASSIGN_OR_RETURN(InsertOrReplace & components,
+                   HackyInsertOrReplace(str, size));
+  if (components.replace) {
+    return absl::InvalidArgumentError("REPLACE found instead of INSERT");
+  }
+
+  // Create the insert statement.
+  std::unique_ptr<Insert> stmt =
+      std::make_unique<Insert>(components.table_name);
+
+  // Add columns.
+  stmt->SetColumns(std::move(components.columns));
+
+  // Parse and add values.
+  std::vector<Value> parsed_values;
+  parsed_values.reserve(components.values.size());
+  for (const std::string &str : components.values) {
+    parsed_values.push_back(Value::FromSQLString(str));
+  }
+  stmt->SetValues(std::move(parsed_values));
   return stmt;
 }
 
@@ -99,9 +125,20 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
   ConsumeWhiteSpace(&str, &size);
 
   // <col>, ...
-  std::vector<std::string> columns;
+  std::vector<Select::ResultColumn> columns;
   while (true) {
-    columns.push_back(ExtractIdentifier(&str, &size));
+    std::string unparsed = ExtractIdentifier(&str, &size);
+    if (unparsed.size() == 0) {
+      return absl::InvalidArgumentError("Hacky select: COLUMN");
+    }
+
+    char c = unparsed[0];
+    if (c == '"' || c == '\'' || std::isdigit(c) || c == '-') {  // Literal.
+      columns.emplace_back(Value::FromSQLString(unparsed));
+    } else {  // Column name  (or *).
+      columns.emplace_back(unparsed);
+    }
+
     ConsumeWhiteSpace(&str, &size);
     if (!StartsWith(&str, &size, ",", 1)) {
       break;
@@ -125,7 +162,7 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
 
   // Create the select statement.
   std::unique_ptr<Select> stmt = std::make_unique<Select>(table_name);
-  for (const std::string &col : columns) {
+  for (const Select::ResultColumn &col : columns) {
     stmt->AddColumn(col);
   }
 
@@ -178,10 +215,7 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyGDPR(const char *str,
   ConsumeWhiteSpace(&str, &size);
 
   // <user_id>.
-  std::string user_id = ExtractValue(&str, &size);
-  if (user_id.size() == 0) {
-    return absl::InvalidArgumentError("Hacky GDPR: user_id");
-  }
+  Value user_id = Value::FromSQLString(ExtractValue(&str, &size));
   ConsumeWhiteSpace(&str, &size);
 
   return std::make_unique<GDPRStatement>(operation, shard_kind, user_id);

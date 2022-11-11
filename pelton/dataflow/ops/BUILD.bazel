@@ -65,7 +65,6 @@ cc_library(
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
         "//pelton/dataflow:types",
-        "//pelton/dataflow:value",
         "//pelton/sqlast:ast",
         "@com_google_googletest//:gtest_prod",
         "@glog",
@@ -102,6 +101,24 @@ cc_library(
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
         "//pelton/dataflow:types",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "forward_view",
+    srcs = [
+        "forward_view.cc",
+    ],
+    hdrs = [
+        "forward_view.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [
+        "//pelton/dataflow:operator",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:types",
+        "@glog",
     ],
 )
 
@@ -288,6 +305,8 @@ cc_test(
     ],
     deps = [
         ":aggregate",
+        ":filter",
+        ":matview",
         "//pelton/dataflow:key",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
