@@ -40,9 +40,10 @@ const Value &Insert::GetValue(const std::string &colname, size_t index) const {
 }
 
 // Update.
-void Update::AddColumnValue(const std::string &column, const Value &value) {
+void Update::AddColumnValue(const std::string &column,
+                            std::unique_ptr<Expression> &&value) {
   this->columns_.push_back(column);
-  this->values_.push_back(value);
+  this->values_.push_back(std::move(value));
 }
 void Update::SetWhereClause(std::unique_ptr<BinaryExpression> &&where) {
   this->where_clause_ = std::optional(std::move(where));

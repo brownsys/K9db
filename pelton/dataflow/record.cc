@@ -214,6 +214,59 @@ size_t Record::Hash(const std::vector<ColumnID> &cols) const {
   return hash_value;
 }
 
+// Create a new record resulting from applying the update to this record.
+// Updating the sequence given an update statement and schema.
+Record Record::Update(const UpdateMap &updates) const {
+  Record updated{this->schema_, true};
+  for (size_t i = 0; i < this->schema_.size(); i++) {
+    const std::string &column_name = this->schema_.NameOf(i);
+    auto it = updates.find(column_name);
+    if (it == updates.end()) {
+      updated.SetValue(this->GetValue(i), i);
+    } else {
+      std::function<sqlast::Value(const sqlast::Expression *)> evaluate =
+          [&](const sqlast::Expression *expr) {
+            switch (expr->type()) {
+              case sqlast::Expression::Type::LITERAL: {
+                auto l = static_cast<const sqlast::LiteralExpression *>(expr);
+                return l->value();
+              }
+              case sqlast::Expression::Type::COLUMN: {
+                auto c = static_cast<const sqlast::ColumnExpression *>(expr);
+                int idx = this->schema_.IndexOf(c->column());
+                CHECK_GE(idx, 0);
+                return this->GetValue(idx);
+              }
+              case sqlast::Expression::Type::PLUS: {
+                const sqlast::BinaryExpression *binexpr =
+                    static_cast<const sqlast::BinaryExpression *>(expr);
+                sqlast::Value left = evaluate(binexpr->GetLeft());
+                sqlast::Value right = evaluate(binexpr->GetRight());
+                CHECK(left.type() == sqlast::Value::Type::INT);
+                CHECK(right.type() == sqlast::Value::Type::INT);
+                return sqlast::Value(left.GetInt() + right.GetInt());
+              }
+              case sqlast::Expression::Type::MINUS: {
+                const sqlast::BinaryExpression *binexpr =
+                    static_cast<const sqlast::BinaryExpression *>(expr);
+                sqlast::Value left = evaluate(binexpr->GetLeft());
+                sqlast::Value right = evaluate(binexpr->GetRight());
+                CHECK(left.type() == sqlast::Value::Type::INT);
+                CHECK(right.type() == sqlast::Value::Type::INT);
+                return sqlast::Value(left.GetInt() - right.GetInt());
+              }
+              default:
+                LOG(FATAL) << "Unsupported update expression";
+            }
+          };
+      sqlast::Value value = evaluate(it->second);
+      CHECK(value.TypeCompatible(this->schema_.TypeOf(i)));
+      updated.SetValue(value, i);
+    }
+  }
+  return updated;
+}
+
 // Equality: schema must be identical (pointer wise) and all values must be
 // equal.
 bool Record::operator==(const Record &other) const {

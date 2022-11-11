@@ -145,7 +145,7 @@ class Select : public AbstractStatement {
   std::vector<T> VisitChildren(AbstractVisitor<T> *visitor) const {
     std::vector<T> result;
     if (this->where_clause_.has_value()) {
-      result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
+      result.push_back(this->where_clause_->get()->Visit(visitor));
     }
     return result;
   }
@@ -153,7 +153,7 @@ class Select : public AbstractStatement {
   std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
     std::vector<T> result;
     if (this->where_clause_.has_value()) {
-      result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
+      result.push_back(this->where_clause_->get()->Visit(visitor));
     }
     return result;
   }
@@ -192,7 +192,7 @@ class Delete : public AbstractStatement {
   std::vector<T> VisitChildren(AbstractVisitor<T> *visitor) const {
     std::vector<T> result;
     if (this->where_clause_.has_value()) {
-      result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
+      result.push_back(this->where_clause_->get()->Visit(visitor));
     }
     return result;
   }
@@ -200,7 +200,7 @@ class Delete : public AbstractStatement {
   std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
     std::vector<T> result;
     if (this->where_clause_.has_value()) {
-      result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
+      result.push_back(this->where_clause_->get()->Visit(visitor));
     }
     return result;
   }
@@ -219,9 +219,13 @@ class Update : public AbstractStatement {
   const std::string &table_name() const { return this->table_name_; }
   std::string &table_name() { return this->table_name_; }
 
-  void AddColumnValue(const std::string &column, const Value &value);
+  void AddColumnValue(const std::string &column,
+                      std::unique_ptr<Expression> &&value);
+
   const std::vector<std::string> &GetColumns() const { return this->columns_; }
-  const std::vector<Value> &GetValues() const { return this->values_; }
+  const std::vector<std::unique_ptr<Expression>> &GetValues() const {
+    return this->values_;
+  }
 
   bool HasWhereClause() const { return this->where_clause_.has_value(); }
   void SetWhereClause(std::unique_ptr<BinaryExpression> &&where);
@@ -242,16 +246,22 @@ class Update : public AbstractStatement {
   template <class T>
   std::vector<T> VisitChildren(AbstractVisitor<T> *visitor) const {
     std::vector<T> result;
+    for (const std::unique_ptr<Expression> &value : this->values_) {
+      result.push_back(value->Visit(visitor));
+    }
     if (this->where_clause_.has_value()) {
-      result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
+      result.push_back(this->where_clause_->get()->Visit(visitor));
     }
     return result;
   }
   template <class T>
   std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
     std::vector<T> result;
+    for (std::unique_ptr<Expression> &value : this->values_) {
+      result.push_back(value->Visit(visitor));
+    }
     if (this->where_clause_.has_value()) {
-      result.push_back(std::move(this->where_clause_->get()->Visit(visitor)));
+      result.push_back(this->where_clause_->get()->Visit(visitor));
     }
     return result;
   }
@@ -259,7 +269,7 @@ class Update : public AbstractStatement {
  private:
   std::string table_name_;
   std::vector<std::string> columns_;
-  std::vector<Value> values_;
+  std::vector<std::unique_ptr<Expression>> values_;
   std::optional<std::unique_ptr<BinaryExpression>> where_clause_;
 };
 

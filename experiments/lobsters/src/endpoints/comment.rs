@@ -231,7 +231,6 @@ where
     }
 
     // why oh why is story hotness *updated* here?!
-    /*
     c = c
         .drop_exec(
             "UPDATE stories \
@@ -240,7 +239,6 @@ where
             (hotness - 1, story),
         )
         .await?;
-    */
 
     let key = format!("user:{}:comments_posted", user);
     c = c

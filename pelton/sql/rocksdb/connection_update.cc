@@ -23,9 +23,9 @@ ResultSetAndStatus RocksdbConnection::ExecuteUpdate(const sqlast::Update &sql) {
   const dataflow::SchemaRef &schema = table.Schema();
 
   // Turn SQL statement to a map of updates.
-  std::unordered_map<std::string, sqlast::Value> updates;
+  dataflow::Record::UpdateMap updates;
   for (const auto &[col, v] : util::Zip(&sql.GetColumns(), &sql.GetValues())) {
-    updates.emplace(col, v);
+    updates.emplace(col, v.get());
   }
 
   // Find the records to be updated.
@@ -41,12 +41,13 @@ ResultSetAndStatus RocksdbConnection::ExecuteUpdate(const sqlast::Update &sql) {
   DedupSet<std::string> dedup_keys;
   for (DeleteRecord &element : records) {
     // Update record.
-    RocksdbSequence updated = element.value.Update(schema, updates);
+    dataflow::Record urecord = element.record.Update(updates);
+    RocksdbSequence updated = RocksdbSequence::FromRecord(urecord);
 
     // Append record to result.
     if (!dedup_keys.Duplicate(element.value.At(pk_col).ToString())) {
       vec.push_back(std::move(element.record));
-      vec.push_back(updated.DecodeRecord(schema, true));
+      vec.push_back(std::move(urecord));
     }
 
     // Update indices.

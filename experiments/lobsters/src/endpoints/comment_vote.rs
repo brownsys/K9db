@@ -154,7 +154,6 @@ where
     // frontpage, but we're okay with using a more basic
     // upvote/downvote ratio thingy. See Story::calculated_hotness
     // in the lobsters source for details.
-    /*
     c = c
         .drop_exec(
             &format!(
@@ -182,7 +181,6 @@ where
             ),
         )
         .await?;
-    */
 
     Ok((c, false))
 }

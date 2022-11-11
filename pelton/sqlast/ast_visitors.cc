@@ -172,15 +172,15 @@ std::string Stringifier::VisitUpdate(const Update &ast) {
   std::string result = "UPDATE " + ast.table_name() + " SET ";
   // Columns and values.
   const std::vector<std::string> &cols = ast.GetColumns();
-  const std::vector<Value> &vals = ast.GetValues();
+  const std::vector<std::unique_ptr<Expression>> &vals = ast.GetValues();
   for (size_t i = 0; i < cols.size(); i++) {
-    result += cols.at(i) + " = " + vals.at(i).AsSQLString();
+    result += cols.at(i) + " = " + vals.at(i)->Visit(this);
     if (i < cols.size() - 1) {
       result += ", ";
     }
   }
   if (ast.HasWhereClause()) {
-    result += " WHERE " + ast.VisitChildren(this).at(0);
+    result += " WHERE " + ast.GetWhereClause()->Visit(this);
   }
   return result;
 }
@@ -256,6 +256,12 @@ std::string Stringifier::VisitBinaryExpression(const BinaryExpression &ast) {
       break;
     case Expression::Type::GREATER_THAN:
       op = " > ";
+      break;
+    case Expression::Type::PLUS:
+      op = " + ";
+      break;
+    case Expression::Type::MINUS:
+      op = " - ";
       break;
     default:
       assert(false);

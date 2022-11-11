@@ -111,7 +111,7 @@ void ValueMapper::VisitBinaryExpression(const BinaryExpression &ast) {
       this->VisitBinaryExpression(*TO_BINARY(ast.GetRight()));
       break;
     }
-    default:  // >, LITERAL, CLUMN, LIST.
+    default:  // >, LITERAL, COLUMN, LIST, PLUS, MINUS.
       LOG(FATAL) << "Bad expression";
   }
 }

@@ -7,6 +7,7 @@
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <unordered_map>
 // NOLINTNEXTLINE
 #include <variant>
 #include <vector>
@@ -171,6 +172,11 @@ class Record {
   const SchemaRef &schema() const { return this->schema_; }
   bool IsPositive() const { return this->positive_; }
   int GetTimestamp() const { return this->timestamp_; }
+
+  // Create a new record resulting from applying the update to this record.
+  // Updating the sequence given an update statement and schema.
+  using UpdateMap = std::unordered_map<std::string, const sqlast::Expression *>;
+  Record Update(const UpdateMap &updates) const;
 
   // Equality: schema must be identical (pointer wise) and all values must be
   // equal.

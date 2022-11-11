@@ -330,7 +330,6 @@ antlrcpp::Any AstTransformer::visitExpr_list(
 // Update constructs.
 antlrcpp::Any AstTransformer::visitUpdate_stmt(
     sqlparser::SQLiteParser::Update_stmtContext *ctx) {
-  this->in_update_ = true;
   if (ctx->with_clause() != nullptr || ctx->OR() != nullptr ||
       ctx->column_name_list().size() > 0) {
     return absl::InvalidArgumentError("Invalid update constructs");
@@ -344,11 +343,13 @@ antlrcpp::Any AstTransformer::visitUpdate_stmt(
     CAST_REF(std::string, column, ctx->column_name(i)->accept(this));
     CAST_REF(std::unique_ptr<Expression>, value_expr,
              ctx->expr(i)->accept(this));
-    if (value_expr->type() != Expression::Type::LITERAL) {
-      return absl::InvalidArgumentError("Update value must be a literal");
+    if (value_expr->type() != Expression::Type::LITERAL &&
+        value_expr->type() != Expression::Type::COLUMN &&
+        value_expr->type() != Expression::Type::PLUS &&
+        value_expr->type() != Expression::Type::MINUS) {
+      return absl::InvalidArgumentError("Illegal update expression");
     }
-    update->AddColumnValue(
-        column, static_cast<LiteralExpression *>(value_expr.get())->value());
+    update->AddColumnValue(column, std::move(value_expr));
   }
   // Where clause.
   if (ctx->WHERE() != nullptr) {
@@ -366,7 +367,6 @@ antlrcpp::Any AstTransformer::visitUpdate_stmt(
     update->SetWhereClause(std::move(bexpr));
   }
 
-  this->in_update_ = false;
   return static_cast<std::unique_ptr<AbstractStatement>>(std::move(update));
 }
 
@@ -506,19 +506,10 @@ antlrcpp::Any AstTransformer::visitQualified_table_name(
 // Expressions.
 antlrcpp::Any AstTransformer::visitExpr(
     sqlparser::SQLiteParser::ExprContext *ctx) {
-  // Hack.
-  if ((ctx->PLUS() != nullptr || ctx->MINUS() != nullptr) && this->in_update_) {
-    if (ctx->expr(0)->literal_value() != nullptr) {
-      return ctx->expr(0)->accept(this);
-    }
-    if (ctx->expr(1)->literal_value() != nullptr) {
-      return ctx->expr(1)->accept(this);
-    }
-  }
-
   if ((ctx->literal_value() == nullptr && ctx->ASSIGN() == nullptr &&
        ctx->column_name() == nullptr && ctx->AND() == nullptr &&
-       ctx->GT() == nullptr && ctx->IN() == nullptr && ctx->IS() == nullptr) ||
+       ctx->GT() == nullptr && ctx->IN() == nullptr && ctx->IS() == nullptr &&
+       ctx->PLUS() == nullptr && ctx->MINUS() == nullptr) ||
       ctx->expr().size() > 2) {
     return absl::InvalidArgumentError("Unsupported expression");
   }
@@ -573,6 +564,12 @@ antlrcpp::Any AstTransformer::visitExpr(
   }
   if (ctx->GT() != nullptr) {
     result = std::make_unique<BinaryExpression>(Expression::Type::GREATER_THAN);
+  }
+  if (ctx->PLUS() != nullptr) {
+    result = std::make_unique<BinaryExpression>(Expression::Type::PLUS);
+  }
+  if (ctx->MINUS() != nullptr) {
+    result = std::make_unique<BinaryExpression>(Expression::Type::MINUS);
   }
 
   CAST_REF(std::unique_ptr<Expression>, expr0, ctx->expr(0)->accept(this));

@@ -7,6 +7,7 @@
 
 #include "pelton/shards/sqlengine/delete.h"
 #include "pelton/shards/sqlengine/insert.h"
+#include "pelton/util/iterator.h"
 #include "pelton/util/status.h"
 
 namespace pelton {
@@ -16,32 +17,25 @@ namespace sqlengine {
 // Update records using the given update statement in memory.
 absl::StatusOr<std::vector<sqlast::Insert>> UpdateContext::UpdateRecords(
     const std::vector<dataflow::Record> &records) {
-  // What is being updated.
-  const std::vector<std::string> &updated_cols = this->stmt_.GetColumns();
-  const std::vector<sqlast::Value> &updated_vals = this->stmt_.GetValues();
-  std::vector<bool> should_update(this->schema_.size(), false);
-  for (const std::string &col_name : updated_cols) {
-    int col_index = this->schema_.IndexOf(col_name);
-    if (col_index < 0) {
-      return absl::InvalidArgumentError("Unrecognized column " + col_name);
-    }
-    should_update.at(col_index) = true;
+  // Turn SQL statement to a map of updates.
+  dataflow::Record::UpdateMap updates;
+  const std::vector<std::string> &cols = this->stmt_.GetColumns();
+  const auto &vals = this->stmt_.GetValues();
+  for (const auto &[col, v] : util::Zip(&cols, &vals)) {
+    updates.emplace(col, v.get());
   }
 
   // Update one record at a time.
   std::vector<sqlast::Insert> result;
   result.reserve(records.size());
   for (const dataflow::Record &record : records) {
-    size_t update_count = 0;
-    result.emplace_back(this->table_name_);
+    dataflow::Record updated = record.Update(updates);
     std::vector<sqlast::Value> values;
+    values.reserve(this->schema_.size());
     for (size_t i = 0; i < this->schema_.size(); i++) {
-      if (should_update.at(i)) {
-        values.push_back(updated_vals.at(update_count++));
-      } else {
-        values.push_back(record.GetValue(i));
-      }
+      values.push_back(updated.GetValue(i));
     }
+    result.emplace_back(this->table_name_);
     result.back().SetValues(std::move(values));
   }
 

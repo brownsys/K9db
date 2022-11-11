@@ -101,11 +101,6 @@ class RocksdbSequence {
   dataflow::Record DecodeRecord(const dataflow::SchemaRef &schema,
                                 bool positive) const;
 
-  // Updating the sequence given an update statement and schema.
-  RocksdbSequence Update(
-      const dataflow::SchemaRef &schema,
-      const std::unordered_map<std::string, sqlast::Value> &updates) const;
-
  private:
   std::string data_;
 };

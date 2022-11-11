@@ -162,27 +162,6 @@ dataflow::Record RocksdbSequence::DecodeRecord(
   return record;
 }
 
-// Updating the sequence given an update statement and schema.
-RocksdbSequence RocksdbSequence::Update(
-    const dataflow::SchemaRef &schema,
-    const std::unordered_map<std::string, sqlast::Value> &updates) const {
-  RocksdbSequence updated;
-  size_t i = 0;
-  for (rocksdb::Slice slice : *this) {
-    const std::string &column_name = schema.NameOf(i);
-    auto it = updates.find(column_name);
-    if (it == updates.end()) {
-      updated.AppendEncoded(slice);
-    } else {
-      CHECK(it->second.TypeCompatible(schema.TypeOf(i)));
-      updated.Append(it->second);
-    }
-    i++;
-  }
-  CHECK_EQ(i, schema.size());
-  return updated;
-}
-
 // From a record.
 RocksdbSequence RocksdbSequence::FromRecord(const dataflow::Record &record) {
   RocksdbSequence encoded;
