@@ -146,7 +146,7 @@ where
             .drop_exec(
                 "SELECT votes.* \
                  FROM votes \
-                 WHERE votes.OWNER_user_id = ? \
+                 WHERE votes.user_id = ? \
                  AND votes.story_id = ? \
                  AND votes.comment_id IS NULL",
                 (uid, story),

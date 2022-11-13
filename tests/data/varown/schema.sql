@@ -1,6 +1,6 @@
-CREATE TABLE user ( \
+CREATE DATA_SUBJECT TABLE user ( \
     id INTEGER PRIMARY KEY, \
-    PII_name TEXT \
+    name TEXT \
 );
 CREATE TABLE t ( \
     id INT PRIMARY KEY, \
@@ -8,6 +8,6 @@ CREATE TABLE t ( \
 );
 CREATE TABLE rel ( \
     id INT PRIMARY KEY, \
-    from_t INT REFERENCES user(id), \
-    OWNING_to_t INT REFERENCES t(id) \
+    from_t INT OWNED_BY user(id), \
+    to_t INT OWNS t(id) \
 );

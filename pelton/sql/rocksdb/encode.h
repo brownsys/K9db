@@ -12,7 +12,6 @@
 
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
-#include "pelton/dataflow/value.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/shard_name.h"
 #include "rocksdb/slice.h"
@@ -25,16 +24,8 @@ namespace sql {
 
 rocksdb::Slice ExtractColumn(const rocksdb::Slice &slice, size_t col);
 
-rocksdb::Slice ExtractSlice(const rocksdb::Slice &slice, size_t spos,
-                            size_t count);
-
-std::string EncodeValue(const dataflow::Value &val);
-std::string EncodeValue(sqlast::ColumnDefinition::Type type,
-                        const rocksdb::Slice &value);
-
-std::vector<std::string> EncodeValues(const std::vector<dataflow::Value> &vals);
-void EncodeValues(sqlast::ColumnDefinition::Type type,
-                  std::vector<std::string> *values);
+std::vector<std::string> EncodeValues(sqlast::ColumnDefinition::Type type,
+                                      const std::vector<sqlast::Value> &vals);
 
 class RocksdbSequence {
  public:
@@ -54,14 +45,9 @@ class RocksdbSequence {
   rocksdb::Slice Data() const { return rocksdb::Slice(this->data_); }
 
   // Inserting into sequence.
-  void Append(sqlast::ColumnDefinition::Type type, const rocksdb::Slice &slice);
-  void Append(const dataflow::Value &val);
+  void Append(const sqlast::Value &val);
   void Append(const util::ShardName &shard_name);
   void AppendEncoded(const rocksdb::Slice &slice);
-
-  // Replacing inside the sequence.
-  void Replace(size_t pos, sqlast::ColumnDefinition::Type type,
-               const rocksdb::Slice &slice);
 
   // Getting from the sequence.
   // Does not include trailing __ROCKSSEP.
@@ -112,7 +98,8 @@ class RocksdbSequence {
   Iterator end() const;
 
   // For reading/decoding into dataflow.
-  dataflow::Record DecodeRecord(const dataflow::SchemaRef &schema) const;
+  dataflow::Record DecodeRecord(const dataflow::SchemaRef &schema,
+                                bool positive) const;
 
  private:
   std::string data_;
@@ -144,11 +131,6 @@ class RocksdbRecord {
   // For reading/decoding.
   rocksdb::Slice GetShard() const { return this->key_.At(0); }
   rocksdb::Slice GetPK() const { return this->key_.At(1); }
-
-  // For updating.
-  RocksdbRecord Update(const std::unordered_map<size_t, std::string> &update,
-                       const dataflow::SchemaRef &schema,
-                       const util::ShardName &shard_name) const;
 
  private:
   RocksdbSequence key_;

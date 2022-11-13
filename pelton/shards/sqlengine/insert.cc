@@ -35,7 +35,7 @@ bool InsertContext::InsertedInto(const std::string &shard_kind,
 /*
  * Helpers for inserting statement into the database by sharding type.
  */
-int InsertContext::DirectInsert(dataflow::Value &&fkval,
+int InsertContext::DirectInsert(sqlast::Value &&fkval,
                                 const ShardDescriptor &desc) {
   int res = 0;
   std::string user_id = fkval.AsUnquotedString();
@@ -46,7 +46,7 @@ int InsertContext::DirectInsert(dataflow::Value &&fkval,
   return res;
 }
 absl::StatusOr<int> InsertContext::TransitiveInsert(
-    dataflow::Value &&fkval, const ShardDescriptor &desc) {
+    sqlast::Value &&fkval, const ShardDescriptor &desc) {
   // Insert into shards of users as determined via transitive index.
   const TransitiveInfo &info = std::get<TransitiveInfo>(desc.info);
   const IndexDescriptor &index = *info.index;
@@ -58,7 +58,7 @@ absl::StatusOr<int> InsertContext::TransitiveInsert(
   for (dataflow::Record &r : indexed) {
     ASSERT_RET(r.GetInt(2) > 0, Internal, "Index count 0");
     ASSERT_RET(!r.IsNull(1), Internal, "T Index gives NULL owner");
-    std::string user_id = r.GetValueString(1);
+    std::string user_id = r.GetValue(1).AsUnquotedString();
     if (!this->InsertedInto(desc.shard_kind, user_id)) {
       util::ShardName shard_name(desc.shard_kind, user_id);
       ACCUM(this->db_->ExecuteInsert(this->stmt_, shard_name), res);
@@ -71,7 +71,7 @@ absl::StatusOr<int> InsertContext::TransitiveInsert(
   // ownership paths reveal an existing owner).
   return res;
 }
-absl::StatusOr<int> InsertContext::VariableInsert(dataflow::Value &&fkval,
+absl::StatusOr<int> InsertContext::VariableInsert(sqlast::Value &&fkval,
                                                   const ShardDescriptor &desc) {
   const VariableInfo &info = std::get<VariableInfo>(desc.info);
   const IndexDescriptor &index = *info.index;
@@ -83,7 +83,7 @@ absl::StatusOr<int> InsertContext::VariableInsert(dataflow::Value &&fkval,
   for (dataflow::Record &r : indexed) {
     ASSERT_RET(r.GetInt(2) > 0, Internal, "Index count 0");
     ASSERT_RET(!r.IsNull(1), Internal, "T Index gives NULL owner");
-    std::string user_id = r.GetValueString(1);
+    std::string user_id = r.GetValue(1).AsUnquotedString();
     if (!this->InsertedInto(desc.shard_kind, user_id)) {
       util::ShardName shard_name(desc.shard_kind, user_id);
       ACCUM(this->db_->ExecuteInsert(this->stmt_, shard_name), res);
@@ -107,8 +107,7 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
     // Identify value of the column along which we are sharding.
     size_t colidx = EXTRACT_VARIANT(column_index, desc->info);
     const std::string &colname = EXTRACT_VARIANT(column, desc->info);
-    auto coltype = this->schema_.TypeOf(colidx);
-    dataflow::Value val(coltype, this->stmt_.GetValue(colname, colidx));
+    sqlast::Value val = this->stmt_.GetValue(colname, colidx);
     ASSERT_RET(!val.IsNull(), Internal, "OWNER cannot be NULL");
 
     // Handle according to sharding type.
@@ -169,7 +168,7 @@ absl::StatusOr<int> InsertContext::AssignDependentsToShard(
                  "Variable OWNS FK points to nonPK");
 
       // The value of the column that is a foreign key.
-      std::vector<dataflow::Value> vals;
+      std::vector<sqlast::Value> vals;
       for (const dataflow::Record &record : records) {
         vals.emplace_back(record.GetValue(colidx));
       }
@@ -195,7 +194,7 @@ absl::StatusOr<int> InsertContext::AssignDependentsToShard(
       size_t nextidx = info.column_index;
 
       // The value of the column that is a foreign key.
-      std::vector<dataflow::Value> vals;
+      std::vector<sqlast::Value> vals;
       for (const dataflow::Record &record : records) {
         vals.emplace_back(record.GetValue(colidx));
       }
@@ -225,12 +224,6 @@ absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
   // The inserted / replaced records to feed to dataflow engine.
   std::vector<dataflow::Record> records;
   records.push_back(this->dstate_.CreateRecord(this->stmt_));
-
-  // If replace, we need to delete the old record first (if exists), then
-  // insert the new one.
-  if (this->stmt_.replace()) {
-    return absl::InvalidArgumentError("REPLACE unsupported");
-  }
 
   // Insert the data into the physical shards.
   ASSIGN_OR_RETURN(int result, this->InsertIntoBaseTable());

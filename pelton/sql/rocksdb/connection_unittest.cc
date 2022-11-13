@@ -33,6 +33,10 @@ namespace sql {
 #define DB_PATH "/tmp/pelton/rocksdb/rocksdbconnection-test"
 #define STR(s) std::make_unique<std::string>(s)
 
+#define SQL(s) sqlast::Value::FromSQLString(s)
+#define COL(s) sqlast::Select::ResultColumn(s)
+#define LIT(s) sqlast::Select::ResultColumn(SQL(s))
+
 /*
  * Shorthand type aliases.
  */
@@ -104,13 +108,14 @@ void CleanDatabase() {
 }
 
 void CreateTable() {
+  using C = sqlast::ColumnConstraint::Type;
   // Create Table.
   sqlast::CreateTable tbl("test_table");
   tbl.AddColumn("ID", sqlast::ColumnDefinition("ID", CType::INT));
   tbl.AddColumn("name", sqlast::ColumnDefinition("name", CType::TEXT));
   tbl.AddColumn("age", sqlast::ColumnDefinition("age", CType::INT));
   tbl.MutableColumn("ID").AddConstraint(
-      sqlast::ColumnConstraint(Constraint::PRIMARY_KEY));
+      sqlast::ColumnConstraint::Make(C::PRIMARY_KEY));
   EXPECT_TRUE(CONN->ExecuteCreateTable(tbl));
 }
 
@@ -122,20 +127,20 @@ void CreateNameIndex() {
 
 void InsertData() {
   // Insert into table.
-  sqlast::Insert insert("test_table", false);
-  insert.SetValues({"0", "'user1'", "20"});
+  sqlast::Insert insert("test_table");
+  insert.SetValues({SQL("0"), SQL("'user1'"), SQL("20")});
   EXPECT_EQ(CONN->ExecuteInsert(insert, util::ShardName("user", "1")), 1);
 
-  insert.SetValues({"1", "'user2'", "25"});
+  insert.SetValues({SQL("1"), SQL("'user2'"), SQL("25")});
   EXPECT_EQ(CONN->ExecuteInsert(insert, util::ShardName("user", "2")), 1);
 
-  insert.SetValues({"2", "'user3'", "30"});
+  insert.SetValues({SQL("2"), SQL("'user3'"), SQL("30")});
   EXPECT_EQ(CONN->ExecuteInsert(insert, util::ShardName("user", "3")), 1);
 
-  insert.SetValues({"3", "'user3'", "35"});
+  insert.SetValues({SQL("3"), SQL("'user3'"), SQL("35")});
   EXPECT_EQ(CONN->ExecuteInsert(insert, util::ShardName("user", "3")), 1);
 
-  insert.SetValues({"3", "'user3'", "35"});
+  insert.SetValues({SQL("3"), SQL("'user3'"), SQL("35")});
   EXPECT_EQ(CONN->ExecuteInsert(insert, util::ShardName("user", "2")), 1);
 }
 
@@ -152,17 +157,22 @@ std::unique_ptr<BinExpr> MakeWhere(
     const std::unordered_map<std::string, std::vector<std::string>> &map) {
   // Transform map to condition.
   std::unique_ptr<BinExpr> condition(nullptr);
-  for (const auto &[col, vals] : map) {
+  for (const auto &[col, unparsed] : map) {
+    // Transform strings to typed AST values.
+    std::vector<sqlast::Value> vals;
+    for (const std::string &str : unparsed) {
+      vals.push_back(SQL(str));
+    }
     // Transform current clause.
     std::unique_ptr<BinExpr> clause(nullptr);
     if (vals.size() > 1) {
       clause = std::make_unique<BinExpr>(EType::IN);
       clause->SetLeft(std::make_unique<ColExpr>(col));
       clause->SetRight(std::make_unique<ListExpr>(vals));
-    } else if (vals.front() == "NULL") {
+    } else if (vals.front().IsNull()) {
       clause = std::make_unique<BinExpr>(EType::IS);
       clause->SetLeft(std::make_unique<ColExpr>(col));
-      clause->SetRight(std::make_unique<LitExpr>("NULL"));
+      clause->SetRight(std::make_unique<LitExpr>(vals.front()));
     } else {
       clause = std::make_unique<BinExpr>(EType::EQ);
       clause->SetLeft(std::make_unique<ColExpr>(col));
@@ -186,7 +196,7 @@ std::unique_ptr<BinExpr> MakeWhere(
 SqlResultSet SelectBy(
     const std::unordered_map<std::string, std::vector<std::string>> &map) {
   sqlast::Select select("test_table");
-  select.AddColumn("*");
+  select.AddColumn(COL("*"));
   select.SetWhereClause(MakeWhere(map));
 
   return CONN->ExecuteSelect(select);
@@ -310,9 +320,9 @@ TEST_F(RocksdbConnectionTest, CreateInsertSelect) {
 TEST_F(RocksdbConnectionTest, SelectAllProject) {
   // Select all records with projection.
   sqlast::Select select("test_table");
-  select.AddColumn("1");
-  select.AddColumn("'ID'");
-  select.AddColumn("name");
+  select.AddColumn(LIT("1"));
+  select.AddColumn(LIT("'ID'"));
+  select.AddColumn(COL("name"));
   SqlResultSet result = CONN->ExecuteSelect(select);
 
   // Expected output.
@@ -502,7 +512,7 @@ TEST_F(RocksdbConnectionTest, DeleteShard) {
 
   // Table is now empty!
   sqlast::Select select("test_table");
-  select.AddColumn("*");
+  select.AddColumn(COL("*"));
   EXPECT_EQ(CONN->ExecuteSelect(select), EMPTY);
   EXPECT_EQ(CONN->GetAll("test_table"), EMPTY);
 }
@@ -510,7 +520,7 @@ TEST_F(RocksdbConnectionTest, DeleteShard) {
 TEST_F(RocksdbConnectionTest, GetAllDeleteAll) {
   // Get all records in table: shared record appears only once!
   sqlast::Select select("test_table");
-  select.AddColumn("*");
+  select.AddColumn(COL("*"));
   EXPECT_EQ(CONN->ExecuteSelect(select), GetRecords({0, 1, 2, 3}));
   EXPECT_EQ(CONN->GetAll("test_table"), GetRecords({0, 1, 2, 3}));
 
@@ -525,7 +535,7 @@ TEST_F(RocksdbConnectionTest, GetAllDeleteAll) {
 
 TEST_F(RocksdbConnectionTest, CountShards) {
   // 3 -> 2, 0, 1, 2, -> 1
-  std::vector<dataflow::Value> pk_values;
+  std::vector<sqlast::Value> pk_values;
   pk_values.emplace_back(0_s);
   pk_values.emplace_back(1_s);
   pk_values.emplace_back(2_s);

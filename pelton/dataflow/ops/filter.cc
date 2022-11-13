@@ -4,41 +4,37 @@
 #include <utility>
 
 #include "glog/logging.h"
-#include "pelton/sqlast/ast.h"
 
 // The value in v must be of the same type as the corresponding one in the
 // record schema.
-#define COLUMN_VALUE_CMP_MACRO(col, v, OP)                          \
-  if (record.schema().TypeOf(col) != Record::TypeOfVariant(v)) {    \
-    LOG(FATAL) << "Type mistmatch in filter value";                 \
-  }                                                                 \
-  if (record.IsNull(col)) {                                         \
-    return false;                                                   \
-  }                                                                 \
-  switch (record.schema().TypeOf(col)) {                            \
-    case sqlast::ColumnDefinition::Type::INT:                       \
-      if (!(record.GetInt(col) OP std::get<int64_t>(v))) {          \
-        return false;                                               \
-      }                                                             \
-      break;                                                        \
-    case sqlast::ColumnDefinition::Type::UINT:                      \
-      if (!(record.GetUInt(col) OP std::get<uint64_t>(v))) {        \
-        return false;                                               \
-      }                                                             \
-      break;                                                        \
-    case sqlast::ColumnDefinition::Type::TEXT:                      \
-      if (!(record.GetString(col) OP std::get<std::string>(v))) {   \
-        return false;                                               \
-      }                                                             \
-      break;                                                        \
-    case sqlast::ColumnDefinition::Type::DATETIME:                  \
-      if (!(record.GetDateTime(col) OP std::get<std::string>(v))) { \
-        return false;                                               \
-      }                                                             \
-      break;                                                        \
-    default:                                                        \
-      LOG(FATAL) << "Unsupported data type in filter operator";     \
-  }                                                                 \
+#define COLUMN_VALUE_CMP_MACRO(col, v, OP)                      \
+  if (record.IsNull(col)) {                                     \
+    return false;                                               \
+  }                                                             \
+  switch (record.schema().TypeOf(col)) {                        \
+    case sqlast::ColumnDefinition::Type::INT:                   \
+      if (!(record.GetInt(col) OP v.GetInt())) {                \
+        return false;                                           \
+      }                                                         \
+      break;                                                    \
+    case sqlast::ColumnDefinition::Type::UINT:                  \
+      if (!(record.GetUInt(col) OP v.GetUInt())) {              \
+        return false;                                           \
+      }                                                         \
+      break;                                                    \
+    case sqlast::ColumnDefinition::Type::TEXT:                  \
+      if (!(record.GetString(col) OP v.GetString())) {          \
+        return false;                                           \
+      }                                                         \
+      break;                                                    \
+    case sqlast::ColumnDefinition::Type::DATETIME:              \
+      if (!(record.GetDateTime(col) OP v.GetString())) {        \
+        return false;                                           \
+      }                                                         \
+      break;                                                    \
+    default:                                                    \
+      LOG(FATAL) << "Unsupported data type in filter operator"; \
+  }                                                             \
   // COLUMN_VALUE_COMPARE_MACRO
 
 #define COLUMN_COLUMN_CMP_MACRO(col1, col2, OP)                       \
@@ -80,7 +76,7 @@
   if (operation.is_column()) {                                               \
     COLUMN_COLUMN_CMP_MACRO(operation.left(), operation.right_column(), OP); \
   } else {                                                                   \
-    COLUMN_VALUE_CMP_MACRO(operation.left(), operation.right(), OP);         \
+    COLUMN_VALUE_CMP_MACRO(operation.left(), operation.right_value(), OP);   \
   }                                                                          \
   break
 // GENERIC_COMPARE_MACRO

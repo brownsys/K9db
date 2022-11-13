@@ -33,7 +33,7 @@ SqlResultSet RocksdbConnection::GetShard(const std::string &table_name,
     std::string shard = key.At(0).ToString();
     RocksdbSequence value =
         this->encryption_manager_.DecryptValue(shard, std::move(envalue));
-    records.push_back(value.DecodeRecord(schema));
+    records.push_back(value.DecodeRecord(schema, true));
   }
 
   return SqlResultSet(schema, std::move(records));
@@ -63,7 +63,7 @@ SqlResultSet RocksdbConnection::DeleteShard(const std::string &table_name,
     std::string shard = key.At(0).ToString();
     RocksdbSequence value =
         this->encryption_manager_.DecryptValue(shard, std::move(envalue));
-    records.push_back(value.DecodeRecord(schema));
+    records.push_back(value.DecodeRecord(schema, false));
 
     // Delete in indices.
     table.IndexDelete(shard, value);

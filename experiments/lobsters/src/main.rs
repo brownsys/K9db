@@ -27,19 +27,19 @@ lazy_static! {
   // Sum should be 100000 or less (excluding -1s).
   // Comment out entry to use default weight.
   static ref WEIGHTS: HashMap<String, isize> = HashMap::from([
-    //("story".into(), 100000),
-    //("frontpage".into(), -1),
-    //("user".into(), -1),
-    //("comments".into(), -1),
-    //("recent".into(), -1),
-    //("commentvoteup".into(), -1),
-    //("commentvotedown".into(), -1),
-    //("storyvoteup".into(), -1),
-    //("storyvotedown".into(), -1),
-    //("comment".into(), -1),
-    //("subcomment".into(), -1),
-    //("login".into(), -1),
-    //("submit".into(), -1),
+    //("story".into(), 10000),
+    //("frontpage".into(), 10000),
+    //("user".into(), 10000),
+    //("comments".into(), 10000),
+    //("recent".into(), 10000),
+    //("commentvoteup".into(), 5000),
+    //("commentvotedown".into(), 5000),
+    //("storyvoteup".into(), 5000),
+    //("storyvotedown".into(), 5000),
+    //("comment".into(), 7000),
+    //("subcomment".into(), 3000),
+    //("login".into(), 10000),
+    //("submit".into(), 10000),
   ]);
 }
 
@@ -55,7 +55,7 @@ static VIEWS: [&'static str; 16] = [
     "SELECT tags.id, stories.user_id, count(*) AS `count` FROM tags INNER JOIN taggings ON tags.id = taggings.tag_id INNER JOIN stories ON taggings.story_id = stories.id WHERE tags.inactive = 0 AND stories.user_id = ? GROUP BY tags.id, stories.user_id ORDER BY `count` DESC LIMIT 1",
     "SELECT suggested_titles.* FROM suggested_titles WHERE suggested_titles.story_id = ?",
     "SELECT taggings.* FROM taggings WHERE taggings.story_id = ?",
-    "SELECT 1 AS `one`, hats.OWNER_user_id FROM hats WHERE hats.OWNER_user_id = ? LIMIT 1",
+    "SELECT 1 AS `one`, hats.user_id FROM hats WHERE hats.user_id = ? LIMIT 1",
     "SELECT suggested_taggings.* FROM suggested_taggings WHERE suggested_taggings.story_id = ?",
     "SELECT comments.* FROM comments WHERE comments.is_deleted = 0 AND comments.is_moderated = 0 ORDER BY id DESC LIMIT 40",
     "SELECT stories.* FROM stories WHERE stories.id = ?",
@@ -330,7 +330,7 @@ impl Service<TrawlerRequest> for MysqlTrawler {
                         let c = c.await?;
                         let (mut c, user) = c
                             .first_exec::<_, _, my::Row>(
-                                "SELECT 1 AS `one` FROM users WHERE users.PII_username = ?",
+                                "SELECT 1 AS `one` FROM users WHERE users.username = ?",
                                 (format!("user{}", acting_as.unwrap()),),
                             )
                             .await?;
@@ -340,7 +340,7 @@ impl Service<TrawlerRequest> for MysqlTrawler {
                             c = c
                                 .drop_exec(
                                     "INSERT INTO users \
-                                    (id, PII_username, email, password_digest, created_at, is_admin, \
+                                    (id, username, email, password_digest, created_at, is_admin, \
                                     password_reset_token, session_token, about, invited_by_user_id,\
                                     is_moderator, pushover_mentions, rss_token, mailing_list_token,\
                                     mailing_list_mode, karma, banned_at, banned_by_user_id, \

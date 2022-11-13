@@ -12,32 +12,10 @@ namespace sql {
 
 bool InMemoryFilter(const sqlast::ValueMapper &value_mapper,
                     const dataflow::Record &record) {
-  for (const auto &[i, vals] : value_mapper.Before()) {
-    std::string value;
-    if (record.IsNull(i)) {
-      value = "NULL";
-    } else {
-      switch (record.schema().TypeOf(i)) {
-        case sqlast::ColumnDefinition::Type::UINT: {
-          value = std::to_string(record.GetUInt(i));
-          break;
-        }
-        case sqlast::ColumnDefinition::Type::INT: {
-          value = std::to_string(record.GetInt(i));
-          break;
-        }
-        case sqlast::ColumnDefinition::Type::TEXT: {
-          value = '\'' + record.GetString(i) + '\'';
-          break;
-        }
-        case sqlast::ColumnDefinition::Type::DATETIME: {
-          value = '\'' + record.GetDateTime(i) + '\'';
-          break;
-        }
-        default: {
-          LOG(FATAL) << "UNREACHABLE";
-        }
-      }
+  for (const auto &[i, vals] : value_mapper.Values()) {
+    sqlast::Value value = record.GetValue(i);
+    if (value.type() == sqlast::Value::Type::UINT) {
+      value = sqlast::Value(static_cast<int64_t>(value.GetUInt()));
     }
     if (std::find(vals.begin(), vals.end(), value) == vals.end()) {
       return false;

@@ -9,7 +9,11 @@ namespace sql {
 
 // Open a connection.
 void RocksdbConnection::Open(const std::string &db_name) {
+#ifdef PELTON_OPT
+  std::string path = "/mnt/disks/my-ssd/pelton/" + db_name;
+#else
   std::string path = "/tmp/pelton/rocksdb/" + db_name;
+#endif  // PELTON_OPT
 
   // Options.
   rocksdb::Options opts;

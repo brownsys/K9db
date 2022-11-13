@@ -5,6 +5,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 // NOLINTNEXTLINE
 #include <variant>
 #include <vector>
@@ -14,6 +15,7 @@
 #include "pelton/dataflow/ops/project_enum.h"
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/types.h"
+#include "pelton/sqlast/ast.h"
 
 namespace pelton {
 namespace dataflow {
@@ -28,46 +30,46 @@ class ProjectOperator : public Operator {
 
   ProjectOperator() : Operator(Operator::Type::PROJECT), projections_() {}
 
-  void AddColumnProjection(const std::string &column_name, ColumnID cid) {
-    this->projections_.emplace_back(column_name, cid);
+  // Projecting a column.
+  void AddColumnProjection(const std::string &name, ColumnID cid) {
+    this->projections_.emplace_back(name, cid);
   }
 
-  void AddLiteralProjection(const std::string &column_name,
-                            Record::DataVariant literal) {
-    this->projections_.emplace_back(column_name, literal, true);
+  // Projecting a literal.
+  void AddLiteralProjection(const std::string &name, uint64_t literal) {
+    this->projections_.emplace_back(name, sqlast::Value(literal));
+  }
+  void AddLiteralProjection(const std::string &name, int64_t literal) {
+    this->projections_.emplace_back(name, sqlast::Value(literal));
+  }
+  void AddLiteralProjection(const std::string &name, const std::string &lit) {
+    this->projections_.emplace_back(name, sqlast::Value(lit));
   }
 
-  void AddArithmeticColumnsProjection(const std::string &column_name,
-                                      ColumnID left_col, ColumnID right_col,
-                                      Operation op) {
-    this->projections_.emplace_back(column_name, op, left_col, right_col);
+  // Projecting an arithmetic operation with two columns.
+  void AddArithmeticProjectionColumns(const std::string &name, Operation op,
+                                      ColumnID l, ColumnID r) {
+    this->projections_.emplace_back(name, op, l, r);
   }
-  void AddArithmeticLeftProjection(std::string column_name, ColumnID left_col,
-                                   Record::DataVariant literal, Operation op) {
-    if (literal.index() == 2 && this->input_schemas_.size() > 0 &&
-        this->input_schemas_.at(0).TypeOf(left_col) ==
-            sqlast::ColumnDefinition::Type::UINT) {
-      int64_t v = std::get<2>(literal);
-      CHECK_GE(v, 0);
-      this->AddArithmeticLeftProjection(column_name, left_col,
-                                        static_cast<uint64_t>(v), op);
-    } else {
-      this->projections_.emplace_back(column_name, left_col, op, literal);
-    }
+
+  // Projecting an arithmetic operation with a literal (on the left) and a col.
+  void AddArithmeticProjectionLiteralLeft(const std::string &name, Operation op,
+                                          uint64_t l, ColumnID r) {
+    this->projections_.emplace_back(name, op, sqlast::Value(l), r);
   }
-  void AddArithmeticRightProjection(std::string column_name,
-                                    Record::DataVariant literal,
-                                    ColumnID right_col, Operation op) {
-    if (literal.index() == 2 && this->input_schemas_.size() > 0 &&
-        this->input_schemas_.at(0).TypeOf(right_col) ==
-            sqlast::ColumnDefinition::Type::UINT) {
-      int64_t v = std::get<2>(literal);
-      CHECK_GE(v, 0);
-      this->AddArithmeticRightProjection(column_name, static_cast<uint64_t>(v),
-                                         right_col, op);
-    } else {
-      this->projections_.emplace_back(column_name, literal, right_col, op);
-    }
+  void AddArithmeticProjectionLiteralLeft(const std::string &name, Operation op,
+                                          int64_t l, ColumnID r) {
+    this->projections_.emplace_back(name, op, sqlast::Value(l), r);
+  }
+
+  // Projecting an arithmetic operation with a col and a literal (on the right).
+  void AddArithmeticProjectionLiteralRight(const std::string &name, Operation o,
+                                           ColumnID l, uint64_t r) {
+    this->projections_.emplace_back(name, o, l, sqlast::Value(r));
+  }
+  void AddArithmeticProjectionLiteralRight(const std::string &name, Operation o,
+                                           ColumnID l, int64_t r) {
+    this->projections_.emplace_back(name, o, l, sqlast::Value(r));
   }
 
   std::optional<ColumnID> ProjectColumn(ColumnID col) const;
@@ -88,20 +90,19 @@ class ProjectOperator : public Operator {
     ProjectionOperation(const std::string &name, ColumnID cid)
         : name_(name),
           left_(static_cast<uint64_t>(cid)),
-          right_(NullValue()),
+          right_(),
           meta_(Metadata::COLUMN),
           op_(Operation::NONE) {}
 
-    // Project literal (bool _ is for distinguishing from other constructors).
-    ProjectionOperation(const std::string &name, Record::DataVariant literal,
-                        bool _)
+    // Project literal.
+    ProjectionOperation(const std::string &name, sqlast::Value &&literal)
         : name_(name),
-          left_(literal),
-          right_(NullValue()),
+          left_(std::move(literal)),
+          right_(),
           meta_(Metadata::LITERAL),
           op_(Operation::NONE) {}
 
-    // Project arithmetic operation
+    // Project arithmetic operation over two columns.
     ProjectionOperation(const std::string &name, Operation op, ColumnID left,
                         ColumnID right)
         : name_(name),
@@ -111,20 +112,21 @@ class ProjectOperator : public Operator {
           op_(op) {
       CHECK_NE(op, Operation::NONE);
     }
-    ProjectionOperation(const std::string &name, ColumnID left, Operation op,
-                        Record::DataVariant literal)
+    // Project arithmetic operation over a literal and a column.
+    ProjectionOperation(const std::string &name, Operation op,
+                        sqlast::Value &&left, ColumnID right)
         : name_(name),
-          left_(static_cast<uint64_t>(left)),
-          right_(literal),
+          left_(std::move(left)),
+          right_(static_cast<uint64_t>(right)),
           meta_(Metadata::ARITHMETIC_WITH_LITERAL_LEFT),
           op_(op) {
       CHECK_NE(op, Operation::NONE);
     }
-    ProjectionOperation(const std::string &name, Record::DataVariant literal,
-                        ColumnID right, Operation op)
+    ProjectionOperation(const std::string &name, Operation op, ColumnID left,
+                        sqlast::Value &&right)
         : name_(name),
-          left_(literal),
-          right_(static_cast<uint64_t>(right)),
+          left_(static_cast<uint64_t>(left)),
+          right_(std::move(right)),
           meta_(Metadata::ARITHMETIC_WITH_LITERAL_RIGHT),
           op_(op) {
       CHECK_NE(op, Operation::NONE);
@@ -136,40 +138,30 @@ class ProjectOperator : public Operator {
     bool arithemtic() const { return this->op_ != Operation::NONE; }
     bool left_column() const {
       return this->meta_ == Metadata::ARITHMETIC_WITH_COLUMN ||
-             this->meta_ == Metadata::ARITHMETIC_WITH_LITERAL_LEFT;
+             this->meta_ == Metadata::ARITHMETIC_WITH_LITERAL_RIGHT;
     }
     bool right_column() const {
       return this->meta_ == Metadata::ARITHMETIC_WITH_COLUMN ||
-             this->meta_ == Metadata::ARITHMETIC_WITH_LITERAL_RIGHT;
+             this->meta_ == Metadata::ARITHMETIC_WITH_LITERAL_LEFT;
     }
 
     // Accessors.
     const std::string &getName() const { return this->name_; }
-    ColumnID getColumn() const {
-      uint64_t col = std::get<uint64_t>(this->left_);
-      return static_cast<ColumnID>(col);
-    }
-    const Record::DataVariant &getLiteral() const { return this->left_; }
-    ColumnID getLeftColumn() const { return this->getColumn(); }
-    const Record::DataVariant &getLeftLiteral() const {
-      return this->getLiteral();
-    }
-    ColumnID getRightColumn() const {
-      uint64_t col = std::get<uint64_t>(this->right_);
-      return static_cast<ColumnID>(col);
-    }
-    const Record::DataVariant &getRightLiteral() const { return this->right_; }
+    ColumnID getLeftColumn() const { return this->left_.GetUInt(); }
+    const sqlast::Value &getLeftLiteral() const { return this->left_; }
+    ColumnID getRightColumn() const { return this->right_->GetUInt(); }
+    const sqlast::Value &getRightLiteral() const { return *this->right_; }
     Operation getOperation() const { return this->op_; }
 
    private:
     // The name of the target projected column.
     std::string name_;
-    // The left (or only if unary) operand in the projection.
+    // The left (or only, if unary) operand in the projection.
     // May be a literal or column.
-    Record::DataVariant left_;
+    sqlast::Value left_;
     // The right operand (only exists when binary projection).
     // May be a literal or a column.
-    Record::DataVariant right_;
+    std::optional<sqlast::Value> right_;
     // Specifes the type of projection (e.g. column, literal, or arithmetic)
     // this including whether left_ and right_ are literals or columns.
     Metadata meta_;

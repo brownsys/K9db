@@ -9,6 +9,7 @@
 #include "pelton/shards/sqlengine/gdpr.h"
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/insert.h"
+#include "pelton/shards/sqlengine/replace.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/update.h"
 #include "pelton/shards/sqlengine/view.h"
@@ -46,15 +47,21 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       return context.Exec();
     }
 
-    // Case 2: Insert statement.
+    // Case 2: INSERT or REPLACE statement.
     case sqlast::AbstractStatement::Type::INSERT: {
       auto *stmt = static_cast<sqlast::Insert *>(statement.get());
       util::SharedLock lock = connection->state->ReaderLock();
       InsertContext context(*stmt, connection, &lock);
       return context.Exec();
     }
+    case sqlast::AbstractStatement::Type::REPLACE: {
+      auto *stmt = static_cast<sqlast::Replace *>(statement.get());
+      util::SharedLock lock = connection->state->ReaderLock();
+      ReplaceContext context(*stmt, connection, &lock);
+      return context.Exec();
+    }
 
-    // Case 3: Update statement.
+    // Case 3: UPDATE statement.
     case sqlast::AbstractStatement::Type::UPDATE: {
       auto *stmt = static_cast<sqlast::Update *>(statement.get());
       util::SharedLock lock = connection->state->ReaderLock();
@@ -62,7 +69,7 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       return context.Exec();
     }
 
-    // Case 4: Select statement.
+    // Case 4: SELECT statement.
     // Might be a select from a matview or a table.
     case sqlast::AbstractStatement::Type::SELECT: {
       auto *stmt = static_cast<sqlast::Select *>(statement.get());
@@ -76,7 +83,7 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       }
     }
 
-    // Case 5: Delete statement.
+    // Case 5: DELETE statement.
     case sqlast::AbstractStatement::Type::DELETE: {
       auto *stmt = static_cast<sqlast::Delete *>(statement.get());
       util::SharedLock lock = connection->state->ReaderLock();

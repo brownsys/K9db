@@ -1,5 +1,6 @@
 #include "pelton/proxy/src/ffi/ffi.h"
 
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -20,6 +21,11 @@ DEFINE_string(hostname, "127.0.0.1:10001", "Hostname to bind against");
 
 uint64_t ffi_total_time = 0;
 uint64_t ffi_total_count = 0;
+
+// Defined in rust (proxy.rs).
+extern "C" {
+void proxy_terminate(int);
+}
 
 // process command line arguments with gflags
 FFIArgs FFIGflags(int argc, char **argv, const char *usage) {
@@ -43,6 +49,9 @@ bool FFIInitialize(size_t workers, bool consistent) {
   LOG(INFO) << "C-Wrapper: running pelton::initialize";
   if (pelton::initialize(workers, consistent)) {
     LOG(INFO) << "C-Wrapper: global connection opened";
+    // Set signal handler.
+    signal(SIGINT, proxy_terminate);
+    signal(SIGTERM, proxy_terminate);
     return true;
   } else {
     LOG(FATAL) << "C-Wrapper: failed to open global connection";

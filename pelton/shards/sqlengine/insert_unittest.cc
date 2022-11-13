@@ -51,7 +51,7 @@ TEST_F(InsertTest, UnshardedTable) {
 
 TEST_F(InsertTest, Datasubject) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -82,7 +82,7 @@ TEST_F(InsertTest, Datasubject) {
 
 TEST_F(InsertTest, DirectTable) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
 
   // Make a pelton connection.
@@ -115,7 +115,7 @@ TEST_F(InsertTest, DirectTable) {
 
 TEST_F(InsertTest, TransitiveTable) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
   std::string nums = MakeCreate("phones", {"id" I PK, "aid" I FK "addr(id)"});
 
@@ -158,7 +158,7 @@ TEST_F(InsertTest, TransitiveTable) {
 
 TEST_F(InsertTest, DeepTransitiveTable) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
   std::string nums = MakeCreate("phones", {"id" I PK, "aid" I FK "addr(id)"});
   std::string deep = MakeCreate("deep", {"id" I PK, "pid" I FK "phones(id)"});
@@ -213,7 +213,7 @@ TEST_F(InsertTest, DeepTransitiveTable) {
 
 TEST_F(InsertTest, DeepTransitiveUnnaturalTable) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
   std::string nums = MakeCreate("phones", {"id" I PK, "aid" I FK "addr(id)"});
   std::string deep = MakeCreate("deep", {"id" I PK, "pid" I FK "phones(id)"});
@@ -274,10 +274,9 @@ TEST_F(InsertTest, DeepTransitiveUnnaturalTable) {
 
 TEST_F(InsertTest, TwoOwners) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
-                         "OWNER_receiver" I FK "user(id)"});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I OB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -313,10 +312,9 @@ TEST_F(InsertTest, TwoOwners) {
 
 TEST_F(InsertTest, OwnerAccessor) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
-                         "ACCESSOR_receiver" I FK "user(id)"});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I AB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -352,9 +350,10 @@ TEST_F(InsertTest, OwnerAccessor) {
 
 TEST_F(InsertTest, ShardedDataSubject) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string invited = MakeCreate(
-      "invited", {"id" I PK, "PII_name" STR, "inviting_user" I FK "user(id)"});
+      "invited", {"id" I PK, "name" STR, "inviting_user" I FK "user(id)"},
+      true);
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -387,11 +386,11 @@ TEST_F(InsertTest, ShardedDataSubject) {
 
 TEST_F(InsertTest, VariableOwnership) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string grps = MakeCreate("grps", {"gid" I PK});
-  std::string assoc =
-      MakeCreate("association", {"id" I PK, "OWNING_group" I FK "grps(gid)",
-                                 "OWNER_user" I FK "user(id)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"id" I PK, "group_id" I OW "grps(gid)", "user_id" I OB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -438,18 +437,18 @@ TEST_F(InsertTest, VariableOwnership) {
 
 TEST_F(InsertTest, ComplexVariableOwnership) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string admin = MakeCreate("admin", {"aid" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string admin = MakeCreate("admin", {"aid" I PK, "name" STR}, true);
   std::string grps =
-      MakeCreate("grps", {"gid" I PK, "OWNER_admin" I FK "admin(aid)"});
-  std::string assoc =
-      MakeCreate("association", {"sid" I PK, "OWNING_group" I FK "grps(gid)",
-                                 "OWNER_user" I FK "user(id)"});
+      MakeCreate("grps", {"gid" I PK, "admin" I OB "admin(aid)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"sid" I PK, "group_id" I OW "grps(gid)", "user_id" I OB "user(id)"});
   std::string files =
-      MakeCreate("files", {"fid" I PK, "OWNER_creator" I FK "user(id)"});
-  std::string fassoc =
-      MakeCreate("fassoc", {"fsid" I PK, "OWNING_file" I FK "files(fid)",
-                            "OWNER_group" I FK "grps(gid)"});
+      MakeCreate("files", {"fid" I PK, "creator" I OB "user(id)"});
+  std::string fassoc = MakeCreate(
+      "fassoc",
+      {"fsid" I PK, "file" I OW "files(fid)", "group_id" I OB "grps(gid)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();

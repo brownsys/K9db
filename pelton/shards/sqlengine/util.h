@@ -12,20 +12,12 @@
 
 #include "pelton/connection.h"
 #include "pelton/dataflow/record.h"
-#include "pelton/sqlast/ast.h"
 #include "pelton/util/shard_name.h"
 #include "pelton/util/upgradable_lock.h"
 
 namespace pelton {
 namespace shards {
 namespace sqlengine {
-
-bool IsADataSubject(const sqlast::CreateTable &stmt);
-
-bool IsOwner(const sqlast::ColumnDefinition &col);
-bool IsAccessor(const sqlast::ColumnDefinition &col);
-bool IsOwns(const sqlast::ColumnDefinition &col);
-bool IsAccesses(const sqlast::ColumnDefinition &col);
 
 // Determine which shards the given record reside in.
 enum class ShardLocation { NO_SHARD, NOT_IN_GIVEN_SHARD, IN_GIVEN_SHARD };

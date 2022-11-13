@@ -20,6 +20,7 @@ class AbstractStatement {
     CREATE_TABLE,
     CREATE_INDEX,
     INSERT,
+    REPLACE,
     UPDATE,
     SELECT,
     DELETE,
@@ -37,7 +38,7 @@ class AbstractStatement {
   // Printing to screen.
   friend std::ostream &operator<<(std::ostream &os, const AbstractStatement &r);
 
- private:
+ protected:
   Type type_;
 };
 

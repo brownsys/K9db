@@ -7,6 +7,7 @@
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <unordered_map>
 // NOLINTNEXTLINE
 #include <variant>
 #include <vector>
@@ -15,20 +16,20 @@
 #include "pelton/dataflow/key.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/types.h"
-#include "pelton/dataflow/value.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/type_utils.h"
 
 namespace pelton {
 namespace dataflow {
 
+// Pass instances of this to Record(<schema>, <positive>, <data...>) to indicate
+// null values.
+class NullValue {
+  // nothing to see here
+};
+
 class Record {
  public:
-  // Variant with the same type options as the record data type, can be used
-  // by external code to ensure same types are supported.
-  using DataVariant = std::variant<std::string, uint64_t, int64_t, NullValue>;
-  static sqlast::ColumnDefinition::Type TypeOfVariant(const DataVariant &v);
-
   // No default constructor.
   Record() = delete;
 
@@ -158,12 +159,10 @@ class Record {
   // Data access with generic type.
   Key GetKey() const;
   Key GetValues(const std::vector<ColumnID> &cols) const;
-  Value GetValue(ColumnID col) const;
-  std::string GetValueString(ColumnID col) const;
+  sqlast::Value GetValue(ColumnID col) const;
 
   // Data type transformation.
-  void SetValue(const std::string &value, size_t i);
-  void SetValue(const Value &value, size_t i);
+  void SetValue(const sqlast::Value &value, size_t i);
 
   // Deterministic hashing for partitioning / mutli-threading.
   size_t Hash(const std::vector<ColumnID> &cols) const;
@@ -173,6 +172,11 @@ class Record {
   const SchemaRef &schema() const { return this->schema_; }
   bool IsPositive() const { return this->positive_; }
   int GetTimestamp() const { return this->timestamp_; }
+
+  // Create a new record resulting from applying the update to this record.
+  // Updating the sequence given an update statement and schema.
+  using UpdateMap = std::unordered_map<std::string, const sqlast::Expression *>;
+  Record Update(const UpdateMap &updates) const;
 
   // Equality: schema must be identical (pointer wise) and all values must be
   // equal.

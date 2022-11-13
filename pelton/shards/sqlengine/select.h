@@ -36,14 +36,14 @@ class SelectContext {
         db_(conn->state->Database()),
         lock_(lock) {}
 
-  /* Main entry point for insert: Executes the statement against the shards. */
+  /* Main entry point for select: Executes the statement against the shards. */
   absl::StatusOr<sql::SqlResult> Exec();
 
  private:
   /* Members. */
   const sqlast::Select &stmt_;
   const std::string &table_name_;
-  Table &table_;
+  const Table &table_;
   const dataflow::SchemaRef &schema_;
 
   // Pelton connection.

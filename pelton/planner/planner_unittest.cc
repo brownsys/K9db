@@ -697,7 +697,7 @@ TEST(PlannerTest, FilterArithmeticCondition) {
       (std::vector<std::string>{"Col1", "Col2", "Col3", "_PELTON_TMP_4"}));
   EXPECT_EQ(
       projectOpBefore->output_schema().column_types(),
-      (std::vector<CType>{CType::INT, CType::TEXT, CType::UINT, CType::UINT}));
+      (std::vector<CType>{CType::INT, CType::TEXT, CType::UINT, CType::INT}));
   EXPECT_EQ(projectOpBefore->output_schema().keys(),
             std::vector<dataflow::ColumnID>{0});
 

@@ -9,8 +9,8 @@
 #include "absl/status/statusor.h"
 #include "pelton/connection.h"
 #include "pelton/dataflow/record.h"
-#include "pelton/dataflow/value.h"
 #include "pelton/shards/types.h"
+#include "pelton/sqlast/ast.h"
 #include "pelton/util/shard_name.h"
 #include "pelton/util/upgradable_lock.h"
 
@@ -21,7 +21,7 @@ namespace index {
 
 // Index lookup: value must be unparsed: i.e. surrounded by quotes etc.
 std::vector<dataflow::Record> LookupIndex(const IndexDescriptor &index,
-                                          dataflow::Value &&value,
+                                          sqlast::Value &&value,
                                           Connection *connection,
                                           util::SharedLock *lock);
 

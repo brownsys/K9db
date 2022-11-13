@@ -65,7 +65,6 @@ cc_library(
         "//pelton/dataflow:operator",
         "//pelton/dataflow:record",
         "//pelton/dataflow:types",
-        "//pelton/dataflow:value",
         "//pelton/sqlast:ast",
         "@com_google_googletest//:gtest_prod",
         "@glog",

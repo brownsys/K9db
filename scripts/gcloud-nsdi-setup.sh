@@ -38,7 +38,6 @@ echo 'export LOCAL_IP=$(curl  http://metadata.google.internal/computeMetadata/v1
 ssh-keyscan github.com >> ~/.ssh/known_hosts
 git clone git@github.com:brownsys/pelton.git
 cd pelton
-git checkout nsdi
 
 # Run the setup scripts
 ./scripts/setup-user.sh
@@ -57,6 +56,10 @@ sudo service mariadb stop
 
 # Build ownCloud harness
 cd ~/pelton/experiments/ownCloud
+bazel build ... -c opt
+
+# Build vote harness
+cd ~/pelton/experiments/vote
 bazel build ... -c opt
 
 # Build pelton

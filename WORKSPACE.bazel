@@ -164,11 +164,8 @@ cc_library(
     ],
 )
 """,
-    # My non-merged change for AUTO_INCREMENT from March 7 2022.
-    # Also create_view_stmt QUERY_LITERAL.
-    # Add less intrusive OWNER annotation.
-    commit = "65c56a9ded55064a83df3ca3383eed0ee556d132",
-    #remote = "https://github.com/antlr/grammars-v4",
+    # Has all our annotations.
+    commit = "1c39a36a0e42ae81c79cd7c1de67eafeb2b0e1d0",
     remote = "https://github.com/KinanBab/grammars-v4.git",
 )
 
@@ -290,10 +287,8 @@ filegroup(
 
 cmake(
     name = "rocksdb",
-    env = {
-      "USE_RTTI": "1",
-    },
     generate_args = [
+        "-DUSE_RTTI=ON",
         "-DROCKSDB_BUILD_SHARED=ON",
         "-DWITH_GFLAGS=OFF",
         "-DWITH_BZ2=1",
@@ -317,8 +312,8 @@ cmake(
     visibility = ["//visibility:public"],
 )
 """,
-    commit = "ce9ac2ce110465d9329c806f4cb57d92f821597e",
-    remote = "https://github.com/KinanBab/rocksdb.git",
+    commit = "eb9a80fe1f18017b4d7f4084e8f2554f12234822",
+    remote = "https://github.com/facebook/rocksdb.git",
 )
 
 # libsodium.

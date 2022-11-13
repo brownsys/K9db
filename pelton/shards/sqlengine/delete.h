@@ -12,7 +12,6 @@
 #include "pelton/connection.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/state.h"
-#include "pelton/dataflow/value.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
 #include "pelton/sql/abstract_connection.h"
@@ -38,7 +37,7 @@ class DeleteContext {
         db_(conn->state->Database()),
         lock_(lock) {}
 
-  /* Main entry point for insert: Executes the statement against the shards. */
+  /* Main entry point for delete: Executes the statement against the shards. */
   absl::StatusOr<sql::SqlResult> Exec();
   absl::StatusOr<std::pair<std::vector<dataflow::Record>, int>> ExecReturning();
 
@@ -55,7 +54,7 @@ class DeleteContext {
   /* Members. */
   const sqlast::Delete &stmt_;
   const std::string &table_name_;
-  Table &table_;
+  const Table &table_;
   const dataflow::SchemaRef &schema_;
 
   // Pelton connection.

@@ -48,8 +48,8 @@ jobs:
         docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/test.sh bin/examples/social_chat.sql bin/examples/social_chat.cntd.sql"
 
     # bin/test_multithreaded_proxy
-    - name: Run multi-threaded tests via mysql proxy
-      run: docker exec pelton-testing sh -c "cd /home/pelton/ && ./bin/test_multithreaded_proxy.sh"
+    #- name: Run multi-threaded tests via mysql proxy
+    #  run: docker exec pelton-testing sh -c "cd /home/pelton/ && ./bin/test_multithreaded_proxy.sh"
 
     # valgrind
     - name: Test dataflow with valgrind
@@ -59,7 +59,7 @@ jobs:
         TEST_KEY: bazel test //pelton/dataflow:key-test --config=valgrind --test_output=all
         TEST_RECORD: bazel test //pelton/dataflow:record-test --config=valgrind --test_output=all
         TEST_SCHEMA: bazel test //pelton/dataflow:schema-test --config=valgrind --test_output=all
-        TEST_VALUE: bazel test //pelton/dataflow:value-test --config=valgrind --test_output=all
+        TEST_VALUE: bazel test //pelton/sqlast:ast_value-test --config=valgrind --test_output=all
       run: |
         docker exec pelton-testing sh -c "cd /home/pelton && $TEST_OPS"
         docker exec pelton-testing sh -c "cd /home/pelton && $TEST_GRAPH_PARTITION"

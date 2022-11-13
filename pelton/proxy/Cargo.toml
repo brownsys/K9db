@@ -11,7 +11,6 @@ lazy_static = "1.4.0"
 msql-srv = "0.8.7"
 slog = { version = "2.7.0" } #features = ["max_level_error", "release_max_level_error"] }
 slog-term = "2.8.0"
-ctrlc = "3.1.9"
 gflags = "0.3"
 regex = "0.2"
 

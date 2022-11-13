@@ -441,8 +441,8 @@ TEST(AggregateOperatorTest, SumGoesAwayWithFilter) {
   aggregate.ComputeOutputSchema();
   // Filter operator..
   FilterOperator filter;
-  filter.AddOperation(0_s, 1, FilterOperator::Operation::GREATER_THAN);
   filter.AddParent(&aggregate);
+  filter.AddLiteralOperation(1, 0_s, FilterOperator::Operation::GREATER_THAN);
   // create a chained matview operator.
   UnorderedMatViewOperator matview(group_columns);
   matview.AddParent(&filter);

@@ -59,7 +59,7 @@ TEST_F(DeleteTest, UnshardedTable) {
 
 TEST_F(DeleteTest, DirectTable) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
 
   // Make a pelton connection.
@@ -95,7 +95,7 @@ TEST_F(DeleteTest, DirectTable) {
 
 TEST_F(DeleteTest, DeepTransitiveTable) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
   std::string nums = MakeCreate("phones", {"id" I PK, "aid" I FK "addr(id)"});
   std::string deep = MakeCreate("deep", {"id" I PK, "pid" I FK "phones(id)"});
@@ -176,10 +176,9 @@ TEST_F(DeleteTest, DeepTransitiveTable) {
 
 TEST_F(DeleteTest, TwoOwners) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
-                         "OWNER_receiver" I FK "user(id)"});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I OB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -210,7 +209,7 @@ TEST_F(DeleteTest, TwoOwners) {
 
   // Do some deletes.
   auto del1 = MakeDelete("msg", {"id = 1"});
-  auto del2 = MakeDelete("msg", {"OWNER_receiver = 0"});
+  auto del2 = MakeDelete("msg", {"receiver = 0"});
 
   EXPECT_UPDATE(Execute(del1, &conn), 2);
   EXPECT_UPDATE(Execute(del2, &conn), 3);
@@ -225,10 +224,10 @@ TEST_F(DeleteTest, TwoOwners) {
 
 TEST_F(DeleteTest, ShardedDataSubject) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string middle = MakeCreate("mid", {"id" I PK, "uid" I FK "user(id)"});
   std::string invited = MakeCreate(
-      "invited", {"id" I PK, "PII_name" STR, "inviting_mid" I FK "mid(id)"});
+      "invited", {"id" I PK, "name" STR, "inviting_mid" I FK "mid(id)"}, true);
   std::string attr = MakeCreate("attr", {"id" I PK, "iid" I FK "invited(id)"});
 
   // Make a pelton connection.
@@ -279,11 +278,11 @@ TEST_F(DeleteTest, ShardedDataSubject) {
 
 TEST_F(DeleteTest, VariableOwnership) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string grps = MakeCreate("grps", {"gid" I PK});
-  std::string assoc =
-      MakeCreate("association", {"id" I PK, "OWNING_group" I FK "grps(gid)",
-                                 "OWNER_user" I FK "user(id)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"id" I PK, "group_id" I OW "grps(gid)", "user_id" I OB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -336,18 +335,18 @@ TEST_F(DeleteTest, VariableOwnership) {
 
 TEST_F(DeleteTest, ComplexVariableOwnership) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string admin = MakeCreate("admin", {"aid" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string admin = MakeCreate("admin", {"aid" I PK, "name" STR}, true);
   std::string grps =
-      MakeCreate("grps", {"gid" I PK, "OWNER_admin" I FK "admin(aid)"});
-  std::string assoc =
-      MakeCreate("association", {"sid" I PK, "OWNING_group" I FK "grps(gid)",
-                                 "OWNER_user" I FK "user(id)"});
+      MakeCreate("grps", {"gid" I PK, "admin" I OB "admin(aid)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"sid" I PK, "group_id" I OW "grps(gid)", "user_id" I OB "user(id)"});
   std::string files =
-      MakeCreate("files", {"fid" I PK, "OWNER_creator" I FK "user(id)"});
-  std::string fassoc =
-      MakeCreate("fassoc", {"fsid" I PK, "OWNING_file" I FK "files(fid)",
-                            "OWNER_group" I FK "grps(gid)"});
+      MakeCreate("files", {"fid" I PK, "creator" I OB "user(id)"});
+  std::string fassoc = MakeCreate(
+      "fassoc",
+      {"fsid" I PK, "file" I OW "files(fid)", "group_id" I OB "grps(gid)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -420,7 +419,7 @@ TEST_F(DeleteTest, ComplexVariableOwnership) {
   EXPECT_EQ(db->GetAll("fassoc"), (V{farow1, farow3, farow4}));
 
   // Delete from association and validate.
-  auto del3 = MakeDelete("association", {"OWNING_group = 10"});
+  auto del3 = MakeDelete("association", {"group_id = 10"});
   EXPECT_UPDATE(Execute(del3, &conn), 7);
   EXPECT_EQ(db->GetShard("files", SN("user", "0")), (V{frow1, frow2}));
   EXPECT_EQ(db->GetShard("files", SN("user", "5")), (V{}));

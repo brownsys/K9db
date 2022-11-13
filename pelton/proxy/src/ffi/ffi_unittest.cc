@@ -13,6 +13,11 @@
 
 FFIConnection c_conn;
 
+// Ensure symbol exists. In reality, this is defined in the proxy.
+extern "C" {
+void proxy_terminate(int) {}
+}
+
 namespace {
 
 using CType = FFIColumnType;

@@ -1,19 +1,19 @@
 SET echo;
 
-CREATE TABLE Users ( \
+CREATE DATA_SUBJECT TABLE Users ( \
   id int, \
-  PII_name text, \
+  name text, \
   PRIMARY KEY(id) \
 );
 
 CREATE TABLE chat ( \
   id int, \
-  OWNER_sender_id int, \
-  OWNER_receiver_id int, \
+  sender_id int, \
+  receiver_id int, \
   message text, \
   PRIMARY KEY(id), \
-  FOREIGN KEY (OWNER_sender_id) REFERENCES Users(id), \
-  FOREIGN KEY (OWNER_receiver_id) REFERENCES Users(id) \
+  FOREIGN KEY (sender_id) OWNED_BY Users(id), \
+  FOREIGN KEY (receiver_id) OWNED_BY Users(id) \
 );
 
 INSERT INTO Users VALUES (1, 'Alice');
@@ -26,27 +26,25 @@ INSERT INTO chat VALUES (3, 3, 1, 'HELLO from carl');
 INSERT INTO chat VALUES (4, 3, 2, 'HELLO from carl 2');
 
 SELECT * FROM chat;
-GDPR GET Users 1;
+#GDPR GET Users 1;
 
 UPDATE chat SET message = 'Hello 2' WHERE message = 'HELLO from carl 2';
-UPDATE chat SET message = 'From Alice' WHERE OWNER_sender_id = 1;
-UPDATE chat SET message = 'To Alice' WHERE OWNER_receiver_id = 1;
+UPDATE chat SET message = 'From Alice' WHERE sender_id = 1;
+UPDATE chat SET message = 'To Alice' WHERE receiver_id = 1;
 SELECT * FROM chat;
 
 INSERT INTO chat VALUES (5, 1, 2, 'Message will move');
-#UPDATE chat SET OWNER_sender_id = 3 WHERE id = 5 AND OWNER_receiver_id = 2 AND OWNER_sender_id = 1;
+#UPDATE chat SET sender_id = 3 WHERE id = 5 AND receiver_id = 2 AND sender_id = 1;
 SELECT * FROM chat WHERE id = 5;
-#UPDATE chat SET OWNER_sender_id = 2, OWNER_receiver_id = 3 WHERE id = 5;
+#UPDATE chat SET sender_id = 2, receiver_id = 3 WHERE id = 5;
 SELECT * FROM chat WHERE id = 5;
-SELECT * FROM chat WHERE OWNER_sender_id = 1;
-SELECT * FROM chat WHERE OWNER_sender_id = 2;
-SELECT * FROM chat WHERE OWNER_sender_id = 3;
+SELECT * FROM chat WHERE sender_id = 1;
+SELECT * FROM chat WHERE sender_id = 2;
+SELECT * FROM chat WHERE sender_id = 3;
 
-GDPR FORGET Users 1;
-DELETE FROM Users WHERE id = 1;
+#GDPR FORGET Users 1;
 SELECT * FROM chat;
-SELECT * FROM chat WHERE OWNER_sender_id = 1;
+SELECT * FROM chat WHERE sender_id = 1;
 
-GDPR FORGET Users 2;
-DELETE FROM Users WHERE id = 2;
+#GDPR FORGET Users 2;
 SELECT * FROM chat;

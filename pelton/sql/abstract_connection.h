@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "pelton/dataflow/record.h"
-#include "pelton/dataflow/value.h"
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/shard_name.h"
@@ -20,7 +19,7 @@ namespace pelton {
 namespace sql {
 
 using ResultSetAndStatus = std::pair<SqlResultSet, int>;
-using KeyPair = std::pair<util::ShardName, dataflow::Value>;
+using KeyPair = std::pair<util::ShardName, sqlast::Value>;
 
 class AbstractConnection {
  public:
@@ -39,6 +38,9 @@ class AbstractConnection {
   // Insert.
   virtual int ExecuteInsert(const sqlast::Insert &sql,
                             const util::ShardName &shard_name) = 0;
+
+  // Update.
+  virtual ResultSetAndStatus ExecuteUpdate(const sqlast::Update &sql) = 0;
 
   // Delete.
   virtual SqlDeleteSet ExecuteDelete(const sqlast::Delete &sql) = 0;
@@ -62,7 +64,7 @@ class AbstractConnection {
 
   virtual ResultSetAndStatus AssignToShards(
       const std::string &table_name, size_t column_index,
-      const std::vector<dataflow::Value> &values,
+      const std::vector<sqlast::Value> &values,
       const std::unordered_set<util::ShardName> &targets) = 0;
 
   virtual int DeleteFromShard(const std::string &table_name,
@@ -72,7 +74,7 @@ class AbstractConnection {
 
   virtual std::vector<size_t> CountShards(
       const std::string &table_name,
-      const std::vector<dataflow::Value> &pk_values) const = 0;
+      const std::vector<sqlast::Value> &pk_values) const = 0;
 };
 
 }  // namespace sql

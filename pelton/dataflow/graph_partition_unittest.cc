@@ -225,7 +225,7 @@ std::unique_ptr<DataFlowGraphPartition> MakeFilterGraph(
 
   auto in = std::make_unique<InputOperator>("test-table", schema);
   auto filter = std::make_unique<FilterOperator>();
-  filter->AddOperation(5UL, 0, FilterOperator::Operation::GREATER_THAN);
+  filter->AddLiteralOperation(0, 5UL, FilterOperator::Operation::GREATER_THAN);
   auto matview = std::make_unique<KeyOrderedMatViewOperator>(keys);
 
   auto in_ptr = in.get();
@@ -329,7 +329,7 @@ std::unique_ptr<DataFlowGraphPartition> MakeProjectOnFilterGraph(
 
   auto in = std::make_unique<InputOperator>("test-table", schema);
   auto filter = std::make_unique<FilterOperator>();
-  filter->AddOperation(5_u, 0, FilterOperator::Operation::GREATER_THAN);
+  filter->AddLiteralOperation(0, 5_u, FilterOperator::Operation::GREATER_THAN);
   auto project = std::make_unique<ProjectOperator>();
   project->AddColumnProjection(schema.NameOf(0), 0);
   project->AddColumnProjection(schema.NameOf(2), 2);

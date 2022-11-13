@@ -17,6 +17,8 @@ namespace sql {
 #define SEP std::string({__ROCKSSEP})
 #define NUL std::string({__ROCKSNULL})
 
+#define SQL(s) sqlast::Value::FromSQLString(s)
+
 using CType = sqlast::ColumnDefinition::Type;
 
 dataflow::SchemaRef schema = dataflow::SchemaFactory::Create(
@@ -26,11 +28,11 @@ dataflow::SchemaRef schema = dataflow::SchemaFactory::Create(
 // RocksdbSequence.
 TEST(RocksdbEncodeTest, RocksdbSequence) {
   RocksdbSequence row;
-  row.Append(CType::UINT, "0");
-  row.Append(CType::TEXT, "'kinan'");
-  row.Append(CType::INT, "-10");
-  row.Append(CType::TEXT, "NULL");
-  row.Append(CType::DATETIME, "'2022-09-01 00:00:00'");
+  row.Append(sqlast::Value(0_u));
+  row.Append(sqlast::Value("kinan"));
+  row.Append(sqlast::Value(-10_s));
+  row.Append(sqlast::Value());  // NULL.
+  row.Append(sqlast::Value("2022-09-01 00:00:00"));
 
   // Test At.
   EXPECT_EQ(row.At(0), "0");
@@ -47,25 +49,20 @@ TEST(RocksdbEncodeTest, RocksdbSequence) {
             "-10" + SEP + NUL + SEP + "2022-09-01 00:00:00" + SEP);
   EXPECT_EQ(row.Slice(0, 5), row.Data().ToString());
 
-  // Test Update.
-  row.Replace(1, CType::TEXT, "'user'");
-  row.Replace(2, CType::INT, "-20");
-  EXPECT_EQ(row.At(1), "user");
-  EXPECT_EQ(row.At(2), "-20");
-
   // Test release / constructor.
   RocksdbSequence read = RocksdbSequence(row.Release());
 
   // Test record decoding.
-  dataflow::Record record = read.DecodeRecord(schema);
+  dataflow::Record record = read.DecodeRecord(schema, true);
+  EXPECT_EQ(record.IsPositive(), true);
   EXPECT_EQ(record.GetUInt(0), 0_u);
-  EXPECT_EQ(record.GetString(1), "user");
-  EXPECT_EQ(record.GetInt(2), -20_s);
+  EXPECT_EQ(record.GetString(1), "kinan");
+  EXPECT_EQ(record.GetInt(2), -10_s);
   EXPECT_EQ(record.IsNull(3), true);
   EXPECT_EQ(record.GetDateTime(4), "2022-09-01 00:00:00");
 
   // Test Iterator.
-  std::vector<std::string> expected = {"0", "user", "-20", NUL + "",
+  std::vector<std::string> expected = {"0", "kinan", "-10", NUL + "",
                                        "2022-09-01 00:00:00"};
 
   RocksdbSequence::Iterator it = read.begin();
@@ -79,12 +76,9 @@ TEST(RocksdbEncodeTest, RocksdbSequence) {
 
 // RocksdbRecord
 TEST(RocksdbEncodeTest, RocksdbRecord) {
-  sqlast::Insert stmt("table", false);
-  stmt.AddValue("0");
-  stmt.AddValue("'user'");
-  stmt.AddValue("-20");
-  stmt.AddValue("NULL");
-  stmt.AddValue("'2022-09-01 00:00:00'");
+  sqlast::Insert stmt("table");
+  stmt.SetValues({SQL("0"), SQL("'user'"), SQL("-20"), SQL("NULL"),
+                  SQL("'2022-09-01 00:00:00'")});
 
   // Test from insert.
   RocksdbRecord record =
@@ -102,17 +96,14 @@ TEST(RocksdbEncodeTest, RocksdbRecord) {
   // Test other constructor.
   RocksdbRecord read(record.Key().Release(), record.Value().Release());
 
-  // Test Update.
-  std::unordered_map<size_t, std::string> update;
-  update.emplace(0, "10");
-  update.emplace(2, "NULL");
-  update.emplace(3, "'email@gmail.com'");
-  read = read.Update(update, schema, util::ShardName("shard", "2"));
+  // Test key.
+  EXPECT_EQ(read.Key().Data(), "shard__0" + SEP + "0" + SEP);
+  EXPECT_EQ(read.GetShard(), "shard__0");
+  EXPECT_EQ(read.GetPK(), "0");
 
-  EXPECT_EQ(read.Key().Data(), "shard__2" + SEP + "10" + SEP);
-  EXPECT_EQ(read.Value().Data(), "10" + SEP + "user" + SEP + NUL + SEP +
-                                     "email@gmail.com" + SEP +
-                                     "2022-09-01 00:00:00" + SEP);
+  // Test value.
+  EXPECT_EQ(read.Value().Data(), "0" + SEP + "user" + SEP + "-20" + SEP + NUL +
+                                     SEP + "2022-09-01 00:00:00" + SEP);
 }
 
 // RocksdbIndexInternalRecord

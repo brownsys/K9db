@@ -15,6 +15,7 @@ cc_library(
         ":delete",
         ":index",
         ":insert",
+        ":replace",
         ":select",
         ":update",
         ":view",
@@ -45,7 +46,6 @@ cc_library(
         "//pelton:connection",
         "//pelton/shards:state",
         "//pelton/shards:types",
-        "//pelton/sqlast:ast",
         "//pelton/util:shard_name",
         "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/strings",
@@ -62,7 +62,6 @@ cc_library(
     ],
     deps = [
         ":index",
-        ":util",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:schema",
@@ -125,7 +124,6 @@ cc_library(
         "//pelton/dataflow:graph",
         "//pelton/dataflow:key",
         "//pelton/dataflow:record",
-        "//pelton/dataflow:value",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sqlast:ast",
@@ -148,7 +146,6 @@ cc_library(
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
-        "//pelton/dataflow:value",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sql:abstract_connection",
@@ -158,6 +155,28 @@ cc_library(
         "//pelton/util:status",
         "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/status",
+    ],
+)
+
+cc_library(
+    name = "replace",
+    srcs = [
+        "replace.cc",
+    ],
+    hdrs = [
+        "replace.h",
+    ],
+    deps = [
+        ":delete",
+        ":insert",
+        "//pelton:connection",
+        "//pelton/dataflow:schema",
+        "//pelton/shards:state",
+        "//pelton/shards:types",
+        "//pelton/sql:result",
+        "//pelton/sqlast:ast",
+        "//pelton/util:status",
+        "//pelton/util:upgradable_lock",
     ],
 )
 
@@ -176,7 +195,6 @@ cc_library(
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
-        "//pelton/dataflow:value",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sql:abstract_connection",
@@ -231,7 +249,6 @@ cc_library(
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
-        "//pelton/dataflow:value",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sql:abstract_connection",

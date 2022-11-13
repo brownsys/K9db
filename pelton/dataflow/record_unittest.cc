@@ -50,11 +50,11 @@ TEST(RecordTest, DataRep) {
   EXPECT_EQ(record.GetInt(2), v2);
 
   // Using GetValue()...
-  EXPECT_EQ(record.GetValue(0).type(), CType::UINT);
+  EXPECT_EQ(record.GetValue(0).type(), sqlast::Value::Type::UINT);
   EXPECT_EQ(record.GetValue(0).GetUInt(), v0);
-  EXPECT_EQ(record.GetValue(1).type(), CType::TEXT);
+  EXPECT_EQ(record.GetValue(1).type(), sqlast::Value::Type::TEXT);
   EXPECT_EQ(record.GetValue(1).GetString(), *v1);
-  EXPECT_EQ(record.GetValue(2).type(), CType::INT);
+  EXPECT_EQ(record.GetValue(2).type(), sqlast::Value::Type::INT);
   EXPECT_EQ(record.GetValue(2).GetInt(), v2);
 }
 
@@ -132,6 +132,13 @@ TEST(RecordTest, NulLValues) {
   EXPECT_EQ(&record.GetString(1), v1);  // pointer/address equality.
   EXPECT_EQ(record.GetString(1), *v1);  // deep equality
   EXPECT_TRUE(record.IsNull(2));
+
+  EXPECT_TRUE(record.GetValue(0).IsNull());
+  EXPECT_EQ(record.GetValue(0).type(), sqlast::Value::Type::_NULL);
+  EXPECT_EQ(record.GetValue(1).GetString(), "hello");
+  EXPECT_EQ(record.GetValue(1).type(), sqlast::Value::Type::TEXT);
+  EXPECT_TRUE(record.GetValue(2).IsNull());
+  EXPECT_EQ(record.GetValue(2).type(), sqlast::Value::Type::_NULL);
 }
 
 // Tests setting and getting data from record using variadic constructor.
@@ -331,10 +338,10 @@ TEST(RecordTest, GetKey) {
   r3.SetInt(500, 0);
 
   // Test key types.
-  EXPECT_EQ(r1.GetKey().value(0).type(), CType::TEXT);
-  EXPECT_EQ(r1.GetKey().value(1).type(), CType::INT);
-  EXPECT_EQ(r2.GetKey().value(0).type(), CType::TEXT);
-  EXPECT_EQ(r3.GetKey().value(0).type(), CType::TEXT);
+  EXPECT_EQ(r1.GetKey().value(0).type(), sqlast::Value::Type::TEXT);
+  EXPECT_EQ(r1.GetKey().value(1).type(), sqlast::Value::Type::INT);
+  EXPECT_EQ(r2.GetKey().value(0).type(), sqlast::Value::Type::TEXT);
+  EXPECT_EQ(r3.GetKey().value(0).type(), sqlast::Value::Type::TEXT);
 
   // Test keys.
   EXPECT_EQ(r1.GetKey().value(0).GetString(), k11);

@@ -5,8 +5,8 @@
 
 #include <optional>
 
-#include "pelton/sql/rocksdb/dedup.h"
 #include "glog/logging.h"
+#include "pelton/sql/rocksdb/dedup.h"
 
 namespace pelton {
 namespace sql {
@@ -33,15 +33,17 @@ std::vector<dataflow::Record> RocksdbConnection::GetDirect(
   } else if (table.HasIndexOn(column_index)) {
     // Lookup by secondary index.
     std::vector<std::string> shard_names;
-    std::vector<std::string> values;
+    std::vector<sqlast::Value> values;
     for (const auto &[shard_name, value] : keys) {
       shard_names.emplace_back(shard_name.AsView());
-      values.push_back(EncodeValue(value));
+      values.push_back(value);
     }
 
     // Find index and lookup.
     const RocksdbIndex &index = table.GetIndex(column_index);
-    IndexSet s = index.GetWithShards(std::move(shard_names), std::move(values));
+    IndexSet s =
+        index.GetWithShards(std::move(shard_names),
+                            EncodeValues(schema.TypeOf(column_index), values));
     for (auto it = s.begin(); it != s.end();) {
       auto node = s.extract(it++);
       RocksdbIndexRecord &record = node.value();
@@ -66,7 +68,7 @@ std::vector<dataflow::Record> RocksdbConnection::GetDirect(
       RocksdbSequence row =
           this->encryption_manager_.DecryptValue(shard, std::move(*en_row));
       if (!dedup.Duplicate(row.At(table.PKColumn()).ToString())) {
-        result.push_back(row.DecodeRecord(schema));
+        result.push_back(row.DecodeRecord(schema, true));
       }
     }
   }
@@ -84,7 +86,7 @@ struct KeyData {
 // Shard-based operations for copying/moving/deleting records.
 ResultSetAndStatus RocksdbConnection::AssignToShards(
     const std::string &table_name, size_t column_index,
-    const std::vector<dataflow::Value> &values,
+    const std::vector<sqlast::Value> &values,
     const std::unordered_set<util::ShardName> &targets) {
   util::ShardName default_shard(DEFAULT_SHARD, DEFAULT_SHARD);
   // Look up table info.
@@ -92,8 +94,8 @@ ResultSetAndStatus RocksdbConnection::AssignToShards(
   const dataflow::SchemaRef &schema = table.Schema();
 
   // Find source then use the other API.
-  std::optional<IndexSet> sources =
-      table.IndexLookup(column_index, EncodeValues(values));
+  std::optional<IndexSet> sources = table.IndexLookup(
+      column_index, EncodeValues(schema.TypeOf(column_index), values));
   CHECK(sources.has_value()) << "Assign to shards with no index";
   if (sources->size() == 0) {
     return std::pair(sql::SqlResultSet(schema), 0);
@@ -199,7 +201,7 @@ ResultSetAndStatus RocksdbConnection::AssignToShards(
       }
     }
 
-    records.push_back(row.DecodeRecord(schema));
+    records.push_back(row.DecodeRecord(schema, true));
   }
 
   return std::pair(sql::SqlResultSet(schema, std::move(records)), count);
@@ -208,12 +210,14 @@ ResultSetAndStatus RocksdbConnection::AssignToShards(
 // Count the number of shards each record with a given PK value is in.
 std::vector<size_t> RocksdbConnection::CountShards(
     const std::string &table_name,
-    const std::vector<dataflow::Value> &pk_values) const {
+    const std::vector<sqlast::Value> &pk_values) const {
   // Look up table info.
   const RocksdbTable &table = this->tables_.at(table_name);
+  const dataflow::SchemaRef &schema = table.Schema();
 
   // Lookup counts.
-  return table.GetPKIndex().CountShards(EncodeValues(pk_values));
+  return table.GetPKIndex().CountShards(
+      EncodeValues(schema.TypeOf(table.PKColumn()), pk_values));
 }
 
 // Delete records from shard, moving indicated ones to default shard.

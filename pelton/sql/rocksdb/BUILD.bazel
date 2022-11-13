@@ -11,6 +11,7 @@ cc_library(
         "connection_schema.cc",
         "connection_select.cc",
         "connection_shard.cc",
+        "connection_update.cc",
     ],
     hdrs = [
         "connection.h",
@@ -26,7 +27,6 @@ cc_library(
         ":table",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
-        "//pelton/dataflow:value",
         "//pelton/sql:abstract_connection",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
@@ -82,7 +82,6 @@ cc_library(
     deps = [
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
-        "//pelton/dataflow:value",
         "//pelton/sqlast:ast",
         "//pelton/util:shard_name",
         "@glog",

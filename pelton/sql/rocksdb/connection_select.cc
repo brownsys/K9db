@@ -3,8 +3,8 @@
 #include "pelton/sql/rocksdb/connection.h"
 // clang-format on
 
-#include "pelton/sql/rocksdb/project.h"
 #include "pelton/dataflow/schema.h"
+#include "pelton/sql/rocksdb/project.h"
 
 namespace pelton {
 namespace sql {

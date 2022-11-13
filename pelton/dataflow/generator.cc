@@ -17,7 +17,6 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/state.h"
-#include "pelton/dataflow/value.h"
 
 namespace pelton {
 namespace dataflow {
@@ -143,102 +142,108 @@ NodeIndex DataFlowGraphGenerator::AddMatviewOperator(
 
 // Setting properties on existing operators.
 // Filter.
-void DataFlowGraphGenerator::AddFilterOperationString(NodeIndex filter_operator,
-                                                      const std::string &value,
+void DataFlowGraphGenerator::AddFilterOperationString(NodeIndex filter,
                                                       ColumnID column,
-                                                      FilterOperationEnum fop) {
+                                                      const std::string &value,
+                                                      FilterOperationEnum op) {
   // Get filter operator.
-  Operator *op = this->graph_->GetNode(filter_operator);
-  CHECK(op->type() == Operator::Type::FILTER);
-  FilterOperator *filter = static_cast<FilterOperator *>(op);
+  Operator *ptr = this->graph_->GetNode(filter);
+  CHECK(ptr->type() == Operator::Type::FILTER);
+  FilterOperator *fop = static_cast<FilterOperator *>(ptr);
   // Add the operation to filter.
-  filter->AddOperation(value, column, fop);
+  fop->AddLiteralOperation(column, value, op);
 }
-void DataFlowGraphGenerator::AddFilterOperationInt(NodeIndex filter_operator,
-                                                   int64_t value,
+void DataFlowGraphGenerator::AddFilterOperationInt(NodeIndex filter,
                                                    ColumnID column,
-                                                   FilterOperationEnum fop) {
+                                                   int64_t value,
+                                                   FilterOperationEnum op) {
   // Get filter operator.
-  Operator *op = this->graph_->GetNode(filter_operator);
-  CHECK(op->type() == Operator::Type::FILTER);
-  FilterOperator *filter = static_cast<FilterOperator *>(op);
+  Operator *ptr = this->graph_->GetNode(filter);
+  CHECK(ptr->type() == Operator::Type::FILTER);
+  FilterOperator *fop = static_cast<FilterOperator *>(ptr);
   // Add the operation to filter.
-  filter->AddOperation(value, column, fop);
+  fop->AddLiteralOperation(column, value, op);
 }
-void DataFlowGraphGenerator::AddFilterOperationNull(NodeIndex filter_operator,
+void DataFlowGraphGenerator::AddFilterOperationNull(NodeIndex filter,
                                                     ColumnID column,
-                                                    FilterOperationEnum fop) {
+                                                    FilterOperationEnum op) {
   // Get filter operator.
-  Operator *op = this->graph_->GetNode(filter_operator);
-  CHECK(op->type() == Operator::Type::FILTER);
-  FilterOperator *filter = static_cast<FilterOperator *>(op);
+  Operator *ptr = this->graph_->GetNode(filter);
+  CHECK(ptr->type() == Operator::Type::FILTER);
+  FilterOperator *fop = static_cast<FilterOperator *>(ptr);
   // Add the operation to filter.
-  filter->AddOperation(column, fop);
+  fop->AddNullOperation(column, op);
 }
-void DataFlowGraphGenerator::AddFilterOperationColumn(NodeIndex filter_operator,
-                                                      ColumnID left_column,
-                                                      ColumnID right_column,
-                                                      FilterOperationEnum fop) {
+void DataFlowGraphGenerator::AddFilterOperationColumn(NodeIndex filter,
+                                                      ColumnID left,
+                                                      ColumnID right,
+                                                      FilterOperationEnum op) {
   // Get filter operator.
-  Operator *op = this->graph_->GetNode(filter_operator);
-  CHECK(op->type() == Operator::Type::FILTER);
-  FilterOperator *filter = static_cast<FilterOperator *>(op);
-  filter->AddOperation(left_column, fop, right_column);
+  Operator *ptr = this->graph_->GetNode(filter);
+  CHECK(ptr->type() == Operator::Type::FILTER);
+  FilterOperator *fop = static_cast<FilterOperator *>(ptr);
+  fop->AddColumnOperation(left, right, op);
 }
 
 // Projection.
-void DataFlowGraphGenerator::AddProjectionColumn(NodeIndex project_operator,
-                                                 const std::string &column_name,
+void DataFlowGraphGenerator::AddProjectionColumn(NodeIndex project,
+                                                 const std::string &name,
                                                  ColumnID cid) {
   // Get project operator.
-  Operator *op = this->graph_->GetNode(project_operator);
-  CHECK(op->type() == Operator::Type::PROJECT);
-  ProjectOperator *project = static_cast<ProjectOperator *>(op);
+  Operator *ptr = this->graph_->GetNode(project);
+  CHECK(ptr->type() == Operator::Type::PROJECT);
+  ProjectOperator *pop = static_cast<ProjectOperator *>(ptr);
   // Add projection to project
-  project->AddColumnProjection(column_name, cid);
+  pop->AddColumnProjection(name, cid);
 }
-void DataFlowGraphGenerator::AddProjectionLiteralInt(
-    NodeIndex project_operator, const std::string &column_name, int64_t value) {
+void DataFlowGraphGenerator::AddProjectionLiteralInt(NodeIndex project,
+                                                     const std::string &name,
+                                                     int64_t value) {
   // Get project operator.
-  Operator *op = this->graph_->GetNode(project_operator);
-  CHECK(op->type() == Operator::Type::PROJECT);
-  ProjectOperator *project = static_cast<ProjectOperator *>(op);
+  Operator *ptr = this->graph_->GetNode(project);
+  CHECK(ptr->type() == Operator::Type::PROJECT);
+  ProjectOperator *pop = static_cast<ProjectOperator *>(ptr);
   // Add projection to project
-  project->AddLiteralProjection(column_name, value);
+  pop->AddLiteralProjection(name, value);
 }
-void DataFlowGraphGenerator::AddProjectionArithmeticLiteralLeft(
-    NodeIndex project_operator, const std::string &column_name,
-    ColumnID left_column, int64_t right_literal,
-    ProjectOperationEnum operation) {
+void DataFlowGraphGenerator::AddProjectionLiteralString(
+    NodeIndex project, const std::string &name, const std::string &value) {
   // Get project operator.
-  Operator *op = this->graph_->GetNode(project_operator);
-  CHECK(op->type() == Operator::Type::PROJECT);
-  ProjectOperator *project = static_cast<ProjectOperator *>(op);
+  Operator *ptr = this->graph_->GetNode(project);
+  CHECK(ptr->type() == Operator::Type::PROJECT);
+  ProjectOperator *pop = static_cast<ProjectOperator *>(ptr);
   // Add projection to project
-  project->AddArithmeticLeftProjection(column_name, left_column, right_literal,
-                                       operation);
-}
-void DataFlowGraphGenerator::AddProjectionArithmeticLiteralRight(
-    NodeIndex project_operator, const std::string &column_name,
-    int64_t left_literal, ColumnID right_column,
-    ProjectOperationEnum operation) {
-  // Get project operator.
-  Operator *op = this->graph_->GetNode(project_operator);
-  CHECK(op->type() == Operator::Type::PROJECT);
-  ProjectOperator *project = static_cast<ProjectOperator *>(op);
-  // Add projection to project
-  project->AddArithmeticRightProjection(column_name, left_literal, right_column,
-                                        operation);
+  pop->AddLiteralProjection(name, value);
 }
 void DataFlowGraphGenerator::AddProjectionArithmeticColumns(
-    NodeIndex project_operator, const std::string &column_name, ColumnID left,
-    ColumnID right, ProjectOperationEnum operation) {
+    NodeIndex project, const std::string &name, ProjectOperationEnum op,
+    ColumnID left, ColumnID right) {
   // Get project operator.
-  Operator *op = this->graph_->GetNode(project_operator);
-  CHECK(op->type() == Operator::Type::PROJECT);
-  ProjectOperator *project = static_cast<ProjectOperator *>(op);
+  Operator *ptr = this->graph_->GetNode(project);
+  CHECK(ptr->type() == Operator::Type::PROJECT);
+  ProjectOperator *pop = static_cast<ProjectOperator *>(ptr);
   // Add projection to project
-  project->AddArithmeticColumnsProjection(column_name, left, right, operation);
+  pop->AddArithmeticProjectionColumns(name, op, left, right);
+}
+void DataFlowGraphGenerator::AddProjectionArithmeticLiteralLeft(
+    NodeIndex project, const std::string &name, ProjectOperationEnum op,
+    int64_t left, ColumnID right) {
+  // Get project operator.
+  Operator *ptr = this->graph_->GetNode(project);
+  CHECK(ptr->type() == Operator::Type::PROJECT);
+  ProjectOperator *pop = static_cast<ProjectOperator *>(ptr);
+  // Add projection to project
+  pop->AddArithmeticProjectionLiteralLeft(name, op, left, right);
+}
+void DataFlowGraphGenerator::AddProjectionArithmeticLiteralRight(
+    NodeIndex project, const std::string &name, ProjectOperationEnum op,
+    ColumnID left, int64_t right) {
+  // Get project operator.
+  Operator *ptr = this->graph_->GetNode(project);
+  CHECK(ptr->type() == Operator::Type::PROJECT);
+  ProjectOperator *pop = static_cast<ProjectOperator *>(ptr);
+  // Add projection to project
+  pop->AddArithmeticProjectionLiteralRight(name, op, left, right);
 }
 
 // Reading schema.

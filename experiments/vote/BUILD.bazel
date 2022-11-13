@@ -1,0 +1,57 @@
+load("@rules_rust//rust:rust.bzl", "rust_binary", "rust_library")
+
+rust_library(
+    name = "common",
+    srcs = [
+        "src/common/lib.rs",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cargo:clap",
+        "//cargo:failure",
+        "//cargo:hdrhistogram",
+    ],
+)
+
+rust_library(
+    name = "clients",
+    srcs = [
+        "src/clients/lib.rs",
+        "src/clients/mysql.rs",
+        "src/clients/memcached.rs",
+        "src/clients/memcached_hybrid.rs",
+        "src/clients/pelton.rs",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+	":common",
+        "//cargo:clap",
+        "//cargo:failure",
+        "//cargo:mysql_async",
+        "//cargo:tower_service",
+	"//cargo:memcached_rs",
+	"//cargo:tokio",
+    ],
+)
+
+rust_binary(
+    name = "vote-benchmark",
+    srcs = [
+        "src/main.rs",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+	":common",
+        ":clients",
+        "//cargo:clap",
+        "//cargo:failure",
+        "//cargo:futures_util",
+        "//cargo:hdrhistogram",
+        "//cargo:num_cpus",
+        "//cargo:rand",
+        "//cargo:rand_distr",
+        "//cargo:tokio",
+        "//cargo:tower_service",
+        "//cargo:zipf",
+    ],
+)

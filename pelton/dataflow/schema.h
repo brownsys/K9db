@@ -3,6 +3,7 @@
 
 #include <list>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "glog/logging.h"
@@ -17,13 +18,17 @@ struct SchemaData {
   std::vector<std::string> column_names;
   std::vector<sqlast::ColumnDefinition::Type> column_types;
   std::vector<ColumnID> keys;
+  std::unordered_map<std::string, ColumnID> name_to_index;
   // Constructors.
   SchemaData(const std::vector<std::string> &cn,
              const std::vector<sqlast::ColumnDefinition::Type> &ct,
              const std::vector<ColumnID> &ks)
-      : column_names(cn), column_types(ct), keys(ks) {
+      : column_names(cn), column_types(ct), keys(ks), name_to_index() {
     if (column_names.size() != column_types.size()) {
       LOG(FATAL) << "Incosistent number of columns in schema!";
+    }
+    for (size_t i = 0; i < column_names.size(); i++) {
+      name_to_index.emplace(column_names.at(i), i);
     }
   }
   // Semantic equality (not pointer based).

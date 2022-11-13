@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 exports_files(
     ["ast_schema_enums.h"],
@@ -8,9 +8,11 @@ exports_files(
 cc_library(
     name = "ast",
     srcs = [
+        "ast_abstract.cc",
         "ast_expressions.cc",
         "ast_schema.cc",
         "ast_statements.cc",
+        "ast_value.cc",
         "ast_visitors.cc",
     ],
     hdrs = [
@@ -20,6 +22,7 @@ cc_library(
         "ast_schema.h",
         "ast_schema_enums.h",
         "ast_statements.h",
+        "ast_value.h",
         "ast_visitors.h",
     ],
     visibility = ["//pelton:__subpackages__"],
@@ -78,6 +81,7 @@ cc_library(
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":ast",
+        "//pelton/util:status",
         "@com_google_absl//absl/status:statusor",
     ],
 )
@@ -94,6 +98,20 @@ cc_library(
     deps = [
         ":ast",
         "//pelton/dataflow:schema",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "ast_value-test",
+    srcs = [
+        "ast_value_unittest.cc",
+    ],
+    deps = [
+        ":ast",
+        "//pelton/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
         "@glog",
     ],
 )
