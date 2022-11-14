@@ -10,7 +10,7 @@ curl https://sh.rustup.rs | sh -s -- -y
 source $HOME/.cargo/env
 cargo install cargo-raze
 
-# run cargo raze
+# Run cargo raze.
 cd pelton/proxy && cargo raze && cd -
 cd experiments/lobsters && cargo raze && cd -
 cd experiments/ownCloud && cargo raze && cd -

@@ -15,24 +15,23 @@ sudo apt-get install -y linux-tools-common linux-tools-generic linux-tools-`unam
 
 # Download flamegraph repo.
 git clone https://github.com/brendangregg/FlameGraph
-echo '# Add flame alias to generate flamegraphs' >> ~/.bashrc
-echo 'alias flame="~/flame.sh"' >> ~/.bashrc
+echo '# Add flame alias to generate flamegraphs' >> ~/.bash_profile
+echo 'alias flame="~/flame.sh"' >> ~/.bash_profile
 
 # Make sure ssh deploy key is added.
 eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/nsdi
 
 # Start and stop ssh-agent with the nsdi key on login/logout
-echo '# add git deploy key' >> ~/.bashrc
-echo 'eval "$(ssh-agent -s)"' >> ~/.bashrc
-echo 'ssh-add ~/.ssh/nsdi' >> ~/.bashrc
+echo '# add git deploy key' >> ~/.bash_profile
+echo 'eval "$(ssh-agent -s)"' >> ~/.bash_profile
+echo 'ssh-add ~/.ssh/nsdi' >> ~/.bash_profile
 echo 'if [[ "$SSH_AGENT_PID" != "" ]]; then' >> ~/.bash_logout
 echo '  eval $(/usr/bin/ssh-agent -k)' >> ~/.bash_logout
 echo 'fi' >> ~/.bash_logout
 
 # Export the local ip as a environment variable
-echo 'export LOCAL_IP=$(curl  http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip -H "Metadata-Flavor: Google")' >> ~/.bashrc
-
+echo 'export LOCAL_IP=$(curl  http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip -H "Metadata-Flavor: Google")' >> ~/.bash_profile
 
 # Clones to /home/pelton/pelton
 ssh-keyscan github.com >> ~/.ssh/known_hosts
