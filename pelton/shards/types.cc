@@ -1,38 +1,33 @@
 #include "pelton/shards/types.h"
 
+#include "glog/logging.h"
+
 namespace pelton {
 namespace shards {
 
-std::ostream &operator<<(std::ostream &os, const DirectInfo &o) {
-  os << "`" << o.column << "`";
-  return os;
-}
-
-std::ostream &operator<<(std::ostream &os, const TransitiveInfo &o) {
-  os << "`" << o.column << "` -> `" << o.next_table << "`.`" << o.next_column
-     << "`";
-  return os;
-}
-
-std::ostream &operator<<(std::ostream &os, const VariableInfo &o) {
-  os << "`" << o.origin_relation << "`.`" << o.origin_column << "` --> `"
-     << o.column << "`";
+std::ostream &operator<<(std::ostream &os, const InfoType &o) {
+  switch (o) {
+    case InfoType::DIRECT:
+      os << "DIRECT";
+      break;
+    case InfoType::TRANSITIVE:
+      os << "TRANSITIVE";
+      break;
+    case InfoType::VARIABLE:
+      os << "VARIABLE";
+      break;
+    default:
+      LOG(FATAL) << "Unreachable";
+  }
   return os;
 }
 
 std::ostream &operator<<(std::ostream &os, const ShardDescriptor &o) {
-  os << "{`" << o.shard_kind << "`: ";
-  switch (o.type) {
-    case InfoType::DIRECT:
-      os << std::get<DirectInfo>(o.info);
-      break;
-    case InfoType::TRANSITIVE:
-      os << std::get<TransitiveInfo>(o.info);
-      break;
-    case InfoType::VARIABLE:
-      os << std::get<VariableInfo>(o.info);
-      break;
-  }
+  os << "{ \n";
+  os << "  shard_kind: " << o.shard_kind << ",\n";
+  os << "  type: " << o.type << ",\n";
+  os << "  downcolumn: " << o.downcolumn() << ",\n";
+  os << "  upcolumn: " << o.next_table() << "." << o.upcolumn() << "\n";
   os << "}";
   return os;
 }
@@ -74,6 +69,57 @@ std::ostream &operator<<(std::ostream &os, const Shard &o) {
   }
   os << "]";
   return os;
+}
+
+// Helpers for accessing members of InfoType in a type agnostic way.
+const TableName &ShardDescriptor::next_table() const {
+  switch (this->type) {
+    case InfoType::DIRECT:
+      return this->shard_kind;
+    case InfoType::VARIABLE:
+      return std::get<VariableInfo>(this->info).origin_relation;
+    case InfoType::TRANSITIVE:
+      return std::get<TransitiveInfo>(this->info).next_table;
+    default:
+      LOG(FATAL) << "Unreachable";
+  }
+}
+const ColumnName &ShardDescriptor::downcolumn() const {
+  switch (this->type) {
+    case InfoType::DIRECT:
+      return std::get<DirectInfo>(this->info).column;
+    case InfoType::TRANSITIVE:
+      return std::get<TransitiveInfo>(this->info).column;
+    case InfoType::VARIABLE:
+      return std::get<VariableInfo>(this->info).column;
+    default:
+      LOG(FATAL) << "Unreachable";
+  }
+}
+const ColumnName &ShardDescriptor::upcolumn() const {
+  switch (this->type) {
+    case InfoType::DIRECT:
+      return std::get<DirectInfo>(this->info).next_column;
+    case InfoType::TRANSITIVE:
+      return std::get<TransitiveInfo>(this->info).next_column;
+    case InfoType::VARIABLE:
+      return std::get<VariableInfo>(this->info).origin_column;
+    default:
+      LOG(FATAL) << "Unreachable";
+  }
+}
+const std::optional<IndexDescriptor *> ShardDescriptor::index_descriptor()
+    const {
+  switch (this->type) {
+    case InfoType::DIRECT:
+      return {};
+    case InfoType::TRANSITIVE:
+      return std::get<TransitiveInfo>(this->info).index;
+    case InfoType::VARIABLE:
+      return std::get<VariableInfo>(this->info).index;
+    default:
+      LOG(FATAL) << "Unreachable";
+  }
 }
 
 }  // namespace shards

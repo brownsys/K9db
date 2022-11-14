@@ -9,6 +9,7 @@ enum ColumnConstraintTypeEnum {
   PRIMARY_KEY,
   UNIQUE,
   FOREIGN_KEY,
+  NOT_NULL,
 };
 enum ForeignKeyTypeEnum {
   OWNED_BY,

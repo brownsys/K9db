@@ -196,7 +196,7 @@ antlrcpp::Any AstTransformer::visitColumn_constraint(
   }
   if (ctx->NOT() != nullptr) {
     std::cout << "Warning: NOT NULL constraint not enforced" << std::endl;
-    return {};
+    return ColumnConstraint::Make(ColumnConstraint::Type::NOT_NULL);
   }
 
   if (ctx->PRIMARY() != nullptr) {

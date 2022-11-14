@@ -31,6 +31,11 @@ bool RocksdbConnection::ExecuteCreateTable(const sqlast::CreateTable &stmt) {
 
   // Create indices for table.
   for (size_t i = 0; i < stmt.GetColumns().size(); i++) {
+    // Primary key already has index created for it.
+    if (i == schema.keys().front()) {
+      continue;
+    }
+    // For non-PK columns, we create an index automatically if unique or FK.
     const auto &column = stmt.GetColumns().at(i);
     for (const auto &cnstr : column.GetConstraints()) {
       switch (cnstr.type()) {

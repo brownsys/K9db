@@ -110,6 +110,31 @@ struct ShardDescriptor {
   // The type of sharding.
   InfoType type;
   std::variant<DirectInfo, TransitiveInfo, VariableInfo> info;
+
+  bool is_transitive() const { return this->type == InfoType::TRANSITIVE; }
+  bool is_varowned() const { return this->type == InfoType::VARIABLE; }
+
+  // `upcolumn` and `downcolumn` are just convenient ways to access the
+  // "arrowheads" on an ownership relationship. Together with `next_table` this
+  // lets you talk about the entire relationship with the next "hop" in the
+  // following way: Lets assume we have a table `t` with a shard descriptor `d`.
+  //
+  // +----------------+        +----------------+
+  // | d.next_table() |        | t              |
+  // +----------------+        +----------------+
+  // | d.upcolumn()   | <----- | d.downcolumn() |
+  // | ...            |        | ...            |
+  // +----------------+        +----------------+
+  //
+  // `d.next_table()` always returns a table that is one hop closer in the
+  // transitrivity chain. The arrow between up- and downcolumn can be reversed
+  // (in the case of variable ownership), however `downcolumn` will always be
+  // the column in `t` and `upcolumn` always be the column in `d.next_table()`
+  // regardless of arrow direction.
+  const ColumnName &downcolumn() const;
+  const ColumnName &upcolumn() const;
+  const TableName &next_table() const;
+  const std::optional<IndexDescriptor *> index_descriptor() const;
 };
 
 // Metadata about a sharded table.
@@ -145,9 +170,7 @@ struct Shard {
 };
 
 // For debugging / printing.
-std::ostream &operator<<(std::ostream &os, const DirectInfo &o);
-std::ostream &operator<<(std::ostream &os, const TransitiveInfo &o);
-std::ostream &operator<<(std::ostream &os, const VariableInfo &o);
+std::ostream &operator<<(std::ostream &os, const InfoType &o);
 std::ostream &operator<<(std::ostream &os, const ShardDescriptor &o);
 std::ostream &operator<<(std::ostream &os, const Table &o);
 std::ostream &operator<<(std::ostream &os, const Shard &o);

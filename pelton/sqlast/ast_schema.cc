@@ -130,6 +130,11 @@ bool CreateTable::HasColumn(const std::string &column_name) const {
   return this->columns_map_.count(column_name) == 1;
 }
 
+const ColumnDefinition &CreateTable::GetColumn(
+    const std::string &column_name) const {
+  return this->columns_.at(this->columns_map_.at(column_name));
+}
+
 void CreateTable::AddAnonymizeRule(AnonymizationRule &&anon_rule) {
   this->anon_rules_.push_back(std::move(anon_rule));
 }
@@ -152,6 +157,23 @@ std::ostream &operator<<(std::ostream &os, const ColumnDefinition::Type &r) {
     os << ColumnDefinition::TypeToString(r);
   }
   return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const ColumnConstraint::FKType &t) {
+  switch (t) {
+    case ForeignKeyTypeEnum::OWNED_BY:
+      return os << "OWNED_BY";
+    case ForeignKeyTypeEnum::OWNS:
+      return os << "OWNS";
+    case ForeignKeyTypeEnum::ACCESSED_BY:
+      return os << "ACCESSED_BY";
+    case ForeignKeyTypeEnum::ACCESSES:
+      return os << "ACCESSES";
+    case ForeignKeyTypeEnum::AUTO:
+      return os << "AUTO";
+    case ForeignKeyTypeEnum::PLAIN:
+      return os << "PLAIN";
+  }
 }
 
 }  // namespace sqlast

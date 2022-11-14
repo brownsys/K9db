@@ -49,8 +49,8 @@ std::optional<SqlResult> SpecialStatements(const std::string &sql,
       return SqlResult(true);
     }
   }
-  if (absl::StartsWith(sql, "EXPLAIN PRIVACY")) {
-    explain::ExplainPrivacy(*connection);
+  if (absl::StartsWith(sql, "EXPLAIN COMPLIANCE")) {
+    explain::ExplainCompliance(*connection);
     return SqlResult(true);
   }
   if (absl::StartsWith(sql, "EXPLAIN ")) {

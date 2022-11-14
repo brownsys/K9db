@@ -81,8 +81,12 @@ class SharderState {
 
   // Debugging information / statistics.
   std::vector<std::pair<ShardKind, uint64_t>> NumShards() const;
-  const std::unordered_map<TableName, Table> &AllTables() const {
-    return this->tables_;
+  std::list<std::pair<TableName, const Table *>> ReverseTables() const {
+    std::list<std::pair<TableName, const Table *>> vec;
+    for (const auto &[table_name, table] : this->tables_) {
+      vec.emplace_front(table_name, &table);
+    }
+    return vec;
   }
 
  private:

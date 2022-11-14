@@ -28,5 +28,6 @@ cc_library(
     deps = [
         "//pelton/dataflow:schema",
         "//pelton/sqlast:ast",
+        "@glog",
     ],
 )
