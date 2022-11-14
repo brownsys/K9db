@@ -45,11 +45,13 @@ void RocksdbTable::CreateIndex(size_t column_index) {
 
 // Index updating.
 void RocksdbTable::IndexAdd(const rocksdb::Slice &shard,
-                            const RocksdbSequence &row) {
+                            const RocksdbSequence &row, bool update_pk) {
   rocksdb::Slice pk = row.At(this->pk_column_);
 
   // Update PK index.
-  this->pk_index_.Add(pk, shard);
+  if (update_pk) {
+    this->pk_index_.Add(pk, shard);
+  }
 
   // Update other indices.
   size_t i = 0;
@@ -61,11 +63,13 @@ void RocksdbTable::IndexAdd(const rocksdb::Slice &shard,
   }
 }
 void RocksdbTable::IndexDelete(const rocksdb::Slice &shard,
-                               const RocksdbSequence &row) {
+                               const RocksdbSequence &row, bool update_pk) {
   rocksdb::Slice pk = row.At(this->pk_column_);
 
   // Update PK index.
-  this->pk_index_.Delete(pk, shard);
+  if (update_pk) {
+    this->pk_index_.Delete(pk, shard);
+  }
 
   // Update other indices.
   size_t i = 0;
@@ -214,6 +218,10 @@ std::optional<EncryptedValue> RocksdbTable::Get(const EncryptedKey &key) const {
 // MultiGet: faster multi key lookup.
 std::vector<std::optional<EncryptedValue>> RocksdbTable::MultiGet(
     const std::vector<EncryptedKey> &keys) const {
+  if (keys.size() == 0) {
+    return {};
+  }
+
   rocksdb::ReadOptions opts;
   opts.total_order_seek = true;
   opts.verify_checksums = false;

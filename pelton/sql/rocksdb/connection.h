@@ -39,6 +39,9 @@ class RocksdbConnection : public AbstractConnection {
   int ExecuteInsert(const sqlast::Insert &sql,
                     const util::ShardName &shard_name) override;
 
+  RecordAndStatus ExecuteReplace(const sqlast::Replace &sql,
+                                 const util::ShardName &shard_name) override;
+
   // Delete.
   SqlDeleteSet ExecuteDelete(const sqlast::Delete &sql) override;
 

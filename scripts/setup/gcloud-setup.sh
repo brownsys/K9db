@@ -40,33 +40,17 @@ git clone git@github.com:brownsys/pelton.git
 cd pelton
 
 # Run the setup scripts
-./scripts/setup-user.sh
+./scripts/setup/setup-user.sh
 
 # Format and load the ssd.
-sudo service mariadb stop
-sudo ./scripts/gcloud-nsdi-ssd-setup.sh
+sudo ./scripts/setup/gcloud-ssd-setup.sh
+
+# Configure mariadb to store database in directory
+sudo echo "datadir = /mnt/disks/my-ssd/mysql" >> /etc/mysql/mariadb.cnf
 
 # Do this on the server only: https://cloud.google.com/architecture/mysql-remote-access
 LOCAL_IP=$(curl  http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip -H "Metadata-Flavor: Google")
 sudo sed -i "s|bind-address.*|bind-address = $LOCAL_IP|" /etc/mysql/mariadb.conf.d/50-server.cnf
 sudo service mariadb restart
 
-# Do this on the client only
-sudo service mariadb stop
-
-# Build ownCloud harness
-cd ~/pelton/experiments/ownCloud
-bazel build ... -c opt
-
-# Build vote harness
-cd ~/pelton/experiments/vote
-bazel build ... -c opt
-
-# Build pelton
-cd ~/pelton
-if [[ "$ROLE" == "db" ]]; then
-  bazel build //:pelton --config opt
-else
-  cd experiments/lobsters
-  bazel build ... -c opt
-fi
+./scripts/setup/gcloud-build.sh $ROLE

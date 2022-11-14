@@ -1,4 +1,4 @@
-sudo scripts/setup-root.sh
+sudo scripts/setup/setup-root.sh
 
 # Give access to pelton db directory
 USER=$(whoami)

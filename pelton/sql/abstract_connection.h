@@ -3,6 +3,7 @@
 #define PELTON_SQL_ABSTRACT_CONNECTION_H_
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -18,6 +19,7 @@
 namespace pelton {
 namespace sql {
 
+using RecordAndStatus = std::pair<std::optional<dataflow::Record>, int>;
 using ResultSetAndStatus = std::pair<SqlResultSet, int>;
 using KeyPair = std::pair<util::ShardName, sqlast::Value>;
 
@@ -38,6 +40,9 @@ class AbstractConnection {
   // Insert.
   virtual int ExecuteInsert(const sqlast::Insert &sql,
                             const util::ShardName &shard_name) = 0;
+
+  virtual RecordAndStatus ExecuteReplace(const sqlast::Replace &sql,
+                                         const util::ShardName &shard_name) = 0;
 
   // Update.
   virtual ResultSetAndStatus ExecuteUpdate(const sqlast::Update &sql) = 0;

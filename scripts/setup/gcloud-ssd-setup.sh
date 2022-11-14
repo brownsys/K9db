@@ -1,4 +1,6 @@
 #!/bin/bash
+service mariadb stop
+umount /mnt/disks/my-ssd || /bin/true
 
 # Format and attach SSD.
 mkfs.ext4 -F /dev/nvme0n1
@@ -10,6 +12,3 @@ chown mysql.mysql -R /mnt/disks/my-ssd/mysql
 mkdir -p /mnt/disks/my-ssd/pelton
 chown -R mysql.mysql /mnt/disks/my-ssd
 chmod -R 777 /mnt/disks/my-ssd
-
-# Configure mariadb to store database in directory
-echo "datadir = /mnt/disks/my-ssd/mysql" >> /etc/mysql/mariadb.cnf

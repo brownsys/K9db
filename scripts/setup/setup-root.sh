@@ -87,7 +87,7 @@ echo "test:tsan --test_env TSAN_OPTIONS=suppressions=/home/pelton/.tsan_jvm_supp
 ln -s /usr/bin/python2 /usr/bin/python
 
 # configure mariadb on startup and run mysqld in the background
-mariadb -u root < scripts/configure_db.sql
+mariadb -u root < scripts/setup/configure_db.sql
 
 useradd memcached
 mkdir -p /var/pelton/rocksdb

@@ -77,8 +77,10 @@ class RocksdbTable {
   }
 
   // Index updating.
-  void IndexAdd(const rocksdb::Slice &shard, const RocksdbSequence &row);
-  void IndexDelete(const rocksdb::Slice &shard, const RocksdbSequence &row);
+  void IndexAdd(const rocksdb::Slice &shard, const RocksdbSequence &row,
+                bool update_pk = true);
+  void IndexDelete(const rocksdb::Slice &shard, const RocksdbSequence &row,
+                   bool update_pk = true);
   void IndexUpdate(const rocksdb::Slice &shard, const RocksdbSequence &old,
                    const RocksdbSequence &updated);
 

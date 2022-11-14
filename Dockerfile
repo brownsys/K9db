@@ -108,8 +108,8 @@ RUN echo "test:tsan --test_env TSAN_OPTIONS=suppressions=/home/pelton/.tsan_jvm_
 RUN ln -s /usr/bin/python2 /usr/bin/python
 
 # configure mariadb on startup and run mysqld in the background
-ADD scripts/configure_db.sql /home/configure_db.sql
-ADD scripts/configure_db.sh /home/configure_db.sh
+ADD scripts/setup/configure_db.sql /home/configure_db.sql
+ADD scripts/setup/configure_db.sh /home/configure_db.sh
 RUN chmod 750 /home/configure_db.sh
 
 RUN useradd memcached
