@@ -1,8 +1,11 @@
 INSERT INTO user VALUES (10, 'my user');
 INSERT INTO t VALUES (2000, 'I must be gone');
 INSERT INTO rel VALUES (200, 10, 2000);
+
+GDPR GET user 10;
+
 DELETE FROM rel WHERE id = 200;
 
-#GDPR GET user 10;
+GDPR GET user 10;
 
 SELECT * FROM t WHERE id = 2000;

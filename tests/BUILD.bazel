@@ -73,42 +73,29 @@ cc_test(
     deps = [":common"],
 )
 
-# TODO: uncomment when GDPR GET/FORGET support is restored.
-# cc_test(
-#     name = "delf_ecommerce",
-#     srcs = [
-#         "delf_ecommerce.cc",
-#     ],
-#     data = [
-#         "//tests/data:delf-ecommerce-data",
-#     ],
-#     deps = [
-#         ":common",
-#     ],
-# )
-#
-# cc_test(
-#     name = "delf_medical_retain",
-#     srcs = [
-#         "delf_medical_retain.cc",
-#     ],
-#     data = [
-#         "//tests/data:delf-medical-chat-retain-data",
-#     ],
-#     deps = [
-#         ":common",
-#     ],
-# )
-#
-# cc_test(
-#     name = "delf_medical_anonymize",
-#     srcs = [
-#         "delf_medical_anonymize.cc",
-#     ],
-#     data = [
-#         "//tests/data:delf-medical-chat-anonymize-data",
-#     ],
-#     deps = [
-#         ":common",
-#     ],
-# )
+# Test GDPR GET/FORGET end to end with accessors and owners..
+cc_test(
+    name = "delf_ecommerce",
+    srcs = [
+        "delf_ecommerce.cc",
+    ],
+    data = [
+        "//tests/data:delf-ecommerce-data",
+    ],
+    deps = [
+        ":common",
+    ],
+)
+
+cc_test(
+    name = "delf_medical_retain",
+    srcs = [
+        "delf_medical_retain.cc",
+    ],
+    data = [
+        "//tests/data:delf-medical-chat-retain-data",
+    ],
+    deps = [
+        ":common",
+    ],
+)

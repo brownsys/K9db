@@ -108,9 +108,10 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
     // Case 8: GDPR (GET | FORGET) statements.
     case sqlast::AbstractStatement::Type::GDPR: {
       auto *stmt = static_cast<sqlast::GDPRStatement *>(statement.get());
-      return gdpr::Shard(*stmt, connection);
+      util::SharedLock lock = connection->state->ReaderLock();
+      GDPRContext context(*stmt, connection, &lock);
+      return context.Exec();
     }
-    
 
     // Unsupported (this should not be reachable).
     default:

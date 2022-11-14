@@ -8,9 +8,11 @@ update # = 1
 ;
 update # = 2
 ;
-#200|10|2000
-#2000|target
-#;
-#200|11|2000
-#2000|target
-#;
+10|first_user
+200|10|2000
+2000|target
+;
+11|second_user
+200|11|2000
+2000|target
+;

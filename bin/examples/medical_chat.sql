@@ -58,17 +58,17 @@ INSERT INTO chat VALUES (5, 20, 1, 'HELLO 3');
 SELECT * FROM chat;
 SELECT * FROM chat WHERE doctor_id = 2;
 SELECT * FROM chat WHERE patient_id = 10;
-#GDPR GET patients 10;
-#GDPR GET doctors 2;
+GDPR GET patients 10;
+GDPR GET doctors 2;
 
 -- Test view creation after inserts.
 CREATE VIEW v1 AS '"SELECT doctors.name, patients.name FROM doctors JOIN chat ON doctors.id = chat.doctor_id JOIN patients ON chat.patient_id = patients.id"';
 SELECT * FROM v1;
 
-#GDPR FORGET doctors 1;
+GDPR FORGET doctors 1;
 SELECT * FROM chat;
 
-#GDPR FORGET patients 10;
+GDPR FORGET patients 10;
 SELECT * FROM patients;
 SELECT * FROM chat;
 

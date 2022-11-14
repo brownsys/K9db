@@ -64,8 +64,8 @@ SHOW SHARDS;
 SHOW MEMORY;
 SHOW VIEW v1;
 
-#GDPR GET students 1;
-#GDPR FORGET students 1;
+GDPR GET students 1;
+GDPR FORGET students 1;
 
 SELECT * FROM submissions;
 
@@ -73,23 +73,23 @@ UPDATE submissions SET ts = 20 WHERE student_id = 2 AND assignment_id = 1;
 UPDATE submissions SET ts = 30 WHERE assignment_id = 2;
 SELECT * FROM submissions;
 
-#REPLACE INTO assignments (Name, ID) VALUES ('replaced 2', 2);
+REPLACE INTO assignments (Name, ID) VALUES ('replaced 2', 2);
 SELECT * FROM assignments;
 SELECT * FROM v1;
 
-#REPLACE INTO assignments VALUES (3, 'assignment 3');
+REPLACE INTO assignments VALUES (3, 'assignment 3');
 SELECT * FROM assignments;
 SELECT * FROM v1;
 
-#REPLACE INTO submissions VALUES (2, 2, 1, 2000);
+REPLACE INTO submissions VALUES (2, 2, 1, 2000);
 SELECT * FROM grades WHERE student_id = 2;
 SELECT * FROM v1;
 
-#REPLACE INTO submissions VALUES (8, 2, 1, 4000);
+REPLACE INTO submissions VALUES (8, 2, 1, 4000);
 SELECT * FROM grades WHERE student_id = 2;
 SELECT * FROM v1;
 
-#REPLACE INTO submissions (student_id, ts, ID, assignment_id) VALUES (3, 7000, 7, 2);
+REPLACE INTO submissions (student_id, ts, ID, assignment_id) VALUES (3, 7000, 7, 2);
 SELECT * FROM grades WHERE student_id = 3;
 SELECT * FROM grades;
 SELECT * FROM v1;

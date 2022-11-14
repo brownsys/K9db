@@ -1,11 +1,9 @@
-#include "pelton/shards/sqlengine/insert.h"
-#include "pelton/shards/sqlengine/gdpr.h"
-
 #include <string>
 #include <unordered_set>
 #include <vector>
 
 #include "glog/logging.h"
+#include "pelton/shards/sqlengine/gdpr.h"
 #include "pelton/shards/sqlengine/tests_helpers.h"
 #include "pelton/util/shard_name.h"
 
@@ -26,7 +24,7 @@ PELTON_FIXTURE(GDPRForgetTest);
 
 TEST_F(GDPRForgetTest, Datasubject) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -60,7 +58,7 @@ TEST_F(GDPRForgetTest, Datasubject) {
 
 TEST_F(GDPRForgetTest, DirectTable) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
 
   // Make a pelton connection.
@@ -87,7 +85,7 @@ TEST_F(GDPRForgetTest, DirectTable) {
   // Validate forget.
   std::string forget = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget, &conn), 3);
-  
+
   EXPECT_EQ(db->GetShard("addr", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("addr", SN("user", "5")), (V{row3}));
   EXPECT_EQ(db->GetShard("addr", SN("user", "10")), (V{}));
@@ -97,7 +95,7 @@ TEST_F(GDPRForgetTest, DirectTable) {
 TEST_F(GDPRForgetTest, UnshardedTable) {
   // Parse create table statements.
   std::string unsharded = MakeCreate("unsharded", {"id" I PK, "name" STR});
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
 
   // Make a pelton connection.
@@ -134,12 +132,13 @@ TEST_F(GDPRForgetTest, UnshardedTable) {
   EXPECT_EQ(db->GetShard("addr", SN("user", "5")), (V{row3}));
   EXPECT_EQ(db->GetShard("addr", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("addr", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
-  EXPECT_EQ(db->GetShard("unsharded", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{row4, row5}));
+  EXPECT_EQ(db->GetShard("unsharded", SN(DEFAULT_SHARD, DEFAULT_SHARD)),
+            (V{row4, row5}));
 }
 
 TEST_F(GDPRForgetTest, TransitiveTable) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
   std::string nums = MakeCreate("phones", {"id" I PK, "aid" I FK "addr(id)"});
 
@@ -185,7 +184,7 @@ TEST_F(GDPRForgetTest, TransitiveTable) {
 
 TEST_F(GDPRForgetTest, DeepTransitiveTable) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
   std::string nums = MakeCreate("phones", {"id" I PK, "aid" I FK "addr(id)"});
   std::string deep = MakeCreate("deep", {"id" I PK, "pid" I FK "phones(id)"});
@@ -243,10 +242,9 @@ TEST_F(GDPRForgetTest, DeepTransitiveTable) {
 
 TEST_F(GDPRForgetTest, TwoOwners) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
-                         "OWNER_receiver" I FK "user(id)"});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I OB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -294,10 +292,9 @@ TEST_F(GDPRForgetTest, TwoOwners) {
 
 TEST_F(GDPRForgetTest, TwoOwnersDataflowUpdate) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
-                         "OWNER_receiver" I FK "user(id)"});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I OB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -328,7 +325,7 @@ TEST_F(GDPRForgetTest, TwoOwnersDataflowUpdate) {
   EXPECT_SUCCESS(Execute("CREATE VIEW v1 AS '\"SELECT * FROM msg\"';", &conn));
 
   // Validate initial dataflow state.
-  EXPECT_EQ(Execute("SELECT * FROM v1;", &conn).ResultSets().at(0), 
+  EXPECT_EQ(Execute("SELECT * FROM v1;", &conn).ResultSets().at(0),
             (V{row1, row2, row3, row4}));
 
   // Validate forget for user with id 0.
@@ -341,7 +338,7 @@ TEST_F(GDPRForgetTest, TwoOwnersDataflowUpdate) {
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
 
   // Validate dataflow state after forget for user with id 0.
-  EXPECT_EQ(Execute("SELECT * FROM v1;", &conn).ResultSets().at(0), 
+  EXPECT_EQ(Execute("SELECT * FROM v1;", &conn).ResultSets().at(0),
             (V{row1, row3, row4}));
 
   // Validate forget for user with id 10.
@@ -354,16 +351,15 @@ TEST_F(GDPRForgetTest, TwoOwnersDataflowUpdate) {
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
 
   // Validate dataflow state after forget for user with id 10.
-  EXPECT_EQ(Execute("SELECT * FROM v1;", &conn).ResultSets().at(0), 
+  EXPECT_EQ(Execute("SELECT * FROM v1;", &conn).ResultSets().at(0),
             (V{row3, row4}));
 }
 
 TEST_F(GDPRForgetTest, OwnerAccessor) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "OWNER_sender" I FK "user(id)",
-                         "ACCESSOR_receiver" I FK "user(id)"});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I AB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -405,9 +401,10 @@ TEST_F(GDPRForgetTest, OwnerAccessor) {
 
 TEST_F(GDPRForgetTest, ShardedDataSubject) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string invited = MakeCreate(
-      "invited", {"id" I PK, "PII_name" STR, "inviting_user" I FK "user(id)"});
+      "invited", {"id" I PK, "name" STR, "inviting_user" I FK "user(id)"},
+      true);
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -453,11 +450,11 @@ TEST_F(GDPRForgetTest, ShardedDataSubject) {
 
 TEST_F(GDPRForgetTest, VariableOwnership) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string grps = MakeCreate("grps", {"gid" I PK});
-  std::string assoc =
-      MakeCreate("association", {"id" I PK, "OWNING_group" I FK "grps(gid)",
-                                 "OWNER_user" I FK "user(id)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"id" I PK, "group_id" I OW "grps(gid)", "user_id" I OB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -509,18 +506,18 @@ TEST_F(GDPRForgetTest, VariableOwnership) {
 
 TEST_F(GDPRForgetTest, ComplexVariableOwnership) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string admin = MakeCreate("admin", {"aid" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string admin = MakeCreate("admin", {"aid" I PK, "name" STR}, true);
   std::string grps =
-      MakeCreate("grps", {"gid" I PK, "OWNER_admin" I FK "admin(aid)"});
-  std::string assoc =
-      MakeCreate("association", {"sid" I PK, "OWNING_group" I FK "grps(gid)",
-                                 "OWNER_user" I FK "user(id)"});
+      MakeCreate("grps", {"gid" I PK, "admin" I OB "admin(aid)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"sid" I PK, "group_id" I OW "grps(gid)", "user_id" I OB "user(id)"});
   std::string files =
-      MakeCreate("files", {"fid" I PK, "OWNER_creator" I FK "user(id)"});
-  std::string fassoc =
-      MakeCreate("fassoc", {"fsid" I PK, "OWNING_file" I FK "files(fid)",
-                            "OWNER_group" I FK "grps(gid)"});
+      MakeCreate("files", {"fid" I PK, "creator" I OB "user(id)"});
+  std::string fassoc = MakeCreate(
+      "fassoc",
+      {"fsid" I PK, "file" I OW "files(fid)", "group_id" I OB "grps(gid)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -598,18 +595,18 @@ TEST_F(GDPRForgetTest, ComplexVariableOwnership) {
 
 TEST_F(GDPRForgetTest, ComplexVariableOwnershipAdminDelete) {
   // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "PII_name" STR});
-  std::string admin = MakeCreate("admin", {"aid" I PK, "PII_name" STR});
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string admin = MakeCreate("admin", {"aid" I PK, "name" STR}, true);
   std::string grps =
-      MakeCreate("grps", {"gid" I PK, "OWNER_admin" I FK "admin(aid)"});
-  std::string assoc =
-      MakeCreate("association", {"sid" I PK, "OWNING_group" I FK "grps(gid)",
-                                 "OWNER_user" I FK "user(id)"});
+      MakeCreate("grps", {"gid" I PK, "admin" I OB "admin(aid)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"sid" I PK, "group_id" I OW "grps(gid)", "user_id" I OB "user(id)"});
   std::string files =
-      MakeCreate("files", {"fid" I PK, "OWNER_creator" I FK "user(id)"});
-  std::string fassoc =
-      MakeCreate("fassoc", {"fsid" I PK, "OWNING_file" I FK "files(fid)",
-                            "OWNER_group" I FK "grps(gid)"});
+      MakeCreate("files", {"fid" I PK, "creator" I OB "user(id)"});
+  std::string fassoc = MakeCreate(
+      "fassoc",
+      {"fsid" I PK, "file" I OW "files(fid)", "group_id" I OB "grps(gid)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();

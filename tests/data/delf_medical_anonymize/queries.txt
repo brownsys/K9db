@@ -1,8 +1,0 @@
-update # = 2
-;
-3|20|1|HELLO
-4|20|-999999|HELLO 2
-5|20|1|HELLO 3
-1|10|1|HELLO
-2|10|-999999|Good bye
-;

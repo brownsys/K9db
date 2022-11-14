@@ -11,8 +11,8 @@ cc_library(
     visibility = ["//pelton:__subpackages__"],
     deps = [
         ":create",
-        ":gdpr",
         ":delete",
+        ":gdpr",
         ":index",
         ":insert",
         ":replace",
@@ -222,16 +222,17 @@ cc_library(
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",
-        "//pelton/dataflow:value",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/sql:abstract_connection",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
+        "//pelton/util:iterator",
         "//pelton/util:shard_name",
         "//pelton/util:status",
         "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/status",
+        "@glog",
     ],
 )
 

@@ -1,2 +1,2 @@
-#GDPR FORGET user 2;
-#GDPR GET user 1;
+GDPR FORGET user 2;
+GDPR GET user 1;

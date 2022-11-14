@@ -6,4 +6,4 @@ INSERT INTO t VALUES (1005, 'target_del');
 
 DELETE FROM rel WHERE id = 105;
 
-#GDPR GET user 5;
+GDPR GET user 5;

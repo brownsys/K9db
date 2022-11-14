@@ -5,10 +5,10 @@ INSERT INTO rel VALUES (106, 5, 1005);
 
 INSERT INTO t VALUES (1005, 'target_del');
 
-#GDPR GET user 5;
+GDPR GET user 5;
 
 DELETE FROM rel WHERE id = 105;
 
-#GDPR GET user 5;
+GDPR GET user 5;
 
 SELECT * FROM t WHERE id = 1005;

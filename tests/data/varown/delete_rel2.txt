@@ -10,7 +10,9 @@ update # = 2
 ;
 update # = 2
 ;
-#;
-#109|9|1008
-#1008|target_del_2
-#;
+8|test
+;
+9|b
+109|9|1008
+1008|target_del_2
+;

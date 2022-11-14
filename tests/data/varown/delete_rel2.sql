@@ -8,5 +8,5 @@ INSERT INTO t VALUES (1008, 'target_del_2');
 
 DELETE FROM rel WHERE id = 108;
 
-#GDPR GET user 8;
-#GDPR GET user 9;
+GDPR GET user 8;
+GDPR GET user 9;

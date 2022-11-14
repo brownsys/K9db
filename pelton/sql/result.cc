@@ -1,7 +1,6 @@
 #include "pelton/sql/result.h"
 
 #include <string>
-#include <unordered_set>
 
 #include "glog/logging.h"
 
@@ -38,57 +37,26 @@ util::Iterable<SqlDeleteSet::ShardRecordsIt> SqlDeleteSet::Iterate(
 }
 
 // SqlResultSet.
-void SqlResultSet::Append(SqlResultSet &&other, bool deduplicate) {
+void SqlResultSet::AppendDeduplicate(SqlResultSet &&other) {
   if (this->schema_ != other.schema_) {
     LOG(FATAL) << "Appending different schemas";
   }
+
   // Deduplicate using a hash set.
   std::unordered_set<std::string> duplicates;
-  if (deduplicate) {
-    // Store keys of existing records.
-    for (size_t i = 0; i < this->records_.size(); i++) {
-      std::string key = this->records_.at(i).GetValueString(this->schema_.keys().front());
-      duplicates.insert(key);
-    }
-  }
-  for (size_t i = 0; i < other.records_.size(); i++) {
-    std::string key = other.records_.at(i).GetValueString(other.schema_.keys().front());
-    if (!deduplicate || duplicates.count(key) == 0) {
-      this->records_.push_back(std::move(other.records_.at(i)));
-    }
-  }
-}
+  size_t pk_index = this->schema_.keys().front();
 
-// SqlResult.
-void SqlResult::Append(SqlResult &&other, bool deduplicate) {
-  CHECK(this->type_ == other.type_) << "Append different types";
-  switch (this->type_) {
-    case Type::STATEMENT: {
-      if (this->status_ != false) {
-        this->status_ = other.status_;
-      }
-      break;
+  // Store keys of existing records.
+  if (this->lazy_keys_.size() == 0) {
+    for (size_t i = 0; i < this->records_.size(); i++) {
+      std::string key = this->records_.at(i).GetValue(pk_index).AsSQLString();
+      duplicates.insert(std::move(key));
     }
-    case Type::UPDATE: {
-      if (other.status_ < 0) {
-        this->status_ = other.status_;
-      } else if (this->status_ >= 0) {
-        this->status_ += other.status_;
-      }
-      if (this->lid_ != 0 && other.lid_ != 0) {
-        LOG(FATAL) << "Appending results with different last insert id!";
-      }
-      if (this->lid_ == 0) {
-        this->lid_ = other.lid_;
-      }
-      break;
-    }
-    case Type::QUERY: {
-      if (this->sets_.size() != 1 || other.sets_.size() != 1) {
-        LOG(FATAL) << "Appending bad ResultSet size";
-      }
-      this->sets_.front().Append(std::move(other.sets_.front()), deduplicate);
-      break;
+  }
+  for (dataflow::Record &record : other.records_) {
+    std::string key = record.GetValue(pk_index).AsSQLString();
+    if (duplicates.insert(std::move(key)).second) {
+      this->records_.push_back(std::move(record));
     }
   }
 }

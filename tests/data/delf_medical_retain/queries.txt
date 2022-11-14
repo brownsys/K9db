@@ -1,10 +1,13 @@
+10|Carl
 1|10|1|HELLO
 2|10|2|Good bye
 ;
+2|Bob
 4|20|2|HELLO 2
 2|10|2|Good bye
 ;
-update # = 2
+update # = 3
 ;
+2|Bob
 4|20|2|HELLO 2
 ;

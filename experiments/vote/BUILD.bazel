@@ -17,20 +17,20 @@ rust_library(
     name = "clients",
     srcs = [
         "src/clients/lib.rs",
-        "src/clients/mysql.rs",
         "src/clients/memcached.rs",
         "src/clients/memcached_hybrid.rs",
+        "src/clients/mysql.rs",
         "src/clients/pelton.rs",
     ],
     visibility = ["//visibility:public"],
     deps = [
-	":common",
+        ":common",
         "//cargo:clap",
         "//cargo:failure",
+        "//cargo:memcached_rs",
         "//cargo:mysql_async",
+        "//cargo:tokio",
         "//cargo:tower_service",
-	"//cargo:memcached_rs",
-	"//cargo:tokio",
     ],
 )
 
@@ -41,8 +41,8 @@ rust_binary(
     ],
     visibility = ["//visibility:public"],
     deps = [
-	":common",
         ":clients",
+        ":common",
         "//cargo:clap",
         "//cargo:failure",
         "//cargo:futures_util",

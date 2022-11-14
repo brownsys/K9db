@@ -4,6 +4,7 @@
 #include <iterator>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -60,15 +61,10 @@ class SqlResultSet {
 
   SqlResultSet(const dataflow::SchemaRef &schema,
                std::vector<dataflow::Record> &&records)
-      : schema_(schema), records_(std::move(records)), keys_() {}
-
-  SqlResultSet(const dataflow::SchemaRef &schema,
-               std::vector<dataflow::Record> &&records,
-               std::vector<std::string> &&keys)
-      : schema_(schema), records_(std::move(records)), keys_(std::move(keys)) {}
+      : schema_(schema), records_(std::move(records)) {}
 
   // Adding additional results to this set.
-  void Append(SqlResultSet &&other, bool deduplicate);
+  void AppendDeduplicate(SqlResultSet &&other);
 
   // Query API.
   const dataflow::SchemaRef &schema() const { return this->schema_; }
@@ -81,7 +77,7 @@ class SqlResultSet {
  private:
   dataflow::SchemaRef schema_;
   std::vector<dataflow::Record> records_;
-  std::vector<std::string> keys_;
+  std::unordered_set<std::string> lazy_keys_;
 };
 
 // Our version of an SqlResult.
@@ -156,10 +152,6 @@ class SqlResult {
     return this->sets_;
   }
 
-  // Internal API: do not use outside of pelton code.
-  // Appends the provided SqlResult to this SqlResult, appeneded
-  // result is moved and becomes empty after append.
-  void Append(SqlResult &&other, bool deduplicate);
   inline void AddResultSet(SqlResultSet &&resultset) {
     this->sets_.push_back(std::move(resultset));
   }
