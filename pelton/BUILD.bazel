@@ -27,6 +27,7 @@ cc_library(
         "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
+        "@glog",
     ],
 )
 

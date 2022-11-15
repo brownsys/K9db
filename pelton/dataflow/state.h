@@ -10,6 +10,7 @@
 // NOLINTNEXTLINE
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "pelton/dataflow/channel.h"
@@ -86,6 +87,16 @@ class DataFlowState {
   sql::SqlResult SizeInMemory() const;
   sql::SqlResult FlowDebug(const std::string &flow_name) const;
 
+  // Get all views that will be affected by a table update.
+  std::vector<FlowName> GetFlowsAffectBy(const TableName &table) const {
+    auto it = this->all_flows_.find(table);
+    if (it == this->all_flows_.end()) {
+      return {};
+    } else {
+      return std::vector<FlowName>(it->second.begin(), it->second.end());
+    }
+  }
+
   // Shutdown all worker threads.
   size_t workers() const { return this->workers_; }
   void Shutdown();
@@ -110,6 +121,9 @@ class DataFlowState {
   // DataFlow graphs and views.
   std::unordered_map<FlowName, std::unique_ptr<DataFlowGraph>> flows_;
   std::unordered_map<TableName, std::vector<FlowName>> flows_per_input_table_;
+  // This includes flows_per_input_table_ and their nested views.
+  std::unordered_map<TableName, std::unordered_set<FlowName>> all_flows_;
+  std::unordered_map<FlowName, std::unordered_set<TableName>> all_tables_;
   // Mutex that allows safe modification of dataflow's state while it is
   // processing records.
   mutable std::shared_mutex mtx_;

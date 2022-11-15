@@ -304,6 +304,7 @@ void FromFlow(const std::string &flow_name,
     }
     stmt->stems.push_back(";");
   }
+  stmt->view_name = flow_name;
 }
 
 // Extract type information about ? arguments from the underlying tables.
@@ -333,6 +334,7 @@ void FromTables(const CanonicalQuery &query,
     }
     stmt->arg_types.push_back(schema.TypeOf(schema.IndexOf(column_name)));
   }
+  stmt->view_name = {};
 }
 
 // For handling insert/replace prepared statements.

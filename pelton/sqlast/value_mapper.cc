@@ -41,6 +41,9 @@ void ValueMapper::VisitReplace(const Replace &ast) {
 void ValueMapper::VisitGDPRStatement(const GDPRStatement &ast) {
   LOG(FATAL) << "UNSUPPORTED";
 }
+void ValueMapper::VisitExplainQuery(const ExplainQuery &ast) {
+  LOG(FATAL) << "UNSUPPORTED";
+}
 
 // These are important.
 void ValueMapper::VisitSelect(const Select &ast) {

@@ -6,6 +6,7 @@ cc_library(
     srcs = [
         "connection.cc",
         "connection_delete.cc",
+        "connection_explain.cc",
         "connection_gdpr.cc",
         "connection_insert.cc",
         "connection_schema.cc",

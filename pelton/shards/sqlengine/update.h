@@ -38,12 +38,12 @@ class UpdateContext {
   /* Main entry point for update: Executes the statement against the shards. */
   absl::StatusOr<sql::SqlResult> Exec();
 
- private:
   /* Returns true if the update statement may change the sharding/ownership of
      any affected record in the table or dependent tables. False guarantees
      the update is a no-op wrt ownership. */
   bool ModifiesSharding() const;
 
+ private:
   /* Executes the update by issuing a delete followed by an insert. */
   absl::StatusOr<sql::SqlResult> DeleteInsert();
 

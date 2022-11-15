@@ -80,6 +80,11 @@ class AbstractConnection {
   virtual std::vector<size_t> CountShards(
       const std::string &table_name,
       const std::vector<sqlast::Value> &pk_values) const = 0;
+
+  // Index information for explain.
+  virtual std::vector<std::string> GetIndices(const std::string &tbl) const = 0;
+  virtual std::string GetIndex(const std::string &tbl,
+                               const sqlast::BinaryExpression *const) const = 0;
 };
 
 }  // namespace sql

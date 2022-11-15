@@ -2,12 +2,14 @@
 #include "pelton/pelton.h"
 
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <utility>
 
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_split.h"
+#include "glog/logging.h"
 #include "pelton/dataflow/graph.h"
 #include "pelton/explain.h"
 #include "pelton/planner/planner.h"
@@ -50,6 +52,25 @@ std::optional<SqlResult> SpecialStatements(const std::string &sql,
   if (absl::StartsWith(sql, "EXPLAIN PRIVACY")) {
     explain::ExplainPrivacy(*connection);
     return SqlResult(true);
+  }
+  if (absl::StartsWith(sql, "EXPLAIN ")) {
+    std::string query = sql.substr(8);
+    // Check if this matches a previously prepared statement with some view.
+    State *state = connection->state;
+    util::SharedLock lock = state->CanonicalReaderLock();
+    auto pair = prepared::Canonicalize(query);
+    if (state->HasCanonicalStatement(pair.first)) {
+      const prepared::CanonicalDescriptor &desc =
+          state->GetCanonicalStatement(pair.first);
+      if (desc.view_name.has_value()) {
+        const auto &schema = dataflow::SchemaFactory::EXPLAIN_QUERY_SCHEMA;
+        std::vector<dataflow::Record> v;
+        v.emplace_back(schema, true, std::make_unique<std::string>("VIEW"),
+                       std::make_unique<std::string>(desc.view_name.value()));
+        return sql::SqlResult(sql::SqlResultSet(schema, std::move(v)));
+      }
+    }
+    return {};
   }
   if (absl::StartsWith(sql, "SHOW ")) {
     std::vector<std::string> split = absl::StrSplit(sql, ' ');

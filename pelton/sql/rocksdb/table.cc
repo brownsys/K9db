@@ -105,6 +105,19 @@ void RocksdbTable::IndexUpdate(const rocksdb::Slice &shard,
 }
 
 // Index Lookup.
+std::optional<std::string> RocksdbTable::ChooseIndex(
+    sqlast::ValueMapper *value_mapper) const {
+  if (value_mapper->HasValues(this->pk_column_)) {
+    return this->schema_.NameOf(this->pk_column_);
+  }
+  for (size_t col = 0; col < this->schema_.size(); col++) {
+    const std::optional<RocksdbIndex> &index = this->indices_.at(col);
+    if (index.has_value() && value_mapper->HasValues(col)) {
+      return this->schema_.NameOf(col);
+    }
+  }
+  return {};
+}
 std::optional<IndexSet> RocksdbTable::IndexLookup(
     sqlast::ValueMapper *value_mapper) const {
   // Find an index to lookup with.

@@ -142,5 +142,12 @@ SchemaRef SchemaFactory::PERF_LIST_SCHEMA =
                               sqlast::ColumnDefinition::Type::UINT},
                           std::vector<ColumnID>{});
 
+SchemaRef SchemaFactory::EXPLAIN_QUERY_SCHEMA =
+    SchemaFactory::Create(std::vector<std::string>{"Type", "Name"},
+                          std::vector<sqlast::ColumnDefinition::Type>{
+                              sqlast::ColumnDefinition::Type::TEXT,
+                              sqlast::ColumnDefinition::Type::TEXT},
+                          std::vector<ColumnID>{});
+
 }  // namespace dataflow
 }  // namespace pelton

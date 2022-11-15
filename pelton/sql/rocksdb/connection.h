@@ -79,6 +79,11 @@ class RocksdbConnection : public AbstractConnection {
       const std::string &table_name,
       const std::vector<sqlast::Value> &pk_values) const override;
 
+  // Index information for explain.
+  std::vector<std::string> GetIndices(const std::string &tbl) const override;
+  std::string GetIndex(const std::string &tbl,
+                       const sqlast::BinaryExpression *const) const override;
+
  private:
   std::unique_ptr<rocksdb::DB> db_;
   std::unordered_map<std::string, RocksdbTable> tables_;

@@ -301,6 +301,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("SHOW MEMORY")
        || q_string.starts_with("SHOW PREPARED")
        || q_string.starts_with("SHOW PERF")
+       || q_string.starts_with("EXPLAIN")
     {
       let select_response = pelton::exec_select(self.rust_conn, q_string);
       return write_result(results, select_response);

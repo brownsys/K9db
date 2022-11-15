@@ -6,6 +6,7 @@
 
 #include "pelton/shards/sqlengine/create.h"
 #include "pelton/shards/sqlengine/delete.h"
+#include "pelton/shards/sqlengine/explain.h"
 #include "pelton/shards/sqlengine/gdpr.h"
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/insert.h"
@@ -110,6 +111,14 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       auto *stmt = static_cast<sqlast::GDPRStatement *>(statement.get());
       util::SharedLock lock = connection->state->ReaderLock();
       GDPRContext context(*stmt, connection, &lock);
+      return context.Exec();
+    }
+
+    // Case 9: EXPLAIN <query> statements.
+    case sqlast::AbstractStatement::Type::EXPLAIN_QUERY: {
+      auto *stmt = static_cast<sqlast::ExplainQuery *>(statement.get());
+      util::SharedLock lock = connection->state->ReaderLock();
+      ExplainContext context(*stmt, connection, &lock);
       return context.Exec();
     }
 

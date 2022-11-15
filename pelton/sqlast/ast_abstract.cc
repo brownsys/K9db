@@ -23,6 +23,8 @@ std::ostream &operator<<(std::ostream &os, const AbstractStatement::Type &t) {
       return os << "CREATE VIEW";
     case AbstractStatement::Type::GDPR:
       return os << "GDPR";
+    case AbstractStatement::Type::EXPLAIN_QUERY:
+      return os << "EXPLAIN QUERY";
     default:
       LOG(FATAL) << "No string representation defined for an enum variant for "
                  << typeid(t).name();

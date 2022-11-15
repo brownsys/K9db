@@ -312,6 +312,35 @@ class GDPRStatement : public AbstractStatement {
   Value user_id_;
 };
 
+class ExplainQuery : public AbstractStatement {
+ public:
+  explicit ExplainQuery(std::unique_ptr<AbstractStatement> &&query)
+      : AbstractStatement(AbstractStatement::Type::EXPLAIN_QUERY),
+        query_(std::move(query)) {}
+
+  const AbstractStatement *GetQuery() const { return this->query_.get(); }
+
+  template <class T>
+  T Visit(AbstractVisitor<T> *visitor) const {
+    return visitor->VisitExplainQuery(*this);
+  }
+  template <class T>
+  T Visit(MutableVisitor<T> *visitor) {
+    return visitor->VisitExplainQuery(this);
+  }
+  template <class T>
+  std::vector<T> VisitChildren(AbstractVisitor<T> *visitor) const {
+    return {this->query_->Visit(visitor)};
+  }
+  template <class T>
+  std::vector<T> VisitChildren(MutableVisitor<T> *visitor) {
+    return {this->query_->Visit(visitor)};
+  }
+
+ private:
+  std::unique_ptr<AbstractStatement> query_;
+};
+
 }  // namespace sqlast
 }  // namespace pelton
 

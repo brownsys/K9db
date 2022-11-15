@@ -1,6 +1,7 @@
 #ifndef PELTON_PREPARED_H_
 #define PELTON_PREPARED_H_
 
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -27,6 +28,7 @@ struct CanonicalDescriptor {
   std::vector<std::string> arg_names;   // size = args_count
   std::vector<std::string> arg_ops;     // size = args_count
   std::vector<sqlast::ColumnDefinition::Type> arg_types;
+  std::optional<std::string> view_name;  // If from a view.
 };
 
 // Contains information about a connection-specific prepared statement

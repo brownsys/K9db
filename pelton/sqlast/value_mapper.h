@@ -47,6 +47,7 @@ class ValueMapper : public AbstractVisitor<void> {
   void VisitInsert(const Insert &ast) override;
   void VisitReplace(const Replace &ast) override;
   void VisitGDPRStatement(const GDPRStatement &ast) override;
+  void VisitExplainQuery(const ExplainQuery &ast) override;
 
   // These are important.
   void VisitSelect(const Select &ast) override;

@@ -25,7 +25,8 @@ class AbstractStatement {
     SELECT,
     DELETE,
     CREATE_VIEW,
-    GDPR
+    GDPR,
+    EXPLAIN_QUERY
   };
 
   // Constructor.
@@ -34,6 +35,12 @@ class AbstractStatement {
 
   // Accessors.
   const Type &type() const { return this->type_; }
+
+  template <class T>
+  T Visit(AbstractVisitor<T> *visitor) const;
+
+  template <class T>
+  T Visit(MutableVisitor<T> *visitor);
 
   // Printing to screen.
   friend std::ostream &operator<<(std::ostream &os, const AbstractStatement &r);

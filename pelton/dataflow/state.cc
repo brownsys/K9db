@@ -115,6 +115,8 @@ void DataFlowState::AddFlow(const FlowName &name,
   // Map input names to this flow.
   for (const auto &[input_name, input] : flow->inputs()) {
     this->flows_per_input_table_[input_name].push_back(name);
+    this->all_flows_[input_name].insert(name);
+    this->all_tables_[name].insert(input_name);
   }
 
   // Create a non-owning vector of channels.
@@ -135,6 +137,10 @@ void DataFlowState::AddFlow(const FlowName &name,
         vec.push_back(partition->GetNode(forward->parent_id()));
       }
       parents.emplace(flow_name, std::move(vec));
+      for (const std::string &table : this->all_tables_[flow_name]) {
+        this->all_flows_[table].insert(name);
+        this->all_tables_[name].insert(table);
+      }
     }
   }
 

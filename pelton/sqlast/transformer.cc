@@ -39,29 +39,59 @@ AstTransformer::TransformStatement(
 // Valid Syntax.
 antlrcpp::Any AstTransformer::visitSql_stmt(
     sqlparser::SQLiteParser::Sql_stmtContext *ctx) {
-  if (ctx->create_table_stmt() != nullptr) {
-    return ctx->create_table_stmt()->accept(this);
-  }
-  if (ctx->create_index_stmt() != nullptr) {
-    return ctx->create_index_stmt()->accept(this);
-  }
-  if (ctx->insert_stmt() != nullptr) {
-    return ctx->insert_stmt()->accept(this);
-  }
-  if (ctx->update_stmt() != nullptr) {
-    return ctx->update_stmt()->accept(this);
-  }
-  if (ctx->select_stmt() != nullptr) {
-    return ctx->select_stmt()->accept(this);
-  }
-  if (ctx->delete_stmt() != nullptr) {
-    return ctx->delete_stmt()->accept(this);
-  }
-  if (ctx->create_view_stmt() != nullptr) {
-    return ctx->create_view_stmt()->accept(this);
+  // Regular statement.
+  if (ctx->EXPLAIN() == nullptr) {
+    if (ctx->create_table_stmt() != nullptr) {
+      return ctx->create_table_stmt()->accept(this);
+    }
+    if (ctx->create_index_stmt() != nullptr) {
+      return ctx->create_index_stmt()->accept(this);
+    }
+    if (ctx->insert_stmt() != nullptr) {
+      return ctx->insert_stmt()->accept(this);
+    }
+    if (ctx->update_stmt() != nullptr) {
+      return ctx->update_stmt()->accept(this);
+    }
+    if (ctx->select_stmt() != nullptr) {
+      return ctx->select_stmt()->accept(this);
+    }
+    if (ctx->delete_stmt() != nullptr) {
+      return ctx->delete_stmt()->accept(this);
+    }
+    if (ctx->create_view_stmt() != nullptr) {
+      return ctx->create_view_stmt()->accept(this);
+    }
+    return absl::InvalidArgumentError("Unsupported statement type");
   }
 
-  return absl::InvalidArgumentError("Unsupported statement type");
+  // Explain <query> statement.
+  if (ctx->EXPLAIN() != nullptr) {
+    this->allow_question_mark_ = true;
+    std::unique_ptr<AbstractStatement> result;
+    if (ctx->insert_stmt() != nullptr) {
+      CAST_REF(std::unique_ptr<AbstractStatement>, stmt,
+               ctx->insert_stmt()->accept(this));
+      result = std::make_unique<ExplainQuery>(std::move(stmt));
+    } else if (ctx->update_stmt() != nullptr) {
+      CAST_REF(std::unique_ptr<AbstractStatement>, stmt,
+               ctx->update_stmt()->accept(this));
+      result = std::make_unique<ExplainQuery>(std::move(stmt));
+    } else if (ctx->select_stmt() != nullptr) {
+      auto res = ctx->select_stmt()->accept(this);
+      CAST_REF(std::unique_ptr<AbstractStatement>, stmt,
+               ctx->select_stmt()->accept(this));
+      result = std::make_unique<ExplainQuery>(std::move(stmt));
+    } else if (ctx->delete_stmt() != nullptr) {
+      CAST_REF(std::unique_ptr<AbstractStatement>, stmt,
+               ctx->delete_stmt()->accept(this));
+      result = std::make_unique<ExplainQuery>(std::move(stmt));
+    } else {
+      return absl::InvalidArgumentError("Unsupported statement type");
+    }
+    this->allow_question_mark_ = false;
+    return std::move(result);
+  }
 }
 
 // Create a view.
@@ -318,11 +348,14 @@ antlrcpp::Any AstTransformer::visitExpr_list(
     sqlparser::SQLiteParser::Expr_listContext *ctx) {
   std::vector<Value> values;
   for (auto expr_ctx : ctx->expr()) {
-    if (expr_ctx->literal_value() == nullptr) {
+    if (expr_ctx->BIND_PARAMETER() != nullptr && this->allow_question_mark_) {
+      values.emplace_back("?");
+    } else if (expr_ctx->literal_value() != nullptr) {
+      CAST_REF(Value, val, expr_ctx->literal_value()->accept(this));
+      values.push_back(std::move(val));
+    } else {
       return absl::InvalidArgumentError("Non-literal value in insert");
     }
-    CAST_REF(Value, val, expr_ctx->literal_value()->accept(this));
-    values.push_back(std::move(val));
   }
   return values;
 }
@@ -443,7 +476,7 @@ antlrcpp::Any AstTransformer::visitResult_column(
     return absl::InvalidArgumentError("Bad column expression in SELECT");
   }
   if (ctx->STAR() != nullptr) {
-    return std::string("*");
+    return Select::ResultColumn("*");
   }
   return absl::InvalidArgumentError("SELECT column is not * nor a column name");
 }
@@ -506,6 +539,12 @@ antlrcpp::Any AstTransformer::visitQualified_table_name(
 // Expressions.
 antlrcpp::Any AstTransformer::visitExpr(
     sqlparser::SQLiteParser::ExprContext *ctx) {
+  if (ctx->BIND_PARAMETER() != nullptr && this->allow_question_mark_) {
+    std::unique_ptr<Expression> result =
+        std::make_unique<LiteralExpression>(Value("?"));
+    return result;
+  }
+
   if ((ctx->literal_value() == nullptr && ctx->ASSIGN() == nullptr &&
        ctx->column_name() == nullptr && ctx->AND() == nullptr &&
        ctx->GT() == nullptr && ctx->IN() == nullptr && ctx->IS() == nullptr &&

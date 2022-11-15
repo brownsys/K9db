@@ -217,6 +217,10 @@ std::string Stringifier::VisitGDPRStatement(const GDPRStatement &ast) {
   return result;
 }
 
+std::string Stringifier::VisitExplainQuery(const ExplainQuery &ast) {
+  return "EXPLAIN " + ast.Visit(this);
+}
+
 /*
  * Where clause expressions.
  */
@@ -273,7 +277,7 @@ std::string Stringifier::VisitBinaryExpression(const BinaryExpression &ast) {
 /* Logging abstract statements stringifies them. */
 std::ostream &operator<<(std::ostream &os, const AbstractStatement &r) {
   Stringifier stringifier;
-  os << stringifier.Visit(&r);
+  os << r.Visit(&stringifier);
   return os;
 }
 

@@ -11,12 +11,6 @@
 #include "pelton/sqlast/ast_schema.h"
 #include "pelton/sqlast/ast_statements.h"
 
-#define PELTON_CONST_VISIT_CAST(stmt, type, visitor) \
-  static_cast<const type *>(stmt)->Visit(visitor)
-
-#define PELTON_VISIT_CAST(stmt, type, visitor) \
-  static_cast<type *>(stmt)->Visit(visitor)
-
 namespace pelton {
 namespace sqlast {
 
@@ -37,35 +31,11 @@ class AbstractVisitor {
   virtual T VisitSelect(const Select &ast) = 0;
   virtual T VisitDelete(const Delete &ast) = 0;
   virtual T VisitGDPRStatement(const GDPRStatement &ast) = 0;
+  virtual T VisitExplainQuery(const ExplainQuery &ast) = 0;
   virtual T VisitColumnExpression(const ColumnExpression &ast) = 0;
   virtual T VisitLiteralExpression(const LiteralExpression &ast) = 0;
   virtual T VisitLiteralListExpression(const LiteralListExpression &ast) = 0;
   virtual T VisitBinaryExpression(const BinaryExpression &ast) = 0;
-
-  T Visit(const AbstractStatement *stmt) {
-    switch (stmt->type()) {
-      case sqlast::AbstractStatement::Type::CREATE_TABLE:
-        return PELTON_CONST_VISIT_CAST(stmt, CreateTable, this);
-      case sqlast::AbstractStatement::Type::CREATE_INDEX:
-        return PELTON_CONST_VISIT_CAST(stmt, CreateIndex, this);
-      case sqlast::AbstractStatement::Type::CREATE_VIEW:
-        return PELTON_CONST_VISIT_CAST(stmt, CreateView, this);
-      case sqlast::AbstractStatement::Type::INSERT:
-        return PELTON_CONST_VISIT_CAST(stmt, Insert, this);
-      case sqlast::AbstractStatement::Type::REPLACE:
-        return PELTON_CONST_VISIT_CAST(stmt, Replace, this);
-      case sqlast::AbstractStatement::Type::UPDATE:
-        return PELTON_CONST_VISIT_CAST(stmt, Update, this);
-      case sqlast::AbstractStatement::Type::DELETE:
-        return PELTON_CONST_VISIT_CAST(stmt, Delete, this);
-      case sqlast::AbstractStatement::Type::SELECT:
-        return PELTON_CONST_VISIT_CAST(stmt, Select, this);
-      case sqlast::AbstractStatement::Type::GDPR:
-        return PELTON_CONST_VISIT_CAST(stmt, GDPRStatement, this);
-      default:
-        assert(false);
-    }
-  }
 };
 
 // Visit and modify.
@@ -85,36 +55,71 @@ class MutableVisitor {
   virtual T VisitSelect(Select *ast) = 0;
   virtual T VisitDelete(Delete *ast) = 0;
   virtual T VisitGDPRStatement(GDPRStatement *ast) = 0;
+  virtual T VisitExplainQuery(ExplainQuery *ast) = 0;
   virtual T VisitColumnExpression(ColumnExpression *ast) = 0;
   virtual T VisitLiteralExpression(LiteralExpression *ast) = 0;
   virtual T VisitLiteralListExpression(LiteralListExpression *ast) = 0;
   virtual T VisitBinaryExpression(BinaryExpression *ast) = 0;
-
-  T Visit(AbstractStatement *stmt) {
-    switch (stmt->type()) {
-      case sqlast::AbstractStatement::Type::CREATE_TABLE:
-        return PELTON_VISIT_CAST(stmt, CreateTable, this);
-      case sqlast::AbstractStatement::Type::CREATE_INDEX:
-        return PELTON_VISIT_CAST(stmt, CreateIndex, this);
-      case sqlast::AbstractStatement::Type::CREATE_VIEW:
-        return PELTON_VISIT_CAST(stmt, CreateView, this);
-      case sqlast::AbstractStatement::Type::INSERT:
-        return PELTON_VISIT_CAST(stmt, Insert, this);
-      case sqlast::AbstractStatement::Type::REPLACE:
-        return PELTON_VISIT_CAST(stmt, Replace, this);
-      case sqlast::AbstractStatement::Type::UPDATE:
-        return PELTON_VISIT_CAST(stmt, Update, this);
-      case sqlast::AbstractStatement::Type::DELETE:
-        return PELTON_VISIT_CAST(stmt, Delete, this);
-      case sqlast::AbstractStatement::Type::SELECT:
-        return PELTON_VISIT_CAST(stmt, Select, this);
-      case sqlast::AbstractStatement::Type::GDPR:
-        return PELTON_VISIT_CAST(stmt, GDPRStatement, this);
-      default:
-        assert(false);
-    }
-  }
 };
+
+// Allow us to visit a statement without knowing its exact type.
+#define PELTON_VISIT_CAST(type) static_cast<type *>(this)->Visit(visitor)
+
+template <class T>
+T AbstractStatement::Visit(AbstractVisitor<T> *visitor) const {
+  switch (this->type()) {
+    case sqlast::AbstractStatement::Type::CREATE_TABLE:
+      return PELTON_VISIT_CAST(const CreateTable);
+    case sqlast::AbstractStatement::Type::CREATE_INDEX:
+      return PELTON_VISIT_CAST(const CreateIndex);
+    case sqlast::AbstractStatement::Type::CREATE_VIEW:
+      return PELTON_VISIT_CAST(const CreateView);
+    case sqlast::AbstractStatement::Type::INSERT:
+      return PELTON_VISIT_CAST(const Insert);
+    case sqlast::AbstractStatement::Type::REPLACE:
+      return PELTON_VISIT_CAST(const Replace);
+    case sqlast::AbstractStatement::Type::UPDATE:
+      return PELTON_VISIT_CAST(const Update);
+    case sqlast::AbstractStatement::Type::DELETE:
+      return PELTON_VISIT_CAST(const Delete);
+    case sqlast::AbstractStatement::Type::SELECT:
+      return PELTON_VISIT_CAST(const Select);
+    case sqlast::AbstractStatement::Type::GDPR:
+      return PELTON_VISIT_CAST(const GDPRStatement);
+    case sqlast::AbstractStatement::Type::EXPLAIN_QUERY:
+      return PELTON_VISIT_CAST(const ExplainQuery);
+    default:
+      assert(false);
+  }
+}
+
+template <class T>
+T AbstractStatement::Visit(MutableVisitor<T> *visitor) {
+  switch (this->type()) {
+    case sqlast::AbstractStatement::Type::CREATE_TABLE:
+      return PELTON_VISIT_CAST(CreateTable);
+    case sqlast::AbstractStatement::Type::CREATE_INDEX:
+      return PELTON_VISIT_CAST(CreateIndex);
+    case sqlast::AbstractStatement::Type::CREATE_VIEW:
+      return PELTON_VISIT_CAST(CreateView);
+    case sqlast::AbstractStatement::Type::INSERT:
+      return PELTON_VISIT_CAST(Insert);
+    case sqlast::AbstractStatement::Type::REPLACE:
+      return PELTON_VISIT_CAST(Replace);
+    case sqlast::AbstractStatement::Type::UPDATE:
+      return PELTON_VISIT_CAST(Update);
+    case sqlast::AbstractStatement::Type::DELETE:
+      return PELTON_VISIT_CAST(Delete);
+    case sqlast::AbstractStatement::Type::SELECT:
+      return PELTON_VISIT_CAST(Select);
+    case sqlast::AbstractStatement::Type::GDPR:
+      return PELTON_VISIT_CAST(GDPRStatement);
+    case sqlast::AbstractStatement::Type::EXPLAIN_QUERY:
+      return PELTON_VISIT_CAST(ExplainQuery);
+    default:
+      assert(false);
+  }
+}
 
 // Turns ASTs to strings.
 class Stringifier : public AbstractVisitor<std::string> {
@@ -133,6 +138,7 @@ class Stringifier : public AbstractVisitor<std::string> {
   std::string VisitSelect(const Select &ast) override;
   std::string VisitDelete(const Delete &ast) override;
   std::string VisitGDPRStatement(const GDPRStatement &ast) override;
+  std::string VisitExplainQuery(const ExplainQuery &ast) override;
   std::string VisitColumnExpression(const ColumnExpression &ast) override;
   std::string VisitLiteralExpression(const LiteralExpression &ast) override;
   std::string VisitLiteralListExpression(

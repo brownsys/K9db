@@ -111,6 +111,7 @@ class SchemaFactory {
   static SchemaRef FLOW_DEBUG_SCHEMA;
   static SchemaRef NUM_SHARDS_SCHEMA;
   static SchemaRef PERF_LIST_SCHEMA;
+  static SchemaRef EXPLAIN_QUERY_SCHEMA;
 };
 
 }  // namespace dataflow

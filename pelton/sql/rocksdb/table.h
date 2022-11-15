@@ -85,6 +85,7 @@ class RocksdbTable {
                    const RocksdbSequence &updated);
 
   // Index lookups.
+  std::optional<std::string> ChooseIndex(sqlast::ValueMapper *vm) const;
   std::optional<IndexSet> IndexLookup(sqlast::ValueMapper *vm) const;
   std::optional<DedupIndexSet> IndexLookupDedup(sqlast::ValueMapper *vm) const;
   std::optional<IndexSet> IndexLookup(size_t column_index,
@@ -99,6 +100,18 @@ class RocksdbTable {
   }
   const RocksdbIndex &GetIndex(size_t column) const {
     return *this->indices_.at(column);
+  }
+
+  // Index information.
+  std::vector<std::string> GetIndices() const {
+    std::vector<std::string> result;
+    result.push_back(this->schema_.NameOf(this->pk_column_));
+    for (size_t i = 0; i < this->indices_.size(); i++) {
+      if (this->indices_.at(i).has_value()) {
+        result.push_back(this->schema_.NameOf(i));
+      }
+    }
+    return result;
   }
 
   // Check if a record with given PK exists.
