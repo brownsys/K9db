@@ -163,6 +163,7 @@ where
         )
         .await?;
 
+    // TODO(babman): can serve using index?
     c = c
         .drop_exec(
             "SELECT stories.id, stories.merged_story_id \
@@ -220,6 +221,7 @@ where
             )
             .await?;
 
+        // TODO(babman): Another one from an index?
         c = c
             .drop_exec(
                 "SELECT stories.id, stories.merged_story_id \

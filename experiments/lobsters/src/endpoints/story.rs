@@ -76,6 +76,7 @@ where
     }
 
     // XXX: probably not drop here, but we know we have no merged stories
+    // TODO(babman): index???
     c = c
         .drop_exec(
             "SELECT stories.id, stories.merged_story_id \

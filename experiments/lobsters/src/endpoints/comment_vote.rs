@@ -140,6 +140,7 @@ where
         )
         .await?;
 
+    // TODO(babman): also index?
     c = c
         .drop_exec(
             "SELECT stories.id, stories.merged_story_id \
