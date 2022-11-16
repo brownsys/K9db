@@ -249,19 +249,23 @@ class CreateTable : public AbstractStatement {
 
 class CreateIndex : public AbstractStatement {
  public:
-  CreateIndex(bool ondisk, const std::string &index_name,
-              const std::string &table_name, const std::string &column_name)
+  CreateIndex(const std::string &index_name, const std::string &table_name)
       : AbstractStatement(AbstractStatement::Type::CREATE_INDEX),
-        ondisk_(ondisk),
         index_name_(index_name),
         table_name_(table_name),
-        column_name_(column_name) {}
+        column_names_() {}
+
+  // Add columns.
+  void AddColumn(const std::string &column_name) {
+    this->column_names_.push_back(column_name);
+  }
 
   // Accessors.
-  bool ondisk() const { return this->ondisk_; }
   const std::string &table_name() const { return this->table_name_; }
   const std::string &index_name() const { return this->index_name_; }
-  const std::string &column_name() const { return this->column_name_; }
+  const std::vector<std::string> &column_names() const {
+    return this->column_names_;
+  }
 
   // Visitor pattern.
   template <class T>
@@ -286,7 +290,7 @@ class CreateIndex : public AbstractStatement {
   bool ondisk_;
   std::string index_name_;
   std::string table_name_;
-  std::string column_name_;
+  std::vector<std::string> column_names_;
 };
 
 class CreateView : public AbstractStatement {

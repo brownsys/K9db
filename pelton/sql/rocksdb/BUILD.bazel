@@ -135,6 +135,9 @@ cc_library(
     deps = [
         ":dedup",
         ":encode",
+        "//pelton/dataflow:schema",
+        "//pelton/sqlast:ast",
+        "//pelton/sqlast:value_mapper",
         "//pelton/util:iterator",
         "//pelton/util:status",
         "@glog",
@@ -209,6 +212,7 @@ cc_test(
     ],
     deps = [
         ":index",
+        "//pelton/util:ints",
         "//pelton/util:status",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",

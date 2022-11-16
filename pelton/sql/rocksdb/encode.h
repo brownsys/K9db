@@ -18,6 +18,7 @@
 
 #define __ROCKSSEP static_cast<char>(30)
 #define __ROCKSNULL static_cast<char>(0)
+#define __ROCKSCOMP static_cast<char>(1)
 
 namespace pelton {
 namespace sql {
@@ -48,6 +49,7 @@ class RocksdbSequence {
   void Append(const sqlast::Value &val);
   void Append(const util::ShardName &shard_name);
   void AppendEncoded(const rocksdb::Slice &slice);
+  void AppendComposite(const std::vector<rocksdb::Slice> &slices);
 
   // Getting from the sequence.
   // Does not include trailing __ROCKSSEP.
@@ -55,6 +57,9 @@ class RocksdbSequence {
 
   // Includes trailing __ROCKSSEP, as well as internal __ROCKSSEP.
   rocksdb::Slice Slice(size_t spos, size_t count) const;
+
+  // Split components into vector.
+  std::vector<rocksdb::Slice> Split() const;
 
   // Equality is over underlying data.
   bool operator==(const RocksdbSequence &o) const {
@@ -203,7 +208,8 @@ class RocksdbIndexInternalRecord {
       : data_(std::move(str)) {}
 
   // When handling SQL statements.
-  RocksdbIndexInternalRecord(const rocksdb::Slice &index_value,
+  // Vector because index can be composite.
+  RocksdbIndexInternalRecord(const std::vector<rocksdb::Slice> &index_values,
                              const rocksdb::Slice &shard_name,
                              const rocksdb::Slice &pk);
 
@@ -218,6 +224,7 @@ class RocksdbIndexInternalRecord {
 
   // For looking up records corresponding to index entry.
   RocksdbIndexRecord TargetKey() const;
+  bool HasPrefix(const rocksdb::Slice &slice) const;
 
  private:
   RocksdbSequence data_;

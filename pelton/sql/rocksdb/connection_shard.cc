@@ -11,7 +11,7 @@
 namespace pelton {
 namespace sql {
 
-// Get records by shard + PK.
+// Get records by shard + column value (PK or not).
 std::vector<dataflow::Record> RocksdbConnection::GetDirect(
     const std::string &table_name, size_t column_index,
     const std::vector<KeyPair> &keys) const {
@@ -30,28 +30,32 @@ std::vector<dataflow::Record> RocksdbConnection::GetDirect(
       key.Append(value);
       en_keys.push_back(this->encryption_manager_.EncryptKey(std::move(key)));
     }
-  } else if (table.HasIndexOn(column_index)) {
-    // Lookup by secondary index.
+  } else {
+    RocksdbTable::IndexChoice plan = table.ChooseIndex(column_index);
+    CHECK(plan.type != RocksdbTable::IndexChoiceType::PK) << "UNREACHABLE";
+    CHECK(plan.type != RocksdbTable::IndexChoiceType::SCAN)
+        << "Get Direct on non-indexed column";
+
+    // Encode shards and column values for index lookup.
     std::vector<std::string> shard_names;
     std::vector<sqlast::Value> values;
     for (const auto &[shard_name, value] : keys) {
       shard_names.emplace_back(shard_name.AsView());
       values.push_back(value);
     }
+    std::vector<std::string> encoded =
+        EncodeValues(schema.TypeOf(column_index), values);
 
     // Find index and lookup.
-    const RocksdbIndex &index = table.GetIndex(column_index);
-    IndexSet s =
-        index.GetWithShards(std::move(shard_names),
-                            EncodeValues(schema.TypeOf(column_index), values));
+    const RocksdbIndex &index = table.GetTableIndex(plan.idx);
+    IndexSet s = index.GetWithShards(std::move(shard_names), std::move(encoded),
+                                     plan.prefix);
     for (auto it = s.begin(); it != s.end();) {
       auto node = s.extract(it++);
       RocksdbIndexRecord &record = node.value();
       decr.push_back(record.GetShard().ToString());
       en_keys.push_back(this->encryption_manager_.EncryptKey(record.Release()));
     }
-  } else {
-    LOG(FATAL) << "Get Direct on non-indexed column";
   }
 
   // Lookup using multiget.
@@ -94,8 +98,9 @@ ResultSetAndStatus RocksdbConnection::AssignToShards(
   const dataflow::SchemaRef &schema = table.Schema();
 
   // Find source then use the other API.
-  std::optional<IndexSet> sources = table.IndexLookup(
-      column_index, EncodeValues(schema.TypeOf(column_index), values));
+  sqlast::ValueMapper value_mapper(schema);
+  value_mapper.AddValues(column_index, std::vector<sqlast::Value>(values));
+  std::optional<IndexSet> sources = table.IndexLookup(&value_mapper);
   CHECK(sources.has_value()) << "Assign to shards with no index";
   if (sources->size() == 0) {
     return std::pair(sql::SqlResultSet(schema), 0);

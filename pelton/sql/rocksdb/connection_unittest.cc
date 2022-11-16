@@ -121,7 +121,8 @@ void CreateTable() {
 
 void CreateNameIndex() {
   // Create Table.
-  sqlast::CreateIndex idx(true, "name_index", "test_table", "name");
+  sqlast::CreateIndex idx("name_index", "test_table");
+  idx.AddColumn("name");
   EXPECT_TRUE(CONN->ExecuteCreateIndex(idx));
 }
 

@@ -102,8 +102,15 @@ std::string Stringifier::VisitAnonymizationRule(const AnonymizationRule &ast) {
  */
 
 std::string Stringifier::VisitCreateIndex(const CreateIndex &ast) {
-  return "CREATE INDEX " + ast.index_name() + " ON " + ast.table_name() + "(" +
-         ast.column_name() + ")";
+  std::string str = "CREATE INDEX " + ast.index_name();
+  str += " ON " + ast.table_name() + "(";
+  for (const std::string &column_name : ast.column_names()) {
+    str += column_name + ", ";
+  }
+  str.pop_back();
+  str.pop_back();
+  str.push_back(')');
+  return str;
 }
 
 std::string Stringifier::VisitCreateView(const CreateView &ast) {

@@ -10,6 +10,21 @@
 namespace pelton {
 namespace sql {
 
+namespace {
+template <typename T>
+bool IsPrefix(const std::vector<T> &left, const std::vector<T> &right) {
+  if (left.size() > right.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < left.size(); i++) {
+    if (left.at(i) != right.at(i)) {
+      return false;
+    }
+  }
+  return true;
+}
+}  // namespace
+
 // Constructor.
 RocksdbTable::RocksdbTable(rocksdb::DB *db, const std::string &table_name,
                            const dataflow::SchemaRef &schema)
@@ -17,9 +32,10 @@ RocksdbTable::RocksdbTable(rocksdb::DB *db, const std::string &table_name,
       table_name_(table_name),
       schema_(schema),
       pk_column_(),
+      unique_columns_(),
       handle_(),
       pk_index_(db, table_name),
-      indices_(schema.size()) {
+      indices_() {
   const std::vector<dataflow::ColumnID> &keys = this->schema_.keys();
   CHECK_EQ(keys.size(), 1u) << "BAD PK ROCKSDB TABLE";
   this->pk_column_ = keys.front();
@@ -35,18 +51,37 @@ RocksdbTable::RocksdbTable(rocksdb::DB *db, const std::string &table_name,
 }
 
 // Create an index.
-void RocksdbTable::CreateIndex(size_t column_index) {
-  if (column_index != this->pk_column_ &&
-      !this->indices_.at(column_index).has_value()) {
-    this->indices_.at(column_index) =
-        RocksdbIndex(this->db_, this->table_name_, column_index);
+void RocksdbTable::CreateIndex(const std::vector<size_t> &cols) {
+  CHECK_GT(cols.size(), 0u) << "Index has no columns";
+  if (std::find(cols.begin(), cols.end(), this->pk_column_) != cols.end()) {
+    LOG(FATAL) << "Index includes PK";
   }
+  if (cols.size() > 1) {
+    for (size_t unique : this->unique_columns_) {
+      if (std::find(cols.begin(), cols.end(), unique) != cols.end()) {
+        LOG(FATAL) << "Composite index includes unique column";
+      }
+    }
+  }
+  for (const RocksdbIndex &index : this->indices_) {
+    if (index.GetColumns() == cols) {
+      return;
+    }
+    if (IsPrefix(cols, index.GetColumns())) {
+      LOG(WARNING) << "Index is a prefix of an existing index";
+    }
+    if (IsPrefix(index.GetColumns(), cols)) {
+      LOG(WARNING) << "An existing index is a prefix of index being created";
+    }
+  }
+  this->indices_.emplace_back(this->db_, this->table_name_, cols);
 }
 
 // Index updating.
 void RocksdbTable::IndexAdd(const rocksdb::Slice &shard,
                             const RocksdbSequence &row, bool update_pk) {
-  rocksdb::Slice pk = row.At(this->pk_column_);
+  std::vector<rocksdb::Slice> split = row.Split();
+  rocksdb::Slice pk = split.at(this->pk_column_);
 
   // Update PK index.
   if (update_pk) {
@@ -54,17 +89,19 @@ void RocksdbTable::IndexAdd(const rocksdb::Slice &shard,
   }
 
   // Update other indices.
-  size_t i = 0;
-  for (rocksdb::Slice value : row) {
-    std::optional<RocksdbIndex> &index = this->indices_.at(i++);
-    if (index.has_value()) {
-      index->Add(value, shard, pk);
+  for (RocksdbIndex &index : this->indices_) {
+    std::vector<rocksdb::Slice> index_values;
+    index_values.reserve(index.GetColumns().size());
+    for (size_t col : index.GetColumns()) {
+      index_values.push_back(split.at(col));
     }
+    index.Add(index_values, shard, pk);
   }
 }
 void RocksdbTable::IndexDelete(const rocksdb::Slice &shard,
                                const RocksdbSequence &row, bool update_pk) {
-  rocksdb::Slice pk = row.At(this->pk_column_);
+  std::vector<rocksdb::Slice> split = row.Split();
+  rocksdb::Slice pk = split.at(this->pk_column_);
 
   // Update PK index.
   if (update_pk) {
@@ -72,131 +109,141 @@ void RocksdbTable::IndexDelete(const rocksdb::Slice &shard,
   }
 
   // Update other indices.
-  size_t i = 0;
-  for (rocksdb::Slice value : row) {
-    std::optional<RocksdbIndex> &index = this->indices_.at(i++);
-    if (index.has_value()) {
-      index->Delete(value, shard, pk);
+  for (RocksdbIndex &index : this->indices_) {
+    std::vector<rocksdb::Slice> index_values;
+    index_values.reserve(index.GetColumns().size());
+    for (size_t col : index.GetColumns()) {
+      index_values.push_back(split.at(col));
     }
+    index.Delete(index_values, shard, pk);
   }
 }
 void RocksdbTable::IndexUpdate(const rocksdb::Slice &shard,
                                const RocksdbSequence &old,
                                const RocksdbSequence &updated) {
-  rocksdb::Slice pk = old.At(this->pk_column_);
-  CHECK(pk == updated.At(this->pk_column_)) << "Update cannot change PK";
+  std::vector<rocksdb::Slice> osplit = old.Split();
+  std::vector<rocksdb::Slice> usplit = updated.Split();
+  rocksdb::Slice pk = osplit.at(this->pk_column_);
+  CHECK(pk == usplit.at(this->pk_column_)) << "Update cannot change PK";
 
-  size_t i = 0;
-  auto oit = old.begin();
-  auto uit = updated.begin();
-  while (oit != old.end()) {
-    std::optional<RocksdbIndex> &index = this->indices_.at(i++);
-    if (index.has_value()) {
-      rocksdb::Slice oslice = *oit;
-      rocksdb::Slice uslice = *uit;
-      if (oslice != uslice) {
-        index->Delete(oslice, shard, pk);
-        index->Add(uslice, shard, pk);
+  for (RocksdbIndex &index : this->indices_) {
+    bool changed = false;
+    std::vector<rocksdb::Slice> ovalues;
+    std::vector<rocksdb::Slice> uvalues;
+    ovalues.reserve(index.GetColumns().size());
+    uvalues.reserve(index.GetColumns().size());
+    for (size_t col : index.GetColumns()) {
+      ovalues.push_back(osplit.at(col));
+      uvalues.push_back(usplit.at(col));
+      changed = changed || osplit.at(col) != usplit.at(col);
+    }
+    if (changed) {
+      index.Delete(ovalues, shard, pk);
+      index.Add(uvalues, shard, pk);
+    }
+  }
+}
+
+// Query planning (selecting index).
+RocksdbTable::IndexChoice RocksdbTable::ChooseIndex(
+    sqlast::ValueMapper *value_mapper) const {
+  // PK has highest priority.
+  if (value_mapper->HasValues(this->pk_column_)) {
+    return {IndexChoiceType::PK, false, 0};
+  }
+  // Unique indices have second highest priority.
+  for (size_t column : this->unique_columns_) {
+    if (value_mapper->HasValues(column)) {
+      for (size_t index = 0; index < this->indices_.size(); index++) {
+        const auto &cols = this->indices_.at(index).GetColumns();
+        if (cols.size() == 1 && cols.front() == column) {
+          return {IndexChoiceType::UNIQUE, false, static_cast<size_t>(index)};
+        }
       }
     }
-    ++oit;
-    ++uit;
   }
+  // Least priorty are regular indices. We try to select the index with the most
+  // conditions matched.
+  size_t max = 0;
+  size_t argmax = 0;
+  bool max_complete = false;
+  for (size_t i = 0; i < this->indices_.size(); i++) {
+    size_t prefix =
+        value_mapper->PrefixWithValues(this->indices_.at(i).GetColumns());
+    bool complete = (prefix == this->indices_.at(i).GetColumns().size());
+    if (prefix > max) {
+      max = prefix;
+      argmax = i;
+      max_complete = complete;
+    } else if (prefix == max && !max_complete && complete) {
+      max = prefix;
+      argmax = i;
+      max_complete = true;
+    }
+  }
+  if (max > 0) {
+    return {IndexChoiceType::REGULAR, !max_complete, argmax};
+  }
+  return {IndexChoiceType::SCAN, false, 0};
+}
+RocksdbTable::IndexChoice RocksdbTable::ChooseIndex(size_t column_index) const {
+  sqlast::ValueMapper vm(this->schema_);
+  vm.AddValues(column_index, {});
+  return this->ChooseIndex(&vm);
 }
 
 // Index Lookup.
-std::optional<std::string> RocksdbTable::ChooseIndex(
-    sqlast::ValueMapper *value_mapper) const {
-  if (value_mapper->HasValues(this->pk_column_)) {
-    return this->schema_.NameOf(this->pk_column_);
-  }
-  for (size_t col = 0; col < this->schema_.size(); col++) {
-    const std::optional<RocksdbIndex> &index = this->indices_.at(col);
-    if (index.has_value() && value_mapper->HasValues(col)) {
-      return this->schema_.NameOf(col);
-    }
-  }
-  return {};
-}
 std::optional<IndexSet> RocksdbTable::IndexLookup(
     sqlast::ValueMapper *value_mapper) const {
-  // Find an index to lookup with.
-  std::optional<IndexSet> set;
-  if (value_mapper->HasValues(this->pk_column_)) {
-    // Lookup primary index.
-    std::vector<sqlast::Value> vals =
-        value_mapper->ReleaseValues(this->pk_column_);
-    std::vector<std::string> encoded =
-        EncodeValues(this->schema_.TypeOf(this->pk_column_), vals);
-    return this->pk_index_.Get(std::move(encoded));
-  }
-
-  // Lookup by first available non PK index.
-  for (size_t col = 0; col < this->schema_.size(); col++) {
-    const std::optional<RocksdbIndex> &index = this->indices_.at(col);
-    if (index.has_value() && value_mapper->HasValues(col)) {
-      // Lookup col index.
-      std::vector<sqlast::Value> vals = value_mapper->ReleaseValues(col);
+  IndexChoice plan = this->ChooseIndex(value_mapper);
+  switch (plan.type) {
+    // By primary key index.
+    case IndexChoiceType::PK: {
+      std::vector<sqlast::Value> vals =
+          value_mapper->ReleaseValues(this->pk_column_);
       std::vector<std::string> encoded =
-          EncodeValues(this->schema_.TypeOf(col), vals);
-      return index->Get(std::move(encoded));
+          EncodeValues(this->schema_.TypeOf(this->pk_column_), vals);
+      return this->pk_index_.Get(std::move(encoded));
     }
+    // By unique or regular index.
+    case IndexChoiceType::UNIQUE:
+    case IndexChoiceType::REGULAR: {
+      const RocksdbIndex &index = this->indices_.at(plan.idx);
+      return index.Get(index.EncodeComposite(value_mapper, this->schema_),
+                       plan.prefix);
+    }
+    // By scan.
+    case IndexChoiceType::SCAN:
+      return {};
+    default:
+      LOG(FATAL) << "Unsupported query plan";
   }
-
-  return {};
 }
 std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
     sqlast::ValueMapper *value_mapper) const {
-  // Find an index to lookup with.
-  std::optional<IndexSet> set;
-  if (value_mapper->HasValues(this->pk_column_)) {
-    // Lookup primary index.
-    std::vector<sqlast::Value> vals =
-        value_mapper->ReleaseValues(this->pk_column_);
-    std::vector<std::string> encoded =
-        EncodeValues(this->schema_.TypeOf(this->pk_column_), vals);
-    return this->pk_index_.GetDedup(std::move(encoded));
-  }
-
-  // Lookup by first available non PK index.
-  for (size_t col = 0; col < this->schema_.size(); col++) {
-    const std::optional<RocksdbIndex> &index = this->indices_.at(col);
-    if (index.has_value() && value_mapper->HasValues(col)) {
-      // Lookup col index.
-      std::vector<sqlast::Value> vals = value_mapper->ReleaseValues(col);
+  IndexChoice plan = this->ChooseIndex(value_mapper);
+  switch (plan.type) {
+    // By primary key index.
+    case IndexChoiceType::PK: {
+      std::vector<sqlast::Value> vals =
+          value_mapper->ReleaseValues(this->pk_column_);
       std::vector<std::string> encoded =
-          EncodeValues(this->schema_.TypeOf(col), vals);
-      return index->GetDedup(std::move(encoded));
+          EncodeValues(this->schema_.TypeOf(this->pk_column_), vals);
+      return this->pk_index_.GetDedup(std::move(encoded));
     }
+    // By unique or regular index.
+    case IndexChoiceType::UNIQUE:
+    case IndexChoiceType::REGULAR: {
+      const RocksdbIndex &index = this->indices_.at(plan.idx);
+      return index.GetDedup(index.EncodeComposite(value_mapper, this->schema_),
+                            plan.prefix);
+    }
+    // By scan.
+    case IndexChoiceType::SCAN:
+      return {};
+    default:
+      LOG(FATAL) << "Unsupported query plan";
   }
-
-  return {};
-}
-
-std::optional<IndexSet> RocksdbTable::IndexLookup(
-    size_t column_index, std::vector<std::string> &&values) const {
-  if (column_index == this->pk_column_) {
-    return this->pk_index_.Get(std::move(values));
-  }
-  const std::optional<RocksdbIndex> &index = this->indices_.at(column_index);
-  if (index.has_value()) {
-    // Lookup col index.
-    return index->Get(std::move(values));
-  }
-  return {};
-}
-
-std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
-    size_t column_index, std::vector<std::string> &&values) const {
-  if (column_index == this->pk_column_) {
-    return this->pk_index_.GetDedup(std::move(values));
-  }
-  const std::optional<RocksdbIndex> &index = this->indices_.at(column_index);
-  if (index.has_value()) {
-    // Lookup col index.
-    return index->GetDedup(std::move(values));
-  }
-  return {};
 }
 
 // Check if a record with given PK exists.

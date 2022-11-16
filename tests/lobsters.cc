@@ -1,5 +1,8 @@
 #include "tests/common.h"
 
+TEST(E2ECorrectnessTest, LobstersExplain) {
+  tests::RunTest("tests/data/lobsters/explain");
+}
 TEST(E2ECorrectnessTest, LobstersQ1) {
   tests::RunTest("tests/data/lobsters/q1");
 }

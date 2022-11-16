@@ -294,16 +294,16 @@ antlrcpp::Any AstTransformer::visitCreate_index_stmt(
       ctx->WHERE() != nullptr || ctx->schema_name() != nullptr) {
     return absl::InvalidArgumentError("Invalid Create Index statement");
   }
-  if (ctx->indexed_column().size() > 1) {
-    return absl::InvalidArgumentError("Multi-column index are not supported!");
-  }
 
+  // bool disk = (ctx->INMEMORY() == nullptr);
   CAST_REF(std::string, index_name, ctx->index_name()->accept(this));
   CAST_REF(std::string, table_name, ctx->table_name()->accept(this));
-  CAST_REF(std::string, column_name, ctx->indexed_column(0)->accept(this));
-  bool disk = (ctx->INMEMORY() == nullptr);
-  return static_cast<std::unique_ptr<AbstractStatement>>(
-      std::make_unique<CreateIndex>(disk, index_name, table_name, column_name));
+  auto stmt = std::make_unique<CreateIndex>(index_name, table_name);
+  for (auto column_name_ctx : ctx->indexed_column()) {
+    CAST_REF(std::string, column_name, column_name_ctx->accept(this));
+    stmt->AddColumn(column_name);
+  }
+  return static_cast<std::unique_ptr<AbstractStatement>>(std::move(stmt));
 }
 
 // Insert constructs.

@@ -103,6 +103,14 @@ void RocksdbSequence::AppendEncoded(const rocksdb::Slice &slice) {
   this->data_.append(slice.data(), slice.size());
   this->data_.push_back(__ROCKSSEP);
 }
+void RocksdbSequence::AppendComposite(
+    const std::vector<rocksdb::Slice> &slices) {
+  for (size_t i = 0; i < slices.size(); i++) {
+    this->data_.append(slices.at(i).data(), slices.at(i).size());
+    this->data_.push_back(__ROCKSCOMP);
+  }
+  this->data_.at(this->data_.size() - 1) = __ROCKSSEP;
+}
 
 // Reading from sequence.
 rocksdb::Slice RocksdbSequence::At(size_t pos) const {
@@ -110,6 +118,9 @@ rocksdb::Slice RocksdbSequence::At(size_t pos) const {
 }
 rocksdb::Slice RocksdbSequence::Slice(size_t spos, size_t count) const {
   return ExtractSlice(this->data_, spos, count);
+}
+std::vector<rocksdb::Slice> RocksdbSequence::Split() const {
+  return std::vector<rocksdb::Slice>(this->begin(), this->end());
 }
 
 // Iterating over sequence.
@@ -253,10 +264,10 @@ RocksdbRecord RocksdbRecord::FromInsert(const sqlast::Insert &stmt,
  * RocksdbIndexInternalRecord.
  */
 RocksdbIndexInternalRecord::RocksdbIndexInternalRecord(
-    const rocksdb::Slice &index_value, const rocksdb::Slice &shard_name,
-    const rocksdb::Slice &pk)
+    const std::vector<rocksdb::Slice> &index_values,
+    const rocksdb::Slice &shard_name, const rocksdb::Slice &pk)
     : data_() {
-  this->data_.AppendEncoded(index_value);
+  this->data_.AppendComposite(index_values);
   this->data_.AppendEncoded(shard_name);
   this->data_.AppendEncoded(pk);
 }
@@ -272,6 +283,13 @@ rocksdb::Slice RocksdbIndexInternalRecord::GetPK() const {
 // For looking up records corresponding to index entry.
 RocksdbIndexRecord RocksdbIndexInternalRecord::TargetKey() const {
   return RocksdbIndexRecord(this->data_.Slice(1, 2));
+}
+bool RocksdbIndexInternalRecord::HasPrefix(const rocksdb::Slice &slice) const {
+  rocksdb::Slice data = this->data_.Data();
+  if (slice.size() > data.size()) {
+    return false;
+  }
+  return slice == rocksdb::Slice(data.data(), slice.size());
 }
 
 /*

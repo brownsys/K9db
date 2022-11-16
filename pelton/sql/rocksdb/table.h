@@ -66,14 +66,22 @@ class RocksdbTable {
   RocksdbTable(rocksdb::DB *db, const std::string &table_name,
                const dataflow::SchemaRef &schema);
 
+  void AddUniqueColumn(size_t column) {
+    this->unique_columns_.push_back(column);
+  }
+
   // Get the schema.
   const dataflow::SchemaRef &Schema() const { return this->schema_; }
   size_t PKColumn() const { return this->pk_column_; }
 
   // Index creation.
-  void CreateIndex(size_t column_index);
-  void CreateIndex(const std::string &column_name) {
-    this->CreateIndex(this->schema_.IndexOf(column_name));
+  void CreateIndex(const std::vector<size_t> &columns);
+  void CreateIndex(const std::vector<std::string> &column_names) {
+    std::vector<size_t> columns;
+    for (const std::string &column_name : column_names) {
+      columns.push_back(this->schema_.IndexOf(column_name));
+    }
+    this->CreateIndex(columns);
   }
 
   // Index updating.
@@ -84,32 +92,40 @@ class RocksdbTable {
   void IndexUpdate(const rocksdb::Slice &shard, const RocksdbSequence &old,
                    const RocksdbSequence &updated);
 
+  // Query planning (selecting index).
+  enum IndexChoiceType { PK, UNIQUE, REGULAR, SCAN };
+  struct IndexChoice {
+    IndexChoiceType type;
+    bool prefix;
+    size_t idx;
+  };
+  IndexChoice ChooseIndex(sqlast::ValueMapper *vm) const;
+  IndexChoice ChooseIndex(size_t column_index) const;
+
   // Index lookups.
-  std::optional<std::string> ChooseIndex(sqlast::ValueMapper *vm) const;
   std::optional<IndexSet> IndexLookup(sqlast::ValueMapper *vm) const;
   std::optional<DedupIndexSet> IndexLookupDedup(sqlast::ValueMapper *vm) const;
-  std::optional<IndexSet> IndexLookup(size_t column_index,
-                                      std::vector<std::string> &&values) const;
-  std::optional<DedupIndexSet> IndexLookupDedup(
-      size_t column_index, std::vector<std::string> &&values) const;
 
   // Get an index.
   const RocksdbPKIndex &GetPKIndex() const { return this->pk_index_; }
-  bool HasIndexOn(size_t column) const {
-    return this->indices_.at(column).has_value();
-  }
-  const RocksdbIndex &GetIndex(size_t column) const {
-    return *this->indices_.at(column);
+  const RocksdbIndex &GetTableIndex(size_t index) const {
+    return this->indices_.at(index);
   }
 
   // Index information.
   std::vector<std::string> GetIndices() const {
     std::vector<std::string> result;
-    result.push_back(this->schema_.NameOf(this->pk_column_));
-    for (size_t i = 0; i < this->indices_.size(); i++) {
-      if (this->indices_.at(i).has_value()) {
-        result.push_back(this->schema_.NameOf(i));
+    result.push_back("(" + this->schema_.NameOf(this->pk_column_) + ")");
+    for (const RocksdbIndex &index : this->indices_) {
+      std::string name = "(";
+      for (size_t col : index.GetColumns()) {
+        name.append(this->schema_.NameOf(col));
+        name.push_back(',');
+        name.push_back(' ');
       }
+      name.pop_back();
+      name.back() = ')';
+      result.push_back(std::move(name));
     }
     return result;
   }
@@ -139,13 +155,14 @@ class RocksdbTable {
 
   // The index of the PK column.
   size_t pk_column_;
+  std::vector<size_t> unique_columns_;
 
   // Column Family handler.
   std::unique_ptr<rocksdb::ColumnFamilyHandle> handle_;
 
   // Indices.
   RocksdbPKIndex pk_index_;
-  std::vector<std::optional<RocksdbIndex>> indices_;  // size == schema_.size().
+  std::vector<RocksdbIndex> indices_;
 };
 
 }  // namespace sql

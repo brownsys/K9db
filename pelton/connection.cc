@@ -80,6 +80,23 @@ sql::SqlResult State::PreparedDebug() const {
   return sql::SqlResult(sql::SqlResultSet(schema, std::move(records)));
 }
 
+sql::SqlResult State::ListIndices() const {
+  // Acquire reader lock.
+  util::SharedLock reader_lock = this->ReaderLock();
+  // Get schema.
+  dataflow::SchemaRef schema = dataflow::SchemaFactory::LIST_INDICES_SCHEMA;
+  // Loop over all tables and add their indices.
+  std::vector<dataflow::Record> records;
+  for (const std::string &table : this->sstate_.GetTables()) {
+    for (const std::string &columns : this->database_->GetIndices(table)) {
+      records.emplace_back(schema, true, std::make_unique<std::string>(table),
+                           std::make_unique<std::string>(columns));
+    }
+  }
+  // Return result.
+  return sql::SqlResult(sql::SqlResultSet(schema, std::move(records)));
+}
+
 // Locks.
 util::UniqueLock State::WriterLock() { return util::UniqueLock(&this->mtx_); }
 util::SharedLock State::ReaderLock() const {

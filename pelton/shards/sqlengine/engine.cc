@@ -102,8 +102,10 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
 
     // Case 7: CREATE INDEX statement.
     case sqlast::AbstractStatement::Type::CREATE_INDEX: {
-      std::cout << "CREATE INDEX CALLED" << std::endl;
-      return sql::SqlResult(true);
+      auto *stmt = static_cast<sqlast::CreateIndex *>(statement.get());
+      util::SharedLock lock = connection->state->ReaderLock();
+      auto db = connection->state->Database();
+      return sql::SqlResult(db->ExecuteCreateIndex(*stmt));
     }
 
     // Case 8: GDPR (GET | FORGET) statements.

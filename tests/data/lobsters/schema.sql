@@ -222,3 +222,5 @@ CREATE TABLE votes ( \
   FOREIGN KEY (story_id) REFERENCES stories(id), \
   FOREIGN KEY (comment_id) REFERENCES comments(id) \
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
+CREATE INDEX votes_comp ON votes(user_id, story_id, comment_id);
+

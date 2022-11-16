@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <utility>
 
+#include "pelton/sqlast/ast.h"
 #include "pelton/util/iterator.h"
 #include "pelton/util/status.h"
 
@@ -30,15 +31,16 @@ class IndexPrefixTransform : public rocksdb::SliceTransform {
 };
 
 // Helper: avoids writing the Get code twice for regular and dedup lookups.
-template <typename T, typename R, bool shards_specified = false>
+template <typename T, typename R, bool prefix = false,
+          bool shards_specified = false>
 T GetHelper(rocksdb::DB *db, rocksdb::ColumnFamilyHandle *handle,
             std::vector<std::string> &&values,
             std::vector<std::string> &&shards = {}) {
   // Iterator options.
   rocksdb::ReadOptions options;
   options.fill_cache = false;
-  options.total_order_seek = false;
-  options.prefix_same_as_start = true;
+  options.total_order_seek = prefix;
+  options.prefix_same_as_start = !prefix;
   options.verify_checksums = false;
 
   // Open iterator.
@@ -46,8 +48,10 @@ T GetHelper(rocksdb::DB *db, rocksdb::ColumnFamilyHandle *handle,
   std::unique_ptr<rocksdb::Iterator> it(ptr);
 
   // Make and sort all prefixes.
-  for (std::string &val : values) {
-    val.push_back(__ROCKSSEP);
+  if (!prefix) {
+    for (std::string &val : values) {
+      val.push_back(__ROCKSSEP);
+    }
   }
 
   if constexpr (shards_specified) {
@@ -70,6 +74,11 @@ T GetHelper(rocksdb::DB *db, rocksdb::ColumnFamilyHandle *handle,
     rocksdb::Slice pslice(value);
     for (it->Seek(pslice); it->Valid(); it->Next()) {
       R record(it->key());
+      if constexpr (prefix) {
+        if (!record.HasPrefix(pslice)) {
+          break;
+        }
+      }
       if constexpr (shards_specified) {
         if (record.GetShard() == shards.at(i)) {
           result.emplace(record.TargetKey());
@@ -89,10 +98,13 @@ T GetHelper(rocksdb::DB *db, rocksdb::ColumnFamilyHandle *handle,
  */
 // Constructor.
 RocksdbIndex::RocksdbIndex(rocksdb::DB *db, const std::string &table_name,
-                           size_t column)
-    : db_(db) {
+                           const std::vector<size_t> &columns)
+    : db_(db), handle_(), columns_(columns) {
   // Create a name for the index.
-  std::string name = table_name + "_index" + std::to_string(column);
+  std::string name = table_name + "_index";
+  for (size_t c : this->columns_) {
+    name += "_" + std::to_string(c);
+  }
 
   // Create a column family for this index.
   rocksdb::ColumnFamilyHandle *handle;
@@ -104,37 +116,86 @@ RocksdbIndex::RocksdbIndex(rocksdb::DB *db, const std::string &table_name,
 }
 
 // Adding things to index.
-void RocksdbIndex::Add(const rocksdb::Slice &value,
+void RocksdbIndex::Add(const std::vector<rocksdb::Slice> &values,
                        const rocksdb::Slice &shard_name,
                        const rocksdb::Slice &pk) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
-  IRecord e(value, shard_name, pk);
+  IRecord e(values, shard_name, pk);
   PANIC(this->db_->Put(rocksdb::WriteOptions(), handle, e.Data(), ""));
 }
 
 // Deleting things from index.
-void RocksdbIndex::Delete(const rocksdb::Slice &value,
+void RocksdbIndex::Delete(const std::vector<rocksdb::Slice> &values,
                           const rocksdb::Slice &shard_name,
                           const rocksdb::Slice &pk) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
-  IRecord e(value, shard_name, pk);
+  IRecord e(values, shard_name, pk);
   PANIC(this->db_->Delete(rocksdb::WriteOptions(), handle, e.Data()));
 }
 
-// Get by value.
-IndexSet RocksdbIndex::Get(std::vector<std::string> &&v) const {
-  return GetHelper<IndexSet, IRecord>(this->db_, this->handle_.get(),
-                                      std::move(v));
+// Use to encode condition values for composite index.
+std::vector<std::string> RocksdbIndex::EncodeComposite(
+    sqlast::ValueMapper *vm, const dataflow::SchemaRef &schema) const {
+  std::vector<std::string> result;
+  for (size_t col : this->columns_) {
+    // Prefix has been consumed.
+    if (!vm->HasValues(col)) {
+      for (std::string &str : result) {
+        str.push_back(__ROCKSCOMP);
+      }
+      break;
+    }
+    // More columns still have values.
+    std::vector<sqlast::Value> vals = vm->ReleaseValues(col);
+    if (result.size() == 0) {
+      result = EncodeValues(schema.TypeOf(col), vals);
+    } else {
+      std::vector<std::string> next;
+      std::vector<std::string> encoded = EncodeValues(schema.TypeOf(col), vals);
+      for (const std::string &previous : result) {
+        for (const std::string &enc : encoded) {
+          next.push_back(previous);
+          next.back().push_back(__ROCKSCOMP);
+          next.back().append(enc);
+        }
+      }
+      result = std::move(next);
+    }
+  }
+  return result;
 }
-DedupIndexSet RocksdbIndex::GetDedup(std::vector<std::string> &&v) const {
-  return GetHelper<DedupIndexSet, IRecord>(this->db_, this->handle_.get(),
-                                           std::move(v));
+
+// Get by value.
+IndexSet RocksdbIndex::Get(std::vector<std::string> &&v, bool prefix) const {
+  if (prefix) {
+    return GetHelper<IndexSet, IRecord, true>(this->db_, this->handle_.get(),
+                                              std::move(v));
+  } else {
+    return GetHelper<IndexSet, IRecord>(this->db_, this->handle_.get(),
+                                        std::move(v));
+  }
+}
+DedupIndexSet RocksdbIndex::GetDedup(std::vector<std::string> &&v,
+                                     bool prefix) const {
+  if (prefix) {
+    return GetHelper<DedupIndexSet, IRecord, true>(
+        this->db_, this->handle_.get(), std::move(v));
+  } else {
+    return GetHelper<DedupIndexSet, IRecord>(this->db_, this->handle_.get(),
+                                             std::move(v));
+  }
 }
 
 IndexSet RocksdbIndex::GetWithShards(std::vector<std::string> &&shards,
-                                     std::vector<std::string> &&values) const {
-  return GetHelper<IndexSet, IRecord, true>(
-      this->db_, this->handle_.get(), std::move(values), std::move(shards));
+                                     std::vector<std::string> &&values,
+                                     bool prefix) const {
+  if (prefix) {
+    return GetHelper<IndexSet, IRecord, true, true>(
+        this->db_, this->handle_.get(), std::move(values), std::move(shards));
+  } else {
+    return GetHelper<IndexSet, IRecord, false, true>(
+        this->db_, this->handle_.get(), std::move(values), std::move(shards));
+  }
 }
 
 /*

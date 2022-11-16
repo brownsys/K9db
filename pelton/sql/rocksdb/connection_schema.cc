@@ -33,11 +33,12 @@ bool RocksdbConnection::ExecuteCreateTable(const sqlast::CreateTable &stmt) {
   for (size_t i = 0; i < stmt.GetColumns().size(); i++) {
     const auto &column = stmt.GetColumns().at(i);
     for (const auto &cnstr : column.GetConstraints()) {
-      if (cnstr.type() == sqlast::ColumnConstraint::Type::PRIMARY_KEY ||
-          cnstr.type() == sqlast::ColumnConstraint::Type::FOREIGN_KEY ||
-          cnstr.type() == sqlast::ColumnConstraint::Type::UNIQUE) {
-        it->second.CreateIndex(i);
-        break;
+      switch (cnstr.type()) {
+        case sqlast::ColumnConstraint::Type::UNIQUE:
+          it->second.AddUniqueColumn(i);
+        case sqlast::ColumnConstraint::Type::FOREIGN_KEY:
+          it->second.CreateIndex(std::vector<size_t>{i});
+          break;
       }
     }
   }
@@ -47,10 +48,9 @@ bool RocksdbConnection::ExecuteCreateTable(const sqlast::CreateTable &stmt) {
 
 // Execute Create Index Statement
 bool RocksdbConnection::ExecuteCreateIndex(const sqlast::CreateIndex &stmt) {
-  CHECK(stmt.ondisk()) << "Creating a rocksdb index for a non-disk statement";
   const std::string &table_name = stmt.table_name();
   RocksdbTable &table = this->tables_.at(table_name);
-  table.CreateIndex(stmt.column_name());
+  table.CreateIndex(stmt.column_names());
   return true;
 }
 

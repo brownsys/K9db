@@ -16,6 +16,7 @@ namespace sql {
 
 #define SEP std::string({__ROCKSSEP})
 #define NUL std::string({__ROCKSNULL})
+#define COMP std::string({__ROCKSCOMP})
 
 #define SQL(s) sqlast::Value::FromSQLString(s)
 
@@ -107,11 +108,15 @@ TEST(RocksdbEncodeTest, RocksdbRecord) {
 }
 
 // RocksdbIndexInternalRecord
+#define IV(s) \
+  { rocksdb::Slice(s) }
+#define IV2(s1, s2) \
+  { rocksdb::Slice(s1), rocksdb::Slice(s2) }
 TEST(RocksdbEncodeTest, RocksdbIndexInternalRecord) {
   // Test piece-wise constructor.
-  RocksdbIndexInternalRecord r1("10", "shard__0", "5");
-  RocksdbIndexInternalRecord r2("20", "shard__0", "5");
-  RocksdbIndexInternalRecord r3("20", "shard__1", "5");
+  RocksdbIndexInternalRecord r1(IV("10"), "shard__0", "5");
+  RocksdbIndexInternalRecord r2(IV("20"), "shard__0", "5");
+  RocksdbIndexInternalRecord r3(IV2("20", "v"), "shard__1", "5");
 
   // Test read constructor.
   r1 = RocksdbIndexInternalRecord(r1.Data());
@@ -121,7 +126,7 @@ TEST(RocksdbEncodeTest, RocksdbIndexInternalRecord) {
   // Test data.
   EXPECT_EQ(r1.Data(), "10" + SEP + "shard__0" + SEP + "5" + SEP);
   EXPECT_EQ(r2.Data(), "20" + SEP + "shard__0" + SEP + "5" + SEP);
-  EXPECT_EQ(r3.Data(), "20" + SEP + "shard__1" + SEP + "5" + SEP);
+  EXPECT_EQ(r3.Data(), "20" + COMP + "v" + SEP + "shard__1" + SEP + "5" + SEP);
 
   // Test getters.
   EXPECT_EQ(r1.GetShard(), "shard__0");

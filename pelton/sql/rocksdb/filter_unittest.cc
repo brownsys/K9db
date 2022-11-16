@@ -1,5 +1,3 @@
-#define PELTON_FILTER_UNITTEST
-
 #include "pelton/sql/rocksdb/filter.h"
 
 #include <memory>

@@ -136,6 +136,13 @@ Table &SharderState::GetTable(const TableName &table_name) {
 const Table &SharderState::GetTable(const TableName &table_name) const {
   return this->tables_.at(table_name);
 }
+std::vector<std::string> SharderState::GetTables() const {
+  std::vector<std::string> vec;
+  for (const auto &[table_name, _] : this->tables_) {
+    vec.push_back(table_name);
+  }
+  return vec;
+}
 
 /*
  * Shard / shardkind lookups.

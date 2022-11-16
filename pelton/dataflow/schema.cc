@@ -149,5 +149,12 @@ SchemaRef SchemaFactory::EXPLAIN_QUERY_SCHEMA =
                               sqlast::ColumnDefinition::Type::TEXT},
                           std::vector<ColumnID>{});
 
+SchemaRef SchemaFactory::LIST_INDICES_SCHEMA =
+    SchemaFactory::Create(std::vector<std::string>{"Table", "Columns"},
+                          std::vector<sqlast::ColumnDefinition::Type>{
+                              sqlast::ColumnDefinition::Type::TEXT,
+                              sqlast::ColumnDefinition::Type::TEXT},
+                          std::vector<ColumnID>{});
+
 }  // namespace dataflow
 }  // namespace pelton

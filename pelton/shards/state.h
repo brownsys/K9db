@@ -63,6 +63,7 @@ class SharderState {
   bool IsAccessed(const TableName &table_name) const;
   Table &GetTable(const TableName &table_name);
   const Table &GetTable(const TableName &table_name) const;
+  std::vector<std::string> GetTables() const;
 
   // Shard / shardkind lookups.
   void AddShardKind(const ShardKind &shard_kind, const ColumnName &id_column,

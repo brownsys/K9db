@@ -25,6 +25,16 @@ class ValueMapper : public AbstractVisitor<void> {
   bool HasValues(size_t col_idx) const {
     return this->values_.count(col_idx) == 1;
   }
+  size_t PrefixWithValues(const std::vector<size_t> &cols) {
+    size_t prefix = 0;
+    for (size_t i = 0; i < cols.size(); i++) {
+      if (this->values_.count(cols.at(i)) == 0) {
+        return prefix;
+      }
+      prefix++;
+    }
+    return prefix;
+  }
   std::vector<Value> ReleaseValues(size_t col_idx) {
     auto node = this->values_.extract(col_idx);
     std::vector<Value> res = std::move(node.mapped());
@@ -34,6 +44,14 @@ class ValueMapper : public AbstractVisitor<void> {
     return this->values_;
   }
   bool Empty() const { return this->values_.size() == 0; }
+
+  // Add values manually (without visiting some ast).
+  void AddValue(size_t i, const Value &value) {
+    this->values_[i].push_back(value);
+  }
+  void AddValues(size_t i, std::vector<Value> &&values) {
+    this->values_[i] = std::move(values);
+  }
 
   // Visitors.
   // These are unsupported.
@@ -63,14 +81,6 @@ class ValueMapper : public AbstractVisitor<void> {
  private:
   dataflow::SchemaRef schema_;
   std::unordered_map<size_t, std::vector<Value>> values_;
-
- public:
-#ifdef PELTON_FILTER_UNITTEST
-  // To allow unittests to add values for testing.
-  void AddValue(size_t i, const Value &value) {
-    this->values_[i].push_back(value);
-  }
-#endif  // PELTON_FILTER_UNITTEST
 };
 
 }  // namespace sqlast
