@@ -77,7 +77,32 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecForget() {
 /*
  * Get and helpers.
  */
-void GDPRContext::AddOrAppend(const TableName &tbl, sql::SqlResultSet &&set) {
+void GDPRContext::AddOrAppendAndAnon(const TableName &tbl, 
+                                     const std::string &accessed_column,
+                                     sql::SqlResultSet &&set) {
+  // Find the table with table name `tbl` among all tables; access create_stmt
+  // Extract the vector of anonymization rules via GetAnonymizationRules
+  // Use GetType, GetDataSubject, GetAnonymizeColumns
+  // Match accessed_column with the result of GetDataSubject
+
+  const std::vector<sqlast::AnonymizationRule> &rules = 
+    this->sstate_.GetTable(table_name).create_stmt.GetAnonymizationRules();
+
+  std::vector<dataflow::Record> &&records = set.Vec();
+
+  for (dataflow::Record &record : records) {
+    for (const sqlast::AnonymizationRule &rule : rules) {
+      // Since it's only used in GDPR GET, we are checking for the type
+      if (rule.GetType() == AnonymizationOpTypeEnum::GET && 
+          rule.GetDataSubject() == accessed_column) {
+          for (const std::string &anon_column : rule.GetAnonymizeColumns()) {
+            size_t anon_idx = record.schema.IndexOf(anon_column);
+            record.SetNull(true, anon_idx);
+          }
+      }
+    }
+  }
+
   auto it = this->result_.find(tbl);
   if (it == this->result_.end()) {
     this->result_.emplace(tbl, std::move(set));
@@ -152,7 +177,8 @@ void GDPRContext::FindData(const TableName &tbl, const ShardDescriptor *desc,
     this->FindInDependents(tbl, resultset.rows());
 
     // Add to result set.
-    this->AddOrAppend(tbl, std::move(resultset));
+    // We should pass more info into AddOrAppend here; possibly, column_name?
+    this->AddOrAppendAndAnon(tbl, column_name, std::move(resultset));
   }
 }
 
@@ -169,7 +195,8 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecGet() {
       this->FindInDependents(table_name, resultset.rows());
 
       // Add to result set.
-      this->AddOrAppend(table_name, std::move(resultset));
+      this->AddOrAppendAndAnon(table_name, this->shard_kind_, 
+                               std::move(resultset));
     }
   }
 

@@ -40,7 +40,9 @@ class GDPRContext {
   absl::StatusOr<sql::SqlResult> ExecForget();
 
   /* Handle get and its helpers. */
-  void AddOrAppend(const TableName &tbl, sql::SqlResultSet &&set);
+  void AddOrAppendAndAnon(const TableName &tbl, 
+                          const std::string &accessed_column,
+                          sql::SqlResultSet &&set);
 
   sqlast::Select MakeAccessSelect(const TableName &tbl,
                                   const std::string &column,
