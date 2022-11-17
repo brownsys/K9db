@@ -86,17 +86,17 @@ void GDPRContext::AddOrAppendAndAnon(const TableName &tbl,
   // Match accessed_column with the result of GetDataSubject
 
   const std::vector<sqlast::AnonymizationRule> &rules = 
-    this->sstate_.GetTable(table_name).create_stmt.GetAnonymizationRules();
+    this->sstate_.GetTable(tbl).create_stmt.GetAnonymizationRules();
 
   std::vector<dataflow::Record> &&records = set.Vec();
 
   for (dataflow::Record &record : records) {
     for (const sqlast::AnonymizationRule &rule : rules) {
       // Since it's only used in GDPR GET, we are checking for the type
-      if (rule.GetType() == AnonymizationOpTypeEnum::GET && 
+      if (rule.GetType() == sqlast::AnonymizationOpTypeEnum::GET && 
           rule.GetDataSubject() == accessed_column) {
           for (const std::string &anon_column : rule.GetAnonymizeColumns()) {
-            size_t anon_idx = record.schema.IndexOf(anon_column);
+            size_t anon_idx = record.schema().IndexOf(anon_column);
             record.SetNull(true, anon_idx);
           }
       }
@@ -105,9 +105,9 @@ void GDPRContext::AddOrAppendAndAnon(const TableName &tbl,
 
   auto it = this->result_.find(tbl);
   if (it == this->result_.end()) {
-    this->result_.emplace(tbl, std::move(set));
+    this->result_.emplace(tbl, sql::SqlResultSet(set.schema(), std::move(records)));
   } else {
-    it->second.AppendDeduplicate(std::move(set));
+    it->second.AppendDeduplicate(sql::SqlResultSet(set.schema(), std::move(records)));
   }
 }
 
@@ -195,8 +195,7 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecGet() {
       this->FindInDependents(table_name, resultset.rows());
 
       // Add to result set.
-      this->AddOrAppendAndAnon(table_name, this->shard_kind_, 
-                               std::move(resultset));
+      this->AddOrAppendAndAnon(table_name, , std::move(resultset));
     }
   }
 
