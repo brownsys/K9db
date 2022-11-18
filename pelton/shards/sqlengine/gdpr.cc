@@ -77,43 +77,11 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecForget() {
 /*
  * Get and helpers.
  */
-void GDPRContext::AddOrAppendAndAnonOwned(const TableName &tbl, 
-                                          sql::SqlResultSet &&set) {
-  const std::vector<sqlast::AnonymizationRule> &rules = 
-    this->sstate_.GetTable(tbl).create_stmt.GetAnonymizationRules();
-
-  std::vector<dataflow::Record> &&records = set.Vec();
-
-  for (dataflow::Record &record : records) {
-    for (const sqlast::AnonymizationRule &rule : rules) {
-      if (rule.GetType() == sqlast::AnonymizationOpTypeEnum::GET && 
-        this->user_id_ == record.GetValue(record.schema().IndexOf(rule.GetDataSubject()))) {
-        for (const std::string &anon_column : rule.GetAnonymizeColumns()) {
-          size_t anon_idx = record.schema().IndexOf(anon_column);
-          record.SetNull(true, anon_idx);
-          std::cout << "ANONYMIZING!" << std::endl;
-        }
-      }
-    }
-  }
-  std::cout << "DONE ANONYMIZING! FOR " << std::endl;
-
-  auto it = this->result_.find(tbl);
-  if (it == this->result_.end()) {
-    this->result_.emplace(tbl, sql::SqlResultSet(set.schema(), std::move(records)));
-  } else {
-    it->second.AppendDeduplicate(sql::SqlResultSet(set.schema(), std::move(records)));
-  }
-}
 
 void GDPRContext::AddOrAppendAndAnon(const TableName &tbl, 
-                                     const std::string &accessed_column,
-                                     sql::SqlResultSet &&set) {
-  // Find the table with table name `tbl` among all tables; access create_stmt
-  // Extract the vector of anonymization rules via GetAnonymizationRules
-  // Use GetType, GetDataSubject, GetAnonymizeColumns
-  // Match accessed_column with the result of GetDataSubject
-
+                                     sql::SqlResultSet &&set,
+                                     std::optional<std::reference_wrapper<const std::string>> accessed_column) {
+                                      
   const std::vector<sqlast::AnonymizationRule> &rules = 
     this->sstate_.GetTable(tbl).create_stmt.GetAnonymizationRules();
 
@@ -122,11 +90,20 @@ void GDPRContext::AddOrAppendAndAnon(const TableName &tbl,
   for (dataflow::Record &record : records) {
     for (const sqlast::AnonymizationRule &rule : rules) {
       // Since it's only used in GDPR GET, we are checking for the type
-      if (rule.GetType() == sqlast::AnonymizationOpTypeEnum::GET && 
-        rule.GetDataSubject() == accessed_column) {
-        for (const std::string &anon_column : rule.GetAnonymizeColumns()) {
-          size_t anon_idx = record.schema().IndexOf(anon_column);
-          record.SetNull(true, anon_idx);
+      if (rule.GetType() == sqlast::AnonymizationOpTypeEnum::GET) { 
+        if (!accessed_column) {
+          size_t data_subject_idx = record.schema().IndexOf(rule.GetDataSubject());
+          if (this->user_id_ == record.GetValue(data_subject_idx)) {
+            for (const std::string &anon_column : rule.GetAnonymizeColumns()) {
+              size_t anon_idx = record.schema().IndexOf(anon_column);
+              record.SetNull(true, anon_idx);
+            }
+          }
+        } else if (rule.GetDataSubject() == accessed_column->get()) {
+          for (const std::string &anon_column : rule.GetAnonymizeColumns()) {
+            size_t anon_idx = record.schema().IndexOf(anon_column);
+            record.SetNull(true, anon_idx);
+          }
         }
       }
     }
@@ -206,7 +183,7 @@ void GDPRContext::FindData(const TableName &tbl, const ShardDescriptor *desc,
     this->FindInDependents(tbl, resultset.rows());
 
     // Add to result set.
-    this->AddOrAppendAndAnon(tbl, column_name, std::move(resultset));
+    this->AddOrAppendAndAnon(tbl, std::move(resultset), column_name);
   }
 }
 
@@ -223,7 +200,7 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecGet() {
       this->FindInDependents(table_name, resultset.rows());
 
       // Add to result set.
-      this->AddOrAppendAndAnonOwned(table_name, std::move(resultset));
+      this->AddOrAppendAndAnon(table_name, std::move(resultset));
     }
   }
 
