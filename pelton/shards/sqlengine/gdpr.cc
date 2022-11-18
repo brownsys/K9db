@@ -77,6 +77,35 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecForget() {
 /*
  * Get and helpers.
  */
+void GDPRContext::AddOrAppendAndAnonOwned(const TableName &tbl, 
+                                          sql::SqlResultSet &&set) {
+  const std::vector<sqlast::AnonymizationRule> &rules = 
+    this->sstate_.GetTable(tbl).create_stmt.GetAnonymizationRules();
+
+  std::vector<dataflow::Record> &&records = set.Vec();
+
+  for (dataflow::Record &record : records) {
+    for (const sqlast::AnonymizationRule &rule : rules) {
+      if (rule.GetType() == sqlast::AnonymizationOpTypeEnum::GET && 
+        this->user_id_ == record.GetValue(record.schema().IndexOf(rule.GetDataSubject()))) {
+        for (const std::string &anon_column : rule.GetAnonymizeColumns()) {
+          size_t anon_idx = record.schema().IndexOf(anon_column);
+          record.SetNull(true, anon_idx);
+          std::cout << "ANONYMIZING!" << std::endl;
+        }
+      }
+    }
+  }
+  std::cout << "DONE ANONYMIZING! FOR " << std::endl;
+
+  auto it = this->result_.find(tbl);
+  if (it == this->result_.end()) {
+    this->result_.emplace(tbl, sql::SqlResultSet(set.schema(), std::move(records)));
+  } else {
+    it->second.AppendDeduplicate(sql::SqlResultSet(set.schema(), std::move(records)));
+  }
+}
+
 void GDPRContext::AddOrAppendAndAnon(const TableName &tbl, 
                                      const std::string &accessed_column,
                                      sql::SqlResultSet &&set) {
@@ -94,11 +123,11 @@ void GDPRContext::AddOrAppendAndAnon(const TableName &tbl,
     for (const sqlast::AnonymizationRule &rule : rules) {
       // Since it's only used in GDPR GET, we are checking for the type
       if (rule.GetType() == sqlast::AnonymizationOpTypeEnum::GET && 
-          rule.GetDataSubject() == accessed_column) {
-          for (const std::string &anon_column : rule.GetAnonymizeColumns()) {
-            size_t anon_idx = record.schema().IndexOf(anon_column);
-            record.SetNull(true, anon_idx);
-          }
+        rule.GetDataSubject() == accessed_column) {
+        for (const std::string &anon_column : rule.GetAnonymizeColumns()) {
+          size_t anon_idx = record.schema().IndexOf(anon_column);
+          record.SetNull(true, anon_idx);
+        }
       }
     }
   }
@@ -177,7 +206,6 @@ void GDPRContext::FindData(const TableName &tbl, const ShardDescriptor *desc,
     this->FindInDependents(tbl, resultset.rows());
 
     // Add to result set.
-    // We should pass more info into AddOrAppend here; possibly, column_name?
     this->AddOrAppendAndAnon(tbl, column_name, std::move(resultset));
   }
 }
@@ -195,7 +223,7 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecGet() {
       this->FindInDependents(table_name, resultset.rows());
 
       // Add to result set.
-      this->AddOrAppendAndAnon(table_name, , std::move(resultset));
+      this->AddOrAppendAndAnonOwned(table_name, std::move(resultset));
     }
   }
 
