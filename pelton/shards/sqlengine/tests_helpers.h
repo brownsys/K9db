@@ -99,27 +99,28 @@ sql::SqlResult Execute(const std::string &sql, Connection *conn);
  * google test fixture class, allows us to manage the pelton state and
  * initialize / destruct it for every test.
  */
-#define PELTON_FIXTURE(NAME)                                  \
-  static const char *DB_PATH = "/tmp/pelton/rocksdb/" #NAME;  \
-  class NAME : public ::testing::Test {                       \
-   protected:                                                 \
-    void SetUp() override {                                   \
-      std::filesystem::remove_all(DB_PATH);                   \
-      this->pelton_state_ = std::make_unique<State>(3, true); \
-      this->pelton_state_->Initialize(#NAME);                 \
-    }                                                         \
-    void TearDown() override {                                \
-      this->pelton_state_ = nullptr;                          \
-      std::filesystem::remove_all(DB_PATH);                   \
-    }                                                         \
-    Connection CreateConnection() {                           \
-      Connection connection;                                  \
-      connection.state = this->pelton_state_.get();           \
-      return connection;                                      \
-    }                                                         \
-                                                              \
-   private:                                                   \
-    std::unique_ptr<State> pelton_state_;                     \
+#define PELTON_FIXTURE(NAME)                                               \
+  static const char *DB_PATH = "/tmp/pelton/rocksdb/" #NAME;               \
+  class NAME : public ::testing::Test {                                    \
+   protected:                                                              \
+    void SetUp() override {                                                \
+      std::filesystem::remove_all(DB_PATH);                                \
+      this->pelton_state_ = std::make_unique<State>(3, true);              \
+      this->pelton_state_->Initialize(#NAME);                              \
+    }                                                                      \
+    void TearDown() override {                                             \
+      this->pelton_state_ = nullptr;                                       \
+      std::filesystem::remove_all(DB_PATH);                                \
+    }                                                                      \
+    Connection CreateConnection() {                                        \
+      Connection connection;                                               \
+      connection.state = this->pelton_state_.get();                        \
+      connection.session = this->pelton_state_->Database()->OpenSession(); \
+      return connection;                                                   \
+    }                                                                      \
+                                                                           \
+   private:                                                                \
+    std::unique_ptr<State> pelton_state_;                                  \
   }
 
 }  // namespace sqlengine

@@ -9,6 +9,7 @@
 
 namespace pelton {
 namespace sql {
+namespace rocks {
 
 bool InMemoryFilter(const sqlast::ValueMapper &value_mapper,
                     const dataflow::Record &record) {
@@ -24,5 +25,6 @@ bool InMemoryFilter(const sqlast::ValueMapper &value_mapper,
   return true;
 }
 
+}  // namespace rocks
 }  // namespace sql
 }  // namespace pelton

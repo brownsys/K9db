@@ -16,6 +16,7 @@
 
 namespace pelton {
 namespace sql {
+namespace rocks {
 
 // Forward declaration for use in Cipher.
 // class EncryptionManager;
@@ -147,6 +148,7 @@ class PeltonPrefixTransform : public rocksdb::SliceTransform {
 // Either encrypted or plain bytes.
 const rocksdb::Comparator *PeltonComparator();
 
+}  // namespace rocks
 }  // namespace sql
 }  // namespace pelton
 
@@ -154,15 +156,15 @@ const rocksdb::Comparator *PeltonComparator();
 namespace std {
 
 template <>
-struct hash<pelton::sql::Cipher> {
-  size_t operator()(const pelton::sql::Cipher &o) const {
+struct hash<pelton::sql::rocks::Cipher> {
+  size_t operator()(const pelton::sql::rocks::Cipher &o) const {
     return hash<std::string>{}(o.cipher_);
   }
 };
 
 template <>
-struct hash<pelton::sql::EncryptedKey> {
-  size_t operator()(const pelton::sql::EncryptedKey &o) const {
+struct hash<pelton::sql::rocks::EncryptedKey> {
+  size_t operator()(const pelton::sql::rocks::EncryptedKey &o) const {
     return hash<std::string>{}(o.data_);
   }
 };

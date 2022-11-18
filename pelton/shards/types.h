@@ -175,6 +175,86 @@ std::ostream &operator<<(std::ostream &os, const ShardDescriptor &o);
 std::ostream &operator<<(std::ostream &os, const Table &o);
 std::ostream &operator<<(std::ostream &os, const Shard &o);
 
+// Helper to allow for easily traversing a tree of owned/accessed tables.
+// void visit(owner, owned, desc, A).
+template <typename A>
+class Visitor {
+ private:
+  using State = std::unordered_map<TableName, Table>;
+  using Up = const Table &;
+  using Down = const Table &;
+  using Link = const ShardDescriptor *;
+  using Functor = std::function<bool(Up, Down, Link, A)>;
+
+ public:
+  // Use this if you want to instantiate by passing in a lambda.
+  explicit Visitor(Functor f) : f_(std::move(f)) {}
+
+ private:
+  // Invoked by SharderState to visit.
+  void Initialize(const State *state) { this->state_ = state; }
+
+  // Internal; Do not modify or override.
+  template <bool Up>
+  void VisitOwners(const TableName &table_name, A arg) {
+    const Table &table = this->state_->at(table_name);
+    // Identify direction.
+    if constexpr (Up) {
+      for (const auto &desc : table.owners) {
+        if (desc->shard_kind != table_name) {
+          const Table &next = this->state_->at(desc->next_table());
+          if (this->VisitOwner(next, table, desc.get(), arg)) {
+            this->VisitOwners<true>(next.table_name, arg);
+          }
+        }
+      }
+    } else {
+      for (const auto &[next_table, desc] : table.dependents) {
+        const Table &next = this->state_->at(next_table);
+        if (this->VisitOwner(table, next, desc, arg)) {
+          this->VisitOwners<false>(next.table_name, arg);
+        }
+      }
+    }
+  }
+  template <bool Up>
+  void VisitAccessors(const TableName &table_name, A arg) {
+    const Table &table = this->state_->at(table_name);
+    // Identify direction.
+    if constexpr (Up) {
+      for (const auto &desc : table.accessors) {
+        const Table &next = this->state_->at(desc->next_table());
+        if (this->VisitAccessor(next, table, desc.get(), arg)) {
+          this->VisitAccessors<true>(next.table_name, arg);
+        }
+      }
+    } else {
+      for (const auto &[next_table, desc] : table.access_dependents) {
+        const Table &next = this->state_->at(next_table);
+        if (this->VisitAccessor(table, next, desc, arg)) {
+          this->VisitAccessors<false>(next.table_name, arg);
+        }
+      }
+    }
+  }
+
+ protected:
+  // If you want to instantiate by overriding/inheritance, then your subclass
+  // should invoke this default constructor, and then override Visit(...) below.
+  Visitor() = default;
+  virtual bool VisitOwner(Up u, Down d, Link l, A a) {
+    return this->f_.value()(u, d, l, a);
+  }
+  virtual bool VisitAccessor(Up u, Down d, Link l, A a) {
+    return this->f_.value()(u, d, l, a);
+  }
+
+ private:
+  std::optional<Functor> f_;
+  const State *state_ = nullptr;
+  friend class SharderState;
+};
+
 }  // namespace shards
 }  // namespace pelton
 

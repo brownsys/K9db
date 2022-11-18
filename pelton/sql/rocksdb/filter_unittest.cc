@@ -16,6 +16,7 @@
 
 namespace pelton {
 namespace sql {
+namespace rocks {
 
 using CType = sqlast::ColumnDefinition::Type;
 
@@ -183,5 +184,6 @@ TEST(FilterTest, Combined) {
   EXPECT_FALSE(InMemoryFilter(cond, r5));
 }
 
+}  // namespace rocks
 }  // namespace sql
 }  // namespace pelton

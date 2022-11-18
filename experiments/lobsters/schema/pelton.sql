@@ -24,6 +24,9 @@ CREATE DATA_SUBJECT TABLE users (
   disabled_invite_reason varchar(200),
   settings text
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
+CREATE INDEX users_username ON users (username);
+
+
 CREATE TABLE stories (
   id int NOT NULL PRIMARY KEY,
   created_at datetime,
@@ -46,6 +49,11 @@ CREATE TABLE stories (
   user_is_author int,
   FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX stories_short_id ON stories (short_id);
+CREATE INDEX stories_user_id ON stories (user_id);
+CREATE INDEX stories_merged_story ON stories (merged_story_id);
+
+
 CREATE TABLE comments (
   id int NOT NULL PRIMARY KEY,
   created_at datetime NOT NULL,
@@ -64,10 +72,14 @@ CREATE TABLE comments (
   is_moderated int,
   is_from_email int,
   hat_id int,
-  FOREIGN KEY (user_id) OWNED_BY users(id)
+  FOREIGN KEY (user_id) OWNED_BY users(id),
+  FOREIGN KEY (story_id) REFERENCES stories(id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
--- CREATE INDEX commentspk ON comments(id);
--- CREATE INDEX comments_short_index ON comments(short_id);
+CREATE INDEX comments_short_id ON comments (short_id);
+CREATE INDEX comments_user_id ON comments (user_id);
+CREATE INDEX comments_story_id ON comments (story_id);
+
+
 CREATE TABLE hat_requests (
   id int NOT NULL PRIMARY KEY,
   created_at datetime,
@@ -78,6 +90,9 @@ CREATE TABLE hat_requests (
   comment text,
   FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
+CREATE INDEX hat_requests_user_id ON hat_requests (user_id);
+
+
 CREATE TABLE hats (
   id int NOT NULL PRIMARY KEY,
   created_at datetime,
@@ -91,6 +106,10 @@ CREATE TABLE hats (
   FOREIGN KEY (user_id) OWNED_BY users(id),
   FOREIGN KEY (granted_by_user_id) OWNED_BY users(id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
+CREATE INDEX hats_user_id ON hats (user_id);
+CREATE INDEX hats_granted_by_user_id ON hats (granted_by_user_id);
+
+
 CREATE TABLE hidden_stories (
   id int NOT NULL PRIMARY KEY,
   user_id int,
@@ -98,7 +117,11 @@ CREATE TABLE hidden_stories (
   FOREIGN KEY (user_id) OWNED_BY users(id),
   FOREIGN KEY (story_id) REFERENCES stories(id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
-CREATE INDEX hidden_stories_comp ON hidden_stories(user_id, story_id);
+CREATE INDEX hidden_stories_user_story ON hidden_stories (user_id, story_id);
+CREATE INDEX hidden_stories_user_id ON hidden_stories (user_id);
+CREATE INDEX hidden_stories_story_id ON hidden_stories (story_id);
+
+
 CREATE DATA_SUBJECT TABLE invitation_requests (
   id int NOT NULL PRIMARY KEY,
   code varchar(255),
@@ -110,6 +133,8 @@ CREATE DATA_SUBJECT TABLE invitation_requests (
   created_at datetime NOT NULL,
   updated_at datetime NOT NULL
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
+
+
 CREATE DATA_SUBJECT TABLE invitations (
   id int NOT NULL PRIMARY KEY,
   user_id int,
@@ -120,10 +145,15 @@ CREATE DATA_SUBJECT TABLE invitations (
   memo text,
   FOREIGN KEY (user_id) OWNED_BY users(id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX invitations_user_id ON invitations (user_id);
+
+
 CREATE TABLE keystores (
   keyX varchar(50) NOT NULL PRIMARY KEY,
   valueX int
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
+
+
 CREATE TABLE messages (
   id int NOT NULL PRIMARY KEY,
   created_at datetime,
@@ -138,6 +168,11 @@ CREATE TABLE messages (
   FOREIGN KEY (author_user_id) OWNED_BY users(id),
   FOREIGN KEY (recipient_user_id) OWNED_BY users(id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX messages_short_id ON messages (short_id);
+CREATE INDEX messages_author ON messages (author_user_id);
+CREATE INDEX messages_recipient ON messages (recipient_user_id);
+
+
 CREATE TABLE moderations (
   id int NOT NULL PRIMARY KEY,
   created_at datetime NOT NULL,
@@ -152,6 +187,10 @@ CREATE TABLE moderations (
   FOREIGN KEY (user_id) OWNED_BY users(id),
   FOREIGN KEY (moderator_user_id) OWNED_BY users(id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX moderations_user_id ON moderations (user_id);
+CREATE INDEX moderations_mod_user_id ON moderations (moderator_user_id);
+
+
 CREATE TABLE read_ribbons (
   id int NOT NULL PRIMARY KEY,
   is_following int,
@@ -162,7 +201,11 @@ CREATE TABLE read_ribbons (
   FOREIGN KEY (user_id) OWNED_BY users(id),
   FOREIGN KEY (story_id) REFERENCES stories(id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX read_ribbons_user_id ON read_ribbons (user_id);
+CREATE INDEX read_ribbons_story_id ON read_ribbons (story_id);
 CREATE INDEX read_ribbons_composite ON read_ribbons(user_id, story_id);
+
+
 CREATE TABLE saved_stories (
   id int NOT NULL PRIMARY KEY,
   created_at datetime NOT NULL,
@@ -172,10 +215,11 @@ CREATE TABLE saved_stories (
   FOREIGN KEY (user_id) OWNED_BY users(id),
   FOREIGN KEY (story_id) REFERENCES stories(id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
+CREATE INDEX saved_stories_user_id ON saved_stories (user_id);
+CREATE INDEX saved_stories_story_id ON saved_stories (story_id);
 CREATE INDEX saved_stories_composite ON saved_stories(user_id, story_id);
--- Need this index for transitive sharding.
---CREATE INDEX storiespk ON stories(id);
---CREATE INDEX stories_short_index ON stories(short_id);
+
+
 CREATE TABLE tags (
   id int NOT NULL PRIMARY KEY,
   tag varchar(25) NOT NULL UNIQUE,
@@ -185,6 +229,9 @@ CREATE TABLE tags (
   inactive int,
   hotness_mod int
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
+CREATE INDEX tags_tag ON tags (tag);
+
+
 CREATE TABLE suggested_taggings (
   id int NOT NULL PRIMARY KEY,
   story_id int,
@@ -193,6 +240,10 @@ CREATE TABLE suggested_taggings (
   FOREIGN KEY (user_id) OWNED_BY users(id),
   FOREIGN KEY (story_id) REFERENCES users(id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
+CREATE INDEX suggested_taggings_user_id ON suggested_taggings (user_id);
+CREATE INDEX suggested_taggings_story_id ON suggested_taggings (story_id);
+
+
 CREATE TABLE suggested_titles (
   id int NOT NULL PRIMARY KEY,
   story_id int,
@@ -201,14 +252,22 @@ CREATE TABLE suggested_titles (
   FOREIGN KEY (user_id) OWNED_BY users(id),
   FOREIGN KEY (story_id) REFERENCES stories(id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
+CREATE INDEX suggested_titles_user_id ON suggested_titles (user_id);
+CREATE INDEX suggested_titles_story_id ON suggested_titles (story_id);
+
+
 CREATE TABLE tag_filters (
   id int NOT NULL PRIMARY KEY,
   created_at datetime NOT NULL,
   updated_at datetime NOT NULL,
   user_id int,
   tag_id int,
-  FOREIGN KEY (user_id) REFERENCES users(id)
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (tag_id) REFERENCES tags(id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
+CREATE INDEX tag_filters_user_id ON tag_filters (user_id);
+
+
 CREATE TABLE taggings (
   id int NOT NULL PRIMARY KEY,
   story_id int NOT NULL,
@@ -216,7 +275,10 @@ CREATE TABLE taggings (
   FOREIGN KEY (tag_id) REFERENCES tags(id),
   FOREIGN KEY (story_id) REFERENCES stories(id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
+CREATE INDEX taggings_story_id ON taggings (story_id);
 CREATE INDEX taggings_composite ON taggings (story_id, tag_id);
+
+
 CREATE TABLE votes (
   id int NOT NULL PRIMARY KEY,
   user_id int NOT NULL,
@@ -228,5 +290,10 @@ CREATE TABLE votes (
   FOREIGN KEY (story_id) REFERENCES stories(id),
   FOREIGN KEY (comment_id) REFERENCES comments(id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
+CREATE INDEX votes_user_id ON votes (user_id);
+CREATE INDEX votes_story_id ON votes (story_id);
+CREATE INDEX votes_comment_id ON votes (comment_id);
 CREATE INDEX votes_composite ON votes(user_id, comment_id, story_id);
+
+
 INSERT INTO tags VALUES (1, 'test', NULL, 0, 0, 0, 0);

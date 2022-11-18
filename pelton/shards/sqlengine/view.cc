@@ -20,7 +20,7 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/state.h"
 #include "pelton/planner/planner.h"
-#include "pelton/sql/abstract_connection.h"
+#include "pelton/sql/connection.h"
 
 namespace pelton {
 namespace shards {
@@ -34,8 +34,8 @@ namespace view {
 absl::StatusOr<sql::SqlResult> CreateView(const sqlast::CreateView &stmt,
                                           Connection *connection,
                                           util::UniqueLock *lock) {
+  SharderState &state = connection->state->SharderState();
   dataflow::DataFlowState &dataflow_state = connection->state->DataflowState();
-  sql::AbstractConnection *db = connection->state->Database();
 
   // Plan the query using calcite and generate a concrete graph for it.
   std::unique_ptr<dataflow::DataFlowGraphPartition> graph =
@@ -48,11 +48,14 @@ absl::StatusOr<sql::SqlResult> CreateView(const sqlast::CreateView &stmt,
   // Update new View with existing data in tables.
   std::vector<std::pair<std::string, std::vector<dataflow::Record>>> data;
 
+  // Begin transaction (for reading tables content).
+  connection->session->BeginTransaction();
+
   // Iterate through each table in the new View's flow.
   dataflow::Future future(true);
   for (const auto &table_name : dataflow_state.GetFlow(flow_name).Inputs()) {
     // Generate and execute select * query for current table
-    sql::SqlResultSet result = db->GetAll(table_name);
+    sql::SqlResultSet result = connection->session->GetAll(table_name);
 
     // Vectorize and store records.
     std::vector<pelton::dataflow::Record> records = std::move(result.Vec());
@@ -80,6 +83,9 @@ absl::StatusOr<sql::SqlResult> CreateView(const sqlast::CreateView &stmt,
   }
 
   future.Wait();
+
+  // Nothing to commit.
+  connection->session->RollbackTransaction();
 
   return sql::SqlResult(true);
 }
@@ -340,6 +346,8 @@ absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
 
   // Transform WHERE statement to conditions on matview keys.
   LookupCondition condition = ConstraintKeys(flow, stmt.GetWhereClause());
+
+  // Read from view.
   std::vector<dataflow::Record> records =
       LookupRecords(flow, condition, stmt.limit(), stmt.offset());
 

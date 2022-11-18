@@ -30,7 +30,7 @@ class GDPRContext {
         conn_(conn),
         sstate_(conn->state->SharderState()),
         dstate_(conn->state->DataflowState()),
-        db_(conn->state->Database()),
+        db_(conn->session.get()),
         lock_(lock) {}
 
   absl::StatusOr<sql::SqlResult> Exec();
@@ -66,7 +66,7 @@ class GDPRContext {
   // Connection components.
   SharderState &sstate_;
   dataflow::DataFlowState &dstate_;
-  sql::AbstractConnection *db_;
+  sql::Session *db_;
 
   // Shared Lock so we can read from the states safetly.
   util::SharedLock *lock_;

@@ -101,6 +101,13 @@ absl::StatusOr<int> InsertContext::VariableInsert(sqlast::Value &&fkval,
  * Entry point for inserting into the database.
  */
 absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
+  // First, make sure PK does not exist! (this also locks).
+  size_t pk = this->schema_.keys().front();
+  const std::string &pkcol = this->schema_.NameOf(pk);
+  if (this->db_->Exists(this->table_name_, this->stmt_.GetValue(pkcol, pk))) {
+    return absl::InvalidArgumentError("PK exists!");
+  }
+
   // Need to insert a copy for each way of sharding the table.
   int res = 0;
   for (const std::unique_ptr<ShardDescriptor> &desc : this->table_.owners) {
@@ -143,8 +150,9 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
   return res;
 }
 
-absl::StatusOr<int> InsertContext::AssignDependentsToShard(
-    const Table &table, const std::vector<dataflow::Record> &records) {
+absl::StatusOr<int> InsertContext::CopyDependents(
+    const Table &table, bool transitive,
+    const std::vector<dataflow::Record> &records) {
   int result = 0;
   // The insert into this table may affect the sharding of data in dependent
   // tables. Figure this out.
@@ -181,11 +189,11 @@ absl::StatusOr<int> InsertContext::AssignDependentsToShard(
       ACCUM(status, result);
 
       // Do it recursively for dependent of copied records.
-      ACCUM_STATUS(this->AssignDependentsToShard(next, records.rows()), result);
+      ACCUM_STATUS(this->CopyDependents(next, true, records.rows()), result);
     }
 
     // Similar but for transitive dependencies.
-    if (desc->type == InfoType::TRANSITIVE) {
+    if (transitive && desc->type == InfoType::TRANSITIVE) {
       const TransitiveInfo &info = std::get<TransitiveInfo>(desc->info);
       const Table &next = this->sstate_.GetTable(next_table);
 
@@ -207,7 +215,7 @@ absl::StatusOr<int> InsertContext::AssignDependentsToShard(
       ACCUM(status, result);
 
       // Do it recursively for dependent of copied records.
-      ACCUM_STATUS(this->AssignDependentsToShard(next, records.rows()), result);
+      ACCUM_STATUS(this->CopyDependents(next, true, records.rows()), result);
     }
   }
   return result;
@@ -217,33 +225,53 @@ absl::StatusOr<int> InsertContext::AssignDependentsToShard(
  * Main entry point for insert: Executes the statement against the shards.
  */
 absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
+  // Begin the transaction.
+  this->db_->BeginTransaction();
+
+  // Perform all rocksb operations within the transaction.
+  MOVE_OR_RETURN(InsertContext::Result result, this->ExecWithinTransaction());
+  auto &[records, status] = result;
+  if (status < 0) {
+    this->db_->RollbackTransaction();
+    return sql::SqlResult(status);
+  }
+
+  // Commit transaction.
+  this->db_->CommitTransaction();
+
+  // Process updates to dataflows.
+  this->dstate_.ProcessRecords(this->table_name_, std::move(records));
+
+  // Return number of copies inserted.
+  return sql::SqlResult(status);
+}
+
+/* Helper that Exec() calls: performs all of insert except Committing to
+   rocksdb and updating dataflows. */
+absl::StatusOr<InsertContext::Result> InsertContext::ExecWithinTransaction() {
   // Make sure table exists in the schema first.
   ASSERT_RET(this->sstate_.TableExists(this->table_name_), InvalidArgument,
              "Table does not exist");
 
-  // The inserted / replaced records to feed to dataflow engine.
+  // The inserted records to feed to dataflow engine.
   std::vector<dataflow::Record> records;
   records.push_back(this->dstate_.CreateRecord(this->stmt_));
 
   // Insert the data into the physical shards.
-  ASSIGN_OR_RETURN(int result, this->InsertIntoBaseTable());
-  if (result < 0) {
-    return sql::SqlResult(result);
+  ASSIGN_OR_RETURN(int status, this->InsertIntoBaseTable());
+  if (status < 0) {
+    return InsertContext::Result(std::vector<dataflow::Record>(), status);
   }
 
   // Copy/move any dependent records in dependent table to the shards of
   // users that own the just inserted record.
-  ASSIGN_OR_RETURN(int status,
-                   this->AssignDependentsToShard(this->table_, records));
-  if (status < 0) {
-    return sql::SqlResult(status);
+  ASSIGN_OR_RETURN(int d, this->CopyDependents(this->table_, false, records));
+  if (d < 0) {
+    return InsertContext::Result(std::vector<dataflow::Record>(), d);
   }
 
-  // Everything has been inserted; feed to dataflows.
-  this->dstate_.ProcessRecords(this->table_name_, std::move(records));
-
-  // Return number of copies inserted.
-  return sql::SqlResult(result + status);
+  // Done!
+  return InsertContext::Result(std::move(records), status + d);
 }
 
 }  // namespace sqlengine

@@ -7,6 +7,7 @@
 
 namespace pelton {
 namespace sql {
+namespace rocks {
 
 /*
  * EncryptedKey
@@ -84,5 +85,6 @@ const rocksdb::Comparator *PeltonComparator() {
   return rocksdb::BytewiseComparator();
 }
 
+}  // namespace rocks
 }  // namespace sql
 }  // namespace pelton

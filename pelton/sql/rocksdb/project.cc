@@ -8,6 +8,7 @@
 
 namespace pelton {
 namespace sql {
+namespace rocks {
 
 Projection ProjectionSchema(
     const dataflow::SchemaRef &table_schema,
@@ -73,5 +74,6 @@ dataflow::Record Project(const Projection &project,
   return output;
 }
 
+}  // namespace rocks
 }  // namespace sql
 }  // namespace pelton

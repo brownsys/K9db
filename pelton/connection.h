@@ -2,6 +2,10 @@
 #define PELTON_CONNECTION_H_
 
 #include <memory>
+// NOLINTNEXTLINE
+#include <mutex>
+// NOLINTNEXTLINE
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -9,7 +13,7 @@
 #include "pelton/dataflow/state.h"
 #include "pelton/prepared.h"
 #include "pelton/shards/state.h"
-#include "pelton/sql/abstract_connection.h"
+#include "pelton/sql/connection.h"
 #include "pelton/sql/result.h"
 #include "pelton/util/upgradable_lock.h"
 
@@ -36,7 +40,7 @@ class State {
   const dataflow::DataFlowState &DataflowState() const { return this->dstate_; }
 
   // Accessors for the underlying database.
-  sql::AbstractConnection *Database() { return this->database_.get(); }
+  sql::Connection *Database() { return this->database_.get(); }
 
   // Manage cannonical prepared statements.
   bool HasCanonicalStatement(const std::string &canonical) const;
@@ -63,7 +67,7 @@ class State {
   shards::SharderState sstate_;
   dataflow::DataFlowState dstate_;
   // Connection to underlying database.
-  std::unique_ptr<sql::AbstractConnection> database_;
+  std::unique_ptr<sql::Connection> database_;
   // Descriptors of queries already encountered in canonical form.
   std::unordered_map<std::string, prepared::CanonicalDescriptor> stmts_;
   // Lock for managing stmts_.
@@ -76,6 +80,7 @@ struct Connection {
   State *state;
   // Prepared statements created by this connection.
   std::vector<prepared::PreparedStatementDescriptor> stmts;
+  std::unique_ptr<sql::Session> session;
 };
 
 }  // namespace pelton

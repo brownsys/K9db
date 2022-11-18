@@ -55,9 +55,9 @@ cc_library(
         ":prepared",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
-        "//pelton/sql:abstract_connection",
+        "//pelton/sql:connection",
+        "//pelton/sql:factory",
         "//pelton/sql:result",
-        "//pelton/sql/rocksdb:connection",
         "//pelton/util:upgradable_lock",
     ],
 )

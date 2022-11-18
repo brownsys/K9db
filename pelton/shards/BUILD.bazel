@@ -13,6 +13,7 @@ cc_library(
         ":types",
         "//pelton/dataflow:schema",
         "@com_google_absl//absl/status",
+        "@glog",
     ],
 )
 

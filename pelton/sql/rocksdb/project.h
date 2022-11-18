@@ -11,6 +11,7 @@
 
 namespace pelton {
 namespace sql {
+namespace rocks {
 
 struct Projection {
   dataflow::SchemaRef schema;
@@ -24,6 +25,7 @@ Projection ProjectionSchema(
 dataflow::Record Project(const Projection &project,
                          const dataflow::Record &record);
 
+}  // namespace rocks
 }  // namespace sql
 }  // namespace pelton
 

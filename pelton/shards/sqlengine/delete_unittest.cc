@@ -28,7 +28,7 @@ TEST_F(DeleteTest, UnshardedTable) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -64,7 +64,7 @@ TEST_F(DeleteTest, DirectTable) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -102,7 +102,7 @@ TEST_F(DeleteTest, DeepTransitiveTable) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -182,7 +182,7 @@ TEST_F(DeleteTest, TwoOwners) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -232,7 +232,7 @@ TEST_F(DeleteTest, ShardedDataSubject) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -286,7 +286,7 @@ TEST_F(DeleteTest, VariableOwnership) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -350,7 +350,7 @@ TEST_F(DeleteTest, ComplexVariableOwnership) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -369,7 +369,7 @@ TEST_F(DeleteTest, ComplexVariableOwnership) {
   auto &&[assoc1, a_] = MakeInsert("association", {"100", "10", "0"});
   auto &&[assoc2, a__] = MakeInsert("association", {"200", "10", "5"});
   auto &&[assoc3, a___] = MakeInsert("association", {"300", "15", "0"});
-  auto &&[assoc4, a____] = MakeInsert("association", {"300", "15", "5"});
+  auto &&[assoc4, a____] = MakeInsert("association", {"400", "15", "5"});
   auto &&[f1, frow1] = MakeInsert("files", {"55", "0"});
   auto &&[f2, frow2] = MakeInsert("files", {"56", "0"});
   auto &&[fa1, farow1] = MakeInsert("fassoc", {"20", "55", "10"});
