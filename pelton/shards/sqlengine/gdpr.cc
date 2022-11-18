@@ -93,6 +93,16 @@ void GDPRContext::AddOrAppendAndAnon(const TableName &tbl,
       if (rule.GetType() == sqlast::AnonymizationOpTypeEnum::GET) { 
         if (!accessed_column) {
           size_t data_subject_idx = record.schema().IndexOf(rule.GetDataSubject());
+          const auto &owners = this->sstate_.GetTable(tbl).owners;
+
+          auto result = std::find_if(owners.begin(), owners.end(),
+            [&rule](const std::unique_ptr<ShardDescriptor> &desc) 
+              { return EXTRACT_VARIANT(column, desc->info) == rule.GetDataSubject(); });
+          
+          if (result == owners.end() || (*result)->shard_kind != this->shard_kind_) {
+            continue;
+          }
+
           if (this->user_id_ == record.GetValue(data_subject_idx)) {
             for (const std::string &anon_column : rule.GetAnonymizeColumns()) {
               size_t anon_idx = record.schema().IndexOf(anon_column);
