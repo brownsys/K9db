@@ -256,7 +256,9 @@ TEST_F(GDPRGetTest, TwoOwnersAnon) {
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string msg =
       MakeCreate("msg", {"id" I PK, "sender" I OB "user(id)",
-                         "receiver" I OB "user(id)"}, ",ON GET receiver ANON (sender)");
+                         "receiver" I OB "user(id)"}, false, "," 
+                         ON_GET "receiver" ANON "(sender),"
+                         ON_GET "sender" ANON "(receiver)");
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -267,14 +269,16 @@ TEST_F(GDPRGetTest, TwoOwnersAnon) {
 
   // Perform some inserts.
   auto &&[usr1, u0] = MakeInsert("user", {"0", "'u1'"});
-  auto &&[usr2, u__] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[usr2, u1] = MakeInsert("user", {"5", "'u10'"});
   auto &&[usr3, u2] = MakeInsert("user", {"10", "'u100'"});
   auto &&[msg1, row1] = MakeInsert("msg", {"1", "0", "10"});
   auto &&[_, row1_anon] = MakeInsert("msg", {"1", "NULL", "10"});
   auto &&[msg2, row2] = MakeInsert("msg", {"2", "0", "0"});
   auto &&[msg3, row3] = MakeInsert("msg", {"3", "5", "10"});
-  auto &&[__, row3_anon] = MakeInsert("msg", {"3", "NULL", "10"});
+  auto &&[__, row3_anon1] = MakeInsert("msg", {"3", "NULL", "10"});
+  auto &&[___, row3_anon2] = MakeInsert("msg", {"3", "5", "NULL"});
   auto &&[msg4, row4] = MakeInsert("msg", {"4", "5", "0"});
+  auto &&[____, row4_anon] = MakeInsert("msg", {"4", "5", "NULL"});
 
   EXPECT_UPDATE(Execute(usr1, &conn), 1);
   EXPECT_UPDATE(Execute(usr2, &conn), 1);
@@ -284,15 +288,63 @@ TEST_F(GDPRGetTest, TwoOwnersAnon) {
   EXPECT_UPDATE(Execute(msg3, &conn), 2);
   EXPECT_UPDATE(Execute(msg4, &conn), 2);
 
-  // Validate get for user with id 0.
-  // std::string get1 = MakeGDPRGet("user", "0");
-  // EXPECT_EQ(Execute(get1, &conn).ResultSets(),
-  //           (VV{(V{row1, row2, row4}), (V{u0})}));
+  // Validate anon on get for user with id 5.
+  std::string get1 = MakeGDPRGet("user", "5");
+  EXPECT_EQ(Execute(get1, &conn).ResultSets(),
+            (VV{(V{row3_anon2, row4_anon}), (V{u1})}));
 
-  // // Validate get for user with id 10.
+  // Validate anon on get for user with id 10.
   std::string get2 = MakeGDPRGet("user", "10");
   EXPECT_EQ(Execute(get2, &conn).ResultSets(),
-            (VV{(V{row1_anon, row3_anon}), (V{u2})}));
+            (VV{(V{row1_anon, row3_anon1}), (V{u2})}));
+}
+
+TEST_F(GDPRGetTest, OwnerAccessorAnon) {
+  // Parse create table statements.
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string msg =
+      MakeCreate("msg", {"id" I PK, "sender" I OB "user(id)",
+                         "receiver" I AB "user(id)"}, false, "," 
+                         ON_GET "receiver" ANON "(sender),"
+                         ON_GET "sender" ANON "(receiver)");
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(msg, &conn));
+
+  // Perform some inserts.
+  auto &&[usr1, u0] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr2, u1] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[usr3, u2] = MakeInsert("user", {"10", "'u100'"});
+  auto &&[msg1, row1] = MakeInsert("msg", {"1", "0", "10"});
+  auto &&[_, row1_anon] = MakeInsert("msg", {"1", "NULL", "10"});
+  auto &&[msg2, row2] = MakeInsert("msg", {"2", "0", "0"});
+  auto &&[msg3, row3] = MakeInsert("msg", {"3", "5", "10"});
+  auto &&[__, row3_anon1] = MakeInsert("msg", {"3", "NULL", "10"});
+  auto &&[___, row3_anon2] = MakeInsert("msg", {"3", "5", "NULL"});
+  auto &&[msg4, row4] = MakeInsert("msg", {"4", "5", "0"});
+  auto &&[____, row4_anon] = MakeInsert("msg", {"4", "5", "NULL"});
+
+  EXPECT_UPDATE(Execute(usr1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr2, &conn), 1);
+  EXPECT_UPDATE(Execute(usr3, &conn), 1);
+  EXPECT_UPDATE(Execute(msg1, &conn), 1);
+  EXPECT_UPDATE(Execute(msg2, &conn), 1); 
+  EXPECT_UPDATE(Execute(msg3, &conn), 1);
+  EXPECT_UPDATE(Execute(msg4, &conn), 1);
+
+  // Validate anon on get for user with id 5.
+  std::string get1 = MakeGDPRGet("user", "5");
+  EXPECT_EQ(Execute(get1, &conn).ResultSets(),
+            (VV{(V{row3_anon2, row4_anon}), (V{u1})}));
+
+  // Validate anon on get for user with id 10.
+  std::string get2 = MakeGDPRGet("user", "10");
+  EXPECT_EQ(Execute(get2, &conn).ResultSets(),
+            (VV{(V{row1_anon, row3_anon1}), (V{u2})}));
 }
 
 TEST_F(GDPRGetTest, OwnerAccessor) {
