@@ -179,7 +179,7 @@ TEST_F(GDPRGetAnonTest, TwoDistinctOwnersAnon) {
   EXPECT_EQ(Execute(get4, &conn).ResultSets(), (VV{(V{row3_anon2}), (V{d1})}));
 }
 
-TEST_F(GDPRGetAnonTest, TransitiveAnon) {
+TEST_F(GDPRGetAnonTest, TransitiveOwnershipAnon) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string prof = MakeCreate("prof", {"id" I PK, "uid" I FK "user(id)"});
@@ -225,6 +225,77 @@ TEST_F(GDPRGetAnonTest, TransitiveAnon) {
   std::string get = MakeGDPRGet("user", "5");
   EXPECT_EQ(Execute(get, &conn).ResultSets(),
             (VV{(V{row3}), (V{row4_anon, row6_anon1, row7_anon}), (V{u1})}));
+}
+
+TEST_F(GDPRGetAnonTest, ComplexVariableOwnershipAnon) {
+  // Parse create table statements.
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string admin = MakeCreate("admin", {"aid" I PK, "name" STR}, true);
+  std::string grps =
+      MakeCreate("grps", {"gid" I PK, "admin" I OB "admin(aid)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"sid" I PK, "group_id" I OW "grps(gid)", "user_id" I OB "user(id)"});
+  std::string files =
+      MakeCreate("files", {"fid" I PK, "creator" I OB "user(id)"}, false,
+                 "," ON_GET "fid" ANON "(creator)");
+  std::string fassoc = MakeCreate(
+      "fassoc",
+      {"fsid" I PK, "file" I OW "files(fid)", "group_id" I OB "grps(gid)"});
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(admin, &conn));
+  EXPECT_SUCCESS(Execute(grps, &conn));
+  EXPECT_SUCCESS(Execute(assoc, &conn));
+  EXPECT_SUCCESS(Execute(files, &conn));
+  EXPECT_SUCCESS(Execute(fassoc, &conn));
+
+  // Perform some inserts.
+  auto &&[usr1, u_] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr2, u1] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[adm1, d0] = MakeInsert("admin", {"0", "'a1'"});
+  auto &&[grps1, grow1] = MakeInsert("grps", {"0", "0"});
+  auto &&[grps2, grow2] = MakeInsert("grps", {"1", "0"});
+
+  EXPECT_UPDATE(Execute(usr1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr2, &conn), 1);
+  EXPECT_UPDATE(Execute(adm1, &conn), 1);
+  EXPECT_UPDATE(Execute(grps1, &conn), 1);
+  EXPECT_UPDATE(Execute(grps2, &conn), 1);
+
+  // Insert files and fassocs but not associated to any users.
+  auto &&[f1, frow1] = MakeInsert("files", {"0", "0"});
+  auto &&[_, frow1_anon] = MakeInsert("files", {"0", "NULL"});
+  auto &&[f2, frow2] = MakeInsert("files", {"1", "0"});
+  auto &&[__, frow2_anon] = MakeInsert("files", {"1", "NULL"});
+  auto &&[fa1, farow1] = MakeInsert("fassoc", {"0", "0", "1"});
+  auto &&[fa2, farow2] = MakeInsert("fassoc", {"1", "1", "1"});
+
+  EXPECT_UPDATE(Execute(f1, &conn), 1);
+  EXPECT_UPDATE(Execute(f2, &conn), 1);
+  EXPECT_UPDATE(Execute(fa1, &conn), 2);
+  EXPECT_UPDATE(Execute(fa2, &conn), 2);
+
+  // Associate everything with a user.
+  auto &&[assoc1, a0] = MakeInsert("association", {"0", "1", "5"});
+
+  EXPECT_UPDATE(Execute(assoc1, &conn), 6);
+
+  // Validate get for user with id 5.
+  std::string get1 = MakeGDPRGet("user", "5");
+  EXPECT_EQ(Execute(get1, &conn).ResultSets(),
+            (VV{(V{frow1_anon, frow2_anon}), (V{grow2}), (V{u1}),
+                (V{farow1, farow2}), (V{a0})}));
+
+  // Validate get for admin with id 0.
+  std::string get2 = MakeGDPRGet("admin", "0");
+  EXPECT_EQ(Execute(get2, &conn).ResultSets(),
+            (VV{(V{frow1_anon, frow2_anon}), (V{grow1, grow2}), (V{d0}),
+                (V{farow1, farow2})}));
 }
 
 }  // namespace sqlengine

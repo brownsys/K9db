@@ -95,16 +95,16 @@ void GDPRContext::AddOrAppendAndAnon(
 
           // Find the owner, owning relation of which is originating from the
           // data subject column
-          auto owner_desc = std::find_if(
-              owners.begin(), owners.end(),
-              [&rule](const std::unique_ptr<ShardDescriptor> &desc) {
-                return EXTRACT_VARIANT(column, desc->info) ==
-                       rule.GetDataSubject();
-              });
+          auto owner_desc =
+              std::find_if(owners.begin(), owners.end(),
+                           [&](const std::unique_ptr<ShardDescriptor> &desc) {
+                             return (EXTRACT_VARIANT(column, desc->info) ==
+                                     rule.GetDataSubject()) &&
+                                    desc->shard_kind == this->shard_kind_;
+                           });
 
-          // Check that we found something, the right shard_kind
-          if (owner_desc == owners.end() ||
-              (*owner_desc)->shard_kind != this->shard_kind_) {
+          // Check that we found something
+          if (owner_desc == owners.end()) {
             continue;
           }
 
