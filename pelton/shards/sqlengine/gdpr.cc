@@ -78,32 +78,72 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecForget() {
  * Get and helpers.
  */
 
-void GDPRContext::AddOrAppendAndAnon(const TableName &tbl, 
-                                     sql::SqlResultSet &&set,
-                                     std::optional<std::reference_wrapper<const std::string>> accessed_column) {
-                                      
-  const std::vector<sqlast::AnonymizationRule> &rules = 
-    this->sstate_.GetTable(tbl).create_stmt.GetAnonymizationRules();
+void GDPRContext::AddOrAppendAndAnon(
+    const TableName &tbl, sql::SqlResultSet &&set,
+    std::optional<std::reference_wrapper<const std::string>> accessed_column) {
+  const std::vector<sqlast::AnonymizationRule> &rules =
+      this->sstate_.GetTable(tbl).create_stmt.GetAnonymizationRules();
 
   std::vector<dataflow::Record> &&records = set.Vec();
 
   for (dataflow::Record &record : records) {
     for (const sqlast::AnonymizationRule &rule : rules) {
       // Since it's only used in GDPR GET, we are checking for the type
-      if (rule.GetType() == sqlast::AnonymizationOpTypeEnum::GET) { 
+      if (rule.GetType() == sqlast::AnonymizationOpTypeEnum::GET) {
         if (!accessed_column) {
-          size_t data_subject_idx = record.schema().IndexOf(rule.GetDataSubject());
           const auto &owners = this->sstate_.GetTable(tbl).owners;
 
-          auto result = std::find_if(owners.begin(), owners.end(),
-            [&rule](const std::unique_ptr<ShardDescriptor> &desc) 
-              { return EXTRACT_VARIANT(column, desc->info) == rule.GetDataSubject(); });
-          
-          if (result == owners.end() || (*result)->shard_kind != this->shard_kind_) {
+          // Find the owner, owning relation of which is originating from the
+          // data subject column
+          auto owner_desc = std::find_if(
+              owners.begin(), owners.end(),
+              [&rule](const std::unique_ptr<ShardDescriptor> &desc) {
+                return EXTRACT_VARIANT(column, desc->info) ==
+                       rule.GetDataSubject();
+              });
+
+          // Check that we found something, the right shard_kind
+          if (owner_desc == owners.end() ||
+              (*owner_desc)->shard_kind != this->shard_kind_) {
             continue;
           }
 
-          if (this->user_id_ == record.GetValue(data_subject_idx)) {
+          size_t data_subject_idx =
+              record.schema().IndexOf(rule.GetDataSubject());
+          sqlast::Value data_subject = record.GetValue(data_subject_idx);
+          std::vector<sqlast::Value> user_ids = {};
+
+          if ((*owner_desc)->type == InfoType::DIRECT) {
+            // If the type of sharding is direct, we know for sure that
+            // data_subject column of the anonymized table would contain user_id
+            user_ids.push_back(data_subject);
+          } else if ((*owner_desc)->type == InfoType::TRANSITIVE) {
+            // If the type of sharding is transitive, we need to get the user_id
+            // via an index lookup
+            const IndexDescriptor &index =
+                *(std::get<TransitiveInfo>((*owner_desc)->info).index);
+            std::vector<dataflow::Record> indexed = index::LookupIndex(
+                index, std::move(data_subject), this->conn_, this->lock_);
+
+            // Collect user_ids in the vector above
+            for (const dataflow::Record &rec : indexed) {
+              user_ids.push_back(rec.GetValue(1));
+            }
+          } else if ((*owner_desc)->type == InfoType::VARIABLE) {
+            // Same thing as for transitive type of sharding
+            const IndexDescriptor &index =
+                *(std::get<VariableInfo>((*owner_desc)->info).index);
+            std::vector<dataflow::Record> indexed = index::LookupIndex(
+                index, std::move(data_subject), this->conn_, this->lock_);
+
+            // Collect user_ids in the vector above
+            for (const dataflow::Record &rec : indexed) {
+              user_ids.push_back(rec.GetValue(1));
+            }
+          }
+
+          if (std::find(user_ids.begin(), user_ids.end(), this->user_id_) !=
+              user_ids.end()) {
             for (const std::string &anon_column : rule.GetAnonymizeColumns()) {
               size_t anon_idx = record.schema().IndexOf(anon_column);
               record.SetNull(true, anon_idx);
@@ -121,9 +161,11 @@ void GDPRContext::AddOrAppendAndAnon(const TableName &tbl,
 
   auto it = this->result_.find(tbl);
   if (it == this->result_.end()) {
-    this->result_.emplace(tbl, sql::SqlResultSet(set.schema(), std::move(records)));
+    this->result_.emplace(tbl,
+                          sql::SqlResultSet(set.schema(), std::move(records)));
   } else {
-    it->second.AppendDeduplicate(sql::SqlResultSet(set.schema(), std::move(records)));
+    it->second.AppendDeduplicate(
+        sql::SqlResultSet(set.schema(), std::move(records)));
   }
 }
 

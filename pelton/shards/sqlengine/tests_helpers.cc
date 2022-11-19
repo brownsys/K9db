@@ -53,8 +53,7 @@ namespace sqlengine {
 
 // sqlast::CreateTable
 std::string MakeCreate(const std::string &tbl_name,
-                       const std::vector<std::string> &cols,
-                       bool data_subject,
+                       const std::vector<std::string> &cols, bool data_subject,
                        std::string anon_str) {
   std::string sql;
   if (data_subject) {

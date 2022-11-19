@@ -64,8 +64,7 @@ namespace sqlengine {
  */
 std::string MakeCreate(const std::string &tbl_name,
                        const std::vector<std::string> &cols,
-                       bool data_subject = false,
-                       std::string anon_str = "");
+                       bool data_subject = false, std::string anon_str = "");
 
 std::pair<std::string, std::string> MakeInsert(
     const std::string &tbl_name, const std::vector<std::string> &vals);

@@ -151,8 +151,8 @@ TEST_F(GDPRGetTest, TransitiveTable) {
 
   // Validate get.
   std::string get = MakeGDPRGet("user", "0");
-  EXPECT_EQ(Execute(get, &conn).ResultSets(), (VV{(V{row1, row2}), (V{row5,
-row6, row7}), (V{row0})}));
+  EXPECT_EQ(Execute(get, &conn).ResultSets(),
+            (VV{(V{row1, row2}), (V{row5, row6, row7}), (V{row0})}));
 }
 
 TEST_F(GDPRGetTest, DeepTransitiveTable) {
@@ -204,17 +204,16 @@ TEST_F(GDPRGetTest, DeepTransitiveTable) {
 
   // Validate get.
   std::string get = MakeGDPRGet("user", "0");
-  EXPECT_EQ(Execute(get, &conn).ResultSets(),
-            (VV{(V{row1, row2, row4, row5}), (V{p1, p2, p3}), (V{a0, a1}),
-(V{u0})}));
+  EXPECT_EQ(
+      Execute(get, &conn).ResultSets(),
+      (VV{(V{row1, row2, row4, row5}), (V{p1, p2, p3}), (V{a0, a1}), (V{u0})}));
 }
 
 TEST_F(GDPRGetTest, TwoOwners) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "sender" I OB "user(id)",
-                         "receiver" I OB "user(id)"});
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I OB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -247,18 +246,16 @@ TEST_F(GDPRGetTest, TwoOwners) {
 
   // Validate get for user with id 10.
   std::string get2 = MakeGDPRGet("user", "10");
-  EXPECT_EQ(Execute(get2, &conn).ResultSets(),
-            (VV{(V{row1, row3}), (V{u2})}));
+  EXPECT_EQ(Execute(get2, &conn).ResultSets(), (VV{(V{row1, row3}), (V{u2})}));
 }
 
 TEST_F(GDPRGetTest, TwoOwnersAnon) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "sender" I OB "user(id)",
-                         "receiver" I OB "user(id)"}, false, "," 
-                         ON_GET "receiver" ANON "(sender),"
-                         ON_GET "sender" ANON "(receiver)");
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I OB "user(id)"},
+      false,
+      "," ON_GET "receiver" ANON "(sender)," ON_GET "sender" ANON "(receiver)");
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -302,11 +299,10 @@ TEST_F(GDPRGetTest, TwoOwnersAnon) {
 TEST_F(GDPRGetTest, OwnerAccessorAnon) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "sender" I OB "user(id)",
-                         "receiver" I AB "user(id)"}, false, "," 
-                         ON_GET "receiver" ANON "(sender),"
-                         ON_GET "sender" ANON "(receiver)");
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I AB "user(id)"},
+      false,
+      "," ON_GET "receiver" ANON "(sender)," ON_GET "sender" ANON "(receiver)");
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -332,7 +328,7 @@ TEST_F(GDPRGetTest, OwnerAccessorAnon) {
   EXPECT_UPDATE(Execute(usr2, &conn), 1);
   EXPECT_UPDATE(Execute(usr3, &conn), 1);
   EXPECT_UPDATE(Execute(msg1, &conn), 1);
-  EXPECT_UPDATE(Execute(msg2, &conn), 1); 
+  EXPECT_UPDATE(Execute(msg2, &conn), 1);
   EXPECT_UPDATE(Execute(msg3, &conn), 1);
   EXPECT_UPDATE(Execute(msg4, &conn), 1);
 
@@ -351,11 +347,11 @@ TEST_F(GDPRGetTest, TwoDistinctOwnersAnon) {
   // Parse create table statements.
   std::string patient = MakeCreate("patient", {"id" I PK, "name" STR}, true);
   std::string doctor = MakeCreate("doctor", {"id" I PK, "name" STR}, true);
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "sender" I OB "doctor(id)",
-                         "receiver" I AB "patient(id)"}, false, "," 
-                         ON_GET "receiver" ANON "(sender),"
-                         ON_GET "sender" ANON "(receiver)");
+  std::string msg = MakeCreate(
+      "msg",
+      {"id" I PK, "sender" I OB "doctor(id)", "receiver" I AB "patient(id)"},
+      false,
+      "," ON_GET "receiver" ANON "(sender)," ON_GET "sender" ANON "(receiver)");
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -388,7 +384,7 @@ TEST_F(GDPRGetTest, TwoDistinctOwnersAnon) {
   EXPECT_UPDATE(Execute(doc1, &conn), 1);
   EXPECT_UPDATE(Execute(doc2, &conn), 1);
   EXPECT_UPDATE(Execute(msg1, &conn), 1);
-  EXPECT_UPDATE(Execute(msg2, &conn), 1); 
+  EXPECT_UPDATE(Execute(msg2, &conn), 1);
   EXPECT_UPDATE(Execute(msg3, &conn), 1);
 
   // Validate anon on get for patient with id 0.
@@ -398,9 +394,8 @@ TEST_F(GDPRGetTest, TwoDistinctOwnersAnon) {
 
   // Validate anon on get for patient with id 5.
   std::string get2 = MakeGDPRGet("patient", "5");
-  EXPECT_EQ(Execute(get2, &conn).ResultSets(),
-            (VV{(V{row2_anon1}), (V{p1})}));
-  
+  EXPECT_EQ(Execute(get2, &conn).ResultSets(), (VV{(V{row2_anon1}), (V{p1})}));
+
   // Validate anon on get for doctor with id 0.
   std::string get3 = MakeGDPRGet("doctor", "0");
   EXPECT_EQ(Execute(get3, &conn).ResultSets(),
@@ -408,16 +403,62 @@ TEST_F(GDPRGetTest, TwoDistinctOwnersAnon) {
 
   // Validate anon on get for doctor with id 5.
   std::string get4 = MakeGDPRGet("doctor", "5");
-  EXPECT_EQ(Execute(get4, &conn).ResultSets(),
-            (VV{(V{row3_anon2}), (V{d1})}));
+  EXPECT_EQ(Execute(get4, &conn).ResultSets(), (VV{(V{row3_anon2}), (V{d1})}));
+}
+
+TEST_F(GDPRGetTest, TransitiveAnon) {
+  // Parse create table statements.
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string prof = MakeCreate("prof", {"id" I PK, "uid" I FK "user(id)"});
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "prof(id)", "receiver" I OB "prof(id)"},
+      false,
+      "," ON_GET "receiver" ANON "(sender)," ON_GET "sender" ANON "(receiver)");
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(prof, &conn));
+  EXPECT_SUCCESS(Execute(msg, &conn));
+
+  // Perform some inserts.
+  auto &&[usr1, u0] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr2, u1] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[prof1, row1] = MakeInsert("prof", {"0", "0"});
+  auto &&[prof2, row2] = MakeInsert("prof", {"1", "0"});
+  auto &&[prof3, row3] = MakeInsert("prof", {"2", "5"});
+  auto &&[msg1, row4] = MakeInsert("msg", {"1", "0", "2"});
+  auto &&[_, row4_anon] = MakeInsert("msg", {"1", "NULL", "2"});
+  auto &&[msg2, row5] = MakeInsert("msg", {"2", "0", "0"});
+  auto &&[msg3, row6] = MakeInsert("msg", {"3", "1", "2"});
+  auto &&[__, row6_anon1] = MakeInsert("msg", {"3", "NULL", "2"});
+  auto &&[___, row6_anon2] = MakeInsert("msg", {"3", "1", "NULL"});
+  auto &&[msg4, row7] = MakeInsert("msg", {"4", "2", "0"});
+  auto &&[____, row7_anon] = MakeInsert("msg", {"4", "2", "NULL"});
+
+  EXPECT_UPDATE(Execute(usr1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr2, &conn), 1);
+  EXPECT_UPDATE(Execute(prof1, &conn), 1);
+  EXPECT_UPDATE(Execute(prof2, &conn), 1);
+  EXPECT_UPDATE(Execute(prof3, &conn), 1);
+  EXPECT_UPDATE(Execute(msg1, &conn), 2);
+  EXPECT_UPDATE(Execute(msg2, &conn), 1);
+  EXPECT_UPDATE(Execute(msg3, &conn), 2);
+  EXPECT_UPDATE(Execute(msg4, &conn), 2);
+
+  // Validate anon on get.
+  std::string get = MakeGDPRGet("user", "5");
+  EXPECT_EQ(Execute(get, &conn).ResultSets(),
+            (VV{(V{row3}), (V{row4_anon, row6_anon1, row7_anon}), (V{u1})}));
 }
 
 TEST_F(GDPRGetTest, OwnerAccessor) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "sender" I OB "user(id)",
-                         "receiver" I AB "user(id)"});
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I AB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -445,8 +486,8 @@ TEST_F(GDPRGetTest, OwnerAccessor) {
 
   // Validate get for user with id 0.
   std::string get0 = MakeGDPRGet("user", "0");
-  EXPECT_EQ(Execute(get0, &conn).ResultSets(), (VV{(V{row1, row2, row4}),
-(V{u0})}));
+  EXPECT_EQ(Execute(get0, &conn).ResultSets(),
+            (VV{(V{row1, row2, row4}), (V{u0})}));
 
   // Validate get for user with id 10.
   std::string get1 = MakeGDPRGet("user", "10");
@@ -458,7 +499,7 @@ TEST_F(GDPRGetTest, ShardedDataSubject) {
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string invited = MakeCreate(
       "invited", {"id" I PK, "name" STR, "inviting_user" I FK "user(id)"},
-true);
+      true);
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -482,8 +523,7 @@ true);
 
   // Validate get for user with id 0.
   std::string get1 = MakeGDPRGet("user", "0");
-  EXPECT_EQ(Execute(get1, &conn).ResultSets(),
-            (VV{(V{row2, row3}), (V{u0})}));
+  EXPECT_EQ(Execute(get1, &conn).ResultSets(), (VV{(V{row2, row3}), (V{u0})}));
 
   // Validate get for invited with id 1.
   std::string get2 = MakeGDPRGet("invited", "1");
@@ -494,9 +534,9 @@ TEST_F(GDPRGetTest, VariableOwnership) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
   std::string grps = MakeCreate("grps", {"gid" I PK});
-  std::string assoc =
-      MakeCreate("association", {"id" I PK, "group_id" I OW "grps(gid)",
-                                 "user_id" I OB "user(id)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"id" I PK, "group_id" I OW "grps(gid)", "user_id" I OB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -540,14 +580,14 @@ TEST_F(GDPRGetTest, ComplexVariableOwnership) {
   std::string admin = MakeCreate("admin", {"aid" I PK, "name" STR}, true);
   std::string grps =
       MakeCreate("grps", {"gid" I PK, "admin" I OB "admin(aid)"});
-  std::string assoc =
-      MakeCreate("association", {"sid" I PK, "group_id" I OW "grps(gid)",
-                                 "user_id" I OB "user(id)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"sid" I PK, "group_id" I OW "grps(gid)", "user_id" I OB "user(id)"});
   std::string files =
       MakeCreate("files", {"fid" I PK, "creator" I OB "user(id)"});
-  std::string fassoc =
-      MakeCreate("fassoc", {"fsid" I PK, "file" I OW "files(fid)",
-                            "group_id" I OB "grps(gid)"});
+  std::string fassoc = MakeCreate(
+      "fassoc",
+      {"fsid" I PK, "file" I OW "files(fid)", "group_id" I OB "grps(gid)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -593,25 +633,22 @@ TEST_F(GDPRGetTest, ComplexVariableOwnership) {
   std::string get1 = MakeGDPRGet("user", "5");
   EXPECT_EQ(Execute(get1, &conn).ResultSets(),
             (VV{(V{frow1, frow2}), (V{grow2}), (V{u1}), (V{farow1, farow2}),
-(V{a0})}));
+                (V{a0})}));
 
   // Validate get for admin with id 0.
   std::string get2 = MakeGDPRGet("admin", "0");
-  EXPECT_EQ(Execute(get2, &conn).ResultSets(),
-            (VV{(V{frow1, frow2}), (V{grow1, grow2}), (V{d0}), (V{farow1,
-farow2})}));
+  EXPECT_EQ(
+      Execute(get2, &conn).ResultSets(),
+      (VV{(V{frow1, frow2}), (V{grow1, grow2}), (V{d0}), (V{farow1, farow2})}));
 }
 
 TEST_F(GDPRGetTest, TransitiveAccessorship) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
-  std::string msg =
-      MakeCreate("msg", {"id" I PK, "sender" I OB "user(id)",
-                         "receiver" I AB "user(id)"});
-  std::string meta =
-      MakeCreate("meta", {"id" I PK, "message" I OB "msg(id)"});
-  std::string deep =
-      MakeCreate("deep", {"id" I PK, "meta" I AB "meta(id)"});
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I AB "user(id)"});
+  std::string meta = MakeCreate("meta", {"id" I PK, "message" I OB "msg(id)"});
+  std::string deep = MakeCreate("deep", {"id" I PK, "meta" I AB "meta(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -645,8 +682,8 @@ TEST_F(GDPRGetTest, TransitiveAccessorship) {
 
   // Validate get for user with id 0.
   std::string get0 = MakeGDPRGet("user", "0");
-  EXPECT_EQ(Execute(get0, &conn).ResultSets(), (VV{(V{row1, row2, row4}),
-(V{u0}), (V{row5}), (V{row6})}));
+  EXPECT_EQ(Execute(get0, &conn).ResultSets(),
+            (VV{(V{row1, row2, row4}), (V{u0}), (V{row5}), (V{row6})}));
 
   // Validate get for user with id 5.
   std::string get1 = MakeGDPRGet("user", "5");
@@ -654,8 +691,8 @@ TEST_F(GDPRGetTest, TransitiveAccessorship) {
 
   // Validate get for user with id 10.
   std::string get2 = MakeGDPRGet("user", "10");
-  EXPECT_EQ(Execute(get2, &conn).ResultSets(), (VV{(V{row1, row3}), (V{u2}),
-(V{row5}), (V{row6})}));
+  EXPECT_EQ(Execute(get2, &conn).ResultSets(),
+            (VV{(V{row1, row3}), (V{u2}), (V{row5}), (V{row6})}));
 }
 
 TEST_F(GDPRGetTest, VariableAccessorship) {
@@ -715,10 +752,13 @@ TEST_F(GDPRGetTest, VariableAccessorship) {
 TEST_F(GDPRGetTest, SimpleMixedAccessorship) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
-  std::string grps = MakeCreate("grps", {"gid" I PK, "creator" I OB
-"user(id)"}); std::string meta = MakeCreate("meta", {"id" I PK, "group_id" I OB
-"grps(gid)"}); std::string assoc = MakeCreate("association", {"id" I PK,
-"group_id" I AC "grps(gid)", "user_id" I OB "user(id)"});
+  std::string grps =
+      MakeCreate("grps", {"gid" I PK, "creator" I OB "user(id)"});
+  std::string meta =
+      MakeCreate("meta", {"id" I PK, "group_id" I OB "grps(gid)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"id" I PK, "group_id" I AC "grps(gid)", "user_id" I OB "user(id)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -772,14 +812,14 @@ TEST_F(GDPRGetTest, ComplexVariableAccessorship) {
   std::string admin = MakeCreate("admin", {"aid" I PK, "name" STR}, true);
   std::string grps =
       MakeCreate("grps", {"gid" I PK, "admin" I OB "admin(aid)"});
-  std::string assoc =
-      MakeCreate("association", {"sid" I PK, "group_id" I AC "grps(gid)",
-                                 "user_id" I OB "user(id)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"sid" I PK, "group_id" I AC "grps(gid)", "user_id" I OB "user(id)"});
   std::string files =
       MakeCreate("files", {"fid" I PK, "creator" I OB "user(id)"});
-  std::string fassoc =
-      MakeCreate("fassoc", {"fsid" I PK, "file" I AC "files(fid)",
-                            "group_id" I OB "grps(gid)"});
+  std::string fassoc = MakeCreate(
+      "fassoc",
+      {"fsid" I PK, "file" I AC "files(fid)", "group_id" I OB "grps(gid)"});
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -825,13 +865,13 @@ TEST_F(GDPRGetTest, ComplexVariableAccessorship) {
   std::string get1 = MakeGDPRGet("user", "5");
   EXPECT_EQ(Execute(get1, &conn).ResultSets(),
             (VV{(V{frow1, frow2}), (V{grow2}), (V{u1}), (V{farow1, farow2}),
-(V{a0})}));
+                (V{a0})}));
 
   // Validate get for admin with id 0.
   std::string get2 = MakeGDPRGet("admin", "0");
-  EXPECT_EQ(Execute(get2, &conn).ResultSets(),
-            (VV{(V{frow1, frow2}), (V{grow1, grow2}), (V{d0}), (V{farow1,
-farow2})}));
+  EXPECT_EQ(
+      Execute(get2, &conn).ResultSets(),
+      (VV{(V{frow1, frow2}), (V{grow1, grow2}), (V{d0}), (V{farow1, farow2})}));
 }
 
 }  // namespace sqlengine
