@@ -238,8 +238,10 @@ TEST_F(GDPRGetAnonTest, TransitiveOwnershipAnon) {
 
   // Validate anon on get for user with id 0.
   std::string get1 = MakeGDPRGet("user", "0");
-  EXPECT_EQ(Execute(get1, &conn).ResultSets(),
-            (VV{(V{row1, row2}), (V{row4_anon2, row5, row6_anon2, row7_anon2, row8, row9}), (V{u0})}));
+  EXPECT_EQ(
+      Execute(get1, &conn).ResultSets(),
+      (VV{(V{row1, row2}),
+          (V{row4_anon2, row5, row6_anon2, row7_anon2, row8, row9}), (V{u0})}));
 
   // Validate anon on get for user with id 5.
   std::string get2 = MakeGDPRGet("user", "5");
@@ -275,7 +277,7 @@ TEST_F(GDPRGetAnonTest, ComplexVariableOwnershipAnon) {
   EXPECT_SUCCESS(Execute(fassoc, &conn));
 
   // Perform some inserts.
-  auto &&[usr1, u_] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr1, u0] = MakeInsert("user", {"0", "'u1'"});
   auto &&[usr2, u1] = MakeInsert("user", {"5", "'u10'"});
   auto &&[adm1, d0] = MakeInsert("admin", {"0", "'a1'"});
   auto &&[grps1, grow1] = MakeInsert("grps", {"0", "0"});
@@ -302,18 +304,26 @@ TEST_F(GDPRGetAnonTest, ComplexVariableOwnershipAnon) {
 
   // Associate everything with a user.
   auto &&[assoc1, a0] = MakeInsert("association", {"0", "1", "5"});
+  auto &&[assoc2, a1] = MakeInsert("association", {"1", "1", "0"});
 
   EXPECT_UPDATE(Execute(assoc1, &conn), 6);
+  EXPECT_UPDATE(Execute(assoc2, &conn), 4);
 
-  // Validate get for user with id 5.
-  std::string get1 = MakeGDPRGet("user", "5");
+  // Validate anon on get for user with id 0.
+  std::string get1 = MakeGDPRGet("user", "0");
   EXPECT_EQ(Execute(get1, &conn).ResultSets(),
+            (VV{(V{frow1, frow2}), (V{grow2}), (V{u0}), (V{farow1, farow2}),
+                (V{a1})}));
+
+  // Validate anon on get for user with id 5.
+  std::string get2 = MakeGDPRGet("user", "5");
+  EXPECT_EQ(Execute(get2, &conn).ResultSets(),
             (VV{(V{frow1_anon, frow2_anon}), (V{grow2}), (V{u1}),
                 (V{farow1, farow2}), (V{a0})}));
 
-  // Validate get for admin with id 0.
-  std::string get2 = MakeGDPRGet("admin", "0");
-  EXPECT_EQ(Execute(get2, &conn).ResultSets(),
+  // Validate anon on get for admin with id 0.
+  std::string get3 = MakeGDPRGet("admin", "0");
+  EXPECT_EQ(Execute(get3, &conn).ResultSets(),
             (VV{(V{frow1_anon, frow2_anon}), (V{grow1, grow2}), (V{d0}),
                 (V{farow1, farow2})}));
 }

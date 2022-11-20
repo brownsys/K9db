@@ -46,9 +46,8 @@ class GDPRContext {
   void AddIntersect(std::vector<std::string> &into,
                     const std::vector<std::string> &from);
 
-  bool ShouldBeApplied(const sqlast::AnonymizationRule &rule,
-                       const std::unique_ptr<ShardDescriptor> &owner_desc,
-                       const dataflow::Record &record);
+  bool OwnsRecordThroughDesc(const std::unique_ptr<ShardDescriptor> &owner_desc,
+                             const dataflow::Record &record);
 
   void AddOrAppendAndAnon(
       const TableName &tbl, sql::SqlResultSet &&set,

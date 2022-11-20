@@ -100,39 +100,35 @@ void GDPRContext::AddIntersect(std::vector<std::string> &into,
   into = intersection;
 }
 
-bool GDPRContext::ShouldBeApplied(
-    const sqlast::AnonymizationRule &rule,
+bool GDPRContext::OwnsRecordThroughDesc(
     const std::unique_ptr<ShardDescriptor> &owner_desc,
     const dataflow::Record &record) {
   // Find the owners, owning relation of which is originating from the
   // data subject column, and the rules attributed to them
-  if (EXTRACT_VARIANT(column, owner_desc->info) == rule.GetDataSubject() &&
-      owner_desc->shard_kind == this->shard_kind_) {
-    size_t data_subject_idx = record.schema().IndexOf(rule.GetDataSubject());
-    sqlast::Value data_subject = record.GetValue(data_subject_idx);
-    std::vector<sqlast::Value> user_ids;
+  size_t data_subject_idx =
+      record.schema().IndexOf(EXTRACT_VARIANT(column, owner_desc->info));
+  sqlast::Value data_subject = record.GetValue(data_subject_idx);
+  std::vector<sqlast::Value> user_ids;
 
-    if (owner_desc->type == InfoType::DIRECT) {
-      // If the type of sharding is direct, we know for sure that
-      // data_subject column of the anonymized table would contain
-      // user_id
-      user_ids = {data_subject};
-    } else if (owner_desc->type == InfoType::TRANSITIVE) {
-      // If the type of sharding is transitive, we need to get the
-      // user_id via an index lookup
-      const IndexDescriptor &index =
-          *(std::get<TransitiveInfo>(owner_desc->info).index);
-      user_ids = this->ExtractUserIDs(index, std::move(data_subject));
-    } else if (owner_desc->type == InfoType::VARIABLE) {
-      // Same thing as for transitive type of sharding
-      const IndexDescriptor &index =
-          *(std::get<VariableInfo>(owner_desc->info).index);
-      user_ids = this->ExtractUserIDs(index, std::move(data_subject));
-    }
-    return std::find(user_ids.begin(), user_ids.end(), this->user_id_) !=
-           user_ids.end();
+  if (owner_desc->type == InfoType::DIRECT) {
+    // If the type of sharding is direct, we know for sure that
+    // data_subject column of the anonymized table would contain
+    // user_id
+    user_ids = {data_subject};
+  } else if (owner_desc->type == InfoType::TRANSITIVE) {
+    // If the type of sharding is transitive, we need to get the
+    // user_id via an index lookup
+    const IndexDescriptor &index =
+        *(std::get<TransitiveInfo>(owner_desc->info).index);
+    user_ids = this->ExtractUserIDs(index, std::move(data_subject));
+  } else if (owner_desc->type == InfoType::VARIABLE) {
+    // Same thing as for transitive type of sharding
+    const IndexDescriptor &index =
+        *(std::get<VariableInfo>(owner_desc->info).index);
+    user_ids = this->ExtractUserIDs(index, std::move(data_subject));
   }
-  return false;
+  return std::find(user_ids.begin(), user_ids.end(), this->user_id_) !=
+         user_ids.end();
 }
 
 void GDPRContext::AddOrAppendAndAnon(
@@ -145,30 +141,50 @@ void GDPRContext::AddOrAppendAndAnon(
 
   for (dataflow::Record &record : records) {
     // All columns that need to be anonymized for the record
-    std::vector<std::string> anon_columns = {};
-    for (const sqlast::AnonymizationRule &rule : rules) {
-      // Since it's only used in GDPR GET, we are checking for the type
-      if (rule.GetType() == sqlast::AnonymizationOpTypeEnum::GET) {
-        if (!accessed_column) {
-          const auto &owners = this->sstate_.GetTable(tbl).owners;
-          for (const auto &desc : owners) {
-            if (this->ShouldBeApplied(rule, desc, record)) {
-              if (anon_columns.empty()) {
-                anon_columns = rule.GetAnonymizeColumns();
-              } else {
-                this->AddIntersect(anon_columns, rule.GetAnonymizeColumns());
+    std::vector<std::vector<std::string>> anon_column_sets = {};
+    const auto &owners = this->sstate_.GetTable(tbl).owners;
+
+    for (const auto &desc : owners) {
+      if (!accessed_column) {
+        // the next condition checks whether user owns record through desc
+        if (desc->shard_kind == this->shard_kind_ &&
+            this->OwnsRecordThroughDesc(desc, record)) {
+          bool some_rule_applies = false;
+          for (const sqlast::AnonymizationRule &rule : rules) {
+            // Since it's only used in GDPR GET, we are checking for the type
+            if (rule.GetType() == sqlast::AnonymizationOpTypeEnum::GET) {
+              if (EXTRACT_VARIANT(column, desc->info) ==
+                  rule.GetDataSubject()) {
+                anon_column_sets.push_back(rule.GetAnonymizeColumns());
+                some_rule_applies = true;
               }
             }
           }
-        } else if (rule.GetDataSubject() == accessed_column->get()) {
-          if (anon_columns.empty()) {
-            anon_columns = rule.GetAnonymizeColumns();
-          } else {
-            this->AddIntersect(anon_columns, rule.GetAnonymizeColumns());
+          // if users owns record through desc but no rules apply, ensure that
+          // the record does not get anonymized
+          if (!some_rule_applies && !accessed_column) {
+            anon_column_sets.push_back({});
+          }
+        }
+      } else {
+        // accessorship case
+        for (const sqlast::AnonymizationRule &rule : rules) {
+          if (rule.GetDataSubject() == accessed_column->get()) {
+            anon_column_sets.push_back(rule.GetAnonymizeColumns());
           }
         }
       }
     }
+
+    std::vector<std::string> anon_columns = {};
+    for (size_t i = 0; i < anon_column_sets.size(); i++) {
+      if (i == 0) {
+        anon_columns = anon_column_sets.at(i);
+      } else {
+        this->AddIntersect(anon_columns, anon_column_sets.at(i));
+      }
+    }
+
     for (const std::string &anon_column : anon_columns) {
       size_t anon_idx = record.schema().IndexOf(anon_column);
       record.SetNull(true, anon_idx);
