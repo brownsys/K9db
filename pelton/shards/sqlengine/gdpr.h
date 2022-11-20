@@ -40,6 +40,16 @@ class GDPRContext {
   absl::StatusOr<sql::SqlResult> ExecForget();
 
   /* Handle get and its helpers. */
+  std::vector<sqlast::Value> ExtractUserIDs(const IndexDescriptor &index,
+                                            sqlast::Value &&data_subject);
+
+  void AddIntersect(std::vector<std::string> &into,
+                    const std::vector<std::string> &from);
+
+  bool ShouldBeApplied(const sqlast::AnonymizationRule &rule,
+                       const std::unique_ptr<ShardDescriptor> &owner_desc,
+                       const dataflow::Record &record);
+
   void AddOrAppendAndAnon(
       const TableName &tbl, sql::SqlResultSet &&set,
       std::optional<std::reference_wrapper<const std::string>> accessed_column =
