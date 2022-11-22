@@ -22,35 +22,6 @@ using SN = util::ShardName;
 // Define a fixture that manages a pelton connection.
 PELTON_FIXTURE(GDPRGetAnonTest);
 
-// TEST_F(GDPRGetAnonTest, OwnedDataNotAnon) {
-//   // Parse create table statements.
-//   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
-//   std::string files = MakeCreate(
-//       "files", {"id" I PK, "creator" I OB "user(id)", "data" STR}, 
-//       false,
-//       "," ON_GET "creator" ANON "(data)");
-
-//   // Make a pelton connection.
-//   Connection conn = CreateConnection();
-
-//   // Create the tables.
-//   EXPECT_SUCCESS(Execute(usr, &conn));
-//   EXPECT_SUCCESS(Execute(files, &conn));
-
-//   // Perform some inserts.
-//   auto &&[usr1, u0] = MakeInsert("user", {"0", "'u1'"});
-//   auto &&[files1, row1] = MakeInsert("files", {"0", "0", "'file1'"});
-//   auto &&[files2, row2] = MakeInsert("files", {"1", "0", "'file2'"});
-
-//   EXPECT_UPDATE(Execute(usr1, &conn), 1);
-//   EXPECT_UPDATE(Execute(files1, &conn), 1);
-//   EXPECT_UPDATE(Execute(files2, &conn), 1);
-
-//   // Validate get.
-//   std::string get = MakeGDPRGet("user", "0");
-//   EXPECT_EQ(Execute(get, &conn).ResultSets(), (VV{(V{u0}), (V{row1, row2})}));
-// }
-
 TEST_F(GDPRGetAnonTest, TwoOwnersAnon) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
@@ -415,7 +386,8 @@ TEST_F(GDPRGetAnonTest, ComplexVariableOwnershipAnon) {
       {"sid" I PK, "group_id" I OW "grps(gid)", "user_id" I OB "user(id)"});
   std::string files =
       MakeCreate("files", {"fid" I PK, "creator" I OB "user(id)"}, false,
-                 "," ON_GET "fid" ANON "(creator)");
+                 "," ON_GET "fid" ANON "(creator),"
+                     ON_GET "creator" ANON "(fid)");
   std::string fassoc = MakeCreate(
       "fassoc",
       {"fsid" I PK, "file" I OW "files(fid)", "group_id" I OB "grps(gid)"});
