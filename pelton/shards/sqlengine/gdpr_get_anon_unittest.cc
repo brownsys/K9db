@@ -22,6 +22,35 @@ using SN = util::ShardName;
 // Define a fixture that manages a pelton connection.
 PELTON_FIXTURE(GDPRGetAnonTest);
 
+// TEST_F(GDPRGetAnonTest, OwnedDataNotAnon) {
+//   // Parse create table statements.
+//   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+//   std::string files = MakeCreate(
+//       "files", {"id" I PK, "creator" I OB "user(id)", "data" STR}, 
+//       false,
+//       "," ON_GET "creator" ANON "(data)");
+
+//   // Make a pelton connection.
+//   Connection conn = CreateConnection();
+
+//   // Create the tables.
+//   EXPECT_SUCCESS(Execute(usr, &conn));
+//   EXPECT_SUCCESS(Execute(files, &conn));
+
+//   // Perform some inserts.
+//   auto &&[usr1, u0] = MakeInsert("user", {"0", "'u1'"});
+//   auto &&[files1, row1] = MakeInsert("files", {"0", "0", "'file1'"});
+//   auto &&[files2, row2] = MakeInsert("files", {"1", "0", "'file2'"});
+
+//   EXPECT_UPDATE(Execute(usr1, &conn), 1);
+//   EXPECT_UPDATE(Execute(files1, &conn), 1);
+//   EXPECT_UPDATE(Execute(files2, &conn), 1);
+
+//   // Validate get.
+//   std::string get = MakeGDPRGet("user", "0");
+//   EXPECT_EQ(Execute(get, &conn).ResultSets(), (VV{(V{u0}), (V{row1, row2})}));
+// }
+
 TEST_F(GDPRGetAnonTest, TwoOwnersAnon) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
@@ -105,6 +134,125 @@ TEST_F(GDPRGetAnonTest, OwnerAccessorAnon) {
   auto &&[msg4, row4] = MakeInsert("msg", {"4", "5", "0"});
   auto &&[_____, row4_anon1] = MakeInsert("msg", {"4", "5", "NULL"});
   auto &&[______, row4_anon2] = MakeInsert("msg", {"4", "NULL", "0"});
+
+  EXPECT_UPDATE(Execute(usr1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr2, &conn), 1);
+  EXPECT_UPDATE(Execute(usr3, &conn), 1);
+  EXPECT_UPDATE(Execute(msg1, &conn), 1);
+  EXPECT_UPDATE(Execute(msg2, &conn), 1);
+  EXPECT_UPDATE(Execute(msg3, &conn), 1);
+  EXPECT_UPDATE(Execute(msg4, &conn), 1);
+
+  // Validate anon on get for user with id 5.
+  std::string get1 = MakeGDPRGet("user", "5");
+  EXPECT_EQ(Execute(get1, &conn).ResultSets(),
+            (VV{(V{row3_anon2, row4_anon1}), (V{u1})}));
+
+  // Validate anon on get for user with id 10.
+  std::string get2 = MakeGDPRGet("user", "10");
+  EXPECT_EQ(Execute(get2, &conn).ResultSets(),
+            (VV{(V{row1_anon1, row3_anon1}), (V{u2})}));
+
+  // Validate anon on get for user with id 0.
+  std::string get3 = MakeGDPRGet("user", "0");
+  EXPECT_EQ(Execute(get3, &conn).ResultSets(),
+            (VV{(V{row1_anon2, row4_anon2, row2}), (V{u0})}));
+}
+
+TEST_F(GDPRGetAnonTest, MultipleAccessPathsMergeRules) {
+  // Parse create table statements.
+  std::string admn = MakeCreate("admin", {"aid" I PK, "aname" STR}, true);
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "creator" I OB "admin(aid)", 
+      "sender" I AB "user(id)", "receiver" I AB "user(id)", 
+      "secret1" STR, "secret2" STR},
+      false,
+      "," ON_GET "receiver" ANON "(sender, secret1, secret2, creator)," 
+          ON_GET "sender" ANON "(receiver, secret1, creator)");
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(admn, &conn));
+  EXPECT_SUCCESS(Execute(msg, &conn));
+
+  // // Perform some inserts.
+  auto &&[admn1, a0] = MakeInsert("admin", {"0", "'a1'"});
+  auto &&[usr1, u0] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr2, u1] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[usr3, u2] = MakeInsert("user", {"10", "'u100'"});
+  auto &&[msg1, row1] = MakeInsert("msg", {"1", "0", "0", "10", "'secret1'", "'secret2'"});
+  auto &&[_, row1_anon1] = MakeInsert("msg", {"1", "NULL", "NULL", "10", "NULL", "NULL"});
+  auto &&[__, row1_anon2] = MakeInsert("msg", {"1", "NULL", "0", "NULL", "NULL", "'secret2'"});
+  auto &&[msg2, row2] = MakeInsert("msg", {"2", "0", "0", "0", "'secret1'", "'secret2'"});
+  auto &&[___, row2_anon1] = MakeInsert("msg", {"2", "NULL", "0", "0", "NULL", "'secret2'"});
+  auto &&[msg3, row3] = MakeInsert("msg", {"3", "0", "5", "10", "'secret1'", "'secret2'"});
+  auto &&[____, row3_anon1] = MakeInsert("msg", {"3", "NULL", "NULL", "10", "NULL", "NULL"});
+  auto &&[_____, row3_anon2] = MakeInsert("msg", {"3", "NULL", "5", "NULL", "NULL", "'secret2'"});
+  auto &&[msg4, row4] = MakeInsert("msg", {"4", "0", "5", "0", "'secret1'", "'secret2'"});
+  auto &&[______, row4_anon1] = MakeInsert("msg", {"4", "NULL", "5", "NULL", "NULL", "'secret2'"});
+  auto &&[_______, row4_anon2] = MakeInsert("msg", {"4", "NULL", "NULL", "0", "NULL", "NULL"});
+
+  EXPECT_UPDATE(Execute(admn1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr2, &conn), 1);
+  EXPECT_UPDATE(Execute(usr3, &conn), 1);
+  EXPECT_UPDATE(Execute(msg1, &conn), 1);
+  EXPECT_UPDATE(Execute(msg2, &conn), 1);
+  EXPECT_UPDATE(Execute(msg3, &conn), 1);
+  EXPECT_UPDATE(Execute(msg4, &conn), 1);
+
+  // Validate anon on get for user with id 5.
+  std::string get1 = MakeGDPRGet("user", "5");
+  EXPECT_EQ(Execute(get1, &conn).ResultSets(),
+            (VV{(V{row3_anon2, row4_anon1}), (V{u1})}));
+
+  // // Validate anon on get for user with id 10.
+  std::string get2 = MakeGDPRGet("user", "10");
+  EXPECT_EQ(Execute(get2, &conn).ResultSets(),
+            (VV{(V{row1_anon1, row3_anon1}), (V{u2})}));
+
+  // Validate anon on get for user with id 0.
+  // Anonymization rules between both access paths should merge (set intersection).
+  std::string get3 = MakeGDPRGet("user", "0");
+  EXPECT_EQ(Execute(get3, &conn).ResultSets(),
+            (VV{(V{row1_anon2, row4_anon2, row2_anon1}), (V{u0})}));
+}
+
+TEST_F(GDPRGetAnonTest, MultipleColumnsAnon) {
+  // Parse create table statements.
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "user(id)", "receiver" I AB "user(id)", 
+              "sender_secret" STR, "receiver_secret" STR},
+      false,
+      "," ON_GET "receiver" ANON "(sender, sender_secret)," 
+          ON_GET "sender" ANON "(receiver, receiver_secret)");
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(msg, &conn));
+
+  // Perform some inserts.
+  auto &&[usr1, u0] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr2, u1] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[usr3, u2] = MakeInsert("user", {"10", "'u100'"});
+  auto &&[msg1, row1] = MakeInsert("msg", {"1", "0", "10", "'secret1'", "'secret2'"});
+  auto &&[_, row1_anon1] = MakeInsert("msg", {"1", "NULL", "10", "NULL", "'secret2'"});
+  auto &&[__, row1_anon2] = MakeInsert("msg", {"1", "0", "NULL", "'secret1'", "NULL"});
+  auto &&[msg2, row2] = MakeInsert("msg", {"2", "0", "0", "'secret1'", "'secret2'"});
+  auto &&[msg3, row3] = MakeInsert("msg", {"3", "5", "10", "'secret1'", "'secret2'"});
+  auto &&[___, row3_anon1] = MakeInsert("msg", {"3", "NULL", "10", "NULL", "'secret2'"});
+  auto &&[____, row3_anon2] = MakeInsert("msg", {"3", "5", "NULL", "'secret1'", "NULL"});
+  auto &&[msg4, row4] = MakeInsert("msg", {"4", "5", "0", "'secret1'", "'secret2'"});
+  auto &&[_____, row4_anon1] = MakeInsert("msg", {"4", "5", "NULL", "'secret1'", "NULL"});
+  auto &&[______, row4_anon2] = MakeInsert("msg", {"4", "NULL", "0", "NULL", "'secret2'"});
 
   EXPECT_UPDATE(Execute(usr1, &conn), 1);
   EXPECT_UPDATE(Execute(usr2, &conn), 1);
