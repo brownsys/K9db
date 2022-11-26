@@ -413,3 +413,15 @@ cc_test(
         "@glog",
     ],
 )
+
+cc_test(
+    name = "gdpr-forget-anon-test",
+    srcs = [
+        "gdpr_forget_anon_unittest.cc",
+    ],
+    deps = [
+        ":tests_helpers",
+        "//pelton/util:shard_name",
+        "@glog",
+    ],
+)
