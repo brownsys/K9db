@@ -11,6 +11,7 @@
 #include "glog/logging.h"
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/select.h"
+#include "pelton/shards/sqlengine/update.h"
 #include "pelton/shards/types.h"
 #include "pelton/util/iterator.h"
 #include "pelton/util/shard_name.h"
@@ -47,23 +48,73 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecForget() {
     sql::SqlResultSet result =
         this->db_->DeleteShard(table_name, std::move(shard));
 
+    const std::vector<sqlast::AnonymizationRule> &rules =
+      this->sstate_.GetTable(table_name).create_stmt.GetAnonymizationRules();
+
     // Time to update dataflows.
     count += result.size();
-    if (this->dstate_.HasFlowsFor(table_name)) {
-      std::vector<dataflow::Record> vec = result.Vec();
-      std::vector<sqlast::Value> pks;
-      for (const auto &r : vec) {
-        size_t pk_col_index = r.schema().keys().at(0);
-        pks.push_back(r.GetValue(pk_col_index));
-      }
+    
+    std::cout << "HAS DATAFLOWS" << std::endl;
+    std::vector<dataflow::Record> vec = result.Vec();
+    std::vector<sqlast::Value> pks;
+    for (const auto &r : vec) {
+      size_t pk_col_index = r.schema().keys().at(0);
+      pks.push_back(r.GetValue(pk_col_index));
+    }
 
-      // Count how many owners each record has.
-      std::vector<size_t> counts = this->db_->CountShards(table_name, pks);
-      CHECK_EQ(vec.size(), counts.size());
-      for (size_t i = 0; i < vec.size(); i++) {
-        if (counts.at(i) == 0) {
+    // Count how many owners each record has.
+    std::vector<size_t> counts = this->db_->CountShards(table_name, pks);
+    CHECK_EQ(vec.size(), counts.size());
+    for (size_t i = 0; i < vec.size(); i++) {
+      if (counts.at(i) == 0) {
+        if (this->dstate_.HasFlowsFor(table_name)) {
           dataflow_updates.push_back(std::move(vec.at(i)));
         }
+      } else {
+        // Apply anonymization rules in copies of data.
+        // All columns that need to be anonymized for the record
+        std::unordered_set<std::string> anon_column_set = {};
+        const auto &owners = this->sstate_.GetTable(table_name).owners;
+
+        for (const auto &desc : owners) {
+          // the next condition checks whether user owns record through desc
+          if (desc->shard_kind == this->shard_kind_ &&
+              this->OwnsRecordThroughDesc(desc, vec.at(i))) {
+            for (const sqlast::AnonymizationRule &rule : rules) {
+              if (rule.GetType() == sqlast::AnonymizationOpTypeEnum::DEL) {
+                if (EXTRACT_VARIANT(column, desc->info) ==
+                    rule.GetDataSubject()) {
+                    for (const auto &anon_col : rule.GetAnonymizeColumns()) {
+                      anon_column_set.insert(anon_col);
+                    }
+                }
+              }
+            }
+          }
+        } 
+
+        // Issue update to anonymize copies
+        // UPDATE <tbl> SET <anon_cols = NULL> WHERE <id> = <pk>;
+        sqlast::Update update{table_name};
+        for (const auto &anon_col : anon_column_set) {
+          std::cout << "FOR " << table_name << " ANONYMIZE COLUMN: " << anon_col << std::endl;
+          update.AddColumnValue(anon_col, std::make_unique<sqlast::LiteralExpression>(
+            sqlast::Value::FromSQLString("NULL")));
+        }
+
+        std::unique_ptr<sqlast::BinaryExpression> binexpr =
+            std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::EQ);
+        binexpr->SetLeft(std::make_unique<sqlast::ColumnExpression>(
+          vec.at(i).schema().NameOf(vec.at(i).schema().keys().at(0))));
+        binexpr->SetRight(std::make_unique<sqlast::LiteralExpression>(pks.at(i)));
+
+        update.SetWhereClause(std::move(binexpr));
+
+        std::cout << update << std::endl;
+
+        UpdateContext context(update, this->conn_, this->lock_);
+        MOVE_OR_PANIC(sql::SqlResult result, context.Exec());
+        count += result.UpdateCount();
       }
 
       // Update dataflow with deletions from table.

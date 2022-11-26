@@ -223,6 +223,7 @@ cc_library(
     deps = [
         ":index",
         ":select",
+        ":update",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:record",
