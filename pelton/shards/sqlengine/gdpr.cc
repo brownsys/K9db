@@ -1,6 +1,7 @@
 // GDPR statements handling (FORGET and GET).
 #include "pelton/shards/sqlengine/gdpr.h"
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_set>
@@ -37,25 +38,59 @@ absl::StatusOr<sql::SqlResult> GDPRContext::Exec() {
  * Forget.
  */
 
+sqlast::Update GDPRContext::MakeAccessAnonUpdate(
+    const TableName &tbl, const std::unordered_set<std::string> &anon_cols,
+    const std::string &pk_col, sqlast::Value pk_val) {
+  // Build select statement on the form:
+  // UPDATE <tbl> SET <anon_cols = NULL> WHERE <pk_col> = <pk_val>;
+  sqlast::Update update{tbl};
+  for (const auto &anon_col : anon_cols) {
+    // FIX: change 600 to NULL
+    update.AddColumnValue(anon_col, std::make_unique<sqlast::LiteralExpression>(
+                                        sqlast::Value::FromSQLString("600")));
+  }
+
+  std::unique_ptr<sqlast::BinaryExpression> binexpr =
+      std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::EQ);
+  binexpr->SetLeft(std::make_unique<sqlast::ColumnExpression>(pk_col));
+  binexpr->SetRight(std::make_unique<sqlast::LiteralExpression>(pk_val));
+  update.SetWhereClause(std::move(binexpr));
+
+  std::cout << update << std::endl;
+
+  return update;
+}
+
 absl::StatusOr<sql::SqlResult> GDPRContext::ExecForget() {
   Shard current_shard = this->sstate_.GetShard(this->shard_kind_);
 
   int count = 0;
   for (const auto &table_name : current_shard.owned_tables) {
     std::vector<dataflow::Record> dataflow_updates;
+    std::vector<dataflow::Record> anonymize_updates;
 
     util::ShardName shard(this->shard_kind_, this->user_id_str_);
     sql::SqlResultSet result =
         this->db_->DeleteShard(table_name, std::move(shard));
+    count += result.size();
 
     const std::vector<sqlast::AnonymizationRule> &rules =
-      this->sstate_.GetTable(table_name).create_stmt.GetAnonymizationRules();
+        this->sstate_.GetTable(table_name).create_stmt.GetAnonymizationRules();
+    const dataflow::SchemaRef &current_schema =
+        this->sstate_.GetTable(table_name).schema;
 
-    // Time to update dataflows.
-    count += result.size();
-    
-    std::cout << "HAS DATAFLOWS" << std::endl;
     std::vector<dataflow::Record> vec = result.Vec();
+
+    std::cout << "DELETED VALUES FOR TABLE " << table_name << ": " << std::endl;
+    for (const auto &rec : vec) {
+      std::cout << rec << std::endl;
+    }
+
+    // Recurse on access dependents before the dataflow updates get moved.
+    if (vec.size() > 0) {
+      this->FindInDependents(table_name, vec, true);
+    }
+
     std::vector<sqlast::Value> pks;
     for (const auto &r : vec) {
       size_t pk_col_index = r.schema().keys().at(0);
@@ -65,64 +100,91 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecForget() {
     // Count how many owners each record has.
     std::vector<size_t> counts = this->db_->CountShards(table_name, pks);
     CHECK_EQ(vec.size(), counts.size());
+
     for (size_t i = 0; i < vec.size(); i++) {
       if (counts.at(i) == 0) {
         if (this->dstate_.HasFlowsFor(table_name)) {
           dataflow_updates.push_back(std::move(vec.at(i)));
         }
       } else {
-        // Apply anonymization rules in copies of data.
-        // All columns that need to be anonymized for the record
-        std::unordered_set<std::string> anon_column_set = {};
-        const auto &owners = this->sstate_.GetTable(table_name).owners;
+        anonymize_updates.push_back(std::move(vec.at(i)));
+      }
+    }
 
-        for (const auto &desc : owners) {
-          // the next condition checks whether user owns record through desc
-          if (desc->shard_kind == this->shard_kind_ &&
-              this->OwnsRecordThroughDesc(desc, vec.at(i))) {
-            for (const sqlast::AnonymizationRule &rule : rules) {
-              if (rule.GetType() == sqlast::AnonymizationOpTypeEnum::DEL) {
-                if (EXTRACT_VARIANT(column, desc->info) ==
-                    rule.GetDataSubject()) {
-                    for (const auto &anon_col : rule.GetAnonymizeColumns()) {
-                      anon_column_set.insert(anon_col);
-                    }
+    // Update dataflow with deletions from table.
+    this->dstate_.ProcessRecords(table_name, std::move(dataflow_updates));
+
+    for (const auto &anonymized_record : anonymize_updates) {
+      // Apply anonymization rules in copies of data.
+      // All columns that need to be anonymized for the record
+      std::unordered_set<std::string> anon_column_set = {};
+      const auto &owners = this->sstate_.GetTable(table_name).owners;
+
+      for (const auto &desc : owners) {
+        // the next condition checks whether user owns record through desc
+        if (desc->shard_kind == this->shard_kind_ &&
+            this->OwnsRecordThroughDesc(desc, anonymized_record)) {
+          for (const sqlast::AnonymizationRule &rule : rules) {
+            if (rule.GetType() == sqlast::AnonymizationOpTypeEnum::DEL) {
+              if (EXTRACT_VARIANT(column, desc->info) ==
+                  rule.GetDataSubject()) {
+                for (const auto &anon_col : rule.GetAnonymizeColumns()) {
+                  anon_column_set.insert(anon_col);
                 }
               }
             }
           }
-        } 
-
-        // Issue update to anonymize copies
-        // UPDATE <tbl> SET <anon_cols = NULL> WHERE <id> = <pk>;
-        sqlast::Update update{table_name};
-        for (const auto &anon_col : anon_column_set) {
-          std::cout << "FOR " << table_name << " ANONYMIZE COLUMN: " << anon_col << std::endl;
-          update.AddColumnValue(anon_col, std::make_unique<sqlast::LiteralExpression>(
-            sqlast::Value::FromSQLString("NULL")));
         }
+      }
 
-        std::unique_ptr<sqlast::BinaryExpression> binexpr =
-            std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::EQ);
-        binexpr->SetLeft(std::make_unique<sqlast::ColumnExpression>(
-          vec.at(i).schema().NameOf(vec.at(i).schema().keys().at(0))));
-        binexpr->SetRight(std::make_unique<sqlast::LiteralExpression>(pks.at(i)));
-
-        update.SetWhereClause(std::move(binexpr));
-
-        std::cout << update << std::endl;
+      if (anon_column_set.size() > 0) {
+        // Issue update to anonymize copies
+        sqlast::Update update = this->MakeAccessAnonUpdate(
+            table_name, anon_column_set,
+            current_schema.NameOf(current_schema.keys().at(0)),
+            anonymized_record.GetValue(current_schema.keys().at(0)));
 
         UpdateContext context(update, this->conn_, this->lock_);
         MOVE_OR_PANIC(sql::SqlResult result, context.Exec());
         count += result.UpdateCount();
       }
-
-      // Update dataflow with deletions from table.
-      this->dstate_.ProcessRecords(table_name, std::move(dataflow_updates));
     }
   }
 
   return sql::SqlResult(count);
+}
+
+void GDPRContext::AnonAccessors(const TableName &tbl, sql::SqlResultSet &&set,
+                                const std::string &accessed_column) {
+  const std::vector<sqlast::AnonymizationRule> &rules =
+      this->sstate_.GetTable(tbl).create_stmt.GetAnonymizationRules();
+  const dataflow::SchemaRef &current_schema =
+      this->sstate_.GetTable(tbl).schema;
+
+  std::vector<dataflow::Record> &&records = set.Vec();
+
+  for (dataflow::Record &record : records) {
+    // All columns that need to be anonymized for the record
+    std::unordered_set<std::string> anon_column_set = {};
+
+    // accessorship case
+    for (const sqlast::AnonymizationRule &rule : rules) {
+      if (rule.GetDataSubject() == accessed_column) {
+        for (const auto &anon_col : rule.GetAnonymizeColumns()) {
+          anon_column_set.insert(anon_col);
+        }
+      }
+    }
+
+    // Issue update to anonymize copies
+    sqlast::Update update = this->MakeAccessAnonUpdate(
+        tbl, anon_column_set,
+        current_schema.NameOf(current_schema.keys().at(0)),
+        record.GetValue(current_schema.keys().at(0)));
+
+    UpdateContext context(update, this->conn_, this->lock_);
+    MOVE_OR_PANIC(sql::SqlResult result, context.Exec());
+  }
 }
 
 /*
@@ -182,9 +244,9 @@ bool GDPRContext::OwnsRecordThroughDesc(
          user_ids.end();
 }
 
-void GDPRContext::AddOrAppendAndAnon(
-    const TableName &tbl, sql::SqlResultSet &&set,
-    std::optional<std::reference_wrapper<const std::string>> accessed_column) {
+void GDPRContext::AddOrAppendAndAnon(const TableName &tbl,
+                                     sql::SqlResultSet &&set,
+                                     const std::string &accessed_column) {
   const std::vector<sqlast::AnonymizationRule> &rules =
       this->sstate_.GetTable(tbl).create_stmt.GetAnonymizationRules();
 
@@ -196,7 +258,7 @@ void GDPRContext::AddOrAppendAndAnon(
     const auto &owners = this->sstate_.GetTable(tbl).owners;
 
     for (const auto &desc : owners) {
-      if (!accessed_column) {
+      if (accessed_column == "") {
         // the next condition checks whether user owns record through desc
         if (desc->shard_kind == this->shard_kind_ &&
             this->OwnsRecordThroughDesc(desc, record)) {
@@ -213,14 +275,14 @@ void GDPRContext::AddOrAppendAndAnon(
           }
           // if users owns record through desc but no rules apply, ensure that
           // the record does not get anonymized
-          if (!some_rule_applies && !accessed_column) {
+          if (!some_rule_applies && accessed_column == "") {
             anon_column_sets.push_back({});
           }
         }
       } else {
         // accessorship case
         for (const sqlast::AnonymizationRule &rule : rules) {
-          if (rule.GetDataSubject() == accessed_column->get()) {
+          if (rule.GetDataSubject() == accessed_column) {
             anon_column_sets.push_back(rule.GetAnonymizeColumns());
           }
         }
@@ -269,7 +331,8 @@ sqlast::Select GDPRContext::MakeAccessSelect(
 }
 
 void GDPRContext::FindInDependents(const TableName &table_name,
-                                   const std::vector<dataflow::Record> &rows) {
+                                   const std::vector<dataflow::Record> &rows,
+                                   bool forget) {
   // Only considers access dependents within the same shard kind.
   const Table &table = this->sstate_.GetTable(table_name);
   for (const auto &[deptbl, depdesc] : table.access_dependents) {
@@ -299,12 +362,13 @@ void GDPRContext::FindInDependents(const TableName &table_name,
       next_vals.push_back(record.GetValue(colidx));
     }
 
-    this->FindData(deptbl, depdesc, next_vals);
+    this->FindData(deptbl, depdesc, next_vals, forget);
   }
 }
 
 void GDPRContext::FindData(const TableName &tbl, const ShardDescriptor *desc,
-                           const std::vector<sqlast::Value> &fkvals) {
+                           const std::vector<sqlast::Value> &fkvals,
+                           bool forget) {
   // Find the accessed data.
   const std::string &column_name = EXTRACT_VARIANT(column, desc->info);
   sqlast::Select select = this->MakeAccessSelect(tbl, column_name, fkvals);
@@ -314,10 +378,14 @@ void GDPRContext::FindData(const TableName &tbl, const ShardDescriptor *desc,
   // Recurse on access dependents.
   sql::SqlResultSet &resultset = result.ResultSets().front();
   if (resultset.size() > 0) {
-    this->FindInDependents(tbl, resultset.rows());
+    this->FindInDependents(tbl, resultset.rows(), forget);
 
-    // Add to result set.
-    this->AddOrAppendAndAnon(tbl, std::move(resultset), column_name);
+    // Add to result set or anonymize.
+    if (!forget) {
+      this->AddOrAppendAndAnon(tbl, std::move(resultset), column_name);
+    } else {
+      this->AnonAccessors(tbl, std::move(resultset), column_name);
+    }
   }
 }
 
@@ -331,7 +399,7 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecGet() {
 
     // Recurse on access dependents.
     if (resultset.size() > 0) {
-      this->FindInDependents(table_name, resultset.rows());
+      this->FindInDependents(table_name, resultset.rows(), false);
 
       // Add to result set.
       this->AddOrAppendAndAnon(table_name, std::move(resultset));
