@@ -282,6 +282,62 @@ TEST_F(GDPRForgetAnonTest, TransitiveOwnershipAnon) {
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
 }
 
+TEST_F(GDPRForgetAnonTest, TransitiveAccessorshipAnon) {
+  // Parse create table statements.
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string prof = MakeCreate("prof", {"id" I PK, "uid" I FK "user(id)"});
+  std::string msg = MakeCreate(
+      "msg", {"id" I PK, "sender" I OB "prof(id)", "receiver" I AB "prof(id)"},
+      false,
+      "," ON_DEL "receiver" ANON "(receiver)");
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+  sql::AbstractConnection *db = conn.state->Database();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(prof, &conn));
+  EXPECT_SUCCESS(Execute(msg, &conn));
+
+  // Perform some inserts.
+  auto &&[usr1, u0] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr2, u1] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[prof1, row1] = MakeInsert("prof", {"0", "0"});
+  auto &&[prof2, row2] = MakeInsert("prof", {"1", "0"});
+  auto &&[prof3, row3] = MakeInsert("prof", {"2", "5"});
+  auto &&[msg1, row4] = MakeInsert("msg", {"1", "0", "2"});
+  // Sending a message to myself from the same profile
+  auto &&[msg2, row5] = MakeInsert("msg", {"2", "0", "0"});
+  // More tests
+  auto &&[msg3, row6] = MakeInsert("msg", {"3", "1", "2"});
+  auto &&[msg4, row7] = MakeInsert("msg", {"4", "2", "0"});
+  auto &&[___, row7_anon] = MakeInsert("msg", {"4", "2", "600"});
+  // Sending a message to myself from different profiles
+  auto &&[msg5, row8] = MakeInsert("msg", {"5", "0", "1"});
+  auto &&[msg6, row9] = MakeInsert("msg", {"6", "1", "0"});
+
+  EXPECT_UPDATE(Execute(usr1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr2, &conn), 1);
+  EXPECT_UPDATE(Execute(prof1, &conn), 1);
+  EXPECT_UPDATE(Execute(prof2, &conn), 1);
+  EXPECT_UPDATE(Execute(prof3, &conn), 1);
+  EXPECT_UPDATE(Execute(msg1, &conn), 1);
+  EXPECT_UPDATE(Execute(msg2, &conn), 1);
+  EXPECT_UPDATE(Execute(msg3, &conn), 1);
+  EXPECT_UPDATE(Execute(msg4, &conn), 1);
+  EXPECT_UPDATE(Execute(msg5, &conn), 1);
+  EXPECT_UPDATE(Execute(msg6, &conn), 1);
+
+  // Validate anon on forget for user with id 0.
+  std::string forget = MakeGDPRForget("user", "0");
+  // TODO: Change to EXPECT_UPDATE
+  Execute(forget, &conn);
+  EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row7_anon}));
+  EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+}
+
 TEST_F(GDPRForgetAnonTest, ComplexVariableOwnershipAnon) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
@@ -360,6 +416,84 @@ TEST_F(GDPRForgetAnonTest, ComplexVariableOwnershipAnon) {
   EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "5")), (V{farow1, farow2}));
+}
+
+TEST_F(GDPRForgetAnonTest, ComplexVariableAccessorshipAnon) {
+  // Parse create table statements.
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string admin = MakeCreate("admin", {"aid" I PK, "name" STR}, true);
+  std::string grps =
+      MakeCreate("grps", {"gid" I PK, "admin" I OB "admin(aid)"});
+  std::string assoc = MakeCreate(
+      "association",
+      {"sid" I PK, "group_id" I OW "grps(gid)", "user_id" I OB "user(id)"});
+  std::string files =
+      MakeCreate("files", {"fid" I PK, "creator" I OB "user(id)", "group_secret" I}, false,
+                 "," ON_DEL "fid" ANON "(group_secret)");
+  std::string fassoc = MakeCreate(
+      "fassoc",
+      {"fsid" I PK, "file" I AC "files(fid)", "group_id" I AB "grps(gid)"});
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+  sql::AbstractConnection *db = conn.state->Database();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(admin, &conn));
+  EXPECT_SUCCESS(Execute(grps, &conn));
+  EXPECT_SUCCESS(Execute(assoc, &conn));
+  EXPECT_SUCCESS(Execute(files, &conn));
+  EXPECT_SUCCESS(Execute(fassoc, &conn));
+
+  // Perform some inserts.
+  auto &&[usr1, u0] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr2, u1] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[adm1, d0] = MakeInsert("admin", {"0", "'a1'"});
+  auto &&[grps1, grow1] = MakeInsert("grps", {"0", "0"});
+  auto &&[grps2, grow2] = MakeInsert("grps", {"1", "0"});
+
+  EXPECT_UPDATE(Execute(usr1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr2, &conn), 1);
+  EXPECT_UPDATE(Execute(adm1, &conn), 1);
+  EXPECT_UPDATE(Execute(grps1, &conn), 1);
+  EXPECT_UPDATE(Execute(grps2, &conn), 1);
+
+  // Insert files and fassocs but not associated to any users.
+  auto &&[f1, frow1] = MakeInsert("files", {"0", "0", "0"});
+  auto &&[_, frow1_anon] = MakeInsert("files", {"0", "0", "600"});
+  auto &&[f2, frow2] = MakeInsert("files", {"1", "0", "0"});
+  auto &&[__, frow2_anon] = MakeInsert("files", {"1", "0", "600"});
+  auto &&[fa1, farow1] = MakeInsert("fassoc", {"0", "0", "1"});
+  auto &&[fa2, farow2] = MakeInsert("fassoc", {"1", "1", "1"});
+
+  EXPECT_UPDATE(Execute(f1, &conn), 1);
+  EXPECT_UPDATE(Execute(f2, &conn), 1);
+  EXPECT_UPDATE(Execute(fa1, &conn), 1);
+  EXPECT_UPDATE(Execute(fa2, &conn), 1);
+
+  // Associate everything with a user.
+  auto &&[assoc1, a0] = MakeInsert("association", {"0", "1", "5"});
+  auto &&[assoc2, a1] = MakeInsert("association", {"1", "1", "0"});
+
+  EXPECT_UPDATE(Execute(assoc1, &conn), 2);
+  EXPECT_UPDATE(Execute(assoc2, &conn), 2);
+
+  // Validate anon on forget for user with id 5.
+  std::string forget = MakeGDPRForget("user", "5");
+  // TODO: Change to EXPECT_UPDATE
+  Execute(forget, &conn);
+  EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{grow1, grow2}));
+  EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("fassoc", SN("admin", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{grow2}));
+  EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{}));
+  EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  EXPECT_EQ(db->GetShard("files", SN("user", "0")), (V{frow1_anon, frow2_anon}));
+  EXPECT_EQ(db->GetShard("files", SN("user", "5")), (V{}));
+  EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  EXPECT_EQ(db->GetShard("fassoc", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("fassoc", SN("user", "5")), (V{}));
 }
 
 }  // namespace sqlengine
