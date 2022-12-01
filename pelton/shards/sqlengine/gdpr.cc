@@ -151,6 +151,13 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecForget() {
     }
   }
 
+  // for (const auto &table_name : current_shard.owned_tables) {
+  //   // DELETE FOR REAL!!1!
+  //   util::ShardName shard(this->shard_kind_, this->user_id_str_);
+  //   sql::SqlResultSet result =
+  //     this->db_->DeleteShard(table_name, std::move(shard));
+  // }
+
   return sql::SqlResult(count);
 }
 
