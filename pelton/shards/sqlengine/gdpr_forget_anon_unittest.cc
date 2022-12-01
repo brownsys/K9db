@@ -59,8 +59,7 @@ TEST_F(GDPRForgetAnonTest, TwoOwnersAnon) {
 
   // Validate anon on forget for user with id 0.
   std::string forget = MakeGDPRForget("user", "0");
-  // TODO: Change to EXPECT_UPDATE
-  Execute(forget, &conn);
+  EXPECT_UPDATE(Execute(forget, &conn), 10);
 
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4_anon}));
@@ -103,8 +102,7 @@ TEST_F(GDPRForgetAnonTest, OwnerAccessorAnon) {
 
   // Validate anon on forget for user with id 0.
   std::string forget = MakeGDPRForget("user", "0");
-  // TODO: Change to EXPECT_UPDATE
-  Execute(forget, &conn);
+  EXPECT_UPDATE(Execute(forget, &conn), 3);
 
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4_anon}));
@@ -112,55 +110,55 @@ TEST_F(GDPRForgetAnonTest, OwnerAccessorAnon) {
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
 }
 
-// TEST_F(GDPRForgetAnonTest, MultipleColumnsAnon) {
-//   // Parse create table statements.
-//   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
-//   std::string msg = MakeCreate(
-//       "msg",
-//       {"id" I PK, "sender" I OB "user(id)", "receiver" I AB "user(id)",
-//        "sender_secret" STR, "receiver_secret" STR},
-//       false, "," ON_DEL "receiver" ANON "(receiver, receiver_secret)");
+TEST_F(GDPRForgetAnonTest, MultipleColumnsAnon) {
+  // Parse create table statements.
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string msg = MakeCreate(
+      "msg",
+      {"id" I PK, "sender" I OB "user(id)", "receiver" I AB "user(id)",
+       "sender_secret" I, "receiver_secret" I},
+      false, "," ON_DEL "receiver" ANON "(receiver, receiver_secret)");
 
-//   // Make a pelton connection.
-//   Connection conn = CreateConnection();
-//   sql::AbstractConnection *db = conn.state->Database();
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+  sql::AbstractConnection *db = conn.state->Database();
 
-//   // Create the tables.
-//   EXPECT_SUCCESS(Execute(usr, &conn));
-//   EXPECT_SUCCESS(Execute(msg, &conn));
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(msg, &conn));
 
-//   // Perform some inserts.
-//   auto &&[usr1, u0] = MakeInsert("user", {"0", "'u1'"});
-//   auto &&[usr2, u1] = MakeInsert("user", {"5", "'u10'"});
-//   auto &&[usr3, u2] = MakeInsert("user", {"10", "'u100'"});
-//   auto &&[msg1, row1] =
-//       MakeInsert("msg", {"1", "0", "10", "'secret1'", "'secret2'"});
-//   auto &&[msg2, row2] =
-//       MakeInsert("msg", {"2", "0", "0", "'secret1'", "'secret2'"});
-//   auto &&[msg3, row3] =
-//       MakeInsert("msg", {"3", "5", "10", "'secret1'", "'secret2'"});
-//   auto &&[msg4, row4] =
-//       MakeInsert("msg", {"4", "5", "0", "'secret1'", "'secret2'"});
-//   auto &&[_, row4_anon] =
-//       MakeInsert("msg", {"4", "5", "600", "'secret1'", "600"});
+  // Perform some inserts.
+  auto &&[usr1, u0] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr2, u1] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[usr3, u2] = MakeInsert("user", {"10", "'u100'"});
+  auto &&[msg1, row1] =
+      MakeInsert("msg", {"1", "0", "10", "123", "234"});
+  auto &&[msg2, row2] =
+      MakeInsert("msg", {"2", "0", "0", "123", "234"});
+  auto &&[msg3, row3] =
+      MakeInsert("msg", {"3", "5", "10", "123", "234"});
+  auto &&[msg4, row4] =
+      MakeInsert("msg", {"4", "5", "0", "123", "234"});
+  auto &&[_, row4_anon] =
+      MakeInsert("msg", {"4", "5", "600", "123", "600"});
 
-//   EXPECT_UPDATE(Execute(usr1, &conn), 1);
-//   EXPECT_UPDATE(Execute(usr2, &conn), 1);
-//   EXPECT_UPDATE(Execute(usr3, &conn), 1);
-//   EXPECT_UPDATE(Execute(msg1, &conn), 1);
-//   EXPECT_UPDATE(Execute(msg2, &conn), 1);
-//   EXPECT_UPDATE(Execute(msg3, &conn), 1);
-//   EXPECT_UPDATE(Execute(msg4, &conn), 1);
+  EXPECT_UPDATE(Execute(usr1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr2, &conn), 1);
+  EXPECT_UPDATE(Execute(usr3, &conn), 1);
+  EXPECT_UPDATE(Execute(msg1, &conn), 1);
+  EXPECT_UPDATE(Execute(msg2, &conn), 1);
+  EXPECT_UPDATE(Execute(msg3, &conn), 1);
+  EXPECT_UPDATE(Execute(msg4, &conn), 1);
 
-//   // Validate anon on forget for user with id 0.
-//   std::string forget = MakeGDPRForget("user", "0");
-//   EXPECT_UPDATE(Execute(forget, &conn), 4);
+  // Validate anon on forget for user with id 0.
+  std::string forget = MakeGDPRForget("user", "0");
+  EXPECT_UPDATE(Execute(forget, &conn), 3);
 
-//   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
-//   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4_anon}));
-//   EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{}));
-//   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
-// }
+  EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
+  EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4_anon}));
+  EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{}));
+  EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+}
 
 TEST_F(GDPRForgetAnonTest, TwoDistinctOwnersAnon) {
   // Parse create table statements.
@@ -205,8 +203,7 @@ TEST_F(GDPRForgetAnonTest, TwoDistinctOwnersAnon) {
 
   // Validate anon on forget for patient with id 0.
   std::string forget1 = MakeGDPRForget("patient", "0");
-  // TODO: Change to EXPECT_UPDATE
-  Execute(forget1, &conn);
+  EXPECT_UPDATE(Execute(forget1, &conn), 9);
   EXPECT_EQ(db->GetShard("msg", SN("patient", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("patient", "5")), (V{row2}));
   EXPECT_EQ(db->GetShard("msg", SN("doctor", "0")), (V{row2, row1_anon}));
@@ -215,8 +212,7 @@ TEST_F(GDPRForgetAnonTest, TwoDistinctOwnersAnon) {
 
   // Validate anon on forget for doctor with id 5.
   std::string forget2 = MakeGDPRForget("doctor", "5");
-  // TODO: Change to EXPECT_UPDATE
-  Execute(forget2, &conn);
+  EXPECT_UPDATE(Execute(forget2, &conn), 5);
   EXPECT_EQ(db->GetShard("msg", SN("patient", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("patient", "5")), (V{row2}));
   EXPECT_EQ(db->GetShard("msg", SN("doctor", "0")), (V{row2, row1_anon}));
@@ -274,8 +270,7 @@ TEST_F(GDPRForgetAnonTest, TransitiveOwnershipAnon) {
 
   // Validate anon on forget for user with id 0.
   std::string forget = MakeGDPRForget("user", "0");
-  // TODO: Change to EXPECT_UPDATE
-  Execute(forget, &conn);
+  EXPECT_UPDATE(Execute(forget, &conn), 15);
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")),
             (V{row4_anon, row6_anon, row7_anon}));
@@ -331,8 +326,7 @@ TEST_F(GDPRForgetAnonTest, TransitiveAccessorshipAnon) {
 
   // Validate anon on forget for user with id 0.
   std::string forget = MakeGDPRForget("user", "0");
-  // TODO: Change to EXPECT_UPDATE
-  Execute(forget, &conn);
+  EXPECT_UPDATE(Execute(forget, &conn), 8);
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row7_anon}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
@@ -401,8 +395,7 @@ TEST_F(GDPRForgetAnonTest, ComplexVariableOwnershipAnon) {
 
   // Validate anon on forget for user with id 0.
   std::string forget = MakeGDPRForget("user", "0");
-  // TODO: Change to EXPECT_UPDATE
-  Execute(forget, &conn);
+  EXPECT_UPDATE(Execute(forget, &conn), 19);
   EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{grow1, grow2}));
   EXPECT_EQ(db->GetShard("files", SN("admin", "0")),
             (V{frow1_anon, frow2_anon}));
@@ -481,8 +474,7 @@ TEST_F(GDPRForgetAnonTest, ComplexVariableAccessorshipAnon) {
 
   // Validate anon on forget for user with id 5.
   std::string forget = MakeGDPRForget("user", "5");
-  // TODO: Change to EXPECT_UPDATE
-  Execute(forget, &conn);
+  EXPECT_UPDATE(Execute(forget, &conn), 3);
   EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{grow1, grow2}));
   EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("admin", "0")), (V{}));
