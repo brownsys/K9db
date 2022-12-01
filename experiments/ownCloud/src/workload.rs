@@ -15,6 +15,8 @@ pub enum Request<'a> {
   Read(Vec<&'a User>, Vec<usize>),
   Direct(Share<'a>),
   Indirect(Share<'a>),
+  GetFilePK(File<'a>),
+  UpdateFilePK(File<'a>, String),
 }
 
 pub type ZipfF = f64;
@@ -23,6 +25,7 @@ pub struct WorkloadGenerator {
   rng: rand::rngs::ThreadRng,
   st: GeneratorState,
   zipf_f: ZipfF,
+  fn_counter : Integer
 }
 
 impl WorkloadGenerator {
@@ -95,5 +98,24 @@ impl WorkloadGenerator {
     };
     self.st.track_share(&share);
     Request::Indirect(share)
+  }
+
+  pub fn make_get_file_pk<'a>(
+    &mut self,
+    files: &'a [File<'a>],
+  ) -> Request<'a> {
+    let flen = files.len();
+    file =  &files[self.rng.gen_range(0..flen)];
+    Request::GetFilePK(share)
+  }
+
+  pub fn make_update_file_pk<'a>(
+    &mut self,
+    files: &'a [File<'a>],
+  ) -> Request<'a> {
+    let flen = files.len();
+    file =  &files[self.rng.gen_range(0..flen)];
+    workload.fn_counter = workload.fn_counter + 1;
+    Request::UpdateFilePK(share, workload.fn_counter.to_string();)
   }
 }

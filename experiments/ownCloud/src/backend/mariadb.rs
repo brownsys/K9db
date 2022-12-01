@@ -58,6 +58,30 @@ pub fn reads<'a>(
   time
 }
 
+pub fn read_file_pk<'a>(conn: &mut Conn, file: &File<'a>) -> u128 {
+  let now = std::time::Instant::now();
+  conn
+    .query_drop(&format!(
+      "SELECT * FROM oc_files WHERE id = {}",
+      file.id
+    ))
+    .unwrap()
+  now.elapsed().as_micros()
+}
+
+pub fn update_file_pk<'a>(conn: &mut Conn, file: &File<'a>, new_name: String) -> u128 {
+  let now = std::time::Instant::now();
+  conn
+    .query_drop(&format!(
+      // "UPDATE oc_files SET file_name = {} WHERE id = {}",
+      // new_name, file.id
+      "SELECT * FROM oc_files WHERE id = {}",
+      file.id
+    ))
+    .unwrap()
+  now.elapsed().as_micros()
+}
+
 pub fn direct<'a>(conn: &mut Conn, share: &Share<'a>) -> u128 {
   let now = std::time::Instant::now();
   insert_share(conn, share);

@@ -76,3 +76,13 @@ pub fn insert_file<'a>(conn: &mut Conn, file: &File<'a>) {
 pub fn insert_share<'a>(conn: &mut Conn, share: &Share<'a>) {
   mariadb::insert_share(conn, share)
 }
+
+// Add update
+
+pub fn read_file_pk<'a>(conn: &mut Conn, file: &File<'a>) -> u128 {
+  mariadb::read_file_pk(conn, file)
+}
+
+pub fn update_file_pk<'a>(conn: &mut Conn, file: &File<'a>, new_name: String) -> u128 {
+  mariadb::update_file_pk(conn, file, new_name)
+}

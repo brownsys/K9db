@@ -126,26 +126,45 @@ fn main() {
   }
 
   // Run actual load.
-  let mut last_write_direct = false;
+  let mut last_write = 0; // 0 is direct, 1 is indirect, 2 is get file by pk
+  let mut last_read_user = false;
   let mut reads = Vec::<u128>::new();
   let mut dwrites = Vec::<u128>::new();
   let mut gwrites = Vec::<u128>::new();
+
+  let mut read_file_pk = Vec::<u128>::new();
+  let mut update_file_pk = Vec::<u128>::new();
   for i in 0..operations {
     if write_every > 0 && i > 0 && i % write_every == 0 {
       // Must issue a write.
-      if !last_write_direct {
-        last_write_direct = true;
+      if last_write % 3 == 0 {
+        // do direct
         let request = workload.make_direct_share(&users, &files);
         dwrites.push(backend.run(&request));
-      } else {
+      } else if last_write % 3 == 1 {
+        // do indirect
         last_write_direct = false;
         let request = workload.make_group_share(&groups, &files);
         gwrites.push(backend.run(&request));
+      } else {
+        // do update file by pk
+        let request = workload.make_update_file_pk(&files);
+        update_file_pk.push(backend.run(&request));
       }
+      last_write += 1;
     } else {
       // Must issue a read.
-      let request = workload.make_read(in_size, &users);
-      reads.push(backend.run(&request));
+      if !last_read_user{
+        // read all of a user's files
+        last_read_user = true;
+        let request = workload.make_read(in_size, &users);
+        reads.push(backend.run(&request));
+      } else {
+        // read a specific file by pk
+        last_read_user = false;
+        let request = workload.make_get_file_pk(&files);
+        read_file_pk.push(backend.run(&request));
+      }
     };
   }
 
@@ -175,5 +194,23 @@ fn main() {
     writeln!(f, "Group [90]: {}", gwrites[gwrites.len() * 90 / 100]);
     writeln!(f, "Group [95]: {}", gwrites[gwrites.len() * 95 / 100]);
     writeln!(f, "Group [99]: {}", gwrites[gwrites.len() * 99 / 100]);
+  }
+
+  if read_file_pk.len() > 0 {
+    read_file_pk.sort();
+    writeln!(f, "Read File PK: {}", read_file_pk.len());
+    writeln!(f, "Read File PK [50]: {}", read_file_pk[read_file_pk.len() / 2]);
+    writeln!(f, "Read File PK [90]: {}", read_file_pk[read_file_pk.len() * 90 / 100]);
+    writeln!(f, "Read File PK [95]: {}", read_file_pk[read_file_pk.len() * 95 / 100]);
+    writeln!(f, "Read File PK [99]: {}", read_file_pk[read_file_pk.len() * 99 / 100]);
+  }
+
+  if update_file_pk.len() > 0 {
+    update_file_pk.sort();
+    writeln!(f, "Update File PK: {}", update_file_pk.len());
+    writeln!(f, "Update File PK [50]: {}", update_file_pk[update_file_pk.len() / 2]);
+    writeln!(f, "Update File PK [90]: {}", update_file_pk[update_file_pk.len() * 90 / 100]);
+    writeln!(f, "Update File PK [95]: {}", update_file_pk[update_file_pk.len() * 95 / 100]);
+    writeln!(f, "Update File PK [99]: {}", update_file_pk[update_file_pk.len() * 99 / 100]);
   }
 }

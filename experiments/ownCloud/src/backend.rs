@@ -90,11 +90,15 @@ impl Backend {
         Request::Read(load, expected) => pelton::reads(conn, load, expected),
         Request::Direct(load) => pelton::direct(conn, load),
         Request::Indirect(load) => pelton::indirect(conn, load),
+        Request::GetFilePK(load) => pelton::read_file_pk(conn, load),
+        Request::UpdateFilePK(load, chg) => pelton::update_file_pk(conn, load),
       },
       Backend::MariaDB(conn) => match request {
         Request::Read(load, expected) => mariadb::reads(conn, load, expected),
         Request::Direct(load) => mariadb::direct(conn, load),
         Request::Indirect(load) => mariadb::indirect(conn, load),
+        Request::GetFilePK(load) => mariadb::read_file_pk(conn, load),
+        Request::UpdateFilePK(load, chg) => mariadb::update_file_pk(conn, load),
       },
       Backend::Memcached(conn, client) => match request {
         Request::Read(load, expected) => {
@@ -102,11 +106,15 @@ impl Backend {
         }
         Request::Direct(load) => hybrid::direct(conn, client, load),
         Request::Indirect(load) => hybrid::indirect(conn, client, load),
+        Request::GetFilePK(load) => hybrid::read_file_pk(conn, load),
+        Request::UpdateFilePK(load, chg) => hybrid::update_file_pk(conn, load),
       },
       Backend::Simulate(conn) => match request {
         Request::Read(load, expected) => simulate::reads(conn, load, expected),
         Request::Direct(load) => simulate::direct(conn, load),
         Request::Indirect(load) => simulate::indirect(conn, load),
+        Request::GetFilePK(load) => simulate::read_file_pk(conn, load),
+        Request::UpdateFilePK(load, chg) => simulate::update_file_pk(conn, load),
       },
     }
   }
