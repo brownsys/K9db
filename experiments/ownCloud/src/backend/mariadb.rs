@@ -73,10 +73,10 @@ pub fn update_file_pk<'a>(conn: &mut Conn, file: &File<'a>, new_name: String) ->
   let now = std::time::Instant::now();
   conn
     .query_drop(&format!(
-      // "UPDATE oc_files SET file_name = {} WHERE id = {}",
-      // new_name, file.id
-      "SELECT * FROM oc_files WHERE id = {}",
-      file.id
+      "UPDATE oc_files SET file_name = '{}' WHERE id = {}",
+      new_name.to_string(), file.id
+      // "SELECT * FROM oc_files WHERE id = {}",
+      // file.id
     ))
     .unwrap();
   now.elapsed().as_micros()
