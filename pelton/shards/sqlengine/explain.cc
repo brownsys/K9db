@@ -137,13 +137,13 @@ void ExplainContext::Explain(const sqlast::Replace &query) {
 void ExplainContext::Explain(const sqlast::Update &query) {
   UpdateContext context(query, this->conn_, this->lock_);
   if (context.ModifiesSharding()) {
-    this->AddExplanation("FAST UPDATE", query.table_name());
-  } else {
     // A DELETE.
     this->Explain(query.DeleteDomain());
     // Followed by INSERT.
     sqlast::Insert insert(query.table_name());
     this->Explain(insert);
+  } else {
+    this->AddExplanation("FAST UPDATE", query.table_name());
   }
 }
 

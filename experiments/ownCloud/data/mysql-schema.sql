@@ -4,30 +4,32 @@ CREATE TABLE oc_storages (
   available INT,
   last_checked INT,
   PRIMARY KEY (numeric_id)
-);
+) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE oc_users (
   uid VARCHAR(64),
   displayname VARCHAR(64),
   password VARCHAR(255),
   PRIMARY KEY(uid)
-);
+) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE oc_groups (
   gid VARCHAR(64),
   PRIMARY KEY(gid)
-);
+) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE oc_group_user (
   id INT PRIMARY KEY,
   gid VARCHAR(64) REFERENCES oc_groups(gid),
   uid VARCHAR(64) REFERENCES oc_users(uid)
-);
+) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX oc_group_user_uid ON oc_group_user(uid);
+CREATE INDEX oc_group_user_gid ON oc_group_user(gid);
 
 CREATE TABLE oc_files (
   id INTEGER PRIMARY KEY,
   file_name VARCHAR(255)
-);
+) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE oc_share (
   id INT PRIMARY KEY,
@@ -50,7 +52,12 @@ CREATE TABLE oc_share (
   share_name VARCHAR(64),
   file_source INT,
   attributes TEXT
-);
+) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX oc_share_type_direct ON oc_share(share_with, share_type);
+CREATE INDEX oc_share_type_indirect ON oc_share(share_with_group, share_type);
+CREATE INDEX oc_share_uid_owner ON oc_share(uid_owner);
+CREATE INDEX oc_share_uid_initiator ON oc_share(uid_initiator);
+CREATE INDEX oc_share_item_source ON oc_share(item_source);
 
 CREATE TABLE oc_filecache (
   fileid INTEGER PRIMARY KEY REFERENCES oc_files(id),
@@ -69,9 +76,4 @@ CREATE TABLE oc_filecache (
   checksum VARCHAR(255),
   mtime INT,
   storage_mtime INT
-);
-
-CREATE INDEX oc_share_type_direct ON oc_share(share_with, share_type);
-CREATE INDEX oc_share_type_indirect ON oc_share(share_with_group, share_type);
-CREATE INDEX oc_group_user_uid ON oc_group_user(uid);
-CREATE INDEX oc_storages_numeric_id ON oc_storages(numeric_id);
+) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
