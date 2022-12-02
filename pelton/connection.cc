@@ -5,7 +5,7 @@
 
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
-#include "pelton/sql/rocksdb/connection.h"
+#include "pelton/sql/factory.h"
 
 namespace pelton {
 
@@ -20,7 +20,7 @@ State::~State() {
 void State::Initialize(const std::string &db_name) {
   auto lock = this->WriterLock();
   if (this->database_ == nullptr) {
-    this->database_ = std::make_unique<sql::RocksdbConnection>();
+    this->database_ = sql::MakeConnection();
     this->database_->Open(db_name);
   }
 }

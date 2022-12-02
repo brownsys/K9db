@@ -13,6 +13,7 @@
 
 namespace pelton {
 namespace sql {
+namespace rocks {
 
 #define SEP std::string({__ROCKSSEP})
 #define NUL std::string({__ROCKSNULL})
@@ -145,25 +146,33 @@ TEST(RocksdbEncodeTest, RocksdbIndexInternalRecord) {
 // RocksdbPKIndexInternalRecord
 TEST(RocksdbEncodeTest, RocksdbPKIndexInternalRecord) {
   // Test piece-wise constructor.
-  RocksdbPKIndexInternalRecord r1("5", "shard__0");
-  RocksdbPKIndexInternalRecord r2("5", "shard__0");
-  RocksdbPKIndexInternalRecord r3("10", "shard__1");
+  RocksdbPKIndexInternalRecord r1;
+  RocksdbPKIndexInternalRecord r2;
+  r1.AppendNewShard("shard__0");
+  r1.AppendNewShard("shard__1");
+  r2.AppendNewShard("shard__1");
 
   // Test read constructor.
   r1 = RocksdbPKIndexInternalRecord(r1.Data());
   r2 = RocksdbPKIndexInternalRecord(r2.Data());
-  r3 = RocksdbPKIndexInternalRecord(r3.Data());
 
   // Test data.
-  EXPECT_EQ(r1.Data(), "5" + SEP + "shard__0" + SEP);
-  EXPECT_EQ(r2.Data(), "5" + SEP + "shard__0" + SEP);
-  EXPECT_EQ(r3.Data(), "10" + SEP + "shard__1" + SEP);
+  EXPECT_EQ(r1.Data(), "shard__0" + SEP + "shard__1" + SEP);
+  EXPECT_EQ(r2.Data(), "shard__1" + SEP);
+  EXPECT_FALSE(r1.Empty());
+  EXPECT_FALSE(r2.Empty());
 
-  // Test getters.
-  EXPECT_EQ(r1.GetShard(), "shard__0");
-  EXPECT_EQ(r2.GetShard(), "shard__0");
-  EXPECT_EQ(r3.GetShard(), "shard__1");
+  // Remove some shards.
+  r1.RemoveShard("shard__3");
+  r1.RemoveShard("shard__1");
+  r1.RemoveShard("shard__1");
+  r2.RemoveShard("shard__1");
+  EXPECT_EQ(r1.Data(), "shard__0" + SEP);
+  EXPECT_EQ(r2.Data(), "");
+  EXPECT_FALSE(r1.Empty());
+  EXPECT_TRUE(r2.Empty());
 }
 
+}  // namespace rocks
 }  // namespace sql
 }  // namespace pelton

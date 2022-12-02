@@ -3,12 +3,12 @@
 
 #include <memory>
 
-#include "pelton/sql/abstract_connection.h"
+#include "pelton/sql/connection.h"
 
 namespace pelton {
 namespace sql {
 
-std::unique_ptr<AbstractConnection> MakeConnection();
+std::unique_ptr<Connection> MakeConnection();
 
 }  // namespace sql
 }  // namespace pelton

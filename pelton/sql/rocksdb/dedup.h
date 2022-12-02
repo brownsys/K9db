@@ -10,6 +10,7 @@
 
 namespace pelton {
 namespace sql {
+namespace rocks {
 
 template <typename T>
 class DedupSet {
@@ -47,6 +48,7 @@ using DedupIndexSet =
     std::unordered_set<RocksdbIndexRecord, RocksdbIndexRecord::DedupHash,
                        RocksdbIndexRecord::DedupEqual>;
 
+}  // namespace rocks
 }  // namespace sql
 }  // namespace pelton
 

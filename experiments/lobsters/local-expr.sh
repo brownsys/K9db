@@ -18,6 +18,7 @@ sleep 5
 # Prime pelton.
 echo "Priming pelton..."
 bazel run -c opt //:lobsters-harness -- --runtime 0 --datascale 0.05 --reqscale 100 --queries pelton --backend pelton --prime --scale_everything "mysql://root:password@localhost:10001/lobsters" > /home/bab/Desktop/pelton-paper/2023-osdi/graphs/lobsters-endpoints/pelton.txt 2>&1
+mariadb -P10001 -e "SET SERIALIAZBLE";
 
 # Can run the flamegraph script here.
 if [[ "$FLAME" == "1" ]]; then

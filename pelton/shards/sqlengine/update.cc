@@ -1,6 +1,7 @@
 // UPDATE statements sharding and rewriting.
 #include "pelton/shards/sqlengine/update.h"
 
+#include <cassert>
 #include <memory>
 #include <unordered_set>
 #include <utility>
@@ -9,6 +10,8 @@
 #include "pelton/shards/sqlengine/insert.h"
 #include "pelton/util/iterator.h"
 #include "pelton/util/status.h"
+
+#define CM ,
 
 namespace pelton {
 namespace shards {
@@ -66,12 +69,17 @@ bool UpdateContext::ModifiesSharding() const {
 
 /* Executes the update by issuing a delete followed by an insert. */
 absl::StatusOr<sql::SqlResult> UpdateContext::DeleteInsert() {
+  // Start transaction.
+  this->db_->BeginTransaction();
+  LOG(WARNING) << "SLOW UPDATE " << this->stmt_;
+
   // Delete all the records being updated.
   sqlast::Delete delete_stmt = this->stmt_.DeleteDomain();
-  DeleteContext del_context(delete_stmt, this->conn_, this->lock_);
-  MOVE_OR_RETURN(auto &&[records __COMMA count], del_context.ExecReturning());
-  if (count < 0) {
-    return sql::SqlResult(count);
+  DeleteContext dcontext(delete_stmt, this->conn_, this->lock_);
+  ASSIGN_OR_RETURN(auto &[records CM status], dcontext.ExecWithinTransaction());
+  if (status < 0) {
+    this->db_->RollbackTransaction();
+    return sql::SqlResult(status);
   }
 
   // Perform update over deleted records in memory.
@@ -79,26 +87,49 @@ absl::StatusOr<sql::SqlResult> UpdateContext::DeleteInsert() {
                  this->UpdateRecords(records));
 
   // Insert updated records!
+  records.clear();
   for (const sqlast::Insert &insert : inserts) {
-    InsertContext context(insert, this->conn_, this->lock_);
-    MOVE_OR_RETURN(sql::SqlResult result, context.Exec());
-    if (result.UpdateCount() < 0) {
-      return sql::SqlResult(result.UpdateCount());
+    InsertContext icontext(insert, this->conn_, this->lock_);
+    ASSIGN_OR_RETURN(auto &[vec CM istatus], icontext.ExecWithinTransaction());
+    if (istatus < 0) {
+      this->db_->RollbackTransaction();
+      return sql::SqlResult(istatus);
     }
-    count += result.UpdateCount();
+    status += istatus;
+    for (dataflow::Record &record : vec) {
+      records.push_back(std::move(record));
+    }
   }
 
-  // Return number of copies inserted.
-  return sql::SqlResult(count);
+  // Commit and update dataflow.
+  this->db_->CommitTransaction();
+
+  // Process updates to dataflows.
+  this->dstate_.ProcessRecords(this->table_name_, std::move(records));
+
+  // Return number of copies updated.
+  return sql::SqlResult(status);
 }
 
 /* Executes the update directly against the database by overriding data
    in the database. */
 absl::StatusOr<sql::SqlResult> UpdateContext::DirectUpdate() {
+  // Start transaction.
+  this->db_->BeginTransaction();
+
+  // Execute update directly against DB.
   sql::ResultSetAndStatus result = this->db_->ExecuteUpdate(this->stmt_);
-  if (result.second >= 0) {
-    this->dstate_.ProcessRecords(this->table_name_, result.first.Vec());
+  if (result.second < 0) {
+    this->db_->RollbackTransaction();
+    return sql::SqlResult(result.second);
   }
+
+  // Commit to DB.
+  this->db_->CommitTransaction();
+
+  // Process updates to dataflows.
+  this->dstate_.ProcessRecords(this->table_name_, result.first.Vec());
+
   return sql::SqlResult(result.second);
 }
 

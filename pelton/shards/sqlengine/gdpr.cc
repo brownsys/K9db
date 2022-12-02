@@ -37,11 +37,15 @@ absl::StatusOr<sql::SqlResult> GDPRContext::Exec() {
  */
 
 absl::StatusOr<sql::SqlResult> GDPRContext::ExecForget() {
-  Shard current_shard = this->sstate_.GetShard(this->shard_kind_);
+  const Shard &current_shard = this->sstate_.GetShard(this->shard_kind_);
+
+  // Begin transaction.
+  this->db_->BeginTransaction();
 
   int count = 0;
+  std::unordered_map<std::string, std::vector<dataflow::Record>> all_updates;
   for (const auto &table_name : current_shard.owned_tables) {
-    std::vector<dataflow::Record> dataflow_updates;
+    std::vector<dataflow::Record> &dataflow_updates = all_updates[table_name];
 
     util::ShardName shard(this->shard_kind_, this->user_id_str_);
     sql::SqlResultSet result =
@@ -65,8 +69,15 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecForget() {
           dataflow_updates.push_back(std::move(vec.at(i)));
         }
       }
+    }
+  }
 
-      // Update dataflow with deletions from table.
+  // Commit to database.
+  this->db_->CommitTransaction();
+
+  // Update dataflow with deletions from table.
+  for (auto &[table_name, dataflow_updates] : all_updates) {
+    if (dataflow_updates.size() > 0) {
       this->dstate_.ProcessRecords(table_name, std::move(dataflow_updates));
     }
   }
@@ -144,7 +155,7 @@ void GDPRContext::FindData(const TableName &tbl, const ShardDescriptor *desc,
   const std::string &column_name = EXTRACT_VARIANT(column, desc->info);
   sqlast::Select select = this->MakeAccessSelect(tbl, column_name, fkvals);
   SelectContext context(select, this->conn_, this->lock_);
-  MOVE_OR_PANIC(sql::SqlResult result, context.Exec());
+  MOVE_OR_PANIC(sql::SqlResult result, context.ExecWithinTransaction());
 
   // Recurse on access dependents.
   sql::SqlResultSet &resultset = result.ResultSets().front();
@@ -157,7 +168,12 @@ void GDPRContext::FindData(const TableName &tbl, const ShardDescriptor *desc,
 }
 
 absl::StatusOr<sql::SqlResult> GDPRContext::ExecGet() {
-  Shard current_shard = this->sstate_.GetShard(this->shard_kind_);
+  const Shard &current_shard = this->sstate_.GetShard(this->shard_kind_);
+
+  // Begin transaction.
+  this->db_->BeginTransaction();
+
+  // Start getting data.
   for (const auto &table_name : current_shard.owned_tables) {
     // Get data from tables owned by user.
     util::ShardName shard(this->shard_kind_, this->user_id_str_);
@@ -172,6 +188,9 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecGet() {
       this->AddOrAppend(table_name, std::move(resultset));
     }
   }
+
+  // Nothing to commit; read only.
+  this->db_->RollbackTransaction();
 
   // Turn into sql::SqlResult.
   using I = std::unordered_map<TableName, sql::SqlResultSet>::iterator;

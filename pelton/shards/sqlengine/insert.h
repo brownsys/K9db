@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "absl/status/statusor.h"
@@ -13,7 +14,7 @@
 #include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
-#include "pelton/sql/abstract_connection.h"
+#include "pelton/sql/connection.h"
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/upgradable_lock.h"
@@ -24,6 +25,8 @@ namespace sqlengine {
 
 class InsertContext {
  public:
+  using Result = std::pair<std::vector<dataflow::Record>, int>;
+
   InsertContext(const sqlast::Insert &stmt, Connection *conn,
                 util::SharedLock *lock)
       : stmt_(stmt),
@@ -33,11 +36,15 @@ class InsertContext {
         conn_(conn),
         sstate_(conn->state->SharderState()),
         dstate_(conn->state->DataflowState()),
-        db_(conn->state->Database()),
+        db_(conn->session.get()),
         lock_(lock) {}
 
   /* Main entry point for insert: Executes the statement against the shards. */
   absl::StatusOr<sql::SqlResult> Exec();
+
+  /* Helper that Exec() calls: performs all of insert except Committing to
+     rocksdb and updating dataflows. */
+  absl::StatusOr<Result> ExecWithinTransaction();
 
  private:
   /* Have we inserted the record into this shard yet? */
@@ -55,8 +62,9 @@ class InsertContext {
 
   /* Recursively moving/copying records in dependent tables into the affected
      shard. */
-  absl::StatusOr<int> AssignDependentsToShard(
-      const Table &table, const std::vector<dataflow::Record> &records);
+  absl::StatusOr<int> CopyDependents(
+      const Table &table, bool transitive,
+      const std::vector<dataflow::Record> &records);
 
   /* Members. */
   // Statement being inserted.
@@ -71,7 +79,7 @@ class InsertContext {
   // Connection components.
   SharderState &sstate_;
   dataflow::DataFlowState &dstate_;
-  sql::AbstractConnection *db_;
+  sql::Session *db_;
 
   // Shared Lock so we can read from the states safetly.
   util::SharedLock *lock_;

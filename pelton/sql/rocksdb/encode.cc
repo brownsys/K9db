@@ -8,6 +8,7 @@
 
 namespace pelton {
 namespace sql {
+namespace rocks {
 
 /*
  * Helpers.
@@ -75,6 +76,12 @@ std::string EncodeValue(const sqlast::Value &val) {
 rocksdb::Slice ExtractColumn(const rocksdb::Slice &slice, size_t col) {
   rocksdb::Slice result = ExtractSlice(slice, col, 1);
   return rocksdb::Slice(result.data(), result.size() - 1);
+}
+
+std::string EncodeValue(sqlast::ColumnDefinition::Type type,
+                        const sqlast::Value &v) {
+  CHECK(v.TypeCompatible(type));
+  return EncodeValue(v);
 }
 
 std::vector<std::string> EncodeValues(sqlast::ColumnDefinition::Type type,
@@ -295,27 +302,20 @@ bool RocksdbIndexInternalRecord::HasPrefix(const rocksdb::Slice &slice) const {
 /*
  * RocksdbPKIndexInternalRecord.
  */
-RocksdbPKIndexInternalRecord::RocksdbPKIndexInternalRecord(
-    const rocksdb::Slice &pk_val, const rocksdb::Slice &shard_name)
-    : data_() {
-  this->data_.AppendEncoded(pk_val);
-  this->data_.AppendEncoded(shard_name);
+void RocksdbPKIndexInternalRecord::AppendNewShard(const rocksdb::Slice &shard) {
+  for (rocksdb::Slice slice : this->data_) {
+    CHECK(shard != slice) << "Duplicate shard for PK";
+  }
+  this->data_.AppendEncoded(shard);
 }
-
-// For reading/decoding.
-rocksdb::Slice RocksdbPKIndexInternalRecord::GetPK() const {
-  return this->data_.At(0);
-}
-rocksdb::Slice RocksdbPKIndexInternalRecord::GetShard() const {
-  return this->data_.At(1);
-}
-
-// For looking up records corresponding to index entry.
-RocksdbIndexRecord RocksdbPKIndexInternalRecord::TargetKey() const {
-  RocksdbSequence output;
-  output.AppendEncoded(this->GetShard());
-  output.AppendEncoded(this->GetPK());
-  return RocksdbIndexRecord(std::move(output));
+void RocksdbPKIndexInternalRecord::RemoveShard(const rocksdb::Slice &shard) {
+  RocksdbSequence updated;
+  for (rocksdb::Slice slice : this->data_) {
+    if (slice != shard) {
+      updated.AppendEncoded(slice);
+    }
+  }
+  this->data_ = std::move(updated);
 }
 
 /*
@@ -324,5 +324,6 @@ RocksdbIndexRecord RocksdbPKIndexInternalRecord::TargetKey() const {
 rocksdb::Slice RocksdbIndexRecord::GetShard() const { return data_.At(0); }
 rocksdb::Slice RocksdbIndexRecord::GetPK() const { return data_.At(1); }
 
+}  // namespace rocks
 }  // namespace sql
 }  // namespace pelton

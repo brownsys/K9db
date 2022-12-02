@@ -96,6 +96,14 @@ class DataFlowState {
       return std::vector<FlowName>(it->second.begin(), it->second.end());
     }
   }
+  std::vector<TableName> GetTablesAffecting(const FlowName &flow) const {
+    auto it = this->all_tables_.find(flow);
+    if (it == this->all_tables_.end()) {
+      return {};
+    } else {
+      return std::vector<TableName>(it->second.begin(), it->second.end());
+    }
+  }
 
   // Shutdown all worker threads.
   size_t workers() const { return this->workers_; }

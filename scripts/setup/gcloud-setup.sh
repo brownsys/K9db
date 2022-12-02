@@ -45,7 +45,7 @@ cd pelton
 sudo ./scripts/setup/gcloud-ssd-setup.sh
 
 # Configure mariadb to store database in directory
-sudo echo "datadir = /mnt/disks/my-ssd/mysql" >> /etc/mysql/mariadb.cnf
+echo "datadir = /mnt/disks/my-ssd/mysql" | sudo tee -a /etc/mysql/mariadb.cnf
 
 # Do this on the server only: https://cloud.google.com/architecture/mysql-remote-access
 LOCAL_IP=$(curl  http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip -H "Metadata-Flavor: Google")

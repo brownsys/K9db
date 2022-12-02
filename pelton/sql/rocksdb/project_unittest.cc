@@ -16,6 +16,7 @@
 
 namespace pelton {
 namespace sql {
+namespace rocks {
 
 using CType = sqlast::ColumnDefinition::Type;
 
@@ -121,5 +122,6 @@ TEST(ProjectTest, CombinedProject) {
   EXPECT_EQ(result.GetString(4), "kinan");
 }
 
+}  // namespace rocks
 }  // namespace sql
 }  // namespace pelton

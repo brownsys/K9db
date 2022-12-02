@@ -4,5 +4,5 @@ SELECT|stories USING (short_id) [UNIQUE]
 ;
 SELECT|votes USING (user_id) [TOTAL] WITH FILTERS (comment_id) [INMEMORY]
 ;
-SELECT|votes USING (user_id, story_id, comment_id) [PREFIX]
+SELECT|votes USING (user_id) [TOTAL] WITH FILTERS (story_id) [INMEMORY]
 ;
