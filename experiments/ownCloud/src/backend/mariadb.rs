@@ -65,7 +65,7 @@ pub fn read_file_pk<'a>(conn: &mut Conn, file: &File<'a>) -> u128 {
       "SELECT * FROM oc_files WHERE id = {}",
       file.id
     ))
-    .unwrap()
+    .unwrap();
   now.elapsed().as_micros()
 }
 
@@ -78,7 +78,7 @@ pub fn update_file_pk<'a>(conn: &mut Conn, file: &File<'a>, new_name: String) ->
       "SELECT * FROM oc_files WHERE id = {}",
       file.id
     ))
-    .unwrap()
+    .unwrap();
   now.elapsed().as_micros()
 }
 

@@ -143,7 +143,7 @@ fn main() {
         dwrites.push(backend.run(&request));
       } else if last_write % 3 == 1 {
         // do indirect
-        last_write_direct = false;
+        let last_write_direct = false;
         let request = workload.make_group_share(&groups, &files);
         gwrites.push(backend.run(&request));
       } else {

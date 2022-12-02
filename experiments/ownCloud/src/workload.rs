@@ -15,8 +15,8 @@ pub enum Request<'a> {
   Read(Vec<&'a User>, Vec<usize>),
   Direct(Share<'a>),
   Indirect(Share<'a>),
-  GetFilePK(File<'a>),
-  UpdateFilePK(File<'a>, String),
+  GetFilePK(&'a File<'a>),
+  UpdateFilePK(&'a File<'a>, String),
 }
 
 pub type ZipfF = f64;
@@ -25,7 +25,7 @@ pub struct WorkloadGenerator {
   rng: rand::rngs::ThreadRng,
   st: GeneratorState,
   zipf_f: ZipfF,
-  fn_counter : Integer
+  fn_counter : u128,
 }
 
 impl WorkloadGenerator {
@@ -35,6 +35,7 @@ impl WorkloadGenerator {
       rng: rand::thread_rng(),
       st: st,
       zipf_f,
+      fn_counter: 0
     }
   }
 
@@ -105,8 +106,8 @@ impl WorkloadGenerator {
     files: &'a [File<'a>],
   ) -> Request<'a> {
     let flen = files.len();
-    file =  &files[self.rng.gen_range(0..flen)];
-    Request::GetFilePK(share)
+    let file =  &files[self.rng.gen_range(0..flen)];
+    Request::GetFilePK(file)
   }
 
   pub fn make_update_file_pk<'a>(
@@ -114,8 +115,8 @@ impl WorkloadGenerator {
     files: &'a [File<'a>],
   ) -> Request<'a> {
     let flen = files.len();
-    file =  &files[self.rng.gen_range(0..flen)];
-    workload.fn_counter = workload.fn_counter + 1;
-    Request::UpdateFilePK(share, workload.fn_counter.to_string();)
+    let file =  &files[self.rng.gen_range(0..flen)];
+    self.fn_counter = self.fn_counter + 1;
+    Request::UpdateFilePK(file, self.fn_counter.to_string())
   }
 }

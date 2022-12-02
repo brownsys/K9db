@@ -95,3 +95,7 @@ pub fn insert_file<'a>(conn: &mut SimulatedState, file: &File<'a>) {}
 pub fn insert_share<'a>(conn: &mut SimulatedState, share: &Share<'a>) {
   conn.insert_share(share);
 }
+
+pub fn read_file_pk<'a>(conn: &mut SimulatedState, file: &File<'a>) -> u128 {0}
+
+pub fn update_file_pk<'a>(conn: &mut SimulatedState, file: &File<'a>, new_name: String) -> u128 {0}
