@@ -101,7 +101,11 @@ absl::StatusOr<sql::SqlResult> PerformViewQuery(const std::string question_mark,
   // WHERE (share_type = 0) AND (share_with = [question_mark])
 
   sqlast::Select select_1{"oc_share"};
-  select_1.AddColumn(sqlast::Select::ResultColumn("*"));
+  select_1.AddColumn(sqlast::Select::ResultColumn("id"));
+  select_1.AddColumn(sqlast::Select::ResultColumn("item_source"));
+  select_1.AddColumn(sqlast::Select::ResultColumn("share_type"));
+  select_1.AddColumn(sqlast::Select::ResultColumn("file_source"));
+  select_1.AddColumn(sqlast::Select::ResultColumn("share_with"));
 
   std::unique_ptr<sqlast::BinaryExpression> select_1_where_clause =
       std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::AND);
@@ -169,7 +173,11 @@ absl::StatusOr<sql::SqlResult> PerformViewQuery(const std::string question_mark,
   // WHERE (share_type = 1) AND (share_with_group IN [select_2_result_vec])
 
   sqlast::Select select_3{"oc_share"};
-  select_3.AddColumn(sqlast::Select::ResultColumn("*"));
+  select_3.AddColumn(sqlast::Select::ResultColumn("id"));
+  select_3.AddColumn(sqlast::Select::ResultColumn("item_source"));
+  select_3.AddColumn(sqlast::Select::ResultColumn("share_type"));
+  select_3.AddColumn(sqlast::Select::ResultColumn("file_source"));
+  select_3.AddColumn(sqlast::Select::ResultColumn("share_with_group"));
 
   std::unique_ptr<sqlast::BinaryExpression> select_3_where_clause =
       std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::AND);
@@ -202,79 +210,50 @@ absl::StatusOr<sql::SqlResult> PerformViewQuery(const std::string question_mark,
 
   // Check nullity of the other joins
 
-  // ========== JOIN 1 STARTS ==========
+  // ========== INNER JOIN CHECK STARTS ==========
 
-  std::vector<sqlast::Value> file_source_vec_1;
+  std::vector<sqlast::Value> file_source_vec;
 
   CHECK_EQ(select_1_result.ResultSets().size(), 1);
   size_t index_of_file_source_1 =
       select_1_result.ResultSets().at(0).schema().IndexOf("file_source");
 
   for (const auto &rec : select_1_result.ResultSets().at(0).rows()) {
-    file_source_vec_1.push_back(rec.GetValue(index_of_file_source_1));
+    file_source_vec.push_back(rec.GetValue(index_of_file_source_1));
   }
-
-  // SELECT fileid FROM oc_filecache
-  // WHERE file_source IN [file_source_vec_1]
-
-  sqlast::Select select_join_1{"oc_filecache"};
-  select_join_1.AddColumn(sqlast::Select::ResultColumn("file_source"));
-
-  std::unique_ptr<sqlast::BinaryExpression> select_join_1_where_clause =
-      std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::IN);
-
-  select_join_1_where_clause->SetLeft(
-      std::make_unique<sqlast::ColumnExpression>("file_source"));
-  select_join_1_where_clause->SetRight(
-      std::make_unique<sqlast::LiteralListExpression>(file_source_vec_1));
-
-  select_join_1.SetWhereClause(std::move(select_join_1_where_clause));
-
-  SelectContext select_join_1_context(select_join_1, conn, lock);
-  MOVE_OR_PANIC(sql::SqlResult select_join_1_result,
-                select_join_1_context.Exec());
-
-  CHECK_EQ(select_join_1_result.ResultSets().size(), 1);
-  CHECK_EQ(select_join_1_result.ResultSets().at(0).rows().size(), 0);
-
-  // ========== JOIN 1 ENDS ==========
-
-  // ========== JOIN 2 STARTS ==========
-
-  std::vector<sqlast::Value> file_source_vec_2;
 
   CHECK_EQ(select_3_result.ResultSets().size(), 1);
   size_t index_of_file_source_2 =
       select_3_result.ResultSets().at(0).schema().IndexOf("file_source");
 
   for (const auto &rec : select_3_result.ResultSets().at(0).rows()) {
-    file_source_vec_2.push_back(rec.GetValue(index_of_file_source_2));
+    file_source_vec.push_back(rec.GetValue(index_of_file_source_2));
   }
 
   // SELECT fileid FROM oc_filecache
-  // WHERE file_source IN [file_source_vec_2]
+  // WHERE file_source IN [file_source_vec]
 
-  sqlast::Select select_join_2{"oc_filecache"};
-  select_join_2.AddColumn(sqlast::Select::ResultColumn("file_source"));
+  sqlast::Select select_join{"oc_filecache"};
+  select_join.AddColumn(sqlast::Select::ResultColumn("file_source"));
 
-  std::unique_ptr<sqlast::BinaryExpression> select_join_2_where_clause =
+  std::unique_ptr<sqlast::BinaryExpression> select_join_where_clause =
       std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::IN);
 
-  select_join_2_where_clause->SetLeft(
+  select_join_where_clause->SetLeft(
       std::make_unique<sqlast::ColumnExpression>("file_source"));
-  select_join_2_where_clause->SetRight(
-      std::make_unique<sqlast::LiteralListExpression>(file_source_vec_2));
+  select_join_where_clause->SetRight(
+      std::make_unique<sqlast::LiteralListExpression>(file_source_vec));
 
-  select_join_2.SetWhereClause(std::move(select_join_2_where_clause));
+  select_join.SetWhereClause(std::move(select_join_where_clause));
 
-  SelectContext select_join_2_context(select_join_2, conn, lock);
-  MOVE_OR_PANIC(sql::SqlResult select_join_2_result,
-                select_join_2_context.Exec());
+  SelectContext select_join_context(select_join, conn, lock);
+  MOVE_OR_PANIC(sql::SqlResult select_join_result,
+                select_join_context.Exec());
 
-  CHECK_EQ(select_join_2_result.ResultSets().size(), 1);
-  CHECK_EQ(select_join_2_result.ResultSets().at(0).rows().size(), 0);
+  CHECK_EQ(select_join_result.ResultSets().size(), 1);
+  CHECK_EQ(select_join_result.ResultSets().at(0).rows().size(), 0);
 
-  // ========== JOIN 2 ENDS ==========
+  // ========== INNER JOIN CHECK ENDS ==========
 
   // Perform a "union"
   std::vector<dataflow::Record> union_vec;
