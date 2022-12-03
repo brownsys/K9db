@@ -353,7 +353,7 @@ absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
     auto tmp = stmt.GetWhereClause()->GetRight();
     auto list = static_cast<const sqlast::LiteralListExpression *>(tmp);
     for (const sqlast::Value &v : list->values()) {
-      std::string str = v.AsSQLString();
+      std::string str = v.GetString();
       std::cout << "Calling PerformViewQuery with ? = ~" << str << "~"
                 << std::endl;
       MOVE_OR_RETURN(sql::SqlResult result,
