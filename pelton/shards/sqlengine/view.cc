@@ -20,6 +20,7 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/state.h"
 #include "pelton/planner/planner.h"
+#include "pelton/shards/sqlengine/view_query.h"
 #include "pelton/sql/connection.h"
 
 namespace pelton {
@@ -342,6 +343,29 @@ absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
 
   // Get the corresponding flow.
   const std::string &view_name = stmt.table_name();
+
+  // Hack for handicaping pelton: if requested: run the owncloud query without
+  // views.
+  if (view_name == "file_view2") {
+    std::cout << "file_view2" << std::endl;
+    std::vector<dataflow::Record> records;
+    dataflow::SchemaRef schema;
+    auto tmp = stmt.GetWhereClause()->GetRight();
+    auto list = static_cast<const sqlast::LiteralListExpression *>(tmp);
+    for (const sqlast::Value &v : list->values()) {
+      std::string str = v.AsSQLString();
+      std::cout << "Calling PerformViewQuery with ? = ~" << str << "~"
+                << std::endl;
+      MOVE_OR_RETURN(sql::SqlResult result,
+                     PerformViewQuery(str, connection, lock));
+      for (const auto &r : result.ResultSets().at(0).rows()) {
+        records.emplace_back(r.Copy());
+        schema = r.schema();
+      }
+    }
+    return sql::SqlResult(sql::SqlResultSet(schema, std::move(records)));
+  }
+
   const dataflow::DataFlowGraph &flow = dstate.GetFlow(view_name);
 
   // Transform WHERE statement to conditions on matview keys.

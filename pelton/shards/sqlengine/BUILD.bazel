@@ -20,6 +20,7 @@ cc_library(
         ":select",
         ":update",
         ":view",
+        ":view_query",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
@@ -30,6 +31,26 @@ cc_library(
         "//pelton/util:status",
         "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/status",
+    ],
+)
+
+cc_library(
+    name = "view_query",
+    srcs = [
+        "view_query.cc",
+    ],
+    hdrs = [
+        "view_query.h",
+    ],
+    deps = [
+        ":select",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/sql:result",
+        "//pelton/sqlast:ast",
+        "//pelton/util:status",
+        "@com_google_absl//absl/status",
+        "@glog",
     ],
 )
 
@@ -50,15 +71,6 @@ cc_library(
         "//pelton/util:shard_name",
         "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/strings",
-        
-        ":select",
-        "//pelton/dataflow:record",
-        "//pelton/dataflow:schema",
-        "//pelton/sql:result",
-        "//pelton/sqlast:ast",
-        "//pelton/util:status",
-        "@com_google_absl//absl/status",
-        "@glog",
     ],
 )
 
@@ -95,6 +107,7 @@ cc_library(
     ],
     hdrs = [
         "view.h",
+        "view_query.h",
     ],
     deps = [
         "//pelton:connection",

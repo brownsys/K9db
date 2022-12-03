@@ -6,13 +6,9 @@
 #include <string>
 #include <vector>
 
-#include "absl/status/status.h"
-#include "glog/logging.h"
 #include "pelton/connection.h"
 #include "pelton/dataflow/record.h"
-#include "pelton/shards/sqlengine/select.h"
 #include "pelton/util/shard_name.h"
-#include "pelton/util/status.h"
 #include "pelton/util/upgradable_lock.h"
 
 namespace pelton {
@@ -26,10 +22,6 @@ std::vector<ShardLocation> Locate(const std::string &table_name,
                                   const util::ShardName &shard_name,
                                   const std::vector<dataflow::Record> &records,
                                   Connection *conn, util::SharedLock *lock);
-
-absl::StatusOr<sql::SqlResult> PerformViewQuery(const std::string question_mark,
-                                                Connection *conn,
-                                                util::SharedLock *lock);
 
 }  // namespace sqlengine
 }  // namespace shards

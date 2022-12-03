@@ -75,7 +75,8 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
     case sqlast::AbstractStatement::Type::SELECT: {
       auto *stmt = static_cast<sqlast::Select *>(statement.get());
       util::SharedLock lock = connection->state->ReaderLock();
-      if (dstate.HasFlow(stmt->table_name())) {
+      if (dstate.HasFlow(stmt->table_name()) ||
+          stmt->table_name() == "file_view2") {
         return view::SelectView(*stmt, connection, &lock);
       } else {
         util::SharedLock lock = connection->state->ReaderLock();
