@@ -162,7 +162,7 @@ fn main() {
       } else {
         // read a specific file by pk
         last_read_user = false;
-        let request = workload.make_get_file_pk(&files);
+        let request = workload.make_get_file_pk(in_size, &files);
         read_file_pk.push(backend.run(&request));
       }
     };

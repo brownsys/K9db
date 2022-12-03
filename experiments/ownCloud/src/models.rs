@@ -30,6 +30,13 @@ impl PartialEq for User {
     &self.uid == &other.uid
   }
 }
+
+impl<'a> PartialEq for &'a File<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
 /*
 impl <'a> ToValue for Group<'a> {
     fn to_value(&self) -> Value {

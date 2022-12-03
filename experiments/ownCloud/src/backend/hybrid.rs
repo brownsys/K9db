@@ -219,8 +219,8 @@ pub fn insert_share<'a>(
   mariadb::insert_share(conn, share)
 }
 
-pub fn read_file_pk<'a>(conn: &mut Conn, file: &File<'a>) -> u128 {
-  mariadb::read_file_pk(conn, file)
+pub fn read_file_pk<'a>(conn: &mut Conn, files: &Vec<&'a File<'a>>) -> u128 {
+  mariadb::read_file_pk(conn, files)
 }
 
 pub fn update_file_pk<'a>(conn: &mut Conn, file: &File<'a>, new_name: String) -> u128 {

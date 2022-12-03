@@ -15,7 +15,7 @@ pub enum Request<'a> {
   Read(Vec<&'a User>, Vec<usize>),
   Direct(Share<'a>),
   Indirect(Share<'a>),
-  GetFilePK(&'a File<'a>),
+  GetFilePK(Vec<&'a File<'a>>),
   UpdateFilePK(&'a File<'a>, String),
 }
 
@@ -103,11 +103,24 @@ impl WorkloadGenerator {
 
   pub fn make_get_file_pk<'a>(
     &mut self,
+    num_samples: usize,
     files: &'a [File<'a>],
   ) -> Request<'a> {
+    let mut rng = rand::thread_rng();
     let flen = files.len();
-    let file =  &files[self.rng.gen_range(0..flen)];
-    Request::GetFilePK(file)
+    let mut samples: Vec<&'a File<'a>> = Vec::with_capacity(1000);
+    if flen < num_samples {
+      panic!("Too few files, need at least as many as samples");
+    }
+    let distr = Zipf::new(flen as u64, self.zipf_f).unwrap();
+    while samples.len() != num_samples {
+      let s = distr.sample(&mut rng) - 1.0;
+      let f: &'a File<'a> = &files[s as usize];
+      if !samples.contains(&f) {
+        samples.push(f);
+      }
+    }
+    Request::GetFilePK(samples)
   }
 
   pub fn make_update_file_pk<'a>(

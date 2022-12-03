@@ -58,12 +58,14 @@ pub fn reads<'a>(
   time
 }
 
-pub fn read_file_pk<'a>(conn: &mut Conn, file: &File<'a>) -> u128 {
+pub fn read_file_pk<'a>(conn: &mut Conn, files: &Vec<&'a File<'a>>) -> u128 {
+  let fids = files.iter().map(|f| format!("{}", &f.id)).collect::<Vec<_>>();
+
   let now = std::time::Instant::now();
   conn
     .query_drop(&format!(
-      "SELECT * FROM oc_files WHERE id = {}",
-      file.id
+      "SELECT * FROM oc_files WHERE id IN ({})",
+      fids.join(",")
     ))
     .unwrap();
   now.elapsed().as_micros()
