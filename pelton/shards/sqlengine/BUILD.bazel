@@ -50,6 +50,15 @@ cc_library(
         "//pelton/util:shard_name",
         "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/strings",
+        
+        ":select",
+        "//pelton/dataflow:record",
+        "//pelton/dataflow:schema",
+        "//pelton/sql:result",
+        "//pelton/sqlast:ast",
+        "//pelton/util:status",
+        "@com_google_absl//absl/status",
+        "@glog",
     ],
 )
 
