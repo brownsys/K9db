@@ -175,21 +175,44 @@ absl::StatusOr<int> InsertContext::CopyDependents(
       ASSERT_RET(nextidx == next.schema.keys().at(0), Internal,
                  "Variable OWNS FK points to nonPK");
 
+      // We use this index to skip records we know are already owned by the
+      // user.
+      const IndexDescriptor &index = *info.index;
+
       // The value of the column that is a foreign key.
       std::vector<sqlast::Value> vals;
       for (const dataflow::Record &record : records) {
-        vals.emplace_back(record.GetValue(colidx));
+        // Check if the row at next_table[pk == v] is already owned by
+        // this user.
+        sqlast::Value v = record.GetValue(colidx);
+        std::vector<dataflow::Record> indexed = index::LookupIndex(
+            index, sqlast::Value(v), this->conn_, this->lock_);
+
+        // Make owners into a set.
+        std::unordered_set<util::ShardName> owners;
+        for (dataflow::Record &r : indexed) {
+          owners.emplace(desc->shard_kind, r.GetValue(1).AsUnquotedString());
+        }
+        // Speedup using secondary index.
+        for (const auto &target : targets) {
+          if (owners.count(target) == 0) {
+            vals.emplace_back(std::move(v));
+            break;
+          }
+        }
       }
 
       // Ask database to assign all the records in the next table, whose id =
       // the FK value to the owners of the record that was just inserted.
       // This also removes any copies of the data in the default shard.
-      auto &&[records, status] =
-          this->db_->AssignToShards(next_table, nextidx, vals, targets);
-      ACCUM(status, result);
+      if (vals.size() > 0) {
+        auto &&[records, status] =
+            this->db_->AssignToShards(next_table, nextidx, vals, targets);
+        ACCUM(status, result);
 
-      // Do it recursively for dependent of copied records.
-      ACCUM_STATUS(this->CopyDependents(next, true, records.rows()), result);
+        // Do it recursively for dependent of copied records.
+        ACCUM_STATUS(this->CopyDependents(next, true, records.rows()), result);
+      }
     }
 
     // Similar but for transitive dependencies.

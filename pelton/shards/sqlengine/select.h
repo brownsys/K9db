@@ -57,6 +57,13 @@ class SelectContext {
 
   // Shared Lock so we can read from the states safetly.
   util::SharedLock *lock_;
+
+  // Find the relevant <shard, pk> pairs that the query is looking up by
+  // analyzing the query, sharding state, and secondary in memory indices.
+  // If this returns NONE, then the information was not sufficient to determine
+  // this set safetly, and thus we should rely on our rocksdb engine to handle
+  // the query.
+  std::optional<std::vector<sql::KeyPair>> FindDirectKeys();
 };
 
 }  // namespace sqlengine
