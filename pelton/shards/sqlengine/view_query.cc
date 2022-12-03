@@ -44,7 +44,7 @@ absl::StatusOr<sql::SqlResult> PerformViewQuery(const std::string question_mark,
   select_1_left_expr->SetLeft(
       std::make_unique<sqlast::ColumnExpression>("share_type"));
   select_1_left_expr->SetRight(std::make_unique<sqlast::LiteralExpression>(
-      sqlast::Value(static_cast<uint64_t>(0))));
+      sqlast::Value(static_cast<int64_t>(0))));
 
   select_1_right_expr->SetLeft(
       std::make_unique<sqlast::ColumnExpression>("share_with"));
@@ -116,7 +116,7 @@ absl::StatusOr<sql::SqlResult> PerformViewQuery(const std::string question_mark,
   select_3_left_expr->SetLeft(
       std::make_unique<sqlast::ColumnExpression>("share_type"));
   select_3_left_expr->SetRight(std::make_unique<sqlast::LiteralExpression>(
-      sqlast::Value(static_cast<uint64_t>(1))));
+      sqlast::Value(static_cast<int64_t>(1))));
 
   select_3_right_expr->SetLeft(
       std::make_unique<sqlast::ColumnExpression>("share_with_group"));
