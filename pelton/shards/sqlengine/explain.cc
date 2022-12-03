@@ -37,8 +37,7 @@ void ExplainContext::RecurseInsert(const std::string &table_name, bool first) {
 }
 
 void ExplainContext::RecurseDelete(const std::string &shard_kind,
-                                   const std::string &table_name,
-                                   bool first) {
+                                   const std::string &table_name, bool first) {
   const Table &tbl = this->sstate_.GetTable(table_name);
   for (const auto &[dep_tbl, dep_desc] : tbl.dependents) {
     if (shard_kind != "*" && dep_desc->shard_kind != shard_kind) {

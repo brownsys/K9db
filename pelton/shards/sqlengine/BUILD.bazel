@@ -286,6 +286,7 @@ cc_library(
         "select.h",
     ],
     deps = [
+        ":index",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:schema",
@@ -294,9 +295,11 @@ cc_library(
         "//pelton/sql:connection",
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
+        "//pelton/sqlast:value_mapper",
         "//pelton/util:status",
         "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/status",
+        "@glog",
     ],
 )
 
