@@ -92,8 +92,10 @@ std::optional<std::vector<sql::KeyPair>> SelectContext::FindDirectKeys() {
         std::vector<dataflow::Record> r = index::LookupIndex(
             index, sqlast::Value(pk), this->conn_, this->lock_);
         if (r.size() > 0) {
+          sqlast::Value uid = r.at(0).GetValue(1);
           direct_keys.emplace_back(
-              util::ShardName(shard_kind, r.at(0).GetString(1)), std::move(pk));
+              util::ShardName(shard_kind, uid.AsUnquotedString()),
+              std::move(pk));
         }
       }
       return direct_keys;
