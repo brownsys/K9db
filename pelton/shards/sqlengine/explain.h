@@ -45,9 +45,9 @@ class ExplainContext {
   void Explain(const sqlast::Select &query);
 
   /* Recurse on dependent tables. */
-  void RecurseInsert(const std::string &table_name);
+  void RecurseInsert(const std::string &table_name, bool first);
   void RecurseDelete(const std::string &shard_kind,
-                     const std::string &table_name);
+                     const std::string &table_name, bool first);
 
   /* Members. */
   const sqlast::ExplainQuery &stmt_;

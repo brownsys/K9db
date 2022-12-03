@@ -4,7 +4,7 @@ OUT="$PELTONDIR/scripts/owncloud"
 echo "Writing output to $OUT"
 
 # Experiment parameters.
-user=100
+user=10000
 groups=5
 files=3
 dshare=3

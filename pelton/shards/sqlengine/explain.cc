@@ -16,10 +16,13 @@ namespace sqlengine {
  * Helpers.
  */
 
-void ExplainContext::RecurseInsert(const std::string &table_name) {
+void ExplainContext::RecurseInsert(const std::string &table_name, bool first) {
   const Table &tbl = this->sstate_.GetTable(table_name);
   for (const auto &[dep_tbl, dep_desc] : tbl.dependents) {
     if (dep_desc->type == InfoType::DIRECT) {
+      continue;
+    }
+    if (first && dep_desc->type == InfoType::TRANSITIVE) {
       continue;
     }
     const std::string &shard_kind = dep_desc->shard_kind;
@@ -29,15 +32,22 @@ void ExplainContext::RecurseInsert(const std::string &table_name) {
     for (const std::string &index : this->db_->GetIndices(dep_tbl)) {
       this->AddExplanation("INDEX UPDATE", dep_tbl + " ON (" + index + ")");
     }
-    this->RecurseInsert(dep_tbl);
+    this->RecurseInsert(dep_tbl, false);
   }
 }
 
 void ExplainContext::RecurseDelete(const std::string &shard_kind,
-                                   const std::string &table_name) {
+                                   const std::string &table_name,
+                                   bool first) {
   const Table &tbl = this->sstate_.GetTable(table_name);
   for (const auto &[dep_tbl, dep_desc] : tbl.dependents) {
     if (shard_kind != "*" && dep_desc->shard_kind != shard_kind) {
+      continue;
+    }
+    if (dep_desc->type == InfoType::DIRECT) {
+      continue;
+    }
+    if (first && dep_desc->type == InfoType::TRANSITIVE) {
       continue;
     }
     std::string column = EXTRACT_VARIANT(column, dep_desc->info);
@@ -51,7 +61,7 @@ void ExplainContext::RecurseDelete(const std::string &shard_kind,
     for (const std::string &index : indices) {
       this->AddExplanation("INDEX UPDATE", dep_tbl + " ON (" + index + ")");
     }
-    this->RecurseDelete(dep_desc->shard_kind, dep_tbl);
+    this->RecurseDelete(dep_desc->shard_kind, dep_tbl, false);
   }
 }
 
@@ -83,7 +93,7 @@ void ExplainContext::Explain(const sqlast::Insert &query) {
       this->AddExplanation("INDEX UPDATE", table_name + " ON (" + index + ")");
     }
   }
-  this->RecurseInsert(table_name);
+  this->RecurseInsert(table_name, true);
   for (const std::string &view : this->dstate_.GetFlowsAffectBy(table_name)) {
     this->AddExplanation("VIEW UPDATE", view);
   }
@@ -103,7 +113,7 @@ void ExplainContext::Explain(const sqlast::Delete &query) {
       this->AddExplanation("INDEX UPDATE", table_name + " ON (" + index + ")");
     }
   }
-  this->RecurseDelete("*", table_name);
+  this->RecurseDelete("*", table_name, true);
   for (const std::string &view : this->dstate_.GetFlowsAffectBy(table_name)) {
     this->AddExplanation("VIEW UPDATE", view);
   }
