@@ -155,8 +155,8 @@ absl::StatusOr<sql::SqlResult> PerformViewQuery(const std::string question_mark,
     file_source_vec.push_back(rec.GetValue(index_of_file_source_2));
   }
 
-  // SELECT fileid FROM oc_filecache
-  // WHERE file_source IN [file_source_vec]
+  // SELECT fileid, path FROM oc_filecache
+  // WHERE fileid IN [file_source_vec]
 
   sqlast::Select select_join{"oc_filecache"};
   select_join.AddColumn(sqlast::Select::ResultColumn("fileid"));
@@ -215,7 +215,7 @@ absl::StatusOr<sql::SqlResult> PerformViewQuery(const std::string question_mark,
     projected_rec.SetInt(rec.GetInt(rec.schema().IndexOf("id")), 0);
     projected_rec.SetInt(rec.GetInt(rec.schema().IndexOf("item_source")), 1);
     projected_rec.SetInt(rec.GetInt(rec.schema().IndexOf("share_type")), 2);
-    projected_rec.SetNull(true, 3);
+    projected_rec.SetInt(rec.GetInt(rec.schema().IndexOf("file_source")), 3);
     projected_rec.SetNull(true, 4);
     projected_rec.SetNull(true, 5);
     projected_rec.SetString(std::make_unique<std::string>(question_mark), 6);
