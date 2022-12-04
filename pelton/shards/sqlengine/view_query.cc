@@ -2,8 +2,9 @@
 #include "pelton/shards/sqlengine/view_query.h"
 
 #include <memory>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
-#include <vector>
 
 #include "absl/status/status.h"
 #include "glog/logging.h"
@@ -99,11 +100,7 @@ absl::StatusOr<sql::SqlResult> PerformViewQuery(
   for (const auto &rec : select_2_result.ResultSets().at(0).rows()) {
     std::string gid_str = rec.GetValue(index_of_gid).GetString();
     std::string uid_str = rec.GetValue(index_of_uid).GetString();
-    if (select_2_result_map.find(gid_str) == select_2_result_map.end()) {
-      select_2_result_map.insert({gid_str, {uid_str}});
-    } else {
-      select_2_result_map.at(gid_str).insert(uid_str);
-    }
+    select_2_result_map[gid_str].insert(uid_str);
     select_2_result_vec.push_back(rec.GetValue(index_of_gid));
   }
 
@@ -195,17 +192,12 @@ absl::StatusOr<sql::SqlResult> PerformViewQuery(
   // ========== INNER JOIN CHECK ENDS ==========
 
   // Perform a "union"
-  std::vector<dataflow::Record> union_vec;
-
-  std::vector<dataflow::Record> select_1_result_vec =
+  std::vector<dataflow::Record> union_vec =
       select_1_result.ResultSets().at(0).Vec();
   std::vector<dataflow::Record> select_3_result_vec =
       select_3_result.ResultSets().at(0).Vec();
 
-  for (auto &rec : select_1_result_vec) {
-    union_vec.push_back(std::move(rec));
-  }
-
+  size_t select_1_size = union_vec.size();
   for (auto &rec : select_3_result_vec) {
     union_vec.push_back(std::move(rec));
   }
@@ -222,32 +214,24 @@ absl::StatusOr<sql::SqlResult> PerformViewQuery(
       dataflow::SchemaFactory::Create(names, types, keys);
 
   std::vector<dataflow::Record> projection_vec;
-
   for (const auto &rec : union_vec) {
-    std::cout << rec << std::endl;
-    dataflow::Record projected_rec{schema};
-
-    projected_rec.SetInt(rec.GetInt(rec.schema().IndexOf("id")), 0);
-    projected_rec.SetInt(rec.GetInt(rec.schema().IndexOf("item_source")), 1);
-    projected_rec.SetInt(rec.GetInt(rec.schema().IndexOf("share_type")), 2);
-    projected_rec.SetInt(rec.GetInt(rec.schema().IndexOf("file_source")), 3);
-    projected_rec.SetNull(true, 4);
-    projected_rec.SetNull(true, 5);
-
-    if (rec.schema().HasColumn("share_with")) {
-      projected_rec.SetString(make_unique<std::string>(rec.GetString(
-                                  rec.schema().IndexOf("share_with"))),
-                              6);
-      projection_vec.push_back(std::move(projected_rec));
-    } else if (rec.schema().HasColumn("share_with_group")) {
-      for (const std::string &uid : select_2_result_map.at(
-               rec.GetString(rec.schema().IndexOf("share_with_group")))) {
-        projected_rec.SetString(make_unique<std::string>(uid), 6);
-        dataflow::Record projected_rec_copy = projected_rec.Copy();
-        projection_vec.push_back(std::move(projected_rec_copy));
-      }
+    dataflow::Record projected{schema};
+    projected.SetInt(rec.GetInt(0), 0);
+    projected.SetInt(rec.GetInt(1), 1);
+    projected.SetInt(rec.GetInt(2), 2);
+    projected.SetInt(rec.GetInt(3), 3);
+    projected.SetNull(true, 4);
+    projected.SetNull(true, 5);
+    // Last column is the user_id, either from the direct share_with or via
+    // the group.
+    if (projection_vec.size() < select_1_size) {
+      projected.SetString(std::make_unique<std::string>(rec.GetString(4)), 6);
+      projection_vec.push_back(std::move(projected));
     } else {
-      LOG(FATAL) << "UNREACHABLE";
+      for (const std::string &uid : select_2_result_map.at(rec.GetString(4))) {
+        projected.SetString(std::make_unique<std::string>(uid), 6);
+        projection_vec.push_back(projected.Copy());
+      }
     }
   }
 

@@ -350,16 +350,13 @@ absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
   // views.
   if (!sstate.ViewsEnabled()) {
     if (view_name == "file_view") {
-      dataflow::SchemaRef schema;
-      std::vector<dataflow::Record> records;
-      auto tmp = stmt.GetWhereClause()->GetRight();
-      auto list = static_cast<const sqlast::LiteralListExpression *>(tmp);
+      auto expr = stmt.GetWhereClause()->GetRight();
+      auto list = static_cast<const sqlast::LiteralListExpression *>(expr);
       MOVE_OR_RETURN(sql::SqlResult result,
                      PerformViewQuery(list->values(), connection, lock));
-      for (const auto &r : result.ResultSets().at(0).rows()) {
-        schema = r.schema();
-        records.emplace_back(r.Copy());
-      }
+      std::vector<dataflow::Record> records = result.ResultSets().at(0).Vec();
+      CHECK_GT(records.size(), 0u);
+      const dataflow::SchemaRef &schema = records.at(0).schema();
       return sql::SqlResult(sql::SqlResultSet(schema, std::move(records)));
     }
     LOG(FATAL) << "Views disabled but view " << stmt.table_name()

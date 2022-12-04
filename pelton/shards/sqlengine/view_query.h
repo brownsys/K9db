@@ -3,6 +3,7 @@
 #define PELTON_SHARDS_SQLENGINE_VIEW_QUERY_H_
 
 #include <string>
+#include <vector>
 
 #include "absl/status/statusor.h"
 #include "pelton/connection.h"
