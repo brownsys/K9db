@@ -4,7 +4,7 @@ OUT="$PELTONDIR/scripts/votes"
 echo "Writing output to $OUT"
 
 # Experiment parameters.
-articles=100000
+articles=10000
 distribution="skewed"
 target=1000
 write=19
@@ -25,7 +25,7 @@ bazel run :vote-benchmark -c opt -- \
   --target $target \
   --write-every 1 \
   --runtime $prime \
-  mysql > $OUT/baseline-prime.out 2>&1
+  mysql --address "$LOCAL_IP:3306" > $OUT/baseline-prime.out 2>&1
 echo "Load"
 bazel run :vote-benchmark -c opt -- \
   --articles $articles \
@@ -34,8 +34,7 @@ bazel run :vote-benchmark -c opt -- \
   --write-every $write \
   --runtime $runtime \
   --no-prime \
-  mysql > $OUT/baseline.out 2>&1
-sleep 3
+  mysql --address "$LOCAL_IP:3306"  > $OUT/baseline.out 2>&1
 sleep 3
 
 # Baseline + memcached.
@@ -47,7 +46,7 @@ bazel run :vote-benchmark -c opt -- \
   --target $target \
   --write-every 1 \
   --runtime $prime \
-  memcached-hybrid > $OUT/hybrid-prime.out 2>&1
+  memcached-hybrid --mysql-address "$LOCAL_IP:3306" > $OUT/hybrid-prime.out 2>&1
 echo "Warmup...."
 bazel run :vote-benchmark -c opt -- \
   --articles $articles \
@@ -56,7 +55,7 @@ bazel run :vote-benchmark -c opt -- \
   --write-every $write \
   --runtime $warmup \
   --no-prime \
-  memcached-hybrid > $OUT/hybrid-warmup.out 2>&1
+  memcached-hybrid --mysql-address "$LOCAL_IP:3306" > $OUT/hybrid-warmup.out 2>&1
 echo "Load"
 bazel run :vote-benchmark -c opt -- \
   --articles $articles \
@@ -65,7 +64,7 @@ bazel run :vote-benchmark -c opt -- \
   --write-every $write \
   --runtime $runtime \
   --no-prime \
-  memcached-hybrid > $OUT/hybrid.out 2>&1
+  memcached-hybrid --mysql-address "$LOCAL_IP:3306"  > $OUT/hybrid.out 2>&1
 
 # Kill memcached and mariadb
 echo "Killing memcached & mariadb"
