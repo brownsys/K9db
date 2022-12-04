@@ -1,6 +1,6 @@
 #!/bin/bash
 PELTONDIR="/home/pelton/pelton"
-OUT="$PELTONDIR/scripts/owncloud"
+OUT="$PELTONDIR/scripts/owncloud-handicap"
 echo "Writing output to $OUT"
 
 # Experiment parameters.
@@ -19,45 +19,8 @@ zipf=1.6
 cd $PELTONDIR
 cd experiments/ownCloud
 
-# Baseline mariadb.
-echo "Running baseline harness"
-bazel run :benchmark -c opt -- \
-  --num-users $user \
-  --users-per-group $groups \
-  --files-per-user $files \
-  --direct-shares-per-file $dshare \
-  --group-shares-per-file $gshare \
-  --write_every $writes \
-  --in_size $insize \
-  --operations $ops \
-  --zipf $zipf \
-  --backend mariadb \
-  > "$OUT/baseline.out" 2>&1
-sleep 3
-
-# Memcached now.
-echo "Running memcached harness"
-bazel run :benchmark -c opt -- \
-  --num-users $user \
-  --users-per-group $groups \
-  --files-per-user $files \
-  --direct-shares-per-file $dshare \
-  --group-shares-per-file $gshare \
-  --write_every $writes \
-  --in_size $insize \
-  --operations $ops \
-  --warmup $warmup \
-  --zipf $zipf \
-  --backend memcached \
-  > "$OUT/hybrid.out" 2>&1
-sleep 3
-
-echo "Killing memcached & mariadb"
-mariadb -P10001 --host=127.0.0.1 -e "STOP"
-sleep 10
-
-# Pelton!
-echo "Running pelton harness"
+# No views.
+echo "Running pelton - no views"
 bazel run :benchmark -c opt -- \
   --num-users $user \
   --users-per-group $groups \
@@ -69,8 +32,57 @@ bazel run :benchmark -c opt -- \
   --operations $ops \
   --zipf $zipf \
   --backend pelton \
-  > "$OUT/pelton.out" 2>&1
-sleep 3
+  --views \
+  > "$OUT/noviews.out" 2>&1
+
+# kill Pelton
+echo "killing pelton"
+mariadb -P10001 --host=127.0.0.1 -e "STOP"
+
+# Sleep
+sleep 30
+
+# No view + no indices
+echo "Running pelton - no views + no indices"
+bazel run :benchmark -c opt -- \
+  --num-users $user \
+  --users-per-group $groups \
+  --files-per-user $files \
+  --direct-shares-per-file $dshare \
+  --group-shares-per-file $gshare \
+  --write_every $writes \
+  --in_size $insize \
+  --operations $ops \
+  --zipf $zipf \
+  --backend pelton \
+  --views \
+  --indices \
+  > "$OUT/noindices.out" 2>&1
+
+# kill Pelton
+echo "killing pelton"
+mariadb -P10001 --host=127.0.0.1 -e "STOP"
+
+# Sleep
+sleep 30
+
+# No view + no indices + no accessors
+echo "Running pelton - no views + no indices + no accessors"
+bazel run :benchmark -c opt -- \
+  --num-users $user \
+  --users-per-group $groups \
+  --files-per-user $files \
+  --direct-shares-per-file $dshare \
+  --group-shares-per-file $gshare \
+  --write_every $writes \
+  --in_size $insize \
+  --operations $ops \
+  --zipf $zipf \
+  --backend pelton \
+  --views \
+  --indices \
+  --accessors \
+  > "$OUT/noaccessors.out" 2>&1
 
 # kill Pelton
 echo "killing pelton"

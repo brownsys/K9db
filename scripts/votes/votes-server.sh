@@ -1,6 +1,6 @@
 #!/bin/bash
 PELTONDIR="/home/pelton/pelton"
-OUT="$PELTONDIR/scripts/owncloud"
+OUT="$PELTONDIR/scripts/votes"
 echo "Writing output to $OUT"
 cd $PELTONDIR
 

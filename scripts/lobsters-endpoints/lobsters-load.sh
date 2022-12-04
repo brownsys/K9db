@@ -1,9 +1,9 @@
 #!/bin/bash
-OUT="/home/pelton/pelton/scripts/lobsters"
+OUT="/home/pelton/pelton/scripts/lobsters-endpoints"
 echo "Writing output to $OUT"
 
 RT=120
-DS=1
+DS=2.5
 RS=1000
 TARGET_IP="$1"
 
