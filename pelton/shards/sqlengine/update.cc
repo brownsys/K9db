@@ -128,7 +128,9 @@ absl::StatusOr<sql::SqlResult> UpdateContext::DirectUpdate() {
   this->db_->CommitTransaction();
 
   // Process updates to dataflows.
-  this->dstate_.ProcessRecords(this->table_name_, result.first.Vec());
+  if (this->sstate_.IndicesEnabled()) {
+    this->dstate_.ProcessRecords(this->table_name_, result.first.Vec());
+  }
 
   return sql::SqlResult(result.second);
 }

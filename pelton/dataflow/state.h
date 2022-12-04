@@ -62,7 +62,8 @@ class DataFlowState {
 
   // Add and manage flows.
   void AddFlow(const FlowName &name,
-               std::unique_ptr<DataFlowGraphPartition> &&flow);
+               std::unique_ptr<DataFlowGraphPartition> &&flow,
+               bool real_view = true);
 
   const DataFlowGraph &GetFlow(const FlowName &name) const;
 

@@ -32,6 +32,12 @@ absl::StatusOr<IndexDescriptor> Create(const std::string &table_name,
                                        Connection *connection,
                                        util::UniqueLock *lock);
 
+// Fake lookup.
+std::vector<dataflow::Record> FakeLookup(const IndexDescriptor &index,
+                                         sqlast::Value &&value,
+                                         Connection *connection,
+                                         util::SharedLock *lock);
+
 }  // namespace index
 }  // namespace sqlengine
 }  // namespace shards

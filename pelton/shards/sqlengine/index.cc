@@ -148,7 +148,7 @@ absl::StatusOr<IndexDescriptor> Create(const std::string &table_name,
 
   // Plan and create the flow for the index.
   MOVE_OR_RETURN(sql::SqlResult result,
-                 view::CreateView(create_stmt, connection, lock));
+                 view::CreateView(create_stmt, connection, lock, true));
   ASSERT_RET(result.Success(), Internal, "Error VD index");
 
   // Return index descriptor.
@@ -162,6 +162,11 @@ std::vector<dataflow::Record> LookupIndex(const IndexDescriptor &index,
                                           sqlast::Value &&value,
                                           Connection *connection,
                                           util::SharedLock *lock) {
+  const SharderState &sstate = connection->state->SharderState();
+  if (!sstate.IndicesEnabled()) {
+    return FakeLookup(index, std::move(value), connection, lock);
+  }
+
   const dataflow::DataFlowState &dstate = connection->state->DataflowState();
   const dataflow::DataFlowGraph &flow = dstate.GetFlow(index.index_name);
   // Lookup by given value as key.

@@ -27,6 +27,10 @@ pub struct Args {
   pub write_every: usize,
   pub operations: usize,
   pub perf: bool,
+  pub echo: bool,
+  pub views: bool,
+  pub indices: bool,
+  pub accessors: bool,
   pub warmup: usize,
   pub distr: Option<ZipfF>,
 }
@@ -48,6 +52,10 @@ fn main() {
                 (@arg write_every: --write_every +takes_value "Issue a direct or group write every x operations")
                 (@arg operations: --operations +takes_value "Number of operations in load")
                 (@arg perf: --perf "Wait for user input before starting workload to attach perf")
+                (@arg echo: --echo "Issue SET echo")
+                (@arg views: --views "Disable views")
+                (@arg indices: --indices "Disable in memory indices")
+                (@arg accessors: --accessors "Disable accessors")
                 (@arg warmup: --warmup +takes_value "# reads to warm up")
                 (@arg distr: --zipf [s] "Use zipf distribution with a frequency rank exponent of 's' (default to uniform)")
         ).get_matches();
@@ -67,6 +75,10 @@ fn main() {
     write_every: value_t_or_exit!(matches, "write_every", usize),
     operations: value_t_or_exit!(matches, "operations", usize),
     perf: matches.is_present("perf"),
+    echo: matches.is_present("echo"),
+    views: matches.is_present("views"),
+    indices: matches.is_present("indices"),
+    accessors: matches.is_present("accessors"),
     warmup: value_t!(matches, "warmup", usize).unwrap_or(0),
     distr: value_t!(matches, "distr", ZipfF).ok(),
   };
@@ -94,7 +106,7 @@ fn main() {
   let operations = args.operations;
 
   // Run the experiment for each provided backend.
-  let mut backend = Backend::from_str(&args.backend);
+  let mut backend = Backend::from_str(&args.backend, args.views, args.accessors, args.echo);
   eprintln!("--> Starting backend {}", backend);
 
   // Insert load (priming).
@@ -109,6 +121,12 @@ fn main() {
     .iter()
     .for_each(|share| backend.insert_share(share));
   eprintln!("--> Priming done in {}ms", instant.elapsed().as_millis());
+
+  // Disable indices.
+  if args.indices {
+    eprintln!("Disabling indices");
+    backend.execute("SET INDICES OFF");
+  }
 
   // Wait for user input.
   if args.perf {

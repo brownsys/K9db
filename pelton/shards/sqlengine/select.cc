@@ -83,22 +83,24 @@ std::optional<std::vector<sql::KeyPair>> SelectContext::FindDirectKeys() {
   }
 
   // Case 3: We have an in-memory index over the PK column.
-  auto it = this->table_.indices.find(pkname);
-  if (it != this->table_.indices.end()) {
-    auto it2 = it->second.find(shard_kind);
-    if (it2 != it->second.end()) {
-      const IndexDescriptor &index = *it2->second;
-      for (sqlast::Value &pk : pkvals) {
-        std::vector<dataflow::Record> r = index::LookupIndex(
-            index, sqlast::Value(pk), this->conn_, this->lock_);
-        if (r.size() > 0) {
-          sqlast::Value uid = r.at(0).GetValue(1);
-          direct_keys.emplace_back(
-              util::ShardName(shard_kind, uid.AsUnquotedString()),
-              std::move(pk));
+  if (this->sstate_.IndicesEnabled()) {
+    auto it = this->table_.indices.find(pkname);
+    if (it != this->table_.indices.end()) {
+      auto it2 = it->second.find(shard_kind);
+      if (it2 != it->second.end()) {
+        const IndexDescriptor &index = *it2->second;
+        for (sqlast::Value &pk : pkvals) {
+          std::vector<dataflow::Record> r = index::LookupIndex(
+              index, sqlast::Value(pk), this->conn_, this->lock_);
+          if (r.size() > 0) {
+            sqlast::Value uid = r.at(0).GetValue(1);
+            direct_keys.emplace_back(
+                util::ShardName(shard_kind, uid.AsUnquotedString()),
+                std::move(pk));
+          }
         }
+        return direct_keys;
       }
-      return direct_keys;
     }
   }
 

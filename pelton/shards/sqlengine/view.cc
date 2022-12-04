@@ -34,7 +34,7 @@ namespace view {
 
 absl::StatusOr<sql::SqlResult> CreateView(const sqlast::CreateView &stmt,
                                           Connection *connection,
-                                          util::UniqueLock *lock) {
+                                          util::UniqueLock *lock, bool index) {
   SharderState &state = connection->state->SharderState();
   dataflow::DataFlowState &dataflow_state = connection->state->DataflowState();
 
@@ -44,7 +44,8 @@ absl::StatusOr<sql::SqlResult> CreateView(const sqlast::CreateView &stmt,
 
   // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
   std::string flow_name = stmt.view_name();
-  dataflow_state.AddFlow(flow_name, std::move(graph));
+  dataflow_state.AddFlow(flow_name, std::move(graph),
+                         index || state.ViewsEnabled());
 
   // Update new View with existing data in tables.
   std::vector<std::pair<std::string, std::vector<dataflow::Record>>> data;
@@ -339,6 +340,7 @@ LookupCondition ConstraintKeys(const dataflow::DataFlowGraph &flow,
 absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
                                           Connection *connection,
                                           util::SharedLock *lock) {
+  const SharderState &sstate = connection->state->SharderState();
   const dataflow::DataFlowState &dstate = connection->state->DataflowState();
 
   // Get the corresponding flow.
@@ -346,24 +348,24 @@ absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
 
   // Hack for handicaping pelton: if requested: run the owncloud query without
   // views.
-  if (view_name == "file_view2") {
-    std::cout << "file_view2" << std::endl;
-    std::vector<dataflow::Record> records;
-    dataflow::SchemaRef schema;
-    auto tmp = stmt.GetWhereClause()->GetRight();
-    auto list = static_cast<const sqlast::LiteralListExpression *>(tmp);
-    for (const sqlast::Value &v : list->values()) {
-      std::string str = v.GetString();
-      std::cout << "Calling PerformViewQuery with ? = ~" << str << "~"
-                << std::endl;
-      MOVE_OR_RETURN(sql::SqlResult result,
-                     PerformViewQuery(str, connection, lock));
-      for (const auto &r : result.ResultSets().at(0).rows()) {
-        records.emplace_back(r.Copy());
-        schema = r.schema();
+  if (!sstate.ViewsEnabled()) {
+    if (view_name == "file_view") {
+      dataflow::SchemaRef schema;
+      std::vector<dataflow::Record> records;
+      auto tmp = stmt.GetWhereClause()->GetRight();
+      auto list = static_cast<const sqlast::LiteralListExpression *>(tmp);
+      for (const sqlast::Value &v : list->values()) {
+        MOVE_OR_RETURN(sql::SqlResult result,
+                       PerformViewQuery(v.GetString(), connection, lock));
+        for (const auto &r : result.ResultSets().at(0).rows()) {
+          schema = r.schema();
+          records.emplace_back(r.Copy());
+        }
       }
+      return sql::SqlResult(sql::SqlResultSet(schema, std::move(records)));
     }
-    return sql::SqlResult(sql::SqlResultSet(schema, std::move(records)));
+    LOG(FATAL) << "Views disabled but view " << stmt.table_name()
+               << " is accessed by " << stmt;
   }
 
   const dataflow::DataFlowGraph &flow = dstate.GetFlow(view_name);

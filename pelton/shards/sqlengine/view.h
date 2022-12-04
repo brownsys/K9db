@@ -15,7 +15,7 @@ namespace view {
 
 absl::StatusOr<sql::SqlResult> CreateView(const sqlast::CreateView &stmt,
                                           Connection *connection,
-                                          util::UniqueLock *lock);
+                                          util::UniqueLock *lock, bool index);
 
 absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
                                           Connection *connection,

@@ -48,12 +48,21 @@ std::optional<SqlResult> SpecialStatements(const std::string &sql,
       echo = true;
       return SqlResult(true);
     }
-    if (absl::StartsWith(split.at(1), "SERIALIAZBLE")) {
-      util::UniqueLock lock = connection->state->WriterLock();
-      shards::SharderState &sstate = connection->state->SharderState();
-      sstate.TurnOnSerializable();
-      std::cout << "Pelton is now serializable!" << std::endl;
-      return SqlResult(true);
+    if (split.size() == 3 && absl::StartsWith(split.at(2), "OFF")) {
+      if (absl::StartsWith(split.at(1), "VIEWS")) {
+        util::UniqueLock lock = connection->state->WriterLock();
+        shards::SharderState &sstate = connection->state->SharderState();
+        sstate.DisableViews();
+        std::cout << "Turned views off!" << std::endl;
+        return SqlResult(true);
+      }
+      if (absl::StartsWith(split.at(1), "INDICES")) {
+        util::UniqueLock lock = connection->state->WriterLock();
+        shards::SharderState &sstate = connection->state->SharderState();
+        sstate.DisableIndices();
+        std::cout << "Turned indices off!" << std::endl;
+        return SqlResult(true);
+      }
     }
   }
   if (absl::StartsWith(sql, "EXPLAIN COMPLIANCE")) {

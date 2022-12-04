@@ -1,5 +1,6 @@
 extern crate memcached;
 extern crate mysql;
+use crate::backend::mysql::prelude::Queryable;
 
 // src/db.rs
 use super::db::{mariadb_connect, memcached_connect, pelton_connect};
@@ -119,10 +120,19 @@ impl Backend {
     }
   }
 
+  pub fn execute(&mut self, sql: &str) {
+    match self {
+      Backend::Pelton(conn) => conn.query_drop(sql).unwrap(),
+      Backend::MariaDB(conn) => conn.query_drop(sql).unwrap(),
+      Backend::Memcached(conn, _) => conn.query_drop(sql).unwrap(),
+      Backend::Simulate(_) => {},
+    }
+  }
+
   // Parse backend from string.
-  pub fn from_str(s: &str) -> Self {
+  pub fn from_str(s: &str, views: bool, accessors: bool, echo: bool) -> Self {
     match s {
-      "pelton" => Backend::Pelton(pelton_connect()),
+      "pelton" => Backend::Pelton(pelton_connect(views, accessors, echo)),
       "mariadb" => Backend::MariaDB(mariadb_connect()),
       "memcached" => Backend::Memcached(mariadb_connect(), memcached_connect()),
       "simulate" => Backend::Simulate(simulate::SimulatedState::new()),

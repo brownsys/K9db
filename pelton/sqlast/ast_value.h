@@ -87,4 +87,12 @@ std::ostream &operator<<(std::ostream &os, const pelton::sqlast::Value &v);
 }  // namespace sqlast
 }  // namespace pelton
 
+// Override std::hash for Value.
+namespace std {
+template <>
+struct hash<pelton::sqlast::Value> {
+  size_t operator()(const pelton::sqlast::Value &o) const { return o.Hash(); }
+};
+}  // namespace std
+
 #endif  // PELTON_SQLAST_AST_VALUE_H_

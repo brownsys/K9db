@@ -114,12 +114,11 @@ class SharderState {
     v->template VisitAccessors<false>(table, arg);
   }
 
-  // Add locks for the given table (which was just created).
-  void AddTableLocks(const Table &table);
-
-  // Allows us to disable serializability during priming.
-  // TODO(babman): implement this.
-  void TurnOnSerializable() {}
+  // Configurations.
+  void DisableIndices() { this->enable_indices_ = false; }
+  void DisableViews() { this->enable_views_ = false; }
+  bool IndicesEnabled() const { return this->enable_indices_; }
+  bool ViewsEnabled() const { return this->enable_views_; }
 
  private:
   // All the different shard kinds that currently exist in the system.
@@ -133,7 +132,11 @@ class SharderState {
 
   // Counts of users currently in the system.
   std::unordered_map<ShardKind, std::atomic<uint64_t>> users_;
-  std::atomic<uint64_t> index_count_;
+  std::atomic<uint64_t> index_count_ = 0;
+
+  // Dynamic configurations.
+  bool enable_indices_ = true;
+  bool enable_views_ = true;
 };
 
 }  // namespace shards

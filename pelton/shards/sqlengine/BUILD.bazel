@@ -4,6 +4,7 @@ cc_library(
     name = "engine",
     srcs = [
         "engine.cc",
+        "index_fake.cc",
     ],
     hdrs = [
         "engine.h",
@@ -28,6 +29,7 @@ cc_library(
         "//pelton/sql:result",
         "//pelton/sqlast:ast",
         "//pelton/sqlast:parser",
+        "//pelton/util:ints",
         "//pelton/util:status",
         "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/status",
@@ -152,6 +154,7 @@ cc_library(
         "//pelton/sqlast:ast",
         "//pelton/util:upgradable_lock",
         "@com_google_absl//absl/status",
+        "@glog",
     ],
 )
 

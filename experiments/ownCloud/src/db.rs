@@ -15,9 +15,10 @@ const DB_NAME: &'static str = "owncloud";
 
 // Schemas.
 const PELTON_SCHEMA: &'static str = include_str!("../data/schema.sql");
+const ALL_OWNERS_SCHEMA: &'static str = include_str!("../data/schema_owners.sql");
 const MARIADB_SCHEMA: &'static str = include_str!("../data/mysql-schema.sql");
 
-pub fn pelton_connect() -> Conn {
+pub fn pelton_connect(views: bool, accessors: bool, echo: bool) -> Conn {
   // Start a connection.
   let opts = OptsBuilder::new()
     .user(Some(DB_USER))
@@ -26,8 +27,19 @@ pub fn pelton_connect() -> Conn {
     .ip_or_hostname(Some("127.0.0.1"))
     .tcp_nodelay(true);
   let mut connection = Conn::new(opts).unwrap();
+  if echo {
+    connection.query_drop("SET echo").unwrap();
+  }
+  if views {
+    println!("Disabling views...");
+    connection.query_drop("SET VIEWS OFF").unwrap();
+  }
   // Create the schema.
-  run_file(&mut connection, PELTON_SCHEMA);
+  if accessors {
+    run_file(&mut connection, ALL_OWNERS_SCHEMA);
+  } else {
+    run_file(&mut connection, PELTON_SCHEMA);
+  }
   connection
 }
 

@@ -17,6 +17,7 @@ rust_binary(
     compile_data = [
         "data/schema.sql",
         "data/mysql-schema.sql",
+        "data/schema_owners.sql",
     ],
     deps = [
         "//cargo:clap",

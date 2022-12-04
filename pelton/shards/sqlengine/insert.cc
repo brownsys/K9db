@@ -41,7 +41,7 @@ int InsertContext::DirectInsert(sqlast::Value &&fkval,
   std::string user_id = fkval.AsUnquotedString();
   if (!this->InsertedInto(desc.shard_kind, user_id)) {
     util::ShardName shard_name(desc.shard_kind, user_id);
-    res = this->db_->ExecuteInsert(this->stmt_, shard_name);
+    // res = this->db_->ExecuteInsert(this->stmt_, shard_name);
   }
   return res;
 }
@@ -61,7 +61,7 @@ absl::StatusOr<int> InsertContext::TransitiveInsert(
     std::string user_id = r.GetValue(1).AsUnquotedString();
     if (!this->InsertedInto(desc.shard_kind, user_id)) {
       util::ShardName shard_name(desc.shard_kind, user_id);
-      ACCUM(this->db_->ExecuteInsert(this->stmt_, shard_name), res);
+      // ACCUM(this->db_->ExecuteInsert(this->stmt_, shard_name), res);
     }
   }
 
@@ -86,7 +86,7 @@ absl::StatusOr<int> InsertContext::VariableInsert(sqlast::Value &&fkval,
     std::string user_id = r.GetValue(1).AsUnquotedString();
     if (!this->InsertedInto(desc.shard_kind, user_id)) {
       util::ShardName shard_name(desc.shard_kind, user_id);
-      ACCUM(this->db_->ExecuteInsert(this->stmt_, shard_name), res);
+      // ACCUM(this->db_->ExecuteInsert(this->stmt_, shard_name), res);
     }
   }
 
@@ -115,6 +115,9 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
     size_t colidx = EXTRACT_VARIANT(column_index, desc->info);
     const std::string &colname = EXTRACT_VARIANT(column, desc->info);
     sqlast::Value val = this->stmt_.GetValue(colname, colidx);
+    if (val.IsNull()) {
+      continue;
+    }
     ASSERT_RET(!val.IsNull(), Internal, "OWNER cannot be NULL");
 
     // Handle according to sharding type.
@@ -143,8 +146,10 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
 
   // If no OWNERs detected, we insert into global/default shard.
   if (res == 0) {
-    util::ShardName shard_name(DEFAULT_SHARD, DEFAULT_SHARD);
-    ACCUM(this->db_->ExecuteInsert(this->stmt_, shard_name), res);
+    if (!this->InsertedInto(DEFAULT_SHARD, DEFAULT_SHARD)) {
+      util::ShardName shard_name(DEFAULT_SHARD, DEFAULT_SHARD);
+      // ACCUM(this->db_->ExecuteInsert(this->stmt_, shard_name), res);
+    }
   }
 
   return res;
@@ -191,7 +196,9 @@ absl::StatusOr<int> InsertContext::CopyDependents(
         // Make owners into a set.
         std::unordered_set<util::ShardName> owners;
         for (dataflow::Record &r : indexed) {
-          owners.emplace(desc->shard_kind, r.GetValue(1).AsUnquotedString());
+          if (!r.GetValue(1).IsNull()) {
+            owners.emplace(desc->shard_kind, r.GetValue(1).AsUnquotedString());
+          }
         }
         // Speedup using secondary index.
         for (const auto &target : targets) {
@@ -263,7 +270,9 @@ absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
   this->db_->CommitTransaction();
 
   // Process updates to dataflows.
-  this->dstate_.ProcessRecords(this->table_name_, std::move(records));
+  if (this->sstate_.IndicesEnabled()) {
+    this->dstate_.ProcessRecords(this->table_name_, std::move(records));
+  }
 
   // Return number of copies inserted.
   return sql::SqlResult(status);
@@ -291,6 +300,18 @@ absl::StatusOr<InsertContext::Result> InsertContext::ExecWithinTransaction() {
   ASSIGN_OR_RETURN(int d, this->CopyDependents(this->table_, false, records));
   if (d < 0) {
     return InsertContext::Result(std::vector<dataflow::Record>(), d);
+  }
+
+  // Now do the actual inserts that InsertIntoBaseTable() scheduled, so that
+  // they do not interfere with fake index lookups in CopyDependents().
+  for (const auto &[shard_kind, shards] : this->shards_) {
+    for (const auto &shard : shards) {
+      int r = this->db_->ExecuteInsert(this->stmt_, shard);
+      if (r < 0) {
+        return InsertContext::Result(std::vector<dataflow::Record>(), d);
+      }
+      status += r;
+    }
   }
 
   // Done!

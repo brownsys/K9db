@@ -110,13 +110,16 @@ SchemaRef DataFlowState::GetTableSchema(const TableName &table_name) const {
 
 // Manage flows.
 void DataFlowState::AddFlow(const FlowName &name,
-                            std::unique_ptr<DataFlowGraphPartition> &&flow) {
+                            std::unique_ptr<DataFlowGraphPartition> &&flow,
+                            bool real_view) {
   std::unique_lock lock(this->mtx_);
   // Map input names to this flow.
-  for (const auto &[input_name, input] : flow->inputs()) {
-    this->flows_per_input_table_[input_name].push_back(name);
-    this->all_flows_[input_name].insert(name);
-    this->all_tables_[name].insert(input_name);
+  if (real_view) {
+    for (const auto &[input_name, input] : flow->inputs()) {
+      this->flows_per_input_table_[input_name].push_back(name);
+      this->all_flows_[input_name].insert(name);
+      this->all_tables_[name].insert(input_name);
+    }
   }
 
   // Create a non-owning vector of channels.
