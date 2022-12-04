@@ -594,7 +594,7 @@ fn main() {
                         .long("address")
                         .takes_value(true)
                         .required(true)
-                        .default_value("127.0.0.1:3306")
+                        .default_value("localhost:3306")
                         .help("Address of MySQL server"),
                 )
                 .arg(
