@@ -354,13 +354,11 @@ absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
       std::vector<dataflow::Record> records;
       auto tmp = stmt.GetWhereClause()->GetRight();
       auto list = static_cast<const sqlast::LiteralListExpression *>(tmp);
-      for (const sqlast::Value &v : list->values()) {
-        MOVE_OR_RETURN(sql::SqlResult result,
-                       PerformViewQuery(v.GetString(), connection, lock));
-        for (const auto &r : result.ResultSets().at(0).rows()) {
-          schema = r.schema();
-          records.emplace_back(r.Copy());
-        }
+      MOVE_OR_RETURN(sql::SqlResult result,
+                     PerformViewQuery(list->values(), connection, lock));
+      for (const auto &r : result.ResultSets().at(0).rows()) {
+        schema = r.schema();
+        records.emplace_back(r.Copy());
       }
       return sql::SqlResult(sql::SqlResultSet(schema, std::move(records)));
     }

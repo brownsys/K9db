@@ -18,12 +18,12 @@ namespace view {
 
 using CType = sqlast::ColumnDefinition::Type;
 
-absl::StatusOr<sql::SqlResult> PerformViewQuery(const std::string question_mark,
-                                                Connection *conn,
-                                                util::SharedLock *lock) {
+absl::StatusOr<sql::SqlResult> PerformViewQuery(
+    const std::vector<sqlast::Value> params, Connection *conn,
+    util::SharedLock *lock) {
   // ========== SELECT 1 BEGIN ==========
   // SELECT * FROM oc_share
-  // WHERE (share_type = 0) AND (share_with = [question_mark])
+  // WHERE (share_type = 0) AND (share_with IN [params])
 
   sqlast::Select select_1{"oc_share"};
   select_1.AddColumn(sqlast::Select::ResultColumn("id"));
@@ -39,7 +39,7 @@ absl::StatusOr<sql::SqlResult> PerformViewQuery(const std::string question_mark,
       std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::EQ);
 
   std::unique_ptr<sqlast::BinaryExpression> select_1_right_expr =
-      std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::EQ);
+      std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::IN);
 
   select_1_left_expr->SetLeft(
       std::make_unique<sqlast::ColumnExpression>("share_type"));
@@ -48,8 +48,8 @@ absl::StatusOr<sql::SqlResult> PerformViewQuery(const std::string question_mark,
 
   select_1_right_expr->SetLeft(
       std::make_unique<sqlast::ColumnExpression>("share_with"));
-  select_1_right_expr->SetRight(std::make_unique<sqlast::LiteralExpression>(
-      sqlast::Value(question_mark)));
+  select_1_right_expr->SetRight(
+      std::make_unique<sqlast::LiteralListExpression>(params));
 
   select_1_where_clause->SetLeft(std::move(select_1_left_expr));
   select_1_where_clause->SetRight(std::move(select_1_right_expr));
@@ -62,19 +62,20 @@ absl::StatusOr<sql::SqlResult> PerformViewQuery(const std::string question_mark,
   // ========== SELECT 1 END ==========
 
   // ========== SELECT 2 BEGIN ==========
-  // SELECT gid FROM oc_group_user
-  // WHERE uid = [question_mark]
+  // SELECT uid, gid FROM oc_group_user
+  // WHERE uid IN [params]
 
   sqlast::Select select_2{"oc_group_user"};
   select_2.AddColumn(sqlast::Select::ResultColumn("gid"));
+  select_2.AddColumn(sqlast::Select::ResultColumn("uid"));
 
   std::unique_ptr<sqlast::BinaryExpression> select_2_where_clause =
-      std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::EQ);
+      std::make_unique<sqlast::BinaryExpression>(sqlast::Expression::Type::IN);
 
   select_2_where_clause->SetLeft(
       std::make_unique<sqlast::ColumnExpression>("uid"));
-  select_2_where_clause->SetRight(std::make_unique<sqlast::LiteralExpression>(
-      sqlast::Value(question_mark)));
+  select_2_where_clause->SetRight(
+      std::make_unique<sqlast::LiteralListExpression>(params));
 
   select_2.SetWhereClause(std::move(select_2_where_clause));
 
@@ -85,11 +86,24 @@ absl::StatusOr<sql::SqlResult> PerformViewQuery(const std::string question_mark,
 
   // Convert the results of SELECT 2 to vector
   std::vector<sqlast::Value> select_2_result_vec;
+  // Convert the results of SELECT 2 to a map from [gid] to [uids]
+  std::unordered_map<std::string, std::unordered_set<std::string>>
+      select_2_result_map;
 
   CHECK_EQ(select_2_result.ResultSets().size(), 1);
   size_t index_of_gid =
       select_2_result.ResultSets().at(0).schema().IndexOf("gid");
+  size_t index_of_uid =
+      select_2_result.ResultSets().at(0).schema().IndexOf("uid");
+
   for (const auto &rec : select_2_result.ResultSets().at(0).rows()) {
+    std::string gid_str = rec.GetValue(index_of_gid).GetString();
+    std::string uid_str = rec.GetValue(index_of_uid).GetString();
+    if (select_2_result_map.find(gid_str) == select_2_result_map.end()) {
+      select_2_result_map.insert({gid_str, {uid_str}});
+    } else {
+      select_2_result_map.at(gid_str).insert(uid_str);
+    }
     select_2_result_vec.push_back(rec.GetValue(index_of_gid));
   }
 
@@ -210,6 +224,7 @@ absl::StatusOr<sql::SqlResult> PerformViewQuery(const std::string question_mark,
   std::vector<dataflow::Record> projection_vec;
 
   for (const auto &rec : union_vec) {
+    std::cout << rec << std::endl;
     dataflow::Record projected_rec{schema};
 
     projected_rec.SetInt(rec.GetInt(rec.schema().IndexOf("id")), 0);
@@ -218,9 +233,22 @@ absl::StatusOr<sql::SqlResult> PerformViewQuery(const std::string question_mark,
     projected_rec.SetInt(rec.GetInt(rec.schema().IndexOf("file_source")), 3);
     projected_rec.SetNull(true, 4);
     projected_rec.SetNull(true, 5);
-    projected_rec.SetString(std::make_unique<std::string>(question_mark), 6);
 
-    projection_vec.push_back(std::move(projected_rec));
+    if (rec.schema().HasColumn("share_with")) {
+      projected_rec.SetString(make_unique<std::string>(rec.GetString(
+                                  rec.schema().IndexOf("share_with"))),
+                              6);
+      projection_vec.push_back(std::move(projected_rec));
+    } else if (rec.schema().HasColumn("share_with_group")) {
+      for (const std::string &uid : select_2_result_map.at(
+               rec.GetString(rec.schema().IndexOf("share_with_group")))) {
+        projected_rec.SetString(make_unique<std::string>(uid), 6);
+        dataflow::Record projected_rec_copy = projected_rec.Copy();
+        projection_vec.push_back(std::move(projected_rec_copy));
+      }
+    } else {
+      LOG(FATAL) << "UNREACHABLE";
+    }
   }
 
   sql::SqlResultSet projection_result_set(schema, std::move(projection_vec));

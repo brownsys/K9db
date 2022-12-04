@@ -15,9 +15,9 @@ namespace shards {
 namespace sqlengine {
 namespace view {
 
-absl::StatusOr<sql::SqlResult> PerformViewQuery(const std::string question_mark,
-                                                Connection *conn,
-                                                util::SharedLock *lock);
+absl::StatusOr<sql::SqlResult> PerformViewQuery(
+    const std::vector<sqlast::Value> params, Connection *conn,
+    util::SharedLock *lock);
 
 }  // namespace view
 }  // namespace sqlengine
