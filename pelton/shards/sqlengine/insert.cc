@@ -145,7 +145,7 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
   }
 
   // If no OWNERs detected, we insert into global/default shard.
-  if (res == 0) {
+  if (this->shards_.size() == 0) {
     if (!this->InsertedInto(DEFAULT_SHARD, DEFAULT_SHARD)) {
       util::ShardName shard_name(DEFAULT_SHARD, DEFAULT_SHARD);
       // ACCUM(this->db_->ExecuteInsert(this->stmt_, shard_name), res);
