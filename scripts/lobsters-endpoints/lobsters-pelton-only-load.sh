@@ -1,5 +1,5 @@
 #!/bin/bash
-OUT="/home/pelton/pelton/scripts/lobsters"
+OUT="/home/pelton/pelton/scripts/lobsters-endpoints"
 echo "Writing output to $OUT"
 
 RT=120
