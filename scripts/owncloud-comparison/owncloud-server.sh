@@ -9,7 +9,7 @@ sudo service mariadb restart
 
 # Run memcached.
 cd experiments/memcached
-bazel run @memcached//:memcached -c opt > "$OUT/memcached.log" 2>&1 &
+bazel run @memcached//:memcached --config=opt -- -M  > "$OUT/memcached.log" 2>&1 &
 pid=$!
 
 # Get signal to kill memcached.
