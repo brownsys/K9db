@@ -27,6 +27,11 @@ elif [[ "$1" == "physical" ]]; then
   mkdir -p /mnt/disks/my-ssd/pelton/
   bazel run //:pelton --config opt --physical=on -- "${@:2}"
 
+elif [[ "$1" == "unencrypted" ]]; then
+    rm -rf /mnt/disks/my-ssd/pelton/
+  mkdir -p /mnt/disks/my-ssd/pelton/
+  bazel run //:pelton --config opt --encryption=off -- "${@:2}"
+
 else
-  echo 'use either "dbg", "opt", "physical", "valgrind", "asan", or "tsan"!'
+  echo 'use either "dbg", "opt", "physical", "unencrypted", "valgrind", "asan", or "tsan"!'
 fi
