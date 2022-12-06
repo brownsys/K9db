@@ -6,7 +6,7 @@ echo "Writing output to $OUT"
 # Experiment parameters.
 articles=10000
 distribution="skewed"
-target=1000
+target=10000
 write=19
 runtime=60
 warmup=60
