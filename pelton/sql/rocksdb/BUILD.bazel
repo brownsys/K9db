@@ -69,6 +69,49 @@ cc_library(
     ],
 )
 
+# Disable/enable "true" physical separation.
+# .bazelrc defines an alias to shortcut this
+# e.g. bazel build ... --physical=off    [default]
+#      bazel build ... --physical=on
+string_flag(
+    name = "physical_separation",
+    build_setting_default = "off",
+    values = [
+        "on",
+        "off",
+    ],
+)
+
+config_setting(
+    name = "enable_separation",
+    flag_values = {
+        ":physical_separation": "on",
+    },
+)
+
+cc_library(
+    name = "table_physical",
+    srcs = [
+        "table_physical.cc",
+    ],
+    hdrs = [
+        "table_physical.h",
+    ],
+    defines = select({
+        ":enable_separation": ["PELTON_PHYSICAL_SEPARATION"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":encode",
+        ":encryption",
+        ":transaction",
+        "//pelton/util:status",
+        "//pelton/util:upgradable_lock",
+        "@glog",
+        "@rocksdb",
+    ],
+)
+
 cc_library(
     name = "table",
     srcs = [
@@ -82,6 +125,7 @@ cc_library(
         ":encode",
         ":encryption",
         ":index",
+        ":table_physical",
         ":transaction",
         "//pelton/dataflow:schema",
         "//pelton/sqlast:value_mapper",

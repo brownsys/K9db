@@ -88,4 +88,30 @@ bazel run :benchmark -c opt -- \
 echo "killing pelton"
 mariadb -P10001 --host=127.0.0.1 -e "STOP"
 
+
+# Sleep until physical separated pelton can be compiled
+sleep 90
+
+# No view + no indices + no accessors
+echo "Running pelton - physical separation + no views + no indices + no accessors"
+bazel run :benchmark -c opt -- \
+  --num-users $user \
+  --users-per-group $groups \
+  --files-per-user $files \
+  --direct-shares-per-file $dshare \
+  --group-shares-per-file $gshare \
+  --write_every $writes \
+  --in_size $insize \
+  --operations $ops \
+  --zipf $zipf \
+  --backend pelton \
+  --views \
+  --indices \
+  --accessors \
+  > "$OUT/physical.out" 2>&1
+
+# kill Pelton
+echo "killing pelton"
+mariadb -P10001 --host=127.0.0.1 -e "STOP"
+
 echo "All done!"

@@ -34,21 +34,12 @@ RocksdbTable::RocksdbTable(rocksdb::DB *db, const std::string &table_name,
       schema_(schema),
       pk_column_(),
       unique_columns_(),
-      handle_(),
+      handle_(db, table_name),
       pk_index_(db, table_name),
       indices_() {
   const std::vector<dataflow::ColumnID> &keys = this->schema_.keys();
   CHECK_EQ(keys.size(), 1u) << "BAD PK ROCKSDB TABLE";
   this->pk_column_ = keys.front();
-
-  // Create rocksdb table.
-  rocksdb::ColumnFamilyHandle *handle;
-  rocksdb::ColumnFamilyOptions options;
-  options.OptimizeLevelStyleCompaction();
-  options.prefix_extractor.reset(new PeltonPrefixTransform());
-  options.comparator = PeltonComparator();
-  PANIC(this->db_->CreateColumnFamily(options, table_name, &handle));
-  this->handle_ = std::unique_ptr<rocksdb::ColumnFamilyHandle>(handle);
 }
 
 // Create an index.
@@ -250,138 +241,37 @@ bool RocksdbTable::Exists(const rocksdb::Slice &pk_value,
 // Write to database.
 void RocksdbTable::Put(const EncryptedKey &key, const EncryptedValue &value,
                        RocksdbTransaction *txn) {
-  txn->Put(this->handle_.get(), key.Data(), value.Data());
+  this->handle_.Put(key, value, txn);
 }
 
 // Get from database.
 std::optional<EncryptedValue> RocksdbTable::Get(
     const EncryptedKey &key, bool read, const RocksdbTransaction *txn) const {
-  std::optional<std::string> data;
-  if (read) {
-    data = txn->Get(this->handle_.get(), key.Data());
-  } else {
-    data = txn->GetForUpdate(this->handle_.get(), key.Data());
-  }
-  if (data.has_value()) {
-    return Cipher::FromDB(std::move(data.value()));
-  }
-  return {};
+  return this->handle_.Get(key, read, txn);
 }
 
 // MultiGet: faster multi key lookup.
 std::vector<std::optional<EncryptedValue>> RocksdbTable::MultiGet(
     const std::vector<EncryptedKey> &keys, bool read,
     const RocksdbTransaction *txn) const {
-  if (keys.size() == 0) {
-    return {};
-  }
-
-  // Extract slices.
-  std::vector<rocksdb::Slice> slices;
-  slices.reserve(keys.size());
-  for (const EncryptedKey &key : keys) {
-    slices.push_back(key.Data());
-  }
-
-  // Use MultiGet.
-  std::vector<std::optional<std::string>> data;
-  if (read) {
-    data = txn->MultiGet(this->handle_.get(), slices);
-  } else {
-    data = txn->MultiGetForUpdate(this->handle_.get(), slices);
-  }
-
-  // Transform to Ciphers.
-  std::vector<std::optional<EncryptedValue>> result;
-  result.reserve(keys.size());
-  for (size_t i = 0; i < keys.size(); i++) {
-    std::optional<std::string> opt = data.at(i);
-    if (opt.has_value()) {
-      result.emplace_back(Cipher::FromDB(std::move(opt.value())));
-    } else {
-      result.emplace_back();
-    }
-  }
-
-  return result;
+  return this->handle_.MultiGet(keys, read, txn);
 }
 
 // Delete from database.
 void RocksdbTable::Delete(const EncryptedKey &key, RocksdbTransaction *txn) {
-  txn->Delete(this->handle_.get(), key.Data());
+  this->handle_.Delete(key, txn);
 }
 
 // Get all data in table.
 RocksdbStream RocksdbTable::GetAll(const RocksdbTransaction *txn) const {
-  std::unique_ptr<rocksdb::Iterator> it =
-      txn->Iterate(this->handle_.get(), false);
-  it->SeekToFirst();
-  return RocksdbStream(std::move(it));
+  return this->handle_.GetAll(txn);
 }
 
 // Get all data in shard.
 // Read all data from shard.
 RocksdbStream RocksdbTable::GetShard(const EncryptedPrefix &shard_name,
                                      const RocksdbTransaction *txn) const {
-  // Iterator that spans the whole shard prefix.
-  std::unique_ptr<rocksdb::Iterator> it =
-      txn->Iterate(this->handle_.get(), true);
-  it->Seek(shard_name.Data());
-  return RocksdbStream(std::move(it));
-}
-
-/*
- * RocksdbStream
- */
-
-using RocksdbStreamIterator = RocksdbStream::Iterator;
-
-// Construct end iterator.
-RocksdbStreamIterator::Iterator() : it_(nullptr) {}
-
-// Construct iterator given a ready rocksdb iterator (with some seek performed).
-RocksdbStreamIterator::Iterator(rocksdb::Iterator *it) : it_(it) {
-  this->EnsureValid();
-}
-
-// Next key/value pair.
-RocksdbStreamIterator &RocksdbStreamIterator::operator++() {
-  if (this->it_ != nullptr) {
-    this->it_->Next();
-    this->EnsureValid();
-  }
-  return *this;
-}
-
-// Equality of underlying iterator.
-bool RocksdbStreamIterator::operator==(const RocksdbStreamIterator &o) const {
-  return this->it_ == o.it_;
-}
-bool RocksdbStreamIterator::operator!=(const RocksdbStreamIterator &o) const {
-  return this->it_ != o.it_;
-}
-
-// Get current key/value pair.
-RocksdbStreamIterator::value_type RocksdbStreamIterator::operator*() const {
-  return RocksdbStreamIterator::value_type(
-      this->it_->key(), Cipher::FromDB(this->it_->value().ToString()));
-}
-
-// When the iterator is consumed, set it to nullptr.
-void RocksdbStreamIterator::EnsureValid() {
-  if (!this->it_->Valid()) {
-    this->it_ = nullptr;
-  }
-}
-
-// To an actual vector. Consume this stream.
-std::vector<std::pair<EncryptedKey, EncryptedValue>> RocksdbStream::ToVector() {
-  std::vector<std::pair<EncryptedKey, EncryptedValue>> result;
-  for (; this->it_->Valid(); this->it_->Next()) {
-    result.emplace_back(this->it_->key(),
-                        Cipher::FromDB(this->it_->value().ToString()));
-  }
-  return result;
+  return this->handle_.GetShard(shard_name, txn);
 }
 
 }  // namespace rocks

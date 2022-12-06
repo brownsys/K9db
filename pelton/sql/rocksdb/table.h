@@ -12,6 +12,7 @@
 #include "pelton/sql/rocksdb/encode.h"
 #include "pelton/sql/rocksdb/encryption.h"
 #include "pelton/sql/rocksdb/index.h"
+#include "pelton/sql/rocksdb/table_physical.h"
 #include "pelton/sql/rocksdb/transaction.h"
 #include "pelton/sqlast/value_mapper.h"
 #include "rocksdb/db.h"
@@ -19,50 +20,6 @@
 namespace pelton {
 namespace sql {
 namespace rocks {
-
-class RocksdbStream {
- public:
-  // Iterator class.
-  class Iterator {
-   public:
-    // Iterator traits
-    using difference_type = int64_t;
-    using value_type = std::pair<EncryptedKey, EncryptedValue>;
-    using reference = std::pair<EncryptedKey, EncryptedValue> &;
-    using pointer = std::pair<EncryptedKey, EncryptedValue> *;
-    using iterator_category = std::input_iterator_tag;
-
-    Iterator &operator++();
-
-    bool operator==(const Iterator &o) const;
-    bool operator!=(const Iterator &o) const;
-
-    // Access current element.
-    value_type operator*() const;
-
-   private:
-    rocksdb::Iterator *it_;
-
-    Iterator();
-    explicit Iterator(rocksdb::Iterator *it);
-
-    void EnsureValid();
-
-    friend RocksdbStream;
-  };
-
-  explicit RocksdbStream(std::unique_ptr<rocksdb::Iterator> &&it)
-      : it_(std::move(it)) {}
-
-  RocksdbStream::Iterator begin() const { return Iterator(this->it_.get()); }
-  RocksdbStream::Iterator end() const { return Iterator(); }
-
-  // To an actual vector. Consumes this vector.
-  std::vector<std::pair<EncryptedKey, EncryptedValue>> ToVector();
-
- private:
-  std::unique_ptr<rocksdb::Iterator> it_;
-};
 
 class RocksdbTable {
  public:
@@ -166,8 +123,8 @@ class RocksdbTable {
   size_t pk_column_;
   std::vector<size_t> unique_columns_;
 
-  // Column Family handler.
-  std::unique_ptr<rocksdb::ColumnFamilyHandle> handle_;
+  // Wrapper around Column Family handlers.
+  RocksdbPhysicalSeparator handle_;
 
   // Indices.
   RocksdbPKIndex pk_index_;

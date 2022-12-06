@@ -109,7 +109,6 @@ TEST(TableTest, PutExistsGetDelete) {
   txn = std::make_unique<RocksdbTransaction>(db.get());
 
   // Encrypt.
-
   EncryptedKey e1 = enc.EncryptKey(COPY(k1));
   EncryptedKey e2 = enc.EncryptKey(COPY(k2));
   EncryptedKey e3 = enc.EncryptKey(COPY(k3));

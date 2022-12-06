@@ -6,6 +6,10 @@ try-import /home/docker.bazelrc
 # Alias to simplify disabling / enabling encryption
 build --flag_alias=encryption=//pelton/sql/rocksdb:configure_encryption
 
+# Alias to simplify enabling physical separation (into different column
+# families).
+build --flag_alias=physical=//pelton/sql/rocksdb:physical_separation
+
 build --cxxopt="-std=c++2a"
 build --host_cxxopt="-std=c++2a"
 build --copt -g
