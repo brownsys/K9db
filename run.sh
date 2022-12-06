@@ -22,6 +22,11 @@ elif [[ "$1"  == "tsan" ]]; then
   TSAN_OPTIONS=suppressions=/home/bab/Documents/research/pelton/.tsan_jvm_suppress.txt \
   bazel run //:pelton --config tsan -- --logtostderr=1
 
+elif [[ "$1" == "unencrypted" ]]; then
+    rm -rf /mnt/disks/my-ssd/pelton/
+  mkdir -p /mnt/disks/my-ssd/pelton/
+  bazel run //:pelton --config opt --encryption=off -- "${@:2}"
+
 else
-  echo 'use either "dbg", "opt", "valgrind", "asan", or "tsan"!'
+  echo 'use either "dbg", "opt", "unencrypted", "valgrind", "asan", or "tsan"!'
 fi
