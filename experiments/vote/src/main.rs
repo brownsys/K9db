@@ -46,6 +46,7 @@ where
     let per_generator = 1_500_000;
     let mut target = value_t_or_exit!(global_args, "ops", f64);
     let ngen = (target as usize + per_generator - 1) / per_generator; // rounded up
+    assert!(ngen == 1);
     target /= ngen as f64;
 
     let articles = value_t_or_exit!(global_args, "articles", usize);
@@ -67,7 +68,7 @@ where
 
     let ts = (write_t.clone(), read_t.clone());
 
-    let available_cores = num_cpus::get() - ngen;
+    let available_cores = num_cpus::get() - ngen - 2;
     let mut rt = tokio::runtime::Builder::new()
         .enable_all()
         .threaded_scheduler()
@@ -115,7 +116,7 @@ where
                             handle,
                             errd,
                             ex,
-                            zipf::ZipfDistribution::new(articles, 1.15).unwrap(),
+                            zipf::ZipfDistribution::new(articles, 0.6).unwrap(),
                             target,
                             global_args,
                         )
