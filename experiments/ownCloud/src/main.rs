@@ -4,6 +4,7 @@ extern crate clap;
 use rand::Rng;
 use std::io::Write;
 use std::time::{Duration, Instant};
+use std::collections::HashMap;
 
 // src/*.rs
 mod backend;
@@ -31,7 +32,7 @@ pub struct Args {
   pub views: bool,
   pub indices: bool,
   pub accessors: bool,
-  pub warmup: usize,
+  pub warmup: bool,
   pub distr: Option<ZipfF>,
 }
 
@@ -56,7 +57,7 @@ fn main() {
                 (@arg views: --views "Disable views")
                 (@arg indices: --indices "Disable in memory indices")
                 (@arg accessors: --accessors "Disable accessors")
-                (@arg warmup: --warmup +takes_value "# reads to warm up")
+                (@arg warmup: --warmup "Warmup the cache!")
                 (@arg distr: --zipf [s] "Use zipf distribution with a frequency rank exponent of 's' (default to uniform)")
         ).get_matches();
 
@@ -79,7 +80,7 @@ fn main() {
     views: matches.is_present("views"),
     indices: matches.is_present("indices"),
     accessors: matches.is_present("accessors"),
-    warmup: value_t!(matches, "warmup", usize).unwrap_or(0),
+    warmup: matches.is_present("warmup"),
     distr: value_t!(matches, "distr", ZipfF).ok(),
   };
 
@@ -99,6 +100,19 @@ fn main() {
   let groups = st.generate_groups(&users, args.users_per_group);
   let group_shares =
     st.generate_group_shares(&groups, &files, args.group_shares_per_file);
+
+  // Map user at index k to group at index v.
+  let mut user_to_group_map: HashMap<usize, usize> = HashMap::new();
+  let mut index_map: HashMap<String, usize> = HashMap::new();
+  for (i, u) in users.iter().enumerate() {
+    index_map.insert(u.uid.clone(), i);
+  }
+  for (gi, g) in groups.iter().enumerate() {
+    for (_, u) in &g.users {
+      let i = index_map[&u.uid];
+      user_to_group_map.insert(i, gi);
+    }
+  }
 
   // Parameters.
   let in_size = args.in_size;
@@ -142,9 +156,10 @@ fn main() {
   let mut workload = WorkloadGenerator::new(st, args.distr.unwrap_or(0.0) /* s = 0 is uniform distr */);
 
   // Warmup.
-  for i in 0..args.warmup {
-    let request = workload.make_read(in_size, &users);
-    backend.run(&request);
+  if args.warmup {
+    let instant = Instant::now();
+    backend.warmup();
+    eprintln!("--> Warmup done in {}ms", instant.elapsed().as_millis());
   }
 
   // Run actual load.
@@ -166,7 +181,7 @@ fn main() {
       } else if last_write % 3 == 1 {
         // do indirect
         let last_write_direct = false;
-        let request = workload.make_group_share(&groups, &files);
+        let request = workload.make_group_share(&users, &groups, &files, &user_to_group_map);
         gwrites.push(backend.run(&request));
       } else {
         // do update file by pk

@@ -40,6 +40,7 @@ impl GeneratorState {
   pub fn generate_users(&mut self, num: usize) -> Vec<User> {
     let users: Vec<User> = std::iter::repeat_with(|| User {
       uid: self.new_sid(EntityType::User),
+      gid: "".to_string(),
     })
     .take(num)
     .collect();

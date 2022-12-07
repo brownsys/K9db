@@ -119,13 +119,20 @@ impl Backend {
       },
     }
   }
-
   pub fn execute(&mut self, sql: &str) {
     match self {
       Backend::Pelton(conn) => conn.query_drop(sql).unwrap(),
       Backend::MariaDB(conn) => conn.query_drop(sql).unwrap(),
       Backend::Memcached(conn, _) => conn.query_drop(sql).unwrap(),
       Backend::Simulate(_) => {},
+    }
+  }
+  pub fn warmup(&mut self) {
+    match self {
+      Backend::Pelton(conn) => {},
+      Backend::MariaDB(conn) => {},
+      Backend::Memcached(conn, cl) => hybrid::warmup(conn, cl),
+      Backend::Simulate(conn) => {},
     }
   }
 

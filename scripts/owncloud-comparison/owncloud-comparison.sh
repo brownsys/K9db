@@ -4,7 +4,7 @@ OUT="$PELTONDIR/scripts/owncloud-comparison"
 echo "Writing output to $OUT"
 
 # Experiment parameters.
-user=10000
+user=100000
 groups=5
 files=3
 dshare=3
@@ -12,7 +12,6 @@ gshare=2
 writes=20
 insize=50
 ops=500
-warmup=500
 zipf=1.6
 
 # Go to owncloud directory
@@ -46,7 +45,7 @@ bazel run :benchmark -c opt -- \
   --write_every $writes \
   --in_size $insize \
   --operations $ops \
-  --warmup $warmup \
+  --warmup \
   --zipf $zipf \
   --backend memcached \
   > "$OUT/hybrid.out" 2>&1

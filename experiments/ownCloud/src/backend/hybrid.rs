@@ -107,8 +107,7 @@ pub fn reads<'a>(
       }
       map.insert(key, value);
     }
-
-    // Store data in memcached.
+    
     client
       .set_multi(
         map
@@ -130,6 +129,39 @@ pub fn reads<'a>(
   }
 
   time
+}
+
+pub fn warmup(conn: &mut Conn, client: &mut Client) {
+  // Get all the data.
+  let results = mariadb::read_all_with_data(conn);
+  
+  // Group by user id (share_target)
+  let mut map: BTreeMap<String, String> = BTreeMap::new();
+  for row in results {
+    // The user id is the last (sixth) column.
+    let key = encode_user(&row.get::<String, usize>(6).unwrap());
+    // The row is encoded as a string.
+    let mut value = encode_row(row);
+    // Concat encoding of this row to any previous rows associated with
+    // the same user.
+    if map.contains_key(&key) {
+      let old = map.get(&key).unwrap();
+      if old.len() > 0 {
+        value = concat_rows(old, &value);
+      }
+    }
+    map.insert(key, value);
+  }
+
+  // Store data in memcached.
+  client
+    .set_multi(
+      map
+        .iter()
+        .map(|(k, v)| (k.as_bytes(), (v.as_bytes(), 0, 0)))
+        .collect(),
+    )
+    .unwrap();
 }
 
 pub fn direct<'a>(
