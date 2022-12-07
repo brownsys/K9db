@@ -287,6 +287,11 @@ std::ostream &operator<<(std::ostream &os, const AbstractStatement &r) {
   os << r.Visit(&stringifier);
   return os;
 }
+std::ostream &operator<<(std::ostream &os, const Expression &e) {
+  Stringifier stringifier;
+  os << e.Visit(&stringifier);
+  return os;
+}
 
 }  // namespace sqlast
 }  // namespace pelton

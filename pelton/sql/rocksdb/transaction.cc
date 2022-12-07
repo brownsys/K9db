@@ -162,7 +162,7 @@ std::vector<std::optional<std::string>> RocksdbTransaction::MultiGet(
   results.reserve(keys.size());
   for (size_t i = 0; i < keys.size(); i++) {
     if (statuses[i].ok()) {
-      results.emplace_back(std::move(*pins[i].GetSelf()));
+      results.emplace_back(pins[i].ToString());
     } else if (statuses[i].IsNotFound()) {
       results.emplace_back();
     } else {
@@ -197,8 +197,7 @@ std::vector<std::optional<std::string>> RocksdbTransaction::MultiGetForUpdate(
     rocksdb::ColumnFamilyHandle *cf,
     const std::vector<rocksdb::Slice> &keys) const {
   std::vector<rocksdb::ColumnFamilyHandle *> handles(keys.size(), cf);
-  std::vector<std::string> pins;
-  pins.reserve(keys.size());
+  std::vector<std::string> pins(keys.size(), "");
 
   // Read from rocksdb.
   rocksdb::ReadOptions opts;
