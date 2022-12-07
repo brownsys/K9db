@@ -3,7 +3,8 @@ OUT="/home/pelton/pelton/scripts/lobsters-endpoints"
 echo "Writing output to $OUT"
 
 RT=120
-DS=2.5
+#15k users
+DS=2.59
 RS=1000
 TARGET_IP="$1"
 
