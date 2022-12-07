@@ -106,7 +106,7 @@ fn main() {
   let operations = args.operations;
 
   // Run the experiment for each provided backend.
-  let mut backend = Backend::from_str(&args.backend, args.views, args.accessors, args.echo);
+  let mut backend = Backend::from_str(&args.backend, args.views, args.accessors);
   eprintln!("--> Starting backend {}", backend);
 
   // Insert load (priming).
@@ -132,6 +132,10 @@ fn main() {
   if args.perf {
     eprintln!("# perf provided: waiting for user input before executing load");
     std::io::stdin().read_line(&mut String::new());
+  }
+  if args.echo {
+    eprintln!("SET ECHO!");
+    backend.execute("SET echo");
   }
 
   // Create a generator workload.

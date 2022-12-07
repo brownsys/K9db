@@ -130,9 +130,9 @@ impl Backend {
   }
 
   // Parse backend from string.
-  pub fn from_str(s: &str, views: bool, accessors: bool, echo: bool) -> Self {
+  pub fn from_str(s: &str, views: bool, accessors: bool) -> Self {
     match s {
-      "pelton" => Backend::Pelton(pelton_connect(views, accessors, echo)),
+      "pelton" => Backend::Pelton(pelton_connect(views, accessors)),
       "mariadb" => Backend::MariaDB(mariadb_connect()),
       "memcached" => Backend::Memcached(mariadb_connect(), memcached_connect()),
       "simulate" => Backend::Simulate(simulate::SimulatedState::new()),

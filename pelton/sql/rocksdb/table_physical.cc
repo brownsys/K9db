@@ -169,9 +169,11 @@ std::vector<std::optional<EncryptedValue>> RocksdbPhysicalSeparator::MultiGet(
 
     // Transform to Ciphers.
     for (size_t i = 0; i < vec.size(); i++) {
-      std::optional<std::string> opt = data.at(i);
+      std::optional<std::string> &opt = data.at(i);
       if (opt.has_value()) {
         result[vec.at(i)] = Cipher::FromDB(std::move(opt.value()));
+      } else {
+        result[vec.at(i)] = std::optional<EncryptedValue>();
       }
     }
   }
