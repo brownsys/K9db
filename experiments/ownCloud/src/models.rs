@@ -1,6 +1,7 @@
 // Owncloud user.
 pub struct User {
   pub uid: String,
+  pub gid: String,  // ID of the group this user is in.
 }
 
 pub struct File<'a> {

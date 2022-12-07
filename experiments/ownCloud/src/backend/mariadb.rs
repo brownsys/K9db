@@ -30,6 +30,24 @@ pub fn reads_with_data<'a>(conn: &mut Conn, sample: &Vec<String>) -> Vec<Row> {
   conn.query(query).unwrap()
 }
 
+pub fn read_all_with_data(conn: &mut Conn) -> Vec<Row> {
+  let query = format!(
+    "(SELECT s.id as sid, s.item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, s.share_with as share_target
+      FROM oc_share s
+      LEFT JOIN oc_filecache f ON s.file_source = f.fileid
+      LEFT JOIN oc_storages st ON f.storage = st.numeric_id
+      WHERE (s.share_type = 0))
+     UNION 
+      (SELECT s.id as sid, s.item_source, s.share_type, f.fileid, f.path, st.id AS storage_string_id, oc_group_user.uid as share_target
+      FROM oc_share s
+      LEFT JOIN oc_filecache f ON s.file_source = f.fileid
+      LEFT JOIN oc_storages st ON f.storage = st.numeric_id
+      JOIN oc_group_user ON s.share_with_group = oc_group_user.gid
+      WHERE (s.share_type = 1))",
+  );
+  conn.query(query).unwrap()
+}
+
 // Workload execution.
 pub fn reads<'a>(
   conn: &mut Conn,

@@ -6,6 +6,8 @@ use rand::distributions::Distribution;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
+use std::collections::HashMap;
+
 // src.models.rs
 use super::generator::{EntityType, GeneratorState};
 use super::models::{File, Group, Share, ShareType, User};
@@ -73,11 +75,15 @@ impl WorkloadGenerator {
     users: &'a [User],
     files: &'a [File<'a>],
   ) -> Request<'a> {
-    let ulen = users.len();
+    // Select a user from zipf.
+    let distr = Zipf::new(users.len() as u64, self.zipf_f).unwrap();
+    let s = distr.sample(&mut self.rng) - 1.0;
+    let u: &'a User = &users[s as usize];
+    // Select some file randomly.
     let flen = files.len();
     let share = Share {
       id: self.st.new_id(EntityType::Share),
-      share_with: ShareType::Direct(&users[self.rng.gen_range(0..ulen)]),
+      share_with: ShareType::Direct(u),
       file: &files[self.rng.gen_range(0..flen)],
     };
     self.st.track_share(&share);
@@ -87,14 +93,22 @@ impl WorkloadGenerator {
   // Create a write workload with indirect shares.
   pub fn make_group_share<'a>(
     &mut self,
+    users: &'a [User],
     groups: &'a [Group<'a>],
     files: &'a [File<'a>],
+    user_to_group: &HashMap<usize, usize>,
   ) -> Request<'a> {
-    let glen = groups.len();
+    // Select a user from zipf.
+    let distr = Zipf::new(users.len() as u64, self.zipf_f).unwrap();
+    let s = distr.sample(&mut self.rng) - 1.0;
+    let u = s as usize;
+    // Get group of the select users.
+    let g = &groups[user_to_group[&u]];
+    // Select some file randomly.
     let flen = files.len();
     let share = Share {
       id: self.st.new_id(EntityType::Share),
-      share_with: ShareType::Group(&groups[self.rng.gen_range(0..glen)]),
+      share_with: ShareType::Group(g),
       file: &files[self.rng.gen_range(0..flen)],
     };
     self.st.track_share(&share);

@@ -119,6 +119,15 @@ impl Backend {
     }
   }
 
+  pub fn warmup(&mut self) {
+    match self {
+      Backend::Pelton(conn) => {},
+      Backend::MariaDB(conn) => {},
+      Backend::Memcached(conn, cl) => hybrid::warmup(conn, cl),
+      Backend::Simulate(conn) => {},
+    }
+  }
+
   // Parse backend from string.
   pub fn from_str(s: &str) -> Self {
     match s {
