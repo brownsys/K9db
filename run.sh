@@ -23,7 +23,7 @@ elif [[ "$1"  == "tsan" ]]; then
   bazel run //:pelton --config tsan -- --logtostderr=1
 
 elif [[ "$1" == "unencrypted" ]]; then
-    rm -rf /mnt/disks/my-ssd/pelton/
+  rm -rf /mnt/disks/my-ssd/pelton/
   mkdir -p /mnt/disks/my-ssd/pelton/
   bazel run //:pelton --config opt --encryption=off -- "${@:2}"
 

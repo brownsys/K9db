@@ -28,7 +28,7 @@ bazel run -c opt //:lobsters-harness -- \
 # send signal to server to kill mariadb and start pelton.
 echo "Killing pelton server..."
 mariadb -P10001 --host=$TARGET_IP -e "STOP";
-sleep 30
+sleep 60
 
 # Pelton.
 echo "Priming pelton..."
@@ -49,7 +49,7 @@ bazel run -c opt //:lobsters-harness -- \
 echo "Killing pelton server..."
 mariadb -P10001 --host=$TARGET_IP -e "STOP";
 
-sleep 90
+sleep 240
 
 # Pelton unencrypted.
 echo "Priming pelton (unencrypted)..."
