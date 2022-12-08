@@ -11,7 +11,7 @@ dshare=3
 gshare=2
 writes=20
 insize=50
-ops=500
+ops=30000
 warmup=500
 zipf=1.6
 
@@ -95,7 +95,7 @@ sleep 90
 # No view + no indices + no accessors
 echo "Running pelton - physical separation + no views + no indices + no accessors"
 bazel run :benchmark -c opt -- \
-  --num-users $user \
+  --num-users 1000 \
   --users-per-group $groups \
   --files-per-user $files \
   --direct-shares-per-file $dshare \
