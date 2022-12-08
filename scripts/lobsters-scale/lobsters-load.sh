@@ -11,7 +11,7 @@ cd ~/pelton/experiments/lobsters
 
 # Loop over datascales
 #for DS in "1.72" "3.44" "5.17" "6.89" "8.62"        # 10k:50k:10k
-for DS in "1.72" "2.59" "3.44" "4.31" "5.17"        # 10k:30k:5k
+for DS in "7.76" "10.34" "12.9" "8.62" "17.24"       # 45k, 60k, 75k, 50k, 100k
 do
   echo "Datascale $DS"
   bazel run -c opt //:lobsters-harness -- \
