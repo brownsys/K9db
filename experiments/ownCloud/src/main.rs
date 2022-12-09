@@ -25,7 +25,6 @@ pub struct Args {
   pub backend: String,
   pub in_size: usize,
   pub outfile: Option<String>,
-  pub write_every: usize,
   pub operations: usize,
   pub perf: bool,
   pub warmup: bool,
@@ -46,7 +45,6 @@ fn main() {
                 (@arg backend: --backend ... +required +takes_value "Backend type to use")
                 (@arg in_size: --in_size +takes_value "Number of values in an IN clauses")
                 (@arg outfile: -o --out +takes_value "File for writing output to (defaults to stdout")
-                (@arg write_every: --write_every +takes_value "Issue a direct or group write every x operations")
                 (@arg operations: --operations +takes_value "Number of operations in load")
                 (@arg perf: --perf "Wait for user input before starting workload to attach perf")
                 (@arg warmup: --warmup "Warmup the cache!")
@@ -65,7 +63,6 @@ fn main() {
     backend: matches.value_of("backend").map(&str::to_string).unwrap(),
     in_size: value_t!(matches, "in_size", usize).unwrap_or(1),
     outfile: matches.value_of("outfile").map(&str::to_string),
-    write_every: value_t_or_exit!(matches, "write_every", usize),
     operations: value_t_or_exit!(matches, "operations", usize),
     perf: matches.is_present("perf"),
     warmup: matches.is_present("warmup"),
@@ -96,15 +93,14 @@ fn main() {
     index_map.insert(u.uid.clone(), i);
   }
   for (gi, g) in groups.iter().enumerate() {
-    for (_, u) in &g.users {
-      let i = index_map[&u.uid];
+    for (_, uid) in &g.users {
+      let i = index_map[uid];
       user_to_group_map.insert(i, gi);
     }
   }
 
   // Parameters.
   let in_size = args.in_size;
-  let write_every = args.write_every;
   let operations = args.operations;
 
   // Run the experiment for each provided backend.
@@ -113,15 +109,11 @@ fn main() {
 
   // Insert load (priming).
   let instant = Instant::now();
-  users.iter().for_each(|user| backend.insert_user(user));
-  groups.iter().for_each(|group| backend.insert_group(group));
-  files.iter().for_each(|file| backend.insert_file(file));
-  direct_shares
-    .iter()
-    .for_each(|share| backend.insert_share(share));
-  group_shares
-    .iter()
-    .for_each(|share| backend.insert_share(share));
+  backend.insert_users(users.clone());
+  backend.insert_groups(groups.clone());
+  backend.insert_files(files.clone());
+  backend.insert_shares(direct_shares.clone());
+  backend.insert_shares(group_shares.clone());
   eprintln!("--> Priming done in {}ms", instant.elapsed().as_millis());
 
   // Wait for user input.
@@ -146,41 +138,36 @@ fn main() {
   let mut reads = Vec::<u128>::new();
   let mut dwrites = Vec::<u128>::new();
   let mut gwrites = Vec::<u128>::new();
-
   let mut read_file_pk = Vec::<u128>::new();
   let mut update_file_pk = Vec::<u128>::new();
-  for i in 0..operations {
-    if write_every > 0 && i > 0 && i % write_every == 0 {
-      // Must issue a write.
-      if last_write % 3 == 0 {
-        // do direct
-        let request = workload.make_direct_share(&users, &files);
-        dwrites.push(backend.run(&request));
-      } else if last_write % 3 == 1 {
-        // do indirect
-        let last_write_direct = false;
-        let request = workload.make_group_share(&users, &groups, &files, &user_to_group_map);
+
+  let mut next_write = 0;
+  for i in 0..(operations/3) {
+    // Issue a direct/indirect write and a update by pk.
+    if next_write % 3 == 0 {
+      // do direct
+      let request = workload.make_direct_share(&users, &files);
+      dwrites.push(backend.run(&request));
+    } else if next_write % 3 == 1 {
+      // do indirect
+      let request = workload.make_group_share(&users, &groups, &files, &user_to_group_map);
         gwrites.push(backend.run(&request));
-      } else {
-        // do update file by pk
-        let request = workload.make_update_file_pk(&files);
-        update_file_pk.push(backend.run(&request));
-      }
-      last_write += 1;
     } else {
-      // Must issue a read.
-      if !last_read_user{
-        // read all of a user's files
-        last_read_user = true;
-        let request = workload.make_read(in_size, &users);
-        reads.push(backend.run(&request));
-      } else {
-        // read a specific file by pk
-        last_read_user = false;
-        let request = workload.make_get_file_pk(in_size, &files);
-        read_file_pk.push(backend.run(&request));
-      }
-    };
+      // do update file by pk
+      let request = workload.make_update_file_pk(&files);
+      update_file_pk.push(backend.run(&request));  
+    }
+    next_write += 1;
+    
+    // read all of a user's files
+    last_read_user = true;
+    let request = workload.make_read(in_size, &users);
+    reads.push(backend.run(&request));
+    
+    // read a specific file by pk
+    last_read_user = false;
+    let request = workload.make_get_file_pk(in_size, &files);
+    read_file_pk.push(backend.run(&request));
   }
 
   // Report medians and tails.

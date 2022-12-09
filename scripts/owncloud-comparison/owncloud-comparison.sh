@@ -1,18 +1,18 @@
 #!/bin/bash
 PELTONDIR="/home/pelton/pelton"
+PELTONDIR="../.."
 OUT="$PELTONDIR/scripts/owncloud-comparison"
 echo "Writing output to $OUT"
 
 # Experiment parameters.
-user=100000
+user=10000
 groups=5
 files=3
 dshare=3
 gshare=2
-writes=20
-insize=50
-ops=30000
-zipf=1.6
+insize=10
+ops=10000
+zipf=0.6
 
 # Go to owncloud directory
 cd $PELTONDIR
@@ -26,7 +26,6 @@ bazel run :benchmark -c opt -- \
   --files-per-user $files \
   --direct-shares-per-file $dshare \
   --group-shares-per-file $gshare \
-  --write_every $writes \
   --in_size $insize \
   --operations $ops \
   --zipf $zipf \
@@ -42,7 +41,6 @@ bazel run :benchmark -c opt -- \
   --files-per-user $files \
   --direct-shares-per-file $dshare \
   --group-shares-per-file $gshare \
-  --write_every $writes \
   --in_size $insize \
   --operations $ops \
   --warmup \
@@ -63,7 +61,6 @@ bazel run :benchmark -c opt -- \
   --files-per-user $files \
   --direct-shares-per-file $dshare \
   --group-shares-per-file $gshare \
-  --write_every $writes \
   --in_size $insize \
   --operations $ops \
   --zipf $zipf \

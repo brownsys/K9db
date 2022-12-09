@@ -11,7 +11,7 @@ bazel build ... -c opt
 
 # Build memcached
 cd /home/pelton/pelton/experiments/memcached
-bazel build @memcached//:memcached -c opt
+bazel build @memcached//:memcached --config=opt
 
 # Build pelton
 cd /home/pelton/pelton

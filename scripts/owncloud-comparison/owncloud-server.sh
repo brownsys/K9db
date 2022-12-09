@@ -1,5 +1,6 @@
 #!/bin/bash
 PELTONDIR="/home/pelton/pelton"
+PELTONDIR="../.."
 OUT="$PELTONDIR/scripts/owncloud-comparison"
 echo "Writing output to $OUT"
 cd $PELTONDIR
@@ -9,7 +10,7 @@ sudo service mariadb restart
 
 # Run memcached.
 cd experiments/memcached
-bazel run @memcached//:memcached --config=opt -- -M -m 2048 > "$OUT/memcached.log" 2>&1 &
+bazel run @memcached//:memcached --config=opt -- -U 0 -p 11211 -M -m 2048 > "$OUT/memcached.log" 2>&1 &
 pid=$!
 
 # Get signal to kill memcached.
