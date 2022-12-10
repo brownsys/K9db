@@ -10,7 +10,7 @@ files=3
 dshare=3
 gshare=2
 insize=10
-ops=1000
+ops=10000
 zipf=0.6
 
 
