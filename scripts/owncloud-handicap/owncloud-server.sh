@@ -7,6 +7,10 @@ cd $PELTONDIR
 # Stop mariadb.
 sudo service mariadb stop
 
+# Run pelton.
+./run.sh opt
+echo "Terminated"
+
 # Run pelton - no views.
 ./run.sh opt
 echo "Terminated"

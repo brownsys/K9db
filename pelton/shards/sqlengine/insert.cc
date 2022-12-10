@@ -270,9 +270,7 @@ absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
   this->db_->CommitTransaction();
 
   // Process updates to dataflows.
-  if (this->sstate_.IndicesEnabled()) {
-    this->dstate_.ProcessRecords(this->table_name_, std::move(records));
-  }
+  this->dstate_.ProcessRecords(this->table_name_, std::move(records));
 
   // Return number of copies inserted.
   return sql::SqlResult(status);

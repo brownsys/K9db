@@ -4,18 +4,34 @@ OUT="$PELTONDIR/scripts/owncloud-handicap"
 echo "Writing output to $OUT"
 
 # Experiment parameters.
-user=10000
+user=100000
 groups=5
 files=3
 dshare=3
 gshare=2
-insize=10
-ops=10000
-
+insize=50
+ops=25000
 
 # Go to owncloud directory
 cd $PELTONDIR
 cd experiments/ownCloud
+
+# Pelton.
+echo "Running pelton - no views"
+bazel run :benchmark -c opt -- \
+  --num-users $user \
+  --users-per-group $groups \
+  --files-per-user $files \
+  --direct-shares-per-file $dshare \
+  --group-shares-per-file $gshare \
+  --in_size $insize \
+  --operations $ops \
+  --backend pelton \
+  > "$OUT/pelton.out" 2>&1
+
+# kill Pelton
+echo "killing pelton"
+mariadb -P10001 --host=127.0.0.1 -e "STOP"
 
 # No views.
 echo "Running pelton - no views"
