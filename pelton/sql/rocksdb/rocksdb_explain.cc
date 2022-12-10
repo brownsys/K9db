@@ -46,6 +46,7 @@ std::string RocksdbConnection::GetIndex(
   std::string result = "";
   RocksdbTable::IndexChoice plan = table.ChooseIndex(&value_mapper);
   switch (plan.type) {
+#ifndef PELTON_PHYSICAL_SEPARATION
     case RocksdbTable::IndexChoiceType::PK: {
       index_cols.push_back(table.PKColumn());
       result = "(" + schema.NameOf(table.PKColumn()) + ")";
@@ -63,6 +64,7 @@ std::string RocksdbConnection::GetIndex(
       result = Join(index_cols, schema) + " [TOTAL]";
       break;
     }
+#endif  // PELTON_PHYSICAL_SEPARATION
     case RocksdbTable::IndexChoiceType::SCAN: {
       result = "[SCAN]";
       break;

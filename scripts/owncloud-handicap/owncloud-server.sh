@@ -8,19 +8,19 @@ cd $PELTONDIR
 sudo service mariadb stop
 
 # Run pelton.
-./run.sh opt
+./run.sh physical
 echo "Terminated"
 
 # Run pelton - no views.
-./run.sh opt
+./run.sh physical
 echo "Terminated"
 
 # Run pelton - no indices
-./run.sh opt
+./run.sh physical
 echo "Terminated"
 
 # Run pelton - no accessors
-./run.sh opt
+./run.sh physical
 echo "Terminated"
 
 # Run pelton - physical separation.

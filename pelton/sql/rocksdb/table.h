@@ -68,10 +68,12 @@ class RocksdbTable {
       sqlast::ValueMapper *vm, const RocksdbTransaction *txn) const;
 
   // Get an index.
+#ifndef PELTON_PHYSICAL_SEPARATION
   const RocksdbPKIndex &GetPKIndex() const { return this->pk_index_; }
   const RocksdbIndex &GetTableIndex(size_t index) const {
     return this->indices_.at(index);
   }
+#endif  // PELTON_PHYSICAL_SEPARATION
 
   // Index information.
   std::vector<std::string> GetIndices() const {
@@ -91,9 +93,11 @@ class RocksdbTable {
     return result;
   }
 
+#ifndef PELTON_PHYSICAL_SEPARATION
   // Check if a record with given PK exists.
   bool Exists(const rocksdb::Slice &pk_value,
               const RocksdbTransaction *txn) const;
+#endif  // PELTON_PHYSICAL_SEPARATION
 
   // Put/Delete API.
   void Put(const EncryptedKey &key, const EncryptedValue &value,
@@ -127,7 +131,9 @@ class RocksdbTable {
   RocksdbPhysicalSeparator handle_;
 
   // Indices.
+#ifndef PELTON_PHYSICAL_SEPARATION
   RocksdbPKIndex pk_index_;
+#endif  // PELTON_PHYSICAL_SEPARATION
   std::vector<RocksdbIndex> indices_;
 };
 

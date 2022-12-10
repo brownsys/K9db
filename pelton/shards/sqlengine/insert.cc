@@ -104,9 +104,11 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
   // First, make sure PK does not exist! (this also locks).
   size_t pk = this->schema_.keys().front();
   const std::string &pkcol = this->schema_.NameOf(pk);
+#ifndef PELTON_PHYSICAL_SEPARATION
   if (this->db_->Exists(this->table_name_, this->stmt_.GetValue(pkcol, pk))) {
     return absl::InvalidArgumentError("PK exists!");
   }
+#endif  // PELTON_PHYSICAL_SEPARATION 
 
   // Need to insert a copy for each way of sharding the table.
   int res = 0;

@@ -20,11 +20,15 @@ namespace rocks {
 
 bool RocksdbSession::Exists(const std::string &table_name,
                             const sqlast::Value &pk) const {
+#ifdef PELTON_PHYSICAL_SEPARATION
+  LOG(FATAL) << "Unsupported";
+#else
   CHECK(!pk.IsNull()) << "PK is NULL";
   const RocksdbTable &table = this->conn_->tables_.at(table_name);
   size_t pk_index = table.Schema().keys().front();
   std::string pk_value = EncodeValue(table.Schema().TypeOf(pk_index), pk);
   return table.Exists(pk_value, this->txn_.get());
+#endif
 }
 
 int RocksdbSession::ExecuteInsert(const sqlast::Insert &stmt,
@@ -62,6 +66,9 @@ int RocksdbSession::ExecuteInsert(const sqlast::Insert &stmt,
 
 RecordAndStatus RocksdbSession::ExecuteReplace(
     const sqlast::Replace &stmt, const util::ShardName &shard_name) {
+#ifdef PELTON_PHYSICAL_SEPARATION
+  LOG(FATAL) << "Unsupported";
+#else
   // Read table metadata.
   const std::string &table_name = stmt.table_name();
   RocksdbTable &table = this->conn_->tables_.at(table_name);
@@ -141,6 +148,7 @@ RecordAndStatus RocksdbSession::ExecuteReplace(
 
   // Done.
   return RecordAndStatus(std::move(result), count);
+#endif  // PELTON_PHYSICAL_SEPARATION
 }
 
 }  // namespace rocks

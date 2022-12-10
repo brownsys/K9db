@@ -1,6 +1,26 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 
+# Disable/enable "true" physical separation.
+# .bazelrc defines an alias to shortcut this
+# e.g. bazel build ... --physical=off    [default]
+#      bazel build ... --physical=on
+string_flag(
+    name = "physical_separation",
+    build_setting_default = "off",
+    values = [
+        "on",
+        "off",
+    ],
+)
+
+config_setting(
+    name = "enable_separation",
+    flag_values = {
+        ":physical_separation": "on",
+    },
+)
+
 cc_library(
     name = "rocksdb_connection",
     srcs = [
@@ -20,6 +40,10 @@ cc_library(
         "rocksdb_helpers.cc",
     ],
     visibility = ["//pelton:__subpackages__"],
+    defines = select({
+        ":enable_separation": ["PELTON_PHYSICAL_SEPARATION"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":dedup",
         ":encode",
@@ -67,26 +91,6 @@ cc_library(
     deps = [
         ":encode",
     ],
-)
-
-# Disable/enable "true" physical separation.
-# .bazelrc defines an alias to shortcut this
-# e.g. bazel build ... --physical=off    [default]
-#      bazel build ... --physical=on
-string_flag(
-    name = "physical_separation",
-    build_setting_default = "off",
-    values = [
-        "on",
-        "off",
-    ],
-)
-
-config_setting(
-    name = "enable_separation",
-    flag_values = {
-        ":physical_separation": "on",
-    },
 )
 
 cc_library(

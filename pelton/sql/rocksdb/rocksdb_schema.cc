@@ -30,6 +30,7 @@ bool RocksdbConnection::ExecuteCreateTable(const sqlast::CreateTable &stmt) {
       std::make_tuple(this->db_.get(), table_name, schema));
   CHECK(flag);
 
+#ifndef PELTON_PHYSICAL_SEPARATION
   // Create indices for table.
   for (size_t i = 0; i < stmt.GetColumns().size(); i++) {
     // Primary key already has index created for it.
@@ -50,6 +51,7 @@ bool RocksdbConnection::ExecuteCreateTable(const sqlast::CreateTable &stmt) {
       }
     }
   }
+#endif  // PELTON_PHYSICAL_SEPARATION
 
   return true;
 }

@@ -37,6 +37,9 @@ std::vector<dataflow::Record> RocksdbSession::GetDirect(
     CHECK(plan.type != RocksdbTable::IndexChoiceType::SCAN)
         << "Get Direct on non-indexed column";
 
+#ifdef PELTON_PHYSICAL_SEPARATION
+    LOG(FATAL) << "UNSUPPORTED";
+#else
     // Encode shards and column values for index lookup.
     std::vector<std::string> shard_names;
     std::vector<sqlast::Value> values;
@@ -57,6 +60,7 @@ std::vector<dataflow::Record> RocksdbSession::GetDirect(
       decr.push_back(record.GetShard().ToString());
       en_keys.push_back(this->conn_->encryption_.EncryptKey(record.Release()));
     }
+#endif  // PELTON_PHYSICAL_SEPARATION
   }
 
   // Lookup using multiget.
@@ -98,7 +102,56 @@ ResultSetAndStatus RocksdbSession::AssignToShards(
   // Look up table info.
   RocksdbTable &table = this->conn_->tables_.at(table_name);
   const dataflow::SchemaRef &schema = table.Schema();
+  std::unordered_set<sqlast::Value> set(values.begin(), values.end());
 
+#ifdef PELTON_PHYSICAL_SEPARATION
+  size_t count = 0;
+  std::vector<dataflow::Record> records;
+
+  RocksdbStream all = table.GetAll(this->txn_.get());
+  DedupSet<std::string> dup_keys;
+  for (auto [enkey, enval] : all) {
+    EncryptedKey enkey_copy = enkey;
+
+    // Decrypt key.
+    RocksdbSequence key =
+        this->conn_->encryption_.DecryptKey(std::move(enkey));
+
+    // Use shard from decrypted key to decrypt value.
+    if (!dup_keys.Duplicate(key.At(1).ToString())) {
+      // Decrypt record.
+      std::string shard = key.At(0).ToString();
+      RocksdbSequence row =
+          this->conn_->encryption_.DecryptValue(shard, std::move(enval));          
+      dataflow::Record record = row.DecodeRecord(schema, true);
+      // Does record match condition.
+      auto it = set.find(record.GetValue(column_index));
+      if (it != set.end()) {
+        records.push_back(std::move(record));
+
+        // Create the new target key and encrypt it.
+        for (const util::ShardName &target : targets) {
+          RocksdbSequence target_key;
+          target_key.Append(target);
+          target_key.AppendEncoded(row.At(schema.keys().front()));
+          EncryptedKey target_enkey =
+              this->conn_->encryption_.EncryptKey(std::move(target_key));
+
+          // Encrypt the row.
+          RocksdbSequence r(row);
+          EncryptedValue target_envalue =
+              this->conn_->encryption_.EncryptValue(target.ByRef(), std::move(r));
+
+          // Add to table.
+          table.IndexAdd(target.AsSlice(), row, this->txn_.get());
+          table.Put(target_enkey, target_envalue, this->txn_.get());
+          count++;
+        }
+      }
+    }
+  }
+  return std::pair(sql::SqlResultSet(schema, std::move(records)), count);
+#else
   // Find source then use the other API.
   sqlast::ValueMapper value_mapper(schema);
   value_mapper.AddValues(column_index, std::vector<sqlast::Value>(values));
@@ -214,12 +267,16 @@ ResultSetAndStatus RocksdbSession::AssignToShards(
   }
 
   return std::pair(sql::SqlResultSet(schema, std::move(records)), count);
+#endif  // PELTON_PHYSICAL_SEPARATION
 }
 
 // Count the number of shards each record with a given PK value is in.
 std::vector<size_t> RocksdbSession::CountShards(
     const std::string &table_name,
     const std::vector<sqlast::Value> &pk_values) const {
+#ifdef PELTON_PHYSICAL_SEPARATION
+  LOG(FATAL) << "UNSUPPORTED";
+#else
   // Look up table info.
   const RocksdbTable &table = this->conn_->tables_.at(table_name);
   const dataflow::SchemaRef &schema = table.Schema();
@@ -228,6 +285,7 @@ std::vector<size_t> RocksdbSession::CountShards(
   return table.GetPKIndex().CountShards(
       EncodeValues(schema.TypeOf(table.PKColumn()), pk_values),
       this->txn_.get());
+#endif  // PELTON_PHYSICAL_SEPARATION
 }
 
 // Delete records from shard, moving indicated ones to default shard.

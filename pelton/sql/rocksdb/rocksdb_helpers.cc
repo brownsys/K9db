@@ -82,7 +82,7 @@ std::vector<T> RocksdbSession::GetRecords(
   } else {
     // No relevant index; iterate over everything.
     if (where != nullptr) {
-      LOG(WARNING) << "Selecting by scan from table " << table_name;
+      // LOG(WARNING) << "Selecting by scan from table " << table_name;
     }
 
     // Iterate over everything while deduplicating by PK.

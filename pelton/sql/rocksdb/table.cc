@@ -35,7 +35,9 @@ RocksdbTable::RocksdbTable(rocksdb::DB *db, const std::string &table_name,
       pk_column_(),
       unique_columns_(),
       handle_(db, table_name),
+#ifndef PELTON_PHYSICAL_SEPARATION
       pk_index_(db, table_name),
+#endif  // PELTON_PHYSICAL_SEPARATION
       indices_() {
   const std::vector<dataflow::ColumnID> &keys = this->schema_.keys();
   CHECK_EQ(keys.size(), 1u) << "BAD PK ROCKSDB TABLE";
@@ -73,6 +75,7 @@ void RocksdbTable::CreateIndex(const std::vector<size_t> &cols) {
 void RocksdbTable::IndexAdd(const rocksdb::Slice &shard,
                             const RocksdbSequence &row, RocksdbTransaction *txn,
                             bool update_pk) {
+#ifndef PELTON_PHYSICAL_SEPARATION
   std::vector<rocksdb::Slice> split = row.Split();
   rocksdb::Slice pk = split.at(this->pk_column_);
 
@@ -90,10 +93,12 @@ void RocksdbTable::IndexAdd(const rocksdb::Slice &shard,
     }
     index.Add(index_values, shard, pk, txn);
   }
+#endif  // PELTON_PHYSICAL_SEPARATION
 }
 void RocksdbTable::IndexDelete(const rocksdb::Slice &shard,
                                const RocksdbSequence &row,
                                RocksdbTransaction *txn, bool update_pk) {
+#ifndef PELTON_PHYSICAL_SEPARATION
   std::vector<rocksdb::Slice> split = row.Split();
   rocksdb::Slice pk = split.at(this->pk_column_);
 
@@ -111,11 +116,13 @@ void RocksdbTable::IndexDelete(const rocksdb::Slice &shard,
     }
     index.Delete(index_values, shard, pk, txn);
   }
+#endif  // PELTON_PHYSICAL_SEPARATION
 }
 void RocksdbTable::IndexUpdate(const rocksdb::Slice &shard,
                                const RocksdbSequence &old,
                                const RocksdbSequence &updated,
                                RocksdbTransaction *txn) {
+#ifndef PELTON_PHYSICAL_SEPARATION
   std::vector<rocksdb::Slice> osplit = old.Split();
   std::vector<rocksdb::Slice> usplit = updated.Split();
   rocksdb::Slice pk = osplit.at(this->pk_column_);
@@ -137,11 +144,15 @@ void RocksdbTable::IndexUpdate(const rocksdb::Slice &shard,
       index.Add(uvalues, shard, pk, txn);
     }
   }
+#endif  // PELTON_PHYSICAL_SEPARATION
 }
 
 // Query planning (selecting index).
 RocksdbTable::IndexChoice RocksdbTable::ChooseIndex(
     sqlast::ValueMapper *value_mapper) const {
+#ifdef PELTON_PHYSICAL_SEPARATION
+  return {IndexChoiceType::SCAN, 0};
+#else
   // PK has highest priority.
   if (value_mapper->HasValues(this->pk_column_)) {
     return {IndexChoiceType::PK, 0};
@@ -172,6 +183,7 @@ RocksdbTable::IndexChoice RocksdbTable::ChooseIndex(
     return {IndexChoiceType::REGULAR, argmax};
   }
   return {IndexChoiceType::SCAN, 0};
+#endif  // PELTON_PHYSICAL_SEPARATION
 }
 RocksdbTable::IndexChoice RocksdbTable::ChooseIndex(size_t column_index) const {
   sqlast::ValueMapper vm(this->schema_);
@@ -182,6 +194,9 @@ RocksdbTable::IndexChoice RocksdbTable::ChooseIndex(size_t column_index) const {
 // Index Lookup.
 std::optional<IndexSet> RocksdbTable::IndexLookup(
     sqlast::ValueMapper *value_mapper, const RocksdbTransaction *txn) const {
+#ifdef PELTON_PHYSICAL_SEPARATION
+    return {};
+#else
   IndexChoice plan = this->ChooseIndex(value_mapper);
   switch (plan.type) {
     // By primary key index.
@@ -204,9 +219,13 @@ std::optional<IndexSet> RocksdbTable::IndexLookup(
     default:
       LOG(FATAL) << "Unsupported query plan";
   }
+#endif  // PELTON_PHYSICAL_SEPARATION
 }
 std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
     sqlast::ValueMapper *value_mapper, const RocksdbTransaction *txn) const {
+#ifdef PELTON_PHYSICAL_SEPARATION
+    return {};
+#else
   IndexChoice plan = this->ChooseIndex(value_mapper);
   switch (plan.type) {
     // By primary key index.
@@ -230,13 +249,16 @@ std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
     default:
       LOG(FATAL) << "Unsupported query plan";
   }
+#endif  // PELTON_PHYSICAL_SEPARATION
 }
 
+#ifndef PELTON_PHYSICAL_SEPARATION
 // Check if a record with given PK exists.
 bool RocksdbTable::Exists(const rocksdb::Slice &pk_value,
                           const RocksdbTransaction *txn) const {
   return this->pk_index_.CheckUniqueAndLock(pk_value, txn);
 }
+#endif  // PELTON_PHYSICAL_SEPARATION
 
 // Write to database.
 void RocksdbTable::Put(const EncryptedKey &key, const EncryptedValue &value,
