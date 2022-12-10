@@ -9,11 +9,10 @@ groups=5
 files=3
 dshare=3
 gshare=2
-writes=20
-insize=50
-ops=30000
-warmup=500
-zipf=1.6
+insize=10
+ops=1000
+zipf=0.6
+
 
 # Go to owncloud directory
 cd $PELTONDIR
@@ -27,7 +26,6 @@ bazel run :benchmark -c opt -- \
   --files-per-user $files \
   --direct-shares-per-file $dshare \
   --group-shares-per-file $gshare \
-  --write_every $writes \
   --in_size $insize \
   --operations $ops \
   --zipf $zipf \
@@ -50,7 +48,6 @@ bazel run :benchmark -c opt -- \
   --files-per-user $files \
   --direct-shares-per-file $dshare \
   --group-shares-per-file $gshare \
-  --write_every $writes \
   --in_size $insize \
   --operations $ops \
   --zipf $zipf \
@@ -74,7 +71,6 @@ bazel run :benchmark -c opt -- \
   --files-per-user $files \
   --direct-shares-per-file $dshare \
   --group-shares-per-file $gshare \
-  --write_every $writes \
   --in_size $insize \
   --operations $ops \
   --zipf $zipf \
@@ -88,7 +84,6 @@ bazel run :benchmark -c opt -- \
 echo "killing pelton"
 mariadb -P10001 --host=127.0.0.1 -e "STOP"
 
-
 # Sleep until physical separated pelton can be compiled
 sleep 90
 
@@ -100,7 +95,6 @@ bazel run :benchmark -c opt -- \
   --files-per-user $files \
   --direct-shares-per-file $dshare \
   --group-shares-per-file $gshare \
-  --write_every $writes \
   --in_size $insize \
   --operations $ops \
   --zipf $zipf \

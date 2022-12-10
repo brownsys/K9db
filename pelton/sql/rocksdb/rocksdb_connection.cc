@@ -6,6 +6,7 @@
 #include "glog/logging.h"
 #include "pelton/util/status.h"
 #include "rocksdb/options.h"
+#include "rocksdb/table.h"
 
 namespace pelton {
 namespace sql {
@@ -22,12 +23,16 @@ void RocksdbConnection::Open(const std::string &db_name) {
   std::string path = "/tmp/pelton/rocksdb/" + db_name;
 #endif  // PELTON_OPT
 
+  rocksdb::BlockBasedTableOptions table_options;
+  table_options.no_block_cache = true;
+
   // Options.
   rocksdb::Options opts;
   opts.create_if_missing = true;
   opts.error_if_exists = true;
   opts.IncreaseParallelism();
   opts.OptimizeLevelStyleCompaction();
+  opts.table_factory.reset(rocksdb::NewBlockBasedTableFactory(table_options));
 
   // Transaction options.
   rocksdb::TransactionDBOptions txn_opts;
