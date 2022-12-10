@@ -4,7 +4,7 @@ OUT="$PELTONDIR/scripts/owncloud-handicap"
 echo "Writing output to $OUT"
 
 # Experiment parameters.
-user=100000
+user=10000
 groups=5
 files=3
 dshare=3
@@ -28,7 +28,7 @@ bazel run :benchmark -c opt -- \
   --in_size $insize \
   --operations $ops \
   --backend pelton \
-  --views \
+  --accessors \
   > "$OUT/noviews.out" 2>&1
 
 # kill Pelton
@@ -50,7 +50,7 @@ bazel run :benchmark -c opt -- \
   --operations $ops \
   --backend pelton \
   --views \
-  --indices \
+  --accessors \
   > "$OUT/noindices.out" 2>&1
 
 # kill Pelton
