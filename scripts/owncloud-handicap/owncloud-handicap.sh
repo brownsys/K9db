@@ -11,7 +11,6 @@ dshare=3
 gshare=2
 insize=10
 ops=10000
-zipf=0.6
 
 
 # Go to owncloud directory
@@ -28,7 +27,6 @@ bazel run :benchmark -c opt -- \
   --group-shares-per-file $gshare \
   --in_size $insize \
   --operations $ops \
-  --zipf $zipf \
   --backend pelton \
   --views \
   > "$OUT/noviews.out" 2>&1
@@ -50,7 +48,6 @@ bazel run :benchmark -c opt -- \
   --group-shares-per-file $gshare \
   --in_size $insize \
   --operations $ops \
-  --zipf $zipf \
   --backend pelton \
   --views \
   --indices \
@@ -73,7 +70,6 @@ bazel run :benchmark -c opt -- \
   --group-shares-per-file $gshare \
   --in_size $insize \
   --operations $ops \
-  --zipf $zipf \
   --backend pelton \
   --views \
   --indices \
@@ -97,7 +93,6 @@ bazel run :benchmark -c opt -- \
   --group-shares-per-file $gshare \
   --in_size $insize \
   --operations $ops \
-  --zipf $zipf \
   --backend pelton \
   --views \
   --indices \
