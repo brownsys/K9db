@@ -25,10 +25,14 @@ bazel run -c opt //:lobsters-harness -- \
   "mysql://pelton:password@$TARGET_IP:3306/lobsters" \
   > "$OUT/baseline.out" 2>&1
 
-# send signal to server to kill mariadb and start pelton.
+# Show DB size of baseline.
+mariadb -P3306 --host=$TARGET_IP -u pelton -ppassword \
+  -e "SELECT table_schema AS 'Database', SUM(data_length + index_length) / 1024 / 1024 AS 'Size (MB)' FROM information_schema.TABLES GROUP BY table_schema"
+
+# Send signal to server to kill mariadb and start pelton.
 echo "Killing pelton server..."
 mariadb -P10001 --host=$TARGET_IP -e "STOP";
-sleep 60
+sleep 600  # Sleep long enough for memcached experiment to run and build on server.
 
 # Pelton.
 echo "Priming pelton..."
@@ -44,6 +48,9 @@ bazel run -c opt //:lobsters-harness -- \
   --backend pelton --scale_everything \
   "mysql://root:password@$TARGET_IP:10001/lobsters" \
   > "$OUT/pelton.out" 2>&1
+
+echo "Finding memory..."
+mariadb -P10001 --host=$TARGET_IP -e "SHOW MEMORY" > "$OUT/memory.out" 2>&1
 
 # Stop pelton server.
 echo "Killing pelton server..."

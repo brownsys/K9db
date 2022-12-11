@@ -1,4 +1,21 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+
+string_flag(
+    name = "queries",
+    build_setting_default = "real",
+    values = [
+        "all",
+        "real",
+    ],
+)
+
+config_setting(
+    name = "real_queries",
+    flag_values = {
+        ":queries": "real",
+    },
+)
 
 cc_binary(
     name = "memcached",
@@ -15,4 +32,8 @@ cc_binary(
     deps = [
         "@libmemcached",
     ],
+    defines = select({
+        ":real_queries": ["QUERIES=REAL_QUERIES"],
+        "//conditions:default": ["QUERIES=ALL_QUERIES"],
+    }),
 )

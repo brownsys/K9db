@@ -32,7 +32,7 @@ static std::vector<std::string> ALL_QUERIES = {
     "SELECT suggested_titles.* FROM suggested_titles WHERE "
     "suggested_titles.story_id = ?",                                // _7
     "SELECT taggings.* FROM taggings WHERE taggings.story_id = ?",  // _8
-    "SELECT 1 AS `one`, hats.OWNER_user_id FROM hats WHERE hats.OWNER_user_id "
+    "SELECT 1 AS `one`, hats.user_id FROM hats WHERE hats.user_id "
     "= ? LIMIT 1",  // _9
     "SELECT suggested_taggings.* FROM suggested_taggings WHERE "
     "suggested_taggings.story_id = ?",  // _10
@@ -100,9 +100,12 @@ static std::regex REGEX_HAVING{"(.*) HAVING ([A-Za-z0-9\\._]+) \\= \\?(.*)"};
 static std::regex REGEX_COLUMN{"([A-Za-z_0-9]+\\.)?([A-Za-z0-9_]+)"};
 static std::regex REGEX_LIMIT{"(.*) LIMIT ([0-9]+)"};
 
-#define QUERIES ALL_QUERIES
+// QUERIES should be defined to be REAL_QUERIES or ALL_QUERIES by bazel.
+#define DO_QUOTE(X)        #X
+#define QUOTE(X)           DO_QUOTE(X)
 
 int main(int argc, char **argv) {
+  std::cout << QUOTE(QUERIES) << std::endl;
   uint64_t total_size = 0;
 
   // Connect to Mariadb and memcached.

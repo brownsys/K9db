@@ -6,13 +6,7 @@ This experiment gives us the expected memory for two memcached setup with **lobs
 2. **REAL_QUERIES**: This setup caches only the queries that a reasonable developer would cached if using mysql with lobsters (joins, aggregates, and order by).
 
 ## Running the experiment
-
-The bazel target is `//memcached:memcached`.
-
-Running takes no command line arguments.
-
-To change the experiment setup, change the `#define QUERIES <...>` in `main.cc` to
-either `REAL_QUERIES` or `ALL_QUERIES`.
+To run, use `bazel run //memcached:memcached --queries=(real|all)`.
 
 The experiment expects that a memcached server is running on `localhost:11211`,
 and a Mariadb server is listening on `localhost:3303` with username `pelton` and password
