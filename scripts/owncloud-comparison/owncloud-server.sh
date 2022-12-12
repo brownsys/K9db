@@ -1,6 +1,5 @@
 #!/bin/bash
 PELTONDIR="/home/pelton/pelton"
-PELTONDIR="../.."
 OUT="$PELTONDIR/scripts/owncloud-comparison"
 echo "Writing output to $OUT"
 cd $PELTONDIR
