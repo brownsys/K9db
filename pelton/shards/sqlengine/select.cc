@@ -90,14 +90,20 @@ std::optional<std::vector<sql::KeyPair>> SelectContext::FindDirectKeys() {
       if (it2 != it->second.end()) {
         const IndexDescriptor &index = *it2->second;
         for (sqlast::Value &pk : pkvals) {
-          std::vector<dataflow::Record> r = index::LookupIndex(
+          std::vector<dataflow::Record> v = index::LookupIndex(
               index, sqlast::Value(pk), this->conn_, this->lock_);
-          if (r.size() > 0) {
-            sqlast::Value uid = r.at(0).GetValue(1);
-            direct_keys.emplace_back(
-                util::ShardName(shard_kind, uid.AsUnquotedString()),
-                std::move(pk));
+          bool found = false;
+          for (dataflow::Record &r : v) {
+            sqlast::Value uid = r.GetValue(1);
+            if (!uid.IsNull()) {
+              direct_keys.emplace_back(
+                  util::ShardName(shard_kind, uid.AsUnquotedString()),
+                  std::move(pk));
+              found = true;
+              break;
+            }
           }
+          CHECK(found) << "Index lookup all owners null!";
         }
         return direct_keys;
       }

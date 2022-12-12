@@ -35,7 +35,6 @@ bazel run :benchmark -c opt -- \
   --zipf $zipf \
   --backend pelton \
   --views \
-  --indices \
   > "$OUT/noviews.out" 2>&1
 
 # kill Pelton
@@ -56,7 +55,6 @@ bazel run :benchmark -c opt -- \
   --zipf $zipf \
   --backend pelton \
   --views \
-  --indices \
   --accessors \
   > "$OUT/noaccessors.out" 2>&1
 
