@@ -16,6 +16,9 @@ pid=$!
 # Get signal to kill memcached.
 cd $PELTONDIR
 ./run.sh opt
+
+# Find memory usage in memcached
+echo "stats" | nc localhost 11211 -q 1 > "$OUT/memcached-memory.out" 2>&1
 kill $pid
 
 sudo service mariadb stop

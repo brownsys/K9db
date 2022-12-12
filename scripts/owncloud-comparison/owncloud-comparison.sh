@@ -37,6 +37,11 @@ bazel run :benchmark -c opt -- \
   > "$OUT/baseline.out" 2>&1
 sleep 3
 
+# Show DB size of baseline.
+mariadb -P3306 --host=$LOCAL_IP -u pelton -ppassword \
+  -e "SELECT table_schema AS 'Database', SUM(data_length + index_length) / 1024 / 1024 AS 'Size (MB)' FROM information_schema.TABLES GROUP BY table_schema" \
+  > "$OUT/mariadb-memory.out" 2>&1
+
 # Memcached now.
 echo "Running memcached harness"
 bazel run :benchmark -c opt -- \
@@ -75,6 +80,8 @@ bazel run :benchmark -c opt -- \
   --backend pelton \
   > "$OUT/pelton.out" 2>&1
 sleep 3
+
+mariadb -P10001 --host=127.0.0.1 -e "SHOW MEMORY" > "$OUT/pelton-memory.out" 2>&1
 
 # kill Pelton
 echo "killing pelton"
