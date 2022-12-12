@@ -10,8 +10,8 @@ files=3
 dshare=3
 gshare=2
 write_batch_size=1
-read_in_size=5
-write_every=4
+read_in_size=4
+write_every=5
 ops=10000
 zipf=0.6
 
