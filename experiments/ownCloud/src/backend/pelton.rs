@@ -51,12 +51,12 @@ pub fn reads(
 
   time
 }
-pub fn direct(conn: &mut Conn, share: &Share) -> u128 {
-  mariadb::direct(conn, share)
+pub fn direct(conn: &mut Conn, shares: &Vec<Share>) -> u128 {
+  mariadb::direct(conn, shares)
 }
 
-pub fn indirect(conn: &mut Conn, share: &Share) -> u128 {
-  mariadb::indirect(conn, share)
+pub fn indirect(conn: &mut Conn, shares: &Vec<Share>) -> u128 {
+  mariadb::indirect(conn, shares)
 }
 pub fn read_file_pk(conn: &mut Conn, files: &Vec<File>) -> u128 {
   mariadb::read_file_pk(conn, files)

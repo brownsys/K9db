@@ -10,7 +10,9 @@ groups=5
 files=3
 dshare=3
 gshare=2
-insize=10
+write_batch_size=1
+read_in_size=1
+write_every=19
 ops=10000
 zipf=0.6
 
@@ -26,7 +28,9 @@ bazel run :benchmark -c opt -- \
   --files-per-user $files \
   --direct-shares-per-file $dshare \
   --group-shares-per-file $gshare \
-  --in_size $insize \
+  --read_in_size $read_in_size \
+  --write_batch_size $write_batch_size \
+  --write_every $write_every \
   --operations $ops \
   --zipf $zipf \
   --backend mariadb \
@@ -41,7 +45,9 @@ bazel run :benchmark -c opt -- \
   --files-per-user $files \
   --direct-shares-per-file $dshare \
   --group-shares-per-file $gshare \
-  --in_size $insize \
+  --read_in_size $read_in_size \
+  --write_batch_size $write_batch_size \
+  --write_every $write_every \
   --operations $ops \
   --warmup \
   --zipf $zipf \
@@ -61,7 +67,9 @@ bazel run :benchmark -c opt -- \
   --files-per-user $files \
   --direct-shares-per-file $dshare \
   --group-shares-per-file $gshare \
-  --in_size $insize \
+  --read_in_size $read_in_size \
+  --write_batch_size $write_batch_size \
+  --write_every $write_every \
   --operations $ops \
   --zipf $zipf \
   --backend pelton \
