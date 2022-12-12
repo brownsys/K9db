@@ -105,7 +105,7 @@ class RocksdbSession : public Session {
   // Shard-based operations for copying/moving/deleting records.
   std::vector<dataflow::Record> GetDirect(
       const std::string &table_name, size_t column_index,
-      const std::vector<KeyPair> &keys) const override;
+      const std::vector<KeyPair> &keys, bool read) const override;
 
   ResultSetAndStatus AssignToShards(
       const std::string &table_name, size_t column_index,

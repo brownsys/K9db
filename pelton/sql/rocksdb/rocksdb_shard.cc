@@ -15,7 +15,7 @@ namespace rocks {
 // Get records by shard + column value (PK or not).
 std::vector<dataflow::Record> RocksdbSession::GetDirect(
     const std::string &table_name, size_t column_index,
-    const std::vector<KeyPair> &keys) const {
+    const std::vector<KeyPair> &keys, bool read) const {
   const RocksdbTable &table = this->conn_->tables_.at(table_name);
   const dataflow::SchemaRef &schema = table.Schema();
 
@@ -61,7 +61,7 @@ std::vector<dataflow::Record> RocksdbSession::GetDirect(
 
   // Lookup using multiget.
   std::vector<std::optional<EncryptedValue>> en_rows =
-      table.MultiGet(en_keys, false, this->txn_.get());
+      table.MultiGet(en_keys, read, this->txn_.get());
 
   // Decrypt result.
   std::vector<dataflow::Record> result;

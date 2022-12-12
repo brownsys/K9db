@@ -94,7 +94,7 @@ absl::StatusOr<int> DeleteContext::DeleteDependents(
 
     // Get records.
     std::vector<dataflow::Record> next_records =
-        this->db_->GetDirect(next_table, nextidx, vals);
+        this->db_->GetDirect(next_table, nextidx, vals, false);
     ASSERT_RET(!direct || next_records.size() == 0, Internal,
                "Cannot delete data subject with data. use GDPR FORGET");
 

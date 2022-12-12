@@ -66,7 +66,7 @@ class Session {
   // Shard operations.
   virtual std::vector<dataflow::Record> GetDirect(
       const std::string &table_name, size_t column_index,
-      const std::vector<KeyPair> &keys) const = 0;
+      const std::vector<KeyPair> &keys, bool read) const = 0;
 
   virtual ResultSetAndStatus AssignToShards(
       const std::string &table_name, size_t column_index,
