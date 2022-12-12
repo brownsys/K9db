@@ -80,10 +80,10 @@ pub fn reads(conn: &mut SimulatedState, sample: &Vec<User>,
   conn.print();
   0
 }
-pub fn direct(conn: &mut SimulatedState, share: &Share) -> u128 {
+pub fn direct(conn: &mut SimulatedState, share: &Vec<Share>) -> u128 {
   0
 }
-pub fn indirect(conn: &mut SimulatedState, share: &Share) -> u128 {
+pub fn indirect(conn: &mut SimulatedState, share: &Vec<Share>) -> u128 {
   0
 }
 pub fn read_file_pk(conn: &mut SimulatedState, files: &Vec<File>) -> u128 {

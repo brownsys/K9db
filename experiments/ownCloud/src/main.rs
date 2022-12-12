@@ -23,7 +23,9 @@ pub struct Args {
   pub group_shares_per_file: usize,
   pub users_per_group: usize,
   pub backend: String,
-  pub in_size: usize,
+  pub read_in_size: usize,
+  pub write_batch_size: usize,
+  pub write_every: usize,
   pub outfile: Option<String>,
   pub operations: usize,
   pub perf: bool,
@@ -47,7 +49,9 @@ fn main() {
                 (@arg group_shares_per_file: --("group-shares-per-file") +takes_value "Avg group shares per file")
                 (@arg users_per_group: --("users-per-group") +takes_value "Avg users per group")
                 (@arg backend: --backend ... +required +takes_value "Backend type to use")
-                (@arg in_size: --in_size +takes_value "Number of values in an IN clauses")
+                (@arg read_in_size: --read_in_size +takes_value "Number of values in an IN clauses")
+                (@arg write_batch_size: --write_batch_size +takes_value "Number of writes in a dedup batch")
+                (@arg write_every: --write_every +takes_value "How many read batches before a write")
                 (@arg outfile: -o --out +takes_value "File for writing output to (defaults to stdout")
                 (@arg operations: --operations +takes_value "Number of operations in load")
                 (@arg perf: --perf "Wait for user input before starting workload to attach perf")
@@ -69,7 +73,9 @@ fn main() {
     users_per_group: value_t!(matches, "users_per_group", usize).unwrap_or(1),
     num_users: value_t_or_exit!(matches, "num_users", usize),
     backend: matches.value_of("backend").map(&str::to_string).unwrap(),
-    in_size: value_t!(matches, "in_size", usize).unwrap_or(1),
+    read_in_size: value_t!(matches, "read_in_size", usize).unwrap_or(1),
+    write_batch_size: value_t!(matches, "write_batch_size", usize).unwrap_or(1),
+    write_every: value_t!(matches, "write_every", usize).unwrap_or(19),
     outfile: matches.value_of("outfile").map(&str::to_string),
     operations: value_t_or_exit!(matches, "operations", usize),
     perf: matches.is_present("perf"),
@@ -112,7 +118,9 @@ fn main() {
   }
 
   // Parameters.
-  let in_size = args.in_size;
+  let read_in_size = args.read_in_size;
+  let write_batch_size = args.write_batch_size;
+  let write_every = args.write_every;
   let operations = args.operations;
 
   // Run the experiment for each provided backend.
@@ -163,33 +171,39 @@ fn main() {
   let mut read_file_pk = Vec::<u128>::new();
   let mut update_file_pk = Vec::<u128>::new();
 
-  let mut next_write = 0;
-  for i in 0..(operations/3) {
-    // Issue a direct/indirect write and a update by pk.
-    if next_write % 3 == 0 {
-      // do direct
-      let request = workload.make_direct_share(&users, &files);
-      dwrites.push(backend.run(&request));
-    } else if next_write % 3 == 1 {
-      // do indirect
-      let request = workload.make_group_share(&users, &groups, &files, &user_to_group_map);
+  let mut direct = true;
+  let mut batch_count = 0;
+  for i in 0..(operations / 2) {
+    if batch_count == write_every {
+      batch_count = 0;
+      if direct {
+        direct = false;
+        let request = workload.make_direct_share(write_batch_size, &users, &files);
+        dwrites.push(backend.run(&request));
+      } else {
+        direct = true;
+        let request = workload.make_group_share(write_batch_size, &users, &groups, &files, &user_to_group_map);
         gwrites.push(backend.run(&request));
+      }
     } else {
+      let request = workload.make_read(read_in_size, &users);
+      reads.push(backend.run(&request));
+      batch_count = batch_count + 1;
+    }
+  }
+  
+  batch_count = 0;
+  for i in 0..(operations / 2) {
+    if batch_count == write_every {
+      batch_count = 0;
       // do update file by pk
       let request = workload.make_update_file_pk(&files);
       update_file_pk.push(backend.run(&request));  
+    } else {
+      let request = workload.make_get_file_pk(read_in_size, &files);
+      read_file_pk.push(backend.run(&request));
+      batch_count = batch_count + 1;
     }
-    next_write += 1;
-    
-    // read all of a user's files
-    last_read_user = true;
-    let request = workload.make_read(in_size, &users);
-    reads.push(backend.run(&request));
-    
-    // read a specific file by pk
-    last_read_user = false;
-    let request = workload.make_get_file_pk(in_size, &files);
-    read_file_pk.push(backend.run(&request));
   }
 
   // Report medians and tails.

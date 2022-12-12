@@ -77,32 +77,34 @@ pub fn reads(
   time
 }
 
-pub fn direct(conn: &mut Conn, share: &Share) -> u128 {
+pub fn direct(conn: &mut Conn, shares: &Vec<Share>) -> u128 {
   let now = std::time::Instant::now();
-  let (share_type, user_target, group_target) = match &share.share_with {
-    ShareType::Direct(u) => (0, quoted(&u.uid), "NULL".to_string()),
-    ShareType::Group(g) => (1, "NULL".to_string(), quoted(&g.gid)),
-  };
-  conn
-    .query_drop(format!(
-      "INSERT INTO oc_share VALUES ({share_id}, \
-                           {share_type}, {user_target}, {group_target}, \
-                           '{owner}', '{initiator}', NULL, 'file', {file}, \
-                           '', '', 24, 0, 0, NULL, '', 1, '', 24, '19');",
-      share_id = share.id,
-      user_target = user_target,
-      group_target = group_target,
-      share_type = share_type,
-      owner = share.file.owned_by,
-      initiator = share.file.owned_by,
-      file = share.file.id,
-    ))
-    .unwrap();
+  for share in shares {
+    let (share_type, user_target, group_target) = match &share.share_with {
+      ShareType::Direct(u) => (0, quoted(&u.uid), "NULL".to_string()),
+      ShareType::Group(g) => (1, "NULL".to_string(), quoted(&g.gid)),
+    };
+    conn
+      .query_drop(format!(
+        "INSERT INTO oc_share VALUES ({share_id}, \
+                             {share_type}, {user_target}, {group_target}, \
+                             '{owner}', '{initiator}', NULL, 'file', {file}, \
+                             '', '', 24, 0, 0, NULL, '', 1, '', 24, '19');",
+        share_id = share.id,
+        user_target = user_target,
+        group_target = group_target,
+        share_type = share_type,
+        owner = share.file.owned_by,
+        initiator = share.file.owned_by,
+        file = share.file.id,
+      ))
+      .unwrap();
+  }
   now.elapsed().as_micros()
 }
 
-pub fn indirect(conn: &mut Conn, share: &Share) -> u128 {
-  direct(conn, share)
+pub fn indirect(conn: &mut Conn, shares: &Vec<Share>) -> u128 {
+  direct(conn, shares)
 }
 
 pub fn read_file_pk(conn: &mut Conn, files: &Vec<File>) -> u128 {

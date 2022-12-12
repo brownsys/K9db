@@ -7,6 +7,7 @@ use rand::rngs::ThreadRng;
 use rand::Rng;
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 // src.models.rs
 use super::generator::{EntityType, GeneratorState};
@@ -15,8 +16,8 @@ use super::models::{File, Group, Share, ShareType, User};
 // Request
 pub enum Request {
   Read(Vec<User>, Vec<usize>),
-  Direct(Share),
-  Indirect(Share),
+  Direct(Vec<Share>),
+  Indirect(Vec<Share>),
   GetFilePK(Vec<File>),
   UpdateFilePK(File, String),
 }
@@ -72,47 +73,66 @@ impl WorkloadGenerator {
   // Create a write workload with direct shares.
   pub fn make_direct_share(
     &mut self,
+    write_batch_size: usize,
     users: &[User],
     files: &[File],
   ) -> Request {
-    // Select a user from zipf.
     let distr = Zipf::new(users.len() as u64, self.zipf_f).unwrap();
-    let s = distr.sample(&mut self.rng) - 1.0;
-    let u: &User = &users[s as usize];
-    // Select some file randomly.
-    let flen = files.len();
-    let share = Share {
-      id: self.st.new_id(EntityType::Share),
-      share_with: ShareType::Direct(u.clone()),
-      file: files[self.rng.gen_range(0..flen)].clone(),
-    };
-    self.st.track_share(&share);
-    Request::Direct(share)
+    let mut sampled: HashSet<usize> = HashSet::new();
+    let mut samples: Vec<Share> = Vec::with_capacity(write_batch_size);
+    while samples.len() != write_batch_size {
+      // Select a user from zipf.
+      let s = distr.sample(&mut self.rng) - 1.0;
+      let us = s as usize;
+      if !sampled.contains(&us) {
+        sampled.insert(us);
+        let u: &User = &users[s as usize];
+        // Select some file randomly.
+        let flen = files.len();
+        let share = Share {
+          id: self.st.new_id(EntityType::Share),
+          share_with: ShareType::Direct(u.clone()),
+          file: files[self.rng.gen_range(0..flen)].clone(),
+        };
+        self.st.track_share(&share);
+        samples.push(share);
+      }
+    }
+    Request::Direct(samples)
   }
 
   // Create a write workload with indirect shares.
   pub fn make_group_share(
     &mut self,
+    write_batch_size: usize,
     users: &[User],
     groups: &[Group],
     files: &[File],
     user_to_group: &HashMap<usize, usize>,
   ) -> Request {
-    // Select a user from zipf.
     let distr = Zipf::new(users.len() as u64, self.zipf_f).unwrap();
-    let s = distr.sample(&mut self.rng) - 1.0;
-    let u = s as usize;
-    // Get group of the select users.
-    let g = &groups[user_to_group[&u]];
-    // Select some file randomly.
-    let flen = files.len();
-    let share = Share {
-      id: self.st.new_id(EntityType::Share),
-      share_with: ShareType::Group(g.clone()),
-      file: files[self.rng.gen_range(0..flen)].clone(),
-    };
-    self.st.track_share(&share);
-    Request::Indirect(share)
+    let mut sampled: HashSet<usize> = HashSet::new();
+    let mut samples: Vec<Share> = Vec::with_capacity(write_batch_size);
+    while samples.len() != write_batch_size {
+      // Select a user from zipf.
+      let s = distr.sample(&mut self.rng) - 1.0;
+      let u = s as usize;
+      if !sampled.contains(&u) {
+        sampled.insert(u);
+        // Get group of the select users.
+        let g = &groups[user_to_group[&u]];
+        // Select some file randomly.
+        let flen = files.len();
+        let share = Share {
+          id: self.st.new_id(EntityType::Share),
+          share_with: ShareType::Group(g.clone()),
+          file: files[self.rng.gen_range(0..flen)].clone(),
+        };
+        self.st.track_share(&share);
+        samples.push(share)
+      }
+    }
+    Request::Indirect(samples)
   }
 
   pub fn make_get_file_pk(

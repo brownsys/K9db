@@ -150,51 +150,73 @@ pub fn reads(
 pub fn direct(
   conn: &mut Conn,
   client: &mut Client,
-  share: &Share,
+  shares: &Vec<Share>,
 ) -> u128 {
   let now = std::time::Instant::now();
+  
   // Write to database.
-  mariadb::direct(conn, share);
-
-  // Invalidate.
-  if let ShareType::Direct(u) = &share.share_with {
-    // Can invalidate user directly.
-    let key = encode_user(&u.uid);
-    client.delete(key.as_bytes());
-
-    // Done.
-    now.elapsed().as_micros()
-  } else {
-    panic!("indirect called with direct!");
+  mariadb::direct(conn, shares);
+  
+  let mut users: Vec<String> = Vec::with_capacity(shares.len());
+  for share in shares {
+    // Mark to invalidate.
+    if let ShareType::Direct(u) = &share.share_with {
+      users.push(encode_user(&u.uid));
+    } else {
+      panic!("indirect called with direct!");
+    }
   }
+  
+  // Invalidate.
+  let keys = users.iter().map(|u| u.as_bytes()).collect::<Vec<_>>();
+  client.delete_multi(&keys);
+
+  // Done.
+  now.elapsed().as_micros()
 }
 
 pub fn indirect(
   conn: &mut Conn,
   client: &mut Client,
-  share: &Share,
+  shares: &Vec<Share>,
 ) -> u128 {
   let now = std::time::Instant::now();
+
   // Write to database.
-  mariadb::indirect(conn, share);
+  mariadb::indirect(conn, shares);
 
-  // Invalidate.
-  if let ShareType::Group(g) = &share.share_with {
-    // Read group members.
-    let key = encode_group(&g.gid);
-    let (value, _) = client.get(key.as_bytes()).unwrap();
-    let strval = String::from_utf8(value).unwrap();
-    let users = strval.split(",").map(encode_user).collect::<Vec<_>>();
-
-    // Invalidate group members.
-    let keys = users.iter().map(|u| u.as_bytes()).collect::<Vec<_>>();
-    client.delete_multi(&keys);
-
-    // Done.
-    now.elapsed().as_micros()
-  } else {
-    panic!("indirect called with direct!");
+  let mut groups: Vec<String> = Vec::with_capacity(shares.len());
+  for share in shares {
+    // Mark to Invalidate.
+    if let ShareType::Group(g) = &share.share_with {
+      // Read group members.
+      groups.push(encode_group(&g.gid));
+    } else {
+      panic!("indirect called with direct!");
+    }
   }
+
+  // Find members of all groups.
+  let keys = groups.iter().map(|g| g.as_bytes()).collect::<Vec<_>>();
+  let result = client.get_multi(&keys).unwrap();
+
+  // Invalidate all members.
+  let mut users: Vec<String> = Vec::with_capacity(keys.len() * 5);
+  for key in keys {
+    if let Some((members, _)) = result.get(key) {
+      let strval = std::str::from_utf8(members).unwrap();
+      for u in strval.split(",") {
+        users.push(encode_user(u));
+      }
+    } else {
+      panic!("group members not in memcached");
+    }
+  }
+
+  let keys = users.iter().map(|u| u.as_bytes()).collect::<Vec<_>>();
+  client.delete_multi(&keys);
+
+  now.elapsed().as_micros()
 }
 
 pub fn read_file_pk(conn: &mut Conn, files: &Vec<File>) -> u128 {
