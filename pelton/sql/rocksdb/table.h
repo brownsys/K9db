@@ -106,9 +106,11 @@ class RocksdbTable {
 
   // Index lookups.
   std::optional<IndexSet> IndexLookup(sqlast::ValueMapper *vm,
-                                      const RocksdbTransaction *txn) const;
+                                      const RocksdbTransaction *txn,
+                                      int limit = -1) const;
   std::optional<DedupIndexSet> IndexLookupDedup(
-      sqlast::ValueMapper *vm, const RocksdbTransaction *txn) const;
+      sqlast::ValueMapper *vm, const RocksdbTransaction *txn,
+      int limit = -1) const;
 
   // Get an index.
   const RocksdbPKIndex &GetPKIndex() const { return this->pk_index_; }

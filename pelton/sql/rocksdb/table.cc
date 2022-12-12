@@ -190,7 +190,8 @@ RocksdbTable::IndexChoice RocksdbTable::ChooseIndex(size_t column_index) const {
 
 // Index Lookup.
 std::optional<IndexSet> RocksdbTable::IndexLookup(
-    sqlast::ValueMapper *value_mapper, const RocksdbTransaction *txn) const {
+    sqlast::ValueMapper *value_mapper, const RocksdbTransaction *txn,
+    int limit) const {
   IndexChoice plan = this->ChooseIndex(value_mapper);
   switch (plan.type) {
     // By primary key index.
@@ -205,7 +206,7 @@ std::optional<IndexSet> RocksdbTable::IndexLookup(
     case IndexChoiceType::UNIQUE:
     case IndexChoiceType::REGULAR: {
       const RocksdbIndex &index = this->indices_.at(plan.idx);
-      return index.Get(index.EncodeComposite(value_mapper, this->schema_), txn);
+      return index.Get(index.EncodeComposite(value_mapper, this->schema_), txn, limit);
     }
     // By scan.
     case IndexChoiceType::SCAN:
@@ -215,7 +216,7 @@ std::optional<IndexSet> RocksdbTable::IndexLookup(
   }
 }
 std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
-    sqlast::ValueMapper *value_mapper, const RocksdbTransaction *txn) const {
+    sqlast::ValueMapper *value_mapper, const RocksdbTransaction *txn, int limit) const {
   IndexChoice plan = this->ChooseIndex(value_mapper);
   switch (plan.type) {
     // By primary key index.
@@ -231,7 +232,7 @@ std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
     case IndexChoiceType::REGULAR: {
       const RocksdbIndex &index = this->indices_.at(plan.idx);
       return index.GetDedup(index.EncodeComposite(value_mapper, this->schema_),
-                            txn);
+                            txn, limit);
     }
     // By scan.
     case IndexChoiceType::SCAN:

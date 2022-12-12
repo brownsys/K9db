@@ -15,7 +15,8 @@ namespace rocks {
 template <typename T, bool DEDUP>
 std::vector<T> RocksdbSession::GetRecords(
     const std::string &table_name,
-    const sqlast::BinaryExpression *const where) const {
+    const sqlast::BinaryExpression *const where,
+    int limit) const {
   using SET = std::conditional<DEDUP, DedupIndexSet, IndexSet>::type;
 
   // T must be one of {SelectRecord, DeleteRecord}.
@@ -38,9 +39,9 @@ std::vector<T> RocksdbSession::GetRecords(
   // Look up existing indices.
   std::optional<SET> lookup;
   if constexpr (DEDUP) {
-    lookup = table.IndexLookupDedup(&value_mapper, this->txn_.get());
+    lookup = table.IndexLookupDedup(&value_mapper, this->txn_.get(), limit);
   } else {
-    lookup = table.IndexLookup(&value_mapper, this->txn_.get());
+    lookup = table.IndexLookup(&value_mapper, this->txn_.get(), limit);
   }
 
   if (lookup.has_value()) {
@@ -108,6 +109,10 @@ std::vector<T> RocksdbSession::GetRecords(
         } else if constexpr (Tdelete) {
           records.emplace_back(std::move(shard), std::move(enkey_copy),
                                std::move(value), std::move(record));
+        }
+        
+        if (limit != -1 && records.size() == limit) {
+          break;
         }
       }
     }

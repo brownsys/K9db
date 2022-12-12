@@ -41,9 +41,9 @@ class RocksdbIndex {
 
   // Get the shard and pk of matching records for given values.
   IndexSet Get(std::vector<std::string> &&values,
-               const RocksdbTransaction *txn) const;
+               const RocksdbTransaction *txn, int limit = -1) const;
   DedupIndexSet GetDedup(std::vector<std::string> &&values,
-                         const RocksdbTransaction *txn) const;
+                         const RocksdbTransaction *txn, int limit = -1) const;
 
   IndexSet GetWithShards(std::vector<std::string> &&shards,
                          std::vector<std::string> &&values,

@@ -36,7 +36,8 @@ template <typename T, typename R, bool shards_specified = false>
 T GetHelper(rocksdb::DB *db, const RocksdbTransaction *txn,
             rocksdb::ColumnFamilyHandle *handle,
             std::vector<std::string> &&values,
-            std::vector<std::string> &&shards = {}) {
+            std::vector<std::string> &&shards = {},
+            int limit = -1) {
   // Open iterator over the database and the txn together.
   std::unique_ptr<rocksdb::Iterator> it = txn->Iterate(handle, true);
 
@@ -71,6 +72,9 @@ T GetHelper(rocksdb::DB *db, const RocksdbTransaction *txn,
         }
       } else {
         result.emplace(record.TargetKey());
+      }
+      if (limit != -1 && result.size() == limit) {
+        return result;
       }
     }
   }
@@ -153,14 +157,15 @@ std::vector<std::string> RocksdbIndex::EncodeComposite(
 
 // Get by value.
 IndexSet RocksdbIndex::Get(std::vector<std::string> &&v,
-                           const RocksdbTransaction *txn) const {
+                           const RocksdbTransaction *txn, int limit) const {
   return GetHelper<IndexSet, IRecord>(this->db_, txn, this->handle_.get(),
-                                      std::move(v));
+                                      std::move(v), {}, limit);
 }
 DedupIndexSet RocksdbIndex::GetDedup(std::vector<std::string> &&v,
-                                     const RocksdbTransaction *txn) const {
+                                     const RocksdbTransaction *txn,
+                                     int limit) const {
   return GetHelper<DedupIndexSet, IRecord>(this->db_, txn, this->handle_.get(),
-                                           std::move(v));
+                                           std::move(v), {}, limit);
 }
 
 IndexSet RocksdbIndex::GetWithShards(std::vector<std::string> &&shards,

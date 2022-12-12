@@ -141,7 +141,8 @@ class RocksdbSession : public Session {
   // Get records matching where condition.
   template <typename T, bool DEDUP>
   std::vector<T> GetRecords(const std::string &table_name,
-                            const sqlast::BinaryExpression *const where) const;
+                            const sqlast::BinaryExpression *const where,
+                            int limit = -1) const;
 };
 
 }  // namespace rocks

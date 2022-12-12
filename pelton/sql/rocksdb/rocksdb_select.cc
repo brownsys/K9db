@@ -23,7 +23,7 @@ SqlResultSet RocksdbSession::ExecuteSelect(const sqlast::Select &sql) const {
 
   // Filter by where clause.
   std::vector<dataflow::Record> records =
-      this->GetRecords<SelectRecord, true>(table_name, where);
+      this->GetRecords<SelectRecord, true>(table_name, where, sql.limit());
 
   // Apply projection, if any.
   Projection projection = ProjectionSchema(schema, sql.GetColumns());

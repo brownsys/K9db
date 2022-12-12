@@ -8,7 +8,7 @@ INSERT INTO comments VALUES (3, '2021-04-21 01:00:00', '2021-04-21 01:00:00', ''
 INSERT INTO hat_requests VALUES (0, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 0, 'myhat', 'mylink', 'mycomment');
 INSERT INTO hat_requests VALUES (1, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 1, 'myhat', 'mylink', 'mycomment');
 INSERT INTO hats VALUES (0, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 0, 0, 'myhat', 'mylink', 0, '2021-04-21 01:00:00');
-INSERT INTO hats VALUES (1, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 1, 1, 'myhat', 'mylink', 0, '2021-04-21 01:00:00');
+INSERT INTO hats VALUES (1, '2021-04-21 01:00:00', '2021-04-21 01:00:00', 0, 1, 'myhat', 'mylink', 0, '2021-04-21 01:00:00');
 INSERT INTO hidden_stories VALUES (0, 0, 0);
 INSERT INTO hidden_stories VALUES (1, 1, 1);
 INSERT INTO invitation_requests VALUES (0, 'code', 0, 'email', 'name', 'memo', 'ip', '2021-04-21 01:00:00', '2021-04-21 01:00:00');

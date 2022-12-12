@@ -19,3 +19,12 @@ CREATE VIEW q24 AS '"SELECT saved_stories.* FROM saved_stories WHERE saved_stori
 CREATE VIEW q31 AS '"SELECT 1, user_id, story_id FROM hidden_stories WHERE user_id = ? AND hidden_stories.story_id = ?"';
 CREATE VIEW q33 AS '"SELECT votes.* FROM votes WHERE votes.user_id = ? AND votes.comment_id = ?"';
 CREATE VIEW q34 AS '"SELECT comments.* FROM comments WHERE comments.short_id = ?"';
+-- new after indices
+CREATE VIEW q11 AS '"SELECT stories.id, stories.merged_story_id FROM stories WHERE stories.merged_story_id = ?"';
+CREATE VIEW q17 AS '"SELECT votes.* FROM votes WHERE votes.comment_id = ?"';
+CREATE VIEW q25 AS '"SELECT suggested_titles.* FROM suggested_titles WHERE suggested_titles.story_id = ?"';
+CREATE VIEW q26 AS '"SELECT taggings.* FROM taggings WHERE taggings.story_id = ?"';
+CREATE VIEW q27 AS '"SELECT 1 AS `one`, hats.user_id FROM hats WHERE hats.user_id = ? LIMIT 1"';
+CREATE VIEW q28 AS '"SELECT suggested_taggings.* FROM suggested_taggings WHERE suggested_taggings.story_id = ?"';
+CREATE VIEW q29 AS '"SELECT tags.* FROM tags WHERE tags.id = ?"';
+CREATE VIEW q32 AS '"SELECT stories.* FROM stories WHERE stories.id = ?"';
