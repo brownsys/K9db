@@ -152,8 +152,8 @@ fn main() {
   let mut direct = true;
   let mut batch_count = 0;
   for i in 0..(operations / 2) {
-    if batch_count == write_every {
-      batch_count = 0;
+    if batch_count >= write_every {
+      batch_count -= write_every;
       if direct {
         direct = false;
         let request = workload.make_direct_share(write_batch_size, &users, &files);
@@ -166,21 +166,21 @@ fn main() {
     } else {
       let request = workload.make_read(read_in_size, &users);
       reads.push(backend.run(&request));
-      batch_count = batch_count + 1;
+      batch_count = batch_count + read_in_size;
     }
   }
   
   batch_count = 0;
   for i in 0..(operations / 2) {
-    if batch_count == write_every {
-      batch_count = 0;
+    if batch_count >= write_every {
+      batch_count -= write_every;
       // do update file by pk
       let request = workload.make_update_file_pk(&files);
       update_file_pk.push(backend.run(&request));  
     } else {
       let request = workload.make_get_file_pk(read_in_size, &files);
       read_file_pk.push(backend.run(&request));
-      batch_count = batch_count + 1;
+      batch_count = batch_count + read_in_size;
     }
   }
 
