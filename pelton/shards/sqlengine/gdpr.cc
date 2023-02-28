@@ -151,12 +151,12 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecForget() {
       }
     }
   }
-  
+
   for (const auto &table_name : current_shard.owned_tables) {
     // Delete any tables in shard added from anonymization updates.
     util::ShardName shard(this->shard_kind_, this->user_id_str_);
     sql::SqlResultSet result =
-      this->db_->DeleteShard(table_name, std::move(shard));
+        this->db_->DeleteShard(table_name, std::move(shard));
   }
 
   // Commit to database.
@@ -225,12 +225,13 @@ std::vector<sqlast::Value> GDPRContext::ExtractUserIDs(
   return user_ids;
 }
 
-void GDPRContext::AddIntersect(std::vector<std::string> &into,
-                               const std::vector<std::string> &from) {
+std::vector<std::string> GDPRContext::AddIntersect(
+    const std::vector<std::string> &into,
+    const std::vector<std::string> &from) {
   std::vector<std::string> intersection;
   std::set_intersection(into.begin(), into.end(), from.begin(), from.end(),
                         intersection.begin());
-  into = intersection;
+  return intersection;
 }
 
 bool GDPRContext::OwnsRecordThroughDesc(
@@ -314,7 +315,7 @@ void GDPRContext::AddOrAppendAndAnon(const TableName &tbl,
       if (i == 0) {
         anon_columns = anon_column_sets.at(i);
       } else {
-        this->AddIntersect(anon_columns, anon_column_sets.at(i));
+        anon_columns = this->AddIntersect(anon_columns, anon_column_sets.at(i));
       }
     }
 

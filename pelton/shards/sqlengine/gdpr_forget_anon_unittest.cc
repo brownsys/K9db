@@ -131,16 +131,11 @@ TEST_F(GDPRForgetAnonTest, MultipleColumnsAnon) {
   auto &&[usr1, u0] = MakeInsert("user", {"0", "'u1'"});
   auto &&[usr2, u1] = MakeInsert("user", {"5", "'u10'"});
   auto &&[usr3, u2] = MakeInsert("user", {"10", "'u100'"});
-  auto &&[msg1, row1] =
-      MakeInsert("msg", {"1", "0", "10", "123", "234"});
-  auto &&[msg2, row2] =
-      MakeInsert("msg", {"2", "0", "0", "123", "234"});
-  auto &&[msg3, row3] =
-      MakeInsert("msg", {"3", "5", "10", "123", "234"});
-  auto &&[msg4, row4] =
-      MakeInsert("msg", {"4", "5", "0", "123", "234"});
-  auto &&[_, row4_anon] =
-      MakeInsert("msg", {"4", "5", "600", "123", "600"});
+  auto &&[msg1, row1] = MakeInsert("msg", {"1", "0", "10", "123", "234"});
+  auto &&[msg2, row2] = MakeInsert("msg", {"2", "0", "0", "123", "234"});
+  auto &&[msg3, row3] = MakeInsert("msg", {"3", "5", "10", "123", "234"});
+  auto &&[msg4, row4] = MakeInsert("msg", {"4", "5", "0", "123", "234"});
+  auto &&[_, row4_anon] = MakeInsert("msg", {"4", "5", "600", "123", "600"});
 
   EXPECT_UPDATE(Execute(usr1, &conn), 1);
   EXPECT_UPDATE(Execute(usr2, &conn), 1);
@@ -283,8 +278,7 @@ TEST_F(GDPRForgetAnonTest, TransitiveAccessorshipAnon) {
   std::string prof = MakeCreate("prof", {"id" I PK, "uid" I FK "user(id)"});
   std::string msg = MakeCreate(
       "msg", {"id" I PK, "sender" I OB "prof(id)", "receiver" I AB "prof(id)"},
-      false,
-      "," ON_DEL "receiver" ANON "(receiver)");
+      false, "," ON_DEL "receiver" ANON "(receiver)");
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
@@ -420,9 +414,9 @@ TEST_F(GDPRForgetAnonTest, ComplexVariableAccessorshipAnon) {
   std::string assoc = MakeCreate(
       "association",
       {"sid" I PK, "group_id" I OW "grps(gid)", "user_id" I OB "user(id)"});
-  std::string files =
-      MakeCreate("files", {"fid" I PK, "creator" I OB "user(id)", "group_secret" I}, false,
-                 "," ON_DEL "fid" ANON "(group_secret)");
+  std::string files = MakeCreate(
+      "files", {"fid" I PK, "creator" I OB "user(id)", "group_secret" I}, false,
+      "," ON_DEL "fid" ANON "(group_secret)");
   std::string fassoc = MakeCreate(
       "fassoc",
       {"fsid" I PK, "file" I AC "files(fid)", "group_id" I AB "grps(gid)"});
@@ -481,7 +475,8 @@ TEST_F(GDPRForgetAnonTest, ComplexVariableAccessorshipAnon) {
   EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{grow2}));
   EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{}));
   EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
-  EXPECT_EQ(db->GetShard("files", SN("user", "0")), (V{frow1_anon, frow2_anon}));
+  EXPECT_EQ(db->GetShard("files", SN("user", "0")),
+            (V{frow1_anon, frow2_anon}));
   EXPECT_EQ(db->GetShard("files", SN("user", "5")), (V{}));
   EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "0")), (V{}));

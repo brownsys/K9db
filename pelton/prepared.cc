@@ -64,7 +64,8 @@ std::unordered_set<std::string> NO_VIEWS = {
     "SELECT votes.* FROM votes WHERE votes.user_id = ? AND "
     "votes.story_id = ? AND votes.comment_id = ?",
     // Q11.
-    "SELECT stories.id, stories.merged_story_id FROM stories WHERE stories.merged_story_id = ?",
+    "SELECT stories.id, stories.merged_story_id FROM stories WHERE "
+    "stories.merged_story_id = ?",
     // Q14.
     "SELECT comments.* FROM comments WHERE comments.story_id = ? AND "
     "comments.short_id = ?",
@@ -89,13 +90,15 @@ std::unordered_set<std::string> NO_VIEWS = {
     "SELECT saved_stories.* FROM saved_stories WHERE saved_stories.user_id = ? "
     "AND saved_stories.story_id = ?",
     // Q25,
-    "SELECT suggested_titles.* FROM suggested_titles WHERE suggested_titles.story_id = ?",
+    "SELECT suggested_titles.* FROM suggested_titles WHERE "
+    "suggested_titles.story_id = ?",
     // Q26,
     "SELECT taggings.* FROM taggings WHERE taggings.story_id = ?",
     // Q27,
     "SELECT 1 AS `one`, hats.user_id FROM hats WHERE hats.user_id = ? LIMIT 1",
     // Q28.
-    "SELECT suggested_taggings.* FROM suggested_taggings WHERE suggested_taggings.story_id = ?",
+    "SELECT suggested_taggings.* FROM suggested_taggings WHERE "
+    "suggested_taggings.story_id = ?",
     // Q29.
     "SELECT tags.* FROM tags WHERE tags.id = ?",
     // Q31.
@@ -109,7 +112,8 @@ std::unordered_set<std::string> NO_VIEWS = {
     // Q34.
     "SELECT comments.* FROM comments WHERE comments.short_id = ?",
     // NOT in test but does not need a view.
-    "SELECT taggings.story_id, taggings.tag_id FROM taggings WHERE taggings.story_id = ? AND taggings.tag_id = ?",
+    "SELECT taggings.story_id, taggings.tag_id FROM taggings WHERE "
+    "taggings.story_id = ? AND taggings.tag_id = ?",
     // GDPRBench.
     "SELECT * FROM usertable WHERE YCSB_KEY = ?",
     // Owncloud.

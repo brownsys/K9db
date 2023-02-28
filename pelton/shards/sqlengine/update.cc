@@ -148,7 +148,8 @@ absl::StatusOr<sql::SqlResult> UpdateContext::DirectUpdate(
  * Main entry point for update:
  * Transforms statement into a corresponding delete followed by an insert.
  */
-absl::StatusOr<sql::SqlResult> UpdateContext::Exec(bool standalone_transaction) {
+absl::StatusOr<sql::SqlResult> UpdateContext::Exec(
+    bool standalone_transaction) {
   if (this->ModifiesSharding()) {
     return this->DeleteInsert(standalone_transaction);
   } else {

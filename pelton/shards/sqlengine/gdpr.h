@@ -3,8 +3,10 @@
 #ifndef PELTON_SHARDS_SQLENGINE_GDPR_H_
 #define PELTON_SHARDS_SQLENGINE_GDPR_H_
 
+#include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "absl/status/statusor.h"
@@ -43,8 +45,8 @@ class GDPRContext {
   std::vector<sqlast::Value> ExtractUserIDs(const IndexDescriptor &index,
                                             sqlast::Value &&data_subject);
 
-  void AddIntersect(std::vector<std::string> &into,
-                    const std::vector<std::string> &from);
+  std::vector<std::string> AddIntersect(const std::vector<std::string> &into,
+                                        const std::vector<std::string> &from);
 
   bool OwnsRecordThroughDesc(const std::unique_ptr<ShardDescriptor> &owner_desc,
                              const dataflow::Record &record);
