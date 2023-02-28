@@ -61,6 +61,44 @@ void SqlResultSet::AppendDeduplicate(SqlResultSet &&other) {
   }
 }
 
+void SqlResultSet::AppendMerge(SqlResultSet &&other) {
+  if (this->schema_ != other.schema_) {
+    LOG(FATAL) << "Appending different schemas";
+  }
+
+  // Deduplicate using a hash set.
+  std::unordered_map<std::string, dataflow::Record> consolidated;
+  size_t pk_index = this->schema_.keys().front();
+
+  // Store keys of existing records.
+  if (this->lazy_keys_.size() == 0) {
+    for (dataflow::Record &record : this->records_) {
+      std::string key = record.GetValue(pk_index).AsSQLString();
+      consolidated.insert({key, std::move(record)});
+    }
+  }
+  for (dataflow::Record &record : other.records_) {
+    std::string key = record.GetValue(pk_index).AsSQLString();
+    auto it = consolidated.find(key);
+    if (it == consolidated.end()) {
+      consolidated.insert({key, std::move(record)});
+    } else {
+      dataflow::Record &merging_into = (*it).second;
+      for (const std::string &column_name :
+           merging_into.schema().column_names()) {
+        size_t column_idx = merging_into.schema().IndexOf(column_name);
+        if (merging_into.GetValue(column_idx).IsNull()) {
+          merging_into.SetValue(record.GetValue(column_idx), column_idx);
+        }
+      }
+    }
+  }
+  this->records_.clear();
+  for (auto &p : consolidated) {
+    this->records_.push_back(std::move(p.second));
+  }
+}
+
 std::ostream &operator<<(std::ostream &s, const SqlResult::Type &res) {
   switch (res) {
     case SqlResult::Type::STATEMENT:

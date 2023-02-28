@@ -65,6 +65,7 @@ class SqlResultSet {
 
   // Adding additional results to this set.
   void AppendDeduplicate(SqlResultSet &&other);
+  void AppendMerge(SqlResultSet &&other);
 
   // Query API.
   const dataflow::SchemaRef &schema() const { return this->schema_; }

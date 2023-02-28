@@ -115,8 +115,8 @@ absl::StatusOr<sql::SqlResult> SelectContext::ExecWithinTransaction() {
   if (direct_keys.has_value()) {
     // Lookup direct in the DB.
     size_t pkcol = this->schema_.keys().front();
-    std::vector<dataflow::Record> records =
-        this->db_->GetDirect(this->table_name_, pkcol, direct_keys.value(), true);
+    std::vector<dataflow::Record> records = this->db_->GetDirect(
+        this->table_name_, pkcol, direct_keys.value(), true);
     return sql::SqlResult(sql::SqlResultSet(this->schema_, std::move(records)));
   }
 

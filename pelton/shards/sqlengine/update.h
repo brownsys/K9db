@@ -36,7 +36,7 @@ class UpdateContext {
         lock_(lock) {}
 
   /* Main entry point for update: Executes the statement against the shards. */
-  absl::StatusOr<sql::SqlResult> Exec();
+  absl::StatusOr<sql::SqlResult> Exec(bool standalone_transaction = true);
 
   /* Returns true if the update statement may change the sharding/ownership of
      any affected record in the table or dependent tables. False guarantees
@@ -45,11 +45,11 @@ class UpdateContext {
 
  private:
   /* Executes the update by issuing a delete followed by an insert. */
-  absl::StatusOr<sql::SqlResult> DeleteInsert();
+  absl::StatusOr<sql::SqlResult> DeleteInsert(bool standalone_transaction);
 
   /* Executes the update directly against the database by overriding data
      in the database. */
-  absl::StatusOr<sql::SqlResult> DirectUpdate();
+  absl::StatusOr<sql::SqlResult> DirectUpdate(bool standalone_transaction);
 
   /* Update records using the given update statement in memory. */
   absl::StatusOr<std::vector<sqlast::Insert>> UpdateRecords(

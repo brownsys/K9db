@@ -36,8 +36,7 @@ template <typename T, typename R, bool shards_specified = false>
 T GetHelper(rocksdb::DB *db, const RocksdbTransaction *txn,
             rocksdb::ColumnFamilyHandle *handle,
             std::vector<std::string> &&values,
-            std::vector<std::string> &&shards = {},
-            int limit = -1) {
+            std::vector<std::string> &&shards = {}, int limit = -1) {
   // Open iterator over the database and the txn together.
   std::unique_ptr<rocksdb::Iterator> it = txn->Iterate(handle, true);
 

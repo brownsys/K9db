@@ -14,8 +14,7 @@ namespace rocks {
  */
 template <typename T, bool DEDUP>
 std::vector<T> RocksdbSession::GetRecords(
-    const std::string &table_name,
-    const sqlast::BinaryExpression *const where,
+    const std::string &table_name, const sqlast::BinaryExpression *const where,
     int limit) const {
   using SET = std::conditional<DEDUP, DedupIndexSet, IndexSet>::type;
 
@@ -110,7 +109,7 @@ std::vector<T> RocksdbSession::GetRecords(
           records.emplace_back(std::move(shard), std::move(enkey_copy),
                                std::move(value), std::move(record));
         }
-        
+
         if (limit != -1 && records.size() == limit) {
           break;
         }

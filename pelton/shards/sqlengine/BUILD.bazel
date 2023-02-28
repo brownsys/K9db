@@ -223,6 +223,7 @@ cc_library(
     deps = [
         ":index",
         ":select",
+        ":update",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:record",
@@ -394,9 +395,33 @@ cc_test(
 )
 
 cc_test(
+    name = "gdpr-get-anon-test",
+    srcs = [
+        "gdpr_get_anon_unittest.cc",
+    ],
+    deps = [
+        ":tests_helpers",
+        "//pelton/util:shard_name",
+        "@glog",
+    ],
+)
+
+cc_test(
     name = "gdpr-forget-test",
     srcs = [
         "gdpr_forget_unittest.cc",
+    ],
+    deps = [
+        ":tests_helpers",
+        "//pelton/util:shard_name",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "gdpr-forget-anon-test",
+    srcs = [
+        "gdpr_forget_anon_unittest.cc",
     ],
     deps = [
         ":tests_helpers",

@@ -30,8 +30,9 @@ static std::vector<std::string> ALL_QUERIES = {
     "stories.user_id = ? GROUP BY tags.id, stories.user_id ORDER BY `count` "
     "DESC LIMIT 1",  // _6
     "SELECT suggested_titles.* FROM suggested_titles WHERE "
-    "suggested_titles.story_id = ?",                                // _7 [can go]
-    "SELECT taggings.* FROM taggings WHERE taggings.story_id = ?",  // _8 [can go]
+    "suggested_titles.story_id = ?",  // _7 [can go]
+    "SELECT taggings.* FROM taggings WHERE taggings.story_id = ?",  // _8 [can
+                                                                    // go]
     "SELECT 1 AS `one`, hats.user_id FROM hats WHERE hats.user_id "
     "= ? LIMIT 1",  // _9 [can go?]
     "SELECT suggested_taggings.* FROM suggested_taggings WHERE "
@@ -89,8 +90,7 @@ static std::vector<std::string> REAL_QUERIES = {
     "parent_comments.user_id = read_ribbons.user_id AND ( "
     "parent_comments.upvotes - parent_comments.downvotes ) >= 0 ) OR ( "
     "parent_comments.id IS NULL AND stories.user_id = read_ribbons.user_id ) ) "
-    "GROUP BY read_ribbons.user_id HAVING read_ribbons.user_id = ?"
-};
+    "GROUP BY read_ribbons.user_id HAVING read_ribbons.user_id = ?"};
 
 // Regex to find key column.
 static std::regex REGEX_BEFORE_AND{"(.*) ([A-Za-z0-9\\._]+) \\= \\? AND(.*)"};
@@ -101,8 +101,8 @@ static std::regex REGEX_COLUMN{"([A-Za-z_0-9]+\\.)?([A-Za-z0-9_]+)"};
 static std::regex REGEX_LIMIT{"(.*) LIMIT ([0-9]+)"};
 
 // QUERIES should be defined to be REAL_QUERIES or ALL_QUERIES by bazel.
-#define DO_QUOTE(X)        #X
-#define QUOTE(X)           DO_QUOTE(X)
+#define DO_QUOTE(X) #X
+#define QUOTE(X) DO_QUOTE(X)
 
 int main(int argc, char **argv) {
   std::cout << QUOTE(QUERIES) << std::endl;

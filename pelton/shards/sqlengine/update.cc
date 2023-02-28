@@ -68,10 +68,14 @@ bool UpdateContext::ModifiesSharding() const {
 }
 
 /* Executes the update by issuing a delete followed by an insert. */
-absl::StatusOr<sql::SqlResult> UpdateContext::DeleteInsert() {
-  // Start transaction.
-  this->db_->BeginTransaction();
+absl::StatusOr<sql::SqlResult> UpdateContext::DeleteInsert(
+    bool standalone_transaction) {
   LOG(WARNING) << "SLOW UPDATE " << this->stmt_;
+
+  // Start transaction.
+  if (standalone_transaction) {
+    this->db_->BeginTransaction();
+  }
 
   // Delete all the records being updated.
   sqlast::Delete delete_stmt = this->stmt_.DeleteDomain();
@@ -102,7 +106,9 @@ absl::StatusOr<sql::SqlResult> UpdateContext::DeleteInsert() {
   }
 
   // Commit and update dataflow.
-  this->db_->CommitTransaction();
+  if (standalone_transaction) {
+    this->db_->CommitTransaction();
+  }
 
   // Process updates to dataflows.
   this->dstate_.ProcessRecords(this->table_name_, std::move(records));
@@ -113,9 +119,12 @@ absl::StatusOr<sql::SqlResult> UpdateContext::DeleteInsert() {
 
 /* Executes the update directly against the database by overriding data
    in the database. */
-absl::StatusOr<sql::SqlResult> UpdateContext::DirectUpdate() {
+absl::StatusOr<sql::SqlResult> UpdateContext::DirectUpdate(
+    bool standalone_transaction) {
   // Start transaction.
-  this->db_->BeginTransaction();
+  if (standalone_transaction) {
+    this->db_->BeginTransaction();
+  }
 
   // Execute update directly against DB.
   sql::ResultSetAndStatus result = this->db_->ExecuteUpdate(this->stmt_);
@@ -125,7 +134,9 @@ absl::StatusOr<sql::SqlResult> UpdateContext::DirectUpdate() {
   }
 
   // Commit to DB.
-  this->db_->CommitTransaction();
+  if (standalone_transaction) {
+    this->db_->CommitTransaction();
+  }
 
   // Process updates to dataflows.
   this->dstate_.ProcessRecords(this->table_name_, result.first.Vec());
@@ -137,11 +148,12 @@ absl::StatusOr<sql::SqlResult> UpdateContext::DirectUpdate() {
  * Main entry point for update:
  * Transforms statement into a corresponding delete followed by an insert.
  */
-absl::StatusOr<sql::SqlResult> UpdateContext::Exec() {
+absl::StatusOr<sql::SqlResult> UpdateContext::Exec(
+    bool standalone_transaction) {
   if (this->ModifiesSharding()) {
-    return this->DeleteInsert();
+    return this->DeleteInsert(standalone_transaction);
   } else {
-    return this->DirectUpdate();
+    return this->DirectUpdate(standalone_transaction);
   }
 }
 

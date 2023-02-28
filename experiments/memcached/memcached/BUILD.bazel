@@ -25,6 +25,10 @@ cc_binary(
         "mariadb.h",
         "memcached.h",
     ],
+    defines = select({
+        ":real_queries": ["QUERIES=REAL_QUERIES"],
+        "//conditions:default": ["QUERIES=ALL_QUERIES"],
+    }),
     linkopts = [
         "-lmariadbcpp",
     ],
@@ -32,8 +36,4 @@ cc_binary(
     deps = [
         "@libmemcached",
     ],
-    defines = select({
-        ":real_queries": ["QUERIES=REAL_QUERIES"],
-        "//conditions:default": ["QUERIES=ALL_QUERIES"],
-    }),
 )
