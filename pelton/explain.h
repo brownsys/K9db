@@ -1,4 +1,4 @@
-// EXPLAIN PRIVACY command.
+// EXPLAIN COMPLIANCE command.
 #ifndef PELTON_EXPLAIN_H_
 #define PELTON_EXPLAIN_H_
 
@@ -7,7 +7,7 @@
 namespace pelton {
 namespace explain {
 
-void ExplainPrivacy(const Connection &connection);
+void ExplainCompliance(const Connection &connection);
 
 }  // namespace explain
 }  // namespace pelton

@@ -186,6 +186,96 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
   return stmt;
 }
 
+absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyUpdate(const char *str,
+                                                               size_t size) {
+  // UPDATE <tablename> SET <col> = <val>, ... WHERE <colum_name> = <value>
+  // UPDATE.
+  if (!StartsWith(&str, &size, "UPDATE", 6)) {
+    return absl::InvalidArgumentError("Hacky update: UPDATE");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // <tablename>.
+  std::string table_name = ExtractIdentifier(&str, &size);
+  if (table_name.size() == 0) {
+    return absl::InvalidArgumentError("Hacky update: table name");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // SET.
+  if (!StartsWith(&str, &size, "SET", 3)) {
+    return absl::InvalidArgumentError("Hacky update: SET");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // <col>, ...
+  std::unique_ptr<Update> stmt = std::make_unique<Update>(table_name);
+  while (true) {
+    // <column>
+    std::string column = ExtractIdentifier(&str, &size);
+    if (column.size() == 0) {
+      return absl::InvalidArgumentError("Hacky update: COLUMN");
+    }
+    ConsumeWhiteSpace(&str, &size);
+
+    // =.
+    if (!StartsWith(&str, &size, "=", 1)) {
+      return absl::InvalidArgumentError("HACKY update: =");
+    }
+    ConsumeWhiteSpace(&str, &size);
+
+    // <value>.
+    std::string unparsed = ExtractValue(&str, &size);
+    if (unparsed.size() == 0) {
+      return absl::InvalidArgumentError("HACKY update: VALUE");
+    }
+    ConsumeWhiteSpace(&str, &size);
+
+    // Check if it is + 1.
+    Value value = Value::FromSQLString(unparsed);
+    auto literal = std::make_unique<LiteralExpression>(value);
+    if (StartsWith(&str, &size, "+ ", 2)) {
+      std::string column = ExtractIdentifier(&str, &size);
+      if (column.size() == 0) {
+        return absl::InvalidArgumentError("Hacky update: + COLUMN");
+      }
+      auto col = std::make_unique<ColumnExpression>(column);
+      auto plus = std::make_unique<BinaryExpression>(Expression::Type::PLUS);
+      plus->SetLeft(std::move(col));
+      plus->SetRight(std::move(literal));
+      stmt->AddColumnValue(column, std::move(plus));
+    } else {
+      stmt->AddColumnValue(column, std::move(literal));
+    }
+
+    if (!StartsWith(&str, &size, ",", 1)) {
+      break;
+    }
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // FROM.
+  if (!StartsWith(&str, &size, "WHERE", 5)) {
+    return absl::InvalidArgumentError("Hacky update: WHERE");
+  }
+  ConsumeWhiteSpace(&str, &size);
+
+  // Condition.
+  auto condition = HackyCondition(&str, &size);
+  if (condition == nullptr) {
+    return absl::InvalidArgumentError("Hacky update: condition");
+  }
+  stmt->SetWhereClause(std::move(condition));
+
+  // End of statement.
+  ConsumeWhiteSpace(&str, &size);
+  if (size != 0 && !StartsWith(&str, &size, ";", 1)) {
+    return absl::InvalidArgumentError("Hacky update: ;");
+  }
+
+  return stmt;
+}
+
 absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyGDPR(const char *str,
                                                              size_t size) {
   // GDPR (FORGET | GET) shard_kind user_id;
@@ -234,6 +324,9 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyParse(
   }
   if (str[0] == 'G' || str[0] == 'g') {
     return HackyGDPR(str, size);
+  }
+  if (str[0] == 'U' || str[0] == 'u') {
+    return HackyUpdate(str, size);
   }
 
   return absl::InvalidArgumentError("Cannot hacky parse");

@@ -107,7 +107,7 @@ void InitializeDatabase(const std::string &db_name,
   DropDatabase(db_name);
 
   // Create and open a connection to pelton.
-  CHECK(pelton::initialize(3, true));
+  CHECK(pelton::initialize(1, true));
   CHECK(pelton::open(&connection, db_name));
 
   // Set echo if specified by cmd flags.

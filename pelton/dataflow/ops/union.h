@@ -20,8 +20,6 @@ class UnionOperator : public Operator {
   UnionOperator() : Operator(Operator::Type::UNION) {}
 
  protected:
-  bool DeepCompareSchemas(const SchemaRef s1, const SchemaRef s2);
-
   std::vector<Record> Process(NodeIndex source, std::vector<Record> &&records,
                               const Promise &promise) override;
 

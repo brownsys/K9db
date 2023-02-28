@@ -1,9 +1,9 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
 cc_library(
-    name = "abstract_connection",
+    name = "connection",
     hdrs = [
-        "abstract_connection.h",
+        "connection.h",
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
@@ -23,8 +23,8 @@ cc_library(
     ],
     visibility = ["//:__subpackages__"],
     deps = [
-        ":abstract_connection",
-        "//pelton/sql/rocksdb:connection",
+        ":connection",
+        "//pelton/sql/rocksdb:rocksdb_connection",
     ],
 )
 

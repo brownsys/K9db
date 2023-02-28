@@ -9,6 +9,7 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/sql/rocksdb/dedup.h"
 #include "pelton/sql/rocksdb/encode.h"
+#include "pelton/sql/rocksdb/transaction.h"
 #include "pelton/sqlast/value_mapper.h"
 #include "rocksdb/db.h"
 #include "rocksdb/slice.h"
@@ -16,6 +17,7 @@
 
 namespace pelton {
 namespace sql {
+namespace rocks {
 
 class RocksdbIndex {
  public:
@@ -27,22 +29,25 @@ class RocksdbIndex {
   // index_value is the value of 'name'.
   // key is the value of 'id' (the PK) without a shard prefix.
   void Add(const std::vector<rocksdb::Slice> &index_values,
-           const rocksdb::Slice &shard_name, const rocksdb::Slice &pk);
+           const rocksdb::Slice &shard_name, const rocksdb::Slice &pk,
+           RocksdbTransaction *txn);
   void Delete(const std::vector<rocksdb::Slice> &index_values,
-              const rocksdb::Slice &shard_name, const rocksdb::Slice &pk);
+              const rocksdb::Slice &shard_name, const rocksdb::Slice &pk,
+              RocksdbTransaction *txn);
 
   // Use to encode condition values for composite index.
   std::vector<std::string> EncodeComposite(
       sqlast::ValueMapper *vm, const dataflow::SchemaRef &schema) const;
 
   // Get the shard and pk of matching records for given values.
-  IndexSet Get(std::vector<std::string> &&values, bool prefix = false) const;
+  IndexSet Get(std::vector<std::string> &&values,
+               const RocksdbTransaction *txn, int limit = -1) const;
   DedupIndexSet GetDedup(std::vector<std::string> &&values,
-                         bool prefix = false) const;
+                         const RocksdbTransaction *txn, int limit = -1) const;
 
   IndexSet GetWithShards(std::vector<std::string> &&shards,
                          std::vector<std::string> &&values,
-                         bool prefix = false) const;
+                         const RocksdbTransaction *txn) const;
 
   // Get the columns over which this index is defined.
   const std::vector<size_t> &GetColumns() const { return this->columns_; }
@@ -60,15 +65,23 @@ class RocksdbPKIndex {
   RocksdbPKIndex(rocksdb::DB *db, const std::string &table_name);
 
   // Updating.
-  void Add(const rocksdb::Slice &pk, const rocksdb::Slice &shard_name);
-  void Delete(const rocksdb::Slice &pk, const rocksdb::Slice &shard_name);
+  void Add(const rocksdb::Slice &pk, const rocksdb::Slice &shard_name,
+           RocksdbTransaction *txn);
+  void Delete(const rocksdb::Slice &pk, const rocksdb::Slice &shard_name,
+              RocksdbTransaction *txn);
 
   // Reading.
-  IndexSet Get(std::vector<std::string> &&pk_values) const;
-  DedupIndexSet GetDedup(std::vector<std::string> &&pk_values) const;
+  bool CheckUniqueAndLock(const rocksdb::Slice &slice,
+                          const RocksdbTransaction *txn) const;
+
+  IndexSet Get(std::vector<std::string> &&pk_values,
+               const RocksdbTransaction *txn) const;
+  DedupIndexSet GetDedup(std::vector<std::string> &&pk_values,
+                         const RocksdbTransaction *txn) const;
 
   // Count how many shard each pk value is in.
-  std::vector<size_t> CountShards(std::vector<std::string> &&pk_values) const;
+  std::vector<size_t> CountShards(std::vector<std::string> &&pk_values,
+                                  const RocksdbTransaction *txn) const;
 
  private:
   rocksdb::DB *db_;
@@ -77,6 +90,7 @@ class RocksdbPKIndex {
   using IRecord = RocksdbPKIndexInternalRecord;
 };
 
+}  // namespace rocks
 }  // namespace sql
 }  // namespace pelton
 

@@ -6,6 +6,8 @@
 
 #include "pelton/shards/state.h"
 
+#include "glog/logging.h"
+
 namespace pelton {
 namespace shards {
 

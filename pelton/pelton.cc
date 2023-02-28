@@ -48,9 +48,16 @@ std::optional<SqlResult> SpecialStatements(const std::string &sql,
       echo = true;
       return SqlResult(true);
     }
+    if (absl::StartsWith(split.at(1), "SERIALIAZBLE")) {
+      util::UniqueLock lock = connection->state->WriterLock();
+      shards::SharderState &sstate = connection->state->SharderState();
+      sstate.TurnOnSerializable();
+      std::cout << "Pelton is now serializable!" << std::endl;
+      return SqlResult(true);
+    }
   }
-  if (absl::StartsWith(sql, "EXPLAIN PRIVACY")) {
-    explain::ExplainPrivacy(*connection);
+  if (absl::StartsWith(sql, "EXPLAIN COMPLIANCE")) {
+    explain::ExplainCompliance(*connection);
     return SqlResult(true);
   }
   if (absl::StartsWith(sql, "EXPLAIN ")) {
@@ -112,6 +119,7 @@ bool open(Connection *connection, const std::string &db_name) {
   // set global state in local connection struct
   PELTON_STATE->Initialize(db_name);
   connection->state = PELTON_STATE;
+  connection->session = PELTON_STATE->Database()->OpenSession();
   return true;
 }
 

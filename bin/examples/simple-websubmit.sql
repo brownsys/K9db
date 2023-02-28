@@ -22,8 +22,6 @@ CREATE TABLE submissions ( \
   PRIMARY KEY(ID) \
 );
 
-CREATE INDEX idx ON submissions (ID);
-
 CREATE TABLE grades ( \
   ID int, \
   student_id int, \

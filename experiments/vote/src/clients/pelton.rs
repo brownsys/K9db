@@ -130,6 +130,8 @@ impl VoteClient for Conn {
                 //    }
                 //    conn = conn.drop_query(sql).await.unwrap();
                 //}
+            } else {
+              VT_COUNTER.store(100000, Ordering::SeqCst)
             }
 
             // now we connect for real

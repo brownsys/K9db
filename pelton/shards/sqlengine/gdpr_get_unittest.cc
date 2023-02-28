@@ -355,8 +355,8 @@ TEST_F(GDPRGetTest, VariableOwnership) {
   // Associate groups with some users.
   auto &&[assoc1, a0] = MakeInsert("association", {"0", "0", "0"});
   auto &&[assoc2, a1] = MakeInsert("association", {"1", "1", "0"});
-  auto &&[assoc3, a___] = MakeInsert("association", {"1", "1", "5"});
-  auto &&[assoc4, a____] = MakeInsert("association", {"2", "1", "5"});
+  auto &&[assoc3, a___] = MakeInsert("association", {"2", "1", "5"});
+  auto &&[assoc4, a____] = MakeInsert("association", {"3", "1", "5"});
 
   EXPECT_UPDATE(Execute(assoc1, &conn), 3);
   EXPECT_UPDATE(Execute(assoc2, &conn), 3);
@@ -523,7 +523,7 @@ TEST_F(GDPRGetTest, VariableAccessorship) {
   // Associate groups with some users.
   auto &&[assoc1, a0] = MakeInsert("association", {"1", "1", "5"});
   auto &&[assoc2, a1] = MakeInsert("association", {"2", "1", "5"});
-  auto &&[assoc3, a2] = MakeInsert("association", {"2", "1", "10"});
+  auto &&[assoc3, a2] = MakeInsert("association", {"3", "1", "10"});
 
   EXPECT_UPDATE(Execute(assoc1, &conn), 1);
   EXPECT_UPDATE(Execute(assoc2, &conn), 1);
@@ -584,7 +584,7 @@ TEST_F(GDPRGetTest, SimpleMixedAccessorship) {
   // Associate groups with some users.
   auto &&[assoc1, a0] = MakeInsert("association", {"1", "1", "5"});
   auto &&[assoc2, a1] = MakeInsert("association", {"2", "1", "5"});
-  auto &&[assoc3, a2] = MakeInsert("association", {"2", "1", "10"});
+  auto &&[assoc3, a2] = MakeInsert("association", {"3", "1", "10"});
 
   EXPECT_UPDATE(Execute(assoc1, &conn), 1);
   EXPECT_UPDATE(Execute(assoc2, &conn), 1);

@@ -25,6 +25,18 @@ cc_library(
 )
 
 cc_library(
+    name = "indexed_mutex",
+    srcs = [
+        "indexed_mutex.cc",
+    ],
+    hdrs = [
+        "indexed_mutex.h",
+    ],
+    visibility = ["//pelton:__subpackages__"],
+    deps = [],
+)
+
+cc_library(
     name = "ints",
     srcs = [
         "ints.cc",

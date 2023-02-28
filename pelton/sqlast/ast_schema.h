@@ -199,6 +199,7 @@ class CreateTable : public AbstractStatement {
   // Column manipulations.
   void AddColumn(const std::string &column_name, const ColumnDefinition &def);
   const std::vector<ColumnDefinition> &GetColumns() const;
+  const ColumnDefinition &GetColumn(const std::string &column_name) const;
   ColumnDefinition &MutableColumn(const std::string &column_name);
   bool HasColumn(const std::string &column_name) const;
 
@@ -328,6 +329,7 @@ class CreateView : public AbstractStatement {
 
 std::ostream &operator<<(std::ostream &os, const ColumnConstraint::Type &r);
 std::ostream &operator<<(std::ostream &os, const ColumnDefinition::Type &r);
+std::ostream &operator<<(std::ostream &os, const ColumnConstraint::FKType &t);
 
 }  // namespace sqlast
 }  // namespace pelton

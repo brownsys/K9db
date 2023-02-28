@@ -20,20 +20,21 @@ Base schema in `shuup/base.sql`
 Schema in `shuup/no-pii.sql`
 
 ```
-shuup_shop: unsharded
-
-shuup_companycontact_members: unsharded
-
-shuup_companycontact: unsharded
-
-shuup_gdpr_gdpruserconsent: unsharded
-
-shuup_personcontact: unsharded
+----------------------------------------- 
+shuup_shop: UNSHARDED
+----------------------------------------- 
+shuup_companycontact_members: UNSHARDED
+----------------------------------------- 
+shuup_companycontact: UNSHARDED
+----------------------------------------- 
+shuup_gdpr_gdpruserconsent: UNSHARDED
+----------------------------------------- 
+shuup_personcontact: UNSHARDED
   [Warning] The column "email" sounds like it may belong to a data subject, but the table is not sharded. You may want to review your annotations.
-
-shuup_contact: unsharded
-
-auth_user: unsharded
+----------------------------------------- 
+shuup_contact: UNSHARDED
+----------------------------------------- 
+auth_user: UNSHARDED
   [Warning] The columns "username", "password" sound like they may belong to a data subject, but the table is not sharded. You may want to review your annotations.
 ```
 
@@ -42,24 +43,25 @@ auth_user: unsharded
 Schema in `shuup/auth-user-is-pii.sql`
 
 ```
-shuup_shop: sharded with
-  OWNER_owner_id shards to auth_user
-
-shuup_companycontact_members: unsharded
-
-shuup_companycontact: unsharded
-
-shuup_gdpr_gdpruserconsent: sharded with
-  OWNER_user_id shards to auth_user
-
-shuup_personcontact: sharded with
-  user_id shards to auth_user
+----------------------------------------- 
+shuup_shop: SHARDED
+  owner_id             shards to auth_user            (explicit annotation)
+----------------------------------------- 
+shuup_companycontact_members: UNSHARDED
+----------------------------------------- 
+shuup_companycontact: UNSHARDED
+----------------------------------------- 
+shuup_gdpr_gdpruserconsent: SHARDED
+  user_id              shards to auth_user            (explicit annotation)
+----------------------------------------- 
+shuup_personcontact: SHARDED
+  user_id              shards to auth_user            (implicitly deduced)
   [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
-
-shuup_contact: unsharded
+----------------------------------------- 
+shuup_contact: UNSHARDED
   [Warning] The column "email" sounds like it may belong to a data subject, but the table is not sharded. You may want to review your annotations.
-
-auth_user: is PII
+----------------------------------------- 
+auth_user: DATASUBJECT
 ```
 
 ### `contact` is PII
@@ -67,36 +69,40 @@ auth_user: is PII
 Schema in `shuup/contact-is-pii.sql`
 
 ```
-shuup_shop: sharded with
-  OWNER_owner_id shards to shuup_contact
-    via auth_user(ptr) resolved with index auth_user_ptr_ptr
-    total transitive distance is 2
+----------------------------------------- 
+shuup_shop: SHARDED
+  owner_id             shards to shuup_contact        (explicit annotation)
+      via   auth_user(user_id)
+      via   shuup_personcontact(id)
+    with a total distance of 3
   [Info] this table is variably owned (via shuup_personcontact)
   [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
-
-shuup_companycontact_members: sharded with
-  companycontact_id shards to shuup_contact
-    via shuup_companycontact(contact_ptr_id) resolved with index company_contact_ptr_id_contact_ptr_id
-    total transitive distance is 1
-
-shuup_companycontact: sharded with
-  contact_ptr_id shards to shuup_contact
-
-shuup_gdpr_gdpruserconsent: sharded with
-  OWNER_user_id shards to shuup_contact
-    via auth_user(ptr) resolved with index auth_user_ptr_ptr
-    total transitive distance is 2
+----------------------------------------- 
+shuup_companycontact_members: SHARDED
+  companycontact_id    shards to shuup_contact        (implicitly deduced)
+      via   shuup_companycontact(id)
+    with a total distance of 2
+----------------------------------------- 
+shuup_companycontact: SHARDED
+  contact_ptr_id       shards to shuup_contact        (implicitly deduced)
+----------------------------------------- 
+shuup_gdpr_gdpruserconsent: SHARDED
+  user_id              shards to shuup_contact        (explicit annotation)
+      via   auth_user(user_id)
+      via   shuup_personcontact(id)
+    with a total distance of 3
   [Info] this table is variably owned (via shuup_personcontact)
   [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
-
-shuup_personcontact: sharded with
-  contact_ptr_id shards to shuup_contact
-
-shuup_contact: is PII
-
-auth_user: sharded with
-  ptr shards to shuup_contact
-    total transitive distance is 1
+----------------------------------------- 
+shuup_personcontact: SHARDED
+  contact_ptr_id       shards to shuup_contact        (implicitly deduced)
+----------------------------------------- 
+shuup_contact: DATASUBJECT
+----------------------------------------- 
+auth_user: SHARDED
+  id                   shards to shuup_contact        (explicit annotation)
+      via   shuup_personcontact(id)
+    with a total distance of 2
   [Info] this table is variably owned (via shuup_personcontact)
   [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
 ```
@@ -106,29 +112,32 @@ auth_user: sharded with
 Schema in `auth-user-and-contact-is-pii.sql`
 
 ```
-shuup_shop: sharded with
-  OWNER_owner_id shards to auth_user
-
-shuup_companycontact_members: sharded with
-  OWNER_contact_id shards to shuup_contact
-    total transitive distance is 1
-  OWNER_contact_id shards to auth_user
-    total transitive distance is 1
+----------------------------------------- 
+shuup_shop: SHARDED
+  owner_id             shards to auth_user            (explicit annotation)
+----------------------------------------- 
+shuup_companycontact_members: SHARDED
+  contact_id           shards to shuup_contact        (explicit annotation)
+      via   shuup_personcontact(id)
+    with a total distance of 2
+  contact_id           shards to auth_user            (explicit annotation)
+      via   shuup_personcontact(id)
+    with a total distance of 2
   [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
-
-shuup_companycontact: sharded with
-  contact_ptr_id shards to shuup_contact
-
-shuup_gdpr_gdpruserconsent: sharded with
-  OWNER_user_id shards to auth_user
-
-shuup_personcontact: sharded with
-  OWNER_contact_ptr_id shards to shuup_contact
-  OWNER_user_id shards to auth_user
-
-shuup_contact: is PII
-
-auth_user: is PII
+----------------------------------------- 
+shuup_companycontact: SHARDED
+  contact_ptr_id       shards to shuup_contact        (implicitly deduced)
+----------------------------------------- 
+shuup_gdpr_gdpruserconsent: SHARDED
+  user_id              shards to auth_user            (explicit annotation)
+----------------------------------------- 
+shuup_personcontact: SHARDED
+  contact_ptr_id       shards to shuup_contact        (explicit annotation)
+  user_id              shards to auth_user            (explicit annotation)
+----------------------------------------- 
+shuup_contact: DATASUBJECT
+----------------------------------------- 
+auth_user: DATASUBJECT
 ```
 
 After adding a `OWNS` to `personcontact(contact_ptr_id)` we get the error

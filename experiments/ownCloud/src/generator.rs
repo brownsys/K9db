@@ -50,11 +50,11 @@ impl GeneratorState {
   }
 
   // Generate groups and add users to them.
-  pub fn generate_groups<'b>(
+  pub fn generate_groups(
     &mut self,
-    users: &'b [User],
+    users: &[User],
     num: usize,
-  ) -> Vec<Group<'b>> {
+  ) -> Vec<Group> {
     if num > users.len() {
       panic!("Number of users < number of users per group");
     }
@@ -74,35 +74,35 @@ impl GeneratorState {
       users.iter().for_each(|u| {
         raw_groups[*grp_iter.next().unwrap()]
           .users
-          .push((self.new_id(EntityType::UserGroupAssoc), u))
+          .push((self.new_id(EntityType::UserGroupAssoc), u.uid.clone()))
       });
     }
     raw_groups
   }
 
   // Generate files with an owner, but no shares.
-  pub fn generate_files<'b>(
+  pub fn generate_files(
     &mut self,
-    users: &'b [User],
+    users: &[User],
     num: usize,
-  ) -> Vec<File<'b>> {
+  ) -> Vec<File> {
     users
       .iter()
       .flat_map(|u| std::iter::repeat(u).take(num))
       .map(|u| File {
         id: self.new_id(EntityType::File),
-        owned_by: u,
+        owned_by: u.uid.clone(),
       })
       .collect()
   }
 
   // Generate direct shares.
-  pub fn generate_direct_shares<'b>(
+  pub fn generate_direct_shares(
     &mut self,
-    users: &'b [User],
-    files: &'b [File<'b>],
+    users: &[User],
+    files: &[File],
     num: usize,
-  ) -> Vec<Share<'b>> {
+  ) -> Vec<Share> {
     let ref mut rng = rand::thread_rng();
     let mut user_pick_v = users.iter().collect::<Vec<_>>();
     user_pick_v.shuffle(rng);
@@ -112,8 +112,8 @@ impl GeneratorState {
       .flat_map(|f| std::iter::repeat(f).take(num))
       .map(|f| Share {
         id: self.new_id(EntityType::Share),
-        share_with: ShareType::Direct(user_pick.next().unwrap()),
-        file: f,
+        share_with: ShareType::Direct(user_pick.next().unwrap().clone().clone()),
+        file: f.clone(),
       })
       .collect();
     shares.iter().for_each(|s| self.track_share(s));
@@ -121,12 +121,12 @@ impl GeneratorState {
   }
 
   // generate indirect shares.
-  pub fn generate_group_shares<'b>(
+  pub fn generate_group_shares(
     &mut self,
-    groups: &'b [Group],
-    files: &'b [File<'b>],
+    groups: &[Group],
+    files: &[File],
     num: usize,
-  ) -> Vec<Share<'b>> {
+  ) -> Vec<Share> {
     let ref mut rng = rand::thread_rng();
     let ref mut grp_pick_v = groups.iter().collect::<Vec<_>>();
     grp_pick_v.shuffle(rng);
@@ -136,8 +136,8 @@ impl GeneratorState {
       .flat_map(|f| std::iter::repeat(f).take(num))
       .map(|f| Share {
         id: self.new_id(EntityType::Share),
-        share_with: ShareType::Group(grp_pick.next().unwrap()),
-        file: f,
+        share_with: ShareType::Group(grp_pick.next().unwrap().clone().clone()),
+        file: f.clone(),
       })
       .collect();
     shares.iter().for_each(|s| self.track_share(s));
@@ -145,12 +145,12 @@ impl GeneratorState {
   }
 
   // Keep track of files shared with all users.
-  pub fn track_share<'b>(&mut self, share: &Share<'b>) {
-    if let ShareType::Direct(u) = share.share_with {
+  pub fn track_share(&mut self, share: &Share) {
+    if let ShareType::Direct(u) = &share.share_with {
       self.1.get_mut(&u.uid).unwrap().push(share.id);
-    } else if let ShareType::Group(g) = share.share_with {
-      g.users.iter().for_each(|(_, u)| {
-        self.1.get_mut(&u.uid).unwrap().push(share.id);
+    } else if let ShareType::Group(g) = &share.share_with {
+      g.users.iter().for_each(|(_, uid)| {
+        self.1.get_mut(uid).unwrap().push(share.id);
       });
     }
   }

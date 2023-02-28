@@ -12,7 +12,7 @@
 #include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
-#include "pelton/sql/abstract_connection.h"
+#include "pelton/sql/connection.h"
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/upgradable_lock.h"
@@ -32,11 +32,11 @@ class UpdateContext {
         conn_(conn),
         sstate_(conn->state->SharderState()),
         dstate_(conn->state->DataflowState()),
-        db_(conn->state->Database()),
+        db_(conn->session.get()),
         lock_(lock) {}
 
   /* Main entry point for update: Executes the statement against the shards. */
-  absl::StatusOr<sql::SqlResult> Exec();
+  absl::StatusOr<sql::SqlResult> Exec(bool standalone_transaction = true);
 
   /* Returns true if the update statement may change the sharding/ownership of
      any affected record in the table or dependent tables. False guarantees
@@ -45,11 +45,11 @@ class UpdateContext {
 
  private:
   /* Executes the update by issuing a delete followed by an insert. */
-  absl::StatusOr<sql::SqlResult> DeleteInsert();
+  absl::StatusOr<sql::SqlResult> DeleteInsert(bool standalone_transaction);
 
   /* Executes the update directly against the database by overriding data
      in the database. */
-  absl::StatusOr<sql::SqlResult> DirectUpdate();
+  absl::StatusOr<sql::SqlResult> DirectUpdate(bool standalone_transaction);
 
   /* Update records using the given update statement in memory. */
   absl::StatusOr<std::vector<sqlast::Insert>> UpdateRecords(
@@ -67,7 +67,7 @@ class UpdateContext {
   // Connection components.
   SharderState &sstate_;
   dataflow::DataFlowState &dstate_;
-  sql::AbstractConnection *db_;
+  sql::Session *db_;
 
   // Shared Lock so we can read from the states safetly.
   util::SharedLock *lock_;

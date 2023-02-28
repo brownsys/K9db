@@ -29,6 +29,9 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
 absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
                                                                size_t size);
 
+absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyUpdate(const char *str,
+                                                               size_t size);
+
 absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyParse(
     const std::string &sql);
 

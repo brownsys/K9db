@@ -10,7 +10,7 @@
 #include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
 #include "pelton/shards/types.h"
-#include "pelton/sql/abstract_connection.h"
+#include "pelton/sql/connection.h"
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/upgradable_lock.h"
@@ -30,7 +30,7 @@ class ReplaceContext {
         conn_(conn),
         sstate_(conn->state->SharderState()),
         dstate_(conn->state->DataflowState()),
-        db_(conn->state->Database()),
+        db_(conn->session.get()),
         lock_(lock) {}
 
   /* Main entry point for replace: Executes the statement against the shards. */
@@ -54,7 +54,7 @@ class ReplaceContext {
   // Connection components.
   SharderState &sstate_;
   dataflow::DataFlowState &dstate_;
-  sql::AbstractConnection *db_;
+  sql::Session *db_;
 
   // Shared Lock so we can read from the states safetly.
   util::SharedLock *lock_;

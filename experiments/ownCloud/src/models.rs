@@ -1,35 +1,47 @@
 // Owncloud user.
+#[derive(Clone)]
 pub struct User {
   pub uid: String,
 }
 
-pub struct File<'a> {
+#[derive(Clone)]
+pub struct File {
   pub id: usize,
-  pub owned_by: &'a User,
+  pub owned_by: String,
 }
 
 // Group consists of several owning users.
-pub struct Group<'a> {
+#[derive(Clone)]
+pub struct Group {
   pub gid: String,
-  pub users: Vec<(usize, &'a User)>,
+  pub users: Vec<(usize, String)>,
 }
 
 // Share.
-pub enum ShareType<'a> {
-  Direct(&'a User),
-  Group(&'a Group<'a>),
+#[derive(Clone)]
+pub enum ShareType {
+  Direct(User),
+  Group(Group),
 }
-pub struct Share<'a> {
+#[derive(Clone)]
+pub struct Share {
   pub id: usize,
-  pub share_with: ShareType<'a>,
-  pub file: &'a File<'a>,
+  pub share_with: ShareType,
+  pub file: File,
 }
 
 impl PartialEq for User {
   fn eq(&self, other: &Self) -> bool {
-    &self.uid == &other.uid
+    self.uid == other.uid
   }
 }
+
+impl PartialEq for File {
+  fn eq(&self, other: &Self) -> bool {
+    self.id == other.id
+  }
+}
+
 /*
 impl <'a> ToValue for Group<'a> {
     fn to_value(&self) -> Value {

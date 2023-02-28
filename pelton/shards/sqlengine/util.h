@@ -1,9 +1,5 @@
 // This file contains utility functions, mostly for standarizing
 // name (suffixes etc) of things.
-//
-// TODO(babman): All these functions should be gone and we should make them
-// part of the AST by improving annotations and making AST typed.
-
 #ifndef PELTON_SHARDS_SQLENGINE_UTIL_H_
 #define PELTON_SHARDS_SQLENGINE_UTIL_H_
 

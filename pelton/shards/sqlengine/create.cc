@@ -4,7 +4,6 @@
 #include <iterator>
 #include <optional>
 #include <unordered_set>
-#include <utility>
 
 #include "glog/logging.h"
 #include "pelton/shards/sqlengine/index.h"

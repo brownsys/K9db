@@ -12,6 +12,8 @@
 #include "pelton/util/shard_name.h"
 #include "pelton/util/status.h"
 
+#define CM ,
+
 namespace pelton {
 namespace shards {
 namespace sqlengine {
@@ -27,6 +29,9 @@ bool ReplaceContext::CanFastReplace() {
 }
 
 absl::StatusOr<sql::SqlResult> ReplaceContext::FastReplace() {
+  // Start transaction.
+  this->db_->BeginTransaction();
+
   // Need to insert a copy for each way of sharding the table.
   CHECK_LE(this->table_.owners.size(), 1u);
   util::ShardName shard_name(DEFAULT_SHARD, DEFAULT_SHARD);
@@ -50,15 +55,21 @@ absl::StatusOr<sql::SqlResult> ReplaceContext::FastReplace() {
   // Perform fast replace.
   auto pair = this->db_->ExecuteReplace(this->stmt_, shard_name);
   if (pair.second < 0) {
+    this->db_->RollbackTransaction();
     return sql::SqlResult(pair.second);
   }
 
-  // update dataflow.
+  // Commit insert to DB.
+  this->db_->CommitTransaction();
+
+  // Update dataflow.
   std::vector<dataflow::Record> records;
   if (pair.first.has_value()) {
     records.push_back(std::move(pair.first.value()));
   }
   records.push_back(this->dstate_.CreateRecord(this->stmt_));
+
+  // Process updates to dataflows.
   this->dstate_.ProcessRecords(this->table_name_, std::move(records));
 
   // Done.
@@ -66,7 +77,10 @@ absl::StatusOr<sql::SqlResult> ReplaceContext::FastReplace() {
 }
 
 absl::StatusOr<sql::SqlResult> ReplaceContext::DeleteInsert() {
+  // Start transaction.
+  this->db_->BeginTransaction();
   LOG(WARNING) << "SLOW REPLACE " << this->stmt_;
+
   // Find PK.
   CHECK_EQ(this->schema_.keys().size(), 1u) << "Replace table with illegal PK";
   size_t pk_index = this->schema_.keys().front();
@@ -81,22 +95,31 @@ absl::StatusOr<sql::SqlResult> ReplaceContext::DeleteInsert() {
   where->SetRight(std::make_unique<sqlast::LiteralExpression>(pk_value));
   delete_stmt.SetWhereClause(std::move(where));
 
-  DeleteContext del_context(delete_stmt, this->conn_, this->lock_);
-  MOVE_OR_RETURN(sql::SqlResult result, del_context.Exec());
-  if (result.UpdateCount() < 0) {
-    return sql::SqlResult(result.UpdateCount());
+  DeleteContext dcontext(delete_stmt, this->conn_, this->lock_);
+  ASSIGN_OR_RETURN(auto &[_ CM dstatus], dcontext.ExecWithinTransaction());
+  if (dstatus < 0) {
+    this->db_->RollbackTransaction();
+    return sql::SqlResult(dstatus);
   }
 
   // Insert the record.
   auto casted = static_cast<const sqlast::Insert *>(&this->stmt_);
-  InsertContext context(*casted, this->conn_, this->lock_);
-  MOVE_OR_RETURN(sql::SqlResult result2, context.Exec());
-  if (result2.UpdateCount() < 0) {
-    return sql::SqlResult(result2.UpdateCount());
+  InsertContext icontext(*casted, this->conn_, this->lock_);
+  ASSIGN_OR_RETURN(auto &[records CM istatus],
+                   icontext.ExecWithinTransaction());
+  if (istatus < 0) {
+    this->db_->RollbackTransaction();
+    return sql::SqlResult(istatus);
   }
 
+  // Commit and update dataflow.
+  this->db_->CommitTransaction();
+
+  // Process updates to dataflows.
+  this->dstate_.ProcessRecords(this->table_name_, std::move(records));
+
   // Return the total number of operations performed against the DB.
-  return sql::SqlResult(result.UpdateCount() + result2.UpdateCount());
+  return sql::SqlResult(dstatus + istatus);
 }
 
 /*

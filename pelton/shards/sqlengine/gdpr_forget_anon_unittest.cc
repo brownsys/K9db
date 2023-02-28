@@ -32,7 +32,7 @@ TEST_F(GDPRForgetAnonTest, TwoOwnersAnon) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -76,7 +76,7 @@ TEST_F(GDPRForgetAnonTest, OwnerAccessorAnon) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -121,7 +121,7 @@ TEST_F(GDPRForgetAnonTest, MultipleColumnsAnon) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -172,7 +172,7 @@ TEST_F(GDPRForgetAnonTest, TwoDistinctOwnersAnon) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(patient, &conn));
@@ -231,7 +231,7 @@ TEST_F(GDPRForgetAnonTest, TransitiveOwnershipAnon) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -288,7 +288,7 @@ TEST_F(GDPRForgetAnonTest, TransitiveAccessorshipAnon) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -350,7 +350,7 @@ TEST_F(GDPRForgetAnonTest, ComplexVariableOwnershipAnon) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -429,7 +429,7 @@ TEST_F(GDPRForgetAnonTest, ComplexVariableAccessorshipAnon) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));

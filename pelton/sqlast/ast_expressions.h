@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -236,6 +237,8 @@ T Expression::Visit(MutableVisitor<T> *visitor) {
       assert(false);
   }
 }
+
+std::ostream &operator<<(std::ostream &os, const Expression &e);
 
 }  // namespace sqlast
 }  // namespace pelton

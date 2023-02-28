@@ -14,7 +14,7 @@
 #include "glog/logging.h"
 #include "pelton/pelton.h"
 
-DEFINE_uint32(workers, 3, "Number of workers");
+DEFINE_uint32(workers, 1, "Number of workers");
 DEFINE_bool(consistent, true, "Dataflow consistency with futures");
 DEFINE_string(db_name, "pelton", "Name of the database");
 DEFINE_string(hostname, "127.0.0.1:10001", "Hostname to bind against");

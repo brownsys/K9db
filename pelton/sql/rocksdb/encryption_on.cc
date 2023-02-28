@@ -11,6 +11,7 @@
 
 namespace pelton {
 namespace sql {
+namespace rocks {
 
 #define KEY_SIZE crypto_aead_aes256gcm_KEYBYTES
 #define NONCE_SIZE crypto_aead_aes256gcm_NPUBBYTES
@@ -244,5 +245,6 @@ const rocksdb::Comparator *PeltonComparator() {
   return &comparator_instance;
 }
 
+}  // namespace rocks
 }  // namespace sql
 }  // namespace pelton

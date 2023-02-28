@@ -75,14 +75,14 @@ impl VoteClient for Conn {
                 conn = conn.drop_query(&workaround).await.unwrap();
                 conn = conn
                     .drop_exec(
-                        "CREATE TABLE art (id int NOT NULL PRIMARY KEY, title varchar(16) NOT NULL) ENGINE = ROCKSDB",
+                        "CREATE TABLE art (id int NOT NULL PRIMARY KEY, title varchar(16) NOT NULL) ENGINE=ROCKSDB DEFAULT CHARSET=utf8",
                         (),
                     )
                     .await
                     .unwrap();
                 conn = conn
                     .drop_exec(
-                        "CREATE TABLE vt (id int NOT NULL PRIMARY KEY AUTO_INCREMENT, u int NOT NULL, article_id int NOT NULL REFERENCES art(id)) ENGINE = ROCKSDB",
+                        "CREATE TABLE vt (id int NOT NULL PRIMARY KEY AUTO_INCREMENT, u int NOT NULL, article_id int NOT NULL REFERENCES art(id)) ENGINE=ROCKSDB DEFAULT CHARSET=utf8",
                         (),
                     )
                     .await

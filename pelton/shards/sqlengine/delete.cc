@@ -94,7 +94,7 @@ absl::StatusOr<int> DeleteContext::DeleteDependents(
 
     // Get records.
     std::vector<dataflow::Record> next_records =
-        this->db_->GetDirect(next_table, nextidx, vals);
+        this->db_->GetDirect(next_table, nextidx, vals, false);
     ASSERT_RET(!direct || next_records.size() == 0, Internal,
                "Cannot delete data subject with data. use GDPR FORGET");
 
@@ -140,44 +140,29 @@ absl::StatusOr<int> DeleteContext::DeleteDependents(
  * Main entry point for delete: Executes the statement against the shards.
  */
 absl::StatusOr<sql::SqlResult> DeleteContext::Exec() {
-  // Make sure table exists in the schema first.
-  ASSERT_RET(this->sstate_.TableExists(this->table_name_), InvalidArgument,
-             "Table does not exist");
+  // Begin the transaction.
+  this->db_->BeginTransaction();
 
-  // Execute the delete in the DB.
-  sql::SqlDeleteSet result = this->db_->ExecuteDelete(this->stmt_);
-
-  // Update dataflow.
-  std::vector<dataflow::Record> updates;
-  if (this->table_.dependents.size() == 0) {
-    updates = result.Vec();
-  } else {
-    updates.reserve(result.Rows().size());
-    for (const dataflow::Record &record : result.Rows()) {
-      updates.push_back(record.Copy());
-    }
+  // Perform all rocksb operations within the transaction.
+  MOVE_OR_RETURN(DeleteContext::Result result, this->ExecWithinTransaction());
+  auto &[records, status] = result;
+  if (status < 0) {
+    this->db_->RollbackTransaction();
+    return sql::SqlResult(status);
   }
-  this->dstate_.ProcessRecords(this->table_name_, std::move(updates));
 
-  // Recursively remove dependent records in dependent tables from the shard
-  // when needed.
-  int total_count = result.Count();
-  for (const util::ShardName &shard : result.IterateShards()) {
-    ASSIGN_OR_RETURN(int status, this->DeleteDependents(this->table_, shard,
-                                                        result.Iterate(shard)));
-    if (status < 0) {
-      return sql::SqlResult(status);
-    }
-    total_count += status;
-  }
+  // Commit transaction.
+  this->db_->CommitTransaction();
+
+  // Process updates to dataflows.
+  // this->dstate_.ProcessRecords(this->table_name_, std::move(records));
 
   // Return number of copies inserted.
-  return sql::SqlResult(total_count);
+  return sql::SqlResult(status);
 }
 
 // Similar to exec but returns deleted records.
-absl::StatusOr<std::pair<std::vector<dataflow::Record>, int>>
-DeleteContext::ExecReturning() {
+absl::StatusOr<DeleteContext::Result> DeleteContext::ExecWithinTransaction() {
   // Make sure table exists in the schema first.
   ASSERT_RET(this->sstate_.TableExists(this->table_name_), InvalidArgument,
              "Table does not exist");
@@ -186,11 +171,14 @@ DeleteContext::ExecReturning() {
   sql::SqlDeleteSet result = this->db_->ExecuteDelete(this->stmt_);
 
   // Update dataflow.
+  // TODO(babman): need to do this after the entire transaction commits...
   std::vector<dataflow::Record> updates;
   updates.reserve(result.Rows().size());
   for (const dataflow::Record &record : result.Rows()) {
     updates.push_back(record.Copy());
   }
+
+  // Process updates to dataflows.
   this->dstate_.ProcessRecords(this->table_name_, std::move(updates));
 
   // Recursively remove dependent records in dependent tables from the shard
@@ -200,13 +188,13 @@ DeleteContext::ExecReturning() {
     ASSIGN_OR_RETURN(int status, this->DeleteDependents(this->table_, shard,
                                                         result.Iterate(shard)));
     if (status < 0) {
-      return std::pair(std::vector<dataflow::Record>(), status);
+      return DeleteContext::Result(std::vector<dataflow::Record>(), status);
     }
     total_count += status;
   }
 
   // Return number of copies inserted.
-  return std::pair(result.Vec(), total_count);
+  return DeleteContext::Result(result.Vec(), total_count);
 }
 
 }  // namespace sqlengine

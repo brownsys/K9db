@@ -13,7 +13,7 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/dataflow/state.h"
 #include "pelton/shards/state.h"
-#include "pelton/sql/abstract_connection.h"
+#include "pelton/sql/connection.h"
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
 #include "pelton/util/upgradable_lock.h"
@@ -45,9 +45,9 @@ class ExplainContext {
   void Explain(const sqlast::Select &query);
 
   /* Recurse on dependent tables. */
-  void RecurseInsert(const std::string &table_name);
+  void RecurseInsert(const std::string &table_name, bool first);
   void RecurseDelete(const std::string &shard_kind,
-                     const std::string &table_name);
+                     const std::string &table_name, bool first);
 
   /* Members. */
   const sqlast::ExplainQuery &stmt_;
@@ -58,7 +58,7 @@ class ExplainContext {
   // Connection components.
   SharderState &sstate_;
   dataflow::DataFlowState &dstate_;
-  sql::AbstractConnection *db_;
+  sql::Connection *db_;
 
   // Shared Lock so we can read from the states safetly.
   util::SharedLock *lock_;

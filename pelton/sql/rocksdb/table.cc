@@ -9,6 +9,7 @@
 
 namespace pelton {
 namespace sql {
+namespace rocks {
 
 namespace {
 template <typename T>
@@ -79,13 +80,14 @@ void RocksdbTable::CreateIndex(const std::vector<size_t> &cols) {
 
 // Index updating.
 void RocksdbTable::IndexAdd(const rocksdb::Slice &shard,
-                            const RocksdbSequence &row, bool update_pk) {
+                            const RocksdbSequence &row, RocksdbTransaction *txn,
+                            bool update_pk) {
   std::vector<rocksdb::Slice> split = row.Split();
   rocksdb::Slice pk = split.at(this->pk_column_);
 
   // Update PK index.
   if (update_pk) {
-    this->pk_index_.Add(pk, shard);
+    this->pk_index_.Add(pk, shard, txn);
   }
 
   // Update other indices.
@@ -95,17 +97,18 @@ void RocksdbTable::IndexAdd(const rocksdb::Slice &shard,
     for (size_t col : index.GetColumns()) {
       index_values.push_back(split.at(col));
     }
-    index.Add(index_values, shard, pk);
+    index.Add(index_values, shard, pk, txn);
   }
 }
 void RocksdbTable::IndexDelete(const rocksdb::Slice &shard,
-                               const RocksdbSequence &row, bool update_pk) {
+                               const RocksdbSequence &row,
+                               RocksdbTransaction *txn, bool update_pk) {
   std::vector<rocksdb::Slice> split = row.Split();
   rocksdb::Slice pk = split.at(this->pk_column_);
 
   // Update PK index.
   if (update_pk) {
-    this->pk_index_.Delete(pk, shard);
+    this->pk_index_.Delete(pk, shard, txn);
   }
 
   // Update other indices.
@@ -115,12 +118,13 @@ void RocksdbTable::IndexDelete(const rocksdb::Slice &shard,
     for (size_t col : index.GetColumns()) {
       index_values.push_back(split.at(col));
     }
-    index.Delete(index_values, shard, pk);
+    index.Delete(index_values, shard, pk, txn);
   }
 }
 void RocksdbTable::IndexUpdate(const rocksdb::Slice &shard,
                                const RocksdbSequence &old,
-                               const RocksdbSequence &updated) {
+                               const RocksdbSequence &updated,
+                               RocksdbTransaction *txn) {
   std::vector<rocksdb::Slice> osplit = old.Split();
   std::vector<rocksdb::Slice> usplit = updated.Split();
   rocksdb::Slice pk = osplit.at(this->pk_column_);
@@ -138,8 +142,8 @@ void RocksdbTable::IndexUpdate(const rocksdb::Slice &shard,
       changed = changed || osplit.at(col) != usplit.at(col);
     }
     if (changed) {
-      index.Delete(ovalues, shard, pk);
-      index.Add(uvalues, shard, pk);
+      index.Delete(ovalues, shard, pk, txn);
+      index.Add(uvalues, shard, pk, txn);
     }
   }
 }
@@ -149,7 +153,7 @@ RocksdbTable::IndexChoice RocksdbTable::ChooseIndex(
     sqlast::ValueMapper *value_mapper) const {
   // PK has highest priority.
   if (value_mapper->HasValues(this->pk_column_)) {
-    return {IndexChoiceType::PK, false, 0};
+    return {IndexChoiceType::PK, 0};
   }
   // Unique indices have second highest priority.
   for (size_t column : this->unique_columns_) {
@@ -157,7 +161,7 @@ RocksdbTable::IndexChoice RocksdbTable::ChooseIndex(
       for (size_t index = 0; index < this->indices_.size(); index++) {
         const auto &cols = this->indices_.at(index).GetColumns();
         if (cols.size() == 1 && cols.front() == column) {
-          return {IndexChoiceType::UNIQUE, false, static_cast<size_t>(index)};
+          return {IndexChoiceType::UNIQUE, static_cast<size_t>(index)};
         }
       }
     }
@@ -166,25 +170,17 @@ RocksdbTable::IndexChoice RocksdbTable::ChooseIndex(
   // conditions matched.
   size_t max = 0;
   size_t argmax = 0;
-  bool max_complete = false;
   for (size_t i = 0; i < this->indices_.size(); i++) {
-    size_t prefix =
-        value_mapper->PrefixWithValues(this->indices_.at(i).GetColumns());
-    bool complete = (prefix == this->indices_.at(i).GetColumns().size());
-    if (prefix > max) {
-      max = prefix;
+    const std::vector<size_t> &index_cols = this->indices_.at(i).GetColumns();
+    if (index_cols.size() > max && value_mapper->HasValues(index_cols)) {
+      max = index_cols.size();
       argmax = i;
-      max_complete = complete;
-    } else if (prefix == max && !max_complete && complete) {
-      max = prefix;
-      argmax = i;
-      max_complete = true;
     }
   }
   if (max > 0) {
-    return {IndexChoiceType::REGULAR, !max_complete, argmax};
+    return {IndexChoiceType::REGULAR, argmax};
   }
-  return {IndexChoiceType::SCAN, false, 0};
+  return {IndexChoiceType::SCAN, 0};
 }
 RocksdbTable::IndexChoice RocksdbTable::ChooseIndex(size_t column_index) const {
   sqlast::ValueMapper vm(this->schema_);
@@ -194,7 +190,8 @@ RocksdbTable::IndexChoice RocksdbTable::ChooseIndex(size_t column_index) const {
 
 // Index Lookup.
 std::optional<IndexSet> RocksdbTable::IndexLookup(
-    sqlast::ValueMapper *value_mapper) const {
+    sqlast::ValueMapper *value_mapper, const RocksdbTransaction *txn,
+    int limit) const {
   IndexChoice plan = this->ChooseIndex(value_mapper);
   switch (plan.type) {
     // By primary key index.
@@ -203,14 +200,13 @@ std::optional<IndexSet> RocksdbTable::IndexLookup(
           value_mapper->ReleaseValues(this->pk_column_);
       std::vector<std::string> encoded =
           EncodeValues(this->schema_.TypeOf(this->pk_column_), vals);
-      return this->pk_index_.Get(std::move(encoded));
+      return this->pk_index_.Get(std::move(encoded), txn);
     }
     // By unique or regular index.
     case IndexChoiceType::UNIQUE:
     case IndexChoiceType::REGULAR: {
       const RocksdbIndex &index = this->indices_.at(plan.idx);
-      return index.Get(index.EncodeComposite(value_mapper, this->schema_),
-                       plan.prefix);
+      return index.Get(index.EncodeComposite(value_mapper, this->schema_), txn, limit);
     }
     // By scan.
     case IndexChoiceType::SCAN:
@@ -220,7 +216,7 @@ std::optional<IndexSet> RocksdbTable::IndexLookup(
   }
 }
 std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
-    sqlast::ValueMapper *value_mapper) const {
+    sqlast::ValueMapper *value_mapper, const RocksdbTransaction *txn, int limit) const {
   IndexChoice plan = this->ChooseIndex(value_mapper);
   switch (plan.type) {
     // By primary key index.
@@ -229,14 +225,14 @@ std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
           value_mapper->ReleaseValues(this->pk_column_);
       std::vector<std::string> encoded =
           EncodeValues(this->schema_.TypeOf(this->pk_column_), vals);
-      return this->pk_index_.GetDedup(std::move(encoded));
+      return this->pk_index_.GetDedup(std::move(encoded), txn);
     }
     // By unique or regular index.
     case IndexChoiceType::UNIQUE:
     case IndexChoiceType::REGULAR: {
       const RocksdbIndex &index = this->indices_.at(plan.idx);
       return index.GetDedup(index.EncodeComposite(value_mapper, this->schema_),
-                            plan.prefix);
+                            txn, limit);
     }
     // By scan.
     case IndexChoiceType::SCAN:
@@ -247,73 +243,64 @@ std::optional<DedupIndexSet> RocksdbTable::IndexLookupDedup(
 }
 
 // Check if a record with given PK exists.
-bool RocksdbTable::Exists(const rocksdb::Slice &pk_value) const {
-  return this->pk_index_.Get({pk_value.ToString()}).size() > 0;
+bool RocksdbTable::Exists(const rocksdb::Slice &pk_value,
+                          const RocksdbTransaction *txn) const {
+  return this->pk_index_.CheckUniqueAndLock(pk_value, txn);
 }
 
 // Write to database.
-void RocksdbTable::Put(const EncryptedKey &key, const EncryptedValue &value) {
-  rocksdb::WriteOptions opts;
-  opts.sync = true;
-  PANIC(this->db_->Put(opts, this->handle_.get(), key.Data(), value.Data()));
+void RocksdbTable::Put(const EncryptedKey &key, const EncryptedValue &value,
+                       RocksdbTransaction *txn) {
+  txn->Put(this->handle_.get(), key.Data(), value.Data());
 }
 
 // Get from database.
-std::optional<EncryptedValue> RocksdbTable::Get(const EncryptedKey &key) const {
-  std::string data;
-
-  rocksdb::ReadOptions opts;
-  opts.total_order_seek = true;
-  opts.verify_checksums = false;
-  auto status = this->db_->Get(opts, this->handle_.get(), key.Data(), &data);
-  if (status.ok()) {
-    return Cipher::FromDB(std::move(data));
-  } else if (status.IsNotFound()) {
-    return {};
+std::optional<EncryptedValue> RocksdbTable::Get(
+    const EncryptedKey &key, bool read, const RocksdbTransaction *txn) const {
+  std::optional<std::string> data;
+  if (read) {
+    data = txn->Get(this->handle_.get(), key.Data());
+  } else {
+    data = txn->GetForUpdate(this->handle_.get(), key.Data());
   }
-  PANIC(status);
+  if (data.has_value()) {
+    return Cipher::FromDB(std::move(data.value()));
+  }
   return {};
 }
 
 // MultiGet: faster multi key lookup.
 std::vector<std::optional<EncryptedValue>> RocksdbTable::MultiGet(
-    const std::vector<EncryptedKey> &keys) const {
+    const std::vector<EncryptedKey> &keys, bool read,
+    const RocksdbTransaction *txn) const {
   if (keys.size() == 0) {
     return {};
   }
 
-  rocksdb::ReadOptions opts;
-  opts.total_order_seek = true;
-  opts.verify_checksums = false;
-
-  // Make C-arrays for rocksdb MultiGet.
-  std::unique_ptr<rocksdb::Slice[]> slices =
-      std::make_unique<rocksdb::Slice[]>(keys.size());
-  std::unique_ptr<rocksdb::PinnableSlice[]> pins =
-      std::make_unique<rocksdb::PinnableSlice[]>(keys.size());
-  std::unique_ptr<rocksdb::Status[]> statuses =
-      std::make_unique<rocksdb::Status[]>(keys.size());
-
-  // Fill rocksdb C-arrays.
-  size_t i = 0;
+  // Extract slices.
+  std::vector<rocksdb::Slice> slices;
+  slices.reserve(keys.size());
   for (const EncryptedKey &key : keys) {
-    slices[i++] = key.Data();
+    slices.push_back(key.Data());
   }
 
   // Use MultiGet.
-  this->db_->MultiGet(opts, this->handle_.get(), keys.size(), slices.get(),
-                      pins.get(), statuses.get());
+  std::vector<std::optional<std::string>> data;
+  if (read) {
+    data = txn->MultiGet(this->handle_.get(), slices);
+  } else {
+    data = txn->MultiGetForUpdate(this->handle_.get(), slices);
+  }
 
-  // Read values that were found.
+  // Transform to Ciphers.
   std::vector<std::optional<EncryptedValue>> result;
+  result.reserve(keys.size());
   for (size_t i = 0; i < keys.size(); i++) {
-    const rocksdb::Status &status = statuses[i];
-    if (status.ok()) {
-      result.emplace_back(Cipher::FromDB(pins[i].ToString()));
-    } else if (status.IsNotFound()) {
-      result.push_back({});
+    std::optional<std::string> opt = data.at(i);
+    if (opt.has_value()) {
+      result.emplace_back(Cipher::FromDB(std::move(opt.value())));
     } else {
-      PANIC(status);
+      result.emplace_back();
     }
   }
 
@@ -321,53 +308,45 @@ std::vector<std::optional<EncryptedValue>> RocksdbTable::MultiGet(
 }
 
 // Delete from database.
-void RocksdbTable::Delete(const EncryptedKey &key) {
-  rocksdb::WriteOptions opts;
-  opts.sync = true;  // Maybe not necessary? Check MYROCKS.
-  PANIC(this->db_->Delete(opts, this->handle_.get(), key.Data()));
+void RocksdbTable::Delete(const EncryptedKey &key, RocksdbTransaction *txn) {
+  txn->Delete(this->handle_.get(), key.Data());
 }
 
 // Get all data in table.
-RocksdbStream RocksdbTable::GetAll() const {
-  rocksdb::ReadOptions options;
-  options.fill_cache = false;
-  options.verify_checksums = false;
-  rocksdb::Iterator *it = this->db_->NewIterator(options, this->handle_.get());
+RocksdbStream RocksdbTable::GetAll(const RocksdbTransaction *txn) const {
+  std::unique_ptr<rocksdb::Iterator> it =
+      txn->Iterate(this->handle_.get(), false);
   it->SeekToFirst();
-  return RocksdbStream(it);
+  return RocksdbStream(std::move(it));
 }
 
 // Get all data in shard.
 // Read all data from shard.
-RocksdbStream RocksdbTable::GetShard(const EncryptedPrefix &shard_name) const {
-  // Read options restrict iterations to records with the same prefix.
-  rocksdb::ReadOptions options;
-  options.fill_cache = false;
-  options.total_order_seek = false;
-  options.prefix_same_as_start = true;
-  options.verify_checksums = false;
+RocksdbStream RocksdbTable::GetShard(const EncryptedPrefix &shard_name,
+                                     const RocksdbTransaction *txn) const {
   // Iterator that spans the whole shard prefix.
-  rocksdb::Iterator *it = this->db_->NewIterator(options, this->handle_.get());
+  std::unique_ptr<rocksdb::Iterator> it =
+      txn->Iterate(this->handle_.get(), true);
   it->Seek(shard_name.Data());
-  return RocksdbStream(it);
+  return RocksdbStream(std::move(it));
 }
 
 /*
  * RocksdbStream
  */
 
-using StreamIterator = RocksdbStream::Iterator;
+using RocksdbStreamIterator = RocksdbStream::Iterator;
 
 // Construct end iterator.
-StreamIterator::Iterator() : it_(nullptr) {}
+RocksdbStreamIterator::Iterator() : it_(nullptr) {}
 
 // Construct iterator given a ready rocksdb iterator (with some seek performed).
-StreamIterator::Iterator(rocksdb::Iterator *it) : it_(it) {
+RocksdbStreamIterator::Iterator(rocksdb::Iterator *it) : it_(it) {
   this->EnsureValid();
 }
 
 // Next key/value pair.
-StreamIterator &StreamIterator::operator++() {
+RocksdbStreamIterator &RocksdbStreamIterator::operator++() {
   if (this->it_ != nullptr) {
     this->it_->Next();
     this->EnsureValid();
@@ -376,21 +355,21 @@ StreamIterator &StreamIterator::operator++() {
 }
 
 // Equality of underlying iterator.
-bool StreamIterator::operator==(const StreamIterator &o) const {
+bool RocksdbStreamIterator::operator==(const RocksdbStreamIterator &o) const {
   return this->it_ == o.it_;
 }
-bool StreamIterator::operator!=(const StreamIterator &o) const {
+bool RocksdbStreamIterator::operator!=(const RocksdbStreamIterator &o) const {
   return this->it_ != o.it_;
 }
 
 // Get current key/value pair.
-StreamIterator::value_type StreamIterator::operator*() const {
-  return StreamIterator::value_type(
+RocksdbStreamIterator::value_type RocksdbStreamIterator::operator*() const {
+  return RocksdbStreamIterator::value_type(
       this->it_->key(), Cipher::FromDB(this->it_->value().ToString()));
 }
 
 // When the iterator is consumed, set it to nullptr.
-void StreamIterator::EnsureValid() {
+void RocksdbStreamIterator::EnsureValid() {
   if (!this->it_->Valid()) {
     this->it_ = nullptr;
   }
@@ -406,5 +385,6 @@ std::vector<std::pair<EncryptedKey, EncryptedValue>> RocksdbStream::ToVector() {
   return result;
 }
 
+}  // namespace rocks
 }  // namespace sql
 }  // namespace pelton

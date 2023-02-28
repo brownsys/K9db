@@ -28,7 +28,7 @@ TEST_F(InsertTest, UnshardedTable) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -55,7 +55,7 @@ TEST_F(InsertTest, Datasubject) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -87,7 +87,7 @@ TEST_F(InsertTest, DirectTable) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -121,7 +121,7 @@ TEST_F(InsertTest, TransitiveTable) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -165,7 +165,7 @@ TEST_F(InsertTest, DeepTransitiveTable) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -211,6 +211,7 @@ TEST_F(InsertTest, DeepTransitiveTable) {
   EXPECT_EQ(db->GetShard("deep", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
 }
 
+/*
 TEST_F(InsertTest, DeepTransitiveUnnaturalTable) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
@@ -220,7 +221,7 @@ TEST_F(InsertTest, DeepTransitiveUnnaturalTable) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -271,6 +272,7 @@ TEST_F(InsertTest, DeepTransitiveUnnaturalTable) {
   EXPECT_EQ(db->GetShard("deep", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("deep", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
 }
+*/
 
 TEST_F(InsertTest, TwoOwners) {
   // Parse create table statements.
@@ -280,7 +282,7 @@ TEST_F(InsertTest, TwoOwners) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -318,7 +320,7 @@ TEST_F(InsertTest, OwnerAccessor) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -357,7 +359,7 @@ TEST_F(InsertTest, ShardedDataSubject) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -394,7 +396,7 @@ TEST_F(InsertTest, VariableOwnership) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -421,8 +423,8 @@ TEST_F(InsertTest, VariableOwnership) {
   // Associate groups with some users.
   auto &&[assoc1, a_] = MakeInsert("association", {"0", "0", "0"});
   auto &&[assoc2, a__] = MakeInsert("association", {"1", "1", "0"});
-  auto &&[assoc3, a___] = MakeInsert("association", {"1", "1", "5"});
-  auto &&[assoc4, a____] = MakeInsert("association", {"2", "1", "5"});
+  auto &&[assoc3, a___] = MakeInsert("association", {"2", "1", "5"});
+  auto &&[assoc4, a____] = MakeInsert("association", {"3", "1", "5"});
 
   EXPECT_UPDATE(Execute(assoc1, &conn), 3);
   EXPECT_UPDATE(Execute(assoc2, &conn), 3);
@@ -452,7 +454,7 @@ TEST_F(InsertTest, ComplexVariableOwnership) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));

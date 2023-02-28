@@ -28,7 +28,7 @@ TEST_F(GDPRForgetTest, Datasubject) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -63,7 +63,7 @@ TEST_F(GDPRForgetTest, DirectTable) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -100,7 +100,7 @@ TEST_F(GDPRForgetTest, UnshardedTable) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -144,7 +144,7 @@ TEST_F(GDPRForgetTest, TransitiveTable) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -191,7 +191,7 @@ TEST_F(GDPRForgetTest, DeepTransitiveTable) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -248,7 +248,7 @@ TEST_F(GDPRForgetTest, TwoOwners) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -298,7 +298,7 @@ TEST_F(GDPRForgetTest, TwoOwnersDataflowUpdate) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -363,7 +363,7 @@ TEST_F(GDPRForgetTest, OwnerAccessor) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -408,7 +408,7 @@ TEST_F(GDPRForgetTest, ShardedDataSubject) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -458,7 +458,7 @@ TEST_F(GDPRForgetTest, VariableOwnership) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -479,8 +479,8 @@ TEST_F(GDPRForgetTest, VariableOwnership) {
   // Associate groups with some users.
   auto &&[assoc1, a_] = MakeInsert("association", {"0", "0", "0"});
   auto &&[assoc2, a__] = MakeInsert("association", {"1", "1", "0"});
-  auto &&[assoc3, a___] = MakeInsert("association", {"1", "1", "5"});
-  auto &&[assoc4, a____] = MakeInsert("association", {"2", "1", "5"});
+  auto &&[assoc3, a___] = MakeInsert("association", {"2", "1", "5"});
+  auto &&[assoc4, a____] = MakeInsert("association", {"3", "1", "5"});
 
   EXPECT_UPDATE(Execute(assoc1, &conn), 3);
   EXPECT_UPDATE(Execute(assoc2, &conn), 3);
@@ -521,7 +521,7 @@ TEST_F(GDPRForgetTest, ComplexVariableOwnership) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));
@@ -610,7 +610,7 @@ TEST_F(GDPRForgetTest, ComplexVariableOwnershipAdminDelete) {
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
-  sql::AbstractConnection *db = conn.state->Database();
+  sql::Session *db = conn.session.get();
 
   // Create the tables.
   EXPECT_SUCCESS(Execute(usr, &conn));

@@ -9,6 +9,7 @@
 
 namespace pelton {
 namespace sql {
+namespace rocks {
 
 namespace {
 
@@ -31,27 +32,18 @@ class IndexPrefixTransform : public rocksdb::SliceTransform {
 };
 
 // Helper: avoids writing the Get code twice for regular and dedup lookups.
-template <typename T, typename R, bool prefix = false,
-          bool shards_specified = false>
-T GetHelper(rocksdb::DB *db, rocksdb::ColumnFamilyHandle *handle,
+template <typename T, typename R, bool shards_specified = false>
+T GetHelper(rocksdb::DB *db, const RocksdbTransaction *txn,
+            rocksdb::ColumnFamilyHandle *handle,
             std::vector<std::string> &&values,
-            std::vector<std::string> &&shards = {}) {
-  // Iterator options.
-  rocksdb::ReadOptions options;
-  options.fill_cache = false;
-  options.total_order_seek = prefix;
-  options.prefix_same_as_start = !prefix;
-  options.verify_checksums = false;
-
-  // Open iterator.
-  rocksdb::Iterator *ptr = db->NewIterator(options, handle);
-  std::unique_ptr<rocksdb::Iterator> it(ptr);
+            std::vector<std::string> &&shards = {},
+            int limit = -1) {
+  // Open iterator over the database and the txn together.
+  std::unique_ptr<rocksdb::Iterator> it = txn->Iterate(handle, true);
 
   // Make and sort all prefixes.
-  if (!prefix) {
-    for (std::string &val : values) {
-      val.push_back(__ROCKSSEP);
-    }
+  for (std::string &val : values) {
+    val.push_back(__ROCKSSEP);
   }
 
   if constexpr (shards_specified) {
@@ -74,17 +66,15 @@ T GetHelper(rocksdb::DB *db, rocksdb::ColumnFamilyHandle *handle,
     rocksdb::Slice pslice(value);
     for (it->Seek(pslice); it->Valid(); it->Next()) {
       R record(it->key());
-      if constexpr (prefix) {
-        if (!record.HasPrefix(pslice)) {
-          break;
-        }
-      }
       if constexpr (shards_specified) {
         if (record.GetShard() == shards.at(i)) {
           result.emplace(record.TargetKey());
         }
       } else {
         result.emplace(record.TargetKey());
+      }
+      if (limit != -1 && result.size() == limit) {
+        return result;
       }
     }
   }
@@ -118,19 +108,19 @@ RocksdbIndex::RocksdbIndex(rocksdb::DB *db, const std::string &table_name,
 // Adding things to index.
 void RocksdbIndex::Add(const std::vector<rocksdb::Slice> &values,
                        const rocksdb::Slice &shard_name,
-                       const rocksdb::Slice &pk) {
+                       const rocksdb::Slice &pk, RocksdbTransaction *txn) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
   IRecord e(values, shard_name, pk);
-  PANIC(this->db_->Put(rocksdb::WriteOptions(), handle, e.Data(), ""));
+  txn->Put(handle, e.Data(), "");
 }
 
 // Deleting things from index.
 void RocksdbIndex::Delete(const std::vector<rocksdb::Slice> &values,
                           const rocksdb::Slice &shard_name,
-                          const rocksdb::Slice &pk) {
+                          const rocksdb::Slice &pk, RocksdbTransaction *txn) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
   IRecord e(values, shard_name, pk);
-  PANIC(this->db_->Delete(rocksdb::WriteOptions(), handle, e.Data()));
+  txn->Delete(handle, e.Data());
 }
 
 // Use to encode condition values for composite index.
@@ -166,36 +156,24 @@ std::vector<std::string> RocksdbIndex::EncodeComposite(
 }
 
 // Get by value.
-IndexSet RocksdbIndex::Get(std::vector<std::string> &&v, bool prefix) const {
-  if (prefix) {
-    return GetHelper<IndexSet, IRecord, true>(this->db_, this->handle_.get(),
-                                              std::move(v));
-  } else {
-    return GetHelper<IndexSet, IRecord>(this->db_, this->handle_.get(),
-                                        std::move(v));
-  }
+IndexSet RocksdbIndex::Get(std::vector<std::string> &&v,
+                           const RocksdbTransaction *txn, int limit) const {
+  return GetHelper<IndexSet, IRecord>(this->db_, txn, this->handle_.get(),
+                                      std::move(v), {}, limit);
 }
 DedupIndexSet RocksdbIndex::GetDedup(std::vector<std::string> &&v,
-                                     bool prefix) const {
-  if (prefix) {
-    return GetHelper<DedupIndexSet, IRecord, true>(
-        this->db_, this->handle_.get(), std::move(v));
-  } else {
-    return GetHelper<DedupIndexSet, IRecord>(this->db_, this->handle_.get(),
-                                             std::move(v));
-  }
+                                     const RocksdbTransaction *txn,
+                                     int limit) const {
+  return GetHelper<DedupIndexSet, IRecord>(this->db_, txn, this->handle_.get(),
+                                           std::move(v), {}, limit);
 }
 
 IndexSet RocksdbIndex::GetWithShards(std::vector<std::string> &&shards,
                                      std::vector<std::string> &&values,
-                                     bool prefix) const {
-  if (prefix) {
-    return GetHelper<IndexSet, IRecord, true, true>(
-        this->db_, this->handle_.get(), std::move(values), std::move(shards));
-  } else {
-    return GetHelper<IndexSet, IRecord, false, true>(
-        this->db_, this->handle_.get(), std::move(values), std::move(shards));
-  }
+                                     const RocksdbTransaction *txn) const {
+  return GetHelper<IndexSet, IRecord, true>(this->db_, txn, this->handle_.get(),
+                                            std::move(values),
+                                            std::move(shards));
 }
 
 /*
@@ -218,67 +196,130 @@ RocksdbPKIndex::RocksdbPKIndex(rocksdb::DB *db, const std::string &table_name)
 
 // Adding things to index.
 void RocksdbPKIndex::Add(const rocksdb::Slice &pk_value,
-                         const rocksdb::Slice &shard_name) {
+                         const rocksdb::Slice &shard_name,
+                         RocksdbTransaction *txn) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
-  IRecord e(pk_value, shard_name);
-  PANIC(this->db_->Put(rocksdb::WriteOptions(), handle, e.Data(), ""));
+  std::optional<std::string> str = txn->Get(handle, pk_value);
+  if (str.has_value()) {
+    IRecord e(std::move(str.value()));
+    e.AppendNewShard(shard_name);
+    txn->Put(handle, pk_value, e.Data());
+  } else {
+    IRecord e;
+    e.AppendNewShard(shard_name);
+    txn->Put(handle, pk_value, e.Data());
+  }
 }
 
 // Deleting things from index.
 void RocksdbPKIndex::Delete(const rocksdb::Slice &pk_value,
-                            const rocksdb::Slice &shard_name) {
+                            const rocksdb::Slice &shard_name,
+                            RocksdbTransaction *txn) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
-  IRecord e(pk_value, shard_name);
-  PANIC(this->db_->Delete(rocksdb::WriteOptions(), handle, e.Data()));
+  std::optional<std::string> str = txn->Get(handle, pk_value);
+  if (str.has_value()) {
+    IRecord e(std::move(str.value()));
+    e.RemoveShard(shard_name);
+    if (e.Empty()) {
+      txn->Delete(handle, pk_value);
+    } else {
+      txn->Put(handle, pk_value, e.Data());
+    }
+  }
+}
+
+// Atomic unique check that also locks record.
+bool RocksdbPKIndex::CheckUniqueAndLock(const rocksdb::Slice &pk,
+                                        const RocksdbTransaction *txn) const {
+  rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
+  std::optional<std::string> result = txn->GetForUpdate(handle, pk);
+  return result.has_value();
 }
 
 // Get by value.
-IndexSet RocksdbPKIndex::Get(std::vector<std::string> &&v) const {
-  return GetHelper<IndexSet, IRecord>(this->db_, this->handle_.get(),
-                                      std::move(v));
+IndexSet RocksdbPKIndex::Get(std::vector<std::string> &&v,
+                             const RocksdbTransaction *txn) const {
+  std::vector<rocksdb::Slice> slices;
+  slices.reserve(v.size());
+  for (const std::string &str : v) {
+    slices.emplace_back(str);
+  }
+
+  IndexSet set;
+  rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
+  std::vector<std::optional<std::string>> records =
+      txn->MultiGet(handle, slices);
+  for (size_t i = 0; i < records.size(); i++) {
+    std::optional<std::string> str = records.at(i);
+    if (str.has_value()) {
+      IRecord irecord(std::move(str.value()));
+      for (rocksdb::Slice shard : irecord) {
+        RocksdbSequence sequence;
+        sequence.AppendEncoded(shard);
+        sequence.AppendEncoded(slices.at(i));
+        set.emplace(std::move(sequence));
+      }
+    }
+  }
+  return set;
 }
-DedupIndexSet RocksdbPKIndex::GetDedup(std::vector<std::string> &&v) const {
-  return GetHelper<DedupIndexSet, IRecord>(this->db_, this->handle_.get(),
-                                           std::move(v));
+DedupIndexSet RocksdbPKIndex::GetDedup(std::vector<std::string> &&v,
+                                       const RocksdbTransaction *txn) const {
+  std::vector<rocksdb::Slice> slices;
+  slices.reserve(v.size());
+  for (const std::string &str : v) {
+    slices.emplace_back(str);
+  }
+
+  DedupIndexSet set;
+  rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
+  std::vector<std::optional<std::string>> records =
+      txn->MultiGet(handle, slices);
+  for (size_t i = 0; i < records.size(); i++) {
+    std::optional<std::string> str = records.at(i);
+    if (str.has_value()) {
+      IRecord irecord(std::move(str.value()));
+      for (rocksdb::Slice shard : irecord) {
+        RocksdbSequence sequence;
+        sequence.AppendEncoded(shard);
+        sequence.AppendEncoded(slices.at(i));
+        set.emplace(std::move(sequence));
+        break;
+      }
+    }
+  }
+  return set;
 }
 
 // Count how many shard each pk value is in.
 std::vector<size_t> RocksdbPKIndex::CountShards(
-    std::vector<std::string> &&pk_values) const {
-  // Iterator options.
-  rocksdb::ReadOptions options;
-  options.fill_cache = false;
-  options.total_order_seek = false;
-  options.prefix_same_as_start = true;
-  options.verify_checksums = false;
-
-  // Open iterator.
-  rocksdb::Iterator *ptr = this->db_->NewIterator(options, this->handle_.get());
-  std::unique_ptr<rocksdb::Iterator> it(ptr);
-
-  // Make and sort all prefixes.
-  std::vector<size_t> indices;
-  indices.reserve(pk_values.size());
-  for (std::string &pk : pk_values) {
-    indices.push_back(indices.size());
-    pk.push_back(__ROCKSSEP);
+    std::vector<std::string> &&pk_values, const RocksdbTransaction *txn) const {
+  std::vector<rocksdb::Slice> slices;
+  slices.reserve(pk_values.size());
+  for (const std::string &str : pk_values) {
+    slices.emplace_back(str);
   }
 
-  auto [b, e] = util::Zip(&pk_values, &indices);
-  std::sort(b, e);
+  rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
+  std::vector<std::optional<std::string>> records =
+      txn->MultiGet(handle, slices);
 
-  // Holds the result.
-  std::vector<size_t> result(pk_values.size(), 0);
-
-  // Go through prefixes in order.
-  for (const auto &[pk_value, idx] : util::Zip(&pk_values, &indices)) {
-    rocksdb::Slice pslice(pk_value);
-    for (it->Seek(pslice); it->Valid(); it->Next()) {
-      result[idx]++;
+  std::vector<size_t> result;
+  result.reserve(pk_values.size());
+  for (size_t i = 0; i < records.size(); i++) {
+    size_t count = 0;
+    std::optional<std::string> str = records.at(i);
+    if (str.has_value()) {
+      IRecord irecord(std::move(str.value()));
+      for (auto it = irecord.begin(); it != irecord.end(); ++it) {
+        count++;
+      }
     }
+    result.push_back(count);
   }
   return result;
 }
 
+}  // namespace rocks
 }  // namespace sql
 }  // namespace pelton

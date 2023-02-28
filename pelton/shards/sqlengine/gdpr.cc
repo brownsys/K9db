@@ -62,11 +62,15 @@ sqlast::Update GDPRContext::MakeAccessAnonUpdate(
 }
 
 absl::StatusOr<sql::SqlResult> GDPRContext::ExecForget() {
-  Shard current_shard = this->sstate_.GetShard(this->shard_kind_);
+  const Shard &current_shard = this->sstate_.GetShard(this->shard_kind_);
+
+  // Begin transaction.
+  this->db_->BeginTransaction();
 
   int count = 0;
+  std::unordered_map<std::string, std::vector<dataflow::Record>> all_updates;
   for (const auto &table_name : current_shard.owned_tables) {
-    std::vector<dataflow::Record> dataflow_updates;
+    std::vector<dataflow::Record> &dataflow_updates = all_updates[table_name];
     std::vector<dataflow::Record> anonymize_updates;
 
     util::ShardName shard(this->shard_kind_, this->user_id_str_);
@@ -111,9 +115,6 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecForget() {
       }
     }
 
-    // Update dataflow with deletions from table.
-    this->dstate_.ProcessRecords(table_name, std::move(dataflow_updates));
-
     for (const auto &anonymized_record : anonymize_updates) {
       // Apply anonymization rules in copies of data.
       // All columns that need to be anonymized for the record
@@ -145,17 +146,27 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecForget() {
             anonymized_record.GetValue(current_schema.keys().at(0)));
 
         UpdateContext context(update, this->conn_, this->lock_);
-        MOVE_OR_PANIC(sql::SqlResult result, context.Exec());
+        MOVE_OR_PANIC(sql::SqlResult result, context.Exec(false));
         count += result.UpdateCount();
       }
     }
   }
-
+  
   for (const auto &table_name : current_shard.owned_tables) {
     // Delete any tables in shard added from anonymization updates.
     util::ShardName shard(this->shard_kind_, this->user_id_str_);
     sql::SqlResultSet result =
       this->db_->DeleteShard(table_name, std::move(shard));
+  }
+
+  // Commit to database.
+  this->db_->CommitTransaction();
+
+  // Update dataflow with deletions from table.
+  for (auto &[table_name, dataflow_updates] : all_updates) {
+    if (dataflow_updates.size() > 0) {
+      this->dstate_.ProcessRecords(table_name, std::move(dataflow_updates));
+    }
   }
 
   return sql::SqlResult(count);
@@ -184,13 +195,15 @@ void GDPRContext::AnonAccessors(const TableName &tbl, sql::SqlResultSet &&set,
     }
 
     // Issue update to anonymize copies
-    sqlast::Update update = this->MakeAccessAnonUpdate(
-        tbl, anon_column_set,
-        current_schema.NameOf(current_schema.keys().at(0)),
-        record.GetValue(current_schema.keys().at(0)));
+    if (anon_column_set.size() > 0) {
+      sqlast::Update update = this->MakeAccessAnonUpdate(
+          tbl, anon_column_set,
+          current_schema.NameOf(current_schema.keys().at(0)),
+          record.GetValue(current_schema.keys().at(0)));
 
-    UpdateContext context(update, this->conn_, this->lock_);
-    MOVE_OR_PANIC(sql::SqlResult result, context.Exec());
+      UpdateContext context(update, this->conn_, this->lock_);
+      MOVE_OR_PANIC(sql::SqlResult result, context.Exec(false));
+    }
   }
 }
 
@@ -380,7 +393,7 @@ void GDPRContext::FindData(const TableName &tbl, const ShardDescriptor *desc,
   const std::string &column_name = EXTRACT_VARIANT(column, desc->info);
   sqlast::Select select = this->MakeAccessSelect(tbl, column_name, fkvals);
   SelectContext context(select, this->conn_, this->lock_);
-  MOVE_OR_PANIC(sql::SqlResult result, context.Exec());
+  MOVE_OR_PANIC(sql::SqlResult result, context.ExecWithinTransaction());
 
   // Recurse on access dependents.
   sql::SqlResultSet &resultset = result.ResultSets().front();
@@ -397,7 +410,12 @@ void GDPRContext::FindData(const TableName &tbl, const ShardDescriptor *desc,
 }
 
 absl::StatusOr<sql::SqlResult> GDPRContext::ExecGet() {
-  Shard current_shard = this->sstate_.GetShard(this->shard_kind_);
+  const Shard &current_shard = this->sstate_.GetShard(this->shard_kind_);
+
+  // Begin transaction.
+  this->db_->BeginTransaction();
+
+  // Start getting data.
   for (const auto &table_name : current_shard.owned_tables) {
     // Get data from tables owned by user.
     util::ShardName shard(this->shard_kind_, this->user_id_str_);
@@ -412,6 +430,9 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecGet() {
       this->AddOrAppendAndAnon(table_name, std::move(resultset));
     }
   }
+
+  // Nothing to commit; read only.
+  this->db_->RollbackTransaction();
 
   // Turn into sql::SqlResult.
   using I = std::unordered_map<TableName, sql::SqlResultSet>::iterator;

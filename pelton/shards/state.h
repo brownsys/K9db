@@ -13,6 +13,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -81,9 +82,44 @@ class SharderState {
 
   // Debugging information / statistics.
   std::vector<std::pair<ShardKind, uint64_t>> NumShards() const;
-  const std::unordered_map<TableName, Table> &AllTables() const {
-    return this->tables_;
+  std::list<std::pair<TableName, const Table *>> ReverseTables() const {
+    std::list<std::pair<TableName, const Table *>> vec;
+    for (const auto &[table_name, table] : this->tables_) {
+      vec.emplace_front(table_name, &table);
+    }
+    return vec;
   }
+
+  // Combinators for recursing over the transitive closure of owners and
+  // dependents.
+  // DFS starting from table and going up or down.
+  template <typename A>
+  void VisitOwnersUp(const TableName &table, Visitor<A> *v, A arg) const {
+    v->Initialize(&this->tables_);
+    v->template VisitOwners<true>(table, arg);
+  }
+  template <typename A>
+  void VisitOwnersDown(const TableName &table, Visitor<A> *v, A arg) const {
+    v->Initialize(&this->tables_);
+    v->template VisitOwners<false>(table, arg);
+  }
+  template <typename A>
+  void VisitAccessorUp(const TableName &table, Visitor<A> *v, A arg) const {
+    v->Initialize(&this->tables_);
+    v->template VisitAccessors<true>(table, arg);
+  }
+  template <typename A>
+  void VisitAccessorDown(const TableName &table, Visitor<A> *v, A arg) const {
+    v->Initialize(&this->tables_);
+    v->template VisitAccessors<false>(table, arg);
+  }
+
+  // Add locks for the given table (which was just created).
+  void AddTableLocks(const Table &table);
+
+  // Allows us to disable serializability during priming.
+  // TODO(babman): implement this.
+  void TurnOnSerializable() {}
 
  private:
   // All the different shard kinds that currently exist in the system.

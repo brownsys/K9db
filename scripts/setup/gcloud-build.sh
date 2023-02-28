@@ -2,17 +2,21 @@
 ROLE="$1"
 
 # Build ownCloud harness
-cd ~/pelton/experiments/ownCloud
+cd /home/pelton/pelton/experiments/ownCloud
 bazel build ... -c opt
 
 # Build vote harness
-cd ~/pelton/experiments/vote
+cd /home/pelton/pelton/experiments/vote
 bazel build ... -c opt
 
+# Build memcached
+cd /home/pelton/pelton/experiments/memcached
+bazel build @memcached//:memcached --config=opt
+
 # Build pelton
-cd ~/pelton
+cd /home/pelton/pelton
 if [[ "$ROLE" == "db" ]]; then
-  bazel build //:pelton --config opt
+  bazel build ... --config opt
 else
   cd experiments/lobsters
   bazel build ... -c opt

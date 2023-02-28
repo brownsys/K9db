@@ -22,8 +22,12 @@
 
 namespace pelton {
 namespace sql {
+namespace rocks {
 
 rocksdb::Slice ExtractColumn(const rocksdb::Slice &slice, size_t col);
+
+std::string EncodeValue(sqlast::ColumnDefinition::Type type,
+                        const sqlast::Value &v);
 
 std::vector<std::string> EncodeValues(sqlast::ColumnDefinition::Type type,
                                       const std::vector<sqlast::Value> &vals);
@@ -233,32 +237,36 @@ class RocksdbIndexInternalRecord {
 // The internal record format physically stored inside RocksdbPKIndex.
 class RocksdbPKIndexInternalRecord {
  public:
+  // Construct the first time we are inserting.
+  RocksdbPKIndexInternalRecord() = default;
+
   // Construct when reading from rocksdb.
   explicit RocksdbPKIndexInternalRecord(const rocksdb::Slice &slice)
       : data_(slice) {}
   explicit RocksdbPKIndexInternalRecord(std::string &&str)
       : data_(std::move(str)) {}
 
-  // When handling SQL statements.
-  RocksdbPKIndexInternalRecord(const rocksdb::Slice &pk_value,
-                               const rocksdb::Slice &shard_name);
+  // Check if empty.
+  bool Empty() const { return this->data_.Data().size() == 0; }
+
+  // Appends a new shard.
+  void AppendNewShard(const rocksdb::Slice &shard);
+  void RemoveShard(const rocksdb::Slice &shard);
 
   // For writing/encoding.
   const RocksdbSequence &Sequence() const { return this->data_; }
   rocksdb::Slice Data() const { return this->data_.Data(); }
   RocksdbSequence &&Release() { return std::move(this->data_); }
 
-  // For reading/decoding.
-  rocksdb::Slice GetPK() const;
-  rocksdb::Slice GetShard() const;
-
-  // For looking up records corresponding to index entry.
-  RocksdbIndexRecord TargetKey() const;
+  // Iterator over all the shards in this record.
+  RocksdbSequence::Iterator begin() const { return this->data_.begin(); }
+  RocksdbSequence::Iterator end() const { return this->data_.end(); }
 
  private:
   RocksdbSequence data_;
 };
 
+}  // namespace rocks
 }  // namespace sql
 }  // namespace pelton
 

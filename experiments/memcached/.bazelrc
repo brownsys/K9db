@@ -1,2 +1,8 @@
 build --cxxopt="-std=c++2a"
 build --host_cxxopt="-std=c++2a"
+
+build:opt -c opt  # use bazel default opt config
+build:opt --copt -O3
+
+# Alias to simplify turning on ALL QUERIES vs REAL QUERIES
+build --flag_alias=queries=//memcached:queries

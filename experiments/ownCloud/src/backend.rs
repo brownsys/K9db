@@ -14,6 +14,7 @@ mod mariadb;
 mod pelton;
 mod simulate;
 
+
 // Backend enum
 pub enum Backend {
   Pelton(mysql::Conn),
@@ -50,36 +51,36 @@ impl Backend {
     }
   }
   // Insert data (for priming).
-  pub fn insert_user(&mut self, user: &User) {
+  pub fn insert_users(&mut self, users: Vec<User>) {
     match self {
-      Backend::Pelton(conn) => pelton::insert_user(conn, user),
-      Backend::MariaDB(conn) => mariadb::insert_user(conn, user),
-      Backend::Memcached(conn, cl) => hybrid::insert_user(conn, cl, user),
-      Backend::Simulate(conn) => simulate::insert_user(conn, user),
+      Backend::Pelton(conn) => pelton::insert_users(conn, users),
+      Backend::MariaDB(conn) => mariadb::insert_users(conn, users),
+      Backend::Memcached(conn, cl) => hybrid::insert_users(conn, cl, users),
+      Backend::Simulate(conn) => simulate::insert_users(conn, users),
     }
   }
-  pub fn insert_group<'a>(&mut self, group: &Group<'a>) {
+  pub fn insert_groups(&mut self, groups: Vec<Group>) {
     match self {
-      Backend::Pelton(conn) => pelton::insert_group(conn, group),
-      Backend::MariaDB(conn) => mariadb::insert_group(conn, group),
-      Backend::Memcached(conn, cl) => hybrid::insert_group(conn, cl, group),
-      Backend::Simulate(conn) => simulate::insert_group(conn, group),
+      Backend::Pelton(conn) => pelton::insert_groups(conn, groups),
+      Backend::MariaDB(conn) => mariadb::insert_groups(conn, groups),
+      Backend::Memcached(conn, cl) => hybrid::insert_groups(conn, cl, groups),
+      Backend::Simulate(conn) => simulate::insert_groups(conn, groups),
     }
   }
-  pub fn insert_file<'a>(&mut self, file: &File<'a>) {
+  pub fn insert_files(&mut self, files: Vec<File>) {
     match self {
-      Backend::Pelton(conn) => pelton::insert_file(conn, file),
-      Backend::MariaDB(conn) => mariadb::insert_file(conn, file),
-      Backend::Memcached(conn, cl) => hybrid::insert_file(conn, cl, file),
-      Backend::Simulate(conn) => simulate::insert_file(conn, file),
+      Backend::Pelton(conn) => pelton::insert_files(conn, files),
+      Backend::MariaDB(conn) => mariadb::insert_files(conn, files),
+      Backend::Memcached(conn, cl) => hybrid::insert_files(conn, cl, files),
+      Backend::Simulate(conn) => simulate::insert_files(conn, files),
     }
   }
-  pub fn insert_share<'a>(&mut self, share: &Share<'a>) {
+  pub fn insert_shares(&mut self, shares: Vec<Share>) {
     match self {
-      Backend::Pelton(conn) => pelton::insert_share(conn, share),
-      Backend::MariaDB(conn) => mariadb::insert_share(conn, share),
-      Backend::Memcached(conn, cl) => hybrid::insert_share(conn, cl, share),
-      Backend::Simulate(conn) => simulate::insert_share(conn, share),
+      Backend::Pelton(conn) => pelton::insert_shares(conn, shares),
+      Backend::MariaDB(conn) => mariadb::insert_shares(conn, shares),
+      Backend::Memcached(conn, cl) => hybrid::insert_shares(conn, cl, shares),
+      Backend::Simulate(conn) => simulate::insert_shares(conn, shares),
     }
   }
 
@@ -90,11 +91,15 @@ impl Backend {
         Request::Read(load, expected) => pelton::reads(conn, load, expected),
         Request::Direct(load) => pelton::direct(conn, load),
         Request::Indirect(load) => pelton::indirect(conn, load),
+        Request::GetFilePK(load) => pelton::read_file_pk(conn, load),
+        Request::UpdateFilePK(load, new_fn) => pelton::update_file_pk(conn, load, new_fn.to_string()),
       },
       Backend::MariaDB(conn) => match request {
         Request::Read(load, expected) => mariadb::reads(conn, load, expected),
         Request::Direct(load) => mariadb::direct(conn, load),
         Request::Indirect(load) => mariadb::indirect(conn, load),
+        Request::GetFilePK(load) => mariadb::read_file_pk(conn, load),
+        Request::UpdateFilePK(load, new_fn) => mariadb::update_file_pk(conn, load, new_fn.to_string()),
       },
       Backend::Memcached(conn, client) => match request {
         Request::Read(load, expected) => {
@@ -102,12 +107,25 @@ impl Backend {
         }
         Request::Direct(load) => hybrid::direct(conn, client, load),
         Request::Indirect(load) => hybrid::indirect(conn, client, load),
+        Request::GetFilePK(load) => hybrid::read_file_pk(conn, load),
+        Request::UpdateFilePK(load, new_fn) => hybrid::update_file_pk(conn, load, new_fn.to_string()),
       },
       Backend::Simulate(conn) => match request {
         Request::Read(load, expected) => simulate::reads(conn, load, expected),
         Request::Direct(load) => simulate::direct(conn, load),
         Request::Indirect(load) => simulate::indirect(conn, load),
+        Request::GetFilePK(load) => simulate::read_file_pk(conn, load),
+        Request::UpdateFilePK(load, new_fn) => simulate::update_file_pk(conn, load, new_fn.to_string()),
       },
+    }
+  }
+
+  pub fn warmup(&mut self) {
+    match self {
+      Backend::Pelton(conn) => {},
+      Backend::MariaDB(conn) => {},
+      Backend::Memcached(conn, cl) => hybrid::warmup(conn, cl),
+      Backend::Simulate(conn) => {},
     }
   }
 

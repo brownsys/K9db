@@ -110,6 +110,31 @@ struct ShardDescriptor {
   // The type of sharding.
   InfoType type;
   std::variant<DirectInfo, TransitiveInfo, VariableInfo> info;
+
+  bool is_transitive() const { return this->type == InfoType::TRANSITIVE; }
+  bool is_varowned() const { return this->type == InfoType::VARIABLE; }
+
+  // `upcolumn` and `downcolumn` are just convenient ways to access the
+  // "arrowheads" on an ownership relationship. Together with `next_table` this
+  // lets you talk about the entire relationship with the next "hop" in the
+  // following way: Lets assume we have a table `t` with a shard descriptor `d`.
+  //
+  // +----------------+        +----------------+
+  // | d.next_table() |        | t              |
+  // +----------------+        +----------------+
+  // | d.upcolumn()   | <----- | d.downcolumn() |
+  // | ...            |        | ...            |
+  // +----------------+        +----------------+
+  //
+  // `d.next_table()` always returns a table that is one hop closer in the
+  // transitrivity chain. The arrow between up- and downcolumn can be reversed
+  // (in the case of variable ownership), however `downcolumn` will always be
+  // the column in `t` and `upcolumn` always be the column in `d.next_table()`
+  // regardless of arrow direction.
+  const ColumnName &downcolumn() const;
+  const ColumnName &upcolumn() const;
+  const TableName &next_table() const;
+  const std::optional<IndexDescriptor *> index_descriptor() const;
 };
 
 // Metadata about a sharded table.
@@ -145,12 +170,90 @@ struct Shard {
 };
 
 // For debugging / printing.
-std::ostream &operator<<(std::ostream &os, const DirectInfo &o);
-std::ostream &operator<<(std::ostream &os, const TransitiveInfo &o);
-std::ostream &operator<<(std::ostream &os, const VariableInfo &o);
+std::ostream &operator<<(std::ostream &os, const InfoType &o);
 std::ostream &operator<<(std::ostream &os, const ShardDescriptor &o);
 std::ostream &operator<<(std::ostream &os, const Table &o);
 std::ostream &operator<<(std::ostream &os, const Shard &o);
+
+// Helper to allow for easily traversing a tree of owned/accessed tables.
+// void visit(owner, owned, desc, A).
+template <typename A>
+class Visitor {
+ private:
+  using State = std::unordered_map<TableName, Table>;
+  using Up = const Table &;
+  using Down = const Table &;
+  using Link = const ShardDescriptor *;
+  using Functor = std::function<bool(Up, Down, Link, A)>;
+
+ public:
+  // Use this if you want to instantiate by passing in a lambda.
+  explicit Visitor(Functor f) : f_(std::move(f)) {}
+
+ private:
+  // Invoked by SharderState to visit.
+  void Initialize(const State *state) { this->state_ = state; }
+
+  // Internal; Do not modify or override.
+  template <bool Up>
+  void VisitOwners(const TableName &table_name, A arg) {
+    const Table &table = this->state_->at(table_name);
+    // Identify direction.
+    if constexpr (Up) {
+      for (const auto &desc : table.owners) {
+        if (desc->shard_kind != table_name) {
+          const Table &next = this->state_->at(desc->next_table());
+          if (this->VisitOwner(next, table, desc.get(), arg)) {
+            this->VisitOwners<true>(next.table_name, arg);
+          }
+        }
+      }
+    } else {
+      for (const auto &[next_table, desc] : table.dependents) {
+        const Table &next = this->state_->at(next_table);
+        if (this->VisitOwner(table, next, desc, arg)) {
+          this->VisitOwners<false>(next.table_name, arg);
+        }
+      }
+    }
+  }
+  template <bool Up>
+  void VisitAccessors(const TableName &table_name, A arg) {
+    const Table &table = this->state_->at(table_name);
+    // Identify direction.
+    if constexpr (Up) {
+      for (const auto &desc : table.accessors) {
+        const Table &next = this->state_->at(desc->next_table());
+        if (this->VisitAccessor(next, table, desc.get(), arg)) {
+          this->VisitAccessors<true>(next.table_name, arg);
+        }
+      }
+    } else {
+      for (const auto &[next_table, desc] : table.access_dependents) {
+        const Table &next = this->state_->at(next_table);
+        if (this->VisitAccessor(table, next, desc, arg)) {
+          this->VisitAccessors<false>(next.table_name, arg);
+        }
+      }
+    }
+  }
+
+ protected:
+  // If you want to instantiate by overriding/inheritance, then your subclass
+  // should invoke this default constructor, and then override Visit(...) below.
+  Visitor() = default;
+  virtual bool VisitOwner(Up u, Down d, Link l, A a) {
+    return this->f_.value()(u, d, l, a);
+  }
+  virtual bool VisitAccessor(Up u, Down d, Link l, A a) {
+    return this->f_.value()(u, d, l, a);
+  }
+
+ private:
+  std::optional<Functor> f_;
+  const State *state_ = nullptr;
+  friend class SharderState;
+};
 
 }  // namespace shards
 }  // namespace pelton

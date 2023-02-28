@@ -13,6 +13,7 @@ cc_library(
         ":types",
         "//pelton/dataflow:schema",
         "@com_google_absl//absl/status",
+        "@glog",
     ],
 )
 
@@ -28,5 +29,6 @@ cc_library(
     deps = [
         "//pelton/dataflow:schema",
         "//pelton/sqlast:ast",
+        "@glog",
     ],
 )

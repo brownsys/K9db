@@ -208,7 +208,7 @@ TEST(PROXY, CLOSE_TEST) {
 int main(int argc, char **argv) {
   // Command line arugments and help message.
   FFIArgs cmd_args = FFIGflags(argc, argv, "ffi_unittest.cc");
-  EXPECT_EQ(cmd_args.workers, 3);
+  EXPECT_EQ(cmd_args.workers, 1);
   EXPECT_EQ(cmd_args.consistent, true);
   EXPECT_EQ(cmd_args.db_name, std::string("pelton"));
   EXPECT_EQ(cmd_args.hostname, std::string("127.0.0.1:10001"));
@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
   DropDatabase();
 
   // Initialize Pelton State
-  EXPECT_TRUE(FFIInitialize(3, true)) << "Opening global connection failed!";
+  EXPECT_TRUE(FFIInitialize(1, true)) << "Opening global connection failed!";
 
   // Run tests.
   ::testing::InitGoogleTest(&argc, argv);

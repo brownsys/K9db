@@ -26,8 +26,6 @@ CREATE TABLE shuup_personcontact ( \
   FOREIGN KEY (OWNING_user_id) REFERENCES auth_user(ptr) \
 );
 
-CREATE INDEX auth_user_ptr ON auth_user(id);
-
 CREATE TABLE shuup_companycontact ( \
   contact_ptr_id int, \
   tax_number int, \
@@ -49,7 +47,6 @@ CREATE TABLE shuup_shop ( \
   PRIMARY KEY (id), \
   FOREIGN KEY (OWNER_owner_id) REFERENCES auth_user(id) \
 );
-CREATE INDEX shuup_shop_id ON shuup_shop(id);
 
 CREATE TABLE shuup_gdpr_gdpruserconsent ( \
   id int, \
