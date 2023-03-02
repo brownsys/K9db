@@ -12,6 +12,7 @@
 #include "pelton/sql/rocksdb/encode.h"
 #include "pelton/sql/rocksdb/encryption.h"
 #include "pelton/sql/rocksdb/index.h"
+#include "pelton/sql/rocksdb/metadata.h"
 #include "pelton/sql/rocksdb/plan.h"
 #include "pelton/sql/rocksdb/transaction.h"
 #include "pelton/sqlast/value_mapper.h"
@@ -67,8 +68,12 @@ class RocksdbStream {
 
 class RocksdbTable {
  public:
+  // Rocksdb Options for table column families.
+  static rocksdb::ColumnFamilyOptions ColumnFamilyOptions();
+
   RocksdbTable(rocksdb::DB *db, const std::string &table_name,
-               const dataflow::SchemaRef &schema);
+               const dataflow::SchemaRef &schema,
+               RocksdbMetadata *metadata = nullptr);
 
   void AddUniqueColumn(size_t column) {
     this->unique_columns_.push_back(column);
@@ -79,13 +84,13 @@ class RocksdbTable {
   size_t PKColumn() const { return this->pk_column_; }
 
   // Index creation.
-  void CreateIndex(const std::vector<size_t> &columns);
-  void CreateIndex(const std::vector<std::string> &column_names) {
+  std::string CreateIndex(const std::vector<size_t> &columns);
+  std::string CreateIndex(const std::vector<std::string> &column_names) {
     std::vector<size_t> columns;
     for (const std::string &column_name : column_names) {
       columns.push_back(this->schema_.IndexOf(column_name));
     }
-    this->CreateIndex(columns);
+    return this->CreateIndex(columns);
   }
 
   // Index updating.
@@ -160,7 +165,7 @@ class RocksdbTable {
   rocksdb::DB *db_;
   std::string table_name_;
   dataflow::SchemaRef schema_;
-
+  RocksdbMetadata *metadata_;
   // The index of the PK column.
   size_t pk_column_;
   std::vector<size_t> unique_columns_;

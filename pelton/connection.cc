@@ -17,12 +17,14 @@ State::~State() {
 }
 
 // Initialize when db name is known.
-void State::Initialize(const std::string &db_name) {
+std::vector<std::string> State::Initialize(const std::string &db_name,
+                                           const std::string &db_path) {
   auto lock = this->WriterLock();
   if (this->database_ == nullptr) {
     this->database_ = sql::MakeConnection();
-    this->database_->Open(db_name);
+    return this->database_->Open(db_name, db_path);
   }
+  return {};
 }
 
 // Manage cannonical prepared statements.

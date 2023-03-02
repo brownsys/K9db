@@ -9,6 +9,7 @@
 #include "pelton/dataflow/schema.h"
 #include "pelton/sql/rocksdb/dedup.h"
 #include "pelton/sql/rocksdb/encode.h"
+#include "pelton/sql/rocksdb/metadata.h"
 #include "pelton/sql/rocksdb/transaction.h"
 #include "pelton/sqlast/value_mapper.h"
 #include "rocksdb/db.h"
@@ -21,8 +22,18 @@ namespace rocks {
 
 class RocksdbIndex {
  public:
+  // Rocksdb Options for index column families.
+  static rocksdb::ColumnFamilyOptions ColumnFamilyOptions();
+  static std::string ColumnFamilySuffix();
+
+  // Constructor.
   RocksdbIndex(rocksdb::DB *db, const std::string &table_name,
-               const std::vector<size_t> &columns);
+               const std::vector<size_t> &columns,
+               RocksdbMetadata *metadata = nullptr);
+
+  // Get the name used for the rocksdb column family corresponding to this
+  // index.
+  const std::string &name() const { return this->cf_name_; }
 
   // Consider table (id PK, name index, age); sharded by some <shard_name>
   // shard_name is the shard_name specialized with the user_id.
@@ -56,13 +67,20 @@ class RocksdbIndex {
   rocksdb::DB *db_;
   std::unique_ptr<rocksdb::ColumnFamilyHandle> handle_;
   std::vector<size_t> columns_;
+  std::string cf_name_;
 
   using IRecord = RocksdbIndexInternalRecord;
 };
 
 class RocksdbPKIndex {
  public:
-  RocksdbPKIndex(rocksdb::DB *db, const std::string &table_name);
+  // Rocksdb Options for PK index column families.
+  static rocksdb::ColumnFamilyOptions ColumnFamilyOptions();
+  static std::string ColumnFamilySuffix();
+
+  // Constructor.
+  RocksdbPKIndex(rocksdb::DB *db, const std::string &table_name,
+                 RocksdbMetadata *metadata = nullptr);
 
   // Updating.
   void Add(const rocksdb::Slice &pk, const rocksdb::Slice &shard_name,

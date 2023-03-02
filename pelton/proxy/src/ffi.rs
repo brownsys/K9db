@@ -27,6 +27,7 @@ pub mod pelton {
     pub consistent: bool,
     pub db_name: String,
     pub hostname: String,
+    pub db_path: String,
   }
 
   // Parse command line flags using gflags in native FFI.
@@ -48,15 +49,22 @@ pub mod pelton {
     let db_name = db_name.to_str().unwrap();
     let hostname = unsafe { CStr::from_ptr(flags.hostname) };
     let hostname = hostname.to_str().unwrap();
+    let db_path = unsafe { CStr::from_ptr(flags.db_path) };
+    let db_path = db_path.to_str().unwrap();
     return CommandLineArgs { workers: flags.workers,
                              consistent: flags.consistent,
                              db_name: db_name.to_string(),
-                             hostname: hostname.to_string() };
+                             hostname: hostname.to_string(),
+                             db_path: db_path.to_string() };
   }
 
   // Starting and stopping the proxy.
-  pub fn initialize(workers: usize, consistent: bool) -> bool {
-    return unsafe { ffi::FFIInitialize(workers, consistent) };
+  pub fn initialize(workers: usize, consistent: bool, db: &str, path: &str) -> bool {
+    let db = CString::new(db).unwrap();
+    let db = db.as_ptr();
+    let path = CString::new(path).unwrap();
+    let path = path.as_ptr();
+    return unsafe { ffi::FFIInitialize(workers, consistent, db, path) };
   }
   pub fn shutdown() -> bool {
     return unsafe { ffi::FFIShutdown() };
@@ -66,10 +74,8 @@ pub mod pelton {
   }
 
   // Open and close a new connection.
-  pub fn open(db: &str) -> FFIConnection {
-    let db = CString::new(db).unwrap();
-    let db = db.as_ptr();
-    return unsafe { ffi::FFIOpen(db) };
+  pub fn open() -> FFIConnection {
+    return unsafe { ffi::FFIOpen() };
   }
   pub fn close(rust_conn: FFIConnection) -> bool {
     return unsafe { ffi::FFIClose(rust_conn) };

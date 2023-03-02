@@ -8,7 +8,7 @@ if [[ "$1" == "dbg" ]]; then
 elif [[ "$1" == "opt" ]]; then
   rm -rf /mnt/disks/my-ssd/pelton/
   mkdir -p /mnt/disks/my-ssd/pelton/
-  bazel run //:pelton --config opt -- "${@:2}"
+  bazel run //:pelton --config opt -- --db_path=/mnt/disks/my-ssd/pelton/ "${@:2}"
 
 elif [[ "$1" == "valgrind" ]]; then
   bazel run //:pelton --config valgrind -- --logtostderr=1 "${@:2}"

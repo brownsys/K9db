@@ -353,13 +353,14 @@ fn main() {
   // Parse command line flags defined using rust's gflags.
   let flags = pelton::gflags(std::env::args(), USAGE);
   info!(log,
-        "Rust proxy: running with args: {:?} {:?} {:?} {:?}",
+        "Rust proxy: running with args: {:?} {:?} {:?} {:?} {:?}",
         flags.workers,
         flags.consistent,
         flags.db_name,
-        flags.hostname);
+        flags.hostname,
+        flags.db_path);
 
-  let global_open = pelton::initialize(flags.workers, flags.consistent);
+  let global_open = pelton::initialize(flags.workers, flags.consistent, &flags.db_name, &flags.db_path);
   if !global_open {
     std::process::exit(-1);
   }
@@ -377,7 +378,6 @@ fn main() {
   while !stop.load(Ordering::Relaxed) {
     while let Ok((stream, _addr)) = listener.accept() {
       stream.set_nodelay(true).expect("Cannot disable nagle");
-      let db_name = flags.db_name.clone();
       // clone log so that each client thread has an owned copy
       let log = log.clone();
       threads.push(std::thread::spawn(move || {
@@ -386,7 +386,7 @@ fn main() {
                            "Rust Proxy: Successfully connected to mysql \
                             proxy\nStream and address are: {:?}",
                            stream);
-                     let rust_conn = pelton::open(&db_name);
+                     let rust_conn = pelton::open();
                      let backend = Backend { rust_conn: rust_conn,
                                              log: log };
                      let _ =

@@ -25,6 +25,7 @@ cc_library(
         ":encode",
         ":encryption",
         ":filter",
+        ":metadata",
         ":project",
         ":table",
         ":transaction",
@@ -35,6 +36,22 @@ cc_library(
         "//pelton/sqlast:ast",
         "//pelton/sqlast:value_mapper",
         "//pelton/util:shard_name",
+        "//pelton/util:status",
+        "@glog",
+        "@rocksdb",
+    ],
+)
+
+cc_library(
+    name = "metadata",
+    srcs = [
+        "metadata.cc",
+    ],
+    hdrs = [
+        "metadata.h",
+    ],
+    deps = [
+        "//pelton/sqlast:ast",
         "//pelton/util:status",
         "@glog",
         "@rocksdb",
@@ -98,6 +115,7 @@ cc_library(
         ":encode",
         ":encryption",
         ":index",
+        ":metadata",
         ":plan",
         ":transaction",
         "//pelton/dataflow:schema",
@@ -171,6 +189,7 @@ cc_library(
     deps = [
         ":dedup",
         ":encode",
+        ":metadata",
         ":transaction",
         "//pelton/dataflow:schema",
         "//pelton/sqlast:ast",
@@ -213,6 +232,7 @@ cc_library(
     ],
     deps = [
         ":encode",
+        ":metadata",
         "//pelton/util:shard_name",
         "//pelton/util:upgradable_lock",
         "@glog",

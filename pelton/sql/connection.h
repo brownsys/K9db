@@ -91,12 +91,14 @@ class Connection {
   virtual ~Connection() = default;
 
   // Opening a connection.
-  virtual void Open(const std::string &db_name) = 0;
+  virtual std::vector<std::string> Open(const std::string &db_name,
+                                        const std::string &db_path) = 0;
   virtual void Close() = 0;
 
   // Schema statements.
   virtual bool ExecuteCreateTable(const sqlast::CreateTable &sql) = 0;
   virtual bool ExecuteCreateIndex(const sqlast::CreateIndex &sql) = 0;
+  virtual bool PersistCreateView(const sqlast::CreateView &sql) = 0;
 
   // Opening a session.
   virtual std::unique_ptr<Session> OpenSession() = 0;

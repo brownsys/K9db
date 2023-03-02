@@ -46,6 +46,8 @@ std::string Stringifier::VisitColumnConstraint(const ColumnConstraint &ast) {
       return "PRIMARY KEY";
     case ColumnConstraint::Type::UNIQUE:
       return "UNIQUE";
+    case ColumnConstraint::Type::NOT_NULL:
+      return "NOT NULL";
     case ColumnConstraint::Type::FOREIGN_KEY: {
       std::string str;
       const auto &[tbl, col, type] = ast.ForeignKey();

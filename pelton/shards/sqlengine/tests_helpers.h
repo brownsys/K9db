@@ -107,7 +107,7 @@ sql::SqlResult Execute(const std::string &sql, Connection *conn);
     void SetUp() override {                                                \
       std::filesystem::remove_all(DB_PATH);                                \
       this->pelton_state_ = std::make_unique<State>(3, true);              \
-      this->pelton_state_->Initialize(#NAME);                              \
+      this->pelton_state_->Initialize(#NAME, "");                          \
     }                                                                      \
     void TearDown() override {                                             \
       this->pelton_state_ = nullptr;                                       \

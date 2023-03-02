@@ -15,6 +15,7 @@ typedef struct {
   bool consistent;
   const char *db_name;
   const char *hostname;
+  const char *db_path;
 } FFIArgs;
 
 // In reality, this is of type pelton::ConnectionLocal.
@@ -53,11 +54,12 @@ FFIArgs FFIGflags(int argc, char **argv, const char *usage);
 
 // Initialize pelton_state in pelton.cc. Returns true if successful and false
 // otherwise.
-bool FFIInitialize(size_t workers, bool consistent);
+bool FFIInitialize(size_t workers, bool consistent, const char *db_name,
+                   const char *db_path);
 
 // Open a connection for a single client. The returned struct has connected =
 // true if successful. Otherwise connected = false.
-FFIConnection FFIOpen(const char *db_name);
+FFIConnection FFIOpen();
 
 // Execute a DDL statement (e.g. CREATE TABLE, CREATE VIEW, CREATE INDEX).
 bool FFIExecDDL(FFIConnection c_conn, const char *query);

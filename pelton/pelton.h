@@ -25,13 +25,14 @@ using Record = dataflow::Record;
 using PreparedStatement = prepared::PreparedStatementDescriptor;
 
 // initialize pelton_state
-bool initialize(size_t workers, bool consistent);
+bool initialize(size_t workers, bool consistent, const std::string &db_name,
+                const std::string &db_path);
 
 // delete pelton_state
 bool shutdown(bool shutdown_jvm = true);
 
 // open connection
-bool open(Connection *connection, const std::string &db_name);
+bool open(Connection *connection);
 
 absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql);
 

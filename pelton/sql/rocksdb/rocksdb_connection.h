@@ -13,6 +13,7 @@
 #include "pelton/sql/connection.h"
 #include "pelton/sql/result.h"
 #include "pelton/sql/rocksdb/encryption.h"
+#include "pelton/sql/rocksdb/metadata.h"
 #include "pelton/sql/rocksdb/table.h"
 #include "pelton/sql/rocksdb/transaction.h"
 #include "pelton/sqlast/ast.h"
@@ -36,12 +37,14 @@ class RocksdbConnection : public Connection {
   ~RocksdbConnection() { this->Close(); }
 
   // Open/close connection.
-  void Open(const std::string &db_name) override;
+  std::vector<std::string> Open(const std::string &db_name,
+                                const std::string &db_path) override;
   void Close() override;
 
   // Schema statements.
   bool ExecuteCreateTable(const sqlast::CreateTable &sql) override;
   bool ExecuteCreateIndex(const sqlast::CreateIndex &sql) override;
+  bool PersistCreateView(const sqlast::CreateView &sql) override;
 
   // Opening a session.
   std::unique_ptr<Session> OpenSession() override;
@@ -55,6 +58,7 @@ class RocksdbConnection : public Connection {
   std::unique_ptr<rocksdb::TransactionDB> db_;
   std::unordered_map<std::string, RocksdbTable> tables_;
   EncryptionManager encryption_;
+  RocksdbMetadata metadata_;
 
   friend RocksdbSession;
 };

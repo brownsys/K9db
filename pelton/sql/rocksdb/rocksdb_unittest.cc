@@ -161,7 +161,7 @@ class GlobalTestState {
     std::filesystem::remove_all(DB_PATH);
     // Initialize a new connection.
     this->conn_ = std::make_unique<RocksdbConnection>();
-    this->conn_->Open(DB_NAME);
+    this->conn_->Open(DB_NAME, "");
   }
 
   void CreateTable() {

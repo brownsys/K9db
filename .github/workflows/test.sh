@@ -2,24 +2,26 @@
 rm -rf /tmp/pelton/rocksdb
 mkdir -p /tmp/pelton/rocksdb
 
-# Run the proxy (in the background).
-bazel run //:pelton -- -logtostderr=1 &> .tmp &
-pid=$!
-sleep 10
-
-# Run the test.
+# Run each test file.
 code=0
 for path in "$@"
 do
+  # Run the proxy (in the background).
+  bazel run //:pelton -- -logtostderr=1 &> .tmp &
+  pid=$!
+  sleep 10
+
+  # Run one test file.
   mariadb --port=10001 --host=127.0.0.1 < "$path"
   status=$?
   if (( status != 0 )); then
     code=$status
   fi
+  
+  # Kill proxy.
+  kill $pid
+  wait $pid
 done
-
-# Kill the proxy.
-kill $pid
 
 # Display proxy output.
 echo ""

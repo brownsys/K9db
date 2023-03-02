@@ -26,33 +26,53 @@ bool IsPrefix(const std::vector<T> &left, const std::vector<T> &right) {
 }
 }  // namespace
 
+// Rocksdb Options for table column families.
+rocksdb::ColumnFamilyOptions RocksdbTable::ColumnFamilyOptions() {
+  rocksdb::ColumnFamilyOptions options;
+  options.OptimizeLevelStyleCompaction();
+  options.prefix_extractor.reset(new PeltonPrefixTransform());
+  options.comparator = PeltonComparator();
+  return options;
+}
+
 // Constructor.
 RocksdbTable::RocksdbTable(rocksdb::DB *db, const std::string &table_name,
-                           const dataflow::SchemaRef &schema)
+                           const dataflow::SchemaRef &schema,
+                           RocksdbMetadata *metadata)
     : db_(db),
       table_name_(table_name),
       schema_(schema),
+      metadata_(metadata),
       pk_column_(),
       unique_columns_(),
       handle_(),
-      pk_index_(db, table_name),
+      pk_index_(db, table_name, metadata),
       indices_() {
   const std::vector<dataflow::ColumnID> &keys = this->schema_.keys();
   CHECK_EQ(keys.size(), 1u) << "BAD PK ROCKSDB TABLE";
   this->pk_column_ = keys.front();
 
-  // Create rocksdb table.
-  rocksdb::ColumnFamilyHandle *handle;
-  rocksdb::ColumnFamilyOptions options;
-  options.OptimizeLevelStyleCompaction();
-  options.prefix_extractor.reset(new PeltonPrefixTransform());
-  options.comparator = PeltonComparator();
-  PANIC(this->db_->CreateColumnFamily(options, table_name, &handle));
-  this->handle_ = std::unique_ptr<rocksdb::ColumnFamilyHandle>(handle);
+  // Has this table been created before and we are reloading as part of
+  // restarting pelton?
+  std::optional<std::unique_ptr<rocksdb::ColumnFamilyHandle>> handle = {};
+  if (metadata != nullptr) {
+    handle = metadata->Find(table_name);
+  }
+
+  if (!handle.has_value()) {
+    // Create rocksdb table.
+    rocksdb::ColumnFamilyHandle *handle;
+    rocksdb::ColumnFamilyOptions options = ColumnFamilyOptions();
+    PANIC(this->db_->CreateColumnFamily(options, table_name, &handle));
+    this->handle_ = std::unique_ptr<rocksdb::ColumnFamilyHandle>(handle);
+  } else {
+    // Table was already created, point to it!
+    this->handle_ = std::move(handle.value());
+  }
 }
 
 // Create an index.
-void RocksdbTable::CreateIndex(const std::vector<size_t> &cols) {
+std::string RocksdbTable::CreateIndex(const std::vector<size_t> &cols) {
   CHECK_GT(cols.size(), 0u) << "Index has no columns";
   if (std::find(cols.begin(), cols.end(), this->pk_column_) != cols.end()) {
     LOG(FATAL) << "Index includes PK";
@@ -66,7 +86,7 @@ void RocksdbTable::CreateIndex(const std::vector<size_t> &cols) {
   }
   for (const RocksdbIndex &index : this->indices_) {
     if (index.GetColumns() == cols) {
-      return;
+      return index.name();
     }
     if (IsPrefix(cols, index.GetColumns())) {
       LOG(WARNING) << "Index is a prefix of an existing index";
@@ -75,7 +95,9 @@ void RocksdbTable::CreateIndex(const std::vector<size_t> &cols) {
       LOG(WARNING) << "An existing index is a prefix of index being created";
     }
   }
-  this->indices_.emplace_back(this->db_, this->table_name_, cols);
+  this->indices_.emplace_back(this->db_, this->table_name_, cols,
+                              this->metadata_);
+  return this->indices_.back().name();
 }
 
 // Index updating.

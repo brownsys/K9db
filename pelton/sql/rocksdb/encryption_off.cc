@@ -31,6 +31,7 @@ EncryptedKey::Offset EncryptedKey::ShardSize(const rocksdb::Slice &slice) {
 
 // Construct encryption manager.
 EncryptionManager::EncryptionManager() = default;
+void EncryptionManager::Initialize(RocksdbMetadata *metadata) {}
 
 // Encryption of keys and values of records.
 EncryptedKey EncryptionManager::EncryptKey(RocksdbSequence &&k) const {

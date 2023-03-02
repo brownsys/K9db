@@ -31,7 +31,8 @@ class State {
   State &operator=(const State &&) = delete;
 
   // Initialize when db name is known.
-  void Initialize(const std::string &db_name);
+  std::vector<std::string> Initialize(const std::string &db_name,
+                                      const std::string &db_path);
 
   // Accessors for underlying components states.
   shards::SharderState &SharderState() { return this->sstate_; }

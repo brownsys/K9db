@@ -47,7 +47,7 @@ bool HasRowNull(FFIResult result, int id) {
 }
 
 TEST(PROXY, OPEN_TEST) {
-  c_conn = FFIOpen(DB_NAME);
+  c_conn = FFIOpen();
   EXPECT_NE(c_conn, nullptr);
 }
 
@@ -212,12 +212,14 @@ int main(int argc, char **argv) {
   EXPECT_EQ(cmd_args.consistent, true);
   EXPECT_EQ(cmd_args.db_name, std::string("pelton"));
   EXPECT_EQ(cmd_args.hostname, std::string("127.0.0.1:10001"));
+  EXPECT_EQ(cmd_args.db_path, std::string(""));
 
   // Drop the database (in case it existed before because of some tests).
   DropDatabase();
 
   // Initialize Pelton State
-  EXPECT_TRUE(FFIInitialize(1, true)) << "Opening global connection failed!";
+  EXPECT_TRUE(FFIInitialize(1, true, DB_NAME, ""))
+      << "Opening global connection failed!";
 
   // Run tests.
   ::testing::InitGoogleTest(&argc, argv);

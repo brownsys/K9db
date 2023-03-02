@@ -86,7 +86,6 @@ absl::StatusOr<sql::SqlResult> CreateView(const sqlast::CreateView &stmt,
 
   // Nothing to commit.
   connection->session->RollbackTransaction();
-
   return sql::SqlResult(true);
 }
 

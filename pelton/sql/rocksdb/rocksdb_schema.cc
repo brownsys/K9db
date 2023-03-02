@@ -27,7 +27,7 @@ bool RocksdbConnection::ExecuteCreateTable(const sqlast::CreateTable &stmt) {
   // Create table.
   auto [it, flag] = this->tables_.emplace(
       std::piecewise_construct, std::make_tuple(table_name),
-      std::make_tuple(this->db_.get(), table_name, schema));
+      std::make_tuple(this->db_.get(), table_name, schema, &this->metadata_));
   CHECK(flag);
 
   // Create indices for table.
@@ -51,14 +51,29 @@ bool RocksdbConnection::ExecuteCreateTable(const sqlast::CreateTable &stmt) {
     }
   }
 
+  // After table creation succeeds. Persist the statement so that it can be
+  // reloaded on restart.
+  this->metadata_.Persist(stmt);
+
   return true;
 }
 
-// Execute Create Index Statement
+// Execute Create Index Statement.
 bool RocksdbConnection::ExecuteCreateIndex(const sqlast::CreateIndex &stmt) {
   const std::string &table_name = stmt.table_name();
   RocksdbTable &table = this->tables_.at(table_name);
-  table.CreateIndex(stmt.column_names());
+  std::string cf_name = table.CreateIndex(stmt.column_names());
+
+  // After index creation succeeds. Persist the statement so that it can be
+  // reloaded on restart.
+  this->metadata_.Persist(cf_name, stmt);
+
+  return true;
+}
+
+// Persist a Create View Statement to disk.
+bool RocksdbConnection::PersistCreateView(const sqlast::CreateView &sql) {
+  this->metadata_.Persist(sql);
   return true;
 }
 

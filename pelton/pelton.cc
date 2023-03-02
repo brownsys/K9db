@@ -106,18 +106,43 @@ std::optional<SqlResult> SpecialStatements(const std::string &sql,
 
 }  // namespace
 
-bool initialize(size_t workers, bool consistent) {
+bool initialize(size_t workers, bool consistent, const std::string &db_name,
+                const std::string &db_path) {
   // if already open
   if (PELTON_STATE != nullptr) {
     return false;
   }
+
+  // Initialize the global state including the rocksdb interface.
   PELTON_STATE = new State(workers, consistent);
+  std::vector<std::string> stmts = PELTON_STATE->Initialize(db_name, db_path);
+
+  // Create a temporary session in order to reload the pre-existing tables and
+  // views.
+  Connection connection;
+  if (!open(&connection)) {
+    return false;
+  }
+
+  // Re-execute previously-persisted create table, index, and view statements.
+  for (std::string stmt : stmts) {
+    MOVE_OR_PANIC(SqlResult result, exec(&connection, stmt));
+    if (!result.Success()) {
+      return false;
+    }
+  }
+
+  // Close temporary session.
+  if (!close(&connection)) {
+    return false;
+  }
+
+  // Done!
   return true;
 }
 
-bool open(Connection *connection, const std::string &db_name) {
+bool open(Connection *connection) {
   // set global state in local connection struct
-  PELTON_STATE->Initialize(db_name);
   connection->state = PELTON_STATE;
   connection->session = PELTON_STATE->Database()->OpenSession();
   return true;

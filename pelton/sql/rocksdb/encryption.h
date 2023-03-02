@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "pelton/sql/rocksdb/encode.h"
+#include "pelton/sql/rocksdb/metadata.h"
 #include "pelton/util/shard_name.h"
 #include "pelton/util/upgradable_lock.h"
 #include "rocksdb/comparator.h"
@@ -101,6 +102,7 @@ using EncryptedPrefix = Cipher;
 class EncryptionManager {
  public:
   EncryptionManager();
+  void Initialize(RocksdbMetadata *metadata);
 
   // Encryption of keys and values of records.
   EncryptedKey EncryptKey(RocksdbSequence &&k) const;
@@ -122,6 +124,7 @@ class EncryptionManager {
   std::unique_ptr<unsigned char[]> global_nonce_;
   std::unordered_map<std::string, std::unique_ptr<unsigned char[]>> keys_;
   mutable util::UpgradableMutex mtx_;
+  RocksdbMetadata *metadata_;
 
   // Get the key of the given user, create the key for that user if it does not
   // exist.

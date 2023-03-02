@@ -66,6 +66,19 @@ std::string Decrypt(rocksdb::Slice input, const unsigned char *nonce,
   return std::string(reinterpret_cast<const char *>(dst.get()), size);
 }
 
+std::unique_ptr<unsigned char[]> DeserializeKey(const std::string &str,
+                                                size_t size) {
+  CHECK_EQ(str.size(), size);
+  std::unique_ptr<char[]> ptr = std::make_unique<char[]>(size);
+  std::memcpy(ptr.get(), str.data(), size);
+  return std::unique_ptr<unsigned char[]>(
+      reinterpret_cast<unsigned char *>(ptr.release()));
+}
+
+std::string SerializeKey(const unsigned char *key, size_t size) {
+  return std::string(reinterpret_cast<const char *>(key), size);
+}
+
 }  // namespace
 
 /*
@@ -108,13 +121,36 @@ EncryptionManager::EncryptionManager()
     : global_key_(std::make_unique<unsigned char[]>(KEY_SIZE)),
       global_nonce_(std::make_unique<unsigned char[]>(NONCE_SIZE)),
       keys_(),
-      mtx_() {
+      mtx_(),
+      metadata_(nullptr) {
   // Initialize libsodium.
   assert(sodium_init() >= 0);
 
   // Generate random global key and nonce.
   crypto_aead_aes256gcm_keygen(this->global_key_.get());
   randombytes_buf(this->global_nonce_.get(), NONCE_SIZE);
+}
+
+// Initialization: load any previously created keys from persistent storage.
+void EncryptionManager::Initialize(RocksdbMetadata *metadata) {
+  this->metadata_ = metadata;
+
+  // Load global key and nonce.
+  std::optional<std::string> key = metadata->LoadGlobalKey();
+  std::optional<std::string> nonce = metadata->LoadGlobalNonce();
+  if (key.has_value()) {
+    this->global_key_ = DeserializeKey(key.value(), KEY_SIZE);
+    this->global_nonce_ = DeserializeKey(nonce.value(), NONCE_SIZE);
+  } else {
+    metadata->PersistGlobalKey(SerializeKey(this->global_key_.get(), KEY_SIZE));
+    metadata->PersistGlobalNonce(
+        SerializeKey(this->global_nonce_.get(), NONCE_SIZE));
+  }
+
+  // Load user keys.
+  for (const auto &[user, key] : metadata->LoadUserKeys()) {
+    this->keys_.emplace(user, DeserializeKey(key, KEY_SIZE));
+  }
 }
 
 // Get the key of the given user.
@@ -136,7 +172,16 @@ const unsigned char *EncryptionManager::GetOrCreateUserKey(
         std::make_unique<unsigned char[]>(KEY_SIZE);
     crypto_aead_aes256gcm_keygen(key.get());
     auto [eit, _] = this->keys_.emplace(shard_name, std::move(key));
-    return eit->second.get();
+    const unsigned char *ptr = eit->second.get();
+    // Unlock mutex before writing to persistent storage.
+    upgraded->unlock();
+    // Persist key.
+    if (this->metadata_ != nullptr) {
+      this->metadata_->PersistUserKey(shard_name, SerializeKey(ptr, KEY_SIZE));
+    } else {
+      LOG(WARNING) << "User keys are not persisted!";
+    }
+    return ptr;
   }
   return this->keys_.at(shard_name).get();
 }

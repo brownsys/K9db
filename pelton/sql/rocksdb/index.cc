@@ -1,6 +1,7 @@
 #include "pelton/sql/rocksdb/index.h"
 
 #include <algorithm>
+#include <optional>
 #include <utility>
 
 #include "pelton/sqlast/ast.h"
@@ -86,23 +87,46 @@ T GetHelper(rocksdb::DB *db, const RocksdbInterface *txn,
 /*
  * RocksdbIndex
  */
-// Constructor.
-RocksdbIndex::RocksdbIndex(rocksdb::DB *db, const std::string &table_name,
-                           const std::vector<size_t> &columns)
-    : db_(db), handle_(), columns_(columns) {
-  // Create a name for the index.
-  std::string name = table_name + "_index";
-  for (size_t c : this->columns_) {
-    name += "_" + std::to_string(c);
-  }
-
-  // Create a column family for this index.
-  rocksdb::ColumnFamilyHandle *handle;
+// Rocksdb Options for index column families.
+std::string RocksdbIndex::ColumnFamilySuffix() { return "__index"; }
+rocksdb::ColumnFamilyOptions RocksdbIndex::ColumnFamilyOptions() {
   rocksdb::ColumnFamilyOptions options;
   options.prefix_extractor.reset(new IndexPrefixTransform());
   options.comparator = rocksdb::BytewiseComparator();
-  PANIC(this->db_->CreateColumnFamily(options, name, &handle));
-  this->handle_ = std::unique_ptr<rocksdb::ColumnFamilyHandle>(handle);
+  return options;
+}
+
+// Constructor.
+RocksdbIndex::RocksdbIndex(rocksdb::DB *db, const std::string &table_name,
+                           const std::vector<size_t> &columns,
+                           RocksdbMetadata *metadata)
+    : db_(db), handle_(), columns_(columns), cf_name_() {
+  // Create a name for the index.
+  std::string name = table_name;
+  for (size_t c : this->columns_) {
+    name += "_" + std::to_string(c);
+  }
+  name += ColumnFamilySuffix();
+
+  // Has this index been created before and we are reloading as part of
+  // restarting pelton?
+  std::optional<std::unique_ptr<rocksdb::ColumnFamilyHandle>> handle = {};
+  if (metadata != nullptr) {
+    handle = metadata->Find(name);
+  }
+
+  if (!handle.has_value()) {
+    // Create a column family for this index.
+    rocksdb::ColumnFamilyHandle *handle;
+    PANIC(this->db_->CreateColumnFamily(ColumnFamilyOptions(), name, &handle));
+    this->handle_ = std::unique_ptr<rocksdb::ColumnFamilyHandle>(handle);
+  } else {
+    // It was already created, point to it!
+    this->handle_ = std::move(handle.value());
+  }
+
+  // Store the name used for this column family.
+  this->cf_name_ = std::move(name);
 }
 
 // Adding things to index.
@@ -180,19 +204,39 @@ IndexSet RocksdbIndex::GetWithShards(std::vector<std::string> &&shards,
 /*
  * RocksdbPKIndex
  */
-// Constructor.
-RocksdbPKIndex::RocksdbPKIndex(rocksdb::DB *db, const std::string &table_name)
-    : db_(db) {
-  // Create a name for the index.
-  std::string name = table_name + "_pk_index";
 
-  // Create a column family for this index.
-  rocksdb::ColumnFamilyHandle *handle;
+// Rocksdb Options for PK index column families.
+std::string RocksdbPKIndex::ColumnFamilySuffix() { return "__pk_index"; }
+rocksdb::ColumnFamilyOptions RocksdbPKIndex::ColumnFamilyOptions() {
   rocksdb::ColumnFamilyOptions options;
   options.prefix_extractor.reset(new IndexPrefixTransform());
   options.comparator = rocksdb::BytewiseComparator();
-  PANIC(this->db_->CreateColumnFamily(options, name, &handle));
-  this->handle_ = std::unique_ptr<rocksdb::ColumnFamilyHandle>(handle);
+  return options;
+}
+
+// Constructor.
+RocksdbPKIndex::RocksdbPKIndex(rocksdb::DB *db, const std::string &table_name,
+                               RocksdbMetadata *metadata)
+    : db_(db) {
+  // Create a name for the index.
+  std::string name = table_name + ColumnFamilySuffix();
+
+  // Has this index been created before and we are reloading as part of
+  // restarting pelton?
+  std::optional<std::unique_ptr<rocksdb::ColumnFamilyHandle>> handle = {};
+  if (metadata != nullptr) {
+    handle = metadata->Find(name);
+  }
+
+  if (!handle.has_value()) {
+    // Create a column family for this index.
+    rocksdb::ColumnFamilyHandle *handle;
+    PANIC(this->db_->CreateColumnFamily(ColumnFamilyOptions(), name, &handle));
+    this->handle_ = std::unique_ptr<rocksdb::ColumnFamilyHandle>(handle);
+  } else {
+    // It was already created, point to it!
+    this->handle_ = std::move(handle.value());
+  }
 }
 
 // Adding things to index.

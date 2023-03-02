@@ -18,6 +18,7 @@ DEFINE_uint32(workers, 1, "Number of workers");
 DEFINE_bool(consistent, true, "Dataflow consistency with futures");
 DEFINE_string(db_name, "pelton", "Name of the database");
 DEFINE_string(hostname, "127.0.0.1:10001", "Hostname to bind against");
+DEFINE_string(db_path, "", "Path to where to store db");
 
 uint64_t ffi_total_time = 0;
 uint64_t ffi_total_count = 0;
@@ -40,14 +41,15 @@ FFIArgs FFIGflags(int argc, char **argv, const char *usage) {
 
   // Returned the read command line flags.
   return {FLAGS_workers, FLAGS_consistent, FLAGS_db_name.c_str(),
-          FLAGS_hostname.c_str()};
+          FLAGS_hostname.c_str(), FLAGS_db_path.c_str()};
 }
 
 // Initialize pelton_state in pelton.cc
-bool FFIInitialize(size_t workers, bool consistent) {
+bool FFIInitialize(size_t workers, bool consistent, const char *db_name,
+                   const char *db_path) {
   // call c++ function from C with converted types
   LOG(INFO) << "C-Wrapper: running pelton::initialize";
-  if (pelton::initialize(workers, consistent)) {
+  if (pelton::initialize(workers, consistent, db_name, db_path)) {
     LOG(INFO) << "C-Wrapper: global connection opened";
     // Set signal handler.
     signal(SIGINT, proxy_terminate);
@@ -61,10 +63,10 @@ bool FFIInitialize(size_t workers, bool consistent) {
 
 // Open a connection for a single client. The returned struct has connected =
 // true if successful. Otherwise connected = false
-FFIConnection FFIOpen(const char *db_name) {
+FFIConnection FFIOpen() {
   // Create a new client connection.
   pelton::Connection *cpp_conn = new pelton::Connection();
-  if (pelton::open(cpp_conn, db_name)) {
+  if (pelton::open(cpp_conn)) {
     return reinterpret_cast<FFIConnection>(cpp_conn);
   }
   LOG(FATAL) << "C-Wrapper: failed to open connection";
