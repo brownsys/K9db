@@ -4,13 +4,12 @@ echo "Writing output to $OUT"
 
 RT=120
 DS=2.59
-RS=1000
 TARGET_IP="$1"
 
 cd ~/pelton/experiments/lobsters
 
 # Loop over datascales
-for RS in "1000" "1250" "1500" "1750" "2000" "2500" "3000" "4000" "5000" "7500"
+for RS in "4800" "4900"
 do
   echo "Datascale $DS"
   bazel run -c opt //:lobsters-harness -- \
@@ -28,13 +27,13 @@ do
 done
 
 # Same but for baseline!
-for RS in "1000" "1250" "1500" "1750" "2000" "2500" "3000" "4000" "5000" "7500"
+for RS in "1500" "2000" "2500" "3000" "3500" "4000" "4500"ss "5000" "6000"
 do
   echo "Datascale $DS"
   bazel run -c opt //:lobsters-harness -- \
     --runtime $RT --datascale $DS --reqscale $RS --queries pelton \
     --backend rocks-mariadb --prime --scale_everything \
-    "mysql://root:password@$TARGET_IP:10001/lobsters" \
+    "mysql://pelton:password@$TARGET_IP:3306/lobsters" \
     > "$OUT/baseline$RS.out" 2>&1
 
   # Sleep a while.
