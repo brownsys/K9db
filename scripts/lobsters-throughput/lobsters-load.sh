@@ -10,7 +10,7 @@ TARGET_IP="$1"
 cd ~/pelton/experiments/lobsters
 
 # Loop over datascales
-for RS in "1000" "1100" "1200" "1300" "1400" "1500" "1750" "2000" "2250" "2500"
+for RS in "1000" "1250" "1500" "1750" "2000" "2500" "3000" "4000" "5000" "7500"
 do
   echo "Datascale $DS"
   bazel run -c opt //:lobsters-harness -- \
