@@ -224,6 +224,7 @@ cc_library(
         ":index",
         ":select",
         ":update",
+        ":delete",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:record",

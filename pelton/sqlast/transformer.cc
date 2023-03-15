@@ -272,7 +272,7 @@ antlrcpp::Any AstTransformer::visitAnonymize_behavior(
     return columns_to_anon;
   } else {
     // Columns to anonymize.
-  for (size_t i = 1; i < ctx->column_name().size(); i++) {
+  for (size_t i = 0; i < ctx->column_name().size(); i++) {
     CAST_REF(std::string, anon_col, ctx->column_name().at(i)->accept(this));
     columns_to_anon.push_back(std::move(anon_col));
   }
@@ -298,7 +298,7 @@ antlrcpp::Any AstTransformer::visitAnonymize_constraint(
   CAST_REF(std::vector<std::string>, columns_to_anon, ctx->anonymize_behavior()->accept(this));
 
   AnonymizationRule rule(anon_type, data_subject_column);
-  rule.SetAnonymizeColumns(columns_to_anon);  
+  rule.SetAnonymizeColumns(std::move(columns_to_anon));  
 
   return rule;
 }

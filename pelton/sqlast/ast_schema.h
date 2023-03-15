@@ -153,8 +153,8 @@ class AnonymizationRule {
     this->anon_columns_.push_back(anon_column);
   }
 
-  void SetAnonymizeColumns(std::vector<std::string> anon_columns) {
-    this->anon_columns_ = anon_columns;
+  void SetAnonymizeColumns(std::vector<std::string> &&anon_columns) {
+    this->anon_columns_ = std::move(anon_columns);
   }
 
   // Visitor pattern.
