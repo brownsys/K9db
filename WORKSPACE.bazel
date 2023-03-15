@@ -165,8 +165,8 @@ cc_library(
 )
 """,
     # Has all our annotations.
-    commit = "1c39a36a0e42ae81c79cd7c1de67eafeb2b0e1d0",
-    remote = "https://github.com/KinanBab/grammars-v4.git",
+    commit = "f907ed9346e526f5bb21ddfc1cf1b99a353ef398",
+    remote = "https://github.com/arjeyaraj/grammars-v4.git",
 )
 
 # External/foreign tools to include make projects.

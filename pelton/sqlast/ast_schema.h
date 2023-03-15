@@ -153,6 +153,10 @@ class AnonymizationRule {
     this->anon_columns_.push_back(anon_column);
   }
 
+  void SetAnonymizeColumns(std::vector<std::string> anon_columns) {
+    this->anon_columns_ = anon_columns;
+  }
+
   // Visitor pattern.
   template <class T>
   T Visit(AbstractVisitor<T> *visitor) const {
