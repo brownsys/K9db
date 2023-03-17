@@ -49,6 +49,7 @@ namespace sqlengine {
 #define ON_GET " ON GET "
 #define ON_DEL " ON DEL "
 #define ANON " ANON "
+#define DEL_ROW " DELETE_ROW "
 
 #define NO " ONLY "
 #define OB " OWNED_BY "
