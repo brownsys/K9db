@@ -249,9 +249,39 @@ PreparedStatementDescriptor MakeStmt(const std::string &query,
   return descriptor;
 }
 
+// Helper function that:
+// 1) Removes all quoted text ("", '', ``)
+// 2) Standardizes white space by changing \n and \t to ' '
+std::string CleanCanonicalQuery(const CanonicalQuery &query){
+  std::string quotes = "'\"`";
+  char last_quote = ' ';
+  std::string cleaned_query = "";
+  for (auto it = query.begin(); it != query.end();it++) {
+      if (quotes.find(*it)<quotes.length()) {
+        if (last_quote == ' '){
+          last_quote = *it;
+        } else if (last_quote == *it){
+          last_quote = ' ';
+          continue;
+        }
+      }
+      if (last_quote == ' '){
+        if (*it == '\t' || *it == '\n'){
+          cleaned_query.push_back(' ');
+        } else {
+          cleaned_query.push_back(*it);
+        }
+      }
+  }
+  
+  return cleaned_query;
+}
+
 // Find out if a query needs to be served from a flow.
 bool NeedsFlow(const CanonicalQuery &query) {
-  return absl::StartsWith(query, "SELECT") && NO_VIEWS.count(query) == 0;
+  std::string cleaned_query = CleanCanonicalQuery(query);
+  return true;
+  // return absl::StartsWith(query, "SELECT") && NO_VIEWS.count(query) == 0;
 }
 
 // Populate prepared statement with concrete values.
