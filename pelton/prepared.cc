@@ -257,21 +257,21 @@ std::string CleanCanonicalQuery(const CanonicalQuery &query){
   char last_quote = ' ';
   std::string cleaned_query = "";
   for (auto it = query.begin(); it != query.end();it++) {
-      if (quotes.find(*it)<quotes.length()) {
-        if (last_quote == ' '){
-          last_quote = *it;
-        } else if (last_quote == *it){
-          last_quote = ' ';
-          continue;
-        }
-      }
+    if (quotes.find(*it)<quotes.length()) {
       if (last_quote == ' '){
-        if (*it == '\t' || *it == '\n'){
-          cleaned_query.push_back(' ');
-        } else {
-          cleaned_query.push_back(*it);
-        }
+        last_quote = *it;
+      } else if (last_quote == *it){
+        last_quote = ' ';
+        continue;
       }
+    }
+    if (last_quote == ' '){
+      if (*it == '\t' || *it == '\n'){
+        cleaned_query.push_back(' ');
+      } else {
+        cleaned_query.push_back(*it);
+      }
+    }
   }
   
   return cleaned_query;
@@ -280,7 +280,27 @@ std::string CleanCanonicalQuery(const CanonicalQuery &query){
 // Find out if a query needs to be served from a flow.
 bool NeedsFlow(const CanonicalQuery &query) {
   std::string cleaned_query = CleanCanonicalQuery(query);
-  return true;
+
+  // Use string.find to find JOINs, GROUP BYs, ORDER BYs, and >s
+  if (cleaned_query.find(" JOIN ") < cleaned_query.length()){
+    return true;
+  } else if (cleaned_query.find(" GROUP BY ") < cleaned_query.length()){
+    return true;
+  } else if (cleaned_query.find(" ORDER BY ") < cleaned_query.length()){
+    return true;
+  } else if (cleaned_query.find(">") < cleaned_query.length()){
+    return true;
+  }
+
+  // Use regex to find COUNT and SUM due to variable whitespace between
+  // keyword and open paren
+  std::regex COUNT_SUM_REGEX{" SUM\\s*\\(| COUNT\\s*\\("};
+  std::smatch sm;
+  if (regex_search(cleaned_query, sm, COUNT_SUM_REGEX)) {
+    return true;
+  }
+
+  return false;
   // return absl::StartsWith(query, "SELECT") && NO_VIEWS.count(query) == 0;
 }
 
