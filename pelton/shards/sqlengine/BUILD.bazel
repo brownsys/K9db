@@ -221,10 +221,10 @@ cc_library(
         "gdpr.h",
     ],
     deps = [
+        ":delete",
         ":index",
         ":select",
         ":update",
-        ":delete",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:record",

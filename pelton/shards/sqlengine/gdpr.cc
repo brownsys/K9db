@@ -10,10 +10,10 @@
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "glog/logging.h"
+#include "pelton/shards/sqlengine/delete.h"
 #include "pelton/shards/sqlengine/index.h"
 #include "pelton/shards/sqlengine/select.h"
 #include "pelton/shards/sqlengine/update.h"
-#include "pelton/shards/sqlengine/delete.h"
 #include "pelton/shards/types.h"
 #include "pelton/util/iterator.h"
 #include "pelton/util/shard_name.h"
@@ -153,22 +153,24 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecForget() {
         UpdateContext context(update, this->conn_, this->lock_);
         MOVE_OR_PANIC(sql::SqlResult result, context.Exec(false));
         count += result.UpdateCount();
-      } else {
-          if (anon_rule_exists) {
-          // Delete the rows that are equal to the DS id being replaced (if exists).
-          sqlast::Delete delete_stmt(table_name);
-          using EType = sqlast::Expression::Type;
-          auto where = std::make_unique<sqlast::BinaryExpression>(EType::EQ);
-          where->SetLeft(std::make_unique<sqlast::ColumnExpression>(current_schema.NameOf(current_schema.keys().at(0))));
-          where->SetRight(std::make_unique<sqlast::LiteralExpression>(anonymized_record.GetValue(current_schema.keys().at(0))));
-          delete_stmt.SetWhereClause(std::move(where));
+      } else if (anon_rule_exists) {
+        // Delete the rows that are equal to the DS id being replaced (if
+        // exists).
+        sqlast::Delete delete_stmt(table_name);
+        using EType = sqlast::Expression::Type;
+        auto where = std::make_unique<sqlast::BinaryExpression>(EType::EQ);
+        where->SetLeft(std::make_unique<sqlast::ColumnExpression>(
+            current_schema.NameOf(current_schema.keys().at(0))));
+        where->SetRight(std::make_unique<sqlast::LiteralExpression>(
+            anonymized_record.GetValue(current_schema.keys().at(0))));
+        delete_stmt.SetWhereClause(std::move(where));
 
-          DeleteContext dcontext(delete_stmt, this->conn_, this->lock_);
-          ASSIGN_OR_RETURN(auto &[_ CM dstatus], dcontext.ExecWithinTransaction());
-          if (dstatus < 0) {
-            this->db_->RollbackTransaction();
-            return sql::SqlResult(dstatus);
-          }
+        DeleteContext dcontext(delete_stmt, this->conn_, this->lock_);
+        ASSIGN_OR_RETURN(auto &[_ CM dstatus],
+                         dcontext.ExecWithinTransaction());
+        if (dstatus < 0) {
+          this->db_->RollbackTransaction();
+          return sql::SqlResult(dstatus);
         }
       }
     }
@@ -206,7 +208,6 @@ void GDPRContext::AnonAccessors(const TableName &tbl, sql::SqlResultSet &&set,
   for (dataflow::Record &record : records) {
     // All columns that need to be anonymized for the record
     std::unordered_set<std::string> anon_column_set = {};
-
     bool anon_rule_exists = false;
 
     // accessorship case
@@ -228,19 +229,19 @@ void GDPRContext::AnonAccessors(const TableName &tbl, sql::SqlResultSet &&set,
 
       UpdateContext context(update, this->conn_, this->lock_);
       MOVE_OR_PANIC(sql::SqlResult result, context.Exec(false));
-    } else {
-          if (anon_rule_exists) {
-          sqlast::Delete delete_stmt(tbl);
-          using EType = sqlast::Expression::Type;
-          auto where = std::make_unique<sqlast::BinaryExpression>(EType::EQ);
-          where->SetLeft(std::make_unique<sqlast::ColumnExpression>(current_schema.NameOf(current_schema.keys().at(0))));
-          where->SetRight(std::make_unique<sqlast::LiteralExpression>(record.GetValue(current_schema.keys().at(0))));
-          delete_stmt.SetWhereClause(std::move(where));
+    } else if (anon_rule_exists) {
+      sqlast::Delete delete_stmt(tbl);
+      using EType = sqlast::Expression::Type;
+      auto where = std::make_unique<sqlast::BinaryExpression>(EType::EQ);
+      where->SetLeft(std::make_unique<sqlast::ColumnExpression>(
+          current_schema.NameOf(current_schema.keys().at(0))));
+      where->SetRight(std::make_unique<sqlast::LiteralExpression>(
+          record.GetValue(current_schema.keys().at(0))));
+      delete_stmt.SetWhereClause(std::move(where));
 
-          DeleteContext dcontext(delete_stmt, this->conn_, this->lock_);
-          dcontext.ExecWithinTransaction();
-          MOVE_OR_PANIC(auto _, dcontext.ExecWithinTransaction());
-        }
+      DeleteContext dcontext(delete_stmt, this->conn_, this->lock_);
+      dcontext.ExecWithinTransaction();
+      MOVE_OR_PANIC(auto _, dcontext.ExecWithinTransaction());
     }
   }
 }

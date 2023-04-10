@@ -222,8 +222,7 @@ TEST_F(GDPRForgetAnonTest, TwoDistinctOwnersDelRow) {
   std::string msg = MakeCreate(
       "msg",
       {"id" I PK, "sender" I OB "doctor(id)", "receiver" I OB "patient(id)"},
-      false,
-      "," ON_DEL "receiver" DEL_ROW "," ON_DEL "sender" DEL_ROW);
+      false, "," ON_DEL "receiver" DEL_ROW "," ON_DEL "sender" DEL_ROW);
 
   // Make a pelton connection.
   Connection conn = CreateConnection();
