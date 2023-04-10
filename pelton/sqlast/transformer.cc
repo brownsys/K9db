@@ -263,6 +263,21 @@ antlrcpp::Any AstTransformer::visitForeign_key_clause(
   return ColumnConstraint::MakeForeignKey(foreign_table, foreign_column, own);
 }
 
+antlrcpp::Any AstTransformer::visitAnonymize_behavior(
+    sqlparser::SQLiteParser::Anonymize_behaviorContext *ctx) {
+  std::vector<std::string> columns_to_anon;
+  if (ctx->DELETE_ROW() != nullptr) {
+    return columns_to_anon;
+  } else {
+    // Columns to anonymize.
+    for (size_t i = 0; i < ctx->column_name().size(); i++) {
+      CAST_REF(std::string, anon_col, ctx->column_name().at(i)->accept(this));
+      columns_to_anon.push_back(std::move(anon_col));
+    }
+    return columns_to_anon;
+  }
+}
+
 antlrcpp::Any AstTransformer::visitAnonymize_constraint(
     sqlparser::SQLiteParser::Anonymize_constraintContext *ctx) {
   // Which operation are we anonymizing over?
@@ -276,14 +291,18 @@ antlrcpp::Any AstTransformer::visitAnonymize_constraint(
   }
 
   // Which foreign key data subject initiates this anonymization?
-  CAST_REF(std::string, data_subject_column, ctx->column_name(0)->accept(this));
-  AnonymizationRule rule(anon_type, data_subject_column);
+  CAST_REF(std::string, data_subject_column, ctx->column_name()->accept(this));
+  CAST_REF(std::vector<std::string>, columns_to_anon,
+           ctx->anonymize_behavior()->accept(this));
 
-  // Columns to anonymize.
-  for (size_t i = 1; i < ctx->column_name().size(); i++) {
-    CAST_REF(std::string, anon_col, ctx->column_name().at(i)->accept(this));
-    rule.AddAnonymizeColumn(anon_col);
+  // DELETE_ROW only supported with ON DEL.
+  if (columns_to_anon.size() == 0 &&
+      anon_type != AnonymizationRule::Type::DEL) {
+    return absl::InvalidArgumentError("DELETE_ROW only supported with ON DEL");
   }
+
+  AnonymizationRule rule(anon_type, data_subject_column);
+  rule.SetAnonymizeColumns(std::move(columns_to_anon));
   return rule;
 }
 

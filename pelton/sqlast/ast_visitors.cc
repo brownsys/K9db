@@ -87,13 +87,19 @@ std::string Stringifier::VisitAnonymizationRule(const AnonymizationRule &ast) {
     default:
       LOG(FATAL) << "Unsupported anonymization type";
   }
-  str += ast.GetDataSubject() + " ANONYMIZE (";
-  for (const std::string &column : ast.GetAnonymizeColumns()) {
-    str += column + ", ";
+
+  const std::vector<std::string> &columns = ast.GetAnonymizeColumns();
+  if (columns.size() == 0) {
+    str += " DELETE_ROW";
+  } else {
+    str += ast.GetDataSubject() + " ANONYMIZE (";
+    for (const std::string &column : columns) {
+      str += column + ", ";
+    }
+    str.pop_back();
+    str.pop_back();
+    str += ")";
   }
-  str.pop_back();
-  str.pop_back();
-  str += ")";
   return str;
 }
 

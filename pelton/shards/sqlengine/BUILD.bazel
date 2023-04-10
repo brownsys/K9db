@@ -221,6 +221,7 @@ cc_library(
         "gdpr.h",
     ],
     deps = [
+        ":delete",
         ":index",
         ":select",
         ":update",

@@ -129,8 +129,6 @@ load("@rules_antlr//antlr:lang.bzl", "CPP")
 rules_antlr_dependencies("4.8", CPP)
 
 # ANTLR grammars repository (non-bazel) which includes the sqlite grammar!
-# TODO(babman): go back to using the git repo instead of the fork when my
-# PR is approved.
 new_git_repository(
     name = "grammars-v4",
     build_file_content = """
@@ -165,7 +163,7 @@ cc_library(
 )
 """,
     # Has all our annotations.
-    commit = "1c39a36a0e42ae81c79cd7c1de67eafeb2b0e1d0",
+    commit = "48a6025a039da2d161d1659aca49bebaefcd9cac",
     remote = "https://github.com/KinanBab/grammars-v4.git",
 )
 
