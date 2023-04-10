@@ -19,6 +19,7 @@
 #include "pelton/sqlast/parser.h"
 #include "pelton/util/status.h"
 #include "pelton/util/upgradable_lock.h"
+#include "pelton/prepared.h"
 
 namespace pelton {
 namespace shards {
@@ -74,13 +75,32 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
     // Might be a select from a matview or a table.
     case sqlast::AbstractStatement::Type::SELECT: {
       auto *stmt = static_cast<sqlast::Select *>(statement.get());
-      util::SharedLock lock = connection->state->ReaderLock();
       if (dstate.HasFlow(stmt->table_name())) {
+        util::SharedLock lock = connection->state->ReaderLock();
         return view::SelectView(*stmt, connection, &lock);
       } else {
-        util::SharedLock lock = connection->state->ReaderLock();
-        SelectContext context(*stmt, connection, &lock);
-        return context.Exec();
+        // should canonicalize before NeedsFlow?
+        if (!pelton::prepared::NeedsFlow(sql)){
+          util::SharedLock lock = connection->state->ReaderLock();
+          SelectContext context(*stmt, connection, &lock);
+          return context.Exec();
+        } else {
+          // create view
+          // Check if/where to canonicalize query
+          auto pair = prepared::Canonicalize(sql);
+          prepared::CanonicalQuery &canonical = pair.first;
+          std::string flow_name =
+            "_curr_flow" ;
+          auto create_view_stmt = std::make_unique<sqlast::CreateView>(flow_name, sql);
+          util::UniqueLock write_lock = connection->state->WriterLock();
+          CHECK_STATUS(view::CreateView(*create_view_stmt, connection, &write_lock));
+
+          // Select from view
+          util::SharedLock read_lock = connection->state->ReaderLock();
+          sqlast::Select select_view{flow_name};
+          select_view.AddColumn(sqlast::Select::ResultColumn("*"));
+          return view::SelectView(select_view, connection, &read_lock);
+        }
       }
     }
 
