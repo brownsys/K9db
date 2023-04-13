@@ -12,6 +12,8 @@ namespace pelton {
 namespace sql {
 namespace rocks {
 
+namespace {
+
 // Options for transaction.
 rocksdb::WriteOptions WriteOpts() {
   rocksdb::WriteOptions opts;
@@ -36,8 +38,6 @@ rocksdb::TransactionOptions TxnOpts() {
 // the iterator correctly enforcing it.
 // As a result, we create a dummy wrapper here that enforces this parameter
 // after using rocksdb::WriteBatchWithIndex's violating iterator.
-namespace {
-
 class PrefixRespectingIterator : public rocksdb::Iterator {
  public:
   PrefixRespectingIterator(rocksdb::Iterator *it,
@@ -84,104 +84,113 @@ class PrefixRespectingIterator : public rocksdb::Iterator {
   rocksdb::Slice prefix_;
 };
 
+// This iterator locks every row read and used.
+// This iterator doesn't lock the boundry row (e.g. when iterating within a key
+// prefix, the first row outside that prefix will be eventually read, which
+// is when iteration ends, this last key is not locked).
+// Locking occurs on Next().
+class LockingIterator : public rocksdb::Iterator {
+ public:
+  LockingIterator(rocksdb::Iterator *it, rocksdb::Transaction *txn,
+                  rocksdb::ColumnFamilyHandle *cf)
+      : it_(it), txn_(txn), cf_(cf) {}
+
+  // We lock when moving to a new row.
+  void Next() {
+    this->Lock();
+    this->it_->Next();
+  }
+  void Prev() { LOG(FATAL) << "Prev() unsupported!"; }
+
+  // All other functions just forward to the underlying iterator.
+  void Seek(const rocksdb::Slice &target) override { this->it_->Seek(target); }
+  bool Valid() const override { return this->it_->Valid(); }
+  void SeekToFirst() { this->it_->SeekToFirst(); }
+  void SeekToLast() { this->it_->SeekToLast(); }
+  void SeekForPrev(const rocksdb::Slice &target) {
+    this->it_->SeekForPrev(target);
+  }
+  rocksdb::Slice key() const { return this->it_->key(); }
+  rocksdb::Slice value() const { return this->it_->value(); }
+  rocksdb::Status status() const { return this->it_->status(); }
+  rocksdb::Status Refresh() { return this->it_->Refresh(); }
+  rocksdb::Slice timestamp() const { return this->it_->timestamp(); }
+  rocksdb::Status GetProperty(std::string prop_name, std::string *prop) {
+    return this->it_->GetProperty(prop_name, prop);
+  }
+
+ private:
+  std::unique_ptr<rocksdb::Iterator> it_;
+  rocksdb::Transaction *txn_;
+  rocksdb::ColumnFamilyHandle *cf_;
+
+  // Lock current key.
+  void Lock() {
+    // Options.
+    rocksdb::ReadOptions opts;
+    opts.total_order_seek = true;
+    opts.verify_checksums = false;
+    // Call GetForUpdate.
+    std::string _;
+    auto status = this->txn_->GetForUpdate(opts, this->cf_, this->key(), &_);
+    if (!status.ok() && !status.IsNotFound()) {
+      PANIC(status);
+    }
+  }
+};
+
 }  // namespace
 
 /*
- * Constructor/destructor.
+ * RocksdbWriteTransaction.
  */
 
-// A transaction starts as soon as it is created!
-RocksdbTransaction::RocksdbTransaction(rocksdb::TransactionDB *db)
+// A write transaction starts as soon as it is created!
+RocksdbWriteTransaction::RocksdbWriteTransaction(rocksdb::TransactionDB *db)
     : db_(db),
       txn_(db_->BeginTransaction(WriteOpts(), TxnOpts())),
-      snapshot_(db_->GetSnapshot()) {}
-
-// Delete owned pointers on destruction.
-RocksdbTransaction::~RocksdbTransaction() {
-  this->txn_ = nullptr;
-  this->db_->ReleaseSnapshot(this->snapshot_);
-  this->snapshot_ = nullptr;
+      finalized_(false) {
+  // TODO(babman): can we get higher isolation using snapshots like the next
+  //               line?
+  // SetSnapshot on the next operation call.
+  // Ensures that the read set has not been modified after the very first read.
+  // this->txn_->SetSnapshotOnNextOperation();
 }
 
-/*
- * Atomic Writes.
- */
+RocksdbWriteTransaction::~RocksdbWriteTransaction() {
+  if (!this->finalized_) {
+    LOG(FATAL) << "Transaction destructed but not committed or rolledback!";
+  }
+  this->txn_ = nullptr;
+}
 
-void RocksdbTransaction::Put(rocksdb::ColumnFamilyHandle *cf,
-                             const rocksdb::Slice &key,
-                             const rocksdb::Slice &value) {
+// Commit / rollback.
+void RocksdbWriteTransaction::Rollback() {
+  this->finalized_ = true;
+  PANIC(this->txn_->Rollback());
+}
+void RocksdbWriteTransaction::Commit() {
+  this->finalized_ = true;
+  PANIC(this->txn_->Commit());
+}
+
+// Writes.
+void RocksdbWriteTransaction::Put(rocksdb::ColumnFamilyHandle *cf,
+                                  const rocksdb::Slice &key,
+                                  const rocksdb::Slice &value) {
   PANIC(this->txn_->Put(cf, key, value));
 }
-void RocksdbTransaction::Delete(rocksdb::ColumnFamilyHandle *cf,
-                                const rocksdb::Slice &key) {
+void RocksdbWriteTransaction::Delete(rocksdb::ColumnFamilyHandle *cf,
+                                     const rocksdb::Slice &key) {
   PANIC(this->txn_->Delete(cf, key));
 }
 
-/*
- * Reads without locking.
- */
-
-std::optional<std::string> RocksdbTransaction::Get(
+// Locking reads.
+std::optional<std::string> RocksdbWriteTransaction::Get(
     rocksdb::ColumnFamilyHandle *cf, const rocksdb::Slice &key) const {
   rocksdb::ReadOptions opts;
   opts.total_order_seek = true;
   opts.verify_checksums = false;
-  // opts.snapshot = this->snapshot_;
-
-  std::string result;
-  rocksdb::Status status = this->txn_->Get(opts, cf, key, &result);
-  if (status.ok()) {
-    return result;
-  } else if (status.IsNotFound()) {
-    return {};
-  }
-  PANIC(status);
-  return {};
-}
-std::vector<std::optional<std::string>> RocksdbTransaction::MultiGet(
-    rocksdb::ColumnFamilyHandle *cf,
-    const std::vector<rocksdb::Slice> &keys) const {
-  // Make C-arrays for rocksdb MultiGet.
-  std::unique_ptr<rocksdb::Status[]> statuses =
-      std::make_unique<rocksdb::Status[]>(keys.size());
-  std::unique_ptr<rocksdb::PinnableSlice[]> pins =
-      std::make_unique<rocksdb::PinnableSlice[]>(keys.size());
-
-  // Read from rocksdb.
-  rocksdb::ReadOptions opts;
-  opts.total_order_seek = true;
-  opts.verify_checksums = false;
-  // opts.snapshot = this->snapshot_;
-
-  // Read.
-  this->txn_->MultiGet(opts, cf, keys.size(), keys.data(), pins.get(),
-                       statuses.get());
-
-  // Move results into vector.
-  std::vector<std::optional<std::string>> results;
-  results.reserve(keys.size());
-  for (size_t i = 0; i < keys.size(); i++) {
-    if (statuses[i].ok()) {
-      results.emplace_back(pins[i].ToString());
-    } else if (statuses[i].IsNotFound()) {
-      results.emplace_back();
-    } else {
-      PANIC(statuses[i]);
-    }
-  }
-  return results;
-}
-
-/*
- * Locking reads.
- */
-
-std::optional<std::string> RocksdbTransaction::GetForUpdate(
-    rocksdb::ColumnFamilyHandle *cf, const rocksdb::Slice &key) const {
-  rocksdb::ReadOptions opts;
-  opts.total_order_seek = true;
-  opts.verify_checksums = false;
-  // opts.snapshot = this->snapshot_;
 
   std::string result;
   rocksdb::Status status = this->txn_->GetForUpdate(opts, cf, key, &result);
@@ -193,7 +202,8 @@ std::optional<std::string> RocksdbTransaction::GetForUpdate(
   PANIC(status);
   return {};
 }
-std::vector<std::optional<std::string>> RocksdbTransaction::MultiGetForUpdate(
+
+std::vector<std::optional<std::string>> RocksdbWriteTransaction::MultiGet(
     rocksdb::ColumnFamilyHandle *cf,
     const std::vector<rocksdb::Slice> &keys) const {
   std::vector<rocksdb::ColumnFamilyHandle *> handles(keys.size(), cf);
@@ -203,7 +213,6 @@ std::vector<std::optional<std::string>> RocksdbTransaction::MultiGetForUpdate(
   rocksdb::ReadOptions opts;
   opts.total_order_seek = true;
   opts.verify_checksums = false;
-  // opts.snapshot = this->snapshot_;
 
   // Read.
   std::vector<rocksdb::Status> statuses =
@@ -224,40 +233,125 @@ std::vector<std::optional<std::string>> RocksdbTransaction::MultiGetForUpdate(
   return results;
 }
 
-/*
- * Iteration without locking.
- */
-
-std::unique_ptr<rocksdb::Iterator> RocksdbTransaction::Iterate(
+std::unique_ptr<rocksdb::Iterator> RocksdbWriteTransaction::Iterate(
     rocksdb::ColumnFamilyHandle *cf, bool same_prefix) const {
   rocksdb::ReadOptions opts;
   opts.fill_cache = false;
   opts.verify_checksums = false;
   opts.total_order_seek = !same_prefix;
   opts.prefix_same_as_start = same_prefix;
-  // opts.snapshot = this->snapshot_;
 
-  // Get an iterator with the base snapshot from both the underlying DB and
+  // Get an iterator from both the underlying DB and
   // the current uncommitted write set of the transaction.
-  rocksdb::Iterator *it = this->txn_->GetIterator(opts, cf);
+  // This iterator locks the read and used row (using GetForUpdate()).
+  std::unique_ptr<rocksdb::Iterator> it = std::make_unique<LockingIterator>(
+      this->txn_->GetIterator(opts, cf), this->txn_.get(), cf);
   if (same_prefix) {
     // Wrap around a prefix respecting iterator.
     rocksdb::ColumnFamilyDescriptor descriptor;
     PANIC(cf->GetDescriptor(&descriptor));
     const rocksdb::SliceTransform *transform =
         descriptor.options.prefix_extractor.get();
-    return std::make_unique<PrefixRespectingIterator>(it, transform);
-  } else {
-    return std::unique_ptr<rocksdb::Iterator>(it);
+    return std::make_unique<PrefixRespectingIterator>(it.release(), transform);
   }
+  return it;
 }
 
 /*
- * Commit / rollback.
+ * RocksdbReadSnapshot.
  */
 
-void RocksdbTransaction::Rollback() { PANIC(this->txn_->Rollback()); }
-void RocksdbTransaction::Commit() { PANIC(this->txn_->Commit()); }
+// Acquire snapshot when the first read is issued, not when transaction is
+// created to match MyRock behavior.
+RocksdbReadSnapshot::RocksdbReadSnapshot(rocksdb::TransactionDB *db)
+    : db_(db), snapshot_(nullptr) {}
+
+// Delete owned pointers on destruction.
+RocksdbReadSnapshot::~RocksdbReadSnapshot() {
+  if (this->snapshot_ != nullptr) {
+    this->db_->ReleaseSnapshot(this->snapshot_);
+  }
+  this->snapshot_ = nullptr;
+}
+
+// Initialize the snapshot if not already initialized.
+void RocksdbReadSnapshot::InitializeSnapshot() const {
+  if (this->snapshot_ == nullptr) {
+    this->snapshot_ = this->db_->GetSnapshot();
+  }
+}
+
+// Non-locking reads from snapshot.
+std::optional<std::string> RocksdbReadSnapshot::Get(
+    rocksdb::ColumnFamilyHandle *cf, const rocksdb::Slice &key) const {
+  this->InitializeSnapshot();
+
+  rocksdb::ReadOptions opts;
+  opts.total_order_seek = true;
+  opts.verify_checksums = false;
+  opts.snapshot = this->snapshot_;
+
+  std::string result;
+  rocksdb::Status status = this->db_->Get(opts, cf, key, &result);
+  if (status.ok()) {
+    return result;
+  } else if (status.IsNotFound()) {
+    return {};
+  }
+  PANIC(status);
+  return {};
+}
+
+std::vector<std::optional<std::string>> RocksdbReadSnapshot::MultiGet(
+    rocksdb::ColumnFamilyHandle *cf,
+    const std::vector<rocksdb::Slice> &keys) const {
+  this->InitializeSnapshot();
+
+  // Make C-arrays for rocksdb MultiGet.
+  std::unique_ptr<rocksdb::Status[]> statuses =
+      std::make_unique<rocksdb::Status[]>(keys.size());
+  std::unique_ptr<rocksdb::PinnableSlice[]> pins =
+      std::make_unique<rocksdb::PinnableSlice[]>(keys.size());
+
+  // Read from rocksdb.
+  rocksdb::ReadOptions opts;
+  opts.total_order_seek = true;
+  opts.verify_checksums = false;
+  opts.snapshot = this->snapshot_;
+
+  // Read.
+  this->db_->MultiGet(opts, cf, keys.size(), keys.data(), pins.get(),
+                      statuses.get());
+
+  // Move results into vector.
+  std::vector<std::optional<std::string>> results;
+  results.reserve(keys.size());
+  for (size_t i = 0; i < keys.size(); i++) {
+    if (statuses[i].ok()) {
+      results.emplace_back(pins[i].ToString());
+    } else if (statuses[i].IsNotFound()) {
+      results.emplace_back();
+    } else {
+      PANIC(statuses[i]);
+    }
+  }
+  return results;
+}
+
+std::unique_ptr<rocksdb::Iterator> RocksdbReadSnapshot::Iterate(
+    rocksdb::ColumnFamilyHandle *cf, bool same_prefix) const {
+  this->InitializeSnapshot();
+
+  rocksdb::ReadOptions opts;
+  opts.fill_cache = false;
+  opts.verify_checksums = false;
+  opts.total_order_seek = !same_prefix;
+  opts.prefix_same_as_start = same_prefix;
+  opts.snapshot = this->snapshot_;
+
+  // Get an iterator with the base snapshot from both the underlying DB.
+  return std::unique_ptr<rocksdb::Iterator>(this->db_->NewIterator(opts, cf));
+}
 
 }  // namespace rocks
 }  // namespace sql

@@ -12,6 +12,7 @@
 #include "pelton/sql/rocksdb/encode.h"
 #include "pelton/sql/rocksdb/encryption.h"
 #include "pelton/sql/rocksdb/index.h"
+#include "pelton/sql/rocksdb/plan.h"
 #include "pelton/sql/rocksdb/transaction.h"
 #include "pelton/sqlast/value_mapper.h"
 #include "rocksdb/db.h"
@@ -89,27 +90,23 @@ class RocksdbTable {
 
   // Index updating.
   void IndexAdd(const rocksdb::Slice &shard, const RocksdbSequence &row,
-                RocksdbTransaction *txn, bool update_pk = true);
+                RocksdbWriteTransaction *txn, bool update_pk = true);
   void IndexDelete(const rocksdb::Slice &shard, const RocksdbSequence &row,
-                   RocksdbTransaction *txn, bool update_pk = true);
+                   RocksdbWriteTransaction *txn, bool update_pk = true);
   void IndexUpdate(const rocksdb::Slice &shard, const RocksdbSequence &old,
-                   const RocksdbSequence &updated, RocksdbTransaction *txn);
+                   const RocksdbSequence &updated,
+                   RocksdbWriteTransaction *txn);
 
   // Query planning (selecting index).
-  enum IndexChoiceType { PK, UNIQUE, REGULAR, SCAN };
-  struct IndexChoice {
-    IndexChoiceType type;
-    size_t idx;
-  };
-  IndexChoice ChooseIndex(sqlast::ValueMapper *vm) const;
-  IndexChoice ChooseIndex(size_t column_index) const;
+  RocksdbPlan ChooseIndex(const sqlast::ValueMapper *vm) const;
+  RocksdbPlan ChooseIndex(size_t column_index) const;
 
   // Index lookups.
   std::optional<IndexSet> IndexLookup(sqlast::ValueMapper *vm,
-                                      const RocksdbTransaction *txn,
+                                      const RocksdbInterface *txn,
                                       int limit = -1) const;
   std::optional<DedupIndexSet> IndexLookupDedup(sqlast::ValueMapper *vm,
-                                                const RocksdbTransaction *txn,
+                                                const RocksdbInterface *txn,
                                                 int limit = -1) const;
 
   // Get an index.
@@ -138,26 +135,26 @@ class RocksdbTable {
 
   // Check if a record with given PK exists.
   bool Exists(const rocksdb::Slice &pk_value,
-              const RocksdbTransaction *txn) const;
+              const RocksdbWriteTransaction *txn) const;
 
   // Put/Delete API.
   void Put(const EncryptedKey &key, const EncryptedValue &value,
-           RocksdbTransaction *txn);
-  void Delete(const EncryptedKey &key, RocksdbTransaction *txn);
+           RocksdbWriteTransaction *txn);
+  void Delete(const EncryptedKey &key, RocksdbWriteTransaction *txn);
 
   // Get and MultiGet.
-  std::optional<EncryptedValue> Get(const EncryptedKey &key, bool read,
-                                    const RocksdbTransaction *txn) const;
+  std::optional<EncryptedValue> Get(const EncryptedKey &key,
+                                    const RocksdbInterface *txn) const;
+
   std::vector<std::optional<EncryptedValue>> MultiGet(
-      const std::vector<EncryptedKey> &keys, bool read,
-      const RocksdbTransaction *txn) const;
+      const std::vector<EncryptedKey> &keys, const RocksdbInterface *txn) const;
 
   // Read all the data.
-  RocksdbStream GetAll(const RocksdbTransaction *txn) const;
+  RocksdbStream GetAll(const RocksdbInterface *txn) const;
 
   // Read all data from shard.
   RocksdbStream GetShard(const EncryptedPrefix &shard_name,
-                         const RocksdbTransaction *txn) const;
+                         const RocksdbInterface *txn) const;
 
  private:
   rocksdb::DB *db_;

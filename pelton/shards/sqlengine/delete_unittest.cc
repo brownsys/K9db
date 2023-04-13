@@ -54,7 +54,9 @@ TEST_F(DeleteTest, UnshardedTable) {
   EXPECT_UPDATE(Execute(del3, &conn), 0);
 
   // Validate deletion.
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetAll("user"), (V{row1}));
+  db->RollbackTransaction();
 }
 
 TEST_F(DeleteTest, DirectTable) {
@@ -90,7 +92,9 @@ TEST_F(DeleteTest, DirectTable) {
   EXPECT_UPDATE(Execute(del2, &conn), 1);
 
   // Validate insertions.
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetAll("addr"), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(DeleteTest, DeepTransitiveTable) {
@@ -151,6 +155,7 @@ TEST_F(DeleteTest, DeepTransitiveTable) {
   EXPECT_UPDATE(Execute(del3, &conn), 10);
 
   // Validate deletion.
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("deep", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("deep", SN("user", "5")), (V{d2}));
   EXPECT_EQ(db->GetShard("deep", SN(DEFAULT_SHARD, DEFAULT_SHARD)),
@@ -172,6 +177,7 @@ TEST_F(DeleteTest, DeepTransitiveTable) {
   EXPECT_EQ(db->GetShard("user", SN("user", "5")), (V{u5}));
   EXPECT_EQ(db->GetShard("user", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetAll("user"), (V{u0, u5}));
+  db->RollbackTransaction();
 }
 
 TEST_F(DeleteTest, TwoOwners) {
@@ -215,11 +221,13 @@ TEST_F(DeleteTest, TwoOwners) {
   EXPECT_UPDATE(Execute(del2, &conn), 3);
 
   // Validate deletion.
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{row5}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row5}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{row3}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetAll("msg"), (V{row3, row5}));
+  db->RollbackTransaction();
 }
 
 TEST_F(DeleteTest, ShardedDataSubject) {
@@ -261,6 +269,7 @@ TEST_F(DeleteTest, ShardedDataSubject) {
   EXPECT_UPDATE(Execute(del2, &conn), 1);
 
   // Validate insertions.
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetAll("mid"), (V{}));
 
   EXPECT_EQ(db->GetShard("invited", SN("user", "0")), (V{}));
@@ -274,6 +283,7 @@ TEST_F(DeleteTest, ShardedDataSubject) {
   EXPECT_EQ(db->GetShard("attr", SN("invited", "500")), (V{}));
   EXPECT_EQ(db->GetShard("attr", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetAll("attr"), (V{ra1}));
+  db->RollbackTransaction();
 }
 
 TEST_F(DeleteTest, VariableOwnership) {
@@ -315,22 +325,28 @@ TEST_F(DeleteTest, VariableOwnership) {
 
   // Delete and validate.
   EXPECT_UPDATE(Execute(del1, &conn), 1);
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{row1}));
   EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{row1}));
   EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetAll("grps"), (V{row1}));
+  db->RollbackTransaction();
 
   EXPECT_UPDATE(Execute(del2, &conn), 2);
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{row1}));
   EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetAll("grps"), (V{row1}));
+  db->RollbackTransaction();
 
   EXPECT_UPDATE(Execute(del3, &conn), 3);
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{}));
   EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{row1}));
   EXPECT_EQ(db->GetAll("grps"), (V{row1}));
+  db->RollbackTransaction();
 }
 
 TEST_F(DeleteTest, ComplexVariableOwnership) {
@@ -396,15 +412,18 @@ TEST_F(DeleteTest, ComplexVariableOwnership) {
   // Delete from fassoc and validate.
   auto del1 = MakeDelete("fassoc", {"fsid = 21"});
   EXPECT_UPDATE(Execute(del1, &conn), 3);
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("files", SN("user", "0")), (V{frow1, frow2}));
   EXPECT_EQ(db->GetShard("files", SN("user", "5")), (V{frow1, frow2}));
   EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{frow1, frow2}));
   EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetAll("files"), (V{frow1, frow2}));
+  db->RollbackTransaction();
 
   // Delete from group and validate.
   auto del2 = MakeDelete("grps", {"gid = 15"});
   EXPECT_UPDATE(Execute(del2, &conn), 13);
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("files", SN("user", "0")), (V{frow1, frow2}));
   EXPECT_EQ(db->GetShard("files", SN("user", "5")), (V{frow1}));
   EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{frow1}));
@@ -417,10 +436,12 @@ TEST_F(DeleteTest, ComplexVariableOwnership) {
   EXPECT_EQ(db->GetShard("fassoc", SN(DEFAULT_SHARD, DEFAULT_SHARD)),
             (V{farow3, farow4}));
   EXPECT_EQ(db->GetAll("fassoc"), (V{farow1, farow3, farow4}));
+  db->RollbackTransaction();
 
   // Delete from association and validate.
   auto del3 = MakeDelete("association", {"group_id = 10"});
   EXPECT_UPDATE(Execute(del3, &conn), 7);
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("files", SN("user", "0")), (V{frow1, frow2}));
   EXPECT_EQ(db->GetShard("files", SN("user", "5")), (V{}));
   EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{frow1}));
@@ -439,6 +460,7 @@ TEST_F(DeleteTest, ComplexVariableOwnership) {
   EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{grow1}));
   EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetAll("grps"), (V{grow1}));
+  db->RollbackTransaction();
 }
 
 }  // namespace sqlengine

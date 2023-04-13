@@ -65,7 +65,7 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecForget() {
   const Shard &current_shard = this->sstate_.GetShard(this->shard_kind_);
 
   // Begin transaction.
-  this->db_->BeginTransaction();
+  this->db_->BeginTransaction(true);
 
   int count = 0;
   std::unordered_map<std::string, std::vector<dataflow::Record>> all_updates;
@@ -414,7 +414,7 @@ absl::StatusOr<sql::SqlResult> GDPRContext::ExecGet() {
   const Shard &current_shard = this->sstate_.GetShard(this->shard_kind_);
 
   // Begin transaction.
-  this->db_->BeginTransaction();
+  this->db_->BeginTransaction(false);
 
   // Start getting data.
   for (const auto &table_name : current_shard.owned_tables) {

@@ -128,7 +128,6 @@ std::string MakeDelete(const std::string &tbl_name,
  */
 sql::SqlResult Execute(const std::string &sql, Connection *conn) {
   MOVE_OR_PANIC(sql::SqlResult result, Shard(sql, conn));
-  conn->session->BeginTransaction();
   return result;
 }
 

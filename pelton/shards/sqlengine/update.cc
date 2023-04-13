@@ -74,7 +74,7 @@ absl::StatusOr<sql::SqlResult> UpdateContext::DeleteInsert(
 
   // Start transaction.
   if (standalone_transaction) {
-    this->db_->BeginTransaction();
+    this->db_->BeginTransaction(true);
   }
 
   // Delete all the records being updated.
@@ -123,7 +123,7 @@ absl::StatusOr<sql::SqlResult> UpdateContext::DirectUpdate(
     bool standalone_transaction) {
   // Start transaction.
   if (standalone_transaction) {
-    this->db_->BeginTransaction();
+    this->db_->BeginTransaction(true);
   }
 
   // Execute update directly against DB.

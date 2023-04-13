@@ -61,10 +61,12 @@ TEST_F(GDPRForgetAnonTest, TwoOwnersAnon) {
   std::string forget = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget, &conn), 10);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4_anon}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{row1_anon, row3}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetAnonTest, OwnerAccessorAnon) {
@@ -104,10 +106,12 @@ TEST_F(GDPRForgetAnonTest, OwnerAccessorAnon) {
   std::string forget = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget, &conn), 3);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4_anon}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetAnonTest, MultipleColumnsAnon) {
@@ -149,10 +153,12 @@ TEST_F(GDPRForgetAnonTest, MultipleColumnsAnon) {
   std::string forget = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget, &conn), 3);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4_anon}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetAnonTest, TwoDistinctOwnersAnon) {
@@ -199,20 +205,24 @@ TEST_F(GDPRForgetAnonTest, TwoDistinctOwnersAnon) {
   // Validate anon on forget for patient with id 0.
   std::string forget1 = MakeGDPRForget("patient", "0");
   EXPECT_UPDATE(Execute(forget1, &conn), 9);
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("patient", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("patient", "5")), (V{row2}));
   EXPECT_EQ(db->GetShard("msg", SN("doctor", "0")), (V{row2, row1_anon}));
   EXPECT_EQ(db->GetShard("msg", SN("doctor", "5")), (V{row3_anon}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 
   // Validate anon on forget for doctor with id 5.
   std::string forget2 = MakeGDPRForget("doctor", "5");
   EXPECT_UPDATE(Execute(forget2, &conn), 5);
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("patient", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("patient", "5")), (V{row2}));
   EXPECT_EQ(db->GetShard("msg", SN("doctor", "0")), (V{row2, row1_anon}));
   EXPECT_EQ(db->GetShard("msg", SN("doctor", "5")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetAnonTest, TransitiveOwnershipAnon) {
@@ -266,10 +276,12 @@ TEST_F(GDPRForgetAnonTest, TransitiveOwnershipAnon) {
   // Validate anon on forget for user with id 0.
   std::string forget = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget, &conn), 15);
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")),
             (V{row4_anon, row6_anon, row7_anon}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetAnonTest, TransitiveAccessorshipAnon) {
@@ -321,9 +333,11 @@ TEST_F(GDPRForgetAnonTest, TransitiveAccessorshipAnon) {
   // Validate anon on forget for user with id 0.
   std::string forget = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget, &conn), 8);
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row7_anon}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetAnonTest, ComplexVariableOwnershipAnon) {
@@ -390,6 +404,7 @@ TEST_F(GDPRForgetAnonTest, ComplexVariableOwnershipAnon) {
   // Validate anon on forget for user with id 0.
   std::string forget = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget, &conn), 19);
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{grow1, grow2}));
   EXPECT_EQ(db->GetShard("files", SN("admin", "0")),
             (V{frow1_anon, frow2_anon}));
@@ -403,6 +418,7 @@ TEST_F(GDPRForgetAnonTest, ComplexVariableOwnershipAnon) {
   EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "5")), (V{farow1, farow2}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetAnonTest, ComplexVariableAccessorshipAnon) {
@@ -469,6 +485,7 @@ TEST_F(GDPRForgetAnonTest, ComplexVariableAccessorshipAnon) {
   // Validate anon on forget for user with id 5.
   std::string forget = MakeGDPRForget("user", "5");
   EXPECT_UPDATE(Execute(forget, &conn), 3);
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{grow1, grow2}));
   EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("admin", "0")), (V{}));
@@ -481,6 +498,7 @@ TEST_F(GDPRForgetAnonTest, ComplexVariableAccessorshipAnon) {
   EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "5")), (V{}));
+  db->RollbackTransaction();
 }
 
 }  // namespace sqlengine

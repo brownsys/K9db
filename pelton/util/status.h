@@ -27,7 +27,7 @@
 #define PANIC(status)                  \
   auto __PANIC_VAL(__LINE__) = status; \
   if (!__PANIC_VAL(__LINE__).ok())     \
-  LOG(FATAL) << __PANIC_VAL(__LINE__).getState()
+  LOG(FATAL) << __PANIC_VAL(__LINE__).ToString()
 
 #define __ASSIGN_OR_RETURN_VAR_NAME(arg) __ASSIGN_OR_RETURN_RESULT_##arg
 #define __ASSIGN_OR_RETURN_VAL(arg) __ASSIGN_OR_RETURN_VAR_NAME(arg)

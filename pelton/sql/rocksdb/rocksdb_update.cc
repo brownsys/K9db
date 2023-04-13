@@ -17,6 +17,10 @@ namespace rocks {
  */
 
 ResultSetAndStatus RocksdbSession::ExecuteUpdate(const sqlast::Update &sql) {
+  CHECK(this->write_txn_) << "Update called on read txn";
+  RocksdbWriteTransaction *txn =
+      reinterpret_cast<RocksdbWriteTransaction *>(this->txn_.get());
+
   const std::string &table_name = sql.table_name();
   const sqlast::BinaryExpression *const where = sql.GetWhereClause();
 
@@ -52,12 +56,12 @@ ResultSetAndStatus RocksdbSession::ExecuteUpdate(const sqlast::Update &sql) {
     }
 
     // Update indices.
-    table.IndexUpdate(element.shard, element.value, updated, this->txn_.get());
+    table.IndexUpdate(element.shard, element.value, updated, txn);
 
     // Update table.
     EncryptedValue envalue = this->conn_->encryption_.EncryptValue(
         element.shard, std::move(updated));
-    table.Put(element.key, envalue, this->txn_.get());
+    table.Put(element.key, envalue, txn);
   }
 
   return ResultSetAndStatus(SqlResultSet(schema, std::move(vec)), count);

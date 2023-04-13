@@ -45,8 +45,10 @@ TEST_F(InsertTest, UnshardedTable) {
   EXPECT_UPDATE(Execute(stmt4, &conn), 1);
 
   // Validate insertions.
+  db->BeginTransaction(false);
   sql::SqlResultSet r = db->GetShard("user", SN(DEFAULT_SHARD, DEFAULT_SHARD));
   EXPECT_EQ(r, (V{row1, row2, row3, row4}));
+  db->RollbackTransaction();
 }
 
 TEST_F(InsertTest, Datasubject) {
@@ -72,12 +74,14 @@ TEST_F(InsertTest, Datasubject) {
   EXPECT_UPDATE(Execute(stmt4, &conn), 1);
 
   // Validate insertions.
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("user", SN("user", "0")), (V{row1}));
   EXPECT_EQ(db->GetShard("user", SN("user", "1")), (V{row2}));
   EXPECT_EQ(db->GetShard("user", SN("user", "2")), (V{row3}));
   EXPECT_EQ(db->GetShard("user", SN("user", "5")), (V{row4}));
   EXPECT_EQ(db->GetShard("user", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("user", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(InsertTest, DirectTable) {
@@ -107,10 +111,12 @@ TEST_F(InsertTest, DirectTable) {
   EXPECT_UPDATE(Execute(addr3, &conn), 1);
 
   // Validate insertions.
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("addr", SN("user", "0")), (V{row1, row2}));
   EXPECT_EQ(db->GetShard("addr", SN("user", "5")), (V{row3}));
   EXPECT_EQ(db->GetShard("addr", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("addr", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(InsertTest, TransitiveTable) {
@@ -150,10 +156,12 @@ TEST_F(InsertTest, TransitiveTable) {
   EXPECT_UPDATE(Execute(num4, &conn), 1);
 
   // Validate insertions.
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("phones", SN("user", "0")), (V{row2, row3, row4}));
   EXPECT_EQ(db->GetShard("phones", SN("user", "5")), (V{row1}));
   EXPECT_EQ(db->GetShard("phones", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("phones", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(InsertTest, DeepTransitiveTable) {
@@ -205,10 +213,12 @@ TEST_F(InsertTest, DeepTransitiveTable) {
   EXPECT_UPDATE(Execute(deep5, &conn), 1);
 
   // Validate insertions.
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("deep", SN("user", "0")), (V{row1, row2, row4, row5}));
   EXPECT_EQ(db->GetShard("deep", SN("user", "5")), (V{row3}));
   EXPECT_EQ(db->GetShard("deep", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("deep", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 /*
@@ -306,10 +316,12 @@ TEST_F(InsertTest, TwoOwners) {
   EXPECT_UPDATE(Execute(msg4, &conn), 2);
 
   // Validate insertions.
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{row1, row2, row4}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{row1, row3}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(InsertTest, OwnerAccessor) {
@@ -344,10 +356,12 @@ TEST_F(InsertTest, OwnerAccessor) {
   EXPECT_UPDATE(Execute(msg4, &conn), 1);
 
   // Validate insertions.
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{row1, row2}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(InsertTest, ShardedDataSubject) {
@@ -379,11 +393,13 @@ TEST_F(InsertTest, ShardedDataSubject) {
   EXPECT_UPDATE(Execute(inv3, &conn), 2);
 
   // Validate insertions.
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("invited", SN("user", "0")), (V{row2, row3}));
   EXPECT_EQ(db->GetShard("invited", SN("user", "5")), (V{row1}));
   EXPECT_EQ(db->GetShard("invited", SN("invited", "0")), (V{row1}));
   EXPECT_EQ(db->GetShard("invited", SN("invited", "1")), (V{row2}));
   EXPECT_EQ(db->GetShard("invited", SN("invited", "5")), (V{row3}));
+  db->RollbackTransaction();
 }
 
 TEST_F(InsertTest, VariableOwnership) {
@@ -415,10 +431,12 @@ TEST_F(InsertTest, VariableOwnership) {
   EXPECT_UPDATE(Execute(grps2, &conn), 1);
 
   // Validate insertions.
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{}));
   EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)),
             (V{row1, row2}));
+  db->RollbackTransaction();
 
   // Associate groups with some users.
   auto &&[assoc1, a_] = MakeInsert("association", {"0", "0", "0"});
@@ -432,9 +450,11 @@ TEST_F(InsertTest, VariableOwnership) {
   EXPECT_UPDATE(Execute(assoc4, &conn), 1);
 
   // Validate move after insertion
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{row1, row2}));
   EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{row2}));
   EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(InsertTest, ComplexVariableOwnership) {
@@ -478,10 +498,12 @@ TEST_F(InsertTest, ComplexVariableOwnership) {
   EXPECT_UPDATE(Execute(grps2, &conn), 1);
 
   // Validate insertions.
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{grow1, grow2}));
   EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{}));
   EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 
   // Insert files and fassocs but not associated to any users.
   auto &&[f1, frow1] = MakeInsert("files", {"0", "0"});
@@ -494,17 +516,20 @@ TEST_F(InsertTest, ComplexVariableOwnership) {
   EXPECT_UPDATE(Execute(fa1, &conn), 2);
   EXPECT_UPDATE(Execute(fa2, &conn), 2);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{frow1, frow2}));
   EXPECT_EQ(db->GetShard("files", SN("user", "0")), (V{frow1, frow2}));
   EXPECT_EQ(db->GetShard("files", SN("user", "5")), (V{}));
   EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 
   // Associate everything with a user.
   auto &&[assoc1, a_] = MakeInsert("association", {"0", "1", "5"});
 
   EXPECT_UPDATE(Execute(assoc1, &conn), 6);
 
-  // Validate move after insertion
+  // Validate move after insertion.
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{grow1, grow2}));
   EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{frow1, frow2}));
   EXPECT_EQ(db->GetShard("fassoc", SN("admin", "0")), (V{farow1, farow2}));
@@ -516,6 +541,7 @@ TEST_F(InsertTest, ComplexVariableOwnership) {
   EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "5")), (V{farow1, farow2}));
+  db->RollbackTransaction();
 
   // Re-associating the same row with user doesn't yield deep recursive copies.
   auto &&[reassoc1, ra_] = MakeInsert("association", {"1", "1", "5"});
@@ -525,6 +551,7 @@ TEST_F(InsertTest, ComplexVariableOwnership) {
   EXPECT_UPDATE(Execute(reassoc2, &conn), 4);
 
   // Validate after reassociation.
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{grow1, grow2}));
   EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{frow1, frow2}));
   EXPECT_EQ(db->GetShard("fassoc", SN("admin", "0")), (V{farow1, farow2}));
@@ -536,6 +563,7 @@ TEST_F(InsertTest, ComplexVariableOwnership) {
   EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "0")), (V{farow1, farow2}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "5")), (V{farow1, farow2}));
+  db->RollbackTransaction();
 }
 
 }  // namespace sqlengine

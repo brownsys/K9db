@@ -94,7 +94,9 @@ TEST(TransactionTest, CommitTest) {
   // Create DB.
   std::unique_ptr<rocksdb::TransactionDB> db = InitializeDatabase();
   std::unique_ptr<rocksdb::ColumnFamilyHandle> cf = InitializeTable(db.get());
-  RocksdbTransaction txn(db.get());
+
+  RocksdbWriteTransaction txn(db.get());
+  RocksdbReadSnapshot snapshot(db.get());
 
   // Put some data.
   txn.Put(cf.get(), "k1", "v1");
@@ -106,6 +108,9 @@ TEST(TransactionTest, CommitTest) {
   EXPECT_TRUE(!Get(db.get(), cf.get(), "k1"));
   EXPECT_TRUE(!Get(db.get(), cf.get(), "k2"));
   EXPECT_TRUE(!Get(db.get(), cf.get(), "k3"));
+  EXPECT_TRUE(!snapshot.Get(cf.get(), "k1"));
+  EXPECT_TRUE(!snapshot.Get(cf.get(), "k2"));
+  EXPECT_TRUE(!snapshot.Get(cf.get(), "k3"));
 
   // However, data is readable via transaction (RYW).
   EXPECT_EQ(txn.Get(cf.get(), "k1"), "v1");
@@ -123,6 +128,11 @@ TEST(TransactionTest, CommitTest) {
   EXPECT_EQ(Get(db.get(), cf.get(), "k1"), "v1");
   EXPECT_EQ(Get(db.get(), cf.get(), "k2"), "v2");
   EXPECT_EQ(Get(db.get(), cf.get(), "k3"), "v3");
+
+  // But it is still unreadable with snapshot!
+  EXPECT_TRUE(!snapshot.Get(cf.get(), "k1"));
+  EXPECT_TRUE(!snapshot.Get(cf.get(), "k2"));
+  EXPECT_TRUE(!snapshot.Get(cf.get(), "k3"));
 }
 
 // Put, Get before committing, Rollback, Get after rolling back...
@@ -130,7 +140,8 @@ TEST(TransactionTest, RollbackTest) {
   // Create DB.
   std::unique_ptr<rocksdb::TransactionDB> db = InitializeDatabase();
   std::unique_ptr<rocksdb::ColumnFamilyHandle> cf = InitializeTable(db.get());
-  RocksdbTransaction txn(db.get());
+
+  RocksdbWriteTransaction txn(db.get());
 
   // Put some data.
   txn.Put(cf.get(), "k1", "v1");
@@ -194,7 +205,7 @@ TEST(TransactionTest, MixedTest) {
 
   // First thread.
   std::thread thread1([&]() {
-    RocksdbTransaction txn(db.get());
+    RocksdbWriteTransaction txn(db.get());
 
     // Barrier 1.
     sync1(1);
@@ -217,7 +228,7 @@ TEST(TransactionTest, MixedTest) {
 
   // Second thread.
   std::thread thread2([&]() {
-    RocksdbTransaction txn(db.get());
+    RocksdbWriteTransaction txn(db.get());
 
     // Barrier 1.
     sync2(1);

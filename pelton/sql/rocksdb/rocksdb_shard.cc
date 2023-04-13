@@ -15,7 +15,7 @@ namespace rocks {
 // Get records by shard + column value (PK or not).
 std::vector<dataflow::Record> RocksdbSession::GetDirect(
     const std::string &table_name, size_t column_index,
-    const std::vector<KeyPair> &keys, bool read) const {
+    const std::vector<KeyPair> &keys) const {
   const RocksdbTable &table = this->conn_->tables_.at(table_name);
   const dataflow::SchemaRef &schema = table.Schema();
 
@@ -32,9 +32,9 @@ std::vector<dataflow::Record> RocksdbSession::GetDirect(
       en_keys.push_back(this->conn_->encryption_.EncryptKey(std::move(key)));
     }
   } else {
-    RocksdbTable::IndexChoice plan = table.ChooseIndex(column_index);
-    CHECK(plan.type != RocksdbTable::IndexChoiceType::PK) << "UNREACHABLE";
-    CHECK(plan.type != RocksdbTable::IndexChoiceType::SCAN)
+    RocksdbPlan plan = table.ChooseIndex(column_index);
+    CHECK(plan.type() != RocksdbPlan::IndexChoiceType::PK) << "UNREACHABLE";
+    CHECK(plan.type() != RocksdbPlan::IndexChoiceType::SCAN)
         << "Get Direct on non-indexed column";
 
     // Encode shards and column values for index lookup.
@@ -48,7 +48,7 @@ std::vector<dataflow::Record> RocksdbSession::GetDirect(
         EncodeValues(schema.TypeOf(column_index), values);
 
     // Find index and lookup.
-    const RocksdbIndex &index = table.GetTableIndex(plan.idx);
+    const RocksdbIndex &index = table.GetTableIndex(plan.idx());
     IndexSet s = index.GetWithShards(std::move(shard_names), std::move(encoded),
                                      this->txn_.get());
     for (auto it = s.begin(); it != s.end();) {
@@ -61,7 +61,7 @@ std::vector<dataflow::Record> RocksdbSession::GetDirect(
 
   // Lookup using multiget.
   std::vector<std::optional<EncryptedValue>> en_rows =
-      table.MultiGet(en_keys, read, this->txn_.get());
+      table.MultiGet(en_keys, this->txn_.get());
 
   // Decrypt result.
   std::vector<dataflow::Record> result;
@@ -94,6 +94,10 @@ ResultSetAndStatus RocksdbSession::AssignToShards(
     const std::string &table_name, size_t column_index,
     const std::vector<sqlast::Value> &values,
     const std::unordered_set<util::ShardName> &targets) {
+  CHECK(this->write_txn_) << "AssignToShards called on read txn";
+  RocksdbWriteTransaction *txn =
+      reinterpret_cast<RocksdbWriteTransaction *>(this->txn_.get());
+
   util::ShardName default_shard(DEFAULT_SHARD, DEFAULT_SHARD);
   // Look up table info.
   RocksdbTable &table = this->conn_->tables_.at(table_name);
@@ -102,8 +106,7 @@ ResultSetAndStatus RocksdbSession::AssignToShards(
   // Find source then use the other API.
   sqlast::ValueMapper value_mapper(schema);
   value_mapper.AddValues(column_index, std::vector<sqlast::Value>(values));
-  std::optional<IndexSet> sources =
-      table.IndexLookup(&value_mapper, this->txn_.get());
+  std::optional<IndexSet> sources = table.IndexLookup(&value_mapper, txn);
   CHECK(sources.has_value()) << "Assign to shards with no index";
   if (sources->size() == 0) {
     return std::pair(sql::SqlResultSet(schema), 0);
@@ -163,8 +166,7 @@ ResultSetAndStatus RocksdbSession::AssignToShards(
   }
 
   // Lookup keys.
-  std::vector<std::optional<EncryptedValue>> rows =
-      table.MultiGet(enkeys, false, this->txn_.get());
+  std::vector<std::optional<EncryptedValue>> rows = table.MultiGet(enkeys, txn);
 
   // Copy/move the records as appropriate.
   int count = 0;
@@ -183,8 +185,8 @@ ResultSetAndStatus RocksdbSession::AssignToShards(
 
     // Need to delete row.
     if (data.del) {
-      table.IndexDelete(data.shard, row, this->txn_.get());
-      table.Delete(enkey, this->txn_.get());
+      table.IndexDelete(data.shard, row, txn);
+      table.Delete(enkey, txn);
       count++;
     }
 
@@ -204,8 +206,8 @@ ResultSetAndStatus RocksdbSession::AssignToShards(
             this->conn_->encryption_.EncryptValue(target.ByRef(), std::move(r));
 
         // Add to table.
-        table.IndexAdd(target.AsSlice(), row, this->txn_.get());
-        table.Put(target_enkey, target_envalue, this->txn_.get());
+        table.IndexAdd(target.AsSlice(), row, txn);
+        table.Put(target_enkey, target_envalue, txn);
         count++;
       }
     }
@@ -235,6 +237,10 @@ int RocksdbSession::DeleteFromShard(
     const std::string &table_name, const util::ShardName &shard_name,
     const std::vector<dataflow::Record> &records,
     const std::vector<bool> &move_to_default) {
+  CHECK(this->write_txn_) << "DeleteFromShard called on read txn";
+  RocksdbWriteTransaction *txn =
+      reinterpret_cast<RocksdbWriteTransaction *>(this->txn_.get());
+
   util::ShardName default_shard(DEFAULT_SHARD, DEFAULT_SHARD);
 
   // Look up table info.
@@ -255,13 +261,13 @@ int RocksdbSession::DeleteFromShard(
   // Delete all keys.
   int count = 0;
   for (size_t i = 0; i < records.size(); i++) {
-    table.IndexDelete(shard_name.AsSlice(), rows.at(i), this->txn_.get());
-    table.Delete(en_keys.at(i), this->txn_.get());
+    table.IndexDelete(shard_name.AsSlice(), rows.at(i), txn);
+    table.Delete(en_keys.at(i), txn);
     count++;
 
     // Move to default shard if appropriate.
     if (move_to_default.at(i)) {
-      table.IndexAdd(default_shard.AsSlice(), rows.at(i), this->txn_.get());
+      table.IndexAdd(default_shard.AsSlice(), rows.at(i), txn);
 
       // Encrypt record.
       RocksdbSequence key;
@@ -272,7 +278,7 @@ int RocksdbSession::DeleteFromShard(
       table.Put(this->conn_->encryption_.EncryptKey(std::move(key)),
                 this->conn_->encryption_.EncryptValue(default_shard.ByRef(),
                                                       std::move(rows.at(i))),
-                this->txn_.get());
+                txn);
       count++;
     }
   }

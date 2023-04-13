@@ -1,7 +1,4 @@
-// clang-format off
-// NOLINTNEXTLINE
 #include "pelton/sql/rocksdb/rocksdb_connection.h"
-// clang-format on
 
 #include "glog/logging.h"
 #include "pelton/util/status.h"
@@ -11,10 +8,7 @@ namespace pelton {
 namespace sql {
 namespace rocks {
 
-/*
- * Opening/closing a rocksdb connection.
- */
-
+// Open a database connection (on pelton start).
 void RocksdbConnection::Open(const std::string &db_name) {
 #ifdef PELTON_OPT
   std::string path = "/mnt/disks/my-ssd/pelton/" + db_name;
@@ -41,6 +35,7 @@ void RocksdbConnection::Open(const std::string &db_name) {
   this->db_ = std::unique_ptr<rocksdb::TransactionDB>(db);
 }
 
+// Close database connection (on pelton shutdown).
 void RocksdbConnection::Close() {
   this->tables_.clear();
   this->db_ = nullptr;

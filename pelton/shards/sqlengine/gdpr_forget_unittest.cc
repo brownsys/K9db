@@ -48,12 +48,14 @@ TEST_F(GDPRForgetTest, Datasubject) {
   std::string forget = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget, &conn), 1);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("user", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("user", SN("user", "1")), (V{row2}));
   EXPECT_EQ(db->GetShard("user", SN("user", "2")), (V{row3}));
   EXPECT_EQ(db->GetShard("user", SN("user", "5")), (V{row4}));
   EXPECT_EQ(db->GetShard("user", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("user", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetTest, DirectTable) {
@@ -86,10 +88,12 @@ TEST_F(GDPRForgetTest, DirectTable) {
   std::string forget = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget, &conn), 3);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("addr", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("addr", SN("user", "5")), (V{row3}));
   EXPECT_EQ(db->GetShard("addr", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("addr", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetTest, UnshardedTable) {
@@ -128,12 +132,14 @@ TEST_F(GDPRForgetTest, UnshardedTable) {
   std::string forget = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget, &conn), 3);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("addr", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("addr", SN("user", "5")), (V{row3}));
   EXPECT_EQ(db->GetShard("addr", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("addr", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetShard("unsharded", SN(DEFAULT_SHARD, DEFAULT_SHARD)),
             (V{row4, row5}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetTest, TransitiveTable) {
@@ -176,10 +182,12 @@ TEST_F(GDPRForgetTest, TransitiveTable) {
   std::string forget = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget, &conn), 6);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("phones", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("phones", SN("user", "5")), (V{row4}));
   EXPECT_EQ(db->GetShard("phones", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("phones", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetTest, DeepTransitiveTable) {
@@ -234,10 +242,12 @@ TEST_F(GDPRForgetTest, DeepTransitiveTable) {
   std::string forget = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget, &conn), 10);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("deep", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("deep", SN("user", "5")), (V{row3}));
   EXPECT_EQ(db->GetShard("deep", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("deep", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetTest, TwoOwners) {
@@ -275,19 +285,23 @@ TEST_F(GDPRForgetTest, TwoOwners) {
   std::string forget1 = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget1, &conn), 4);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{row1, row3}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 
   // Validate forget for user with id 10.
   std::string forget2 = MakeGDPRForget("user", "10");
   EXPECT_UPDATE(Execute(forget2, &conn), 3);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetTest, TwoOwnersDataflowUpdate) {
@@ -332,10 +346,12 @@ TEST_F(GDPRForgetTest, TwoOwnersDataflowUpdate) {
   std::string forget1 = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget1, &conn), 4);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{row1, row3}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 
   // Validate dataflow state after forget for user with id 0.
   EXPECT_EQ(Execute("SELECT * FROM v1;", &conn).ResultSets().at(0),
@@ -345,10 +361,12 @@ TEST_F(GDPRForgetTest, TwoOwnersDataflowUpdate) {
   std::string forget2 = MakeGDPRForget("user", "10");
   EXPECT_UPDATE(Execute(forget2, &conn), 3);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 
   // Validate dataflow state after forget for user with id 10.
   EXPECT_EQ(Execute("SELECT * FROM v1;", &conn).ResultSets().at(0),
@@ -393,10 +411,12 @@ TEST_F(GDPRForgetTest, OwnerAccessor) {
   std::string forget2 = MakeGDPRForget("user", "10");
   EXPECT_UPDATE(Execute(forget2, &conn), 1);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3, row4}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetTest, ShardedDataSubject) {
@@ -431,21 +451,25 @@ TEST_F(GDPRForgetTest, ShardedDataSubject) {
   std::string forget1 = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget1, &conn), 3);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("invited", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("invited", SN("user", "5")), (V{row1}));
   EXPECT_EQ(db->GetShard("invited", SN("invited", "0")), (V{row1}));
   EXPECT_EQ(db->GetShard("invited", SN("invited", "1")), (V{row2}));
   EXPECT_EQ(db->GetShard("invited", SN("invited", "5")), (V{row3}));
+  db->RollbackTransaction();
 
   // Validate forget of invited with id 1.
   std::string forget2 = MakeGDPRForget("invited", "1");
   EXPECT_UPDATE(Execute(forget2, &conn), 1);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("invited", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("invited", SN("user", "5")), (V{row1}));
   EXPECT_EQ(db->GetShard("invited", SN("invited", "0")), (V{row1}));
   EXPECT_EQ(db->GetShard("invited", SN("invited", "1")), (V{}));
   EXPECT_EQ(db->GetShard("invited", SN("invited", "5")), (V{row3}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetTest, VariableOwnership) {
@@ -491,17 +515,21 @@ TEST_F(GDPRForgetTest, VariableOwnership) {
   std::string forget1 = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget1, &conn), 5);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{row2}));
   EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 
   // Validate forget after the second forget.
   std::string forget2 = MakeGDPRForget("user", "5");
   EXPECT_UPDATE(Execute(forget2, &conn), 4);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("grps", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("grps", SN("user", "5")), (V{}));
   EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetTest, ComplexVariableOwnership) {
@@ -564,6 +592,7 @@ TEST_F(GDPRForgetTest, ComplexVariableOwnership) {
   std::string forget1 = MakeGDPRForget("user", "5");
   EXPECT_UPDATE(Execute(forget1, &conn), 7);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{grow1, grow2}));
   EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{frow1, frow2}));
   EXPECT_EQ(db->GetShard("fassoc", SN("admin", "0")), (V{farow1, farow2}));
@@ -575,11 +604,13 @@ TEST_F(GDPRForgetTest, ComplexVariableOwnership) {
   EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "5")), (V{}));
+  db->RollbackTransaction();
 
   // Validate second forget.
   std::string forget2 = MakeGDPRForget("admin", "0");
   EXPECT_UPDATE(Execute(forget2, &conn), 7);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{}));
   EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("admin", "0")), (V{}));
@@ -591,6 +622,7 @@ TEST_F(GDPRForgetTest, ComplexVariableOwnership) {
   EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "5")), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetTest, ComplexVariableOwnershipAdminDelete) {
@@ -653,6 +685,7 @@ TEST_F(GDPRForgetTest, ComplexVariableOwnershipAdminDelete) {
   std::string forget = MakeGDPRForget("admin", "0");
   EXPECT_UPDATE(Execute(forget, &conn), 7);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("grps", SN("admin", "0")), (V{}));
   EXPECT_EQ(db->GetShard("files", SN("admin", "0")), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("admin", "0")), (V{}));
@@ -664,6 +697,7 @@ TEST_F(GDPRForgetTest, ComplexVariableOwnershipAdminDelete) {
   EXPECT_EQ(db->GetShard("files", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("fassoc", SN("user", "5")), (V{farow1, farow2}));
+  db->RollbackTransaction();
 }
 
 }  // namespace sqlengine

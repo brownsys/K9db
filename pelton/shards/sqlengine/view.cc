@@ -49,7 +49,7 @@ absl::StatusOr<sql::SqlResult> CreateView(const sqlast::CreateView &stmt,
   std::vector<std::pair<std::string, std::vector<dataflow::Record>>> data;
 
   // Begin transaction (for reading tables content).
-  connection->session->BeginTransaction();
+  connection->session->BeginTransaction(false);
 
   // Iterate through each table in the new View's flow.
   dataflow::Future future(true);

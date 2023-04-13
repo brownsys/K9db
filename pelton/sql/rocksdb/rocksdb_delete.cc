@@ -26,6 +26,10 @@ RocksdbSession::DeleteRecord::DeleteRecord(std::string &&s, EncryptedKey &&k,
  */
 
 SqlDeleteSet RocksdbSession::ExecuteDelete(const sqlast::Delete &sql) {
+  CHECK(this->write_txn_) << "Delete called on read txn";
+  RocksdbWriteTransaction *txn =
+      reinterpret_cast<RocksdbWriteTransaction *>(this->txn_.get());
+
   const std::string &table_name = sql.table_name();
   const sqlast::BinaryExpression *const where = sql.GetWhereClause();
 
@@ -42,10 +46,10 @@ SqlDeleteSet RocksdbSession::ExecuteDelete(const sqlast::Delete &sql) {
   DedupMap<std::string> dedup_keys;
   for (DeleteRecord &element : records) {
     // Update indices.
-    table.IndexDelete(element.shard, element.value, this->txn_.get());
+    table.IndexDelete(element.shard, element.value, txn);
 
     // Delete record.
-    table.Delete(element.key, this->txn_.get());
+    table.Delete(element.key, txn);
 
     // Append record to result.
     if (!dedup_keys.Exists(element.value.At(pk_col).ToString())) {

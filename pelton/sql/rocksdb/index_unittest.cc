@@ -118,7 +118,7 @@ rocksdb::Slice shard2("shard2");
 // Does get and get_all get all data?
 TEST(RocksdbIndexTest, GetAll) {
   std::unique_ptr<rocksdb::TransactionDB> db = InitializeDatabase();
-  RocksdbTransaction txn(db.get());
+  RocksdbWriteTransaction txn(db.get());
 
   RocksdbIndex index(db.get(), "", {0});
   index.Add({z}, shard10, pk1, &txn);
@@ -127,12 +127,14 @@ TEST(RocksdbIndexTest, GetAll) {
 
   EXPECT_REQ(index.Get(V({z, o}), &txn),
              {{shard10, pk1}, {shard100, pk2}, {shard10, pk3}});
+
+  txn.Rollback();
 }
 
 // Does get work with non-existent shard names
 TEST(RocksdbIndexTest, GetNonExistent) {
   std::unique_ptr<rocksdb::TransactionDB> db = InitializeDatabase();
-  RocksdbTransaction txn(db.get());
+  RocksdbWriteTransaction txn(db.get());
 
   RocksdbIndex index(db.get(), "", {0});
   index.Add({z}, shard10, pk1, &txn);
@@ -140,12 +142,14 @@ TEST(RocksdbIndexTest, GetNonExistent) {
   index.Add({o}, shard10, pk3, &txn);
 
   EXPECT_REQ(index.Get(V({t}), &txn), {});
+
+  txn.Rollback();
 }
 
 // Some column Values passed to get and get_all are non-existent
 TEST(RocksdbIndexTest, GetSomeNonExistent) {
   std::unique_ptr<rocksdb::TransactionDB> db = InitializeDatabase();
-  RocksdbTransaction txn(db.get());
+  RocksdbWriteTransaction txn(db.get());
 
   RocksdbIndex index(db.get(), "", {0});
   index.Add({z}, shard10, pk1, &txn);
@@ -153,21 +157,25 @@ TEST(RocksdbIndexTest, GetSomeNonExistent) {
   index.Add({o}, shard10, pk3, &txn);
 
   EXPECT_REQ(index.Get(V({t, z}), &txn), {{shard10, pk1}, {shard100, pk2}});
+
+  txn.Rollback();
 }
 
 // Do get and get_all work if no data has been inserted yet?
 TEST(RocksdbIndexTest, NoData) {
   std::unique_ptr<rocksdb::TransactionDB> db = InitializeDatabase();
-  RocksdbTransaction txn(db.get());
+  RocksdbWriteTransaction txn(db.get());
 
   RocksdbIndex index(db.get(), "", {0});
   EXPECT_REQ(index.Get(V({z, o, t}), &txn), {});
+
+  txn.Rollback();
 }
 
 // Does get and all confuse entries where the values are swapped
 TEST(RocksdbIndexTest, SimpleGet) {
   std::unique_ptr<rocksdb::TransactionDB> db = InitializeDatabase();
-  RocksdbTransaction txn(db.get());
+  RocksdbWriteTransaction txn(db.get());
 
   RocksdbIndex index(db.get(), "", {0});
   index.Add({t}, shard1, pk1, &txn);  // value, shard name, key
@@ -205,12 +213,14 @@ TEST(RocksdbIndexTest, SimpleGet) {
                                                 {shard10, pk6},
                                                 {shard2, pk4},
                                                 {shard10, pk5}});
+
+  txn.Rollback();
 }
 
 // Does get and get_all work correctly right after delete
 TEST(RocksdbIndexTest, GetAfterDelete) {
   std::unique_ptr<rocksdb::TransactionDB> db = InitializeDatabase();
-  RocksdbTransaction txn(db.get());
+  RocksdbWriteTransaction txn(db.get());
 
   RocksdbIndex index(db.get(), "", {0});
   index.Add({t}, shard1, pk1, &txn);
@@ -238,12 +248,14 @@ TEST(RocksdbIndexTest, GetAfterDelete) {
   // All values.
   EXPECT_REQ(index.Get(V({t, z, o}), &txn),
              {{shard1, pk2}, {shard10, pk6}, {shard2, pk4}, {shard10, pk5}});
+
+  txn.Rollback();
 }
 
 // Get deduplicate truly deduplicates
 TEST(RocksdbIndexTest, GetDedup) {
   std::unique_ptr<rocksdb::TransactionDB> db = InitializeDatabase();
-  RocksdbTransaction txn(db.get());
+  RocksdbWriteTransaction txn(db.get());
 
   RocksdbIndex index(db.get(), "", {0});
   index.Add({t}, shard1, pk1, &txn);
@@ -274,6 +286,8 @@ TEST(RocksdbIndexTest, GetDedup) {
                                                   {{shard1, shard2}, pk2},
                                                   {{shard10}, pk5},
                                                   {{shard1}, pk4}});
+
+  txn.Rollback();
 }
 
 TEST(RocksdbIndexTest, CompositeIndex) {
@@ -282,7 +296,7 @@ TEST(RocksdbIndexTest, CompositeIndex) {
       dataflow::SchemaFactory::Create({"", ""}, {CType::INT, CType::INT}, {});
 
   std::unique_ptr<rocksdb::TransactionDB> db = InitializeDatabase();
-  RocksdbTransaction txn(db.get());
+  RocksdbWriteTransaction txn(db.get());
 
   RocksdbIndex index(db.get(), "composite", {0, 1});
   index.Add({z, z}, shard10, pk1, &txn);
@@ -325,12 +339,14 @@ TEST(RocksdbIndexTest, CompositeIndex) {
   EXPECT_REQ(index.GetWithShards(V({shard100, shard100, shard100}),
                                  V({{z, z}, {z, o}, {o, z}}), &txn),
              {{shard100, pk2}, {shard100, pk1}});
+
+  txn.Rollback();
 }
 
 // For PK indices.
 TEST(RocksdbPKIndex, GetAfterDelete) {
   std::unique_ptr<rocksdb::TransactionDB> db = InitializeDatabase();
-  RocksdbTransaction txn(db.get());
+  RocksdbWriteTransaction txn(db.get());
 
   RocksdbPKIndex index(db.get(), "");
   index.Add({pk1}, shard1, &txn);  // Gets deleted
@@ -368,11 +384,13 @@ TEST(RocksdbPKIndex, GetAfterDelete) {
                                                    {shard10, pk1},
                                                    {shard1, pk2},
                                                    {shard100, pk4}});
+
+  txn.Rollback();
 }
 
 TEST(RocksdbPKIndex, GetDedup) {
   std::unique_ptr<rocksdb::TransactionDB> db = InitializeDatabase();
-  RocksdbTransaction txn(db.get());
+  RocksdbWriteTransaction txn(db.get());
 
   RocksdbPKIndex index(db.get(), "");
   index.Add({pk1}, shard1, &txn);
@@ -398,11 +416,13 @@ TEST(RocksdbPKIndex, GetDedup) {
   EXPECT_DEQ(
       index.GetDedup(V({pk1, pk2, pk3}), &txn),
       {{{shard1, shard2}, pk1}, {{shard1}, pk2}, {{shard10, shard2}, pk3}});
+
+  txn.Rollback();
 }
 
 TEST(RocksdbPKIndex, CountShards) {
   std::unique_ptr<rocksdb::TransactionDB> db = InitializeDatabase();
-  RocksdbTransaction txn(db.get());
+  RocksdbWriteTransaction txn(db.get());
 
   RocksdbPKIndex index(db.get(), "");
   index.Add({pk1}, shard1, &txn);
@@ -424,6 +444,8 @@ TEST(RocksdbPKIndex, CountShards) {
             (std::vector<size_t>{2, 1, 2, 0}));
   EXPECT_EQ(index.CountShards(V({pk3, pk1, pk6, pk2}), &txn),
             (std::vector<size_t>{2, 2, 0, 1}));
+
+  txn.Rollback();
 }
 
 }  // namespace rocks
