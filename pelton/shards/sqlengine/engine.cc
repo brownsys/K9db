@@ -94,7 +94,7 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
           auto create_view_stmt = std::make_unique<sqlast::CreateView>(flow_name, sql);
           util::UniqueLock write_lock = connection->state->WriterLock();
           CHECK_STATUS(view::CreateView(*create_view_stmt, connection, &write_lock));
-          write_lock.unlock();
+
           // Select from view
           util::SharedLock read_lock = connection->state->ReaderLock();
           sqlast::Select select_view{flow_name};
