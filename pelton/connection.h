@@ -51,6 +51,9 @@ class State {
   void AddCanonicalStatement(const std::string &canonical,
                              prepared::CanonicalDescriptor &&descriptor);
 
+  // Manage backend views for selects that need flows
+  int GetBackendViewCount() const;
+  void IncrementBackendViewCount();
   // Statistics.
   sql::SqlResult FlowDebug(const std::string &view_name) const;
   sql::SqlResult SizeInMemory() const;
@@ -74,6 +77,8 @@ class State {
   // Lock for managing stmts_.
   mutable util::UpgradableMutex mtx_;
   mutable util::UpgradableMutex canonical_mtx_;
+  // Counter for Backend views created to handle selects which require views
+  int backend_view_count;
 };
 
 struct Connection {
