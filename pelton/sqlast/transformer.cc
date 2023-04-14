@@ -422,13 +422,6 @@ antlrcpp::Any AstTransformer::visitUpdate_stmt(
   return static_cast<std::unique_ptr<AbstractStatement>>(std::move(update));
 }
 
-// TODO: Actually parse join clause properly
-antlrcpp::Any AstTransformer::visitJoin_clause(
-    sqlparser::SQLiteParser::Join_clauseContext *ctx) {
-  CAST_REF(std::string, table_name, ctx->table_or_subquery(0)->accept(this));
-  return table_name;
-}
-
 // Select constructs.
 antlrcpp::Any AstTransformer::visitSelect_stmt(
     sqlparser::SQLiteParser::Select_stmtContext *ctx) {
@@ -457,20 +450,15 @@ antlrcpp::Any AstTransformer::visitSelect_stmt(
 antlrcpp::Any AstTransformer::visitSelect_core(
     sqlparser::SQLiteParser::Select_coreContext *ctx) {
   if (ctx->DISTINCT() != nullptr || ctx->ALL() != nullptr ||
-      ctx->GROUP() != nullptr || ctx->HAVING() != nullptr || 
-      ctx->WINDOW() != nullptr || ctx->VALUES() != nullptr) {
+      ctx->table_or_subquery().size() != 1 || ctx->GROUP() != nullptr ||
+      ctx->HAVING() != nullptr || ctx->WINDOW() != nullptr ||
+      ctx->VALUES() != nullptr) {
     return absl::InvalidArgumentError("Unsupported select modifiers");
   }
 
-  std::unique_ptr<Select> select;
   // Find the table name.
-  if (ctx->join_clause()!= nullptr){
-    CAST_REF(std::string, table_name, ctx->join_clause()->accept(this));
-    select = std::make_unique<Select>(table_name);
-  } else {
-    CAST_REF(std::string, table_name, ctx->table_or_subquery(0)->accept(this));
-    select = std::make_unique<Select>(table_name);
-  }
+  CAST_REF(std::string, table_name, ctx->table_or_subquery(0)->accept(this));
+  std::unique_ptr<Select> select = std::make_unique<Select>(table_name);
 
   for (auto *result_column_ctx : ctx->result_column()) {
     CAST_REF(Select::ResultColumn, column, result_column_ctx->accept(this));
@@ -806,6 +794,10 @@ antlrcpp::Any AstTransformer::visitPragma_value(
 }
 antlrcpp::Any AstTransformer::visitReindex_stmt(
     sqlparser::SQLiteParser::Reindex_stmtContext *ctx) {
+  return absl::InvalidArgumentError("Unsupported Syntax");
+}
+antlrcpp::Any AstTransformer::visitJoin_clause(
+    sqlparser::SQLiteParser::Join_clauseContext *ctx) {
   return absl::InvalidArgumentError("Unsupported Syntax");
 }
 antlrcpp::Any AstTransformer::visitFactored_select_stmt(

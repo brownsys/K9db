@@ -21,7 +21,6 @@ cc_library(
         ":update",
         ":view",
         "//pelton:connection",
-        "//pelton:prepared",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/shards:types",
