@@ -268,20 +268,24 @@ TEST_F(GDPRForgetAnonTest, TwoDistinctOwnersDelRow) {
   // Validate delete_row on forget for patient with id 0.
   std::string forget1 = MakeGDPRForget("patient", "0");
   EXPECT_UPDATE(Execute(forget1, &conn), 3);
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("patient", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("patient", "5")), (V{row2}));
   EXPECT_EQ(db->GetShard("msg", SN("doctor", "0")), (V{row2}));
   EXPECT_EQ(db->GetShard("msg", SN("doctor", "5")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 
   // Validate delete_row on forget for doctor with id 5.
   std::string forget2 = MakeGDPRForget("doctor", "5");
   EXPECT_UPDATE(Execute(forget2, &conn), 1);
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("patient", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("patient", "5")), (V{row2}));
   EXPECT_EQ(db->GetShard("msg", SN("doctor", "0")), (V{row2}));
   EXPECT_EQ(db->GetShard("msg", SN("doctor", "5")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetAnonTest, OwnerAccessorDelRow) {
@@ -321,10 +325,12 @@ TEST_F(GDPRForgetAnonTest, OwnerAccessorDelRow) {
   std::string forget = MakeGDPRForget("user", "0");
   EXPECT_UPDATE(Execute(forget, &conn), 3);
 
+  db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("msg", SN("user", "0")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "5")), (V{row3}));
   EXPECT_EQ(db->GetShard("msg", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("msg", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
 }
 
 TEST_F(GDPRForgetAnonTest, TransitiveOwnershipAnon) {
