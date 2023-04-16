@@ -24,14 +24,13 @@ using RecordAndStatus = std::pair<std::optional<dataflow::Record>, int>;
 using ResultSetAndStatus = std::pair<SqlResultSet, int>;
 using KeyPair = std::pair<util::ShardName, sqlast::Value>;
 
-// A session provides atomic writes/reads.
 class Session {
  public:
   Session() = default;
   virtual ~Session() = default;
 
   // Commit and rollback.
-  virtual void BeginTransaction() = 0;
+  virtual void BeginTransaction(bool write) = 0;
   virtual void CommitTransaction() = 0;
   virtual void RollbackTransaction() = 0;
 
@@ -66,7 +65,7 @@ class Session {
   // Shard operations.
   virtual std::vector<dataflow::Record> GetDirect(
       const std::string &table_name, size_t column_index,
-      const std::vector<KeyPair> &keys, bool read) const = 0;
+      const std::vector<KeyPair> &keys) const = 0;
 
   virtual ResultSetAndStatus AssignToShards(
       const std::string &table_name, size_t column_index,
@@ -84,6 +83,8 @@ class Session {
 };
 
 // Singular connection to the underyling database, which can open many sessions.
+// Operations here have no concurrency control. Instead, they rely on global
+// locking. These are schema operations.
 class Connection {
  public:
   Connection() = default;

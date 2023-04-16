@@ -60,7 +60,7 @@ std::vector<T> RocksdbSession::GetRecords(
 
     // Multi Lookup by encrypted keys.
     std::vector<std::optional<EncryptedValue>> envalues =
-        table.MultiGet(keys, Tselect, this->txn_.get());
+        table.MultiGet(keys, this->txn_.get());
 
     // Decrypt all values.
     for (size_t i = 0; i < envalues.size(); i++) {
@@ -90,6 +90,9 @@ std::vector<T> RocksdbSession::GetRecords(
     DedupSet<std::string> dup_keys;
     for (auto [enkey, enval] : all) {
       EncryptedKey enkey_copy = enkey;
+      if (limit != -1 && records.size() == static_cast<size_t>(limit)) {
+        break;
+      }
 
       // Decrypt key.
       RocksdbSequence key =
@@ -108,10 +111,6 @@ std::vector<T> RocksdbSession::GetRecords(
         } else if constexpr (Tdelete) {
           records.emplace_back(std::move(shard), std::move(enkey_copy),
                                std::move(value), std::move(record));
-        }
-
-        if (limit != -1 && records.size() == limit) {
-          break;
         }
       }
     }

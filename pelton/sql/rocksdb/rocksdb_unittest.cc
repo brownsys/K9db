@@ -183,7 +183,7 @@ class GlobalTestState {
 
   void InsertData() {
     auto session = this->conn_->OpenSession();
-    session->BeginTransaction();
+    session->BeginTransaction(true);
     // Insert into table.
     sqlast::Insert insert("test_table");
     insert.SetValues({SQL("0"), SQL("'user1'"), SQL("20")});
@@ -223,7 +223,7 @@ class RocksdbConnectionTest : public ::testing::Test {
       STATE = std::make_unique<GlobalTestState>();
     }
     this->session = STATE->conn_->OpenSession();
-    this->session->BeginTransaction();
+    this->session->BeginTransaction(true);
     CHECK_LE(COUNT, 20u);
   }
 

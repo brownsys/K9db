@@ -33,7 +33,7 @@ class IndexPrefixTransform : public rocksdb::SliceTransform {
 
 // Helper: avoids writing the Get code twice for regular and dedup lookups.
 template <typename T, typename R, bool shards_specified = false>
-T GetHelper(rocksdb::DB *db, const RocksdbTransaction *txn,
+T GetHelper(rocksdb::DB *db, const RocksdbInterface *txn,
             rocksdb::ColumnFamilyHandle *handle,
             std::vector<std::string> &&values,
             std::vector<std::string> &&shards = {}, int limit = -1) {
@@ -64,6 +64,10 @@ T GetHelper(rocksdb::DB *db, const RocksdbTransaction *txn,
     const std::string &value = values.at(i);
     rocksdb::Slice pslice(value);
     for (it->Seek(pslice); it->Valid(); it->Next()) {
+      if (limit != -1 && result.size() == static_cast<size_t>(limit)) {
+        return result;
+      }
+
       R record(it->key());
       if constexpr (shards_specified) {
         if (record.GetShard() == shards.at(i)) {
@@ -71,9 +75,6 @@ T GetHelper(rocksdb::DB *db, const RocksdbTransaction *txn,
         }
       } else {
         result.emplace(record.TargetKey());
-      }
-      if (limit != -1 && result.size() == limit) {
-        return result;
       }
     }
   }
@@ -107,7 +108,7 @@ RocksdbIndex::RocksdbIndex(rocksdb::DB *db, const std::string &table_name,
 // Adding things to index.
 void RocksdbIndex::Add(const std::vector<rocksdb::Slice> &values,
                        const rocksdb::Slice &shard_name,
-                       const rocksdb::Slice &pk, RocksdbTransaction *txn) {
+                       const rocksdb::Slice &pk, RocksdbWriteTransaction *txn) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
   IRecord e(values, shard_name, pk);
   txn->Put(handle, e.Data(), "");
@@ -116,7 +117,8 @@ void RocksdbIndex::Add(const std::vector<rocksdb::Slice> &values,
 // Deleting things from index.
 void RocksdbIndex::Delete(const std::vector<rocksdb::Slice> &values,
                           const rocksdb::Slice &shard_name,
-                          const rocksdb::Slice &pk, RocksdbTransaction *txn) {
+                          const rocksdb::Slice &pk,
+                          RocksdbWriteTransaction *txn) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
   IRecord e(values, shard_name, pk);
   txn->Delete(handle, e.Data());
@@ -156,12 +158,12 @@ std::vector<std::string> RocksdbIndex::EncodeComposite(
 
 // Get by value.
 IndexSet RocksdbIndex::Get(std::vector<std::string> &&v,
-                           const RocksdbTransaction *txn, int limit) const {
+                           const RocksdbInterface *txn, int limit) const {
   return GetHelper<IndexSet, IRecord>(this->db_, txn, this->handle_.get(),
                                       std::move(v), {}, limit);
 }
 DedupIndexSet RocksdbIndex::GetDedup(std::vector<std::string> &&v,
-                                     const RocksdbTransaction *txn,
+                                     const RocksdbInterface *txn,
                                      int limit) const {
   return GetHelper<DedupIndexSet, IRecord>(this->db_, txn, this->handle_.get(),
                                            std::move(v), {}, limit);
@@ -169,7 +171,7 @@ DedupIndexSet RocksdbIndex::GetDedup(std::vector<std::string> &&v,
 
 IndexSet RocksdbIndex::GetWithShards(std::vector<std::string> &&shards,
                                      std::vector<std::string> &&values,
-                                     const RocksdbTransaction *txn) const {
+                                     const RocksdbInterface *txn) const {
   return GetHelper<IndexSet, IRecord, true>(this->db_, txn, this->handle_.get(),
                                             std::move(values),
                                             std::move(shards));
@@ -196,7 +198,7 @@ RocksdbPKIndex::RocksdbPKIndex(rocksdb::DB *db, const std::string &table_name)
 // Adding things to index.
 void RocksdbPKIndex::Add(const rocksdb::Slice &pk_value,
                          const rocksdb::Slice &shard_name,
-                         RocksdbTransaction *txn) {
+                         RocksdbWriteTransaction *txn) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
   std::optional<std::string> str = txn->Get(handle, pk_value);
   if (str.has_value()) {
@@ -213,7 +215,7 @@ void RocksdbPKIndex::Add(const rocksdb::Slice &pk_value,
 // Deleting things from index.
 void RocksdbPKIndex::Delete(const rocksdb::Slice &pk_value,
                             const rocksdb::Slice &shard_name,
-                            RocksdbTransaction *txn) {
+                            RocksdbWriteTransaction *txn) {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
   std::optional<std::string> str = txn->Get(handle, pk_value);
   if (str.has_value()) {
@@ -227,17 +229,17 @@ void RocksdbPKIndex::Delete(const rocksdb::Slice &pk_value,
   }
 }
 
-// Atomic unique check that also locks record.
-bool RocksdbPKIndex::CheckUniqueAndLock(const rocksdb::Slice &pk,
-                                        const RocksdbTransaction *txn) const {
+// Check whether PK exists or not and lock it (atomic)!
+bool RocksdbPKIndex::Exists(const rocksdb::Slice &pk,
+                            const RocksdbWriteTransaction *txn) const {
   rocksdb::ColumnFamilyHandle *handle = this->handle_.get();
-  std::optional<std::string> result = txn->GetForUpdate(handle, pk);
+  std::optional<std::string> result = txn->Get(handle, pk);
   return result.has_value();
 }
 
 // Get by value.
 IndexSet RocksdbPKIndex::Get(std::vector<std::string> &&v,
-                             const RocksdbTransaction *txn) const {
+                             const RocksdbInterface *txn) const {
   std::vector<rocksdb::Slice> slices;
   slices.reserve(v.size());
   for (const std::string &str : v) {
@@ -263,7 +265,7 @@ IndexSet RocksdbPKIndex::Get(std::vector<std::string> &&v,
   return set;
 }
 DedupIndexSet RocksdbPKIndex::GetDedup(std::vector<std::string> &&v,
-                                       const RocksdbTransaction *txn) const {
+                                       const RocksdbInterface *txn) const {
   std::vector<rocksdb::Slice> slices;
   slices.reserve(v.size());
   for (const std::string &str : v) {
@@ -292,7 +294,7 @@ DedupIndexSet RocksdbPKIndex::GetDedup(std::vector<std::string> &&v,
 
 // Count how many shard each pk value is in.
 std::vector<size_t> RocksdbPKIndex::CountShards(
-    std::vector<std::string> &&pk_values, const RocksdbTransaction *txn) const {
+    std::vector<std::string> &&pk_values, const RocksdbInterface *txn) const {
   std::vector<rocksdb::Slice> slices;
   slices.reserve(pk_values.size());
   for (const std::string &str : pk_values) {

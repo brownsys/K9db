@@ -25,7 +25,7 @@ class ValueMapper : public AbstractVisitor<void> {
   bool HasValues(size_t col_idx) const {
     return this->values_.count(col_idx) == 1;
   }
-  bool HasValues(const std::vector<size_t> &cols) {
+  bool HasValues(const std::vector<size_t> &cols) const {
     for (size_t i = 0; i < cols.size(); i++) {
       if (this->values_.count(cols.at(i)) == 0) {
         return false;

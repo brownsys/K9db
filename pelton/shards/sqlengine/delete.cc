@@ -94,7 +94,7 @@ absl::StatusOr<int> DeleteContext::DeleteDependents(
 
     // Get records.
     std::vector<dataflow::Record> next_records =
-        this->db_->GetDirect(next_table, nextidx, vals, false);
+        this->db_->GetDirect(next_table, nextidx, vals);
     ASSERT_RET(!direct || next_records.size() == 0, Internal,
                "Cannot delete data subject with data. use GDPR FORGET");
 
@@ -141,7 +141,7 @@ absl::StatusOr<int> DeleteContext::DeleteDependents(
  */
 absl::StatusOr<sql::SqlResult> DeleteContext::Exec() {
   // Begin the transaction.
-  this->db_->BeginTransaction();
+  this->db_->BeginTransaction(true);
 
   // Perform all rocksb operations within the transaction.
   MOVE_OR_RETURN(DeleteContext::Result result, this->ExecWithinTransaction());

@@ -79,8 +79,8 @@ std::vector<RocksdbSequence> DecryptStream(const EncryptionManager &enc,
 TEST(TableTest, PutExistsGetDelete) {
   // Create DB.
   std::unique_ptr<rocksdb::TransactionDB> db = InitializeDatabase();
-  std::unique_ptr<RocksdbTransaction> txn =
-      std::make_unique<RocksdbTransaction>(db.get());
+  std::unique_ptr<RocksdbWriteTransaction> txn =
+      std::make_unique<RocksdbWriteTransaction>(db.get());
 
   // Create a dummy encryption manager.
   EncryptionManager enc;
@@ -106,7 +106,7 @@ TEST(TableTest, PutExistsGetDelete) {
 
   // Commit sometimes but not others (to test RYW).
   txn->Commit();
-  txn = std::make_unique<RocksdbTransaction>(db.get());
+  txn = std::make_unique<RocksdbWriteTransaction>(db.get());
 
   // Encrypt.
 
@@ -131,18 +131,18 @@ TEST(TableTest, PutExistsGetDelete) {
   EXPECT_FALSE(tbl.Exists("50", txn.get()));
 
   // Read.
-  RocksdbSequence r1 = enc.DecryptValue("usr0", *tbl.Get(e1, true, txn.get()));
-  RocksdbSequence r2 = enc.DecryptValue("usr1", *tbl.Get(e2, true, txn.get()));
-  RocksdbSequence r3 = enc.DecryptValue("usr2", *tbl.Get(e3, true, txn.get()));
-  RocksdbSequence r4 = enc.DecryptValue("usr0", *tbl.Get(e4, true, txn.get()));
+  RocksdbSequence r1 = enc.DecryptValue("usr0", *tbl.Get(e1, txn.get()));
+  RocksdbSequence r2 = enc.DecryptValue("usr1", *tbl.Get(e2, txn.get()));
+  RocksdbSequence r3 = enc.DecryptValue("usr2", *tbl.Get(e3, txn.get()));
+  RocksdbSequence r4 = enc.DecryptValue("usr0", *tbl.Get(e4, txn.get()));
 
   // Check correctness.
   EXPECT_EQ(v1.Data(), r1.Data());
   EXPECT_EQ(v2.Data(), r2.Data());
   EXPECT_EQ(v3.Data(), r3.Data());
   EXPECT_EQ(v4.Data(), r4.Data());
-  EXPECT_FALSE(tbl.Get(e5, true, txn.get()).has_value());
-  EXPECT_FALSE(tbl.Get(e6, true, txn.get()).has_value());
+  EXPECT_FALSE(tbl.Get(e5, txn.get()).has_value());
+  EXPECT_FALSE(tbl.Get(e6, txn.get()).has_value());
 
   // Check that stream gives us correct data.
   std::vector<RocksdbSequence> rows = DecryptStream(enc, tbl.GetAll(txn.get()));
@@ -160,7 +160,7 @@ TEST(TableTest, PutExistsGetDelete) {
 
   // Commit sometimes but not others (to test RYW).
   txn->Commit();
-  txn = std::make_unique<RocksdbTransaction>(db.get());
+  txn = std::make_unique<RocksdbWriteTransaction>(db.get());
 
   // Check exists.
   EXPECT_TRUE(tbl.Exists("10", txn.get()));
@@ -170,16 +170,16 @@ TEST(TableTest, PutExistsGetDelete) {
   EXPECT_FALSE(tbl.Exists("50", txn.get()));
 
   // Read.
-  RocksdbSequence d1 = enc.DecryptValue("usr0", *tbl.Get(e1, true, txn.get()));
-  RocksdbSequence d4 = enc.DecryptValue("usr0", *tbl.Get(e4, true, txn.get()));
+  RocksdbSequence d1 = enc.DecryptValue("usr0", *tbl.Get(e1, txn.get()));
+  RocksdbSequence d4 = enc.DecryptValue("usr0", *tbl.Get(e4, txn.get()));
 
   // Check correctness.
   EXPECT_EQ(v1.Data(), d1.Data());
-  EXPECT_FALSE(tbl.Get(e2, true, txn.get()).has_value());
-  EXPECT_FALSE(tbl.Get(e3, true, txn.get()).has_value());
+  EXPECT_FALSE(tbl.Get(e2, txn.get()).has_value());
+  EXPECT_FALSE(tbl.Get(e3, txn.get()).has_value());
   EXPECT_EQ(v4.Data(), d4.Data());
-  EXPECT_FALSE(tbl.Get(e5, true, txn.get()).has_value());
-  EXPECT_FALSE(tbl.Get(e6, true, txn.get()).has_value());
+  EXPECT_FALSE(tbl.Get(e5, txn.get()).has_value());
+  EXPECT_FALSE(tbl.Get(e6, txn.get()).has_value());
 
   // Check that stream gives us correct data.
   rows = DecryptStream(enc, tbl.GetAll(txn.get()));
@@ -187,6 +187,8 @@ TEST(TableTest, PutExistsGetDelete) {
   EXPECT_EQ(std::find(rows.begin(), rows.end(), v2), rows.end());
   EXPECT_EQ(std::find(rows.begin(), rows.end(), v3), rows.end());
   EXPECT_NE(std::find(rows.begin(), rows.end(), v4), rows.end());
+
+  txn->Rollback();
 }
 
 }  // namespace rocks

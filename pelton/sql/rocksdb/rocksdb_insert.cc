@@ -20,15 +20,23 @@ namespace rocks {
 
 bool RocksdbSession::Exists(const std::string &table_name,
                             const sqlast::Value &pk) const {
+  CHECK(this->write_txn_) << "Exists called on read txn";
+  RocksdbWriteTransaction *txn =
+      reinterpret_cast<RocksdbWriteTransaction *>(this->txn_.get());
+
   CHECK(!pk.IsNull()) << "PK is NULL";
   const RocksdbTable &table = this->conn_->tables_.at(table_name);
   size_t pk_index = table.Schema().keys().front();
   std::string pk_value = EncodeValue(table.Schema().TypeOf(pk_index), pk);
-  return table.Exists(pk_value, this->txn_.get());
+  return table.Exists(pk_value, txn);
 }
 
 int RocksdbSession::ExecuteInsert(const sqlast::Insert &stmt,
                                   const util::ShardName &shard_name) {
+  CHECK(this->write_txn_) << "Insert called on read txn";
+  RocksdbWriteTransaction *txn =
+      reinterpret_cast<RocksdbWriteTransaction *>(this->txn_.get());
+
   // Read table metadata.
   const std::string &table_name = stmt.table_name();
   RocksdbTable &table = this->conn_->tables_.at(table_name);
@@ -37,11 +45,8 @@ int RocksdbSession::ExecuteInsert(const sqlast::Insert &stmt,
   // Encode row.
   RocksdbRecord record = RocksdbRecord::FromInsert(stmt, schema, shard_name);
 
-  // Ensure PK is unique.
-  // CHECK(!table.Exists(record.GetPK())) << "Integrity error: PK exists";
-
   // Update indices.
-  table.IndexAdd(shard_name.AsSlice(), record.Value(), this->txn_.get());
+  table.IndexAdd(shard_name.AsSlice(), record.Value(), txn);
 
   // Encrypt key and record value.
   EncryptedKey key =
@@ -50,7 +55,7 @@ int RocksdbSession::ExecuteInsert(const sqlast::Insert &stmt,
       shard_name.ByRef(), std::move(record.Value()));
 
   // Write to DB.
-  table.Put(key, value, this->txn_.get());
+  table.Put(key, value, txn);
 
   // Done.
   return 1;
@@ -62,6 +67,10 @@ int RocksdbSession::ExecuteInsert(const sqlast::Insert &stmt,
 
 RecordAndStatus RocksdbSession::ExecuteReplace(
     const sqlast::Replace &stmt, const util::ShardName &shard_name) {
+  CHECK(this->write_txn_) << "Replace called on read txn";
+  RocksdbWriteTransaction *txn =
+      reinterpret_cast<RocksdbWriteTransaction *>(this->txn_.get());
+
   // Read table metadata.
   const std::string &table_name = stmt.table_name();
   RocksdbTable &table = this->conn_->tables_.at(table_name);
@@ -81,7 +90,7 @@ RecordAndStatus RocksdbSession::ExecuteReplace(
   int same_shard_index = -1;
   std::vector<std::string> shards;
   std::vector<EncryptedKey> enkeys;
-  IndexSet set = table.GetPKIndex().Get(std::move(pkstr), this->txn_.get());
+  IndexSet set = table.GetPKIndex().Get(std::move(pkstr), txn);
   for (auto it = set.begin(); it != set.end();) {
     auto node = set.extract(it++);
     RocksdbIndexRecord &key = node.value();
@@ -94,7 +103,7 @@ RecordAndStatus RocksdbSession::ExecuteReplace(
 
   // Lookup any existing records.
   std::vector<std::optional<EncryptedValue>> envalues =
-      table.MultiGet(enkeys, false, this->txn_.get());
+      table.MultiGet(enkeys, txn);
   for (size_t i = 0; i < envalues.size(); i++) {
     std::optional<EncryptedValue> &opt = envalues.at(i);
     if (opt.has_value()) {
@@ -112,10 +121,10 @@ RecordAndStatus RocksdbSession::ExecuteReplace(
       // indices if they exist.
       if (static_cast<int>(i) != same_shard_index) {
         count++;
-        table.IndexDelete(shard, value, this->txn_.get());
-        table.Delete(enkeys.at(i), this->txn_.get());
+        table.IndexDelete(shard, value, txn);
+        table.Delete(enkeys.at(i), txn);
       } else {
-        table.IndexDelete(shard, value, this->txn_.get(), false);
+        table.IndexDelete(shard, value, txn, false);
       }
     }
   }
@@ -124,7 +133,7 @@ RecordAndStatus RocksdbSession::ExecuteReplace(
   RocksdbRecord record = RocksdbRecord::FromInsert(stmt, schema, shard_name);
 
   // We do not need to update PK index if an existing record had the same shard.
-  table.IndexAdd(shard_name.AsSlice(), record.Value(), this->txn_.get(),
+  table.IndexAdd(shard_name.AsSlice(), record.Value(), txn,
                  same_shard_index == -1);
 
   // Encrypt record key and value.
@@ -136,7 +145,7 @@ RecordAndStatus RocksdbSession::ExecuteReplace(
       shard_name.ByRef(), std::move(record.Value()));
 
   // Write to DB.
-  table.Put(key, value, this->txn_.get());
+  table.Put(key, value, txn);
   count++;
 
   // Done.

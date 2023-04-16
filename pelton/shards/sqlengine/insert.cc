@@ -249,7 +249,7 @@ absl::StatusOr<int> InsertContext::CopyDependents(
  */
 absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
   // Begin the transaction.
-  this->db_->BeginTransaction();
+  this->db_->BeginTransaction(true);
 
   // Perform all rocksb operations within the transaction.
   MOVE_OR_RETURN(InsertContext::Result result, this->ExecWithinTransaction());

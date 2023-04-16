@@ -30,24 +30,24 @@ class RocksdbIndex {
   // key is the value of 'id' (the PK) without a shard prefix.
   void Add(const std::vector<rocksdb::Slice> &index_values,
            const rocksdb::Slice &shard_name, const rocksdb::Slice &pk,
-           RocksdbTransaction *txn);
+           RocksdbWriteTransaction *txn);
   void Delete(const std::vector<rocksdb::Slice> &index_values,
               const rocksdb::Slice &shard_name, const rocksdb::Slice &pk,
-              RocksdbTransaction *txn);
+              RocksdbWriteTransaction *txn);
 
   // Use to encode condition values for composite index.
   std::vector<std::string> EncodeComposite(
       sqlast::ValueMapper *vm, const dataflow::SchemaRef &schema) const;
 
   // Get the shard and pk of matching records for given values.
-  IndexSet Get(std::vector<std::string> &&values, const RocksdbTransaction *txn,
+  IndexSet Get(std::vector<std::string> &&values, const RocksdbInterface *txn,
                int limit = -1) const;
   DedupIndexSet GetDedup(std::vector<std::string> &&values,
-                         const RocksdbTransaction *txn, int limit = -1) const;
+                         const RocksdbInterface *txn, int limit = -1) const;
 
   IndexSet GetWithShards(std::vector<std::string> &&shards,
                          std::vector<std::string> &&values,
-                         const RocksdbTransaction *txn) const;
+                         const RocksdbInterface *txn) const;
 
   // Get the columns over which this index is defined.
   const std::vector<size_t> &GetColumns() const { return this->columns_; }
@@ -66,22 +66,23 @@ class RocksdbPKIndex {
 
   // Updating.
   void Add(const rocksdb::Slice &pk, const rocksdb::Slice &shard_name,
-           RocksdbTransaction *txn);
+           RocksdbWriteTransaction *txn);
   void Delete(const rocksdb::Slice &pk, const rocksdb::Slice &shard_name,
-              RocksdbTransaction *txn);
+              RocksdbWriteTransaction *txn);
 
-  // Reading.
-  bool CheckUniqueAndLock(const rocksdb::Slice &slice,
-                          const RocksdbTransaction *txn) const;
+  // Check whether PK exists or not and lock it (atomic)!
+  bool Exists(const rocksdb::Slice &slice,
+              const RocksdbWriteTransaction *txn) const;
 
+  // Reads.
   IndexSet Get(std::vector<std::string> &&pk_values,
-               const RocksdbTransaction *txn) const;
+               const RocksdbInterface *txn) const;
   DedupIndexSet GetDedup(std::vector<std::string> &&pk_values,
-                         const RocksdbTransaction *txn) const;
+                         const RocksdbInterface *txn) const;
 
   // Count how many shard each pk value is in.
   std::vector<size_t> CountShards(std::vector<std::string> &&pk_values,
-                                  const RocksdbTransaction *txn) const;
+                                  const RocksdbInterface *txn) const;
 
  private:
   rocksdb::DB *db_;

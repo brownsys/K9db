@@ -15,15 +15,25 @@ std::unique_ptr<Session> RocksdbConnection::OpenSession() {
   return std::make_unique<RocksdbSession>(this);
 }
 
-void RocksdbSession::BeginTransaction() {
-  this->txn_ = std::make_unique<RocksdbTransaction>(this->conn_->db_.get());
+void RocksdbSession::BeginTransaction(bool write) {
+  this->write_txn_ = write;
+  rocksdb::TransactionDB *db = this->conn_->db_.get();
+  if (write) {
+    this->txn_ = std::make_unique<RocksdbWriteTransaction>(db);
+  } else {
+    this->txn_ = std::make_unique<RocksdbReadSnapshot>(db);
+  }
 }
 void RocksdbSession::CommitTransaction() {
-  this->txn_->Commit();
+  if (this->write_txn_) {
+    reinterpret_cast<RocksdbWriteTransaction *>(this->txn_.get())->Commit();
+  }
   this->txn_ = nullptr;
 }
 void RocksdbSession::RollbackTransaction() {
-  this->txn_->Rollback();
+  if (this->write_txn_) {
+    reinterpret_cast<RocksdbWriteTransaction *>(this->txn_.get())->Rollback();
+  }
   this->txn_ = nullptr;
 }
 

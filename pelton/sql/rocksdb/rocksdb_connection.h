@@ -65,12 +65,12 @@ class RocksdbSession : public Session {
  public:
   // Constructor + destructor.
   explicit RocksdbSession(RocksdbConnection *connection)
-      : conn_(connection), txn_(nullptr) {}
+      : conn_(connection), write_txn_(false), txn_(nullptr) {}
 
   ~RocksdbSession() = default;
 
   // Commit or rollback.
-  void BeginTransaction() override;
+  void BeginTransaction(bool write) override;
   void CommitTransaction() override;
   void RollbackTransaction() override;
 
@@ -103,10 +103,9 @@ class RocksdbSession : public Session {
                         util::ShardName &&shard_name) const override;
 
   // Shard-based operations for copying/moving/deleting records.
-  std::vector<dataflow::Record> GetDirect(const std::string &table_name,
-                                          size_t column_index,
-                                          const std::vector<KeyPair> &keys,
-                                          bool read) const override;
+  std::vector<dataflow::Record> GetDirect(
+      const std::string &table_name, size_t column_index,
+      const std::vector<KeyPair> &keys) const override;
 
   ResultSetAndStatus AssignToShards(
       const std::string &table_name, size_t column_index,
@@ -125,7 +124,8 @@ class RocksdbSession : public Session {
  private:
   // The parent connection.
   RocksdbConnection *conn_;
-  std::unique_ptr<RocksdbTransaction> txn_;
+  bool write_txn_;
+  std::unique_ptr<RocksdbInterface> txn_;
 
   // The possible types the helper function below can return.
   using SelectRecord = dataflow::Record;

@@ -30,7 +30,7 @@ bool ReplaceContext::CanFastReplace() {
 
 absl::StatusOr<sql::SqlResult> ReplaceContext::FastReplace() {
   // Start transaction.
-  this->db_->BeginTransaction();
+  this->db_->BeginTransaction(true);
 
   // Need to insert a copy for each way of sharding the table.
   CHECK_LE(this->table_.owners.size(), 1u);
@@ -78,7 +78,7 @@ absl::StatusOr<sql::SqlResult> ReplaceContext::FastReplace() {
 
 absl::StatusOr<sql::SqlResult> ReplaceContext::DeleteInsert() {
   // Start transaction.
-  this->db_->BeginTransaction();
+  this->db_->BeginTransaction(true);
   LOG(WARNING) << "SLOW REPLACE " << this->stmt_;
 
   // Find PK.

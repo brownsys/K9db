@@ -41,6 +41,10 @@ SqlResultSet RocksdbSession::GetShard(const std::string &table_name,
 
 SqlResultSet RocksdbSession::DeleteShard(const std::string &table_name,
                                          util::ShardName &&shard_name) {
+  CHECK(this->write_txn_) << "DeleteShard called on read txn";
+  RocksdbWriteTransaction *txn =
+      reinterpret_cast<RocksdbWriteTransaction *>(this->txn_.get());
+
   RocksdbTable &table = this->conn_->tables_.at(table_name);
   const dataflow::SchemaRef &schema = table.Schema();
 
@@ -52,10 +56,10 @@ SqlResultSet RocksdbSession::DeleteShard(const std::string &table_name,
       this->conn_->encryption_.EncryptSeek(std::move(shard_name));
 
   // Get all content of shard.
-  RocksdbStream stream = table.GetShard(seek, this->txn_.get());
+  RocksdbStream stream = table.GetShard(seek, txn);
   for (auto [enkey, envalue] : stream) {
     // Delete in table.
-    table.Delete(enkey, this->txn_.get());
+    table.Delete(enkey, txn);
 
     // Decrypt and add to result set.
     RocksdbSequence key = this->conn_->encryption_.DecryptKey(std::move(enkey));
@@ -65,7 +69,7 @@ SqlResultSet RocksdbSession::DeleteShard(const std::string &table_name,
     records.push_back(value.DecodeRecord(schema, false));
 
     // Delete in indices.
-    table.IndexDelete(shard, value, this->txn_.get());
+    table.IndexDelete(shard, value, txn);
   }
 
   return SqlResultSet(schema, std::move(records));

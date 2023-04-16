@@ -13,8 +13,8 @@ std::vector<pelton::dataflow::Record> SelectTFromDefaultDB(int64_t id) {
   std::vector<pelton::sql::KeyPair> vec;
   vec.emplace_back(pelton::util::ShardName(DEFAULT_SHARD, DEFAULT_SHARD),
                    pelton::sqlast::Value(id));
-  instance->session->BeginTransaction();
-  auto result = instance->session->GetDirect("t", 0, vec, true);
+  instance->session->BeginTransaction(false);
+  auto result = instance->session->GetDirect("t", 0, vec);
   instance->session->RollbackTransaction();
   return result;
 }
