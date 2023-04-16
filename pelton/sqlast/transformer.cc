@@ -39,32 +39,6 @@ AstTransformer::TransformStatement(
 // Valid Syntax.
 antlrcpp::Any AstTransformer::visitSql_stmt(
     sqlparser::SQLiteParser::Sql_stmtContext *ctx) {
-  // Regular statement.
-  if (ctx->EXPLAIN() == nullptr) {
-    if (ctx->create_table_stmt() != nullptr) {
-      return ctx->create_table_stmt()->accept(this);
-    }
-    if (ctx->create_index_stmt() != nullptr) {
-      return ctx->create_index_stmt()->accept(this);
-    }
-    if (ctx->insert_stmt() != nullptr) {
-      return ctx->insert_stmt()->accept(this);
-    }
-    if (ctx->update_stmt() != nullptr) {
-      return ctx->update_stmt()->accept(this);
-    }
-    if (ctx->select_stmt() != nullptr) {
-      return ctx->select_stmt()->accept(this);
-    }
-    if (ctx->delete_stmt() != nullptr) {
-      return ctx->delete_stmt()->accept(this);
-    }
-    if (ctx->create_view_stmt() != nullptr) {
-      return ctx->create_view_stmt()->accept(this);
-    }
-    return absl::InvalidArgumentError("Unsupported statement type");
-  }
-
   // Explain <query> statement.
   if (ctx->EXPLAIN() != nullptr) {
     this->allow_question_mark_ = true;
@@ -92,6 +66,30 @@ antlrcpp::Any AstTransformer::visitSql_stmt(
     this->allow_question_mark_ = false;
     return std::move(result);
   }
+
+  // Regular statement.
+  if (ctx->create_table_stmt() != nullptr) {
+    return ctx->create_table_stmt()->accept(this);
+  }
+  if (ctx->create_index_stmt() != nullptr) {
+    return ctx->create_index_stmt()->accept(this);
+  }
+  if (ctx->insert_stmt() != nullptr) {
+    return ctx->insert_stmt()->accept(this);
+  }
+  if (ctx->update_stmt() != nullptr) {
+    return ctx->update_stmt()->accept(this);
+  }
+  if (ctx->select_stmt() != nullptr) {
+    return ctx->select_stmt()->accept(this);
+  }
+  if (ctx->delete_stmt() != nullptr) {
+    return ctx->delete_stmt()->accept(this);
+  }
+  if (ctx->create_view_stmt() != nullptr) {
+    return ctx->create_view_stmt()->accept(this);
+  }
+  return absl::InvalidArgumentError("Unsupported statement type");
 }
 
 // Create a view.
@@ -266,16 +264,14 @@ antlrcpp::Any AstTransformer::visitForeign_key_clause(
 antlrcpp::Any AstTransformer::visitAnonymize_behavior(
     sqlparser::SQLiteParser::Anonymize_behaviorContext *ctx) {
   std::vector<std::string> columns_to_anon;
-  if (ctx->DELETE_ROW() != nullptr) {
-    return columns_to_anon;
-  } else {
+  if (ctx->DELETE_ROW() == nullptr) {
     // Columns to anonymize.
     for (size_t i = 0; i < ctx->column_name().size(); i++) {
       CAST_REF(std::string, anon_col, ctx->column_name().at(i)->accept(this));
       columns_to_anon.push_back(std::move(anon_col));
     }
-    return columns_to_anon;
   }
+  return columns_to_anon;
 }
 
 antlrcpp::Any AstTransformer::visitAnonymize_constraint(
@@ -294,11 +290,9 @@ antlrcpp::Any AstTransformer::visitAnonymize_constraint(
   CAST_REF(std::string, data_subject_column, ctx->column_name()->accept(this));
   CAST_REF(std::vector<std::string>, columns_to_anon,
            ctx->anonymize_behavior()->accept(this));
-
-  // DELETE_ROW only supported with ON DEL.
-  if (columns_to_anon.size() == 0 &&
-      anon_type != AnonymizationRule::Type::DEL) {
-    return absl::InvalidArgumentError("DELETE_ROW only supported with ON DEL");
+  if (ctx->table_name() != nullptr) {
+    CAST_REF(std::string, foreign_table, ctx->table_name()->accept(this));
+    data_subject_column = foreign_table + "(" + data_subject_column + ")";
   }
 
   AnonymizationRule rule(anon_type, data_subject_column);

@@ -185,6 +185,52 @@ std::vector<std::unique_ptr<ShardDescriptor>> CreateContext::MakeBDescriptors(
 }
 
 /*
+ * Validate anonymization rules.
+ */
+absl::Status CreateContext::ValidateAnonymizationRules(
+    const Annotations &annotations) const {
+  // Find PK.
+  size_t pk = this->schema_.keys().front();
+  const std::string &pk_col = this->schema_.NameOf(pk);
+
+  // Find all OWNED_BY columns.
+  std::unordered_set<std::string> owners;
+  for (const std::unique_ptr<ShardDescriptor> &desc : this->table_.owners) {
+    owners.insert(EXTRACT_VARIANT(column, desc->info));
+  }
+  for (size_t owns : annotations.owns) {
+    owners.insert(this->schema_.NameOf(owns));
+  }
+
+  // Loop over anonymization rules.
+  const std::vector<sqlast::AnonymizationRule> &rules =
+      this->stmt_.GetAnonymizationRules();
+  for (size_t i = 0; i < rules.size(); i++) {
+    const sqlast::AnonymizationRule &rule = rules.at(i);
+    if (rule.GetType() != sqlast::AnonymizationRule::Type::DEL) {
+      continue;
+    }
+    for (const std::string &column : rule.GetAnonymizeColumns()) {
+      // Should not anonymize PK.
+      ASSERT_RET(pk_col != column, Internal,
+                 "DEL Anonymization rule anonymizes PK!");
+
+      // Should not anonymize other OWNED_BY.
+      for (const std::string &fk : owners) {
+        if (fk == rule.GetDataSubject()) {
+          continue;
+        }
+        ASSERT_RET(fk != column, Internal,
+                   "DEL Anonymization rule " + std::to_string(i) +
+                       " anonymizes different ownership fk " + fk);
+      }
+    }
+  }
+
+  return absl::OkStatus();
+}
+
+/*
  * Handling create: Resolves sharding and creates the physical table.
  */
 
@@ -251,6 +297,8 @@ absl::StatusOr<sql::SqlResult> CreateContext::Exec() {
     APPEND_MOVE(this->table_.accessors, v);
   }
   /* End of direct and transitive ACCESSORS. */
+
+  CHECK_STATUS(this->ValidateAnonymizationRules(annotations));
 
   /* Now we create this table and add its information to our state. */
   Table *table_ptr = this->sstate_.AddTable(std::move(this->table_));

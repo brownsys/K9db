@@ -38,6 +38,9 @@ class Session {
   virtual bool Exists(const std::string &table_name,
                       const sqlast::Value &pk) const = 0;
 
+  virtual bool Exists(const std::string &table_name, size_t column_index,
+                      const sqlast::Value &val) const = 0;
+
   virtual int ExecuteInsert(const sqlast::Insert &sql,
                             const util::ShardName &shard_name) = 0;
 
@@ -45,7 +48,7 @@ class Session {
                                          const util::ShardName &shard_name) = 0;
 
   // Update.
-  virtual ResultSetAndStatus ExecuteUpdate(const sqlast::Update &sql) = 0;
+  virtual SqlUpdateSet ExecuteUpdate(const sqlast::Update &sql) = 0;
 
   // Delete.
   virtual SqlDeleteSet ExecuteDelete(const sqlast::Delete &sql) = 0;
@@ -80,6 +83,10 @@ class Session {
   virtual std::vector<size_t> CountShards(
       const std::string &table_name,
       const std::vector<sqlast::Value> &pk_values) const = 0;
+
+  virtual std::unordered_set<util::ShardName> FindShards(
+      const std::string &table_name, size_t column_index,
+      const sqlast::Value &value) const = 0;
 };
 
 // Singular connection to the underyling database, which can open many sessions.

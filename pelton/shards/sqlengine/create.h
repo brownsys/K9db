@@ -61,6 +61,9 @@ class CreateContext {
       bool owners, bool create_indices, Table *origin,
       const sqlast::ColumnDefinition &origin_col, size_t origin_index);
 
+  // Validate that anonymization rules are valid.
+  absl::Status ValidateAnonymizationRules(const Annotations &annotations) const;
+
   /* Members. */
   // Statement being inserted.
   const sqlast::CreateTable &stmt_;

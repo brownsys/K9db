@@ -25,8 +25,6 @@ namespace sqlengine {
 
 class DeleteContext {
  public:
-  using Result = std::pair<std::vector<dataflow::Record>, int>;
-
   DeleteContext(const sqlast::Delete &stmt, Connection *conn,
                 util::SharedLock *lock)
       : stmt_(stmt),
@@ -42,19 +40,17 @@ class DeleteContext {
   /* Main entry point for delete: Executes the statement against the shards. */
   absl::StatusOr<sql::SqlResult> Exec();
 
-  /* Helper that Exec() calls: performs all of delete except Committing to
-     rocksdb and updating dataflows. */
+  using Result = std::pair<int, std::vector<dataflow::Record>>;
   absl::StatusOr<Result> ExecWithinTransaction();
+  absl::StatusOr<Result> DeleteAnonymize();
 
  private:
-  using RecordsIterable = util::Iterable<sql::SqlDeleteSet::ShardRecordsIt>;
+  /* Check FK integrity */
+  absl::Status CheckFKIntegrity(const sql::SqlDeleteSet &delset);
 
-  /* Recursively deleting records in dependent tables from the affected
+  /* Recursively moving/copying records in dependent tables into the affected
      shard. */
-  template <typename Iterable>
-  absl::StatusOr<int> DeleteDependents(const Table &table,
-                                       const util::ShardName &shard_name,
-                                       Iterable &&records);
+  absl::StatusOr<int> CascadeDependents(const sql::SqlDeleteSet &delset);
 
   /* Members. */
   const sqlast::Delete &stmt_;
@@ -72,10 +68,6 @@ class DeleteContext {
 
   // Shared Lock so we can read from the states safetly.
   util::SharedLock *lock_;
-
-  // Records that have already been moved to default (to avoid double moving).
-  // TableName -> { PKs of records that were moved }
-  std::unordered_map<std::string, std::unordered_set<std::string>> moved_;
 };
 
 }  // namespace sqlengine

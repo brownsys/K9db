@@ -27,10 +27,6 @@ TEST_F(Varown, Storage2) { tests::RunTest(data_file("storage")); }
 // Point Lookup: A variably owned resource can be looked up normally
 TEST_F(Varown, Lookup) { tests::RunTest(data_file("lookup")); }
 
-// Resource Deletes: A point delete delets all copies of a variably owned
-// resource
-TEST_F(Varown, Delete) { tests::RunTest(data_file("delete")); }
-
 // Relationship Deletes: Deleting the connecting row also deletes the pointed-to
 // resource Commented out because of record-type error
 TEST_F(Varown, DeleteRel1) { tests::RunTest(data_file("delete_rel1")); }

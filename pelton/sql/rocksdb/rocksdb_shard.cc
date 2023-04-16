@@ -286,6 +286,46 @@ int RocksdbSession::DeleteFromShard(
   return count;
 }
 
+std::unordered_set<util::ShardName> RocksdbSession::FindShards(
+    const std::string &table_name, size_t column_index,
+    const sqlast::Value &value) const {
+  RocksdbInterface *txn =
+      reinterpret_cast<RocksdbInterface *>(this->txn_.get());
+
+  // Encode value.
+  const RocksdbTable &table = this->conn_->tables_.at(table_name);
+  CHECK(!value.IsNull()) << "Val is NULL";
+  std::string encoded = EncodeValue(table.Schema().TypeOf(column_index), value);
+
+  // Check via index.
+  std::unordered_set<util::ShardName> shards;
+  RocksdbPlan plan = table.ChooseIndex(column_index);
+  switch (plan.type()) {
+    case RocksdbPlan::IndexChoiceType::PK: {
+      const RocksdbPKIndex &index = table.GetPKIndex();
+      IndexSet set = index.Get({encoded}, txn);
+      for (const RocksdbIndexRecord &record : set) {
+        shards.emplace(record.GetShard().ToString());
+      }
+      break;
+    }
+    case RocksdbPlan::IndexChoiceType::UNIQUE:
+    case RocksdbPlan::IndexChoiceType::REGULAR: {
+      // Look up via index.
+      const RocksdbIndex &index = table.GetTableIndex(plan.idx());
+      IndexSet set = index.Get({encoded}, txn);
+      for (const RocksdbIndexRecord &record : set) {
+        shards.emplace(record.GetShard().ToString());
+      }
+      break;
+    }
+    default:
+      CHECK(false) << "FindShards on non-indexed column";
+  }
+
+  return shards;
+}
+
 }  // namespace rocks
 }  // namespace sql
 }  // namespace pelton

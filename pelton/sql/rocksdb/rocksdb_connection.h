@@ -82,6 +82,9 @@ class RocksdbSession : public Session {
   bool Exists(const std::string &table_name,
               const sqlast::Value &pk) const override;
 
+  bool Exists(const std::string &table_name, size_t column_index,
+              const sqlast::Value &val) const override;
+
   int ExecuteInsert(const sqlast::Insert &sql,
                     const util::ShardName &shard_name) override;
 
@@ -95,7 +98,7 @@ class RocksdbSession : public Session {
   SqlResultSet ExecuteSelect(const sqlast::Select &sql) const override;
 
   // Update.
-  ResultSetAndStatus ExecuteUpdate(const sqlast::Update &sql) override;
+  SqlUpdateSet ExecuteUpdate(const sqlast::Update &sql) override;
 
   // Everything in a table.
   SqlResultSet GetAll(const std::string &table_name) const override;
@@ -124,6 +127,10 @@ class RocksdbSession : public Session {
   std::vector<size_t> CountShards(
       const std::string &table_name,
       const std::vector<sqlast::Value> &pk_values) const override;
+
+  std::unordered_set<util::ShardName> FindShards(
+      const std::string &table_name, size_t column_index,
+      const sqlast::Value &value) const override;
 
  private:
   // The parent connection.

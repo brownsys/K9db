@@ -14,7 +14,6 @@ cc_library(
         ":delete",
         ":explain",
         ":gdpr",
-        ":index",
         ":insert",
         ":replace",
         ":select",
@@ -43,13 +42,12 @@ cc_library(
     ],
     visibility = ["//pelton:__subpackages__"],
     deps = [
-        ":index",
         "//pelton:connection",
         "//pelton/shards:state",
         "//pelton/shards:types",
         "//pelton/util:shard_name",
-        "//pelton/util:upgradable_lock",
-        "@com_google_absl//absl/strings",
+        "//pelton/util:status",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -143,6 +141,7 @@ cc_library(
     ],
     deps = [
         ":index",
+        ":util",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:record",
@@ -168,8 +167,8 @@ cc_library(
         "replace.h",
     ],
     deps = [
-        ":delete",
         ":insert",
+        ":update",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:record",
@@ -194,8 +193,7 @@ cc_library(
         "update.h",
     ],
     deps = [
-        ":delete",
-        ":insert",
+        ":util",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:record",
@@ -216,13 +214,14 @@ cc_library(
     name = "gdpr",
     srcs = [
         "gdpr.cc",
+        "gdpr_forget.cc",
+        "gdpr_get.cc",
     ],
     hdrs = [
         "gdpr.h",
     ],
     deps = [
         ":delete",
-        ":index",
         ":select",
         ":update",
         "//pelton:connection",
@@ -306,8 +305,6 @@ cc_library(
         "explain.h",
     ],
     deps = [
-        ":replace",
-        ":update",
         "//pelton:connection",
         "//pelton/dataflow:dstate",
         "//pelton/dataflow:record",
@@ -390,10 +387,10 @@ cc_test(
         "update_unittest.cc",
     ],
     deps = [
-        ":insert",
-        ":update",
-        ":tests_helpers",
         ":engine",
+        ":insert",
+        ":tests_helpers",
+        ":update",
         "//pelton/util:shard_name",
         "@glog",
     ],

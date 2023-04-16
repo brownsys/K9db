@@ -74,8 +74,8 @@ class SharderState {
   const Shard &GetShard(const ShardKind &shard_kind) const;
 
   // Track users.
-  void IncrementUsers(const ShardKind &kind);
-  void DecrementUsers(const ShardKind &kind);
+  void IncrementUsers(const ShardKind &kind, size_t count);
+  void DecrementUsers(const ShardKind &kind, size_t count);
 
   // To create unique index names.
   uint64_t IncrementIndexCount() { return this->index_count_++; }

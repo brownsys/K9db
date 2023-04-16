@@ -35,12 +35,8 @@ class ReplaceContext {
 
   /* Main entry point for replace: Executes the statement against the shards. */
   absl::StatusOr<sql::SqlResult> Exec();
-  bool CanFastReplace();
 
  private:
-  absl::StatusOr<sql::SqlResult> FastReplace();
-  absl::StatusOr<sql::SqlResult> DeleteInsert();
-
   /* Members. */
   // The REPLACE statement.
   const sqlast::Replace &stmt_;

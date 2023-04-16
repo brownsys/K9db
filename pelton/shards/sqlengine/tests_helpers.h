@@ -70,10 +70,13 @@ std::string MakeCreate(const std::string &tbl_name,
 std::pair<std::string, std::string> MakeInsert(
     const std::string &tbl_name, const std::vector<std::string> &vals);
 
+std::pair<std::string, std::string> MakeReplace(
+    const std::string &tbl_name, const std::vector<std::string> &vals);
+
 std::string MakeUpdate(
     const std::string &tbl_name,
     const std::vector<std::pair<std::string, std::string>> &set_pairs,
-    const std::vector<std::pair<std::string, std::string>> &update_pairs);
+    const std::vector<std::string> &conds);
 
 std::string MakeDelete(const std::string &tbl_name,
                        const std::vector<std::string> &conds);
@@ -96,10 +99,16 @@ std::string MakeGDPRForget(const std::string &tbl_name,
 sql::SqlResult Execute(const std::string &sql, Connection *conn);
 
 /*
+ * Execute expecting an error.
+ */
+bool ExecuteError(const std::string &sql, Connection *conn);
+
+/*
  * Macros for EXPECTing that SqlResults are correct.
  */
 #define EXPECT_SUCCESS(r) EXPECT_TRUE(r.Success())
 #define EXPECT_UPDATE(r, c) EXPECT_EQ(r.UpdateCount(), c)
+#define EXPECT_QUERY(r, v) EXPECT_EQ(r.ResultSets().front(), v)
 
 /*
  * google test fixture class, allows us to manage the pelton state and

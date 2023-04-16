@@ -3,7 +3,6 @@
 #include <vector>
 
 #include "glog/logging.h"
-#include "pelton/shards/sqlengine/gdpr.h"
 #include "pelton/shards/sqlengine/tests_helpers.h"
 #include "pelton/util/shard_name.h"
 
@@ -482,7 +481,8 @@ TEST_F(GDPRGetTest, TransitiveAccessorship) {
 
   // Validate get for user with id 5.
   std::string get1 = MakeGDPRGet("user", "5");
-  EXPECT_EQ(Execute(get1, &conn).ResultSets(), (VV{(V{row4, row3}), (V{u1})}));
+  EXPECT_EQ(Execute(get1, &conn).ResultSets(),
+            (VV{(V{row4, row3}), (V{u1}), (V{}), (V{})}));
 
   // Validate get for user with id 10.
   std::string get2 = MakeGDPRGet("user", "10");
@@ -531,7 +531,8 @@ TEST_F(GDPRGetTest, VariableAccessorship) {
 
   // Validate get for user with id 0.
   std::string get0 = MakeGDPRGet("user", "0");
-  EXPECT_EQ(Execute(get0, &conn).ResultSets(), (VV{(V{row1, row2}), (V{u0})}));
+  EXPECT_EQ(Execute(get0, &conn).ResultSets(),
+            (VV{(V{row1, row2}), (V{u0}), (V{})}));
 
   // Validate get for user with id 5.
   std::string get1 = MakeGDPRGet("user", "5");

@@ -171,11 +171,11 @@ const Shard &SharderState::GetShard(const ShardKind &shard_kind) const {
 /*
  * Track users.
  */
-void SharderState::IncrementUsers(const ShardKind &kind) {
-  this->users_.at(kind)++;
+void SharderState::IncrementUsers(const ShardKind &kind, size_t count) {
+  this->users_.at(kind) += count;
 }
-void SharderState::DecrementUsers(const ShardKind &kind) {
-  this->users_.at(kind)--;
+void SharderState::DecrementUsers(const ShardKind &kind, size_t count) {
+  this->users_.at(kind) -= count;
 }
 
 /*

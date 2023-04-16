@@ -3,7 +3,6 @@
 #include <vector>
 
 #include "glog/logging.h"
-#include "pelton/shards/sqlengine/gdpr.h"
 #include "pelton/shards/sqlengine/tests_helpers.h"
 #include "pelton/util/shard_name.h"
 

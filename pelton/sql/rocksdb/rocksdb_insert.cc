@@ -31,6 +31,34 @@ bool RocksdbSession::Exists(const std::string &table_name,
   return table.Exists(pk_value, txn);
 }
 
+bool RocksdbSession::Exists(const std::string &table_name, size_t column_index,
+                            const sqlast::Value &val) const {
+  CHECK(this->write_txn_) << "Exists(2) called on read txn";
+  RocksdbWriteTransaction *txn =
+      reinterpret_cast<RocksdbWriteTransaction *>(this->txn_.get());
+
+  // Special case: column index refers to PK.
+  const RocksdbTable &table = this->conn_->tables_.at(table_name);
+  if (table.Schema().keys().front() == column_index) {
+    return this->Exists(table_name, val);
+  }
+
+  // Check via index.
+  RocksdbPlan plan = table.ChooseIndex(column_index);
+  CHECK(plan.type() != RocksdbPlan::IndexChoiceType::PK) << "UNREACHABLE";
+  CHECK(plan.type() != RocksdbPlan::IndexChoiceType::SCAN)
+      << "Exists(2) on non-indexed column";
+
+  // Encode value.
+  CHECK(!val.IsNull()) << "Val is NULL";
+  std::string encoded = EncodeValue(table.Schema().TypeOf(column_index), val);
+
+  // Look up via index.
+  const RocksdbIndex &index = table.GetTableIndex(plan.idx());
+  IndexSet set = index.Get({encoded}, txn);
+  return set.size() > 0;
+}
+
 int RocksdbSession::ExecuteInsert(const sqlast::Insert &stmt,
                                   const util::ShardName &shard_name) {
   CHECK(this->write_txn_) << "Insert called on read txn";

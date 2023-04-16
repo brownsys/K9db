@@ -27,8 +27,11 @@ class SqlDeleteSet {
   size_t AddRecord(dataflow::Record &&record);
   void AssignToShard(size_t idx, std::string &&shard);
 
-  const std::vector<dataflow::Record> &Rows() const { return this->records_; }
   std::vector<dataflow::Record> &&Vec() { return std::move(this->records_); }
+  const std::vector<dataflow::Record> &Rows() const { return this->records_; }
+  const std::unordered_map<util::ShardName, std::vector<size_t>> &Map() const {
+    return this->shards_;
+  }
 
   size_t Count() const { return this->count_; }
 
@@ -45,6 +48,48 @@ class SqlDeleteSet {
   using RecordsIt = decltype(records_)::const_iterator;
   using ShardsIt = util::MapItT<MapIt, const util::ShardName &>;
   using ShardRecordsIt = util::MapItT<VecIt, const dataflow::Record &>;
+
+ public:
+  util::Iterable<RecordsIt> IterateRecords() const;
+  util::Iterable<ShardsIt> IterateShards() const;
+  util::Iterable<ShardRecordsIt> Iterate(const util::ShardName &shard) const;
+};
+
+// A SqlUpdateSet represents the results of an update operation.
+// It contains the records as they were before deletion, in addition to their
+// new state after update.
+// It also tracks the shards that these records are in.
+class SqlUpdateSet {
+ public:
+  SqlUpdateSet() = default;
+
+  size_t AddRecord(dataflow::Record &&old, dataflow::Record &&updated);
+  void AssignToShard(size_t idx, std::string &&shard);
+
+  std::vector<dataflow::Record> &&Vec() { return std::move(this->records_); }
+  const std::vector<dataflow::Record> &Rows() const { return this->records_; }
+  const std::unordered_map<util::ShardName, std::vector<size_t>> &Map() const {
+    return this->shards_;
+  }
+
+  size_t Count() const { return this->count_; }
+
+ private:
+  size_t count_ = 0;
+  std::vector<dataflow::Record> records_;
+  std::unordered_map<util::ShardName, std::vector<size_t>> shards_;
+
+  using MapIt = decltype(shards_)::const_iterator;
+  using VecIt = std::vector<size_t>::const_iterator;
+
+ public:
+  using RecordPair =
+      std::pair<const dataflow::Record &, const dataflow::Record &>;
+
+  // Iterator interface.
+  using RecordsIt = decltype(records_)::const_iterator;
+  using ShardsIt = util::MapItT<MapIt, const util::ShardName &>;
+  using ShardRecordsIt = util::MapItT<VecIt, RecordPair>;
 
  public:
   util::Iterable<RecordsIt> IterateRecords() const;

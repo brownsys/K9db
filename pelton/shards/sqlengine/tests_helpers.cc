@@ -96,31 +96,55 @@ std::pair<std::string, std::string> MakeInsert(
   return std::pair(sql, row);
 }
 
+std::pair<std::string, std::string> MakeReplace(
+    const std::string &tbl_name, const std::vector<std::string> &vals) {
+  std::string sql = " REPLACE INTO " + tbl_name + " VALUES (";
+  for (size_t i = 0; i < vals.size(); i++) {
+    sql += vals.at(i);
+    if (i < vals.size() - 1) {
+      sql += ",";
+    }
+  }
+  sql += ");";
+
+  std::string row = "|";
+  for (const std::string &v : vals) {
+    if (v[0] == '\'' || v[0] == '"') {
+      row += v.substr(1, v.size() - 2);
+    } else {
+      row += v;
+    }
+    row += "|";
+  }
+
+  return std::pair(sql, row);
+}
+
 // sqlast::Update.
 std::string MakeUpdate(
     const std::string &tbl_name,
     const std::vector<std::pair<std::string, std::string>> &set_pairs,
-    const std::vector<std::pair<std::string, std::string>> &update_pairs) {
+    const std::vector<std::string> &conds) {
   std::string sql = "UPDATE " + tbl_name + " SET ";
 
   for (size_t i = 0; i < set_pairs.size(); i++) {
     sql += set_pairs.at(i).first + " = " + set_pairs.at(i).second;
     if (i < set_pairs.size() - 1) {
-      sql += ",";
+      sql += ", ";
     }
   }
 
-  sql += " WHERE ";
-
-  for (size_t i = 0; i < update_pairs.size(); i++) {
-    sql += update_pairs.at(i).first + " = " + update_pairs.at(i).second;
-    if (i < update_pairs.size() - 1) {
-      sql += ",";
+  if (conds.size() > 0) {
+    sql += " WHERE ";
+    for (size_t i = 0; i < conds.size(); i++) {
+      sql += conds.at(i);
+      if (i < conds.size() - 1) {
+        sql += " AND ";
+      }
     }
   }
 
   sql += ";";
-
   return sql;
 }
 
@@ -157,6 +181,18 @@ std::string MakeDelete(const std::string &tbl_name,
 sql::SqlResult Execute(const std::string &sql, Connection *conn) {
   MOVE_OR_PANIC(sql::SqlResult result, Shard(sql, conn));
   return result;
+}
+
+/*
+ * Execute expecting an error.
+ */
+bool ExecuteError(const std::string &sql, Connection *conn) {
+  absl::StatusOr<sql::SqlResult> result = Shard(sql, conn);
+  if (!result.ok()) {
+    conn->session->RollbackTransaction();
+    return true;
+  }
+  return false;
 }
 
 }  // namespace sqlengine

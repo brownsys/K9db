@@ -3,8 +3,6 @@
 
 #include <algorithm>
 
-#include "pelton/shards/sqlengine/replace.h"
-#include "pelton/shards/sqlengine/update.h"
 #include "pelton/shards/types.h"
 #include "pelton/util/status.h"
 
@@ -82,10 +80,9 @@ void ExplainContext::Explain(const sqlast::Insert &query) {
       this->AddExplanation("INSERT [" + shard_kind + "#" + column + "]",
                            table_name + " USING " + index);
     } else if (desc->type == InfoType::VARIABLE) {
-      const std::string &index =
-          std::get<VariableInfo>(desc->info).index->index_name;
+      std::string fk = desc->next_table() + "." + desc->upcolumn();
       this->AddExplanation("INSERT [" + shard_kind + "#" + column + "]",
-                           table_name + " USING " + index);
+                           table_name + " USING WHERE ON" + fk);
     }
     // On disk index updates.
     for (const std::string &index : this->db_->GetIndices(table_name)) {
@@ -119,41 +116,31 @@ void ExplainContext::Explain(const sqlast::Delete &query) {
 }
 
 void ExplainContext::Explain(const sqlast::Replace &query) {
-  const std::string &table_name = query.table_name();
-  const Table &tbl = this->sstate_.GetTable(table_name);
-  ReplaceContext context(query, this->conn_, this->lock_);
-  if (context.CanFastReplace()) {
-    this->AddExplanation("FAST REPLACE", table_name);
-    for (const std::string &index : this->db_->GetIndices(table_name)) {
-      this->AddExplanation("INDEX UPDATE", table_name + " ON (" + index + ")");
-    }
-  } else {
-    // A DELETE.
-    const std::string &pk = tbl.schema.NameOf(tbl.schema.keys().front());
-    using EType = sqlast::Expression::Type;
-    auto bx = std::make_unique<sqlast::BinaryExpression>(EType::EQ);
-    bx->SetLeft(std::make_unique<sqlast::ColumnExpression>(pk));
-    bx->SetRight(std::make_unique<sqlast::LiteralExpression>(sqlast::Value()));
-    sqlast::Delete del(query.table_name());
-    del.SetWhereClause(std::move(bx));
-    this->Explain(del);
-    // Followed by INSERT.
-    sqlast::Insert insert(query.table_name());
-    this->Explain(insert);
+  sqlast::Update update(query.table_name());
+  for (size_t i = 0; i < this->schema_.size(); i++) {
+    const sqlast::Value &v = query.GetValue(this->schema_.NameOf(i), i);
+    update.AddColumnValue(this->schema_.NameOf(i),
+                          std::make_unique<sqlast::LiteralExpression>(v));
   }
+
+  sqlast::Expression::Type eq = sqlast::Expression::Type::EQ;
+  std::unique_ptr<sqlast::BinaryExpression> where =
+      std::make_unique<sqlast::BinaryExpression>(eq);
+  size_t pkcol = this->schema_.keys().at(0);
+  const std::string &pkcolname = this->schema_.NameOf(pkcol);
+  const sqlast::Value &pkval = query.GetValue(pkcolname, pkcol);
+  where->SetLeft(std::make_unique<sqlast::ColumnExpression>(pkcolname));
+  where->SetRight(std::make_unique<sqlast::LiteralExpression>(pkval));
+  update.SetWhereClause(std::move(where));
+  this->Explain(update);
 }
 
 void ExplainContext::Explain(const sqlast::Update &query) {
-  UpdateContext context(query, this->conn_, this->lock_);
-  if (context.ModifiesSharding()) {
-    // A DELETE.
-    this->Explain(query.DeleteDomain());
-    // Followed by INSERT.
-    sqlast::Insert insert(query.table_name());
-    this->Explain(insert);
-  } else {
-    this->AddExplanation("FAST UPDATE", query.table_name());
-  }
+  // Delete.
+  this->Explain(query.DeleteDomain());
+  // Followed by INSERT.
+  sqlast::Insert insert(query.table_name());
+  this->Explain(insert);
 }
 
 void ExplainContext::Explain(const sqlast::Select &query) {

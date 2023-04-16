@@ -3,7 +3,6 @@
 #define PELTON_SHARDS_SQLENGINE_INSERT_H_
 
 #include <string>
-#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -33,38 +32,32 @@ class InsertContext {
         table_name_(stmt_.table_name()),
         table_(conn->state->SharderState().GetTable(table_name_)),
         schema_(table_.schema),
+        records_(),
         conn_(conn),
         sstate_(conn->state->SharderState()),
         dstate_(conn->state->DataflowState()),
         db_(conn->session.get()),
-        lock_(lock) {}
+        lock_(lock),
+        shards_(),
+        new_users_(0) {}
 
   /* Main entry point for insert: Executes the statement against the shards. */
   absl::StatusOr<sql::SqlResult> Exec();
 
-  /* Helper that Exec() calls: performs all of insert except Committing to
-     rocksdb and updating dataflows. */
-  absl::StatusOr<Result> ExecWithinTransaction();
-
  private:
-  /* Have we inserted the record into this shard yet? */
-  bool InsertedInto(const std::string &shard_kind, const std::string &user_id);
-
   /* Helpers for inserting statement into the database by sharding type. */
-  int DirectInsert(sqlast::Value &&fkval, const ShardDescriptor &desc);
-  absl::StatusOr<int> TransitiveInsert(sqlast::Value &&fkval,
-                                       const ShardDescriptor &desc);
-  absl::StatusOr<int> VariableInsert(sqlast::Value &&fkval,
-                                     const ShardDescriptor &desc);
+  absl::Status DirectInsert(sqlast::Value &&fkval, const ShardDescriptor &desc);
+  absl::Status TransitiveInsert(sqlast::Value &&fkval,
+                                const ShardDescriptor &desc);
+  absl::Status VariableInsert(sqlast::Value &&fkval,
+                              const ShardDescriptor &desc);
 
   /* Inserting the statement into the database. */
   absl::StatusOr<int> InsertIntoBaseTable();
 
   /* Recursively moving/copying records in dependent tables into the affected
      shard. */
-  absl::StatusOr<int> CopyDependents(
-      const Table &table, bool transitive,
-      const std::vector<dataflow::Record> &records);
+  absl::StatusOr<int> CascadeDependents();
 
   /* Members. */
   // Statement being inserted.
@@ -72,6 +65,7 @@ class InsertContext {
   const std::string &table_name_;
   const Table &table_;
   const dataflow::SchemaRef &schema_;
+  std::vector<dataflow::Record> records_;
 
   // Pelton connection.
   Connection *conn_;
@@ -84,8 +78,11 @@ class InsertContext {
   // Shared Lock so we can read from the states safetly.
   util::SharedLock *lock_;
 
-  // This vector will store the shardname assigned to this insert.
-  std::unordered_map<ShardKind, std::unordered_set<util::ShardName>> shards_;
+  // Store all the shards we should insert into.
+  std::unordered_set<util::ShardName> shards_;
+
+  // How many new users have we inserted.
+  size_t new_users_ = 0;
 };
 
 }  // namespace sqlengine

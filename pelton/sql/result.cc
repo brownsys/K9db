@@ -36,6 +36,36 @@ util::Iterable<SqlDeleteSet::ShardRecordsIt> SqlDeleteSet::Iterate(
   });
 }
 
+// SqlUpdateSet.
+size_t SqlUpdateSet::AddRecord(dataflow::Record &&old,
+                               dataflow::Record &&updated) {
+  this->records_.push_back(std::move(old));
+  this->records_.push_back(std::move(updated));
+  return this->records_.size() - 2;
+}
+void SqlUpdateSet::AssignToShard(size_t idx, std::string &&shard) {
+  auto [it, _] = this->shards_.emplace(std::move(shard), 0);
+  it->second.emplace_back(idx);
+  this->count_++;
+}
+util::Iterable<SqlUpdateSet::RecordsIt> SqlUpdateSet::IterateRecords() const {
+  return util::Iterable<RecordsIt>(this->records_.cbegin(),
+                                   this->records_.cend());
+}
+util::Iterable<SqlUpdateSet::ShardsIt> SqlUpdateSet::IterateShards() const {
+  return util::Map(&this->shards_,
+                   [](MapIt::reference ref) -> const util::ShardName & {
+                     return ref.first;
+                   });
+}
+util::Iterable<SqlUpdateSet::ShardRecordsIt> SqlUpdateSet::Iterate(
+    const util::ShardName &shard) const {
+  const std::vector<size_t> &vec = this->shards_.at(shard);
+  return util::Map(&vec, [&](VecIt::reference ref) -> RecordPair {
+    return RecordPair(this->records_.at(ref), this->records_.at(ref + 1));
+  });
+}
+
 // SqlResultSet.
 void SqlResultSet::AppendDeduplicate(SqlResultSet &&other) {
   if (this->schema_ != other.schema_) {

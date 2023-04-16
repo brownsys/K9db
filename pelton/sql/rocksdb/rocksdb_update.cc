@@ -16,7 +16,7 @@ namespace rocks {
  * UPDATE STATEMENTS.
  */
 
-ResultSetAndStatus RocksdbSession::ExecuteUpdate(const sqlast::Update &sql) {
+SqlUpdateSet RocksdbSession::ExecuteUpdate(const sqlast::Update &sql) {
   CHECK(this->write_txn_) << "Update called on read txn";
   RocksdbWriteTransaction *txn =
       reinterpret_cast<RocksdbWriteTransaction *>(this->txn_.get());
@@ -41,19 +41,19 @@ ResultSetAndStatus RocksdbSession::ExecuteUpdate(const sqlast::Update &sql) {
   // returned result set (deduplicated), (2) update them in the DB, and (3) add
   // updated records to result set (deduplicated).
   size_t pk_col = schema.keys().at(0);
-  int count = records.size();
-  std::vector<dataflow::Record> vec;
-  DedupSet<std::string> dedup_keys;
+  SqlUpdateSet result;
+  DedupMap<std::string> dedup_keys;
   for (DeleteRecord &element : records) {
     // Update record.
     dataflow::Record urecord = element.record.Update(updates);
     RocksdbSequence updated = RocksdbSequence::FromRecord(urecord);
 
     // Append record to result.
-    if (!dedup_keys.Duplicate(element.value.At(pk_col).ToString())) {
-      vec.push_back(std::move(element.record));
-      vec.push_back(std::move(urecord));
+    if (!dedup_keys.Exists(element.value.At(pk_col).ToString())) {
+      dedup_keys.Assign(
+          result.AddRecord(std::move(element.record), std::move(urecord)));
     }
+    result.AssignToShard(dedup_keys.Value(), std::string(element.shard));
 
     // Update indices.
     table.IndexUpdate(element.shard, element.value, updated, txn);
@@ -64,7 +64,7 @@ ResultSetAndStatus RocksdbSession::ExecuteUpdate(const sqlast::Update &sql) {
     table.Put(element.key, envalue, txn);
   }
 
-  return ResultSetAndStatus(SqlResultSet(schema, std::move(vec)), count);
+  return result;
 }
 
 }  // namespace rocks

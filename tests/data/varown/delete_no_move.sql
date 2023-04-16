@@ -1,9 +1,7 @@
 INSERT INTO user VALUES (5, 'test');
-
+INSERT INTO t VALUES (1005, 'target_del');
 INSERT INTO rel VALUES (105, 5, 1005);
 INSERT INTO rel VALUES (106, 5, 1005);
-
-INSERT INTO t VALUES (1005, 'target_del');
 
 GDPR GET user 5;
 

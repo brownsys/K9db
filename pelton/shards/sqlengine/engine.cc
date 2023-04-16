@@ -113,8 +113,16 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
     case sqlast::AbstractStatement::Type::GDPR: {
       auto *stmt = static_cast<sqlast::GDPRStatement *>(statement.get());
       util::SharedLock lock = connection->state->ReaderLock();
-      GDPRContext context(*stmt, connection, &lock);
-      return context.Exec();
+      switch (stmt->operation()) {
+        case sqlast::GDPRStatement::Operation::GET: {
+          GDPRGetContext context(*stmt, connection, &lock);
+          return context.Exec();
+        }
+        case sqlast::GDPRStatement::Operation::FORGET: {
+          GDPRForgetContext context(*stmt, connection, &lock);
+          return context.Exec();
+        }
+      }
     }
 
     // Case 9: EXPLAIN <query> statements.

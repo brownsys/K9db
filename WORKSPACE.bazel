@@ -163,7 +163,7 @@ cc_library(
 )
 """,
     # Has all our annotations.
-    commit = "48a6025a039da2d161d1659aca49bebaefcd9cac",
+    commit = "854a5f8b191b7f34539727c78fcf31a78f53c15f",
     remote = "https://github.com/KinanBab/grammars-v4.git",
 )
 

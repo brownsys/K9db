@@ -34,7 +34,6 @@ namespace view {
 absl::StatusOr<sql::SqlResult> CreateView(const sqlast::CreateView &stmt,
                                           Connection *connection,
                                           util::UniqueLock *lock) {
-  SharderState &state = connection->state->SharderState();
   dataflow::DataFlowState &dataflow_state = connection->state->DataflowState();
 
   // Plan the query using calcite and generate a concrete graph for it.

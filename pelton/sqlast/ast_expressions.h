@@ -118,6 +118,9 @@ class LiteralListExpression : public Expression {
   explicit LiteralListExpression(const std::vector<Value> &values)
       : Expression(Expression::Type::LIST), values_(values) {}
 
+  explicit LiteralListExpression(std::vector<Value> &&values)
+      : Expression(Expression::Type::LIST), values_(std::move(values)) {}
+
   const std::vector<Value> &values() const;
 
   std::unique_ptr<Expression> Clone() const override {

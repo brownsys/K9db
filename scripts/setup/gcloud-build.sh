@@ -1,6 +1,14 @@
 #!/bin/bash
 ROLE="$1"
 
+# Run cargo raze.
+mkdir -p /tmp/cargo-raze/doesnt/exist/
+cd /home/pelton/pelton
+cd pelton/proxy && cargo raze && cd -
+cd experiments/lobsters && cargo raze && cd -
+cd experiments/ownCloud && cargo raze && cd -
+cd experiments/vote && cargo raze && cd -
+
 # Build ownCloud harness
 cd /home/pelton/pelton/experiments/ownCloud
 bazel build ... -c opt

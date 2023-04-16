@@ -38,11 +38,13 @@ TEST_F(InsertTest, UnshardedTable) {
   auto &&[stmt2, row2] = MakeInsert("user", {"1", "'u2'"});
   auto &&[stmt3, row3] = MakeInsert("user", {"2", "'u3'"});
   auto &&[stmt4, row4] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[stmt5, _] = MakeInsert("user", {"5", "'u15'"});  // Duplicate PK.
 
   EXPECT_UPDATE(Execute(stmt1, &conn), 1);
   EXPECT_UPDATE(Execute(stmt2, &conn), 1);
   EXPECT_UPDATE(Execute(stmt3, &conn), 1);
   EXPECT_UPDATE(Execute(stmt4, &conn), 1);
+  EXPECT_TRUE(ExecuteError(stmt5, &conn));
 
   // Validate insertions.
   db->BeginTransaction(false);
@@ -67,11 +69,13 @@ TEST_F(InsertTest, Datasubject) {
   auto &&[stmt2, row2] = MakeInsert("user", {"1", "'u2'"});
   auto &&[stmt3, row3] = MakeInsert("user", {"2", "'u3'"});
   auto &&[stmt4, row4] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[stmt5, _] = MakeInsert("user", {"5", "'u15'"});  // Duplicate PK.
 
   EXPECT_UPDATE(Execute(stmt1, &conn), 1);
   EXPECT_UPDATE(Execute(stmt2, &conn), 1);
   EXPECT_UPDATE(Execute(stmt3, &conn), 1);
   EXPECT_UPDATE(Execute(stmt4, &conn), 1);
+  EXPECT_TRUE(ExecuteError(stmt5, &conn));
 
   // Validate insertions.
   db->BeginTransaction(false);
@@ -103,12 +107,16 @@ TEST_F(InsertTest, DirectTable) {
   auto &&[addr1, row1] = MakeInsert("addr", {"0", "0"});
   auto &&[addr2, row2] = MakeInsert("addr", {"1", "0"});
   auto &&[addr3, row3] = MakeInsert("addr", {"2", "5"});
+  auto &&[addr4, ___] = MakeInsert("addr", {"2", "0"});   // Duplicate PK.
+  auto &&[addr5, ____] = MakeInsert("addr", {"3", "2"});  // Non-existing FK.
 
   EXPECT_UPDATE(Execute(usr1, &conn), 1);
   EXPECT_UPDATE(Execute(usr2, &conn), 1);
   EXPECT_UPDATE(Execute(addr1, &conn), 1);
   EXPECT_UPDATE(Execute(addr2, &conn), 1);
   EXPECT_UPDATE(Execute(addr3, &conn), 1);
+  EXPECT_TRUE(ExecuteError(addr4, &conn));
+  EXPECT_TRUE(ExecuteError(addr5, &conn));
 
   // Validate insertions.
   db->BeginTransaction(false);
@@ -158,6 +166,51 @@ TEST_F(InsertTest, TransitiveTable) {
   // Validate insertions.
   db->BeginTransaction(false);
   EXPECT_EQ(db->GetShard("phones", SN("user", "0")), (V{row2, row3, row4}));
+  EXPECT_EQ(db->GetShard("phones", SN("user", "5")), (V{row1}));
+  EXPECT_EQ(db->GetShard("phones", SN("user", "10")), (V{}));
+  EXPECT_EQ(db->GetShard("phones", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
+  db->RollbackTransaction();
+}
+
+TEST_F(InsertTest, TransitiveBadIntegrity) {
+  // Parse create table statements.
+  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
+  std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
+  std::string nums = MakeCreate("phones", {"id" I PK, "aid" I FK "addr(id)"});
+
+  // Make a pelton connection.
+  Connection conn = CreateConnection();
+  sql::Session *db = conn.session.get();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(usr, &conn));
+  EXPECT_SUCCESS(Execute(addr, &conn));
+  EXPECT_SUCCESS(Execute(nums, &conn));
+
+  // Perform some inserts.
+  auto &&[usr1, _] = MakeInsert("user", {"0", "'u1'"});
+  auto &&[usr2, __] = MakeInsert("user", {"5", "'u10'"});
+  auto &&[addr1, ___] = MakeInsert("addr", {"0", "0"});
+  auto &&[addr2, ____] = MakeInsert("addr", {"1", "1"});  // Bad FK.
+  auto &&[addr3, _____] = MakeInsert("addr", {"2", "5"});
+  auto &&[num1, row1] = MakeInsert("phones", {"0", "2"});
+  auto &&[num2, e2] = MakeInsert("phones", {"1", "1"});  // Bad FK.
+  auto &&[num3, row3] = MakeInsert("phones", {"2", "0"});
+  auto &&[num4, e4] = MakeInsert("phones", {"3", "4"});  // Bad FK.
+
+  EXPECT_UPDATE(Execute(usr1, &conn), 1);
+  EXPECT_UPDATE(Execute(usr2, &conn), 1);
+  EXPECT_UPDATE(Execute(addr1, &conn), 1);
+  EXPECT_TRUE(ExecuteError(addr2, &conn));
+  EXPECT_UPDATE(Execute(addr3, &conn), 1);
+  EXPECT_UPDATE(Execute(num1, &conn), 1);
+  EXPECT_TRUE(ExecuteError(num2, &conn));
+  EXPECT_UPDATE(Execute(num3, &conn), 1);
+  EXPECT_TRUE(ExecuteError(num4, &conn));
+
+  // Validate insertions.
+  db->BeginTransaction(false);
+  EXPECT_EQ(db->GetShard("phones", SN("user", "0")), (V{row3}));
   EXPECT_EQ(db->GetShard("phones", SN("user", "5")), (V{row1}));
   EXPECT_EQ(db->GetShard("phones", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("phones", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
@@ -221,69 +274,6 @@ TEST_F(InsertTest, DeepTransitiveTable) {
   db->RollbackTransaction();
 }
 
-/*
-TEST_F(InsertTest, DeepTransitiveUnnaturalTable) {
-  // Parse create table statements.
-  std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
-  std::string addr = MakeCreate("addr", {"id" I PK, "uid" I FK "user(id)"});
-  std::string nums = MakeCreate("phones", {"id" I PK, "aid" I FK "addr(id)"});
-  std::string deep = MakeCreate("deep", {"id" I PK, "pid" I FK "phones(id)"});
-
-  // Make a pelton connection.
-  Connection conn = CreateConnection();
-  sql::Session *db = conn.session.get();
-
-  // Create the tables.
-  EXPECT_SUCCESS(Execute(usr, &conn));
-  EXPECT_SUCCESS(Execute(addr, &conn));
-  EXPECT_SUCCESS(Execute(nums, &conn));
-  EXPECT_SUCCESS(Execute(deep, &conn));
-
-  // Perform some inserts.
-  auto &&[usr1, u_] = MakeInsert("user", {"0", "'u1'"});
-  auto &&[usr2, u__] = MakeInsert("user", {"5", "'u10'"});
-  auto &&[deep1, row1] = MakeInsert("deep", {"0", "2"});
-  auto &&[deep2, row2] = MakeInsert("deep", {"1", "2"});
-  auto &&[deep3, row3] = MakeInsert("deep", {"2", "0"});
-  auto &&[deep4, row4] = MakeInsert("deep", {"3", "1"});
-  auto &&[deep5, row5] = MakeInsert("deep", {"4", "3"});
-  auto &&[num1, p_] = MakeInsert("phones", {"0", "2"});
-  auto &&[num2, p__] = MakeInsert("phones", {"1", "1"});
-  auto &&[num3, p___] = MakeInsert("phones", {"2", "0"});
-  auto &&[num4, p____] = MakeInsert("phones", {"3", "0"});
-  auto &&[addr1, a_] = MakeInsert("addr", {"0", "0"});
-  auto &&[addr2, a__] = MakeInsert("addr", {"1", "0"});
-  auto &&[addr3, a___] = MakeInsert("addr", {"2", "5"});
-
-  // INsert out of order.
-  EXPECT_UPDATE(Execute(usr1, &conn), 1);
-  EXPECT_UPDATE(Execute(usr2, &conn), 1);
-  EXPECT_UPDATE(Execute(deep1, &conn), 1);
-  EXPECT_UPDATE(Execute(deep2, &conn), 1);
-  EXPECT_UPDATE(Execute(deep3, &conn), 1);
-  EXPECT_UPDATE(Execute(deep4, &conn), 1);
-  EXPECT_UPDATE(Execute(deep5, &conn), 1);
-  EXPECT_UPDATE(Execute(num1, &conn), 1);
-  EXPECT_UPDATE(Execute(num2, &conn), 1);
-  EXPECT_UPDATE(Execute(num3, &conn), 1);
-  EXPECT_UPDATE(Execute(num4, &conn), 1);
-
-  EXPECT_EQ(db->GetShard("deep", SN(DEFAULT_SHARD, DEFAULT_SHARD)),
-            (V{row1, row2, row3, row4, row5}));
-
-  // Insert resolution of transitivity.
-  EXPECT_UPDATE(Execute(addr1, &conn), 11);
-  EXPECT_UPDATE(Execute(addr2, &conn), 5);
-  EXPECT_UPDATE(Execute(addr3, &conn), 5);
-
-  // Validate insertion moved the data.
-  EXPECT_EQ(db->GetShard("deep", SN("user", "0")), (V{row1, row2, row4, row5}));
-  EXPECT_EQ(db->GetShard("deep", SN("user", "5")), (V{row3}));
-  EXPECT_EQ(db->GetShard("deep", SN("user", "10")), (V{}));
-  EXPECT_EQ(db->GetShard("deep", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
-}
-*/
-
 TEST_F(InsertTest, TwoOwners) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
@@ -306,6 +296,8 @@ TEST_F(InsertTest, TwoOwners) {
   auto &&[msg2, row2] = MakeInsert("msg", {"2", "0", "0"});
   auto &&[msg3, row3] = MakeInsert("msg", {"3", "5", "10"});
   auto &&[msg4, row4] = MakeInsert("msg", {"4", "5", "0"});
+  auto &&[msg5, e_] = MakeInsert("msg", {"4", "3", "0"});   // Bad 1st owner.
+  auto &&[msg6, e__] = MakeInsert("msg", {"4", "5", "4"});  // Bad 2nd owner.
 
   EXPECT_UPDATE(Execute(usr1, &conn), 1);
   EXPECT_UPDATE(Execute(usr2, &conn), 1);
@@ -314,6 +306,8 @@ TEST_F(InsertTest, TwoOwners) {
   EXPECT_UPDATE(Execute(msg2, &conn), 1);  // Inserted only once for u1.
   EXPECT_UPDATE(Execute(msg3, &conn), 2);
   EXPECT_UPDATE(Execute(msg4, &conn), 2);
+  EXPECT_TRUE(ExecuteError(msg5, &conn));
+  EXPECT_TRUE(ExecuteError(msg6, &conn));
 
   // Validate insertions.
   db->BeginTransaction(false);
@@ -443,11 +437,15 @@ TEST_F(InsertTest, VariableOwnership) {
   auto &&[assoc2, a__] = MakeInsert("association", {"1", "1", "0"});
   auto &&[assoc3, a___] = MakeInsert("association", {"2", "1", "5"});
   auto &&[assoc4, a____] = MakeInsert("association", {"3", "1", "5"});
+  auto &&[assoc5, e_] = MakeInsert("association", {"3", "1", "4"});   // user.
+  auto &&[assoc6, e__] = MakeInsert("association", {"3", "3", "5"});  // group.
 
   EXPECT_UPDATE(Execute(assoc1, &conn), 3);
   EXPECT_UPDATE(Execute(assoc2, &conn), 3);
   EXPECT_UPDATE(Execute(assoc3, &conn), 2);
   EXPECT_UPDATE(Execute(assoc4, &conn), 1);
+  EXPECT_TRUE(ExecuteError(assoc5, &conn));
+  EXPECT_TRUE(ExecuteError(assoc6, &conn));
 
   // Validate move after insertion
   db->BeginTransaction(false);

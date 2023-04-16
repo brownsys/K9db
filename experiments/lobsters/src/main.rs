@@ -121,6 +121,7 @@ struct MysqlTrawler {
     c: my::Pool,
     next_conn: MaybeConn,
     variant: Variant,
+    backend_variant: BackendVariant,
     stories_counter: Arc<AtomicU32>,
     taggings_counter: Arc<AtomicU32>,
     votes_counter: Arc<AtomicU32>,
@@ -206,7 +207,8 @@ impl Service<bool> for MysqlTrawlerBuilder {
                 Ok(MysqlTrawler {
                     c: my::Pool::new(orig_opts.clone()),
                     next_conn: MaybeConn::None,
-                    variant,
+                    variant: variant,
+                    backend_variant: backend_variant,
                     stories_counter: stories_counter,
                     taggings_counter: taggings_counter,
                     votes_counter: votes_counter,
@@ -219,7 +221,8 @@ impl Service<bool> for MysqlTrawlerBuilder {
                 Ok(MysqlTrawler {
                     c: my::Pool::new(orig_opts.clone()),
                     next_conn: MaybeConn::None,
-                    variant,
+                    variant: variant,
+                    backend_variant: backend_variant,
                     stories_counter: stories_counter,
                     taggings_counter: taggings_counter,
                     votes_counter: votes_counter,
@@ -387,19 +390,25 @@ impl Service<TrawlerRequest> for MysqlTrawler {
         }
 
         let variant = self.variant;
+        let backend_variant = self.backend_variant;
 
         Box::pin(async move {
             let inner = async move {
                 let (c, with_notifications) = match variant {
                     Variant::Pelton => handle_req!(endpoints, req),
                 }?;
+                
+                let mut issue_notification = with_notifications && !priming;
+                if let BackendVariant::MariaDB = backend_variant {
+                  issue_notification = false;
+                }
 
                 // notifications
                 if let Some(uid) = acting_as {
-                    if with_notifications && !priming {
-                        match variant {
-                            Variant::Pelton => endpoints::notifications(c, uid).await,
-                        }?;
+                    if issue_notification {
+                      match variant {
+                          Variant::Pelton => endpoints::notifications(c, uid).await,
+                      }?;
                     }
                 }
 

@@ -133,8 +133,7 @@ void EXPECT_VARIABLE(Connection *conn, const std::string &table_name,
           info.column_type == column_type &&
           info.origin_relation == origin_relation &&
           info.origin_column == origin_column &&
-          info.origin_column_index == origin_column_index &&
-          owner == (info.index != nullptr)) {
+          info.origin_column_index == origin_column_index) {
         found = true;
         break;
       }

@@ -71,7 +71,7 @@ TEST(PROXY, UPDATE_TEST) {
       {"INSERT INTO test3 VALUES (2, 'bye');", 1},
       {"INSERT INTO test3 VALUES (3, 'world');", 1},
       {"INSERT INTO test3 VALUES (50, NULL);", 1},
-      {"UPDATE test3 SET ID = 10 WHERE ID = 1;", 2},
+      {"UPDATE test3 SET name = 'hi' WHERE ID = 1;", 1},
       {"DELETE FROM test3 WHERE ID = 3;", 1}};
   for (auto &[q, count] : tests) {
     VLOG(1) << "Running query: " << q;
@@ -94,7 +94,7 @@ TEST(PROXY, QUERY_TEST) {
       << "Bad schema";
   EXPECT_EQ(std::string(FFIResultColumnName(response_select, 1)), "name")
       << "Bad schema";
-  EXPECT_TRUE(HasRow(response_select, 10, "hello"));
+  EXPECT_TRUE(HasRow(response_select, 1, "hi"));
   EXPECT_TRUE(HasRow(response_select, 2, "bye"));
   EXPECT_TRUE(HasRowNull(response_select, 50));
   EXPECT_FALSE(FFIResultNextSet(response_select));
@@ -105,7 +105,7 @@ TEST(PROXY, QUERY_TEST) {
   response_select = FFIExecSelect(c_conn, "SELECT * FROM myview;");
   EXPECT_TRUE(FFIResultNextSet(response_select));
   EXPECT_EQ(FFIResultColumnCount(response_select), 2) << "Bad column count";
-  EXPECT_EQ(FFIResultRowCount(response_select), 2) << "Bad row count";
+  EXPECT_EQ(FFIResultRowCount(response_select), 1) << "Bad row count";
   EXPECT_EQ(FFIResultColumnType(response_select, 0), CType::INT) << "Bad types";
   EXPECT_EQ(FFIResultColumnType(response_select, 1), CType::TEXT)
       << "Bad types";
@@ -136,9 +136,6 @@ TEST(PROXY, QUERY_TEST) {
       << "Bad schema";
   EXPECT_EQ(FFIResultGetInt(response_select, 0, 0), 50) << "Bad data";
   EXPECT_EQ(FFIResultIsNull(response_select, 0, 1), true) << "Bad data";
-  EXPECT_EQ(FFIResultGetInt(response_select, 1, 0), 10) << "Bad data";
-  EXPECT_EQ(std::string(FFIResultGetString(response_select, 1, 1)), "hello")
-      << "Bad data";
   EXPECT_FALSE(FFIResultNextSet(response_select));
   FFIResultDestroy(response_select);
 #endif
@@ -170,7 +167,7 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
   EXPECT_EQ(FFIPreparedStatementArgType(stmt3, 2), CType::TEXT) << "Arg type";
 
   // Query from views.
-  const char *args1[] = {"10"};
+  const char *args1[] = {"1"};
   FFIPreparedResult struct1 = FFIExecPrepare(c_conn, 0, 1, args1);
   EXPECT_TRUE(struct1.query);
   FFIResult result1 = struct1.query_result;
@@ -181,13 +178,12 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
   EXPECT_EQ(std::string(FFIResultColumnName(result1, 1)), "name") << "Schema";
   EXPECT_EQ(FFIResultColumnType(result1, 0), CType::INT) << "Bad types";
   EXPECT_EQ(FFIResultColumnType(result1, 1), CType::TEXT) << "Bad types";
-  EXPECT_EQ(FFIResultGetInt(result1, 0, 0), 10) << "Bad data";
-  EXPECT_EQ(std::string(FFIResultGetString(result1, 0, 1)), "hello")
-      << "Bad str";
+  EXPECT_EQ(FFIResultGetInt(result1, 0, 0), 1) << "Bad data";
+  EXPECT_EQ(std::string(FFIResultGetString(result1, 0, 1)), "hi") << "Bad str";
   EXPECT_FALSE(FFIResultNextSet(result1));
   FFIResultDestroy(result1);
 
-  const char *args2[] = {"10", "50"};
+  const char *args2[] = {"1", "50"};
   FFIPreparedResult struct2 = FFIExecPrepare(c_conn, 1, 2, args2);
   EXPECT_TRUE(struct2.query);
   FFIResult result2 = struct2.query_result;
@@ -198,12 +194,12 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
   EXPECT_EQ(std::string(FFIResultColumnName(result2, 1)), "name") << "Schema";
   EXPECT_EQ(FFIResultColumnType(result2, 0), CType::INT) << "Bad types";
   EXPECT_EQ(FFIResultColumnType(result2, 1), CType::TEXT) << "Bad types";
-  EXPECT_TRUE(HasRow(result2, 10, "hello"));
+  EXPECT_TRUE(HasRow(result2, 1, "hi"));
   EXPECT_TRUE(HasRowNull(result2, 50));
   EXPECT_FALSE(FFIResultNextSet(result2));
   FFIResultDestroy(result2);
 
-  const char *args3[] = {"10", "50", "NULL"};
+  const char *args3[] = {"1", "50", "NULL"};
   FFIPreparedResult struct3 = FFIExecPrepare(c_conn, 2, 3, args3);
   EXPECT_TRUE(struct3.query);
   FFIResult result3 = struct3.query_result;

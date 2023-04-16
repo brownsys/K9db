@@ -108,6 +108,18 @@ const ColumnName &ShardDescriptor::upcolumn() const {
       LOG(FATAL) << "Unreachable";
   }
 }
+size_t ShardDescriptor::upcolumn_index() const {
+  switch (this->type) {
+    case InfoType::DIRECT:
+      return std::get<DirectInfo>(this->info).next_column_index;
+    case InfoType::TRANSITIVE:
+      return std::get<TransitiveInfo>(this->info).next_column_index;
+    case InfoType::VARIABLE:
+      return std::get<VariableInfo>(this->info).origin_column_index;
+    default:
+      LOG(FATAL) << "Unreachable";
+  }
+}
 const std::optional<IndexDescriptor *> ShardDescriptor::index_descriptor()
     const {
   switch (this->type) {

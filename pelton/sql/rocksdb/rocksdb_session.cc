@@ -17,11 +17,13 @@ std::unique_ptr<Session> RocksdbConnection::OpenSession() {
 
 void RocksdbSession::BeginTransaction(bool write) {
   this->write_txn_ = write;
-  rocksdb::TransactionDB *db = this->conn_->db_.get();
-  if (write) {
-    this->txn_ = std::make_unique<RocksdbWriteTransaction>(db);
-  } else {
-    this->txn_ = std::make_unique<RocksdbReadSnapshot>(db);
+  if (this->txn_ == nullptr) {
+    rocksdb::TransactionDB *db = this->conn_->db_.get();
+    if (write) {
+      this->txn_ = std::make_unique<RocksdbWriteTransaction>(db);
+    } else {
+      this->txn_ = std::make_unique<RocksdbReadSnapshot>(db);
+    }
   }
 }
 void RocksdbSession::CommitTransaction() {

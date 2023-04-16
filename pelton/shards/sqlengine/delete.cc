@@ -25,112 +25,98 @@ namespace sqlengine {
   acc += __ACCUM_VAL(__LINE__)
 
 /*
- * Delete dependent records from the shard.
+ * Check FK integrity.
  */
-template <typename Iterable>
-absl::StatusOr<int> DeleteContext::DeleteDependents(
-    const Table &table, const util::ShardName &shard_name, Iterable &&records) {
-  int result = 0;
-  // The insert into this table may affect the sharding of data in dependent
-  // tables. Figure this out.
-  for (const auto &[next_table, desc] : table.dependents) {
-    bool direct = false;
-    const Table &next = this->sstate_.GetTable(next_table);
-    if (desc->shard_kind != shard_name.ShardKind()) {
-      continue;
+absl::Status DeleteContext::CheckFKIntegrity(const sql::SqlDeleteSet &delset) {
+  for (const dataflow::Record &record : delset.Rows()) {
+    // Ensure no rows still point to this record using OWNED_BY columns.
+    for (const auto &[next_table, desc] : this->table_.dependents) {
+      // We need to check this for DIRECT and TRANSITIVE.
+      // We do not need to check this for VARIABLE (opposite direction FK).
+      InfoType type = desc->type;
+      if (type == InfoType::DIRECT || type == InfoType::TRANSITIVE) {
+        // Get the corresponding FK columns in this table and dependent table.
+        const std::string &colname = desc->upcolumn();
+        size_t colidx = desc->upcolumn_index();
+        size_t depcolidx = EXTRACT_VARIANT(column_index, desc->info);
+        ASSERT_RET(colidx == this->schema_.keys().at(0), Internal,
+                   "OWNED_BY FK points to nonPK");
+
+        // Ensure no such records exist.
+        sqlast::Value fkval = record.GetValue(colidx);
+        if (this->db_->Exists(next_table, depcolidx, fkval)) {
+          return absl::InvalidArgumentError("Integrity error1: " + colname);
+        }
+      }
     }
 
-    size_t colidx;
-    size_t nextidx;
-    switch (desc->type) {
-      case InfoType::VARIABLE: {
-        // Dependent tables for which this table acts as the variable ownership
-        // association table can have their data affected by this insert.
+    // Ensure no rows still point to this record using OWNS columns.
+    for (const std::unique_ptr<ShardDescriptor> &desc : this->table_.owners) {
+      if (desc->type == InfoType::VARIABLE) {
         const VariableInfo &info = std::get<VariableInfo>(desc->info);
 
         // Get the corresponding FK columns in this table and dependent table.
-        colidx = info.origin_column_index;
-        nextidx = info.column_index;
-        ASSERT_RET(nextidx == next.schema.keys().at(0), Internal,
+        size_t colidx = info.column_index;
+        size_t depcolidx = info.origin_column_index;
+        ASSERT_RET(colidx == this->schema_.keys().at(0), Internal,
                    "Variable OWNS FK points to nonPK");
-        break;
+
+        // Ensure no such records exist.
+        sqlast::Value fkval = record.GetValue(colidx);
+        if (this->db_->Exists(info.origin_relation, depcolidx, fkval)) {
+          return absl::InvalidArgumentError("Integrity error2: " + info.column);
+        }
       }
-      case InfoType::TRANSITIVE: {
-        // Similar but for transitive dependencies.
-        const TransitiveInfo &info = std::get<TransitiveInfo>(desc->info);
+    }
+  }
+
+  return absl::OkStatus();
+}
+
+/*
+ * Recursively moving/copying records in dependent tables into the affected
+ * shard.
+ */
+absl::StatusOr<int> DeleteContext::CascadeDependents(
+    const sql::SqlDeleteSet &delset) {
+  int result = 0;
+
+  // Group by removed shard.
+  Cascader cascader(this->conn_, this->lock_);
+  for (const util::ShardName &shard : delset.IterateShards()) {
+    for (const auto &[next_table, desc] : this->table_.dependents) {
+      if (shard.ShardKind() != desc->shard_kind) {
+        continue;
+      }
+
+      // No need to cascade over DIRECT and TRANSITIVE by FK integrity.
+      if (desc->type == InfoType::VARIABLE) {
+        const VariableInfo &info = std::get<VariableInfo>(desc->info);
+        const Table &next = this->sstate_.GetTable(next_table);
 
         // Get the corresponding FK columns in this table and dependent table.
-        colidx = info.next_column_index;
-        nextidx = info.column_index;
-        ASSERT_RET(colidx == table.schema.keys().at(0), Internal,
-                   "Transitive OWNER points to nonPK");
-        break;
-      }
-      case InfoType::DIRECT: {
-        const DirectInfo &info = std::get<DirectInfo>(desc->info);
-        colidx = info.next_column_index;
-        nextidx = info.column_index;
-        ASSERT_RET(desc->shard_kind == table.table_name, Internal,
-                   "Direct but to a different shard kind");
-        direct = true;
-        break;
-      }
-    }
+        size_t colidx = info.origin_column_index;
+        size_t nextidx = info.column_index;
+        ASSERT_RET(nextidx == next.schema.keys().at(0), Internal,
+                   "Variable OWNS FK points to nonPK");
 
-    // The value of the column that is a foreign key.
-    std::vector<sql::KeyPair> vals;
-    std::unordered_set<std::string> duplicates;
-    for (const dataflow::Record &record : records) {
-      std::string fkstr = record.GetValue(colidx).AsUnquotedString();
-      if (duplicates.insert(std::move(fkstr)).second) {
-        vals.emplace_back(shard_name.Copy(), record.GetValue(colidx));
-      }
-    }
-
-    // We want to delete next[nextidx] if they are no longer owned by this
-    // user due to deletion.
-    std::vector<dataflow::Record> rm;
-    std::vector<bool> def;
-
-    // Get records.
-    std::vector<dataflow::Record> next_records =
-        this->db_->GetDirect(next_table, nextidx, vals);
-    ASSERT_RET(!direct || next_records.size() == 0, Internal,
-               "Cannot delete data subject with data. use GDPR FORGET");
-
-    // Find whether or not they are owned by this user.
-    std::vector<ShardLocation> locations =
-        Locate(next_table, shard_name, next_records, this->conn_, this->lock_);
-    size_t pk = next.schema.keys().front();
-    std::unordered_set<std::string> &moved_set = this->moved_[next_table];
-    for (size_t i = 0; i < next_records.size(); i++) {
-      switch (locations.at(i)) {
-        case ShardLocation::IN_GIVEN_SHARD:
-          break;
-        case ShardLocation::NOT_IN_GIVEN_SHARD: {
-          rm.push_back(std::move(next_records.at(i)));
-          def.push_back(false);
-          break;
+        // The value of the column that is a foreign key.
+        Cascader::Condition cond;
+        cond.column = nextidx;
+        for (const dataflow::Record &record : delset.Iterate(shard)) {
+          cond.values.push_back(record.GetValue(colidx));
         }
-        case ShardLocation::NO_SHARD: {
-          dataflow::Record &record = next_records.at(i);
-          std::string pkstr = record.GetValue(pk).AsUnquotedString();
-          def.push_back(moved_set.insert(std::move(pkstr)).second);
-          rm.push_back(std::move(record));
-          break;
-        }
+
+        // Ask database to remove from this shard all the records in the next
+        // table whose <nextidx> column IN <vals>, provided they are not owned
+        // by this user in some other way.
+        std::unordered_set<util::ShardName> shards;
+        shards.emplace(shard.ShardKind(), shard.UserID());
+        ACCUM_STATUS(
+            cascader.CascadeOut(next_table, desc->shard_kind, shards, cond),
+            result);
       }
     }
-    if (rm.size() == 0) {
-      continue;
-    }
-
-    // Delete appropriate records, and move free floating ones to default shard.
-    ACCUM(this->db_->DeleteFromShard(next_table, shard_name, rm, def), result);
-
-    // Continue recursively.
-    ACCUM_STATUS(this->DeleteDependents(next, shard_name, util::Iterable(&rm)),
-                 result);
   }
 
   return result;
@@ -140,61 +126,60 @@ absl::StatusOr<int> DeleteContext::DeleteDependents(
  * Main entry point for delete: Executes the statement against the shards.
  */
 absl::StatusOr<sql::SqlResult> DeleteContext::Exec() {
+  // Make sure table exists in the schema first.
+  ASSERT_RET(this->sstate_.TableExists(this->table_name_), InvalidArgument,
+             "Table does not exist");
+
   // Begin the transaction.
   this->db_->BeginTransaction(true);
 
-  // Perform all rocksb operations within the transaction.
-  MOVE_OR_RETURN(DeleteContext::Result result, this->ExecWithinTransaction());
-  auto &[records, status] = result;
-  if (status < 0) {
+  // Execute the delete.
+  MOVE_OR_RETURN(Result result, this->ExecWithinTransaction());
+  if (result.first < 0) {
     this->db_->RollbackTransaction();
-    return sql::SqlResult(status);
+    return sql::SqlResult(result.first);
   }
 
   // Commit transaction.
   this->db_->CommitTransaction();
 
   // Process updates to dataflows.
-  // this->dstate_.ProcessRecords(this->table_name_, std::move(records));
+  this->dstate_.ProcessRecords(this->table_name_, std::move(result.second));
 
   // Return number of copies inserted.
-  return sql::SqlResult(status);
+  return sql::SqlResult(result.first);
 }
 
-// Similar to exec but returns deleted records.
 absl::StatusOr<DeleteContext::Result> DeleteContext::ExecWithinTransaction() {
-  // Make sure table exists in the schema first.
-  ASSERT_RET(this->sstate_.TableExists(this->table_name_), InvalidArgument,
-             "Table does not exist");
+  Result result;
 
   // Execute the delete in the DB.
-  sql::SqlDeleteSet result = this->db_->ExecuteDelete(this->stmt_);
+  sql::SqlDeleteSet resultset = this->db_->ExecuteDelete(this->stmt_);
+  size_t status = resultset.Count();
 
-  // Update dataflow.
-  // TODO(babman): need to do this after the entire transaction commits...
-  std::vector<dataflow::Record> updates;
-  updates.reserve(result.Rows().size());
-  for (const dataflow::Record &record : result.Rows()) {
-    updates.push_back(record.Copy());
+  // Decode the deleted records.
+  // Ensure no incoming FKs point to any of these records.
+  CHECK_STATUS(this->CheckFKIntegrity(resultset));
+
+  // Cascade over dependents tables and removes dependents rows from affected
+  // shards.
+  ASSIGN_OR_RETURN(size_t cascaded, this->CascadeDependents(resultset));
+  if (cascaded < 0) {
+    result.first = cascaded;
+    return result;
   }
 
-  // Process updates to dataflows.
-  this->dstate_.ProcessRecords(this->table_name_, std::move(updates));
-
-  // Recursively remove dependent records in dependent tables from the shard
-  // when needed.
-  int total_count = result.Count();
-  for (const util::ShardName &shard : result.IterateShards()) {
-    ASSIGN_OR_RETURN(int status, this->DeleteDependents(this->table_, shard,
-                                                        result.Iterate(shard)));
-    if (status < 0) {
-      return DeleteContext::Result(std::vector<dataflow::Record>(), status);
-    }
-    total_count += status;
-  }
-
-  // Return number of copies inserted.
-  return DeleteContext::Result(result.Vec(), total_count);
+  result.first = status + cascaded;
+  result.second = resultset.Vec();
+  return result;
+}
+absl::StatusOr<DeleteContext::Result> DeleteContext::DeleteAnonymize() {
+  // Execute the delete in the DB.
+  sql::SqlDeleteSet resultset = this->db_->ExecuteDelete(this->stmt_);
+  Result result;
+  result.first = resultset.Count();
+  result.second = resultset.Vec();
+  return result;
 }
 
 }  // namespace sqlengine
