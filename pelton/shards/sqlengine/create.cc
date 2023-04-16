@@ -176,22 +176,9 @@ std::vector<std::unique_ptr<ShardDescriptor>> CreateContext::MakeBDescriptors(
     ShardDescriptor next;
     next.shard_kind = shard_kind;
     next.type = InfoType::VARIABLE;
-    IndexDescriptor *index = nullptr;
-    if (create_indices) {
-      // We need an index for this table[col_name/origin_column] and shard_kind.
-      auto &col_indices = origin->indices[col_name];
-      if (col_indices.count(shard_kind) == 0) {
-        MOVE_OR_PANIC(IndexDescriptor tmp,
-                      index::Create(origin_table, shard_kind, col_name,
-                                    this->conn_, this->lock_));
-        col_indices.emplace(shard_kind,
-                            std::make_unique<IndexDescriptor>(std::move(tmp)));
-      }
-      index = col_indices.at(shard_kind).get();
-    }
     next.info = VariableInfo{
         target_column_name, target_column_index, type, origin_table,
-        col_name,           origin_index,        index};
+        col_name,           origin_index};
     result.push_back(std::make_unique<ShardDescriptor>(next));
   }
   return result;

@@ -16,17 +16,18 @@ namespace shards {
 namespace sqlengine {
 namespace index {
 
-// We can reuse some indices but it will make our deletes inconsistent when
-// it deletes things in the table where the index is re-used while leaving
-// rows in the table the index is defined over dangling.
-// E.g. deleting a group without deleting its association.
-#define PELTON_INDEX_REUSE false
-
 /*
  * Helpers to build index SQL query.
  */
 namespace {
 
+// Forward declaration for co-recursion.
+absl::StatusOr<std::string> BuildIndexSQL(const std::string &table_name,
+                                          const std::string &shard_kind,
+                                          const std::string &column_name,
+                                          const SharderState &state);
+
+// Direct sharding.
 std::string MakeIndexPiece(const std::string &table_name,
                            const std::string &column_name,
                            const DirectInfo &info) {
@@ -36,6 +37,7 @@ std::string MakeIndexPiece(const std::string &table_name,
          "FROM " + table_name;
 }
 
+// Transitive sharding.
 std::string MakeIndexPiece(const std::string &table_name,
                            const std::string &column_name,
                            const TransitiveInfo &info) {
@@ -49,26 +51,33 @@ std::string MakeIndexPiece(const std::string &table_name,
          "ON " + j1 + " = " + j2;
 }
 
-std::string MakeIndexPiece(const std::string &table_name,
-                           const std::string &column_name,
-                           const VariableInfo &info) {
+// Variable sharding.
+absl::StatusOr<std::string> MakeIndexPiece(const std::string &table_name,
+                                           const std::string &shard_kind,
+                                           const std::string &column_name,
+                                           const VariableInfo &info,
+                                           const SharderState &state) {
+  // Create an SQL statement that maps the parent column (aliased as _col)
+  // to the shards that own rows with that value (aliased as _shard), and their
+  // counts (aliased as _c).
+  const std::string &parent_table = info.origin_relation;
+  const std::string &parent_column = info.origin_column;
+  const std::string &nested_name = parent_table + "_index";
+  MOVE_OR_RETURN(std::string nested,
+                 BuildIndexSQL(parent_table, shard_kind, parent_column, state));
+
+  // Join with nested SQL statement.
   std::string col = table_name + "." + column_name;
-  std::string sh = info.index->index_name + "._shard";
+  std::string sh = nested_name + "." + "_shard";
+  std::string c = nested_name + "." + "_c";
   std::string j1 = table_name + "." + info.column;
-  std::string j2 = info.index->index_name + "._col";
-  std::string c = info.index->index_name + "._c";
-  // Reuse optimization; saves a join. This is used if a new view is still
-  // needed for the index due to other ways of owning (i.e. to feed into UNION).
-  if (PELTON_INDEX_REUSE && info.column == column_name) {
-    return "SELECT " + j2 + " AS _col, " + sh + " AS _shard, " + c + " AS _c " +
-           "FROM " + info.index->index_name;
-  }
-  // No reuse optimization.
+  std::string j2 = nested_name + "." + "_col";
   return "SELECT " + col + " AS _col, " + sh + " AS _shard, " + c + " AS _c " +
-         "FROM " + table_name + " JOIN " + info.index->index_name + " " +
-         "ON " + j1 + " = " + j2;
+         "FROM " + table_name + " JOIN (" + nested + ") AS " + nested_name +
+         " ON " + j1 + " = " + j2;
 }
 
+// Combines all the pieces into a coherent union.
 std::string UnionCount(const std::vector<std::string> &pieces) {
   std::string sql = "SELECT _col, _shard, SUM(_c) as _c FROM (";
   for (size_t i = 0; i < pieces.size(); i++) {
@@ -80,6 +89,51 @@ std::string UnionCount(const std::vector<std::string> &pieces) {
   }
   sql += ") GROUP BY _col, _shard HAVING _col = ? AND _c > 0";
   return sql;
+}
+
+// Recursive function.
+absl::StatusOr<std::string> BuildIndexSQL(const std::string &table_name,
+                                          const std::string &shard_kind,
+                                          const std::string &column_name,
+                                          const SharderState &state) {
+  // Construct part of the index for each way of owning the table.
+  std::vector<std::string> pieces;
+  const Table &table = state.GetTable(table_name);
+  for (const std::unique_ptr<ShardDescriptor> &desc : table.owners) {
+    if (desc->shard_kind == shard_kind) {
+      switch (desc->type) {
+        case InfoType::DIRECT: {
+          const DirectInfo &info = std::get<DirectInfo>(desc->info);
+          pieces.push_back(MakeIndexPiece(table_name, column_name, info));
+          break;
+        }
+        case InfoType::TRANSITIVE: {
+          const TransitiveInfo &info = std::get<TransitiveInfo>(desc->info);
+          pieces.push_back(MakeIndexPiece(table_name, column_name, info));
+          break;
+        }
+        case InfoType::VARIABLE: {
+          const VariableInfo &info = std::get<VariableInfo>(desc->info);
+          // We do not create an index over VARIABLE edges as an optimization,
+          // as they are unneeded for inserts due to FK integrity.
+          // However, now we have some transitive table further down that
+          // depends on this VARIABLE edge, so we need to embed it into our
+          // current index.
+          // We need to do this recursively for all VARIABLE edges above, until
+          // we reach a DIRECT sharding FK, or a transitive FK with an index.
+          MOVE_OR_RETURN(
+              std::string piece,
+              MakeIndexPiece(table_name, shard_kind, column_name, info, state));
+          pieces.push_back(std::move(piece));
+          break;
+        }
+      }
+    }
+  }
+
+  // Combine pieces into one index.
+  ASSERT_RET(pieces.size() > 0, InvalidArgument, "Index over unsharded table!");
+  return UnionCount(pieces);
 }
 
 }  // namespace
@@ -98,53 +152,10 @@ absl::StatusOr<IndexDescriptor> Create(const std::string &table_name,
   uint64_t idx = sstate.IncrementIndexCount();
   std::string index_name = "_index_" + std::to_string(idx);
 
-  // Construct part of the index for each way of owning the table.
-  std::vector<std::string> pieces;
-  std::vector<IndexDescriptor *> reuse;
-  bool can_be_reused = PELTON_INDEX_REUSE;
-  Table &table = sstate.GetTable(table_name);
-  for (const std::unique_ptr<ShardDescriptor> &desc : table.owners) {
-    if (desc->shard_kind == shard_kind) {
-      switch (desc->type) {
-        case InfoType::DIRECT: {
-          const DirectInfo &info = std::get<DirectInfo>(desc->info);
-          pieces.push_back(MakeIndexPiece(table_name, column_name, info));
-          can_be_reused = false;
-          break;
-        }
-        case InfoType::TRANSITIVE: {
-          const TransitiveInfo &info = std::get<TransitiveInfo>(desc->info);
-          pieces.push_back(MakeIndexPiece(table_name, column_name, info));
-          can_be_reused = false;
-          break;
-        }
-        case InfoType::VARIABLE: {
-          const VariableInfo &info = std::get<VariableInfo>(desc->info);
-          // Usually, an index already exists over the origin (i.e. association)
-          // table. Because of the inverse directionality of an OWNS FK, that
-          // index may be used directly without a join! We check if this is the
-          // case below.
-          pieces.push_back(MakeIndexPiece(table_name, column_name, info));
-          if (info.column == column_name) {
-            reuse.push_back(info.index);
-          } else {
-            can_be_reused = false;
-          }
-          break;
-        }
-      }
-    }
-  }
-
-  // Try to reuse an existing index and avoid creating an index if possible.
-  if (can_be_reused && reuse.size() == 1) {
-    const std::string &reused_index = reuse.front()->index_name;
-    return IndexDescriptor{reused_index, table_name, shard_kind, column_name};
-  }
-
-  // Combine pieces into one index.
-  ASSERT_RET(pieces.size() > 0, InvalidArgument, "Index over unsharded table!");
-  sqlast::CreateView create_stmt(index_name, UnionCount(pieces));
+  // Create the SQL query that expresses the index.
+  MOVE_OR_RETURN(std::string sql,
+                 BuildIndexSQL(table_name, shard_kind, column_name, sstate));
+  sqlast::CreateView create_stmt(index_name, sql);
 
   // Plan and create the flow for the index.
   MOVE_OR_RETURN(sql::SqlResult result,

@@ -97,10 +97,6 @@ struct VariableInfo {
   TableName origin_relation;
   ColumnName origin_column;
   ColumnIndex origin_column_index;
-  // The index for dealing with variability.
-  // The index maps values of <column> to data subject IDs (for ownership).
-  // No index for accessors: this is empty.
-  IndexDescriptor *index;
 };
 
 // Specifies one way a table is sharded.

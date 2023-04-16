@@ -116,7 +116,7 @@ const std::optional<IndexDescriptor *> ShardDescriptor::index_descriptor()
     case InfoType::TRANSITIVE:
       return std::get<TransitiveInfo>(this->info).index;
     case InfoType::VARIABLE:
-      return std::get<VariableInfo>(this->info).index;
+      return {};
     default:
       LOG(FATAL) << "Unreachable";
   }
