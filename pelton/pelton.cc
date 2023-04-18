@@ -163,25 +163,19 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
     return std::move(special.value());
   }
 
-  if (absl::StartsWith(sql, "SELECT")) {
-    // Canonicalize the query.
-    auto pair = prepared::Canonicalize(sql);
-    prepared::CanonicalQuery &canonical = pair.first;
-
-    prepared::CanonicalDescriptor descriptor =
-            prepared::MakeCanonical(canonical);
-    // Check if statement should be served via a view or directly.
-    if (prepared::NeedsFlow(canonical)) {
-      // Plan the query.
-      std::string flow_name =
-          "_" + std::to_string(connection->state->GetBackendViewCount());
-      std::string create_view_stmt =
-          "CREATE VIEW _v" + flow_name + " AS '\"" + canonical + "\"'";
-      CHECK_STATUS_OR(exec(connection, create_view_stmt));
-      connection->state->IncrementBackendViewCount();
-      std::string select_view_stmt =
-          "SELECT * FROM _v" + flow_name;
-      return shards::sqlengine::Shard(select_view_stmt, connection);
+  if (absl::StartsWith(sql, "SELECT") && prepared::NeedsFlow(sql)) {
+    std::string flow_name =
+        "_" + std::to_string(connection->state->GetBackendViewCount());
+    std::string create_view_stmt =
+        "CREATE VIEW _v" + flow_name + " AS '\"" + sql + "\"'";
+    CHECK_STATUS_OR(exec(connection, create_view_stmt));
+    connection->state->IncrementBackendViewCount();
+    std::string select_view_stmt =
+        "SELECT * FROM _v" + flow_name;
+    try {
+      return shards::sqlengine::Shard(sql, connection);
+    } catch (std::exception &e) {
+      return absl::InternalError(e.what());
     }
   }
   // Parse and rewrite statement.
