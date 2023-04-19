@@ -385,6 +385,20 @@ cc_test(
 )
 
 cc_test(
+    name = "update-test",
+    srcs = [
+        "update_unittest.cc",
+    ],
+    deps = [
+        ":insert",
+        ":update",
+        ":tests_helpers",
+        "//pelton/util:shard_name",
+        "@glog",
+    ],
+)
+
+cc_test(
     name = "gdpr-get-test",
     srcs = [
         "gdpr_get_unittest.cc",

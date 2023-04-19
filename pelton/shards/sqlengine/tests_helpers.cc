@@ -96,6 +96,34 @@ std::pair<std::string, std::string> MakeInsert(
   return std::pair(sql, row);
 }
 
+// sqlast::Update.
+std::string MakeUpdate(
+    const std::string &tbl_name,
+    const std::vector<std::pair<std::string, std::string>> &set_pairs,
+    const std::vector<std::pair<std::string, std::string>> &update_pairs) {
+  std::string sql = "UPDATE " + tbl_name + " SET ";
+
+  for (size_t i = 0; i < set_pairs.size(); i++) {
+    sql += set_pairs.at(i).first + " = " + set_pairs.at(i).second;
+    if (i < set_pairs.size() - 1) {
+      sql += ",";
+    }
+  }
+
+  sql += " WHERE ";
+
+  for (size_t i = 0; i < update_pairs.size(); i++) {
+    sql += update_pairs.at(i).first + " = " + update_pairs.at(i).second;
+    if (i < update_pairs.size() - 1) {
+      sql += ",";
+    }
+  }
+
+  sql += ";";
+
+  return sql;
+}
+
 // sqlast::Get.
 std::string MakeGDPRGet(const std::string &tbl_name,
                         const std::string &user_id) {

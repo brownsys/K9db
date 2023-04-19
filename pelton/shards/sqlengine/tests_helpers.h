@@ -70,6 +70,11 @@ std::string MakeCreate(const std::string &tbl_name,
 std::pair<std::string, std::string> MakeInsert(
     const std::string &tbl_name, const std::vector<std::string> &vals);
 
+std::string MakeUpdate(
+    const std::string &tbl_name,
+    const std::vector<std::pair<std::string, std::string>> &set_pairs,
+    const std::vector<std::pair<std::string, std::string>> &update_pairs);
+
 std::string MakeDelete(const std::string &tbl_name,
                        const std::vector<std::string> &conds);
 
