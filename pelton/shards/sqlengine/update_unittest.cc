@@ -59,14 +59,13 @@ TEST_F(UpdateTest, UnshardedTable) {
   EXPECT_UPDATE(Execute(update_stmt3, &conn), 1);
   EXPECT_UPDATE(Execute(update_stmt4, &conn), 2);
 
-  // Validate insertions.
+  // Validate insertions and updates.
   db->BeginTransaction(false);
   sql::SqlResultSet r = db->GetShard("user", SN(DEFAULT_SHARD, DEFAULT_SHARD));
   EXPECT_EQ(r, (V{"|0|u5|", "|1|u8|", "|2|u8|", row4}));
   db->RollbackTransaction();
 }
 
-/*
 TEST_F(UpdateTest, Datasubject) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
@@ -84,16 +83,30 @@ TEST_F(UpdateTest, Datasubject) {
   auto &&[stmt3, row3] = MakeInsert("user", {"2", "'u3'"});
   auto &&[stmt4, row4] = MakeInsert("user", {"5", "'u10'"});
 
+  // Update one field.
+  auto &&update_stmt1 = MakeUpdate("user", {{"name", "'u5'"}}, {{"id", "0"}});
+  // Update two records to have the same field.
+  auto &&update_stmt2 = MakeUpdate("user", {{"name", "'u7'"}}, {{"id", "1"}});
+  auto &&update_stmt3 = MakeUpdate("user", {{"name", "'u7'"}}, {{"id", "2"}});
+  // Update two values in one statement.
+  auto &&update_stmt4 =
+      MakeUpdate("user", {{"name", "'u8'"}}, {{"name", "'u7'"}});
+
   EXPECT_UPDATE(Execute(stmt1, &conn), 1);
   EXPECT_UPDATE(Execute(stmt2, &conn), 1);
   EXPECT_UPDATE(Execute(stmt3, &conn), 1);
   EXPECT_UPDATE(Execute(stmt4, &conn), 1);
 
-  // Validate insertions.
+  EXPECT_UPDATE(Execute(update_stmt1, &conn), 1);
+  EXPECT_UPDATE(Execute(update_stmt2, &conn), 1);
+  EXPECT_UPDATE(Execute(update_stmt3, &conn), 1);
+  EXPECT_UPDATE(Execute(update_stmt4, &conn), 2);
+
+  // Validate insertions and updates.
   db->BeginTransaction(false);
-  EXPECT_EQ(db->GetShard("user", SN("user", "0")), (V{row1}));
-  EXPECT_EQ(db->GetShard("user", SN("user", "1")), (V{row2}));
-  EXPECT_EQ(db->GetShard("user", SN("user", "2")), (V{row3}));
+  EXPECT_EQ(db->GetShard("user", SN("user", "0")), (V{"|0|u5|"}));
+  EXPECT_EQ(db->GetShard("user", SN("user", "1")), (V{"|1|u8|"}));
+  EXPECT_EQ(db->GetShard("user", SN("user", "2")), (V{"|2|u8|"}));
   EXPECT_EQ(db->GetShard("user", SN("user", "5")), (V{row4}));
   EXPECT_EQ(db->GetShard("user", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("user", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
@@ -120,16 +133,21 @@ TEST_F(UpdateTest, DirectTable) {
   auto &&[addr2, row2] = MakeInsert("addr", {"1", "0"});
   auto &&[addr3, row3] = MakeInsert("addr", {"2", "5"});
 
+  // Update FK in a directly sharded table (should move to a different shard).
+  auto &&update_stmt = MakeUpdate("addr", {{"uid", "5"}}, {{"id", "0"}});
+
   EXPECT_UPDATE(Execute(usr1, &conn), 1);
   EXPECT_UPDATE(Execute(usr2, &conn), 1);
   EXPECT_UPDATE(Execute(addr1, &conn), 1);
   EXPECT_UPDATE(Execute(addr2, &conn), 1);
   EXPECT_UPDATE(Execute(addr3, &conn), 1);
 
-  // Validate insertions.
+  EXPECT_UPDATE(Execute(update_stmt, &conn), 2);
+
+  // Validate insertions and updates.
   db->BeginTransaction(false);
-  EXPECT_EQ(db->GetShard("addr", SN("user", "0")), (V{row1, row2}));
-  EXPECT_EQ(db->GetShard("addr", SN("user", "5")), (V{row3}));
+  EXPECT_EQ(db->GetShard("addr", SN("user", "0")), (V{row2}));
+  EXPECT_EQ(db->GetShard("addr", SN("user", "5")), (V{row3, "|0|5|"}));
   EXPECT_EQ(db->GetShard("addr", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("addr", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   db->RollbackTransaction();
@@ -161,6 +179,10 @@ TEST_F(UpdateTest, TransitiveTable) {
   auto &&[num3, row3] = MakeInsert("phones", {"2", "0"});
   auto &&[num4, row4] = MakeInsert("phones", {"3", "0"});
 
+  // Update FK in a transitively sharded table
+  //    (should move transitively owned records to a different shard too).
+  auto &&update_stmt = MakeUpdate("addr", {{"uid", "5"}}, {{"id", "0"}});
+
   EXPECT_UPDATE(Execute(usr1, &conn), 1);
   EXPECT_UPDATE(Execute(usr2, &conn), 1);
   EXPECT_UPDATE(Execute(addr1, &conn), 1);
@@ -171,15 +193,19 @@ TEST_F(UpdateTest, TransitiveTable) {
   EXPECT_UPDATE(Execute(num3, &conn), 1);
   EXPECT_UPDATE(Execute(num4, &conn), 1);
 
-  // Validate insertions.
+  EXPECT_UPDATE(Execute(update_stmt, &conn), 3);
+
+  // Validate insertions and updates.
   db->BeginTransaction(false);
-  EXPECT_EQ(db->GetShard("phones", SN("user", "0")), (V{row2, row3, row4}));
-  EXPECT_EQ(db->GetShard("phones", SN("user", "5")), (V{row1}));
+  EXPECT_EQ(db->GetShard("phones", SN("user", "0")), (V{row2}));
+  EXPECT_EQ(db->GetShard("phones", SN("user", "5")),
+            (V{row1, "|2|0|", "|3|0|"}));
   EXPECT_EQ(db->GetShard("phones", SN("user", "10")), (V{}));
   EXPECT_EQ(db->GetShard("phones", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{}));
   db->RollbackTransaction();
 }
 
+/*
 TEST_F(UpdateTest, DeepTransitiveTable) {
   // Parse create table statements.
   std::string usr = MakeCreate("user", {"id" I PK, "name" STR}, true);
