@@ -18,29 +18,17 @@ mariadb --port=10001 --host=127.0.0.1 < experiments/explain/shuup/{schema_name}.
 
 Which table is the data subject (PII) - `shuup_contact`, `auth_user` or `shuup_personcontact`?
 
-0. Run `EXPLAIN` on our base, unannotated schema.
+Shuup’s schema has several tables that might correspond to data subjects. Pelton’s `EXPLAIN COMPLIANCE` helps the developer understand that they need to annotate `personcontact`.
 
-1. Annotate `auth_user` as PII: guest users are `personcontact`s ⇒ they have addresses etc. but they would not be sharded, because `personcontact.user_id` column is nullable. Explain tells us that there may be no owner in some cases. Explain also warns us that `contact` has `email` etc fields but is unowned => Forgot `OWNS` on `contact_ptr_id`
+0. Run `EXPLAIN` on our base, unannotated schema to receive guidance on which tables might correspond to data subjects. It will flag several columns which sound like they could correspond to data subjects in `auth_user`, `shuup_contact`, and `shuup_personcontact`.
 
-2. `auth_user` and `contact` are PII: because explain flagged the nullable `personcontact.user_id` ⇒ `OWNS` into PII creates warning
+1. A developer's first step might be to annotate `auth_user`, the login details table, as PII - this is plausible, but incompliant. It results in `shuup_contact` being unconnected to the ownership graph, as there are no foreign keys `auth_user`. The `personcontact` table has such a foreign key (`personcontact.user_id`), but it is nullable (e.g., for guest customers who lack accounts), and thus some of its rows will be stored in μDBs and others in the orphaned region. Explain also warns us that `shuup_contact` has `email` etc fields but is unowned, indicating that the developer should add an `OWNS` annotation to `contact_ptr_id`.
 
-3. `contact` is PII: overcompliant. The developer will figure this out by looking at how things are sharded.
+2. `auth_user` and `contact` are PII. This is overcompliant - see 3. below.
 
-4. `shuup_personcontact` is PII.
+3. `contact` is PII. A developer might also annotate `contact` with `DATA SUBJECT`, but that table includes entries for customers and companies. Annotating it makes companies into data subjects, will duplicate various company-related tables across μDBs. `EXPLAIN COMPLIANCE` alerts the developer to this.
 
-## Extract from paper discussing Shuup
-
-Shuup’s schema has several tables that might correspond to data subjects. Pelton’s `EXPLAIN COMPLIANCE` helps the developer understand that they need to annotate `personcontact`. An incompliant (but plausible) alternative would be to annotate `auth_user`, the login details table. This results in `contact` being unconnected to the ownership graph, as there are no foreign keys `auth_user`. The `personcontact` table has such a foreign key, but it is nullable (e.g., for guest customers who lack accounts), and thus some of its rows will be stored in μDBs and others in the orphaned region. Pelton’s `EXPLAIN COMPLIANCE` helps the developer identify and rectify these issues:
-
-```
-1 Table "contact": GLOBAL
-2 [Compliance Warning] Column "email" suggests personal
-data, but the table is not connected to any owners. 3 Table "personcontact": in μDB for auth_user.id
-4 [Compliance Warning] Table has owners, but nullable
-       foreign key may make data unreachable.
-```
-
-A developer might also annotate `contact` with `DATA SUBJECT`, but that table includes entries for customers and companies. Annotating it makes companies into data subjects, will duplicate various company-related tables across μDBs. `EXPLAIN COMPLIANCE` alerts the developer to this as well.
+4. `shuup_personcontact` is PII. We annotate personcontact with `DATA SUBJECT`. This table stores natural persons, and has FKs to their contact information (in `contact`) and their logins (in `auth_user`) if they have accounts. Thus, `personcontact` connects users with and users without accounts.
 
 ## Step by Step
 
