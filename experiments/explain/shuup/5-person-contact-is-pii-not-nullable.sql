@@ -17,6 +17,7 @@ CREATE DATA_SUBJECT TABLE shuup_personcontact ( \
   contact_ptr_id int NOT NULL, \
   name text, \
   user_id int NOT NULL, \
+  email text, \
   PRIMARY KEY(pid), \
   FOREIGN KEY (contact_ptr_id) OWNS shuup_contact(id), \
   FOREIGN KEY (user_id) OWNS auth_user(id) \

@@ -17,6 +17,7 @@ CREATE TABLE shuup_personcontact ( \
   name text, \
   contact_ptr_id int, \
   user_id int, \
+  email text, \
   PRIMARY KEY(pid), \
   FOREIGN KEY (contact_ptr_id) REFERENCES shuup_contact(id), \
   FOREIGN KEY (user_id) REFERENCES auth_user(id) \
