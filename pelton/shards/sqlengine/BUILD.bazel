@@ -393,6 +393,7 @@ cc_test(
         ":insert",
         ":update",
         ":tests_helpers",
+        ":engine",
         "//pelton/util:shard_name",
         "@glog",
     ],
