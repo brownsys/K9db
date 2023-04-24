@@ -163,6 +163,32 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
     return std::move(special.value());
   }
 
+  // Check if this is a query that can only be served with a view.
+  if (prepared::NeedsFlow(sql)) {
+    try {
+      // Create a one-off view for this query.
+      if (sql.back() == ';') {
+        sql.pop_back();
+      }
+
+      size_t idx = connection->state->GetAndIncrementOneOffViewCount();
+      std::string flow_name = "_oneoff_" + std::to_string(idx);
+      std::string create_view_stmt =
+          "CREATE VIEW " + flow_name + " AS '\"" + sql + "\"'";
+
+      // Make sure creation was successful.
+      MOVE_OR_RETURN(sql::SqlResult result,
+                     shards::sqlengine::Shard(create_view_stmt, connection));
+      ASSERT_RET(result.Success(), Internal, "Could not create one-off view");
+
+      // Select the content of the view and return it.
+      std::string select_view = "SELECT * FROM " + flow_name + ";";
+      return shards::sqlengine::Shard(select_view, connection);
+    } catch (std::exception &e) {
+      return absl::InternalError(e.what());
+    }
+  }
+
   // Parse and rewrite statement.
   try {
     return shards::sqlengine::Shard(sql, connection);
@@ -257,7 +283,12 @@ absl::StatusOr<SqlResult> exec(Connection *connection, size_t stmt_id,
                                const std::vector<std::string> &args) {
   const prepared::PreparedStatementDescriptor &stmt =
       connection->stmts.at(stmt_id);
-  return exec(connection, prepared::PopulateStatement(stmt, args));
+  try {
+    std::string sql = prepared::PopulateStatement(stmt, args);
+    return shards::sqlengine::Shard(sql, connection);
+  } catch (std::exception &e) {
+    return absl::InternalError(e.what());
+  }
 }
 
 }  // namespace pelton

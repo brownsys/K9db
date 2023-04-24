@@ -120,13 +120,34 @@ TEST(PROXY, QUERY_TEST) {
       << "Bad data";
   EXPECT_FALSE(FFIResultNextSet(response_select));
   FFIResultDestroy(response_select);
+
+  // Query using one-off view.
+  response_select =
+      FFIExecSelect(c_conn, "SELECT * FROM test3 WHERE ID > 4 ORDER BY name;");
+  EXPECT_TRUE(FFIResultNextSet(response_select));
+  EXPECT_EQ(FFIResultColumnCount(response_select), 2) << "Bad column count";
+  EXPECT_EQ(FFIResultRowCount(response_select), 2) << "Bad row count";
+  EXPECT_EQ(FFIResultColumnType(response_select, 0), CType::INT) << "Bad types";
+  EXPECT_EQ(FFIResultColumnType(response_select, 1), CType::TEXT)
+      << "Bad types";
+  EXPECT_EQ(std::string(FFIResultColumnName(response_select, 0)), "ID")
+      << "Bad schema";
+  EXPECT_EQ(std::string(FFIResultColumnName(response_select, 1)), "name")
+      << "Bad schema";
+  EXPECT_EQ(FFIResultGetInt(response_select, 0, 0), 50) << "Bad data";
+  EXPECT_EQ(FFIResultIsNull(response_select, 0, 1), true) << "Bad data";
+  EXPECT_EQ(FFIResultGetInt(response_select, 1, 0), 10) << "Bad data";
+  EXPECT_EQ(std::string(FFIResultGetString(response_select, 1, 1)), "hello")
+      << "Bad data";
+  EXPECT_FALSE(FFIResultNextSet(response_select));
+  FFIResultDestroy(response_select);
 #endif
 }
 
 // Test prepared statements.
 #ifndef PELTON_VALGRIND_MODE
 TEST(PROXY, PREPARED_STATMENT_TEST) {
-  // Query from table.
+  // Reads from table.
   FFIPreparedStatement stmt1 =
       FFIPrepare(c_conn, "SELECT * FROM test3 where ID = ?;");
 
@@ -139,6 +160,7 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
   EXPECT_EQ(FFIPreparedStatementArgCount(stmt2), 2) << "Bad arg count";
   EXPECT_EQ(FFIPreparedStatementArgType(stmt2, 0), CType::INT) << "Arg type";
   EXPECT_EQ(FFIPreparedStatementArgType(stmt2, 1), CType::INT) << "Arg type";
+
   FFIPreparedStatement stmt3 = FFIPrepare(
       c_conn, "SELECT * FROM test3 where ID IN (?, ?) AND test3.name = ?;");
   EXPECT_EQ(FFIPreparedStatementID(stmt3), 2) << "Bad statement id";
@@ -196,6 +218,29 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
   EXPECT_EQ(FFIResultIsNull(result3, 0, 1), true) << "Bad str";
   EXPECT_FALSE(FFIResultNextSet(result3));
   FFIResultDestroy(result3);
+
+  // Reads from views.
+  FFIPreparedStatement stmt4 = FFIPrepare(
+      c_conn, "SELECT ID, COUNT(*) AS C FROM test3 GROUP BY ID HAVING ID = ?;");
+  EXPECT_EQ(FFIPreparedStatementID(stmt4), 3) << "Bad statement id";
+  EXPECT_EQ(FFIPreparedStatementArgCount(stmt4), 1) << "Bad arg count";
+  EXPECT_EQ(FFIPreparedStatementArgType(stmt4, 0), CType::INT) << "Arg type";
+
+  const char *args4[] = {"10"};
+  FFIPreparedResult struct4 = FFIExecPrepare(c_conn, 3, 1, args4);
+  EXPECT_TRUE(struct4.query);
+  FFIResult result4 = struct4.query_result;
+  EXPECT_TRUE(FFIResultNextSet(result4));
+  EXPECT_EQ(FFIResultColumnCount(result4), 2) << "Bad column count";
+  EXPECT_EQ(FFIResultRowCount(result4), 1) << "Bad row count";
+  EXPECT_EQ(std::string(FFIResultColumnName(result4, 0)), "ID") << "Schema";
+  EXPECT_EQ(std::string(FFIResultColumnName(result4, 1)), "C") << "Schema";
+  EXPECT_EQ(FFIResultColumnType(result4, 0), CType::INT) << "Bad types";
+  EXPECT_EQ(FFIResultColumnType(result4, 1), CType::UINT) << "Bad types";
+  EXPECT_EQ(FFIResultGetInt(result4, 0, 0), 10) << "Bad data";
+  EXPECT_EQ(FFIResultGetUInt(result4, 0, 1), 1) << "Bad str";
+  EXPECT_FALSE(FFIResultNextSet(result4));
+  FFIResultDestroy(result4);
 }
 #endif
 
