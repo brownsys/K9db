@@ -25,7 +25,7 @@ elif [[ "$1"  == "tsan" ]]; then
 elif [[ "$1" == "unencrypted" ]]; then
   rm -rf /mnt/disks/my-ssd/pelton/
   mkdir -p /mnt/disks/my-ssd/pelton/
-  bazel run //:pelton --config opt --encryption=off -- "${@:2}"
+  bazel run //:pelton --config opt --encryption=off -- --db_path=/mnt/disks/my-ssd/pelton/ "${@:2}"
 
 else
   echo 'use either "dbg", "opt", "unencrypted", "valgrind", "asan", or "tsan"!'
