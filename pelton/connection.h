@@ -1,6 +1,7 @@
 #ifndef PELTON_CONNECTION_H_
 #define PELTON_CONNECTION_H_
 
+#include <atomic>
 #include <memory>
 // NOLINTNEXTLINE
 #include <mutex>
@@ -52,8 +53,8 @@ class State {
                              prepared::CanonicalDescriptor &&descriptor);
 
   // Manage backend views for selects that need flows
-  int GetBackendViewCount() const;
-  void IncrementBackendViewCount();
+  size_t GetAndIncrementOneOffViewCount() { return this->oneoff_view_count_++; }
+
   // Statistics.
   sql::SqlResult FlowDebug(const std::string &view_name) const;
   sql::SqlResult SizeInMemory() const;
@@ -78,7 +79,7 @@ class State {
   mutable util::UpgradableMutex mtx_;
   mutable util::UpgradableMutex canonical_mtx_;
   // Counter for Backend views created to handle selects which require views
-  int backend_view_count;
+  std::atomic<size_t> oneoff_view_count_;
 };
 
 struct Connection {

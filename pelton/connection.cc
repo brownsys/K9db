@@ -41,10 +41,6 @@ void State::AddCanonicalStatement(const std::string &canonical,
   this->stmts_.emplace(canonical, std::move(descriptor));
 }
 
-// Manage backend views for selects that need flows
-int State::GetBackendViewCount() const {return this->backend_view_count;}
-void State::IncrementBackendViewCount() {this->backend_view_count += 1;}
-
 // Statistics.
 sql::SqlResult State::FlowDebug(const std::string &view_name) const {
   util::SharedLock lock = this->ReaderLock();

@@ -169,6 +169,7 @@ cc_library(
     hdrs = [
         "filter.h",
     ],
+    visibility = ["//pelton:__subpackages__"],
     deps = [
         "//pelton/dataflow:record",
         "//pelton/dataflow:schema",

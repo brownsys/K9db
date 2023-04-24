@@ -287,6 +287,7 @@ cc_library(
         "//pelton/shards:types",
         "//pelton/sql:connection",
         "//pelton/sql:result",
+        "//pelton/sql/rocksdb:filter",
         "//pelton/sqlast:ast",
         "//pelton/sqlast:value_mapper",
         "//pelton/util:status",

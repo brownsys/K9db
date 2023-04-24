@@ -36,88 +36,64 @@ namespace {
 static std::regex FROM_TABLE_REGEX{FROM_TABLE};
 static std::regex CANONICAL_PARAM_REGEX{TABLE_COLUMN_NAME OP Q};
 
-// Prepared statements that should not be served from views.
-std::unordered_set<std::string> NO_VIEWS = {
-    // PreparedTest.java.
-    "SELECT * FROM tbl WHERE id = ?",
-    // Lobsters.
-    // Q1.
-    "SELECT 1 AS `one` FROM users WHERE users.username = ?",
-    // Q2.
-    "SELECT 1 AS `one`, stories.short_id FROM stories WHERE stories.short_id = "
-    "?",
-    // Q3.
-    "SELECT tags.* FROM tags WHERE tags.inactive = 0 AND tags.tag = ?",
-    // Q4.
-    "SELECT keystores.* FROM keystores WHERE keystores.keyX = ?",
-    // Q5.
-    "SELECT votes.* FROM votes WHERE votes.user_id = ? AND "
-    "votes.story_id = ? AND votes.comment_id IS NULL",
-    // Q7.
-    "SELECT stories.* FROM stories WHERE stories.short_id = ?",
-    // Q8.
-    "SELECT users.* FROM users WHERE users.id = ?",
-    // Q9.
-    "SELECT 1 AS `one`, comments.short_id FROM comments WHERE "
-    "comments.short_id = ?",
-    // Q10.
-    "SELECT votes.* FROM votes WHERE votes.user_id = ? AND "
-    "votes.story_id = ? AND votes.comment_id = ?",
-    // Q11.
-    "SELECT stories.id, stories.merged_story_id FROM stories WHERE "
-    "stories.merged_story_id = ?",
-    // Q14.
-    "SELECT comments.* FROM comments WHERE comments.story_id = ? AND "
-    "comments.short_id = ?",
-    // Q15.
-    "SELECT read_ribbons.* FROM read_ribbons WHERE read_ribbons.user_id = ? "
-    "AND read_ribbons.story_id = ?",
-    // Q17.
-    "SELECT votes.* FROM votes WHERE votes.comment_id = ?",
-    // Q18.
-    "SELECT hidden_stories.story_id FROM hidden_stories WHERE "
-    "hidden_stories.user_id = ?",
-    // Q19.
-    "SELECT users.* FROM users WHERE users.username = ?",
-    // Q20.
-    "SELECT hidden_stories.* FROM hidden_stories WHERE hidden_stories.user_id "
-    "= ? AND hidden_stories.story_id = ?",
-    // Q21.
-    "SELECT tag_filters.* FROM tag_filters WHERE tag_filters.user_id = ?",
-    // Q23.
-    "SELECT taggings.story_id FROM taggings WHERE taggings.story_id = ?",
-    // Q24.
-    "SELECT saved_stories.* FROM saved_stories WHERE saved_stories.user_id = ? "
-    "AND saved_stories.story_id = ?",
-    // Q25,
-    "SELECT suggested_titles.* FROM suggested_titles WHERE "
-    "suggested_titles.story_id = ?",
-    // Q26,
-    "SELECT taggings.* FROM taggings WHERE taggings.story_id = ?",
-    // Q27,
-    "SELECT 1 AS `one`, hats.user_id FROM hats WHERE hats.user_id = ? LIMIT 1",
-    // Q28.
-    "SELECT suggested_taggings.* FROM suggested_taggings WHERE "
-    "suggested_taggings.story_id = ?",
-    // Q29.
-    "SELECT tags.* FROM tags WHERE tags.id = ?",
-    // Q31.
-    "SELECT 1, user_id, story_id FROM hidden_stories WHERE "
-    "hidden_stories.user_id = ? AND hidden_stories.story_id = ?",
-    // Q32.
-    "SELECT stories.* FROM stories WHERE stories.id = ?",
-    // Q33.
-    "SELECT votes.* FROM votes WHERE votes.user_id = ? AND "
-    "votes.comment_id = ?",
-    // Q34.
-    "SELECT comments.* FROM comments WHERE comments.short_id = ?",
-    // NOT in test but does not need a view.
-    "SELECT taggings.story_id, taggings.tag_id FROM taggings WHERE "
-    "taggings.story_id = ? AND taggings.tag_id = ?",
-    // GDPRBench.
-    "SELECT * FROM usertable WHERE YCSB_KEY = ?",
-    // Owncloud.
-    "SELECT * FROM file_view WHERE share_target = ?"};
+// Regexes to figure out if a view is needed or not.
+#define SPACE_OR_OPEN_PAR "(\\s|\\()"
+#define SUM_OR_COUNT "( SUM\\s*\\(| COUNT\\s*\\()"
+#define JOIN " JOIN" SPACE_OR_OPEN_PAR
+#define GROUP_BY " GROUP BY "
+#define ORDER_BY " ORDER BY "
+#define EXPENSIVE "(" JOIN "|" ORDER_BY "|" GROUP_BY "|>|<|>=|<=|\\+|-)"
+#define SELECT "(^|\\s|\\(|\\))SELECT" SPACE_OR_OPEN_PAR
+
+static std::regex VIEW_FEATURES_REGEX{SUM_OR_COUNT "|" EXPENSIVE};
+static std::regex NESTED_QUERY{SELECT ".*" SELECT};
+
+// Helper function that:
+// 1) Removes all quoted text ("", '', ``)
+// 2) Standardizes white space by changing \n and \t to ' '
+// 3) turns everything into upper case.
+std::string CleanCanonicalQuery(const CanonicalQuery &query) {
+  char current_quote = ' ';
+  bool in_quote = false;
+  std::string cleaned_query = "";
+  for (size_t i = 0; i < query.size(); i++) {
+    char c = query.at(i);
+
+    // Ignore whats inside quotes.
+    if (in_quote) {
+      // If we are inside quotes and we encounter \, we escape next char.
+      if (c == '\\') {
+        i++;
+        continue;
+      }
+      // Found matching closing quote.
+      if (current_quote == c) {
+        current_quote = ' ';
+        in_quote = false;
+      }
+      continue;
+    }
+
+    // We are not inside quotes.
+    // But maybe we are at the opening quote!
+    if (c == '"' || c == '`' || c == '\'') {
+      current_quote = c;
+      in_quote = true;
+      continue;
+    }
+
+    // Character is legit, we push it after cleaning it.
+    if (c == '\t' || c == '\n' || c == '\r') {
+      cleaned_query.push_back(' ');
+    } else if (c >= 97 && c <= 122) {
+      cleaned_query.push_back(c - 32);
+    } else {
+      cleaned_query.push_back(c);
+    }
+  }
+
+  return cleaned_query;
+}
 
 }  // namespace
 
@@ -249,59 +225,20 @@ PreparedStatementDescriptor MakeStmt(const std::string &query,
   return descriptor;
 }
 
-// Helper function that:
-// 1) Removes all quoted text ("", '', ``)
-// 2) Standardizes white space by changing \n and \t to ' '
-std::string CleanCanonicalQuery(const CanonicalQuery &query){
-  std::string quotes = "'\"`";
-  char last_quote = ' ';
-  std::string cleaned_query = "";
-  for (auto it = query.begin(); it != query.end();it++) {
-    if (quotes.find(*it)<quotes.length()) {
-      if (last_quote == ' '){
-        last_quote = *it;
-      } else if (last_quote == *it){
-        last_quote = ' ';
-        continue;
-      }
-    }
-    if (last_quote == ' '){
-      if (*it == '\t' || *it == '\n'){
-        cleaned_query.push_back(' ');
-      } else {
-        cleaned_query.push_back(*it);
-      }
-    }
-  }
-  
-  return cleaned_query;
-}
-
 // Find out if a query needs to be served from a flow.
 bool NeedsFlow(const CanonicalQuery &query) {
   std::string cleaned_query = CleanCanonicalQuery(query);
-
-  // Use string.find to find JOINs, GROUP BYs, ORDER BYs, and >s
-  if (cleaned_query.find(" JOIN ") < cleaned_query.length()){
-    return true;
-  } else if (cleaned_query.find(" GROUP BY ") < cleaned_query.length()){
-    return true;
-  } else if (cleaned_query.find(" ORDER BY ") < cleaned_query.length()){
-    return true;
-  } else if (cleaned_query.find(">") < cleaned_query.length()){
-    return true;
+  if (!absl::StartsWith(cleaned_query, "SELECT")) {
+    return false;
   }
 
-  // Use regex to find COUNT and SUM due to variable whitespace between
-  // keyword and open paren
-  std::regex COUNT_SUM_REGEX{" SUM\\s*\\(| COUNT\\s*\\("};
   std::smatch sm;
-  if (regex_search(cleaned_query, sm, COUNT_SUM_REGEX)) {
+  if (regex_search(cleaned_query, sm, VIEW_FEATURES_REGEX)) {
+    return true;
+  } else if (regex_search(cleaned_query, sm, NESTED_QUERY)) {
     return true;
   }
-
   return false;
-  // return absl::StartsWith(query, "SELECT") && NO_VIEWS.count(query) == 0;
 }
 
 // Populate prepared statement with concrete values.

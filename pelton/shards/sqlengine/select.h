@@ -16,6 +16,7 @@
 #include "pelton/sql/connection.h"
 #include "pelton/sql/result.h"
 #include "pelton/sqlast/ast.h"
+#include "pelton/sqlast/value_mapper.h"
 #include "pelton/util/upgradable_lock.h"
 
 namespace pelton {
@@ -63,7 +64,8 @@ class SelectContext {
   // If this returns NONE, then the information was not sufficient to determine
   // this set safetly, and thus we should rely on our rocksdb engine to handle
   // the query.
-  std::optional<std::vector<sql::KeyPair>> FindDirectKeys();
+  std::optional<std::vector<sql::KeyPair>> FindDirectKeys(
+      sqlast::ValueMapper *value_mapper);
 };
 
 }  // namespace sqlengine

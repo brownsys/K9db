@@ -4,6 +4,7 @@ import com.brownsys.pelton.PlanningContext;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rex.RexDynamicParam;
 import org.apache.calcite.rex.RexInputRef;
@@ -29,6 +30,13 @@ public class MatViewOperatorFactory {
   }
 
   public void createOperator(LogicalSort sort, ArrayList<Integer> children) {
+    // Display a warning that DESCENDING is ignored.
+    for (RelFieldCollation field : sort.getCollation().getFieldCollations()) {
+      if (field.getDirection().isDescending()) {
+        System.out.println("Warning: DESCENDING order ignored");
+      }
+    }
+
     // Find the (explicit) sorting parameters.
     List<RexNode> exps = sort.getSortExps();
     int[] sortingCols = new int[exps.size()];

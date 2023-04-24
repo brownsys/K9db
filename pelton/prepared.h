@@ -53,11 +53,6 @@ PreparedStatementDescriptor MakeStmt(const std::string &query,
                                      const CanonicalDescriptor *canonical,
                                      std::vector<size_t> &&arg_value_count);
 
-
-// Helper functions to help clean Canonical Queries for NeedsFlow
-// functions to remove quoted text from a string and standardize whitespace
-std::string CleanCanonicalQuery(const CanonicalQuery &query); 
-
 // Find out if a query needs to be served from a flow.
 bool NeedsFlow(const CanonicalQuery &query);
 
