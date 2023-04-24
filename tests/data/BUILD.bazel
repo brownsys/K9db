@@ -1,4 +1,13 @@
 filegroup(
+    name = "shuup-data",
+    srcs = glob([
+        "shuup/*.sql",
+        "shuup/*.txt",
+    ]),
+    visibility = ["//tests:__subpackages__"],
+)
+
+filegroup(
     name = "lobsters-data",
     srcs = glob([
         "lobsters/*.sql",

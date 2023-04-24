@@ -16,6 +16,20 @@ cc_library(
     ],
 )
 
+cc_test(
+    name = "shuup",
+    timeout = "long",
+    srcs = [
+        "shuup.cc",
+    ],
+    data = [
+        "//tests/data:shuup-data",
+    ],
+    deps = [
+        ":common",
+    ],
+)
+
 # lobsters.
 cc_test(
     name = "lobsters",

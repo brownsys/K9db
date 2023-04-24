@@ -1,0 +1,55 @@
+# GDPR GET alice
+# shuup_personcontact
+1|6|Alice|15|alice@email.com
+# auth_user
+15|Alice|secure
+# shuup_contact
+6|Alice|alice@email.com
+# shuup_companycontact_members
+1|8|1
+# shuup_shop
+1|1
+# shuup_gdpr_gdpruserconsent
+1|00:00:00|1|15
+# shuup_basket
+1|15|1|2|1
+# shuup_order
+1|15|6|15|1|1|2|71
+# shuup_mutaddress
+71|6666|15
+;
+
+# GDPR FORGET alice
+update # = 9
+;
+
+# Ensure GDPR FORGET deleted the right data
+# shuup_personcontact
+2|7|Joe|16|joe@email.com
+;
+# auth_user
+16|Joe|insecure
+;
+# shuup_contact
+7|Joe|joe@email.com
+8|Company A|company@email.com
+;
+# shuup_companycontact_members
+;
+# shuup_gdpr_gdpruserconsent
+;
+# shuup_mutaddress
+;
+# shuup_order
+;
+# shuup_basket
+;
+
+# GDPR GET joe
+# shuup_personcontact
+2|7|Joe|16|joe@email.com
+# auth_user
+16|Joe|insecure
+# shuup_contact
+7|Joe|joe@email.com
+;
