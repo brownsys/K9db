@@ -1,6 +1,5 @@
 CREATE TABLE auth_user ( \
   id int, \
-  ptr int, \
   username text, \
   password text, \
   PRIMARY KEY(id) \
@@ -8,28 +7,27 @@ CREATE TABLE auth_user ( \
 
 CREATE TABLE shuup_contact ( \
   id int, \
-  ptr int, \
   name text, \
+  email text, \
   PRIMARY KEY(id) \
 );
 
-CREATE INDEX shuup_contact_ptr ON shuup_contact(ptr);
-
-CREATE TABLE shuup_personcontact ( \
+CREATE DATA_SUBJECT TABLE shuup_personcontact ( \
   pid int, \
   contact_ptr_id int, \
   name text, \
   user_id int, \
   email text, \
   PRIMARY KEY(pid), \
-  FOREIGN KEY (contact_ptr_id) REFERENCES shuup_contact(ptr), \
-  FOREIGN KEY (user_id) REFERENCES auth_user(ptr) \
+  FOREIGN KEY (contact_ptr_id) OWNS shuup_contact(id), \
+  FOREIGN KEY (user_id) OWNS auth_user(id) \
 );
 
 CREATE TABLE shuup_companycontact ( \
   contact_ptr_id int, \
   tax_number int, \
-  PRIMARY KEY(contact_ptr_id) \
+  PRIMARY KEY(contact_ptr_id), \
+  FOREIGN KEY (contact_ptr_id) REFERENCES shuup_contact(id) \
 );
 
 CREATE TABLE shuup_companycontact_members ( \
@@ -38,14 +36,14 @@ CREATE TABLE shuup_companycontact_members ( \
   contact_id int, \
   PRIMARY KEY (id), \
   FOREIGN KEY (companycontact_id) REFERENCES shuup_companycontact(contact_ptr_id), \
-  FOREIGN KEY (contact_id) REFERENCES shuup_personcontact(pid) \
+  FOREIGN KEY (contact_id) ACCESSED_BY shuup_personcontact(pid) \
 );
 
 CREATE TABLE shuup_shop ( \
   id int, \
   owner_id int, \
   PRIMARY KEY (id), \
-  FOREIGN KEY (owner_id) REFERENCES auth_user(id) \
+  FOREIGN KEY (owner_id) OWNED_BY auth_user(id) \
 );
 
 CREATE TABLE shuup_gdpr_gdpruserconsent ( \
@@ -54,7 +52,7 @@ CREATE TABLE shuup_gdpr_gdpruserconsent ( \
   shop_id int, \
   user_id int, \
   FOREIGN KEY (shop_id) REFERENCES shuup_shop(id), \
-  FOREIGN KEY (user_id) REFERENCES auth_user(id), \
+  FOREIGN KEY (user_id) OWNED_BY auth_user(id), \
   PRIMARY KEY (id) \
 );
 
