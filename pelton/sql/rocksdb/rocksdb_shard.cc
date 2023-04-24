@@ -12,6 +12,14 @@ namespace pelton {
 namespace sql {
 namespace rocks {
 
+// Get records by shard + PK value.
+std::vector<dataflow::Record> RocksdbSession::GetDirect(
+    const std::string &table_name, const std::vector<KeyPair> &keys) const {
+  const RocksdbTable &table = this->conn_->tables_.at(table_name);
+  const dataflow::SchemaRef &schema = table.Schema();
+  return this->GetDirect(table_name, schema.keys().front(), keys);
+}
+
 // Get records by shard + column value (PK or not).
 std::vector<dataflow::Record> RocksdbSession::GetDirect(
     const std::string &table_name, size_t column_index,

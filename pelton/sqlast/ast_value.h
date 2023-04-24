@@ -2,6 +2,7 @@
 #define PELTON_SQLAST_AST_VALUE_H_
 
 #include <cassert>
+#include <functional>
 #include <ostream>
 #include <string>
 #include <utility>
@@ -86,5 +87,14 @@ std::ostream &operator<<(std::ostream &os, const pelton::sqlast::Value &v);
 
 }  // namespace sqlast
 }  // namespace pelton
+
+namespace std {
+
+template <>
+struct hash<pelton::sqlast::Value> {
+  size_t operator()(const pelton::sqlast::Value &o) const { return o.Hash(); }
+};
+
+}  // namespace std
 
 #endif  // PELTON_SQLAST_AST_VALUE_H_

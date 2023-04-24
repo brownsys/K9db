@@ -1,3 +1,5 @@
+CTX START;
+
 INSERT INTO user VALUES (0, 'test');
 INSERT INTO user VALUES (1, 'b');
 

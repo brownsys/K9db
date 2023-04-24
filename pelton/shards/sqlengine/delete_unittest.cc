@@ -380,6 +380,9 @@ TEST_F(DeleteTest, VariableOwnership) {
   EXPECT_EQ(db->GetShard("grps", SN(DEFAULT_SHARD, DEFAULT_SHARD)), (V{row2}));
   EXPECT_EQ(db->GetAll("grps"), (V{row2}));
   db->RollbackTransaction();
+
+  // Compliance Transaction will throw an error because we have orphaned a row.
+  EXPECT_FALSE(conn.ctx->Commit().ok());
 }
 
 TEST_F(DeleteTest, ComplexVariableOwnership) {

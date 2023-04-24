@@ -208,6 +208,7 @@ absl::StatusOr<sql::SqlResult> GDPRForgetContext::Exec() {
 
   // Begin transaction.
   this->db_->BeginTransaction(true);
+  CHECK_STATUS(this->conn_->ctx->AddCheckpoint());
 
   // This builds the working set of records that this user has ownership or
   // access rights to.
@@ -221,6 +222,7 @@ absl::StatusOr<sql::SqlResult> GDPRForgetContext::Exec() {
 
   // Commit transaction.
   this->db_->CommitTransaction();
+  CHECK_STATUS(this->conn_->ctx->CommitCheckpoint());
 
   // Update dataflow.
   for (auto &[table_name, records] : this->records_) {

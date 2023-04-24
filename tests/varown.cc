@@ -65,6 +65,11 @@ TEST_F(Varown, DeleteNoMove) {
   EXPECT_EQ(SelectTFromDefaultDB(1005).size(), 0);
 }
 
+// Adding stuff to default shard outside of compliance transaction.
+TEST_F(Varown, OrphanedOutsideCtx) {
+  tests::RunTest(data_file("orphaned_outside_ctx"));
+}
+
 int main(int argc, char **argv) {
   try {
     return tests::TestingMainFixture(argc, argv, "varown", 2,

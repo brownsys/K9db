@@ -39,9 +39,10 @@ static inline void Trim(std::string &s) {
 
 // Special statements we added to SQL.
 bool echo = false;
+bool auto_ctx = false;
 
-std::optional<SqlResult> SpecialStatements(const std::string &sql,
-                                           Connection *connection) {
+absl::StatusOr<std::optional<SqlResult>> SpecialStatements(
+    const std::string &sql, Connection *connection) {
   if (absl::StartsWith(sql, "SET ")) {
     std::vector<std::string> split = absl::StrSplit(sql, ' ');
     if (absl::StartsWith(split.at(1), "echo")) {
@@ -53,6 +54,11 @@ std::optional<SqlResult> SpecialStatements(const std::string &sql,
       shards::SharderState &sstate = connection->state->SharderState();
       sstate.TurnOnSerializable();
       std::cout << "Pelton is now serializable!" << std::endl;
+      return SqlResult(true);
+    }
+    if (absl::StartsWith(split.at(1), "AUTO_CTX")) {
+      auto_ctx = true;
+      CHECK_STATUS(connection->ctx->Start());
       return SqlResult(true);
     }
   }
@@ -77,7 +83,7 @@ std::optional<SqlResult> SpecialStatements(const std::string &sql,
         return sql::SqlResult(sql::SqlResultSet(schema, std::move(v)));
       }
     }
-    return {};
+    return std::optional<SqlResult>{};
   }
   if (absl::StartsWith(sql, "SHOW ")) {
     std::vector<std::string> split = absl::StrSplit(sql, ' ');
@@ -101,7 +107,22 @@ std::optional<SqlResult> SpecialStatements(const std::string &sql,
       return connection->state->ListIndices();
     }
   }
-  return {};
+  if (absl::StartsWith(sql, "CTX")) {
+    std::vector<std::string> split = absl::StrSplit(sql, ' ');
+    if (absl::StartsWith(split.at(1), "START")) {
+      CHECK_STATUS(connection->ctx->Start());
+      return sql::SqlResult(true);
+    }
+    if (absl::StartsWith(split.at(1), "COMMIT")) {
+      CHECK_STATUS(connection->ctx->Commit());
+      return sql::SqlResult(true);
+    }
+    if (absl::StartsWith(split.at(1), "ROLLBACK")) {
+      CHECK_STATUS(connection->ctx->Discard());
+      return sql::SqlResult(true);
+    }
+  }
+  return std::optional<SqlResult>{};
 }
 
 }  // namespace
@@ -145,10 +166,18 @@ bool open(Connection *connection) {
   // set global state in local connection struct
   connection->state = PELTON_STATE;
   connection->session = PELTON_STATE->Database()->OpenSession();
+  connection->ctx =
+      std::make_unique<ComplianceTransaction>(connection->session.get());
+  if (auto_ctx) {
+    PANIC(connection->ctx->Start());
+  }
   return true;
 }
 
-bool close(Connection *connection) { return true; }
+bool close(Connection *connection) {
+  PANIC(connection->ctx->Commit());
+  return true;
+}
 
 absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
   // Trim statement, removing whitespace
@@ -158,7 +187,7 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
     std::cout << sql << std::endl;
   }
   // If special statement, handle it separately.
-  auto special = SpecialStatements(sql, connection);
+  MOVE_OR_RETURN(auto special, SpecialStatements(sql, connection));
   if (special) {
     return std::move(special.value());
   }
@@ -191,7 +220,11 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
 
   // Parse and rewrite statement.
   try {
-    return shards::sqlengine::Shard(sql, connection);
+    auto result = shards::sqlengine::Shard(sql, connection);
+    if (!result.ok()) {
+      connection->session->RollbackTransaction();
+    }
+    return result;
   } catch (std::exception &e) {
     return absl::InternalError(e.what());
   }

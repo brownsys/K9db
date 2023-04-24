@@ -52,12 +52,14 @@ cc_library(
     hdrs = ["connection.h"],
     visibility = ["//:__subpackages__"],
     deps = [
+        ":ctx",
         ":prepared",
         "//pelton/dataflow:dstate",
         "//pelton/shards:state",
         "//pelton/sql:connection",
         "//pelton/sql:factory",
         "//pelton/sql:result",
+        "//pelton/util:status",
         "//pelton/util:upgradable_lock",
     ],
 )
@@ -81,5 +83,23 @@ cc_library(
         "//pelton/util:status",
         "@com_google_absl//absl/strings",
         "@glog",
+    ],
+)
+
+cc_library(
+    name = "ctx",
+    srcs = [
+        "ctx.cc",
+    ],
+    hdrs = [
+        "ctx.h",
+    ],
+    deps = [
+        "//pelton/dataflow:record",
+        "//pelton/sql:connection",
+        "//pelton/sqlast:ast",
+        "//pelton/util:shard_name",
+        "//pelton/util:status",
+        "@com_google_absl//absl/status",
     ],
 )

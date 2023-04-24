@@ -70,6 +70,10 @@ class Session {
       const std::string &table_name, size_t column_index,
       const std::vector<KeyPair> &keys) const = 0;
 
+  virtual std::vector<dataflow::Record> GetDirect(
+      const std::string &table_name,
+      const std::vector<KeyPair> &keys) const = 0;  // column_index = pk.
+
   virtual ResultSetAndStatus AssignToShards(
       const std::string &table_name, size_t column_index,
       const std::vector<sqlast::Value> &values,

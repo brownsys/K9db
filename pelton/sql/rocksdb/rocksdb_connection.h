@@ -114,6 +114,10 @@ class RocksdbSession : public Session {
       const std::string &table_name, size_t column_index,
       const std::vector<KeyPair> &keys) const override;
 
+  std::vector<dataflow::Record> GetDirect(
+      const std::string &table_name,
+      const std::vector<KeyPair> &keys) const override;
+
   ResultSetAndStatus AssignToShards(
       const std::string &table_name, size_t column_index,
       const std::vector<sqlast::Value> &values,

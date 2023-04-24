@@ -102,6 +102,7 @@ absl::StatusOr<int> Cascader::CascadeOut(const std::string &table_name,
   // Filter out records that do not need removal because they are legitimate.
   std::vector<dataflow::Record> remove;
   std::vector<bool> unowned;
+  std::unordered_set<sqlast::Value> orphans;
   for (size_t i = 0; i < next_records.size(); i++) {
     if (legitimate_shards.at(i).count(shard) == 0) {
       remove.push_back(std::move(next_records.at(i)));
@@ -110,7 +111,10 @@ absl::StatusOr<int> Cascader::CascadeOut(const std::string &table_name,
         sqlast::Value PK = remove.back().GetValue(table.schema.keys().at(0));
         std::string str = PK.AsUnquotedString();
         std::unordered_set<std::string> &moved = this->moved_[table_name];
-        unowned.back() = moved.insert(std::move(str)).second;
+        if (moved.insert(std::move(str)).second) {
+          unowned.back() = true;
+          orphans.insert(PK);
+        }
       }
     }
   }
@@ -120,6 +124,9 @@ absl::StatusOr<int> Cascader::CascadeOut(const std::string &table_name,
   if (status < 0) {
     return status;
   }
+
+  // Track orphans.
+  CHECK_STATUS(this->conn_->ctx->AddOrphans(table_name, orphans));
 
   // Now, we need to cascade onto remove dependents.
   for (const auto &[next_table, desc] : table.dependents) {

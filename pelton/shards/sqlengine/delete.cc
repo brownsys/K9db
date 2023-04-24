@@ -132,16 +132,19 @@ absl::StatusOr<sql::SqlResult> DeleteContext::Exec() {
 
   // Begin the transaction.
   this->db_->BeginTransaction(true);
+  CHECK_STATUS(this->conn_->ctx->AddCheckpoint());
 
   // Execute the delete.
   MOVE_OR_RETURN(Result result, this->ExecWithinTransaction());
   if (result.first < 0) {
     this->db_->RollbackTransaction();
+    CHECK_STATUS(this->conn_->ctx->RollbackCheckpoint());
     return sql::SqlResult(result.first);
   }
 
   // Commit transaction.
   this->db_->CommitTransaction();
+  CHECK_STATUS(this->conn_->ctx->CommitCheckpoint());
 
   // Process updates to dataflows.
   this->dstate_.ProcessRecords(this->table_name_, std::move(result.second));

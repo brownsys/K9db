@@ -8,3 +8,5 @@ update # = 3
 ;
 5|test
 ;
+!error!
+;

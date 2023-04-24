@@ -219,7 +219,15 @@ void RunTest(const std::string &query_file_prefix) {
     VLOG(1) << "Running query: " << query;
     // Run query.
     auto status = pelton::exec(&connection, query);
-    ASSERT_TRUE(status.ok()) << status.status() << query;
+    bool expect_error =
+        expected.size() == 1u && expected.front() == "|!error!|";
+    if (status.ok()) {
+      ASSERT_FALSE(expect_error) << "No expected error " << query;
+    } else {
+      ASSERT_TRUE(expect_error)
+          << "Unexpected error: " << status.status() << " in " << query;
+      continue;
+    }
 
     // Store output.
     std::vector<std::string> actual;
@@ -235,6 +243,12 @@ void RunTest(const std::string &query_file_prefix) {
     } else if (result.IsUpdate()) {
       actual.push_back("|update # = " + std::to_string(result.UpdateCount()) +
                        "|");
+    } else if (result.IsStatement()) {
+      if (result.Success()) {
+        actual.push_back("|!true!|");
+      } else {
+        actual.push_back("|!false!|");
+      }
     }
 
     // Check output vs expected.

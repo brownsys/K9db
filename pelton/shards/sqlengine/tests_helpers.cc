@@ -4,7 +4,6 @@
 
 #include "pelton/dataflow/record.h"
 #include "pelton/shards/sqlengine/engine.h"
-#include "pelton/util/status.h"
 
 namespace pelton {
 namespace sql {
@@ -190,6 +189,7 @@ bool ExecuteError(const std::string &sql, Connection *conn) {
   absl::StatusOr<sql::SqlResult> result = Shard(sql, conn);
   if (!result.ok()) {
     conn->session->RollbackTransaction();
+    conn->ctx->RollbackCheckpoint();
     return true;
   }
   return false;

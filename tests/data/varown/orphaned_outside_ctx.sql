@@ -1,0 +1,11 @@
+CTX COMMIT;
+
+INSERT INTO t VALUES (4401, 'target3');
+
+DELETE FROM rel WHERE id = 100;
+
+DELETE FROM rel WHERE id = 101;
+
+UPDATE rel SET to_t = 1001 WHERE id = 102;
+
+UPDATE rel SET to_t = 1000 WHERE id = 102;

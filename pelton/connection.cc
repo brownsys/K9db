@@ -6,6 +6,7 @@
 #include "pelton/dataflow/record.h"
 #include "pelton/dataflow/schema.h"
 #include "pelton/sql/factory.h"
+#include "pelton/util/status.h"
 
 namespace pelton {
 

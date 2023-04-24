@@ -89,7 +89,8 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
   // First, make sure PK does not exist! (this also locks).
   size_t pk = this->schema_.keys().front();
   const std::string &pkcol = this->schema_.NameOf(pk);
-  if (this->db_->Exists(this->table_name_, this->stmt_.GetValue(pkcol, pk))) {
+  sqlast::Value pkval = this->stmt_.GetValue(pkcol, pk);
+  if (this->db_->Exists(this->table_name_, pkval)) {
     return absl::InvalidArgumentError("PK exists!");
   }
 
@@ -157,7 +158,13 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
   } else {
     // If no OWNERs detected, we insert into global/default shard.
     util::ShardName shard_name(DEFAULT_SHARD, DEFAULT_SHARD);
-    return this->db_->ExecuteInsert(this->stmt_, shard_name);
+    int status = this->db_->ExecuteInsert(this->stmt_, shard_name);
+    // If table is owned by someone but we inserted into default shard,
+    // track orphaned data in CTX.
+    if (status >= 0 && this->table_.owners.size() > 0) {
+      CHECK_STATUS(this->conn_->ctx->AddOrphan(this->table_name_, pkval));
+    }
+    return status;
   }
 }
 
@@ -226,6 +233,7 @@ absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
 
   // Begin the transaction.
   this->db_->BeginTransaction(true);
+  CHECK_STATUS(this->conn_->ctx->AddCheckpoint());
 
   // The inserted record to feed to dataflow engine.
   this->records_.push_back(this->dstate_.CreateRecord(this->stmt_));
@@ -234,19 +242,25 @@ absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
   ASSIGN_OR_RETURN(int status, this->InsertIntoBaseTable());
   if (status < 0) {
     this->db_->RollbackTransaction();
+    CHECK_STATUS(this->conn_->ctx->RollbackCheckpoint());
     return sql::SqlResult(status);
   }
 
   // Cascade any dependent records in dependent tables into the shards of
   // the inserted statement.
-  ASSIGN_OR_RETURN(int cascaded, this->CascadeDependents());
-  if (cascaded < 0) {
-    this->db_->RollbackTransaction();
-    return sql::SqlResult(cascaded);
+  int cascaded = 0;
+  if (this->shards_.size() > 0) {
+    ASSIGN_OR_RETURN(cascaded, this->CascadeDependents());
+    if (cascaded < 0) {
+      this->db_->RollbackTransaction();
+      CHECK_STATUS(this->conn_->ctx->RollbackCheckpoint());
+      return sql::SqlResult(cascaded);
+    }
   }
 
   // Commit transaction.
   this->db_->CommitTransaction();
+  CHECK_STATUS(this->conn_->ctx->CommitCheckpoint());
 
   // Process updates to dataflows.
   this->dstate_.ProcessRecords(this->table_name_, std::move(this->records_));

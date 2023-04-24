@@ -9,3 +9,5 @@ DELETE FROM rel WHERE id = 200;
 GDPR GET user 10;
 
 SELECT * FROM t WHERE id = 2000;
+
+CTX COMMIT;

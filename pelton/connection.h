@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "pelton/ctx.h"
 #include "pelton/dataflow/state.h"
 #include "pelton/prepared.h"
 #include "pelton/shards/state.h"
@@ -88,6 +89,7 @@ struct Connection {
   // Prepared statements created by this connection.
   std::vector<prepared::PreparedStatementDescriptor> stmts;
   std::unique_ptr<sql::Session> session;
+  std::unique_ptr<ComplianceTransaction> ctx;  // Destruct this first.
 };
 
 }  // namespace pelton

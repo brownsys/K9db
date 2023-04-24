@@ -268,6 +268,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("CREATE VIEW")
        || q_string.starts_with("SET")
        || q_string.starts_with("EXPLAIN COMPLIANCE")
+       || q_string.starts_with("CTX")
     {
       let ddl_response = pelton::exec_ddl(self.rust_conn, q_string);
       if ddl_response {
