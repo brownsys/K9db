@@ -10,7 +10,6 @@ clang-format --version
 # Run clang-format.
 find . -not -path "./third_party/**" \
        -not -path "./.git/**" \
-       -not -path "./experiments/lobsters/noria/**" \
   | egrep "\.(${CLANG_FORMAT_EXTENSIONS})\$" \
   | xargs clang-format --verbose -style=google -i
 

@@ -1,5 +1,5 @@
 #include "glog/logging.h"
-#include "pelton/shards/state.h"
+#include "k9db/shards/state.h"
 #include "tests/common.h"
 
 // Features / things to test
@@ -8,11 +8,11 @@ std::string data_file(const std::string &s) { return "tests/data/varown/" + s; }
 
 class Varown : public tests::CleanDatabaseFixture {};
 
-std::vector<pelton::dataflow::Record> SelectTFromDefaultDB(int64_t id) {
-  auto *instance = tests::GetPeltonInstance();
-  std::vector<pelton::sql::KeyPair> vec;
-  vec.emplace_back(pelton::util::ShardName(DEFAULT_SHARD, DEFAULT_SHARD),
-                   pelton::sqlast::Value(id));
+std::vector<k9db::dataflow::Record> SelectTFromDefaultDB(int64_t id) {
+  auto *instance = tests::GetK9dbInstance();
+  std::vector<k9db::sql::KeyPair> vec;
+  vec.emplace_back(k9db::util::ShardName(DEFAULT_SHARD, DEFAULT_SHARD),
+                   k9db::sqlast::Value(id));
   instance->session->BeginTransaction(false);
   auto result = instance->session->GetDirect("t", 0, vec);
   instance->session->RollbackTransaction();

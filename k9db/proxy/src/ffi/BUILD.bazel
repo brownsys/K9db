@@ -1,0 +1,35 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+exports_files(
+    ["ffi.h"],
+    visibility = ["//k9db/proxy:__subpackages__"],
+)
+
+cc_library(
+    name = "ffi",
+    srcs = [
+        "ffi.cc",
+    ],
+    hdrs = [
+        "ffi.h",
+    ],
+    linkopts = ["-rdynamic"],
+    linkstatic = 1,
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//k9db",
+        "@com_github_gflags_gflags//:gflags",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "ffi-test",
+    srcs = [
+        "ffi_unittest.cc",
+    ],
+    deps = [
+        ":ffi",
+        "@com_google_googletest//:gtest",
+    ],
+)

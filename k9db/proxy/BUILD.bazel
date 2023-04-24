@@ -1,0 +1,93 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library")
+
+config_setting(
+    name = "asan",
+    values = {"copt": "-DK9DB_ASAN"},
+)
+
+config_setting(
+    name = "tsan",
+    values = {"copt": "-DK9DB_TSAN"},
+)
+
+rust_binary(
+    name = "proxy",
+    srcs = [
+        "src/proxy.rs",
+    ],
+    rustc_flags = [
+        "-Clink-args=-L/home/k9db/bazel-bin/external/rocksdb/copy_rocksdb/rocksdb/lib",
+        "-Clink-args=-L/home/k9db/k9db/bazel-bin/external/rocksdb/copy_rocksdb/rocksdb/lib",
+        "-Clink-args=-L/home/bab/Documents/research/pelton/bazel-bin/external/rocksdb/copy_rocksdb/rocksdb/lib",
+        "-Clink-args=-rdynamic",
+        "-Clink-args=-Wl,-export-dynamic",
+    ] + select({
+        ":asan": [
+            "-Clink-args=-fsanitize=address",
+            "-Zsanitizer=address",
+        ],
+        ":tsan": [
+            "-Clink-args=-fsanitize=thread",
+            "-Zsanitizer=thread",
+        ],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":ffi",
+        "//k9db/proxy/cargo:gflags",
+        "//k9db/proxy/cargo:lazy_static",
+        "//k9db/proxy/cargo:msql_srv",
+        "//k9db/proxy/cargo:regex",
+        "//k9db/proxy/cargo:slog",
+        "//k9db/proxy/cargo:slog_term",
+        "//k9db/proxy/src/ffi",
+    ],
+)
+
+# Includes both the bindgen generated ffi definitions and our wrappers.
+# Also, depends on the ffi .so library so that it gets linked
+# with our rust code.
+rust_library(
+    name = "ffi",
+    srcs = [
+        ":ffi_bindgen",
+        ":ffi_wrappers",
+    ],
+    deps = [
+        "//k9db/proxy/cargo:msql_srv",
+    ],
+)
+
+# Invoke bindgen to generate rust definitions for the ffi library.
+genrule(
+    name = "ffi_bindgen",
+    srcs = [
+        "//k9db/proxy/src/ffi:ffi.h",
+    ],
+    outs = [
+        "ffi_bindgen.rs",
+    ],
+    cmd = """
+        ./$(location @raze__bindgen__0_32_3//:cargo_bin_bindgen) $< -o $@
+    """,
+    tools = [
+        "@raze__bindgen__0_32_3//:cargo_bin_bindgen",
+    ],
+)
+
+# Copy proxy_wrappers to bazel out / working directory
+# This way, it becomes located in the exact same directory that
+# contains proxy_ffi_bindgen.rs, and can thus include! it.
+genrule(
+    name = "ffi_wrappers",
+    srcs = [
+        "src/ffi.rs",
+    ],
+    outs = [
+        "ffi.rs",
+    ],
+    cmd = """
+        cp $< $@
+    """,
+)

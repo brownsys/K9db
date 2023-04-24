@@ -1,0 +1,47 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "connection",
+    hdrs = [
+        "connection.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        ":result",
+        "//k9db/sqlast:ast",
+        "//k9db/util:shard_name",
+    ],
+)
+
+cc_library(
+    name = "factory",
+    srcs = [
+        "factory.cc",
+    ],
+    hdrs = [
+        "factory.h",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        ":connection",
+        "//k9db/sql/rocksdb:rocksdb_connection",
+    ],
+)
+
+cc_library(
+    name = "result",
+    srcs = [
+        "result.cc",
+    ],
+    hdrs = [
+        "result.h",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
+        "//k9db/util:iterator",
+        "//k9db/util:shard_name",
+        "@glog",
+    ],
+)

@@ -44,29 +44,25 @@ jobs:
     - name: Run prepared statement test
       run: docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/prepared-test.sh"
 
-    # bin/examples/* via proxy
+    # examples/* via proxy
     - name: Run examples via proxy
       run: |
-        docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/test.sh bin/examples/simple-websubmit.sql"
-        docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/test.sh bin/examples/medical_chat.sql"
+        docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/test.sh examples/simple-websubmit.sql"
+        docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/test.sh examples/medical_chat.sql"
 
     - name: Run social chat with restart/recovery
       run: |
-        docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/test.sh bin/examples/social_chat.sql bin/examples/social_chat.cntd.sql"
-
-    # bin/test_multithreaded_proxy
-    #- name: Run multi-threaded tests via mysql proxy
-    #  run: docker exec pelton-testing sh -c "cd /home/pelton/ && ./bin/test_multithreaded_proxy.sh"
+        docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/test.sh examples/social_chat.sql examples/social_chat.cntd.sql"
 
     # valgrind
     - name: Test dataflow with valgrind
       env:
-        TEST_OPS: bazel test //pelton/dataflow/ops/... --config=valgrind --test_output=all
-        TEST_GRAPH_PARTITION: bazel test //pelton/dataflow:graph_partition-test --config=valgrind --test_output=all
-        TEST_KEY: bazel test //pelton/dataflow:key-test --config=valgrind --test_output=all
-        TEST_RECORD: bazel test //pelton/dataflow:record-test --config=valgrind --test_output=all
-        TEST_SCHEMA: bazel test //pelton/dataflow:schema-test --config=valgrind --test_output=all
-        TEST_VALUE: bazel test //pelton/sqlast:ast_value-test --config=valgrind --test_output=all
+        TEST_OPS: bazel test //k9db/dataflow/ops/... --config=valgrind --test_output=all
+        TEST_GRAPH_PARTITION: bazel test //k9db/dataflow:graph_partition-test --config=valgrind --test_output=all
+        TEST_KEY: bazel test //k9db/dataflow:key-test --config=valgrind --test_output=all
+        TEST_RECORD: bazel test //k9db/dataflow:record-test --config=valgrind --test_output=all
+        TEST_SCHEMA: bazel test //k9db/dataflow:schema-test --config=valgrind --test_output=all
+        TEST_VALUE: bazel test //k9db/sqlast:ast_value-test --config=valgrind --test_output=all
       run: |
         docker exec pelton-testing sh -c "cd /home/pelton && $TEST_OPS"
         docker exec pelton-testing sh -c "cd /home/pelton && $TEST_GRAPH_PARTITION"

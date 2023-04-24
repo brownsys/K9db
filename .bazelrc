@@ -4,7 +4,7 @@ try-import /home/docker.bazelrc
 
 
 # Alias to simplify disabling / enabling encryption
-build --flag_alias=encryption=//pelton/sql/rocksdb:configure_encryption
+build --flag_alias=encryption=//k9db/sql/rocksdb:configure_encryption
 
 build --cxxopt="-std=c++2a"
 build --host_cxxopt="-std=c++2a"
@@ -17,7 +17,7 @@ build:asan --copt -fsanitize=address
 build:asan --copt -g
 build:asan --copt -O1
 build:asan --copt -fno-omit-frame-pointer
-build:asan --copt -DPELTON_ASAN
+build:asan --copt -DK9DB_ASAN
 build:asan --linkopt -fsanitize=address
 build:asan --extra_toolchains @rust_nightly_toolchains//:toolchain_for_x86_64-unknown-linux-gnu
 test:asan --test_env ASAN_OPTIONS=allow_user_segv_handler=1:handle_segv=0:malloc_context_size=256:fast_unwind_on_malloc=0
@@ -26,7 +26,7 @@ test:asan --test_env ASAN_OPTIONS=allow_user_segv_handler=1:handle_segv=0:malloc
 build:valgrind --platform_suffix=valgrind
 build:valgrind --strip=never
 build:valgrind --copt -g
-build:valgrind --copt -DPELTON_VALGRIND_MODE
+build:valgrind --copt -DK9DB_VALGRIND_MODE
 test:valgrind --run_under "valgrind --error-exitcode=1 --leak-check=full"
 test:valgrind --test_output all
 run:valgrind --run_under "valgrind --error-exitcode=1 --errors-for-leak-kinds=definite --leak-check=full --show-leak-kinds=definite"
@@ -34,8 +34,8 @@ run:valgrind --run_under "valgrind --error-exitcode=1 --errors-for-leak-kinds=de
 # For running under cachegrind
 build:cachegrind --platform_suffix=cachegrind
 build:cachegrind -c opt
-build:cachegrind --copt -DPELTON_OPT
-build:cachegrind --host_copt -DPELTON_OPT
+build:cachegrind --copt -DK9DB_OPT
+build:cachegrind --host_copt -DK9DB_OPT
 test:cachegrind --run_under "valgrind --tool=cachegrind "
 test:cachegrind --test_output all
 run:cachegrind --run_under "valgrind --tool=cachegrind "
@@ -43,8 +43,8 @@ run:cachegrind --run_under "valgrind --tool=cachegrind "
 # Optimized build.
 build:opt --platform_suffix=opt
 build:opt -c opt  # use bazel default opt config
-build:opt --copt -DPELTON_OPT
-build:opt --host_copt -DPELTON_OPT
+build:opt --copt -DK9DB_OPT
+build:opt --host_copt -DK9DB_OPT
 build:opt --copt -O3
 
 # For thread sanitizer
@@ -54,7 +54,7 @@ build:tsan --copt -fsanitize=thread
 build:tsan --copt -g
 build:tsan --copt -O1
 build:tsan --copt -fno-omit-frame-pointer
-build:tsan --copt -DPELTON_TSAN
+build:tsan --copt -DK9DB_TSAN
 build:tsan --linkopt -fsanitize=thread
 build:tsan --extra_toolchains @rust_nightly_toolchains//:toolchain_for_x86_64-unknown-linux-gnu
 test:tsan --test_env ASAN_OPTIONS=allow_user_segv_handler=1:handle_segv=0:malloc_context_size=256:fast_unwind_on_malloc=0
@@ -62,7 +62,7 @@ test:tsan --test_env ASAN_OPTIONS=allow_user_segv_handler=1:handle_segv=0:malloc
 # For running under perf
 build:perf --platform_suffix=perf
 build:perf -c opt
-build:perf --copt -DPELTON_OPT
-build:perf --host_copt -DPELTON_OPT
+build:perf --copt -DK9DB_OPT
+build:perf --host_copt -DK9DB_OPT
 test:perf --run_under "sudo perf stat -B -e cache-references,cache-misses,cycles,instructions,branches,faults,migrations "
 run:perf --run_under "sudo perf stat -B -e cache-references,cache-misses,cycles,instructions,branches,faults,migrations "

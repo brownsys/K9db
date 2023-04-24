@@ -1,0 +1,55 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+cc_library(
+    name = "planner",
+    srcs = [
+        "planner.cc",
+        "planner.h",
+        "@bazel_tools//tools/jdk:current_java_runtime",
+    ],
+    copts = [
+        "-L/usr/lib/jvm/default-java/lib/server/",
+    ],
+    data = [
+        "//k9db/planner/calcite",
+        "//k9db/planner/calcite:calcite_so",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        "//k9db/dataflow:dstate",
+        "//k9db/dataflow:generator",
+        "//k9db/dataflow:graph",
+        "@bazel_tools//tools/jdk:jni",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "planner-test",
+    srcs = [
+        "planner.h",
+        "planner_unittest.cc",
+    ],
+    target_compatible_with = [
+        "@platforms//os:linux",
+    ],
+    deps = [
+        ":planner",
+        "//k9db/dataflow:dstate",
+        "//k9db/dataflow:graph",
+        "//k9db/dataflow:key",
+        "//k9db/dataflow:operator",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
+        "//k9db/dataflow:types",
+        "//k9db/dataflow/ops:aggregate",
+        "//k9db/dataflow/ops:filter",
+        "//k9db/dataflow/ops:input",
+        "//k9db/dataflow/ops:project",
+        "//k9db/sqlast:ast",
+        "//k9db/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
+    ],
+)

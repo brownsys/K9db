@@ -1,0 +1,105 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "k9db",
+    srcs = [
+        "explain.h",
+        "k9db.cc",
+    ],
+    hdrs = [
+        "k9db.h",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        ":connection",
+        ":explain",
+        ":prepared",
+        "//k9db/dataflow:dstate",
+        "//k9db/dataflow:graph",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
+        "//k9db/planner",
+        "//k9db/shards:state",
+        "//k9db/shards:types",
+        "//k9db/shards/sqlengine:engine",
+        "//k9db/sql:result",
+        "//k9db/util:status",
+        "//k9db/util:upgradable_lock",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "explain",
+    srcs = [
+        "explain.cc",
+    ],
+    hdrs = [
+        "explain.h",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        ":connection",
+        "//k9db/shards:state",
+    ],
+)
+
+cc_library(
+    name = "connection",
+    srcs = ["connection.cc"],
+    hdrs = ["connection.h"],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        ":ctx",
+        ":prepared",
+        "//k9db/dataflow:dstate",
+        "//k9db/shards:state",
+        "//k9db/sql:connection",
+        "//k9db/sql:factory",
+        "//k9db/sql:result",
+        "//k9db/util:status",
+        "//k9db/util:upgradable_lock",
+    ],
+)
+
+cc_library(
+    name = "prepared",
+    srcs = [
+        "prepared.cc",
+    ],
+    hdrs = [
+        "prepared.h",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//k9db/dataflow:dstate",
+        "//k9db/dataflow:graph",
+        "//k9db/dataflow/ops:input",
+        "//k9db/dataflow/ops:matview",
+        "//k9db/sqlast:ast",
+        "//k9db/sqlast:hacky",
+        "//k9db/util:status",
+        "@com_google_absl//absl/strings",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "ctx",
+    srcs = [
+        "ctx.cc",
+    ],
+    hdrs = [
+        "ctx.h",
+    ],
+    deps = [
+        "//k9db/dataflow:record",
+        "//k9db/sql:connection",
+        "//k9db/sqlast:ast",
+        "//k9db/util:shard_name",
+        "//k9db/util:status",
+        "@com_google_absl//absl/status",
+    ],
+)

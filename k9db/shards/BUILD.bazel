@@ -1,0 +1,34 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "state",
+    srcs = [
+        "state.cc",
+    ],
+    hdrs = [
+        "state.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        ":types",
+        "//k9db/dataflow:schema",
+        "@com_google_absl//absl/status",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "types",
+    srcs = [
+        "types.cc",
+    ],
+    hdrs = [
+        "types.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        "//k9db/dataflow:schema",
+        "//k9db/sqlast:ast",
+        "@glog",
+    ],
+)

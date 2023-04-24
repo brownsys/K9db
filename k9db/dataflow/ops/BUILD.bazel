@@ -1,0 +1,348 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+exports_files(
+    [
+        "benchmark_utils.h",
+        "filter_enum.h",
+        "aggregate_enum.h",
+        "project_enum.h",
+        "equijoin_enum.h",
+    ],
+    ["//k9db/dataflow:__subpackages__"],
+)
+
+cc_library(
+    name = "equijoin",
+    srcs = [
+        "equijoin.cc",
+    ],
+    hdrs = [
+        "equijoin.h",
+        "equijoin_enum.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        ":grouped_data",
+        "//k9db/dataflow:key",
+        "//k9db/dataflow:operator",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
+        "//k9db/dataflow:types",
+        "//k9db/sqlast:ast",
+        "@com_google_googletest//:gtest_prod",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "exchange",
+    srcs = [
+        "exchange.cc",
+    ],
+    hdrs = [
+        "exchange.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        "//k9db/dataflow:channel",
+        "//k9db/dataflow:operator",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:types",
+    ],
+)
+
+cc_library(
+    name = "filter",
+    srcs = [
+        "filter.cc",
+    ],
+    hdrs = [
+        "filter.h",
+        "filter_enum.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        "//k9db/dataflow:operator",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:types",
+        "//k9db/sqlast:ast",
+        "@com_google_googletest//:gtest_prod",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "input",
+    srcs = [
+        "input.cc",
+    ],
+    hdrs = [
+        "input.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        "//k9db/dataflow:operator",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:types",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "identity",
+    srcs = [
+        "identity.cc",
+    ],
+    hdrs = [
+        "identity.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        "//k9db/dataflow:operator",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:types",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "forward_view",
+    srcs = [
+        "forward_view.cc",
+    ],
+    hdrs = [
+        "forward_view.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        "//k9db/dataflow:operator",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:types",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "grouped_data",
+    srcs = [],
+    hdrs = [
+        "grouped_data.h",
+    ],
+    deps = [
+        "//k9db/dataflow:key",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
+        "//k9db/dataflow:types",
+        "//k9db/util:merge_sort",
+        "@com_google_absl//absl/container:btree",
+        "@com_google_absl//absl/container:flat_hash_map",
+    ],
+)
+
+cc_library(
+    name = "matview",
+    srcs = [],
+    hdrs = [
+        "matview.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        ":grouped_data",
+        "//k9db/dataflow:key",
+        "//k9db/dataflow:operator",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
+        "//k9db/dataflow:types",
+        "@com_google_googletest//:gtest_prod",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "union",
+    srcs = [
+        "union.cc",
+    ],
+    hdrs = [
+        "union.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        "//k9db/dataflow:operator",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
+        "//k9db/dataflow:types",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "project",
+    srcs = [
+        "project.cc",
+    ],
+    hdrs = [
+        "project.h",
+        "project_enum.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        "//k9db/dataflow:operator",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
+        "//k9db/dataflow:types",
+        "//k9db/sqlast:ast",
+        "@com_google_googletest//:gtest_prod",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "aggregate",
+    srcs = [
+        "aggregate.cc",
+    ],
+    hdrs = [
+        "aggregate.h",
+        "aggregate_enum.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        ":grouped_data",
+        "//k9db/dataflow:operator",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
+        "//k9db/dataflow:types",
+        "//k9db/sqlast:ast",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_googletest//:gtest_prod",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "equijoin-test",
+    srcs = [
+        "equijoin_unittest.cc",
+    ],
+    deps = [
+        ":equijoin",
+        ":identity",
+        "//k9db/dataflow:graph_partition",
+        "//k9db/dataflow:key",
+        "//k9db/dataflow:operator",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
+        "//k9db/dataflow:types",
+        "//k9db/sqlast:ast",
+        "//k9db/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "filter-test",
+    srcs = [
+        "filter_unittest.cc",
+    ],
+    deps = [
+        ":filter",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
+        "//k9db/dataflow:types",
+        "//k9db/sqlast:ast",
+        "//k9db/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "matview-test",
+    srcs = [
+        "matview_unittest.cc",
+    ],
+    deps = [
+        ":matview",
+        "//k9db/dataflow:key",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
+        "//k9db/dataflow:types",
+        "//k9db/sqlast:ast",
+        "//k9db/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "project-test",
+    srcs = [
+        "project_unittest.cc",
+    ],
+    deps = [
+        ":project",
+        "//k9db/dataflow:key",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
+        "//k9db/dataflow:types",
+        "//k9db/sqlast:ast",
+        "//k9db/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "aggregate-test",
+    srcs = [
+        "aggregate_unittest.cc",
+    ],
+    deps = [
+        ":aggregate",
+        ":filter",
+        ":matview",
+        "//k9db/dataflow:key",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
+        "//k9db/dataflow:types",
+        "//k9db/sqlast:ast",
+        "//k9db/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "benchmarks",
+    srcs = [
+        "benchmark_main.cc",
+        "benchmark_utils.h",
+        "equijoin_benchmark.cc",
+        "filter_benchmark.cc",
+        "identity_benchmark.cc",
+        "matview_benchmark.cc",
+    ],
+    tags = ["benchmark"],
+    deps = [
+        ":equijoin",
+        ":filter",
+        ":identity",
+        ":input",
+        ":matview",
+        "//k9db/dataflow:graph_partition",
+        "//k9db/dataflow:operator",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
+        "//k9db/dataflow:types",
+        "//k9db/sqlast:ast",
+        "//k9db/util:ints",
+        "@com_github_google_benchmark//:benchmark",
+    ],
+)

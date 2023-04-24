@@ -1,0 +1,117 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+exports_files(
+    ["ast_schema_enums.h"],
+    ["//k9db/dataflow:__subpackages__"],
+)
+
+cc_library(
+    name = "ast",
+    srcs = [
+        "ast_abstract.cc",
+        "ast_expressions.cc",
+        "ast_schema.cc",
+        "ast_statements.cc",
+        "ast_value.cc",
+        "ast_visitors.cc",
+    ],
+    hdrs = [
+        "ast.h",
+        "ast_abstract.h",
+        "ast_expressions.h",
+        "ast_schema.h",
+        "ast_schema_enums.h",
+        "ast_statements.h",
+        "ast_value.h",
+        "ast_visitors.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@glog",
+    ],
+)
+
+cc_library(
+    name = "parser",
+    srcs = [
+        "parser.cc",
+    ],
+    hdrs = [
+        "parser.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        ":ast",
+        ":hacky",
+        ":transformer",
+        "@antlr4_runtimes//:cpp",
+        "@com_google_absl//absl/status:statusor",
+        "@grammars-v4//:sqlparser",
+    ],
+)
+
+cc_library(
+    name = "transformer",
+    srcs = [
+        "transformer.cc",
+    ],
+    hdrs = [
+        "transformer.h",
+    ],
+    deps = [
+        ":ast",
+        "@antlr4_runtimes//:cpp",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@grammars-v4//:sqlparser",
+    ],
+)
+
+cc_library(
+    name = "hacky",
+    srcs = [
+        "hacky.cc",
+        "hacky_util.h",
+    ],
+    hdrs = [
+        "hacky.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        ":ast",
+        "//k9db/util:status",
+        "@com_google_absl//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "value_mapper",
+    srcs = [
+        "value_mapper.cc",
+    ],
+    hdrs = [
+        "value_mapper.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        ":ast",
+        "//k9db/dataflow:schema",
+        "@glog",
+    ],
+)
+
+cc_test(
+    name = "ast_value-test",
+    srcs = [
+        "ast_value_unittest.cc",
+    ],
+    deps = [
+        ":ast",
+        "//k9db/util:ints",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@glog",
+    ],
+)

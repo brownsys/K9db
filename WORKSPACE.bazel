@@ -1,4 +1,4 @@
-workspace(name = "pelton")
+workspace(name = "k9db")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_repository")
@@ -242,7 +242,7 @@ load("@rules_rust//bindgen:repositories.bzl", "rust_bindgen_repositories")
 
 rust_bindgen_repositories()
 
-load("//pelton/proxy/cargo:crates.bzl", "raze_fetch_remote_crates")
+load("//k9db/proxy/cargo:crates.bzl", "raze_fetch_remote_crates")
 
 raze_fetch_remote_crates()
 

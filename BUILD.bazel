@@ -26,8 +26,8 @@ format_java(
     tool = ":google_java_format_binary",
 )
 
-# Alias: pelton mysql proxy.
+# Alias: k9db mysql proxy.
 alias(
-    name = "pelton",
-    actual = "//pelton/proxy",
+    name = "k9db",
+    actual = "//k9db/proxy",
 )

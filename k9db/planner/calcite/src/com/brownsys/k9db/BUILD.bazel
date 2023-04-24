@@ -1,0 +1,46 @@
+load("@rules_java//java:defs.bzl", "java_binary", "java_test")
+
+java_binary(
+    name = "QueryPlanner",
+    srcs = [
+        "PhysicalPlanVisitor.java",
+        "PlanningContext.java",
+        "QueryPlanner.java",
+        "operators/AggregateOperatorFactory.java",
+        "operators/FilterOperatorFactory.java",
+        "operators/InputOperatorFactory.java",
+        "operators/JoinOperatorFactory.java",
+        "operators/MatViewOperatorFactory.java",
+        "operators/ProjectOperatorFactory.java",
+        "operators/UnionOperatorFactory.java",
+        "rules/FilterPastJoin.java",
+        "schema/K9dbSchemaFactory.java",
+        "schema/K9dbTable.java",
+        "util/RexArithmeticCollector.java",
+        "util/RexInputRefCollector.java",
+        "util/RexInputRefOffsetter.java",
+        "//k9db/planner/calcite/src/com/brownsys/k9db/nativelib:DataDataFlowGraphLibrary_java",
+        "//k9db/planner/calcite/src/com/brownsys/k9db/nativelib:DataFlowGraphLibraryConfig_java",
+    ],
+    data = [
+        "//k9db/planner/calcite/src/com/brownsys/k9db/nativelib:libjniDataFlowGraphLibrary_so",
+    ],
+    main_class = "com.brownsys.k9db.QueryPlanner",
+    visibility = ["//k9db/planner:__subpackages__"],
+    deps = [
+        "@maven//:org_apache_calcite_avatica_avatica_core",
+        "@maven//:org_apache_calcite_calcite_core",
+        "@maven//:org_bytedeco_javacpp",
+    ],
+)
+
+java_test(
+    name = "QueryPlannerTest",
+    srcs = [
+        "QueryPlannerTest.java",
+    ],
+    deps = [
+        ":QueryPlanner",
+        "@maven//:org_apache_calcite_calcite_core",
+    ],
+)

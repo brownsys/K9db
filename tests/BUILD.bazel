@@ -9,7 +9,7 @@ cc_library(
         "common.h",
     ],
     deps = [
-        "//pelton",
+        "//k9db",
         "@com_github_gflags_gflags//:gflags",
         "@com_google_googletest//:gtest",
         "@glog",

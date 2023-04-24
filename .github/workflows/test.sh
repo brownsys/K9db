@@ -1,13 +1,12 @@
 #!/bin/bash
-rm -rf /tmp/pelton/rocksdb
-mkdir -p /tmp/pelton/rocksdb
+rm -rf /tmp/k9db_*
 
 # Run each test file.
 code=0
 for path in "$@"
 do
   # Run the proxy (in the background).
-  bazel run //:pelton -- -logtostderr=1 &> .tmp &
+  bazel run //:k9db -- -logtostderr=1 &> .tmp &
   pid=$!
   sleep 10
 

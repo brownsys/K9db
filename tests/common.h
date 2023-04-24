@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "pelton/pelton.h"
+#include "k9db/k9db.h"
 
 namespace tests {
 
@@ -31,11 +31,11 @@ int TestingMain(int argc, char **argv, const std::string &testname,
 int TestingMainFixture(int argc, char **argv, const std::string &testname,
                        size_t file_count, ...);
 
-// Constitutes a test that checks that pelton produces a matching output
+// Constitutes a test that checks that k9db produces a matching output
 // for the given queries.
 void RunTest(const std::string &query_file_prefix);
 
-pelton::Connection *GetPeltonInstance();
+k9db::Connection *GetK9dbInstance();
 
 // See documentation for `TestingMainFixture`
 class CleanDatabaseFixture : public ::testing::Test {

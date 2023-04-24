@@ -10,7 +10,7 @@ def _format_java_impl(ctx):
             cd ${{BUILD_WORKSPACE_DIRECTORY}}
             if [ "$1" = "CHECK" ]
             then
-              FILES=$(find . | grep "pelton/planner/calcite/.*\\.java$")
+              FILES=$(find . | grep "k9db/planner/calcite/.*\\.java$")
               CHANGES=$(./bazel-bin/{script} -n $FILES)
               if [ -z "$CHANGES" ]
               then
@@ -21,7 +21,7 @@ def _format_java_impl(ctx):
                 exit 1
               fi
             else
-              find . | grep "pelton/planner/calcite/.*\\.java$" | xargs ./bazel-bin/{script} -i
+              find . | grep "k9db/planner/calcite/.*\\.java$" | xargs ./bazel-bin/{script} -i
             fi
         """.format(
             script = tool_script.short_path,

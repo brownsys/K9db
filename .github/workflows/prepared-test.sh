@@ -1,10 +1,9 @@
 #!/bin/bash
-rm -rf /tmp/pelton/rocksdb
-mkdir -p /tmp/pelton/rocksdb
+rm -rf /tmp/k9db_*
 
 # Run the proxy (in the background).
-bazel build //:pelton
-bazel run //:pelton -- -logtostderr=1 &> .tmp &
+bazel build //:k9db
+bazel run //:k9db -- -logtostderr=1 &> .tmp &
 pid=$!
 sleep 10
 

@@ -36,6 +36,7 @@ user.bazelrc
 # Build directories
 bazel-bin
 bazel-out
+bazel-k9db
 bazel-pelton
 bazel-testlogs
 

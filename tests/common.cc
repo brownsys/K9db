@@ -14,7 +14,6 @@
 
 #include "gflags/gflags.h"
 #include "glog/logging.h"
-#include "pelton/pelton.h"
 
 namespace tests {
 
@@ -23,7 +22,7 @@ DEFINE_bool(echo, false, "whether to echo commands before executing them");
 
 namespace {
 
-pelton::Connection connection;
+k9db::Connection connection;
 
 // Turn record into string in format similar to rows in expected files.
 template <typename T>
@@ -35,7 +34,7 @@ std::string ToString(const T &x) {
 
 // Drop the database (if it exists).
 void DropDatabase(const std::string &db_name) {
-  std::filesystem::remove_all("/tmp/pelton/rocksdb/" + db_name);
+  std::filesystem::remove_all("/tmp/k9db_" + db_name);
 }
 
 // Read an SQL file one command at a time.
@@ -92,7 +91,7 @@ std::vector<std::vector<std::string>> ReadExpected(const std::string &file) {
       current_query.clear();
       continue;
     }
-    // Prepend and append '|' to match pelton's output format.
+    // Prepend and append '|' to match k9db's output format.
     current_query.push_back("|" + line + "|");
   }
   stream.close();
@@ -106,13 +105,13 @@ void InitializeDatabase(const std::string &db_name,
   LOG(INFO) << "Dropping DB " << db_name << "...";
   DropDatabase(db_name);
 
-  // Create and open a connection to pelton.
-  CHECK(pelton::initialize(1, true, db_name, ""));
-  CHECK(pelton::open(&connection));
+  // Create and open a connection to k9db.
+  CHECK(k9db::initialize(1, true, db_name, ""));
+  CHECK(k9db::open(&connection));
 
   // Set echo if specified by cmd flags.
   if (FLAGS_echo) {
-    CHECK(pelton::exec(&connection, "SET echo;").ok());
+    CHECK(k9db::exec(&connection, "SET echo;").ok());
   }
 
   // Create all the tables.
@@ -120,7 +119,7 @@ void InitializeDatabase(const std::string &db_name,
     LOG(INFO) << "Executing file " << file_path;
     auto commands = ReadSQL(file_path);
     for (const std::string &command : commands) {
-      const auto status = pelton::exec(&connection, command);
+      const auto status = k9db::exec(&connection, command);
       if (!status.ok()) {
         LOG(FATAL) << status.status();
       }
@@ -132,9 +131,9 @@ void InitializeDatabase(const std::string &db_name,
 // Clean up after testing is complete.
 void TearDown(const std::string &db_name, bool shutdown_jvm) {
   LOG(INFO) << "Closing connections...";
-  // Close connection to pelton.
-  CHECK(pelton::close(&connection));
-  CHECK(pelton::shutdown(shutdown_jvm));
+  // Close connection to k9db.
+  CHECK(k9db::close(&connection));
+  CHECK(k9db::shutdown(shutdown_jvm));
 
   // Drop the test database.
   LOG(INFO) << "Dropping DB " << db_name << "...";
@@ -203,7 +202,7 @@ int TestingMainFixture(int argc, char **argv, const std::string &testname,
   return res;
 }
 
-// Constitutes a test that checks that pelton produces a matching output
+// Constitutes a test that checks that k9db produces a matching output
 // for the given queries.
 void RunTest(const std::string &query_file_prefix) {
   auto queries = ReadSQL(query_file_prefix + ".sql");
@@ -218,7 +217,7 @@ void RunTest(const std::string &query_file_prefix) {
 
     VLOG(1) << "Running query: " << query;
     // Run query.
-    auto status = pelton::exec(&connection, query);
+    auto status = k9db::exec(&connection, query);
     bool expect_error =
         expected.size() == 1u && expected.front() == "|!error!|";
     if (status.ok()) {
@@ -231,11 +230,11 @@ void RunTest(const std::string &query_file_prefix) {
 
     // Store output.
     std::vector<std::string> actual;
-    pelton::SqlResult &result = status.value();
+    k9db::SqlResult &result = status.value();
     if (result.IsQuery()) {
-      for (pelton::SqlResultSet &resultset : result.ResultSets()) {
-        std::vector<pelton::Record> records = resultset.Vec();
-        for (pelton::Record &record : records) {
+      for (k9db::SqlResultSet &resultset : result.ResultSets()) {
+        std::vector<k9db::Record> records = resultset.Vec();
+        for (k9db::Record &record : records) {
           record.SetPositive(true);
           actual.push_back(ToString(record));
         }
@@ -290,7 +289,7 @@ void CleanDatabaseFixture::TearDown() {
   tests::TearDown(this->db_name(), false);
 }
 
-pelton::Connection *GetPeltonInstance() { return &connection; }
+k9db::Connection *GetK9dbInstance() { return &connection; }
 
 std::optional<std::string> CleanDatabaseFixture::_db_name;
 std::optional<std::vector<std::string>> CleanDatabaseFixture::_file_path_args;
