@@ -10,15 +10,32 @@ config_setting(
     values = {"copt": "-DK9DB_TSAN"},
 )
 
+genrule(
+    name = "rocksdb_so",
+    srcs = [
+        "@rocksdb//:rocksdb",
+    ],
+    outs = [
+        "librocksdb.so",
+    ],
+    cmd = """
+        locs=($(execpaths @rocksdb//:rocksdb))
+        cp "$${locs[0]}/lib/librocksdb.so" $@
+    """,
+)
+
+cc_library(
+    name = "rocksdb_soso",
+    srcs = [":rocksdb_so"],
+    hdrs = [],
+)
+
 rust_binary(
     name = "proxy",
     srcs = [
         "src/proxy.rs",
     ],
     rustc_flags = [
-        "-Clink-args=-L/home/k9db/bazel-bin/external/rocksdb/copy_rocksdb/rocksdb/lib",
-        "-Clink-args=-L/home/k9db/k9db/bazel-bin/external/rocksdb/copy_rocksdb/rocksdb/lib",
-        "-Clink-args=-L/home/bab/Documents/research/pelton/bazel-bin/external/rocksdb/copy_rocksdb/rocksdb/lib",
         "-Clink-args=-rdynamic",
         "-Clink-args=-Wl,-export-dynamic",
     ] + select({
@@ -42,6 +59,7 @@ rust_binary(
         "//k9db/proxy/cargo:slog",
         "//k9db/proxy/cargo:slog_term",
         "//k9db/proxy/src/ffi",
+        "@rocksdb//:rocksdb_so",
     ],
 )
 

@@ -275,6 +275,7 @@ git_repository(
 new_git_repository(
     name = "rocksdb",
     build_file_content = """
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 
 filegroup(
@@ -307,6 +308,28 @@ cmake(
     out_shared_libs = ["librocksdb.so.7"],
     out_static_libs = [],
     deps = [],
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "rocksdb_so_gen",
+    srcs = [
+        ":rocksdb",
+    ],
+    outs = [
+        "librocksdb.so",
+    ],
+    cmd = \"\"\"
+        locs=($(execpaths :rocksdb))
+        cp "$${locs[0]}/lib/librocksdb.so" $@
+    \"\"\",
+)
+
+cc_library(
+    name = "rocksdb_so",
+    srcs = [
+        ":rocksdb_so_gen",
+    ],
     visibility = ["//visibility:public"],
 )
 """,

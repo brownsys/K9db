@@ -6,12 +6,14 @@ try-import /home/docker.bazelrc
 # Alias to simplify disabling / enabling encryption
 build --flag_alias=encryption=//k9db/sql/rocksdb:configure_encryption
 
+build --platform_suffix=normal
 build --cxxopt="-std=c++2a"
 build --host_cxxopt="-std=c++2a"
 build --copt -g
 build --host_copt -g
 build --strip=never
 
+build:asan --platform_suffix=asan
 build:asan --strip=never
 build:asan --copt -fsanitize=address
 build:asan --copt -g
