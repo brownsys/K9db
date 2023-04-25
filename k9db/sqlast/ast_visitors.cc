@@ -17,7 +17,11 @@ namespace sqlast {
  */
 
 std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
-  std::string result = "CREATE TABLE " + ast.table_name() + " (";
+  std::string result = "CREATE ";
+  if (ast.IsDataSubject()) {
+    result += "DATA_SUBJECT ";
+  }
+  result += "TABLE " + ast.table_name() + " (";
   bool first = true;
   for (const std::string &col : ast.VisitChildren(this)) {
     if (!first) {
@@ -27,7 +31,6 @@ std::string Stringifier::VisitCreateTable(const CreateTable &ast) {
     result += col;
   }
   result += ")";
-  result += " ENGINE ROCKSDB";
   return result;
 }
 
@@ -94,7 +97,7 @@ std::string Stringifier::VisitAnonymizationRule(const AnonymizationRule &ast) {
   if (columns.size() == 0) {
     str += " DELETE_ROW";
   } else {
-    str += ast.GetDataSubject() + " ANONYMIZE (";
+    str += ast.GetDataSubject() + " ANON (";
     for (const std::string &column : columns) {
       str += column + ", ";
     }

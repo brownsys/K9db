@@ -30,4 +30,5 @@ format_java(
 alias(
     name = "k9db",
     actual = "//k9db/proxy",
+    visibility = ["//visibility:public"],
 )

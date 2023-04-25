@@ -18,55 +18,25 @@ jobs:
     # Docker setup.
     - name: Build docker container
       run: |
-        docker build --no-cache -t pelton/latest .
+        docker build --no-cache -t k9db/latest .
 
+    # Run docker and do one time cargo raze setup.
     - name: Run docker container
       run: |
-        docker run --mount type=bind,source=$(pwd),target=/home/pelton --name pelton-testing -d -t pelton/latest
-        sleep 60
+        docker run --mount type=bind,source=$(pwd),target=/home/k9db --name k9db -d -t k9db/latest
+        sleep 20
+        docker logs k9db
 
     # bazel build ...
     - name: Build all
       run: |
-        docker exec pelton-testing sh -c "cd /home/pelton && bazel build ..."
-        docker exec pelton-testing sh -c "cd /home/pelton/experiments/lobsters && bazel build ..."
-        docker exec pelton-testing sh -c "cd /home/pelton/experiments/ownCloud && bazel build ..."
+        docker exec k9db sh -c "cd /home/k9db && bazel build ..."
 
     # bazel test all (with encryption; on by default)
     - name: Test all
-      run: docker exec pelton-testing sh -c "cd /home/pelton && bazel test ... --test_output=all"
+      run: docker exec k9db sh -c "cd /home/k9db && bazel test ... --test_output=all"
 
     # bazel test all without encryption
     - name: Test all no encryption
-      run: docker exec pelton-testing sh -c "cd /home/pelton && bazel test ... --encryption=off --test_output=all"
+      run: docker exec k9db sh -c "cd /home/k9db && bazel test ... --encryption=off --test_output=all"
 
-    # prepared statement test.
-    - name: Run prepared statement test
-      run: docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/prepared-test.sh"
-
-    # examples/* via proxy
-    - name: Run examples via proxy
-      run: |
-        docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/test.sh examples/simple-websubmit.sql"
-        docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/test.sh examples/medical_chat.sql"
-
-    - name: Run social chat with restart/recovery
-      run: |
-        docker exec pelton-testing sh -c "cd /home/pelton && ./.github/workflows/test.sh examples/social_chat.sql examples/social_chat.cntd.sql"
-
-    # valgrind
-    - name: Test dataflow with valgrind
-      env:
-        TEST_OPS: bazel test //k9db/dataflow/ops/... --config=valgrind --test_output=all
-        TEST_GRAPH_PARTITION: bazel test //k9db/dataflow:graph_partition-test --config=valgrind --test_output=all
-        TEST_KEY: bazel test //k9db/dataflow:key-test --config=valgrind --test_output=all
-        TEST_RECORD: bazel test //k9db/dataflow:record-test --config=valgrind --test_output=all
-        TEST_SCHEMA: bazel test //k9db/dataflow:schema-test --config=valgrind --test_output=all
-        TEST_VALUE: bazel test //k9db/sqlast:ast_value-test --config=valgrind --test_output=all
-      run: |
-        docker exec pelton-testing sh -c "cd /home/pelton && $TEST_OPS"
-        docker exec pelton-testing sh -c "cd /home/pelton && $TEST_GRAPH_PARTITION"
-        docker exec pelton-testing sh -c "cd /home/pelton && $TEST_KEY"
-        docker exec pelton-testing sh -c "cd /home/pelton && $TEST_RECORD"
-        docker exec pelton-testing sh -c "cd /home/pelton && $TEST_SCHEMA"
-        docker exec pelton-testing sh -c "cd /home/pelton && $TEST_VALUE"

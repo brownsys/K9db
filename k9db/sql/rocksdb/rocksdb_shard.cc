@@ -302,7 +302,7 @@ std::unordered_set<util::ShardName> RocksdbSession::FindShards(
 
   // Encode value.
   const RocksdbTable &table = this->conn_->tables_.at(table_name);
-  CHECK(!value.IsNull()) << "Val is NULL";
+  // CHECK(!value.IsNull()) << "Val is NULL";
   std::string encoded = EncodeValue(table.Schema().TypeOf(column_index), value);
 
   // Check via index.

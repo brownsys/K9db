@@ -1,0 +1,44 @@
+load("@rules_java//java:defs.bzl", "java_binary")
+load("//examples:test.bzl", "k9db_sql_test", "k9db_test")
+
+java_binary(
+    name = "PreparedStatements",
+    srcs = [
+        "PreparedStatements.java",
+    ],
+    jvm_flags = [
+        "-enableassertions",
+    ],
+    main_class = "PreparedStatements",
+    deps = [
+        "@maven//:org_mariadb_jdbc_mariadb_java_client",
+    ],
+)
+
+k9db_test(
+    name = "prepared-test",
+    binaries = [":PreparedStatements"],
+    db_name = "prepared_test",
+    port = 10001,
+)
+
+k9db_sql_test(
+    name = "websubmit",
+    srcs = ["websubmit.sql"],
+    port = 10002,
+)
+
+k9db_sql_test(
+    name = "medical_chat",
+    srcs = ["medical_chat.sql"],
+    port = 10003,
+)
+
+k9db_sql_test(
+    name = "social_chat",
+    srcs = [
+        "social_chat.sql",
+        "social_chat_cntd.sql",
+    ],
+    port = 10004,
+)

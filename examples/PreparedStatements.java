@@ -6,7 +6,7 @@ import java.sql.SQLException;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 
-class PreparedTest {
+class PreparedStatements {
   public static String JDBC_STRING =
       "jdbc:mariadb://127.0.0.1:10001?user=root&password=password&"
       + "autoReconnect=true&useSSL=false&sslMode=DISABLED&useServerPrepStmts"
@@ -23,7 +23,7 @@ class PreparedTest {
       "INSERT INTO tbl VALUES(?, ?, ?);";
 
   public static String PREP_UPDATE =
-      "UPDATE tbl SET id = ? WHERE id = ?";
+      "UPDATE tbl SET name = ? WHERE id = ?";
 
   public static String[] PREP_SELECT = {
       "SELECT age, Count(id) FROM tbl WHERE age = ? GROUP BY age",
@@ -55,9 +55,9 @@ class PreparedTest {
     assert prepInsert.executeUpdate() == 1;
 
     PreparedStatement prepUpdate = connection.prepareStatement(PREP_UPDATE);
-    prepUpdate.setInt(1, 1);
+    prepUpdate.setString(1, "Johnny");
     prepUpdate.setInt(2, 10);
-    assert prepUpdate.executeUpdate() == 2;
+    assert prepUpdate.executeUpdate() == 1;
 
     prepSelect = connection.prepareStatement(PREP_SELECT[0]);
     prepSelect.setInt(1, 25);
@@ -85,15 +85,15 @@ class PreparedTest {
     assert !resultSet.next();
 
     prepSelect = connection.prepareStatement(PREP_SELECT[2]);
-    prepSelect.setInt(1, 1);
+    prepSelect.setInt(1, 10);
     resultSet = prepSelect.executeQuery();
     metadata = resultSet.getMetaData();
     assert metadata.getColumnName(1).equals("id");
     assert metadata.getColumnName(2).equals("name");
     assert metadata.getColumnName(3).equals("age");
     assert resultSet.next();
-    assert resultSet.getInt(1) == 1;
-    assert resultSet.getString(2).equals("John");
+    assert resultSet.getInt(1) == 10;
+    assert resultSet.getString(2).equals("Johnny");
     assert resultSet.getInt(3) == 25;
     assert !resultSet.next();
 
@@ -144,7 +144,7 @@ class PreparedTest {
     assert metadata.getColumnName(2).equals("name");
     assert resultSet.next();
     assert resultSet.getInt(1) == 25;
-    assert resultSet.getString(2).equals("John");
+    assert resultSet.getString(2).equals("Johnny");
     assert !resultSet.next();
 
     connection.close();

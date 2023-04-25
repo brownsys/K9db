@@ -10,26 +10,6 @@ config_setting(
     values = {"copt": "-DK9DB_TSAN"},
 )
 
-genrule(
-    name = "rocksdb_so",
-    srcs = [
-        "@rocksdb//:rocksdb",
-    ],
-    outs = [
-        "librocksdb.so",
-    ],
-    cmd = """
-        locs=($(execpaths @rocksdb//:rocksdb))
-        cp "$${locs[0]}/lib/librocksdb.so" $@
-    """,
-)
-
-cc_library(
-    name = "rocksdb_soso",
-    srcs = [":rocksdb_so"],
-    hdrs = [],
-)
-
 rust_binary(
     name = "proxy",
     srcs = [
