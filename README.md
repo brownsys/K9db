@@ -171,7 +171,6 @@ You can run this using:
 ```bash
 bazel run :k9db --config opt
 ```
-```
 
 You can pass multiple command line flags to K9db to configure it.
 ```bash
