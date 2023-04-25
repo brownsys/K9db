@@ -1,4 +1,5 @@
 user.bazelrc
+docker.bazelrc
 
 # Prerequisites
 *.d

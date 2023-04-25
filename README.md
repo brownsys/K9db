@@ -1,143 +1,238 @@
-# Pelton
+# K9db
 
-A new dataflow processor.
+A MySQL-compatible database for privacy compliance-by-construction.
+
+## Overview
+
+K9db is a MySQL-like database that provides similar capabilities to MySQL,
+while providing applications with a correct-by-construction built-in mechanism
+to comply with subject access requests (SARs), as required by privacy
+legislations, such as GDPR.
+
+K9db support two types of SARs: data access and data deletion. The former allows
+data subjects (i.e. human users) to access a copy of data related to them, while
+the later allows them to request removal of that data. Applications must handle
+these two types of SARs correctly to comply with the GDPR right's to access and
+erasure (the right to be forgotten).
+
+Internally, K9db tracks association between each row of data stored in it and
+users that have rights to it. K9db uses this information to automatically and
+correctly handle SARs, and to also ensure that regular application queries and
+updates maintain compliance (e.g. do not create dangling or orphaned data).
+K9db achieves this while maintaing performance comparable to MySQL, by relying
+on various design decisions and optimizations, including a new physical storage
+layout organized by data subjects. Refer to our upcoming OSDI paper for details.
+
+K9db provides an integrated and compliant in-memory cache to speed up expensive
+queries. K9db automatically ensures this cache is up-to-date with respect to
+SARs, as well as regular application updates. Unlike demand filled caching, such
+as with Memcached, K9db's caches rely on incremental data flow processing to
+keep the cache always up-to-date with no invalidations.
+
+To use K9db, applications need to add annotations to their SQL schema to express
+the ownership relationships between datasubjects and data in the various tables.
+Furthermore, developers may need to combine several related operations into
+a compliance transaction if these operations temporary create orphaned.
+
+K9db runs each query as a single-statement transaction with REPEATABLE_READS
+isolation. K9db enforces PK uniqueness and FK referential integrity for FKs with
+ownership annotations.
+
+K9db was previously known as Pelton.
 
 ## Requirements
-Pelton only supports Ubuntu 20.04+ currently. MacOS might work but is not continously supported.
-To build, you need a working [Bazel 4.0](https://docs.bazel.build/versions/4.0.0/install.html)
-installation.
 
-Bazel will pull some dependencies automatically. However, it relies on some dependencies being
-installed system-wide via your system's package manager:
-install the following via your package manager:
- * GCC-11 (`apt-get install gcc-11 g++-11`)
- * mysql8 and mysqlcppconn8 (the c++ mysql connector), follow instructions here
-   to install for [ubuntu](https://dev.mysql.com/doc/mysql-apt-repo-quick-guide/en/).
-   Make sure to afterwards run `apt-get install libmysqlcppconn8-2 libmysqlcppconn-dev` (the
-   exact version is not important as long as it is 8).
- * The memcached baseline relies on these packages `flex bison libevent-dev`.
-
-Check out [.github/workflows/ubuntutest.yml](.github/workflows/ubuntutest.yml),
-specifically the dependencies section, for a scripted way to install dependencies
-on ubuntu 20.
-
-## Rust
-Rust dependencies are also managed by bazel. When using Rust you can list your
-dependencies as usual in a Cargo.toml file, and expose them to bazel using `raze`.
-You will need to install `raze` using `cargo install cargo-raze`.
-
-We currently have 4 rust packages in pelton:
-`pelton/proxy`
-`experiments/lobsters`
-`experiments/memcached`
-`experiments/ownCloud`
-
-Each of these packages contain a Cargo.toml file. When first installing pelton,
-you need to run `cargo raze` in each of their directories.
-
-If adding your own rust package to pelton, you will need to structure it similarly.
-Make sure to add `raze` configurations to your Cargo.toml file. You will also need
-to add a WORKSPACE.bazel and a BUILD.bazel file. You can use any of the above packages
-as inspiration for what that may look like.
-
-## Docker container
-We provide a docker container with all the dependencies.
-
-To build the docker container, run
+First, you must clone this repo to some directory of your choosing. We will
+call this `<K9DB_DIR>`. You should also initialize its git submodules.
 ```bash
-docker build -t pelton/latest .
+git submodule init
+git submodule update
 ```
 
-The docker container runs mariadb as a daemon. You should run the docker
-container in the background and then attach your shell to it or execute commands
-in it using docker exec:
+After cloning, you have multiple options for building
+and running K9DB:
+1. By using our provided docker container (recommended for trying out K9db).
+2. By installing the requirements and building K9db yourself.
+3. By using our provided scripts if you are running on google cloud (recommend
+   if you are trying to reproduce the results from our paper). Consult the
+   experiments section for more details on this.
+
+Currently, you *cannot* build K9db directly on MacOS. You must instead use the
+docker container. If your machine has *M1/M2* processors, K9db may *not* build
+even using the container.
+
+### Docker container
+
+You will need to install Docker on your machine. You then need to build the
+docker container image. This step may take anywhere between 5-30 minutes,
+depending on your system and internet connection.
 ```bash
-# Run the container and name it pelton-testing
-# Mount pelton into the container.
-docker run --mount type=bind,source=$(pwd),target=/home/pelton --name pelton-testing -d -p 3306:3306 -p 10001:10001 -t pelton/latest
+cd <K9DB_DIR>  # navigate to repo root directory
+docker build -t k9db/latest .  # build image and name it k9db/latest
+```
 
-# Wait a few seconds for mysqld to run successfully inside the container
+After the image is built, you can start it the first time using.
+This will also perform some one-time configurations needed to build k9db.
+```bash
+docker run --mount type=bind,source=$(pwd),target=/home/k9db --name k9db -d -p 3306:3306 -p 10001:10001 -t k9db/latest
+```
 
-# Run desired commands
-docker exec -it pelton-testing /bin/bash
+You can check that the one-time configuration is done by looking at the
+container logs, and looking for the message `Configuration done!`.
+```bash
+docker logs k9db
+```
+
+After configuration is done, you can open a terminal inside your container.
+```bash
+docker exec -it k9db /bin/bash
+$ # now you are inside the container
+$ # validate container is setup properly
+$ cd /home/k9db
+$ ls  # you should see the contents of this repo
+$ ...
+$ exit  # exit the container when you are done.  
+```
+
+You can stop the container and restart it as you wish using.
+```bash
+docker stop k9db
+docker start k9db
+```
+
+Note: the container mounts the repo from your host filesystem rather than copies
+it. You can think of this as making a symbolic link to its content. Any changes
+you make to the contents of the repo inside the container will be visible in
+your host filesystem and vice-versa.
+
+We tested this using `Docker version 20.10.19, build d85ef84`.
+
+### Installing the requirements yourself
+
+If you do not wish to use the docker container. You can install our requirements
+yourself using your favorite package manager. We built k9db on ubuntu 20 and 22,
+but similar systems should also work.
+
+Core requirements:
+1. GCC-11 (e.g. `apt-get install gcc-11 g++-11`).
+2. openjdk-11 (e.g. `apt-get install openjdk-11-jdk`).
+3. rustc and cargo 1.56.0.
+4. bazel-4.0.0 [https://docs.bazel.build/versions/4.0.0/install.html](https://docs.bazel.build/versions/4.0.0/install.html).
+5. libffi-dev, libssl-dev, zlib1g-dev, libncurses5-dev.
+6. cargo-raze (e.g. cargo install cargo-raze).
+7. A MySQL command line client to connect and interact with k9db after running it.
+   We recommend using `mariadb-client-10.6`.
+
+After installing these requirements, ensure that they are the default binaries
+on your system.
+
+You will need to run cargo raze *once* to fetch the rust dependencies from cargo
+and turn them to bazel dependencies.
+```bash
+mkdir -p /tmp/cargo-raze/doesnt/exist/  # may be needed for some versions of raze.
+cd <K9DB_DIR>/k9db/proxy && cargo raze
+cd <K9DB_DIR>/experiments/lobsters && cargo raze
+cd <K9DB_DIR>/experiments/ownCloud && cargo raze
+cd <K9DB_DIR>/experiments/vote && cargo raze
+```
+
+The following are not required to build or run K9DB. But they may be required
+to run some of our experiments from the paper including the baselines.
+1. MariaDB server with MyRocks (`mariadb-server-10.6` `mariadb-plugin-rocksdb`).
+2. MariaDB C++ connector (`libmariadb3` `libmariadb-dev`).
+3. flex, bison, libevent-dev.
+
+After installing MariaDB server, you will need to configure it once to load
+the MyRocks extension. You can do so using:
+```bash
+mariadb -u root
+> # Now connected to mariadb server.
+> CREATE USER 'k9db'@'%' IDENTIFIED BY 'password';
+> GRANT ALL PRIVILEGES ON *.* TO 'k9db'@'%' IDENTIFIED BY 'password';
+> FLUSH PRIVILEGES;
+> INSTALL SONAME 'ha_rocksdb';
 ```
 
 ## Building, Testing, and Running
-Run `bazel build ...`.
 
-To list all available targets, use `bazel query //...`.
+If using the docker container, open a terminal inside it and navigate to
+`/home/k9db`. Otherwise, naviagte to `<k9DB_DIR>` on your system.
 
-To run all tests, run `bazel test ...`.
-
-Pelton's main entry point is its mysql proxy, which you can run using `bazel run //:pelton`.
-You can run this in various mode using `./run.sh [dbg, opt, valgrind, asan, tsan]`.
-
-## Disabling Encryption
-Encryption is on by default. It can be turned off by passing `--encryption=off`
-to any bazel command. For example:
-```
-bazel test ... --encryption=off
-bazel run //:pelton --encryption=off
+You can build K9db using bazel.
+```bash
+# This may take anywhere from 5-50 minutes, depending on your system.
+bazel build :k9db
 ```
 
-## TSAN and ASAN
-The JVM introduces a variety of things that look like various leaks and races. These are
-all JVM internals we have no control over and are likely correct. We suppress them when
-running the JVM.
+To run all tests, run `bazel test ...`
 
-You need to configure bazel to use our supression files. These files must be provided
-using their absolute path. You can configure bazel by creating your own `user.bazelrc`
-file in the root directory of `pelton`. The docker file comes with this file provided
-in. The content of the files should include:
+K9db's main entry point is its mysql proxy, which acts as a MySQL server.
+You can run this using:
+```bash
+bazel run :k9db --config opt
 ```
-test:asan --test_env LSAN_OPTIONS=suppressions=</path/to/pelton/>.lsan_jvm_suppress.txt
-test:tsan --test_env LSAN_OPTIONS=suppressions=</path/to/pelton/>.lsan_jvm_suppress.txt
-test:tsan --test_env TSAN_OPTIONS=suppressions=</path/to/pelton/>.tsan_jvm_suppress.txt
 ```
 
-## Code style
+You can pass multiple command line flags to K9db to configure it.
+```bash
+bazel run :k9db -- --db_path=[/tmp] \
+                   --db_name=[k9db] \
+                   --hostname=[127.0.0.1:10001] \
+                   --logtostderr=([0]|1)
+```
 
-We follow [the Google C++ style guide](https://google.github.io/styleguide/cppguide.html);
-Please run `./format.sh` prior to pushing code. Run `cpplint.py` frequently to detect
-semantic variations from the style guide.
+You can stop K9db at any time by using `ctrl+c`. K9db will always try to
+shutdown cleanly and wait for any open clients to disconnect before shutting
+down. You can start K9db again using the above command at any point, and it
+will reload the database state as it was prior to shutdown. To destroy the
+database, you will need to remove it from the filesystem after shutting K9db
+down.
+```bash
+ctrl+c               # shutdown K9db.
+rm -rf /tmp/k9db_*   # clear all databases in default location
+bazel run :k9db      # fresh start with an empty database.
+```
 
-We recommend adding this as a git pre-commit hook. You can do that by creating
-`.git/hooks/pre-commit` with the following content:
+By default, bazel build and runs in debug mode which is suitable for
+getting started with K9db. For optimal performance while reproducing our
+experiments, you will need to run using optimized mode.
 
 ```bash
-#!/bin/bash
-# Checks if source files have linting errors prior to commit.
-
-# Only files with these extensions will be checked for linting errors.
-CLANG_FORMAT_EXTENSIONS="cc|h|proto|inc"
-
-# Run cpplint.
-output=$(find . -not -path "./third_party/**" \
-       -not -path "./.git/**" \
-  | egrep "\.(${CLANG_FORMAT_EXTENSIONS})\$" \
-  | xargs python2.7 cpplint.py --filter=-legal 2>&1)
-
-if [ $(grep "Total errors found: 0" <<< "$output" | wc -l) -eq 1 ]; then
-  echo "No Linting Errors..."
-else
-  echo "C++ Linting Errors, commit reject!"
-  echo "$output"
-  exit 1
-fi
-
-# (Dry)-run google java format.
-bazel run //:format_java -- CHECK
+bazel run :k9db --config opt
 ```
 
-## MySQL Proxy
+## Tutorial
 
-The proxy acts as a MySQL database while interfacing with pelton.
-Queries are converted to C compatible types and sent to pelton.
-Responses are converted to rust compatible types and returned.
-Any application that uses a MySQL backend may connect to this proxy instead of a traditional database.
+Coming soon.
 
-The flow of the proxy is essentially as follows:
-Application <=> Mysql Proxy <=> FFI <=> Pelton API (C++)
+## Reproducing Our Results
 
-You can find more details in this
-![design diagram](https://user-images.githubusercontent.com/47846691/142964390-7dc575e4-300e-4388-8006-1070fa82ad5d.png).
+Coming soon.
+
+## Limitations and Known Issues.
+
+K9db is a prototype proof-of-concept software validating that
+compliance-by-construction is practical and achievable.
+
+Our prototype has several limitations, some of which are in the works:
+1. We use determinstic encryption for both keys and values. This has leakage.
+   Keys must be encrypted in a consistent way to enable consistent lookups.
+   However, values can be encrypted with randomized nonces.
+   We are working on several improvements to our encryption schemes.
+2. We do not support SQL transactions.
+3. We do not support multi-column primary keys, multi-column foreign keys, and
+   foreign keys targeting a non-primary key column.
+4. We do not enforce UNIQUE and NOT NULL constraints.
+5. We have limited support for DATETIME.
+6. We support the basic core of SQL. Using unsupported syntax or features will
+   result in an unsupported error.
+
+Furthermore, we are currently aware of two bugs of significance:
+1. Our planner creates incorrect plans for cached queries where the key is
+   projected out (e.g. `SELECT col2 FROM table WHERE col1 = ?`).
+2. `OWNS` foreign keys forming chains of 2 or longer are sometimes mishandled
+   during schema creation.
+
+## Contributing
+
+We welcome issues and PRs. Please check the [contributions guide](contributing.md).

@@ -1,8 +1,8 @@
-# Docker image to build pelton incl. all dependencies
+# Docker image to build k9db incl. all dependencies
 # based on Ubuntu 2004
 FROM ubuntu:focal-20211006
 
-MAINTAINER Pelton team "http://cs.brown.edu/people/malte/research/pbc/"
+MAINTAINER K9db team "http://cs.brown.edu/people/malte/research/pbc/"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG C.UTF-8
@@ -44,65 +44,42 @@ RUN /root/.cargo/bin/cargo install cargo-raze
 
 # install mariadb (for baselines only)
 RUN apt-get remove -y --purge mysql*
-
 RUN curl -LsS -O https://downloads.mariadb.com/MariaDB/mariadb_repo_setup
 RUN bash mariadb_repo_setup --mariadb-server-version=10.6
 RUN rm mariadb_repo_setup
 RUN apt-get install -y mariadb-server-10.6 mariadb-client-10.6
 RUN apt-get install -y mariadb-plugin-rocksdb
-RUN echo "[mysqld]" >> /etc/mysql/mariadb.cnf \
-    && echo "table_open_cache_instances = 1" >> /etc/mysql/mariadb.cnf \
-    && echo "table_open_cache = 1000000" >> /etc/mysql/mariadb.cnf \
-    && echo "table_definition_cache = 1000000" >> /etc/mysql/mariadb.cnf \
-    && echo "open_files_limit = 1000000" >> /etc/mysql/mariadb.cnf
-
-RUN echo "* hard nofile 1024000" >> /etc/security/limits.conf \
-    && echo "* soft nofile 1024000" >> /etc/security/limits.conf \
-    && echo "mysql hard nofile 1024000" >> /etc/security/limits.conf \
-    && echo "mysql soft nofile 1024000" >> /etc/security/limits.conf \
-    && echo "root hard nofile 1024000" >> /etc/security/limits.conf \
-    && echo "root soft nofile 1024000" >> /etc/security/limits.conf
-
-RUN echo "* soft nofile 1024000" >> /etc/security/limits.d/90-nproc.conf \
-    && echo "* hard nofile 1024000" >> /etc/security/limits.d/90-nproc.conf \
-    && echo "* soft nproc 10240" >> /etc/security/limits.d/90-nproc.conf \
-    && echo "* hard nproc 10240" >> /etc/security/limits.d/90-nproc.conf \
-    && echo "root soft nproc unlimited" >> /etc/security/limits.d/90-nproc.conf
 
 # install mariadb connector (for memcached)
 RUN apt-get install -y libmariadb3 libmariadb-dev
 RUN cd /tmp \
     && wget https://dlm.mariadb.com/1601342/Connectors/cpp/connector-cpp-1.0.0/mariadb-connector-cpp-1.0.0-ubuntu-groovy-amd64.tar.gz \
     && tar -xvzf mariadb-connector-cpp-1.0.0-*.tar.gz
-
 RUN cd /tmp/mariadb-connector-cpp-1.0.0-* \
     && install -d /usr/include/mariadb/conncpp \
     && install -d /usr/include/mariadb/conncpp/compat \
     && install -v include/mariadb/*.hpp /usr/include/mariadb/ \
     && install -v include/mariadb/conncpp/*.hpp /usr/include/mariadb/conncpp \
     && install -v include/mariadb/conncpp/compat/* /usr/include/mariadb/conncpp/compat
-
 RUN cd /tmp/mariadb-connector-cpp-1.0.0-* \
     && install -d /usr/lib/mariadb \
     && install -d /usr/lib/mariadb/plugin \
     && install -v lib64/mariadb/libmariadbcpp.so /usr/lib \
     && install -v lib64/mariadb/plugin/* /usr/lib/mariadb/plugin
 
-# configure mariadb user
+# configure mariadb and memcached users
 RUN chown -R mysql:root /var/lib/mysql
 RUN mkdir -p /run/mysqld
 RUN chown -R mysql:root /run/mysqld/
-
-# clear tmp folder
-RUN rm -rf /tmp/*
+RUN useradd memcached
 
 # Do not copy, instead bind mount during docker run
-RUN mkdir /home/pelton
+RUN mkdir /home/k9db
 
 # Generate docker.bazelrc
-RUN echo "test:asan --test_env LSAN_OPTIONS=suppressions=/home/pelton/.lsan_jvm_suppress.txt" > /home/docker.bazelrc
-RUN echo "test:tsan --test_env LSAN_OPTIONS=suppressions=/home/pelton/.lsan_jvm_suppress.txt" >> /home/docker.bazelrc
-RUN echo "test:tsan --test_env TSAN_OPTIONS=suppressions=/home/pelton/.tsan_jvm_suppress.txt" >> /home/docker.bazelrc
+RUN echo "test:asan --test_env LSAN_OPTIONS=suppressions=/home/k9db/.lsan_jvm_suppress.txt" > /home/docker.bazelrc
+RUN echo "test:tsan --test_env LSAN_OPTIONS=suppressions=/home/k9db/.lsan_jvm_suppress.txt" >> /home/docker.bazelrc
+RUN echo "test:tsan --test_env TSAN_OPTIONS=suppressions=/home/k9db/.tsan_jvm_suppress.txt" >> /home/docker.bazelrc
 
 # for GDPRBench, replace python with python2
 RUN ln -s /usr/bin/python2 /usr/bin/python
@@ -112,13 +89,9 @@ ADD scripts/setup/configure_db.sql /home/configure_db.sql
 ADD scripts/setup/configure_db.sh /home/configure_db.sh
 RUN chmod 750 /home/configure_db.sh
 
-RUN useradd memcached
-RUN mkdir -p /var/pelton/rocksdb
-RUN mkdir -p /tmp/pelton/rocksdb
-
 EXPOSE 10001/tcp
 EXPOSE 3306/tcp
 
 ENTRYPOINT /bin/bash ./home/configure_db.sh && /bin/bash
 
-# Run with docker run -v .:/home/pelton
+# Run with docker run --mount type=bind,source=$(pwd),target=/home/k9db --name k9db -d -p 3306:3306 -p 10001:10001 -t k9db/latest

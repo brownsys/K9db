@@ -1,7 +1,6 @@
 # Optional per-user config goes into user.bazelrc, which is .gitignore-ed.
-try-import user.bazelrc
+try-import %workspace%/user.bazelrc
 try-import /home/docker.bazelrc
-
 
 # Alias to simplify disabling / enabling encryption
 build --flag_alias=encryption=//k9db/sql/rocksdb:configure_encryption

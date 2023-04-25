@@ -1,6 +1,6 @@
-CREATE USER 'pelton'@'%' IDENTIFIED BY 'password'
+CREATE USER 'k9db'@'%' IDENTIFIED BY 'password'
 \p;
-GRANT ALL PRIVILEGES ON *.* TO 'pelton'@'%' IDENTIFIED BY 'password'
+GRANT ALL PRIVILEGES ON *.* TO 'k9db'@'%' IDENTIFIED BY 'password'
 \p;
 FLUSH PRIVILEGES
 \p;
