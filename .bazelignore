@@ -1,4 +1,4 @@
-pelton/planner/calcite/.bin/
+k9db/planner/calcite/.bin/
 experiments/lobsters
 experiments/memcached
 experiments/vote
