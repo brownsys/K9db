@@ -42,19 +42,19 @@ K9db was previously known as Pelton.
 
 ## Installing, Building, and Running K9db
 
-The requirements for building and running K9db are listed in our [wiki](./wiki/Requirements).
+The requirements for building and running K9db are listed in our [wiki](https://github.com/brownsys/K9db/wiki/Requirements).
 
-You can either [install our dependencies yourself](./wiki/Requirements%3A-Ubuntu-and-similar-distros)
-or use our [provided Docker container](./wiki/Requirements%3A-Using-Docker).
+You can either [install our dependencies yourself](https://github.com/brownsys/K9db/wiki/Requirements%3A-Ubuntu-and-similar-distros)
+or use our [provided Docker container](https://github.com/brownsys/K9db/wiki/Requirements%3A-Using-Docker).
 
-You can then use bazel to [build and run K9db](./wiki/Building,-Testing,-and-Running).
+You can then use bazel to [build and run K9db](https://github.com/brownsys/K9db/wiki/Building,-Testing,-and-Running).
 
 K9db does not currently build on Mac machines with M1/M2 processors, even when using the Docker container.
 
 ## Tutorial
 
-Checkout our wiki for how to [run and connect to a K9db server](./wiki/Tutorial),
-as well as for a tutorial on our [basic operations](./wiki/Basic-Operations).
+Checkout our wiki for how to [run and connect to a K9db server](https://github.com/brownsys/K9db/wiki/Tutorial),
+as well as for a tutorial on our [basic operations](https://github.com/brownsys/K9db/wiki/Basic-Operations).
 
 Tutorials for more complex features and more complex scenarios are coming soon.
 
@@ -68,7 +68,7 @@ K9db is a prototype proof-of-concept software validating that
 compliance-by-construction is practical and achievable.
 
 We have several limitations, including a couple of known bugs, and various enhancements in the works.
-These are listed in our [wiki](./wiki/Limitations-and-Known-Issues), and in GitHub issues.
+These are listed in our [wiki](https://github.com/brownsys/K9db/wiki/Limitations-and-Known-Issues), and in GitHub issues.
 Feel free to open additional issues for feature requests or new bugs.
 
 ## Contributing
