@@ -5,11 +5,11 @@ SET echo;
 SELECT * FROM chat;
 
 -- Can access data.
-GDPR GET Users 1;
+GDPR GET users 1;
 
 -- Leaving may leave data if it still has owners.
-GDPR FORGET Users 1;
+GDPR FORGET users 1;
 SELECT * FROM chat;
 
-GDPR FORGET Users 2;
+GDPR FORGET users 2;
 SELECT * FROM chat;

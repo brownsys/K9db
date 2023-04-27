@@ -19,13 +19,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 // Help message.
-const USAGE: &str = "
-  Available options:
-  --help (false): displays this help message.
-  --workers (3): number of dataflow workers.
-  --db_name (k9db): name of the database.
-  --db_username (root): database user to connect with to mariadb.
-  --db_password (password): password to connect with to mariadb.";
+const USAGE: &str = "K9db options: look below for 'Flags from k9db/proxy/src/ffi/ffi.cc'";
 
 // Helper for translating k9db types to msql-srv types.
 fn convert_type(coltype: k9db::FFIColumnType) -> msql_srv::ColumnType {

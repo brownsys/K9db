@@ -24,7 +24,7 @@ jobs:
     - name: Run docker container
       run: |
         docker run --mount type=bind,source=$(pwd),target=/home/k9db --name k9db -d -t k9db/latest
-        sleep 20
+        sleep 35
         docker logs k9db
 
     # bazel build ...
