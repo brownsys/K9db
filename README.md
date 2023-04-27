@@ -56,7 +56,8 @@ K9db does not currently build on Mac machines with M1/M2 processors, even when u
 Checkout our wiki for how to [run and connect to a K9db server](https://github.com/brownsys/K9db/wiki/Tutorial),
 as well as for a tutorial on our [basic operations](https://github.com/brownsys/K9db/wiki/Basic-Operations).
 
-Tutorials for more complex features and more complex scenarios are coming soon.
+Our wiki also covers more complex scenarios and features, including [shared data](https://github.com/brownsys/K9db/wiki/Shared-Data),
+[accessorship](https://github.com/brownsys/K9db/wiki/Ownership-vs-Access), and [dynamic/variable ownership](https://github.com/brownsys/K9db/wiki/Variable-Ownership).
 
 ## Reproducing Our Results
 
