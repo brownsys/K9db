@@ -45,15 +45,9 @@ CREATE TABLE shares (
   share_with_group INT,
   file_id INT,
   PRIMARY KEY (ID),
-  -- The creator owns the file.
   FOREIGN KEY (creator) OWNED_BY users(ID),
-  -- Sharing with a user or a group only gives them access to the file
-  FOREIGN KEY (share_with_user) ACCESSED_BY users(ID),
-  FOREIGN KEY (share_with_group) ACCESSED_BY usergroups(ID),
-  -- Whoever owns this share (i.e. the creator) also owns the file.
-  -- K9db automatically downgrades (but doesnt upgrade) rights of data subjects
-  -- when following a path with mixed access and ownership types.
-  -- Thus, accessors of this share become accessors of the file.
+  FOREIGN KEY (share_with_user) OWNED_BY users(ID),
+  FOREIGN KEY (share_with_group) OWNED_BY usergroups(ID),
   FOREIGN KEY (file_id) OWNS files(ID)
 );
 
@@ -69,16 +63,13 @@ INSERT INTO shares VALUES (2, 1, 2, NULL, 1);
 -- Share file 1 with members of group 1.
 INSERT INTO shares VALUES (3, 1, NULL, 1, 1);
 
--- Bob has access to file
-GDPR GET users 2;
-
--- File remains even after Bob removes his data.
-GDPR FORGET users 2;
+-- File remains even after alice (the creator) is removed.
+GDPR FORGET users 1;
 SELECT * FROM files;
 SELECT * FROM usergroups;
 
--- File does not remain when creator requests deletion.
+-- File goes away when all users it is shared with are gone.
 -- Groups is also removed cause all members are gone.
-GDPR FORGET users 1;
+GDPR FORGET users 2;
 SELECT * FROM files;
 SELECT * FROM usergroups;

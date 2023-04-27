@@ -50,3 +50,11 @@ k9db_sql_test(
     ],
     port = 10005,
 )
+
+k9db_sql_test(
+    name = "owncloud_owners",
+    srcs = [
+        "owncloud_owners.sql",
+    ],
+    port = 10006,
+)
