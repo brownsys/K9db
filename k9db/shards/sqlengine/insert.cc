@@ -122,7 +122,9 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
     size_t colidx = EXTRACT_VARIANT(column_index, desc->info);
     const std::string &colname = EXTRACT_VARIANT(column, desc->info);
     sqlast::Value val = this->stmt_.GetValue(colname, colidx);
-    ASSERT_RET(!val.IsNull(), Internal, "OWNER cannot be NULL");
+    if (val.IsNull()) {
+      continue;
+    }
 
     // Handle according to sharding type.
     switch (desc->type) {
