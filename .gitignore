@@ -38,6 +38,7 @@ docker.bazelrc
 bazel-bin
 bazel-out
 bazel-k9db
+bazel-K9db
 bazel-pelton
 bazel-testlogs
 

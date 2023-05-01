@@ -85,8 +85,8 @@ RUN echo "test:tsan --test_env TSAN_OPTIONS=suppressions=/home/k9db/.tsan_jvm_su
 RUN ln -s /usr/bin/python2 /usr/bin/python
 
 # configure mariadb on startup and run mysqld in the background
-ADD scripts/setup/configure_db.sql /home/configure_db.sql
-ADD scripts/setup/configure_db.sh /home/configure_db.sh
+ADD configure_db.sql /home/configure_db.sql
+ADD configure_db.sh /home/configure_db.sh
 RUN chmod 750 /home/configure_db.sh
 
 EXPOSE 10001/tcp
