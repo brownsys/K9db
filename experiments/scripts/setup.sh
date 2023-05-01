@@ -11,20 +11,27 @@ echo 'export LOCAL_IP=$(curl  http://metadata.google.internal/computeMetadata/v1
 echo "======================================================================"
 echo "Installing K9db dependencies..."
 cd $K9DB_DIR
-./experiments/scripts/dependencies.sh
+./experiments/scripts/setup/dependencies.sh
 
 # Install and configure mariadb.
 echo "======================================================================"
 echo "Installing and configuring MariaDB..."
 cd $K9DB_DIR
-./experiments/scripts/mariadb.sh
+./experiments/scripts/setup/mariadb.sh
 
 # Building harnesses and K9db.
 echo "======================================================================"
 echo "Building harnesses and K9db...".
 cd $K9DB_DIR
-./experiments/scripts/build.sh
+./experiments/scripts/setup/build.sh
+
+# Setup plotting scripts.
+echo "======================================================================"
+echo "Setup plotting scripts...".
+cd $K9DB_DIR
+./experiments/scripts/setup/plotting.sh
 
 echo "======================================================================"
 echo "Machine setup done!"
-echo "Do not forget to run './experiments/scripts/ssd.sh' after any restart!"
+echo "Do not forget to run './experiments/scripts/setup/ssd.sh' after any restart!"
+cd $K9DB_DIR

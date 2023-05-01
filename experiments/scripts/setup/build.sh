@@ -17,7 +17,7 @@ bazel build //:vote-benchmark -c opt
 echo "Building memcached..."
 cd ${K9DB_DIR}/experiments/memcached
 bazel build @memcached//:memcached --config=opt
-bazel build //memcached:memcached --config=opt --queries=real
+bazel build //memcached:memcached --config=opt
 
 # Build lobsters harness
 echo "Building lobsters harness..."

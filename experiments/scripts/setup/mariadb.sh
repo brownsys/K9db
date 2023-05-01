@@ -60,7 +60,7 @@ sudo rm -rf mariadb*
 # Configure MariaDB to use SSD.
 echo "Configuring MariaDB SSD..."
 cd $K9DB_DIR
-./experiments/scripts/ssd.sh
+./experiments/scripts/setup/ssd.sh
 echo 'datadir = /mnt/disks/my-ssd/mysql' | sudo tee -a /etc/mysql/mariadb.cnf
 
 # Configure MariaDB to listen on the external network interface.

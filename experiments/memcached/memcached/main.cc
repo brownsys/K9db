@@ -4,61 +4,16 @@
 // NOLINTNEXTLINE
 #include <regex>
 
+#include "gflags/gflags.h"
 #include "memcached/encode.h"
 #include "memcached/mariadb.h"
 #include "memcached/memcached.h"
 
+// The IP of the MariaDB database server where the lobsters database is stored.
+DEFINE_string(database, "127.0.0.1", "IP of MariaDB database with lobsters");
+
 // Queries to cache.
-static std::vector<std::string> ALL_QUERIES = {
-    "SELECT comments.upvotes, comments.downvotes, comments.story_id FROM "
-    "comments JOIN stories ON comments.story_id = stories.id WHERE "
-    "comments.story_id = ? AND comments.user_id != stories.user_id",  // _0
-    "SELECT stories.id, stories.merged_story_id FROM stories WHERE "
-    "stories.merged_story_id = ?",  // _1  [can go]
-    "SELECT comments.*, comments.upvotes - comments.downvotes AS saldo FROM "
-    "comments WHERE comments.story_id = ? "
-    "ORDER BY saldo ASC, confidence DESC",  // _2
-    "SELECT tags.*, taggings.story_id FROM tags INNER JOIN taggings ON tags.id "
-    "= taggings.tag_id WHERE taggings.story_id = ?",  // _3
-    "SELECT stories.* FROM stories WHERE stories.merged_story_id IS NULL AND "
-    "stories.is_expired = 0 AND stories.upvotes - stories.downvotes >= 0 ORDER "
-    "BY hotness ASC LIMIT 51",                               // _4
-    "SELECT votes.* FROM votes WHERE votes.comment_id = ?",  // _5 [can go]
-    "SELECT tags.id, stories.user_id, count(*) AS `count` FROM tags INNER JOIN "
-    "taggings ON tags.id = taggings.tag_id INNER JOIN stories ON "
-    "taggings.story_id = stories.id WHERE tags.inactive = 0 AND "
-    "stories.user_id = ? GROUP BY tags.id, stories.user_id ORDER BY `count` "
-    "DESC LIMIT 1",  // _6
-    "SELECT suggested_titles.* FROM suggested_titles WHERE "
-    "suggested_titles.story_id = ?",  // _7 [can go]
-    "SELECT taggings.* FROM taggings WHERE taggings.story_id = ?",  // _8 [can
-                                                                    // go]
-    "SELECT 1 AS `one`, hats.user_id FROM hats WHERE hats.user_id "
-    "= ? LIMIT 1",  // _9 [can go?]
-    "SELECT suggested_taggings.* FROM suggested_taggings WHERE "
-    "suggested_taggings.story_id = ?",  // _10 [can go]
-    "SELECT comments.* FROM comments WHERE comments.is_deleted = 0 AND "
-    "comments.is_moderated = 0 ORDER BY id DESC LIMIT 40",  // _11
-    "SELECT stories.* FROM stories WHERE stories.id = ?",   // _12 [can go]
-    "SELECT stories.* FROM stories WHERE stories.merged_story_id IS NULL AND "
-    "stories.is_expired = 0 AND stories.upvotes - stories.downvotes <= 5 ORDER "
-    "BY stories.id DESC LIMIT 51",  // _13
-    "SELECT read_ribbons.user_id, COUNT(*) FROM read_ribbons JOIN stories ON "
-    "(read_ribbons.story_id = stories.id) JOIN comments ON "
-    "(read_ribbons.story_id = comments.story_id) LEFT JOIN comments AS "
-    "parent_comments ON (comments.parent_comment_id = parent_comments.id) "
-    "WHERE read_ribbons.is_following = 1 AND comments.user_id <> "
-    "read_ribbons.user_id AND comments.is_deleted = 0 AND "
-    "comments.is_moderated = 0 AND ( comments.upvotes - comments.downvotes ) "
-    ">= 0 AND read_ribbons.updated_at < comments.created_at AND ( ( "
-    "parent_comments.user_id = read_ribbons.user_id AND ( "
-    "parent_comments.upvotes - parent_comments.downvotes ) >= 0 ) OR ( "
-    "parent_comments.id IS NULL AND stories.user_id = read_ribbons.user_id ) ) "
-    "GROUP BY read_ribbons.user_id HAVING read_ribbons.user_id = ?",  // _14
-    "SELECT taggings.story_id, taggings.tag_id FROM taggings WHERE "
-    "taggings.story_id = ? AND taggings.tag_id = ?",  // _15 [can go]
-};
-static std::vector<std::string> REAL_QUERIES = {
+static std::vector<std::string> QUERIES = {
     "SELECT comments.upvotes, comments.downvotes, comments.story_id FROM "
     "comments JOIN stories ON comments.story_id = stories.id WHERE "
     "comments.story_id = ? AND comments.user_id != stories.user_id",
@@ -100,16 +55,14 @@ static std::regex REGEX_HAVING{"(.*) HAVING ([A-Za-z0-9\\._]+) \\= \\?(.*)"};
 static std::regex REGEX_COLUMN{"([A-Za-z_0-9]+\\.)?([A-Za-z0-9_]+)"};
 static std::regex REGEX_LIMIT{"(.*) LIMIT ([0-9]+)"};
 
-// QUERIES should be defined to be REAL_QUERIES or ALL_QUERIES by bazel.
-#define DO_QUOTE(X) #X
-#define QUOTE(X) DO_QUOTE(X)
-
 int main(int argc, char **argv) {
-  std::cout << QUOTE(QUERIES) << std::endl;
   uint64_t total_size = 0;
 
+  // Parse command line flags.
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+
   // Connect to Mariadb and memcached.
-  MariaDBConnection mariadb;
+  MariaDBConnection mariadb(FLAGS_database);
   MemcachedConnection memcached;
 
   // Loop over queries.

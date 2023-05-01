@@ -13,18 +13,11 @@
 
 class MariaDBConnection {
  public:
-  MariaDBConnection() {
-    std::string host = "localhost";
-    char *local_ip = std::getenv("LOCAL_IP");
-    if (local_ip != nullptr) {
-      if (local_ip[0] != '\0') {
-        host = std::string(local_ip);
-      }
-    }
+  explicit MariaDBConnection(const std::string &host) {
     // Connect to mariadb server.
     sql::ConnectOptionsMap props;
     props["hostName"] = host.c_str();
-    props["userName"] = "pelton";
+    props["userName"] = "k9db";
     props["password"] = "password";
 
     sql::Driver *driver = sql::mariadb::get_driver_instance();
@@ -67,7 +60,7 @@ class MariaDBConnection {
       // Transform row to our representation.
       MemcachedKey key = EncodeBaseKey(rows.get(), schema.get(), key_indices);
       MemcachedRecord record = EncodeRow(rows.get(), schema.get());
-      if (data[key].size() < limit) {
+      if (limit == -1 || data[key].size() < static_cast<size_t>(limit)) {
         data[key].push_back(record);
       }
     }

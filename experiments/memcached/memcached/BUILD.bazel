@@ -10,13 +10,6 @@ string_flag(
     ],
 )
 
-config_setting(
-    name = "real_queries",
-    flag_values = {
-        ":queries": "real",
-    },
-)
-
 cc_binary(
     name = "memcached",
     srcs = [
@@ -25,15 +18,12 @@ cc_binary(
         "mariadb.h",
         "memcached.h",
     ],
-    defines = select({
-        ":real_queries": ["QUERIES=REAL_QUERIES"],
-        "//conditions:default": ["QUERIES=ALL_QUERIES"],
-    }),
     linkopts = [
         "-lmariadbcpp",
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "@com_github_gflags_gflags//:gflags",
         "@libmemcached",
     ],
 )
