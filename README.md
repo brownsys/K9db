@@ -61,7 +61,7 @@ Our wiki also covers more complex scenarios and features, including [shared data
 
 ## Reproducing Our Results
 
-Coming soon.
+Checkout our wiki for [how to setup and run the experiments](https://github.com/brownsys/K9db/wiki/Experiments) from our OSDI paper.
 
 ## Limitations and Known Issues.
 
