@@ -146,7 +146,7 @@ impl VoteClient for Conn {
     type Future = impl Future<Output = Result<Self, failure::Error>> + Send;
     fn new(params: Parameters, args: clap::ArgMatches<'_>) -> <Self as VoteClient>::Future {
         let addr = args.value_of("mysql-address").unwrap();
-        let addr = format!("mysql://pelton:password@{}", addr);
+        let addr = format!("mysql://k9db:password@{}", addr);
         let db = args.value_of("database").unwrap().to_string();
         let mem_addr = args.value_of("memcached-address").unwrap().to_string();
         let memcached_conn = MemcachedConn::new(&mem_addr, false);

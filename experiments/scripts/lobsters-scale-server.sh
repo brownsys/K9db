@@ -1,4 +1,8 @@
 #!/bin/bash
+mkdir -p /mnt/disks/my-ssd/k9db
+
+echo "Check load instance for output"
+
 # Stop mariadb.
 sudo service mariadb stop
 

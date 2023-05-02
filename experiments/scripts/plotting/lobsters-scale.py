@@ -11,7 +11,7 @@ DATA_SCALE_1 = 5800
 
 # Define additional flags.
 gflags.DEFINE_string('dir', '../logs/lobsters-scale/', 'Path to directory with scale numbers')
-gflags.DEFINE_string('outdir', '../outputs/lobsters-scale/', 'Output directory')
+gflags.DEFINE_string('outdir', '../outputs/lobsters-scale', 'Output directory')
 
 def GetFiles():
   result, scales = [], []

@@ -29,7 +29,7 @@ gflags.DEFINE_string('baseline', '../logs/lobsters/baseline.out', 'Input file wi
 gflags.DEFINE_string('baseline_memory', '../logs/lobsters/baseline-memory.out', 'Input file with baseline memory numbers')
 gflags.DEFINE_string('memcached_memory', '../logs/lobsters/memcached-memory.out', 'Input file with memcached memory numbers')
 gflags.DEFINE_string('k9db_memory', '../logs/lobsters/k9db-memory.out', 'Input file with k9db memory numbers')
-gflags.DEFINE_string('outdir', '../outputs/lobsters-endpoints/', 'Output directory')
+gflags.DEFINE_string('outdir', '../outputs/lobsters-endpoints', 'Output directory')
 
 # Formatting for the markdown output.
 def PrintMarkdown(baseline, k9db, unencrypted):

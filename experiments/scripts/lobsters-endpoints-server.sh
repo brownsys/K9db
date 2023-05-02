@@ -1,5 +1,6 @@
 #!/bin/bash
-K9DB_DIR="$(pwd)"
+mkdir -p /mnt/disks/my-ssd/k9db
+
 echo "Check load instance for output"
 
 # Restart mariadb.

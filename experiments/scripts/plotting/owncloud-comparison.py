@@ -12,7 +12,7 @@ gflags.DEFINE_string('cuts', 'no', 'How many cuts to do on the y-axis ' + \
 gflags.DEFINE_string('baseline_memory', '../logs/owncloud/mariadb-memory.out', 'Input file with baseline memory numbers')
 gflags.DEFINE_string('memcached_memory', '../logs/owncloud/memcached-memory.out', 'Input file with memcached memory numbers')
 gflags.DEFINE_string('k9db_memory', '../logs/owncloud/k9db-memory.out', 'Input file with k9db memory numbers')
-gflags.DEFINE_string('outdir', '../outputs/owncloud/', 'Output directory')
+gflags.DEFINE_string('outdir', '../outputs/owncloud', 'Output directory')
 
 
 ENDPOINTS = ["Read", "Direct", "Group", "Read File PK", "Update File PK"]

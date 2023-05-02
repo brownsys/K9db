@@ -5,6 +5,7 @@ PLOT_OUT="${K9DB_DIR}/experiments/scripts/outputs/owncloud/"
 
 mkdir -p "$LOG_OUT"
 mkdir -p "$PLOT_OUT"
+mkdir -p /mnt/disks/my-ssd/k9db
 
 echo "Writing plots and final outputs to $PLOT_OUT"
 echo "Writing logs and temporary measurements to $LOG_OUT"
