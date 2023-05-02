@@ -14,9 +14,15 @@ sudo curl -LsS -O https://downloads.mariadb.com/MariaDB/mariadb_repo_setup
 sudo bash mariadb_repo_setup --mariadb-server-version=10.6
 sudo rm mariadb_repo_setup
 sudo apt-get install -y mariadb-server-10.6 mariadb-client-10.6 mariadb-plugin-rocksdb
-sudo service mariadb stop
+
+# Start mariadb, configure mariadb user.
+echo "Starting MariaDB and configuring user..."
+cd $K9DB_DIR
+sudo service mariadb start
+sudo mariadb -u root < configure_db.sql
 
 # Configure mariadb for optimized performance.
+sudo service mariadb stop
 echo "Configuring MariaDB performance...."
 echo "[mysqld]" | sudo tee -a /etc/mysql/mariadb.cnf
 echo "table_open_cache_instances = 1" | sudo tee -a /etc/mysql/mariadb.cnf
@@ -67,9 +73,3 @@ echo 'datadir = /mnt/disks/my-ssd/mysql' | sudo tee -a /etc/mysql/mariadb.cnf
 echo "Configuring MariaDB network interface..."
 LOCAL_IP=$(curl  http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip -H "Metadata-Flavor: Google")
 sudo sed -i "s|bind-address.*|bind-address = $LOCAL_IP|" /etc/mysql/mariadb.conf.d/50-server.cnf
-
-# Start mariadb, configure mariadb user.
-echo "Starting MariaDB and configuring user..."
-cd $K9DB_DIR
-sudo service mariadb start
-sudo mariadb -u root < configure_db.sql

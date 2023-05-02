@@ -82,6 +82,9 @@ pub fn insert_users(conn: &mut Conn, users: Vec<User>) {
 pub fn insert_groups(conn: &mut Conn, groups: Vec<Group>) {
   for group in &groups {
     conn
+      .query_drop("CTX START;")
+      .unwrap();
+    conn
       .query_drop(&format!("INSERT INTO oc_groups VALUES ('{}')", &group.gid))
       .unwrap();
     group.users.iter().for_each(|(i, uid)| {
@@ -92,16 +95,25 @@ pub fn insert_groups(conn: &mut Conn, groups: Vec<Group>) {
         ))
         .unwrap();
     });
+    conn
+      .query_drop("CTX COMMIT;")
+      .unwrap();
   }
 }
 
 pub fn insert_files(conn: &mut Conn, files: Vec<File>) {
   for file in &files {
     conn
+      .query_drop("CTX START;")
+      .unwrap();
+    conn
       .query_drop(&format!(
         "INSERT INTO oc_files VALUES ({}, '{}')",
         file.id, file.id
       ))
+      .unwrap();
+    conn
+      .query_drop("CTX ROLLBACK;")
       .unwrap();
   }
 }

@@ -9,7 +9,7 @@ use memcached::client::Client;
 use memcached::proto::ProtoType;
 
 // Connection properties.
-const DB_USER: &'static str = "pelton";
+const DB_USER: &'static str = "k9db";
 const DB_PASSWORD: &'static str = "password";
 const DB_NAME: &'static str = "owncloud";
 
@@ -17,13 +17,13 @@ const DB_NAME: &'static str = "owncloud";
 const PELTON_SCHEMA: &'static str = include_str!("../data/schema.sql");
 const MARIADB_SCHEMA: &'static str = include_str!("../data/mysql-schema.sql");
 
-pub fn pelton_connect() -> Conn {
+pub fn pelton_connect(ip: &str) -> Conn {
   // Start a connection.
   let opts = OptsBuilder::new()
     .user(Some(DB_USER))
     .pass(Some(DB_PASSWORD))
     .tcp_port(10001)
-    .ip_or_hostname(Some("127.0.0.1"))
+    .ip_or_hostname(Some(ip))
     .tcp_nodelay(true);
   let mut connection = Conn::new(opts).unwrap();
   // Create the schema.
@@ -31,16 +31,12 @@ pub fn pelton_connect() -> Conn {
   connection
 }
 
-pub fn mariadb_connect() -> Conn {
-  let db_ip_result = match std::env::var("LOCAL_IP") {
-    Ok(v) => if v == "" { "localhost".to_string() } else { v },
-    Err(_) => "localhost".to_string(),
-  };
+pub fn mariadb_connect(ip: &str) -> Conn {
   // Start a connection.
   let opts = OptsBuilder::new()
     .user(Some(DB_USER))
     .pass(Some(DB_PASSWORD))
-    .ip_or_hostname(Some(db_ip_result));
+    .ip_or_hostname(Some(ip));
   let mut connection = Conn::new(opts).unwrap();
   // Clean up database.
   connection

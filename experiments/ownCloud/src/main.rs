@@ -31,6 +31,7 @@ pub struct Args {
   pub perf: bool,
   pub warmup: bool,
   pub distr: Option<ZipfF>,
+  pub db_ip: String,
 }
 
 fn main() {
@@ -53,6 +54,7 @@ fn main() {
                 (@arg perf: --perf "Wait for user input before starting workload to attach perf")
                 (@arg warmup: --warmup "Warmup the cache!")
                 (@arg distr: --zipf [s] "Use zipf distribution with a frequency rank exponent of 's' (default to uniform)")
+                (@arg db_ip: --db_ip ... +required +takes_value "IP of database server")
         ).get_matches();
 
   // Parse command line arguments.
@@ -73,6 +75,7 @@ fn main() {
     perf: matches.is_present("perf"),
     warmup: matches.is_present("warmup"),
     distr: value_t!(matches, "distr", ZipfF).ok(),
+    db_ip: matches.value_of("db_ip").map(&str::to_string).unwrap(),
   };
 
   // Output file.
@@ -112,7 +115,7 @@ fn main() {
   let operations = args.operations;
 
   // Run the experiment for each provided backend.
-  let mut backend = Backend::from_str(&args.backend);
+  let mut backend = Backend::from_str(&args.backend, &args.db_ip);
   eprintln!("--> Starting backend {}", backend);
 
   // Insert load (priming).
