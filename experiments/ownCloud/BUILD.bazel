@@ -16,6 +16,7 @@ rust_binary(
     ],
     compile_data = [
         "data/schema.sql",
+        "data/schema-owners.sql",
         "data/mysql-schema.sql",
     ],
     deps = [

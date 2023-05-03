@@ -32,6 +32,7 @@ pub struct Args {
   pub warmup: bool,
   pub distr: Option<ZipfF>,
   pub db_ip: String,
+  pub all_owners: bool,
 }
 
 fn main() {
@@ -55,6 +56,7 @@ fn main() {
                 (@arg warmup: --warmup "Warmup the cache!")
                 (@arg distr: --zipf [s] "Use zipf distribution with a frequency rank exponent of 's' (default to uniform)")
                 (@arg db_ip: --db_ip ... +required +takes_value "IP of database server")
+                (@arg all_owners: --all_owners "Use the all owners schema")
         ).get_matches();
 
   // Parse command line arguments.
@@ -76,6 +78,7 @@ fn main() {
     warmup: matches.is_present("warmup"),
     distr: value_t!(matches, "distr", ZipfF).ok(),
     db_ip: matches.value_of("db_ip").map(&str::to_string).unwrap(),
+    all_owners: matches.is_present("all_owners"),
   };
 
   // Output file.
@@ -115,7 +118,7 @@ fn main() {
   let operations = args.operations;
 
   // Run the experiment for each provided backend.
-  let mut backend = Backend::from_str(&args.backend, &args.db_ip);
+  let mut backend = Backend::from_str(&args.backend, &args.db_ip, args.all_owners);
   eprintln!("--> Starting backend {}", backend);
 
   // Insert load (priming).

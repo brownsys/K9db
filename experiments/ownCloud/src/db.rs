@@ -15,9 +15,10 @@ const DB_NAME: &'static str = "owncloud";
 
 // Schemas.
 const PELTON_SCHEMA: &'static str = include_str!("../data/schema.sql");
+const ALL_OWNERS_SCHEMA: &'static str = include_str!("../data/schema-owners.sql");
 const MARIADB_SCHEMA: &'static str = include_str!("../data/mysql-schema.sql");
 
-pub fn pelton_connect(ip: &str) -> Conn {
+pub fn pelton_connect(ip: &str, all_owners: bool) -> Conn {
   // Start a connection.
   let opts = OptsBuilder::new()
     .user(Some(DB_USER))
@@ -27,7 +28,11 @@ pub fn pelton_connect(ip: &str) -> Conn {
     .tcp_nodelay(true);
   let mut connection = Conn::new(opts).unwrap();
   // Create the schema.
-  run_file(&mut connection, PELTON_SCHEMA);
+  if all_owners {
+    run_file(&mut connection, ALL_OWNERS_SCHEMA);
+  } else {
+    run_file(&mut connection, PELTON_SCHEMA);
+  }
   connection
 }
 

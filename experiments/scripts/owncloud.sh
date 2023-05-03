@@ -135,6 +135,6 @@ mariadb -P10001 -e "STOP" > /dev/null 2>&1;
 echo "Experiment ran. Now plotting"
 cd "${K9DB_DIR}/experiments/scripts/plotting"
 . venv/bin/activate
-python owncloud.py --paper
+python owncloud-comparison.py --paper
 
 echo "Terminated"
