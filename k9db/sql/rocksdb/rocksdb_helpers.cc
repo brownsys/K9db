@@ -81,9 +81,11 @@ std::vector<T> RocksdbSession::GetRecords(
     }
   } else {
     // No relevant index; iterate over everything.
+#ifndef K9DB_PHYSICAL_SEPARATION
     if (where != nullptr) {
       LOG(WARNING) << "Selecting by scan from table " << table_name;
     }
+#endif  // K9DB_PHYSICAL_SEPARATION
 
     // Iterate over everything while deduplicating by PK.
     RocksdbStream all = table.GetAll(this->txn_.get());

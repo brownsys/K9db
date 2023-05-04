@@ -65,6 +65,9 @@ std::vector<std::string> RocksdbMetadata::Initialize(
     }
   }
 
+  // Is this a restart?
+  this->is_restart_ = this->cf_map_.size() > 0u;
+
   // In case k9db is just being started for the first time, we need to create
   // the column families for statements and keys.
   if (this->keys_cf_ == nullptr) {

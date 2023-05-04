@@ -15,13 +15,12 @@ fn quoted(s: &str) -> String {
 
 // Helper: gets the results not just the time.
 pub fn reads_with_data(conn: &mut Conn, sample: &Vec<&str>) -> Vec<Row> {
-  let questions: Vec<_> = sample.iter().map(|_| "?".to_string()).collect();
+  let quoted: Vec<_> = sample.iter().map(|s| format!("'{}'", s)).collect();
   let query = format!(
     "SELECT * FROM file_view WHERE share_target IN ({})",
-    questions.join(",")
+    quoted.join(","),
   );
-  let stmt = conn.prep(query).unwrap();
-  conn.exec(stmt, sample).unwrap()
+  conn.query(query).unwrap()
 }
 
 // Load:

@@ -38,9 +38,11 @@ absl::Status InsertContext::DirectInsert(sqlast::Value &&fkval,
     const Table &next_table = this->sstate_.GetTable(desc.shard_kind);
     ASSERT_RET(info.next_column_index == next_table.schema.keys().at(0),
                Internal, "Direct OWNED_BY FK points to nonPK");
+#ifndef K9DB_PHYSICAL_SEPARATION
     if (!this->db_->Exists(desc.shard_kind, fkval)) {
       return absl::InvalidArgumentError("Integrity error(1): " + info.column);
     }
+#endif  // K9DB_PHYSICAL_SEPARATION
   }
   this->shards_.emplace(desc.shard_kind, fkval.AsUnquotedString());
   return absl::OkStatus();
@@ -53,9 +55,11 @@ absl::Status InsertContext::TransitiveInsert(sqlast::Value &&fkval,
   const Table &next_table = this->sstate_.GetTable(info.next_table);
   ASSERT_RET(info.next_column_index == next_table.schema.keys().at(0), Internal,
              "Transitive OWNED_BY FK points to nonPK");
+#ifndef K9DB_PHYSICAL_SEPARATION
   if (!this->db_->Exists(info.next_table, fkval)) {
     return absl::InvalidArgumentError("Integrity error(2): " + info.column);
   }
+#endif  // K9DB_PHYSICAL_SEPARATION
 
   // Insert into shards of users as determined via transitive index.
   const IndexDescriptor &index = *info.index;
@@ -90,9 +94,11 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
   size_t pk = this->schema_.keys().front();
   const std::string &pkcol = this->schema_.NameOf(pk);
   sqlast::Value pkval = this->stmt_.GetValue(pkcol, pk);
+#ifndef K9DB_PHYSICAL_SEPARATION
   if (this->db_->Exists(this->table_name_, pkval)) {
     return absl::InvalidArgumentError("PK exists!");
   }
+#endif  // K9DB_PHYSICAL_SEPARATION
 
   // Then, we need to make sure that outgoing OWNS columns point to existing
   // records (and lock them)!
@@ -110,9 +116,11 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
 
       // Ensure record exists and lock it.
       sqlast::Value fkval = this->stmt_.GetValue(colname, colidx);
+#ifndef K9DB_PHYSICAL_SEPARATION
       if (!this->db_->Exists(next_table, fkval)) {
         return absl::InvalidArgumentError("Integrity error(3): " + colname);
       }
+#endif  // K9DB_PHYSICAL_SEPARATION
     }
   }
 

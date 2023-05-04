@@ -1,3 +1,4 @@
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@com_github_bazelbuild_buildtools//buildifier:def.bzl", "buildifier")
 load("@rules_java//java:defs.bzl", "java_binary")
 load("format-java.bzl", "format_java")
@@ -31,4 +32,40 @@ alias(
     name = "k9db",
     actual = "//k9db/proxy",
     visibility = ["//visibility:public"],
+)
+
+# Flags for drill down experiment.
+# Example: bazel [run|build] //:k9db --//:views=off --//:physical_separation=on
+string_flag(
+    name = "views",
+    build_setting_default = "on",
+    values = [
+        "on",
+        "off",
+    ],
+)
+
+string_flag(
+    name = "physical_separation",
+    build_setting_default = "off",
+    values = [
+        "on",
+        "off",
+    ],
+)
+
+config_setting(
+    name = "disable_views",
+    flag_values = {
+        ":views": "off",
+    },
+    visibility = ["//:__subpackages__"],
+)
+
+config_setting(
+    name = "enable_separation",
+    flag_values = {
+        ":physical_separation": "on",
+    },
+    visibility = ["//:__subpackages__"],
 )

@@ -64,6 +64,11 @@ class DataFlowState {
   void AddFlow(const FlowName &name,
                std::unique_ptr<DataFlowGraphPartition> &&flow);
 
+  // Add a fake empty flow in order to remember that the given name is
+  // associated with a fake flow. This is used in drill down experiment
+  // to disable views.
+  void AddFakeFlow(const FlowName &name);
+
   const DataFlowGraph &GetFlow(const FlowName &name) const;
 
   std::vector<std::string> GetFlows() const;

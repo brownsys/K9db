@@ -3,6 +3,7 @@
 #include "glog/logging.h"
 #include "k9db/util/status.h"
 #include "rocksdb/options.h"
+#include "rocksdb/table.h"
 
 #define DEFAULT_K9DB_DB_PATH "/tmp/k9db_"
 
@@ -36,10 +37,14 @@ std::vector<std::string> RocksdbConnection::Open(const std::string &db_name,
   path = path + db_name;
 
   // Options.
+  rocksdb::BlockBasedTableOptions table_options;
+  table_options.no_block_cache = true;
+
   rocksdb::Options opts;
   opts.create_if_missing = true;
   opts.IncreaseParallelism();
   opts.OptimizeLevelStyleCompaction();
+  opts.table_factory.reset(rocksdb::NewBlockBasedTableFactory(table_options));
 
   // Transaction options.
   rocksdb::TransactionDBOptions txn_opts;

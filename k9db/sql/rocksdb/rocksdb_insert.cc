@@ -20,6 +20,9 @@ namespace rocks {
 
 bool RocksdbSession::Exists(const std::string &table_name,
                             const sqlast::Value &pk) const {
+#ifdef K9DB_PHYSICAL_SEPARATION
+  LOG(FATAL) << "UNSUPPORTED";
+#else
   CHECK(this->write_txn_) << "Exists called on read txn";
   RocksdbWriteTransaction *txn =
       reinterpret_cast<RocksdbWriteTransaction *>(this->txn_.get());
@@ -29,10 +32,14 @@ bool RocksdbSession::Exists(const std::string &table_name,
   size_t pk_index = table.Schema().keys().front();
   std::string pk_value = EncodeValue(table.Schema().TypeOf(pk_index), pk);
   return table.Exists(pk_value, txn);
+#endif  // K9DB_PHYSICAL_SEPARATION
 }
 
 bool RocksdbSession::Exists(const std::string &table_name, size_t column_index,
                             const sqlast::Value &val) const {
+#ifdef K9DB_PHYSICAL_SEPARATION
+  LOG(FATAL) << "UNSUPPORTED";
+#else
   CHECK(this->write_txn_) << "Exists(2) called on read txn";
   RocksdbWriteTransaction *txn =
       reinterpret_cast<RocksdbWriteTransaction *>(this->txn_.get());
@@ -57,6 +64,7 @@ bool RocksdbSession::Exists(const std::string &table_name, size_t column_index,
   const RocksdbIndex &index = table.GetTableIndex(plan.idx());
   IndexSet set = index.Get({encoded}, txn);
   return set.size() > 0;
+#endif  // K9DB_PHYSICAL_SEPARATION
 }
 
 int RocksdbSession::ExecuteInsert(const sqlast::Insert &stmt,
@@ -95,6 +103,9 @@ int RocksdbSession::ExecuteInsert(const sqlast::Insert &stmt,
 
 RecordAndStatus RocksdbSession::ExecuteReplace(
     const sqlast::Replace &stmt, const util::ShardName &shard_name) {
+#ifdef K9DB_PHYSICAL_SEPARATION
+  LOG(FATAL) << "UNSUPPORTED";
+#else
   CHECK(this->write_txn_) << "Replace called on read txn";
   RocksdbWriteTransaction *txn =
       reinterpret_cast<RocksdbWriteTransaction *>(this->txn_.get());
@@ -130,7 +141,7 @@ RecordAndStatus RocksdbSession::ExecuteReplace(
   }
 
   // Lookup any existing records.
-  std::vector<std::optional<EncryptedValue>> envalues =
+  std::vector<std::optional<EncryptedValue> > envalues =
       table.MultiGet(enkeys, txn);
   for (size_t i = 0; i < envalues.size(); i++) {
     std::optional<EncryptedValue> &opt = envalues.at(i);
@@ -178,6 +189,7 @@ RecordAndStatus RocksdbSession::ExecuteReplace(
 
   // Done.
   return RecordAndStatus(std::move(result), count);
+#endif  // K9DB_PHYSICAL_SEPARATION
 }
 
 }  // namespace rocks

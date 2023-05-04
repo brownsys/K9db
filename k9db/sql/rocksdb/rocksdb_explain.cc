@@ -9,7 +9,11 @@ namespace rocks {
 
 std::vector<std::string> RocksdbConnection::GetIndices(
     const std::string &tbl) const {
+#ifdef K9DB_PHYSICAL_SEPARATION
+  return {};
+#else
   return this->tables_.at(tbl).GetIndices();
+#endif  //  K9DB_PHYSICAL_SEPARATION
 }
 
 std::string RocksdbConnection::GetIndex(

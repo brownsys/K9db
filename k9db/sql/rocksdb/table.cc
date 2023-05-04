@@ -352,60 +352,6 @@ RocksdbStream RocksdbTable::GetShard(const EncryptedPrefix &shard_name,
   return RocksdbStream(std::move(it));
 }
 
-/*
- * RocksdbStream
- */
-
-using RocksdbStreamIterator = RocksdbStream::Iterator;
-
-// Construct end iterator.
-RocksdbStreamIterator::Iterator() : it_(nullptr) {}
-
-// Construct iterator given a ready rocksdb iterator (with some seek performed).
-RocksdbStreamIterator::Iterator(rocksdb::Iterator *it) : it_(it) {
-  this->EnsureValid();
-}
-
-// Next key/value pair.
-RocksdbStreamIterator &RocksdbStreamIterator::operator++() {
-  if (this->it_ != nullptr) {
-    this->it_->Next();
-    this->EnsureValid();
-  }
-  return *this;
-}
-
-// Equality of underlying iterator.
-bool RocksdbStreamIterator::operator==(const RocksdbStreamIterator &o) const {
-  return this->it_ == o.it_;
-}
-bool RocksdbStreamIterator::operator!=(const RocksdbStreamIterator &o) const {
-  return this->it_ != o.it_;
-}
-
-// Get current key/value pair.
-RocksdbStreamIterator::value_type RocksdbStreamIterator::operator*() const {
-  return RocksdbStreamIterator::value_type(
-      this->it_->key(), Cipher::FromDB(this->it_->value().ToString()));
-}
-
-// When the iterator is consumed, set it to nullptr.
-void RocksdbStreamIterator::EnsureValid() {
-  if (!this->it_->Valid()) {
-    this->it_ = nullptr;
-  }
-}
-
-// To an actual vector. Consume this stream.
-std::vector<std::pair<EncryptedKey, EncryptedValue>> RocksdbStream::ToVector() {
-  std::vector<std::pair<EncryptedKey, EncryptedValue>> result;
-  for (; this->it_->Valid(); this->it_->Next()) {
-    result.emplace_back(this->it_->key(),
-                        Cipher::FromDB(this->it_->value().ToString()));
-  }
-  return result;
-}
-
 }  // namespace rocks
 }  // namespace sql
 }  // namespace k9db

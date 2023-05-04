@@ -79,9 +79,10 @@ cc_library(
 
 cc_library(
     name = "view",
-    srcs = [
-        "view.cc",
-    ],
+    srcs = select({
+        "//:disable_views": ["view_fake.cc"],
+        "//conditions:default": ["view.cc"],
+    }),
     hdrs = [
         "view.h",
     ],
@@ -110,9 +111,10 @@ cc_library(
 
 cc_library(
     name = "index",
-    srcs = [
-        "index.cc",
-    ],
+    srcs = select({
+        "//:disable_views": ["index_fake.cc"],
+        "//conditions:default": ["index.cc"],
+    }),
     hdrs = [
         "index.h",
     ],
@@ -123,8 +125,11 @@ cc_library(
         "//k9db/dataflow:graph",
         "//k9db/dataflow:key",
         "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
         "//k9db/shards:state",
         "//k9db/shards:types",
+        "//k9db/sql:connection",
+        "//k9db/sql:result",
         "//k9db/sqlast:ast",
         "//k9db/util:upgradable_lock",
         "@com_google_absl//absl/status",
@@ -139,6 +144,10 @@ cc_library(
     hdrs = [
         "insert.h",
     ],
+    defines = select({
+        "//:enable_separation": ["K9DB_PHYSICAL_SEPARATION"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":index",
         ":util",
@@ -277,6 +286,10 @@ cc_library(
     hdrs = [
         "select.h",
     ],
+    defines = select({
+        "//:enable_separation": ["K9DB_PHYSICAL_SEPARATION"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":index",
         "//k9db:connection",

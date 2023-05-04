@@ -76,6 +76,9 @@ class RocksdbMetadata {
   void PersistGlobalNonce(const std::string &nonce);
   void PersistUserKey(const std::string &user_id, const std::string &key);
 
+  // Check if this is a restart.
+  bool IsRestart() const { return this->is_restart_; }
+
  private:
   rocksdb::TransactionDB *db_;
   std::unique_ptr<rocksdb::ColumnFamilyHandle> statements_cf_;
@@ -89,6 +92,7 @@ class RocksdbMetadata {
 
   // Counter ensures persist and reload occur in the same order.
   std::atomic<size_t> counter_;
+  bool is_restart_;
 };
 
 }  // namespace rocks

@@ -19,6 +19,10 @@ cc_library(
         "rocksdb_connection.h",
         "rocksdb_helpers.cc",
     ],
+    defines = select({
+        "//:enable_separation": ["K9DB_PHYSICAL_SEPARATION"],
+        "//conditions:default": [],
+    }),
     visibility = ["//k9db:__subpackages__"],
     deps = [
         ":dedup",
@@ -104,12 +108,17 @@ cc_library(
 
 cc_library(
     name = "table",
-    srcs = [
-        "table.cc",
-    ],
+    srcs = select({
+        "//:enable_separation": ["table_physical.cc"],
+        "//conditions:default": ["table.cc"],
+    }),
     hdrs = [
         "table.h",
     ],
+    defines = select({
+        "//:enable_separation": ["K9DB_PHYSICAL_SEPARATION"],
+        "//conditions:default": [],
+    }),
     visibility = ["//k9db/sql:__subpackages__"],
     deps = [
         ":encode",

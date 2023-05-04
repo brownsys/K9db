@@ -30,6 +30,7 @@ bool RocksdbConnection::ExecuteCreateTable(const sqlast::CreateTable &stmt) {
       std::make_tuple(this->db_.get(), table_name, schema, &this->metadata_));
   CHECK(flag);
 
+#ifndef K9DB_PHYSICAL_SEPARATION
   // Create indices for table.
   for (size_t i = 0; i < stmt.GetColumns().size(); i++) {
     // Primary key already has index created for it.
@@ -50,6 +51,7 @@ bool RocksdbConnection::ExecuteCreateTable(const sqlast::CreateTable &stmt) {
       }
     }
   }
+#endif  // K9DB_PHYSICAL_SEPARATION
 
   // After table creation succeeds. Persist the statement so that it can be
   // reloaded on restart.
@@ -60,6 +62,9 @@ bool RocksdbConnection::ExecuteCreateTable(const sqlast::CreateTable &stmt) {
 
 // Execute Create Index Statement.
 bool RocksdbConnection::ExecuteCreateIndex(const sqlast::CreateIndex &stmt) {
+#ifdef K9DB_PHYSICAL_SEPARATION
+  LOG(FATAL) << "UNSUPPORTED";
+#else
   const std::string &table_name = stmt.table_name();
   RocksdbTable &table = this->tables_.at(table_name);
   std::string cf_name = table.CreateIndex(stmt.column_names());
@@ -69,6 +74,7 @@ bool RocksdbConnection::ExecuteCreateIndex(const sqlast::CreateIndex &stmt) {
   this->metadata_.Persist(cf_name, stmt);
 
   return true;
+#endif
 }
 
 // Persist a Create View Statement to disk.

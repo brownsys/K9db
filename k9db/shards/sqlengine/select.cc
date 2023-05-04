@@ -79,6 +79,7 @@ std::optional<std::vector<sql::KeyPair>> SelectContext::FindDirectKeys(
     return direct_keys;
   }
 
+#ifndef K9DB_PHYSICAL_SEPARATION
   // Case 3: We have an in-memory index over the PK column.
   auto it = this->table_.indices.find(pkname);
   if (it != this->table_.indices.end()) {
@@ -98,6 +99,7 @@ std::optional<std::vector<sql::KeyPair>> SelectContext::FindDirectKeys(
       return direct_keys;
     }
   }
+#endif  // K9DB_PHYSICAL_SEPARATION
 
   // No index: cannot apply optimization!
   return {};

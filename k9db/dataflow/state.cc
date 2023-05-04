@@ -150,6 +150,11 @@ void DataFlowState::AddFlow(const FlowName &name,
   this->flows_.emplace(name, std::move(graph));
 }
 
+void DataFlowState::AddFakeFlow(const FlowName &name) {
+  std::unique_lock lock(this->mtx_);
+  this->flows_.emplace(name, nullptr);
+}
+
 const DataFlowGraph &DataFlowState::GetFlow(const FlowName &name) const {
   std::shared_lock lock(this->mtx_);
   return *this->flows_.at(name);
@@ -247,7 +252,9 @@ sql::SqlResult DataFlowState::SizeInMemory() const {
   uint64_t total_size = 0;
   this->mtx_.lock_shared();
   for (const auto &[fname, flow] : this->flows_) {
-    total_size += flow->SizeInMemory(&records);
+    if (flow != nullptr) {
+      total_size += flow->SizeInMemory(&records);
+    }
   }
   this->mtx_.unlock_shared();
   records.emplace_back(SchemaFactory::MEMORY_SIZE_SCHEMA, true,
