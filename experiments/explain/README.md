@@ -1,36 +1,38 @@
 # EXPLAIN Scenarios
 
-## How to Run
+This experiment provides a step-by-step example of how to annotate the schema of an e-commerce platform called Shuup to achieve compliance with privacy laws like Europe's General Data Protection Regulation (GDPR).
 
-1. Start the proxy
+## Quickstart
 
-```
-   bazel run //:pelton
-```
-
-2. Run the schema file
+1. Start k9db.
 
 ```
-mariadb --port=10001 --host=127.0.0.1 < experiments/explain/shuup/{schema_name}.sql
+   bazel run :k9db -- --logtostderr=1
 ```
 
-## Summary
+2. Run the schema file via the mysql proxy to see output produced by K9db's `EXPLAIN COMPLIANCE` command.
 
-Which table is the data subject (PII) - `shuup_contact`, `auth_user` or `shuup_personcontact`?
+```
+mariadb P100001 < experiments/explain/shuup/{schema_name}.sql
+```
 
-Shuup’s schema has several tables that might correspond to data subjects. Pelton’s `EXPLAIN COMPLIANCE` helps the developer understand that they need to annotate `personcontact`.
+## Step-by-step explanation
 
-0. Run `EXPLAIN` on our base, unannotated schema to receive guidance on which tables might correspond to data subjects. It will flag several columns which sound like they could correspond to data subjects in `auth_user`, `shuup_contact`, and `shuup_personcontact`.
+Looking at `shuup/0-no-pii.sql`, which table is the data subject (i.e. the table containing Personally Identifiable Information, PII): `shuup_contact`, `auth_user` or `shuup_personcontact`?
 
-1. A developer's first step might be to annotate `auth_user`, the login details table, as PII - this is plausible, but incompliant. It results in `shuup_contact` being unconnected to the ownership graph, as there are no foreign keys `auth_user`. The `personcontact` table has such a foreign key (`personcontact.user_id`), but it is nullable (e.g., for guest customers who lack accounts), and thus some of its rows will be stored in μDBs and others in the orphaned region. Explain also warns us that `shuup_contact` has `email` etc fields but is unowned, indicating that the developer should add an `OWNS` annotation to `contact_ptr_id`.
+Shuup’s schema has several tables that might correspond to data subjects. K9db’s `EXPLAIN COMPLIANCE` helps the developer understand that they need to annotate `personcontact`.
 
-2. `auth_user` and `contact` are PII. This is overcompliant - see 3. below.
+0. First, let's run `EXPLAIN` on our base, unannotated schema to receive guidance on which tables might correspond to data subjects. K9db will flag several columns which sound like they could correspond to data subjects in the tables `auth_user`, `shuup_contact`, and `shuup_personcontact`.
+
+1. `auth_user` is PII. A developer's first step might be to annotate `auth_user`, the login details table, as containing PII - this is plausible, but incompliant. It results in `shuup_contact` being unconnected to the ownership graph, as there are no foreign keys `auth_user`. The `personcontact` table has such a foreign key (`personcontact.user_id`), but it is nullable (e.g., for guest customers who lack accounts), and thus some of its rows will be stored in μDBs and others in the orphaned region. Explain also warns us that `shuup_contact` has `email` etc fields but is unowned, indicating that the developer should add an `OWNS` annotation to `contact_ptr_id`.
+
+2. `auth_user` and `contact` are PII. Annotating both tables appears plausible, but is overcompliant - see 3. below for an explanation.
 
 3. `contact` is PII. A developer might also annotate `contact` with `DATA SUBJECT`, but that table includes entries for customers and companies. Annotating it makes companies into data subjects, will duplicate various company-related tables across μDBs. `EXPLAIN COMPLIANCE` alerts the developer to this.
 
 4. `shuup_personcontact` is PII. We annotate personcontact with `DATA SUBJECT`. This table stores natural persons, and has FKs to their contact information (in `contact`) and their logins (in `auth_user`) if they have accounts. Thus, `personcontact` connects users with and users without accounts.
 
-## Step by Step
+## Explain Compliance output
 
 ### 0. No PII (starting point)
 
@@ -178,7 +180,7 @@ shuup_shop: SHARDED
   [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
 ```
 
-### `shuup_personcontact` is PII
+### 4. `shuup_personcontact` is PII
 
 Schema in `shuup/4-person-contact-is-pii.sql`
 
@@ -240,7 +242,7 @@ shuup_shop: SHARDED
   [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
 ```
 
-### `shuup_personcontact` is PII
+### 5. `shuup_personcontact` is PII
 
 Schema in `shuup/5-person-contact-is-pii-not-nullable.sql`
 
@@ -288,43 +290,81 @@ shuup_shop: SHARDED
       via   shuup_shop(owner_id) -> shuup_personcontact(pid)
 ```
 
-## ownCloud?
+## ownCloud
 
-- `share_with_group` is `OWNER`
-  - Makes `file` double var shared
-  - Makes `share` var+N shared
-
-Running `ownCloud.sql` produces
+Running the annotated `ownCloud.sql` with K9db's `EXPLAIN COMPLIANCE` command produces the following output.
 
 ```
-oc_share: sharded with
-  OWNER_share_with_group shards to oc_users
-    via oc_groups(gid) resolved with index users_for_group
-    via oc_group_user(uid) resolved with index _unq_indx_1_uid
-    total transitive distance is 2
-  OWNER_uid_owner shards to oc_users
-  [Info] this table is variably owned (via oc_group_user)
-
-oc_group_user: sharded with
-  uid shards to oc_users
-
-oc_groups: sharded with
-  gid shards to oc_users
-    via oc_group_user(uid) resolved with index _unq_indx_1_uid
-    total transitive distance is 1
-  [Info] this table is variably owned (via oc_group_user)
-
-oc_users: is PII
-
-oc_files: sharded with
-  id shards to oc_users
-    via oc_share(OWNER_share_with_group) resolved with index users_for_file_via_group
-    via oc_groups(gid) resolved with index users_for_group
-    via oc_group_user(uid) resolved with index _unq_indx_1_uid
-    total transitive distance is 3
-  id shards to oc_users
-    via oc_share(OWNER_uid_owner) resolved with index _unq_indx_2_OWNER_uid_owner
-    total transitive distance is 1
-  [SEVERE] This table is variably sharded 2 times in sequence. This will create oc_share*oc_group_user copies of records inserted into this table. This is likely not desired behavior, I suggest checking your `OWNS` annotations.
-  [Warning] This table is variably owned in multiple ways (via oc_share and oc_share). This may not be desired behavior.
+-----------------------------------------
+oc_storages: UNSHARDED
+-----------------------------------------
+oc_users: DATASUBJECT
+-----------------------------------------
+oc_groups: SHARDED
+  gid                  shards to oc_users             (explicit annotation)
+      via   oc_groups(gid) -> oc_group_user(gid)
+      via   oc_groups(uid) -> oc_users(uid)
+    with a total distance of 2
+  [Info]    This table is variably owned (via oc_group_user)
+  [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
+-----------------------------------------
+oc_group_user: SHARDED
+  uid                  shards to oc_users             (explicit annotation)
+      via   oc_group_user(uid) -> oc_users(uid)
+  [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
+-----------------------------------------
+oc_files: SHARDED
+  id                   shards to oc_users             (explicit annotation)
+      via   oc_files(id) -> oc_share(item_source)
+      via   oc_files(share_with) -> oc_users(uid)
+    with a total distance of 2
+  id                   shards to oc_users             (explicit annotation)
+      via   oc_files(id) -> oc_share(item_source)
+      via   oc_files(share_with_group) -> oc_groups(gid)
+      via   oc_files(gid) -> oc_group_user(gid)
+      via   oc_files(uid) -> oc_users(uid)
+    with a total distance of 4
+  id                   shards to oc_users             (explicit annotation)
+      via   oc_files(id) -> oc_share(item_source)
+      via   oc_files(uid_owner) -> oc_users(uid)
+    with a total distance of 2
+  [SEVERE]  This table is variably sharded 2 times in sequence. This will create |oc_share|*|oc_group_user| copies of records inserted into this table. This is likely not desired behavior, I suggest checking your `OWNS` annotations.
+  [Warning] This table is variably owned in multiple ways (via oc_share and oc_share and oc_share). This may not be desired behavior.
+  [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
+-----------------------------------------
+oc_share: SHARDED
+  share_with           shards to oc_users             (explicit annotation)
+      via   oc_share(share_with) -> oc_users(uid)
+  share_with_group     shards to oc_users             (explicit annotation)
+      via   oc_share(share_with_group) -> oc_groups(gid)
+      via   oc_share(gid) -> oc_group_user(gid)
+      via   oc_share(uid) -> oc_users(uid)
+    with a total distance of 3
+  uid_owner            shards to oc_users             (explicit annotation)
+      via   oc_share(uid_owner) -> oc_users(uid)
+  [Info]    This table is variably owned (via oc_group_user)
+  [Warning] This table is variably owned and also copied an additional 2 times.
+  [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
+-----------------------------------------
+oc_filecache: SHARDED
+  fileid               shards to oc_users             (explicit annotation)
+      via   oc_filecache(fileid) -> oc_files(id)
+      via   oc_filecache(id) -> oc_share(item_source)
+      via   oc_filecache(share_with) -> oc_users(uid)
+    with a total distance of 3
+  fileid               shards to oc_users             (explicit annotation)
+      via   oc_filecache(fileid) -> oc_files(id)
+      via   oc_filecache(id) -> oc_share(item_source)
+      via   oc_filecache(share_with_group) -> oc_groups(gid)
+      via   oc_filecache(gid) -> oc_group_user(gid)
+      via   oc_filecache(uid) -> oc_users(uid)
+    with a total distance of 5
+  fileid               shards to oc_users             (explicit annotation)
+      via   oc_filecache(fileid) -> oc_files(id)
+      via   oc_filecache(id) -> oc_share(item_source)
+      via   oc_filecache(uid_owner) -> oc_users(uid)
+    with a total distance of 3
+  [SEVERE]  This table is variably sharded 2 times in sequence. This will create |oc_share|*|oc_group_user| copies of records inserted into this table. This is likely not desired behavior, I suggest checking your `OWNS` annotations.
+  [Warning] This table is variably owned in multiple ways (via oc_share and oc_share and oc_share). This may not be desired behavior.
+  [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
 ```
