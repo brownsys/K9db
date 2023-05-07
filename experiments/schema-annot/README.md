@@ -188,3 +188,92 @@ PaperTagAnno: UNSHARDED
 -----------------------------------------
 Settings: UNSHARDED
 ```
+
+## Instagram
+
+```
+-----------------------------------------
+likes: SHARDED
+  like_by              shards to users                (explicit annotation)
+      via   likes(like_by) -> users(id)
+-----------------------------------------
+hashtags: SHARDED
+  user_id              shards to users                (explicit annotation)
+      via   hashtags(user_id) -> users(id)
+-----------------------------------------
+messages: SHARDED
+  mssg_by              shards to users                (explicit annotation)
+      via   messages(mssg_by) -> users(id)
+  mssg_to              shards to users                (explicit annotation)
+      via   messages(mssg_to) -> users(id)
+-----------------------------------------
+group_members: SHARDED
+  member               shards to users                (explicit annotation)
+      via   group_members(member) -> users(id)
+-----------------------------------------
+follow_system: SHARDED
+  follow_by            shards to users                (explicit annotation)
+      via   follow_system(follow_by) -> users(id)
+  follow_to            shards to users                (explicit annotation)
+      via   follow_system(follow_to) -> users(id)
+-----------------------------------------
+favourites: SHARDED
+  user                 shards to users                (implicitly deduced)
+      via   favourites(user) -> users(id)
+-----------------------------------------
+groups1: SHARDED
+  admin                shards to users                (implicitly deduced)
+      via   groups1(admin) -> users(id)
+-----------------------------------------
+comments: SHARDED
+  comment_by           shards to users                (explicit annotation)
+      via   comments(comment_by) -> users(id)
+-----------------------------------------
+conversations: SHARDED
+  user_one             shards to users                (explicit annotation)
+      via   conversations(user_one) -> users(id)
+  user_two             shards to users                (explicit annotation)
+      via   conversations(user_two) -> users(id)
+-----------------------------------------
+bookmarks: SHARDED
+  post_id              shards to users                (implicitly deduced)
+      via   bookmarks(post_id) -> posts(id)
+      via   bookmarks(user_id) -> users(id)
+    with a total distance of 2
+-----------------------------------------
+blocks: SHARDED
+  user_id              shards to users                (implicitly deduced)
+      via   blocks(user_id) -> users(id)
+-----------------------------------------
+posts: SHARDED
+  user_id              shards to users                (explicit annotation)
+      via   posts(user_id) -> users(id)
+-----------------------------------------
+users: DATASUBJECT
+-----------------------------------------
+notifications: SHARDED
+  notify_to            shards to users                (explicit annotation)
+      via   notifications(notify_to) -> users(id)
+-----------------------------------------
+post_tags: SHARDED
+  user                 shards to users                (explicit annotation)
+      via   post_tags(user) -> users(id)
+-----------------------------------------
+profile_views: SHARDED
+  view_by              shards to users                (explicit annotation)
+      via   profile_views(view_by) -> users(id)
+-----------------------------------------
+tags: SHARDED
+  user                 shards to users                (implicitly deduced)
+      via   tags(user) -> users(id)
+-----------------------------------------
+recommendations: SHARDED
+  recommend_by         shards to users                (explicit annotation)
+      via   recommendations(recommend_by) -> users(id)
+  recommend_to         shards to users                (explicit annotation)
+      via   recommendations(recommend_to) -> users(id)
+-----------------------------------------
+shares: SHARDED
+  share_by             shards to users                (explicit annotation)
+      via   shares(share_by) -> users(id)
+```
