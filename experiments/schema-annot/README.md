@@ -81,3 +81,110 @@ user_user_relation: SHARDED
 ```
 
 ## Hotcrp
+
+```
+-----------------------------------------
+PaperOption: SHARDED
+  paperId              shards to ContactInfo          (implicitly deduced)
+      via   PaperOption(paperId) -> Paper(paperId)
+      via   PaperOption(leadContactId) -> ContactInfo(contactId)
+    with a total distance of 2
+-----------------------------------------
+PaperTopic: SHARDED
+  paperId              shards to ContactInfo          (explicit annotation)
+      via   PaperTopic(paperId) -> Paper(paperId)
+      via   PaperTopic(leadContactId) -> ContactInfo(contactId)
+    with a total distance of 2
+-----------------------------------------
+PaperComment: SHARDED
+  contactId            shards to ContactInfo          (explicit annotation)
+      via   PaperComment(contactId) -> ContactInfo(contactId)
+-----------------------------------------
+TopicInterest: SHARDED
+  contactId            shards to ContactInfo          (implicitly deduced)
+      via   TopicInterest(contactId) -> ContactInfo(contactId)
+-----------------------------------------
+MailLog: SHARDED
+  paperIds             shards to ContactInfo          (implicitly deduced)
+      via   MailLog(paperIds) -> Paper(paperId)
+      via   MailLog(leadContactId) -> ContactInfo(contactId)
+    with a total distance of 2
+  [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
+-----------------------------------------
+FilteredDocument: SHARDED
+  inDocId              shards to ContactInfo          (explicit annotation)
+      via   FilteredDocument(inDocId) -> DocumentLink(documentId)
+      via   FilteredDocument(paperId) -> Paper(paperId)
+      via   FilteredDocument(leadContactId) -> ContactInfo(contactId)
+    with a total distance of 3
+-----------------------------------------
+PaperWatch: SHARDED
+  contactId            shards to ContactInfo          (explicit annotation)
+      via   PaperWatch(contactId) -> ContactInfo(contactId)
+-----------------------------------------
+DeletedContactInfo: SHARDED
+  contactId            shards to ContactInfo          (explicit annotation)
+      via   DeletedContactInfo(contactId) -> ContactInfo(contactId)
+-----------------------------------------
+DocumentLink: SHARDED
+  paperId              shards to ContactInfo          (implicitly deduced)
+      via   DocumentLink(paperId) -> Paper(paperId)
+      via   DocumentLink(leadContactId) -> ContactInfo(contactId)
+    with a total distance of 2
+-----------------------------------------
+Capability: SHARDED
+  contactId            shards to ContactInfo          (explicit annotation)
+      via   Capability(contactId) -> ContactInfo(contactId)
+-----------------------------------------
+ActionLog: SHARDED
+  contactId            shards to ContactInfo          (explicit annotation)
+      via   ActionLog(contactId) -> ContactInfo(contactId)
+-----------------------------------------
+ReviewRequest: DATASUBJECT AND SHARDED
+  requestedBy          shards to ContactInfo          (explicit annotation)
+      via   ReviewRequest(requestedBy) -> ContactInfo(contactId)
+-----------------------------------------
+Paper: SHARDED
+  leadContactId        shards to ContactInfo          (explicit annotation)
+      via   Paper(leadContactId) -> ContactInfo(contactId)
+-----------------------------------------
+PaperReview: SHARDED
+  contactId            shards to ContactInfo          (explicit annotation)
+      via   PaperReview(contactId) -> ContactInfo(contactId)
+-----------------------------------------
+ReviewRating: SHARDED
+  contactId            shards to ContactInfo          (explicit annotation)
+      via   ReviewRating(contactId) -> ContactInfo(contactId)
+-----------------------------------------
+PaperConflict: SHARDED
+  contactId            shards to ContactInfo          (explicit annotation)
+      via   PaperConflict(contactId) -> ContactInfo(contactId)
+-----------------------------------------
+PaperStorage: UNSHARDED
+-----------------------------------------
+Formula: SHARDED
+  createdBy            shards to ContactInfo          (explicit annotation)
+      via   Formula(createdBy) -> ContactInfo(contactId)
+-----------------------------------------
+ContactInfo: DATASUBJECT
+-----------------------------------------
+PaperReviewPreference: SHARDED
+  contactId            shards to ContactInfo          (explicit annotation)
+      via   PaperReviewPreference(contactId) -> ContactInfo(contactId)
+-----------------------------------------
+PaperReviewRefused: DATASUBJECT AND SHARDED
+  contactId            shards to ContactInfo          (explicit annotation)
+      via   PaperReviewRefused(contactId) -> ContactInfo(contactId)
+-----------------------------------------
+PaperTag: SHARDED
+  paperId              shards to ContactInfo          (implicitly deduced)
+      via   PaperTag(paperId) -> Paper(paperId)
+      via   PaperTag(leadContactId) -> ContactInfo(contactId)
+    with a total distance of 2
+-----------------------------------------
+TopicArea: UNSHARDED
+-----------------------------------------
+PaperTagAnno: UNSHARDED
+-----------------------------------------
+Settings: UNSHARDED
+```
