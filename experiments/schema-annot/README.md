@@ -361,3 +361,143 @@ posts: SHARDED
 -----------------------------------------
 sashes: UNSHARDED
 ```
+
+## Opencart
+
+```
+-----------------------------------------
+customer_reward: SHARDED
+  customer_id          shards to customer             (implicitly deduced)
+      via   customer_reward(customer_id) -> customer(customer_id)
+-----------------------------------------
+customer_online: SHARDED
+  customer_id          shards to customer             (explicit annotation)
+      via   customer_online(customer_id) -> customer(customer_id)
+-----------------------------------------
+customer_login: UNSHARDED
+  [Warning] The column "email" sounds like it may belong to a data subject, but the table is not sharded. You may want to review your annotations.
+-----------------------------------------
+custom_field_customer_group: UNSHARDED
+-----------------------------------------
+customer_group: UNSHARDED
+-----------------------------------------
+customer_affiliate_report: SHARDED
+  customer_id          shards to customer             (implicitly deduced)
+      via   customer_affiliate_report(customer_id) -> customer(customer_id)
+-----------------------------------------
+customer_affiliate: UNSHARDED
+-----------------------------------------
+tax_rate_to_customer_group: UNSHARDED
+-----------------------------------------
+customer_activity: SHARDED
+  customer_id          shards to customer             (explicit annotation)
+      via   customer_activity(customer_id) -> customer(customer_id)
+-----------------------------------------
+currency: UNSHARDED
+-----------------------------------------
+api_session: UNSHARDED
+-----------------------------------------
+location: UNSHARDED
+-----------------------------------------
+customer_ip: SHARDED
+  customer_id          shards to customer             (explicit annotation)
+      via   customer_ip(customer_id) -> customer(customer_id)
+-----------------------------------------
+attribute_group: UNSHARDED
+-----------------------------------------
+coupon_history: SHARDED
+  customer_id          shards to customer             (implicitly deduced)
+      via   coupon_history(customer_id) -> customer(customer_id)
+-----------------------------------------
+geo_zone: UNSHARDED
+-----------------------------------------
+customer_history: SHARDED
+  customer_id          shards to customer             (explicit annotation)
+      via   customer_history(customer_id) -> customer(customer_id)
+-----------------------------------------
+country: UNSHARDED
+-----------------------------------------
+user: UNSHARDED
+  [Warning] The columns "username", "password", "firstname", "lastname", "email" sound like they may belong to a data subject, but the table is not sharded. You may want to review your annotations.
+-----------------------------------------
+customer: DATASUBJECT
+-----------------------------------------
+customer_approval: SHARDED
+  customer_id          shards to customer             (implicitly deduced)
+      via   customer_approval(customer_id) -> customer(customer_id)
+-----------------------------------------
+cart: SHARDED
+  customer_id          shards to customer             (implicitly deduced)
+      via   cart(customer_id) -> customer(customer_id)
+-----------------------------------------
+user_group: UNSHARDED
+-----------------------------------------
+attribute_group_description: UNSHARDED
+-----------------------------------------
+api: UNSHARDED
+  [Warning] The column "username" sounds like it may belong to a data subject, but the table is not sharded. You may want to review your annotations.
+-----------------------------------------
+coupon: UNSHARDED
+-----------------------------------------
+api_ip: UNSHARDED
+-----------------------------------------
+return: SHARDED
+  customer_id          shards to customer             (implicitly deduced)
+      via   return(customer_id) -> customer(customer_id)
+-----------------------------------------
+banner: UNSHARDED
+-----------------------------------------
+address: SHARDED
+  customer_id          shards to customer             (explicit annotation)
+      via   address(customer_id) -> customer(customer_id)
+-----------------------------------------
+category_description: UNSHARDED
+-----------------------------------------
+banner_image: UNSHARDED
+-----------------------------------------
+review: SHARDED
+  customer_id          shards to customer             (implicitly deduced)
+      via   review(customer_id) -> customer(customer_id)
+-----------------------------------------
+attribute: UNSHARDED
+-----------------------------------------
+category: UNSHARDED
+-----------------------------------------
+attribute_description: UNSHARDED
+-----------------------------------------
+customer_search: SHARDED
+  customer_id          shards to customer             (explicit annotation)
+      via   customer_search(customer_id) -> customer(customer_id)
+-----------------------------------------
+custom_field_value: UNSHARDED
+-----------------------------------------
+customer_transaction: SHARDED
+  customer_id          shards to customer             (explicit annotation)
+      via   customer_transaction(customer_id) -> customer(customer_id)
+-----------------------------------------
+order1: SHARDED
+  customer_id          shards to customer             (explicit annotation)
+      via   order1(customer_id) -> customer(customer_id)
+-----------------------------------------
+customer_wishlist: SHARDED
+  customer_id          shards to customer             (implicitly deduced)
+      via   customer_wishlist(customer_id) -> customer(customer_id)
+-----------------------------------------
+custom_field: UNSHARDED
+-----------------------------------------
+custom_field_description: UNSHARDED
+-----------------------------------------
+download: UNSHARDED
+-----------------------------------------
+gdpr: UNSHARDED
+-----------------------------------------
+order_history: UNSHARDED
+-----------------------------------------
+order_product: UNSHARDED
+-----------------------------------------
+order_recurring: UNSHARDED
+-----------------------------------------
+order_recurring_transaction: UNSHARDED
+-----------------------------------------
+order_shipment: UNSHARDED
+```
