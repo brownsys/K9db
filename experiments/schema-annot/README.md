@@ -1,4 +1,12 @@
+# Sample applications
+
+`experiments/schema-annot/annotated` contains the schemas of a number of sample applications along with annotated versions of them which capture data ownership relationships important for compliance with privacy laws like the GDPR.
+
+Converting and annotating these schemas required removing certain SQL features currently unsupported by k9db (a full list is provided at the top of each schema file). However, removing these features does not affect privacy compliance.
+
 # Explain Compliance
+
+The following shows the output of running k9db's `EXPLAIN COMPLIANCE` command on each schema.
 
 ## Commento
 
@@ -293,4 +301,63 @@ comment: SHARDED
 setting: UNSHARDED
 -----------------------------------------
 oauth_provider: UNSHARDED
+```
+
+## Socify
+
+```
+-----------------------------------------
+merit_scores: UNSHARDED
+-----------------------------------------
+event_attendees: SHARDED
+  user_id              shards to users                (explicit annotation)
+      via   event_attendees(user_id) -> users(id)
+  [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
+-----------------------------------------
+photo_albums: SHARDED
+  user_id              shards to users                (explicit annotation)
+      via   photo_albums(user_id) -> users(id)
+  [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
+-----------------------------------------
+merit_score_points: UNSHARDED
+-----------------------------------------
+authentications: UNSHARDED
+-----------------------------------------
+follows: SHARDED
+  followable_id        shards to users                (explicit annotation)
+      via   follows(followable_id) -> users(id)
+  follower_id          shards to users                (explicit annotation)
+      via   follows(follower_id) -> users(id)
+  [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
+-----------------------------------------
+merit_actions: UNSHARDED
+-----------------------------------------
+events: SHARDED
+  user_id              shards to users                (explicit annotation)
+      via   events(user_id) -> users(id)
+  [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
+-----------------------------------------
+attachments: UNSHARDED
+-----------------------------------------
+merit_activity_logs: UNSHARDED
+-----------------------------------------
+votes: UNSHARDED
+-----------------------------------------
+badges_sashes: UNSHARDED
+-----------------------------------------
+activities: SHARDED
+  owner_id             shards to users                (explicit annotation)
+      via   activities(owner_id) -> users(id)
+  [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
+-----------------------------------------
+users: DATASUBJECT
+-----------------------------------------
+photos: UNSHARDED
+-----------------------------------------
+posts: SHARDED
+  user_id              shards to users                (explicit annotation)
+      via   posts(user_id) -> users(id)
+  [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
+-----------------------------------------
+sashes: UNSHARDED
 ```
