@@ -277,3 +277,20 @@ shares: SHARDED
   share_by             shards to users                (explicit annotation)
       via   shares(share_by) -> users(id)
 ```
+
+## Schnack
+
+```
+-----------------------------------------
+user: DATASUBJECT
+-----------------------------------------
+subscription: UNSHARDED
+-----------------------------------------
+comment: SHARDED
+  user_id              shards to user                 (explicit annotation)
+      via   comment(user_id) -> user(id)
+-----------------------------------------
+setting: UNSHARDED
+-----------------------------------------
+oauth_provider: UNSHARDED
+```
