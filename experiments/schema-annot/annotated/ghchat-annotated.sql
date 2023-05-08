@@ -1,8 +1,3 @@
--- Unsupported
--- AUTO_INCREMENT
--- col type with specified byte length e.g. text
--- col type char, varchar, tinyint
-
 CREATE DATA_SUBJECT TABLE user_info (
   id int NOT NULL,
   github_id int,
@@ -19,13 +14,12 @@ CREATE DATA_SUBJECT TABLE user_info (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8; 
 
 CREATE TABLE group_info (
-  id int NOT NULL,
   to_group_id text NOT NULL,
   name text NOT NULL,
   group_notice text NOT NULL,
   creator_id int NOT NULL,
   create_time int NOT NULL,
-  PRIMARY KEY (id),
+  PRIMARY KEY (to_group_id),
   FOREIGN KEY (creator_id) OWNED_BY user_info(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8; 
 
@@ -39,6 +33,7 @@ CREATE TABLE group_msg (
   PRIMARY KEY (id),
   -- KEY to_group (to_group_id),
   FOREIGN KEY (from_user) OWNED_BY user_info(id)
+  FOREIGN KEY (to_group_id) ACCESSED_BY group_info(to_group_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE group_user_relation (
@@ -46,7 +41,8 @@ CREATE TABLE group_user_relation (
   to_group_id text NOT NULL,
   user_id text NOT NULL,
   PRIMARY KEY (id),
-  FOREIGN KEY (user_id) REFERENCES user_info(id)
+  FOREIGN KEY (user_id) OWNED_BY user_info(id)
+  FOREIGN KEY (to_group_id) ACCESSES group_info(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE private_msg (

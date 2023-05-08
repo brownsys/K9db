@@ -65,7 +65,8 @@ CREATE TABLE api (
     status int NOT NULL,
     date_added datetime NOT NULL,
     date_modified datetime NOT NULL,
-    PRIMARY KEY (api_id)
+    PRIMARY KEY (api_id),
+	-- FOREIGN KEY (username) REFERENCES users (user_id)
 );
 
 CREATE TABLE api_ip (

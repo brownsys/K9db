@@ -179,6 +179,7 @@ CREATE TABLE MailLog (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE PaperComment (
+  id int PRIMARY KEY NOT NULL,
   paperId int NOT NULL, -- should be OWNER if we could filter on comment type
   commentId int NOT NULL,
   contactId int NOT NULL,
@@ -194,7 +195,6 @@ CREATE TABLE PaperComment (
   commentRound int NOT NULL,
   commentFormat int,
   commentOverflow text,
-  PRIMARY KEY (paperId),
   -- UNIQUE KEY commentId (commentId),
   -- KEY contactId (contactId),
   -- KEY timeModifiedContact (timeModified,contactId),
@@ -203,22 +203,21 @@ CREATE TABLE PaperComment (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE PaperConflict (
+  id int PRIMARY KEY NOT NULL,
   paperId int NOT NULL,
   contactId int NOT NULL,
   conflictType int NOT NULL,
-  PRIMARY KEY (paperId),
-  -- KEY paperId (paperId),
   FOREIGN KEY (paperId) REFERENCES Paper(paperId),
   FOREIGN KEY (contactId) OWNED_BY ContactInfo(contactId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE PaperOption (
+  id int PRIMARY KEY NOT NULL,
   paperId int NOT NULL,
   optionId int NOT NULL,
   value int NOT NULL,
   data text,
   dataOverflow text,
-  PRIMARY KEY (paperId),
   FOREIGN KEY (paperId) REFERENCES Paper(paperId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -261,30 +260,32 @@ CREATE TABLE PaperReview (
   tfields text,
   sfields text,
   data text,
-  PRIMARY KEY (paperId),
+  PRIMARY KEY (reviewId),
   -- UNIQUE KEY reviewId (reviewId),
   -- KEY contactId (contactId),
   -- KEY reviewType (reviewType),
   -- KEY reviewRound (reviewRound),
   -- KEY requestedBy (requestedBy),
-  FOREIGN KEY (paperId) REFERENCES Paper(paperId),
+  FOREIGN KEY (paperId) ACCESSED_BY Paper(paperId),
   FOREIGN KEY (contactId) OWNED_BY ContactInfo(contactId),
-  FOREIGN KEY (requestedBy) ACCESSED_BY ContactInfo(contactId)
+  FOREIGN KEY (requestedBy) ACCESSED_BY ContactInfo(contactId),
+  -- author should see review, but not who reviewed it
+  -- only thing author should see is content of review, and when submitted (dates)
+  ON GET contact_id ANON (review_token, reviewType, reviewRound, requestedBy, reviewNotified)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE PaperReviewPreference (
+  id int PRIMARY KEY NOT NULL,
   paperId int NOT NULL,
   contactId int NOT NULL,
   preference int NOT NULL,
   expertise int,
-  PRIMARY KEY (paperId),
   FOREIGN KEY (paperId) REFERENCES Paper(paperId),
   FOREIGN KEY (contactId) OWNED_BY ContactInfo(contactId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
--- ? Q: Why is this is a data subject if it refers to ContactInfo?
--- seems weird that all the email, firstName etc fields are duplicated though
-CREATE DATA_SUBJECT TABLE PaperReviewRefused (
+CREATE TABLE PaperReviewRefused (
+  id int PRIMARY KEY NOT NULL,
   paperId int NOT NULL,
   email text NOT NULL,
   firstName text,
@@ -299,19 +300,22 @@ CREATE DATA_SUBJECT TABLE PaperReviewRefused (
   reviewRound int,
   data text,
   reason text,
-  PRIMARY KEY (paperId),
   FOREIGN KEY (paperId) REFERENCES Paper(paperId),
   FOREIGN KEY (contactId) OWNED_BY ContactInfo(contactId),
   FOREIGN KEY (requestedBy) ACCESSED_BY ContactInfo(contactId),
-  FOREIGN KEY (refusedBy) ACCESSED_BY ContactInfo(contactId)
+  FOREIGN KEY (refusedBy) ACCESSED_BY ContactInfo(contactId),
+  ON GET requestedBy ANON (email, firstName, lastName, affiliation, contactId),
+  ON DEL requestedBy ANON (requestedBy),
+  ON GET refusedBy ANON (email, firstName, lastName, affiliation, contactId),
+  ON DEL refusedBy ANON (refusedBy)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE PaperTag (
+  id int PRIMARY KEY NOT NULL,
   paperId int NOT NULL,
   -- # case-insensitive; see TAG_MAXLEN in init.php
   tag text NOT NULL,		
   tagIndex int NOT NULL,
-  PRIMARY KEY (paperId),
   FOREIGN KEY (paperId) REFERENCES Paper(paperId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -333,38 +337,36 @@ CREATE TABLE TopicArea (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE PaperTopic (
+  id int PRIMARY KEY NOT NULL,
   paperId int NOT NULL,
   topicId int NOT NULL,
-  PRIMARY KEY (paperId),
   FOREIGN KEY (paperId) OWNED_BY Paper(paperId),
   FOREIGN KEY (topicId) REFERENCES TopicArea(topicId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE PaperWatch (
+  id int PRIMARY KEY NOT NULL,
   paperId int NOT NULL,
   contactId int NOT NULL,
   watch int NOT NULL,
-  PRIMARY KEY (paperId),
   FOREIGN KEY (contactId) OWNED_BY ContactInfo(contactId),
   FOREIGN KEY (paperId) REFERENCES Paper(paperId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE ReviewRating (
+  id int PRIMARY KEY NOT NULL,
   paperId int NOT NULL,
   reviewId int NOT NULL,
   contactId int NOT NULL,
   rating int NOT NULL,
-  PRIMARY KEY (paperId),
   FOREIGN KEY (contactId) OWNED_BY ContactInfo(contactId),
-  FOREIGN KEY (paperId) REFERENCES Paper(paperId)
-  -- NOTE: commented out FK below because reviewId is not PK of PaperReview (multi PKs not supported in k9db)
-  -- error is "implicit OWNER doesn't point to PK"
-  -- FOREIGN KEY (reviewId) REFERENCES PaperReview(reviewId)
+  FOREIGN KEY (paperId) REFERENCES Paper(paperId),
+  FOREIGN KEY (reviewId) REFERENCES PaperReview(reviewId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
--- ? Q: Why is this is a data subject if it refers to ContactInfo?
--- seems weird that all the email, firstName etc fields are duplicated though
+-- data subject because this could refer to a person who does not have an account on hotcrp
 CREATE DATA_SUBJECT TABLE ReviewRequest (
+  id int PRIMARY KEY NOT NULL,
   paperId int NOT NULL,
   email text NOT NULL,
   firstName text,
@@ -374,9 +376,10 @@ CREATE DATA_SUBJECT TABLE ReviewRequest (
   requestedBy int NOT NULL,
   timeRequested int NOT NULL,
   reviewRound int,
-  PRIMARY KEY (paperId),
   FOREIGN KEY (paperId) REFERENCES Paper(paperId),
-  FOREIGN KEY (requestedBy) OWNED_BY ContactInfo(contactId)
+  FOREIGN KEY (requestedBy) ACCESSED_BY ContactInfo(contactId),
+  -- authors of papers should not see who reviewed their paper
+  ON GET paperId ANON (email, firstName, lastName, affiliation, requestedBy, timeRequested)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE Settings (

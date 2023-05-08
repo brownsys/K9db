@@ -1,14 +1,3 @@
--- NOTE: commented out inserts, triggers, and functions that are not related to privacy compliance
--- Features currently unsupported by K9db: 
--- 1. TIMESTAMP and BOOLEAN column type definitions
--- 2. CREATE TABLE IF NOT EXISTS 
--- 3. a single space after \ at the end of a line of SQL
--- 4. DEFAULT values 
--- 5. Multiple primary key columns
--- e.g.   PRIMARY KEY (domain, email), \
--- Schema has been modified to work around these unsupported features. 
-
--- had to add PRIMARY KEY to avoid error: "Invalid PK"
 CREATE TABLE config ( \
   allowNewOwners int NOT NULL, \
   PRIMARY KEY(allowNewOwners) \
@@ -100,7 +89,14 @@ CREATE TABLE comments ( \
   state TEXT NOT NULL, \
   creationDate datetime NOT NULL, \
   FOREIGN KEY (commenterHex) OWNED_BY commenters(commenterHex), \
-  FOREIGN KEY (domain) REFERENCES domains(domain) \
+  FOREIGN KEY (domain) ACCESSED_BY domains(domain), \
+  ON DEL parentHex DELETE_ROW, \
+  -- (if doesn't work, open issue, self referencing foreign keys with accessed by crashes)
+  -- TODO: Open issue would like to be able to delete parentHex (general issue, example)
+  -- FOREIGN KEY (parentHex) ACCESSED_BY comments(parentHex), \
+  -- ON DEL parentHex ANON (commenterHex, score, state), \
+  ON GET parentHex ANON (commenterHex, score, state), \
+  ON GET domain ANON (commenterHex, score, state) \
 );
 
 -- DELETEing a comment should recursively delete all children

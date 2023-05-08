@@ -34,7 +34,7 @@ CREATE TABLE groups1 (
 
 CREATE TABLE posts (
   id int NOT NULL,
-  -- NOTE: renamed from 'user' to 'user_id' to avoid k9db crashing (conflict with SQL keyword?)
+  -- NOTE: renamed from 'user' to 'user_id' to avoid k9db crashing (reserved keyword)
   user_id int NOT NULL,
   description text NOT NULL,
   imgSrc text NOT NULL,
@@ -96,7 +96,8 @@ CREATE TABLE favourites (
   user int NOT NULL,
   fav_time text NOT NULL,
   PRIMARY KEY (fav_id),
-  FOREIGN KEY (user) REFERENCES users(id)
+  FOREIGN KEY (user) REFERENCES users(id),
+  FOREIGN KEY (fav_by) OWNED_BY users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE follow_system (
@@ -107,8 +108,7 @@ CREATE TABLE follow_system (
   follow_to_username text NOT NULL,
   follow_time text NOT NULL,
   PRIMARY KEY (follow_id),
-  FOREIGN KEY (follow_by) OWNED_BY users(id),
-  FOREIGN KEY (follow_to) OWNED_BY users(id)
+  FOREIGN KEY (follow_by) OWNED_BY users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE group_members (

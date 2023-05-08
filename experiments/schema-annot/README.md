@@ -2,7 +2,33 @@
 
 `experiments/schema-annot/annotated` contains the schemas of a number of sample applications along with annotated versions of them which capture data ownership relationships important for compliance with privacy laws like the GDPR.
 
-Converting and annotating these schemas required removing certain SQL features currently unsupported by k9db (a full list is provided at the top of each schema file). However, removing these features does not affect privacy compliance.
+## Data Ownership Patterns
+
+- `commento`: accessorship for nested comments. The `comments` table contains a `parentHex` with a self referencing foreign key.
+- `ghchat`: groups have admins, but each member of a group only has access to the group such that chat messages are owned exclusively by their sender and only accessed by a member of a group.
+- `instagram`: messages/conversations are `OWNED_BY` both recipient and sender, shares are `ACCESSED_BY` the user being shared with, group membership is `ACCESSED_BY` the person who adds members
+- `schnack`: each comment is `OWNED_BY` a single user.
+- `hotcrp`: Authors should see a `PaperReview`, but not who conducted the review. Hence fields related to who requested the review (`requestedBy`) should be anonymized when the author `GDPR GET`s their data. Likewise, when accessors to `PaperReviewRefused` request their data, fields like `email`, `firstName`, and `lastName` should be anonymized.
+- `socify`: follows are dually `OWNED_BY` follower and followable users.
+- `mouthful`: `Author` column represents a data subject embedded within the `Comment` table.
+
+## Annotations Used
+
+- `commento`: 3 `DATA_SUBJECT`, 8 `OWNED_BY`, 3 `ACCESSED_BY`, 2 `ON GET ANON`, 1 `ON DEL ANON`, 1 `ON DEL DELETE_ROW`
+- `ghchat`: 1 `DATA_SUBJECT`, 7 `OWNED_BY`, 2 `ACCESSED_BY`, 1 `ACCESSES`,
+- `instagram`: 1 `DATA_SUBJECT`, 17 `OWNED_BY`, 2 `ACCESSED_BY`
+- `schnack`: 1 `DATA_SUBJECT`, 1 `OWNED_BY`
+- `hotcrp`: 2 `DATA_SUBJECT`, 14 `OWNED_BY`, 9 `ACCESSED_BY`, 4 `ON GET ANON`, 2 `ON DEL ANON`
+- `socify`: 1 `DATA_SUBJECT`, 8 `OWNED_BY`
+- `mouthful`: 1 `DATA_SUBJECT`, 1 `OWNED_BY`
+
+## Unsupported Features
+
+Converting and annotating these schemas required removing certain SQL features currently unsupported by k9db. However, removing these features does not affect privacy compliance.
+
+- `all schemas`: reserved keywords (e.g. groups, user, match, index, key, from), multi-column primary keys, `[UNIQUE] KEY`, `CREATE TABLE IF NOT EXISTS`, `DEFAULT` values, column type definitions (e.g. timestamp, boolean, varchar, tinyint), `AUTO_INCREMENT`
+- `commento`: self referencing foreign keys with `ACCESSED_BY` for `parentHex` in the `comments` table, representing accessorship for nested comments.
+- `mouthful`: `Author` column representing a data subject embedded within the `Comment` table. As a work around, we add a separate table for users.
 
 # Explain Compliance
 
@@ -149,8 +175,10 @@ ActionLog: SHARDED
       via   ActionLog(contactId) -> ContactInfo(contactId)
 -----------------------------------------
 ReviewRequest: DATASUBJECT AND SHARDED
-  requestedBy          shards to ContactInfo          (explicit annotation)
-      via   ReviewRequest(requestedBy) -> ContactInfo(contactId)
+  paperId              shards to ContactInfo          (implicitly deduced)
+      via   ReviewRequest(paperId) -> Paper(paperId)
+      via   ReviewRequest(leadContactId) -> ContactInfo(contactId)
+    with a total distance of 2
 -----------------------------------------
 Paper: SHARDED
   leadContactId        shards to ContactInfo          (explicit annotation)
@@ -180,7 +208,7 @@ PaperReviewPreference: SHARDED
   contactId            shards to ContactInfo          (explicit annotation)
       via   PaperReviewPreference(contactId) -> ContactInfo(contactId)
 -----------------------------------------
-PaperReviewRefused: DATASUBJECT AND SHARDED
+PaperReviewRefused: SHARDED
   contactId            shards to ContactInfo          (explicit annotation)
       via   PaperReviewRefused(contactId) -> ContactInfo(contactId)
 -----------------------------------------
@@ -953,4 +981,17 @@ PREFIX_smarty_lazy_cache: UNSHARDED
 PREFIX_cms_role_lang: UNSHARDED
 -----------------------------------------
 PREFIX_employee_session: UNSHARDED
+```
+
+## Mouthful
+
+```
+-----------------------------------------
+user: DATASUBJECT
+-----------------------------------------
+Thread: UNSHARDED
+-----------------------------------------
+Comment: SHARDED
+  Author               shards to user                 (explicit annotation)
+      via   Comment(Author) -> user(id)
 ```
