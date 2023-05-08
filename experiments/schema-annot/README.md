@@ -501,3 +501,456 @@ order_recurring_transaction: UNSHARDED
 -----------------------------------------
 order_shipment: UNSHARDED
 ```
+
+## Prestashop
+
+```
+-----------------------------------------
+PREFIX_profile: UNSHARDED
+-----------------------------------------
+PREFIX_order_slip_detail_tax: UNSHARDED
+-----------------------------------------
+PREFIX_product_sale: UNSHARDED
+-----------------------------------------
+PREFIX_configuration_kpi: UNSHARDED
+-----------------------------------------
+PREFIX_date_range: UNSHARDED
+-----------------------------------------
+PREFIX_feature_shop: UNSHARDED
+-----------------------------------------
+PREFIX_profile_lang: UNSHARDED
+-----------------------------------------
+PREFIX_smarty_last_flush: UNSHARDED
+-----------------------------------------
+PREFIX_product_download: UNSHARDED
+-----------------------------------------
+PREFIX_product_attribute_image: UNSHARDED
+-----------------------------------------
+PREFIX_carrier_lang: UNSHARDED
+-----------------------------------------
+PREFIX_stock_mvt_reason_lang: UNSHARDED
+-----------------------------------------
+PREFIX_product_attribute: UNSHARDED
+-----------------------------------------
+PREFIX_cart_rule_combination: UNSHARDED
+-----------------------------------------
+PREFIX_quick_access_lang: UNSHARDED
+-----------------------------------------
+PREFIX_page_viewed: UNSHARDED
+-----------------------------------------
+PREFIX_cart_rule_product_rule_value: UNSHARDED
+-----------------------------------------
+PREFIX_page_type: UNSHARDED
+-----------------------------------------
+PREFIX_customized_data: UNSHARDED
+-----------------------------------------
+PREFIX_pack: UNSHARDED
+-----------------------------------------
+PREFIX_configuration: UNSHARDED
+-----------------------------------------
+PREFIX_order_state_lang: UNSHARDED
+-----------------------------------------
+PREFIX_order_return: SHARDED
+  id_customer          shards to PREFIX_customer      (implicitly deduced)
+      via   PREFIX_order_return(id_customer) -> PREFIX_customer(id_customer)
+-----------------------------------------
+PREFIX_module_currency: UNSHARDED
+-----------------------------------------
+PREFIX_supply_order_state: UNSHARDED
+-----------------------------------------
+PREFIX_order_slip_detail: UNSHARDED
+-----------------------------------------
+PREFIX_stock_available: UNSHARDED
+-----------------------------------------
+PREFIX_order_slip: UNSHARDED
+-----------------------------------------
+PREFIX_supplier_lang: UNSHARDED
+-----------------------------------------
+PREFIX_order_message_lang: UNSHARDED
+-----------------------------------------
+PREFIX_supplier: UNSHARDED
+-----------------------------------------
+PREFIX_order_invoice_tax: UNSHARDED
+-----------------------------------------
+PREFIX_order_invoice: UNSHARDED
+-----------------------------------------
+PREFIX_product_attribute_combination: UNSHARDED
+-----------------------------------------
+PREFIX_mail: UNSHARDED
+-----------------------------------------
+PREFIX_module_carrier: UNSHARDED
+-----------------------------------------
+PREFIX_module_preference: UNSHARDED
+-----------------------------------------
+PREFIX_module_group: UNSHARDED
+-----------------------------------------
+PREFIX_product: UNSHARDED
+-----------------------------------------
+PREFIX_page: UNSHARDED
+-----------------------------------------
+PREFIX_orders: UNSHARDED
+-----------------------------------------
+PREFIX_module_country: UNSHARDED
+-----------------------------------------
+PREFIX_order_state: UNSHARDED
+  [Warning] The column "send_email" sounds like it may belong to a data subject, but the table is not sharded. You may want to review your annotations.
+-----------------------------------------
+PREFIX_module_access: UNSHARDED
+-----------------------------------------
+PREFIX_module: UNSHARDED
+-----------------------------------------
+PREFIX_authorization_role: UNSHARDED
+-----------------------------------------
+PREFIX_order_cart_rule: UNSHARDED
+-----------------------------------------
+PREFIX_order_history: UNSHARDED
+-----------------------------------------
+PREFIX_meta_lang: UNSHARDED
+-----------------------------------------
+PREFIX_order_detail_tax: UNSHARDED
+-----------------------------------------
+PREFIX_meta: UNSHARDED
+-----------------------------------------
+PREFIX_manufacturer: UNSHARDED
+-----------------------------------------
+PREFIX_state: UNSHARDED
+-----------------------------------------
+PREFIX_specific_price_rule_condition: UNSHARDED
+-----------------------------------------
+PREFIX_order_message: UNSHARDED
+-----------------------------------------
+PREFIX_country: UNSHARDED
+-----------------------------------------
+PREFIX_order_carrier: UNSHARDED
+-----------------------------------------
+PREFIX_message_readed: UNSHARDED
+-----------------------------------------
+PREFIX_image_type: UNSHARDED
+-----------------------------------------
+PREFIX_contact_shop: UNSHARDED
+-----------------------------------------
+PREFIX_product_shop: UNSHARDED
+-----------------------------------------
+PREFIX_image_lang: UNSHARDED
+-----------------------------------------
+PREFIX_product_lang: UNSHARDED
+-----------------------------------------
+PREFIX_connections: UNSHARDED
+-----------------------------------------
+PREFIX_hook_module_exceptions: UNSHARDED
+-----------------------------------------
+PREFIX_hook_module: UNSHARDED
+-----------------------------------------
+PREFIX_message: UNSHARDED
+-----------------------------------------
+PREFIX_cms_category: UNSHARDED
+-----------------------------------------
+PREFIX_cms_category_shop: UNSHARDED
+-----------------------------------------
+PREFIX_tax: UNSHARDED
+-----------------------------------------
+PREFIX_guest: SHARDED
+  id_customer          shards to PREFIX_customer      (explicit annotation)
+      via   PREFIX_guest(id_customer) -> PREFIX_customer(id_customer)
+  [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
+-----------------------------------------
+PREFIX_group_lang: UNSHARDED
+-----------------------------------------
+PREFIX_customization_field: UNSHARDED
+-----------------------------------------
+PREFIX_group: UNSHARDED
+-----------------------------------------
+PREFIX_log: UNSHARDED
+-----------------------------------------
+PREFIX_image_shop: UNSHARDED
+-----------------------------------------
+PREFIX_gender_lang: UNSHARDED
+  [Warning] The column "id_gender" sounds like it may belong to a data subject, but the table is not sharded. You may want to review your annotations.
+-----------------------------------------
+PREFIX_request_sql: UNSHARDED
+-----------------------------------------
+PREFIX_store_shop: UNSHARDED
+-----------------------------------------
+PREFIX_feature_value_lang: UNSHARDED
+-----------------------------------------
+PREFIX_cart_rule_product_rule: UNSHARDED
+-----------------------------------------
+PREFIX_feature_product: UNSHARDED
+-----------------------------------------
+PREFIX_cart_rule_country: UNSHARDED
+-----------------------------------------
+PREFIX_cart: UNSHARDED
+-----------------------------------------
+PREFIX_group_reduction: UNSHARDED
+-----------------------------------------
+PREFIX_carrier_zone: UNSHARDED
+-----------------------------------------
+PREFIX_carrier: UNSHARDED
+-----------------------------------------
+PREFIX_attribute_impact: UNSHARDED
+-----------------------------------------
+PREFIX_quick_access: UNSHARDED
+-----------------------------------------
+PREFIX_category_lang: UNSHARDED
+-----------------------------------------
+PREFIX_tax_rule: UNSHARDED
+-----------------------------------------
+PREFIX_product_carrier: UNSHARDED
+-----------------------------------------
+PREFIX_timezone: UNSHARDED
+-----------------------------------------
+PREFIX_employee_shop: UNSHARDED
+-----------------------------------------
+PREFIX_category: UNSHARDED
+-----------------------------------------
+PREFIX_manufacturer_lang: UNSHARDED
+-----------------------------------------
+PREFIX_cart_rule_shop: UNSHARDED
+-----------------------------------------
+PREFIX_product_supplier: UNSHARDED
+-----------------------------------------
+PREFIX_order_return_state_lang: UNSHARDED
+-----------------------------------------
+PREFIX_order_return_detail: UNSHARDED
+-----------------------------------------
+PREFIX_cart_rule_group: UNSHARDED
+-----------------------------------------
+PREFIX_currency: UNSHARDED
+-----------------------------------------
+PREFIX_cart_cart_rule: UNSHARDED
+-----------------------------------------
+PREFIX_attachment_lang: UNSHARDED
+-----------------------------------------
+PREFIX_customer_message: UNSHARDED
+-----------------------------------------
+PREFIX_hook_alias: UNSHARDED
+-----------------------------------------
+PREFIX_attachment: UNSHARDED
+-----------------------------------------
+PREFIX_feature_value: UNSHARDED
+-----------------------------------------
+PREFIX_employee: DATASUBJECT
+-----------------------------------------
+PREFIX_order_return_state: UNSHARDED
+-----------------------------------------
+PREFIX_contact: DATASUBJECT
+-----------------------------------------
+PREFIX_operating_system: UNSHARDED
+-----------------------------------------
+PREFIX_feature_lang: UNSHARDED
+-----------------------------------------
+PREFIX_cart_product: UNSHARDED
+-----------------------------------------
+PREFIX_cms: UNSHARDED
+-----------------------------------------
+PREFIX_cart_rule_carrier: UNSHARDED
+-----------------------------------------
+PREFIX_accessory: UNSHARDED
+-----------------------------------------
+PREFIX_category_group: UNSHARDED
+-----------------------------------------
+PREFIX_risk: UNSHARDED
+-----------------------------------------
+PREFIX_alias: UNSHARDED
+-----------------------------------------
+PREFIX_hook: UNSHARDED
+-----------------------------------------
+PREFIX_delivery: UNSHARDED
+-----------------------------------------
+PREFIX_product_attachment: UNSHARDED
+-----------------------------------------
+PREFIX_image: UNSHARDED
+-----------------------------------------
+PREFIX_cart_rule: UNSHARDED
+-----------------------------------------
+PREFIX_connections_page: UNSHARDED
+-----------------------------------------
+PREFIX_country_lang: UNSHARDED
+-----------------------------------------
+PREFIX_feature: UNSHARDED
+-----------------------------------------
+PREFIX_cart_rule_lang: UNSHARDED
+-----------------------------------------
+PREFIX_customer_session: SHARDED
+  id_customer          shards to PREFIX_customer      (implicitly deduced)
+      via   PREFIX_customer_session(id_customer) -> PREFIX_customer(id_customer)
+  [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
+-----------------------------------------
+PREFIX_order_detail: UNSHARDED
+-----------------------------------------
+PREFIX_store: UNSHARDED
+  [Warning] The column "email" sounds like it may belong to a data subject, but the table is not sharded. You may want to review your annotations.
+-----------------------------------------
+PREFIX_stock: UNSHARDED
+-----------------------------------------
+PREFIX_cms_category_lang: UNSHARDED
+-----------------------------------------
+PREFIX_cart_rule_product_rule_group: UNSHARDED
+-----------------------------------------
+PREFIX_configuration_kpi_lang: UNSHARDED
+-----------------------------------------
+PREFIX_contact_lang: UNSHARDED
+-----------------------------------------
+PREFIX_address: UNSHARDED
+  [Warning] The columns "lastname", "firstname" sound like they may belong to a data subject, but the table is not sharded. You may want to review your annotations.
+-----------------------------------------
+PREFIX_configuration_lang: UNSHARDED
+-----------------------------------------
+PREFIX_referrer_cache: UNSHARDED
+-----------------------------------------
+PREFIX_risk_lang: UNSHARDED
+-----------------------------------------
+PREFIX_tab_module_preference: UNSHARDED
+-----------------------------------------
+PREFIX_product_attribute_shop: UNSHARDED
+-----------------------------------------
+PREFIX_connections_source: UNSHARDED
+-----------------------------------------
+PREFIX_currency_lang: UNSHARDED
+-----------------------------------------
+PREFIX_access: UNSHARDED
+-----------------------------------------
+PREFIX_customer: DATASUBJECT
+-----------------------------------------
+PREFIX_customization_field_lang: UNSHARDED
+-----------------------------------------
+PREFIX_carrier_group: UNSHARDED
+-----------------------------------------
+PREFIX_product_tag: UNSHARDED
+-----------------------------------------
+PREFIX_order_payment: UNSHARDED
+-----------------------------------------
+PREFIX_customer_group: SHARDED
+  id_customer          shards to PREFIX_customer      (implicitly deduced)
+      via   PREFIX_customer_group(id_customer) -> PREFIX_customer(id_customer)
+-----------------------------------------
+PREFIX_webservice_permission: UNSHARDED
+-----------------------------------------
+PREFIX_category_product: UNSHARDED
+-----------------------------------------
+PREFIX_customer_message_sync_imap: UNSHARDED
+-----------------------------------------
+PREFIX_product_group_reduction_cache: UNSHARDED
+-----------------------------------------
+PREFIX_memcached_servers: UNSHARDED
+-----------------------------------------
+PREFIX_customer_thread: SHARDED
+  id_customer          shards to PREFIX_customer      (implicitly deduced)
+      via   PREFIX_customer_thread(id_customer) -> PREFIX_customer(id_customer)
+  [Warning] This table is sharded, but all sharding paths are nullable. This will lead to records being stored in a global table if those columns are NULL and could be a source of non-compliance.
+-----------------------------------------
+PREFIX_customization: UNSHARDED
+-----------------------------------------
+PREFIX_cms_lang: UNSHARDED
+-----------------------------------------
+PREFIX_gender: UNSHARDED
+  [Warning] The column "id_gender" sounds like it may belong to a data subject, but the table is not sharded. You may want to review your annotations.
+-----------------------------------------
+PREFIX_range_price: UNSHARDED
+-----------------------------------------
+PREFIX_range_weight: UNSHARDED
+-----------------------------------------
+PREFIX_referrer: UNSHARDED
+-----------------------------------------
+PREFIX_search_word: UNSHARDED
+-----------------------------------------
+PREFIX_referrer_shop: UNSHARDED
+-----------------------------------------
+PREFIX_webservice_account_shop: UNSHARDED
+-----------------------------------------
+PREFIX_search_engine: UNSHARDED
+-----------------------------------------
+PREFIX_search_index: UNSHARDED
+-----------------------------------------
+PREFIX_specific_price: UNSHARDED
+-----------------------------------------
+PREFIX_tag: UNSHARDED
+-----------------------------------------
+PREFIX_tag_count: UNSHARDED
+-----------------------------------------
+PREFIX_tax_lang: UNSHARDED
+-----------------------------------------
+PREFIX_web_browser: UNSHARDED
+-----------------------------------------
+PREFIX_zone: UNSHARDED
+-----------------------------------------
+PREFIX_store_lang: UNSHARDED
+-----------------------------------------
+PREFIX_webservice_account: UNSHARDED
+-----------------------------------------
+PREFIX_required_field: UNSHARDED
+-----------------------------------------
+PREFIX_product_country_tax: UNSHARDED
+-----------------------------------------
+PREFIX_tax_rules_group: UNSHARDED
+-----------------------------------------
+PREFIX_specific_price_priority: UNSHARDED
+-----------------------------------------
+PREFIX_import_match: UNSHARDED
+-----------------------------------------
+PREFIX_shop_url: UNSHARDED
+-----------------------------------------
+PREFIX_country_shop: UNSHARDED
+-----------------------------------------
+PREFIX_carrier_shop: UNSHARDED
+-----------------------------------------
+PREFIX_specific_price_rule: UNSHARDED
+-----------------------------------------
+PREFIX_address_format: UNSHARDED
+-----------------------------------------
+PREFIX_cms_shop: UNSHARDED
+-----------------------------------------
+PREFIX_currency_shop: UNSHARDED
+-----------------------------------------
+PREFIX_group_shop: UNSHARDED
+-----------------------------------------
+PREFIX_tax_rules_group_shop: UNSHARDED
+-----------------------------------------
+PREFIX_zone_shop: UNSHARDED
+-----------------------------------------
+PREFIX_manufacturer_shop: UNSHARDED
+-----------------------------------------
+PREFIX_supplier_shop: UNSHARDED
+-----------------------------------------
+PREFIX_module_shop: UNSHARDED
+-----------------------------------------
+PREFIX_stock_mvt_reason: UNSHARDED
+-----------------------------------------
+PREFIX_warehouse: UNSHARDED
+-----------------------------------------
+PREFIX_warehouse_product_location: UNSHARDED
+-----------------------------------------
+PREFIX_warehouse_shop: UNSHARDED
+-----------------------------------------
+PREFIX_warehouse_carrier: UNSHARDED
+-----------------------------------------
+PREFIX_supply_order: UNSHARDED
+-----------------------------------------
+PREFIX_supply_order_detail: UNSHARDED
+-----------------------------------------
+PREFIX_supply_order_state_lang: UNSHARDED
+-----------------------------------------
+PREFIX_supply_order_history: UNSHARDED
+  [Warning] The columns "employee_lastname", "employee_firstname" sound like they may belong to a data subject, but the table is not sharded. You may want to review your annotations.
+-----------------------------------------
+PREFIX_supply_order_receipt_history: UNSHARDED
+  [Warning] The columns "employee_lastname", "employee_firstname" sound like they may belong to a data subject, but the table is not sharded. You may want to review your annotations.
+-----------------------------------------
+PREFIX_specific_price_rule_condition_group: UNSHARDED
+-----------------------------------------
+PREFIX_category_shop: UNSHARDED
+-----------------------------------------
+PREFIX_carrier_tax_rules_group_shop: UNSHARDED
+-----------------------------------------
+PREFIX_order_invoice_payment: UNSHARDED
+-----------------------------------------
+PREFIX_cms_role: UNSHARDED
+-----------------------------------------
+PREFIX_smarty_cache: UNSHARDED
+-----------------------------------------
+PREFIX_smarty_lazy_cache: UNSHARDED
+-----------------------------------------
+PREFIX_cms_role_lang: UNSHARDED
+-----------------------------------------
+PREFIX_employee_session: UNSHARDED
+```

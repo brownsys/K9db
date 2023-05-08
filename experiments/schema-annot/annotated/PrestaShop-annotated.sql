@@ -681,7 +681,8 @@ CREATE DATA_SUBJECT TABLE PREFIX_customer (
 CREATE TABLE PREFIX_customer_group (
   id_customer int NOT NULL,
   id_group int NOT NULL,
-  PRIMARY KEY (id_customer)
+  PRIMARY KEY (id_customer),
+  FOREIGN KEY (id_customer) REFERENCES PREFIX_customer (id_customer)
   -- PRIMARY KEY (id_customer, id_group),
   -- INDEX customer_login(id_group),
   -- KEY id_customer (id_customer)
@@ -728,7 +729,8 @@ CREATE TABLE PREFIX_customer_thread (
   token text,
   date_add datetime NOT NULL,
   date_upd datetime NOT NULL,
-  PRIMARY KEY (id_customer_thread)
+  PRIMARY KEY (id_customer_thread),
+  FOREIGN KEY (id_customer) REFERENCES PREFIX_customer (id_customer)
   -- KEY id_shop (id_shop),
   -- KEY id_lang (id_lang),
   -- KEY id_contact (id_contact),
@@ -990,7 +992,8 @@ CREATE TABLE PREFIX_guest (
   windows_media int,
   accept_language text,
   mobile_theme int NOT NULL,
-  PRIMARY KEY (id_guest)
+  PRIMARY KEY (id_guest),
+  FOREIGN KEY (id_customer) OWNED_BY PREFIX_customer(id_customer)
   -- KEY id_customer (id_customer),
   -- KEY id_operating_system (id_operating_system),
   -- KEY id_web_browser (id_web_browser)
@@ -1294,7 +1297,9 @@ CREATE TABLE PREFIX_orders (
   valid int NOT NULL,
   date_add datetime NOT NULL,
   date_upd datetime NOT NULL,
-  PRIMARY KEY (id_order)
+  PRIMARY KEY (id_order),
+  FOREIGN KEY (id_customer) ACCESSED_BY PREFIX_customer (id_customer),
+  ON DEL id_customer ANON (id_customer)
   -- KEY reference (reference),
   -- KEY id_customer (id_customer),
   -- KEY id_cart (id_cart),
@@ -1471,7 +1476,8 @@ CREATE TABLE PREFIX_order_return (
   question text NOT NULL,
   date_add datetime NOT NULL,
   date_upd datetime NOT NULL,
-  PRIMARY KEY (id_order_return)
+  PRIMARY KEY (id_order_return),
+  FOREIGN KEY (id_customer) REFERENCES PREFIX_customer (id_customer)
   -- KEY order_return_customer (id_customer),
   -- KEY id_order (id_order)
 ) ENGINE=ENGINE_TYPE DEFAULT CHARSET=utf8mb4 COLLATION;
@@ -2919,7 +2925,8 @@ CREATE TABLE PREFIX_customer_session (
   id_customer_session int NOT NULL,
   id_customer int,
   token text,
-  PRIMARY KEY (id_customer_session)
+  PRIMARY KEY (id_customer_session),
+  FOREIGN KEY (id_customer) REFERENCES PREFIX_customer(id_customer)
 ) ENGINE=ENGINE_TYPE DEFAULT CHARSET=utf8mb4 COLLATION;
 
 EXPLAIN COMPLIANCE;
