@@ -91,10 +91,8 @@ CREATE TABLE comments ( \
   FOREIGN KEY (commenterHex) OWNED_BY commenters(commenterHex), \
   FOREIGN KEY (domain) ACCESSED_BY domains(domain), \
   ON DEL parentHex DELETE_ROW, \
-  -- (if doesn't work, open issue, self referencing foreign keys with accessed by crashes)
-  -- TODO: Open issue would like to be able to delete parentHex (general issue, example)
+  -- issue #170 self-referencing foreign key currently unsupported
   -- FOREIGN KEY (parentHex) ACCESSED_BY comments(parentHex), \
-  -- ON DEL parentHex ANON (commenterHex, score, state), \
   ON GET parentHex ANON (commenterHex, score, state), \
   ON GET domain ANON (commenterHex, score, state) \
 );

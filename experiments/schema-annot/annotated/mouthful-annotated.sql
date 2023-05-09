@@ -1,3 +1,4 @@
+-- modified from original, see issue #171
 CREATE DATA_SUBJECT TABLE user (
     id text PRIMARY KEY
 );

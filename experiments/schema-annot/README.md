@@ -5,12 +5,12 @@
 ## Data Ownership Patterns
 
 - `commento`: accessorship for nested comments. The `comments` table contains a `parentHex` with a self referencing foreign key.
-- `ghchat`: groups have admins, but each member of a group only has access to the group such that chat messages are owned exclusively by their sender and only accessed by a member of a group.
+- `ghchat`: groups have admins, so each member of a group only has access to the group such that chat messages are owned exclusively by their sender and only accessed by a member of a group.
 - `instagram`: messages/conversations are `OWNED_BY` both recipient and sender, shares are `ACCESSED_BY` the user being shared with, group membership is `ACCESSED_BY` the person who adds members
 - `schnack`: each comment is `OWNED_BY` a single user.
-- `hotcrp`: Authors should see a `PaperReview`, but not who conducted the review. Hence fields related to who requested the review (`requestedBy`) should be anonymized when the author `GDPR GET`s their data. Likewise, when accessors to `PaperReviewRefused` request their data, fields like `email`, `firstName`, and `lastName` should be anonymized.
+- `hotcrp`: Authors should see a `PaperReview`, but not who conducted the review. Hence fields related to who requested the review (`requestedBy`) should be anonymized when the author `GDPR GET`s their data.
 - `socify`: follows are dually `OWNED_BY` follower and followable users.
-- `mouthful`: `Author` column represents a data subject embedded within the `Comment` table.
+- `mouthful`: `Author` column represents a data subject embedded within the `Comment` table. Unlike other schemas, there is no separate table that clearly refers to a data subject.
 
 ## Annotations Used
 
@@ -24,10 +24,13 @@
 
 ## Unsupported Features
 
-Converting and annotating these schemas required removing certain SQL features currently unsupported by k9db. However, removing these features does not affect privacy compliance.
+Converting and annotating these schemas required removing certain SQL features currently unsupported by k9db. However, removing these features does not affect privacy compliance. A list of unsupported features is provided below:
 
-- `all schemas`: reserved keywords (e.g. groups, user, match, index, key, from), multi-column primary keys, `[UNIQUE] KEY`, `CREATE TABLE IF NOT EXISTS`, `DEFAULT` values, column type definitions (e.g. timestamp, boolean, varchar, tinyint), `AUTO_INCREMENT`
-- `commento`: self referencing foreign keys with `ACCESSED_BY` for `parentHex` in the `comments` table, representing accessorship for nested comments.
+- `all schemas`: reserved keywords as column or table names (e.g. groups, user, match, index, key, from), multi-column primary keys, `[UNIQUE] KEY`, `CREATE TABLE IF NOT EXISTS`, `DEFAULT` values, certain column type definitions (e.g. timestamp, boolean, varchar, tinyint), `AUTO_INCREMENT`
+
+Specific schemas:
+
+- `commento`: self referencing foreign keys with `ACCESSED_BY` for `parentHex` in the `comments` table are unsupported (issue #170)
 - `mouthful`: `Author` column representing a data subject embedded within the `Comment` table. As a work around, we add a separate table for users.
 
 # Explain Compliance

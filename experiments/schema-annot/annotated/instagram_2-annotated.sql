@@ -20,7 +20,7 @@ CREATE DATA_SUBJECT TABLE users (
   PRIMARY KEY (id)
 );
 
--- k9db crashes when this table is called 'groups', so renamed to groups1
+-- Reserved keyword: k9db crashes when this table is called 'groups', so renamed to groups1
 CREATE TABLE groups1 (
   id int NOT NULL,
   name text NOT NULL,
@@ -34,11 +34,11 @@ CREATE TABLE groups1 (
 
 CREATE TABLE posts (
   id int NOT NULL,
-  -- NOTE: renamed from 'user' to 'user_id' to avoid k9db crashing (reserved keyword)
+  -- Reserved keyword: renamed from 'user' to 'user_id' to avoid k9db crashing 
   user_id int NOT NULL,
   description text NOT NULL,
   imgSrc text NOT NULL,
-  -- NOTE: k9db crashes when column is called 'filter'
+  -- Reserved keyword: k9db crashes when column is called 'filter'
   -- filter text NOT NULL,
   location text NOT NULL,
   type text NOT NULL,
@@ -126,7 +126,7 @@ CREATE TABLE hashtags (
   hashtag_id int NOT NULL,
   hashtag text NOT NULL,
   post_id int NOT NULL,
-  -- NOTE: renamed from 'user' to 'user_id' to avoid k9db crashing (conflict with SQL keyword?)
+  -- Reserved keyword: renamed from 'user' to 'user_id' to avoid k9db crashing
   user_id int NOT NULL,
   hashtag_time text NOT NULL,
   PRIMARY KEY (hashtag_id),
