@@ -32,7 +32,7 @@ CREATE TABLE group_msg (
   attachments text,
   PRIMARY KEY (id),
   -- KEY to_group (to_group_id),
-  FOREIGN KEY (from_user) OWNED_BY user_info(id)
+  FOREIGN KEY (from_user) OWNED_BY user_info(id),
   FOREIGN KEY (to_group_id) ACCESSED_BY group_info(to_group_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -42,7 +42,8 @@ CREATE TABLE group_user_relation (
   user_id text NOT NULL,
   PRIMARY KEY (id),
   FOREIGN KEY (user_id) OWNED_BY user_info(id)
-  FOREIGN KEY (to_group_id) ACCESSES group_info(id)
+  -- TODO: accesses fails with INVALID_ARGUMENT: ACCESSES into table with dependencies
+  -- FOREIGN KEY (to_group_id) ACCESSES group_info(to_group_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE private_msg (
