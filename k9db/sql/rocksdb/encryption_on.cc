@@ -195,9 +195,12 @@ EncryptedKey EncryptionManager::EncryptKey(RocksdbSequence &&k) const {
 }
 EncryptedValue EncryptionManager::EncryptValue(const std::string &shard_name,
                                                RocksdbSequence &&v) {
-  const unsigned char *nonce = this->global_nonce_.get();
+  unsigned char *nonce = new unsigned char[NONCE_SIZE];
+  randombytes_buf(nonce, NONCE_SIZE);
   const unsigned char *key = this->GetOrCreateUserKey(shard_name);
-  return Cipher(Encrypt(v.Data(), nonce, key));
+  std::string nonce_str(reinterpret_cast<char *>(nonce), NONCE_SIZE);
+  std::string cipher_str = Encrypt(v.Data(), nonce, key);
+  return Cipher(nonce_str + cipher_str);
 }
 
 // Decryption of records.
@@ -212,9 +215,12 @@ RocksdbSequence EncryptionManager::DecryptKey(EncryptedKey &&k) const {
 }
 RocksdbSequence EncryptionManager::DecryptValue(const std::string &shard_name,
                                                 EncryptedValue &&v) const {
-  const unsigned char *nonce = this->global_nonce_.get();
+  std::string str = v.Release();
+  const char *ptr = str.data();
+  const unsigned char *nonce = reinterpret_cast<const unsigned char *>(ptr);
   const unsigned char *key = this->GetUserKey(shard_name);
-  return RocksdbSequence(Decrypt(v.Data(), nonce, key));
+  rocksdb::Slice cipher(ptr + NONCE_SIZE, str.size() - NONCE_SIZE);
+  return RocksdbSequence(Decrypt(cipher, nonce, key));
 }
 
 // Encrypts a key for use with rocksdb Seek.
