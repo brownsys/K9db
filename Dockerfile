@@ -47,10 +47,12 @@ RUN apt-get remove -y --purge mysql*
 RUN curl -LsS -O https://downloads.mariadb.com/MariaDB/mariadb_repo_setup
 RUN bash mariadb_repo_setup --mariadb-server-version=10.6
 RUN rm mariadb_repo_setup
+RUN apt-get update
 RUN apt-get install -y mariadb-server-10.6 mariadb-client-10.6
 RUN apt-get install -y mariadb-plugin-rocksdb
 
 # install mariadb connector (for memcached)
+RUN apt-get update
 RUN apt-get install -y libmariadb3 libmariadb-dev
 RUN cd /tmp \
     && wget https://dlm.mariadb.com/1601342/Connectors/cpp/connector-cpp-1.0.0/mariadb-connector-cpp-1.0.0-ubuntu-groovy-amd64.tar.gz \
