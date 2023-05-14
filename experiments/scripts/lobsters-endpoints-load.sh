@@ -10,12 +10,24 @@ echo "Writing plots and final outputs to $PLOT_OUT"
 echo "Writing logs and temporary measurements to $LOG_OUT"
 cd "${K9DB_DIR}/experiments/lobsters"
 
+MEMCACHED_USER=""
+if [[ "$(whoami)" == "root" ]]; then
+  MEMCACHED_USER="-u memcached"
+fi
+
 # Experiment parameters: you need to change the request scale `RS` parameter if
 # running on a different configuration.
 RT=120
 DS=2.59  # Data scale: corresponds to 15k users
 RS=1000  # request scale
+INFLIGHT=""
+# INFLIGHT="--in-flight=15"
 TARGET_IP="$1"
+
+#
+# Build harness.
+#
+bazel build -c opt //:lobsters-harness
 
 #
 # Baseline
@@ -24,8 +36,14 @@ TARGET_IP="$1"
 #
 echo "Running against baseline..."
 bazel run -c opt //:lobsters-harness -- \
+  --runtime 0 --datascale $DS --reqscale $RS --queries pelton \
+  --backend rocks-mariadb --prime --scale_everything $INFLIGHT \
+  "mysql://k9db:password@$TARGET_IP:3306/lobsters" \
+  > "$LOG_OUT/baseline-prime.out" 2>&1
+
+bazel run -c opt //:lobsters-harness -- \
   --runtime $RT --datascale $DS --reqscale $RS --queries pelton \
-  --backend rocks-mariadb --prime --scale_everything \
+  --backend rocks-mariadb --scale_everything \
   "mysql://k9db:password@$TARGET_IP:3306/lobsters" \
   > "$LOG_OUT/baseline.out" 2>&1
 
@@ -39,11 +57,13 @@ echo "Running memcached experiment against baseline..."
 cd "$K9DB_DIR/experiments/memcached"
 
 # Run memcached server.
-bazel run @memcached//:memcached --config=opt -- -m 1024 -M > "$LOG_OUT/memcached-server.log" 2>&1 &
+bazel build @memcached//:memcached --config=opt
+bazel run @memcached//:memcached --config=opt -- $MEMCACHED_USER -m 1024 -M > "$LOG_OUT/memcached-server.log" 2>&1 &
 pid=$!
 sleep 30
 
 # Run memcached experiment
+bazel build //memcached:memcached --config=opt
 bazel run //memcached:memcached --config=opt -- --database=$TARGET_IP \
   > "$LOG_OUT/memcached-memory.out" 2>&1
 kill $pid
@@ -61,8 +81,14 @@ sleep 60
 cd "${K9DB_DIR}/experiments/lobsters"
 echo "Running against K9db..."
 bazel run -c opt //:lobsters-harness -- \
+  --runtime 0 --datascale $DS --reqscale $RS --queries pelton \
+  --backend pelton --prime --scale_everything $INFLIGHT \
+  "mysql://root:password@$TARGET_IP:10001/lobsters" \
+  > "$LOG_OUT/_prime_scale$DS.out" 2>&1
+
+bazel run -c opt //:lobsters-harness -- \
   --runtime $RT --datascale $DS --reqscale $RS --queries pelton \
-  --backend pelton --prime --scale_everything \
+  --backend pelton --scale_everything \
   "mysql://root:password@$TARGET_IP:10001/lobsters" \
   > "$LOG_OUT/scale$DS.out" 2>&1
 
@@ -79,8 +105,14 @@ sleep 60
 
 echo "Running against K9db (unencrypted)..."
 bazel run -c opt //:lobsters-harness -- \
+  --runtime 0 --datascale $DS --reqscale $RS --queries pelton \
+  --backend pelton --prime --scale_everything $INFLIGHT \
+  "mysql://root:password@$TARGET_IP:10001/lobsters" \
+  > "$LOG_OUT/unencrypted-prime.out" 2>&1
+
+bazel run -c opt //:lobsters-harness -- \
   --runtime $RT --datascale $DS --reqscale $RS --queries pelton \
-  --backend pelton --prime --scale_everything \
+  --backend pelton --scale_everything \
   "mysql://root:password@$TARGET_IP:10001/lobsters" \
   > "$LOG_OUT/unencrypted.out" 2>&1
 

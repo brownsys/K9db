@@ -4,10 +4,10 @@
 cd experiments/scripts/plotting
 
 # Install latex dependencies
-sudo apt-get install -y texlive-latex-base texlive-fonts-recommended texlive-fonts-extra dvipng cm-super
+sudo apt-get install -y texlive-latex-base texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra dvipng cm-super
 
 # Install python3 virtualenv.
-sudo apt-get install -y python3.8-venv
+sudo apt-get install -y python3-pip python3.8-venv
 
 # Create virtual env and install requirements
 python3 -m venv venv

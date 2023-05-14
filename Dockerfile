@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y \
     libncursesw5-dev libreadline-dev libgdbm-dev libdb5.3-dev libbz2-dev \
     libexpat1-dev liblzma-dev tk-dev libffi-dev wget gcc-11 g++-11 unzip \
     openjdk-11-jdk maven python2 valgrind curl libclang-dev flex bison libevent-dev \
-    libsnappy-dev
+    libsnappy-dev netcat
 
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 90 \
                                  --slave /usr/bin/gcc-ar gcc-ar /usr/bin/gcc-ar-11 \
@@ -75,6 +75,10 @@ RUN mkdir -p /run/mysqld
 RUN chown -R mysql:root /run/mysqld/
 RUN useradd memcached
 
+# configure mariadb datadir
+RUN echo '[mysqld]' >> /etc/mysql/mariadb.cnf
+RUN echo 'datadir = /var/lib/mysql' >> /etc/mysql/mariadb.cnf
+
 # Do not copy, instead bind mount during docker run
 RUN mkdir /home/k9db
 
@@ -86,14 +90,21 @@ RUN echo "test:tsan --test_env TSAN_OPTIONS=suppressions=/home/k9db/.tsan_jvm_su
 # for GDPRBench, replace python with python2
 RUN ln -s /usr/bin/python2 /usr/bin/python
 
+# Latex for plotting
+RUN apt-get update && apt-get install --no-install-recommends -y \
+  texlive-latex-base texlive-latex-extra \
+  texlive-fonts-recommended texlive-fonts-extra \
+  dvipng cm-super
+RUN apt-get update && apt-get install -y python3-pip python3.8-venv
+
 # configure mariadb on startup and run mysqld in the background
 ADD configure_db.sql /home/configure_db.sql
-ADD configure_db.sh /home/configure_db.sh
-RUN chmod 750 /home/configure_db.sh
+ADD configure_docker.sh /home/configure_docker.sh
+RUN chmod 750 /home/configure_docker.sh
 
 EXPOSE 10001/tcp
 EXPOSE 3306/tcp
 
-ENTRYPOINT /bin/bash ./home/configure_db.sh && /bin/bash
+ENTRYPOINT /bin/bash ./home/configure_docker.sh && /bin/bash
 
 # Run with docker run --mount type=bind,source=$(pwd),target=/home/k9db --name k9db -d -p 3306:3306 -p 10001:10001 -t k9db/latest

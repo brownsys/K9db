@@ -11,6 +11,14 @@ echo "Writing plots and final outputs to $PLOT_OUT"
 echo "Writing logs and temporary measurements to $LOG_OUT"
 cd "${K9DB_DIR}/experiments/ownCloud"
 
+# sudo is not available inside docker container
+SUDO="sudo "
+MEMCACHED_USER=""
+if [[ "$(whoami)" == "root" ]]; then
+  SUDO=""
+  MEMCACHED_USER="-u memcached"
+fi
+
 # The database IP is either 127.0.0.1 or LOCAL_IP if running on gcloud.
 DB_IP=$LOCAL_IP
 if [[ $LOCAL_IP == "" ]]; then
@@ -31,12 +39,17 @@ ops=10000
 zipf=0.6
 
 #
+# Building harness.
+#
+bazel build :benchmark -c opt
+
+#
 # Run against MariaDB baseline.
 #
 echo "Running against MariaDB..."
 
 # Start MariaDB.
-sudo service mariadb start
+$SUDO service mariadb restart
 
 # Run harness against MariaDB.
 bazel run :benchmark -c opt -- \
@@ -65,7 +78,8 @@ mariadb -P3306 --host=$DB_IP -u k9db -ppassword \
 echo "Running against MariaDB+memcached..."
 cd "$K9DB_DIR/experiments/memcached"
 
-bazel run @memcached//:memcached --config=opt -- -m 1024 -M > "$LOG_OUT/memcached-server.log" 2>&1 &
+bazel build @memcached//:memcached --config=opt
+bazel run @memcached//:memcached --config=opt -- $MEMCACHED_USER -m 1024 -M > "$LOG_OUT/memcached-server.log" 2>&1 &
 pid=$!
 sleep 30
 
@@ -92,7 +106,7 @@ echo "stats" | nc localhost 11211 -q 1 > "$LOG_OUT/memcached-memory.out" 2>&1
 
 # Kill memcached and MariaDB.
 kill $pid
-sudo service mariadb stop
+$SUDO service mariadb stop
 
 #
 # Run against K9db.
@@ -102,6 +116,7 @@ echo "Running against K9db..."
 # Run K9db server.
 cd ${K9DB_DIR}
 rm -rf /mnt/disks/my-ssd/k9db/k9db
+bazel build //:k9db --config=opt
 bazel run //:k9db --config=opt -- --db_path="/mnt/disks/my-ssd/k9db/" \
   > "$LOG_OUT/k9db-server.out" 2>&1 &
 sleep 10
@@ -137,4 +152,4 @@ cd "${K9DB_DIR}/experiments/scripts/plotting"
 . venv/bin/activate
 python owncloud-comparison.py --paper
 
-echo "Terminated"
+echo "Success"

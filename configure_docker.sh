@@ -23,5 +23,15 @@ if [[ -f "/home/configure_db.sql" ]]; then
   cd /home/k9db/experiments/ownCloud && /root/.cargo/bin/cargo raze && cd -
   cd /home/k9db/experiments/vote && /root/.cargo/bin/cargo raze && cd -
 
+  # Install plotting dependencies.
+  echo "Installing plotting dependencies ..."
+  cd /home/k9db/experiments/scripts/plotting
+  rm -rf __pycache__ venv
+  python3 -m venv venv
+  . venv/bin/activate
+  pip install -r requirements.txt || /bin/true
+  deactivate
+  cd -
+
   echo "Configuration done!"
 fi

@@ -11,6 +11,14 @@ echo "Writing plots and final outputs to $PLOT_OUT"
 echo "Writing logs and temporary measurements to $LOG_OUT"
 cd "${K9DB_DIR}/experiments/vote"
 
+# sudo is not available inside docker container
+SUDO="sudo "
+MEMCACHED_USER=""
+if [[ "$(whoami)" == "root" ]]; then
+  SUDO=""
+  MEMCACHED_USER="-u memcached"
+fi
+
 # The database IP is either 127.0.0.1 or LOCAL_IP if running on gcloud.
 DB_IP=$LOCAL_IP
 if [[ $LOCAL_IP == "" ]]; then
@@ -28,10 +36,15 @@ warmup=60
 prime=30
 
 #
+# Build harness
+#
+bazel build :vote-benchmark -c opt
+
+#
 # MariaDB baseline
 #
 echo "Running against MariaDB..."
-sudo service mariadb start
+$SUDO service mariadb restart
 
 # Baseline mariadb.
 echo "  Priming..."
@@ -60,7 +73,8 @@ echo "Running against MariaDB+memcached..."
 
 # Running memcached server in background.
 cd "$K9DB_DIR/experiments/memcached"
-bazel run @memcached//:memcached --config=opt -- -m 1024 -M > "$LOG_OUT/memcached-server.log" 2>&1 &
+bazel build @memcached//:memcached --config=opt
+bazel run @memcached//:memcached --config=opt -- $MEMCACHED_USER -m 1024 -M > "$LOG_OUT/memcached-server.log" 2>&1 &
 pid=$!
 sleep 30
 
@@ -97,7 +111,7 @@ bazel run :vote-benchmark -c opt -- \
 
 # Kill memcached and mariadb
 kill $pid
-sudo service mariadb stop
+$SUDO service mariadb stop
 
 #
 # K9db.
@@ -108,6 +122,7 @@ echo "Running against K9db..."
 # Running K9db server in background.
 cd ${K9DB_DIR}
 rm -rf /mnt/disks/my-ssd/k9db/k9db
+bazel build //:k9db --config=opt
 bazel run //:k9db --config=opt -- --db_path="/mnt/disks/my-ssd/k9db/" \
   > "$LOG_OUT/k9db-server.out" 2>&1 &
 sleep 10
@@ -144,4 +159,4 @@ cd "${K9DB_DIR}/experiments/scripts/plotting"
 . venv/bin/activate
 python votes.py --paper
 
-echo "Terminated"
+echo "Success"
