@@ -72,4 +72,5 @@ echo 'datadir = /mnt/disks/my-ssd/mysql' | sudo tee -a /etc/mysql/mariadb.cnf
 # Configure MariaDB to listen on the external network interface.
 echo "Configuring MariaDB network interface..."
 LOCAL_IP=$(curl  http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip -H "Metadata-Flavor: Google")
+echo "LOCAL_IP=\"$LOCAL_IP\"" >> ~/.bashrc
 sudo sed -i "s|bind-address.*|bind-address = $LOCAL_IP|" /etc/mysql/mariadb.conf.d/50-server.cnf

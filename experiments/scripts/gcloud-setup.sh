@@ -19,17 +19,18 @@ echo "Installing and configuring MariaDB..."
 cd $K9DB_DIR
 ./experiments/scripts/setup/mariadb.sh
 
-# Building harnesses and K9db.
-echo "======================================================================"
-echo "Building harnesses and K9db...".
-cd $K9DB_DIR
-./experiments/scripts/setup/build.sh
-
 # Setup plotting scripts.
 echo "======================================================================"
 echo "Setup plotting scripts...".
 cd $K9DB_DIR
 ./experiments/scripts/setup/plotting.sh
+
+# Building harnesses and K9db.
+echo "======================================================================"
+echo "Building harnesses and K9db...".
+cd $K9DB_DIR
+source ~/.bashrc
+./experiments/scripts/setup/build.sh
 
 echo "======================================================================"
 echo "Machine setup done!"
