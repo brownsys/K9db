@@ -199,6 +199,9 @@ absl::Status GDPRContext::RecurseOverDependents() {
  */
 absl::Status GDPRContext::RecurseOverAccessDependents(
     const std::string &table_name, std::vector<dataflow::Record> &&records) {
+  if (records.empty()) {
+    return absl::OkStatus();
+  }
   // Iterate over all the access dependents.
   const Table &table = this->sstate_.GetTable(table_name);
   for (const auto &[next_table, desc] : table.access_dependents) {

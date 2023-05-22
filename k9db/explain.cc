@@ -180,6 +180,7 @@ void ReportShardingInformation(const shards::TableName &table_name,
         default:
           LOG(FATAL) << "UNREACHABLE";
       }
+      last_table = info.next_table();
       // << info->next_table() << "(" << tinfo.upcolumn() << ")";
       out << std::endl;
     }

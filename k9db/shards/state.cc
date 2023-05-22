@@ -52,12 +52,20 @@ Table *SharderState::AddTable(Table &&table) {
       }
       case InfoType::TRANSITIVE: {
         const TransitiveInfo &info = std::get<TransitiveInfo>(descriptor->info);
-        parent = &this->tables_.at(info.next_table);
+        if (info.next_table == table.table_name) {
+          parent = &table;
+        } else {
+          parent = &this->tables_.at(info.next_table);
+        }
         break;
       }
       case InfoType::VARIABLE: {
         const VariableInfo &info = std::get<VariableInfo>(descriptor->info);
-        parent = &this->tables_.at(info.origin_relation);
+        if (info.origin_relation == table.table_name) {
+          parent = &table;
+        } else {
+          parent = &this->tables_.at(info.origin_relation);
+        }
         break;
       }
     }

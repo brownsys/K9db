@@ -482,7 +482,7 @@ TEST_F(GDPRGetTest, TransitiveAccessorship) {
   // Validate get for user with id 5.
   std::string get1 = MakeGDPRGet("user", "5");
   EXPECT_EQ(Execute(get1, &conn).ResultSets(),
-            (VV{(V{row4, row3}), (V{u1}), (V{}), (V{})}));
+            (VV{(V{row4, row3}), (V{u1}), (V{})}));
 
   // Validate get for user with id 10.
   std::string get2 = MakeGDPRGet("user", "10");
@@ -668,6 +668,51 @@ TEST_F(GDPRGetTest, ComplexVariableAccessorship) {
   EXPECT_EQ(
       Execute(get2, &conn).ResultSets(),
       (VV{(V{frow1, frow2}), (V{grow1, grow2}), (V{d0}), (V{farow1, farow2})}));
+}
+
+TEST_F(GDPRGetTest, SelfFKTable) {
+  // Parse create table statements.
+  std::string commenters =
+      MakeCreate("commenters", {"commenterHex" STR PK}, true);
+  std::string comments =
+      MakeCreate("comments", {"commentHex" STR PK,
+                              "commenterHex" STR OB "commenters(commenterHex)",
+                              "parentHex" STR AB "comments(commentHex)"});
+
+  // Make a k9db connection.
+  Connection conn = CreateConnection();
+
+  // Create the tables.
+  EXPECT_SUCCESS(Execute(commenters, &conn));
+  EXPECT_SUCCESS(Execute(comments, &conn));
+
+  // Perform some inserts.
+  auto &&[cr0_stmt, cr0] = MakeInsert("commenters", {"'0'"});
+  auto &&[cr1_stmt, cr1] = MakeInsert("commenters", {"'1'"});
+  auto &&[cr2_stmt, cr2] = MakeInsert("commenters", {"'2'"});
+
+  EXPECT_UPDATE(Execute(cr0_stmt, &conn), 1);
+  EXPECT_UPDATE(Execute(cr1_stmt, &conn), 1);
+  EXPECT_UPDATE(Execute(cr2_stmt, &conn), 1);
+
+  auto &&[c0_stmt, c0] = MakeInsert("comments", {"'0'", "'0'", "NULL"});
+  auto &&[c1_stmt, c1] = MakeInsert("comments", {"'1'", "'0'", "'0'"});
+  auto &&[c2_stmt, c2] = MakeInsert("comments", {"'2'", "'1'", "'1'"});
+  auto &&[c3_stmt, c3] = MakeInsert("comments", {"'3'", "'2'", "'2'"});
+  auto &&[c4_stmt, c4] = MakeInsert("comments", {"'4'", "'0'", "'3'"});
+  auto &&[c5_stmt, c5] = MakeInsert("comments", {"'5'", "'1'", "'3'"});
+
+  EXPECT_UPDATE(Execute(c0_stmt, &conn), 1);
+  EXPECT_UPDATE(Execute(c1_stmt, &conn), 1);
+  EXPECT_UPDATE(Execute(c2_stmt, &conn), 1);
+  EXPECT_UPDATE(Execute(c3_stmt, &conn), 1);
+  EXPECT_UPDATE(Execute(c4_stmt, &conn), 1);
+  EXPECT_UPDATE(Execute(c5_stmt, &conn), 1);
+
+  // Validate get.
+  std::string get = MakeGDPRGet("commenters", "0");
+  EXPECT_EQ(Execute(get, &conn).ResultSets(),
+            (VV{(V{cr0}), (V{c0, c1, c2, c3, c4, c5})}));
 }
 
 }  // namespace sqlengine

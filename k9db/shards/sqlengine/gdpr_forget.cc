@@ -224,6 +224,9 @@ absl::StatusOr<sql::SqlResult> GDPRForgetContext::Exec() {
   this->db_->CommitTransaction();
   CHECK_STATUS(this->conn_->ctx->CommitCheckpoint());
 
+  // Decrement users.
+  this->sstate_.DecrementUsers(this->shard_kind_, 1);
+
   // Update dataflow.
   for (auto &[table_name, records] : this->records_) {
     this->dstate_.ProcessRecords(table_name, std::move(records));

@@ -33,22 +33,40 @@ absl::StatusOr<CreateContext::Annotations> CreateContext::DiscoverValidate() {
     // Make sure all FK point to existing tables.
     const sqlast::ColumnConstraint &fk = col.GetForeignKeyConstraint();
     const auto &[foreign_table, foreign_column, fk_type] = fk.ForeignKey();
-    ASSERT_RET(this->sstate_.TableExists(foreign_table), InvalidArgument,
-               "FK points to nonexisting table");
-    const Table &target = this->sstate_.GetTable(foreign_table);
+
+    // In case this is a self-referring FK.
+    bool self_fk = foreign_table == this->stmt_.table_name();
+    if (!self_fk) {
+      ASSERT_RET(this->sstate_.TableExists(foreign_table), InvalidArgument,
+                 "FK points to nonexisting table");
+    }
+
+    const Table &target =
+        self_fk ? this->table_ : this->sstate_.GetTable(foreign_table);
     ASSERT_RET(target.schema.HasColumn(foreign_column), InvalidArgument,
                "FK points to nonexisting column");
 
-    // Check if this points to the PK.
-    size_t index = target.schema.IndexOf(foreign_column);
-    bool points_to_pk = target.schema.keys().at(0) == index;
+    // Check if this points to the PK, handle various annotations.
+    bool foreign_owned, foreign_accessed, points_to_pk;
+    if (self_fk) {
+      foreign_owned = !annotations.explicit_owners.empty() ||
+                      !annotations.implicit_owners.empty() ||
+                      this->stmt_.IsDataSubject();
+      foreign_accessed = !annotations.accessors.empty() || foreign_owned;
+      points_to_pk =
+          this->stmt_.GetColumn(foreign_column)
+              .HasConstraint(sqlast::ColumnConstraint::Type::PRIMARY_KEY);
+    } else {
+      foreign_owned = this->sstate_.IsOwned(foreign_table);
+      foreign_accessed = this->sstate_.IsAccessed(foreign_table);
+      points_to_pk =
+          target.schema.keys().at(0) == target.schema.IndexOf(foreign_column);
+    }
 
-    // Handle various annotations.
-    bool foreign_owned = this->sstate_.IsOwned(foreign_table);
-    bool foreign_accessed = this->sstate_.IsAccessed(foreign_table);
     if (fk_type == sqlast::ColumnConstraint::FKType::OWNED_BY) {
       ASSERT_RET(foreign_owned, InvalidArgument, "OWNER to a non data subject");
       ASSERT_RET(points_to_pk, InvalidArgument, "OWNER doesn't point to PK");
+      ASSERT_RET(!self_fk, InvalidArgument, "OWNER on a self-referencing FK");
       annotations.explicit_owners.push_back(i);
     } else if (fk_type == sqlast::ColumnConstraint::FKType::ACCESSED_BY) {
       ASSERT_RET(foreign_accessed, InvalidArgument,
@@ -57,6 +75,7 @@ absl::StatusOr<CreateContext::Annotations> CreateContext::DiscoverValidate() {
       annotations.accessors.push_back(i);
     } else if (fk_type == sqlast::ColumnConstraint::FKType::OWNS) {
       ASSERT_RET(points_to_pk, InvalidArgument, "OWNS doesn't point to PK");
+      ASSERT_RET(!self_fk, InvalidArgument, "OWNS on a self-referencing FK");
       annotations.owns.push_back(i);
     } else if (fk_type == sqlast::ColumnConstraint::FKType::ACCESSES) {
       ASSERT_RET(points_to_pk, InvalidArgument, "ACCESSES doesn't point to PK");
@@ -99,7 +118,11 @@ std::vector<std::unique_ptr<ShardDescriptor>> CreateContext::MakeFDescriptors(
   const std::string &fk_colname = fk_col.column_name();
   const sqlast::ColumnConstraint &fk = fk_col.GetForeignKeyConstraint();
   const auto &[next_table, next_col, _] = fk.ForeignKey();
-  Table &tbl = this->sstate_.GetTable(next_table);
+
+  Table &tbl = next_table == this->table_name_
+                   ? this->table_
+                   : this->sstate_.GetTable(next_table);
+
   size_t next_col_index = tbl.schema.IndexOf(next_col);
   const std::vector<std::unique_ptr<ShardDescriptor>> &vec =
       owners ? tbl.owners : tbl.accessors;
@@ -117,11 +140,13 @@ std::vector<std::unique_ptr<ShardDescriptor>> CreateContext::MakeFDescriptors(
     // First time we see this shard_kind.
     ShardDescriptor descriptor;
     descriptor.shard_kind = shard_kind;
-    if (shard_kind == next_table) {  // Direct sharding.
+    if (shard_kind == next_table && next_table != this->table_name_) {
+      // Direct sharding.
       descriptor.type = InfoType::DIRECT;
       descriptor.info = DirectInfo{fk_colname, fk_column_index, fk_column_type,
                                    next_col, next_col_index};
-    } else {  // Transitive sharding.
+    } else {
+      // Transitive sharding.
       descriptor.type = InfoType::TRANSITIVE;
       IndexDescriptor *index = nullptr;
       if (create_indices) {
