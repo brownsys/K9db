@@ -166,7 +166,9 @@ CREATE TABLE messages (
   deleted_by_author int,
   deleted_by_recipient int,
   FOREIGN KEY (author_user_id) OWNED_BY users(id),
-  FOREIGN KEY (recipient_user_id) OWNED_BY users(id)
+  FOREIGN KEY (recipient_user_id) OWNED_BY users(id),
+  ON DEL author_user_id ANON (author_user_id),
+  ON DEL recipient_user_id ANON (recipient_user_id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8mb4;
 CREATE INDEX messages_short_id ON messages (short_id);
 CREATE INDEX messages_author ON messages (author_user_id);
@@ -238,7 +240,8 @@ CREATE TABLE suggested_taggings (
   tag_id int,
   user_id int,
   FOREIGN KEY (user_id) OWNED_BY users(id),
-  FOREIGN KEY (story_id) REFERENCES users(id)
+  FOREIGN KEY (story_id) REFERENCES users(id),
+  FOREIGN KEY (tag_id) ACCESSES tags(id)
 ) ENGINE=ROCKSDB DEFAULT CHARSET=utf8;
 CREATE INDEX suggested_taggings_user_id ON suggested_taggings (user_id);
 CREATE INDEX suggested_taggings_story_id ON suggested_taggings (story_id);
