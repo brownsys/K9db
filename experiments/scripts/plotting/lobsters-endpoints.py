@@ -106,7 +106,7 @@ def PlotLobstersMergedPercentiles(baseline, k9db, unencrypted):
   plt.ylabel("Latency [ms]")
   plt.xticks(X, [PLOT_LABELS[e] for e in ENDPOINTS], rotation=25, ha='right')
   plt.xlabel("Lobsters endpoint")
-  plt.ylim(ymax=30)
+  plt.ylim(ymax=35)
   plt.legend(frameon=False)
   plt.savefig(FLAGS.outdir + "/figure8.pdf", format="pdf", bbox_inches="tight", pad_inches=0.01)
 
