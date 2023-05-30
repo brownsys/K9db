@@ -59,9 +59,14 @@ as well as for a tutorial on our [basic operations](https://github.com/brownsys/
 Our wiki also covers more complex scenarios and features, including [shared data](https://github.com/brownsys/K9db/wiki/Shared-Data),
 [accessorship](https://github.com/brownsys/K9db/wiki/Ownership-vs-Access), and [dynamic/variable ownership](https://github.com/brownsys/K9db/wiki/Variable-Ownership).
 
-## Reproducing Our Results
+## Reproducing our OSDI'23 results.
 
-Checkout our wiki for [how to setup and run the experiments](https://github.com/brownsys/K9db/wiki/Experiments) from our OSDI paper.
+You can find the commit corresponding to our OSDI 2023 paper and artifact
+[here](https://github.com/brownsys/K9db/releases/tag/osdi2023).
+
+
+Checkout our wiki for [how to setup and run the experiments](https://github.com/brownsys/K9db/wiki/Experiments/c720b085ca34edc16246f296991e623a29933f9b) from our OSDI paper.
+The corresponding wiki commit hash is `c720b085ca34edc16246f296991e623a29933f9b`.
 
 ## Limitations and Known Issues.
 
