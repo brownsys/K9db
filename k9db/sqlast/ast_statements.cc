@@ -23,6 +23,18 @@ void Insert::SetColumns(std::vector<std::string> &&colname) {
 void Insert::SetValues(std::vector<Value> &&values) {
   this->values_ = std::move(values);
 }
+int Insert::HasValue(const std::string &colname) const {
+  if (this->HasColumns()) {
+    for (size_t i = 0; i < this->columns_.size(); i++) {
+      if (this->columns_.at(i) == colname) {
+        return i;
+      }
+    }
+    return -1;
+  } else {
+    return -1;
+  }
+}
 const Value &Insert::GetValue(const std::string &colname, size_t index) const {
   if (this->HasColumns()) {
     for (size_t i = 0; i < this->columns_.size(); i++) {

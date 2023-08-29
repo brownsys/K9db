@@ -24,6 +24,8 @@ absl::StatusOr<sql::SqlResult> ReplaceContext::Exec() {
   // Make sure table exists in the schema first.
   ASSERT_RET(this->sstate_.TableExists(this->table_name_), InvalidArgument,
              "Table does not exist");
+  ASSERT_RET(this->table_.auto_increments.size() > 0, InvalidArgument,
+             "REPLACE not supported for tables with AUTO_INCREMENT");
 
   // Begin the transaction.
   this->db_->BeginTransaction(true);

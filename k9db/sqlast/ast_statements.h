@@ -40,6 +40,7 @@ class Insert : public AbstractStatement {
   const std::vector<Value> &GetValues() const { return this->values_; }
 
   // Get by index or by column name, if stmt HasColumns.
+  int HasValue(const std::string &colname) const;
   const Value &GetValue(const std::string &colname, size_t index) const;
 
   // Visitor pattern.

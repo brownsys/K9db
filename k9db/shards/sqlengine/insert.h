@@ -5,6 +5,8 @@
 #include <string>
 #include <unordered_set>
 #include <utility>
+// NOLINTNEXTLINE
+#include <variant>
 #include <vector>
 
 #include "absl/status/statusor.h"
@@ -22,14 +24,47 @@ namespace k9db {
 namespace shards {
 namespace sqlengine {
 
+template <typename T>
+class RefOrOwned {
+ public:
+  static RefOrOwned<T> FromRef(const T &t) {
+    const T *ptr = &t;
+    return RefOrOwned<T>{V(std::in_place_type<const T *>, ptr)};
+  }
+  static RefOrOwned<T> FromOwned(T &&t) {
+    return RefOrOwned<T>{V(std::in_place_type<T>, std::move(t))};
+  }
+
+  const T &operator*() const {
+    if (this->data_.index() == 0) {
+      return *std::get<0>(this->data_);
+    } else {
+      return std::get<1>(this->data_);
+    }
+  }
+
+  const T *operator->() const {
+    if (this->data_.index() == 0) {
+      return std::get<0>(this->data_);
+    } else {
+      return &std::get<1>(this->data_);
+    }
+  }
+
+ private:
+  using V = std::variant<const T *, T>;
+  explicit RefOrOwned(V &&data) : data_(std::move(data)) {}
+  V data_;
+};
+
 class InsertContext {
  public:
   using Result = std::pair<std::vector<dataflow::Record>, int>;
 
   InsertContext(const sqlast::Insert &stmt, Connection *conn,
                 util::SharedLock *lock)
-      : stmt_(stmt),
-        table_name_(stmt_.table_name()),
+      : stmt_(RefOrOwned<sqlast::Insert>::FromRef(stmt)),
+        table_name_(stmt.table_name()),
         table_(conn->state->SharderState().GetTable(table_name_)),
         schema_(table_.schema),
         records_(),
@@ -52,6 +87,9 @@ class InsertContext {
   absl::Status VariableInsert(sqlast::Value &&fkval,
                               const ShardDescriptor &desc);
 
+  /* Add auto increment and default values. */
+  absl::Status AutoIncrementAndDefault();
+
   /* Inserting the statement into the database. */
   absl::StatusOr<int> InsertIntoBaseTable();
 
@@ -61,7 +99,7 @@ class InsertContext {
 
   /* Members. */
   // Statement being inserted.
-  const sqlast::Insert &stmt_;
+  RefOrOwned<sqlast::Insert> stmt_;
   const std::string &table_name_;
   const Table &table_;
   const dataflow::SchemaRef &schema_;
