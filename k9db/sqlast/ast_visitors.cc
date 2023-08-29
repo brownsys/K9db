@@ -76,6 +76,12 @@ std::string Stringifier::VisitColumnConstraint(const ColumnConstraint &ast) {
       }
       return str + tbl + "(" + col + ")";
     }
+    case ColumnConstraint::Type::DEFAULT: {
+      return "DEFAULT " + ast.Default().AsSQLString();
+    }
+    case ColumnConstraint::Type::AUTO_INCREMENT: {
+      return "AUTO_INCREMENT";
+    }
     default:
       LOG(FATAL) << "UNSUPPORTED COLUMN CONSTRAINT TYPE";
   }

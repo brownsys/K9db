@@ -33,6 +33,7 @@ class ColumnConstraint {
   static ColumnConstraint MakeForeignKey(const std::string &foreign_table,
                                          const std::string &foreign_column,
                                          FKType type);
+  static ColumnConstraint MakeDefault(const DefaultData &default_data);
 
   // Accessors.
   const Type &type() const { return this->type_; }
