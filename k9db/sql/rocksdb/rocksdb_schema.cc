@@ -4,6 +4,7 @@
 // clang-format on
 
 #include "glog/logging.h"
+#include "k9db/sql/rocksdb/dedup.h"
 #include "k9db/util/status.h"
 
 namespace k9db {
@@ -75,6 +76,48 @@ bool RocksdbConnection::ExecuteCreateIndex(const sqlast::CreateIndex &stmt) {
 bool RocksdbConnection::PersistCreateView(const sqlast::CreateView &sql) {
   this->metadata_.Persist(sql);
   return true;
+}
+
+// Get the max value for an INT column (for reloading auto increment counter).
+int64_t RocksdbConnection::GetMaximumValue(
+    const std::string &table_name, const std::string &column_name) const {
+  if (this->tables_.count(table_name) == 0) {
+    LOG(FATAL) << "Table does not exist";
+  }
+
+  // Find column in schema.
+  const RocksdbTable &table = this->tables_.at(table_name);
+  const dataflow::SchemaRef &schema = table.Schema();
+  size_t column_index = schema.IndexOf(column_name);
+  CHECK_EQ(schema.TypeOf(column_index), sqlast::ColumnDefinition::Type::INT)
+      << "GetMaximumValue() called for a non-INT column";
+
+  // Read all the rows.
+  int64_t max = 0;
+  RocksdbReadSnapshot txn(this->db_.get());
+  RocksdbStream all = table.GetAll(&txn);
+  DedupSet<std::string> dup_keys;
+  for (auto [enkey, enval] : all) {
+    // Decrypt key.
+    RocksdbSequence key = this->encryption_.DecryptKey(std::move(enkey));
+
+    // Use shard from decrypted key to decrypt value.
+    if (!dup_keys.Duplicate(key.At(1).ToString())) {
+      // Decrypt record.
+      std::string shard = key.At(0).ToString();
+      RocksdbSequence value =
+          this->encryption_.DecryptValue(shard, std::move(enval));
+
+      // Track max.
+      dataflow::Record record = value.DecodeRecord(schema, true);
+      int64_t v = record.GetInt(column_index);
+      if (v > max) {
+        max = v;
+      }
+    }
+  }
+
+  return max;
 }
 
 }  // namespace rocks

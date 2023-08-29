@@ -275,6 +275,29 @@ absl::StatusOr<sql::SqlResult> CreateContext::Exec() {
   const std::string &pk_col =
       this->stmt_.GetColumns().at(pk_index).column_name();
 
+  // Track any AUTO_INCREMENT and DEFAULT columns.
+  for (const sqlast::ColumnDefinition &column : this->stmt_.GetColumns()) {
+    if (column.HasConstraint(sqlast::ColumnConstraint::Type::AUTO_INCREMENT)) {
+      size_t idx = this->schema_.IndexOf(column.column_name());
+      ASSERT_RET(
+          this->schema_.TypeOf(idx) == sqlast::ColumnDefinition::Type::INT,
+          InvalidArgument, "AUTO_INCREMENT column must be INT");
+      ASSERT_RET(this->table_.defaults.count(column.column_name()) == 0,
+                 InvalidArgument, "AUTO_INCREMENT column cannot have default");
+      this->table_.auto_increments.insert(column.column_name());
+    }
+    if (column.HasConstraint(sqlast::ColumnConstraint::Type::DEFAULT)) {
+      const sqlast::ColumnConstraint &constraint =
+          column.GetConstraintOfType(sqlast::ColumnConstraint::Type::DEFAULT);
+      size_t idx = this->schema_.IndexOf(column.column_name());
+      ASSERT_RET(constraint.Default().TypeCompatible(this->schema_.TypeOf(idx)),
+                 InvalidArgument, "DEFAULT value incompatible with column");
+      ASSERT_RET(this->table_.auto_increments.count(column.column_name()) == 0,
+                 InvalidArgument, "AUTO_INCREMENT column cannot have default");
+      this->table_.defaults.emplace(column.column_name(), constraint.Default());
+    }
+  }
+
   // Discover annotations and handle any errors.
   MOVE_OR_RETURN(Annotations annotations, this->DiscoverValidate());
 
@@ -358,6 +381,14 @@ absl::StatusOr<sql::SqlResult> CreateContext::Exec() {
     CHECK_STATUS(this->sstate_.AddTableAccessor(fk_table, std::move(v)));
   }
   /* End of ACCESSES. */
+
+  /* Reload the value of the atomic counter (for auto increment) in case
+     this is a recreation of an existing table after restart. */
+  if (table_ptr->auto_increments.size() > 0) {
+    const std::string &column = *table_ptr->auto_increments.begin();
+    int64_t max = this->db_->GetMaximumValue(this->table_name_, column);
+    table_ptr->counter = std::make_unique<std::atomic<int64_t>>(max + 1);
+  }
 
   return result;
 }

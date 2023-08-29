@@ -89,7 +89,8 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
   // First, make sure PK does not exist! (this also locks).
   size_t pk = this->schema_.keys().front();
   const std::string &pkcol = this->schema_.NameOf(pk);
-  sqlast::Value pkval = this->stmt_.GetValue(pkcol, pk);
+
+  sqlast::Value pkval = this->stmt_->GetValue(pkcol, pk);
   if (this->db_->Exists(this->table_name_, pkval)) {
     return absl::InvalidArgumentError("PK exists!");
   }
@@ -109,7 +110,7 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
                  "Variable OWNS FK points to nonPK");
 
       // Ensure record exists and lock it.
-      sqlast::Value fkval = this->stmt_.GetValue(colname, colidx);
+      sqlast::Value fkval = this->stmt_->GetValue(colname, colidx);
       if (!this->db_->Exists(next_table, fkval)) {
         return absl::InvalidArgumentError("Integrity error(3): " + colname);
       }
@@ -121,7 +122,7 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
     // Identify value of the column along which we are sharding.
     size_t colidx = EXTRACT_VARIANT(column_index, desc->info);
     const std::string &colname = EXTRACT_VARIANT(column, desc->info);
-    sqlast::Value val = this->stmt_.GetValue(colname, colidx);
+    sqlast::Value val = this->stmt_->GetValue(colname, colidx);
     if (val.IsNull()) {
       continue;
     }
@@ -154,13 +155,13 @@ absl::StatusOr<int> InsertContext::InsertIntoBaseTable() {
   if (this->shards_.size() > 0) {
     int result = 0;
     for (const util::ShardName &shard_name : this->shards_) {
-      ACCUM(this->db_->ExecuteInsert(this->stmt_, shard_name), result);
+      ACCUM(this->db_->ExecuteInsert(*this->stmt_, shard_name), result);
     }
     return result;
   } else {
     // If no OWNERs detected, we insert into global/default shard.
     util::ShardName shard_name(DEFAULT_SHARD, DEFAULT_SHARD);
-    int status = this->db_->ExecuteInsert(this->stmt_, shard_name);
+    int status = this->db_->ExecuteInsert(*this->stmt_, shard_name);
     // If table is owned by someone but we inserted into default shard,
     // track orphaned data in CTX.
     if (status >= 0 && this->table_.owners.size() > 0) {
@@ -226,6 +227,63 @@ absl::StatusOr<int> InsertContext::CascadeDependents() {
 }
 
 /*
+ * Add auto increment and default values.
+ */
+absl::Status InsertContext::AutoIncrementAndDefault() {
+  // Statement does not specify columns: must insert to all columns, cannot
+  // have auto increments.
+  if (!this->stmt_->HasColumns()) {
+    ASSERT_RET(this->stmt_->GetValues().size() == this->schema_.size(),
+               InvalidArgument,
+               "Column-less insert statement must insert to all columns");
+    ASSERT_RET(this->table_.auto_increments.size() == 0, InvalidArgument,
+               "Column-less insert statement against AUTO_INCREMENT table");
+    return absl::OkStatus();
+  }
+
+  // No AUTO_INCREMENT: can early return if statement inserts to all columns.
+  if (this->table_.auto_increments.size() == 0) {
+    if (this->stmt_->GetValues().size() == this->schema_.size()) {
+      return absl::OkStatus();
+    }
+  }
+
+  // Find missing columns, they must all be AUTO_INCREMENT or have a default.
+  int64_t counter = -1;
+  if (this->table_.auto_increments.size() > 0) {
+    counter = (*this->table_.counter)++;
+  }
+
+  size_t found = 0;
+  std::vector<sqlast::Value> values;
+  for (size_t i = 0; i < this->schema_.size(); i++) {
+    const std::string &column = this->schema_.NameOf(i);
+    int idx = this->stmt_->HasValue(column);
+    if (idx > -1) {
+      found++;
+      values.push_back(this->stmt_->GetValues().at(idx));
+    } else {
+      // column is missing, maybe it has a default or auto_increment.
+      if (this->table_.auto_increments.count(column) > 0) {
+        values.emplace_back(counter);
+      } else if (this->table_.defaults.count(column) > 0) {
+        values.push_back(this->table_.defaults.at(column));
+      } else {
+        return absl::InvalidArgumentError("Insert leaves a column valueless");
+      }
+    }
+  }
+  ASSERT_RET(found == this->stmt_->GetValues().size(), InvalidArgument,
+             "Insert statement targets non-existing column");
+
+  // Store new statement.
+  sqlast::Insert stmt{this->table_name_};
+  stmt.SetValues(std::move(values));
+  this->stmt_ = RefOrOwned<sqlast::Insert>::FromOwned(std::move(stmt));
+  return absl::OkStatus();
+}
+
+/*
  * Main entry point for insert: Executes the statement against the shards.
  */
 absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
@@ -233,12 +291,15 @@ absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
   ASSERT_RET(this->sstate_.TableExists(this->table_name_), InvalidArgument,
              "Table does not exist");
 
+  // Apply any auto_increment and default values.
+  CHECK_STATUS(this->AutoIncrementAndDefault());
+
   // Begin the transaction.
   this->db_->BeginTransaction(true);
   CHECK_STATUS(this->conn_->ctx->AddCheckpoint());
 
   // The inserted record to feed to dataflow engine.
-  this->records_.push_back(this->dstate_.CreateRecord(this->stmt_));
+  this->records_.push_back(this->dstate_.CreateRecord(*this->stmt_));
 
   // Insert this statement into the physical shards.
   ASSIGN_OR_RETURN(int status, this->InsertIntoBaseTable());

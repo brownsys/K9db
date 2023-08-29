@@ -23,6 +23,10 @@ std::string ColumnConstraint::TypeToString(Type type) {
       return "UNIQUE";
     case Type::FOREIGN_KEY:
       return "FOREIGN KEY";
+    case Type::DEFAULT:
+      return "DEFAULT";
+    case Type::AUTO_INCREMENT:
+      return "AUTO_INCREMENT";
     default:
       LOG(FATAL) << "Unsupported constraint type!";
   }
@@ -31,6 +35,7 @@ std::string ColumnConstraint::TypeToString(Type type) {
 // Constructor is private: use these functions to create.
 ColumnConstraint ColumnConstraint::Make(Type type) {
   CHECK(type != Type::FOREIGN_KEY);
+  CHECK(type != Type::DEFAULT);
   return ColumnConstraint(type);
 }
 ColumnConstraint ColumnConstraint::MakeForeignKey(
@@ -40,7 +45,12 @@ ColumnConstraint ColumnConstraint::MakeForeignKey(
   constraint.data_ = ForeignKeyData(foreign_table, foreign_column, type);
   return constraint;
 }
-
+ColumnConstraint ColumnConstraint::MakeDefault(
+    const DefaultData &default_data) {
+  ColumnConstraint constraint(Type::DEFAULT);
+  constraint.data_ = default_data;
+  return constraint;
+}
 /*
  * ColumnDefinition.
  */

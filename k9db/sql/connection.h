@@ -110,6 +110,8 @@ class Connection {
   virtual bool ExecuteCreateTable(const sqlast::CreateTable &sql) = 0;
   virtual bool ExecuteCreateIndex(const sqlast::CreateIndex &sql) = 0;
   virtual bool PersistCreateView(const sqlast::CreateView &sql) = 0;
+  virtual int64_t GetMaximumValue(const std::string &table_name,
+                                  const std::string &column_name) const = 0;
 
   // Opening a session.
   virtual std::unique_ptr<Session> OpenSession() = 0;

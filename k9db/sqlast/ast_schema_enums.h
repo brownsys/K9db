@@ -10,6 +10,8 @@ enum ColumnConstraintTypeEnum {
   UNIQUE,
   FOREIGN_KEY,
   NOT_NULL,
+  AUTO_INCREMENT,
+  DEFAULT,
 };
 enum ForeignKeyTypeEnum {
   OWNED_BY,

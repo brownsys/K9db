@@ -1,6 +1,8 @@
 #ifndef K9DB_SHARDS_TYPES_H_
 #define K9DB_SHARDS_TYPES_H_
 
+// NOLINTNEXTLINE
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -139,6 +141,10 @@ struct Table {
   TableName table_name;
   dataflow::SchemaRef schema;
   sqlast::CreateTable create_stmt;
+  // Auto increment and defaults.
+  std::unique_ptr<std::atomic<int64_t>> counter;
+  std::unordered_set<ColumnName> auto_increments;
+  std::unordered_map<ColumnName, sqlast::Value> defaults;
   // owners.size() > 0 <=> sharded table.
   std::vector<std::unique_ptr<ShardDescriptor>> owners;
   std::vector<std::unique_ptr<ShardDescriptor>> accessors;

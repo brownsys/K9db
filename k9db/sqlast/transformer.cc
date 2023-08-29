@@ -187,9 +187,8 @@ antlrcpp::Any AstTransformer::visitColumn_def(
 antlrcpp::Any AstTransformer::visitColumn_constraint(
     sqlparser::SQLiteParser::Column_constraintContext *ctx) {
   if (ctx->asc_desc() != nullptr || ctx->conflict_clause() != nullptr ||
-      ctx->CHECK() != nullptr || ctx->DEFAULT() != nullptr ||
-      ctx->COLLATE() != nullptr || ctx->AS() != nullptr ||
-      ctx->CONSTRAINT() != nullptr || ctx->AUTOINCREMENT() != nullptr) {
+      ctx->CHECK() != nullptr || ctx->COLLATE() != nullptr ||
+      ctx->AS() != nullptr || ctx->CONSTRAINT() != nullptr) {
     return absl::InvalidArgumentError("Invalid inline constraint");
   }
   if (ctx->NOT() != nullptr) {
@@ -206,6 +205,20 @@ antlrcpp::Any AstTransformer::visitColumn_constraint(
   if (ctx->foreign_key_clause() != nullptr) {
     CAST_REF(ColumnConstraint, fk, ctx->foreign_key_clause()->accept(this));
     return fk;
+  }
+  if (ctx->AUTOINCREMENT() != nullptr) {
+    return ColumnConstraint::Make(ColumnConstraint::Type::AUTO_INCREMENT);
+  }
+  if (ctx->DEFAULT() != nullptr) {
+    if (ctx->literal_value() != nullptr) {
+      CAST_REF(Value, val, ctx->literal_value()->accept(this));
+      return ColumnConstraint::MakeDefault(val);
+    }
+    if (ctx->signed_number() != nullptr) {
+      CAST_REF(Value, val, ctx->signed_number()->accept(this));
+      return ColumnConstraint::MakeDefault(val);
+    }
+    return absl::InvalidArgumentError("Default value is an expression");
   }
   return absl::InvalidArgumentError("Unrecognized column constraint");
 }
@@ -728,7 +741,7 @@ antlrcpp::Any AstTransformer::visitRelease_stmt(
 }
 antlrcpp::Any AstTransformer::visitSigned_number(
     sqlparser::SQLiteParser::Signed_numberContext *ctx) {
-  return absl::InvalidArgumentError("Unsupported Syntax");
+  return Value::FromSQLString(ctx->getText());
 }
 antlrcpp::Any AstTransformer::visitConflict_clause(
     sqlparser::SQLiteParser::Conflict_clauseContext *ctx) {
