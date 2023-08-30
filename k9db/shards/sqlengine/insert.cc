@@ -249,6 +249,11 @@ absl::Status InsertContext::AutoIncrementAndDefault() {
   }
 
   // Find missing columns, they must all be AUTO_INCREMENT or have a default.
+  int64_t counter = -1;
+  if (this->table_.auto_increments.size() > 0) {
+    counter = (*this->table_.counter)++;
+  }
+
   size_t found = 0;
   std::vector<sqlast::Value> values;
   for (size_t i = 0; i < this->schema_.size(); i++) {
@@ -260,8 +265,7 @@ absl::Status InsertContext::AutoIncrementAndDefault() {
     } else {
       // column is missing, maybe it has a default or auto_increment.
       if (this->table_.auto_increments.count(column) > 0) {
-        int64_t v = this->table_.auto_increments.at(column)++;
-        values.emplace_back(v);
+        values.emplace_back(counter);
       } else if (this->table_.defaults.count(column) > 0) {
         values.push_back(this->table_.defaults.at(column));
       } else {

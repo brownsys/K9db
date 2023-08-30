@@ -284,7 +284,7 @@ absl::StatusOr<sql::SqlResult> CreateContext::Exec() {
           InvalidArgument, "AUTO_INCREMENT column must be INT");
       ASSERT_RET(this->table_.defaults.count(column.column_name()) == 0,
                  InvalidArgument, "AUTO_INCREMENT column cannot have default");
-      this->table_.auto_increments.emplace(column.column_name(), 1);
+      this->table_.auto_increments.insert(column.column_name());
     }
     if (column.HasConstraint(sqlast::ColumnConstraint::Type::DEFAULT)) {
       const sqlast::ColumnConstraint &constraint =
@@ -381,6 +381,14 @@ absl::StatusOr<sql::SqlResult> CreateContext::Exec() {
     CHECK_STATUS(this->sstate_.AddTableAccessor(fk_table, std::move(v)));
   }
   /* End of ACCESSES. */
+
+  /* Reload the value of the atomic counter (for auto increment) in case
+     this is a recreation of an existing table after restart. */
+  if (table_ptr->auto_increments.size() > 0) {
+    const std::string &column = *table_ptr->auto_increments.begin();
+    int64_t max = this->db_->GetMaximumValue(this->table_name_, column);
+    table_ptr->counter = std::make_unique<std::atomic<int64_t>>(max + 1);
+  }
 
   return result;
 }

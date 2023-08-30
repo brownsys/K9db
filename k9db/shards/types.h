@@ -142,7 +142,8 @@ struct Table {
   dataflow::SchemaRef schema;
   sqlast::CreateTable create_stmt;
   // Auto increment and defaults.
-  mutable std::unordered_map<ColumnName, std::atomic<int64_t>> auto_increments;
+  std::unique_ptr<std::atomic<int64_t>> counter;
+  std::unordered_set<ColumnName> auto_increments;
   std::unordered_map<ColumnName, sqlast::Value> defaults;
   // owners.size() > 0 <=> sharded table.
   std::vector<std::unique_ptr<ShardDescriptor>> owners;

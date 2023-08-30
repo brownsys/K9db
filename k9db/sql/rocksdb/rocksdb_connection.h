@@ -45,6 +45,8 @@ class RocksdbConnection : public Connection {
   bool ExecuteCreateTable(const sqlast::CreateTable &sql) override;
   bool ExecuteCreateIndex(const sqlast::CreateIndex &sql) override;
   bool PersistCreateView(const sqlast::CreateView &sql) override;
+  int64_t GetMaximumValue(const std::string &table_name,
+                          const std::string &column_name) const override;
 
   // Opening a session.
   std::unique_ptr<Session> OpenSession() override;
