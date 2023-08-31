@@ -101,7 +101,7 @@ std::string Stringifier::VisitAnonymizationRule(const AnonymizationRule &ast) {
 
   const std::vector<std::string> &columns = ast.GetAnonymizeColumns();
   if (columns.size() == 0) {
-    str += " DELETE_ROW";
+    str += ast.GetDataSubject() + " DELETE_ROW";
   } else {
     str += ast.GetDataSubject() + " ANON (";
     for (const std::string &column : columns) {

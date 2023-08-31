@@ -206,6 +206,16 @@ void DataFlowGraphGenerator::AddProjectionLiteralInt(NodeIndex project,
   // Add projection to project
   pop->AddLiteralProjection(name, value);
 }
+void DataFlowGraphGenerator::AddProjectionLiteralUInt(NodeIndex project,
+                                                      const std::string &name,
+                                                      uint64_t value) {
+  // Get project operator.
+  Operator *ptr = this->graph_->GetNode(project);
+  CHECK(ptr->type() == Operator::Type::PROJECT);
+  ProjectOperator *pop = static_cast<ProjectOperator *>(ptr);
+  // Add projection to project
+  pop->AddLiteralProjection(name, value);
+}
 void DataFlowGraphGenerator::AddProjectionLiteralString(
     NodeIndex project, const std::string &name, const std::string &value) {
   // Get project operator.

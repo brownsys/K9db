@@ -12,6 +12,7 @@ slog = { version = "2.7.0" }
 slog-term = "2.8.0"
 gflags = "0.3.11"
 regex = "0.2.11"
+chrono = "0.4.19"
 
 [build-dependencies]
 bindgen = "0.32.2"

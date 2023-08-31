@@ -21,6 +21,7 @@
 #include "k9db/dataflow/state.h"
 #include "k9db/planner/planner.h"
 #include "k9db/sql/connection.h"
+#include "k9db/util/status.h"
 
 namespace k9db {
 namespace shards {
@@ -34,14 +35,21 @@ namespace view {
 absl::StatusOr<sql::SqlResult> CreateView(const sqlast::CreateView &stmt,
                                           Connection *connection,
                                           util::UniqueLock *lock) {
+  std::string flow_name = stmt.view_name();
+
+  // Make sure a table or a view with the same name does not exist.
+  const SharderState &sstate = connection->state->SharderState();
   dataflow::DataFlowState &dataflow_state = connection->state->DataflowState();
+  ASSERT_RET(!sstate.TableExists(flow_name), InvalidArgument,
+             "Table with the same name exists!");
+  ASSERT_RET(!dataflow_state.HasFlow(flow_name), InvalidArgument,
+             "View with the same name exists!");
 
   // Plan the query using calcite and generate a concrete graph for it.
   std::unique_ptr<dataflow::DataFlowGraphPartition> graph =
       planner::PlanGraph(&dataflow_state, stmt.query());
 
   // Add The flow to state so that data is fed into it on INSERT/UPDATE/DELETE.
-  std::string flow_name = stmt.view_name();
   dataflow_state.AddFlow(flow_name, std::move(graph));
 
   // Update new View with existing data in tables.

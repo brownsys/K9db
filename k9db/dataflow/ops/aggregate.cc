@@ -11,12 +11,12 @@ void AggregateOperator::ComputeOutputSchema() {
   this->state_.Initialize(false);
 
   // Figure out the aggregate column information.
-  if (aggregate_function_ == Function::COUNT) {
+  if (this->aggregate_function_ == Function::COUNT) {
     if (this->aggregate_column_name_ == "") {
       this->aggregate_column_name_ = "Count";
     }
     this->aggregate_column_type_ = sqlast::ColumnDefinition::Type::UINT;
-  } else {
+  } else if (this->aggregate_function_ == Function::SUM) {
     if (this->aggregate_column_name_ == "") {
       this->aggregate_column_name_ = "Sum";
     }
@@ -36,8 +36,10 @@ void AggregateOperator::ComputeOutputSchema() {
     out_column_types.push_back(this->input_schemas_.at(0).TypeOf(cid));
   }
   // Add another column for the aggregate.
-  out_column_names.push_back(this->aggregate_column_name_);
-  out_column_types.push_back(this->aggregate_column_type_);
+  if (this->aggregate_function_ != Function::NO_AGGREGATE) {
+    out_column_names.push_back(this->aggregate_column_name_);
+    out_column_types.push_back(this->aggregate_column_type_);
+  }
 
   // Construct out_keys.
   // The key for the produced aggregated records are the columns that were
@@ -66,7 +68,9 @@ Record AggregateOperator::EmitRecord(const Key &key,
   for (size_t i = 0; i < key.size(); i++) {
     result.SetValue(key.value(i), i);
   }
-  result.SetValue(aggregate, this->output_schema_.size() - 1);
+  if (this->aggregate_function_ != Function::NO_AGGREGATE) {
+    result.SetValue(aggregate, this->output_schema_.size() - 1);
+  }
   return result;
 }
 
@@ -86,6 +90,7 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
   for (const Record &record : records) {
     Key group_key = record.GetValues(this->group_columns_);
     switch (this->aggregate_function_) {
+      case Function::NO_AGGREGATE:
       case Function::COUNT: {
         if (!record.IsPositive()) {
           // Negative record: decrement value in state by -1.

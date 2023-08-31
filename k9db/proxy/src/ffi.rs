@@ -20,6 +20,7 @@ pub mod k9db {
   // Dependencies from ffi crate.
   use std::ffi::{CStr, CString};
   use std::os::raw::{c_char, c_int};
+  use chrono::naive::NaiveDateTime;
 
   // Command line flags.
   pub struct CommandLineArgs {
@@ -177,12 +178,13 @@ pub mod k9db {
     pub fn datetime<'a>(c_result: FFIResult,
                         row: usize,
                         col: usize)
-                        -> &'a str {
+                        -> NaiveDateTime {
       let cstr = unsafe {
         let ptr = ffi::FFIResultGetDatetime(c_result, row, col);
         CStr::from_ptr(ptr)
       };
-      cstr.to_str().unwrap()
+      let rstr = cstr.to_str().unwrap();
+      NaiveDateTime::parse_from_str(rstr, "%Y-%m-%d %H:%M:%S%.f").unwrap()
     }
 
     // Destory.

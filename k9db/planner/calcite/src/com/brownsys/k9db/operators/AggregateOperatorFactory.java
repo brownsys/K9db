@@ -24,34 +24,39 @@ public class AggregateOperatorFactory {
       keyTranslation.put(groupCols[i], i);
     }
 
-    // We only support a single aggregate function per operator at the moment
-    assert aggregate.getAggCallList().size() == 1;
-    AggregateCall aggCall = aggregate.getAggCallList().get(0);
-    int functionEnum = -1;
-    int aggCol = -1;
-    switch (aggCall.getAggregation().getKind()) {
-      case COUNT:
-        functionEnum = DataFlowGraphLibrary.COUNT;
-        // Count does not have an aggregate column, for safety the data flow
-        // operator also does not depend on it.
-        assert aggCall.getArgList().size() == 0;
-        aggCol = -1;
-        break;
-      case SUM:
-        functionEnum = DataFlowGraphLibrary.SUM;
-        assert aggCall.getArgList().size() == 1;
-        aggCol = this.context.getK9dbIndex(aggCall.getArgList().get(0));
-        break;
-      default:
-        throw new IllegalArgumentException("Invalid aggregate function");
-    }
+    // We only support a single or no aggregate function per operator at the moment.
+    int functionEnum = DataFlowGraphLibrary.NO_AGGREGATE;
+    int aggCol = 0;
+    String aggName = "";
+    if (aggregate.getAggCallList().size() > 0) {
+      assert aggregate.getAggCallList().size() == 1;
+      AggregateCall aggCall = aggregate.getAggCallList().get(0);
+      switch (aggCall.getAggregation().getKind()) {
+        case COUNT:
+          functionEnum = DataFlowGraphLibrary.COUNT;
+          // Count does not have an aggregate column, for safety the data flow
+          // operator also does not depend on it.
+          assert aggCall.getArgList().size() == 0;
+          aggCol = -1;
+          break;
+        case SUM:
+          functionEnum = DataFlowGraphLibrary.SUM;
+          assert aggCall.getArgList().size() == 1;
+          aggCol = this.context.getK9dbIndex(aggCall.getArgList().get(0));
+          break;
+        default:
+          throw new IllegalArgumentException("Invalid aggregate function");
+      }
 
-    this.context.identityTranslation(groupCols.length + 1, keyTranslation);
+      this.context.identityTranslation(groupCols.length + 1, keyTranslation);
 
-    // Get any alias assigned to the aggregate column.
-    String aggName = aggregate.getRowType().getFieldNames().get(groupCols.length);
-    if (aggName.startsWith("EXPR$")) {
-      aggName = "";
+      // Get any alias assigned to the aggregate column.
+      aggName = aggregate.getRowType().getFieldNames().get(groupCols.length);
+      if (aggName.startsWith("EXPR$")) {
+        aggName = "";
+      }
+    } else {
+      this.context.identityTranslation(groupCols.length, keyTranslation);
     }
 
     return this.context

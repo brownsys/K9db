@@ -143,9 +143,15 @@ public class ProjectOperatorFactory {
       case DECIMAL:
       case INTEGER:
         this.calciteToK9dbTarget.put(this.targetCalciteIndex, targetK9dbIndex);
-        this.context
-            .getGenerator()
-            .AddProjectionLiteralInt(projectOperator, name, RexLiteral.intValue(literal));
+        if (name.startsWith("U_")) {
+          this.context
+              .getGenerator()
+              .AddProjectionLiteralUInt(projectOperator, name, RexLiteral.intValue(literal));
+        } else {
+          this.context
+              .getGenerator()
+              .AddProjectionLiteralInt(projectOperator, name, RexLiteral.intValue(literal));
+        }
         break;
       case VARCHAR:
       case CHAR:
