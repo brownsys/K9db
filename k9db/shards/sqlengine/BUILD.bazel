@@ -287,6 +287,7 @@ cc_library(
         "//k9db/sql:connection",
         "//k9db/sql:result",
         "//k9db/sql/rocksdb:filter",
+        "//k9db/sql/rocksdb:project",
         "//k9db/sqlast:ast",
         "//k9db/sqlast:value_mapper",
         "//k9db/util:status",

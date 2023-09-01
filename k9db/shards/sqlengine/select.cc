@@ -6,6 +6,7 @@
 #include "glog/logging.h"
 #include "k9db/shards/sqlengine/index.h"
 #include "k9db/sql/rocksdb/filter.h"
+#include "k9db/sql/rocksdb/project.h"
 #include "k9db/util/status.h"
 
 namespace k9db {
@@ -130,6 +131,17 @@ absl::StatusOr<sql::SqlResult> SelectContext::ExecWithinTransaction() {
       }
       records = std::move(filtered);
     }
+    // Apply projection, if any.
+    sql::rocks::Projection proj =
+        sql::rocks::ProjectionSchema(this->schema_, this->stmt_.GetColumns());
+    if (proj.schema != this->schema_) {
+      std::vector<dataflow::Record> vec;
+      for (const dataflow::Record &record : records) {
+        vec.push_back(sql::rocks::Project(proj, record));
+      }
+      return sql::SqlResult(sql::SqlResultSet(proj.schema, std::move(vec)));
+    }
+
     return sql::SqlResult(sql::SqlResultSet(this->schema_, std::move(records)));
   }
 

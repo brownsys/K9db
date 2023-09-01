@@ -148,6 +148,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        && !stmt.starts_with("UPDATE")
        && !stmt.starts_with("INSERT")
        && !stmt.starts_with("REPLACE")
+       && !stmt.starts_with("DELETE")
     {
       error!(self.log, "Rust proxy: unsupported prepared statement {}", stmt);
       return info.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);

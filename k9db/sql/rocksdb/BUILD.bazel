@@ -152,6 +152,7 @@ cc_library(
     hdrs = [
         "project.h",
     ],
+    visibility = ["//k9db:__subpackages__"],
     deps = [
         "//k9db/dataflow:record",
         "//k9db/dataflow:schema",

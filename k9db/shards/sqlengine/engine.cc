@@ -97,8 +97,12 @@ absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
       auto *stmt = static_cast<sqlast::CreateView *>(statement.get());
       util::UniqueLock lock = connection->state->WriterLock();
       CHECK_STATUS(view::CreateView(*stmt, connection, &lock));
-      bool persisted = connection->state->Database()->PersistCreateView(*stmt);
-      return sql::SqlResult(persisted);
+      // Persist explicit views, not prepared statements.
+      bool ok = true;
+      if (stmt->view_name()[0] != '_') {
+        ok = connection->state->Database()->PersistCreateView(*stmt);
+      }
+      return sql::SqlResult(ok);
     }
 
     // Case 7: CREATE INDEX statement.
