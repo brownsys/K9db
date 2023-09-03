@@ -9,6 +9,7 @@ extern crate lazy_static;
 extern crate msql_srv;
 extern crate slog_term;
 
+use chrono::naive::NaiveDateTime;
 use ffi::k9db;
 use msql_srv::*;
 use slog::Drain;
@@ -27,7 +28,7 @@ fn convert_type(coltype: k9db::FFIColumnType) -> msql_srv::ColumnType {
     k9db::FFIColumnType_UINT => ColumnType::MYSQL_TYPE_LONGLONG,
     k9db::FFIColumnType_INT => ColumnType::MYSQL_TYPE_LONGLONG,
     k9db::FFIColumnType_TEXT => ColumnType::MYSQL_TYPE_VAR_STRING,
-    k9db::FFIColumnType_DATETIME => ColumnType::MYSQL_TYPE_VAR_STRING,
+    k9db::FFIColumnType_DATETIME => ColumnType::MYSQL_TYPE_DATETIME,
     _ => ColumnType::MYSQL_TYPE_NULL,
   }
 }
@@ -74,6 +75,10 @@ fn stringify_parameter(param: msql_srv::ParamValue) -> String {
         ValueInner::Double(v) => (v.floor() as i64).to_string(),
         _ => unimplemented!("Rust proxy: unsupported double type"),
       }
+    },
+    ColumnType::MYSQL_TYPE_DATETIME => {
+      let datetime: NaiveDateTime = param.value.into();
+      datetime.format("'%Y-%m-%d %H:%M:%S%.f'").to_string()
     }
     _ => unimplemented!("Rust proxy: unsupported parameter type"),
   }
@@ -187,10 +192,10 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 results: QueryResultWriter<W>)
                 -> io::Result<()> {
     // Push all parameters (in order) into args formatted by type.
-    let mut args: Vec<String> = Vec::new();
-    for param in params.into_iter() {
-      args.push(stringify_parameter(param));
-    }
+    let args: Vec<String> = params
+        .into_iter()
+        .map(|param| stringify_parameter(param))
+        .collect();
 
     // Call k9db via ffi.
     let response = k9db::exec_prepare(self.rust_conn, stmt_id, args);

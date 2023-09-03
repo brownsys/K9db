@@ -75,6 +75,8 @@ class DataFlowGraphGenerator {
 
   void AddProjectionLiteralInt(NodeIndex project, const std::string &name,
                                int64_t value);
+  void AddProjectionLiteralUInt(NodeIndex project, const std::string &name,
+                                uint64_t value);
   void AddProjectionLiteralString(NodeIndex project, const std::string &name,
                                   const std::string &value);
 

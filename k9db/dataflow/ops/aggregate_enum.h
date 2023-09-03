@@ -4,7 +4,7 @@
 namespace k9db {
 namespace dataflow {
 
-enum AggregateFunctionEnum { COUNT, SUM };
+enum AggregateFunctionEnum { NO_AGGREGATE, COUNT, SUM };
 
 }  // namespace dataflow
 }  // namespace k9db

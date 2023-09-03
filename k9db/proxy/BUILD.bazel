@@ -32,6 +32,7 @@ rust_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":ffi",
+        "//k9db/proxy/cargo:chrono",
         "//k9db/proxy/cargo:gflags",
         "//k9db/proxy/cargo:lazy_static",
         "//k9db/proxy/cargo:msql_srv",
@@ -53,6 +54,7 @@ rust_library(
         ":ffi_wrappers",
     ],
     deps = [
+        "//k9db/proxy/cargo:chrono",
         "//k9db/proxy/cargo:msql_srv",
     ],
 )

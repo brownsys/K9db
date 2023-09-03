@@ -97,13 +97,15 @@ std::vector<std::string> RocksdbMetadata::Initialize(
       std::string view_name = "";
       for (size_t i = 12; i < stmt.size(); i++) {
         if (StartsWith(stmt, " AS ", i)) {
-          view_name = stmt.substr(12, i);
+          view_name = stmt.substr(12, i - 12);
+          break;
         }
       }
       this->persisted_views_.insert(view_name);
     }
     result.push_back(std::move(stmt));
   }
+
   this->counter_ = result.size();
   return result;
 }

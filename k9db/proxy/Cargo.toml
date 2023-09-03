@@ -13,6 +13,7 @@ slog = { version = "2.7.0" } #features = ["max_level_error", "release_max_level_
 slog-term = "2.8.0"
 gflags = "0.3"
 regex = "0.2"
+chrono = "0.4.19"
 
 [build-dependencies]
 bindgen = "0.32.2"
