@@ -40,7 +40,7 @@ RUN cd /tmp \
 
 # install rust
 RUN curl https://sh.rustup.rs | sh -s -- -y
-RUN /root/.cargo/bin/cargo install cargo-raze
+RUN /root/.cargo/bin/cargo install --version 0.15.0 cargo-raze
 
 # install mariadb (for baselines only)
 RUN apt-get remove -y --purge mysql*
