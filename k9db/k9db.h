@@ -14,6 +14,7 @@
 #include "k9db/shards/state.h"
 #include "k9db/shards/types.h"
 #include "k9db/sql/result.h"
+#include "k9db/util/error.h"
 
 namespace k9db {
 
@@ -23,6 +24,10 @@ using SqlResultSet = sql::SqlResultSet;
 using Schema = dataflow::SchemaRef;
 using Record = dataflow::Record;
 using PreparedStatement = prepared::PreparedStatementDescriptor;
+using Error = ::k9db::util::Error;
+
+template <typename T>
+using ErrorOr = ::k9db::util::ErrorOr<T>;
 
 // initialize k9db_state
 bool initialize(size_t workers, bool consistent, const std::string &db_name,

@@ -26,7 +26,7 @@ using CType = FFIColumnType;
 void DropDatabase() { std::filesystem::remove_all("/tmp/k9db_" DB_NAME); }
 
 // Check that a result has this row (since order can be arbitrary).
-bool HasRow(FFIResult result, int id, const std::string &name) {
+bool HasRow(FFIQueryResult result, int id, const std::string &name) {
   for (size_t i = 0; i < FFIResultRowCount(result); i++) {
     if (FFIResultGetInt(result, i, 0) == id && !FFIResultIsNull(result, i, 1) &&
         std::string(FFIResultGetString(result, i, 1)) == name) {
@@ -35,7 +35,7 @@ bool HasRow(FFIResult result, int id, const std::string &name) {
   }
   return false;
 }
-bool HasRowNull(FFIResult result, int id) {
+bool HasRowNull(FFIQueryResult result, int id) {
   for (size_t i = 0; i < FFIResultRowCount(result); i++) {
     if (FFIResultGetInt(result, i, 0) == id && FFIResultIsNull(result, i, 1)) {
       return true;
@@ -45,20 +45,20 @@ bool HasRowNull(FFIResult result, int id) {
 }
 
 TEST(PROXY, OPEN_TEST) {
-  c_conn = FFIOpen();
+  c_conn = FFIOpen().result;
   EXPECT_NE(c_conn, nullptr);
 }
 
 // Test creating tables and views.
 TEST(PROXY, DDL_TEST) {
   auto table = "CREATE TABLE test3 (ID int PRIMARY KEY, name VARCHAR(10));";
-  EXPECT_TRUE(FFIExecDDL(c_conn, table)) << "Creating table failed!";
+  EXPECT_TRUE(FFIExecDDL(c_conn, table).result) << "Creating table failed!";
 
 #ifndef K9DB_VALGRIND_MODE
   auto view =
       "CREATE VIEW myview AS "
       "'\"SELECT * FROM test3 WHERE ID > 5 ORDER BY name\"'";
-  EXPECT_TRUE(FFIExecDDL(c_conn, view)) << "Creating view failed!";
+  EXPECT_TRUE(FFIExecDDL(c_conn, view).result) << "Creating view failed!";
 #endif
 }
 
@@ -73,7 +73,7 @@ TEST(PROXY, UPDATE_TEST) {
       {"DELETE FROM test3 WHERE ID = 3;", 1}};
   for (auto &[q, count] : tests) {
     VLOG(1) << "Running query: " << q;
-    FFIUpdateResult result = FFIExecUpdate(c_conn, q.c_str());
+    FFIUpdateResult result = FFIExecUpdate(c_conn, q.c_str()).result;
     EXPECT_EQ(result.row_count, count) << "Failed: " << q;
   }
 }
@@ -81,7 +81,8 @@ TEST(PROXY, UPDATE_TEST) {
 // Test queries.
 TEST(PROXY, QUERY_TEST) {
   // Query from table.
-  FFIResult response_select = FFIExecSelect(c_conn, "SELECT * FROM test3;");
+  FFIQueryResult response_select =
+      FFIExecSelect(c_conn, "SELECT * FROM test3;").result;
   EXPECT_TRUE(FFIResultNextSet(response_select));
   EXPECT_EQ(FFIResultColumnCount(response_select), 2) << "Bad column count";
   EXPECT_EQ(FFIResultRowCount(response_select), 3) << "Bad row count";
@@ -100,7 +101,7 @@ TEST(PROXY, QUERY_TEST) {
 
 #ifndef K9DB_VALGRIND_MODE
   // Query from view.
-  response_select = FFIExecSelect(c_conn, "SELECT * FROM myview;");
+  response_select = FFIExecSelect(c_conn, "SELECT * FROM myview;").result;
   EXPECT_TRUE(FFIResultNextSet(response_select));
   EXPECT_EQ(FFIResultColumnCount(response_select), 2) << "Bad column count";
   EXPECT_EQ(FFIResultRowCount(response_select), 1) << "Bad row count";
@@ -118,7 +119,8 @@ TEST(PROXY, QUERY_TEST) {
 
   // Query using one-off view.
   response_select =
-      FFIExecSelect(c_conn, "SELECT * FROM test3 WHERE ID > 4 ORDER BY name;");
+      FFIExecSelect(c_conn, "SELECT * FROM test3 WHERE ID > 4 ORDER BY name;")
+          .result;
   EXPECT_TRUE(FFIResultNextSet(response_select));
   EXPECT_EQ(FFIResultColumnCount(response_select), 2) << "Bad column count";
   EXPECT_EQ(FFIResultRowCount(response_select), 1) << "Bad row count";
@@ -141,31 +143,40 @@ TEST(PROXY, QUERY_TEST) {
 TEST(PROXY, PREPARED_STATMENT_TEST) {
   // Reads from table.
   FFIPreparedStatement stmt1 =
-      FFIPrepare(c_conn, "SELECT * FROM test3 where ID = ?;");
+      FFIPrepare(c_conn, "SELECT * FROM test3 where ID = ?;").result;
 
   EXPECT_EQ(FFIPreparedStatementID(stmt1), 0) << "Bad statement id";
   EXPECT_EQ(FFIPreparedStatementArgCount(stmt1), 1) << "Bad arg count";
-  EXPECT_EQ(FFIPreparedStatementArgType(stmt1, 0), CType::INT) << "Arg type";
+  EXPECT_EQ(FFIPreparedStatementArgType(stmt1, 0).result, CType::INT)
+      << "Arg type";
+
   FFIPreparedStatement stmt2 =
-      FFIPrepare(c_conn, "SELECT * FROM test3 where ID IN (?, ?);");
+      FFIPrepare(c_conn, "SELECT * FROM test3 where ID IN (?, ?);").result;
   EXPECT_EQ(FFIPreparedStatementID(stmt2), 1) << "Bad statement id";
   EXPECT_EQ(FFIPreparedStatementArgCount(stmt2), 2) << "Bad arg count";
-  EXPECT_EQ(FFIPreparedStatementArgType(stmt2, 0), CType::INT) << "Arg type";
-  EXPECT_EQ(FFIPreparedStatementArgType(stmt2, 1), CType::INT) << "Arg type";
+  EXPECT_EQ(FFIPreparedStatementArgType(stmt2, 0).result, CType::INT)
+      << "Arg type";
+  EXPECT_EQ(FFIPreparedStatementArgType(stmt2, 1).result, CType::INT)
+      << "Arg type";
 
-  FFIPreparedStatement stmt3 = FFIPrepare(
-      c_conn, "SELECT * FROM test3 where ID IN (?, ?) AND test3.name = ?;");
+  FFIPreparedStatement stmt3 =
+      FFIPrepare(c_conn,
+                 "SELECT * FROM test3 where ID IN (?, ?) AND test3.name = ?;")
+          .result;
   EXPECT_EQ(FFIPreparedStatementID(stmt3), 2) << "Bad statement id";
   EXPECT_EQ(FFIPreparedStatementArgCount(stmt3), 3) << "Bad arg count";
-  EXPECT_EQ(FFIPreparedStatementArgType(stmt3, 0), CType::INT) << "Arg type";
-  EXPECT_EQ(FFIPreparedStatementArgType(stmt3, 1), CType::INT) << "Arg type";
-  EXPECT_EQ(FFIPreparedStatementArgType(stmt3, 2), CType::TEXT) << "Arg type";
+  EXPECT_EQ(FFIPreparedStatementArgType(stmt3, 0).result, CType::INT)
+      << "Arg type";
+  EXPECT_EQ(FFIPreparedStatementArgType(stmt3, 1).result, CType::INT)
+      << "Arg type";
+  EXPECT_EQ(FFIPreparedStatementArgType(stmt3, 2).result, CType::TEXT)
+      << "Arg type";
 
   // Query from views.
   const char *args1[] = {"1"};
-  FFIPreparedResult struct1 = FFIExecPrepare(c_conn, 0, 1, args1);
+  FFIPreparedResult struct1 = FFIExecPrepare(c_conn, 0, 1, args1).result;
   EXPECT_TRUE(struct1.query);
-  FFIResult result1 = struct1.query_result;
+  FFIQueryResult result1 = struct1.query_result;
   EXPECT_TRUE(FFIResultNextSet(result1));
   EXPECT_EQ(FFIResultColumnCount(result1), 2) << "Bad column count";
   EXPECT_EQ(FFIResultRowCount(result1), 1) << "Bad row count";
@@ -179,9 +190,9 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
   FFIResultDestroy(result1);
 
   const char *args2[] = {"1", "50"};
-  FFIPreparedResult struct2 = FFIExecPrepare(c_conn, 1, 2, args2);
+  FFIPreparedResult struct2 = FFIExecPrepare(c_conn, 1, 2, args2).result;
   EXPECT_TRUE(struct2.query);
-  FFIResult result2 = struct2.query_result;
+  FFIQueryResult result2 = struct2.query_result;
   EXPECT_TRUE(FFIResultNextSet(result2));
   EXPECT_EQ(FFIResultColumnCount(result2), 2) << "Bad column count";
   EXPECT_EQ(FFIResultRowCount(result2), 2) << "Bad row count";
@@ -195,9 +206,9 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
   FFIResultDestroy(result2);
 
   const char *args3[] = {"1", "50", "NULL"};
-  FFIPreparedResult struct3 = FFIExecPrepare(c_conn, 2, 3, args3);
+  FFIPreparedResult struct3 = FFIExecPrepare(c_conn, 2, 3, args3).result;
   EXPECT_TRUE(struct3.query);
-  FFIResult result3 = struct3.query_result;
+  FFIQueryResult result3 = struct3.query_result;
   EXPECT_TRUE(FFIResultNextSet(result3));
   EXPECT_EQ(FFIResultColumnCount(result3), 2) << "Bad column count";
   EXPECT_EQ(FFIResultRowCount(result3), 1) << "Bad row count";
@@ -211,16 +222,27 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
   FFIResultDestroy(result3);
 
   // Reads from views.
-  FFIPreparedStatement stmt4 = FFIPrepare(
-      c_conn, "SELECT ID, COUNT(*) AS C FROM test3 GROUP BY ID HAVING ID = ?;");
+  FFIPreparedStatement stmt4 =
+      FFIPrepare(
+          c_conn,
+          "SELECT ID, COUNT(*) AS C FROM test3 GROUP BY ID HAVING ID = ?;")
+          .result;
   EXPECT_EQ(FFIPreparedStatementID(stmt4), 3) << "Bad statement id";
   EXPECT_EQ(FFIPreparedStatementArgCount(stmt4), 1) << "Bad arg count";
-  EXPECT_EQ(FFIPreparedStatementArgType(stmt4, 0), CType::INT) << "Arg type";
+  EXPECT_EQ(FFIPreparedStatementArgType(stmt4, 0).result, CType::INT)
+      << "Arg type";
+
+  // Test error.
+  FFIColumnTypeOrError tmp = FFIPreparedStatementArgType(stmt4, 100);
+  EXPECT_NE(tmp.error.code, 0u) << "No error on arg count exceeding parameters";
+  EXPECT_NE(tmp.error.message, nullptr)
+      << "No error on arg count exceeding parameters";
+  FFIFreeError(tmp.error);
 
   const char *args4[] = {"50"};
-  FFIPreparedResult struct4 = FFIExecPrepare(c_conn, 3, 1, args4);
+  FFIPreparedResult struct4 = FFIExecPrepare(c_conn, 3, 1, args4).result;
   EXPECT_TRUE(struct4.query);
-  FFIResult result4 = struct4.query_result;
+  FFIQueryResult result4 = struct4.query_result;
   EXPECT_TRUE(FFIResultNextSet(result4));
   EXPECT_EQ(FFIResultColumnCount(result4), 2) << "Bad column count";
   EXPECT_EQ(FFIResultRowCount(result4), 1) << "Bad row count";
@@ -236,14 +258,14 @@ TEST(PROXY, PREPARED_STATMENT_TEST) {
 #endif
 
 TEST(PROXY, CLOSE_TEST) {
-  EXPECT_TRUE(FFIClose(c_conn)) << "Closing connection failed!";
+  EXPECT_TRUE(FFIClose(c_conn).result) << "Closing connection failed!";
 }
 
 }  // namespace
 
 int main(int argc, char **argv) {
   // Command line arugments and help message.
-  FFIArgs cmd_args = FFIGflags(argc, argv, "ffi_unittest.cc");
+  FFIArgs cmd_args = FFIGflags(argc, argv, "ffi_unittest.cc").result;
   EXPECT_EQ(cmd_args.workers, 1);
   EXPECT_EQ(cmd_args.consistent, true);
   EXPECT_EQ(cmd_args.db_name, std::string("k9db"));
@@ -254,7 +276,7 @@ int main(int argc, char **argv) {
   DropDatabase();
 
   // Initialize K9db State
-  EXPECT_TRUE(FFIInitialize(1, true, DB_NAME, ""))
+  EXPECT_TRUE(FFIInitialize(1, true, DB_NAME, "").result)
       << "Opening global connection failed!";
 
   // Run tests.
@@ -262,7 +284,7 @@ int main(int argc, char **argv) {
   auto result = RUN_ALL_TESTS();
 
   // Close global connection
-  EXPECT_TRUE(FFIShutdown()) << "Closing global connection failed!";
+  EXPECT_TRUE(FFIShutdown().result) << "Closing global connection failed!";
 
   // Drop the database again.
   DropDatabase();

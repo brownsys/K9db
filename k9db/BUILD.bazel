@@ -23,6 +23,7 @@ cc_library(
         "//k9db/shards:types",
         "//k9db/shards/sqlengine:engine",
         "//k9db/sql:result",
+        "//k9db/util:error",
         "//k9db/util:status",
         "//k9db/util:upgradable_lock",
         "@com_google_absl//absl/status",
