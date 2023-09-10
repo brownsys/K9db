@@ -20,7 +20,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 // Help message.
-const USAGE: &str = "K9db options: look below for 'Flags from k9db/proxy/src/ffi/ffi.cc'";
+const USAGE: &str =
+  "K9db options: look below for 'Flags from k9db/proxy/src/ffi/ffi.cc'";
 
 // Helper for translating k9db types to msql-srv types.
 fn convert_type(coltype: k9db::FFIColumnType) -> msql_srv::ColumnType {
@@ -34,7 +35,7 @@ fn convert_type(coltype: k9db::FFIColumnType) -> msql_srv::ColumnType {
 }
 
 // Helper for translating k9db schema into msql-srv columns.
-fn convert_columns(result: k9db::FFIResult) -> Vec<msql_srv::Column> {
+fn convert_columns(result: k9db::FFIQueryResult) -> Vec<msql_srv::Column> {
   let num = k9db::result::column_count(result);
   let mut cols = Vec::with_capacity(num);
   for c in 0..num {
@@ -75,7 +76,7 @@ fn stringify_parameter(param: msql_srv::ParamValue) -> String {
         ValueInner::Double(v) => (v.floor() as i64).to_string(),
         _ => unimplemented!("Rust proxy: unsupported double type"),
       }
-    },
+    }
     ColumnType::MYSQL_TYPE_DATETIME => {
       let datetime: NaiveDateTime = param.value.into();
       datetime.format("'%Y-%m-%d %H:%M:%S%.f'").to_string()
@@ -84,9 +85,9 @@ fn stringify_parameter(param: msql_srv::ParamValue) -> String {
   }
 }
 
-// Helper for writing a k9db result to msql-srv.
+// Helper for writing a k9db resultset (for a SELECT) to msql-srv.
 fn write_result<W: io::Write>(writer: msql_srv::QueryResultWriter<W>,
-                              result: k9db::FFIResult)
+                              result: k9db::FFIQueryResult)
                               -> io::Result<()> {
   let mut cv: Vec<Vec<msql_srv::Column>> = Vec::new();
   while k9db::result::next_resultset(result) {
@@ -97,7 +98,7 @@ fn write_result<W: io::Write>(writer: msql_srv::QueryResultWriter<W>,
   let mut i = 0;
   while k9db::result::next_resultset(result) {
     i += 1;
-    let columns = &cv[i-1];
+    let columns = &cv[i - 1];
     let mut rw = writer.start(columns).unwrap();
 
     let rows = k9db::result::row_count(result);
@@ -133,6 +134,23 @@ fn write_result<W: io::Write>(writer: msql_srv::QueryResultWriter<W>,
   writer.no_more_results()
 }
 
+// Write the result of an INSERT/UPDATE/DELETE.
+fn write_update_result<W: io::Write>(writer: QueryResultWriter<W>,
+                                     result: k9db::FFIUpdateResult)
+                                     -> io::Result<()> {
+  if result.row_count > -1 {
+    return writer.completed(result.row_count as u64, result.last_insert_id);
+  }
+  return writer.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
+}
+
+// Write the given error through the writer.
+macro_rules! write_error {
+  ($writer:ident, $error:ident) => {
+    $writer.error(ErrorKind::from($error.0), $error.1.as_bytes())
+  };
+}
+
 // msql-srv shim struct.
 #[derive(Debug)]
 struct Backend {
@@ -155,19 +173,34 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        && !stmt.starts_with("REPLACE")
        && !stmt.starts_with("DELETE")
     {
-      error!(self.log, "Rust proxy: unsupported prepared statement {}", stmt);
-      return info.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
+      error!(self.log, "Rust Proxy: unsupported prepared statement {}", stmt);
+      return info.error(ErrorKind::ER_SYNTAX_ERROR, stmt.as_bytes());
     }
 
     // Pass prepared statement to k9db for preparing.
-    let result = k9db::prepare(self.rust_conn, stmt);
-    let stmt_id = k9db::statement::id(result) as u32;
-    let param_count = k9db::statement::arg_count(result);
+    let result = match k9db::prepare(self.rust_conn, stmt) {
+      Ok(result) => result,
+      Err(e) => {
+        error!(self.log,
+               "Rust Proxy: cannot prepare statement {}.\n{}", stmt, e);
+        return write_error!(info, e);
+      }
+    };
 
     // Return the number and type of parameters.
+    let stmt_id = k9db::statement::id(result) as u32;
+    let param_count = k9db::statement::arg_count(result);
     let mut params = Vec::with_capacity(param_count);
     for i in 0..param_count {
-      let arg_type = k9db::statement::arg_type(result, i);
+      let arg_type = match k9db::statement::arg_type(result, i) {
+        Ok(result) => result,
+        Err(e) => {
+          error!(self.log,
+                 "Rust Proxy: cannot prepare statement {}.\n{}", stmt, e);
+          return write_error!(info, e);
+        }
+      };
+
       params.push(Column { table: "".to_string(),
                            column: "".to_string(),
                            colflags: ColumnFlags::empty(),
@@ -192,22 +225,26 @@ impl<W: io::Write> MysqlShim<W> for Backend {
                 results: QueryResultWriter<W>)
                 -> io::Result<()> {
     // Push all parameters (in order) into args formatted by type.
-    let args: Vec<String> = params
-        .into_iter()
-        .map(|param| stringify_parameter(param))
-        .collect();
+    let args: Vec<String> = params.into_iter()
+                                  .map(|param| stringify_parameter(param))
+                                  .collect();
 
     // Call k9db via ffi.
-    let response = k9db::exec_prepare(self.rust_conn, stmt_id, args);
+    let response = match k9db::exec_prepare(self.rust_conn, stmt_id, args) {
+      Ok(response) => response,
+      Err(e) => {
+        error!(self.log,
+               "Rust Proxy: cannot executed prepared statement.\n{}", e);
+        return write_error!(results, e);
+      }
+    };
+
+    // Response might be a query set or a response to an INSERT/UPDATE/DELETE.
     if response.query {
       return write_result(results, response.query_result);
     } else {
-      if response.update_result > -1 {
-        return results.completed(response.update_result as u64,
-                                 response.last_insert_id);
-      }
+      return write_update_result(results, response.update_result);
     }
-    return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
   }
 
   // called when client wants to deallocate resources associated with a prev
@@ -221,8 +258,6 @@ impl<W: io::Write> MysqlShim<W> for Backend {
     // first statement in sql would be `use db` => acknowledgement
     debug!(self.log, "Rust proxy: starting on_init");
     // Tell client that database context has been changed
-    // TODO(babman, benji): Figure out the DB name from the `use db`
-    // statement and pass that to k9db.
     writer.ok()
   }
 
@@ -270,12 +305,21 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("EXPLAIN COMPLIANCE")
        || q_string.starts_with("CTX")
     {
-      let ddl_response = k9db::exec_ddl(self.rust_conn, q_string);
-      if ddl_response {
-        return results.completed(0, 0);
-      }
-      error!(self.log, "Rust Proxy: Failed to execute CREATE {:?}", q_string);
-      return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
+      let result = match k9db::exec_ddl(self.rust_conn, q_string) {
+        Err(e) => {
+          error!(self.log, "Rust Proxy: Error executing {}.\n{}", q_string, e);
+          write_error!(results, e)
+        }
+        Ok(status) => {
+          if status {
+            results.completed(0, 0)
+          } else {
+            error!(self.log, "Rust Proxy: Failure executing {}", q_string);
+            results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
+          }
+        }
+      };
+      return result;
     }
 
     // Data update statements.
@@ -285,13 +329,14 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("REPLACE")
        || q_string.starts_with("GDPR FORGET")
     {
-      let update_response = k9db::exec_update(self.rust_conn, q_string);
-      if update_response.row_count != -1 {
-        return results.completed(update_response.row_count as u64,
-                                 update_response.last_insert_id);
-      }
-      error!(self.log, "Rust Proxy: Failed to execute UPDATE: {:?}", q_string);
-      return results.error(ErrorKind::ER_INTERNAL_ERROR, &[2]);
+      let result = match k9db::exec_update(self.rust_conn, q_string) {
+        Err(e) => {
+          error!(self.log, "Rust Proxy: Error executing {}.\n{}", q_string, e);
+          write_error!(results, e)
+        }
+        Ok(update_result) => write_update_result(results, update_result),
+      };
+      return result;
     }
 
     // Queries.
@@ -305,8 +350,14 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("SHOW INDICES")
        || q_string.starts_with("EXPLAIN")
     {
-      let select_response = k9db::exec_select(self.rust_conn, q_string);
-      return write_result(results, select_response);
+      let result = match k9db::exec_select(self.rust_conn, q_string) {
+        Err(e) => {
+          error!(self.log, "Rust Proxy: Error executing {}.\n{}", q_string, e);
+          write_error!(results, e)
+        }
+        Ok(select_result) => write_result(results, select_result),
+      };
+      return result;
     }
 
     if q_string.starts_with("set") {
@@ -318,8 +369,8 @@ impl<W: io::Write> MysqlShim<W> for Backend {
       std::process::exit(0);
     }
 
-    error!(self.log, "Rust proxy: unsupported query type {}", q_string);
-    results.error(ErrorKind::ER_INTERNAL_ERROR, &[2])
+    error!(self.log, "Rust Proxy: unsupported query type {}", q_string);
+    results.error(ErrorKind::ER_SYNTAX_ERROR, q_string.as_bytes())
   }
 }
 
@@ -327,10 +378,17 @@ impl<W: io::Write> MysqlShim<W> for Backend {
 impl Drop for Backend {
   fn drop(&mut self) {
     info!(self.log, "Rust Proxy: Starting destructor for Backend");
-    if k9db::close(self.rust_conn) {
-      info!(self.log, "Rust Proxy: successfully closed connection");
-    } else {
-      info!(self.log, "Rust Proxy: failed to close connection");
+    match k9db::close(self.rust_conn) {
+      Ok(status) => {
+        if status {
+          info!(self.log, "Rust Proxy: successfully closed connection");
+        } else {
+          error!(self.log, "Rust Proxy: issue closing connection");
+        }
+      }
+      Err(e) => {
+        error!(self.log, "Rust Proxy: Error closing connection. {}", e);
+      }
     }
   }
 }
@@ -352,7 +410,13 @@ fn main() {
     slog::Logger::root(slog_term::FullFormat::new(plain).build().fuse(), o!());
 
   // Parse command line flags defined using rust's gflags.
-  let flags = k9db::gflags(std::env::args(), USAGE);
+  let flags = match k9db::gflags(std::env::args(), USAGE) {
+    Ok(flags) => flags,
+    Err(e) => {
+      error!(log, "Rust Proxy: Cannot parse cmd flags.\n{}", e);
+      std::process::exit(-1);
+    }
+  };
   info!(log,
         "Rust proxy: running with args: {:?} {:?} {:?} {:?} {:?}",
         flags.workers,
@@ -361,37 +425,66 @@ fn main() {
         flags.hostname,
         flags.db_path);
 
-  let global_open = k9db::initialize(flags.workers, flags.consistent, &flags.db_name, &flags.db_path);
-  if !global_open {
-    std::process::exit(-1);
+  // Initialize K9db.
+  match k9db::initialize(flags.workers,
+                         flags.consistent,
+                         &flags.db_name,
+                         &flags.db_path)
+  {
+    Ok(status) => {
+      if !status {
+        error!(log, "Rust Proxy: cannot initialize K9db");
+        std::process::exit(-1);
+      }
+    }
+    Err(e) => {
+      error!(log, "Rust Proxy: cannot initialize K9db.\n{}", e);
+      std::process::exit(-1);
+    }
   }
 
+  // Listen for incoming connections.
   let listener = net::TcpListener::bind(flags.hostname).unwrap();
   info!(log, "Rust Proxy: Listening at: {:?}", listener);
   listener.set_nonblocking(true)
           .expect("Cannot set non-blocking");
 
-
   // store client thread handles
   let mut threads = Vec::new();
 
-  // run listener until terminated with SIGTERM
+  // Run listener until terminated with SIGTERM
   while !stop.load(Ordering::Relaxed) {
     while let Ok((stream, _addr)) = listener.accept() {
       stream.set_nodelay(true).expect("Cannot disable nagle");
       // clone log so that each client thread has an owned copy
       let log = log.clone();
       threads.push(std::thread::spawn(move || {
-                     let bufwriter = io::BufWriter::with_capacity(10000000, stream.try_clone().unwrap());
+                     let bufwriter =
+                       io::BufWriter::with_capacity(10000000,
+                                                    stream.try_clone()
+                                                          .unwrap());
                      info!(log,
                            "Rust Proxy: Successfully connected to mysql \
                             proxy\nStream and address are: {:?}",
                            stream);
-                     let rust_conn = k9db::open();
-                     let backend = Backend { rust_conn: rust_conn,
-                                             log: log };
-                     let _ =
-                       MysqlIntermediary::run_on(backend, stream, bufwriter).unwrap();
+                     match k9db::open() {
+                       Err(err) => error!(log,
+                                          "Rust Proxy: Cannot open new \
+                                           connection.\n{}",
+                                          err),
+                       Ok(rust_conn) => {
+                         let backend = Backend { rust_conn: rust_conn,
+                                                 log: log.clone() };
+                         if let Err(e) =
+                           MysqlIntermediary::run_on(backend, stream, bufwriter)
+                         {
+                           error!(log,
+                                  "Rust Proxy: Cannot run backend via \
+                                   MySqlIntermediary.\n{}",
+                                  e);
+                         }
+                       }
+                     }
                    }));
     }
     // wait before checking listener status
@@ -402,5 +495,9 @@ fn main() {
   for join_handle in threads {
     join_handle.join().unwrap();
   }
-  k9db::shutdown();
+
+  // Shutdown safetly.
+  if let Err(e) = k9db::shutdown() {
+    error!(log, "Rust Proxy: did not shutdown cleanly.\n{}", e);
+  }
 }

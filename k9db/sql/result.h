@@ -163,23 +163,23 @@ class SqlResult {
   // Only safe to use if IsStatement() returns true.
   inline bool Success() const {
     if (!this->IsStatement())
-      DLOG(FATAL) << "Success() called on non-statement result (" << this->type_
-                  << ")";
+      LOG(FATAL) << "Success() called on non-statement result (" << this->type_
+                 << ")";
     return this->status_;
   }
 
   // Only safe to use if IsUpdate() returns true.
   inline int UpdateCount() const {
     if (!this->IsUpdate()) {
-      DLOG(FATAL) << "UpdateCount() called on non-update result ("
-                  << this->type_ << ")";
+      LOG(FATAL) << "UpdateCount() called on non-update result (" << this->type_
+                 << ")";
     }
     return this->status_;
   }
   inline uint64_t LastInsertId() const {
     if (!this->IsUpdate()) {
-      DLOG(FATAL) << "LastInsertId() called on non-update result ("
-                  << this->type_ << ")";
+      LOG(FATAL) << "LastInsertId() called on non-update result ("
+                 << this->type_ << ")";
     }
     return this->lid_;
   }
@@ -187,13 +187,13 @@ class SqlResult {
   // Only safe to use if IsQuery() returns true.
   const std::vector<SqlResultSet> &ResultSets() const {
     if (!this->IsQuery()) {
-      DLOG(FATAL) << "ResultSets() called on non-query result";
+      LOG(FATAL) << "ResultSets() called on non-query result";
     }
     return this->sets_;
   }
   std::vector<SqlResultSet> &ResultSets() {
     if (!this->IsQuery()) {
-      DLOG(FATAL) << "ResultSets() called on non-query result";
+      LOG(FATAL) << "ResultSets() called on non-query result";
     }
     return this->sets_;
   }

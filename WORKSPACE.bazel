@@ -64,11 +64,10 @@ load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 
 protobuf_deps()
 
-
 http_archive(
     name = "com_github_bazelbuild_buildtools",
-    strip_prefix = "buildtools-4.2.5",
-    url = "https://github.com/bazelbuild/buildtools/archive/refs/tags/4.2.5.zip",
+    strip_prefix = "buildtools-4.2.2",
+    url = "https://github.com/bazelbuild/buildtools/archive/refs/tags/4.2.2.zip",
 )
 # End of Buildifier
 
