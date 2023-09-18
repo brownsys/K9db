@@ -12,7 +12,7 @@ namespace k9db {
 namespace sqlast {
 
 absl::StatusOr<std::unique_ptr<AbstractStatement>> SQLParser::Parse(
-    const std::string &sql) {
+    const SQLCommand &sql) {
   auto hacky_result = HackyParse(sql);
   if (hacky_result.ok()) {
     return std::move(hacky_result.value());
@@ -21,7 +21,7 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> SQLParser::Parse(
   this->error_ = false;
 
   // Initialize ANTLR things.
-  this->input_stream_ = std::make_unique<antlr4::ANTLRInputStream>(sql);
+  this->input_stream_ = std::make_unique<antlr4::ANTLRInputStream>(sql.query());
   this->lexer_ =
       std::make_unique<sqlparser::SQLiteLexer>(this->input_stream_.get());
   this->lexer_->addErrorListener(this);
@@ -40,7 +40,7 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> SQLParser::Parse(
   }
 
   // Makes sure that all constructs used in the statement are supported!
-  auto result = AstTransformer().TransformStatement(statement);
+  auto result = AstTransformer(sql).TransformStatement(statement);
   return result;
 }
 

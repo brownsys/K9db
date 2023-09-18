@@ -46,16 +46,16 @@ class PreparedStatements {
 
     PreparedStatement prepInsert = connection.prepareStatement(PREP_INSERT);
     prepInsert.setInt(1, 10);
-    prepInsert.setString(2, "John");
+    prepInsert.setString(2, "John' with escaping\\!? `\" try this");
     prepInsert.setInt(3, 25);
     assert prepInsert.executeUpdate() == 1;
     prepInsert.setInt(1, 2);
-    prepInsert.setString(2, "Smith");
+    prepInsert.setString(2, "Smith' escape\\!? `\n\t\"");
     prepInsert.setInt(3, 35);
     assert prepInsert.executeUpdate() == 1;
 
     PreparedStatement prepUpdate = connection.prepareStatement(PREP_UPDATE);
-    prepUpdate.setString(1, "Johnny");
+    prepUpdate.setString(1, "Johnny'\"`?!\\does it work\n!?");
     prepUpdate.setInt(2, 10);
     assert prepUpdate.executeUpdate() == 1;
 
@@ -71,7 +71,7 @@ class PreparedStatements {
     assert !resultSet.next();
 
     prepSelect = connection.prepareStatement(PREP_SELECT[1]);
-    prepSelect.setString(1, "Smith");
+    prepSelect.setString(1, "Smith' escape\\!? `\n\t\"");
     prepSelect.setInt(2, 35);
     resultSet = prepSelect.executeQuery();
     metadata = resultSet.getMetaData();
@@ -80,7 +80,7 @@ class PreparedStatements {
     assert metadata.getColumnName(3).equals("Count");
     assert resultSet.next();
     assert resultSet.getInt(1) == 35;
-    assert resultSet.getString(2).equals("Smith");
+    assert resultSet.getString(2).equals("Smith' escape\\!? `\n\t\"");
     assert resultSet.getInt(3) == 1;
     assert !resultSet.next();
 
@@ -93,7 +93,7 @@ class PreparedStatements {
     assert metadata.getColumnName(3).equals("age");
     assert resultSet.next();
     assert resultSet.getInt(1) == 10;
-    assert resultSet.getString(2).equals("Johnny");
+    assert resultSet.getString(2).equals("Johnny'\"`?!\\does it work\n!?");
     assert resultSet.getInt(3) == 25;
     assert !resultSet.next();
 
@@ -107,7 +107,7 @@ class PreparedStatements {
     assert metadata.getColumnName(3).equals("age");
     assert resultSet.next();
     assert resultSet.getInt(1) == 2;
-    assert resultSet.getString(2).equals("Smith");
+    assert resultSet.getString(2).equals("Smith' escape\\!? `\n\t\"");
     assert resultSet.getInt(3) == 35;
     assert !resultSet.next();
 
@@ -120,7 +120,7 @@ class PreparedStatements {
     assert metadata.getColumnName(3).equals("age");
     assert resultSet.next();
     assert resultSet.getInt(1) == 2;
-    assert resultSet.getString(2).equals("Smith");
+    assert resultSet.getString(2).equals("Smith' escape\\!? `\n\t\"");
     assert resultSet.getInt(3) == 35;
     assert !resultSet.next();
 
@@ -144,7 +144,7 @@ class PreparedStatements {
     assert metadata.getColumnName(2).equals("name");
     assert resultSet.next();
     assert resultSet.getInt(1) == 25;
-    assert resultSet.getString(2).equals("Johnny");
+    assert resultSet.getString(2).equals("Johnny'\"`?!\\does it work\n!?");
     assert !resultSet.next();
 
     connection.close();

@@ -10,6 +10,7 @@
 #include "k9db/dataflow/graph.h"
 #include "k9db/dataflow/state.h"
 #include "k9db/sqlast/ast.h"
+#include "k9db/sqlast/command.h"
 
 namespace k9db {
 namespace prepared {
@@ -57,8 +58,8 @@ PreparedStatementDescriptor MakeStmt(const std::string &query,
 bool NeedsFlow(const CanonicalQuery &query);
 
 // Populate prepared statement with concrete values.
-std::string PopulateStatement(const PreparedStatementDescriptor &stmt,
-                              const std::vector<std::string> &args);
+sqlast::SQLCommand PopulateStatement(const PreparedStatementDescriptor &stmt,
+                                     const std::vector<std::string> &args);
 
 // Extract type information about ? arguments from flow.
 void FromFlow(const std::string &flow_name,

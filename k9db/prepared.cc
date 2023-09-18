@@ -242,41 +242,43 @@ bool NeedsFlow(const CanonicalQuery &query) {
 }
 
 // Populate prepared statement with concrete values.
-std::string PopulateStatement(const PreparedStatementDescriptor &stmt,
-                              const std::vector<std::string> &args) {
+sqlast::SQLCommand PopulateStatement(const PreparedStatementDescriptor &stmt,
+                                     const std::vector<std::string> &args) {
   const std::vector<std::string> &stems = stmt.canonical->stems;
-  std::string query = stems.at(0);
+
+  sqlast::SQLCommand command;
+  command.AddStem(stems.at(0));
   size_t v = 0;
   for (size_t i = 0; i < stmt.canonical->args_count; i++) {
     const auto &name = stmt.canonical->arg_names.at(i);
-    query.push_back(' ');
-    query.append(name);
+    command.AddChar(' ');
+    command.AddStem(name);
     // Operator: = and IN are sometimes interchanegable.
-    const auto &op = stmt.canonical->arg_ops.at(i);
+    const std::string &op = stmt.canonical->arg_ops.at(i);
     size_t count = stmt.arg_value_count.at(i);
     if (count > 1) {  // IN (?, ...)
       assert(op == "=");
-      query.append(" IN (");
+      command.AddStem(" IN (");
     } else {
-      query.append(op);
+      command.AddStem(op);
     }
     // Add the values assigned to this parameter.
     for (size_t j = 0; j < count; j++) {
-      query.append(args.at(v + j));
+      command.AddArg(args.at(v + j));
       if (j < count - 1) {
-        query.append(", ");
+        command.AddStem(", ");
       }
     }
     v += count;
     // Added all values for this parameter.
     if (count > 1) {
-      query.push_back(')');
+      command.AddChar(')');
     }
     // Next stem.
-    query.push_back(' ');
-    query.append(stems.at(i + 1));
+    command.AddChar(' ');
+    command.AddStem(stems.at(i + 1));
   }
-  return query;
+  return command;
 }
 
 // Extract type information about ? arguments from flow.
@@ -350,8 +352,9 @@ void FromTables(const CanonicalQuery &query,
 absl::StatusOr<CanonicalDescriptor> MakeInsertCanonical(
     const std::string &insert, const dataflow::DataFlowState &dstate) {
   // Parse the statement using the hacky parser.
-  ASSIGN_OR_RETURN(sqlast::InsertOrReplace & components,
-                   sqlast::HackyInsertOrReplace(insert.data(), insert.size()));
+  ASSIGN_OR_RETURN(
+      sqlast::InsertOrReplace & components,
+      sqlast::HackyInsertOrReplace(insert.data(), insert.size(), {}));
   // Find table schema.
   auto schema = dstate.GetTableSchema(components.table_name);
   // Begin constructing the descriptor.

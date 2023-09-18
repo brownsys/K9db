@@ -14,6 +14,7 @@
 #include "k9db/explain.h"
 #include "k9db/planner/planner.h"
 #include "k9db/shards/sqlengine/engine.h"
+#include "k9db/sqlast/command.h"
 #include "k9db/util/status.h"
 #include "k9db/util/upgradable_lock.h"
 
@@ -195,8 +196,8 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
 
       size_t idx = connection->state->GetAndIncrementOneOffViewCount();
       std::string flow_name = "_oneoff_" + std::to_string(idx);
-      std::string create_view_stmt =
-          "CREATE VIEW " + flow_name + " AS '\"" + sql + "\"'";
+      sqlast::SQLCommand create_view_stmt("CREATE VIEW " + flow_name +
+                                          " AS '\"" + sql + "\"'");
 
       // Make sure creation was successful.
       MOVE_OR_RETURN(sql::SqlResult result,
@@ -204,7 +205,7 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
       ASSERT_RET(result.Success(), Internal, "Could not create one-off view");
 
       // Select the content of the view and return it.
-      std::string select_view = "SELECT * FROM " + flow_name + ";";
+      sqlast::SQLCommand select_view("SELECT * FROM " + flow_name + ";");
       return shards::sqlengine::Shard(select_view, connection);
     } catch (std::exception &e) {
       return absl::InternalError(e.what());
@@ -213,7 +214,8 @@ absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
 
   // Parse and rewrite statement.
   try {
-    auto result = shards::sqlengine::Shard(sql, connection);
+    sqlast::SQLCommand command(std::move(sql));
+    auto result = shards::sqlengine::Shard(command, connection);
     if (!result.ok()) {
       connection->session->RollbackTransaction();
     }
@@ -310,7 +312,7 @@ absl::StatusOr<SqlResult> exec(Connection *connection, size_t stmt_id,
   const prepared::PreparedStatementDescriptor &stmt =
       connection->stmts.at(stmt_id);
   try {
-    std::string sql = prepared::PopulateStatement(stmt, args);
+    sqlast::SQLCommand sql = prepared::PopulateStatement(stmt, args);
     return shards::sqlengine::Shard(sql, connection);
   } catch (std::exception &e) {
     return absl::InternalError(e.what());

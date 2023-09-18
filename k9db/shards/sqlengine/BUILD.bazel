@@ -25,6 +25,7 @@ cc_library(
         "//k9db/shards:types",
         "//k9db/sql:result",
         "//k9db/sqlast:ast",
+        "//k9db/sqlast:command",
         "//k9db/sqlast:parser",
         "//k9db/util:status",
         "//k9db/util:upgradable_lock",
