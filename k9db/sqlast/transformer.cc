@@ -374,8 +374,17 @@ antlrcpp::Any AstTransformer::visitExpr_list(
     sqlparser::SQLiteParser::Expr_listContext *ctx) {
   std::vector<Value> values;
   for (auto expr_ctx : ctx->expr()) {
-    if (expr_ctx->BIND_PARAMETER() != nullptr && this->allow_question_mark_) {
-      values.emplace_back("?");
+    if (expr_ctx->BIND_PARAMETER() != nullptr) {
+      std::string param = expr_ctx->BIND_PARAMETER()->getText();
+      // Preparsed value.
+      if (param.size() > 0 && param.at(0) == '$') {
+        size_t arg_index = std::stoi(param.substr(2));
+        values.push_back(Value::FromSQLString(this->command_.arg(arg_index)));
+      } else if (this->allow_question_mark_) {
+        values.emplace_back("?");
+      } else {
+        return absl::InvalidArgumentError("Non-literal value in insert");
+      }
     } else if (expr_ctx->literal_value() != nullptr) {
       CAST_REF(Value, val, expr_ctx->literal_value()->accept(this));
       values.push_back(std::move(val));
@@ -565,10 +574,22 @@ antlrcpp::Any AstTransformer::visitQualified_table_name(
 // Expressions.
 antlrcpp::Any AstTransformer::visitExpr(
     sqlparser::SQLiteParser::ExprContext *ctx) {
-  if (ctx->BIND_PARAMETER() != nullptr && this->allow_question_mark_) {
-    std::unique_ptr<Expression> result =
-        std::make_unique<LiteralExpression>(Value("?"));
-    return result;
+  if (ctx->BIND_PARAMETER() != nullptr) {
+    std::string param = ctx->BIND_PARAMETER()->getText();
+    // Preparsed value.
+    if (param.size() > 0 && param.at(0) == '$') {
+      size_t arg_index = std::stoi(param.substr(2));
+      Value value = Value::FromSQLString(this->command_.arg(arg_index));
+      std::unique_ptr<Expression> result =
+          std::make_unique<LiteralExpression>(value);
+      return result;
+    } else if (this->allow_question_mark_) {
+      std::unique_ptr<Expression> result =
+          std::make_unique<LiteralExpression>(Value("?"));
+      return result;
+    } else {
+      return absl::InvalidArgumentError("Unsupported bind expression");
+    }
   }
 
   if ((ctx->literal_value() == nullptr && ctx->ASSIGN() == nullptr &&
@@ -604,6 +625,20 @@ antlrcpp::Any AstTransformer::visitExpr(
         std::make_unique<ColumnExpression>(column);
     std::vector<Value> values;
     for (auto &v : ctx->expr(1)->expr()) {
+      if (v->BIND_PARAMETER() != nullptr) {
+        std::string param = v->BIND_PARAMETER()->getText();
+        // Preparsed value.
+        if (param.size() > 0 && param.at(0) == '$') {
+          size_t arg_index = std::stoi(param.substr(2));
+          values.push_back(Value::FromSQLString(this->command_.arg(arg_index)));
+          continue;
+        } else if (this->allow_question_mark_) {
+          values.push_back(Value("?"));
+          continue;
+        } else {
+          return absl::InvalidArgumentError("Unsupported bind IN expression");
+        }
+      }
       if (v->literal_value() == nullptr) {
         return absl::InvalidArgumentError(
             "only support literal list value with IN on right");

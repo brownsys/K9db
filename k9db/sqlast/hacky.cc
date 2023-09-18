@@ -11,8 +11,8 @@ namespace k9db {
 namespace sqlast {
 
 // Helper for parsing inserts and replaces.
-absl::StatusOr<InsertOrReplace> HackyInsertOrReplace(const char *str,
-                                                     size_t size) {
+absl::StatusOr<InsertOrReplace> HackyInsertOrReplace(
+    const char *str, size_t size, const std::vector<std::string> &args) {
   // (INSERT|REPLACE) INTO <tablename> VALUES(<val>, <val>, <val>, ...)
   InsertOrReplace components;
 
@@ -73,7 +73,7 @@ absl::StatusOr<InsertOrReplace> HackyInsertOrReplace(const char *str,
   ConsumeWhiteSpace(&str, &size);
 
   do {
-    components.values.push_back(ExtractValue(&str, &size));
+    components.values.push_back(ExtractValue(&str, &size, args));
     ConsumeWhiteSpace(&str, &size);
   } while (StartsWith(&str, &size, ",", 1));
 
@@ -90,10 +90,10 @@ absl::StatusOr<InsertOrReplace> HackyInsertOrReplace(const char *str,
   return components;
 }
 
-absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
-                                                               size_t size) {
+absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(
+    const char *str, size_t size, const std::vector<std::string> &args) {
   ASSIGN_OR_RETURN(InsertOrReplace & components,
-                   HackyInsertOrReplace(str, size));
+                   HackyInsertOrReplace(str, size, args));
   if (components.replace) {
     return absl::InvalidArgumentError("REPLACE found instead of INSERT");
   }
@@ -115,8 +115,8 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
   return stmt;
 }
 
-absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
-                                                               size_t size) {
+absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(
+    const char *str, size_t size, const std::vector<std::string> &args) {
   // SELECT <cols>, ... FROM <tablename> WHERE <colum_name> = <value>
   // SELECT.
   if (!StartsWith(&str, &size, "SELECT", 6)) {
@@ -171,7 +171,7 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
     ConsumeWhiteSpace(&str, &size);
 
     // Condition.
-    auto condition = HackyCondition(&str, &size);
+    auto condition = HackyCondition(&str, &size, args);
     if (condition == nullptr) {
       return absl::InvalidArgumentError("Hacky select: condition");
     }
@@ -186,8 +186,8 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
   return stmt;
 }
 
-absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyUpdate(const char *str,
-                                                               size_t size) {
+absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyUpdate(
+    const char *str, size_t size, const std::vector<std::string> &args) {
   // UPDATE <tablename> SET <col> = <val>, ... WHERE <colum_name> = <value>
   // UPDATE.
   if (!StartsWith(&str, &size, "UPDATE", 6)) {
@@ -225,7 +225,7 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyUpdate(const char *str,
     ConsumeWhiteSpace(&str, &size);
 
     // <value>.
-    std::string unparsed = ExtractValue(&str, &size);
+    std::string unparsed = ExtractValue(&str, &size, args);
     if (unparsed.size() == 0) {
       return absl::InvalidArgumentError("HACKY update: VALUE");
     }
@@ -261,7 +261,7 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyUpdate(const char *str,
   ConsumeWhiteSpace(&str, &size);
 
   // Condition.
-  auto condition = HackyCondition(&str, &size);
+  auto condition = HackyCondition(&str, &size, args);
   if (condition == nullptr) {
     return absl::InvalidArgumentError("Hacky update: condition");
   }
@@ -276,8 +276,8 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyUpdate(const char *str,
   return stmt;
 }
 
-absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyGDPR(const char *str,
-                                                             size_t size) {
+absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyGDPR(
+    const char *str, size_t size, const std::vector<std::string> &args) {
   // GDPR (FORGET | GET) shard_kind user_id;
   // GDPR.
   if (!StartsWith(&str, &size, "GDPR", 4)) {
@@ -305,28 +305,29 @@ absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyGDPR(const char *str,
   ConsumeWhiteSpace(&str, &size);
 
   // <user_id>.
-  Value user_id = Value::FromSQLString(ExtractValue(&str, &size));
+  Value user_id = Value::FromSQLString(ExtractValue(&str, &size, args));
   ConsumeWhiteSpace(&str, &size);
 
   return std::make_unique<GDPRStatement>(operation, shard_kind, user_id);
 }
 
 absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyParse(
-    const std::string &sql) {
-  size_t size = sql.size();
-  const char *str = sql.data();
+    const SQLCommand &sql) {
+  size_t size = sql.query().size();
+  const char *str = sql.query().data();
+  const std::vector<std::string> &args = sql.args();
 
   if (str[0] == 'I' || str[0] == 'i' || str[0] == 'R' || str[0] == 'r') {
-    return HackyInsert(str, size);
+    return HackyInsert(str, size, args);
   }
   if (str[0] == 'S' || str[0] == 's') {
-    return HackySelect(str, size);
+    return HackySelect(str, size, args);
   }
   if (str[0] == 'G' || str[0] == 'g') {
-    return HackyGDPR(str, size);
+    return HackyGDPR(str, size, args);
   }
   if (str[0] == 'U' || str[0] == 'u') {
-    return HackyUpdate(str, size);
+    return HackyUpdate(str, size, args);
   }
 
   return absl::InvalidArgumentError("Cannot hacky parse");

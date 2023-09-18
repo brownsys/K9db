@@ -21,12 +21,13 @@
 #include "k9db/dataflow/state.h"
 #include "k9db/shards/state.h"
 #include "k9db/sql/result.h"
+#include "k9db/sqlast/command.h"
 
 namespace k9db {
 namespace shards {
 namespace sqlengine {
 
-absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
+absl::StatusOr<sql::SqlResult> Shard(const sqlast::SQLCommand &sql,
                                      Connection *connection);
 }  // namespace sqlengine
 }  // namespace shards

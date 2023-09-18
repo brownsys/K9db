@@ -16,6 +16,7 @@
               // ANTLR generated classes within SQLiteParser...
 #include "SQLiteParser.h"
 #include "k9db/sqlast/ast.h"
+#include "k9db/sqlast/command.h"
 
 namespace k9db {
 namespace sqlast {
@@ -25,7 +26,7 @@ class SQLParser : public antlr4::BaseErrorListener {
   SQLParser() = default;
 
   absl::StatusOr<std::unique_ptr<AbstractStatement>> Parse(
-      const std::string &sql);
+      const SQLCommand &sql);
 
   void syntaxError(antlr4::Recognizer *recognizer,
                    antlr4::Token *offendingSymbol, size_t line,

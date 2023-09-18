@@ -4,6 +4,7 @@
 
 #include "k9db/dataflow/record.h"
 #include "k9db/shards/sqlengine/engine.h"
+#include "k9db/sqlast/command.h"
 
 namespace k9db {
 namespace sql {
@@ -178,7 +179,8 @@ std::string MakeDelete(const std::string &tbl_name,
  * Execute a statement.
  */
 sql::SqlResult Execute(const std::string &sql, Connection *conn) {
-  MOVE_OR_PANIC(sql::SqlResult result, Shard(sql, conn));
+  sqlast::SQLCommand command(sql);
+  MOVE_OR_PANIC(sql::SqlResult result, Shard(command, conn));
   return result;
 }
 
@@ -186,7 +188,8 @@ sql::SqlResult Execute(const std::string &sql, Connection *conn) {
  * Execute expecting an error.
  */
 bool ExecuteError(const std::string &sql, Connection *conn) {
-  absl::StatusOr<sql::SqlResult> result = Shard(sql, conn);
+  sqlast::SQLCommand command(sql);
+  absl::StatusOr<sql::SqlResult> result = Shard(command, conn);
   if (!result.ok()) {
     conn->session->RollbackTransaction();
     PANIC(conn->ctx->RollbackCheckpoint());

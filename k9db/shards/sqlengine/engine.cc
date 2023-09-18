@@ -24,7 +24,7 @@ namespace k9db {
 namespace shards {
 namespace sqlengine {
 
-absl::StatusOr<sql::SqlResult> Shard(const std::string &sql,
+absl::StatusOr<sql::SqlResult> Shard(const sqlast::SQLCommand &sql,
                                      Connection *connection) {
   dataflow::DataFlowState &dstate = connection->state->DataflowState();
 

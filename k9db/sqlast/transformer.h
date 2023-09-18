@@ -7,13 +7,14 @@
 #include "SQLiteParserBaseVisitor.h"
 #include "absl/status/statusor.h"
 #include "k9db/sqlast/ast.h"
+#include "k9db/sqlast/command.h"
 
 namespace k9db {
 namespace sqlast {
 
 class AstTransformer : public sqlparser::SQLiteParserBaseVisitor {
  public:
-  AstTransformer() = default;
+  explicit AstTransformer(const SQLCommand &command) : command_(command) {}
 
   // Entry point for cst to ast transformation / building.
   absl::StatusOr<std::unique_ptr<sqlast::AbstractStatement>> TransformStatement(
@@ -258,6 +259,7 @@ class AstTransformer : public sqlparser::SQLiteParserBaseVisitor {
       sqlparser::SQLiteParser::Any_nameContext *context) override;
 
  private:
+  const SQLCommand &command_;
   bool allow_question_mark_ = false;
 };
 }  // namespace sqlast

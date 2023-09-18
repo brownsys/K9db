@@ -10,6 +10,7 @@
 
 #include "absl/status/statusor.h"
 #include "k9db/sqlast/ast.h"
+#include "k9db/sqlast/command.h"
 
 namespace k9db {
 namespace sqlast {
@@ -20,20 +21,20 @@ struct InsertOrReplace {
   std::vector<std::string> columns;
   std::vector<std::string> values;
 };
-absl::StatusOr<InsertOrReplace> HackyInsertOrReplace(const char *str,
-                                                     size_t size);
+absl::StatusOr<InsertOrReplace> HackyInsertOrReplace(
+    const char *str, size_t size, const std::vector<std::string> &args);
 
-absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(const char *str,
-                                                               size_t size);
+absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyInsert(
+    const char *str, size_t size, const std::vector<std::string> &args);
 
-absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(const char *str,
-                                                               size_t size);
+absl::StatusOr<std::unique_ptr<AbstractStatement>> HackySelect(
+    const char *str, size_t size, const std::vector<std::string> &args);
 
-absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyUpdate(const char *str,
-                                                               size_t size);
+absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyUpdate(
+    const char *str, size_t size, const std::vector<std::string> &args);
 
 absl::StatusOr<std::unique_ptr<AbstractStatement>> HackyParse(
-    const std::string &sql);
+    const SQLCommand &sql);
 
 }  // namespace sqlast
 }  // namespace k9db

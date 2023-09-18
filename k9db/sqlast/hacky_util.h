@@ -64,13 +64,26 @@ inline std::string ExtractIdentifier(const char **ptr, size_t *size) {
   return idn;
 }
 
-inline std::string ExtractValue(const char **ptr, size_t *size) {
+inline std::string ExtractValue(const char **ptr, size_t *size,
+                                const std::vector<std::string> &args) {
   ConsumeWhiteSpace(ptr, size);
   if (size == 0) {
     return "";
   }
   if (StartsWith(ptr, size, "NULL", 4)) {
     return "NULL";
+  }
+
+  // bind parameter.
+  if (StartsWith(ptr, size, "$_", 2)) {
+    size_t i = 0;
+    const char *str = *ptr;
+    for (; str[i] >= '0' && str[i] <= '9'; i++) {
+    }
+    size_t arg_index = std::stoi(std::string(str, i));
+    *ptr += i;
+    *size -= i;
+    return args.at(arg_index);
   }
 
   const char *str = *ptr;
@@ -121,8 +134,8 @@ inline bool EqualIgnoreCase(const std::string &str1, const std::string &upper) {
   return true;
 }
 
-std::unique_ptr<BinaryExpression> HackyCondition(const char **ptr,
-                                                 size_t *size) {
+std::unique_ptr<BinaryExpression> HackyCondition(
+    const char **ptr, size_t *size, const std::vector<std::string> &args) {
   std::vector<std::unique_ptr<BinaryExpression>> conditions;
 
   bool has_and = false;
@@ -149,14 +162,14 @@ std::unique_ptr<BinaryExpression> HackyCondition(const char **ptr,
     // Value.
     std::unique_ptr<Expression> right;
     if (gt) {
-      std::string val = ExtractValue(ptr, size);
+      std::string val = ExtractValue(ptr, size, args);
       if (val.size() == 0) {
         return nullptr;
       }
       right = std::make_unique<LiteralExpression>(Value::FromSQLString(val));
     } else if (eq || is) {
       // value or column
-      std::string val = ExtractValue(ptr, size);
+      std::string val = ExtractValue(ptr, size, args);
       if (val.size() > 0) {
         right = std::make_unique<LiteralExpression>(Value::FromSQLString(val));
       } else {
@@ -175,7 +188,7 @@ std::unique_ptr<BinaryExpression> HackyCondition(const char **ptr,
 
       std::vector<Value> values;
       while (true) {
-        std::string val = ExtractValue(ptr, size);
+        std::string val = ExtractValue(ptr, size, args);
         if (val.size() == 0) {
           break;
         }
