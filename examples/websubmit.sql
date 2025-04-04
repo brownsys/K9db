@@ -8,7 +8,7 @@ CREATE DATA_SUBJECT TABLE students (
 );
 
 CREATE TABLE assignments (
-  ID int,
+  ID int AUTO_INCREMENT,
   Name text,
   PRIMARY KEY(ID)
 );
@@ -31,8 +31,8 @@ CREATE VIEW count_view AS '"
     HAVING name = ?"';
 
 -- Insert data.
-INSERT INTO assignments VALUES (1, 'assignment 1');
-INSERT INTO assignments VALUES (2, 'assignment 2');
+INSERT INTO assignments(Name) VALUES ('assignment 1');
+INSERT INTO assignments(Name) VALUES ('assignment 2');
 INSERT INTO students VALUES (1, 'Jerry');
 INSERT INTO students VALUES (2, 'Layne');
 INSERT INTO students VALUES (3, 'Sean');

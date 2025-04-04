@@ -115,9 +115,32 @@ bool Value::TypeCompatible(ColumnDefinitionTypeEnum type) const {
     case Type::INT:
       return type == ColumnDefinitionTypeEnum::INT ||
              type == ColumnDefinitionTypeEnum::UINT;
-    case Type::TEXT:
-      return type == ColumnDefinitionTypeEnum::TEXT ||
-             type == ColumnDefinitionTypeEnum::DATETIME;
+    case Type::TEXT: {
+      if (type == ColumnDefinitionTypeEnum::TEXT) {
+        return true;
+      }
+      if (type == ColumnDefinitionTypeEnum::DATETIME) {
+        const std::string &value = std::get<std::string>(this->data_);
+        if (value.size() < 19) {
+          LOG(FATAL) << "Bad datetime format; use '2020-12-30 23:59:59';"
+                     << " found {" << value << "}";
+        }
+        size_t digits[] = {0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18};
+        for (const size_t &i : digits) {
+          if (value[i] < '0' || value[i] > '9') {
+            LOG(FATAL) << "Bad datetime format; use '2020-12-30 23:59:59';"
+                       << " found {" << value << "}";
+          }
+        }
+        if (value[4] != '-' || value[7] != '-' || value[10] != ' '
+            || value[13] != ':' || value[16] != ':') {
+          LOG(FATAL) << "Bad datetime format; use '2020-12-30 23:59:59';"
+                     << " found {" << value << "}";
+        }
+        return true;
+      }
+      return false;
+    }
     default:
       LOG(FATAL) << "Unsupported type in TypeCompatible";
   }

@@ -87,3 +87,12 @@ filegroup(
     ]),
     visibility = ["//tests:__subpackages__"],
 )
+
+filegroup(
+    name = "websubmit",
+    srcs = glob([
+        "websubmit/*.txt",
+        "websubmit/*.sql",
+    ]),
+    visibility = ["//tests:__subpackages__"],
+)

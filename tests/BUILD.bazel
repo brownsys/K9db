@@ -113,3 +113,16 @@ cc_test(
         ":common",
     ],
 )
+
+cc_test(
+    name = "websubmit",
+    srcs = [
+        "websubmit.cc",
+    ],
+    data = [
+        "//tests/data:websubmit",
+    ],
+    deps = [
+        ":common",
+    ],
+)

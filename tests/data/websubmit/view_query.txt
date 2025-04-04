@@ -1,0 +1,10 @@
+| 1 | lecture 1 | 2 |
+| 2 | lecture 2 | 1 |
+;
+apikey111|answer 1|2020-01-01 01:01:01|100
+apikey333|answer 3|2020-01-01 01:01:03|0
+apikey111|answer 4|2020-01-01 01:02:01|0
+apikey111|answer 6|2020-01-01 02:01:01|0
+apikey222|answer 2|2020-02-01 01:01:02|0
+apikey222|answer 5|2020-02-01 01:02:02|0
+;

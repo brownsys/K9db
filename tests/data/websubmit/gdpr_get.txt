@@ -1,0 +1,11 @@
+1|1|student1@email.com
+a1|student1@email.com|1|answer 1|2020-01-01 01:01:01|100
+a6|student1@email.com|3|answer 6|2020-01-01 02:01:01|0
+a4|student1@email.com|2|answer 4|2020-01-01 01:02:01|0
+student1@email.com|apikey111|0
+;
+2|2|student2@email.com
+a2|student2@email.com|1|answer 2|2020-02-01 01:01:02|0
+a5|student2@email.com|2|answer 5|2020-02-01 01:02:02|0
+student2@email.com|apikey222|0
+;

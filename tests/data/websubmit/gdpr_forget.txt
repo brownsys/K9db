@@ -1,0 +1,20 @@
+update # = 5
+;
+;
+admin@admin.com|apikey000|1
+student3@email.com|apikey333|0
+student2@email.com|apikey222|0
+;
+2|2|student2@email.com
+;
+a3|student3@email.com|1|answer 3|2020-01-01 01:01:03|0
+a5|student2@email.com|2|answer 5|2020-02-01 01:02:02|0
+a2|student2@email.com|1|answer 2|2020-02-01 01:01:02|0
+;
+1|lecture 1|2
+2|lecture x|1
+;
+apikey333|answer 3|2020-01-01 01:01:03|0
+apikey222|answer 2|2020-02-01 01:01:02|0
+apikey222|answer 5|2020-02-01 01:02:02|0
+;

@@ -24,7 +24,10 @@ k9db_test(
 
 k9db_sql_test(
     name = "websubmit",
-    srcs = ["websubmit.sql"],
+    srcs = [
+        "websubmit.sql",
+        "websubmit_cntd.sql",
+    ],
     port = 10002,
 )
 

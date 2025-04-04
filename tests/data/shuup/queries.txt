@@ -10,7 +10,7 @@
 # shuup_shop
 1|1
 # shuup_gdpr_gdpruserconsent
-1|00:00:00|1|15
+1|2020-12-30 00:00:00|1|15
 # shuup_basket
 1|15|1|2|1
 # shuup_order

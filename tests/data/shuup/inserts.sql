@@ -18,7 +18,7 @@ CTX ROLLBACK;
 
 
 INSERT INTO shuup_shop(id, owner_id) VALUES (1, 1);
-INSERT INTO shuup_gdpr_gdpruserconsent(id, created_on, shop_id, user_id) VALUES (1, '00:00:00', 1, 15);
+INSERT INTO shuup_gdpr_gdpruserconsent(id, created_on, shop_id, user_id) VALUES (1, '2020-12-30 00:00:00', 1, 15);
 
 CTX START;
 INSERT INTO shuup_mutaddress(id, tax_number, user_id) VALUES (71, 6666, 15);
