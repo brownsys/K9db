@@ -152,7 +152,7 @@ antlr(
         "sql/sqlite/SQLiteLexer.g4",
     ],
     no_visitor = False,
-    visitor = True,/root/.cargo/bin/cargo raze
+    visitor = True,
     language = "Cpp",
     package = "sqlparser",
 )

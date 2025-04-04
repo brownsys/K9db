@@ -98,8 +98,7 @@ ADD configure_db.sql /home/configure_db.sql
 ADD configure_docker.sh /home/configure_docker.sh
 RUN chmod 750 /home/configure_docker.sh
 
-# Install 
-
+# Install rust
 RUN curl https://sh.rustup.rs | sh -s -- -y
 RUN . /root/.cargo/env && rustup default nightly-2023-12-06
 
