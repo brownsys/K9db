@@ -38,10 +38,6 @@ RUN cd /tmp \
     && echo "source /usr/local/lib/bazel/bin/bazel-complete.bash" >> ~/.bashrc \
     && rm bazel-4.0.0-installer-linux-x86_64.sh
 
-# install rust
-RUN curl https://sh.rustup.rs | sh -s -- -y
-RUN /root/.cargo/bin/cargo install --version 0.15.0 cargo-raze
-
 # install mariadb (for baselines only)
 RUN apt-get remove -y --purge mysql*
 RUN curl -LsS -O https://downloads.mariadb.com/MariaDB/mariadb_repo_setup
@@ -101,6 +97,15 @@ RUN apt-get update && apt-get install -y python3-pip python3.8-venv
 ADD configure_db.sql /home/configure_db.sql
 ADD configure_docker.sh /home/configure_docker.sh
 RUN chmod 750 /home/configure_docker.sh
+
+# Install 
+
+RUN curl https://sh.rustup.rs | sh -s -- -y
+RUN . /root/.cargo/env && rustup default nightly-2023-12-06
+
+# Install cargo raze
+RUN git clone https://github.com/KinanBab/cargo-raze.git /home/cargo-raze
+RUN . /root/.cargo/env && cd /home/cargo-raze/impl && cargo install --locked --path .
 
 EXPOSE 10001/tcp
 EXPOSE 3306/tcp
