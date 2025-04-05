@@ -113,6 +113,7 @@ class SchemaFactory {
   static SchemaRef PERF_LIST_SCHEMA;
   static SchemaRef EXPLAIN_QUERY_SCHEMA;
   static SchemaRef LIST_INDICES_SCHEMA;
+  static SchemaRef SHOW_POLICIES_SCHEMA;
 };
 
 }  // namespace dataflow

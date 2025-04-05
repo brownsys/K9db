@@ -10,6 +10,7 @@ cc_library(
     srcs = [
         "ast_abstract.cc",
         "ast_expressions.cc",
+        "ast_policy.cc",
         "ast_schema.cc",
         "ast_statements.cc",
         "ast_value.cc",
@@ -19,6 +20,7 @@ cc_library(
         "ast.h",
         "ast_abstract.h",
         "ast_expressions.h",
+        "ast_policy.h",
         "ast_schema.h",
         "ast_schema_enums.h",
         "ast_statements.h",

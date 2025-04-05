@@ -156,5 +156,13 @@ SchemaRef SchemaFactory::LIST_INDICES_SCHEMA =
                               sqlast::ColumnDefinition::Type::TEXT},
                           std::vector<ColumnID>{});
 
+SchemaRef SchemaFactory::SHOW_POLICIES_SCHEMA =
+    SchemaFactory::Create(std::vector<std::string>{"Table", "Column", "Policy"},
+                          std::vector<sqlast::ColumnDefinition::Type>{
+                              sqlast::ColumnDefinition::Type::TEXT,
+                              sqlast::ColumnDefinition::Type::TEXT,
+                              sqlast::ColumnDefinition::Type::TEXT},
+                          std::vector<ColumnID>{});
+
 }  // namespace dataflow
 }  // namespace k9db

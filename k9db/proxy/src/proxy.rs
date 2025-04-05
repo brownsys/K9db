@@ -304,6 +304,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("SET")
        || q_string.starts_with("EXPLAIN COMPLIANCE")
        || q_string.starts_with("CTX")
+       || q_string.starts_with("POLICY")
     {
       let result = match k9db::exec_ddl(self.rust_conn, q_string) {
         Err(e) => {
@@ -348,6 +349,7 @@ impl<W: io::Write> MysqlShim<W> for Backend {
        || q_string.starts_with("SHOW PREPARED")
        || q_string.starts_with("SHOW PERF")
        || q_string.starts_with("SHOW INDICES")
+       || q_string.starts_with("SHOW POLICIES")
        || q_string.starts_with("EXPLAIN")
     {
       let result = match k9db::exec_select(self.rust_conn, q_string) {

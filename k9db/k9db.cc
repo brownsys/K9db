@@ -13,6 +13,7 @@
 #include "k9db/dataflow/graph.h"
 #include "k9db/explain.h"
 #include "k9db/planner/planner.h"
+#include "k9db/policy/policy_engine.h"
 #include "k9db/shards/sqlengine/engine.h"
 #include "k9db/sqlast/command.h"
 #include "k9db/util/status.h"
@@ -100,6 +101,9 @@ absl::StatusOr<std::optional<SqlResult>> SpecialStatements(
     if (absl::StartsWith(split.at(1), "INDICES")) {
       return connection->state->ListIndices();
     }
+    if (absl::StartsWith(split.at(1), "POLICIES")) {
+      return connection->state->ShowPolicies();
+    }
   }
   if (absl::StartsWith(sql, "CTX")) {
     std::vector<std::string> split = absl::StrSplit(sql, ' ');
@@ -115,6 +119,10 @@ absl::StatusOr<std::optional<SqlResult>> SpecialStatements(
       CHECK_STATUS(connection->ctx->Discard());
       return sql::SqlResult(true);
     }
+  }
+  if (absl::StartsWith(sql, "POLICY")) {
+    policy::AddPolicy(sql, connection);
+    return sql::SqlResult(true);
   }
   return std::optional<SqlResult>{};
 }
@@ -176,10 +184,12 @@ bool close(Connection *connection) {
 absl::StatusOr<SqlResult> exec(Connection *connection, std::string sql) {
   // Trim statement, removing whitespace
   Trim(sql);
+
   // print sql statements if echo is set to true
   if (echo) {
     std::cout << sql << std::endl;
   }
+
   // If special statement, handle it separately.
   MOVE_OR_RETURN(auto special, SpecialStatements(sql, connection));
   if (special) {

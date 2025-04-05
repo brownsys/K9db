@@ -28,6 +28,7 @@ cc_library(
     visibility = ["//k9db:__subpackages__"],
     deps = [
         "//k9db/dataflow:schema",
+        "//k9db/policy:policy_state",
         "//k9db/sqlast:ast",
         "@glog",
     ],

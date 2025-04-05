@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "k9db/dataflow/schema.h"
+#include "k9db/policy/policy_state.h"
 #include "k9db/sqlast/ast.h"
 
 namespace k9db {
@@ -157,6 +158,8 @@ struct Table {
       ColumnName,
       std::unordered_map<ShardKind, std::unique_ptr<IndexDescriptor>>>
       indices;
+  // Policy related state for this table.
+  policy::PolicyState policy_state;
 };
 
 // Metadata about a shard.

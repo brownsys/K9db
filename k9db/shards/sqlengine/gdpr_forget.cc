@@ -8,8 +8,8 @@
 #include <utility>
 
 #include "glog/logging.h"
-#include "k9db/shards/sqlengine/update.h"
 #include "k9db/shards/sqlengine/delete.h"
+#include "k9db/shards/sqlengine/update.h"
 #include "k9db/util/status.h"
 
 namespace k9db {

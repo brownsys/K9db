@@ -100,6 +100,28 @@ sql::SqlResult State::ListIndices() const {
   return sql::SqlResult(sql::SqlResultSet(schema, std::move(records)));
 }
 
+sql::SqlResult State::ShowPolicies() const {
+  // Acquire reader lock.
+  util::SharedLock reader_lock = this->ReaderLock();
+  // Get schema.
+  dataflow::SchemaRef schema = dataflow::SchemaFactory::SHOW_POLICIES_SCHEMA;
+  // Loop over all tables and add their indices.
+  std::vector<dataflow::Record> records;
+  for (const std::string &table_name : this->sstate_.GetTables()) {
+    const shards::Table &table = this->sstate_.GetTable(table_name);
+    const policy::PolicyState &policy_state = table.policy_state;
+    for (const auto &[column, policy_builder] : policy_state.map()) {
+      std::string policy = policy_builder.schema().ToString();
+      records.emplace_back(schema, true,
+                           std::make_unique<std::string>(table_name),
+                           std::make_unique<std::string>(column),
+                           std::make_unique<std::string>(policy));
+    }
+  }
+  // Return result.
+  return sql::SqlResult(sql::SqlResultSet(schema, std::move(records)));
+}
+
 // Locks.
 util::UniqueLock State::WriterLock() { return util::UniqueLock(&this->mtx_); }
 util::SharedLock State::ReaderLock() const {

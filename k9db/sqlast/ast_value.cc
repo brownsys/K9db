@@ -132,8 +132,8 @@ bool Value::TypeCompatible(ColumnDefinitionTypeEnum type) const {
                        << " found {" << value << "}";
           }
         }
-        if (value[4] != '-' || value[7] != '-' || value[10] != ' '
-            || value[13] != ':' || value[16] != ':') {
+        if (value[4] != '-' || value[7] != '-' || value[10] != ' ' ||
+            value[13] != ':' || value[16] != ':') {
           LOG(FATAL) << "Bad datetime format; use '2020-12-30 23:59:59';"
                      << " found {" << value << "}";
         }

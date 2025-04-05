@@ -62,6 +62,7 @@ class State {
   sql::SqlResult NumShards() const;
   sql::SqlResult PreparedDebug() const;
   sql::SqlResult ListIndices() const;
+  sql::SqlResult ShowPolicies() const;
 
   // Locks.
   util::UniqueLock WriterLock();

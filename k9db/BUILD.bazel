@@ -18,6 +18,7 @@ cc_library(
         "//k9db/dataflow:graph",
         "//k9db/dataflow:record",
         "//k9db/dataflow:schema",
+        "//k9db/policy:policy_engine",
         "//k9db/planner",
         "//k9db/shards:state",
         "//k9db/shards:types",
