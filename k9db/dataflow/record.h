@@ -16,6 +16,7 @@
 #include "k9db/dataflow/key.h"
 #include "k9db/dataflow/schema.h"
 #include "k9db/dataflow/types.h"
+#include "k9db/policy/abstract_policy.h"
 #include "k9db/sqlast/ast.h"
 #include "k9db/util/type_utils.h"
 
@@ -44,7 +45,8 @@ class Record {
         bitmap_(o.bitmap_),
         schema_(o.schema_),
         timestamp_(o.timestamp_),
-        positive_(o.positive_) {
+        positive_(o.positive_),
+        policies_(std::move(o.policies_)) {
     o.data_ = nullptr;
     o.bitmap_ = nullptr;
   }
@@ -60,6 +62,7 @@ class Record {
     this->timestamp_ = o.timestamp_;
     this->positive_ = o.positive_;
     this->bitmap_ = o.bitmap_;
+    this->policies_ = std::move(o.policies_);
     // Invalidate other.
     o.data_ = nullptr;
     o.bitmap_ = nullptr;
@@ -68,9 +71,13 @@ class Record {
 
   // Allocate memory but do not put any values in yet!
   explicit Record(const SchemaRef &schema, bool positive = true)
-      : schema_(schema), timestamp_(0), positive_(positive) {
+      : schema_(schema), timestamp_(0), positive_(positive), policies_() {
     this->data_ = new RecordData[schema.size()];
     this->bitmap_ = nullptr;
+    this->policies_.reserve(schema.size());
+    while (this->policies_.size() < schema.size()) {
+      this->policies_.emplace_back(nullptr);
+    }
   }
 
   // Create record and set all the data together.
@@ -153,6 +160,17 @@ class Record {
     }
   }
 
+  // Set policies.
+  void SetPolicy(size_t column,
+                 std::unique_ptr<policy::AbstractPolicy> &&policy) {
+    this->policies_[column] = std::move(policy);
+  }
+  void SetPolicy(const std::string &column,
+                 std::unique_ptr<policy::AbstractPolicy> &&policy) {
+    size_t i = this->schema_.IndexOf(column);
+    this->policies_[i] = std::move(policy);
+  }
+
   // The size of the record in bytes.
   size_t SizeInMemory() const;
 
@@ -172,6 +190,9 @@ class Record {
   const SchemaRef &schema() const { return this->schema_; }
   bool IsPositive() const { return this->positive_; }
   int GetTimestamp() const { return this->timestamp_; }
+  const std::vector<std::unique_ptr<policy::AbstractPolicy>> &policies() const {
+    return this->policies_;
+  }
 
   // Create a new record resulting from applying the update to this record.
   // Updating the sequence given an update statement and schema.
@@ -326,6 +347,7 @@ class Record {
   SchemaRef schema_;  // [8 B]
   int timestamp_;     // [4 B]
   bool positive_;     // [1 B]
+  std::vector<std::unique_ptr<policy::AbstractPolicy>> policies_;
 
   inline size_t NumBits() const { return schema_.size() / 64 + 1; }
 

@@ -1,9 +1,12 @@
 // SELECT statements sharding and rewriting.
 #include "k9db/shards/sqlengine/select.h"
 
+#include <memory>
 #include <utility>
 
 #include "glog/logging.h"
+#include "k9db/dataflow/record.h"
+#include "k9db/policy/policy_engine.h"
 #include "k9db/shards/sqlengine/index.h"
 #include "k9db/sql/rocksdb/filter.h"
 #include "k9db/sql/rocksdb/project.h"
@@ -121,6 +124,7 @@ absl::StatusOr<sql::SqlResult> SelectContext::ExecWithinTransaction() {
     size_t pkcol = this->schema_.keys().front();
     std::vector<dataflow::Record> records =
         this->db_->GetDirect(this->table_name_, pkcol, direct_keys.value());
+
     // Apply any remaining filters.
     if (!value_mapper.Empty()) {
       std::vector<dataflow::Record> filtered;
@@ -131,6 +135,10 @@ absl::StatusOr<sql::SqlResult> SelectContext::ExecWithinTransaction() {
       }
       records = std::move(filtered);
     }
+
+    // Assign policies.
+    policy::MakePolicies(this->table_name_, this->conn_, &records);
+
     // Apply projection, if any.
     sql::rocks::Projection proj =
         sql::rocks::ProjectionSchema(this->schema_, this->stmt_.GetColumns());
@@ -145,7 +153,12 @@ absl::StatusOr<sql::SqlResult> SelectContext::ExecWithinTransaction() {
     return sql::SqlResult(sql::SqlResultSet(this->schema_, std::move(records)));
   }
 
-  return sql::SqlResult(this->db_->ExecuteSelect(this->stmt_));
+  sql::SqlResultSet result = this->db_->ExecuteSelect(this->stmt_);
+  // TODO(babman): Could run into issue if query projects out something
+  //               used by the policy constructors.
+  std::vector<dataflow::Record> records = result.Vec();
+  policy::MakePolicies(this->table_name_, this->conn_, &records);
+  return sql::SqlResult(sql::SqlResultSet(result.schema(), std::move(records)));
 }
 
 }  // namespace sqlengine

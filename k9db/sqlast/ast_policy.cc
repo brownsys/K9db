@@ -32,10 +32,7 @@ std::string ParameterizeQurey(const std::string &query) {
   return std::regex_replace(query, REGEX, "?");
 }
 
-PolicySchema::SinglePolicy ParseSinglePolicy(const std::string &table_name,
-                                             const std::string &column_name,
-                                             size_t index,
-                                             const std::string &schema) {
+PolicySchema::SinglePolicy ParseSinglePolicy(const std::string &schema) {
   std::vector<std::string> split = absl::StrSplit(schema, ";");
   CHECK_GE(split.size(), 1u) << "Not enough arguments to policy";
 
@@ -43,8 +40,7 @@ PolicySchema::SinglePolicy ParseSinglePolicy(const std::string &table_name,
   std::string &policy_name = split.at(0);
   std::vector<PolicyExpression> expressions;
   for (size_t i = 1; i < split.size(); i++) {
-    expressions.push_back(PolicyExpression::Parse(
-        table_name, column_name, policy_name, index, std::move(split.at(i))));
+    expressions.push_back(PolicyExpression::Parse(std::move(split.at(i))));
   }
 
   return PolicySchema::SinglePolicy{std::move(policy_name),
@@ -52,10 +48,10 @@ PolicySchema::SinglePolicy ParseSinglePolicy(const std::string &table_name,
 }
 
 // For debugging.
-std::string HelperToString(const PolicySchema::SinglePolicy &policy) {
+std::string HelperDescribe(const PolicySchema::SinglePolicy &policy) {
   std::vector<std::string> strings;
   for (const auto &expression : policy.expressions) {
-    strings.push_back(expression.ToString());
+    strings.push_back(expression.Describe());
   }
   return policy.name + "(" + absl::StrJoin(strings, ", ") + ")";
 }
@@ -63,23 +59,15 @@ std::string HelperToString(const PolicySchema::SinglePolicy &policy) {
 }  // namespace
 
 // PolicyQuery
-PolicyQuery PolicyQuery::Parse(const std::string &table_name,
-                               const std::string &column_name,
-                               const std::string &policy_name, size_t index,
-                               const std::string &query) {
-  // Create unique flow name for this query.
-  std::string flow_name =
-      PolicyQuery::CreateFlowName(table_name, column_name, policy_name, index);
-
+PolicyQuery PolicyQuery::Parse(const std::string &query) {
   // Parse query looking for any ${self.<column>} expressions.
   std::vector<std::string> columns = GetAllColumns(query);
   std::string parameterized_query = ParameterizeQurey(query);
 
-  return PolicyQuery(std::move(parameterized_query), std::move(flow_name),
-                     std::move(columns));
+  return PolicyQuery(std::move(parameterized_query), std::move(columns));
 }
 
-std::string PolicyQuery::ToString() const {
+std::string PolicyQuery::Describe() const {
   if (this->params_.size() == 0) {
     return this->query_;
   }
@@ -87,11 +75,7 @@ std::string PolicyQuery::ToString() const {
 }
 
 // PolicyExpression
-PolicyExpression PolicyExpression::Parse(const std::string &table_name,
-                                         const std::string &column_name,
-                                         const std::string &policy_name,
-                                         size_t index,
-                                         const std::string &expr) {
+PolicyExpression PolicyExpression::Parse(const std::string &expr) {
   // All expressions are on the form <symbol>{<expr>}
   // Determine what kind of expression we are looking at.
 
@@ -111,13 +95,12 @@ PolicyExpression PolicyExpression::Parse(const std::string &table_name,
   // Query.
   if (expr[0] == 'q') {
     std::string query = expr.substr(2, expr.size() - 3);
-    return PolicyExpression(
-        PolicyQuery::Parse(table_name, column_name, policy_name, index, query));
+    return PolicyExpression(PolicyQuery::Parse(query));
   }
 
   LOG(FATAL) << "Unrecorgnized policy expression '" << expr << "'";
 }
-std::string PolicyExpression::ToString() const {
+std::string PolicyExpression::Describe() const {
   if (this->expression_.index() == 0) {
     return "v{" + std::get<0>(this->expression_).AsSQLString() + "}";
   }
@@ -125,19 +108,16 @@ std::string PolicyExpression::ToString() const {
     return "${" + std::get<1>(this->expression_) + "}";
   }
   if (this->expression_.index() == 2) {
-    return "q{" + std::get<2>(this->expression_).ToString() + "}";
+    return "q{" + std::get<2>(this->expression_).Describe() + "}";
   }
   LOG(FATAL) << "Bad variant";
 }
 
-
 // PolicySchema
-PolicySchema PolicySchema::Parse(const std::string &table_name,
-                                 const std::string &column_name,
-                                 const std::string &schema) {
+PolicySchema PolicySchema::Parse(const std::string &schema) {
   if (schema[0] == 'P') {
     std::string parsed = schema.substr(2, schema.size());
-    SinglePolicy policy = ParseSinglePolicy(table_name, column_name, 0, parsed);
+    SinglePolicy policy = ParseSinglePolicy(parsed);
     return PolicySchema(Type::SINGLE, {policy});
   }
 
@@ -148,8 +128,7 @@ PolicySchema PolicySchema::Parse(const std::string &table_name,
     std::string parsed = schema.substr(2, schema.size());
     std::vector<std::string> split = absl::StrSplit(parsed, " ~ ");
     for (size_t i = 0; i < split.size(); i++) {
-      policies.push_back(
-          ParseSinglePolicy(table_name, column_name, i, split.at(i)));
+      policies.push_back(ParseSinglePolicy(split.at(i)));
     }
 
     return PolicySchema(op, std::move(policies));
@@ -157,11 +136,11 @@ PolicySchema PolicySchema::Parse(const std::string &table_name,
 
   LOG(FATAL) << "Unrecorgnized policy schema '" << schema << "'";
 }
-std::string PolicySchema::ToString() const {
+std::string PolicySchema::Describe() const {
   std::string delim = this->type_ == Type::AND ? " & " : " | ";
   std::vector<std::string> strings;
   for (const auto &policy : this->policies_) {
-    strings.push_back(HelperToString(policy));
+    strings.push_back(HelperDescribe(policy));
   }
   return absl::StrJoin(strings, delim);
 }
@@ -191,7 +170,7 @@ PolicyStatement PolicyStatement::Parse(const std::string &statement) {
   // Get remaining policy schema.
   CHECK_LT(end + 1, statement.size()) << "No schema!";
   std::string schema = statement.substr(end + 1, statement.size());
-  PolicySchema parsed = PolicySchema::Parse(table_name, column_name, schema);
+  PolicySchema parsed = PolicySchema::Parse(schema);
 
   // Done!
   return PolicyStatement(std::move(table_name), std::move(column_name),

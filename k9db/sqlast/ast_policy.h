@@ -21,43 +21,31 @@ using PolicyColumn = std::string;
 // A sub-query; possibly with parameters.
 class PolicyQuery {
  public:
-  static PolicyQuery Parse(const std::string &table_name,
-                           const std::string &column_name,
-                           const std::string &policy_name, size_t index,
-                           const std::string &query);
+  static PolicyQuery Parse(const std::string &query);
 
   // Constructor.
-  PolicyQuery(std::string &&query, std::string &&flow_name,
-              std::vector<PolicyColumn> &&params)
-      : query_(std::move(query)),
-        flow_name_(std::move(flow_name)),
-        params_(std::move(params)) {}
+  PolicyQuery(std::string &&query, std::vector<PolicyColumn> &&params)
+      : query_(std::move(query)), params_(std::move(params)) {}
 
-  // For debugging.
-  std::string ToString() const;
+  std::string Describe() const;
+
+  std::string &flow_name() { return this->flow_name_; }
+  const std::string &flow_name() const { return this->flow_name_; }
+  const std::string &query() const { return this->query_; }
+  const std::vector<PolicyColumn> &params() const { return this->params_; }
 
  public:
   std::string query_;
   std::string flow_name_;
   std::vector<PolicyColumn> params_;
-
-  // Construct a unique flow name for this query.
-  static std::string CreateFlowName(const std::string &table,
-                                    const std::string &column,
-                                    const std::string &policy_name,
-                                    size_t index) {
-    std::string index_str = std::to_string(index);
-    return "__P_" + table + "_" + column + "_" + policy_name + "_" + index_str;
-  }
 };
 
 // An expression describing an element of the policy.
 class PolicyExpression {
  public:
-  static PolicyExpression Parse(const std::string &table_name,
-                                const std::string &column_name,
-                                const std::string &policy_name, size_t index,
-                                const std::string &expr);
+  using Variant = std::variant<PolicyLiteral, PolicyColumn, PolicyQuery>;
+
+  static PolicyExpression Parse(const std::string &expr);
 
   // Constructor.
   explicit PolicyExpression(PolicyLiteral &&literal)
@@ -70,7 +58,10 @@ class PolicyExpression {
       : expression_(std::move(query)) {}
 
   // For debugging.
-  std::string ToString() const;
+  std::string Describe() const;
+
+  Variant &expression() { return this->expression_; }
+  const Variant &expression() const { return this->expression_; }
 
   /*
   // Evaluate the expression given a record from a base table.
@@ -80,7 +71,7 @@ class PolicyExpression {
   */
 
  public:
-  std::variant<PolicyLiteral, PolicyColumn, PolicyQuery> expression_;
+  Variant expression_;
 };
 
 // Define the schema of a policy associated to some column in some table.
@@ -97,16 +88,18 @@ class PolicySchema {
   enum class Type { SINGLE, AND, OR };
 
   // Parse schema from string represetation.
-  static PolicySchema Parse(const std::string &table_name,
-                            const std::string &column_name,
-                            const std::string &schema);
+  static PolicySchema Parse(const std::string &schema);
 
   // Constructor.
   PolicySchema(Type type, std::vector<SinglePolicy> &&policies)
       : type_(type), policies_(std::move(policies)) {}
 
   // For debugging.
-  std::string ToString() const;
+  std::string Describe() const;
+
+  Type type() const { return this->type_; }
+  std::vector<SinglePolicy> &policies() { return this->policies_; }
+  const std::vector<SinglePolicy> &policies() const { return this->policies_; }
 
   /*
   // Create a policy of this given schema for the given row.

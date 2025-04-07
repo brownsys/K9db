@@ -85,6 +85,7 @@ cc_library(
         ":key",
         ":schema",
         ":types",
+        "//k9db/policy:abstract_policy",
         "//k9db/sqlast:ast",
         "//k9db/util:type_utils",
         "@glog",
@@ -103,12 +104,24 @@ cc_library(
     visibility = ["//k9db:__subpackages__"],
     deps = [
         ":future",
+        ":operator_type",
         ":record",
         ":schema",
         ":types",
         "@com_google_googletest//:gtest_prod",
     ],
 )
+
+cc_library(
+    name = "operator_type",
+    srcs = [],
+    hdrs = [
+        "operator_type.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [],
+)
+
 
 cc_library(
     name = "types",

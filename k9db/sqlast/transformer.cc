@@ -3,7 +3,6 @@
 
 #include "k9db/sqlast/transformer.h"
 
-#include <iostream>
 #include <string>
 #include <unordered_map>
 #include <utility>

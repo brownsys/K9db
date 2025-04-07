@@ -6,7 +6,6 @@
 #include "k9db/dataflow/state.h"
 
 #include <fstream>
-#include <iostream>
 #include <memory>
 #include <utility>
 

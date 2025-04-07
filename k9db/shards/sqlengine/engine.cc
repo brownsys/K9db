@@ -3,7 +3,10 @@
 
 #include <memory>
 #include <utility>
+#include <vector>
 
+#include "k9db/dataflow/record.h"
+#include "k9db/policy/policy_engine.h"
 #include "k9db/shards/sqlengine/create.h"
 #include "k9db/shards/sqlengine/delete.h"
 #include "k9db/shards/sqlengine/explain.h"
@@ -23,6 +26,31 @@
 namespace k9db {
 namespace shards {
 namespace sqlengine {
+
+// Helper for serializing policies.
+namespace {
+
+absl::StatusOr<sql::SqlResult> serialize_policies(
+    const absl::StatusOr<sql::SqlResult> &status) {
+  // Serialize policies of each resultset.
+  if (status.ok()) {
+    std::vector<sql::SqlResultSet> output;
+    output.reserve(status->ResultSets().size());
+    for (const sql::SqlResultSet &set : status->ResultSets()) {
+      if (set.empty()) {
+        output.emplace_back(set.schema());
+      } else {
+        auto rows = policy::SerializePolicies(set.rows());
+        auto schema = rows.at(0).schema();
+        output.emplace_back(schema, std::move(rows));
+      }
+    }
+    return sql::SqlResult(std::move(output));
+  }
+  return status.status();
+}
+
+}  // namespace
 
 absl::StatusOr<sql::SqlResult> Shard(const sqlast::SQLCommand &sql,
                                      Connection *connection) {
@@ -76,11 +104,11 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::SQLCommand &sql,
       auto *stmt = static_cast<sqlast::Select *>(statement.get());
       util::SharedLock lock = connection->state->ReaderLock();
       if (dstate.HasFlow(stmt->table_name())) {
-        return view::SelectView(*stmt, connection, &lock);
+        return serialize_policies(view::SelectView(*stmt, connection, &lock));
       } else {
         util::SharedLock lock = connection->state->ReaderLock();
         SelectContext context(*stmt, connection, &lock);
-        return context.Exec();
+        return serialize_policies(context.Exec());
       }
     }
 
@@ -120,7 +148,7 @@ absl::StatusOr<sql::SqlResult> Shard(const sqlast::SQLCommand &sql,
       switch (stmt->operation()) {
         case sqlast::GDPRStatement::Operation::GET: {
           GDPRGetContext context(*stmt, connection, &lock);
-          return context.Exec();
+          return serialize_policies(context.Exec());
         }
         case sqlast::GDPRStatement::Operation::FORGET: {
           GDPRForgetContext context(*stmt, connection, &lock);

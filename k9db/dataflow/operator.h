@@ -8,6 +8,7 @@
 
 #include "gtest/gtest_prod.h"
 #include "k9db/dataflow/future.h"
+#include "k9db/dataflow/operator_type.h"
 #include "k9db/dataflow/record.h"
 #include "k9db/dataflow/schema.h"
 #include "k9db/dataflow/types.h"
@@ -23,18 +24,7 @@ class DataFlowGraphPartition;
 
 class Operator {
  public:
-  enum class Type {
-    INPUT,
-    IDENTITY,
-    MAT_VIEW,
-    FORWARD_VIEW,
-    FILTER,
-    UNION,
-    EQUIJOIN,
-    PROJECT,
-    AGGREGATE,
-    EXCHANGE,
-  };
+  using Type = OperatorType;
 
   // Cannot copy an operator.
   Operator(const Operator &other) = delete;

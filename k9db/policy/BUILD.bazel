@@ -1,17 +1,56 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
+cc_library(
+    name = "abstract_policy",
+    srcs = [
+        "abstract_policy.cc",
+    ],
+    hdrs = [
+        "abstract_policy.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        "//k9db/dataflow:operator_type",
+    ],
+)
+
 
 cc_library(
-    name = "policy_builder",
-    srcs = [
-        "policy_builder.cc",
-    ],
+    name = "policy_builder_header",
+    srcs = [],
     hdrs = [
         "policy_builder.h",
     ],
     visibility = ["//k9db:__subpackages__"],
     deps = [
+        ":abstract_policy",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:dstate",
         "//k9db/sqlast:ast",
+        "//k9db/util:upgradable_lock",
+    ],
+)
+
+cc_library(
+    name = "policy_builder_impl",
+    srcs = [
+        "policy_builder.cc",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        ":abstract_policy",
+        ":policy_builder_header",
+        "//k9db:connection",
+        "//k9db/dataflow:key",
+        "//k9db/dataflow:record",
+        "//k9db/dataflow:dstate",
+        "//k9db/policy/policies:policies",
+        "//k9db/shards/sqlengine:view",
+        "//k9db/sql:result",
+        "//k9db/sqlast:ast",
+        "//k9db/util:status",
+        "//k9db/util:upgradable_lock",
+        "@glog",
     ],
 )
 
@@ -25,11 +64,13 @@ cc_library(
     ],
     visibility = ["//k9db:__subpackages__"],
     deps = [
-        ":policy_builder",
+        ":abstract_policy",
+        ":policy_builder_impl",
         ":policy_state",
         "//k9db:connection",
         "//k9db/dataflow:dstate",
         "//k9db/dataflow:record",
+        "//k9db/dataflow:schema",
         "//k9db/shards:state",
         "//k9db/shards:types",
         "//k9db/sqlast:ast",
@@ -48,6 +89,6 @@ cc_library(
     ],
     visibility = ["//k9db:__subpackages__"],
     deps = [
-        ":policy_builder",
+        ":policy_builder_header",
     ],
 )

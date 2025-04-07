@@ -21,6 +21,7 @@ cc_library(
         ":view",
         "//k9db:connection",
         "//k9db/dataflow:dstate",
+        "//k9db/policy:policy_engine",
         "//k9db/shards:state",
         "//k9db/shards:types",
         "//k9db/sql:result",
@@ -86,6 +87,7 @@ cc_library(
     hdrs = [
         "view.h",
     ],
+    visibility = ["//k9db:__subpackages__"],
     deps = [
         "//k9db:connection",
         "//k9db/dataflow:dstate",
@@ -283,7 +285,9 @@ cc_library(
         ":index",
         "//k9db:connection",
         "//k9db/dataflow:dstate",
+        "//k9db/dataflow:record",
         "//k9db/dataflow:schema",
+        "//k9db/policy:policy_engine",
         "//k9db/shards:state",
         "//k9db/shards:types",
         "//k9db/sql:connection",

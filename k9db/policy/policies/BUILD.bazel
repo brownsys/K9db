@@ -1,0 +1,20 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+cc_library(
+    name = "policies",
+    srcs = [
+        "policies.cc",
+    ],
+    hdrs = [
+        "policies.h",
+    ],
+    visibility = ["//k9db:__subpackages__"],
+    deps = [
+        "//k9db/dataflow:operator_type",
+        "//k9db/policy:abstract_policy",
+        "//k9db/sqlast:ast",
+        "@com_google_absl//absl/strings",
+        "@glog",
+    ],
+)
+

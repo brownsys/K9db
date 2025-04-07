@@ -44,6 +44,14 @@ Record Record::Copy() const {
     }
   }
 
+  // Copy policies.
+  record.policies_.reserve(this->policies_.size());
+  for (const auto &policy : this->policies_) {
+    if (policy != nullptr) {
+      record.policies_.push_back(policy->Copy());
+    }
+  }
+
   return record;
 }
 

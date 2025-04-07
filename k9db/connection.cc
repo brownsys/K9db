@@ -111,7 +111,7 @@ sql::SqlResult State::ShowPolicies() const {
     const shards::Table &table = this->sstate_.GetTable(table_name);
     const policy::PolicyState &policy_state = table.policy_state;
     for (const auto &[column, policy_builder] : policy_state.map()) {
-      std::string policy = policy_builder.schema().ToString();
+      std::string policy = policy_builder.Describe();
       records.emplace_back(schema, true,
                            std::make_unique<std::string>(table_name),
                            std::make_unique<std::string>(column),
