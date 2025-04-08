@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "k9db/dataflow/record.h"
+#include "k9db/policy/policy_engine.h"
 #include "k9db/shards/sqlengine/index.h"
 #include "k9db/shards/sqlengine/util.h"
 #include "k9db/util/shard_name.h"
@@ -324,6 +325,9 @@ absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
   // Commit transaction.
   this->db_->CommitTransaction();
   CHECK_STATUS(this->conn_->ctx->CommitCheckpoint());
+
+  // Add policies to records.
+  policy::MakePolicies(this->table_name_, this->conn_, &this->records_);
 
   // Process updates to dataflows.
   this->dstate_.ProcessRecords(this->table_name_, std::move(this->records_));

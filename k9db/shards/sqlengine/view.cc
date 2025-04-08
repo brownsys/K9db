@@ -72,6 +72,12 @@ absl::StatusOr<sql::SqlResult> CreateView(const sqlast::CreateView &stmt,
       record.SetPositive(true);
     }
 
+    // Assign records their policy.
+    // TODO(babman): can infinite loop when dealing with creating a new
+    // view for a policy expression or when replaying creation after a
+    // K9db restart.
+    // policy::MakePolicies(table_name, connection, &records);
+
     dataflow_state.ProcessRecordsByFlowName(
         flow_name, table_name, std::move(records), future.GetPromise());
   }

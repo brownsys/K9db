@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "k9db/policy/policy_engine.h"
 #include "k9db/shards/sqlengine/util.h"
 #include "k9db/util/iterator.h"
 #include "k9db/util/status.h"
@@ -510,6 +511,9 @@ absl::StatusOr<sql::SqlResult> UpdateContext::Exec() {
   // Commit transaction.
   this->db_->CommitTransaction();
   CHECK_STATUS(this->conn_->ctx->CommitCheckpoint());
+
+  // Add policies to record.
+  policy::MakePolicies(this->table_name_, this->conn_, &result.second);
 
   // Update dataflow.
   this->dstate_.ProcessRecords(this->table_name_, std::move(result.second));

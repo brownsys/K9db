@@ -45,11 +45,8 @@ Record Record::Copy() const {
   }
 
   // Copy policies.
-  record.policies_.reserve(this->policies_.size());
-  for (const auto &policy : this->policies_) {
-    if (policy != nullptr) {
-      record.policies_.push_back(policy->Copy());
-    }
+  for (size_t i = 0; i < this->policies_.size(); i++) {
+    record.SetPolicy(i, this->CopyPolicy(i));
   }
 
   return record;
@@ -367,6 +364,14 @@ std::ostream &operator<<(std::ostream &os, const k9db::dataflow::Record &r) {
   if (!r.IsPositive()) {
     os << " -- negative";
   }
+
+  /*
+  os << " --- policies: |";
+  for (const auto &p : r.policies_) {
+    os << ((p == nullptr) ? "[nullptr]" : p->Name());
+    os << "|";
+  }
+  */
 
   return os;
 }

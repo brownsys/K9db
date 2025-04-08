@@ -20,8 +20,8 @@ using CType = sqlast::ColumnDefinition::Type;
 
 // Test record size.
 TEST(RecordTest, Size) {
-  // should be 40 bytes.
-  EXPECT_EQ(sizeof(Record), 32);
+  // should be 32 bytes + policies.
+  EXPECT_EQ(sizeof(Record), 32 + sizeof(std::vector<std::unique_ptr<void>>));
 }
 
 // Tests setting and getting data from record.

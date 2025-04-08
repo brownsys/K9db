@@ -70,9 +70,9 @@ void AggregateOperator::ComputeOutputSchema() {
 // The first n-1 columns are assigned values from the given key corresponding
 // to group by columns.
 // The last column is assigned value from the aggregate value.
-Record AggregateOperator::EmitRecord(const Key &key,
-                                     const sqlast::Value &aggregate,
-                                     bool positive) const {
+Record AggregateOperator::EmitRecord(
+    const Key &key, const sqlast::Value &aggregate,
+    std::unique_ptr<policy::AbstractPolicy> &&policy, bool positive) const {
   // Create record and add the group by field values to it.
   Record result{this->output_schema_, positive};
   for (size_t i = 0; i < key.size(); i++) {
@@ -80,6 +80,7 @@ Record AggregateOperator::EmitRecord(const Key &key,
   }
   if (this->aggregate_function_ != Function::NO_AGGREGATE) {
     result.SetValue(aggregate, this->output_schema_.size() - 1);
+    result.SetPolicy(this->output_schema_.size() - 1, std::move(policy));
   }
   return result;
 }
@@ -93,7 +94,19 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
   // to the key prior to processing records.
   // This information is used to determine what records to emit to children
   // operators.
+  using PolicyPtr = std::unique_ptr<policy::AbstractPolicy>;
   absl::flat_hash_map<Key, sqlast::Value> old_values;
+  absl::flat_hash_map<Key, PolicyPtr> old_policies;
+
+  // Make sure it is allowed to aggregate.
+  for (const Record &record : records) {
+    for (const auto &col : this->group_columns_) {
+      const PolicyPtr &policy = record.GetPolicy(col);
+      if (policy != nullptr) {
+        CHECK(policy->Allows(this->type())) << "Policy does not allow this op";
+      }
+    }
+  }
 
   // Go over records, updating the aggregate state for each record, as well as
   // old_values. The records to emit will be computed afterwards.
@@ -111,6 +124,7 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
           sqlast::Value &value = this->state_.Get(group_key).front().value;
           if (old_values.count(group_key) == 0) {
             old_values.emplace(group_key, value);
+            old_policies.emplace(group_key, nullptr);
           }
           value = sqlast::Value(value.GetUInt() - 1);
           if (value.GetUInt() == 0) {
@@ -123,15 +137,18 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
             sqlast::Value &value = this->state_.Get(group_key).front().value;
             if (old_values.count(group_key) == 0) {
               old_values.emplace(group_key, value);
+              old_policies.emplace(group_key, nullptr);
             }
             value = sqlast::Value(value.GetUInt() + 1);
           } else {
             if (old_values.count(group_key) == 0) {
               // Put in null value.
               old_values.emplace(group_key, sqlast::Value());
+              old_policies.emplace(group_key, nullptr);
             }
+            PolicyPtr &policy = this->policies_.emplace_back(nullptr);
             AggregateData data = {
-                sqlast::Value(static_cast<uint64_t>(1)), {}, {}};
+                sqlast::Value(static_cast<uint64_t>(1)), {}, {}, policy};
             this->state_.Insert(group_key, std::move(data));
           }
         }
@@ -139,16 +156,20 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
       }
       case Function::SUM: {
         auto record_value = record.GetValue(this->aggregate_column_index_);
+        PolicyPtr policy = record.CopyPolicy(this->aggregate_column_index_);
         if (!record.IsPositive()) {
           // Negative record: decrement value in state by the value in record.
           if (!this->state_.Contains(group_key)) {
             LOG(FATAL) << "Negative record not seen before in aggregate";
           }
           // Save old value and update the state.
-          sqlast::Value &value = this->state_.Get(group_key).front().value;
+          AggregateData &data = this->state_.Get(group_key).front();
+          sqlast::Value &value = data.value;
           if (old_values.count(group_key) == 0) {
             old_values.emplace(group_key, value);
+            old_policies.emplace(group_key, data.CopyPolicy());
           }
+          data.SubtractPolicy(policy);
           switch (this->aggregate_column_type_) {
             case sqlast::ColumnDefinition::Type::UINT:
               value = sqlast::Value(value.GetUInt() - record_value.GetUInt());
@@ -162,10 +183,13 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
         } else {
           // Positive record: increment value in state by the value in record.
           if (this->state_.Contains(group_key)) {
-            sqlast::Value &value = this->state_.Get(group_key).front().value;
+            AggregateData &data = this->state_.Get(group_key).front();
+            sqlast::Value &value = data.value;
             if (old_values.count(group_key) == 0) {
               old_values.emplace(group_key, value);
+              old_policies.emplace(group_key, data.CopyPolicy());
             }
+            data.CombinePolicy(policy);
             switch (this->aggregate_column_type_) {
               case sqlast::ColumnDefinition::Type::UINT:
                 value = sqlast::Value(value.GetUInt() + record_value.GetUInt());
@@ -180,8 +204,10 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
             if (old_values.count(group_key) == 0) {
               // Put in null value.
               old_values.emplace(group_key, sqlast::Value());
+              old_policies.emplace(group_key, nullptr);
             }
-            AggregateData data = {std::move(record_value), {}, {}};
+            PolicyPtr &pref = this->policies_.emplace_back(std::move(policy));
+            AggregateData data = {std::move(record_value), {}, {}, pref};
             this->state_.Insert(group_key, std::move(data));
           }
         }
@@ -189,6 +215,7 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
       }
       case Function::AVG: {
         auto record_value = record.GetValue(this->aggregate_column_index_);
+        PolicyPtr policy = record.CopyPolicy(this->aggregate_column_index_);
         if (!record.IsPositive()) {
           // Negative record: decrement value in state by the value in record.
           if (!this->state_.Contains(group_key)) {
@@ -199,8 +226,10 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
           sqlast::Value &value = data.value;
           if (old_values.count(group_key) == 0) {
             old_values.emplace(group_key, value);
+            old_policies.emplace(group_key, data.CopyPolicy());
           }
 
+          data.SubtractPolicy(policy);
           sqlast::Value &v1 = data.v1;
           sqlast::Value &v2 = data.v2;
           v2 = sqlast::Value(v2.GetUInt() - 1);
@@ -229,7 +258,9 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
             sqlast::Value &value = data.value;
             if (old_values.count(group_key) == 0) {
               old_values.emplace(group_key, value);
+              old_policies.emplace(group_key, data.CopyPolicy());
             }
+            data.CombinePolicy(policy);
             sqlast::Value &v1 = data.v1;
             sqlast::Value &v2 = data.v2;
             v2 = sqlast::Value(v2.GetUInt() + 1);
@@ -251,9 +282,12 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
             if (old_values.count(group_key) == 0) {
               // Put in null value.
               old_values.emplace(group_key, sqlast::Value());
+              old_policies.emplace(group_key, nullptr);
             }
+            PolicyPtr &pref = this->policies_.emplace_back(std::move(policy));
             AggregateData data = {record_value, record_value,
-                                  sqlast::Value(static_cast<uint64_t>(1))};
+                                  sqlast::Value(static_cast<uint64_t>(1)),
+                                  pref};
             this->state_.Insert(group_key, std::move(data));
           }
         }
@@ -265,18 +299,23 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
   // Emit records only for groups whose value ended up changing.
   std::vector<Record> output;
   for (const auto &[group_key, old_value] : old_values) {
+    PolicyPtr old_policy = std::move(old_policies.at(group_key));
     if (!this->state_.Contains(group_key)) {
       if (!old_value.IsNull()) {
-        output.push_back(this->EmitRecord(group_key, old_value, false));
+        output.push_back(this->EmitRecord(group_key, old_value,
+                                          std::move(old_policy), false));
       }
     } else {
-      const sqlast::Value &new_value =
-          this->state_.Get(group_key).front().value;
+      const AggregateData &data = this->state_.Get(group_key).front();
+      const sqlast::Value &new_value = data.value;
+      PolicyPtr new_policy = data.CopyPolicy();
       if (old_value != new_value) {
         if (!old_value.IsNull()) {
-          output.push_back(this->EmitRecord(group_key, old_value, false));
+          output.push_back(this->EmitRecord(group_key, old_value,
+                                            std::move(old_policy), false));
         }
-        output.push_back(this->EmitRecord(group_key, new_value, true));
+        output.push_back(this->EmitRecord(group_key, new_value,
+                                          std::move(new_policy), true));
       }
     }
   }

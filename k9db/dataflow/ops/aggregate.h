@@ -19,6 +19,7 @@
 #include "k9db/dataflow/record.h"
 #include "k9db/dataflow/schema.h"
 #include "k9db/dataflow/types.h"
+#include "k9db/policy/abstract_policy.h"
 #include "k9db/sqlast/ast.h"
 
 namespace k9db {
@@ -33,8 +34,30 @@ class AggregateOperator : public Operator {
     sqlast::Value value;
     sqlast::Value v1;
     sqlast::Value v2;
+    std::unique_ptr<policy::AbstractPolicy> &policy;
     uint64_t SizeInMemory() const {
       return value.SizeInMemory() + v1.SizeInMemory() + v2.SizeInMemory();
+    }
+    std::unique_ptr<policy::AbstractPolicy> CopyPolicy() const {
+      if (policy == nullptr) {
+        return nullptr;
+      } else {
+        return policy->Copy();
+      }
+    }
+    void CombinePolicy(const std::unique_ptr<policy::AbstractPolicy> &o) {
+      if (policy != nullptr && o != nullptr) {
+        policy = policy->Combine(o);
+      } else if (o != nullptr) {
+        policy = o->Copy();
+      }
+    }
+    void SubtractPolicy(const std::unique_ptr<policy::AbstractPolicy> &o) {
+      if (policy != nullptr && o != nullptr) {
+        policy = policy->Subtract(o);
+      } else if (o != nullptr) {
+        policy = o->Copy();
+      }
     }
   };
 
@@ -53,6 +76,7 @@ class AggregateOperator : public Operator {
                     Function aggregate_function, ColumnID aggregate_column)
       : Operator(Operator::Type::AGGREGATE),
         state_(),
+        policies_(),
         group_columns_(group_columns),
         aggregate_function_(aggregate_function),
         aggregate_column_index_(aggregate_column),
@@ -63,6 +87,7 @@ class AggregateOperator : public Operator {
                     const std::string &agg_column_name)
       : Operator(Operator::Type::AGGREGATE),
         state_(),
+        policies_(),
         group_columns_(group_columns),
         aggregate_function_(aggregate_function),
         aggregate_column_index_(aggregate_column),
@@ -84,6 +109,7 @@ class AggregateOperator : public Operator {
 
  private:
   State state_;
+  std::list<std::unique_ptr<policy::AbstractPolicy>> policies_;
   // Group by columns information.
   std::vector<ColumnID> group_columns_;
   // Aggregate column information.
@@ -97,6 +123,7 @@ class AggregateOperator : public Operator {
   // to group by columns.
   // The last column is assigned value from the aggregate value.
   Record EmitRecord(const Key &key, const sqlast::Value &aggregate,
+                    std::unique_ptr<policy::AbstractPolicy> &&policy,
                     bool positive) const;
 
   // Allow tests to use .Process(...) directly.

@@ -28,6 +28,13 @@ class AccessControl : public AbstractPolicy {
   static std::unique_ptr<AbstractPolicy> Factory(
       std::vector<sqlast::Value> &&values);
 
+  // For debugging.
+  std::string Debug() const override;
+
+  // Combine.
+  std::unique_ptr<AbstractPolicy> Combine(
+      const std::unique_ptr<AbstractPolicy> &other) const override;
+
   // Copying.
   std::unique_ptr<AbstractPolicy> Copy() const override {
     return std::make_unique<AccessControl>(std::unordered_set(this->users_));
@@ -44,15 +51,28 @@ class AccessControl : public AbstractPolicy {
 // MinK aggregation.
 class Aggregate : public AbstractPolicy {
  public:
-  Aggregate(size_t k, size_t min_k) : AbstractPolicy(), k_(k), min_k_(min_k) {}
+  Aggregate(size_t k, size_t min_k, std::string &&distinct)
+      : AbstractPolicy(), k_(k), min_k_(min_k), distinct_() {
+    this->distinct_.insert(std::move(distinct));
+  }
+  Aggregate(size_t k, size_t min_k, std::unordered_set<std::string> &&dist)
+      : AbstractPolicy(), k_(k), min_k_(min_k), distinct_(std::move(dist)) {}
 
   // Factory to create from policy args when reading records from DB.
   static std::unique_ptr<AbstractPolicy> Factory(
       std::vector<sqlast::Value> &&values);
 
+  // For debugging.
+  std::string Debug() const override;
+
+  // Combine.
+  std::unique_ptr<AbstractPolicy> Combine(
+      const std::unique_ptr<AbstractPolicy> &other) const override;
+
   // Copying.
   std::unique_ptr<AbstractPolicy> Copy() const override {
-    return std::make_unique<Aggregate>(this->k_, this->min_k_);
+    return std::make_unique<Aggregate>(this->k_, this->min_k_,
+                                       std::unordered_set(this->distinct_));
   }
 
   // Serializing.
@@ -62,6 +82,7 @@ class Aggregate : public AbstractPolicy {
  private:
   size_t k_;
   size_t min_k_;
+  std::unordered_set<std::string> distinct_;
 };
 
 // User consent for purpose.
@@ -76,6 +97,13 @@ class Consent : public AbstractPolicy {
   // Factory to create from policy args when reading records from DB.
   static std::unique_ptr<AbstractPolicy> Factory(
       std::vector<sqlast::Value> &&values);
+
+  // For debugging.
+  std::string Debug() const override;
+
+  // Combine.
+  std::unique_ptr<AbstractPolicy> Combine(
+      const std::unique_ptr<AbstractPolicy> &other) const override;
 
   // Copying.
   std::unique_ptr<AbstractPolicy> Copy() const override {
@@ -100,6 +128,18 @@ class NoAggregate : public AbstractPolicy {
   static std::unique_ptr<AbstractPolicy> Factory(
       std::vector<sqlast::Value> &&values);
 
+  // For debugging.
+  std::string Debug() const override;
+
+  // Combine.
+  std::unique_ptr<AbstractPolicy> Combine(
+      const std::unique_ptr<AbstractPolicy> &other) const override;
+
+  // Disallow aggregation.
+  bool Allows(dataflow::OperatorType type) const override {
+    return type != dataflow::OperatorType::AGGREGATE;
+  }
+
   // Copying.
   std::unique_ptr<AbstractPolicy> Copy() const override {
     return std::make_unique<NoAggregate>(this->ok_);
@@ -117,6 +157,23 @@ class And : public AbstractPolicy {
  public:
   explicit And(std::vector<std::unique_ptr<AbstractPolicy>> &&policies)
       : policies_(std::move(policies)) {}
+
+  // For debugging.
+  std::string Debug() const override;
+
+  // Combine.
+  std::unique_ptr<AbstractPolicy> Combine(
+      const std::unique_ptr<AbstractPolicy> &other) const override;
+
+  // Disallow aggregation for member policies.
+  bool Allows(dataflow::OperatorType type) const override {
+    for (const auto &policy : this->policies_) {
+      if (!policy->Allows(type)) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   // Copying.
   std::unique_ptr<AbstractPolicy> Copy() const override {
@@ -141,6 +198,23 @@ class Or : public AbstractPolicy {
  public:
   explicit Or(std::vector<std::unique_ptr<AbstractPolicy>> &&policies)
       : policies_(std::move(policies)) {}
+
+  // For debugging.
+  std::string Debug() const override;
+
+  // Combine.
+  std::unique_ptr<AbstractPolicy> Combine(
+      const std::unique_ptr<AbstractPolicy> &other) const override;
+
+  // Disallow aggregation for member policies.
+  bool Allows(dataflow::OperatorType type) const override {
+    for (const auto &policy : this->policies_) {
+      if (policy->Allows(type)) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   // Copying.
   std::unique_ptr<AbstractPolicy> Copy() const override {

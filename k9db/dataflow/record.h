@@ -160,15 +160,27 @@ class Record {
     }
   }
 
-  // Set policies.
+  // Set and Get policies.
   void SetPolicy(size_t column,
                  std::unique_ptr<policy::AbstractPolicy> &&policy) {
-    this->policies_[column] = std::move(policy);
+    this->policies_.at(column) = std::move(policy);
   }
   void SetPolicy(const std::string &column,
                  std::unique_ptr<policy::AbstractPolicy> &&policy) {
     size_t i = this->schema_.IndexOf(column);
-    this->policies_[i] = std::move(policy);
+    this->policies_.at(i) = std::move(policy);
+  }
+  const std::unique_ptr<policy::AbstractPolicy> &GetPolicy(size_t col) const {
+    return this->policies_.at(col);
+  }
+  std::unique_ptr<policy::AbstractPolicy> CopyPolicy(size_t column) const {
+    const std::unique_ptr<policy::AbstractPolicy> &policy =
+        this->policies_.at(column);
+    if (policy != nullptr) {
+      return policy->Copy();
+    } else {
+      return nullptr;
+    }
   }
 
   // The size of the record in bytes.

@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "glog/logging.h"
+#include "k9db/policy/policy_engine.h"
 #include "k9db/shards/sqlengine/delete.h"
 #include "k9db/shards/sqlengine/update.h"
 #include "k9db/util/status.h"
@@ -229,6 +230,10 @@ absl::StatusOr<sql::SqlResult> GDPRForgetContext::Exec() {
 
   // Update dataflow.
   for (auto &[table_name, records] : this->records_) {
+    // Add policies to record.
+    policy::MakePolicies(table_name, this->conn_, &records);
+
+    // Update flows.
     this->dstate_.ProcessRecords(table_name, std::move(records));
   }
 

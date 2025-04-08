@@ -19,9 +19,16 @@ class AbstractPolicy {
 
   // Virtual functions.
   virtual std::string Name() const = 0;
-  virtual bool Check() const;
-  virtual std::unique_ptr<AbstractPolicy> Combine(AbstractPolicy *other);
   virtual bool Allows(dataflow::OperatorType type) const;
+
+  // For debugging.
+  virtual std::string Debug() const = 0;
+
+  // Combinging with other policies.
+  virtual std::unique_ptr<AbstractPolicy> Combine(
+      const std::unique_ptr<AbstractPolicy> &other) const;
+  virtual std::unique_ptr<AbstractPolicy> Subtract(
+      const std::unique_ptr<AbstractPolicy> &other) const;
 
   // Copying.
   virtual std::unique_ptr<AbstractPolicy> Copy() const = 0;

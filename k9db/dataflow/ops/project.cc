@@ -212,6 +212,7 @@ std::vector<Record> ProjectOperator::Process(NodeIndex source,
       if (projection.column()) {
         // Project an existing column.
         ColumnID column = projection.getLeftColumn();
+        out_record.SetPolicy(i, record.CopyPolicy(column));
         if (record.IsNull(column)) {
           out_record.SetNull(true, i);
           continue;
@@ -261,6 +262,18 @@ std::vector<Record> ProjectOperator::Process(NodeIndex source,
         if (projection.left_column() && projection.right_column()) {
           ColumnID left = projection.getLeftColumn();
           ColumnID right = projection.getRightColumn();
+
+          // Combine policies.
+          const auto &left_policy = record.GetPolicy(left);
+          const auto &right_policy = record.GetPolicy(right);
+          if (left_policy != nullptr && right_policy != nullptr) {
+            out_record.SetPolicy(i, left_policy->Combine(right_policy));
+          } else if (left_policy != nullptr) {
+            out_record.SetPolicy(i, left_policy->Copy());
+          } else if (right_policy != nullptr) {
+            out_record.SetPolicy(i, right_policy->Copy());
+          }
+
           switch (projection.getOperation()) {
             case Operation::MINUS: {
               ARITHMETIC_WITH_COLUMN_MACRO(-)
@@ -277,6 +290,7 @@ std::vector<Record> ProjectOperator::Process(NodeIndex source,
         } else if (projection.left_column()) {
           ColumnID left = projection.getLeftColumn();
           const sqlast::Value &right = projection.getRightLiteral();
+          out_record.SetPolicy(i, record.CopyPolicy(left));
           switch (projection.getOperation()) {
             case Operation::MINUS: {
               ARITHMETIC_WITH_RIGHT_LITERAL_MACRO(-)
@@ -293,6 +307,7 @@ std::vector<Record> ProjectOperator::Process(NodeIndex source,
         } else {
           const sqlast::Value &left = projection.getLeftLiteral();
           ColumnID right = projection.getRightColumn();
+          out_record.SetPolicy(i, record.CopyPolicy(right));
           switch (projection.getOperation()) {
             case Operation::MINUS: {
               ARITHMETIC_WITH_LEFT_LITERAL_MACRO(-)

@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "k9db/dataflow/record.h"
+#include "k9db/policy/policy_engine.h"
 #include "k9db/shards/sqlengine/util.h"
 #include "k9db/util/iterator.h"
 #include "k9db/util/shard_name.h"
@@ -145,6 +146,9 @@ absl::StatusOr<sql::SqlResult> DeleteContext::Exec() {
   // Commit transaction.
   this->db_->CommitTransaction();
   CHECK_STATUS(this->conn_->ctx->CommitCheckpoint());
+
+  // Add policies to records.
+  policy::MakePolicies(this->table_name_, this->conn_, &result.second);
 
   // Process updates to dataflows.
   this->dstate_.ProcessRecords(this->table_name_, std::move(result.second));

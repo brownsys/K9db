@@ -213,6 +213,7 @@ cc_library(
         "//k9db/dataflow:record",
         "//k9db/dataflow:schema",
         "//k9db/dataflow:types",
+        "//k9db/policy:abstract_policy",
         "//k9db/sqlast:ast",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_googletest//:gtest_prod",

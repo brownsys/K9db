@@ -211,27 +211,43 @@ void EquiJoinOperator::EmitRow(const Record &left, const Record &right,
   const SchemaRef &lschema = left.schema();
   const SchemaRef &rschema = right.schema();
 
-  // Create a concatenated record, dropping key column from left side.
+  // Create a concatenated record, dropping key column from right side.
   Record record{this->output_schema_, positive};
   for (size_t i = 0; i < lschema.size(); i++) {
-    if (left.IsNull(i))
+    if (left.IsNull(i)) {
       record.SetNull(true, i);
-    else
+    } else {
       CopyIntoRecord(lschema.TypeOf(i), &record, left, i, i);
+    }
+    record.SetPolicy(i, left.CopyPolicy(i));
   }
   for (size_t i = 0; i < rschema.size(); i++) {
-    if (i == this->right_id_) {
-      continue;
-    }
+    // i is the index in the right record, j is the corresponding index in
+    // the output record.
     size_t j = i + lschema.size();
     if (i > this->right_id_) {
       j--;
     }
+
+    // Key column: we already added this to the output from the left record.
+    if (i == this->right_id_) {
+      const auto &lpolicy = left.GetPolicy(this->left_id_);
+      const auto &rpolicy = right.GetPolicy(i);
+      if (lpolicy != nullptr && rpolicy != nullptr) {
+        record.SetPolicy(this->left_id_, lpolicy->Combine(rpolicy));
+      } else if (rpolicy != nullptr) {
+        record.SetPolicy(this->left_id_, rpolicy->Copy());
+      }
+      continue;
+    }
+
+    // Not key column.
     if (right.IsNull(i)) {
       record.SetNull(true, j);
     } else {
       CopyIntoRecord(rschema.TypeOf(i), &record, right, j, i);
     }
+    record.SetPolicy(j, right.CopyPolicy(i));
   }
 
   // add result record to output
