@@ -135,6 +135,7 @@ class Operator {
   // These tests need to use AddParent().
   FRIEND_TEST(AggregateOperatorTest, SumGoesAwayWithFilter);
   FRIEND_TEST(AggregateOperatorTest, CountGoesAwayOnDelete);
+  FRIEND_TEST(AggregateOperatorTest, SimpleAverage);
 
 #ifdef K9DB_BENCHMARK  // shuts up compiler warnings
   friend void ProcessBenchmark(Operator *op, NodeIndex src, RecordGenFunc gen);

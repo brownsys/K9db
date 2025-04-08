@@ -18,3 +18,8 @@ SELECT users.apikey, answers.answer, answers.submitted_at, answers.grade \
 FROM answers JOIN users ON (answers.email = users.email) \
 ORDER BY answers.submitted_at \
 "';
+CREATE VIEW grade_avg AS '"\
+SELECT email, AVG(grade) \
+FROM answers \
+GROUP BY email \
+"';

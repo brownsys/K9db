@@ -44,6 +44,11 @@ public class AggregateOperatorFactory {
           assert aggCall.getArgList().size() == 1;
           aggCol = this.context.getK9dbIndex(aggCall.getArgList().get(0));
           break;
+        case AVG:
+          functionEnum = DataFlowGraphLibrary.AVG;
+          assert aggCall.getArgList().size() == 1;
+          aggCol = this.context.getK9dbIndex(aggCall.getArgList().get(0));
+          break;
         default:
           throw new IllegalArgumentException("Invalid aggregate function");
       }

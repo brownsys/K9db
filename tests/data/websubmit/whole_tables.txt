@@ -20,3 +20,7 @@ a3|student3@email.com|1|answer 3|2020-01-01 01:01:03|0
 a2|student2@email.com|1|answer 2|2020-02-01 01:01:02|0
 a5|student2@email.com|2|answer 5|2020-02-01 01:02:02|0
 ;
+student1@email.com|33
+student2@email.com|0
+student3@email.com|0
+;

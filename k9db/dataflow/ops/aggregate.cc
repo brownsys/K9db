@@ -26,6 +26,16 @@ void AggregateOperator::ComputeOutputSchema() {
         this->aggregate_column_type_ != sqlast::ColumnDefinition::Type::INT) {
       LOG(FATAL) << "Unsupported column type for Sum aggregate";
     }
+  } else if (this->aggregate_function_ == Function::AVG) {
+    if (this->aggregate_column_name_ == "") {
+      this->aggregate_column_name_ = "Avg";
+    }
+    this->aggregate_column_type_ =
+        this->input_schemas_.at(0).TypeOf(this->aggregate_column_index_);
+    if (this->aggregate_column_type_ != sqlast::ColumnDefinition::Type::UINT &&
+        this->aggregate_column_type_ != sqlast::ColumnDefinition::Type::INT) {
+      LOG(FATAL) << "Unsupported column type for Sum aggregate";
+    }
   }
 
   // Obtain column names and types.
@@ -98,7 +108,7 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
             LOG(FATAL) << "Negative record not seen before in aggregate";
           }
           // Save old value and update the state.
-          sqlast::Value &value = this->state_.Get(group_key).front();
+          sqlast::Value &value = this->state_.Get(group_key).front().value;
           if (old_values.count(group_key) == 0) {
             old_values.emplace(group_key, value);
           }
@@ -110,7 +120,7 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
           // Positive record: increment value in state by +1.
           if (this->state_.Contains(group_key)) {
             // Increment state by +1 and track old value.
-            sqlast::Value &value = this->state_.Get(group_key).front();
+            sqlast::Value &value = this->state_.Get(group_key).front().value;
             if (old_values.count(group_key) == 0) {
               old_values.emplace(group_key, value);
             }
@@ -120,8 +130,9 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
               // Put in null value.
               old_values.emplace(group_key, sqlast::Value());
             }
-            this->state_.Insert(group_key,
-                                sqlast::Value(static_cast<uint64_t>(1)));
+            AggregateData data = {
+                sqlast::Value(static_cast<uint64_t>(1)), {}, {}};
+            this->state_.Insert(group_key, std::move(data));
           }
         }
         break;
@@ -134,7 +145,7 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
             LOG(FATAL) << "Negative record not seen before in aggregate";
           }
           // Save old value and update the state.
-          sqlast::Value &value = this->state_.Get(group_key).front();
+          sqlast::Value &value = this->state_.Get(group_key).front().value;
           if (old_values.count(group_key) == 0) {
             old_values.emplace(group_key, value);
           }
@@ -151,7 +162,7 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
         } else {
           // Positive record: increment value in state by the value in record.
           if (this->state_.Contains(group_key)) {
-            sqlast::Value &value = this->state_.Get(group_key).front();
+            sqlast::Value &value = this->state_.Get(group_key).front().value;
             if (old_values.count(group_key) == 0) {
               old_values.emplace(group_key, value);
             }
@@ -170,7 +181,80 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
               // Put in null value.
               old_values.emplace(group_key, sqlast::Value());
             }
-            this->state_.Insert(group_key, std::move(record_value));
+            AggregateData data = {std::move(record_value), {}, {}};
+            this->state_.Insert(group_key, std::move(data));
+          }
+        }
+        break;
+      }
+      case Function::AVG: {
+        auto record_value = record.GetValue(this->aggregate_column_index_);
+        if (!record.IsPositive()) {
+          // Negative record: decrement value in state by the value in record.
+          if (!this->state_.Contains(group_key)) {
+            LOG(FATAL) << "Negative record not seen before in aggregate";
+          }
+          // Save old value and update the state.
+          AggregateData &data = this->state_.Get(group_key).front();
+          sqlast::Value &value = data.value;
+          if (old_values.count(group_key) == 0) {
+            old_values.emplace(group_key, value);
+          }
+
+          sqlast::Value &v1 = data.v1;
+          sqlast::Value &v2 = data.v2;
+          v2 = sqlast::Value(v2.GetUInt() - 1);
+          if (v2.GetUInt() == 0) {
+            this->state_.Erase(group_key);
+            continue;
+          }
+          switch (this->aggregate_column_type_) {
+            case sqlast::ColumnDefinition::Type::UINT:
+              v1 = sqlast::Value(v1.GetUInt() - record_value.GetUInt());
+              value = sqlast::Value(v1.GetUInt() / v2.GetUInt());
+              break;
+            case sqlast::ColumnDefinition::Type::INT: {
+              int64_t count = static_cast<int64_t>(v2.GetUInt());
+              v1 = sqlast::Value(v1.GetInt() - record_value.GetInt());
+              value = sqlast::Value(v1.GetInt() / count);
+              break;
+            }
+            default:
+              LOG(FATAL) << "Unsupported type";
+          }
+        } else {
+          // Positive record: increment value in state by the value in record.
+          if (this->state_.Contains(group_key)) {
+            AggregateData &data = this->state_.Get(group_key).front();
+            sqlast::Value &value = data.value;
+            if (old_values.count(group_key) == 0) {
+              old_values.emplace(group_key, value);
+            }
+            sqlast::Value &v1 = data.v1;
+            sqlast::Value &v2 = data.v2;
+            v2 = sqlast::Value(v2.GetUInt() + 1);
+            switch (this->aggregate_column_type_) {
+              case sqlast::ColumnDefinition::Type::UINT:
+                v1 = sqlast::Value(v1.GetUInt() + record_value.GetUInt());
+                value = sqlast::Value(v1.GetUInt() / v2.GetUInt());
+                break;
+              case sqlast::ColumnDefinition::Type::INT: {
+                int64_t count = static_cast<int64_t>(v2.GetUInt());
+                v1 = sqlast::Value(v1.GetInt() + record_value.GetInt());
+                value = sqlast::Value(v1.GetInt() / count);
+                break;
+              }
+              default:
+                LOG(FATAL) << "Unsupported type";
+            }
+          } else {
+            if (old_values.count(group_key) == 0) {
+              // Put in null value.
+              old_values.emplace(group_key, sqlast::Value());
+            }
+            AggregateData data = {record_value, record_value,
+                                  sqlast::Value(static_cast<uint64_t>(1))};
+            this->state_.Insert(group_key, std::move(data));
           }
         }
         break;
@@ -186,7 +270,8 @@ std::vector<Record> AggregateOperator::Process(NodeIndex source,
         output.push_back(this->EmitRecord(group_key, old_value, false));
       }
     } else {
-      const sqlast::Value &new_value = this->state_.Get(group_key).front();
+      const sqlast::Value &new_value =
+          this->state_.Get(group_key).front().value;
       if (old_value != new_value) {
         if (!old_value.IsNull()) {
           output.push_back(this->EmitRecord(group_key, old_value, false));

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <tuple>
 // NOLINTNEXTLINE
@@ -24,11 +25,24 @@ namespace k9db {
 namespace dataflow {
 
 class AggregateOperator : public Operator {
+ private:
+  // Data we need to store to compute the aggregate.
+  // For COUNT and SUM this is a single integer value with empty v1 and v2.
+  // For AVG, this is three values, the average, sum, and count.
+  struct AggregateData {
+    sqlast::Value value;
+    sqlast::Value v1;
+    sqlast::Value v2;
+    uint64_t SizeInMemory() const {
+      return value.SizeInMemory() + v1.SizeInMemory() + v2.SizeInMemory();
+    }
+  };
+
  public:
   using Function = AggregateFunctionEnum;
   using State =
-      GroupedDataT<absl::flat_hash_map<Key, std::list<sqlast::Value>>,
-                   std::list<sqlast::Value>, std::nullptr_t, sqlast::Value>;
+      GroupedDataT<absl::flat_hash_map<Key, std::list<AggregateData>>,
+                   std::list<AggregateData>, std::nullptr_t, AggregateData>;
 
   AggregateOperator() = delete;
   // Cannot copy an operator.
@@ -96,6 +110,7 @@ class AggregateOperator : public Operator {
   FRIEND_TEST(AggregateOperatorTest, OutputSchemaCompositeKeyTest);
   FRIEND_TEST(AggregateOperatorTest, SumGoesAwayWithFilter);
   FRIEND_TEST(AggregateOperatorTest, CountGoesAwayOnDelete);
+  FRIEND_TEST(AggregateOperatorTest, SimpleAverage);
 };
 
 }  // namespace dataflow
