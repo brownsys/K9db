@@ -208,7 +208,6 @@ cc_library(
     ],
     visibility = ["//k9db:__subpackages__"],
     deps = [
-        ":grouped_data",
         "//k9db/dataflow:operator",
         "//k9db/dataflow:record",
         "//k9db/dataflow:schema",

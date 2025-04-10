@@ -323,6 +323,19 @@ absl::StatusOr<SqlResult> exec(Connection *connection, size_t stmt_id,
       connection->stmts.at(stmt_id);
   try {
     sqlast::SQLCommand sql = prepared::PopulateStatement(stmt, args);
+    if (echo) {
+      std::cout << sql.query();
+      const auto &args = sql.args();
+      if (args.size() > 0) {
+        std::cout << " WITH (";
+        std::cout << args.at(0);
+        for (size_t i = 1; i < args.size(); i++) {
+          std::cout << ", " << args.at(1);
+        }
+        std::cout << ")";
+      }
+      std::cout << std::endl;
+    }
     return shards::sqlengine::Shard(sql, connection);
   } catch (std::exception &e) {
     return absl::InternalError(e.what());

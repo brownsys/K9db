@@ -34,10 +34,12 @@ public class AggregateOperatorFactory {
       switch (aggCall.getAggregation().getKind()) {
         case COUNT:
           functionEnum = DataFlowGraphLibrary.COUNT;
-          // Count does not have an aggregate column, for safety the data flow
-          // operator also does not depend on it.
-          assert aggCall.getArgList().size() == 0;
-          aggCol = -1;
+          assert aggCall.getArgList().size() <= 1;
+          if (aggCall.getArgList().size() == 0) {
+            aggCol = -1;
+          } else {
+            aggCol = this.context.getK9dbIndex(aggCall.getArgList().get(0));
+          }
           break;
         case SUM:
           functionEnum = DataFlowGraphLibrary.SUM;

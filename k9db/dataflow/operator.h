@@ -126,6 +126,7 @@ class Operator {
   FRIEND_TEST(AggregateOperatorTest, SumGoesAwayWithFilter);
   FRIEND_TEST(AggregateOperatorTest, CountGoesAwayOnDelete);
   FRIEND_TEST(AggregateOperatorTest, SimpleAverage);
+  FRIEND_TEST(AggregateOperatorTest, DistinctCount);
 
 #ifdef K9DB_BENCHMARK  // shuts up compiler warnings
   friend void ProcessBenchmark(Operator *op, NodeIndex src, RecordGenFunc gen);

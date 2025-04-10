@@ -591,7 +591,7 @@ TEST(AggregateOperatorTest, SimpleAverage) {
   std::vector<Record> records3;
   records3.emplace_back(schema, false, 4_s, 5_s, 6_s);
 
-  // STAGE2
+  // STAGE3
   aggregate.ProcessAndForward(UNDEFINED_NODE_INDEX, std::move(records3),
                               Promise::None.Derive());
 
@@ -599,6 +599,74 @@ TEST(AggregateOperatorTest, SimpleAverage) {
   std::vector<Record> output3 = matview.All();
   std::vector<Record> expected_records3;
   expected_records3.emplace_back(aggregate.output_schema_, true, 2_s, 5_s);
+  compareRecordStreams(&output3, &expected_records3);
+}
+
+TEST(AggregateOperatorTest, DistinctCount) {
+  SchemaRef schema = CreateSchemaPrimaryKey();
+  std::vector<ColumnID> group_columns = {1};
+  ColumnID aggregate_column = 2;
+  AggregateOperator::Function aggregate_function =
+      AggregateOperator::Function::COUNT;
+  // create aggregate operator..
+  AggregateOperator aggregate =
+      AggregateOperator(group_columns, aggregate_function, aggregate_column);
+  aggregate.input_schemas_.push_back(schema);
+  aggregate.ComputeOutputSchema();
+  // create a chained matview operator.
+  UnorderedMatViewOperator matview(group_columns);
+  matview.AddParent(&aggregate);
+
+  // Records to be fed
+  std::vector<Record> records1;
+  records1.emplace_back(schema, true, 1_s, 2_s, 9_s);
+  records1.emplace_back(schema, true, 2_s, 2_s, 9_s);
+  records1.emplace_back(schema, true, 3_s, 5_s, 9_s);
+  records1.emplace_back(schema, true, 4_s, 5_s, 6_s);
+  records1.emplace_back(schema, true, 5_s, 2_s, 4_s);
+  records1.emplace_back(schema, true, 6_s, 2_s, 9_s);
+
+  // STAGE1
+  aggregate.ProcessAndForward(UNDEFINED_NODE_INDEX, std::move(records1),
+                              Promise::None.Derive());
+
+  // Validate.
+  std::vector<Record> output1 = matview.All();
+  std::vector<Record> expected_records1;
+  expected_records1.emplace_back(aggregate.output_schema_, true, 2_s, 2_u);
+  expected_records1.emplace_back(aggregate.output_schema_, true, 5_s, 2_u);
+  compareRecordStreams(&output1, &expected_records1);
+
+  // Records to be fed
+  std::vector<Record> records2;
+  records2.emplace_back(schema, false, 1_s, 2_s, 9_s);
+  records2.emplace_back(schema, false, 2_s, 2_s, 9_s);
+  records2.emplace_back(schema, false, 3_s, 5_s, 6_s);
+
+  // STAGE2
+  aggregate.ProcessAndForward(UNDEFINED_NODE_INDEX, std::move(records2),
+                              Promise::None.Derive());
+
+  // Validate.
+  std::vector<Record> output2 = matview.All();
+  std::vector<Record> expected_records2;
+  expected_records2.emplace_back(aggregate.output_schema_, true, 2_s, 2_u);
+  expected_records2.emplace_back(aggregate.output_schema_, true, 5_s, 1_u);
+  compareRecordStreams(&output2, &expected_records2);
+
+  // Records to be fed
+  std::vector<Record> records3;
+  records3.emplace_back(schema, false, 5_s, 2_s, 4_s);
+  records3.emplace_back(schema, false, 6_s, 2_s, 9_s);
+
+  // STAGE3
+  aggregate.ProcessAndForward(UNDEFINED_NODE_INDEX, std::move(records3),
+                              Promise::None.Derive());
+
+  // Validate.
+  std::vector<Record> output3 = matview.All();
+  std::vector<Record> expected_records3;
+  expected_records3.emplace_back(aggregate.output_schema_, true, 5_s, 1_u);
   compareRecordStreams(&output3, &expected_records3);
 }
 

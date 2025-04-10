@@ -7,9 +7,176 @@
 namespace k9db {
 namespace dataflow {
 
-void AggregateOperator::ComputeOutputSchema() {
-  this->state_.Initialize(false);
+// AbstractAggregateState.
+AbstractAggregateState::PolicyPtr AbstractAggregateState::CopyPolicy() const {
+  if (this->policy_ == nullptr) {
+    return nullptr;
+  } else {
+    return this->policy_->Copy();
+  }
+}
+void AbstractAggregateState::CombinePolicy(const PolicyPtr &o) {
+  if (this->policy_ != nullptr && o != nullptr) {
+    this->policy_ = this->policy_->Combine(o);
+  } else if (o != nullptr) {
+    this->policy_ = o->Copy();
+  }
+}
+void AbstractAggregateState::SubtractPolicy(const PolicyPtr &o) {
+  if (this->policy_ != nullptr && o != nullptr) {
+    this->policy_ = this->policy_->Subtract(o);
+  } else if (o != nullptr) {
+    this->policy_ = o->Copy();
+  }
+}
 
+// AggregateState per aggregation function.
+namespace {
+
+// Simple count
+class SimpleCountAggregateState : public AbstractAggregateState {
+ private:
+  uint64_t count_;
+
+ public:
+  // NOLINTNEXTLINE
+  explicit SimpleCountAggregateState(PolicyPtr &policy)
+      : AbstractAggregateState(policy), count_(0) {}
+
+  bool Depleted() const override { return this->count_ == 0; }
+  void Add(const sqlast::Value &nvalue) override { this->count_++; }
+  void Remove(const sqlast::Value &ovalue) override { this->count_--; }
+  sqlast::Value Value() const override { return sqlast::Value(this->count_); }
+  uint64_t SizeInMemory() const override { return sizeof(uint64_t); }
+};
+
+// Distinct count
+class DistinctCountAggregateState : public AbstractAggregateState {
+ private:
+  uint64_t count_;
+  absl::flat_hash_map<sqlast::Value, uint64_t> histogram_;
+
+ public:
+  // NOLINTNEXTLINE
+  explicit DistinctCountAggregateState(PolicyPtr &policy)
+      : AbstractAggregateState(policy), count_(0), histogram_() {}
+
+  bool Depleted() const override { return this->count_ == 0; }
+  void Add(const sqlast::Value &nvalue) override {
+    if (this->histogram_.contains(nvalue)) {
+      this->histogram_[nvalue]++;
+    } else {
+      this->histogram_[nvalue]++;
+      this->count_++;
+    }
+  }
+  void Remove(const sqlast::Value &ovalue) override {
+    if (--this->histogram_.at(ovalue) == 0) {
+      this->histogram_.erase(ovalue);
+      this->count_--;
+    }
+  }
+  sqlast::Value Value() const override { return sqlast::Value(this->count_); }
+  uint64_t SizeInMemory() const override {
+    uint64_t size = sizeof(uint64_t);
+    for (const auto &[k, v] : this->histogram_) {
+      size += k.SizeInMemory() + sizeof(v);
+    }
+    return size;
+  }
+};
+
+// Sum
+class SumAggregateState : public AbstractAggregateState {
+ private:
+  sqlast::Value::Type type_;
+  std::variant<int64_t, uint64_t> sum_;
+
+ public:
+  // NOLINTNEXTLINE
+  SumAggregateState(PolicyPtr &policy, sqlast::Value::Type type)
+      : AbstractAggregateState(policy), type_(type), sum_() {
+    if (this->type_ == sqlast::Value::Type::INT) {
+      this->sum_ = static_cast<int64_t>(0);
+    } else {
+      this->sum_ = static_cast<uint64_t>(0);
+    }
+  }
+
+  bool Depleted() const override { return false; }
+  void Add(const sqlast::Value &nvalue) override {
+    if (this->type_ == sqlast::Value::Type::INT) {
+      this->sum_ = std::get<int64_t>(this->sum_) + nvalue.GetInt();
+    } else {
+      this->sum_ = std::get<uint64_t>(this->sum_) + nvalue.GetUInt();
+    }
+  }
+  void Remove(const sqlast::Value &ovalue) override {
+    if (this->type_ == sqlast::Value::Type::INT) {
+      this->sum_ = std::get<int64_t>(this->sum_) - ovalue.GetInt();
+    } else {
+      this->sum_ = std::get<uint64_t>(this->sum_) - ovalue.GetUInt();
+    }
+  }
+  sqlast::Value Value() const override {
+    if (this->type_ == sqlast::Value::Type::INT) {
+      return sqlast::Value(std::get<int64_t>(this->sum_));
+    } else {
+      return sqlast::Value(std::get<uint64_t>(this->sum_));
+    }
+  }
+  uint64_t SizeInMemory() const override {
+    return sizeof(this->type_) + sizeof(this->sum_);
+  }
+};
+
+// Avg
+class AvgAggregateState : public AbstractAggregateState {
+ private:
+  SumAggregateState sum_;
+  SimpleCountAggregateState count_;
+
+ public:
+  // NOLINTNEXTLINE
+  AvgAggregateState(PolicyPtr &policy, sqlast::Value::Type type)
+      : AbstractAggregateState(policy), sum_(policy, type), count_(policy) {}
+
+  bool Depleted() const override { return this->count_.Depleted(); }
+  void Add(const sqlast::Value &nvalue) override {
+    this->sum_.Add(nvalue);
+    this->count_.Add(nvalue);
+  }
+  void Remove(const sqlast::Value &ovalue) override {
+    this->sum_.Remove(ovalue);
+    this->count_.Remove(ovalue);
+  }
+  sqlast::Value Value() const override {
+    sqlast::Value sum = this->sum_.Value();
+    if (sum.type() == sqlast::Value::Type::UINT) {
+      uint64_t count = this->count_.Value().GetUInt();
+      return sqlast::Value(sum.GetUInt() / count);
+    } else {
+      int64_t count = static_cast<int64_t>(this->count_.Value().GetUInt());
+      return sqlast::Value(sum.GetInt() / count);
+    }
+  }
+  uint64_t SizeInMemory() const override {
+    return this->sum_.SizeInMemory() + this->count_.SizeInMemory();
+  }
+};
+
+}  // namespace
+
+// AggregateOperator.
+uint64_t AggregateOperator::SizeInMemory() const {
+  uint64_t size = 0;
+  for (const auto &[_, v] : this->state_) {
+    size += v->SizeInMemory();
+  }
+  return size;
+}
+
+void AggregateOperator::ComputeOutputSchema() {
   // Figure out the aggregate column information.
   if (this->aggregate_function_ == Function::COUNT) {
     if (this->aggregate_column_name_ == "") {
@@ -88,238 +255,120 @@ Record AggregateOperator::EmitRecord(
 std::vector<Record> AggregateOperator::Process(NodeIndex source,
                                                std::vector<Record> &&records,
                                                const Promise &promise) {
-  // old_values[group_key] has the old value associated to that key prior to
-  // processing records.
-  // if old_values[group_key] is a null Value then there was no value associated
-  // to the key prior to processing records.
-  // This information is used to determine what records to emit to children
-  // operators.
   using PolicyPtr = std::unique_ptr<policy::AbstractPolicy>;
-  absl::flat_hash_map<Key, sqlast::Value> old_values;
-  absl::flat_hash_map<Key, PolicyPtr> old_policies;
+  bool has_value = this->aggregate_column_index_ < 4294967295;
 
-  // Make sure it is allowed to aggregate.
+  // old_groups[group_key] indicates whether we have seen this group_key
+  // before in this batch of updates.
+  absl::flat_hash_map<Key, bool> old_groups;
+
+  // Go over records, updating the aggregate state for each record, as well as
+  // old_groups.
+  // The negative records to emit are emitted immediately,
+  // the positive records are computed after all records are processed
+  // to get their most recent version.
+  std::vector<Record> output;
   for (const Record &record : records) {
+    // Read group by key.
+    Key group_key = record.GetValues(this->group_columns_);
+
+    // Make sure it is allowed to aggregate.
     for (const auto &col : this->group_columns_) {
       const PolicyPtr &policy = record.GetPolicy(col);
       if (policy != nullptr) {
         CHECK(policy->Allows(this->type())) << "Policy does not allow this op";
       }
     }
-  }
 
-  // Go over records, updating the aggregate state for each record, as well as
-  // old_values. The records to emit will be computed afterwards.
-  for (const Record &record : records) {
-    Key group_key = record.GetValues(this->group_columns_);
-    switch (this->aggregate_function_) {
-      case Function::NO_AGGREGATE:
-      case Function::COUNT: {
-        if (!record.IsPositive()) {
-          // Negative record: decrement value in state by -1.
-          if (!this->state_.Contains(group_key)) {
-            LOG(FATAL) << "Negative record not seen before in aggregate";
-          }
-          // Save old value and update the state.
-          sqlast::Value &value = this->state_.Get(group_key).front().value;
-          if (old_values.count(group_key) == 0) {
-            old_values.emplace(group_key, value);
-            old_policies.emplace(group_key, nullptr);
-          }
-          value = sqlast::Value(value.GetUInt() - 1);
-          if (value.GetUInt() == 0) {
-            this->state_.Erase(group_key);
-          }
-        } else {
-          // Positive record: increment value in state by +1.
-          if (this->state_.Contains(group_key)) {
-            // Increment state by +1 and track old value.
-            sqlast::Value &value = this->state_.Get(group_key).front().value;
-            if (old_values.count(group_key) == 0) {
-              old_values.emplace(group_key, value);
-              old_policies.emplace(group_key, nullptr);
-            }
-            value = sqlast::Value(value.GetUInt() + 1);
-          } else {
-            if (old_values.count(group_key) == 0) {
-              // Put in null value.
-              old_values.emplace(group_key, sqlast::Value());
-              old_policies.emplace(group_key, nullptr);
-            }
-            PolicyPtr &policy = this->policies_.emplace_back(nullptr);
-            AggregateData data = {
-                sqlast::Value(static_cast<uint64_t>(1)), {}, {}, policy};
-            this->state_.Insert(group_key, std::move(data));
-          }
-        }
-        break;
+    // First time we encounter this group.
+    bool found_old_value = this->state_.contains(group_key);
+    if (!found_old_value) {
+      if (!record.IsPositive()) {
+        LOG(FATAL) << "Negative record not seen before in aggregate";
       }
-      case Function::SUM: {
-        auto record_value = record.GetValue(this->aggregate_column_index_);
-        PolicyPtr policy = record.CopyPolicy(this->aggregate_column_index_);
-        if (!record.IsPositive()) {
-          // Negative record: decrement value in state by the value in record.
-          if (!this->state_.Contains(group_key)) {
-            LOG(FATAL) << "Negative record not seen before in aggregate";
-          }
-          // Save old value and update the state.
-          AggregateData &data = this->state_.Get(group_key).front();
-          sqlast::Value &value = data.value;
-          if (old_values.count(group_key) == 0) {
-            old_values.emplace(group_key, value);
-            old_policies.emplace(group_key, data.CopyPolicy());
-          }
-          data.SubtractPolicy(policy);
-          switch (this->aggregate_column_type_) {
-            case sqlast::ColumnDefinition::Type::UINT:
-              value = sqlast::Value(value.GetUInt() - record_value.GetUInt());
-              break;
-            case sqlast::ColumnDefinition::Type::INT:
-              value = sqlast::Value(value.GetInt() - record_value.GetInt());
-              break;
-            default:
-              LOG(FATAL) << "Unsupported type";
-          }
-        } else {
-          // Positive record: increment value in state by the value in record.
-          if (this->state_.Contains(group_key)) {
-            AggregateData &data = this->state_.Get(group_key).front();
-            sqlast::Value &value = data.value;
-            if (old_values.count(group_key) == 0) {
-              old_values.emplace(group_key, value);
-              old_policies.emplace(group_key, data.CopyPolicy());
-            }
-            data.CombinePolicy(policy);
-            switch (this->aggregate_column_type_) {
-              case sqlast::ColumnDefinition::Type::UINT:
-                value = sqlast::Value(value.GetUInt() + record_value.GetUInt());
-                break;
-              case sqlast::ColumnDefinition::Type::INT:
-                value = sqlast::Value(value.GetInt() + record_value.GetInt());
-                break;
-              default:
-                LOG(FATAL) << "Unsupported type";
-            }
-          } else {
-            if (old_values.count(group_key) == 0) {
-              // Put in null value.
-              old_values.emplace(group_key, sqlast::Value());
-              old_policies.emplace(group_key, nullptr);
-            }
-            PolicyPtr &pref = this->policies_.emplace_back(std::move(policy));
-            AggregateData data = {std::move(record_value), {}, {}, pref};
-            this->state_.Insert(group_key, std::move(data));
-          }
-        }
-        break;
-      }
-      case Function::AVG: {
-        auto record_value = record.GetValue(this->aggregate_column_index_);
-        PolicyPtr policy = record.CopyPolicy(this->aggregate_column_index_);
-        if (!record.IsPositive()) {
-          // Negative record: decrement value in state by the value in record.
-          if (!this->state_.Contains(group_key)) {
-            LOG(FATAL) << "Negative record not seen before in aggregate";
-          }
-          // Save old value and update the state.
-          AggregateData &data = this->state_.Get(group_key).front();
-          sqlast::Value &value = data.value;
-          if (old_values.count(group_key) == 0) {
-            old_values.emplace(group_key, value);
-            old_policies.emplace(group_key, data.CopyPolicy());
-          }
 
-          data.SubtractPolicy(policy);
-          sqlast::Value &v1 = data.v1;
-          sqlast::Value &v2 = data.v2;
-          v2 = sqlast::Value(v2.GetUInt() - 1);
-          if (v2.GetUInt() == 0) {
-            this->state_.Erase(group_key);
-            continue;
-          }
-          switch (this->aggregate_column_type_) {
-            case sqlast::ColumnDefinition::Type::UINT:
-              v1 = sqlast::Value(v1.GetUInt() - record_value.GetUInt());
-              value = sqlast::Value(v1.GetUInt() / v2.GetUInt());
-              break;
-            case sqlast::ColumnDefinition::Type::INT: {
-              int64_t count = static_cast<int64_t>(v2.GetUInt());
-              v1 = sqlast::Value(v1.GetInt() - record_value.GetInt());
-              value = sqlast::Value(v1.GetInt() / count);
-              break;
-            }
-            default:
-              LOG(FATAL) << "Unsupported type";
-          }
-        } else {
-          // Positive record: increment value in state by the value in record.
-          if (this->state_.Contains(group_key)) {
-            AggregateData &data = this->state_.Get(group_key).front();
-            sqlast::Value &value = data.value;
-            if (old_values.count(group_key) == 0) {
-              old_values.emplace(group_key, value);
-              old_policies.emplace(group_key, data.CopyPolicy());
-            }
-            data.CombinePolicy(policy);
-            sqlast::Value &v1 = data.v1;
-            sqlast::Value &v2 = data.v2;
-            v2 = sqlast::Value(v2.GetUInt() + 1);
-            switch (this->aggregate_column_type_) {
-              case sqlast::ColumnDefinition::Type::UINT:
-                v1 = sqlast::Value(v1.GetUInt() + record_value.GetUInt());
-                value = sqlast::Value(v1.GetUInt() / v2.GetUInt());
-                break;
-              case sqlast::ColumnDefinition::Type::INT: {
-                int64_t count = static_cast<int64_t>(v2.GetUInt());
-                v1 = sqlast::Value(v1.GetInt() + record_value.GetInt());
-                value = sqlast::Value(v1.GetInt() / count);
-                break;
-              }
-              default:
-                LOG(FATAL) << "Unsupported type";
-            }
-          } else {
-            if (old_values.count(group_key) == 0) {
-              // Put in null value.
-              old_values.emplace(group_key, sqlast::Value());
-              old_policies.emplace(group_key, nullptr);
-            }
-            PolicyPtr &pref = this->policies_.emplace_back(std::move(policy));
-            AggregateData data = {record_value, record_value,
-                                  sqlast::Value(static_cast<uint64_t>(1)),
-                                  pref};
-            this->state_.Insert(group_key, std::move(data));
-          }
-        }
-        break;
+      // Insert data into state.
+      this->state_.insert({group_key, this->InitialData()});
+    }
+
+    // Look up earlier data in state.
+    std::unique_ptr<AbstractAggregateState> &data = this->state_.at(group_key);
+
+    // Track the 1st old value and policy.
+    if (old_groups.count(group_key) == 0) {
+      old_groups.emplace(group_key, true);
+      if (found_old_value) {
+        // Emit removal of the original record prior to any updates.
+        output.push_back(this->EmitRecord(group_key, data->Value(),
+                                          data->CopyPolicy(), false));
       }
+    }
+
+    // Read value being aggregated.
+    sqlast::Value record_value = sqlast::Value();
+    if (has_value) {
+      record_value = record.GetValue(this->aggregate_column_index_);
+    }
+
+    // Update stored aggregate data.
+    if (record.IsPositive()) {
+      data->Add(record_value);
+      if (has_value) {
+        data->CombinePolicy(record.GetPolicy(this->aggregate_column_index_));
+      }
+    } else {
+      data->Remove(record_value);
+      if (has_value) {
+        data->SubtractPolicy(record.GetPolicy(this->aggregate_column_index_));
+      }
+    }
+
+    // If aggregate is depleted, we erase it.
+    if (data->Depleted()) {
+      // TODO(babman): policy in policies_ is not deleted
+      // policies keep growing indefinitely.
+      this->state_.erase(group_key);
     }
   }
 
   // Emit records only for groups whose value ended up changing.
-  std::vector<Record> output;
-  for (const auto &[group_key, old_value] : old_values) {
-    PolicyPtr old_policy = std::move(old_policies.at(group_key));
-    if (!this->state_.Contains(group_key)) {
-      if (!old_value.IsNull()) {
-        output.push_back(this->EmitRecord(group_key, old_value,
-                                          std::move(old_policy), false));
-      }
-    } else {
-      const AggregateData &data = this->state_.Get(group_key).front();
-      const sqlast::Value &new_value = data.value;
-      PolicyPtr new_policy = data.CopyPolicy();
-      if (old_value != new_value) {
-        if (!old_value.IsNull()) {
-          output.push_back(this->EmitRecord(group_key, old_value,
-                                            std::move(old_policy), false));
-        }
-        output.push_back(this->EmitRecord(group_key, new_value,
-                                          std::move(new_policy), true));
-      }
+  for (const auto &[group_key, _] : old_groups) {
+    if (this->state_.contains(group_key)) {
+      const std::unique_ptr<AbstractAggregateState> &data =
+          this->state_.at(group_key);
+      output.push_back(
+          this->EmitRecord(group_key, data->Value(), data->CopyPolicy(), true));
     }
   }
   return output;
+}
+
+// Initial empty data for a new group.
+std::unique_ptr<AbstractAggregateState> AggregateOperator::InitialData() {
+  using PolicyPtr = std::unique_ptr<policy::AbstractPolicy>;
+
+  sqlast::Value::Type type = sqlast::Value::Type::UINT;
+  if (this->aggregate_column_type_ == sqlast::ColumnDefinition::Type::INT) {
+    type = sqlast::Value::Type::INT;
+  }
+
+  PolicyPtr &ref = this->policies_.emplace_back(nullptr);
+  switch (this->aggregate_function_) {
+    case Function::NO_AGGREGATE:
+    case Function::COUNT: {
+      if (this->aggregate_column_index_ < 4294967295) {
+        return std::make_unique<DistinctCountAggregateState>(ref);
+      } else {
+        return std::make_unique<SimpleCountAggregateState>(ref);
+      }
+    }
+    case Function::SUM: {
+      return std::make_unique<SumAggregateState>(ref, type);
+    }
+    case Function::AVG: {
+      return std::make_unique<AvgAggregateState>(ref, type);
+    }
+  }
 }
 
 // Clone this operator.
