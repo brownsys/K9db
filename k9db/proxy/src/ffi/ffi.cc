@@ -253,6 +253,13 @@ size_t FFIResultColumnCount(FFIQueryResult c_result) {
   const k9db::Schema &schema = result->ResultSets().at(idx).schema();
   return schema.size();
 }
+const char *FFIResultTableName(FFIQueryResult c_result) {
+  int idx = *c_result.index;
+  k9db::SqlResult *result =
+      reinterpret_cast<k9db::SqlResult *>(c_result.result);
+  const std::string &table_name = result->ResultSets().at(idx).table_name();
+  return table_name.c_str();
+}
 const char *FFIResultColumnName(FFIQueryResult c_result, size_t col) {
   int idx = *c_result.index;
   k9db::SqlResult *result =

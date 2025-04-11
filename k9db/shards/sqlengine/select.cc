@@ -147,10 +147,12 @@ absl::StatusOr<sql::SqlResult> SelectContext::ExecWithinTransaction() {
       for (const dataflow::Record &record : records) {
         vec.push_back(sql::rocks::Project(proj, record));
       }
-      return sql::SqlResult(sql::SqlResultSet(proj.schema, std::move(vec)));
+      return sql::SqlResult(
+          sql::SqlResultSet(this->table_name_, proj.schema, std::move(vec)));
     }
 
-    return sql::SqlResult(sql::SqlResultSet(this->schema_, std::move(records)));
+    return sql::SqlResult(sql::SqlResultSet(this->table_name_, this->schema_,
+                                            std::move(records)));
   }
 
   sql::SqlResultSet result = this->db_->ExecuteSelect(this->stmt_);
@@ -158,7 +160,8 @@ absl::StatusOr<sql::SqlResult> SelectContext::ExecWithinTransaction() {
   //               used by the policy constructors.
   std::vector<dataflow::Record> records = result.Vec();
   policy::MakePolicies(this->table_name_, this->conn_, &records);
-  return sql::SqlResult(sql::SqlResultSet(result.schema(), std::move(records)));
+  return sql::SqlResult(sql::SqlResultSet(this->table_name_, result.schema(),
+                                          std::move(records)));
 }
 
 }  // namespace sqlengine

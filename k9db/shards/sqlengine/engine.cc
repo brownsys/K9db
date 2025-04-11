@@ -38,11 +38,11 @@ absl::StatusOr<sql::SqlResult> serialize_policies(
     output.reserve(status->ResultSets().size());
     for (const sql::SqlResultSet &set : status->ResultSets()) {
       if (set.empty()) {
-        output.emplace_back(set.schema());
+        output.emplace_back(set.table_name(), set.schema());
       } else {
         auto rows = policy::SerializePolicies(set.rows());
         auto schema = rows.at(0).schema();
-        output.emplace_back(schema, std::move(rows));
+        output.emplace_back(set.table_name(), schema, std::move(rows));
       }
     }
     return sql::SqlResult(std::move(output));

@@ -363,8 +363,8 @@ absl::StatusOr<sql::SqlResult> SelectView(const sqlast::Select &stmt,
   std::vector<dataflow::Record> records =
       LookupRecords(flow, condition, stmt.limit(), stmt.offset());
 
-  return sql::SqlResult(
-      sql::SqlResultSet(flow.output_schema(), {std::move(records), {}}));
+  return sql::SqlResult(sql::SqlResultSet(view_name, flow.output_schema(),
+                                          {std::move(records), {}}));
 }
 
 }  // namespace view

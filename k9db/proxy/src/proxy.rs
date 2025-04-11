@@ -36,12 +36,13 @@ fn convert_type(coltype: k9db::FFIColumnType) -> msql_srv::ColumnType {
 
 // Helper for translating k9db schema into msql-srv columns.
 fn convert_columns(result: k9db::FFIQueryResult) -> Vec<msql_srv::Column> {
+  let table_name = k9db::result::table_name(result);
   let num = k9db::result::column_count(result);
   let mut cols = Vec::with_capacity(num);
   for c in 0..num {
     let slice = k9db::result::column_name(result, c);
     let coltype = k9db::result::column_type(result, c);
-    cols.push(Column { table: "".to_string(),
+    cols.push(Column { table: table_name.clone(),
                        column: slice.to_string(),
                        coltype: convert_type(coltype),
                        colflags: ColumnFlags::empty() });

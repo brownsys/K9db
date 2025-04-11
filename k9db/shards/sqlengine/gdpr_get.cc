@@ -77,7 +77,7 @@ absl::StatusOr<sql::SqlResult> GDPRGetContext::Exec() {
       }
     }
     // Push result set.
-    result.emplace_back(table.schema, std::move(output));
+    result.emplace_back(table_name, table.schema, std::move(output));
   }
 
   // Nothing to commit; read only.
