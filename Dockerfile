@@ -1,6 +1,6 @@
 # Docker image to build k9db incl. all dependencies
 # based on Ubuntu 2004
-FROM ubuntu:focal-20211006
+FROM ubuntu:24.04
 
 MAINTAINER K9db team "http://cs.brown.edu/people/malte/research/pbc/"
 
@@ -20,8 +20,8 @@ RUN apt-get update && apt-get install -y \
     build-essential libssl-dev zlib1g-dev libncurses5-dev \
     libncursesw5-dev libreadline-dev libgdbm-dev libdb5.3-dev libbz2-dev \
     libexpat1-dev liblzma-dev tk-dev libffi-dev wget gcc-11 g++-11 unzip \
-    openjdk-11-jdk maven python2 valgrind curl libclang-dev flex bison libevent-dev \
-    libsnappy-dev netcat
+    openjdk-11-jdk maven curl libclang-dev libevent-dev \
+    libsnappy-dev
 
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 90 \
                                  --slave /usr/bin/gcc-ar gcc-ar /usr/bin/gcc-ar-11 \
@@ -41,10 +41,10 @@ RUN cd /tmp \
 # install mariadb (for baselines only)
 RUN apt-get remove -y --purge mysql*
 RUN curl -LsS -O https://downloads.mariadb.com/MariaDB/mariadb_repo_setup
-RUN bash mariadb_repo_setup --mariadb-server-version=10.6
+RUN bash mariadb_repo_setup --mariadb-server-version=10.5
 RUN rm mariadb_repo_setup
 RUN apt-get update
-RUN apt-get install -y mariadb-server-10.6 mariadb-client-10.6
+RUN apt-get install -y mariadb-server-10.5 mariadb-client
 RUN apt-get install -y mariadb-plugin-rocksdb
 
 # install mariadb connector (for memcached)
@@ -83,15 +83,12 @@ RUN echo "test:asan --test_env LSAN_OPTIONS=suppressions=/home/k9db/.lsan_jvm_su
 RUN echo "test:tsan --test_env LSAN_OPTIONS=suppressions=/home/k9db/.lsan_jvm_suppress.txt" >> /home/docker.bazelrc
 RUN echo "test:tsan --test_env TSAN_OPTIONS=suppressions=/home/k9db/.tsan_jvm_suppress.txt" >> /home/docker.bazelrc
 
-# for GDPRBench, replace python with python2
-RUN ln -s /usr/bin/python2 /usr/bin/python
-
 # Latex for plotting
 RUN apt-get update && apt-get install --no-install-recommends -y \
   texlive-latex-base texlive-latex-extra \
   texlive-fonts-recommended texlive-fonts-extra \
   dvipng cm-super
-RUN apt-get update && apt-get install -y python3-pip python3.8-venv
+RUN apt-get update && apt-get install -y python3-pip python3-venv
 
 # configure mariadb on startup and run mysqld in the background
 ADD configure_db.sql /home/configure_db.sql
