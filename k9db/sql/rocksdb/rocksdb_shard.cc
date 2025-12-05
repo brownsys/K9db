@@ -117,7 +117,7 @@ ResultSetAndStatus RocksdbSession::AssignToShards(
   std::optional<IndexSet> sources = table.IndexLookup(&value_mapper, txn);
   CHECK(sources.has_value()) << "Assign to shards with no index";
   if (sources->size() == 0) {
-    return std::pair(sql::SqlResultSet(schema), 0);
+    return std::pair(sql::SqlResultSet(table_name, schema), 0);
   }
 
   // In principle, there may be 0 or more columns associated with each value.
@@ -223,7 +223,7 @@ ResultSetAndStatus RocksdbSession::AssignToShards(
     records.push_back(row.DecodeRecord(schema, true));
   }
 
-  return std::pair(sql::SqlResultSet(schema, std::move(records)), count);
+  return std::pair(sql::SqlResultSet(table_name, schema, std::move(records)), count);
 }
 
 // Count the number of shards each record with a given PK value is in.

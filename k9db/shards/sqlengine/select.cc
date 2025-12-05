@@ -139,10 +139,10 @@ absl::StatusOr<sql::SqlResult> SelectContext::ExecWithinTransaction() {
       for (const dataflow::Record &record : records) {
         vec.push_back(sql::rocks::Project(proj, record));
       }
-      return sql::SqlResult(sql::SqlResultSet(proj.schema, std::move(vec)));
+      return sql::SqlResult(sql::SqlResultSet(this->table_name_, proj.schema, std::move(vec)));
     }
 
-    return sql::SqlResult(sql::SqlResultSet(this->schema_, std::move(records)));
+    return sql::SqlResult(sql::SqlResultSet(this->table_name_, this->schema_, std::move(records)));
   }
 
   return sql::SqlResult(this->db_->ExecuteSelect(this->stmt_));

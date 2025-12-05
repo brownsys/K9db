@@ -59,7 +59,7 @@ sql::SqlResult State::NumShards() const {
                          std::make_unique<std::string>(std::move(kind)), num);
   }
   return sql::SqlResult(sql::SqlResultSet(
-      dataflow::SchemaFactory::NUM_SHARDS_SCHEMA, std::move(records)));
+      "#NUM_SHARES", dataflow::SchemaFactory::NUM_SHARDS_SCHEMA, std::move(records)));
 }
 sql::SqlResult State::PreparedDebug() const {
   // Acquire reader lock.
@@ -80,7 +80,7 @@ sql::SqlResult State::PreparedDebug() const {
                          std::make_unique<std::string>(canonical));
   }
   // Return result.
-  return sql::SqlResult(sql::SqlResultSet(schema, std::move(records)));
+  return sql::SqlResult(sql::SqlResultSet("#PREPARED", schema, std::move(records)));
 }
 
 sql::SqlResult State::ListIndices() const {
@@ -97,7 +97,7 @@ sql::SqlResult State::ListIndices() const {
     }
   }
   // Return result.
-  return sql::SqlResult(sql::SqlResultSet(schema, std::move(records)));
+  return sql::SqlResult(sql::SqlResultSet("#INDICES", schema, std::move(records)));
 }
 
 // Locks.

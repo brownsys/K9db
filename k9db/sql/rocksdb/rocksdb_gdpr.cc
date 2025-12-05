@@ -36,7 +36,7 @@ SqlResultSet RocksdbSession::GetShard(const std::string &table_name,
     records.push_back(value.DecodeRecord(schema, true));
   }
 
-  return SqlResultSet(schema, std::move(records));
+  return SqlResultSet(table_name, schema, std::move(records));
 }
 
 SqlResultSet RocksdbSession::DeleteShard(const std::string &table_name,
@@ -72,7 +72,7 @@ SqlResultSet RocksdbSession::DeleteShard(const std::string &table_name,
     table.IndexDelete(shard, value, txn);
   }
 
-  return SqlResultSet(schema, std::move(records));
+  return SqlResultSet(table_name, schema, std::move(records));
 }
 
 }  // namespace rocks

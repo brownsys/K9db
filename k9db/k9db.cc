@@ -74,7 +74,7 @@ absl::StatusOr<std::optional<SqlResult>> SpecialStatements(
         std::vector<dataflow::Record> v;
         v.emplace_back(schema, true, std::make_unique<std::string>("VIEW"),
                        std::make_unique<std::string>(desc.view_name.value()));
-        return sql::SqlResult(sql::SqlResultSet(schema, std::move(v)));
+        return sql::SqlResult(sql::SqlResultSet("#EXPLAIN_QUERY", schema, std::move(v)));
       }
     }
     return std::optional<SqlResult>{};

@@ -35,7 +35,7 @@ SqlResultSet RocksdbSession::ExecuteSelect(const sqlast::Select &sql) const {
     records = std::move(projected);
   }
 
-  return SqlResultSet(projection.schema, std::move(records));
+  return SqlResultSet(table_name, projection.schema, std::move(records));
 }
 
 // Everything in a table.
@@ -47,7 +47,7 @@ SqlResultSet RocksdbSession::GetAll(const std::string &table_name) const {
   std::vector<dataflow::Record> records =
       this->GetRecords<SelectRecord, true>(table_name, nullptr);
 
-  return SqlResultSet(schema, std::move(records));
+  return SqlResultSet(table_name, schema, std::move(records));
 }
 
 }  // namespace rocks

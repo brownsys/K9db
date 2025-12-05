@@ -207,6 +207,13 @@ pub mod k9db {
     pub fn column_count(c_result: FFIQueryResult) -> usize {
       unsafe { ffi::FFIResultColumnCount(c_result) }
     }
+    pub fn table_name<'a>(c_result: FFIQueryResult, col: usize) -> &'a str {
+      let cstr = unsafe {
+        let ptr = ffi::FFIResultColumnTable(c_result, col);
+        CStr::from_ptr(ptr)
+      };
+      cstr.to_str().unwrap()
+    }
     pub fn column_name<'a>(c_result: FFIQueryResult, col: usize) -> &'a str {
       let cstr = unsafe {
         let ptr = ffi::FFIResultColumnName(c_result, col);

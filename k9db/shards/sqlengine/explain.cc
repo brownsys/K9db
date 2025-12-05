@@ -185,7 +185,7 @@ absl::StatusOr<sql::SqlResult> ExplainContext::Exec() {
   }
 
   return sql::SqlResult(
-      sql::SqlResultSet(this->schema_, std::move(this->explanation_)));
+      sql::SqlResultSet("#EXPLAIN_COMPLIANCE", this->schema_, std::move(this->explanation_)));
 }
 
 }  // namespace sqlengine

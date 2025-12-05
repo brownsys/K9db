@@ -102,17 +102,20 @@ class SqlUpdateSet {
 class SqlResultSet {
  public:
   // Constructors.
-  explicit SqlResultSet(const dataflow::SchemaRef &schema) : schema_(schema) {}
+  SqlResultSet(const std::string &table_name, const dataflow::SchemaRef &schema)
+    : table_name_(table_name), schema_(schema) {}
 
-  SqlResultSet(const dataflow::SchemaRef &schema,
+  SqlResultSet(const std::string &table_name,
+               const dataflow::SchemaRef &schema,
                std::vector<dataflow::Record> &&records)
-      : schema_(schema), records_(std::move(records)) {}
+      : table_name_(table_name), schema_(schema), records_(std::move(records)) {}
 
   // Adding additional results to this set.
   void AppendDeduplicate(SqlResultSet &&other);
   void AppendMerge(SqlResultSet &&other);
 
   // Query API.
+  const std::string &table_name() const { return this->table_name_; }
   const dataflow::SchemaRef &schema() const { return this->schema_; }
   std::vector<dataflow::Record> &&Vec() { return std::move(this->records_); }
   const std::vector<dataflow::Record> &rows() const { return this->records_; }
@@ -121,6 +124,7 @@ class SqlResultSet {
   inline bool empty() const { return this->records_.empty(); }
 
  private:
+  std::string table_name_;
   dataflow::SchemaRef schema_;
   std::vector<dataflow::Record> records_;
   std::unordered_set<std::string> lazy_keys_;
@@ -151,8 +155,8 @@ class SqlResult {
   explicit SqlResult(SqlResultSet &&resultset) : type_(Type::QUERY) {
     this->sets_.push_back(std::move(resultset));
   }
-  explicit SqlResult(const dataflow::SchemaRef &schema) : type_(Type::QUERY) {
-    this->sets_.emplace_back(schema);
+  SqlResult(const std::string &table_name, const dataflow::SchemaRef &schema) : type_(Type::QUERY) {
+    this->sets_.emplace_back(table_name, schema);
   }
 
   // API for accessing the result.

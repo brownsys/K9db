@@ -141,6 +141,7 @@ FFISuccessOrError FFIShutdown();
 // FFIResult schema handling.
 bool FFIResultNextSet(FFIQueryResult c_result);
 size_t FFIResultColumnCount(FFIQueryResult c_result);
+const char *FFIResultColumnTable(FFIQueryResult c_result, size_t col);
 const char *FFIResultColumnName(FFIQueryResult c_result, size_t col);
 FFIColumnType FFIResultColumnType(FFIQueryResult c_result, size_t col);
 
