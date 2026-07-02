@@ -1,0 +1,76 @@
+"""
+@generated
+cargo-raze crate build file.
+
+DO NOT EDIT! Replaced on runs of cargo-raze
+"""
+
+# buildifier: disable=load
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
+# buildifier: disable=load
+load(
+    "@rules_rust//rust:defs.bzl",
+    "rust_binary",
+    "rust_library",
+    "rust_proc_macro",
+    "rust_test",
+)
+
+package(default_visibility = [
+    # Public for visibility by "@raze__crate__version//" targets.
+    #
+    # Prefer access through "//cargo", which limits external
+    # visibility to explicit Cargo.toml dependencies.
+    "//visibility:public",
+])
+
+licenses([
+    "notice",  # MIT from expression "MIT OR Apache-2.0"
+])
+
+# Generated Targets
+
+rust_library(
+    name = "mysql_common",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "default",
+    ],
+    crate_root = "src/lib.rs",
+    data = [],
+    edition = "2018",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=mysql_common",
+        "manual",
+    ],
+    version = "0.24.1",
+    # buildifier: leave-alone
+    deps = [
+        "@raze__base64__0_12_3//:base64",
+        "@raze__bigdecimal__0_1_2//:bigdecimal",
+        "@raze__bitflags__1_3_2//:bitflags",
+        "@raze__byteorder__1_4_3//:byteorder",
+        "@raze__bytes__0_5_6//:bytes",
+        "@raze__chrono__0_4_19//:chrono",
+        "@raze__flate2__1_0_22//:flate2",
+        "@raze__lazy_static__1_4_0//:lazy_static",
+        "@raze__lexical__5_2_2//:lexical",
+        "@raze__num_bigint__0_2_6//:num_bigint",
+        "@raze__num_traits__0_2_14//:num_traits",
+        "@raze__rand__0_7_3//:rand",
+        "@raze__regex__1_5_4//:regex",
+        "@raze__rust_decimal__1_22_0//:rust_decimal",
+        "@raze__serde__1_0_136//:serde",
+        "@raze__serde_json__1_0_79//:serde_json",
+        "@raze__sha1__0_6_1//:sha1",
+        "@raze__sha2__0_8_2//:sha2",
+        "@raze__time__0_2_27//:time",
+        "@raze__twox_hash__1_6_2//:twox_hash",
+        "@raze__uuid__0_8_2//:uuid",
+    ],
+)

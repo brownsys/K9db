@@ -1,0 +1,10 @@
+# Keep the build context for Dockerfile.release small. The dev and
+# experiment Dockerfiles bind-mount the repo instead of COPYing it, so
+# these exclusions do not affect them.
+.git
+bazel-*
+user.bazelrc
+experiments
+Dockerfile*
+# Prebuilt proxy binary at the repo root (not part of the source tree).
+proxy

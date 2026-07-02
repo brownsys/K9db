@@ -41,13 +41,3 @@ sudo rm bazel-4.0.0-installer-linux-x86_64.sh
 echo "Installing rust..."
 curl https://sh.rustup.rs | sh -s -- -y
 source $HOME/.cargo/env
-cargo install --version 0.15.0 cargo-raze
-
-# Run cargo raze.
-echo "Running cargo raze..."
-cd $K9DB_DIR
-mkdir -p /tmp/cargo-raze/doesnt/exist/
-cd k9db/proxy && cargo raze && cd -
-cd experiments/lobsters && cargo raze && cd -
-cd experiments/ownCloud && cargo raze && cd -
-cd experiments/vote && cargo raze && cd -

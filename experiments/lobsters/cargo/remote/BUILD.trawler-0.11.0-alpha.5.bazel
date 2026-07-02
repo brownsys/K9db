@@ -1,0 +1,182 @@
+"""
+@generated
+cargo-raze crate build file.
+
+DO NOT EDIT! Replaced on runs of cargo-raze
+"""
+
+# buildifier: disable=load
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
+# buildifier: disable=load
+load(
+    "@rules_rust//rust:defs.bzl",
+    "rust_binary",
+    "rust_library",
+    "rust_proc_macro",
+    "rust_test",
+)
+
+package(default_visibility = [
+    # Public for visibility by "@raze__crate__version//" targets.
+    #
+    # Prefer access through "//cargo", which limits external
+    # visibility to explicit Cargo.toml dependencies.
+    "//visibility:public",
+])
+
+licenses([
+    "notice",  # MIT from expression "MIT OR Apache-2.0"
+])
+
+# Generated Targets
+# buildifier: disable=out-of-order-load
+# buildifier: disable=load-on-top
+load(
+    "@rules_rust//cargo:cargo_build_script.bzl",
+    "cargo_build_script",
+)
+
+cargo_build_script(
+    name = "trawler_build_script",
+    srcs = glob(["**/*.rs"]),
+    build_script_env = {
+    },
+    crate_features = [
+        "clap",
+        "cli",
+        "cookie",
+        "default",
+        "http",
+        "hyper",
+        "lazy_static",
+        "regex",
+        "url",
+    ],
+    crate_root = "data-import.rs",
+    data = glob(["**"]),
+    edition = "2018",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+    version = "0.11.0-alpha.5",
+    visibility = ["//visibility:private"],
+    deps = [
+        "@raze__glob__0_3_0//:glob",
+    ],
+)
+
+rust_binary(
+    # Prefix bin name to disambiguate from (probable) collision with lib name
+    # N.B.: The exact form of this is subject to change.
+    name = "cargo_bin_trawler",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "clap",
+        "cli",
+        "cookie",
+        "default",
+        "http",
+        "hyper",
+        "lazy_static",
+        "regex",
+        "url",
+    ],
+    crate_root = "src/bin/main.rs",
+    data = [],
+    edition = "2018",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=trawler",
+        "manual",
+    ],
+    version = "0.11.0-alpha.5",
+    # buildifier: leave-alone
+    deps = [
+        ":trawler",
+        ":trawler_build_script",
+        "@raze__clap__2_34_0//:clap",
+        "@raze__cookie__0_13_3//:cookie",
+        "@raze__crossbeam_channel__0_4_4//:crossbeam_channel",
+        "@raze__futures_core__0_3_21//:futures_core",
+        "@raze__futures_util__0_3_21//:futures_util",
+        "@raze__hdrhistogram__7_5_0//:hdrhistogram",
+        "@raze__histogram_sampler__0_4_0//:histogram_sampler",
+        "@raze__http__0_2_6//:http",
+        "@raze__hyper__0_13_10//:hyper",
+        "@raze__lazy_static__1_4_0//:lazy_static",
+        "@raze__libc__0_2_119//:libc",
+        "@raze__rand__0_7_3//:rand",
+        "@raze__rand_distr__0_2_2//:rand_distr",
+        "@raze__regex__1_5_4//:regex",
+        "@raze__slog__2_7_0//:slog",
+        "@raze__slog_term__2_8_1//:slog_term",
+        "@raze__time__0_2_7//:time",
+        "@raze__tokio__0_2_25//:tokio",
+        "@raze__tower_make__0_3_0//:tower_make",
+        "@raze__tower_service__0_3_1//:tower_service",
+        "@raze__url__2_2_2//:url",
+        "@raze__zipf__6_1_0//:zipf",
+    ],
+)
+
+rust_library(
+    name = "trawler",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "clap",
+        "cli",
+        "cookie",
+        "default",
+        "http",
+        "hyper",
+        "lazy_static",
+        "regex",
+        "url",
+    ],
+    crate_root = "src/lib.rs",
+    data = [],
+    edition = "2018",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=trawler",
+        "manual",
+    ],
+    version = "0.11.0-alpha.5",
+    # buildifier: leave-alone
+    deps = [
+        ":trawler_build_script",
+        "@raze__clap__2_34_0//:clap",
+        "@raze__cookie__0_13_3//:cookie",
+        "@raze__crossbeam_channel__0_4_4//:crossbeam_channel",
+        "@raze__futures_core__0_3_21//:futures_core",
+        "@raze__futures_util__0_3_21//:futures_util",
+        "@raze__hdrhistogram__7_5_0//:hdrhistogram",
+        "@raze__histogram_sampler__0_4_0//:histogram_sampler",
+        "@raze__http__0_2_6//:http",
+        "@raze__hyper__0_13_10//:hyper",
+        "@raze__lazy_static__1_4_0//:lazy_static",
+        "@raze__libc__0_2_119//:libc",
+        "@raze__rand__0_7_3//:rand",
+        "@raze__rand_distr__0_2_2//:rand_distr",
+        "@raze__regex__1_5_4//:regex",
+        "@raze__slog__2_7_0//:slog",
+        "@raze__slog_term__2_8_1//:slog_term",
+        "@raze__time__0_2_7//:time",
+        "@raze__tokio__0_2_25//:tokio",
+        "@raze__tower_make__0_3_0//:tower_make",
+        "@raze__tower_service__0_3_1//:tower_service",
+        "@raze__url__2_2_2//:url",
+        "@raze__zipf__6_1_0//:zipf",
+    ],
+)

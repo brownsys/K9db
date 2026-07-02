@@ -1,0 +1,63 @@
+"""
+@generated
+cargo-raze crate build file.
+
+DO NOT EDIT! Replaced on runs of cargo-raze
+"""
+
+# buildifier: disable=load
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
+# buildifier: disable=load
+load(
+    "@rules_rust//rust:defs.bzl",
+    "rust_binary",
+    "rust_library",
+    "rust_proc_macro",
+    "rust_test",
+)
+
+package(default_visibility = [
+    # Public for visibility by "@raze__crate__version//" targets.
+    #
+    # Prefer access through "//k9db/proxy/cargo", which limits external
+    # visibility to explicit Cargo.toml dependencies.
+    "//visibility:public",
+])
+
+licenses([
+    "notice",  # MIT from expression "MIT OR Apache-2.0"
+])
+
+# Generated Targets
+
+# Unsupported target "floating-precision" with type "example" omitted
+
+# Unsupported target "repeated_squares" with type "example" omitted
+
+rust_library(
+    name = "bigdecimal",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "serde",
+    ],
+    crate_root = "src/lib.rs",
+    data = [],
+    edition = "2015",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=bigdecimal",
+        "manual",
+    ],
+    version = "0.1.2",
+    # buildifier: leave-alone
+    deps = [
+        "@raze__num_bigint__0_2_6//:num_bigint",
+        "@raze__num_integer__0_1_44//:num_integer",
+        "@raze__num_traits__0_2_14//:num_traits",
+        "@raze__serde__1_0_136//:serde",
+    ],
+)

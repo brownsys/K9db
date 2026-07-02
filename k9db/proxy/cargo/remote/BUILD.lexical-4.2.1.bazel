@@ -1,0 +1,463 @@
+"""
+@generated
+cargo-raze crate build file.
+
+DO NOT EDIT! Replaced on runs of cargo-raze
+"""
+
+# buildifier: disable=load
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
+# buildifier: disable=load
+load(
+    "@rules_rust//rust:defs.bzl",
+    "rust_binary",
+    "rust_library",
+    "rust_proc_macro",
+    "rust_test",
+)
+
+package(default_visibility = [
+    # Public for visibility by "@raze__crate__version//" targets.
+    #
+    # Prefer access through "//k9db/proxy/cargo", which limits external
+    # visibility to explicit Cargo.toml dependencies.
+    "//visibility:public",
+])
+
+licenses([
+    "notice",  # MIT from expression "MIT OR Apache-2.0"
+])
+
+# Generated Targets
+# buildifier: disable=out-of-order-load
+# buildifier: disable=load-on-top
+load(
+    "@rules_rust//cargo:cargo_build_script.bzl",
+    "cargo_build_script",
+)
+
+cargo_build_script(
+    name = "lexical_build_script",
+    srcs = glob(["**/*.rs"]),
+    build_script_env = {
+    },
+    crate_features = [
+        "correct",
+        "default",
+        "ryu",
+        "std",
+    ],
+    crate_root = "build.rs",
+    data = glob(["**"]),
+    edition = "2015",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+    version = "4.2.1",
+    visibility = ["//visibility:private"],
+    deps = [
+        "@raze__rustc_version__0_2_3//:rustc_version",
+    ],
+)
+
+# Unsupported target "atof" with type "bench" omitted
+
+# Unsupported target "atof_malicious" with type "bench" omitted
+
+# Unsupported target "atof_real" with type "bench" omitted
+
+# Unsupported target "atoi" with type "bench" omitted
+
+# Unsupported target "ftoa" with type "bench" omitted
+
+# Unsupported target "itoa" with type "bench" omitted
+
+rust_binary(
+    # Prefix bin name to disambiguate from (probable) collision with lib name
+    # N.B.: The exact form of this is subject to change.
+    name = "cargo_bin_few_ones",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "correct",
+        "default",
+        "ryu",
+        "std",
+    ],
+    crate_root = "data/test-parse-random/few_ones.rs",
+    data = [],
+    edition = "2015",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=few_ones",
+        "manual",
+    ],
+    version = "4.2.1",
+    # buildifier: leave-alone
+    deps = [
+        ":lexical",
+        ":lexical_build_script",
+        "@raze__cfg_if__0_1_10//:cfg_if",
+        "@raze__lexical_core__0_6_8//:lexical_core",
+    ],
+)
+
+rust_binary(
+    # Prefix bin name to disambiguate from (probable) collision with lib name
+    # N.B.: The exact form of this is subject to change.
+    name = "cargo_bin_huge_pow10",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "correct",
+        "default",
+        "ryu",
+        "std",
+    ],
+    crate_root = "data/test-parse-random/huge-pow10.rs",
+    data = [],
+    edition = "2015",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=huge-pow10",
+        "manual",
+    ],
+    version = "4.2.1",
+    # buildifier: leave-alone
+    deps = [
+        ":lexical",
+        ":lexical_build_script",
+        "@raze__cfg_if__0_1_10//:cfg_if",
+        "@raze__lexical_core__0_6_8//:lexical_core",
+    ],
+)
+
+rust_binary(
+    # Prefix bin name to disambiguate from (probable) collision with lib name
+    # N.B.: The exact form of this is subject to change.
+    name = "cargo_bin_long_fractions",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "correct",
+        "default",
+        "ryu",
+        "std",
+    ],
+    crate_root = "data/test-parse-random/long-fractions.rs",
+    data = [],
+    edition = "2015",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=long-fractions",
+        "manual",
+    ],
+    version = "4.2.1",
+    # buildifier: leave-alone
+    deps = [
+        ":lexical",
+        ":lexical_build_script",
+        "@raze__cfg_if__0_1_10//:cfg_if",
+        "@raze__lexical_core__0_6_8//:lexical_core",
+    ],
+)
+
+rust_binary(
+    # Prefix bin name to disambiguate from (probable) collision with lib name
+    # N.B.: The exact form of this is subject to change.
+    name = "cargo_bin_many_digits",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "correct",
+        "default",
+        "ryu",
+        "std",
+    ],
+    crate_root = "data/test-parse-random/many-digits.rs",
+    data = [],
+    edition = "2015",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=many-digits",
+        "manual",
+    ],
+    version = "4.2.1",
+    # buildifier: leave-alone
+    deps = [
+        ":lexical",
+        ":lexical_build_script",
+        "@raze__cfg_if__0_1_10//:cfg_if",
+        "@raze__lexical_core__0_6_8//:lexical_core",
+    ],
+)
+
+rust_binary(
+    # Prefix bin name to disambiguate from (probable) collision with lib name
+    # N.B.: The exact form of this is subject to change.
+    name = "cargo_bin_rand_f64",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "correct",
+        "default",
+        "ryu",
+        "std",
+    ],
+    crate_root = "data/test-parse-random/rand-f64.rs",
+    data = [],
+    edition = "2015",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=rand-f64",
+        "manual",
+    ],
+    version = "4.2.1",
+    # buildifier: leave-alone
+    deps = [
+        ":lexical",
+        ":lexical_build_script",
+        "@raze__cfg_if__0_1_10//:cfg_if",
+        "@raze__lexical_core__0_6_8//:lexical_core",
+    ],
+)
+
+rust_binary(
+    # Prefix bin name to disambiguate from (probable) collision with lib name
+    # N.B.: The exact form of this is subject to change.
+    name = "cargo_bin_short_decimals",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "correct",
+        "default",
+        "ryu",
+        "std",
+    ],
+    crate_root = "data/test-parse-random/short-decimals.rs",
+    data = [],
+    edition = "2015",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=short-decimals",
+        "manual",
+    ],
+    version = "4.2.1",
+    # buildifier: leave-alone
+    deps = [
+        ":lexical",
+        ":lexical_build_script",
+        "@raze__cfg_if__0_1_10//:cfg_if",
+        "@raze__lexical_core__0_6_8//:lexical_core",
+    ],
+)
+
+rust_binary(
+    # Prefix bin name to disambiguate from (probable) collision with lib name
+    # N.B.: The exact form of this is subject to change.
+    name = "cargo_bin_subnorm",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "correct",
+        "default",
+        "ryu",
+        "std",
+    ],
+    crate_root = "data/test-parse-random/subnorm.rs",
+    data = [],
+    edition = "2015",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=subnorm",
+        "manual",
+    ],
+    version = "4.2.1",
+    # buildifier: leave-alone
+    deps = [
+        ":lexical",
+        ":lexical_build_script",
+        "@raze__cfg_if__0_1_10//:cfg_if",
+        "@raze__lexical_core__0_6_8//:lexical_core",
+    ],
+)
+
+rust_binary(
+    # Prefix bin name to disambiguate from (probable) collision with lib name
+    # N.B.: The exact form of this is subject to change.
+    name = "cargo_bin_test_parse_unittests",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "correct",
+        "default",
+        "ryu",
+        "std",
+    ],
+    crate_root = "data/test-parse-unittests/main.rs",
+    data = [],
+    edition = "2015",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=test-parse-unittests",
+        "manual",
+    ],
+    version = "4.2.1",
+    # buildifier: leave-alone
+    deps = [
+        ":lexical",
+        ":lexical_build_script",
+        "@raze__cfg_if__0_1_10//:cfg_if",
+        "@raze__lexical_core__0_6_8//:lexical_core",
+    ],
+)
+
+rust_binary(
+    # Prefix bin name to disambiguate from (probable) collision with lib name
+    # N.B.: The exact form of this is subject to change.
+    name = "cargo_bin_tiny_pow10",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "correct",
+        "default",
+        "ryu",
+        "std",
+    ],
+    crate_root = "data/test-parse-random/tiny-pow10.rs",
+    data = [],
+    edition = "2015",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=tiny-pow10",
+        "manual",
+    ],
+    version = "4.2.1",
+    # buildifier: leave-alone
+    deps = [
+        ":lexical",
+        ":lexical_build_script",
+        "@raze__cfg_if__0_1_10//:cfg_if",
+        "@raze__lexical_core__0_6_8//:lexical_core",
+    ],
+)
+
+rust_binary(
+    # Prefix bin name to disambiguate from (probable) collision with lib name
+    # N.B.: The exact form of this is subject to change.
+    name = "cargo_bin_u32_small",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "correct",
+        "default",
+        "ryu",
+        "std",
+    ],
+    crate_root = "data/test-parse-random/u32-small.rs",
+    data = [],
+    edition = "2015",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=u32-small",
+        "manual",
+    ],
+    version = "4.2.1",
+    # buildifier: leave-alone
+    deps = [
+        ":lexical",
+        ":lexical_build_script",
+        "@raze__cfg_if__0_1_10//:cfg_if",
+        "@raze__lexical_core__0_6_8//:lexical_core",
+    ],
+)
+
+rust_binary(
+    # Prefix bin name to disambiguate from (probable) collision with lib name
+    # N.B.: The exact form of this is subject to change.
+    name = "cargo_bin_u64_pow2",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "correct",
+        "default",
+        "ryu",
+        "std",
+    ],
+    crate_root = "data/test-parse-random/u64-pow2.rs",
+    data = [],
+    edition = "2015",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=u64-pow2",
+        "manual",
+    ],
+    version = "4.2.1",
+    # buildifier: leave-alone
+    deps = [
+        ":lexical",
+        ":lexical_build_script",
+        "@raze__cfg_if__0_1_10//:cfg_if",
+        "@raze__lexical_core__0_6_8//:lexical_core",
+    ],
+)
+
+rust_library(
+    name = "lexical",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "correct",
+        "default",
+        "ryu",
+        "std",
+    ],
+    crate_root = "src/lib.rs",
+    data = [],
+    edition = "2015",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=lexical",
+        "manual",
+    ],
+    version = "4.2.1",
+    # buildifier: leave-alone
+    deps = [
+        ":lexical_build_script",
+        "@raze__cfg_if__0_1_10//:cfg_if",
+        "@raze__lexical_core__0_6_8//:lexical_core",
+    ],
+)
+
+# Unsupported target "long" with type "test" omitted
+
+# Unsupported target "stress" with type "test" omitted

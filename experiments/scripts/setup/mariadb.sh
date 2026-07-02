@@ -19,7 +19,11 @@ sudo apt-get install -y mariadb-server-10.6 mariadb-client-10.6 mariadb-plugin-r
 echo "Starting MariaDB and configuring user..."
 cd $K9DB_DIR
 sudo service mariadb start
-sudo mariadb -u root < configure_db.sql
+sudo mariadb -u root -e "\
+    CREATE USER 'k9db'@'%' IDENTIFIED BY 'password'; \
+    GRANT ALL PRIVILEGES ON *.* TO 'k9db'@'%' IDENTIFIED BY 'password'; \
+    FLUSH PRIVILEGES; \
+    INSTALL SONAME 'ha_rocksdb';"
 
 # Configure mariadb for optimized performance.
 sudo service mariadb stop

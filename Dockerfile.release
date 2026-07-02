@@ -1,0 +1,102 @@
+# Multi-stage build that produces a small, self-contained K9db image.
+#
+# Stage 1 ("build") contains the full build toolchain (bazel, gcc-11, rust,
+# cargo-raze, JDK) and compiles the k9db proxy from source.
+# Stage 2 ("runtime") contains only the compiled binary, its runtime data
+# (calcite planner jar + JNI library, librocksdb), and a headless JRE for
+# the embedded query planner JVM.
+#
+# Build with:
+#   docker build -f Dockerfile.release -t k9db .
+# Run with:
+#   docker run -d --name k9db -p 10001:10001 -v k9db-data:/var/lib/k9db k9db
+# Connect with any mysql client:
+#   mysql --host=127.0.0.1 --port=10001
+
+##############################################################################
+# Stage 1: build k9db from source.
+##############################################################################
+FROM ubuntu:24.04 AS build
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+ENV PATH=/usr/local/bin:$PATH
+
+# Add apt-add-repository and the ppa for gcc-11.
+RUN apt-get update && apt-get install -y software-properties-common \
+    && add-apt-repository -y ppa:ubuntu-toolchain-r/test
+
+# Build dependencies.
+RUN apt-get update && apt-get install -y \
+    apt-utils libssl-dev lsb-release openssl git \
+    build-essential zlib1g-dev libbz2-dev liblzma-dev libffi-dev \
+    wget gcc-11 g++-11 unzip zip pkg-config \
+    openjdk-11-jdk curl libclang-dev libevent-dev \
+    libsnappy-dev python3 python3-dev
+
+RUN ln -sf /usr/bin/python3 /usr/bin/python
+
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 90 \
+                                 --slave /usr/bin/gcc-ar gcc-ar /usr/bin/gcc-ar-11 \
+                                 --slave /usr/bin/gcc-nm gcc-nm /usr/bin/gcc-nm-11 \
+                                 --slave /usr/bin/gcc-ranlib gcc-ranlib /usr/bin/gcc-ranlib-11 \
+                                 --slave /usr/bin/g++ g++ /usr/bin/g++-11 \
+    && update-alternatives --set gcc /usr/bin/gcc-11
+
+# Install bazel 4.0.
+RUN cd /tmp \
+    && wget https://github.com/bazelbuild/bazel/releases/download/4.0.0/bazel-4.0.0-installer-linux-x86_64.sh \
+    && chmod +x bazel-4.0.0-installer-linux-x86_64.sh \
+    && ./bazel-4.0.0-installer-linux-x86_64.sh \
+    && rm bazel-4.0.0-installer-linux-x86_64.sh
+
+# Copy sources (see .dockerignore for exclusions). The bazel rules for the
+# proxy's rust dependencies (k9db/proxy/cargo/) are vendored in the repo, so
+# neither rustup nor cargo-raze are needed here: bazel downloads its own rust
+# toolchain during the build.
+COPY . /src/k9db
+WORKDIR /src/k9db
+
+# Build the k9db proxy (optimized).
+RUN bazel build --config opt //:k9db
+
+# Stage the runtime files: the proxy binary and its runfiles (the calcite
+# planner jar and JNI library are loaded from paths relative to the working
+# directory), plus librocksdb which the binary links dynamically.
+RUN BIN="$(bazel info bazel-bin --config opt)" \
+    && mkdir -p /opt/k9db/lib \
+    && cp -rL "$BIN/k9db/proxy/proxy.runfiles/k9db/." /opt/k9db/ \
+    && find "$BIN" -name 'librocksdb.so*' -exec cp -L {} /opt/k9db/lib/ \; \
+    && cd /opt/k9db/lib \
+    && if [ ! -f librocksdb.so.7 ]; then ln -s librocksdb.so librocksdb.so.7; fi \
+    && strip /opt/k9db/k9db/proxy/proxy
+
+##############################################################################
+# Stage 2: minimal runtime image.
+##############################################################################
+FROM ubuntu:24.04 AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+
+# Runtime dependencies only: a headless JRE for the embedded planner JVM
+# (libjvm/libjsig) and the compression libraries rocksdb was built with.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-11-jre-headless libsnappy1v5 libbz2-1.0 zlib1g tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /opt/k9db /opt/k9db
+
+# The planner loads the calcite jar and JNI library from paths relative to
+# the working directory, so this must be /opt/k9db.
+WORKDIR /opt/k9db
+
+ENV LD_LIBRARY_PATH=/opt/k9db/lib:/usr/lib/jvm/java-11-openjdk-amd64/lib/server:/usr/lib/jvm/java-11-openjdk-amd64/lib
+# Send glog output to the container log instead of files in /tmp.
+ENV GLOG_logtostderr=1
+
+VOLUME /var/lib/k9db
+EXPOSE 10001/tcp
+
+ENTRYPOINT ["/opt/k9db/k9db/proxy/proxy"]
+CMD ["--hostname=0.0.0.0:10001", "--db_path=/var/lib/k9db/"]

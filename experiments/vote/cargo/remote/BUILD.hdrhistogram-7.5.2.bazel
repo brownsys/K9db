@@ -1,0 +1,95 @@
+"""
+@generated
+cargo-raze crate build file.
+
+DO NOT EDIT! Replaced on runs of cargo-raze
+"""
+
+# buildifier: disable=load
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
+# buildifier: disable=load
+load(
+    "@rules_rust//rust:defs.bzl",
+    "rust_binary",
+    "rust_library",
+    "rust_proc_macro",
+    "rust_test",
+)
+
+package(default_visibility = [
+    # Public for visibility by "@raze__crate__version//" targets.
+    #
+    # Prefer access through "//cargo", which limits external
+    # visibility to explicit Cargo.toml dependencies.
+    "//visibility:public",
+])
+
+licenses([
+    "notice",  # MIT from expression "MIT OR Apache-2.0"
+])
+
+# Generated Targets
+
+# Unsupported target "clone" with type "bench" omitted
+
+# Unsupported target "interval_log" with type "bench" omitted
+
+# Unsupported target "quantiles" with type "bench" omitted
+
+# Unsupported target "record" with type "bench" omitted
+
+# Unsupported target "serialization" with type "bench" omitted
+
+# Unsupported target "cli" with type "example" omitted
+
+rust_library(
+    name = "hdrhistogram",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "base64",
+        "crossbeam-channel",
+        "default",
+        "flate2",
+        "nom",
+        "serialization",
+        "sync",
+    ],
+    crate_root = "src/lib.rs",
+    data = [],
+    edition = "2018",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=hdrhistogram",
+        "manual",
+    ],
+    version = "7.5.2",
+    # buildifier: leave-alone
+    deps = [
+        "@raze__base64__0_13_1//:base64",
+        "@raze__byteorder__1_4_3//:byteorder",
+        "@raze__crossbeam_channel__0_5_6//:crossbeam_channel",
+        "@raze__flate2__1_0_24//:flate2",
+        "@raze__nom__7_1_1//:nom",
+        "@raze__num_traits__0_2_15//:num_traits",
+    ],
+)
+
+# Unsupported target "auto_resize" with type "test" omitted
+
+# Unsupported target "data_access" with type "test" omitted
+
+# Unsupported target "histogram" with type "test" omitted
+
+# Unsupported target "interval_log" with type "test" omitted
+
+# Unsupported target "iterators" with type "test" omitted
+
+# Unsupported target "quantile" with type "test" omitted
+
+# Unsupported target "serialization" with type "test" omitted
+
+# Unsupported target "sync" with type "test" omitted
