@@ -1,0 +1,75 @@
+"""
+@generated
+cargo-raze crate build file.
+
+DO NOT EDIT! Replaced on runs of cargo-raze
+"""
+
+# buildifier: disable=load
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
+# buildifier: disable=load
+load(
+    "@rules_rust//rust:defs.bzl",
+    "rust_binary",
+    "rust_library",
+    "rust_proc_macro",
+    "rust_test",
+)
+
+package(default_visibility = [
+    # Public for visibility by "@raze__crate__version//" targets.
+    #
+    # Prefer access through "//cargo", which limits external
+    # visibility to explicit Cargo.toml dependencies.
+    "//visibility:public",
+])
+
+licenses([
+    "notice",  # MIT from expression "MIT OR Apache-2.0"
+])
+
+# Generated Targets
+
+rust_library(
+    name = "mysql_async",
+    srcs = glob(["**/*.rs"]),
+    crate_root = "src/lib.rs",
+    data = [],
+    edition = "2018",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "crate-name=mysql_async",
+        "manual",
+    ],
+    version = "0.23.1",
+    # buildifier: leave-alone
+    deps = [
+        "@raze__bytes__0_5_6//:bytes",
+        "@raze__crossbeam__0_7_3//:crossbeam",
+        "@raze__futures_core__0_3_21//:futures_core",
+        "@raze__futures_sink__0_3_21//:futures_sink",
+        "@raze__futures_util__0_3_21//:futures_util",
+        "@raze__lazy_static__1_4_0//:lazy_static",
+        "@raze__mio_named_pipes__0_1_7//:mio_named_pipes",
+        "@raze__mysql_common__0_22_2//:mysql_common",
+        "@raze__native_tls__0_2_8//:native_tls",
+        "@raze__percent_encoding__2_1_0//:percent_encoding",
+        "@raze__pin_project__0_4_29//:pin_project",
+        "@raze__serde__1_0_136//:serde",
+        "@raze__serde_json__1_0_79//:serde_json",
+        "@raze__thiserror__1_0_30//:thiserror",
+        "@raze__tokio__0_2_25//:tokio",
+        "@raze__tokio_tls__0_3_1//:tokio_tls",
+        "@raze__tokio_util__0_2_0//:tokio_util",
+        "@raze__twox_hash__1_6_2//:twox_hash",
+        "@raze__url__2_2_2//:url",
+    ],
+)
+
+# Unsupported target "exports" with type "test" omitted
+
+# Unsupported target "generic" with type "test" omitted

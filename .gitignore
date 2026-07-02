@@ -67,3 +67,11 @@ target/
 # Cargo raze directories except lockfiles
 **/cargo/*
 !**/cargo/Cargo.raze.lock
+
+# Cargo raze outputs are vendored (checked in) so that builds do not depend
+# on cargo-raze. Run ./vendor-rust.sh in the dev container to regenerate them
+# after changing rust dependencies, then commit the changes.
+!k9db/proxy/cargo/*
+!experiments/lobsters/cargo/*
+!experiments/ownCloud/cargo/*
+!experiments/vote/cargo/*

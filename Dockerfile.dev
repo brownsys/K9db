@@ -1,0 +1,107 @@
+# Docker image for developing k9db: building from source, running tests,
+# and running the experiments (incl. mariadb baselines and plotting).
+# Based on Ubuntu 24.04. For just running k9db, see Dockerfile.release.
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+# /root/.cargo/bin: rust/cargo (installed below) available in every shell.
+ENV PATH=/root/.cargo/bin:/usr/local/bin:$PATH
+
+# Add apt-add-repository and the ppa for gcc-11.
+RUN apt-get update && apt-get install -y software-properties-common \
+    && add-apt-repository -y ppa:ubuntu-toolchain-r/test
+
+# Build dependencies.
+RUN apt-get update && apt-get install -y \
+    apt-utils libssl-dev lsb-release openssl git \
+    build-essential zlib1g-dev libbz2-dev liblzma-dev libffi-dev \
+    wget gcc-11 g++-11 unzip zip pkg-config \
+    openjdk-11-jdk curl libclang-dev libevent-dev \
+    libsnappy-dev python3 python3-dev python3-pip python3-venv \
+    && ln -sf /usr/bin/python3 /usr/bin/python
+
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 90 \
+                                 --slave /usr/bin/gcc-ar gcc-ar /usr/bin/gcc-ar-11 \
+                                 --slave /usr/bin/gcc-nm gcc-nm /usr/bin/gcc-nm-11 \
+                                 --slave /usr/bin/gcc-ranlib gcc-ranlib /usr/bin/gcc-ranlib-11 \
+                                 --slave /usr/bin/g++ g++ /usr/bin/g++-11 \
+    && update-alternatives --set gcc /usr/bin/gcc-11
+
+# Install bazel 4.0.
+RUN cd /tmp \
+    && wget https://github.com/bazelbuild/bazel/releases/download/4.0.0/bazel-4.0.0-installer-linux-x86_64.sh \
+    && chmod +x bazel-4.0.0-installer-linux-x86_64.sh \
+    && ./bazel-4.0.0-installer-linux-x86_64.sh \
+    && rm bazel-4.0.0-installer-linux-x86_64.sh
+
+# Install rust and cargo-raze. The raze outputs (**/cargo/) are vendored in
+# the repo; cargo-raze is only needed to re-vendor them after changing rust
+# dependencies: run ./vendor-rust.sh from the repo root and commit the changes.
+RUN curl https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly-2023-12-06
+RUN git clone https://github.com/KinanBab/cargo-raze.git /home/cargo-raze \
+    && cargo install --locked --path /home/cargo-raze/impl
+
+# Install mariadb (for experiment baselines only) and the mariadb C
+# connector (for memcached).
+RUN curl -LsS -O https://downloads.mariadb.com/MariaDB/mariadb_repo_setup \
+    && bash mariadb_repo_setup --mariadb-server-version=10.5 \
+    && rm mariadb_repo_setup \
+    && apt-get update \
+    && apt-get install -y mariadb-server-10.5 mariadb-client \
+       mariadb-plugin-rocksdb libmariadb3 libmariadb-dev
+
+# Install the mariadb C++ connector (for memcached).
+RUN cd /tmp \
+    && wget https://dlm.mariadb.com/1601342/Connectors/cpp/connector-cpp-1.0.0/mariadb-connector-cpp-1.0.0-ubuntu-groovy-amd64.tar.gz \
+    && tar -xzf mariadb-connector-cpp-1.0.0-*.tar.gz \
+    && cd mariadb-connector-cpp-1.0.0-*/ \
+    && install -d /usr/include/mariadb/conncpp/compat /usr/lib/mariadb/plugin \
+    && install -v include/mariadb/*.hpp /usr/include/mariadb/ \
+    && install -v include/mariadb/conncpp/*.hpp /usr/include/mariadb/conncpp \
+    && install -v include/mariadb/conncpp/compat/* /usr/include/mariadb/conncpp/compat \
+    && install -v lib64/mariadb/libmariadbcpp.so /usr/lib \
+    && install -v lib64/mariadb/plugin/* /usr/lib/mariadb/plugin \
+    && rm -rf /tmp/mariadb-connector-cpp-1.0.0-*
+
+# Configure mariadb: datadir, runtime dirs, and (with the server briefly
+# running at image build time) the k9db user and the rocksdb engine.
+RUN chown -R mysql:root /var/lib/mysql \
+    && mkdir -p /run/mysqld && chown -R mysql:root /run/mysqld \
+    && printf '[mysqld]\ndatadir = /var/lib/mysql\n' >> /etc/mysql/mariadb.cnf \
+    && service mariadb start \
+    && until mariadb -u root -e "SELECT 1" >/dev/null 2>&1; do sleep 1; done \
+    && mariadb -u root -e "\
+        CREATE USER 'k9db'@'%' IDENTIFIED BY 'password'; \
+        GRANT ALL PRIVILEGES ON *.* TO 'k9db'@'%' IDENTIFIED BY 'password'; \
+        FLUSH PRIVILEGES; \
+        INSTALL SONAME 'ha_rocksdb';" \
+    && service mariadb stop
+
+# Memcached user for experiments.
+RUN useradd memcached
+
+# Latex for plotting. For plotting experiment results, create the venv
+# manually when needed:
+#   cd /home/k9db/experiments/scripts/plotting
+#   python3 -m venv venv && . venv/bin/activate && pip install -r requirements.txt
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    texlive-latex-base texlive-latex-extra \
+    texlive-fonts-recommended texlive-fonts-extra \
+    dvipng cm-super
+
+# The k9db repo is bind-mounted here during docker run (do not copy).
+RUN mkdir /home/k9db
+
+# Generate docker.bazelrc (imported by the repo's .bazelrc).
+RUN printf '%s\n' \
+    "test:asan --test_env LSAN_OPTIONS=suppressions=/home/k9db/.lsan_jvm_suppress.txt" \
+    "test:tsan --test_env LSAN_OPTIONS=suppressions=/home/k9db/.lsan_jvm_suppress.txt" \
+    "test:tsan --test_env TSAN_OPTIONS=suppressions=/home/k9db/.tsan_jvm_suppress.txt" \
+    > /home/docker.bazelrc
+
+EXPOSE 10001/tcp 3306/tcp
+
+ENTRYPOINT service mariadb start && /bin/bash
+
+# Run with docker run --mount type=bind,source=$(pwd),target=/home/k9db --name k9db -d -p 3306:3306 -p 10001:10001 -t k9db/latest
