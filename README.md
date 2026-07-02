@@ -45,11 +45,68 @@ K9db was previously known as Pelton.
 The requirements for building and running K9db are listed in our [wiki](https://github.com/brownsys/K9db/wiki/Requirements).
 
 You can either [install our dependencies yourself](https://github.com/brownsys/K9db/wiki/Requirements%3A-Ubuntu-and-similar-distros)
-or use our [provided Docker container](https://github.com/brownsys/K9db/wiki/Requirements%3A-Using-Docker).
+or use our [provided Docker container](https://github.com/brownsys/K9db/wiki/Requirements%3A-Using-Docker) (see the section below).
 
 You can then use bazel to [build and run K9db](https://github.com/brownsys/K9db/wiki/Building,-Testing,-and-Running).
 
 K9db does not currently build on Mac machines with M1/M2 processors, even when using the Docker container.
+
+## Using Docker
+
+The repository provides two Docker images.
+
+### Running K9db (release image)
+
+`Dockerfile.release` packages K9db into a small self-contained image: an
+intermediate stage builds K9db from source, and only the compiled server and
+its runtime dependencies are shipped in the final image.
+
+```bash
+docker build -f Dockerfile.release -t k9db .
+docker run -d --name k9db -p 10001:10001 -v k9db-data:/var/lib/k9db k9db
+```
+
+K9db then accepts MySQL-compatible connections on port 10001:
+
+```bash
+mysql --host=127.0.0.1 --port=10001
+```
+
+The database files are stored in the `k9db-data` volume and thus persist
+across containers (e.g. when upgrading the image). Arguments passed after the
+image name replace the default flags
+(`--hostname=0.0.0.0:10001 --db_path=/var/lib/k9db/`).
+
+### Developing K9db (dev image)
+
+`Dockerfile.dev` contains everything needed to build K9db from source, run the
+tests, and run the experiments (including the mariadb baselines and plotting).
+The repository is bind-mounted into the container, so you can edit the code on
+the host and build inside the container:
+
+```bash
+docker build -f Dockerfile.dev -t k9db/dev .
+docker run --mount type=bind,source=$(pwd),target=/home/k9db --name k9db-dev -d -p 3306:3306 -p 10001:10001 -t k9db/dev
+docker exec -it k9db-dev /bin/bash
+# Inside the container:
+cd /home/k9db && bazel build ... && bazel test ...
+```
+
+### Re-vendoring rust dependencies (devs)
+
+The bazel BUILD files for the rust (cargo) dependencies of the proxy and of
+the experiments are generated with cargo-raze and vendored (checked in) under
+`**/cargo/`, so building K9db does not require cargo-raze. If you change rust
+dependencies (any of the `Cargo.toml` files), re-vendor them by running the
+following inside the dev container from the repo root:
+
+```bash
+./vendor-rust.sh
+```
+
+Then commit and push the regenerated files (when the repo is bind-mounted
+into the container, the regenerated files are owned by root on the host, so
+you may need to `chown` them first).
 
 ## Tutorial
 

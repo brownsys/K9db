@@ -1,4 +1,4 @@
-name: "Tests on Ubuntu"
+name: "Dev tests"
 on:
   push:
     branches:

@@ -16,8 +16,9 @@ CREATE TABLE chat (
   FOREIGN KEY (patient_id) OWNED_BY patients(ID)
 );
 
--- Exercises the embedded JVM / calcite planner.
-CREATE VIEW chat_counts AS '"SELECT patient_id, COUNT(ID) FROM chat GROUP BY patient_id"';
+-- Exercises the embedded JVM / calcite planner. The ? parameter makes this a
+-- keyed view, so it can be queried with WHERE patient_id = <value>.
+CREATE VIEW chat_counts AS '"SELECT patient_id, COUNT(ID) FROM chat GROUP BY patient_id HAVING patient_id = ?"';
 
 INSERT INTO patients VALUES (1, 'Alice');
 INSERT INTO patients VALUES (2, 'Bob');
