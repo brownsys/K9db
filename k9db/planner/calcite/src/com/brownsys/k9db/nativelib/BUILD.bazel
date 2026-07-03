@@ -91,12 +91,15 @@ genrule(
       com/brownsys/k9db/nativelib/DataFlowGraphLibrary.java
 
   # Move outputs to proper directory and remove tmp directory.
+  # javacpp writes the library to a platform-specific directory
+  # (e.g. linux-x86_64/ or linux-arm64/), so glob instead of hardcoding.
   cd $${EXEC_PATH}
-  if [ -f $${PCKG_DIR}linux-x86_64/libjniDataFlowGraphLibrary.so ]; then
-    mv $${PCKG_DIR}linux-x86_64/libjniDataFlowGraphLibrary.so $@
-  else
-    touch $@
+  JNILIB=$$(ls $${PCKG_DIR}linux-*/libjniDataFlowGraphLibrary.so 2>/dev/null | head -1)
+  if [ -z "$${JNILIB}" ]; then
+    echo "ERROR: javacpp did not produce libjniDataFlowGraphLibrary.so" >&2
+    exit 1
   fi
+  mv $${JNILIB} $@
   rm -rf $${TMP_DIR}
 """,
     tools = ["@maven//:org_bytedeco_javacpp"],

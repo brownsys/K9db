@@ -1,0 +1,41 @@
+name: "Dev tests (arm64)"
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    branches:
+      - 'main'
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04-arm
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    # Docker setup.
+    - name: Build docker container
+      run: |
+        docker build --no-cache -f Dockerfile.dev.arm64 -t k9db/dev-arm64 .
+
+    # Run docker (rust dependencies are vendored, no setup needed).
+    - name: Run docker container
+      run: |
+        docker run --mount type=bind,source=$(pwd),target=/home/k9db --name k9db -d -t k9db/dev-arm64
+        sleep 10
+        docker logs k9db
+
+    # bazel build ...
+    - name: Build all
+      run: |
+        docker exec k9db sh -c "cd /home/k9db && bazel build ..."
+
+    # bazel test all (with encryption; on by default)
+    - name: Test all
+      run: docker exec k9db sh -c "cd /home/k9db && bazel test ... --test_output=all"
+
+    # bazel test all without encryption
+    - name: Test all no encryption
+      run: docker exec k9db sh -c "cd /home/k9db && bazel test ... --encryption=off --test_output=all"

@@ -30,6 +30,7 @@ workspace_path = "//k9db/proxy/cargo"
 genmode = "Remote"
 # The set of targets to generate BUILD rules for.
 targets = [
+    "aarch64-unknown-linux-gnu",
     "x86_64-apple-darwin",
     "x86_64-pc-windows-msvc",
     "x86_64-unknown-linux-gnu",

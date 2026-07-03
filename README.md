@@ -49,17 +49,22 @@ or use our [provided Docker container](https://github.com/brownsys/K9db/wiki/Req
 
 You can then use bazel to [build and run K9db](https://github.com/brownsys/K9db/wiki/Building,-Testing,-and-Running).
 
-K9db does not currently build on Mac machines with M1/M2 processors, even when using the Docker container.
+K9db also builds and runs on Apple Silicon Macs (M series) using Docker, as a
+native arm64 Linux container: the release image is multi-arch, and a
+lightweight arm64 development image is provided (see the section below).
+Native (non-Docker) macOS builds are not supported.
 
 ## Using Docker
 
-The repository provides two Docker images.
+The repository provides Docker images for running K9db and for developing it.
 
 ### Running K9db (release image)
 
 `Dockerfile.release` packages K9db into a small self-contained image: an
 intermediate stage builds K9db from source, and only the compiled server and
-its runtime dependencies are shipped in the final image.
+its runtime dependencies are shipped in the final image. The image is
+multi-arch: it builds natively on both x86_64 and arm64 (e.g. Apple Silicon
+Macs) hosts.
 
 ```bash
 docker build -f Dockerfile.release -t k9db .
@@ -87,6 +92,22 @@ the host and build inside the container:
 ```bash
 docker build -f Dockerfile.dev -t k9db/dev .
 docker run --mount type=bind,source=$(pwd),target=/home/k9db --name k9db-dev -d -p 3306:3306 -p 10001:10001 -t k9db/dev
+docker exec -it k9db-dev /bin/bash
+# Inside the container:
+cd /home/k9db && bazel build ... && bazel test ...
+```
+
+`Dockerfile.dev` is x86_64-only.
+
+On arm64 machines (e.g. Apple Silicon Macs), use `Dockerfile.dev.arm64` instead:
+a lightweight development image that can build K9db from source,
+run the tests, and re-vendor the rust dependencies,
+but does not include the experiments pipeline (mariadb baselines, memcached,
+and plotting):
+
+```bash
+docker build -f Dockerfile.dev.arm64 -t k9db/dev-arm64 .
+docker run --mount type=bind,source=$(pwd),target=/home/k9db --name k9db-dev -d -it -p 10001:10001 k9db/dev-arm64
 docker exec -it k9db-dev /bin/bash
 # Inside the container:
 cd /home/k9db && bazel build ... && bazel test ...

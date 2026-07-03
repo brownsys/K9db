@@ -1,0 +1,73 @@
+name: "Test release Docker image (arm64)"
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    branches:
+      - 'main'
+
+jobs:
+  release-test:
+    runs-on: ubuntu-24.04-arm
+    steps:
+    - uses: actions/checkout@v4
+
+    # The arm64 runner image may not ship a mysql client.
+    - name: Install mysql client
+      run: sudo apt-get update && sudo apt-get install -y mysql-client
+
+    # (1) Build the release image.
+    - name: Build release docker image
+      run: docker build -f Dockerfile.release -t k9db:test .
+
+    # (2) Run it with a named volume for the database files.
+    - name: Run k9db container
+      run: |
+        docker volume create k9db-data
+        docker run -d --name k9db -p 10001:10001 -v k9db-data:/var/lib/k9db k9db:test
+        ./tests/release/wait-for-k9db.sh k9db
+
+    # (3) + (4) Feed sql into k9db and check the output of each statement.
+    - name: Create schema and insert data
+      run: |
+        mysql --host=127.0.0.1 --port=10001 < tests/release/01-schema.sql | tee out.txt
+        test ! -s out.txt  # DDL and inserts produce no output.
+
+    - name: Check point lookups
+      run: |
+        mysql --host=127.0.0.1 --port=10001 < tests/release/02-selects.sql | tee out.txt
+        diff tests/release/02-selects.expected out.txt
+
+    - name: Check view (calcite planner / dataflow)
+      run: |
+        mysql --host=127.0.0.1 --port=10001 < tests/release/03-view.sql | tail -n +2 | tee out.txt
+        diff tests/release/03-view.expected out.txt
+
+    # (5) Stop and remove the container; (6) run a fresh one on the same volume.
+    - name: Replace container (data must persist)
+      run: |
+        docker stop k9db
+        docker rm k9db
+        docker run -d --name k9db -p 10001:10001 -v k9db-data:/var/lib/k9db k9db:test
+        ./tests/release/wait-for-k9db.sh k9db
+
+    # (7) The old data (incl. the view) must have survived, and writes work.
+    - name: Check persisted point lookups
+      run: |
+        mysql --host=127.0.0.1 --port=10001 < tests/release/02-selects.sql | tee out.txt
+        diff tests/release/02-selects.expected out.txt
+
+    - name: Check persisted view
+      run: |
+        mysql --host=127.0.0.1 --port=10001 < tests/release/03-view.sql | tail -n +2 | tee out.txt
+        diff tests/release/03-view.expected out.txt
+
+    - name: Check write after restart
+      run: |
+        mysql --host=127.0.0.1 --port=10001 < tests/release/04-write-after-restart.sql | tee out.txt
+        diff tests/release/04-write-after-restart.expected out.txt
+
+    - name: Dump k9db logs on failure
+      if: failure()
+      run: docker logs k9db || true

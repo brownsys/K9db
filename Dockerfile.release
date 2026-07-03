@@ -17,6 +17,7 @@
 # Stage 1: build k9db from source.
 ##############################################################################
 FROM ubuntu:24.04 AS build
+ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
@@ -31,7 +32,7 @@ RUN apt-get update && apt-get install -y \
     apt-utils libssl-dev lsb-release openssl git \
     build-essential zlib1g-dev libbz2-dev liblzma-dev libffi-dev \
     wget gcc-11 g++-11 unzip zip pkg-config \
-    openjdk-11-jdk curl libclang-dev libevent-dev \
+    openjdk-11-jdk curl libclang-dev clang libevent-dev \
     libsnappy-dev python3 python3-dev
 
 RUN ln -sf /usr/bin/python3 /usr/bin/python
@@ -43,12 +44,19 @@ RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 90 \
                                  --slave /usr/bin/g++ g++ /usr/bin/g++-11 \
     && update-alternatives --set gcc /usr/bin/gcc-11
 
-# Install bazel 4.0.
-RUN cd /tmp \
-    && wget https://github.com/bazelbuild/bazel/releases/download/4.0.0/bazel-4.0.0-installer-linux-x86_64.sh \
-    && chmod +x bazel-4.0.0-installer-linux-x86_64.sh \
-    && ./bazel-4.0.0-installer-linux-x86_64.sh \
-    && rm bazel-4.0.0-installer-linux-x86_64.sh
+# Install bazel 4.0. No installer script is published for linux-arm64, so
+# download the standalone binary directly on arm64.
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        wget -O /usr/local/bin/bazel \
+            https://github.com/bazelbuild/bazel/releases/download/4.0.0/bazel-4.0.0-linux-arm64 \
+        && chmod +x /usr/local/bin/bazel; \
+    else \
+        cd /tmp \
+        && wget https://github.com/bazelbuild/bazel/releases/download/4.0.0/bazel-4.0.0-installer-linux-x86_64.sh \
+        && chmod +x bazel-4.0.0-installer-linux-x86_64.sh \
+        && ./bazel-4.0.0-installer-linux-x86_64.sh \
+        && rm bazel-4.0.0-installer-linux-x86_64.sh; \
+    fi
 
 # Copy sources (see .dockerignore for exclusions). The bazel rules for the
 # proxy's rust dependencies (k9db/proxy/cargo/) are vendored in the repo, so
@@ -75,6 +83,7 @@ RUN BIN="$(bazel info bazel-bin --config opt)" \
 # Stage 2: minimal runtime image.
 ##############################################################################
 FROM ubuntu:24.04 AS runtime
+ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
@@ -91,7 +100,8 @@ COPY --from=build /opt/k9db /opt/k9db
 # the working directory, so this must be /opt/k9db.
 WORKDIR /opt/k9db
 
-ENV LD_LIBRARY_PATH=/opt/k9db/lib:/usr/lib/jvm/java-11-openjdk-amd64/lib/server:/usr/lib/jvm/java-11-openjdk-amd64/lib
+# The jvm directory suffix matches docker's TARGETARCH (amd64/arm64).
+ENV LD_LIBRARY_PATH=/opt/k9db/lib:/usr/lib/jvm/java-11-openjdk-${TARGETARCH}/lib/server:/usr/lib/jvm/java-11-openjdk-${TARGETARCH}/lib
 # Send glog output to the container log instead of files in /tmp.
 ENV GLOG_logtostderr=1
 

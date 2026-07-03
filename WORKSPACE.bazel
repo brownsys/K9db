@@ -3,6 +3,23 @@ workspace(name = "k9db")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_repository")
 
+# Override bazel's builtin remote_java_tools_linux (same archive bazel 4.0.0
+# ships with) to patch a missing '#include <limits>' in ijar's zlib_client.h.
+# On x86_64 this doesn't matter (bazel uses the prebuilt ijar binary), but on
+# arm64 there is no prebuilt ijar, so it is compiled from source and fails
+# against newer libstdc++ where <limits> is no longer transitively included.
+http_archive(
+    name = "remote_java_tools_linux",
+    patch_cmds = [
+        "grep -rl numeric_limits java_tools --include=*.h --include=*.cc | xargs sed -i '1i #include <limits>'",
+    ],
+    sha256 = "355c27c603e8fc64bb0e2d7f809741f42576d5f4540f9ce28fd55922085af639",
+    urls = [
+        "https://mirror.bazel.build/bazel_java_tools/releases/javac11/v10.5/java_tools_javac11_linux-v10.5.zip",
+        "https://github.com/bazelbuild/java_tools/releases/download/javac11_v10.5/java_tools_javac11_linux-v10.5.zip",
+    ],
+)
+
 
 # Rules java
 http_archive(
@@ -361,12 +378,24 @@ filegroup(
 
 configure_make(
     name = "libsodium",
+    # libsodium only enables its aarch64 AES256-GCM implementation when
+    # compiled with clang (the code is gated on __clang__). Override CFLAGS
+    # and LDFLAGS as they carry gcc-only flags from the bazel toolchain that
+    # clang rejects; configure arguments take precedence over the environment.
+    configure_options = select({
+        "@platforms//cpu:aarch64": [
+            "CC=clang",
+            "CFLAGS='-O2 -fPIC'",
+            "LDFLAGS=",
+        ],
+        "//conditions:default": [],
+    }),
     lib_source = ":all_srcs",
     out_lib_dir = "lib",
     visibility = ["//visibility:public"],
 )
 """,
-    strip_prefix = "libsodium-1.0.18-RELEASE",
+    strip_prefix = "libsodium-1.0.20-RELEASE",
     type = "zip",
-    url = "https://github.com/jedisct1/libsodium/archive/1.0.18-RELEASE.zip",
+    url = "https://github.com/jedisct1/libsodium/archive/1.0.20-RELEASE.zip",
 )

@@ -1,0 +1,59 @@
+# Docker image for lightweight k9db development on arm64 (e.g. Apple Silicon
+# Macs): building from source and running tests, plus re-vendoring the rust
+# dependencies. Unlike Dockerfile.dev, this image does NOT include the
+# experiment pipeline (mariadb baselines, memcached, latex/plotting).
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+# /root/.cargo/bin: rust/cargo (installed below) available in every shell.
+ENV PATH=/root/.cargo/bin:/usr/local/bin:$PATH
+
+# Add apt-add-repository and the ppa for gcc-11.
+RUN apt-get update && apt-get install -y software-properties-common \
+    && add-apt-repository -y ppa:ubuntu-toolchain-r/test
+
+# Build dependencies.
+RUN apt-get update && apt-get install -y \
+    apt-utils libssl-dev lsb-release openssl git \
+    build-essential zlib1g-dev libbz2-dev liblzma-dev libffi-dev \
+    wget gcc-11 g++-11 unzip zip pkg-config \
+    openjdk-11-jdk curl libclang-dev clang \
+    libsnappy-dev python3 python3-dev mariadb-client \
+    && ln -sf /usr/bin/python3 /usr/bin/python
+
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 90 \
+                                 --slave /usr/bin/gcc-ar gcc-ar /usr/bin/gcc-ar-11 \
+                                 --slave /usr/bin/gcc-nm gcc-nm /usr/bin/gcc-nm-11 \
+                                 --slave /usr/bin/gcc-ranlib gcc-ranlib /usr/bin/gcc-ranlib-11 \
+                                 --slave /usr/bin/g++ g++ /usr/bin/g++-11 \
+    && update-alternatives --set gcc /usr/bin/gcc-11
+
+# Install bazel 4.0. No installer script is published for linux-arm64, so
+# download the standalone binary directly.
+RUN wget -O /usr/local/bin/bazel \
+        https://github.com/bazelbuild/bazel/releases/download/4.0.0/bazel-4.0.0-linux-arm64 \
+    && chmod +x /usr/local/bin/bazel
+
+# Install rust and cargo-raze. The raze outputs (**/cargo/) are vendored in
+# the repo; cargo-raze is only needed to re-vendor them after changing rust
+# dependencies: run ./vendor-rust.sh from the repo root and commit the changes.
+RUN curl https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly-2023-12-06
+RUN git clone https://github.com/KinanBab/cargo-raze.git /home/cargo-raze \
+    && cargo install --locked --path /home/cargo-raze/impl
+
+# The k9db repo is bind-mounted here during docker run (do not copy).
+RUN mkdir /home/k9db
+
+# Generate docker.bazelrc (imported by the repo's .bazelrc).
+RUN printf '%s\n' \
+    "test:asan --test_env LSAN_OPTIONS=suppressions=/home/k9db/.lsan_jvm_suppress.txt" \
+    "test:tsan --test_env LSAN_OPTIONS=suppressions=/home/k9db/.lsan_jvm_suppress.txt" \
+    "test:tsan --test_env TSAN_OPTIONS=suppressions=/home/k9db/.tsan_jvm_suppress.txt" \
+    > /home/docker.bazelrc
+
+EXPOSE 10001/tcp
+
+ENTRYPOINT ["/bin/bash"]
+
+# Run with docker run --mount type=bind,source=$(pwd),target=/home/k9db --name k9db-arm64 -it -p 10001:10001 k9db/dev-arm64
