@@ -194,12 +194,14 @@ TEST(TransactionTest, MixedTest) {
   std::atomic<int> to2 = 0;
   std::function sync1([&](int barrier) {
     to2 = barrier;
-    while (to1 != barrier) {
+    while (to1 < barrier) {
+      std::this_thread::yield();
     }
   });
   std::function sync2([&](int barrier) {
     to1 = barrier;
-    while (to2 != barrier) {
+    while (to2 < barrier) {
+      std::this_thread::yield();
     }
   });
 
