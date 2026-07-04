@@ -220,10 +220,8 @@ TEST(TransactionTest, MixedTest) {
 
     // Commit after sleeping.
     sleep(1);
-    txn.Commit();
-
-    // Signal that we committed.
     to2 = 100;
+    txn.Commit();
   });
 
   // Second thread.
