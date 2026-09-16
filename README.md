@@ -40,7 +40,36 @@ ownership annotations.
 
 K9db was previously known as Pelton.
 
-## Installing, Building, and Running K9db
+## Running Released K9db
+
+Pre-built K9db images are published on [Docker Hub](https://hub.docker.com/r/kinanbab/k9db).
+The same image works on Ubuntu/x86_64 and macOS/Apple Silicon (arm64) hosts:
+Docker automatically pulls the variant matching your host architecture.
+
+```bash
+docker pull kinanbab/k9db:latest
+docker run -d --name k9db -p 10001:10001 -v k9db-data:/var/lib/k9db kinanbab/k9db:latest
+```
+
+K9db then accepts MySQL-compatible connections on port 10001:
+
+```bash
+mysql --host=127.0.0.1 --port=10001
+```
+
+On macOS, install [Docker Desktop](https://www.docker.com/products/docker-desktop/) first;
+the commands above are otherwise identical on both platforms.
+
+To reset to a fresh database, remove the container and its volume, then run it again:
+
+```bash
+docker stop k9db
+docker rm k9db
+docker volume rm k9db-data
+docker run -d --name k9db -p 10001:10001 -v k9db-data:/var/lib/k9db kinanbab/k9db:latest
+```
+
+## Installing, Building, and Running K9db (for development)
 
 The requirements for building and running K9db are listed in our [wiki](https://github.com/brownsys/K9db/wiki/Requirements).
 
@@ -54,11 +83,11 @@ native arm64 Linux container: the release image is multi-arch, and a
 lightweight arm64 development image is provided (see the section below).
 Native (non-Docker) macOS builds are not supported.
 
-## Using Docker
+### Using Docker
 
 The repository provides Docker images for running K9db and for developing it.
 
-### Running K9db (release image)
+#### Running K9db (release image)
 
 `Dockerfile.release` packages K9db into a small self-contained image: an
 intermediate stage builds K9db from source, and only the compiled server and
@@ -82,7 +111,7 @@ across containers (e.g. when upgrading the image). Arguments passed after the
 image name replace the default flags
 (`--hostname=0.0.0.0:10001 --db_path=/var/lib/k9db/`).
 
-### Developing K9db (dev image)
+#### Developing K9db (dev image)
 
 `Dockerfile.dev` contains everything needed to build K9db from source, run the
 tests, and run the experiments (including the mariadb baselines and plotting).
@@ -113,7 +142,7 @@ docker exec -it k9db-dev /bin/bash
 cd /home/k9db && bazel build ... && bazel test ...
 ```
 
-### Re-vendoring rust dependencies (devs)
+#### Re-vendoring rust dependencies (devs)
 
 The bazel BUILD files for the rust (cargo) dependencies of the proxy and of
 the experiments are generated with cargo-raze and vendored (checked in) under
