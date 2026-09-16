@@ -46,6 +46,14 @@ Pre-built K9db images are published on [Docker Hub](https://hub.docker.com/r/kin
 The same image works on Ubuntu/x86_64 and macOS/Apple Silicon (arm64) hosts:
 Docker automatically pulls the variant matching your host architecture.
 
+Automatically run using `docker compose`:
+```bash
+git clone https://github.com/brownsys/K9db
+cd K9db
+docker compose up
+```
+
+Or manually run using `docker run`:
 ```bash
 docker pull kinanbab/k9db:latest
 docker run -d --name k9db -p 10001:10001 -v k9db-data:/var/lib/k9db kinanbab/k9db:latest

@@ -1,0 +1,14 @@
+services:
+  k9db:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: k9db:local
+    ports:
+      - "10001:10001"
+    volumes:
+      - k9db-data:/var/lib/k9db
+    restart: unless-stopped
+
+volumes:
+  k9db-data:
