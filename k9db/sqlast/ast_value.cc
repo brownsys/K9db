@@ -120,20 +120,45 @@ bool Value::TypeCompatible(ColumnDefinitionTypeEnum type) const {
         return true;
       }
       if (type == ColumnDefinitionTypeEnum::DATETIME) {
-        const std::string &value = std::get<std::string>(this->data_);
-        if (value.size() < 19) {
+        std::string value = std::get<std::string>(this->data_);
+        // Matches MariaDB's own DATETIME literal parsing, which allows the
+        // time part to be dropped from the right (seconds, then minutes,
+        // then the whole time-of-day), defaulting missing parts to 0: accept
+        // 'YYYY-MM-DD', 'YYYY-MM-DD HH', 'YYYY-MM-DD HH:MM', and
+        // 'YYYY-MM-DD HH:MM:SS'. A plain DATETIME column has no fractional-
+        // seconds precision, so MariaDB itself silently discards any
+        // '.ffffff'-style suffix; truncate it the same way before checking.
+        if (value.size() > 19) {
+          value = value.substr(0, 19);
+        }
+        if (value.size() != 10 && value.size() != 13 && value.size() != 16 &&
+            value.size() != 19) {
           LOG(FATAL) << "Bad datetime format; use '2020-12-30 23:59:59';"
                      << " found {" << value << "}";
         }
         size_t digits[] = {0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18};
         for (const size_t &i : digits) {
+          if (i >= value.size()) {
+            break;
+          }
           if (value[i] < '0' || value[i] > '9') {
             LOG(FATAL) << "Bad datetime format; use '2020-12-30 23:59:59';"
                        << " found {" << value << "}";
           }
         }
-        if (value[4] != '-' || value[7] != '-' || value[10] != ' '
-            || value[13] != ':' || value[16] != ':') {
+        if (value[4] != '-' || value[7] != '-') {
+          LOG(FATAL) << "Bad datetime format; use '2020-12-30 23:59:59';"
+                     << " found {" << value << "}";
+        }
+        if (value.size() >= 13 && value[10] != ' ') {
+          LOG(FATAL) << "Bad datetime format; use '2020-12-30 23:59:59';"
+                     << " found {" << value << "}";
+        }
+        if (value.size() >= 16 && value[13] != ':') {
+          LOG(FATAL) << "Bad datetime format; use '2020-12-30 23:59:59';"
+                     << " found {" << value << "}";
+        }
+        if (value.size() == 19 && value[16] != ':') {
           LOG(FATAL) << "Bad datetime format; use '2020-12-30 23:59:59';"
                      << " found {" << value << "}";
         }

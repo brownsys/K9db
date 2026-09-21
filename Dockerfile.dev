@@ -42,27 +42,13 @@ RUN curl https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly-2023-12-
 RUN git clone https://github.com/KinanBab/cargo-raze.git /home/cargo-raze \
     && cargo install --locked --path /home/cargo-raze/impl
 
-# Install mariadb (for experiment baselines only) and the mariadb C
-# connector (for memcached).
+# Install mariadb and memcached (for experiment baselines only).
 RUN curl -LsS -O https://downloads.mariadb.com/MariaDB/mariadb_repo_setup \
     && bash mariadb_repo_setup --mariadb-server-version=10.5 \
     && rm mariadb_repo_setup \
     && apt-get update \
     && apt-get install -y mariadb-server-10.5 mariadb-client \
-       mariadb-plugin-rocksdb libmariadb3 libmariadb-dev
-
-# Install the mariadb C++ connector (for memcached).
-RUN cd /tmp \
-    && wget https://dlm.mariadb.com/1601342/Connectors/cpp/connector-cpp-1.0.0/mariadb-connector-cpp-1.0.0-ubuntu-groovy-amd64.tar.gz \
-    && tar -xzf mariadb-connector-cpp-1.0.0-*.tar.gz \
-    && cd mariadb-connector-cpp-1.0.0-*/ \
-    && install -d /usr/include/mariadb/conncpp/compat /usr/lib/mariadb/plugin \
-    && install -v include/mariadb/*.hpp /usr/include/mariadb/ \
-    && install -v include/mariadb/conncpp/*.hpp /usr/include/mariadb/conncpp \
-    && install -v include/mariadb/conncpp/compat/* /usr/include/mariadb/conncpp/compat \
-    && install -v lib64/mariadb/libmariadbcpp.so /usr/lib \
-    && install -v lib64/mariadb/plugin/* /usr/lib/mariadb/plugin \
-    && rm -rf /tmp/mariadb-connector-cpp-1.0.0-*
+       mariadb-plugin-rocksdb memcached
 
 # Configure mariadb: datadir, runtime dirs, and (with the server briefly
 # running at image build time) the k9db user and the rocksdb engine.

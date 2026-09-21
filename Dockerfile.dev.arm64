@@ -1,7 +1,8 @@
 # Docker image for lightweight k9db development on arm64 (e.g. Apple Silicon
 # Macs): building from source and running tests, plus re-vendoring the rust
-# dependencies. Unlike Dockerfile.dev, this image does NOT include the
-# experiment pipeline (mariadb baselines, memcached, latex/plotting).
+# dependencies. Unlike Dockerfile.dev, this image does NOT include the full
+# experiment pipeline (mariadb baselines, latex/plotting) -- memcached is
+# installed since experiments that need it can run standalone via cargo.
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive

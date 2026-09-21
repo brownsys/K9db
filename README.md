@@ -139,8 +139,9 @@ cd /home/k9db && bazel build ... && bazel test ...
 On arm64 machines (e.g. Apple Silicon Macs), use `Dockerfile.dev.arm64` instead:
 a lightweight development image that can build K9db from source,
 run the tests, and re-vendor the rust dependencies,
-but does not include the experiments pipeline (mariadb baselines, memcached,
-and plotting):
+but does not include the full experiments pipeline (mariadb baselines and
+plotting). It does include memcached, since experiments that need it can run
+standalone via cargo:
 
 ```bash
 docker build -f Dockerfile.dev.arm64 -t k9db/dev-arm64 .

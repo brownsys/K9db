@@ -13,11 +13,11 @@ echo "Building votes harness..."
 cd ${K9DB_DIR}/experiments/vote
 bazel build //:vote-benchmark -c opt
 
-# Build memcached
-echo "Building memcached..."
+# Build memcached-memory (the memcached server itself is a system package,
+# installed via Dockerfile.dev/apt -- nothing to build for it).
+echo "Building memcached-memory..."
 cd ${K9DB_DIR}/experiments/memcached
-bazel build @memcached//:memcached --config=opt
-bazel build //memcached:memcached --config=opt
+cargo build --release
 
 # Build lobsters harness
 echo "Building lobsters harness..."

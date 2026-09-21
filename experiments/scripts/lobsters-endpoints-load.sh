@@ -57,14 +57,12 @@ echo "Running memcached experiment against baseline..."
 cd "$K9DB_DIR/experiments/memcached"
 
 # Run memcached server.
-bazel build @memcached//:memcached --config=opt
-bazel run @memcached//:memcached --config=opt -- $MEMCACHED_USER -m 1024 -M > "$LOG_OUT/memcached-server.log" 2>&1 &
+memcached $MEMCACHED_USER -m 1024 -M > "$LOG_OUT/memcached-server.log" 2>&1 &
 pid=$!
 sleep 30
 
 # Run memcached experiment
-bazel build //memcached:memcached --config=opt
-bazel run //memcached:memcached --config=opt -- --database=$TARGET_IP \
+cargo run --release -- --database=$TARGET_IP \
   > "$LOG_OUT/memcached-memory.out" 2>&1
 kill $pid
 
