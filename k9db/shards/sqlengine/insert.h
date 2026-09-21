@@ -90,6 +90,10 @@ class InsertContext {
   /* Add auto increment and default values. */
   absl::Status AutoIncrementAndDefault();
 
+  /* Normalize DATETIME values to the full 'YYYY-MM-DD HH:MM:SS' form,
+     matching how MariaDB itself would store them. */
+  absl::Status CanonicalizeDatetimes();
+
   /* Inserting the statement into the database. */
   absl::StatusOr<int> InsertIntoBaseTable();
 

@@ -185,6 +185,26 @@ ColumnDefinitionTypeEnum Value::ConvertType() const {
   }
 }
 
+void Value::CanonicalizeDatetime() {
+  std::string &value = std::get<std::string>(this->data_);
+  if (value.size() > 19) {
+    value.resize(19);
+  }
+  switch (value.size()) {
+    case 10:
+      value += " 00:00:00";
+      break;
+    case 13:
+      value += ":00:00";
+      break;
+    case 16:
+      value += ":00";
+      break;
+    default:
+      break;
+  }
+}
+
 void Value::ConvertTo(ColumnDefinitionTypeEnum target) {
   switch (this->type()) {
     case Type::_NULL:

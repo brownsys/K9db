@@ -72,6 +72,12 @@ class Value {
   ColumnDefinitionTypeEnum ConvertType() const;
   void ConvertTo(ColumnDefinitionTypeEnum target);
 
+  // Normalizes a DATETIME-compatible TEXT value (already passed
+  // TypeCompatible(DATETIME)) to the full 'YYYY-MM-DD HH:MM:SS' form, the
+  // way MariaDB itself would store it. Only meant to be called once, on
+  // values newly written via INSERT/UPDATE.
+  void CanonicalizeDatetime();
+
   // For logging and printing...
   friend std::ostream &operator<<(std::ostream &os, const Value &k);
 
