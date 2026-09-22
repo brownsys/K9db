@@ -1,0 +1,11 @@
+# Build context for Dockerfile.dev.
+#
+# BuildKit uses <dockerfile>.dockerignore in preference to .dockerignore, so
+# this file overrides the repo-root .dockerignore (which keeps the context for
+# Dockerfile.release small). The dev images need experiments/ and the rest of
+# the tree, and exclude only what is never part of a build.
+#
+# NOTE: per-dockerfile ignore files are a BuildKit feature. Building with
+# DOCKER_BUILDKIT=0 or Docker < 23.0 falls back to the root .dockerignore.
+.git
+bazel-*

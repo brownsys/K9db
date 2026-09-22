@@ -1,6 +1,7 @@
-# Keep the build context for Dockerfile.release small. The dev and
-# experiment Dockerfiles bind-mount the repo instead of COPYing it, so
-# these exclusions do not affect them.
+# Default exclusions, which keep the build context for Dockerfile.release
+# small. The dev images opt out of all of these via their own
+# Dockerfile.dev.dockerignore / Dockerfile.dev.arm64.dockerignore files:
+# BuildKit uses <dockerfile>.dockerignore in preference to this file.
 .git
 bazel-*
 user.bazelrc
