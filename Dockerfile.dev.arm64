@@ -49,7 +49,7 @@ RUN curl -LsS -O https://downloads.mariadb.com/MariaDB/mariadb_repo_setup \
     && rm mariadb_repo_setup \
     && apt-get update \
     && apt-get install -y mariadb-server-10.5 mariadb-client \
-       mariadb-plugin-rocksdb memcached
+       mariadb-plugin-rocksdb memcached netcat-openbsd
 
 # Configure mariadb: datadir, runtime dirs, and (with the server briefly
 # running at image build time) the k9db user and the rocksdb engine.

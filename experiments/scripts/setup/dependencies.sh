@@ -17,7 +17,7 @@ sudo apt-get install -y apt-utils libssl-dev lsb-release openssl vim git \
     libncursesw5-dev libreadline-dev libgdbm-dev libdb5.3-dev libbz2-dev \
     libexpat1-dev liblzma-dev tk-dev libffi-dev wget gcc-11 g++-11 unzip \
     openjdk-11-jdk maven python2 valgrind curl libclang-dev flex bison libevent-dev \
-    libsnappy-dev memcached
+    libsnappy-dev memcached netcat-openbsd
 
 # Memcached user for experiments.
 sudo useradd memcached
