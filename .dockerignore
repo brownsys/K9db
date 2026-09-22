@@ -1,7 +1,7 @@
 # Default exclusions, which keep the build context for Dockerfile.release
-# small. The dev images opt out of all of these via their own
-# Dockerfile.dev.dockerignore / Dockerfile.dev.arm64.dockerignore files:
-# BuildKit uses <dockerfile>.dockerignore in preference to this file.
+# small. The dev image opts out of most of these via its own
+# Dockerfile.dev.dockerignore: BuildKit uses <dockerfile>.dockerignore in
+# preference to this file.
 .git
 bazel-*
 user.bazelrc

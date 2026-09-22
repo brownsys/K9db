@@ -13,8 +13,9 @@ echo "Building votes harness..."
 cd ${K9DB_DIR}/experiments/vote
 bazel build //:vote-benchmark -c opt
 
-# Build memcached-memory (the memcached server itself is a system package,
-# installed via Dockerfile.dev/apt -- nothing to build for it).
+# Build memcached-memory
+# the memcached server itself is a system package,
+# installed via Dockerfile.dev or via scripts/setup/dependencies.sh
 echo "Building memcached-memory..."
 cd ${K9DB_DIR}/experiments/memcached
 cargo build --release
