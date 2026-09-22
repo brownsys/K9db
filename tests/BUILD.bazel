@@ -126,3 +126,18 @@ cc_test(
         ":common",
     ],
 )
+
+# Regression test: large encrypted value round-trip (see encryption_on.cc's
+# Decrypt buffer-sizing fix).
+cc_test(
+    name = "large_value",
+    srcs = [
+        "large_value.cc",
+    ],
+    data = [
+        "//tests/data:large-value-data",
+    ],
+    deps = [
+        ":common",
+    ],
+)

@@ -16,7 +16,6 @@ namespace rocks {
 #define KEY_SIZE crypto_aead_aes256gcm_KEYBYTES
 #define NONCE_SIZE crypto_aead_aes256gcm_NPUBBYTES
 #define CIPHER_OVERHEAD crypto_aead_aes256gcm_ABYTES
-#define PLAIN_MAX_LEN 10000
 
 #define ENCRYPT(dst, dsz, src, sz, nonce, key) \
   crypto_aead_aes256gcm_encrypt(dst, dsz, src, sz, nullptr, 0, NULL, nonce, key)
@@ -53,9 +52,10 @@ std::string Decrypt(rocksdb::Slice input, const unsigned char *nonce,
   const unsigned char *input_buf =
       reinterpret_cast<const unsigned char *>(input.data());
 
-  // Allocate memory for plaintext.
+  // Allocate memory for plaintext, sized to the actual ciphertext.
+  size_t capacity = input.size() - CIPHER_OVERHEAD;
   std::unique_ptr<unsigned char[]> dst =
-      std::make_unique<unsigned char[]>(PLAIN_MAX_LEN);
+      std::make_unique<unsigned char[]>(capacity);
 
   // NOLINTNEXTLINE
   unsigned long long size;

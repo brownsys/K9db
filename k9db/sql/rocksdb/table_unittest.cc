@@ -191,6 +191,22 @@ TEST(TableTest, PutExistsGetDelete) {
   txn->Rollback();
 }
 
+// Regression test: Decrypt() used to allocate a fixed 10000-byte output
+// buffer regardless of the actual ciphertext size, overflowing it whenever
+// the plaintext exceeded that bound. Round-trip a value well past that size.
+TEST(TableTest, EncryptDecryptLargeValue) {
+  EncryptionManager enc;
+
+  std::string large(50000, 'x');
+  RocksdbSequence v =
+      FromVector({"10", large, "-10", "mail", "2012-11-11"});
+
+  EncryptedValue e = enc.EncryptValue("usr0", COPY(v));
+  RocksdbSequence r = enc.DecryptValue("usr0", std::move(e));
+
+  EXPECT_EQ(v.Data(), r.Data());
+}
+
 }  // namespace rocks
 }  // namespace sql
 }  // namespace k9db

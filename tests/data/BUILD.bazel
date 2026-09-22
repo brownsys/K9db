@@ -96,3 +96,12 @@ filegroup(
     ]),
     visibility = ["//tests:__subpackages__"],
 )
+
+filegroup(
+    name = "large-value-data",
+    srcs = glob([
+        "large_value/*.sql",
+        "large_value/*.txt",
+    ]),
+    visibility = ["//tests:__subpackages__"],
+)
