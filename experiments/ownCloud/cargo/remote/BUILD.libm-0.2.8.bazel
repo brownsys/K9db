@@ -26,7 +26,7 @@ package(default_visibility = [
 ])
 
 licenses([
-    "notice",  # MIT from expression "MIT"
+    "notice",  # MIT from expression "MIT OR Apache-2.0"
 ])
 
 # Generated Targets
@@ -43,12 +43,11 @@ cargo_build_script(
     build_script_env = {
     },
     crate_features = [
-        "arch",
         "default",
     ],
     crate_root = "build.rs",
     data = glob(["**"]),
-    edition = "2021",
+    edition = "2018",
     rustc_flags = [
         "--cap-lints=allow",
     ],
@@ -56,7 +55,7 @@ cargo_build_script(
         "cargo-raze",
         "manual",
     ],
-    version = "0.2.15",
+    version = "0.2.8",
     visibility = ["//visibility:private"],
     deps = [
     ],
@@ -66,12 +65,11 @@ rust_library(
     name = "libm",
     srcs = glob(["**/*.rs"]),
     crate_features = [
-        "arch",
         "default",
     ],
     crate_root = "src/lib.rs",
     data = [],
-    edition = "2021",
+    edition = "2018",
     rustc_flags = [
         "--cap-lints=allow",
     ],
@@ -80,7 +78,7 @@ rust_library(
         "crate-name=libm",
         "manual",
     ],
-    version = "0.2.15",
+    version = "0.2.8",
     # buildifier: leave-alone
     deps = [
         ":libm_build_script",

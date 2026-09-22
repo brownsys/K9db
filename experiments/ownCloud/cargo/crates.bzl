@@ -531,11 +531,11 @@ def raze_fetch_remote_crates():
 
     maybe(
         http_archive,
-        name = "raze__libm__0_2_15",
-        url = "https://crates.io/api/v1/crates/libm/0.2.15/download",
+        name = "raze__libm__0_2_8",
+        url = "https://crates.io/api/v1/crates/libm/0.2.8/download",
         type = "tar.gz",
-        strip_prefix = "libm-0.2.15",
-        build_file = Label("//cargo/remote:BUILD.libm-0.2.15.bazel"),
+        strip_prefix = "libm-0.2.8",
+        build_file = Label("//cargo/remote:BUILD.libm-0.2.8.bazel"),
     )
 
     maybe(
