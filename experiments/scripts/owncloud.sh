@@ -78,8 +78,7 @@ mariadb -P3306 --host=$DB_IP -u k9db -ppassword \
 echo "Running against MariaDB+memcached..."
 cd "$K9DB_DIR/experiments/memcached"
 
-bazel build @memcached//:memcached --config=opt
-bazel run @memcached//:memcached --config=opt -- $MEMCACHED_USER -m 1024 -M > "$LOG_OUT/memcached-server.log" 2>&1 &
+memcached $MEMCACHED_USER -m 1024 -M > "$LOG_OUT/memcached-server.log" 2>&1 &
 pid=$!
 sleep 30
 

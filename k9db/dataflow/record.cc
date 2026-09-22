@@ -261,6 +261,10 @@ Record Record::Update(const UpdateMap &updates) const {
           };
       sqlast::Value value = evaluate(it->second);
       CHECK(value.TypeCompatible(this->schema_.TypeOf(i)));
+      if (!value.IsNull() && this->schema_.TypeOf(i) ==
+                                  sqlast::ColumnDefinition::Type::DATETIME) {
+        value.CanonicalizeDatetime();
+      }
       updated.SetValue(value, i);
     }
   }

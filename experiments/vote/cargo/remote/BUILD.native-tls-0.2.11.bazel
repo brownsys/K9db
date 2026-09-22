@@ -65,6 +65,7 @@ cargo_build_script(
     }) + selects.with_or({
         (
             "@rules_rust//rust/platform:x86_64-unknown-linux-gnu",
+            "@rules_rust//rust/platform:aarch64-unknown-linux-gnu",
         ): [
             "@raze__openssl_sys__0_9_77//:openssl_sys",
         ],
@@ -118,6 +119,7 @@ rust_library(
     }) + selects.with_or({
         (
             "@rules_rust//rust/platform:x86_64-unknown-linux-gnu",
+            "@rules_rust//rust/platform:aarch64-unknown-linux-gnu",
         ): [
             "@raze__log__0_4_17//:log",
             "@raze__openssl__0_10_42//:openssl",

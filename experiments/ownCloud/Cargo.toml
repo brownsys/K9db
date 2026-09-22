@@ -9,6 +9,11 @@ rand = "0.8.4"
 rand_distr = "0.4.3"
 clap = "2.34.0"
 memcached-rs = "0.4.2"
+# Transitive dep of rand_distr/num-traits. Pinned because 0.2.9+ adds an x86
+# FMA implementation (arch/x86/fma.rs) that uses core::arch::asm and
+# cfg(target_has_atomic) without gating them behind any #![feature(...)]
+# opt-in, which this repo's pinned nightly-2023-12-06 toolchain rejects.
+libm = "=0.2.8"
 
 [[bin]]
 name = "benchmark"
@@ -19,6 +24,7 @@ workspace_path = "//cargo"
 genmode = "Remote"
 # The set of targets to generate BUILD rules for.
 targets = [
+    "aarch64-unknown-linux-gnu",
     "x86_64-apple-darwin",
     "x86_64-pc-windows-msvc",
     "x86_64-unknown-linux-gnu",

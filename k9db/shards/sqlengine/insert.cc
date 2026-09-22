@@ -283,6 +283,28 @@ absl::Status InsertContext::AutoIncrementAndDefault() {
   return absl::OkStatus();
 }
 
+absl::Status InsertContext::CanonicalizeDatetimes() {
+  // Rebuild the statement's values in schema order, canonicalizing any
+  // DATETIME columns. Both the dataflow record (CreateRecord) and the
+  // physical row encoding (RocksdbRecord::FromInsert) read values off of
+  // this same statement afterwards, so normalizing it once here covers both.
+  std::vector<sqlast::Value> values;
+  values.reserve(this->schema_.size());
+  for (size_t i = 0; i < this->schema_.size(); i++) {
+    sqlast::Value value = this->stmt_->GetValue(this->schema_.NameOf(i), i);
+    if (!value.IsNull() &&
+        this->schema_.TypeOf(i) == sqlast::ColumnDefinition::Type::DATETIME) {
+      value.CanonicalizeDatetime();
+    }
+    values.push_back(std::move(value));
+  }
+
+  sqlast::Insert stmt{this->table_name_};
+  stmt.SetValues(std::move(values));
+  this->stmt_ = RefOrOwned<sqlast::Insert>::FromOwned(std::move(stmt));
+  return absl::OkStatus();
+}
+
 /*
  * Main entry point for insert: Executes the statement against the shards.
  */
@@ -293,6 +315,10 @@ absl::StatusOr<sql::SqlResult> InsertContext::Exec() {
 
   // Apply any auto_increment and default values.
   CHECK_STATUS(this->AutoIncrementAndDefault());
+
+  // Normalize any DATETIME values before they're read by CreateRecord and
+  // InsertIntoBaseTable below.
+  CHECK_STATUS(this->CanonicalizeDatetimes());
 
   // Begin the transaction.
   this->db_->BeginTransaction(true);

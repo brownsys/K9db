@@ -79,8 +79,8 @@ or use our [provided Docker container](https://github.com/brownsys/K9db/wiki/Req
 You can then use bazel to [build and run K9db](https://github.com/brownsys/K9db/wiki/Building,-Testing,-and-Running).
 
 K9db also builds and runs on Apple Silicon Macs (M series) using Docker, as a
-native arm64 Linux container: the release image is multi-arch, and a
-lightweight arm64 development image is provided (see the section below).
+native arm64 Linux container: both the release image and the development
+image build natively on arm64 (see the section below).
 Native (non-Docker) macOS builds are not supported.
 
 ### Using Docker
@@ -126,21 +126,43 @@ docker exec -it k9db-dev /bin/bash
 cd /home/k9db && bazel build ... && bazel test ...
 ```
 
-`Dockerfile.dev` is x86_64-only.
+The image builds natively on both x86_64 and arm64 (e.g. Apple Silicon Macs)
+hosts; the commands above are identical on both. The only
+architecture-dependent step is the bazel install, which `Dockerfile.dev`
+selects via `TARGETARCH`.
 
-On arm64 machines (e.g. Apple Silicon Macs), use `Dockerfile.dev.arm64` instead:
-a lightweight development image that can build K9db from source,
-run the tests, and re-vendor the rust dependencies,
-but does not include the experiments pipeline (mariadb baselines, memcached,
-and plotting):
+#### Docker Compose helpers
+
+The commands above are all you need. For convenience, we also provide two
+`docker compose` files that wrap them; they are helpers only, and everything
+they do can be done with `docker build` and `docker run` directly.
+
+`compose.yaml` runs the published release image:
 
 ```bash
-docker build -f Dockerfile.dev.arm64 -t k9db/dev-arm64 .
-docker run --mount type=bind,source=$(pwd),target=/home/k9db --name k9db-dev -d -it -p 10001:10001 k9db/dev-arm64
-docker exec -it k9db-dev /bin/bash
+docker compose up -d          # start K9db, published on port 10001
+docker compose down           # stop it (add -v to also delete the database)
+```
+
+If you already use docker compose in your own project, you can copy its
+`k9db` service into your own `compose.yaml` to run K9db alongside your
+application.
+
+`compose.dev.yaml` builds and runs the development image, with the repo
+bind-mounted into the container:
+
+```bash
+docker compose -f compose.dev.yaml up -d --build
+docker compose -f compose.dev.yaml exec k9db-dev /bin/bash
 # Inside the container:
 cd /home/k9db && bazel build ... && bazel test ...
 ```
+
+Note that compose namespaces the resources it creates, so the container and
+volume names differ from the `docker run` commands above (e.g. the release
+database volume is `k9db_k9db-data` rather than `k9db-data`). Pick one of the
+two approaches and stick to it, or you will end up with two separate
+databases.
 
 #### Re-vendoring rust dependencies (devs)
 

@@ -47,26 +47,6 @@ echo "* soft nproc 10240" | sudo tee -a /etc/security/limits.d/90-nproc.conf
 echo "* hard nproc 10240" | sudo tee -a /etc/security/limits.d/90-nproc.conf
 echo "root soft nproc unlimited" | sudo tee -a /etc/security/limits.d/90-nproc.conf
 
-# Install mariadb C++ connector.
-echo "Installing MariaDB c++ connector..."
-cd /tmp
-sudo apt-get install -y libmariadb3 libmariadb-dev
-sudo wget https://dlm.mariadb.com/1601342/Connectors/cpp/connector-cpp-1.0.0/mariadb-connector-cpp-1.0.0-ubuntu-groovy-amd64.tar.gz
-sudo tar -xvzf mariadb-connector-cpp-1.0.0-*.tar.gz
-sudo rm mariadb-connector-cpp-1.0.0-*.tar.gz
-cd mariadb-connector-cpp-1.0.0-*
-sudo install -d /usr/include/mariadb/conncpp
-sudo install -d /usr/include/mariadb/conncpp/compat
-sudo install -v include/mariadb/*.hpp /usr/include/mariadb/
-sudo install -v include/mariadb/conncpp/*.hpp /usr/include/mariadb/conncpp
-sudo install -v include/mariadb/conncpp/compat/* /usr/include/mariadb/conncpp/compat
-sudo install -d /usr/lib/mariadb
-sudo install -d /usr/lib/mariadb/plugin
-sudo install -v lib64/mariadb/libmariadbcpp.so /usr/lib
-sudo install -v lib64/mariadb/plugin/* /usr/lib/mariadb/plugin
-cd /tmp
-sudo rm -rf mariadb*
-
 # Configure MariaDB to use SSD.
 echo "Configuring MariaDB SSD..."
 cd $K9DB_DIR
