@@ -1,0 +1,23 @@
+# Helper for launching the development container. This is exactly equivalent
+# to the docker build/run commands in the README, with the repo bind-mounted
+# into the container:
+#   docker compose -f compose.dev.yaml up -d --build
+#   docker compose -f compose.dev.yaml exec k9db-dev /bin/bash
+services:
+  k9db-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: k9db/dev
+    container_name: k9db-dev
+    # Dockerfile.dev starts mariadb and then an interactive shell; without a
+    # tty that shell sees EOF and exits immediately.
+    tty: true
+    # The repo is bind-mounted rather than copied, so edits on the host are
+    # visible inside the container and vice-versa.
+    volumes:
+      - .:/home/k9db
+    # 10001 is K9db, 3306 is the mariadb used by the experiment baselines.
+    ports:
+      - "10001:10001"
+      - "3306:3306"

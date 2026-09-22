@@ -46,14 +46,6 @@ Pre-built K9db images are published on [Docker Hub](https://hub.docker.com/r/kin
 The same image works on Ubuntu/x86_64 and macOS/Apple Silicon (arm64) hosts:
 Docker automatically pulls the variant matching your host architecture.
 
-Automatically run using `docker compose`:
-```bash
-git clone https://github.com/brownsys/K9db
-cd K9db
-docker compose up
-```
-
-Or manually run using `docker run`:
 ```bash
 docker pull kinanbab/k9db:latest
 docker run -d --name k9db -p 10001:10001 -v k9db-data:/var/lib/k9db kinanbab/k9db:latest
@@ -138,6 +130,39 @@ The image builds natively on both x86_64 and arm64 (e.g. Apple Silicon Macs)
 hosts; the commands above are identical on both. The only
 architecture-dependent step is the bazel install, which `Dockerfile.dev`
 selects via `TARGETARCH`.
+
+#### Docker Compose helpers
+
+The commands above are all you need. For convenience, we also provide two
+`docker compose` files that wrap them; they are helpers only, and everything
+they do can be done with `docker build` and `docker run` directly.
+
+`compose.yaml` runs the published release image:
+
+```bash
+docker compose up -d          # start K9db, published on port 10001
+docker compose down           # stop it (add -v to also delete the database)
+```
+
+If you already use docker compose in your own project, you can copy its
+`k9db` service into your own `compose.yaml` to run K9db alongside your
+application.
+
+`compose.dev.yaml` builds and runs the development image, with the repo
+bind-mounted into the container:
+
+```bash
+docker compose -f compose.dev.yaml up -d --build
+docker compose -f compose.dev.yaml exec k9db-dev /bin/bash
+# Inside the container:
+cd /home/k9db && bazel build ... && bazel test ...
+```
+
+Note that compose namespaces the resources it creates, so the container and
+volume names differ from the `docker run` commands above (e.g. the release
+database volume is `k9db_k9db-data` rather than `k9db-data`). Pick one of the
+two approaches and stick to it, or you will end up with two separate
+databases.
 
 #### Re-vendoring rust dependencies (devs)
 
