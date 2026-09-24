@@ -8,6 +8,10 @@
 #
 # Build with:
 #   docker build -f Dockerfile.release -t k9db .
+# By default, rocksdb is built with -march=native: the image only runs on CPUs
+# with the build machine's extensions (e.g. AVX-512). Images meant to run
+# elsewhere (e.g. pushed to docker hub) must be built with:
+#   docker build -f Dockerfile.release --build-arg PORTABLE=true -t k9db .
 # Run with:
 #   docker run -d --name k9db -p 10001:10001 -v k9db-data:/var/lib/k9db k9db
 # Connect with any mysql client:
@@ -65,8 +69,14 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
 COPY . /src/k9db
 WORKDIR /src/k9db
 
-# Build the k9db proxy (optimized).
-RUN bazel build --config opt //:k9db
+# Build the k9db proxy (optimized), portable if PORTABLE=true.
+ARG PORTABLE=false
+RUN case "$PORTABLE" in \
+        true) FLAGS=--portable ;; \
+        false) FLAGS= ;; \
+        *) echo "PORTABLE must be true or false, got: $PORTABLE" >&2; exit 1 ;; \
+    esac \
+    && bazel build --config opt $FLAGS //:k9db
 
 # Stage the runtime files: the proxy binary and its runfiles (the calcite
 # planner jar and JNI library are loaded from paths relative to the working

@@ -1,0 +1,178 @@
+name: "Publish release Docker image"
+
+# Manually triggered (Actions tab -> "Publish release Docker image" -> Run
+# workflow), which asks for the tag to publish (default: latest). Builds
+# Dockerfile.release with PORTABLE=true natively on amd64 and arm64, tests each
+# image, pushes it as kinanbab/k9db:<tag>-<arch>, and then points the
+# multi-arch kinanbab/k9db:<tag> at exactly those two images.
+#
+# Needs the repository secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (a Docker
+# Hub access token with read/write access to kinanbab/k9db).
+#
+# If one architecture fails, the other's <tag>-<arch> may already have been
+# pushed, but <tag> is left untouched.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Docker Hub tag to publish, e.g. latest or 1.2.0"
+        required: true
+        default: latest
+        type: string
+
+permissions:
+  contents: read
+
+# Never run two publishes at once: they would race on the same tags.
+concurrency:
+  group: publish-image
+  cancel-in-progress: false
+
+env:
+  IMAGE: kinanbab/k9db
+  # Passed through the environment, never pasted into scripts with ${{ }}.
+  RELEASE_TAG: ${{ inputs.tag }}
+
+jobs:
+  # A bad tag should fail before an hour of building, not at the push.
+  check-tag:
+    name: Check the tag
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Check the tag
+      run: |
+        # Docker's tag syntax, minus 7 characters for the -<arch> suffix.
+        if ! [[ "$RELEASE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,120}$ ]]; then
+          echo "::error::Invalid tag: '$RELEASE_TAG'. Use letters, digits, _ . - (e.g. latest or 1.2.0)."
+          exit 1
+        fi
+        echo "Publishing $IMAGE:$RELEASE_TAG"
+
+  build:
+    name: Build, test and push (${{ matrix.arch }})
+    strategy:
+      matrix:
+        include:
+          # Each architecture builds natively on its own runner: building
+          # under QEMU emulation would take hours.
+          - arch: amd64
+            runner: ubuntu-24.04
+            # What rocksdb must be compiled for. On x86, --portable replaces
+            # -march=native; on arm64, rocksdb always uses this baseline.
+            march: -march=x86-64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            march: -march=armv8-a+crc+crypto
+    needs: check-tag
+    runs-on: ${{ matrix.runner }}
+    env:
+      ARCH: ${{ matrix.arch }}
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set the image tag
+      run: echo "TAG=$IMAGE:$RELEASE_TAG-$ARCH" >> "$GITHUB_ENV"
+
+    # The arm64 runner image may not ship a mysql client.
+    - name: Install mysql client
+      run: |
+        if ! command -v mysql > /dev/null; then
+          sudo apt-get update && sudo apt-get install -y mysql-client
+        fi
+
+    - name: Build portable release image
+      run: docker build -f Dockerfile.release --build-arg PORTABLE=true -t "$TAG" .
+
+    # Images built with -march=native crash with SIGILL on CPUs lacking the
+    # build machine's extensions (e.g. AVX-512). Check the compiler flags
+    # embedded in librocksdb, and that it has no AVX-512 code.
+    - name: Check the image is portable
+      run: |
+        id=$(docker create "$TAG")
+        docker cp "$id":/opt/k9db/lib/librocksdb.so.7 librocksdb.so
+        docker rm "$id"
+        march=$(strings librocksdb.so | grep -o -E -- '-march=[^ ]+' | sort -u)
+        echo "librocksdb compiled with: $march"
+        if [ "$march" != "${{ matrix.march }}" ]; then
+          echo "::error::librocksdb must be compiled with only ${{ matrix.march }}, got: $march"
+          exit 1
+        fi
+        zmm=$(objdump -d --no-show-raw-insn librocksdb.so | grep -c zmm || true)
+        if [ "$zmm" != 0 ]; then
+          echo "::error::librocksdb contains $zmm AVX-512 instructions."
+          exit 1
+        fi
+
+    - name: Run k9db container
+      run: |
+        docker run -d --name k9db -p 10001:10001 "$TAG"
+        ./tests/release/wait-for-k9db.sh k9db
+
+    - name: Create schema and insert data
+      run: |
+        mysql --host=127.0.0.1 --port=10001 < tests/release/01-schema.sql | tee out.txt
+        test ! -s out.txt  # DDL and inserts produce no output.
+
+    - name: Check point lookups
+      run: |
+        mysql --host=127.0.0.1 --port=10001 < tests/release/02-selects.sql | tee out.txt
+        diff tests/release/02-selects.expected out.txt
+
+    - name: Check view (calcite planner / dataflow)
+      run: |
+        mysql --host=127.0.0.1 --port=10001 < tests/release/03-view.sql | tail -n +2 | tee out.txt
+        diff tests/release/03-view.expected out.txt
+
+    - name: Dump k9db logs on failure
+      if: failure()
+      run: docker logs k9db || true
+
+    - uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    # Record the pushed digest, so <tag> points at exactly this image even if
+    # <tag>-<arch> is pushed again in the meantime.
+    - name: Push
+      run: |
+        docker push "$TAG"
+        digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$TAG")
+        echo "Pushed $digest"
+        echo "$digest" > digest-${{ matrix.arch }}.txt
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: digest-${{ matrix.arch }}
+        path: digest-${{ matrix.arch }}.txt
+        retention-days: 1
+
+  merge:
+    name: Point the tag at both images
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: digest-*
+        merge-multiple: true
+
+    - uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Create multi-arch tag
+      run: |
+        docker buildx imagetools create -t "$IMAGE:$RELEASE_TAG" \
+          "$(cat digest-amd64.txt)" "$(cat digest-arm64.txt)"
+        docker buildx imagetools inspect "$IMAGE:$RELEASE_TAG"
+
+    - name: Summary
+      run: |
+        digest=$(docker buildx imagetools inspect "$IMAGE:$RELEASE_TAG" --format '{{json .Manifest.Digest}}' | tr -d '"')
+        {
+          echo "Published \`$IMAGE:$RELEASE_TAG\` (\`$IMAGE@$digest\`) from:"
+          echo "- amd64: \`$(cat digest-amd64.txt)\`"
+          echo "- arm64: \`$(cat digest-arm64.txt)\`"
+        } >> "$GITHUB_STEP_SUMMARY"

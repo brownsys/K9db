@@ -111,6 +111,12 @@ across containers (e.g. when upgrading the image). Arguments passed after the
 image name replace the default flags
 (`--hostname=0.0.0.0:10001 --db_path=/var/lib/k9db/`).
 
+By default, the image is optimized for the CPU of the machine that builds it
+(RocksDB is compiled with `-march=native`), and may crash on machines without
+the same CPU extensions. When building an image to run elsewhere, e.g. to push
+to Docker Hub, pass `--build-arg PORTABLE=true` to `docker build`, which
+passes `--portable` to bazel. `Dockerfile.dev` accepts the same argument.
+
 #### Developing K9db (dev image)
 
 `Dockerfile.dev` contains everything needed to build K9db from source, run the

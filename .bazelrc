@@ -5,6 +5,10 @@ try-import /home/docker.bazelrc
 # Alias to simplify disabling / enabling encryption
 build --flag_alias=encryption=//k9db/sql/rocksdb:configure_encryption
 
+# Alias for building a portable (not -march=native) rocksdb, see
+# //k9db/sql/rocksdb:configure_portable. Off by default.
+build --flag_alias=portable=//k9db/sql/rocksdb:configure_portable
+
 build --platform_suffix=normal
 build --cxxopt="-std=c++2a"
 build --host_cxxopt="-std=c++2a"

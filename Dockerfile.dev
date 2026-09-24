@@ -90,12 +90,20 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 # The k9db repo is bind-mounted here during docker run (do not copy).
 RUN mkdir /home/k9db
 
-# Generate docker.bazelrc (imported by the repo's .bazelrc).
+# Generate docker.bazelrc (imported by the repo's .bazelrc). With
+# --build-arg PORTABLE=true, every bazel build in the container passes
+# --portable (rocksdb without -march=native, see .bazelrc).
+ARG PORTABLE=false
 RUN printf '%s\n' \
     "test:asan --test_env LSAN_OPTIONS=suppressions=/home/k9db/.lsan_jvm_suppress.txt" \
     "test:tsan --test_env LSAN_OPTIONS=suppressions=/home/k9db/.lsan_jvm_suppress.txt" \
     "test:tsan --test_env TSAN_OPTIONS=suppressions=/home/k9db/.tsan_jvm_suppress.txt" \
-    > /home/docker.bazelrc
+    > /home/docker.bazelrc \
+    && case "$PORTABLE" in \
+        true) echo "build --portable" >> /home/docker.bazelrc ;; \
+        false) ;; \
+        *) echo "PORTABLE must be true or false, got: $PORTABLE" >&2; exit 1 ;; \
+    esac
 
 EXPOSE 10001/tcp 3306/tcp
 

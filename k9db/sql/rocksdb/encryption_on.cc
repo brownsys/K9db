@@ -123,8 +123,17 @@ EncryptionManager::EncryptionManager()
       keys_(),
       mtx_(),
       metadata_(nullptr) {
-  // Initialize libsodium.
-  assert(sodium_init() >= 0);
+  // Initialize libsodium. Not inside an assert: -c opt defines NDEBUG, which
+  // would compile the call out entirely.
+  if (sodium_init() < 0) {
+    LOG(FATAL) << "libsodium failed to initialize";
+  }
+  // libsodium has no software fallback for AES-256-GCM: on a CPU without the
+  // needed instructions, its functions must not be called at all.
+  if (!crypto_aead_aes256gcm_is_available()) {
+    LOG(FATAL) << "AES-256-GCM needs hardware AES (AES-NI + PCLMUL on x86, "
+                  "ARMv8 crypto extensions on arm64)";
+  }
 
   // Generate random global key and nonce.
   crypto_aead_aes256gcm_keygen(this->global_key_.get());

@@ -322,7 +322,21 @@ cmake(
         "-DWITH_SNAPPY=1",
         "-DCMAKE_BUILD_TYPE=Release",
         "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
-    ],
+    ] + select({
+        # By default rocksdb builds with -march=native: fastest on the build
+        # machine, but the library (and any docker image shipping it) crashes
+        # with SIGILL on CPUs lacking its extensions, e.g. AVX-512. Pass
+        # --portable when building something to run elsewhere.
+        "@//k9db/sql/rocksdb:portable": ["-DPORTABLE=ON"],
+        "//conditions:default": [],
+    }) + select({
+        # PORTABLE alone also drops the hardware CRC32C checksum path. Every
+        # CPU that has the AES-NI + PCLMUL that encryption requires also has
+        # SSE4.2, so this costs no portability. x86 only: rocksdb passes
+        # -msse4.2 unconditionally, which breaks aarch64 builds.
+        "@//k9db/sql/rocksdb:portable_x86_64": ["-DFORCE_SSE42=ON"],
+        "//conditions:default": [],
+    }),
     build_args = [
         "--", # pass following args through to `make`
         "-j 8",
