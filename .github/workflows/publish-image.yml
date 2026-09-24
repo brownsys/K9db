@@ -9,8 +9,11 @@ name: "Publish release Docker image"
 # Needs the repository secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (a Docker
 # Hub access token with read/write access to kinanbab/k9db).
 #
+# With "Also tag as latest" checked (the default), latest, latest-amd64 and
+# latest-arm64 are also pointed at the same two images, without rebuilding.
+#
 # If one architecture fails, the other's <tag>-<arch> may already have been
-# pushed, but <tag> is left untouched.
+# pushed, but <tag> and latest are left untouched.
 on:
   workflow_dispatch:
     inputs:
@@ -19,6 +22,11 @@ on:
         required: true
         default: latest
         type: string
+      latest:
+        description: "Also tag as latest"
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -32,6 +40,7 @@ env:
   IMAGE: kinanbab/k9db
   # Passed through the environment, never pasted into scripts with ${{ }}.
   RELEASE_TAG: ${{ inputs.tag }}
+  ALSO_LATEST: ${{ inputs.latest }}
 
 jobs:
   # A bad tag should fail before an hour of building, not at the push.
@@ -168,6 +177,15 @@ jobs:
           "$(cat digest-amd64.txt)" "$(cat digest-arm64.txt)"
         docker buildx imagetools inspect "$IMAGE:$RELEASE_TAG"
 
+    # Copies tags on the registry only: latest is exactly the tested image.
+    - name: Also tag as latest
+      if: inputs.latest && inputs.tag != 'latest'
+      run: |
+        docker buildx imagetools create -t "$IMAGE:latest" \
+          "$(cat digest-amd64.txt)" "$(cat digest-arm64.txt)"
+        docker buildx imagetools create -t "$IMAGE:latest-amd64" "$(cat digest-amd64.txt)"
+        docker buildx imagetools create -t "$IMAGE:latest-arm64" "$(cat digest-arm64.txt)"
+
     - name: Summary
       run: |
         digest=$(docker buildx imagetools inspect "$IMAGE:$RELEASE_TAG" --format '{{json .Manifest.Digest}}' | tr -d '"')
@@ -175,4 +193,7 @@ jobs:
           echo "Published \`$IMAGE:$RELEASE_TAG\` (\`$IMAGE@$digest\`) from:"
           echo "- amd64: \`$(cat digest-amd64.txt)\`"
           echo "- arm64: \`$(cat digest-arm64.txt)\`"
+          if [ "$ALSO_LATEST" = true ] && [ "$RELEASE_TAG" != latest ]; then
+            echo "Also tagged as \`latest\`, \`latest-amd64\` and \`latest-arm64\`."
+          fi
         } >> "$GITHUB_STEP_SUMMARY"
